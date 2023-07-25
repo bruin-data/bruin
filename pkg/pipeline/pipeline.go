@@ -104,6 +104,11 @@ var assetTypeConnectionMapping = map[AssetType][]string{
 	AssetType("sf.sql"): {"snowflake", "sf"},
 }
 
+type SecretMapping struct {
+	SecretKey   string
+	InjectedKey string
+}
+
 type Asset struct {
 	Name            string
 	Description     string
@@ -112,6 +117,7 @@ type Asset struct {
 	DefinitionFile  TaskDefinitionFile
 	Parameters      map[string]string
 	Connection      string
+	Secrets         []SecretMapping
 	DependsOn       []string
 	Schedule        TaskSchedule
 	Materialization Materialization

@@ -51,6 +51,7 @@ type Connections struct {
 
 type Environment struct {
 	Connections Connections `yaml:"connections"`
+	Secrets     map[string]string
 }
 
 type Config struct {

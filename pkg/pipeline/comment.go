@@ -145,7 +145,9 @@ func commentRowsToTask(commentRows []string) *Asset {
 		DependsOn:  []string{},
 		Schedule:   TaskSchedule{},
 		Columns:    map[string]Column{},
+		Secrets:    make([]SecretMapping, 0),
 	}
+
 	for _, row := range commentRows {
 		key, value, found := strings.Cut(row, ":")
 		if !found {
@@ -176,6 +178,24 @@ func commentRowsToTask(commentRows []string) *Asset {
 			values := strings.Split(value, ",")
 			for _, v := range values {
 				task.DependsOn = append(task.DependsOn, strings.TrimSpace(v))
+			}
+
+			continue
+		case "secrets":
+			values := strings.Split(value, ",")
+			for _, v := range values {
+				secretKey := strings.TrimSpace(v)
+				pieces := strings.Split(secretKey, ":")
+				injectedKey := secretKey
+				if len(pieces) > 1 {
+					secretKey = strings.TrimSpace(pieces[0])
+					injectedKey = strings.TrimSpace(pieces[1])
+				}
+
+				task.Secrets = append(task.Secrets, SecretMapping{
+					SecretKey:   secretKey,
+					InjectedKey: injectedKey,
+				})
 			}
 
 			continue

@@ -34,6 +34,10 @@ func TestLoadFromFile(t *testing.T) {
 				},
 			},
 		},
+		Secrets: map[string]string{
+			"key1": "value1",
+			"key2": "value2",
+		},
 	}
 
 	type args struct {
@@ -111,6 +115,7 @@ func TestLoadOrCreate(t *testing.T) {
 			},
 			Snowflake: []SnowflakeConnection{},
 		},
+		Secrets: map[string]string{},
 	}
 	existingConfig := &Config{
 		path:                    configPath,

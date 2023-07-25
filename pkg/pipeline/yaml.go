@@ -102,6 +102,11 @@ type column struct {
 	Tests       []columnCheck `yaml:"checks"`
 }
 
+type secretMapping struct {
+	SecretKey   string
+	InjectedKey string
+}
+
 type taskDefinition struct {
 	Name            string            `yaml:"name"`
 	Description     string            `yaml:"description"`
@@ -110,6 +115,7 @@ type taskDefinition struct {
 	Depends         depends           `yaml:"depends"`
 	Parameters      map[string]string `yaml:"parameters"`
 	Connections     map[string]string `yaml:"connections"`
+	Secrets         []secretMapping   `yaml:"secrets"`
 	Connection      string            `yaml:"connection"`
 	Schedule        taskSchedule      `yaml:"schedule"`
 	Materialization materialization   `yaml:"materialization"`
@@ -200,11 +206,16 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Type:            AssetType(definition.Type),
 		Parameters:      definition.Parameters,
 		Connection:      definition.Connection,
+		Secrets:         make([]SecretMapping, len(definition.Secrets)),
 		DependsOn:       definition.Depends,
 		ExecutableFile:  ExecutableFile{},
 		Schedule:        TaskSchedule{Days: definition.Schedule.Days},
 		Materialization: mat,
 		Columns:         columns,
+	}
+
+	for _, m := range definition.Secrets {
+		task.Secrets = append(task.Secrets, SecretMapping(m))
 	}
 
 	return &task, nil

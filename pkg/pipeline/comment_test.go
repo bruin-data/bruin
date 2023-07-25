@@ -68,6 +68,7 @@ func Test_createTaskFromFile(t *testing.T) {
 					"s3_file_path": "s3://bucket/path",
 				},
 				Connection: "conn2",
+				Secrets:    []pipeline.SecretMapping{},
 				DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
 				Materialization: pipeline.Materialization{
 					Type:           pipeline.MaterializationTypeTable,
@@ -99,6 +100,7 @@ func Test_createTaskFromFile(t *testing.T) {
 					"s3_file_path": "s3://bucket/path",
 				},
 				Connection: "conn1",
+				Secrets:    []pipeline.SecretMapping{},
 				DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
 				Materialization: pipeline.Materialization{
 					Type:           pipeline.MaterializationTypeTable,
@@ -130,6 +132,7 @@ func Test_createTaskFromFile(t *testing.T) {
 					"param3": "third-parameter",
 				},
 				Connection: "conn1",
+				Secrets:    []pipeline.SecretMapping{},
 				DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
 				Schedule:   pipeline.TaskSchedule{Days: []string{"SUNDAY", "MONDAY", "TUESDAY"}},
 				Columns:    map[string]pipeline.Column{},

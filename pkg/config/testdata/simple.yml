@@ -19,6 +19,11 @@ environments:
           role: "role"
           region: "region"
 
+    secrets:
+      key1: value1
+      key2: value2
+
+
   prod:
     connections:
       google_cloud_platform:

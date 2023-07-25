@@ -45,6 +45,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			"param2": "value2",
 		},
 		Connection: "conn1",
+		Secrets:    []pipeline.SecretMapping{},
 		DependsOn:  []string{"gcs-to-bq"},
 		Columns:    map[string]pipeline.Column{},
 	}
@@ -63,6 +64,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			Type: pipeline.YamlTask,
 		},
 		Columns: map[string]pipeline.Column{},
+		Secrets: []pipeline.SecretMapping{},
 	}
 
 	asset3 := &pipeline.Asset{
@@ -85,6 +87,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			"param3": "third-parameter",
 		},
 		Connection: "first-connection",
+		Secrets:    []pipeline.SecretMapping{},
 		DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
 		Columns:    map[string]pipeline.Column{},
 	}
@@ -110,6 +113,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			"param2": "second-parameter",
 		},
 		Connection: "conn2",
+		Secrets:    []pipeline.SecretMapping{},
 		DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
 		Columns:    map[string]pipeline.Column{},
 	}
