@@ -1,0 +1,27 @@
+default_environment: dev
+environments:
+  dev:
+    connections:
+      google_cloud_platform:
+        - name: conn1
+          service_account_json: "{\"key1\": \"value1\"}"
+          service_account_file: "/path/to/service_account.json"
+          project_id: "my-project"
+
+      snowflake:
+        - name: conn2
+          username: "user"
+          password: "pass"
+          account: "account"
+          database: "db"
+          warehouse: "wh"
+          schema: "schema"
+          role: "role"
+          region: "region"
+
+  prod:
+    connections:
+      google_cloud_platform:
+        - name: conn1
+          service_account_file: "/path/to/service_account.json"
+          project_id: "my-project"

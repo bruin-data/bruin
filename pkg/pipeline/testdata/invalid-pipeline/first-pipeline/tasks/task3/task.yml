@@ -1,0 +1,4 @@
+name: second-task
+description: This is a hello world task
+type: bash
+run: hello.sh

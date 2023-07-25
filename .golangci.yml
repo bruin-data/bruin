@@ -1,0 +1,58 @@
+linters:
+  disable:
+    - scopelint
+    - goerr113
+    - wrapcheck
+    - funlen
+    - maligned
+    - golint
+    - interfacer
+    - gomnd
+    - gochecknoglobals
+    - exhaustivestruct
+    - lll
+    - wsl
+    - thelper
+    - testpackage
+    - typecheck
+    - nlreturn
+    - nilnil
+    - varnamelen
+    - forcetypeassert
+    - exhaustruct
+    - gocognit
+    - tagliatelle
+    - ifshort
+    - forbidigo
+    - musttag
+    - interfacebloat
+    - cyclop
+  presets:
+    - bugs
+    - comment
+    - complexity
+    - error
+    - import
+    - metalinter
+    - module
+    - performance
+    - sql
+    - style
+    - test
+    - unused
+linters-settings:
+  revive:
+    rules:
+      - name: unexported-return
+        disabled: true
+  maintidx:
+    under: 10
+
+  ireturn:
+    allow:
+      - anon
+      - error
+      - empty
+      - stdlib
+      - (or|er)$
+      - bigquery.DB

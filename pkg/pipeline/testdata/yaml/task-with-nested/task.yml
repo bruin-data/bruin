@@ -1,0 +1,10 @@
+name: hello-world
+description: This is a hello world task
+type: bash
+run: some/dir/another/../hello.sh
+depends:
+  - gcs-to-bq
+parameters:
+  param1: value1
+  param2: value2
+connection: conn1

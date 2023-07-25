@@ -1,0 +1,39 @@
+name: hello-world
+description: This is a hello world task
+type: bq.sql
+run: hello.sql
+depends:
+  - gcs-to-bq
+parameters:
+  param1: value1
+  param2: value2
+connection: conn1
+materialization:
+  type: "table"
+  strategy: "create+replace"
+  partition_by: dt
+  incremental_key: dt
+  cluster_by:
+    - key1
+    - key2
+
+columns:
+  col1:
+    description: "column one"
+    checks:
+      - name: unique
+      - name: not_null
+      - name: accepted_values
+        value: ['a', 'b', 'c']
+      - name: min
+        value: 3
+      - name: pi
+        value: 3.14
+      - name: intarrays
+        value:
+          - 1
+          - 2
+          - 3
+  col2:
+    description: "column two"
+

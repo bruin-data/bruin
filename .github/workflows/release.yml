@@ -1,0 +1,22 @@
+name: release
+
+on:
+  release:
+    types:
+      - created
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
+
+      - run: make build
+      - name: Upload
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./bin/bruin
+          tag_name: ${{ github.event.release.tag_name }}

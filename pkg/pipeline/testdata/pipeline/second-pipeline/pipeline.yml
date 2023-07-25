@@ -1,0 +1,13 @@
+name: first-pipeline
+schedule: ""
+default_args:
+    owner: "some.user"
+    depends_on_past: false
+    start_date: "2021-01-01"
+    email: ["user@example.com"]
+    email_on_failure: false
+    email_on_retry: false
+    retries: 1
+default_connections:
+    slack: "slack-connection"
+    gcpConnectionId: "gcp-connection-id-here"

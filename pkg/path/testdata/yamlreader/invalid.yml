@@ -1,0 +1,15 @@
+name: "jane"
+surname: "doe"
+age: 25
+height: 1.65
+   skills:
+  - "java"
+  - "python"
+  - "go"
+family:
+  parents:
+ parent1: "mama"
+    parent2: "papa"
+        siblings:
+    - "sister"
+    - "brother"

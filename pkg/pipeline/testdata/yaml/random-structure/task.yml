@@ -1,0 +1,16 @@
+name: hello-world
+type: type1
+depends: task1
+
+appsflyer:
+  apps:
+  - app1
+  - app2
+  report_type: daily_report
+  refresh_days: 1
+  reattribution: False
+output:
+  bigquery:
+    project: proj1
+    dataset: dataset1
+    table: table1

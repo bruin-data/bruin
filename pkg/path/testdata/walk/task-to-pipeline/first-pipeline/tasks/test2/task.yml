@@ -1,0 +1,6 @@
+name: gcs-to-bq-2
+type: bq.transfer
+parameters:
+  transfer_config_id: "some-uuid"
+  project_id: "a-new-project-id"
+  location: "europe-west1"
