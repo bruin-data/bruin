@@ -14,8 +14,6 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
-type Manager struct{}
-
 type GoogleCloudPlatformConnection struct {
 	Name               string `yaml:"name"`
 	ServiceAccountJSON string `yaml:"service_account_json"`
@@ -54,6 +52,10 @@ type Environment struct {
 	Secrets     map[string]string
 }
 
+func (e *Environment) GetSecretByKey(key string) string {
+	return e.Secrets[key]
+}
+
 type Config struct {
 	fs   afero.Fs
 	path string
@@ -62,6 +64,10 @@ type Config struct {
 	SelectedEnvironmentName string                 `yaml:"-"`
 	SelectedEnvironment     *Environment           `yaml:"-"`
 	Environments            map[string]Environment `yaml:"environments"`
+}
+
+func (c *Config) GetSecretByKey(key string) string {
+	return c.SelectedEnvironment.GetSecretByKey(key)
 }
 
 func (c *Config) Persist() error {

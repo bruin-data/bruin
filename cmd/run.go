@@ -175,7 +175,7 @@ func Run(isDebug *bool) *cli.Command {
 				s.MarkTask(task, scheduler.Pending, runDownstreamTasks)
 			}
 
-			mainExecutors, err := setupExecutors(s, connectionManager, startDate, endDate)
+			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate)
 			if err != nil {
 				errorPrinter.Printf(err.Error())
 				return cli.Exit("", 1)
@@ -217,10 +217,10 @@ func Run(isDebug *bool) *cli.Command {
 	}
 }
 
-func setupExecutors(s *scheduler.Scheduler, conn *connection.Manager, startDate, endDate time.Time) (map[pipeline.AssetType]executor.Config, error) {
+func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connection.Manager, startDate, endDate time.Time) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
 	if s.WillRunTaskOfType(executor.TaskTypePython) {
-		mainExecutors[executor.TaskTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(map[string]string{})
+		mainExecutors[executor.TaskTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, map[string]string{})
 	}
 
 	if s.WillRunTaskOfType(executor.TaskTypeBigqueryQuery) {

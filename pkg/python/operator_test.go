@@ -42,6 +42,15 @@ func (m *mockRunner) Run(ctx context.Context, ec *executionContext) error {
 	return args.Error(0)
 }
 
+type mockSecretFinder struct {
+	mock.Mock
+}
+
+func (m *mockSecretFinder) GetSecretByKey(key string) string {
+	args := m.Called(key)
+	return args.String(0)
+}
+
 func TestLocalOperator_RunTask(t *testing.T) {
 	t.Parallel()
 
@@ -51,14 +60,31 @@ func TestLocalOperator_RunTask(t *testing.T) {
 		},
 	}
 
+	assetWithSecrets := &pipeline.Asset{
+		ExecutableFile: pipeline.ExecutableFile{
+			Path: "/path/to/file.py",
+		},
+		Secrets: []pipeline.SecretMapping{
+			{
+				SecretKey:   "key1",
+				InjectedKey: "key1_injected",
+			},
+			{
+				SecretKey:   "key2",
+				InjectedKey: "key2",
+			},
+		},
+	}
 	tests := []struct {
 		name    string
-		setup   func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner)
+		task    *pipeline.Asset
+		setup   func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder)
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
 			name: "should return an error if the repo finder fails",
-			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner) {
+			task: task,
+			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
 				rf.On("Repo", "/path/to/file.py").
 					Return(&git.Repo{}, assert.AnError)
 			},
@@ -66,7 +92,8 @@ func TestLocalOperator_RunTask(t *testing.T) {
 		},
 		{
 			name: "should return an error if the module path finder fails",
-			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner) {
+			task: task,
+			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
 				repo := &git.Repo{Path: "/path/to/repo"}
 				rf.On("Repo", "/path/to/file.py").
 					Return(repo, nil)
@@ -78,7 +105,8 @@ func TestLocalOperator_RunTask(t *testing.T) {
 		},
 		{
 			name: "should fail if requirement finding fails",
-			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner) {
+			task: task,
+			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
 				repo := &git.Repo{Path: "/path/to/repo"}
 				rf.On("Repo", "/path/to/file.py").
 					Return(repo, nil)
@@ -93,7 +121,8 @@ func TestLocalOperator_RunTask(t *testing.T) {
 		},
 		{
 			name: "should call runner if there is no requirements.txt file",
-			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner) {
+			task: task,
+			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
 				repo := &git.Repo{Path: "/path/to/repo"}
 				rf.On("Repo", "/path/to/file.py").
 					Return(repo, nil)
@@ -109,6 +138,38 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					module:          "path.to.module",
 					requirementsTxt: "",
 					task:            task,
+					envVariables:    map[string]string{},
+				}).
+					Return(assert.AnError)
+			},
+			wantErr: assert.Error,
+		},
+		{
+			name: "should call runner with the secrets properly injected",
+			task: assetWithSecrets,
+			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
+				repo := &git.Repo{Path: "/path/to/repo"}
+				rf.On("Repo", "/path/to/file.py").
+					Return(repo, nil)
+
+				mf.On("FindModulePath", repo, mock.Anything).
+					Return("path.to.module", nil)
+
+				mf.On("FindRequirementsTxt", repo, mock.Anything).
+					Return("", &NoRequirementsFoundError{})
+
+				msf.On("GetSecretByKey", "key1").Return("value1")
+				msf.On("GetSecretByKey", "key2").Return("value2")
+
+				runner.On("Run", mock.Anything, &executionContext{
+					repo:            repo,
+					module:          "path.to.module",
+					requirementsTxt: "",
+					task:            assetWithSecrets,
+					envVariables: map[string]string{
+						"key1_injected": "value1",
+						"key2":          "value2",
+					},
 				}).
 					Return(assert.AnError)
 			},
@@ -116,7 +177,8 @@ func TestLocalOperator_RunTask(t *testing.T) {
 		},
 		{
 			name: "should call runner with the found requirements.txt file",
-			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner) {
+			task: task,
+			setup: func(rf *mockRepoFinder, mf *mockModuleFinder, runner *mockRunner, msf *mockSecretFinder) {
 				repo := &git.Repo{Path: "/path/to/repo"}
 				rf.On("Repo", "/path/to/file.py").
 					Return(repo, nil)
@@ -132,6 +194,7 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					module:          "path.to.module",
 					requirementsTxt: "/path/to/requirements.txt",
 					task:            task,
+					envVariables:    map[string]string{},
 				}).Return(assert.AnError)
 			},
 			wantErr: assert.Error,
@@ -145,17 +208,19 @@ func TestLocalOperator_RunTask(t *testing.T) {
 			repo := &mockRepoFinder{}
 			module := &mockModuleFinder{}
 			runner := &mockRunner{}
+			secret := &mockSecretFinder{}
 			if tt.setup != nil {
-				tt.setup(repo, module, runner)
+				tt.setup(repo, module, runner, secret)
 			}
 
 			o := &LocalOperator{
 				repoFinder: repo,
 				module:     module,
 				runner:     runner,
+				config:     secret,
 			}
 
-			tt.wantErr(t, o.RunTask(context.Background(), nil, task))
+			tt.wantErr(t, o.RunTask(context.Background(), nil, tt.task))
 		})
 	}
 }

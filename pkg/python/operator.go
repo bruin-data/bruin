@@ -3,6 +3,7 @@ package python
 import (
 	"context"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -39,9 +40,14 @@ type LocalOperator struct {
 	module       modulePathFinder
 	runner       localRunner
 	envVariables map[string]string
+	config       secretFinder
 }
 
-func NewLocalOperator(envVariables map[string]string) *LocalOperator {
+type secretFinder interface {
+	GetSecretByKey(key string) string
+}
+
+func NewLocalOperator(config *config.Config, envVariables map[string]string) *LocalOperator {
 	cmdRunner := &commandRunner{}
 	fs := afero.NewOsFs()
 
@@ -57,6 +63,7 @@ func NewLocalOperator(envVariables map[string]string) *LocalOperator {
 			},
 		},
 		envVariables: envVariables,
+		config:       config,
 	}
 }
 
@@ -91,13 +98,25 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		}
 	}
 
+	envVariables := o.envVariables
+	if envVariables == nil {
+		envVariables = make(map[string]string)
+	}
+
+	for _, mapping := range t.Secrets {
+		val := o.config.GetSecretByKey(mapping.SecretKey)
+		if val != "" {
+			envVariables[mapping.InjectedKey] = val
+		}
+	}
+
 	err = o.runner.Run(ctx, &executionContext{
 		repo:            repo,
 		module:          module,
 		requirementsTxt: requirementsTxt,
 		pipeline:        p,
 		task:            t,
-		envVariables:    o.envVariables,
+		envVariables:    envVariables,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to execute Python script")
