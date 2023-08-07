@@ -2,6 +2,7 @@ package config
 
 import (
 	"bufio"
+	"encoding/json"
 	errors "errors"
 	"fmt"
 	fs2 "io/fs"
@@ -30,6 +31,23 @@ func (c *GoogleCloudPlatformConnection) GetCredentials() *google.Credentials {
 	return c.rawCredentials
 }
 
+func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
+	if c.ServiceAccountJSON == "" && c.ServiceAccountFile != "" {
+		contents, err := os.ReadFile(c.ServiceAccountFile)
+		if err != nil {
+			return []byte{}, err
+		}
+
+		c.ServiceAccountJSON = string(contents)
+	}
+
+	return json.Marshal(map[string]string{
+		"name":                 c.Name,
+		"service_account_json": c.ServiceAccountJSON,
+		"project_id":           c.ProjectID,
+	})
+}
+
 type SnowflakeConnection struct {
 	Name      string `yaml:"name"`
 	Account   string `yaml:"account"`
@@ -42,18 +60,71 @@ type SnowflakeConnection struct {
 	Warehouse string `yaml:"warehouse"`
 }
 
+func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]string{
+		"name":      c.Name,
+		"account":   c.Account,
+		"username":  c.Username,
+		"password":  c.Password,
+		"region":    c.Region,
+		"role":      c.Role,
+		"database":  c.Database,
+		"schema":    c.Schema,
+		"warehouse": c.Warehouse,
+	})
+}
+
+type GenericConnection struct {
+	Name  string `yaml:"name"`
+	Value string `yaml:"value"`
+}
+
+func (c GenericConnection) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]string{
+		"name":  c.Name,
+		"value": c.Value,
+	})
+}
+
 type Connections struct {
 	GoogleCloudPlatform []GoogleCloudPlatformConnection `yaml:"google_cloud_platform"`
-	Snowflake           []SnowflakeConnection
+	Snowflake           []SnowflakeConnection           `yaml:"snowflake"`
+	Generic             []GenericConnection             `yaml:"generic"`
+
+	byKey map[string]any
+}
+
+func (c *Connections) buildConnectionKeyMap() {
+	c.byKey = make(map[string]any)
+	for i, conn := range c.GoogleCloudPlatform {
+		c.byKey[conn.Name] = &(c.GoogleCloudPlatform[i])
+	}
+
+	for i, conn := range c.Snowflake {
+		c.byKey[conn.Name] = &(c.Snowflake[i])
+	}
+
+	for i, conn := range c.Generic {
+		c.byKey[conn.Name] = &(c.Generic[i])
+	}
 }
 
 type Environment struct {
 	Connections Connections `yaml:"connections"`
-	Secrets     map[string]string
 }
 
-func (e *Environment) GetSecretByKey(key string) string {
-	return e.Secrets[key]
+func (e *Environment) GetSecretByKey(key string) (string, error) {
+	v, ok := e.Connections.byKey[key]
+	if !ok {
+		return "", nil
+	}
+
+	if v, ok := v.(*GenericConnection); ok {
+		return v.Value, nil
+	}
+
+	res, err := json.Marshal(v)
+	return string(res), err
 }
 
 type Config struct {
@@ -66,7 +137,7 @@ type Config struct {
 	Environments            map[string]Environment `yaml:"environments"`
 }
 
-func (c *Config) GetSecretByKey(key string) string {
+func (c *Config) GetSecretByKey(key string) (string, error) {
 	return c.SelectedEnvironment.GetSecretByKey(key)
 }
 
@@ -104,6 +175,8 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 
 	config.SelectedEnvironment = &e
 	config.SelectedEnvironmentName = config.DefaultEnvironmentName
+	config.SelectedEnvironment.Connections.buildConnectionKeyMap()
+
 	return &config, nil
 }
 
@@ -136,6 +209,8 @@ func LoadOrCreate(fs afero.Fs, path string) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to persist config: %w", err)
 	}
+
+	config.SelectedEnvironment.Connections.buildConnectionKeyMap()
 
 	return config, ensureConfigIsInGitignore(fs, path)
 }

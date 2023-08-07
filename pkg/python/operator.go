@@ -44,7 +44,7 @@ type LocalOperator struct {
 }
 
 type secretFinder interface {
-	GetSecretByKey(key string) string
+	GetSecretByKey(key string) (string, error)
 }
 
 func NewLocalOperator(config *config.Config, envVariables map[string]string) *LocalOperator {
@@ -104,7 +104,12 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	}
 
 	for _, mapping := range t.Secrets {
-		val := o.config.GetSecretByKey(mapping.SecretKey)
+		val, err := o.config.GetSecretByKey(mapping.SecretKey)
+		if err != nil {
+			// we should log sth here
+			continue
+		}
+
 		if val != "" {
 			envVariables[mapping.InjectedKey] = val
 		}

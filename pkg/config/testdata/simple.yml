@@ -19,10 +19,11 @@ environments:
           role: "role"
           region: "region"
 
-    secrets:
-      key1: value1
-      key2: value2
-
+      generic:
+        - name: key1
+          value: value1
+        - name: key2
+          value: value2
 
   prod:
     connections:

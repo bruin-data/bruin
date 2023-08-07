@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -13,17 +14,24 @@ import (
 
 type mockPrinter struct {
 	buf *bytes.Buffer
+	m   sync.Mutex
 }
 
 func (m *mockPrinter) Println(a ...interface{}) (int, error) {
+	m.m.Lock()
+	defer m.m.Unlock()
 	return m.buf.Write([]byte(a[0].(string) + "\n"))
 }
 
 func (m *mockPrinter) Printf(format string, a ...interface{}) (int, error) {
+	m.m.Lock()
+	defer m.m.Unlock()
 	return m.buf.Write([]byte(fmt.Sprintf(format, a...)))
 }
 
 func (m *mockPrinter) Print(a ...interface{}) (int, error) {
+	m.m.Lock()
+	defer m.m.Unlock()
 	return m.buf.Write([]byte(a[0].(string)))
 }
 

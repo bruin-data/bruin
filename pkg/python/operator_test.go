@@ -46,9 +46,9 @@ type mockSecretFinder struct {
 	mock.Mock
 }
 
-func (m *mockSecretFinder) GetSecretByKey(key string) string {
+func (m *mockSecretFinder) GetSecretByKey(key string) (string, error) {
 	args := m.Called(key)
-	return args.String(0)
+	return args.String(0), args.Error(1)
 }
 
 func TestLocalOperator_RunTask(t *testing.T) {
@@ -158,8 +158,8 @@ func TestLocalOperator_RunTask(t *testing.T) {
 				mf.On("FindRequirementsTxt", repo, mock.Anything).
 					Return("", &NoRequirementsFoundError{})
 
-				msf.On("GetSecretByKey", "key1").Return("value1")
-				msf.On("GetSecretByKey", "key2").Return("value2")
+				msf.On("GetSecretByKey", "key1").Return("value1", nil)
+				msf.On("GetSecretByKey", "key2").Return("value2", nil)
 
 				runner.On("Run", mock.Anything, &executionContext{
 					repo:            repo,

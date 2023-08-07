@@ -33,10 +33,16 @@ func TestLoadFromFile(t *testing.T) {
 					Warehouse: "wh",
 				},
 			},
-		},
-		Secrets: map[string]string{
-			"key1": "value1",
-			"key2": "value2",
+			Generic: []GenericConnection{
+				{
+					Name:  "key1",
+					Value: "value1",
+				},
+				{
+					Name:  "key2",
+					Value: "value2",
+				},
+			},
 		},
 	}
 
@@ -96,7 +102,13 @@ func TestLoadFromFile(t *testing.T) {
 				tt.want.fs = fs
 				tt.want.path = tt.args.path
 			}
-			assert.Equal(t, tt.want, got)
+
+			if tt.want != nil {
+				got.SelectedEnvironment.Connections.byKey = nil
+				assert.EqualExportedValues(t, *tt.want, *got)
+			} else {
+				assert.Nil(t, got)
+			}
 		})
 	}
 }
@@ -114,9 +126,10 @@ func TestLoadOrCreate(t *testing.T) {
 				},
 			},
 			Snowflake: []SnowflakeConnection{},
+			Generic:   []GenericConnection{},
 		},
-		Secrets: map[string]string{},
 	}
+
 	existingConfig := &Config{
 		path:                    configPath,
 		DefaultEnvironmentName:  "dev",
@@ -196,7 +209,8 @@ func TestLoadOrCreate(t *testing.T) {
 			tt.wantErr(t, err)
 
 			if tt.want != nil {
-				assert.EqualExportedValues(t, *tt.want, *got)
+				assert.EqualExportedValues(t, *tt.want.SelectedEnvironment, *got.SelectedEnvironment)
+				assert.Equal(t, tt.want.SelectedEnvironmentName, got.SelectedEnvironmentName)
 			} else {
 				assert.Equal(t, tt.want, got)
 			}
