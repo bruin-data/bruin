@@ -44,6 +44,12 @@ func Lint(isDebug *bool) *cli.Command {
 				rootPath = "."
 			}
 
+			rootPath, err := path.GetPipelineRootFromTask(rootPath, pipelineDefinitionFile)
+			if err != nil {
+				errorPrinter.Printf("Failed to find the pipeline to validate: '%s'\n", rootPath)
+				return cli.Exit("", 1)
+			}
+
 			cm, err := config.LoadOrCreate(afero.NewOsFs(), path2.Join(rootPath, ".bruin.yml"))
 			if err != nil {
 				errorPrinter.Printf("Failed to load the config file: %v\n", err)

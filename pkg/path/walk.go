@@ -46,7 +46,7 @@ func GetPipelineRootFromTask(taskPath, pipelineDefinitionFile string) (string, e
 		return "", errors.Wrapf(err, "failed to convert task path to absolute path")
 	}
 
-	currentFolder := filepath.Dir(absoluteTaskPath)
+	currentFolder := absoluteTaskPath
 	for currentFolder != "/" {
 		tryPath := filepath.Join(currentFolder, pipelineDefinitionFile)
 		if _, err := os.Stat(tryPath); err == nil {
