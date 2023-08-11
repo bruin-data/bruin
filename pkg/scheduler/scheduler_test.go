@@ -173,8 +173,8 @@ func TestScheduler_Run(t *testing.T) {
 			{
 				Name:      "task12",
 				DependsOn: []string{"task11"},
-				Columns: map[string]pipeline.Column{
-					"col1": {
+				Columns: []pipeline.Column{
+					{
 						Name: "col1",
 						Checks: []pipeline.ColumnCheck{
 							{
@@ -342,8 +342,8 @@ func TestScheduler_WillRunTaskOfType(t *testing.T) {
 		Name:      "task12",
 		DependsOn: []string{"task11"},
 		Type:      "bq.sql",
-		Columns: map[string]pipeline.Column{
-			"col1": {
+		Columns: []pipeline.Column{
+			{
 				Checks: []pipeline.ColumnCheck{
 					{
 						Name: "not_null",

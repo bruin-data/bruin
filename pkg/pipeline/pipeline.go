@@ -121,7 +121,7 @@ type Asset struct {
 	DependsOn       []string
 	Schedule        TaskSchedule
 	Materialization Materialization
-	Columns         map[string]Column
+	Columns         []Column
 
 	Pipeline *Pipeline
 

@@ -47,7 +47,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		Connection: "conn1",
 		Secrets:    []pipeline.SecretMapping{},
 		DependsOn:  []string{"gcs-to-bq"},
-		Columns:    map[string]pipeline.Column{},
+		Columns:    make([]pipeline.Column, 0),
 	}
 
 	asset2 := &pipeline.Asset{
@@ -63,7 +63,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			Path: absPath("testdata/pipeline/first-pipeline/tasks/task2/task.yaml"),
 			Type: pipeline.YamlTask,
 		},
-		Columns: map[string]pipeline.Column{},
+		Columns: make([]pipeline.Column, 0),
 		Secrets: []pipeline.SecretMapping{},
 	}
 
@@ -89,7 +89,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		Connection: "first-connection",
 		Secrets:    []pipeline.SecretMapping{},
 		DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
-		Columns:    map[string]pipeline.Column{},
+		Columns:    make([]pipeline.Column, 0),
 	}
 	asset3.AddUpstream(asset1)
 	asset1.AddDownstream(asset3)
@@ -115,7 +115,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		Connection: "conn2",
 		Secrets:    []pipeline.SecretMapping{},
 		DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
-		Columns:    map[string]pipeline.Column{},
+		Columns:    make([]pipeline.Column, 0),
 	}
 	asset4.AddUpstream(asset1)
 	asset1.AddDownstream(asset4)

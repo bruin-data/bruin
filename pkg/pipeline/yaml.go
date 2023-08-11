@@ -98,6 +98,7 @@ type columnCheck struct {
 }
 
 type column struct {
+	Name        string        `yaml:"name"`
 	Description string        `yaml:"description"`
 	Tests       []columnCheck `yaml:"checks"`
 }
@@ -119,7 +120,7 @@ type taskDefinition struct {
 	Connection      string            `yaml:"connection"`
 	Schedule        taskSchedule      `yaml:"schedule"`
 	Materialization materialization   `yaml:"materialization"`
-	Columns         map[string]column `yaml:"columns"`
+	Columns         []column          `yaml:"columns"`
 }
 
 func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
@@ -183,8 +184,8 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		IncrementalKey: definition.Materialization.IncrementalKey,
 	}
 
-	columns := make(map[string]Column)
-	for name, column := range definition.Columns {
+	columns := make([]Column, len(definition.Columns))
+	for index, column := range definition.Columns {
 		tests := make([]ColumnCheck, len(column.Tests))
 		for i, test := range column.Tests {
 			tests[i] = ColumnCheck{
@@ -193,8 +194,8 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			}
 		}
 
-		columns[name] = Column{
-			Name:        name,
+		columns[index] = Column{
+			Name:        column.Name,
 			Description: column.Description,
 			Checks:      tests,
 		}

@@ -144,7 +144,7 @@ func commentRowsToTask(commentRows []string) *Asset {
 		Parameters: make(map[string]string),
 		DependsOn:  []string{},
 		Schedule:   TaskSchedule{},
-		Columns:    map[string]Column{},
+		Columns:    make([]Column, 0),
 		Secrets:    make([]SecretMapping, 0),
 	}
 

@@ -71,8 +71,8 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 					PartitionBy:    "dt",
 					IncrementalKey: "dt",
 				},
-				Columns: map[string]pipeline.Column{
-					"col1": {
+				Columns: []pipeline.Column{
+					{
 						Name:        "col1",
 						Description: "column one",
 						Checks: []pipeline.ColumnCheck{
@@ -108,7 +108,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 							},
 						},
 					},
-					"col2": {
+					{
 						Name:        "col2",
 						Description: "column two",
 						Checks:      []pipeline.ColumnCheck{},
@@ -137,7 +137,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Connection: "conn1",
 				Secrets:    []pipeline.SecretMapping{},
 				DependsOn:  []string{"gcs-to-bq"},
-				Columns:    map[string]pipeline.Column{},
+				Columns:    make([]pipeline.Column, 0),
 			},
 		},
 		{
@@ -162,7 +162,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Secrets:    []pipeline.SecretMapping{},
 				DependsOn:  []string{"gcs-to-bq"},
 				Schedule:   pipeline.TaskSchedule{Days: []string{"sunday", "monday", "tuesday"}},
-				Columns:    map[string]pipeline.Column{},
+				Columns:    make([]pipeline.Column, 0),
 			},
 		},
 		{
@@ -181,7 +181,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Connection: "conn1",
 				Secrets:    []pipeline.SecretMapping{},
 				DependsOn:  []string{"gcs-to-bq"},
-				Columns:    map[string]pipeline.Column{},
+				Columns:    make([]pipeline.Column, 0),
 			},
 		},
 		{

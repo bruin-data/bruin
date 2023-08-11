@@ -10,7 +10,7 @@ materialization:
    type: table
 
 columns:
-   one:
+  - name: one
     type: integer
     description: "Just a number"
     checks:

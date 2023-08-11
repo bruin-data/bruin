@@ -1,3 +1,4 @@
+//nolint:paralleltest
 package cmd
 
 import (
@@ -128,8 +129,6 @@ Total: 2
 	for _, tc := range tests {
 		tt := tc
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			buf := bytes.NewBuffer(nil)
 			mp := &mockPrinter{buf: buf}
 

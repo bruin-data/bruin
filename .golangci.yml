@@ -27,6 +27,7 @@ linters:
     - musttag
     - interfacebloat
     - cyclop
+    - tparallel
   presets:
     - bugs
     - comment

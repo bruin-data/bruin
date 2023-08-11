@@ -18,7 +18,7 @@ materialization:
     - key2
 
 columns:
-  col1:
+  - name: col1
     description: "column one"
     checks:
       - name: unique
@@ -34,6 +34,6 @@ columns:
           - 1
           - 2
           - 3
-  col2:
+  - name: col2
     description: "column two"
 
