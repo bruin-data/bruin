@@ -14,8 +14,6 @@ also run Python assets within the same pipeline.
 
 - ⚡ blazing fast pipeline execution: bruin is written in Golang and uses concurrency at every opportunity
 
-![bruin CLI](./resources/bruin.svg)
-
 ## Installation
 
 You need to have Golang installed in the first place, then you can run the following command:
