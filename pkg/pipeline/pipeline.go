@@ -98,6 +98,7 @@ type ColumnCheckValue struct {
 	Float       *float64  `json:"float"`
 	StringArray *[]string `json:"string_array"`
 	String      *string   `json:"string"`
+	Bool        *bool     `json:"bool"`
 }
 
 func (v *ColumnCheckValue) MarshalJSON() ([]byte, error) {
@@ -115,6 +116,9 @@ func (v *ColumnCheckValue) MarshalJSON() ([]byte, error) {
 	}
 	if v.String != nil {
 		return json.Marshal(v.String)
+	}
+	if v.Bool != nil {
+		return json.Marshal(v.Bool)
 	}
 
 	return json.Marshal(nil)
@@ -163,7 +167,7 @@ type Asset struct {
 	Columns         []Column           `json:"columns"`
 	CustomChecks    []CustomCheck      `json:"custom_checks"`
 
-	Pipeline *Pipeline `json:"pipeline"`
+	Pipeline *Pipeline `json:"-"`
 
 	upstream   []*Asset
 	downstream []*Asset

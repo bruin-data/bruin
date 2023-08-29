@@ -50,6 +50,7 @@ type columnCheckValue struct {
 	Float       *float64
 	StringArray *[]string
 	String      *string
+	Bool        *bool
 }
 
 func (a *columnCheckValue) UnmarshalYAML(value *yaml.Node) error {
@@ -81,6 +82,8 @@ func (a *columnCheckValue) UnmarshalYAML(value *yaml.Node) error {
 		*a = columnCheckValue{Int: &v}
 	case float64:
 		*a = columnCheckValue{Float: &v}
+	case bool:
+		*a = columnCheckValue{Bool: &v}
 	default:
 		return fmt.Errorf("unexpected type %T", v)
 	}
