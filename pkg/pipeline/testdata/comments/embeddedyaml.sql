@@ -22,6 +22,11 @@ materialization:
     strategy: delete+insert
     incremental_key: dt
 
+custom_checks:
+  - name: check1
+    value: 16
+    query: select * from table1
+
 @bruin */
 
 select *

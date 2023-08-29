@@ -23,6 +23,8 @@ func Test_createTaskFromFile(t *testing.T) {
 		filePath string
 	}
 
+	intValueForCustomCheck := 16
+
 	absPath := func(path string) string {
 		absolutePath, _ := filepath.Abs(path)
 		return absolutePath
@@ -77,7 +79,8 @@ func Test_createTaskFromFile(t *testing.T) {
 					IncrementalKey: "dt",
 					ClusterBy:      []string{"event_name"},
 				},
-				Columns: []pipeline.Column{},
+				Columns:      []pipeline.Column{},
+				CustomChecks: make([]pipeline.CustomCheck, 0),
 			},
 		},
 		{
@@ -110,6 +113,15 @@ func Test_createTaskFromFile(t *testing.T) {
 					ClusterBy:      []string{"event_name"},
 				},
 				Columns: make([]pipeline.Column, 0),
+				CustomChecks: []pipeline.CustomCheck{
+					{
+						Name:  "check1",
+						Query: "select * from table1",
+						Value: pipeline.ColumnCheckValue{
+							Int: &intValueForCustomCheck,
+						},
+					},
+				},
 			},
 		},
 		{
@@ -131,10 +143,11 @@ func Test_createTaskFromFile(t *testing.T) {
 					"param2": "second-parameter",
 					"param3": "third-parameter",
 				},
-				Connection: "conn1",
-				Secrets:    []pipeline.SecretMapping{},
-				DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
-				Columns:    make([]pipeline.Column, 0),
+				Connection:   "conn1",
+				Secrets:      []pipeline.SecretMapping{},
+				DependsOn:    []string{"task1", "task2", "task3", "task4", "task5", "task3"},
+				Columns:      make([]pipeline.Column, 0),
+				CustomChecks: make([]pipeline.CustomCheck, 0),
 			},
 		},
 	}

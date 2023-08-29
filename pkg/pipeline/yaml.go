@@ -104,6 +104,12 @@ type secretMapping struct {
 	InjectedKey string
 }
 
+type customCheck struct {
+	Name  string           `yaml:"name"`
+	Query string           `yaml:"query"`
+	Value columnCheckValue `yaml:"value"`
+}
+
 type taskDefinition struct {
 	Name            string            `yaml:"name"`
 	Description     string            `yaml:"description"`
@@ -116,6 +122,7 @@ type taskDefinition struct {
 	Connection      string            `yaml:"connection"`
 	Materialization materialization   `yaml:"materialization"`
 	Columns         []column          `yaml:"columns"`
+	CustomChecks    []customCheck     `yaml:"custom_checks"`
 }
 
 func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
@@ -207,6 +214,15 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		ExecutableFile:  ExecutableFile{},
 		Materialization: mat,
 		Columns:         columns,
+		CustomChecks:    make([]CustomCheck, len(definition.CustomChecks)),
+	}
+
+	for index, check := range definition.CustomChecks {
+		task.CustomChecks[index] = CustomCheck{
+			Name:  check.Name,
+			Query: check.Query,
+			Value: ColumnCheckValue(check.Value),
+		}
 	}
 
 	for _, m := range definition.Secrets {

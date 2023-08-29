@@ -79,6 +79,19 @@ type Materialization struct {
 	IncrementalKey string                  `json:"incremental_key"`
 }
 
+func (m Materialization) MarshalJSON() ([]byte, error) {
+	if m.Type == "" && m.Strategy == "" && m.PartitionBy == "" && len(m.ClusterBy) == 0 && m.IncrementalKey == "" {
+		return json.Marshal(nil)
+	}
+
+	type Alias Materialization
+	return json.Marshal(&struct {
+		*Alias
+	}{
+		Alias: (*Alias)(&m),
+	})
+}
+
 type ColumnCheckValue struct {
 	IntArray    *[]int    `json:"int_array"`
 	Int         *int      `json:"int"`
@@ -130,6 +143,12 @@ type SecretMapping struct {
 	InjectedKey string `json:"injected_key"`
 }
 
+type CustomCheck struct {
+	Name  string           `json:"name"`
+	Query string           `json:"query"`
+	Value ColumnCheckValue `json:"value"`
+}
+
 type Asset struct {
 	Name            string             `json:"name"`
 	Description     string             `json:"description"`
@@ -139,9 +158,10 @@ type Asset struct {
 	Parameters      map[string]string  `json:"parameters"`
 	Connection      string             `json:"connection"`
 	Secrets         []SecretMapping    `json:"secrets"`
-	DependsOn       []string           `json:"depends_on"`
-	Materialization Materialization    `json:"materialization,omitempty"`
+	DependsOn       []string           `json:"upstream"`
+	Materialization Materialization    `json:"materialization"`
 	Columns         []Column           `json:"columns"`
+	CustomChecks    []CustomCheck      `json:"custom_checks"`
 
 	Pipeline *Pipeline `json:"pipeline"`
 

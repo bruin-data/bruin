@@ -141,10 +141,11 @@ func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath st
 
 func commentRowsToTask(commentRows []string) *Asset {
 	task := Asset{
-		Parameters: make(map[string]string),
-		DependsOn:  []string{},
-		Columns:    make([]Column, 0),
-		Secrets:    make([]SecretMapping, 0),
+		Parameters:   make(map[string]string),
+		DependsOn:    []string{},
+		Columns:      make([]Column, 0),
+		CustomChecks: make([]CustomCheck, 0),
+		Secrets:      make([]SecretMapping, 0),
 	}
 
 	for _, row := range commentRows {
