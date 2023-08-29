@@ -140,7 +140,6 @@ type Asset struct {
 	Connection      string             `json:"connection"`
 	Secrets         []SecretMapping    `json:"secrets"`
 	DependsOn       []string           `json:"depends_on"`
-	Schedule        TaskSchedule       `json:"schedule,omitempty"`
 	Materialization Materialization    `json:"materialization,omitempty"`
 	Columns         []Column           `json:"columns"`
 

@@ -161,7 +161,6 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Connection: "conn1",
 				Secrets:    []pipeline.SecretMapping{},
 				DependsOn:  []string{"gcs-to-bq"},
-				Schedule:   pipeline.TaskSchedule{Days: []string{"sunday", "monday", "tuesday"}},
 				Columns:    make([]pipeline.Column, 0),
 			},
 		},

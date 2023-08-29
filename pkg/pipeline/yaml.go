@@ -11,10 +11,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type taskSchedule struct {
-	Days []string `yaml:"days"`
-}
-
 func mustBeStringArray(fieldName string, value *yaml.Node) ([]string, error) {
 	var multi []string
 	err := value.Decode(&multi)
@@ -118,7 +114,6 @@ type taskDefinition struct {
 	Connections     map[string]string `yaml:"connections"`
 	Secrets         []secretMapping   `yaml:"secrets"`
 	Connection      string            `yaml:"connection"`
-	Schedule        taskSchedule      `yaml:"schedule"`
 	Materialization materialization   `yaml:"materialization"`
 	Columns         []column          `yaml:"columns"`
 }
@@ -210,7 +205,6 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Secrets:         make([]SecretMapping, len(definition.Secrets)),
 		DependsOn:       definition.Depends,
 		ExecutableFile:  ExecutableFile{},
-		Schedule:        TaskSchedule{Days: definition.Schedule.Days},
 		Materialization: mat,
 		Columns:         columns,
 	}

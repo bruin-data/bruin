@@ -35,8 +35,6 @@ const (
 
 	pipelineContainsCycle = "The pipeline has a cycle with dependencies, make sure there are no cyclic dependencies"
 
-	taskScheduleDayDoesNotExist = "Asset schedule day must be a valid weekday"
-
 	pipelineSlackFieldEmptyName           = "Slack notifications must have a `name` attribute"
 	pipelineSlackFieldEmptyConnection     = "Slack notifications must have a `connection` attribute"
 	pipelineSlackNameFieldNotUnique       = "The `name` attribute under the Slack notifications must be unique"
@@ -333,32 +331,6 @@ func EnsurePipelineHasNoCycles(p *pipeline.Pipeline) ([]*Issue, error) {
 			Description: pipelineContainsCycle,
 			Context:     context,
 		})
-	}
-
-	return issues, nil
-}
-
-func EnsureTaskScheduleIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
-	days := []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
-	for _, task := range p.Assets {
-		var wrongDays []string
-		for _, day := range task.Schedule.Days {
-			if !isStringInArray(days, strings.ToLower(day)) {
-				wrongDays = append(wrongDays, day)
-			}
-		}
-		if wrongDays != nil {
-			contextMessages := make([]string, 0)
-			for _, wrongDay := range wrongDays {
-				contextMessages = append(contextMessages, fmt.Sprintf("Given day: %s", wrongDay))
-			}
-			issues = append(issues, &Issue{
-				Task:        task,
-				Description: taskScheduleDayDoesNotExist,
-				Context:     contextMessages,
-			})
-		}
 	}
 
 	return issues, nil

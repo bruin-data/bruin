@@ -134,7 +134,6 @@ func Test_createTaskFromFile(t *testing.T) {
 				Connection: "conn1",
 				Secrets:    []pipeline.SecretMapping{},
 				DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
-				Schedule:   pipeline.TaskSchedule{Days: []string{"SUNDAY", "MONDAY", "TUESDAY"}},
 				Columns:    make([]pipeline.Column, 0),
 			},
 		},

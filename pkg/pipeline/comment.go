@@ -143,7 +143,6 @@ func commentRowsToTask(commentRows []string) *Asset {
 	task := Asset{
 		Parameters: make(map[string]string),
 		DependsOn:  []string{},
-		Schedule:   TaskSchedule{},
 		Columns:    make([]Column, 0),
 		Secrets:    make([]SecretMapping, 0),
 	}
@@ -209,18 +208,6 @@ func commentRowsToTask(commentRows []string) *Asset {
 
 			task.Parameters[parameters[1]] = value
 			continue
-		}
-
-		if strings.HasPrefix(key, "schedule.") {
-			schedule := strings.Split(key, ".")
-			if len(schedule) != 2 {
-				continue
-			}
-
-			valueArray := strings.Split(value, ",")
-			for _, a := range valueArray {
-				task.Schedule.Days = append(task.Schedule.Days, strings.TrimSpace(a))
-			}
 		}
 
 		if strings.HasPrefix(key, "materialization.") {

@@ -40,10 +40,6 @@ func GetRules(logger *zap.SugaredLogger, fs afero.Fs) ([]Rule, error) {
 			Validator:  EnsurePipelineHasNoCycles,
 		},
 		&SimpleRule{
-			Identifier: "valid-task-schedule",
-			Validator:  EnsureTaskScheduleIsValid,
-		},
-		&SimpleRule{
 			Identifier: "valid-athena-sql-task",
 			Validator:  EnsureAthenaSQLTypeTasksHasDatabaseAndS3FilePath,
 		},
