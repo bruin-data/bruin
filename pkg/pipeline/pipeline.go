@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"strings"
 
@@ -86,6 +87,26 @@ type ColumnCheckValue struct {
 	String      *string   `json:"string"`
 }
 
+func (v *ColumnCheckValue) MarshalJSON() ([]byte, error) {
+	if v.IntArray != nil {
+		return json.Marshal(v.IntArray)
+	}
+	if v.Int != nil {
+		return json.Marshal(v.Int)
+	}
+	if v.Float != nil {
+		return json.Marshal(v.Float)
+	}
+	if v.StringArray != nil {
+		return json.Marshal(v.StringArray)
+	}
+	if v.String != nil {
+		return json.Marshal(v.String)
+	}
+
+	return json.Marshal(nil)
+}
+
 type ColumnCheck struct {
 	Name  string           `json:"name"`
 	Value ColumnCheckValue `json:"value"`
@@ -119,8 +140,8 @@ type Asset struct {
 	Connection      string             `json:"connection"`
 	Secrets         []SecretMapping    `json:"secrets"`
 	DependsOn       []string           `json:"depends_on"`
-	Schedule        TaskSchedule       `json:"schedule"`
-	Materialization Materialization    `json:"materialization"`
+	Schedule        TaskSchedule       `json:"schedule,omitempty"`
+	Materialization Materialization    `json:"materialization,omitempty"`
 	Columns         []Column           `json:"columns"`
 
 	Pipeline *Pipeline `json:"pipeline"`
