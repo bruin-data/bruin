@@ -136,7 +136,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			"slack":           "slack-connection",
 			"gcpConnectionId": "gcp-connection-id-here",
 		},
-		Tasks: []*pipeline.Asset{asset1, asset2, asset3, asset4},
+		Assets: []*pipeline.Asset{asset1, asset2, asset3, asset4},
 	}
 	fs := afero.NewOsFs()
 	tests := []struct {
@@ -214,8 +214,8 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			assert.Equal(t, tt.want.DefaultConnections, got.DefaultConnections)
 			assert.Equal(t, tt.want.DefaultParameters, got.DefaultParameters)
 
-			for i, asset := range tt.want.Tasks {
-				gotAsset := got.Tasks[i]
+			for i, asset := range tt.want.Assets {
+				gotAsset := got.Assets[i]
 				assert.EqualExportedValues(t, *asset, *gotAsset)
 
 				gotAssetUpstreams := gotAsset.GetUpstream()
@@ -426,7 +426,7 @@ func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 			"gcp":       "connection1",
 			"snowflake": "connection2",
 		},
-		Tasks: []*pipeline.Asset{asset1, asset2, asset3},
+		Assets: []*pipeline.Asset{asset1, asset2, asset3},
 	}
 
 	assert.Equal(t, "connection1", pipeline1.GetConnectionNameForAsset(asset1))

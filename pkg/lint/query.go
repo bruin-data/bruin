@@ -159,7 +159,7 @@ func (q *QueryValidatorRule) Validate(p *pipeline.Pipeline) ([]*Issue, error) {
 	}
 
 	processedTaskCount := 0
-	for _, task := range p.Tasks {
+	for _, task := range p.Assets {
 		if task.Type != q.TaskType {
 			q.Logger.Debug("Skipping task, task type not matched")
 			continue

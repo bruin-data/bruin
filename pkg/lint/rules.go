@@ -53,7 +53,7 @@ var validIDRegexCompiled = regexp.MustCompile(validIDRegex)
 func EnsureTaskNameIsValid(pipeline *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
-	for _, task := range pipeline.Tasks {
+	for _, task := range pipeline.Assets {
 		if task.Name == "" {
 			issues = append(issues, &Issue{
 				Task:        task,
@@ -76,7 +76,7 @@ func EnsureTaskNameIsValid(pipeline *pipeline.Pipeline) ([]*Issue, error) {
 
 func EnsureTaskNameIsUnique(p *pipeline.Pipeline) ([]*Issue, error) {
 	nameFileMapping := make(map[string][]*pipeline.Asset)
-	for _, task := range p.Tasks {
+	for _, task := range p.Assets {
 		if task.Name == "" {
 			continue
 		}
@@ -112,7 +112,7 @@ func EnsureTaskNameIsUnique(p *pipeline.Pipeline) ([]*Issue, error) {
 func EnsureExecutableFileIsValid(fs afero.Fs) PipelineValidator {
 	return func(p *pipeline.Pipeline) ([]*Issue, error) {
 		issues := make([]*Issue, 0)
-		for _, task := range p.Tasks {
+		for _, task := range p.Assets {
 			if task.DefinitionFile.Type == pipeline.CommentTask {
 				continue
 			}
@@ -208,7 +208,7 @@ func isFileExecutable(mode os.FileMode) bool {
 
 func EnsureDependencyExists(p *pipeline.Pipeline) ([]*Issue, error) {
 	taskMap := map[string]bool{}
-	for _, task := range p.Tasks {
+	for _, task := range p.Assets {
 		if task.Name == "" {
 			continue
 		}
@@ -217,7 +217,7 @@ func EnsureDependencyExists(p *pipeline.Pipeline) ([]*Issue, error) {
 	}
 
 	issues := make([]*Issue, 0)
-	for _, task := range p.Tasks {
+	for _, task := range p.Assets {
 		for _, dep := range task.DependsOn {
 			if _, ok := taskMap[dep]; !ok {
 				issues = append(issues, &Issue{
@@ -255,7 +255,7 @@ func EnsurePipelineScheduleIsValidCron(p *pipeline.Pipeline) ([]*Issue, error) {
 func EnsureOnlyAcceptedTaskTypesAreThere(p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
-	for _, task := range p.Tasks {
+	for _, task := range p.Assets {
 		if task.Type == "" {
 			issues = append(issues, &Issue{
 				Task:        task,
@@ -282,7 +282,7 @@ func EnsureOnlyAcceptedTaskTypesAreThere(p *pipeline.Pipeline) ([]*Issue, error)
 func EnsurePipelineHasNoCycles(p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
-	for _, task := range p.Tasks {
+	for _, task := range p.Assets {
 		for _, dep := range task.DependsOn {
 			if task.Name == dep {
 				issues = append(issues, &Issue{
@@ -293,13 +293,13 @@ func EnsurePipelineHasNoCycles(p *pipeline.Pipeline) ([]*Issue, error) {
 		}
 	}
 
-	taskNameToIndex := make(map[string]int, len(p.Tasks))
-	for i, task := range p.Tasks {
+	taskNameToIndex := make(map[string]int, len(p.Assets))
+	for i, task := range p.Assets {
 		taskNameToIndex[task.Name] = i
 	}
 
-	g := graph.New(len(p.Tasks))
-	for _, task := range p.Tasks {
+	g := graph.New(len(p.Assets))
+	for _, task := range p.Assets {
 		for _, dep := range task.DependsOn {
 			g.Add(taskNameToIndex[task.Name], taskNameToIndex[dep])
 		}
@@ -314,12 +314,12 @@ func EnsurePipelineHasNoCycles(p *pipeline.Pipeline) ([]*Issue, error) {
 
 		tasksInCycle := make(map[string]bool, cycleLength)
 		for _, taskIndex := range cycle {
-			tasksInCycle[p.Tasks[taskIndex].Name] = true
+			tasksInCycle[p.Assets[taskIndex].Name] = true
 		}
 
 		context := make([]string, 0, cycleLength)
 		for _, taskIndex := range cycle {
-			task := p.Tasks[taskIndex]
+			task := p.Assets[taskIndex]
 			for _, dep := range task.DependsOn {
 				if _, ok := tasksInCycle[dep]; !ok {
 					continue
@@ -341,7 +341,7 @@ func EnsurePipelineHasNoCycles(p *pipeline.Pipeline) ([]*Issue, error) {
 func EnsureTaskScheduleIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	days := []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
-	for _, task := range p.Tasks {
+	for _, task := range p.Assets {
 		var wrongDays []string
 		for _, day := range task.Schedule.Days {
 			if !isStringInArray(days, strings.ToLower(day)) {
@@ -375,7 +375,7 @@ func isStringInArray(arr []string, str string) bool {
 
 func EnsureAthenaSQLTypeTasksHasDatabaseAndS3FilePath(p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
-	for _, task := range p.Tasks {
+	for _, task := range p.Assets {
 		if task.Type == "athena.sql" {
 			databaseVar, ok := task.Parameters["database"]
 

@@ -61,7 +61,7 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 		{
 			name: "no tasks to execute",
 			p: &pipeline.Pipeline{
-				Tasks: []*pipeline.Asset{},
+				Assets: []*pipeline.Asset{},
 			},
 			want:    noIssues,
 			wantErr: false,
@@ -69,7 +69,7 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 		{
 			name: "no tasks from task type to execute",
 			p: &pipeline.Pipeline{
-				Tasks: []*pipeline.Asset{
+				Assets: []*pipeline.Asset{
 					{
 						Type: "someOtherTaskType",
 					},
@@ -84,7 +84,7 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 		{
 			name: "a task to extract, but query extractor fails",
 			p: &pipeline.Pipeline{
-				Tasks: []*pipeline.Asset{
+				Assets: []*pipeline.Asset{
 					{
 						Type: "someOtherTaskType",
 					},
@@ -115,7 +115,7 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 		{
 			name: "a task to extract, but no queries in it",
 			p: &pipeline.Pipeline{
-				Tasks: []*pipeline.Asset{
+				Assets: []*pipeline.Asset{
 					{
 						Type: "someOtherTaskType",
 					},
@@ -146,7 +146,7 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 		{
 			name: "two tasks to extract, 3 queries in each, one invalid",
 			p: &pipeline.Pipeline{
-				Tasks: []*pipeline.Asset{
+				Assets: []*pipeline.Asset{
 					{
 						Type: "someOtherTaskType",
 					},

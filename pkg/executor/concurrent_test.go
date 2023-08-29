@@ -43,11 +43,11 @@ func TestConcurrent_Start(t *testing.T) {
 	}
 
 	p := &pipeline.Pipeline{
-		Tasks: []*pipeline.Asset{t11, t21, t12, t22, t3},
+		Assets: []*pipeline.Asset{t11, t21, t12, t22, t3},
 	}
 
 	mockOperator := new(mockOperator)
-	for _, a := range p.Tasks {
+	for _, a := range p.Assets {
 		a := a
 		mockOperator.On("Run", mock.Anything, mock.MatchedBy(func(ti scheduler.TaskInstance) bool {
 			return ti.GetAsset().Name == a.Name
@@ -70,7 +70,7 @@ func TestConcurrent_Start(t *testing.T) {
 	ex.Start(s.WorkQueue, s.Results)
 
 	results := s.Run(context.Background())
-	assert.Len(t, results, len(p.Tasks))
+	assert.Len(t, results, len(p.Assets))
 
 	mockOperator.AssertExpectations(t)
 }

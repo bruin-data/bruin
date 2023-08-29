@@ -238,7 +238,7 @@ func (s *Scheduler) WillRunTaskOfType(taskType pipeline.AssetType) bool {
 func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline) *Scheduler {
 	instances := make([]TaskInstance, 0)
 
-	for _, task := range p.Tasks {
+	for _, task := range p.Assets {
 		parentID := uuid.New().String()
 		instance := &AssetInstance{
 			ID:         parentID,

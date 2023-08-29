@@ -22,35 +22,35 @@ type (
 )
 
 type ExecutableFile struct {
-	Name    string
-	Path    string
-	Content string
+	Name    string `json:"name"`
+	Path    string `json:"path"`
+	Content string `json:"content"`
 }
 
 type TaskDefinitionFile struct {
-	Name string
-	Path string
-	Type TaskDefinitionType
+	Name string             `json:"name"`
+	Path string             `json:"path"`
+	Type TaskDefinitionType `json:"type"`
 }
 
 type DefinitionFile struct {
-	Name string
-	Path string
+	Name string `json:"name"`
+	Path string `json:"path"`
 }
 
 type TaskSchedule struct {
-	Days []string
+	Days []string `json:"days"`
 }
 
 type Notifications struct {
-	Slack []SlackNotification
+	Slack []SlackNotification `json:"slack"`
 }
 
 type SlackNotification struct {
-	Name       string
-	Connection string
-	Success    string
-	Failure    string
+	Name       string `json:"name"`
+	Connection string `json:"connection"`
+	Success    string `json:"success"`
+	Failure    string `json:"failure"`
 }
 
 type MaterializationType string
@@ -71,30 +71,30 @@ const (
 )
 
 type Materialization struct {
-	Type           MaterializationType
-	Strategy       MaterializationStrategy
-	PartitionBy    string
-	ClusterBy      []string
-	IncrementalKey string
+	Type           MaterializationType     `json:"type"`
+	Strategy       MaterializationStrategy `json:"strategy"`
+	PartitionBy    string                  `json:"partition_by"`
+	ClusterBy      []string                `json:"cluster_by"`
+	IncrementalKey string                  `json:"incremental_key"`
 }
 
 type ColumnCheckValue struct {
-	IntArray    *[]int
-	Int         *int
-	Float       *float64
-	StringArray *[]string
-	String      *string
+	IntArray    *[]int    `json:"int_array"`
+	Int         *int      `json:"int"`
+	Float       *float64  `json:"float"`
+	StringArray *[]string `json:"string_array"`
+	String      *string   `json:"string"`
 }
 
 type ColumnCheck struct {
-	Name  string `yaml:"name"`
-	Value ColumnCheckValue
+	Name  string           `json:"name"`
+	Value ColumnCheckValue `json:"value"`
 }
 
 type Column struct {
-	Name        string
-	Description string        `yaml:"description"`
-	Checks      []ColumnCheck `yaml:"checks"`
+	Name        string        `json:"name"`
+	Description string        `json:"description"`
+	Checks      []ColumnCheck `json:"checks"`
 }
 
 type AssetType string
@@ -105,25 +105,25 @@ var assetTypeConnectionMapping = map[AssetType][]string{
 }
 
 type SecretMapping struct {
-	SecretKey   string
-	InjectedKey string
+	SecretKey   string `json:"secret_key"`
+	InjectedKey string `json:"injected_key"`
 }
 
 type Asset struct {
-	Name            string
-	Description     string
-	Type            AssetType
-	ExecutableFile  ExecutableFile
-	DefinitionFile  TaskDefinitionFile
-	Parameters      map[string]string
-	Connection      string
-	Secrets         []SecretMapping
-	DependsOn       []string
-	Schedule        TaskSchedule
-	Materialization Materialization
-	Columns         []Column
+	Name            string             `json:"name"`
+	Description     string             `json:"description"`
+	Type            AssetType          `json:"type"`
+	ExecutableFile  ExecutableFile     `json:"executable_file"`
+	DefinitionFile  TaskDefinitionFile `json:"definition_file"`
+	Parameters      map[string]string  `json:"parameters"`
+	Connection      string             `json:"connection"`
+	Secrets         []SecretMapping    `json:"secrets"`
+	DependsOn       []string           `json:"depends_on"`
+	Schedule        TaskSchedule       `json:"schedule"`
+	Materialization Materialization    `json:"materialization"`
+	Columns         []Column           `json:"columns"`
 
-	Pipeline *Pipeline
+	Pipeline *Pipeline `json:"pipeline"`
 
 	upstream   []*Asset
 	downstream []*Asset
@@ -182,17 +182,17 @@ func uniqueAssets(assets []*Asset) []*Asset {
 }
 
 type Pipeline struct {
-	LegacyID           string   `yaml:"id"`
-	Name               string   `yaml:"name"`
-	Schedule           schedule `yaml:"schedule"`
-	StartDate          string   `yaml:"start_date"`
-	DefinitionFile     DefinitionFile
-	DefaultParameters  map[string]string `yaml:"default_parameters"`
-	DefaultConnections map[string]string `yaml:"default_connections"`
-	Tasks              []*Asset
-	Notifications      Notifications `yaml:"notifications"`
+	LegacyID           string            `yaml:"id" json:"legacy_id"`
+	Name               string            `yaml:"name" json:"name"`
+	Schedule           schedule          `yaml:"schedule" json:"schedule"`
+	StartDate          string            `yaml:"start_date" json:"start_date"`
+	DefinitionFile     DefinitionFile    `json:"definition_file"`
+	DefaultParameters  map[string]string `yaml:"default_parameters" json:"default_parameters"`
+	DefaultConnections map[string]string `yaml:"default_connections" json:"default_connections"`
+	Assets             []*Asset          `json:"assets"`
+	Notifications      Notifications     `yaml:"notifications" json:"notifications"`
 
-	TasksByType map[AssetType][]*Asset
+	TasksByType map[AssetType][]*Asset `json:"-"`
 	tasksByName map[string]*Asset
 }
 
@@ -237,7 +237,7 @@ func (p *Pipeline) GetAssetByPath(assetPath string) *Asset {
 		return nil
 	}
 
-	for _, asset := range p.Tasks {
+	for _, asset := range p.Assets {
 		if asset.DefinitionFile.Path == assetPath {
 			return asset
 		}
@@ -325,7 +325,7 @@ func (b *builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 		task.upstream = make([]*Asset, 0)
 		task.downstream = make([]*Asset, 0)
 
-		pipeline.Tasks = append(pipeline.Tasks, task)
+		pipeline.Assets = append(pipeline.Assets, task)
 
 		if _, ok := pipeline.TasksByType[task.Type]; !ok {
 			pipeline.TasksByType[task.Type] = make([]*Asset, 0)
@@ -335,7 +335,7 @@ func (b *builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 		pipeline.tasksByName[task.Name] = task
 	}
 
-	for _, asset := range pipeline.Tasks {
+	for _, asset := range pipeline.Assets {
 		for _, upstream := range asset.DependsOn {
 			u, ok := pipeline.tasksByName[upstream]
 			if !ok {

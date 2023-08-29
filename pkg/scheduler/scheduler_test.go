@@ -163,7 +163,7 @@ func TestScheduler_Run(t *testing.T) {
 	// task4 -> task5
 
 	p := &pipeline.Pipeline{
-		Tasks: []*pipeline.Asset{
+		Assets: []*pipeline.Asset{
 			{
 				Name: "task11",
 			},
@@ -273,7 +273,7 @@ func TestScheduler_MarkTasksAndDownstream(t *testing.T) {
 	}
 
 	p := &pipeline.Pipeline{
-		Tasks: []*pipeline.Asset{
+		Assets: []*pipeline.Asset{
 			{
 				Name: "task11",
 			},
@@ -354,7 +354,7 @@ func TestScheduler_WillRunTaskOfType(t *testing.T) {
 	}
 
 	p := &pipeline.Pipeline{
-		Tasks: []*pipeline.Asset{
+		Assets: []*pipeline.Asset{
 			{
 				Name: "task11",
 				Type: "bq.sql",
