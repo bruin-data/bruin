@@ -141,6 +141,7 @@ func TestScheduler_getScheduleableTasks(t *testing.T) {
 			p := &Scheduler{
 				taskInstances: taskInstances,
 			}
+			p.initialize()
 
 			got := p.getScheduleableTasks()
 			gotNames := make([]string, 0, len(got))

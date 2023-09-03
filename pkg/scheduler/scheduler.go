@@ -38,7 +38,7 @@ func (s TaskInstanceType) String() string {
 		return "main"
 	case TaskInstanceTypeColumnCheck:
 		return "column_test"
-	case TaskInstanceTypeCustomTest:
+	case TaskInstanceTypeCustomCheck:
 		return "custom_test"
 	}
 	return "unknown"
@@ -56,7 +56,7 @@ const (
 const (
 	TaskInstanceTypeMain TaskInstanceType = iota
 	TaskInstanceTypeColumnCheck
-	TaskInstanceTypeCustomTest
+	TaskInstanceTypeCustomCheck
 )
 
 type TaskInstance interface {
@@ -142,12 +142,38 @@ func (t *ColumnCheckInstance) GetType() TaskInstanceType {
 	return TaskInstanceTypeColumnCheck
 }
 
+type CustomCheckInstance struct {
+	*AssetInstance
+
+	Check *pipeline.CustomCheck
+}
+
+func (t *CustomCheckInstance) GetType() TaskInstanceType {
+	return TaskInstanceTypeCustomCheck
+}
+
 type TaskExecutionResult struct {
 	Instance TaskInstance
 	Error    error
 }
 
 type InstancesByType map[TaskInstanceType][]TaskInstance
+
+func (i InstancesByType) AddUpstreamByType(instanceType TaskInstanceType, upstream TaskInstance) {
+	foundInstances := i[instanceType]
+	for _, instance := range foundInstances {
+		instance.AddUpstream(upstream)
+		upstream.AddDownstream(instance)
+	}
+}
+
+func (i InstancesByType) AddDownstreamByType(instanceType TaskInstanceType, downstream TaskInstance) {
+	foundInstances := i[instanceType]
+	for _, instance := range foundInstances {
+		instance.AddDownstream(downstream)
+		downstream.AddUpstream(instance)
+	}
+}
 
 type Scheduler struct {
 	logger           *zap.SugaredLogger
@@ -281,10 +307,14 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline) *Scheduler {
 		WorkQueue:        make(chan TaskInstance, 100),
 		Results:          make(chan *TaskExecutionResult),
 	}
-	s.constructTaskNameMap()
-	s.constructInstanceRelationships()
+	s.initialize()
 
 	return s
+}
+
+func (s *Scheduler) initialize() {
+	s.constructTaskNameMap()
+	s.constructInstanceRelationships()
 }
 
 // useful for debugging sessions.
@@ -336,11 +366,8 @@ func (s *Scheduler) constructInstanceRelationships() {
 		}
 
 		assetName := ti.GetAsset().Name
-		columnChecks := s.taskNameMap[assetName][TaskInstanceTypeColumnCheck]
-		for _, instance := range columnChecks {
-			instance.AddUpstream(ti)
-			ti.AddDownstream(instance)
-		}
+		s.taskNameMap[assetName].AddUpstreamByType(TaskInstanceTypeColumnCheck, ti)
+		s.taskNameMap[assetName].AddUpstreamByType(TaskInstanceTypeCustomCheck, ti)
 
 		for _, dep := range ti.GetAsset().DependsOn {
 			upstreamInstances, ok := s.taskNameMap[dep]
@@ -424,11 +451,6 @@ func (s *Scheduler) Kickstart() {
 }
 
 func (s *Scheduler) getScheduleableTasks() []TaskInstance {
-	if s.taskNameMap == nil {
-		s.constructTaskNameMap()
-		s.constructInstanceRelationships()
-	}
-
 	tasks := make([]TaskInstance, 0)
 	for _, task := range s.taskInstances {
 		if task.GetStatus() != Pending {
