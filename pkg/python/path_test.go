@@ -159,7 +159,7 @@ func TestFindRequirementsTxt(t *testing.T) {
 			t.Parallel()
 
 			finder := &ModulePathFinder{}
-			got, err := finder.FindRequirementsTxt(tt.args.repo, tt.args.executable)
+			got, err := finder.FindRequirementsTxtInPath(tt.args.repo.Path, tt.args.executable)
 
 			tt.wantErr(t, err)
 			assert.Equal(t, tt.want, got)

@@ -28,8 +28,8 @@ func (m *mockModuleFinder) FindModulePath(repo *git.Repo, executable *pipeline.E
 	return args.Get(0).(string), args.Error(1)
 }
 
-func (m *mockModuleFinder) FindRequirementsTxt(repo *git.Repo, executable *pipeline.ExecutableFile) (string, error) {
-	args := m.Called(repo, executable)
+func (m *mockModuleFinder) FindRequirementsTxtInPath(path string, executable *pipeline.ExecutableFile) (string, error) {
+	args := m.Called(path, executable)
 	return args.Get(0).(string), args.Error(1)
 }
 
@@ -114,7 +114,7 @@ func TestLocalOperator_RunTask(t *testing.T) {
 				mf.On("FindModulePath", repo, mock.Anything).
 					Return("path.to.module", nil)
 
-				mf.On("FindRequirementsTxt", repo, mock.Anything).
+				mf.On("FindRequirementsTxtInPath", repo.Path, mock.Anything).
 					Return("", assert.AnError)
 			},
 			wantErr: assert.Error,
@@ -130,7 +130,7 @@ func TestLocalOperator_RunTask(t *testing.T) {
 				mf.On("FindModulePath", repo, mock.Anything).
 					Return("path.to.module", nil)
 
-				mf.On("FindRequirementsTxt", repo, mock.Anything).
+				mf.On("FindRequirementsTxtInPath", repo.Path, mock.Anything).
 					Return("", &NoRequirementsFoundError{})
 
 				runner.On("Run", mock.Anything, &executionContext{
@@ -155,7 +155,7 @@ func TestLocalOperator_RunTask(t *testing.T) {
 				mf.On("FindModulePath", repo, mock.Anything).
 					Return("path.to.module", nil)
 
-				mf.On("FindRequirementsTxt", repo, mock.Anything).
+				mf.On("FindRequirementsTxtInPath", repo.Path, mock.Anything).
 					Return("", &NoRequirementsFoundError{})
 
 				msf.On("GetSecretByKey", "key1").Return("value1", nil)
@@ -186,7 +186,7 @@ func TestLocalOperator_RunTask(t *testing.T) {
 				mf.On("FindModulePath", repo, mock.Anything).
 					Return("path.to.module", nil)
 
-				mf.On("FindRequirementsTxt", repo, mock.Anything).
+				mf.On("FindRequirementsTxtInPath", repo.Path, mock.Anything).
 					Return("/path/to/requirements.txt", nil)
 
 				runner.On("Run", mock.Anything, &executionContext{

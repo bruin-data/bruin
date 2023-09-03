@@ -24,7 +24,7 @@ type executionContext struct {
 
 type modulePathFinder interface {
 	FindModulePath(repo *git.Repo, executable *pipeline.ExecutableFile) (string, error)
-	FindRequirementsTxt(repo *git.Repo, executable *pipeline.ExecutableFile) (string, error)
+	FindRequirementsTxtInPath(path string, executable *pipeline.ExecutableFile) (string, error)
 }
 
 type repoFinder interface {
@@ -87,7 +87,7 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		return errors.Wrap(err, "failed to build a module path")
 	}
 
-	requirementsTxt, err := o.module.FindRequirementsTxt(repo, &t.ExecutableFile)
+	requirementsTxt, err := o.module.FindRequirementsTxtInPath(repo.Path, &t.ExecutableFile)
 	if err != nil {
 		var noReqsError *NoRequirementsFoundError
 		switch {
