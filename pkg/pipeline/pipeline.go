@@ -270,7 +270,7 @@ func (p *Pipeline) RelativeAssetPath(t *Asset) string {
 	return pipelineDirectory
 }
 
-func (p Pipeline) HasAssetType(taskType AssetType) bool {
+func (p *Pipeline) HasAssetType(taskType AssetType) bool {
 	_, ok := p.TasksByType[taskType]
 	return ok
 }
