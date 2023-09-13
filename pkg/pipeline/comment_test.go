@@ -7,6 +7,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -159,12 +160,18 @@ func Test_createTaskFromFile(t *testing.T) {
 			got, err := pipeline.CreateTaskFromFileComments(afero.NewOsFs())(tt.args.filePath)
 
 			if tt.wantErr {
-				require.Error(t, err)
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}
 
-			require.Equal(t, tt.want, got)
+			if tt.want == nil {
+				assert.Nil(t, got)
+				return
+			}
+
+			assert.EqualExportedValues(t, *tt.want, *got)
+			// assert.Equal(t, tt.wantErr, err != nil)
 		})
 	}
 }

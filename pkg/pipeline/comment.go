@@ -146,6 +146,7 @@ func commentRowsToTask(commentRows []string) *Asset {
 		Columns:      make([]Column, 0),
 		CustomChecks: make([]CustomCheck, 0),
 		Secrets:      make([]SecretMapping, 0),
+		upstream:     make([]*Asset, 0),
 	}
 
 	for _, row := range commentRows {
