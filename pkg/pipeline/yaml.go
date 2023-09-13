@@ -206,6 +206,9 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		}
 	}
 
+	dependsOn := make([]string, len(definition.Depends))
+	copy(dependsOn, definition.Depends)
+
 	task := Asset{
 		Name:            definition.Name,
 		Description:     definition.Description,
@@ -213,7 +216,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Parameters:      definition.Parameters,
 		Connection:      definition.Connection,
 		Secrets:         make([]SecretMapping, len(definition.Secrets)),
-		DependsOn:       definition.Depends,
+		DependsOn:       dependsOn,
 		ExecutableFile:  ExecutableFile{},
 		Materialization: mat,
 		Columns:         columns,

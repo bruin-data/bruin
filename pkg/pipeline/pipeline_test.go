@@ -64,6 +64,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			Path: absPath("testdata/pipeline/first-pipeline/tasks/task2/task.yaml"),
 			Type: pipeline.YamlTask,
 		},
+		DependsOn:    []string{},
 		Columns:      make([]pipeline.Column, 0),
 		Secrets:      []pipeline.SecretMapping{},
 		CustomChecks: make([]pipeline.CustomCheck, 0),
