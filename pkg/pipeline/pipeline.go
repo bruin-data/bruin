@@ -166,6 +166,7 @@ type Asset struct {
 	Materialization Materialization    `json:"materialization"`
 	Columns         []Column           `json:"columns"`
 	CustomChecks    []CustomCheck      `json:"custom_checks"`
+	Image           string             `json:"image"`
 
 	Pipeline *Pipeline `json:"-"`
 

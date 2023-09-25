@@ -1,6 +1,7 @@
 # @bruin.name: some-python-task
 # @bruin.description: some description goes here
 # @bruin.type: bq.sql
+# @bruin.image: python:3.11
 # @bruin.depends: task1, task2
 # @bruin.depends: task3,task4
 # @bruin.depends: task5, task3

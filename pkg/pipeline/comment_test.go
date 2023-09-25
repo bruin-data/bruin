@@ -145,6 +145,7 @@ func Test_createTaskFromFile(t *testing.T) {
 					"param3": "third-parameter",
 				},
 				Connection:   "conn1",
+				Image:        "python:3.11",
 				Secrets:      []pipeline.SecretMapping{},
 				DependsOn:    []string{"task1", "task2", "task3", "task4", "task5", "task3"},
 				Columns:      make([]pipeline.Column, 0),
