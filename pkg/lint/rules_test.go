@@ -4,7 +4,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -147,7 +146,7 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 				pipeline: pipeline.Pipeline{
 					Assets: []*pipeline.Asset{
 						{
-							Type: executor.TaskTypePython,
+							Type: pipeline.AssetTypePython,
 							DefinitionFile: pipeline.TaskDefinitionFile{
 								Type: pipeline.YamlTask,
 							},
@@ -158,7 +157,7 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 			want: []*Issue{
 				{
 					Task: &pipeline.Asset{
-						Type: executor.TaskTypePython,
+						Type: pipeline.AssetTypePython,
 						DefinitionFile: pipeline.TaskDefinitionFile{
 							Type: pipeline.YamlTask,
 						},

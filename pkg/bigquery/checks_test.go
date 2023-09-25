@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -198,7 +197,7 @@ func runTestsFoCountZeroCheck(t *testing.T, instanceBuilder func(q *mockQuerierW
 				AssetInstance: &scheduler.AssetInstance{
 					Asset: &pipeline.Asset{
 						Name: "dataset.test_asset",
-						Type: executor.TaskTypeBigqueryQuery,
+						Type: pipeline.AssetTypeBigqueryQuery,
 					},
 					Pipeline: &pipeline.Pipeline{
 						Name: "test",

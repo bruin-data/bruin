@@ -13,6 +13,11 @@ import (
 const (
 	CommentTask TaskDefinitionType = "comment"
 	YamlTask    TaskDefinitionType = "yaml"
+
+	AssetTypePython         = AssetType("python")
+	AssetTypeSnowflakeQuery = AssetType("sf.sql")
+	AssetTypeBigqueryQuery  = AssetType("bq.sql")
+	AssetTypeEmpty          = AssetType("empty")
 )
 
 var supportedFileSuffixes = []string{".yml", ".yaml", ".sql", ".py"}
@@ -367,6 +372,13 @@ func (b *builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 		if task == nil {
 			continue
 		}
+
+		// if the definition comes from a Python file the asset is always a Python asset, so force it
+		// at least that's the hypothesis for now
+		if strings.HasSuffix(task.ExecutableFile.Path, ".py") {
+			task.Type = AssetTypePython
+		}
+
 		task.upstream = make([]*Asset, 0)
 		task.downstream = make([]*Asset, 0)
 

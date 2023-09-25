@@ -219,11 +219,11 @@ func Run(isDebug *bool) *cli.Command {
 
 func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connection.Manager, startDate, endDate time.Time) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
-	if s.WillRunTaskOfType(executor.TaskTypePython) {
-		mainExecutors[executor.TaskTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, map[string]string{})
+	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
+		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, map[string]string{})
 	}
 
-	if s.WillRunTaskOfType(executor.TaskTypeBigqueryQuery) {
+	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) {
 		wholeFileExtractor := &query.WholeFileExtractor{
 			Fs:       fs,
 			Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate),
@@ -236,8 +236,8 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 			return nil, err
 		}
 
-		mainExecutors[executor.TaskTypeBigqueryQuery][scheduler.TaskInstanceTypeMain] = bqOperator
-		mainExecutors[executor.TaskTypeBigqueryQuery][scheduler.TaskInstanceTypeColumnCheck] = bqTestRunner
+		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeMain] = bqOperator
+		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeColumnCheck] = bqTestRunner
 	}
 
 	return mainExecutors, nil

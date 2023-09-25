@@ -1,6 +1,5 @@
 # @bruin.name: some-python-task
 # @bruin.description: some description goes here
-# @bruin.type: python
 # @bruin.depends: task1, task2
 # @bruin.depends: task3,task4
 # @bruin.depends: task5, task3

@@ -8,9 +8,9 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
-	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/path"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -70,7 +70,7 @@ func Lint(isDebug *bool) *cli.Command {
 			if len(cm.SelectedEnvironment.Connections.GoogleCloudPlatform) > 0 {
 				rules = append(rules, &lint.QueryValidatorRule{
 					Identifier:  "bigquery-validator",
-					TaskType:    executor.TaskTypeBigqueryQuery,
+					TaskType:    pipeline.AssetTypeBigqueryQuery,
 					Connections: connectionManager,
 					Extractor: &query.WholeFileExtractor{
 						Fs:       fs,

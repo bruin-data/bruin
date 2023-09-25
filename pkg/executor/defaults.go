@@ -5,17 +5,10 @@ import (
 	"github.com/bruin-data/bruin/pkg/scheduler"
 )
 
-const (
-	TaskTypePython         = pipeline.AssetType("python")
-	TaskTypeSnowflakeQuery = pipeline.AssetType("sf.sql")
-	TaskTypeBigqueryQuery  = pipeline.AssetType("bq.sql")
-	TaskTypeEmpty          = pipeline.AssetType("empty")
-)
-
 type Config map[scheduler.TaskInstanceType]Operator
 
 var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
-	TaskTypeBigqueryQuery: {
+	pipeline.AssetTypeBigqueryQuery: {
 		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
 		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
 	},
@@ -46,7 +39,7 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 	"gcs.sensor.object": {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
-	TaskTypeEmpty: {
+	pipeline.AssetTypeEmpty: {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
 	"athena.sql": {
@@ -55,7 +48,7 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 	"athena.sensor.query": {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
-	TaskTypePython: {
+	pipeline.AssetTypePython: {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
 	"python.beta": {
@@ -67,7 +60,7 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 	"s3.sensor.key_sensor": {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
-	TaskTypeSnowflakeQuery: {
+	pipeline.AssetTypeSnowflakeQuery: {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
 	"adjust.export.bq": {

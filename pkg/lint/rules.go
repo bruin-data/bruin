@@ -116,7 +116,7 @@ func EnsureExecutableFileIsValid(fs afero.Fs) PipelineValidator {
 			}
 
 			if task.ExecutableFile.Path == "" {
-				if task.Type == executor.TaskTypePython {
+				if task.Type == pipeline.AssetTypePython {
 					issues = append(issues, &Issue{
 						Task:        task,
 						Description: executableFileCannotBeEmpty,

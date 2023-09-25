@@ -3,7 +3,6 @@ package cmd
 import (
 	"testing"
 
-	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
@@ -59,7 +58,7 @@ func TestRenderCommand_Run(t *testing.T) {
 
 	bqAsset := &pipeline.Asset{
 		Name: "asset1",
-		Type: executor.TaskTypeBigqueryQuery,
+		Type: pipeline.AssetTypeBigqueryQuery,
 		ExecutableFile: pipeline.ExecutableFile{
 			Path: "/path/to/executable",
 		},
@@ -67,7 +66,7 @@ func TestRenderCommand_Run(t *testing.T) {
 
 	nonBqAsset := &pipeline.Asset{
 		Name: "non-bq",
-		Type: executor.TaskTypeEmpty,
+		Type: pipeline.AssetTypeEmpty,
 		ExecutableFile: pipeline.ExecutableFile{
 			Path: "/path/to/executable2",
 		},

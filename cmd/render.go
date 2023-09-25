@@ -8,7 +8,6 @@ import (
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/bruin-data/bruin/pkg/bigquery"
-	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/urfave/cli/v2"
@@ -80,7 +79,7 @@ func (r *RenderCommand) Run(taskPath string) error {
 
 	qq := queries[0]
 
-	if task.Type == executor.TaskTypeBigqueryQuery {
+	if task.Type == pipeline.AssetTypeBigqueryQuery {
 		materialized, err := r.bqMaterializer.Render(task, qq.Query)
 		if err != nil {
 			errorPrinter.Printf("Failed to materialize the query: %v\n", err.Error())
