@@ -28,6 +28,8 @@ linters:
     - interfacebloat
     - cyclop
     - tparallel
+    - depguard
+    - tagalign
   presets:
     - bugs
     - comment

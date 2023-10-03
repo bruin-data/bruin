@@ -49,7 +49,7 @@ func isEmbeddedYamlComment(file afero.File) bool {
 }
 
 func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
-	rows := readUntilComments(file)
+	rows, commentRowEnd := readUntilComments(file)
 	if rows == "" {
 		return nil, errors.New("no embedded YAML found in the comments")
 	}
@@ -66,6 +66,10 @@ func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 
 	scanner := bufio.NewScanner(file)
 	content := ""
+	for i := 0; i < commentRowEnd; i++ {
+		scanner.Scan()
+	}
+
 	for scanner.Scan() {
 		content += scanner.Text() + "\n"
 	}
@@ -79,11 +83,14 @@ func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 	return task, nil
 }
 
-func readUntilComments(file afero.File) string {
+func readUntilComments(file afero.File) (string, int) {
 	scanner := bufio.NewScanner(file)
 	defer func() { _, _ = file.Seek(0, io.SeekStart) }()
 	rows := ""
+	rowCount := 0
 	for scanner.Scan() {
+		rowCount += 1
+
 		rowText := scanner.Text()
 		if rowText == "/* @bruin" {
 			continue
@@ -96,7 +103,7 @@ func readUntilComments(file afero.File) string {
 		rows += rowText + "\n"
 	}
 
-	return strings.TrimSpace(rows)
+	return strings.TrimSpace(rows), rowCount
 }
 
 func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath string) (*Asset, error) {

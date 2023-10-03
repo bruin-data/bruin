@@ -96,7 +96,7 @@ func Test_createTaskFromFile(t *testing.T) {
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "embeddedyaml.sql",
 					Path:    absPath("testdata/comments/embeddedyaml.sql"),
-					Content: mustRead(t, "testdata/comments/embeddedyaml.sql"),
+					Content: "select *\nfrom foo;",
 				},
 				Parameters: map[string]string{
 					"param1":       "first-parameter",
