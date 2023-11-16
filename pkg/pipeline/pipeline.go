@@ -364,7 +364,7 @@ func (b *builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 	}
 
 	for _, file := range taskFiles {
-		task, err := b.CreateTaskFromFile(file)
+		task, err := b.CreateAssetFromFile(file)
 		if err != nil {
 			return nil, err
 		}
@@ -416,7 +416,7 @@ func fileHasSuffix(arr []string, str string) bool {
 	return false
 }
 
-func (b *builder) CreateTaskFromFile(path string) (*Asset, error) {
+func (b *builder) CreateAssetFromFile(path string) (*Asset, error) {
 	isSeparateDefinitionFile := false
 	creator := b.commentTaskCreator
 

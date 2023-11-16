@@ -13,6 +13,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/date"
 	"github.com/bruin-data/bruin/pkg/executor"
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/path"
@@ -92,13 +93,18 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			pipelinePath := inputPath
+			repoRoot, err := git.FindRepoFromPath(inputPath)
+			if err != nil {
+				errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
+				return cli.Exit("", 1)
+			}
 
-			runningForATask := isPathReferencingTask(inputPath)
+			runningForAnAsset := isPathReferencingAsset(inputPath)
 			var task *pipeline.Asset
 
 			runDownstreamTasks := false
-			if runningForATask {
-				task, err = builder.CreateTaskFromFile(inputPath)
+			if runningForAnAsset {
+				task, err = builder.CreateAssetFromFile(inputPath)
 				if err != nil {
 					errorPrinter.Printf("Failed to build task: %v\n", err.Error())
 					return cli.Exit("", 1)
@@ -121,11 +127,11 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			}
 
-			if !runningForATask && c.Bool("downstream") {
+			if !runningForAnAsset && c.Bool("downstream") {
 				infoPrinter.Println("Ignoring the '--downstream' flag since you are running the whole pipeline")
 			}
 
-			cm, err := config.LoadOrCreate(afero.NewOsFs(), path2.Join(pipelinePath, ".bruin.yml"))
+			cm, err := config.LoadOrCreate(afero.NewOsFs(), path2.Join(repoRoot.Path, ".bruin.yml"))
 			if err != nil {
 				errorPrinter.Printf("Failed to load the config file: %v\n", err)
 				return cli.Exit("", 1)
@@ -150,7 +156,7 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			if !runningForATask {
+			if !runningForAnAsset {
 				rules, err := lint.GetRules(logger, fs)
 				if err != nil {
 					errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
@@ -243,7 +249,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 	return mainExecutors, nil
 }
 
-func isPathReferencingTask(p string) bool {
+func isPathReferencingAsset(p string) bool {
 	if strings.HasSuffix(p, pipelineDefinitionFile) {
 		return false
 	}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -44,7 +45,13 @@ func Lint(isDebug *bool) *cli.Command {
 				rootPath = "."
 			}
 
-			cm, err := config.LoadOrCreate(afero.NewOsFs(), path2.Join(rootPath, ".bruin.yml"))
+			repoRoot, err := git.FindRepoFromPath(rootPath)
+			if err != nil {
+				errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
+				return cli.Exit("", 1)
+			}
+
+			cm, err := config.LoadOrCreate(afero.NewOsFs(), path2.Join(repoRoot.Path, ".bruin.yml"))
 			if err != nil {
 				errorPrinter.Printf("Failed to load the config file: %v\n", err)
 				return cli.Exit("", 1)

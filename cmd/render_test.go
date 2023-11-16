@@ -13,7 +13,7 @@ type mockBuilder struct {
 	mock.Mock
 }
 
-func (m *mockBuilder) CreateTaskFromFile(path string) (*pipeline.Asset, error) {
+func (m *mockBuilder) CreateAssetFromFile(path string) (*pipeline.Asset, error) {
 	called := m.Called(path)
 	if called.Get(0) == nil {
 		return nil, called.Error(1)
@@ -100,7 +100,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				taskPath: "/path/to/asset",
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateTaskFromFile", "/path/to/asset").
+				f.builder.On("CreateAssetFromFile", "/path/to/asset").
 					Return(nil, assert.AnError)
 			},
 			wantErr: assert.Error,
@@ -111,7 +111,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				taskPath: "/path/to/asset",
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateTaskFromFile", "/path/to/asset").
+				f.builder.On("CreateAssetFromFile", "/path/to/asset").
 					Return(nil, nil)
 			},
 			wantErr: assert.Error,
@@ -122,7 +122,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				taskPath: "/path/to/asset",
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateTaskFromFile", "/path/to/asset").
+				f.builder.On("CreateAssetFromFile", "/path/to/asset").
 					Return(bqAsset, nil)
 
 				f.extractor.On("ExtractQueriesFromFile", bqAsset.ExecutableFile.Path).
@@ -136,7 +136,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				taskPath: "/path/to/asset",
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateTaskFromFile", "/path/to/asset").
+				f.builder.On("CreateAssetFromFile", "/path/to/asset").
 					Return(bqAsset, nil)
 
 				f.extractor.On("ExtractQueriesFromFile", bqAsset.ExecutableFile.Path).
@@ -153,7 +153,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				taskPath: "/path/to/asset",
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateTaskFromFile", "/path/to/asset").
+				f.builder.On("CreateAssetFromFile", "/path/to/asset").
 					Return(bqAsset, nil)
 
 				f.extractor.On("ExtractQueriesFromFile", bqAsset.ExecutableFile.Path).
@@ -173,7 +173,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				taskPath: "/path/to/asset",
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateTaskFromFile", "/path/to/asset").
+				f.builder.On("CreateAssetFromFile", "/path/to/asset").
 					Return(nonBqAsset, nil)
 
 				f.extractor.On("ExtractQueriesFromFile", nonBqAsset.ExecutableFile.Path).

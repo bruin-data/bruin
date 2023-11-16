@@ -43,7 +43,7 @@ type queryMaterializer interface {
 }
 
 type taskCreator interface {
-	CreateTaskFromFile(path string) (*pipeline.Asset, error)
+	CreateAssetFromFile(path string) (*pipeline.Asset, error)
 }
 
 type RenderCommand struct {
@@ -60,7 +60,7 @@ func (r *RenderCommand) Run(taskPath string) error {
 		return cli.Exit("", 1)
 	}
 
-	task, err := r.builder.CreateTaskFromFile(taskPath)
+	task, err := r.builder.CreateAssetFromFile(taskPath)
 	if err != nil {
 		errorPrinter.Printf("Failed to build asset: %v\n", err.Error())
 		return cli.Exit("", 1)

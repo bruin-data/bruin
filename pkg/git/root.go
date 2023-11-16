@@ -27,6 +27,10 @@ func (*RepoFinder) Repo(path string) (*Repo, error) {
 	}, nil
 }
 
+func FindRepoFromPath(path string) (*Repo, error) {
+	return (&RepoFinder{}).Repo(path)
+}
+
 func rootPath(inputPath string) (string, error) {
 	command := exec.Command("git", "rev-parse", "--show-toplevel")
 	command.Dir = inputPath
