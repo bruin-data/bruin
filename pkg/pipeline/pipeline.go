@@ -231,16 +231,26 @@ func uniqueAssets(assets []*Asset) []*Asset {
 	return unique
 }
 
+type EmptyStringMap map[string]string
+
+func (m EmptyStringMap) MarshalJSON() ([]byte, error) {
+	if m == nil {
+		return json.Marshal(map[string]string{})
+	}
+
+	return json.Marshal(map[string]string(m))
+}
+
 type Pipeline struct {
-	LegacyID           string            `yaml:"id" json:"legacy_id"`
-	Name               string            `yaml:"name" json:"name"`
-	Schedule           schedule          `yaml:"schedule" json:"schedule"`
-	StartDate          string            `yaml:"start_date" json:"start_date"`
-	DefinitionFile     DefinitionFile    `json:"definition_file"`
-	DefaultParameters  map[string]string `yaml:"default_parameters" json:"default_parameters"`
-	DefaultConnections map[string]string `yaml:"default_connections" json:"default_connections"`
-	Assets             []*Asset          `json:"assets"`
-	Notifications      Notifications     `yaml:"notifications" json:"notifications"`
+	LegacyID           string         `yaml:"id" json:"legacy_id"`
+	Name               string         `yaml:"name" json:"name"`
+	Schedule           schedule       `yaml:"schedule" json:"schedule"`
+	StartDate          string         `yaml:"start_date" json:"start_date"`
+	DefinitionFile     DefinitionFile `json:"definition_file"`
+	DefaultParameters  EmptyStringMap `yaml:"default_parameters" json:"default_parameters"`
+	DefaultConnections EmptyStringMap `yaml:"default_connections" json:"default_connections"`
+	Assets             []*Asset       `json:"assets"`
+	Notifications      Notifications  `yaml:"notifications" json:"notifications"`
 
 	TasksByType map[AssetType][]*Asset `json:"-"`
 	tasksByName map[string]*Asset
