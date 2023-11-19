@@ -172,6 +172,7 @@ type Asset struct {
 	Columns         []Column           `json:"columns"`
 	CustomChecks    []CustomCheck      `json:"custom_checks"`
 	Image           string             `json:"image"`
+	Metadata        EmptyStringMap     `json:"metadata"`
 
 	Pipeline *Pipeline `json:"-"`
 
