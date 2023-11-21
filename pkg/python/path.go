@@ -49,6 +49,7 @@ func (m *ModulePathFinder) FindRequirementsTxtInPath(path string, executable *pi
 }
 
 func findFileUntilParent(file, startDir, stopDir string) string {
+	stopDir = filepath.Clean(stopDir)
 	for {
 		potentialPath := filepath.Join(startDir, file)
 		if _, err := os.Stat(potentialPath); err == nil {
@@ -56,6 +57,10 @@ func findFileUntilParent(file, startDir, stopDir string) string {
 		}
 
 		if startDir == stopDir {
+			break
+		}
+
+		if startDir == "/" {
 			break
 		}
 

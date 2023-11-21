@@ -1,6 +1,7 @@
 package python
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -141,6 +142,22 @@ func TestFindRequirementsTxt(t *testing.T) {
 			args: args{
 				repo: &git.Repo{
 					Path: repoPath,
+				},
+				executable: &pipeline.ExecutableFile{
+					Path: abs("./testdata/reqfinder/main.py"),
+				},
+			},
+			want: "",
+			wantErr: func(t assert.TestingT, err error, msgAndArgs ...interface{}) bool {
+				_, ok := err.(*NoRequirementsFoundError) //nolint:errorlint
+				return ok
+			},
+		},
+		{
+			name: "no requirements.txt file found even if the root path ends with a slash",
+			args: args{
+				repo: &git.Repo{
+					Path: fmt.Sprintf("%s/", repoPath),
 				},
 				executable: &pipeline.ExecutableFile{
 					Path: abs("./testdata/reqfinder/main.py"),
