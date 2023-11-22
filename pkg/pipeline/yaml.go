@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"crypto/md5" //nolint:gosec
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,15 @@ import (
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 )
+
+var ValidQualityChecks = map[string]bool{
+	"not_null":        true,
+	"unique":          true,
+	"positive":        true,
+	"min":             true,
+	"max":             true,
+	"accepted_values": true,
+}
 
 func mustBeStringArray(fieldName string, value *yaml.Node) ([]string, error) {
 	var multi []string
@@ -192,12 +202,26 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 
 	columns := make([]Column, len(definition.Columns))
 	for index, column := range definition.Columns {
-		tests := make([]ColumnCheck, len(column.Tests))
-		for i, test := range column.Tests {
-			tests[i] = ColumnCheck{
+		tests := make([]ColumnCheck, 0, len(column.Tests))
+
+		seenTests := make(map[string]bool)
+
+		for _, test := range column.Tests {
+			if !ValidQualityChecks[test.Name] {
+				continue
+			}
+
+			if seenTests[test.Name] {
+				continue
+			}
+
+			seenTests[test.Name] = true
+
+			tests = append(tests, ColumnCheck{
+				ID:    hash(fmt.Sprintf("%s-%s", column.Name, test.Name)),
 				Name:  test.Name,
 				Value: ColumnCheckValue(test.Value),
-			}
+			})
 		}
 
 		columns[index] = Column{
@@ -226,7 +250,9 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 	}
 
 	for index, check := range definition.CustomChecks {
+		// set the ID as the hash of the name
 		task.CustomChecks[index] = CustomCheck{
+			ID:    hash(check.Name),
 			Name:  check.Name,
 			Query: check.Query,
 			Value: ColumnCheckValue(check.Value),
@@ -238,4 +264,8 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 	}
 
 	return &task, nil
+}
+
+func hash(s string) string {
+	return fmt.Sprintf("%x", md5.Sum([]byte(s)))[:8] //nolint:gosec
 }

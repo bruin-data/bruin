@@ -27,6 +27,8 @@ columns:
         value: ['a', 'b', 'c']
       - name: min
         value: 3
+      - name: min
+        value: 5
       - name: pi
         value: 3.14
       - name: intarrays

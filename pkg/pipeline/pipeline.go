@@ -130,6 +130,7 @@ func (v *ColumnCheckValue) MarshalJSON() ([]byte, error) {
 }
 
 type ColumnCheck struct {
+	ID    string           `json:"id"`
 	Name  string           `json:"name"`
 	Value ColumnCheckValue `json:"value"`
 }
@@ -153,6 +154,7 @@ type SecretMapping struct {
 }
 
 type CustomCheck struct {
+	ID    string           `json:"id"`
 	Name  string           `json:"name"`
 	Query string           `json:"query"`
 	Value ColumnCheckValue `json:"value"`

@@ -116,6 +116,7 @@ func Test_createTaskFromFile(t *testing.T) {
 				Columns: make([]pipeline.Column, 0),
 				CustomChecks: []pipeline.CustomCheck{
 					{
+						ID:    "3f268a53",
 						Name:  "check1",
 						Query: "select * from table1",
 						Value: pipeline.ColumnCheckValue{
@@ -172,7 +173,6 @@ func Test_createTaskFromFile(t *testing.T) {
 			}
 
 			assert.EqualExportedValues(t, *tt.want, *got)
-			// assert.Equal(t, tt.wantErr, err != nil)
 		})
 	}
 }

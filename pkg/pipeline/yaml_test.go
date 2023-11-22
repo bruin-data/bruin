@@ -78,33 +78,25 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 						Description: "column one",
 						Checks: []pipeline.ColumnCheck{
 							{
+								ID:   "96fedb21",
 								Name: "unique",
 							},
 							{
+								ID:   "e29a1cbd",
 								Name: "not_null",
 							},
 							{
+								ID:   "bde6c438",
 								Name: "accepted_values",
 								Value: pipeline.ColumnCheckValue{
 									StringArray: &[]string{"a", "b", "c"},
 								},
 							},
 							{
+								ID:   "35dac430",
 								Name: "min",
 								Value: pipeline.ColumnCheckValue{
 									Int: &[]int{3}[0],
-								},
-							},
-							{
-								Name: "pi",
-								Value: pipeline.ColumnCheckValue{
-									Float: &[]float64{3.14}[0],
-								},
-							},
-							{
-								Name: "intarrays",
-								Value: pipeline.ColumnCheckValue{
-									IntArray: &[]int{1, 2, 3},
 								},
 							},
 						},
