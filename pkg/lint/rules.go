@@ -35,10 +35,8 @@ const (
 
 	pipelineContainsCycle = "The pipeline has a cycle with dependencies, make sure there are no cyclic dependencies"
 
-	pipelineSlackFieldEmptyName           = "Slack notifications must have a `name` attribute"
-	pipelineSlackFieldEmptyConnection     = "Slack notifications must have a `connection` attribute"
-	pipelineSlackNameFieldNotUnique       = "The `name` attribute under the Slack notifications must be unique"
-	pipelineSlackConnectionFieldNotUnique = "The `connection` attribute under the Slack notifications must be unique"
+	pipelineSlackFieldEmptyChannel     = "Slack notifications must have a `channel` attribute"
+	pipelineSlackChannelFieldNotUnique = "The `channel` attribute under the Slack notifications must be unique"
 
 	athenaSQLEmptyDatabaseField       = "The `database` parameter cannot be empty"
 	athenaSQLInvalidS3FilePath        = "The `s3_file_path` parameter must start with `s3://`"
@@ -390,38 +388,23 @@ func EnsureAthenaSQLTypeTasksHasDatabaseAndS3FilePath(p *pipeline.Pipeline) ([]*
 func EnsureSlackFieldInPipelineIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
-	slackNames := make([]string, 0, len(p.Notifications.Slack))
-	slackConnections := make([]string, 0)
+	slackChannels := make([]string, 0, len(p.Notifications.Slack))
 	for _, slack := range p.Notifications.Slack {
-		if slack.Name == "" {
+		channelWithoutHash := strings.TrimPrefix(slack.Channel, "#")
+		if channelWithoutHash == "" {
 			issues = append(issues, &Issue{
-				Description: pipelineSlackFieldEmptyName,
+				Description: pipelineSlackFieldEmptyChannel,
+			})
+			continue
+		}
+
+		if isStringInArray(slackChannels, channelWithoutHash) {
+			issues = append(issues, &Issue{
+				Description: pipelineSlackChannelFieldNotUnique,
 			})
 		}
 
-		if slack.Connection == "" {
-			issues = append(issues, &Issue{
-				Description: pipelineSlackFieldEmptyConnection,
-			})
-		}
-
-		if isStringInArray(slackNames, slack.Name) {
-			issues = append(issues, &Issue{
-				Description: pipelineSlackNameFieldNotUnique,
-			})
-		}
-		if slack.Name != "" {
-			slackNames = append(slackNames, slack.Name)
-		}
-
-		if isStringInArray(slackConnections, slack.Connection) {
-			issues = append(issues, &Issue{
-				Description: pipelineSlackConnectionFieldNotUnique,
-			})
-		}
-		if slack.Connection != "" {
-			slackConnections = append(slackConnections, slack.Connection)
-		}
+		slackChannels = append(slackChannels, channelWithoutHash)
 	}
 
 	return issues, nil

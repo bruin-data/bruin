@@ -53,10 +53,7 @@ type Notifications struct {
 }
 
 type SlackNotification struct {
-	Name       string `json:"name"`
-	Connection string `json:"connection"`
-	Success    string `json:"success"`
-	Failure    string `json:"failure"`
+	Channel string `json:"channel"`
 }
 
 type MaterializationType string
