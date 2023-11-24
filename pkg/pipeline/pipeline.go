@@ -3,6 +3,7 @@ package pipeline
 import (
 	"encoding/json"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/path"
@@ -54,6 +55,21 @@ type Notifications struct {
 
 type SlackNotification struct {
 	Channel string `json:"channel"`
+}
+
+func (n Notifications) MarshalJSON() ([]byte, error) {
+	slack := make([]SlackNotification, 0, len(n.Slack))
+	for _, s := range n.Slack {
+		if !reflect.ValueOf(s).IsZero() {
+			slack = append(slack, s)
+		}
+	}
+
+	return json.Marshal(struct {
+		Slack []SlackNotification `json:"slack"`
+	}{
+		Slack: slack,
+	})
 }
 
 type MaterializationType string
