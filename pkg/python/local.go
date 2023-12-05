@@ -62,7 +62,7 @@ func (l *localPythonRunner) Run(ctx context.Context, execCtx *executionContext) 
 		return l.cmd.Run(ctx, execCtx.repo, noDependencyCommand)
 	}
 
-	log(ctx, "asset dependencies are successfully installed, starting execCtx...")
+	log(ctx, "asset dependencies are successfully installed, executing the script...")
 	fullCommand := fmt.Sprintf("source %s/bin/activate && echo 'activated virtualenv' && pip3 install -r %s --quiet --quiet && echo 'installed all the dependencies' && python3 -u -m %s", depsPath, execCtx.requirementsTxt, execCtx.module)
 	return l.cmd.Run(ctx, execCtx.repo, &command{
 		Name:    "/bin/sh",

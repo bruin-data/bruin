@@ -86,6 +86,8 @@ func Lint(isDebug *bool) *cli.Command {
 					WorkerCount: 32,
 					Logger:      logger,
 				})
+			} else {
+				logger.Debug("no GCP connections found, skipping BigQuery validation")
 			}
 
 			linter := lint.NewLinter(path.GetPipelinePaths, builder, rules, logger)

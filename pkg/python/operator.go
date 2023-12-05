@@ -2,6 +2,7 @@ package python
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -106,13 +107,14 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	for _, mapping := range t.Secrets {
 		val, err := o.config.GetSecretByKey(mapping.SecretKey)
 		if err != nil {
-			// we should log sth here
-			continue
+			return errors.Wrapf(err, "there's no secret with the name '%s', make sure you are referring to the right secret and the secret is defined correctly in your .bruin.yml file.", mapping.SecretKey)
 		}
 
-		if val != "" {
-			envVariables[mapping.InjectedKey] = val
+		if val == "" {
+			return errors.New(fmt.Sprintf("there's no secret with the name '%s', make sure you are referring to the right secret and the secret is defined correctly in your .bruin.yml file.", mapping.SecretKey))
 		}
+
+		envVariables[mapping.InjectedKey] = val
 	}
 
 	err = o.runner.Run(ctx, &executionContext{
