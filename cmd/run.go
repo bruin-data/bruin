@@ -212,8 +212,26 @@ func Run(isDebug *bool) *cli.Command {
 				upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
 				if len(upstreamFailedTasks) > 0 {
 					errorPrinter.Printf("The following tasks are skipped due to their upstream failing:\n")
+
+					skippedAssets := make(map[string]int, 0)
 					for _, t := range upstreamFailedTasks {
-						errorPrinter.Printf("  - %s\n", t.GetAsset().Name)
+						if _, ok := skippedAssets[t.GetAsset().Name]; !ok {
+							skippedAssets[t.GetAsset().Name] = 0
+						}
+
+						if t.GetType() == scheduler.TaskInstanceTypeMain {
+							continue
+						}
+
+						skippedAssets[t.GetAsset().Name] += 1
+					}
+
+					for asset, checkCount := range skippedAssets {
+						if checkCount == 0 {
+							errorPrinter.Printf("  - %s\n", asset)
+						} else {
+							errorPrinter.Printf("  - %s %s\n", asset, faint(fmt.Sprintf("(and %d checks)", checkCount)))
+						}
 					}
 				}
 			}
