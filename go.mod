@@ -5,6 +5,7 @@ go 1.20
 require (
 	cloud.google.com/go/bigquery v1.50.0
 	github.com/DATA-DOG/go-sqlmock v1.5.0
+	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d
 	github.com/alecthomas/chroma/v2 v2.7.0
 	github.com/fatih/color v1.15.0
 	github.com/go-playground/validator/v10 v10.12.0

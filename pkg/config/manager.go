@@ -1,15 +1,14 @@
 package config
 
 import (
-	"bufio"
 	"encoding/json"
 	errors "errors"
 	"fmt"
 	fs2 "io/fs"
 	"os"
 	"path"
-	"strings"
 
+	"github.com/bruin-data/bruin/pkg/git"
 	path2 "github.com/bruin-data/bruin/pkg/path"
 	"github.com/spf13/afero"
 	"golang.org/x/oauth2/google"
@@ -213,41 +212,6 @@ func LoadOrCreate(fs afero.Fs, path string) (*Config, error) {
 	return config, ensureConfigIsInGitignore(fs, path)
 }
 
-func ensureConfigIsInGitignore(fs afero.Fs, filePath string) (err error) {
-	// Check if .gitignore file exists in the root of the repository
-	gitignorePath := path.Join(path.Dir(filePath), ".gitignore")
-	exists, err := afero.Exists(fs, gitignorePath)
-	if err != nil {
-		return err
-	}
-
-	fileNameToIgnore := path.Base(filePath)
-	if !exists {
-		// Create a new .gitignore file if it doesn't exist
-		if err = afero.WriteFile(fs, gitignorePath, []byte(fileNameToIgnore), 0o644); err != nil {
-			return err
-		}
-		return nil
-	}
-
-	file, err := fs.OpenFile(gitignorePath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0o644)
-	if err != nil {
-		return err
-	}
-	defer func(open afero.File) {
-		tempErr := open.Close()
-		if tempErr != nil {
-			err = errors.Join(err, fmt.Errorf("failed to close file: %w", tempErr))
-		}
-	}(file)
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		if strings.TrimSpace(scanner.Text()) == fileNameToIgnore {
-			return nil
-		}
-	}
-
-	_, err = file.Write([]byte("\n" + fileNameToIgnore))
-	return err
+func ensureConfigIsInGitignore(fs afero.Fs, filePath string) error {
+	return git.EnsureGivenPatternIsInGitignore(fs, path.Dir(filePath), path.Base(filePath))
 }

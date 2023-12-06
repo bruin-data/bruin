@@ -3,9 +3,14 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	path2 "path"
+	"path/filepath"
+	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
@@ -21,6 +26,8 @@ import (
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/fatih/color"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
 )
@@ -62,6 +69,10 @@ func Run(isDebug *bool) *cli.Command {
 				Aliases: []string{"f"},
 				Usage:   "force the validation even if the environment is a production environment",
 			},
+			&cli.BoolFlag{
+				Name:  "no-log-file",
+				Usage: "do not create a log file for this run",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			logger := makeLogger(*isDebug)
@@ -97,6 +108,30 @@ func Run(isDebug *bool) *cli.Command {
 			if err != nil {
 				errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
 				return cli.Exit("", 1)
+			}
+
+			if !c.Bool("no-log-file") {
+				runID := time.Now().Format("2006_01_02_15_04_05")
+				logPath, err := filepath.Abs(fmt.Sprintf("%s/logs/%s.log", repoRoot.Path, runID))
+				if err != nil {
+					errorPrinter.Printf("Failed to create log file: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				fn, err2 := logOutput(logPath)
+				if err2 != nil {
+					errorPrinter.Printf("Failed to create log file: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				defer fn()
+				color.Output = os.Stdout
+
+				err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/*.log")
+				if err != nil {
+					errorPrinter.Printf("Failed to add the log file to .gitignore: %v\n", err)
+					return cli.Exit("", 1)
+				}
 			}
 
 			runningForAnAsset := isPathReferencingAsset(inputPath)
@@ -156,6 +191,8 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", foundPipeline.Name, len(foundPipeline.Assets))
+
 			if !runningForAnAsset {
 				rules, err := lint.GetRules(logger, fs)
 				if err != nil {
@@ -169,6 +206,8 @@ func Run(isDebug *bool) *cli.Command {
 				if err != nil {
 					return cli.Exit("", 1)
 				}
+			} else {
+				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
 			}
 
 			s := scheduler.NewScheduler(logger, foundPipeline)
@@ -187,7 +226,12 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			ex := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"))
+			ex, err := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"))
+			if err != nil {
+				errorPrinter.Printf("Failed to create executor: %v\n", err)
+				return cli.Exit("", 1)
+			}
+
 			ex.Start(s.WorkQueue, s.Results)
 
 			start := time.Now()
@@ -195,49 +239,53 @@ func Run(isDebug *bool) *cli.Command {
 			duration := time.Since(start)
 
 			successPrinter.Printf("\n\nExecuted %d tasks in %s\n", len(results), duration.Truncate(time.Millisecond).String())
-			errors := make([]*scheduler.TaskExecutionResult, 0)
+			errorsInTaskResults := make([]*scheduler.TaskExecutionResult, 0)
 			for _, res := range results {
 				if res.Error != nil {
-					errors = append(errors, res)
+					errorsInTaskResults = append(errorsInTaskResults, res)
 				}
 			}
 
-			if len(errors) > 0 {
-				errorPrinter.Printf("\nFailed tasks: %d\n", len(errors))
-				for _, t := range errors {
-					errorPrinter.Printf("  - %s\n", t.Instance.GetAsset().Name)
-					errorPrinter.Printf("    └── %s\n\n", t.Error.Error())
-				}
-
-				upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
-				if len(upstreamFailedTasks) > 0 {
-					errorPrinter.Printf("The following tasks are skipped due to their upstream failing:\n")
-
-					skippedAssets := make(map[string]int, 0)
-					for _, t := range upstreamFailedTasks {
-						if _, ok := skippedAssets[t.GetAsset().Name]; !ok {
-							skippedAssets[t.GetAsset().Name] = 0
-						}
-
-						if t.GetType() == scheduler.TaskInstanceTypeMain {
-							continue
-						}
-
-						skippedAssets[t.GetAsset().Name] += 1
-					}
-
-					for asset, checkCount := range skippedAssets {
-						if checkCount == 0 {
-							errorPrinter.Printf("  - %s\n", asset)
-						} else {
-							errorPrinter.Printf("  - %s %s\n", asset, faint(fmt.Sprintf("(and %d checks)", checkCount)))
-						}
-					}
-				}
+			if len(errorsInTaskResults) > 0 {
+				printErrorsInResults(errorsInTaskResults, s)
 			}
 
 			return nil
 		},
+	}
+}
+
+func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) {
+	errorPrinter.Printf("\nFailed tasks: %d\n", len(errorsInTaskResults))
+	for _, t := range errorsInTaskResults {
+		errorPrinter.Printf("  - %s\n", t.Instance.GetAsset().Name)
+		errorPrinter.Printf("    └── %s\n\n", t.Error.Error())
+	}
+
+	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
+	if len(upstreamFailedTasks) > 0 {
+		errorPrinter.Printf("The following tasks are skipped due to their upstream failing:\n")
+
+		skippedAssets := make(map[string]int, 0)
+		for _, t := range upstreamFailedTasks {
+			if _, ok := skippedAssets[t.GetAsset().Name]; !ok {
+				skippedAssets[t.GetAsset().Name] = 0
+			}
+
+			if t.GetType() == scheduler.TaskInstanceTypeMain {
+				continue
+			}
+
+			skippedAssets[t.GetAsset().Name] += 1
+		}
+
+		for asset, checkCount := range skippedAssets {
+			if checkCount == 0 {
+				errorPrinter.Printf("  - %s\n", asset)
+			} else {
+				errorPrinter.Printf("  - %s %s\n", asset, faint(fmt.Sprintf("(and %d checks)", checkCount)))
+			}
+		}
 	}
 }
 
@@ -286,4 +334,75 @@ func isDir(path string) bool {
 	}
 
 	return fileInfo.IsDir()
+}
+
+type clearFileWriter struct {
+	file *os.File
+	m    sync.Mutex
+}
+
+func (c *clearFileWriter) Write(p []byte) (int, error) {
+	c.m.Lock()
+	defer c.m.Unlock()
+	_, err := c.file.Write([]byte(Clean(string(p))))
+	return len(p), err
+}
+
+func logOutput(logPath string) (func(), error) {
+	err := os.MkdirAll(filepath.Dir(logPath), 0o700)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create log directory")
+	}
+
+	// open file read/write | create if not exist | clear file at open if exists
+	f, err := os.OpenFile(logPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o666)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to open log file")
+	}
+
+	// save existing stdout | MultiWriter writes to saved stdout and file
+	mw := io.MultiWriter(os.Stdout, &clearFileWriter{f, sync.Mutex{}})
+
+	// get pipe reader and writer | writes to pipe writer come out pipe reader
+	r, w, err := os.Pipe()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create log pipe")
+	}
+
+	// replace stdout,stderr with pipe writer | all writes to stdout, stderr will go through pipe instead (fmt.print, log)
+	os.Stdout = w
+	os.Stderr = w
+
+	// writes with log.Print should also write to mw
+	log.SetOutput(mw)
+
+	// create channel to control exit | will block until all copies are finished
+	exit := make(chan bool)
+
+	go func() {
+		// copy all reads from pipe to multiwriter, which writes to stdout and file
+		_, err := io.Copy(mw, r)
+		if err != nil {
+			panic(err)
+		}
+		// when r or w is closed copy will finish and true will be sent to channel
+		exit <- true
+	}()
+
+	// function to be deferred in main until program exits
+	return func() {
+		// close writer then block on exit channel | this will let mw finish writing before the program exits
+		_ = w.Close()
+		<-exit
+		// close file after all writes have finished
+		_ = f.Close()
+	}, nil
+}
+
+const ansi = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"
+
+var re = regexp.MustCompile(ansi)
+
+func Clean(str string) string {
+	return re.ReplaceAllString(str, "")
 }

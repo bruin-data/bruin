@@ -169,7 +169,11 @@ func Test_installReqsToHomeDir_EnsureVirtualEnvExists(t *testing.T) {
 				fakeCmd.On("Run", mock.Anything, repo, &command{
 					Name: "python3",
 					Args: []string{"-m", "venv", "/path/to/venv"},
-				}).Return(assert.AnError)
+				}).Return(nil)
+				fakeCmd.On("Run", mock.Anything, repo, &command{
+					Name: "/bin/sh",
+					Args: []string{"-c", "source /path/to/venv/bin/activate && pip3 install -r /path1/requirements.txt --quiet --quiet && echo 'installed all the dependencies'"},
+				}).Return(nil)
 
 				return &fields{
 					fs:     fs,
@@ -177,7 +181,8 @@ func Test_installReqsToHomeDir_EnsureVirtualEnvExists(t *testing.T) {
 					cmd:    fakeCmd,
 				}
 			},
-			wantErr: assert.Error,
+			wantErr: assert.NoError,
+			want:    "/path/to/venv",
 		},
 		{
 			name: "the venv is created successfully",

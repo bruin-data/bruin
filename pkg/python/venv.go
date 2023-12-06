@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/git"
@@ -63,7 +64,17 @@ func (i *installReqsToHomeDir) EnsureVirtualEnvExists(ctx context.Context, repo 
 	})
 
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "failed to create virtualenv")
+	}
+
+	fullCommand := fmt.Sprintf("source %s/bin/activate && pip3 install -r %s --quiet --quiet && echo 'installed all the dependencies'", venvPath, requirementsTxt)
+	err = i.cmd.Run(ctx, repo, &command{
+		Name: "/bin/sh",
+		Args: []string{"-c", fullCommand},
+	})
+
+	if err != nil {
+		return "", errors.Wrap(err, "failed to install dependencies in the new isolated environment")
 	}
 
 	return venvPath, nil

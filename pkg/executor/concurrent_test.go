@@ -66,7 +66,8 @@ func TestConcurrent_Start(t *testing.T) {
 		},
 	}
 
-	ex := NewConcurrent(logger, ops, 8)
+	ex, err := NewConcurrent(logger, ops, 8)
+	assert.NoError(t, err)
 	ex.Start(s.WorkQueue, s.Results)
 
 	results := s.Run(context.Background())

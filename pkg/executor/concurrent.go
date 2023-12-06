@@ -44,7 +44,7 @@ func NewConcurrent(
 	logger *zap.SugaredLogger,
 	taskTypeMap map[pipeline.AssetType]Config,
 	workerCount int,
-) *Concurrent {
+) (*Concurrent, error) {
 	executor := &Sequential{
 		TaskTypeMap: taskTypeMap,
 	}
@@ -65,7 +65,7 @@ func NewConcurrent(
 	return &Concurrent{
 		workerCount: workerCount,
 		workers:     workers,
-	}
+	}, nil
 }
 
 func (c Concurrent) Start(input chan scheduler.TaskInstance, result chan<- *scheduler.TaskExecutionResult) {
@@ -103,7 +103,13 @@ func (w worker) run(taskChannel <-chan scheduler.TaskInstance, results chan<- *s
 		duration := time.Since(start)
 		durationString := fmt.Sprintf("(%s)", duration.Truncate(time.Millisecond).String())
 		w.printLock.Lock()
-		w.printer.Printf("[%s] Finished: %s %s\n", time.Now().Format(timeFormat), task.GetHumanID(), faint(durationString))
+
+		res := "Finished"
+		if err != nil {
+			res = "Failed"
+		}
+
+		w.printer.Printf("[%s] %s: %s %s\n", time.Now().Format(timeFormat), res, task.GetHumanID(), faint(durationString))
 		w.printLock.Unlock()
 
 		results <- &scheduler.TaskExecutionResult{

@@ -30,6 +30,7 @@ linters:
     - tparallel
     - depguard
     - tagalign
+    - gocyclo
   presets:
     - bugs
     - comment
