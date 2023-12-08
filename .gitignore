@@ -125,3 +125,4 @@ Temporary Items
 bin
 __pycache__/
 .bruin.yml
+dist/
