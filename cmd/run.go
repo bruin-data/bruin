@@ -122,7 +122,7 @@ func Run(isDebug *bool) *cli.Command {
 
 				fn, err2 := logOutput(logPath)
 				if err2 != nil {
-					errorPrinter.Printf("Failed to create log file: %v\n", err)
+					errorPrinter.Printf("Failed to create log file: %v\n", err2)
 					return cli.Exit("", 1)
 				}
 
