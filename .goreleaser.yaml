@@ -43,6 +43,9 @@ brews:
       name: karakanb
       email: burak.karakan@getbruin.com
 
+    # Folder inside the repository to put the formula.
+    folder: Formula
+
     # The project name and current git tag are used in the format string.
     #
     # Templates: allowed
