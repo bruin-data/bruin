@@ -351,13 +351,13 @@ func (c *clearFileWriter) Write(p []byte) (int, error) {
 }
 
 func logOutput(logPath string) (func(), error) {
-	err := os.MkdirAll(filepath.Dir(logPath), 0o700)
+	err := os.MkdirAll(filepath.Dir(logPath), 0o755)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create log directory")
 	}
 
 	// open file read/write | create if not exist | clear file at open if exists
-	f, err := os.OpenFile(logPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o666)
+	f, err := os.OpenFile(logPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open log file")
 	}

@@ -126,3 +126,5 @@ bin
 __pycache__/
 .bruin.yml
 dist/
+
+logs/*.log

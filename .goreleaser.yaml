@@ -55,19 +55,27 @@ brews:
     homepage: "https://getbruin.com"
     description: "Bruin is a command-line tool for validating and running data transformations on SQL and Python."
 
-    # Packages your package depends on.
     dependencies:
       - name: git
 
-    # Repository to push the generated files to.
     repository:
-      # Repository owner.
-      #
-      # Templates: allowed
       owner: bruin-data
-
-      # Repository name.
-      #
-      # Templates: allowed
       name: homebrew-tap
+
+nfpms:
+  - package_name: bruin
+    homepage: https://getbruin.com
+    maintainer: Burak Karakan <burak.karakan@getbruin.com>
+    description: "Bruin is a command-line tool for validating and running data transformations on SQL and Python."
+    vendor: Bruin Data
+    license: MIT
+    formats:
+      - apk
+      - deb
+      - rpm
+      - termux.deb
+      - archlinux
+    dependencies:
+      - git
+
 

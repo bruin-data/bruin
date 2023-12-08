@@ -16,13 +16,26 @@ also run Python assets within the same pipeline.
 
 ## Installation
 
+### macOS
+```shell
+brew tap bruin-data/tap
+brew install bruin
+```
+
+### Linux
+Binaries are available on the [releases page](https://github.com/bruin-data/bruin/releases).
+
+### via Golang installer
+
 You need to have Golang installed in the first place, then you can run the following command:
 
 ```shell
 go install github.com/bruin-data/bruin@latest
 ```
 
-Please make sure to add GOPATH to your executable path.
+> [!IMPORTANT]
+> Please make sure to add GOPATH to your executable path.
+
 
 ## Getting Started
 
