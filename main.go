@@ -30,6 +30,7 @@ func main() {
 			cmd.Run(&isDebug),
 			cmd.Render(),
 			cmd.Lineage(),
+			cmd.CleanCmd(),
 		},
 	}
 

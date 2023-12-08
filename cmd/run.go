@@ -32,6 +32,8 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+const LogsFolder = "logs"
+
 func Run(isDebug *bool) *cli.Command {
 	return &cli.Command{
 		Name:      "run",
@@ -112,7 +114,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			if !c.Bool("no-log-file") {
 				runID := time.Now().Format("2006_01_02_15_04_05")
-				logPath, err := filepath.Abs(fmt.Sprintf("%s/logs/%s.log", repoRoot.Path, runID))
+				logPath, err := filepath.Abs(fmt.Sprintf("%s/%s/%s.log", repoRoot.Path, LogsFolder, runID))
 				if err != nil {
 					errorPrinter.Printf("Failed to create log file: %v\n", err)
 					return cli.Exit("", 1)
@@ -127,7 +129,7 @@ func Run(isDebug *bool) *cli.Command {
 				defer fn()
 				color.Output = os.Stdout
 
-				err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/*.log")
+				err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, fmt.Sprintf("%s/*.log", LogsFolder))
 				if err != nil {
 					errorPrinter.Printf("Failed to add the log file to .gitignore: %v\n", err)
 					return cli.Exit("", 1)
