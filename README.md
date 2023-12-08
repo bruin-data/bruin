@@ -1,18 +1,23 @@
-# Bruin
+<p align="center">
+  <img src="./resources/logo-horizontal.svg" width="500" />
+</p>
 
 Bruin is a command-line tool for validating and running data transformations on SQL, similar to dbt. On top, bruin can
 also run Python assets within the same pipeline.
 
+<img alt="Welcome to VHS" src="./resources/demo.gif" width="1200" />
+
+Bruin is built to make your life easier when it comes to data transformations:
 - ✨ run SQL transformations on BigQuery/Snowflake
-- 🐍 run Python in isolated environments
+- 🐍 run Python in isolated environments in the same pipeline
 - 💅 built-in data quality checks
-- 🚀 Jinja templating language to avoid repetition
+- 🚀 Jinja templating to avoid repetition
 - ✅ validate data pipelines end-to-end to catch issues early on via dry-run on live
 - 📐 table/view materialization
 - ➕ incremental tables
-- 💻 mix different technologies + databases in a single pipeline, e.g. SQL and Python in the same pipeline
-
 - ⚡ blazing fast pipeline execution: bruin is written in Golang and uses concurrency at every opportunity
+- 🔒 secrets injection via environment variables
+- 📦 easy to install and use
 
 ## Installation
 
@@ -71,7 +76,6 @@ Then let's create a Python asset `assets/hello.py`:
 
 ```python
 # @bruin.name: hello
-# @bruin.type: python
 # @bruin.depends: dataset.bruin_test
 
 print("Hello, world!")
@@ -178,13 +182,3 @@ Executed 1 tasks in 103ms
 ```
 
 You can optionally pass a `--downstream` flag to run the task with all of its downstreams.
-
-## Upcoming Features
-
-- Secrets for Python assets
-- More databases: Postgres, Redshift, MySQL, and more
-
-## Disclaimer
-
-bruin is still in its early stages, so please use it with caution. We are working on improving the documentation and
-adding more features.
