@@ -7,7 +7,9 @@ import (
 	"path/filepath"
 
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
 )
 
@@ -38,6 +40,12 @@ type CleanCommand struct {
 }
 
 func (r *CleanCommand) Run(inputPath string) error {
+	cm := user.NewConfigManager(afero.NewOsFs())
+	err := cm.RecreateHomeDir()
+	if err != nil {
+		return errors.Wrap(err, "failed to recreate the home directory")
+	}
+
 	repoRoot, err := git.FindRepoFromPath(inputPath)
 	if err != nil {
 		errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
