@@ -27,6 +27,8 @@ type installReqsToHomeDir struct {
 	lock sync.Mutex
 }
 
+const Shell = "/bin/bash"
+
 func (i *installReqsToHomeDir) EnsureVirtualEnvExists(ctx context.Context, repo *git.Repo, requirementsTxt string) (string, error) {
 	err := i.config.EnsureVirtualenvDirExists()
 	if err != nil {
@@ -69,7 +71,7 @@ func (i *installReqsToHomeDir) EnsureVirtualEnvExists(ctx context.Context, repo 
 
 	fullCommand := fmt.Sprintf("source %s/bin/activate && pip3 install -r %s --quiet --quiet && echo 'installed all the dependencies'", venvPath, requirementsTxt)
 	err = i.cmd.Run(ctx, repo, &command{
-		Name: "/bin/sh",
+		Name: Shell,
 		Args: []string{"-c", fullCommand},
 	})
 

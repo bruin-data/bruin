@@ -63,7 +63,7 @@ func (l *localPythonRunner) Run(ctx context.Context, execCtx *executionContext) 
 	}
 	fullCommand := fmt.Sprintf("source %s/bin/activate && echo 'activated virtualenv' && python3 -u -m %s", depsPath, execCtx.module)
 	return l.cmd.Run(ctx, execCtx.repo, &command{
-		Name:    "/bin/sh",
+		Name:    Shell,
 		Args:    []string{"-c", fullCommand},
 		EnvVars: execCtx.envVariables,
 	})

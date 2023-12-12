@@ -131,7 +131,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
-					Name: "/bin/sh",
+					Name: Shell,
 					Args: []string{"-c", expectedCommand},
 				}).Return(assert.AnError)
 
@@ -154,7 +154,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
-					Name: "/bin/sh",
+					Name: Shell,
 					Args: []string{"-c", expectedCommand},
 				}).Return(nil)
 
