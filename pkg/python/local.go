@@ -15,6 +15,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const PathToExecutable = "python3"
+
 type cmd interface {
 	Run(ctx context.Context, repo *git.Repo, command *command) error
 }
@@ -43,7 +45,7 @@ func log(ctx context.Context, message string) {
 
 func (l *localPythonRunner) Run(ctx context.Context, execCtx *executionContext) error {
 	noDependencyCommand := &command{
-		Name:    "python3",
+		Name:    PathToExecutable,
 		Args:    []string{"-u", "-m", execCtx.module},
 		EnvVars: execCtx.envVariables,
 	}
@@ -61,7 +63,7 @@ func (l *localPythonRunner) Run(ctx context.Context, execCtx *executionContext) 
 		log(ctx, "requirements.txt is empty, executing the script right away...")
 		return l.cmd.Run(ctx, execCtx.repo, noDependencyCommand)
 	}
-	fullCommand := fmt.Sprintf("source %s/bin/activate && echo 'activated virtualenv' && python3 -u -m %s", depsPath, execCtx.module)
+	fullCommand := fmt.Sprintf("source %s/bin/activate && echo 'activated virtualenv' && %s -u -m %s", depsPath, PathToExecutable, execCtx.module)
 	return l.cmd.Run(ctx, execCtx.repo, &command{
 		Name:    Shell,
 		Args:    []string{"-c", fullCommand},

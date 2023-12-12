@@ -61,7 +61,7 @@ func (i *installReqsToHomeDir) EnsureVirtualEnvExists(ctx context.Context, repo 
 	}
 
 	err = i.cmd.Run(ctx, repo, &command{
-		Name: "python3",
+		Name: PathToExecutable,
 		Args: []string{"-m", "venv", venvPath},
 	})
 

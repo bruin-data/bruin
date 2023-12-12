@@ -49,7 +49,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 			fields: func() *fields {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
-					Name: "python3",
+					Name: PathToExecutable,
 					Args: []string{"-u", "-m", module},
 				}).Return(assert.AnError)
 
@@ -69,7 +69,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 			fields: func() *fields {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
-					Name: "python3",
+					Name: PathToExecutable,
 					Args: []string{"-u", "-m", module},
 				}).Return(nil)
 
@@ -108,7 +108,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
-					Name: "python3",
+					Name: PathToExecutable,
 					Args: []string{"-u", "-m", module},
 				}).Return(nil)
 

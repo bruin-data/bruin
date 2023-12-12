@@ -167,7 +167,7 @@ func Test_installReqsToHomeDir_EnsureVirtualEnvExists(t *testing.T) {
 
 				fakeCmd := new(mockCmd)
 				fakeCmd.On("Run", mock.Anything, repo, &command{
-					Name: "python3",
+					Name: PathToExecutable,
 					Args: []string{"-m", "venv", "/path/to/venv"},
 				}).Return(nil)
 				fakeCmd.On("Run", mock.Anything, repo, &command{
@@ -201,7 +201,7 @@ func Test_installReqsToHomeDir_EnsureVirtualEnvExists(t *testing.T) {
 
 				fakeCmd := new(mockCmd)
 				fakeCmd.On("Run", mock.Anything, repo, &command{
-					Name: "python3",
+					Name: PathToExecutable,
 					Args: []string{"-m", "venv", "/path/to/venv"},
 				}).Return(assert.AnError)
 
