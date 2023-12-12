@@ -82,3 +82,8 @@ func DirExists(fs afero.Fs, searchDir string) bool {
 	res, err := afero.DirExists(fs, searchDir)
 	return err == nil && res
 }
+
+func FileExists(fs afero.Fs, searchFile string) bool {
+	res, err := afero.Exists(fs, searchFile)
+	return err == nil && res
+}

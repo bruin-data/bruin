@@ -141,6 +141,8 @@ func Test_installReqsToHomeDir_EnsureVirtualEnvExists(t *testing.T) {
 				createRequirementsFile(fs, "req1\nreq2")
 
 				require.NoError(t, fs.MkdirAll("/path/to/venv", 0o755))
+				_, err := fs.Create("/path/to/venv/bin/activate")
+				require.NoError(t, err)
 				return &fields{
 					fs:     fs,
 					config: config,
@@ -167,12 +169,12 @@ func Test_installReqsToHomeDir_EnsureVirtualEnvExists(t *testing.T) {
 
 				fakeCmd := new(mockCmd)
 				fakeCmd.On("Run", mock.Anything, repo, &command{
-					Name: PathToExecutable,
+					Name: "/test/python",
 					Args: []string{"-m", "venv", "/path/to/venv"},
 				}).Return(nil)
 				fakeCmd.On("Run", mock.Anything, repo, &command{
 					Name: Shell,
-					Args: []string{"-c", ". /path/to/venv/bin/activate && pip3 install -r /path1/requirements.txt --quiet --quiet && echo 'installed all the dependencies'"},
+					Args: []string{"-c", ". /path/to/venv/bin/activate && /test/pip3 install -r /path1/requirements.txt --quiet --quiet && echo 'installed all the dependencies'"},
 				}).Return(nil)
 
 				return &fields{
@@ -201,7 +203,7 @@ func Test_installReqsToHomeDir_EnsureVirtualEnvExists(t *testing.T) {
 
 				fakeCmd := new(mockCmd)
 				fakeCmd.On("Run", mock.Anything, repo, &command{
-					Name: PathToExecutable,
+					Name: "/test/python",
 					Args: []string{"-m", "venv", "/path/to/venv"},
 				}).Return(assert.AnError)
 
@@ -221,9 +223,11 @@ func Test_installReqsToHomeDir_EnsureVirtualEnvExists(t *testing.T) {
 
 			f := tt.fields()
 			i := &installReqsToHomeDir{
-				fs:     f.fs,
-				config: f.config,
-				cmd:    f.cmd,
+				fs:           f.fs,
+				config:       f.config,
+				cmd:          f.cmd,
+				pathToPython: "/test/python",
+				pathToPip:    "/test/pip3",
 			}
 
 			got, err := i.EnsureVirtualEnvExists(context.Background(), repo, requirementsTxt)

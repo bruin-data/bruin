@@ -15,8 +15,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const PathToExecutable = "python3"
-
 type cmd interface {
 	Run(ctx context.Context, repo *git.Repo, command *command) error
 }
@@ -28,6 +26,7 @@ type requirementsInstaller interface {
 type localPythonRunner struct {
 	cmd                   cmd
 	requirementsInstaller requirementsInstaller
+	pathToPython          string
 }
 
 func log(ctx context.Context, message string) {
@@ -44,9 +43,10 @@ func log(ctx context.Context, message string) {
 }
 
 func (l *localPythonRunner) Run(ctx context.Context, execCtx *executionContext) error {
+	pythonCommandForScript := fmt.Sprintf("%s -u -m %s", l.pathToPython, execCtx.module)
 	noDependencyCommand := &command{
-		Name:    PathToExecutable,
-		Args:    []string{"-u", "-m", execCtx.module},
+		Name:    Shell,
+		Args:    []string{"-c", pythonCommandForScript},
 		EnvVars: execCtx.envVariables,
 	}
 	if execCtx.requirementsTxt == "" {
@@ -63,7 +63,7 @@ func (l *localPythonRunner) Run(ctx context.Context, execCtx *executionContext) 
 		log(ctx, "requirements.txt is empty, executing the script right away...")
 		return l.cmd.Run(ctx, execCtx.repo, noDependencyCommand)
 	}
-	fullCommand := fmt.Sprintf(". %s/bin/activate && echo 'activated virtualenv' && %s -u -m %s", depsPath, PathToExecutable, execCtx.module)
+	fullCommand := fmt.Sprintf(". %s/bin/activate && echo 'activated virtualenv' && %s", depsPath, pythonCommandForScript)
 	return l.cmd.Run(ctx, execCtx.repo, &command{
 		Name:    Shell,
 		Args:    []string{"-c", fullCommand},

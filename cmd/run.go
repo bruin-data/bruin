@@ -77,6 +77,15 @@ func Run(isDebug *bool) *cli.Command {
 			},
 		},
 		Action: func(c *cli.Context) error {
+			defer func() {
+				if err := recover(); err != nil {
+					log.Println("=======================================")
+					log.Println("Bruin encountered an unexpected error, please report the issue to the Bruin team.")
+					log.Println(err)
+					log.Println("=======================================")
+				}
+			}()
+
 			logger := makeLogger(*isDebug)
 
 			inputPath := c.Args().Get(0)

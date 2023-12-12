@@ -3,6 +3,8 @@ package python
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -52,16 +54,29 @@ func NewLocalOperator(config *config.Config, envVariables map[string]string) *Lo
 	cmdRunner := &commandRunner{}
 	fs := afero.NewOsFs()
 
+	pathToPython, err := findPathToExecutable([]string{"python3", "python"})
+	if err != nil {
+		panic("No executable found for Python, neither 'python3' nor 'python', are you sure Python is installed?")
+	}
+
+	pathToPip, err := findPathToExecutable([]string{"pip3", "pip"})
+	if err != nil {
+		panic("No executable found for pip, neither 'pip3' nor 'pip', are you sure pip is installed?")
+	}
+
 	return &LocalOperator{
 		repoFinder: &git.RepoFinder{},
 		module:     &ModulePathFinder{},
 		runner: &localPythonRunner{
 			cmd: cmdRunner,
 			requirementsInstaller: &installReqsToHomeDir{
-				fs:     fs,
-				cmd:    cmdRunner,
-				config: user.NewConfigManager(fs),
+				fs:           fs,
+				cmd:          cmdRunner,
+				config:       user.NewConfigManager(fs),
+				pathToPython: pathToPython,
+				pathToPip:    pathToPip,
 			},
+			pathToPython: pathToPython,
 		},
 		envVariables: envVariables,
 		config:       config,
@@ -130,4 +145,15 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	}
 
 	return nil
+}
+
+func findPathToExecutable(alternatives []string) (string, error) {
+	for _, alternative := range alternatives {
+		path, err := exec.LookPath(alternative)
+		if err == nil {
+			return path, nil
+		}
+	}
+
+	return "", errors.New("no executable found for alternatives: " + strings.Join(alternatives, ", "))
 }

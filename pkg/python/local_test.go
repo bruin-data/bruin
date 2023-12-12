@@ -2,6 +2,7 @@ package python
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/git"
@@ -27,7 +28,6 @@ func Test_localPythonRunner_Run(t *testing.T) {
 	}
 
 	repo := &git.Repo{}
-	// execCtx := &executionContext{}
 
 	module := "path.to.module"
 	requirementsTxt := "/path/to/requirements.txt"
@@ -49,8 +49,8 @@ func Test_localPythonRunner_Run(t *testing.T) {
 			fields: func() *fields {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
-					Name: PathToExecutable,
-					Args: []string{"-u", "-m", module},
+					Name: Shell,
+					Args: []string{"-c", fmt.Sprintf("/test/python -u -m %s", module)},
 				}).Return(assert.AnError)
 
 				return &fields{
@@ -69,8 +69,8 @@ func Test_localPythonRunner_Run(t *testing.T) {
 			fields: func() *fields {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
-					Name: PathToExecutable,
-					Args: []string{"-u", "-m", module},
+					Name: Shell,
+					Args: []string{"-c", "/test/python -u -m path.to.module"},
 				}).Return(nil)
 
 				return &fields{
@@ -108,8 +108,8 @@ func Test_localPythonRunner_Run(t *testing.T) {
 
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
-					Name: PathToExecutable,
-					Args: []string{"-u", "-m", module},
+					Name: Shell,
+					Args: []string{"-c", "/test/python -u -m path.to.module"},
 				}).Return(nil)
 
 				return &fields{
@@ -127,7 +127,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 				reqs.On("EnsureVirtualEnvExists", mock.Anything, repo, requirementsTxt).
 					Return(venvPath, nil)
 
-				expectedCommand := ". /path/to/venv/bin/activate && echo 'activated virtualenv' && python3 -u -m path.to.module"
+				expectedCommand := ". /path/to/venv/bin/activate && echo 'activated virtualenv' && /test/python -u -m path.to.module"
 
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
@@ -150,7 +150,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 				reqs.On("EnsureVirtualEnvExists", mock.Anything, repo, requirementsTxt).
 					Return(venvPath, nil)
 
-				expectedCommand := ". /path/to/venv/bin/activate && echo 'activated virtualenv' && python3 -u -m path.to.module"
+				expectedCommand := ". /path/to/venv/bin/activate && echo 'activated virtualenv' && /test/python -u -m path.to.module"
 
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
@@ -176,6 +176,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 			l := &localPythonRunner{
 				cmd:                   f.cmd,
 				requirementsInstaller: f.requirementsInstaller,
+				pathToPython:          "/test/python",
 			}
 			tt.wantErr(t, l.Run(context.Background(), tt.execCtx))
 		})
