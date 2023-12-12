@@ -63,7 +63,7 @@ func (l *localPythonRunner) Run(ctx context.Context, execCtx *executionContext) 
 		log(ctx, "requirements.txt is empty, executing the script right away...")
 		return l.cmd.Run(ctx, execCtx.repo, noDependencyCommand)
 	}
-	fullCommand := fmt.Sprintf("source %s/bin/activate && echo 'activated virtualenv' && %s -u -m %s", depsPath, PathToExecutable, execCtx.module)
+	fullCommand := fmt.Sprintf(". %s/bin/activate && echo 'activated virtualenv' && %s -u -m %s", depsPath, PathToExecutable, execCtx.module)
 	return l.cmd.Run(ctx, execCtx.repo, &command{
 		Name:    Shell,
 		Args:    []string{"-c", fullCommand},
