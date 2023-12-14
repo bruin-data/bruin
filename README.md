@@ -122,6 +122,9 @@ environments:
           database: "my-database"
           warehouse: "my-warehouse"
           schema: "my-dev-schema"
+      generic:
+        - name: KEY1
+          value: value1
   production:
     connections:
       google_cloud_platform:
@@ -136,6 +139,8 @@ environments:
           database: "my-database"
           warehouse: "my-warehouse"
           schema: "my-prod-schema" 
+        - name: KEY1
+          value: value1
 ```
 
 You can simply switch the environment using the `--environment` flag, e.g.:
