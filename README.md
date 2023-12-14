@@ -139,6 +139,7 @@ environments:
           database: "my-database"
           warehouse: "my-warehouse"
           schema: "my-prod-schema" 
+      generic:
         - name: KEY1
           value: value1
 ```
