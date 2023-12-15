@@ -49,7 +49,8 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
 	pipeline.AssetTypePython: {
-		scheduler.TaskInstanceTypeMain: NoOpOperator{},
+		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
 	},
 	"python.beta": {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},

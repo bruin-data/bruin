@@ -11,6 +11,11 @@
 # @bruin.connection: conn1
 # @bruin.schedule.days: SUNDAY, MONDAY
 # @bruin.schedule.days: TUESDAY
+# @bruin.columns.col1.checks: not_null, positive
+# @bruin.columns.col1.checks: unique
+# @bruin.columns.col2.checks: not_null, unique
+
+
 
 
 print('hello world')

@@ -223,6 +223,43 @@ func commentRowsToTask(commentRows []string) *Asset {
 			continue
 		}
 
+		if strings.HasPrefix(key, "columns.") {
+			// columns.colname.checks: not_null
+			columns := strings.Split(key, ".")
+			if len(columns) != 3 {
+				continue
+			}
+
+			columnName := columns[1]
+
+			columnIndex := -1
+			for index, column := range task.Columns {
+				if column.Name == columnName {
+					columnIndex = index
+					break
+				}
+			}
+
+			if columnIndex == -1 {
+				task.Columns = append(task.Columns, Column{
+					Name:   columnName,
+					Checks: make([]ColumnCheck, 0),
+				})
+				columnIndex = len(task.Columns) - 1
+			}
+
+			if columns[2] == "checks" {
+				checks := strings.Split(value, ",")
+				for _, check := range checks {
+					task.Columns[columnIndex].Checks = append(task.Columns[columnIndex].Checks, ColumnCheck{
+						Name: strings.TrimSpace(check),
+					})
+				}
+			}
+
+			continue
+		}
+
 		if strings.HasPrefix(key, "materialization.") {
 			materializationKeys := strings.Split(key, ".")
 			if len(materializationKeys) != 2 {
