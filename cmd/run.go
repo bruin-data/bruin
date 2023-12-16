@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/snowflake"
 	"io"
 	"log"
 	"os"
@@ -324,6 +325,23 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 
 		// we set the Python runners to run the checks on BigQuery assuming that there won't be many usecases where a user has both BQ and Snowflake
 		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = bqTestRunner
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) {
+		wholeFileExtractor := &query.WholeFileExtractor{
+			Fs:       fs,
+			Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate),
+		}
+
+		sfOperator := snowflake.NewBasicOperator(conn, wholeFileExtractor, snowflake.Materializer{})
+
+		// sfTestRunner, err := snowflake.NewColumnCheckOperator(conn)
+		// if err != nil {
+		// 	return nil, err
+		// }
+
+		mainExecutors[pipeline.AssetTypeSnowflakeQuery][scheduler.TaskInstanceTypeMain] = sfOperator
+		// mainExecutors[pipeline.AssetTypeSnowflakeQuery][scheduler.TaskInstanceTypeColumnCheck] = sfTestRunner
 	}
 
 	return mainExecutors, nil
