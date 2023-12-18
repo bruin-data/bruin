@@ -91,12 +91,12 @@ func NewColumnCheckOperator(manager connectionFetcher) (*ColumnCheckOperator, er
 func (o ColumnCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	test, ok := ti.(*scheduler.ColumnCheckInstance)
 	if !ok {
-		return errors.New("cannot run a non-column test instance")
+		return errors.New("cannot run a non-column check instance")
 	}
 
 	executor, ok := o.testRunners[test.Check.Name]
 	if !ok {
-		return errors.New("there is no executor configured for the test type, test cannot be run: " + test.Check.Name)
+		return errors.New("there is no executor configured for the check type, check cannot be run: " + test.Check.Name)
 	}
 
 	return executor.Check(ctx, test)

@@ -35,10 +35,15 @@ func NewDB(c *Config) (*DB, error) {
 	return &DB{conn: db}, nil
 }
 
-func (db DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
+func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
+	_, err := db.Select(ctx, query)
+	return err
+}
+
+func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
 	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
 	if err != nil {
-		return errors.Wrap(err, "failed to create snowflake context")
+		return nil, errors.Wrap(err, "failed to create snowflake context")
 	}
 
 	rows, err := db.conn.QueryContext(ctx, query.String())
@@ -60,10 +65,36 @@ func (db DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) erro
 		defer rows.Close()
 	}
 
-	return err
+	if err != nil {
+		return nil, err
+	}
+
+	var result [][]interface{}
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		columns := make([]interface{}, len(cols))
+		columnPointers := make([]interface{}, len(cols))
+		for i := range columns {
+			columnPointers[i] = &columns[i]
+		}
+
+		// Scan the result into the column pointers...
+		if err := rows.Scan(columnPointers...); err != nil {
+			return nil, err
+		}
+
+		result = append(result, columns)
+	}
+
+	return result, err
 }
 
-func (db DB) IsValid(ctx context.Context, query *query.Query) (bool, error) {
+func (db *DB) IsValid(ctx context.Context, query *query.Query) (bool, error) {
 	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
 	if err != nil {
 		return false, errors.Wrap(err, "failed to create snowflake context")

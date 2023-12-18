@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/snowflake"
 	"io"
 	"log"
 	"os"
@@ -27,6 +26,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"

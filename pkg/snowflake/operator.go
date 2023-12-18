@@ -17,8 +17,13 @@ type queryExtractor interface {
 	ExtractQueriesFromFile(filepath string) ([]*query.Query, error)
 }
 
+type SfClient interface {
+	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
+	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
+}
+
 type connectionFetcher interface {
-	GetSfConnection(name string) (*DB, error)
+	GetSfConnection(name string) (SfClient, error)
 }
 
 type BasicOperator struct {
@@ -77,26 +82,26 @@ type ColumnCheckOperator struct {
 	testRunners map[string]testRunner
 }
 
-//func NewColumnCheckOperator(manager connectionFetcher) (*ColumnCheckOperator, error) {
-//	return &ColumnCheckOperator{
-//		testRunners: map[string]testRunner{
-//			"not_null":        &NotNullCheck{conn: manager},
-//			"unique":          &UniqueCheck{conn: manager},
-//			"positive":        &PositiveCheck{conn: manager},
-//			"accepted_values": &AcceptedValuesCheck{conn: manager},
-//		},
-//	}, nil
-//}
+func NewColumnCheckOperator(manager connectionFetcher) (*ColumnCheckOperator, error) {
+	return &ColumnCheckOperator{
+		testRunners: map[string]testRunner{
+			"not_null":        &NotNullCheck{conn: manager},
+			"unique":          &UniqueCheck{conn: manager},
+			"positive":        &PositiveCheck{conn: manager},
+			"accepted_values": &AcceptedValuesCheck{conn: manager},
+		},
+	}, nil
+}
 
 func (o ColumnCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	test, ok := ti.(*scheduler.ColumnCheckInstance)
 	if !ok {
-		return errors.New("cannot run a non-column test instance")
+		return errors.New("cannot run a non-column check instance")
 	}
 
 	executor, ok := o.testRunners[test.Check.Name]
 	if !ok {
-		return errors.New("there is no executor configured for the test type, test cannot be run: " + test.Check.Name)
+		return errors.New("there is no executor configured for the check type, check cannot be run: " + test.Check.Name)
 	}
 
 	return executor.Check(ctx, test)

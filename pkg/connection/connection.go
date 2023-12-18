@@ -2,10 +2,10 @@ package connection
 
 import (
 	"errors"
-	"github.com/bruin-data/bruin/pkg/snowflake"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/snowflake"
 )
 
 type Manager struct {
@@ -30,7 +30,7 @@ func (m *Manager) GetBqConnection(name string) (bigquery.DB, error) {
 	return db, nil
 }
 
-func (m *Manager) GetSfConnection(name string) (*snowflake.DB, error) {
+func (m *Manager) GetSfConnection(name string) (snowflake.SfClient, error) {
 	if m.Snowflake == nil {
 		return nil, errors.New("no snowflake connections found")
 	}
@@ -77,7 +77,6 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 		Database: connection.Database,
 		Schema:   connection.Schema,
 	})
-
 	if err != nil {
 		return err
 	}
