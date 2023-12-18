@@ -315,16 +315,16 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 
 		bqOperator := bigquery.NewBasicOperator(conn, wholeFileExtractor, bigquery.Materializer{})
 
-		bqTestRunner, err := bigquery.NewColumnCheckOperator(conn)
+		bqCheckRunner, err := bigquery.NewColumnCheckOperator(conn)
 		if err != nil {
 			return nil, err
 		}
 
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeMain] = bqOperator
-		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeColumnCheck] = bqTestRunner
+		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner
 
 		// we set the Python runners to run the checks on BigQuery assuming that there won't be many usecases where a user has both BQ and Snowflake
-		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = bqTestRunner
+		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) {
@@ -335,13 +335,13 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 
 		sfOperator := snowflake.NewBasicOperator(conn, wholeFileExtractor, snowflake.Materializer{})
 
-		// sfTestRunner, err := snowflake.NewColumnCheckOperator(conn)
-		// if err != nil {
-		// 	return nil, err
-		// }
+		sfCheckRunner, err := snowflake.NewColumnCheckOperator(conn)
+		if err != nil {
+			return nil, err
+		}
 
 		mainExecutors[pipeline.AssetTypeSnowflakeQuery][scheduler.TaskInstanceTypeMain] = sfOperator
-		// mainExecutors[pipeline.AssetTypeSnowflakeQuery][scheduler.TaskInstanceTypeColumnCheck] = sfTestRunner
+		mainExecutors[pipeline.AssetTypeSnowflakeQuery][scheduler.TaskInstanceTypeColumnCheck] = sfCheckRunner
 	}
 
 	return mainExecutors, nil
