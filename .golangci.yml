@@ -60,3 +60,4 @@ linters-settings:
       - stdlib
       - (or|er)$
       - bigquery.DB
+      - snowflake.SfClient

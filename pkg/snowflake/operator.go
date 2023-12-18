@@ -1,4 +1,4 @@
-package bigquery
+package snowflake
 
 import (
 	"context"
@@ -17,8 +17,13 @@ type queryExtractor interface {
 	ExtractQueriesFromFile(filepath string) ([]*query.Query, error)
 }
 
+type SfClient interface {
+	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
+	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
+}
+
 type connectionFetcher interface {
-	GetBqConnection(name string) (DB, error)
+	GetSfConnection(name string) (SfClient, error)
 }
 
 type BasicOperator struct {
@@ -61,7 +66,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 
 	q.Query = materialized
 
-	conn, err := o.connection.GetBqConnection(p.GetConnectionNameForAsset(t))
+	conn, err := o.connection.GetSfConnection(p.GetConnectionNameForAsset(t))
 	if err != nil {
 		return err
 	}

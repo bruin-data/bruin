@@ -90,6 +90,22 @@ func Lint(isDebug *bool) *cli.Command {
 				logger.Debug("no GCP connections found, skipping BigQuery validation")
 			}
 
+			if len(cm.SelectedEnvironment.Connections.Snowflake) > 0 {
+				rules = append(rules, &lint.QueryValidatorRule{
+					Identifier:  "snowflake-validator",
+					TaskType:    pipeline.AssetTypeSnowflakeQuery,
+					Connections: connectionManager,
+					Extractor: &query.WholeFileExtractor{
+						Fs:       fs,
+						Renderer: query.DefaultJinjaRenderer,
+					},
+					WorkerCount: 32,
+					Logger:      logger,
+				})
+			} else {
+				logger.Debug("no Snowflake connections found, skipping Snowflake validation")
+			}
+
 			linter := lint.NewLinter(path.GetPipelinePaths, builder, rules, logger)
 
 			infoPrinter.Printf("Validating pipelines in '%s' for '%s' environment...\n", rootPath, cm.SelectedEnvironmentName)
