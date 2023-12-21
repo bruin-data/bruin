@@ -57,6 +57,7 @@ func Test_createTaskFromFile(t *testing.T) {
 				filePath: "testdata/comments/test.sql",
 			},
 			want: &pipeline.Asset{
+				ID:          "5812ba61bb0f08ce192bf074c9de21c19355e08cd52e75d008bbff59e5729e5b",
 				Name:        "some-sql-task",
 				Description: "some description goes here",
 				Type:        "bq.sql",
@@ -90,6 +91,7 @@ func Test_createTaskFromFile(t *testing.T) {
 				filePath: "testdata/comments/embeddedyaml.sql",
 			},
 			want: &pipeline.Asset{
+				ID:          "5812ba61bb0f08ce192bf074c9de21c19355e08cd52e75d008bbff59e5729e5b",
 				Name:        "some-sql-task",
 				Description: "some description goes here",
 				Type:        "bq.sql",
@@ -116,7 +118,7 @@ func Test_createTaskFromFile(t *testing.T) {
 				Columns: make([]pipeline.Column, 0),
 				CustomChecks: []pipeline.CustomCheck{
 					{
-						ID:    "3f268a53",
+						ID:    "8a859fd2a56cc37285bc3e307ef0d9fc1d2ec054ea3c7d0ec0ff547cbfacf8dd",
 						Name:  "check1",
 						Query: "select * from table1",
 						Value: pipeline.ColumnCheckValue{
@@ -132,6 +134,7 @@ func Test_createTaskFromFile(t *testing.T) {
 				filePath: absPath("testdata/comments/test.py"), // giving an absolute path here tests the case of double-absolute paths
 			},
 			want: &pipeline.Asset{
+				ID:          "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
 				Name:        "some-python-task",
 				Description: "some description goes here",
 				Type:        "bq.sql",

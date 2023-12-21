@@ -290,5 +290,7 @@ func commentRowsToTask(commentRows []string) *Asset {
 		}
 	}
 
+	task.ID = hash(task.Name)
+
 	return &task
 }

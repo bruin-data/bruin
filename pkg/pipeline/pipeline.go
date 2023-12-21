@@ -174,6 +174,7 @@ type CustomCheck struct {
 }
 
 type Asset struct {
+	ID              string             `json:"id"`
 	Name            string             `json:"name"`
 	Description     string             `json:"description"`
 	Type            AssetType          `json:"type"`

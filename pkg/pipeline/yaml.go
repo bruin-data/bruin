@@ -1,7 +1,7 @@
 package pipeline
 
 import (
-	"crypto/md5" //nolint:gosec
+	"crypto/sha256"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -235,6 +235,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 	copy(dependsOn, definition.Depends)
 
 	task := Asset{
+		ID:              hash(definition.Name),
 		Name:            definition.Name,
 		Description:     definition.Description,
 		Type:            AssetType(definition.Type),
@@ -267,5 +268,5 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 }
 
 func hash(s string) string {
-	return fmt.Sprintf("%x", md5.Sum([]byte(s)))[:8] //nolint:gosec
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(s)))[:64]
 }

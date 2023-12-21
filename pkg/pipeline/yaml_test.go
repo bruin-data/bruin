@@ -49,6 +49,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				filePath: "testdata/yaml/task1/task.yml",
 			},
 			want: &pipeline.Asset{
+				ID:          "afa27b44d43b02a9fea41d13cedc2e4016cfcf87c5dbf990e593669aa8ce286d",
 				Name:        "hello-world",
 				Description: "This is a hello world task",
 				Type:        "bq.sql",
@@ -78,22 +79,22 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 						Description: "column one",
 						Checks: []pipeline.ColumnCheck{
 							{
-								ID:   "96fedb21",
+								ID:   "47f67e812439f6d7b1a8a33a8995547e7c5dc5d9cf11f80191f5200b6d6cf030",
 								Name: "unique",
 							},
 							{
-								ID:   "e29a1cbd",
+								ID:   "6eb532e28e52eaebd4b0fc67a2fdc4e4e22b53f2b611422806160ff427fe2c45",
 								Name: "not_null",
 							},
 							{
-								ID:   "bde6c438",
+								ID:   "b0681ccb3ede10841af57f2dfd787e6f007dc1368a9e13cfebaafb86c4fc185c",
 								Name: "accepted_values",
 								Value: pipeline.ColumnCheckValue{
 									StringArray: &[]string{"a", "b", "c"},
 								},
 							},
 							{
-								ID:   "35dac430",
+								ID:   "b050553c53e0d093800e0e23d76a0870eb3388fd037908d0caa46a8adbd8b74f",
 								Name: "min",
 								Value: pipeline.ColumnCheckValue{
 									Int: &[]int{3}[0],
@@ -115,6 +116,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				filePath: "testdata/yaml/task-with-nested/task.yml",
 			},
 			want: &pipeline.Asset{
+				ID:          "afa27b44d43b02a9fea41d13cedc2e4016cfcf87c5dbf990e593669aa8ce286d",
 				Name:        "hello-world",
 				Description: "This is a hello world task",
 				Type:        "bash",
@@ -140,6 +142,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				filePath: "testdata/yaml/task-with-toplevel-runfile/task.yml",
 			},
 			want: &pipeline.Asset{
+				ID:          "afa27b44d43b02a9fea41d13cedc2e4016cfcf87c5dbf990e593669aa8ce286d",
 				Name:        "hello-world",
 				Description: "This is a hello world task",
 				Type:        "bash",
@@ -165,6 +168,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				filePath: "testdata/yaml/task-with-no-runfile/task.yml",
 			},
 			want: &pipeline.Asset{
+				ID:          "afa27b44d43b02a9fea41d13cedc2e4016cfcf87c5dbf990e593669aa8ce286d",
 				Name:        "hello-world",
 				Description: "This is a hello world task",
 				Type:        "bash",

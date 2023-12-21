@@ -27,6 +27,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 	}
 
 	asset1 := &pipeline.Asset{
+		ID:          "943be81e20336c53de2c8ab40991839ca3b88bcb4f854f03cdbd69825eb369b6",
 		Name:        "task1",
 		Description: "This is a hello world task",
 		Type:        "bash",
@@ -52,6 +53,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 	}
 
 	asset2 := &pipeline.Asset{
+		ID:   "c69409a1840ddb3639a4acbaaec46c238c63b6431cc74ee5254b6dcef7b88c4b",
 		Name: "second-task",
 		Type: "bq.transfer",
 		Parameters: map[string]string{
@@ -71,6 +73,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 	}
 
 	asset3 := &pipeline.Asset{
+		ID:          "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
 		Name:        "some-python-task",
 		Description: "some description goes here",
 		Type:        "python",
@@ -99,6 +102,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 	asset1.AddDownstream(asset3)
 
 	asset4 := &pipeline.Asset{
+		ID:          "5812ba61bb0f08ce192bf074c9de21c19355e08cd52e75d008bbff59e5729e5b",
 		Name:        "some-sql-task",
 		Description: "some description goes here",
 		Type:        "bq.sql",
