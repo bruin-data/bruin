@@ -14,7 +14,17 @@ type Manager struct {
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
-	return m.GetBqConnection(name)
+	conn, err := m.GetBqConnection(name)
+	if err == nil {
+		return conn, nil
+	}
+
+	conn, err = m.GetSfConnection(name)
+	if err == nil {
+		return conn, nil
+	}
+
+	return nil, errors.New("connection not found")
 }
 
 func (m *Manager) GetBqConnection(name string) (bigquery.DB, error) {

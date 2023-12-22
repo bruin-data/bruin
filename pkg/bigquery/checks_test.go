@@ -54,8 +54,8 @@ func TestNotNullCheck_Check(t *testing.T) {
 			conn.On("GetBqConnection", "test").Return(q, nil)
 			return &NotNullCheck{conn: conn}
 		},
-		"SELECT count(*) FROM `dataset.test_asset` WHERE `test_column` IS NULL",
-		"column `test_column` has 5 null values",
+		"SELECT count(*) FROM dataset.test_asset WHERE test_column IS NULL",
+		"column test_column has 5 null values",
 		&pipeline.ColumnCheck{
 			Name: "not_null",
 		},
@@ -72,8 +72,8 @@ func TestPositiveCheck_Check(t *testing.T) {
 			conn.On("GetBqConnection", "test").Return(q, nil)
 			return &PositiveCheck{conn: conn}
 		},
-		"SELECT count(*) FROM `dataset.test_asset` WHERE `test_column` <= 0",
-		"column `test_column` has 5 non-positive values",
+		"SELECT count(*) FROM dataset.test_asset WHERE test_column <= 0",
+		"column test_column has 5 non-positive values",
 		&pipeline.ColumnCheck{
 			Name: "positive",
 		},
@@ -90,8 +90,8 @@ func TestUniqueCheck_Check(t *testing.T) {
 			conn.On("GetBqConnection", "test").Return(q, nil)
 			return &UniqueCheck{conn: conn}
 		},
-		"SELECT COUNT(`test_column`) - COUNT(DISTINCT `test_column`) FROM `dataset.test_asset`",
-		"column `test_column` has 5 non-unique values",
+		"SELECT COUNT(test_column) - COUNT(DISTINCT test_column) FROM dataset.test_asset",
+		"column test_column has 5 non-unique values",
 		&pipeline.ColumnCheck{
 			Name: "unique",
 		},
@@ -108,8 +108,8 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 			conn.On("GetBqConnection", "test").Return(q, nil)
 			return &AcceptedValuesCheck{conn: conn}
 		},
-		"SELECT COUNT(*) FROM `dataset.test_asset` WHERE CAST(`test_column` as STRING) NOT IN (\"test\",\"test2\")",
-		"column `test_column` has 5 rows that are not in the accepted values",
+		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN (\"test\",\"test2\")",
+		"column test_column has 5 rows that are not in the accepted values",
 		&pipeline.ColumnCheck{
 			Name: "accepted_values",
 			Value: pipeline.ColumnCheckValue{
@@ -125,8 +125,8 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 			conn.On("GetBqConnection", "test").Return(q, nil)
 			return &AcceptedValuesCheck{conn: conn}
 		},
-		"SELECT COUNT(*) FROM `dataset.test_asset` WHERE CAST(`test_column` as STRING) NOT IN (\"1\",\"2\")",
-		"column `test_column` has 5 rows that are not in the accepted values",
+		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN (\"1\",\"2\")",
+		"column test_column has 5 rows that are not in the accepted values",
 		&pipeline.ColumnCheck{
 			Name: "accepted_values",
 			Value: pipeline.ColumnCheckValue{
