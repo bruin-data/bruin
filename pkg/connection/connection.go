@@ -1,7 +1,7 @@
 package connection
 
 import (
-	"errors"
+	"github.com/pkg/errors"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -102,14 +102,14 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		conn := conn
 		err := connectionManager.AddBqConnectionFromConfig(&conn)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "failed to add BigQuery connection '%s'", conn.Name)
 		}
 	}
 	for _, conn := range cm.SelectedEnvironment.Connections.Snowflake {
 		conn := conn
 		err := connectionManager.AddSfConnectionFromConfig(&conn)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "failed to add Snowflake connection '%s'", conn.Name)
 		}
 	}
 
