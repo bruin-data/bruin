@@ -1,3 +1,14 @@
+run:
+  skip-dirs:
+    - vendor
+    - .git
+    - .idea
+    - dist
+    - .github
+    - resources
+    - bin
+  allow-parallel-runners: true
+
 linters:
   disable:
     - scopelint
