@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -99,7 +100,7 @@ func (c *AcceptedValuesCheck) Check(ctx context.Context, ti *scheduler.ColumnChe
 		val = *ti.Check.Value.StringArray
 	} else {
 		for _, v := range *ti.Check.Value.IntArray {
-			val = append(val, fmt.Sprintf("%d", v))
+			val = append(val, strconv.Itoa(v))
 		}
 	}
 

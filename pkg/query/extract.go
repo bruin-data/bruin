@@ -48,7 +48,7 @@ func (q Query) String() string {
 var queryCommentRegex = regexp.MustCompile(`(?m)(?s)\/\*.*?\*\/|(^|\s)--.*?\n`)
 
 type renderer interface {
-	Render(string) string
+	Render(query string) string
 }
 
 // FileQuerySplitterExtractor is a regular file extractor, but it splits the queries in the given file into multiple

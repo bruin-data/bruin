@@ -396,7 +396,7 @@ func TestScheduler_WillRunTaskOfType(t *testing.T) {
 	s.MarkAll(Succeeded)
 	s.MarkTask(t12, Pending, true)
 
-	assert.Equal(t, s.InstanceCount(), 9)
+	assert.Equal(t, 9, s.InstanceCount())
 	assert.Equal(t, 5, s.InstanceCountByStatus(Pending))
 	assert.False(t, s.WillRunTaskOfType("sf.sql"))
 	assert.False(t, s.WillRunTaskOfType("random"))

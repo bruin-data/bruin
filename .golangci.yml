@@ -64,3 +64,16 @@ linters-settings:
   goconst:
     min-len: 5
     min-occurrences: 5
+  testifylint:
+    enable:
+      - "bool-compare"
+      - "compares"
+      - "empty"
+      - "error-is-as"
+      - "error-nil"
+      - "expected-actual"
+      - "float-compare"
+      - "len"
+      - "suite-dont-use-pkg"
+      - "suite-extra-assert-call"
+      - "suite-thelper"
