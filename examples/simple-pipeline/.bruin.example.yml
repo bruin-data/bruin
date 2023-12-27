@@ -1,0 +1,50 @@
+default_environment: default
+
+environments:
+  default:
+    connections:
+
+      google_cloud_platform:
+        - name: "gcp"
+          service_account_file: "/path/to/service-account.json"
+          project_id: "name-of-the-project"
+
+      snowflake:
+        - name: "snowflake"
+          username: "my-username"
+          password: "my-password"
+          account: "my-account"
+          warehouse: "my-warehouse"
+          role: "my-role"
+          region: "my-region"
+
+      generic:
+        - name: KEY1
+          value: value1
+        - name: KEY2
+          value: "value2"
+
+  # this is an example of a production environment, you can have as many as you want
+  # you would usually have different set of credentials here so that you can connect to your production resources
+  prod:
+    connections:
+
+      google_cloud_platform:
+        - name: "gcp"
+          service_account_file: "/path/to/service-account.json"
+          project_id: "name-of-the-project"
+
+      snowflake:
+        - name: "snowflake"
+          username: "my-username"
+          password: "my-password"
+          account: "my-account"
+          warehouse: "my-warehouse"
+          role: "my-role"
+          region: "my-region"
+
+      generic:
+        - name: KEY1
+          value: value1
+        - name: KEY2
+          value: "value2"
