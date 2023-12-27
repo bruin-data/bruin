@@ -108,6 +108,7 @@ type columnCheck struct {
 
 type column struct {
 	Name        string        `yaml:"name"`
+	Type        string        `yaml:"type"`
 	Description string        `yaml:"description"`
 	Tests       []columnCheck `yaml:"checks"`
 }
@@ -226,6 +227,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 
 		columns[index] = Column{
 			Name:        column.Name,
+			Type:        strings.ToLower(strings.TrimSpace(column.Type)),
 			Description: column.Description,
 			Checks:      tests,
 		}

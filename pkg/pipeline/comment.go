@@ -230,33 +230,7 @@ func commentRowsToTask(commentRows []string) *Asset {
 				continue
 			}
 
-			columnName := columns[1]
-
-			columnIndex := -1
-			for index, column := range task.Columns {
-				if column.Name == columnName {
-					columnIndex = index
-					break
-				}
-			}
-
-			if columnIndex == -1 {
-				task.Columns = append(task.Columns, Column{
-					Name:   columnName,
-					Checks: make([]ColumnCheck, 0),
-				})
-				columnIndex = len(task.Columns) - 1
-			}
-
-			if columns[2] == "checks" {
-				checks := strings.Split(value, ",")
-				for _, check := range checks {
-					task.Columns[columnIndex].Checks = append(task.Columns[columnIndex].Checks, ColumnCheck{
-						Name: strings.TrimSpace(check),
-					})
-				}
-			}
-
+			handleColumnEntry(columns, &task, value)
 			continue
 		}
 
@@ -293,4 +267,35 @@ func commentRowsToTask(commentRows []string) *Asset {
 	task.ID = hash(task.Name)
 
 	return &task
+}
+
+func handleColumnEntry(columnFields []string, task *Asset, value string) {
+	columnName := columnFields[1]
+
+	columnIndex := -1
+	for index, column := range task.Columns {
+		if column.Name == columnName {
+			columnIndex = index
+			break
+		}
+	}
+
+	if columnIndex == -1 {
+		task.Columns = append(task.Columns, Column{
+			Name:   columnName,
+			Checks: make([]ColumnCheck, 0),
+		})
+		columnIndex = len(task.Columns) - 1
+	}
+
+	if columnFields[2] == "checks" {
+		checks := strings.Split(value, ",")
+		for _, check := range checks {
+			task.Columns[columnIndex].Checks = append(task.Columns[columnIndex].Checks, ColumnCheck{
+				Name: strings.TrimSpace(check),
+			})
+		}
+	} else if columnFields[2] == "type" {
+		task.Columns[columnIndex].Type = strings.ToLower(strings.TrimSpace(value))
+	}
 }

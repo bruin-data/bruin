@@ -154,7 +154,9 @@ func Test_createTaskFromFile(t *testing.T) {
 				DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
 				Columns: []pipeline.Column{
 					{
-						Name: "col1", Checks: []pipeline.ColumnCheck{
+						Name: "col1",
+						Type: "string",
+						Checks: []pipeline.ColumnCheck{
 							{
 								Name: "not_null",
 							},

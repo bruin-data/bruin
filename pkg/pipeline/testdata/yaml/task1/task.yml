@@ -19,6 +19,7 @@ materialization:
 
 columns:
   - name: col1
+    type: "string   " # intentionally left some whitespace
     description: "column one"
     checks:
       - name: unique

@@ -150,6 +150,7 @@ type ColumnCheck struct {
 
 type Column struct {
 	Name        string        `json:"name"`
+	Type        string        `json:"type"`
 	Description string        `json:"description"`
 	Checks      []ColumnCheck `json:"checks"`
 }

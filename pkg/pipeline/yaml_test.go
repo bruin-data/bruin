@@ -77,6 +77,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 					{
 						Name:        "col1",
 						Description: "column one",
+						Type:        "string",
 						Checks: []pipeline.ColumnCheck{
 							{
 								ID:   "47f67e812439f6d7b1a8a33a8995547e7c5dc5d9cf11f80191f5200b6d6cf030",

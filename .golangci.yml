@@ -61,3 +61,6 @@ linters-settings:
       - (or|er)$
       - bigquery.DB
       - snowflake.SfClient
+  goconst:
+    min-len: 5
+    min-occurrences: 5

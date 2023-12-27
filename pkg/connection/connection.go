@@ -1,11 +1,10 @@
 package connection
 
 import (
-	"github.com/pkg/errors"
-
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/pkg/errors"
 )
 
 type Manager struct {
