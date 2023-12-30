@@ -219,7 +219,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			seenTests[test.Name] = true
 
 			tests = append(tests, ColumnCheck{
-				ID:    hash(fmt.Sprintf("%s-%s", column.Name, test.Name)),
+				ID:    hash(fmt.Sprintf("%s-%s-%s", definition.Name, column.Name, test.Name)),
 				Name:  test.Name,
 				Value: ColumnCheckValue(test.Value),
 			})
@@ -255,7 +255,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 	for index, check := range definition.CustomChecks {
 		// set the ID as the hash of the name
 		task.CustomChecks[index] = CustomCheck{
-			ID:    hash(check.Name),
+			ID:    hash(fmt.Sprintf("%s-%s", task.Name, check.Name)),
 			Name:  check.Name,
 			Query: check.Query,
 			Value: ColumnCheckValue(check.Value),

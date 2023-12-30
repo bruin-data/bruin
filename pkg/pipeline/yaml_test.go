@@ -80,22 +80,22 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 						Type:        "string",
 						Checks: []pipeline.ColumnCheck{
 							{
-								ID:   "47f67e812439f6d7b1a8a33a8995547e7c5dc5d9cf11f80191f5200b6d6cf030",
+								ID:   "1cde48c4bee4ad881c5d315dbfd136c708bfe4522ca7b74997017302b38ba763",
 								Name: "unique",
 							},
 							{
-								ID:   "6eb532e28e52eaebd4b0fc67a2fdc4e4e22b53f2b611422806160ff427fe2c45",
+								ID:   "7838b56dee5c090c3c04c356c8c1c249be0830efb1df36eb427b91eeb905875a",
 								Name: "not_null",
 							},
 							{
-								ID:   "b0681ccb3ede10841af57f2dfd787e6f007dc1368a9e13cfebaafb86c4fc185c",
+								ID:   "8656942c1be105de34e9c1f500ad64b34f2c0ecf31e762ac6319e6b8cf9bbdcd",
 								Name: "accepted_values",
 								Value: pipeline.ColumnCheckValue{
 									StringArray: &[]string{"a", "b", "c"},
 								},
 							},
 							{
-								ID:   "b050553c53e0d093800e0e23d76a0870eb3388fd037908d0caa46a8adbd8b74f",
+								ID:   "ea4d2fa734a840d95f0d1a65cfc451d8f8e9d121ea972c5d2c6bf365a6a24b74",
 								Name: "min",
 								Value: pipeline.ColumnCheckValue{
 									Int: &[]int{3}[0],

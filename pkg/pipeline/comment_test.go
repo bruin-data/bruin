@@ -118,7 +118,7 @@ func Test_createTaskFromFile(t *testing.T) {
 				Columns: make([]pipeline.Column, 0),
 				CustomChecks: []pipeline.CustomCheck{
 					{
-						ID:    "8a859fd2a56cc37285bc3e307ef0d9fc1d2ec054ea3c7d0ec0ff547cbfacf8dd",
+						ID:    "480f365424205654f7108f2d0ddf6418faed97652bba106ba4080a967a50e5cf",
 						Name:  "check1",
 						Query: "select * from table1",
 						Value: pipeline.ColumnCheckValue{
