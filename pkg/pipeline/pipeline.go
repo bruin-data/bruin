@@ -181,7 +181,7 @@ type Asset struct {
 	Type            AssetType          `json:"type"`
 	ExecutableFile  ExecutableFile     `json:"executable_file"`
 	DefinitionFile  TaskDefinitionFile `json:"definition_file"`
-	Parameters      map[string]string  `json:"parameters"`
+	Parameters      EmptyStringMap     `json:"parameters"`
 	Connection      string             `json:"connection"`
 	Secrets         []SecretMapping    `json:"secrets"`
 	DependsOn       []string           `json:"upstream"`
