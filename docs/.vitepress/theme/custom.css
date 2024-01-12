@@ -1,0 +1,19 @@
+/* .vitepress/theme/custom.css */
+:root {
+  --vp-c-bruin-50: "#FCF3F3";
+  --vp-c-bruin-100: "#F8E3E3";
+  --vp-c-bruin-200: "#F0C2C2";
+  --vp-c-bruin-300: "#E9A1A1";
+  --vp-c-bruin-400: "#E18080";
+  --vp-c-bruin-500: "#D95F5F";
+  --vp-c-bruin-600: "#CE3232";
+  --vp-c-bruin-700: "#A12626";
+  --vp-c-bruin-800: "#741C1C";
+  --vp-c-bruin-900: "#471111";
+  --vp-c-bruin-950: "#300B0B";
+  
+  --vp-c-brand: var(--vp-c-bruin-500);
+  --vp-c-brand-1: var(--vp-c-bruin-500);
+  --vp-c-brand-2: var(--vp-c-bruin-600);
+  --vp-c-brand-3: var(--vp-c-bruin-500);
+}

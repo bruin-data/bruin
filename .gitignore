@@ -128,3 +128,7 @@ __pycache__/
 dist/
 
 logs/*.log
+
+docs/.vitepress/dist
+docs/.vitepress/cache
+node_modules/
