@@ -218,11 +218,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 
 			seenTests[test.Name] = true
 
-			tests = append(tests, ColumnCheck{
-				ID:    hash(fmt.Sprintf("%s-%s-%s", definition.Name, column.Name, test.Name)),
-				Name:  test.Name,
-				Value: ColumnCheckValue(test.Value),
-			})
+			tests = append(tests, NewColumnCheck(definition.Name, column.Name, test.Name, ColumnCheckValue(test.Value)))
 		}
 
 		columns[index] = Column{

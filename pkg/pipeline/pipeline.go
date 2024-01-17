@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -146,6 +147,14 @@ type ColumnCheck struct {
 	ID    string           `json:"id"`
 	Name  string           `json:"name"`
 	Value ColumnCheckValue `json:"value"`
+}
+
+func NewColumnCheck(assetName, columnName, name string, value ColumnCheckValue) ColumnCheck {
+	return ColumnCheck{
+		ID:    hash(fmt.Sprintf("%s-%s-%s", assetName, columnName, name)),
+		Name:  strings.TrimSpace(name),
+		Value: value,
+	}
 }
 
 type Column struct {

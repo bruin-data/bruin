@@ -17,6 +17,11 @@ var commentMarkers = map[string]string{
 	".py":  "#",
 }
 
+var (
+	possiblePrefixesForCommentBlocks = []string{"/* @bruin", "/*  @bruin", "/*   @bruin", `""" @bruin`, `"""  @bruin`, `"""   @bruin`}
+	possibleSuffixesForCommentBlocks = []string{"@bruin */", "@bruin  */", "@bruin   */", `@bruin """`, `@bruin  """`, `@bruin   """`}
+)
+
 func CreateTaskFromFileComments(fs afero.Fs) TaskCreator {
 	return func(filePath string) (*Asset, error) {
 		extension := filepath.Ext(filePath)
@@ -31,7 +36,7 @@ func CreateTaskFromFileComments(fs afero.Fs) TaskCreator {
 		}
 		defer file.Close()
 
-		if !isEmbeddedYamlComment(file) {
+		if !isEmbeddedYamlComment(file, possiblePrefixesForCommentBlocks) {
 			scanner := bufio.NewScanner(file)
 			return singleLineCommentsToTask(scanner, commentMarker, filePath)
 		}
@@ -40,16 +45,23 @@ func CreateTaskFromFileComments(fs afero.Fs) TaskCreator {
 	}
 }
 
-func isEmbeddedYamlComment(file afero.File) bool {
+func isEmbeddedYamlComment(file afero.File, prefixes []string) bool {
 	scanner := bufio.NewScanner(file)
 	defer func() { _, _ = file.Seek(0, io.SeekStart) }()
 	scanner.Scan()
 	rowText := scanner.Text()
-	return strings.HasPrefix(rowText, "/* @bruin")
+
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(rowText, prefix) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
-	rows, commentRowEnd := readUntilComments(file)
+	rows, commentRowEnd := readUntilComments(file, possiblePrefixesForCommentBlocks, possibleSuffixesForCommentBlocks)
 	if rows == "" {
 		return nil, errors.New("no embedded YAML found in the comments")
 	}
@@ -83,21 +95,27 @@ func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 	return task, nil
 }
 
-func readUntilComments(file afero.File) (string, int) {
+func readUntilComments(file afero.File, prefixes, suffixes []string) (string, int) {
 	scanner := bufio.NewScanner(file)
 	defer func() { _, _ = file.Seek(0, io.SeekStart) }()
 	rows := ""
 	rowCount := 0
+
+OUTER:
 	for scanner.Scan() {
 		rowCount += 1
 
 		rowText := scanner.Text()
-		if rowText == "/* @bruin" {
-			continue
+		for _, suffix := range prefixes {
+			if strings.TrimSpace(rowText) == suffix {
+				continue OUTER
+			}
 		}
 
-		if strings.TrimSpace(rowText) == "@bruin */" {
-			break
+		for _, suffix := range suffixes {
+			if strings.TrimSpace(rowText) == suffix {
+				break OUTER
+			}
 		}
 
 		rows += rowText + "\n"
@@ -291,9 +309,9 @@ func handleColumnEntry(columnFields []string, task *Asset, value string) {
 	if columnFields[2] == "checks" {
 		checks := strings.Split(value, ",")
 		for _, check := range checks {
-			task.Columns[columnIndex].Checks = append(task.Columns[columnIndex].Checks, ColumnCheck{
-				Name: strings.TrimSpace(check),
-			})
+			task.Columns[columnIndex].Checks = append(task.Columns[columnIndex].Checks, NewColumnCheck(
+				task.Name, columnName, strings.TrimSpace(check), ColumnCheckValue{},
+			))
 		}
 	} else if columnFields[2] == "type" {
 		task.Columns[columnIndex].Type = strings.ToLower(strings.TrimSpace(value))
