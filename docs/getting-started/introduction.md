@@ -2,48 +2,40 @@
 outline: deep
 ---
 
-# Runtime API Examples
+# What is Bruin?
 
-This page demonstrates usage of some of the runtime APIs provided by VitePress.
+Bruin is a command-line tool that allows you to build end-to-end data pipelines that can:
+- ingest data using Python
+- transform data using Python and SQL
+- add quality checks to your pipelines
 
-The main `useData()` API can be used to access site, theme, and page data for the current page. It works in both `.md` and `.vue` files:
+You can use Bruin to build your data models inside your data warehouse.
 
-```md
-<script setup>
-import { useData } from 'vitepress'
+<br>
 
-const { theme, page, frontmatter } = useData()
-</script>
+# Installation
+Bruin can be installed with a variety of methods.
 
-## Results
+## MacOS
 
-### Theme Data
-<pre>{{ theme }}</pre>
+If you are on macOS, you can use `brew` to install Bruin:
 
-### Page Data
-<pre>{{ page }}</pre>
-
-### Page Frontmatter
-<pre>{{ frontmatter }}</pre>
+```shell
+brew tap bruin-data/tap
+brew install bruin
 ```
 
-<script setup>
-import { useData } from 'vitepress'
+## Windows & Linux
 
-const { site, theme, page, frontmatter } = useData()
-</script>
 
-## Results
+### Golang
+You can install via Golang installer:
 
-### Theme Data
-<pre>{{ theme }}</pre>
+```shell
+go install github.com/bruin-data/bruin@v0.1.5
+```
 
-### Page Data
-<pre>{{ page }}</pre>
+### Pre-built binaries
+You can download [one of the pre-built releases](https://github.com/bruin-data/bruin/releases) for your environment.
 
-### Page Frontmatter
-<pre>{{ frontmatter }}</pre>
 
-## More
-
-Check out the documentation for the [full list of runtime APIs](https://vitepress.dev/reference/runtime-api#usedata).
