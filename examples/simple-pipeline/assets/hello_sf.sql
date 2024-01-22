@@ -19,8 +19,6 @@ columns:
         - name: positive
         - name: accepted_values
           value: [1, 2]
-
-
 @bruin */
 
 select 1 as one

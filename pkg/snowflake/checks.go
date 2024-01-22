@@ -2,9 +2,9 @@ package snowflake
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -17,20 +17,30 @@ type NotNullCheck struct {
 
 func ensureCountZero(check string, res [][]interface{}) (int64, error) {
 	if len(res) != 1 || len(res[0]) != 1 {
-		return 0, errors.Errorf("unexpected result from query during %s check", check)
+		return 0, errors.Errorf("unexpected result from query during %s check: %v", check, res)
 	}
 
-	nullCount, ok := res[0][0].(int64)
-	if !ok {
-		nullCountInt, ok := res[0][0].(int)
-		if !ok {
-			return 0, errors.Errorf("unexpected result from query during %s check, cannot cast result to integer", check)
+	switch v := res[0][0].(type) {
+	case nil:
+		return 0, errors.Errorf("unexpected result from query during %s check, result is nil", check)
+	case float64:
+		return int64(v), nil
+	case float32:
+		return int64(v), nil
+	case int64:
+		return v, nil
+	case int:
+		return int64(v), nil
+	case string:
+		atoi, err := strconv.Atoi(v)
+		if err != nil {
+			return 0, errors.Errorf("unexpected result from query during %s check, cannot cast result string to integer: %v", check, res)
 		}
 
-		nullCount = int64(nullCountInt)
+		return int64(atoi), nil
 	}
 
-	return nullCount, nil
+	return 0, errors.Errorf("unexpected result from query during %s check, cannot cast result to integer: %v", check, res)
 }
 
 func (c *NotNullCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
@@ -104,13 +114,8 @@ func (c *AcceptedValuesCheck) Check(ctx context.Context, ti *scheduler.ColumnChe
 		}
 	}
 
-	res, err := json.Marshal(val)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal accepted values for the query result")
-	}
-
-	sz := len(res)
-	res = res[1 : sz-1]
+	res := strings.Join(val, "','")
+	res = fmt.Sprintf("'%s'", res)
 
 	qq := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE CAST(%s as STRING) NOT IN (%s)", ti.GetAsset().Name, ti.Column.Name, res)
 	return (&countZeroCheck{

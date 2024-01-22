@@ -162,6 +162,11 @@ func TestJinjaRendererWithStartEndDate(t *testing.T) {
 			want:  "set analysis_end_date = '2022-02-04'::date; 2022-02-07",
 		},
 		{
+			name:  "things that are not in the template should be remove",
+			query: "set analysis_end_date = '{{ whatever }}'::date;",
+			want:  "set analysis_end_date = ''::date;",
+		},
+		{
 			name: "array variables work",
 			query: `
 {%- set payment_methods = ["bank_transfer", "credit_card", "gift_card"] -%}

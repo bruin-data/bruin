@@ -78,13 +78,14 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 	}
 
 	db, err := snowflake.NewDB(&snowflake.Config{
-		Account:  connection.Account,
-		Username: connection.Username,
-		Password: connection.Password,
-		Region:   connection.Region,
-		Role:     connection.Role,
-		Database: connection.Database,
-		Schema:   connection.Schema,
+		Account:   connection.Account,
+		Username:  connection.Username,
+		Password:  connection.Password,
+		Region:    connection.Region,
+		Role:      connection.Role,
+		Database:  connection.Database,
+		Schema:    connection.Schema,
+		Warehouse: connection.Warehouse,
 	})
 	if err != nil {
 		return err

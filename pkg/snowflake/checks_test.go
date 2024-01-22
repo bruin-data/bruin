@@ -108,7 +108,7 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 			conn.On("GetSfConnection", "test").Return(q, nil)
 			return &AcceptedValuesCheck{conn: conn}
 		},
-		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN (\"test\",\"test2\")",
+		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN ('test','test2')",
 		"column 'test_column' has 5 rows that are not in the accepted values",
 		&pipeline.ColumnCheck{
 			Name: "accepted_values",
@@ -125,7 +125,7 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 			conn.On("GetSfConnection", "test").Return(q, nil)
 			return &AcceptedValuesCheck{conn: conn}
 		},
-		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN (\"1\",\"2\")",
+		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN ('1','2')",
 		"column 'test_column' has 5 rows that are not in the accepted values",
 		&pipeline.ColumnCheck{
 			Name: "accepted_values",
@@ -180,6 +180,11 @@ func runTestsFoCountZeroCheck(t *testing.T, instanceBuilder func(q *mockQuerierW
 		{
 			name:    "no null values found, test passed",
 			setup:   setupFunc([][]interface{}{{0}}, nil),
+			wantErr: assert.NoError,
+		},
+		{
+			name:    "no null values found, result is a string, test passed",
+			setup:   setupFunc([][]interface{}{{"0"}}, nil),
 			wantErr: assert.NoError,
 		},
 	}
