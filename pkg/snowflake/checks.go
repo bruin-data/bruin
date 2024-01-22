@@ -15,7 +15,7 @@ type NotNullCheck struct {
 	conn connectionFetcher
 }
 
-func ensureCountZero(check string, res [][]interface{}) (int64, error) {
+func EnsureQualityCheckResultCountIsZero(check string, res [][]interface{}) (int64, error) {
 	if len(res) != 1 || len(res[0]) != 1 {
 		return 0, errors.Errorf("unexpected result from query during %s check: %v", check, res)
 	}
@@ -146,7 +146,7 @@ func (c *countZeroCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckIns
 		return errors.Wrapf(err, "failed '%s' check", c.checkName)
 	}
 
-	count, err := ensureCountZero(c.checkName, res)
+	count, err := EnsureQualityCheckResultCountIsZero(c.checkName, res)
 	if err != nil {
 		return err
 	}
