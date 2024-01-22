@@ -278,6 +278,7 @@ type Pipeline struct {
 	DefaultConnections EmptyStringMap `yaml:"default_connections" json:"default_connections"`
 	Assets             []*Asset       `json:"assets"`
 	Notifications      Notifications  `yaml:"notifications" json:"notifications"`
+	Catchup            bool           `yaml:"catchup" json:"catchup"`
 
 	TasksByType map[AssetType][]*Asset `json:"-"`
 	tasksByName map[string]*Asset
