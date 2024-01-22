@@ -145,7 +145,8 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			"slack":           "slack-connection",
 			"gcpConnectionId": "gcp-connection-id-here",
 		},
-		Assets: []*pipeline.Asset{asset1, asset2, asset3, asset4},
+		Retries: 3,
+		Assets:  []*pipeline.Asset{asset1, asset2, asset3, asset4},
 	}
 	fs := afero.NewOsFs()
 	tests := []struct {
@@ -222,6 +223,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			assert.Equal(t, tt.want.DefinitionFile, got.DefinitionFile)
 			assert.Equal(t, tt.want.DefaultConnections, got.DefaultConnections)
 			assert.Equal(t, tt.want.DefaultParameters, got.DefaultParameters)
+			assert.Equal(t, tt.want.Retries, got.Retries)
 
 			for i, asset := range tt.want.Assets {
 				gotAsset := got.Assets[i]

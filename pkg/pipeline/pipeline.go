@@ -279,6 +279,7 @@ type Pipeline struct {
 	Assets             []*Asset       `json:"assets"`
 	Notifications      Notifications  `yaml:"notifications" json:"notifications"`
 	Catchup            bool           `yaml:"catchup" json:"catchup"`
+	Retries            int            `yaml:"retries" json:"retries"`
 
 	TasksByType map[AssetType][]*Asset `json:"-"`
 	tasksByName map[string]*Asset

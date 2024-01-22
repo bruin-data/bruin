@@ -1,5 +1,6 @@
 id: first-pipeline
 schedule: ""
+retries: 3
 default_connections:
   slack: "slack-connection"
   gcpConnectionId: "gcp-connection-id-here"
