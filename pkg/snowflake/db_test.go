@@ -140,7 +140,7 @@ func TestDB_Select(t *testing.T) {
 				Query: "some broken query",
 			},
 			wantErr:      true,
-			errorMessage: "some actual error",
+			errorMessage: fmt.Sprintf("%s  -  some actual error", invalidQueryError),
 		},
 		{
 			name: "generic errors are just propagated",

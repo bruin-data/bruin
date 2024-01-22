@@ -46,19 +46,15 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 		return nil, errors.Wrap(err, "failed to create snowflake context")
 	}
 
-	rows, err := db.conn.QueryContext(ctx, query.String())
+	queryString := query.String()
+	rows, err := db.conn.QueryContext(ctx, queryString)
 	if err == nil {
 		err = rows.Err()
 	}
 
 	if err != nil {
 		errorMessage := err.Error()
-		if strings.Contains(errorMessage, invalidQueryError) {
-			errorSegments := strings.Split(errorMessage, "\n")
-			if len(errorSegments) > 1 {
-				err = errors.New(errorSegments[1])
-			}
-		}
+		err = errors.New(strings.ReplaceAll(errorMessage, "\n", "  -  "))
 	}
 
 	if rows != nil {
