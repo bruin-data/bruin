@@ -16,4 +16,5 @@ print("snowflake is injected from a connection, its value is:", gcpConnection)
 gcpConnAsDict = json.loads(gcpConnection)
 print(gcpConnAsDict)
 
+print("Also some global variables: ", os.getenv('BRUIN_START_DATE'), os.getenv('BRUIN_RUN_ID'))
 print("We are done here.")

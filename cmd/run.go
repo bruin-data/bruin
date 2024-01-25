@@ -122,8 +122,8 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			runID := time.Now().Format("2006_01_02_15_04_05")
 			if !c.Bool("no-log-file") {
-				runID := time.Now().Format("2006_01_02_15_04_05")
 				logPath, err := filepath.Abs(fmt.Sprintf("%s/%s/%s.log", repoRoot.Path, LogsFolder, runID))
 				if err != nil {
 					errorPrinter.Printf("Failed to create log file: %v\n", err)
@@ -232,7 +232,7 @@ func Run(isDebug *bool) *cli.Command {
 				s.MarkTask(task, scheduler.Pending, runDownstreamTasks)
 			}
 
-			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate)
+			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, runID)
 			if err != nil {
 				errorPrinter.Printf(err.Error())
 				return cli.Exit("", 1)
@@ -301,10 +301,20 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	}
 }
 
-func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connection.Manager, startDate, endDate time.Time) (map[pipeline.AssetType]executor.Config, error) {
+func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connection.Manager, startDate, endDate time.Time, runID string) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
-		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, map[string]string{})
+		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, map[string]string{
+			"BRUIN_START_DATE":             startDate.Format("2006-01-02"),
+			"BRUIN_START_DATE_NODASH":      startDate.Format("20060102"),
+			"BRUIN_START_DATETIME":         startDate.Format("2006-01-02T15:04:05"),
+			"BRUIN_START_DATETIME_WITH_TZ": startDate.Format(time.RFC3339),
+			"BRUIN_END_DATE":               endDate.Format("2006-01-02"),
+			"BRUIN_END_DATE_NODASH":        endDate.Format("20060102"),
+			"BRUIN_END_DATETIME":           endDate.Format("2006-01-02T15:04:05"),
+			"BRUIN_END_DATETIME_WITH_TZ":   endDate.Format(time.RFC3339),
+			"BRUIN_RUN_ID":                 runID,
+		})
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) {
