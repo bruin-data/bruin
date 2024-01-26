@@ -17,7 +17,7 @@ type NotNullCheck struct {
 }
 
 func ensureCountZero(check string, res [][]interface{}) (int64, error) {
-	return snowflake.EnsureQualityCheckResultCountIsZero(check, res)
+	return snowflake.CastQualityCheckResultToInteger(check, res)
 }
 
 func (c *NotNullCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {

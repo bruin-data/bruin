@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -297,6 +298,24 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline) *Scheduler {
 				}
 				instances = append(instances, testInstance)
 			}
+		}
+
+		for _, check := range task.CustomChecks {
+			c := check
+			humanIDName := strings.ReplaceAll(strings.ToLower(c.Name), " ", "_")
+			testInstance := &CustomCheckInstance{
+				AssetInstance: &AssetInstance{
+					ID:         uuid.New().String(),
+					HumanID:    fmt.Sprintf("%s:custom-check:%s", task.Name, humanIDName),
+					Pipeline:   p,
+					Asset:      task,
+					status:     Pending,
+					upstream:   make([]TaskInstance, 0),
+					downstream: make([]TaskInstance, 0),
+				},
+				Check: &c,
+			}
+			instances = append(instances, testInstance)
 		}
 	}
 

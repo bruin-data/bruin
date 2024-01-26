@@ -74,17 +74,17 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	return conn.RunQueryWithoutResult(ctx, q)
 }
 
-type testRunner interface {
+type columnCheckRunner interface {
 	Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error
 }
 
 type ColumnCheckOperator struct {
-	testRunners map[string]testRunner
+	testRunners map[string]columnCheckRunner
 }
 
 func NewColumnCheckOperator(manager connectionFetcher) (*ColumnCheckOperator, error) {
 	return &ColumnCheckOperator{
-		testRunners: map[string]testRunner{
+		testRunners: map[string]columnCheckRunner{
 			"not_null":        &NotNullCheck{conn: manager},
 			"unique":          &UniqueCheck{conn: manager},
 			"positive":        &PositiveCheck{conn: manager},
@@ -105,4 +105,27 @@ func (o ColumnCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance)
 	}
 
 	return executor.Check(ctx, test)
+}
+
+type customCheckRunner interface {
+	Check(ctx context.Context, ti *scheduler.CustomCheckInstance) error
+}
+
+func NewCustomCheckOperator(manager connectionFetcher) (*CustomCheckOperator, error) {
+	return &CustomCheckOperator{
+		checkRunner: &CustomCheck{conn: manager},
+	}, nil
+}
+
+type CustomCheckOperator struct {
+	checkRunner customCheckRunner
+}
+
+func (o *CustomCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	instance, ok := ti.(*scheduler.CustomCheckInstance)
+	if !ok {
+		return errors.New("cannot run a non-custom check instance")
+	}
+
+	return o.checkRunner.Check(ctx, instance)
 }

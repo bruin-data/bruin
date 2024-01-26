@@ -48,7 +48,7 @@ func Run(isDebug *bool) *cli.Command {
 			&cli.IntFlag{
 				Name:  "workers",
 				Usage: "number of workers to run the tasks in parallel",
-				Value: 8,
+				Value: 16,
 			},
 			&cli.StringFlag{
 				Name:        "start-date",
@@ -220,6 +220,7 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			} else {
 				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
+				infoPrinter.Printf(" - custom checks: %d\n", len(task.CustomChecks))
 			}
 
 			s := scheduler.NewScheduler(logger, foundPipeline)
@@ -350,8 +351,14 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 			return nil, err
 		}
 
+		sfCustomCheckRunner, err := snowflake.NewCustomCheckOperator(conn)
+		if err != nil {
+			return nil, err
+		}
+
 		mainExecutors[pipeline.AssetTypeSnowflakeQuery][scheduler.TaskInstanceTypeMain] = sfOperator
 		mainExecutors[pipeline.AssetTypeSnowflakeQuery][scheduler.TaskInstanceTypeColumnCheck] = sfCheckRunner
+		mainExecutors[pipeline.AssetTypeSnowflakeQuery][scheduler.TaskInstanceTypeCustomCheck] = sfCustomCheckRunner
 
 		// we set the Python runners to run the checks on Snowflake assuming that there won't be many usecases where a user has both BQ and Snowflake
 		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = sfCheckRunner

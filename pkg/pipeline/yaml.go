@@ -119,9 +119,9 @@ type secretMapping struct {
 }
 
 type customCheck struct {
-	Name  string           `yaml:"name"`
-	Query string           `yaml:"query"`
-	Value columnCheckValue `yaml:"value"`
+	Name  string `yaml:"name"`
+	Query string `yaml:"query"`
+	Value int64  `yaml:"value"`
 }
 
 type taskDefinition struct {
@@ -254,7 +254,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			ID:    hash(fmt.Sprintf("%s-%s", task.Name, check.Name)),
 			Name:  check.Name,
 			Query: check.Query,
-			Value: ColumnCheckValue(check.Value),
+			Value: check.Value,
 		}
 	}
 

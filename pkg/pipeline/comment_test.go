@@ -24,8 +24,6 @@ func Test_createTaskFromFile(t *testing.T) {
 		filePath string
 	}
 
-	intValueForCustomCheck := 16
-
 	absPath := func(path string) string {
 		absolutePath, _ := filepath.Abs(path)
 		return absolutePath
@@ -121,9 +119,7 @@ func Test_createTaskFromFile(t *testing.T) {
 						ID:    "480f365424205654f7108f2d0ddf6418faed97652bba106ba4080a967a50e5cf",
 						Name:  "check1",
 						Query: "select * from table1",
-						Value: pipeline.ColumnCheckValue{
-							Int: &intValueForCustomCheck,
-						},
+						Value: 16,
 					},
 				},
 			},
@@ -249,9 +245,7 @@ func Test_createTaskFromFile(t *testing.T) {
 						ID:    "a26c19e73c6b5cdee1b1bfe135a475979f360b9e7fdfc19a7fca1832d034adbc",
 						Name:  "check1",
 						Query: "select 5",
-						Value: pipeline.ColumnCheckValue{
-							Int: &intValueForCustomCheck,
-						},
+						Value: 16,
 					},
 				},
 			},

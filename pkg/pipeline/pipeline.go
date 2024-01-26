@@ -177,10 +177,10 @@ type SecretMapping struct {
 }
 
 type CustomCheck struct {
-	ID    string           `json:"id"`
-	Name  string           `json:"name"`
-	Query string           `json:"query"`
-	Value ColumnCheckValue `json:"value"`
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Query string `json:"query"`
+	Value int64  `json:"value"`
 }
 
 type Asset struct {
