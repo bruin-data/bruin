@@ -331,8 +331,14 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 			return nil, err
 		}
 
+		bqCustomCheckRunner, err := bigquery.NewCustomCheckOperator(conn)
+		if err != nil {
+			return nil, err
+		}
+
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeMain] = bqOperator
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner
+		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeCustomCheck] = bqCustomCheckRunner
 
 		// we set the Python runners to run the checks on BigQuery assuming that there won't be many usecases where a user has both BQ and Snowflake
 		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner

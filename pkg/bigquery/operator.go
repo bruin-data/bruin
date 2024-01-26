@@ -101,3 +101,26 @@ func (o ColumnCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance)
 
 	return executor.Check(ctx, test)
 }
+
+type customCheckRunner interface {
+	Check(ctx context.Context, ti *scheduler.CustomCheckInstance) error
+}
+
+func NewCustomCheckOperator(manager connectionFetcher) (*CustomCheckOperator, error) {
+	return &CustomCheckOperator{
+		checkRunner: &CustomCheck{conn: manager},
+	}, nil
+}
+
+type CustomCheckOperator struct {
+	checkRunner customCheckRunner
+}
+
+func (o *CustomCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	instance, ok := ti.(*scheduler.CustomCheckInstance)
+	if !ok {
+		return errors.New("cannot run a non-custom check instance")
+	}
+
+	return o.checkRunner.Check(ctx, instance)
+}

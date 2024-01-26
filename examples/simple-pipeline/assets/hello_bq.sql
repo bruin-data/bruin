@@ -20,6 +20,11 @@ columns:
         - name: accepted_values
           value: [1, 2]
 
+custom_checks:
+  - name: This is a custom check name
+    value: 2
+    query: select count(*) from dashboard.hello_bq
+
 
 @bruin */
 

@@ -23,7 +23,7 @@ func ensureCountZero(check string, res [][]interface{}) (int64, error) {
 func (c *NotNullCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s IS NULL", ti.GetAsset().Name, ti.Column.Name)
 
-	return (&countZeroCheck{
+	return (&countableQueryCheck{
 		conn:          c.conn,
 		queryInstance: &query.Query{Query: qq},
 		checkName:     "not_null",
@@ -39,7 +39,7 @@ type PositiveCheck struct {
 
 func (c *PositiveCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s <= 0", ti.GetAsset().Name, ti.Column.Name)
-	return (&countZeroCheck{
+	return (&countableQueryCheck{
 		conn:          c.conn,
 		queryInstance: &query.Query{Query: qq},
 		checkName:     "positive",
@@ -55,7 +55,7 @@ type UniqueCheck struct {
 
 func (c *UniqueCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	qq := fmt.Sprintf("SELECT COUNT(%s) - COUNT(DISTINCT %s) FROM %s", ti.Column.Name, ti.Column.Name, ti.GetAsset().Name)
-	return (&countZeroCheck{
+	return (&countableQueryCheck{
 		conn:          c.conn,
 		queryInstance: &query.Query{Query: qq},
 		checkName:     "unique",
@@ -100,7 +100,7 @@ func (c *AcceptedValuesCheck) Check(ctx context.Context, ti *scheduler.ColumnChe
 	res = res[1 : sz-1]
 
 	qq := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE CAST(%s as STRING) NOT IN (%s)", ti.GetAsset().Name, ti.Column.Name, res)
-	return (&countZeroCheck{
+	return (&countableQueryCheck{
 		conn:          c.conn,
 		queryInstance: &query.Query{Query: qq},
 		checkName:     "accepted_values",
@@ -110,15 +110,24 @@ func (c *AcceptedValuesCheck) Check(ctx context.Context, ti *scheduler.ColumnChe
 	}).Check(ctx, ti)
 }
 
-type countZeroCheck struct {
-	conn          connectionFetcher
-	queryInstance *query.Query
-	checkName     string
-	customError   func(count int64) error
+type countableQueryCheck struct {
+	conn                connectionFetcher
+	expectedQueryResult int64
+	queryInstance       *query.Query
+	checkName           string
+	customError         func(count int64) error
 }
 
-func (c *countZeroCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
-	q, err := c.conn.GetBqConnection(ti.Pipeline.GetConnectionNameForAsset(ti.GetAsset()))
+func (c *countableQueryCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
+	return c.check(ctx, ti.Pipeline.GetConnectionNameForAsset(ti.GetAsset()))
+}
+
+func (c *countableQueryCheck) CustomCheck(ctx context.Context, ti *scheduler.CustomCheckInstance) error {
+	return c.check(ctx, ti.Pipeline.GetConnectionNameForAsset(ti.GetAsset()))
+}
+
+func (c *countableQueryCheck) check(ctx context.Context, connectionName string) error {
+	q, err := c.conn.GetBqConnection(connectionName)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get connection for '%s' check", c.checkName)
 	}
@@ -133,10 +142,25 @@ func (c *countZeroCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckIns
 		return err
 	}
 
-	if count != 0 {
+	if count != c.expectedQueryResult {
 		return c.customError(count)
-		// return errors.Errorf("column %s has %d positive values", ti.Column.Name, count)
 	}
 
 	return nil
+}
+
+type CustomCheck struct {
+	conn connectionFetcher
+}
+
+func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstance) error {
+	return (&countableQueryCheck{
+		conn:                c.conn,
+		expectedQueryResult: ti.Check.Value,
+		queryInstance:       &query.Query{Query: ti.Check.Query},
+		checkName:           ti.Check.Name,
+		customError: func(count int64) error {
+			return errors.Errorf("custom check '%s' has returned %d instead of the expected %d", ti.Check.Name, count, ti.Check.Value)
+		},
+	}).CustomCheck(ctx, ti)
 }
