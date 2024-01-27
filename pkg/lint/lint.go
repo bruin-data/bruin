@@ -135,14 +135,16 @@ func (l *Linter) LintPipelines(pipelines []*pipeline.Pipeline) (*PipelineAnalysi
 }
 
 func (l *Linter) LintPipeline(p *pipeline.Pipeline) (*PipelineIssues, error) {
+	return RunLintRulesOnPipeline(p, l.rules)
+}
+
+func RunLintRulesOnPipeline(p *pipeline.Pipeline, rules []Rule) (*PipelineIssues, error) {
 	pipelineResult := &PipelineIssues{
 		Pipeline: p,
 		Issues:   make(map[Rule][]*Issue),
 	}
 
-	for _, rule := range l.rules {
-		l.logger.Debugf("checking rule '%s' for pipeline '%s'", rule.Name(), p.Name)
-
+	for _, rule := range rules {
 		issues, err := rule.Validate(p)
 		if err != nil {
 			return nil, err
