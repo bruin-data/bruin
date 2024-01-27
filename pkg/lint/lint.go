@@ -77,7 +77,7 @@ func (l *Linter) Lint(rootPath, pipelineDefinitionFileName string) (*PipelineAna
 	l.logger.Debugf("found %d pipelines", len(pipelinePaths))
 	sort.Strings(pipelinePaths)
 
-	err = ensureNoNestedPipelines(pipelinePaths)
+	err = EnsureNoNestedPipelines(pipelinePaths)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func (l *Linter) LintPipelines(pipelines []*pipeline.Pipeline) (*PipelineAnalysi
 	result := &PipelineAnalysisResult{}
 
 	for _, p := range pipelines {
-		pipelineResult, err := l.lintPipeline(p)
+		pipelineResult, err := l.LintPipeline(p)
 		if err != nil {
 			return nil, err
 		}
@@ -134,7 +134,7 @@ func (l *Linter) LintPipelines(pipelines []*pipeline.Pipeline) (*PipelineAnalysi
 	return result, nil
 }
 
-func (l *Linter) lintPipeline(p *pipeline.Pipeline) (*PipelineIssues, error) {
+func (l *Linter) LintPipeline(p *pipeline.Pipeline) (*PipelineIssues, error) {
 	pipelineResult := &PipelineIssues{
 		Pipeline: p,
 		Issues:   make(map[Rule][]*Issue),
@@ -156,7 +156,7 @@ func (l *Linter) lintPipeline(p *pipeline.Pipeline) (*PipelineIssues, error) {
 	return pipelineResult, nil
 }
 
-func ensureNoNestedPipelines(pipelinePaths []string) error {
+func EnsureNoNestedPipelines(pipelinePaths []string) error {
 	var previousPath string
 	for i, path := range pipelinePaths {
 		if i != 0 && strings.HasPrefix(path, fmt.Sprintf("%s/", previousPath)) {
