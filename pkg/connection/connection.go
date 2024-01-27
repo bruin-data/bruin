@@ -5,6 +5,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/pkg/errors"
+	"github.com/sourcegraph/conc"
 )
 
 type Manager struct {
@@ -98,20 +99,29 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 
 func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	connectionManager := &Manager{}
+
+	var wg conc.WaitGroup
 	for _, conn := range cm.SelectedEnvironment.Connections.GoogleCloudPlatform {
 		conn := conn
-		err := connectionManager.AddBqConnectionFromConfig(&conn)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to add BigQuery connection '%s'", conn.Name)
-		}
+		wg.Go(func() {
+			err := connectionManager.AddBqConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add BigQuery connection '%s'", conn.Name))
+			}
+		})
 	}
+
 	for _, conn := range cm.SelectedEnvironment.Connections.Snowflake {
 		conn := conn
-		err := connectionManager.AddSfConnectionFromConfig(&conn)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to add Snowflake connection '%s'", conn.Name)
-		}
+		wg.Go(func() {
+			err := connectionManager.AddSfConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add Snowflake connection '%s'", conn.Name))
+			}
+		})
 	}
+
+	wg.Wait()
 
 	return connectionManager, nil
 }

@@ -2,10 +2,9 @@ package lint
 
 import (
 	"github.com/spf13/afero"
-	"go.uber.org/zap"
 )
 
-func GetRules(logger *zap.SugaredLogger, fs afero.Fs) ([]Rule, error) {
+func GetRules(fs afero.Fs) ([]Rule, error) {
 	rules := []Rule{
 		&SimpleRule{
 			Identifier: "task-name-valid",
@@ -52,8 +51,6 @@ func GetRules(logger *zap.SugaredLogger, fs afero.Fs) ([]Rule, error) {
 			Validator:  EnsureStartDateIsValid,
 		},
 	}
-
-	logger.Debugf("successfully loaded %d rules", len(rules))
 
 	return rules, nil
 }

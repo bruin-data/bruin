@@ -45,11 +45,13 @@ func Lint(isDebug *bool) *cli.Command {
 				rootPath = "."
 			}
 
+			logger.Debugf("using root path '%s'", rootPath)
 			repoRoot, err := git.FindRepoFromPath(rootPath)
 			if err != nil {
 				errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
 				return cli.Exit("", 1)
 			}
+			logger.Debugf("found repo root '%s'", repoRoot.Path)
 
 			cm, err := config.LoadOrCreate(afero.NewOsFs(), path2.Join(repoRoot.Path, ".bruin.yml"))
 			if err != nil {
@@ -57,10 +59,14 @@ func Lint(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			logger.Debugf("loaded the config")
+
 			err = switchEnvironment(c, cm, os.Stdin)
 			if err != nil {
 				return err
 			}
+
+			logger.Debugf("switched to the environment '%s'", cm.SelectedEnvironmentName)
 
 			connectionManager, err := connection.NewManagerFromConfig(cm)
 			if err != nil {
@@ -68,11 +74,15 @@ func Lint(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			rules, err := lint.GetRules(logger, fs)
+			logger.Debugf("built the connection manager instance")
+
+			rules, err := lint.GetRules(fs)
 			if err != nil {
 				errorPrinter.Printf("An error occurred while building the validation rules: %v\n", err)
 				return cli.Exit("", 1)
 			}
+
+			logger.Debugf("successfully loaded %d rules", len(rules))
 
 			if len(cm.SelectedEnvironment.Connections.GoogleCloudPlatform) > 0 {
 				rules = append(rules, &lint.QueryValidatorRule{
