@@ -1,6 +1,7 @@
 package lint
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -1298,6 +1299,177 @@ func TestEnsureStartDateIsValid(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestEnsureMaterializationValuesAreValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		assets  []*pipeline.Asset
+		want    []string
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "no materialization",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "view materialization has extra fields",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:           pipeline.MaterializationTypeView,
+						Strategy:       "whatever",
+						IncrementalKey: "whatever",
+						ClusterBy:      []string{"whatever"},
+						PartitionBy:    "whatever",
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want: []string{
+				materializationStrategyIsNotSupportedForViews,
+				materializationIncrementalKeyNotSupportedForViews,
+				materializationClusterByNotSupportedForViews,
+				materializationPartitionByNotSupportedForViews,
+			},
+		},
+		{
+			name: "table materialization has create+replace, all good",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyCreateReplace,
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "table materialization has append, all good",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyAppend,
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "table materialization has delete+insert but no incremental key",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyDeleteInsert,
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want: []string{
+				"Materialization strategy 'delete+insert' requires the 'incremental_key' field to be set",
+			},
+		},
+		{
+			name: "some random materialization strategy is used",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: "whatever",
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want: []string{
+				fmt.Sprintf(
+					"Materialization strategy 'whatever' is not supported, available strategies are: %v",
+					[]pipeline.MaterializationStrategy{
+						pipeline.MaterializationStrategyCreateReplace,
+						pipeline.MaterializationStrategyAppend,
+						pipeline.MaterializationStrategyDeleteInsert,
+					},
+				),
+			},
+		},
+		{
+			name: "some random materialization type is used",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type: "whatever",
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want: []string{
+				fmt.Sprintf(
+					"Materialization type 'whatever' is not supported, available types are: %v",
+					[]pipeline.MaterializationType{
+						pipeline.MaterializationTypeNone,
+						pipeline.MaterializationTypeView,
+					},
+				),
+			},
+		},
+		{
+			name: "successful table incremental materialization",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:           pipeline.MaterializationTypeTable,
+						Strategy:       pipeline.MaterializationStrategyDeleteInsert,
+						IncrementalKey: "dt",
+						ClusterBy:      []string{"dt"},
+						PartitionBy:    "dt",
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := EnsureMaterializationValuesAreValid(&pipeline.Pipeline{
+				Assets: tt.assets,
+			})
+
+			if !tt.wantErr(t, err) {
+				return
+			}
+
+			// I am doing this because I don't care if I get a nil or empty slice
+			if tt.want != nil {
+				gotMessages := make([]string, len(got))
+				for i, issue := range got {
+					gotMessages[i] = issue.Description
+				}
+
+				assert.Equal(t, tt.want, gotMessages)
+			} else {
+				assert.Equal(t, []*Issue{}, got)
+			}
 		})
 	}
 }

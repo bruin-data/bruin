@@ -47,8 +47,8 @@ func GetRules(fs afero.Fs) ([]Rule, error) {
 			Validator:  EnsureSlackFieldInPipelineIsValid,
 		},
 		&SimpleRule{
-			Identifier: "valid-start-date",
-			Validator:  EnsureStartDateIsValid,
+			Identifier: "materialization-config",
+			Validator:  EnsureMaterializationValuesAreValid,
 		},
 	}
 

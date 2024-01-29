@@ -42,6 +42,11 @@ const (
 	athenaSQLInvalidS3FilePath        = "The `s3_file_path` parameter must start with `s3://`"
 	athenaSQLMissingDatabaseParameter = "The `database` parameter is required for Athena SQL tasks"
 	athenaSQLEmptyS3FilePath          = "The `s3_file_path` parameter cannot be empty"
+
+	materializationStrategyIsNotSupportedForViews     = "Materialization strategy is not supported for views"
+	materializationPartitionByNotSupportedForViews    = "Materialization partition by is not supported for views because views cannot be partitioned"
+	materializationIncrementalKeyNotSupportedForViews = "Materialization incremental key is not supported for views because views cannot be updated incrementally"
+	materializationClusterByNotSupportedForViews      = "Materialization cluster by is not supported for views because views cannot be clustered"
 )
 
 var validIDRegexCompiled = regexp.MustCompile(validIDRegex)
@@ -405,6 +410,90 @@ func EnsureSlackFieldInPipelineIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
 		}
 
 		slackChannels = append(slackChannels, channelWithoutHash)
+	}
+
+	return issues, nil
+}
+
+func EnsureMaterializationValuesAreValid(p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	for _, asset := range p.Assets {
+		switch asset.Materialization.Type {
+		case pipeline.MaterializationTypeNone:
+			continue
+		case pipeline.MaterializationTypeView:
+			if asset.Materialization.Strategy != pipeline.MaterializationStrategyNone {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: materializationStrategyIsNotSupportedForViews,
+				})
+			}
+
+			if asset.Materialization.IncrementalKey != "" {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: materializationIncrementalKeyNotSupportedForViews,
+				})
+			}
+
+			if asset.Materialization.ClusterBy != nil {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: materializationClusterByNotSupportedForViews,
+				})
+			}
+
+			if asset.Materialization.PartitionBy != "" {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: materializationPartitionByNotSupportedForViews,
+				})
+			}
+
+		case pipeline.MaterializationTypeTable:
+			if asset.Materialization.Strategy == pipeline.MaterializationStrategyNone {
+				continue
+			}
+
+			switch asset.Materialization.Strategy {
+			case pipeline.MaterializationStrategyNone:
+			case pipeline.MaterializationStrategyCreateReplace:
+			case pipeline.MaterializationStrategyAppend:
+				continue
+			case pipeline.MaterializationStrategyDeleteInsert:
+				if asset.Materialization.IncrementalKey == "" {
+					issues = append(issues, &Issue{
+						Task:        asset,
+						Description: "Materialization strategy 'delete+insert' requires the 'incremental_key' field to be set",
+					})
+				}
+			default:
+				issues = append(issues, &Issue{
+					Task: asset,
+					Description: fmt.Sprintf(
+						"Materialization strategy '%s' is not supported, available strategies are: %v",
+						asset.Materialization.Strategy,
+						[]pipeline.MaterializationStrategy{
+							pipeline.MaterializationStrategyCreateReplace,
+							pipeline.MaterializationStrategyAppend,
+							pipeline.MaterializationStrategyDeleteInsert,
+						},
+					),
+				})
+			}
+		default:
+			issues = append(issues, &Issue{
+				Task: asset,
+				Description: fmt.Sprintf(
+					"Materialization type '%s' is not supported, available types are: %v",
+					asset.Materialization.Type,
+					[]pipeline.MaterializationType{
+						pipeline.MaterializationTypeNone,
+						pipeline.MaterializationTypeView,
+					},
+				),
+			})
+		}
 	}
 
 	return issues, nil
