@@ -5,7 +5,6 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -177,26 +176,6 @@ func EnsurePipelineNameIsValid(pipeline *pipeline.Pipeline) ([]*Issue, error) {
 	if match := validIDRegexCompiled.MatchString(pipeline.Name); !match {
 		issues = append(issues, &Issue{
 			Description: pipelineNameMustBeAlphanumeric,
-		})
-	}
-
-	return issues, nil
-}
-
-func EnsureStartDateIsValid(pipeline *pipeline.Pipeline) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
-	if pipeline.StartDate == "" {
-		issues = append(issues, &Issue{
-			Description: pipelineStartDateCannotBeEmpty,
-		})
-
-		return issues, nil
-	}
-
-	_, err := time.Parse("2006-01-02", pipeline.StartDate)
-	if err != nil {
-		issues = append(issues, &Issue{
-			Description: pipelineStartDateMustBeValidDate,
 		})
 	}
 
