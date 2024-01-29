@@ -38,7 +38,7 @@ func (m Materializer) Render(task *pipeline.Asset, query string) (string, error)
 		}
 	}
 
-	return "", fmt.Errorf("unsupported materialization type `%s`", mat.Type)
+	return "", fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
 }
 
 func buildIncrementalQuery(task *pipeline.Asset, query string, mat pipeline.Materialization, strategy pipeline.MaterializationStrategy) (string, error) {
