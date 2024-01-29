@@ -34,6 +34,10 @@ custom_checks:
       query: select 5
       value: 16
 
+secrets:
+    - key: secret1
+      inject_as: INJECTED_SECRET1
+
 @bruin """
 
 print('hello world')

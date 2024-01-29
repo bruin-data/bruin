@@ -203,8 +203,13 @@ func Test_createTaskFromFile(t *testing.T) {
 					"param2": "second-parameter",
 					"param3": "third-parameter",
 				},
-				Image:     "python:3.11",
-				Secrets:   []pipeline.SecretMapping{},
+				Image: "python:3.11",
+				Secrets: []pipeline.SecretMapping{
+					{
+						SecretKey:   "secret1",
+						InjectedKey: "INJECTED_SECRET1",
+					},
+				},
 				DependsOn: []string{"task1", "task2", "task3", "task4", "task5"},
 				Columns: []pipeline.Column{
 					{

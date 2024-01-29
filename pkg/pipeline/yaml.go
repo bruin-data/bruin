@@ -114,8 +114,8 @@ type column struct {
 }
 
 type secretMapping struct {
-	SecretKey   string
-	InjectedKey string
+	SecretKey   string `yaml:"key"`
+	InjectedKey string `yaml:"inject_as"`
 }
 
 type customCheck struct {
@@ -258,8 +258,8 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		}
 	}
 
-	for _, m := range definition.Secrets {
-		task.Secrets = append(task.Secrets, SecretMapping(m))
+	for index, m := range definition.Secrets {
+		task.Secrets[index] = SecretMapping(m)
 	}
 
 	return &task, nil
