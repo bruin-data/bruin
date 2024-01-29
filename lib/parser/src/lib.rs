@@ -80,6 +80,7 @@ fn extract_table_names_vector(query: &str) -> Vec<String> {
 }
 
 fn extract_table_names_from_ast(ast: Vec<Statement>) -> Vec<String> {
+    ast[0].to_string()
     let mut table_names = Vec::new();
     for statement in &ast {
         if let Statement::Query(query) = statement {
