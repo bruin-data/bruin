@@ -16,7 +16,9 @@ deps: tools
 
 build:
 	@echo "$(OK_COLOR)==> Building the application...$(NO_COLOR)"
-	@CGO_ENABLED=0 go build -v -ldflags="-s -w" -o "$(BUILD_DIR)/$(NAME)" "$(BUILD_SRC)"
+	@cd lib/parser && cargo build --release
+	@cp lib/parser/target/release/libparser.a lib/
+	@CGO_ENABLED=1 go build -v -ldflags="-s -w" -o "$(BUILD_DIR)/$(NAME)" "$(BUILD_SRC)"
 
 clean:
 	@rm -rf ./bin
@@ -60,3 +62,5 @@ tools-update:
 	go install github.com/daixiang0/gci@latest; \
 	go install mvdan.cc/gofumpt@latest; \
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest;
+
+
