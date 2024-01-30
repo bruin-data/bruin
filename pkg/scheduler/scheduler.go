@@ -262,6 +262,39 @@ func (s *Scheduler) WillRunTaskOfType(taskType pipeline.AssetType) bool {
 	return false
 }
 
+func (s *Scheduler) FindMajorityOfTypes(taskTypes []pipeline.AssetType, defaultIfNone pipeline.AssetType) pipeline.AssetType {
+	taskTypeCounts := make(map[pipeline.AssetType]int)
+	maxTasks := 0
+	maxTaskType := defaultIfNone
+
+	searchTypeMap := make(map[pipeline.AssetType]bool)
+	for _, t := range taskTypes {
+		searchTypeMap[t] = true
+	}
+
+	for _, instance := range s.taskInstances {
+		assetType := instance.GetAsset().Type
+		if !searchTypeMap[assetType] {
+			continue
+		}
+
+		if _, ok := taskTypeCounts[assetType]; !ok {
+			taskTypeCounts[assetType] = 0
+		}
+
+		taskTypeCounts[assetType]++
+
+		if taskTypeCounts[assetType] > maxTasks {
+			maxTasks = taskTypeCounts[assetType]
+			maxTaskType = assetType
+		} else if taskTypeCounts[assetType] == maxTasks {
+			maxTaskType = defaultIfNone
+		}
+	}
+
+	return maxTaskType
+}
+
 func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline) *Scheduler {
 	instances := make([]TaskInstance, 0)
 

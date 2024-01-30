@@ -404,3 +404,66 @@ func TestScheduler_WillRunTaskOfType(t *testing.T) {
 	assert.True(t, s.WillRunTaskOfType("python"))
 	assert.True(t, s.WillRunTaskOfType("empty"))
 }
+
+func TestScheduler_FindMajorityOfTypes(t *testing.T) {
+	t.Parallel()
+
+	p := &pipeline.Pipeline{
+		Assets: []*pipeline.Asset{
+			{
+				Name: "task11",
+				Type: "bq.sql",
+			},
+			{
+				Name: "task21",
+				Type: "sf.sql",
+			},
+			{
+				Name: "random-asset",
+				Type: "random",
+			},
+			{
+				Name:      "task13",
+				DependsOn: []string{"task12"},
+				Type:      "bq.sql",
+			},
+			{
+				Name:      "task22",
+				DependsOn: []string{"task21"},
+				Type:      "python",
+			},
+			{
+				Name:      "task3",
+				DependsOn: []string{"task12", "task22"},
+				Type:      "python",
+			},
+			{
+				Name:      "task4",
+				DependsOn: []string{"task13", "task3"},
+				Type:      "sf.sql",
+			},
+		},
+	}
+
+	s := NewScheduler(zap.NewNop().Sugar(), p)
+
+	// if they are in equal counts, the default should be preferred
+	res := s.FindMajorityOfTypes([]pipeline.AssetType{"bq.sql", "sf.sql"}, "bq.sql")
+	assert.Equal(t, pipeline.AssetType("bq.sql"), res)
+
+	// if one of them is a winner, winner should be returned
+	res = s.FindMajorityOfTypes([]pipeline.AssetType{"python", "random"}, "sf.sql")
+	assert.Equal(t, pipeline.AssetType("python"), res)
+
+	// if none exists, default should be returned
+	res = s.FindMajorityOfTypes([]pipeline.AssetType{"abc", "xyz"}, "sf.sql")
+	assert.Equal(t, pipeline.AssetType("sf.sql"), res)
+
+	// if only one exists, that should be returned
+	res = s.FindMajorityOfTypes([]pipeline.AssetType{"abc", "xyz", "random"}, "sf.sql")
+	assert.Equal(t, pipeline.AssetType("random"), res)
+
+	// if they are in equal counts, the order shouldn't matter
+	res = s.FindMajorityOfTypes([]pipeline.AssetType{"sf.sql", "bq.sql"}, "sf.sql")
+	assert.Equal(t, pipeline.AssetType("sf.sql"), res)
+}

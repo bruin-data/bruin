@@ -14,12 +14,12 @@ type Manager struct {
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
-	conn, err := m.GetBqConnection(name)
+	conn, err := m.GetBqConnectionWithoutDefault(name)
 	if err == nil {
 		return conn, nil
 	}
 
-	conn, err = m.GetSfConnection(name)
+	conn, err = m.GetSfConnectionWithoutDefault(name)
 	if err == nil {
 		return conn, nil
 	}
@@ -28,6 +28,15 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 }
 
 func (m *Manager) GetBqConnection(name string) (bigquery.DB, error) {
+	db, err := m.GetBqConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetBqConnectionWithoutDefault("gcp-default")
+}
+
+func (m *Manager) GetBqConnectionWithoutDefault(name string) (bigquery.DB, error) {
 	if m.BigQuery == nil {
 		return nil, errors.New("no bigquery connections found")
 	}
@@ -41,6 +50,15 @@ func (m *Manager) GetBqConnection(name string) (bigquery.DB, error) {
 }
 
 func (m *Manager) GetSfConnection(name string) (snowflake.SfClient, error) {
+	db, err := m.GetSfConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetSfConnectionWithoutDefault("snowflake-default")
+}
+
+func (m *Manager) GetSfConnectionWithoutDefault(name string) (snowflake.SfClient, error) {
 	if m.Snowflake == nil {
 		return nil, errors.New("no snowflake connections found")
 	}

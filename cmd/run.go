@@ -304,6 +304,12 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 
 func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connection.Manager, startDate, endDate time.Time, runID string) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
+
+	// this is a heuristic we apply to find what might be the most common type of custom check in the pipeline
+	// this should go away once we incorporate URIs into the assets
+	estimateCustomCheckType := s.FindMajorityOfTypes([]pipeline.AssetType{pipeline.AssetTypeBigqueryQuery, pipeline.AssetTypeSnowflakeQuery}, pipeline.AssetTypeBigqueryQuery)
+	fmt.Println("estimateCustomCheckType: ", estimateCustomCheckType)
+
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
 		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, map[string]string{
 			"BRUIN_START_DATE":             startDate.Format("2006-01-02"),
@@ -318,7 +324,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		})
 	}
 
-	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) {
+	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery {
 		wholeFileExtractor := &query.WholeFileExtractor{
 			Fs:       fs,
 			Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate),
@@ -341,10 +347,13 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeCustomCheck] = bqCustomCheckRunner
 
 		// we set the Python runners to run the checks on BigQuery assuming that there won't be many usecases where a user has both BQ and Snowflake
-		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner
+		if estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery {
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = bqCustomCheckRunner
+		}
 	}
 
-	if s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) {
+	if s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery {
 		wholeFileExtractor := &query.WholeFileExtractor{
 			Fs:       fs,
 			Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate),
@@ -367,7 +376,10 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		mainExecutors[pipeline.AssetTypeSnowflakeQuery][scheduler.TaskInstanceTypeCustomCheck] = sfCustomCheckRunner
 
 		// we set the Python runners to run the checks on Snowflake assuming that there won't be many usecases where a user has both BQ and Snowflake
-		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = sfCheckRunner
+		if estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery {
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = sfCheckRunner
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = sfCustomCheckRunner
+		}
 	}
 
 	return mainExecutors, nil
