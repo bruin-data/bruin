@@ -414,7 +414,7 @@ func (b *builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 
 		// if the definition comes from a Python file the asset is always a Python asset, so force it
 		// at least that's the hypothesis for now
-		if strings.HasSuffix(task.ExecutableFile.Path, ".py") {
+		if strings.HasSuffix(task.ExecutableFile.Path, ".py") && task.Type == "" {
 			task.Type = AssetTypePython
 		}
 
