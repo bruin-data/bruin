@@ -307,8 +307,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 
 	// this is a heuristic we apply to find what might be the most common type of custom check in the pipeline
 	// this should go away once we incorporate URIs into the assets
-	estimateCustomCheckType := s.FindMajorityOfTypes([]pipeline.AssetType{pipeline.AssetTypeBigqueryQuery, pipeline.AssetTypeSnowflakeQuery}, pipeline.AssetTypeBigqueryQuery)
-	fmt.Println("estimateCustomCheckType: ", estimateCustomCheckType)
+	estimateCustomCheckType := s.FindMajorityOfTypes([]pipeline.AssetType{pipeline.AssetTypeBigqueryQuery, pipeline.AssetTypeSnowflakeQuery}, pipeline.AssetTypeSnowflakeQuery)
 
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
 		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, map[string]string{
@@ -353,7 +352,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		}
 	}
 
-	if s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery {
+	if s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) || estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery {
 		wholeFileExtractor := &query.WholeFileExtractor{
 			Fs:       fs,
 			Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate),
