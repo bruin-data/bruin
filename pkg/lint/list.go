@@ -50,6 +50,10 @@ func GetRules(fs afero.Fs) ([]Rule, error) {
 			Identifier: "materialization-config",
 			Validator:  EnsureMaterializationValuesAreValid,
 		},
+		&SimpleRule{
+			Identifier: "valid-snowflake-query-sensor",
+			Validator:  EnsureSnowflakeSensorHasQueryParameter,
+		},
 	}
 
 	return rules, nil

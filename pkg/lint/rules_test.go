@@ -1410,3 +1410,82 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 		})
 	}
 }
+
+func TestEnsureSnowflakeSensorHasQueryParameter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		p       *pipeline.Pipeline
+		want    []string
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "no query param",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "task1",
+						Type: pipeline.AssetTypeSnowflakeQuerySensor,
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want:    []string{"Snowflake query sensor requires a `query` parameter"},
+		},
+		{
+			name: "query param exists but empty",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "task1",
+						Type: pipeline.AssetTypeSnowflakeQuerySensor,
+						Parameters: map[string]string{
+							"query": "",
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want:    []string{"Snowflake query sensor requires a `query` parameter that is not empty"},
+		},
+		{
+			name: "no issues",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "task1",
+						Type: pipeline.AssetTypeSnowflakeQuerySensor,
+						Parameters: map[string]string{
+							"query": "SELECT 1",
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := EnsureSnowflakeSensorHasQueryParameter(tt.p)
+			if !tt.wantErr(t, err) {
+				return
+			}
+
+			// I am doing this because I don't care if I get a nil or empty slice
+			if tt.want != nil {
+				gotMessages := make([]string, len(got))
+				for i, issue := range got {
+					gotMessages[i] = issue.Description
+				}
+
+				assert.Equal(t, tt.want, gotMessages)
+			} else {
+				assert.Equal(t, []*Issue{}, got)
+			}
+		})
+	}
+}

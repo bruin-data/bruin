@@ -475,3 +475,30 @@ func EnsureMaterializationValuesAreValid(p *pipeline.Pipeline) ([]*Issue, error)
 
 	return issues, nil
 }
+
+func EnsureSnowflakeSensorHasQueryParameter(p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	for _, asset := range p.Assets {
+		if asset.Type != pipeline.AssetTypeSnowflakeQuerySensor {
+			continue
+		}
+
+		query, ok := asset.Parameters["query"]
+		if !ok {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Snowflake query sensor requires a `query` parameter",
+			})
+			continue
+		}
+
+		if query == "" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Snowflake query sensor requires a `query` parameter that is not empty",
+			})
+		}
+	}
+
+	return issues, nil
+}
