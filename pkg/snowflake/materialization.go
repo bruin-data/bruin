@@ -2,12 +2,30 @@ package snowflake
 
 import (
 	"fmt"
+	"math/rand"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
-type Materializer struct{}
+type randomSuffixGenerator func() string
+
+type Materializer struct {
+	prefixGenerator randomSuffixGenerator
+}
+
+func NewMaterializer() *Materializer {
+	return &Materializer{
+		prefixGenerator: func() string {
+			letters := []rune("abcdefghijklmnopqrstuvwxyz")
+			b := make([]rune, 8)
+			for i := range b {
+				b[i] = letters[rand.Intn(len(letters))] //nolint:all
+			}
+			return string(b)
+		},
+	}
+}
 
 func (m Materializer) Render(task *pipeline.Asset, query string) (string, error) {
 	mat := task.Materialization
@@ -34,23 +52,25 @@ func (m Materializer) Render(task *pipeline.Asset, query string) (string, error)
 		}
 
 		if strategy == pipeline.MaterializationStrategyDeleteInsert {
-			return buildIncrementalQuery(task, query, mat, strategy)
+			return m.buildIncrementalQuery(task, query, mat, strategy)
 		}
 	}
 
 	return "", fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
 }
 
-func buildIncrementalQuery(task *pipeline.Asset, query string, mat pipeline.Materialization, strategy pipeline.MaterializationStrategy) (string, error) {
+func (m *Materializer) buildIncrementalQuery(task *pipeline.Asset, query string, mat pipeline.Materialization, strategy pipeline.MaterializationStrategy) (string, error) {
 	if mat.IncrementalKey == "" {
 		return "", fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", strategy)
 	}
 
+	tempTableName := fmt.Sprintf("__bruin_tmp_%s", m.prefixGenerator())
+
 	queries := []string{
 		"BEGIN TRANSACTION",
-		fmt.Sprintf("CREATE TEMP TABLE __bruin_tmp AS %s", query),
-		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM __bruin_tmp)", task.Name, mat.IncrementalKey, mat.IncrementalKey),
-		fmt.Sprintf("INSERT INTO %s SELECT * FROM __bruin_tmp", task.Name),
+		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, query),
+		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
+		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
 		"COMMIT",
 	}
 

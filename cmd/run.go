@@ -360,7 +360,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 			Renderer: renderer,
 		}
 
-		sfOperator := snowflake.NewBasicOperator(conn, wholeFileExtractor, snowflake.Materializer{})
+		sfOperator := snowflake.NewBasicOperator(conn, wholeFileExtractor, snowflake.NewMaterializer())
 
 		sfCheckRunner, err := snowflake.NewColumnCheckOperator(conn)
 		if err != nil {

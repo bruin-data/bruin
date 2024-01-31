@@ -118,9 +118,9 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1",
 			want: "BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp AS SELECT 1;\n" +
-				"DELETE FROM my.asset WHERE dt in (SELECT DISTINCT dt FROM __bruin_tmp);\n" +
-				"INSERT INTO my.asset SELECT * FROM __bruin_tmp;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_abc AS SELECT 1;\n" +
+				"DELETE FROM my.asset WHERE dt in (SELECT DISTINCT dt FROM __bruin_tmp_abc);\n" +
+				"INSERT INTO my.asset SELECT * FROM __bruin_tmp_abc;\n" +
 				"COMMIT;",
 		},
 	}
@@ -129,7 +129,11 @@ func TestMaterializer_Render(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			m := Materializer{}
+			m := Materializer{
+				prefixGenerator: func() string {
+					return "abc"
+				},
+			}
 			render, err := m.Render(tt.task, tt.query)
 
 			if tt.wantErr {
