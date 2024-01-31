@@ -34,7 +34,9 @@ func (m Materializer) Render(task *pipeline.Asset, query string) (string, error)
 		}
 
 		if strategy == pipeline.MaterializationStrategyDeleteInsert {
-			return buildIncrementalQuery(task, query, mat, strategy)
+			incrementalQuery, err := buildIncrementalQuery(task, query, mat, strategy)
+			fmt.Println(incrementalQuery)
+			return incrementalQuery, err
 		}
 	}
 
@@ -51,16 +53,16 @@ func buildIncrementalQuery(task *pipeline.Asset, query string, mat pipeline.Mate
 		fmt.Sprintf("CREATE TEMP TABLE __bruin_tmp AS %s", query),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM __bruin_tmp)", task.Name, mat.IncrementalKey, mat.IncrementalKey),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM __bruin_tmp", task.Name),
-		"COMMIT TRANSACTION",
+		"COMMIT",
 	}
 
-	return strings.Join(queries, "\n") + ";", nil
+	return strings.Join(queries, ";\n") + ";", nil
 }
 
 func buildCreateReplaceQuery(task *pipeline.Asset, query string, mat pipeline.Materialization) (string, error) {
 	clusterByClause := ""
 	if len(mat.ClusterBy) > 0 {
-		clusterByClause = fmt.Sprintf("CLUSTER BY %s", strings.Join(mat.ClusterBy, ", "))
+		clusterByClause = fmt.Sprintf("CLUSTER BY (%s)", strings.Join(mat.ClusterBy, ", "))
 	}
 
 	return fmt.Sprintf("CREATE OR REPLACE TABLE %s %s AS\n%s", task.Name, clusterByClause, query), nil

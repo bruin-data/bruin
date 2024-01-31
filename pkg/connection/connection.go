@@ -1,6 +1,8 @@
 package connection
 
 import (
+	"sync"
+
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/snowflake"
@@ -11,6 +13,8 @@ import (
 type Manager struct {
 	BigQuery  map[string]*bigquery.Client
 	Snowflake map[string]*snowflake.DB
+
+	mutex sync.Mutex
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
@@ -73,7 +77,9 @@ func (m *Manager) GetSfConnectionWithoutDefault(name string) (snowflake.SfClient
 
 func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatformConnection) error {
 	if m.BigQuery == nil {
+		m.mutex.Lock()
 		m.BigQuery = make(map[string]*bigquery.Client)
+		m.mutex.Unlock()
 	}
 
 	db, err := bigquery.NewDB(&bigquery.Config{
@@ -86,6 +92,8 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 		return err
 	}
 
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 	m.BigQuery[connection.Name] = db
 
 	return nil
@@ -93,7 +101,9 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 
 func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnection) error {
 	if m.Snowflake == nil {
+		m.mutex.Lock()
 		m.Snowflake = make(map[string]*snowflake.DB)
+		m.mutex.Unlock()
 	}
 
 	db, err := snowflake.NewDB(&snowflake.Config{
@@ -110,6 +120,8 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 		return err
 	}
 
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 	m.Snowflake[connection.Name] = db
 
 	return nil
