@@ -34,9 +34,7 @@ func (m Materializer) Render(task *pipeline.Asset, query string) (string, error)
 		}
 
 		if strategy == pipeline.MaterializationStrategyDeleteInsert {
-			incrementalQuery, err := buildIncrementalQuery(task, query, mat, strategy)
-			fmt.Println(incrementalQuery)
-			return incrementalQuery, err
+			return buildIncrementalQuery(task, query, mat, strategy)
 		}
 	}
 
