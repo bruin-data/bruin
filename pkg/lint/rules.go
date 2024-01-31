@@ -27,10 +27,8 @@ const (
 	executableFileIsEmpty         = `The executable file is empty`
 	executableFileIsNotExecutable = "Executable file is not executable, give it the '644' or '755' permissions"
 
-	pipelineNameCannotBeEmpty        = "The pipeline name cannot be empty, it must be a valid name made of alphanumeric characters, dashes, dots and underscores"
-	pipelineNameMustBeAlphanumeric   = "The pipeline name must be made of alphanumeric characters, dashes, dots and underscores"
-	pipelineStartDateCannotBeEmpty   = "The start_date in the pipeline.yml file cannot be empty, it must be a valid datetime in 'YYYY-MM-DD' format, e.g. 2021-01-01"
-	pipelineStartDateMustBeValidDate = "The start_date in the pipeline.yml file must be a valid datetime in 'YYYY-MM-DD' format, e.g. 2021-01-01"
+	pipelineNameCannotBeEmpty      = "The pipeline name cannot be empty, it must be a valid name made of alphanumeric characters, dashes, dots and underscores"
+	pipelineNameMustBeAlphanumeric = "The pipeline name must be made of alphanumeric characters, dashes, dots and underscores"
 
 	pipelineContainsCycle = "The pipeline has a cycle with dependencies, make sure there are no cyclic dependencies"
 

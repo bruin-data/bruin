@@ -16,8 +16,8 @@ type NotNullCheck struct {
 	conn connectionFetcher
 }
 
-func ensureCountZero(check string, res [][]interface{}) (int64, error) {
-	return snowflake.CastQualityCheckResultToInteger(check, res)
+func ensureCountZero(res [][]interface{}) (int64, error) {
+	return snowflake.CastResultToInteger(res)
 }
 
 func (c *NotNullCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
@@ -153,9 +153,9 @@ func (c *countableQueryCheck) check(ctx context.Context, connectionName string) 
 		return errors.Wrapf(err, "failed '%s' check", c.checkName)
 	}
 
-	count, err := ensureCountZero(c.checkName, res)
+	count, err := ensureCountZero(res)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to parse '%s' check result", c.checkName)
 	}
 
 	if count != c.expectedQueryResult {

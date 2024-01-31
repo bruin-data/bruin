@@ -64,7 +64,7 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 	pipeline.AssetTypeSnowflakeQuery: {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
-	"adjust.export.bq": {
+	pipeline.AssetTypeSnowflakeQuerySensor: {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
 	"appsflyer.export.bq": {

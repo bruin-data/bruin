@@ -265,7 +265,7 @@ func TestCustomCheck(t *testing.T) {
 		{
 			name:    "null values found",
 			setup:   setupFunc([][]interface{}{{nil}}, nil),
-			wantErr: checkError("unexpected result from query during check1 check, result is nil"),
+			wantErr: checkError("failed to parse 'check1' check result: unexpected result from query, result is nil"),
 		},
 		{
 			name:    "wrong result returned",

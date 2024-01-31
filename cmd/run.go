@@ -323,10 +323,11 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		})
 	}
 
+	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate)
 	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery {
 		wholeFileExtractor := &query.WholeFileExtractor{
 			Fs:       fs,
-			Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate),
+			Renderer: renderer,
 		}
 
 		bqOperator := bigquery.NewBasicOperator(conn, wholeFileExtractor, bigquery.Materializer{})
@@ -352,10 +353,11 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		}
 	}
 
-	if s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) || estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery {
+	shouldInitiateSnowflake := s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuerySensor) || estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery
+	if shouldInitiateSnowflake {
 		wholeFileExtractor := &query.WholeFileExtractor{
 			Fs:       fs,
-			Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate),
+			Renderer: renderer,
 		}
 
 		sfOperator := snowflake.NewBasicOperator(conn, wholeFileExtractor, snowflake.Materializer{})
@@ -370,9 +372,14 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 			return nil, err
 		}
 
+		sfQuerySensor := snowflake.NewQuerySensor(conn, renderer, 30)
+
 		mainExecutors[pipeline.AssetTypeSnowflakeQuery][scheduler.TaskInstanceTypeMain] = sfOperator
 		mainExecutors[pipeline.AssetTypeSnowflakeQuery][scheduler.TaskInstanceTypeColumnCheck] = sfCheckRunner
 		mainExecutors[pipeline.AssetTypeSnowflakeQuery][scheduler.TaskInstanceTypeCustomCheck] = sfCustomCheckRunner
+		mainExecutors[pipeline.AssetTypeSnowflakeQuerySensor][scheduler.TaskInstanceTypeMain] = sfQuerySensor
+		mainExecutors[pipeline.AssetTypeSnowflakeQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = sfCheckRunner
+		mainExecutors[pipeline.AssetTypeSnowflakeQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = sfCustomCheckRunner
 
 		// we set the Python runners to run the checks on Snowflake assuming that there won't be many usecases where a user has both BQ and Snowflake
 		if estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery {

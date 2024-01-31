@@ -2,6 +2,7 @@ package snowflake
 
 import (
 	"context"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -128,4 +129,60 @@ func (o *CustomCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance
 	}
 
 	return o.checkRunner.Check(ctx, instance)
+}
+
+type renderer interface {
+	Render(query string) string
+}
+
+type QuerySensor struct {
+	connection     connectionFetcher
+	renderer       renderer
+	secondsToSleep int64
+}
+
+func NewQuerySensor(conn connectionFetcher, renderer renderer, secondsToSleep int64) *QuerySensor {
+	return &QuerySensor{
+		connection:     conn,
+		renderer:       renderer,
+		secondsToSleep: secondsToSleep,
+	}
+}
+
+func (o *QuerySensor) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	return o.RunTask(ctx, ti.GetPipeline(), ti.GetAsset())
+}
+
+func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
+	qq, ok := t.Parameters["query"]
+	if !ok {
+		return errors.New("query sensor requires a parameter named 'query'")
+	}
+
+	qq = o.renderer.Render(qq)
+
+	conn, err := o.connection.GetSfConnection(p.GetConnectionNameForAsset(t))
+	if err != nil {
+		return err
+	}
+
+	for {
+		res, err := conn.Select(ctx, &query.Query{Query: qq})
+		if err != nil {
+			return err
+		}
+
+		intRes, err := CastResultToInteger(res)
+		if err != nil {
+			return errors.Wrap(err, "failed to parse query sensor result")
+		}
+
+		if intRes > 0 {
+			break
+		}
+
+		time.Sleep(time.Duration(o.secondsToSleep) * time.Second)
+	}
+
+	return nil
 }

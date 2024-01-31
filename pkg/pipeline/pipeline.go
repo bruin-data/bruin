@@ -16,10 +16,11 @@ const (
 	CommentTask TaskDefinitionType = "comment"
 	YamlTask    TaskDefinitionType = "yaml"
 
-	AssetTypePython         = AssetType("python")
-	AssetTypeSnowflakeQuery = AssetType("sf.sql")
-	AssetTypeBigqueryQuery  = AssetType("bq.sql")
-	AssetTypeEmpty          = AssetType("empty")
+	AssetTypePython               = AssetType("python")
+	AssetTypeSnowflakeQuery       = AssetType("sf.sql")
+	AssetTypeSnowflakeQuerySensor = AssetType("sf.sensor.query")
+	AssetTypeBigqueryQuery        = AssetType("bq.sql")
+	AssetTypeEmpty                = AssetType("empty")
 )
 
 var supportedFileSuffixes = []string{".yml", ".yaml", ".sql", ".py"}
@@ -167,8 +168,9 @@ type Column struct {
 type AssetType string
 
 var assetTypeConnectionMapping = map[AssetType][]string{
-	AssetType("bq.sql"): {"google_cloud_platform", "gcp"},
-	AssetType("sf.sql"): {"snowflake", "sf"},
+	AssetTypeBigqueryQuery:        {"google_cloud_platform", "gcp"},
+	AssetTypeSnowflakeQuery:       {"snowflake", "sf"},
+	AssetTypeSnowflakeQuerySensor: {"snowflake", "sf"},
 }
 
 type SecretMapping struct {
