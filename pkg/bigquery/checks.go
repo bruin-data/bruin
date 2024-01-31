@@ -49,6 +49,22 @@ func (c *PositiveCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInst
 	}).Check(ctx, ti)
 }
 
+type NonNegativeCheck struct {
+	conn connectionFetcher
+}
+
+func (c *NonNegativeCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
+	qq := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s < 0", ti.GetAsset().Name, ti.Column.Name)
+	return (&countableQueryCheck{
+		conn:          c.conn,
+		queryInstance: &query.Query{Query: qq},
+		checkName:     "non_negative",
+		customError: func(count int64) error {
+			return errors.Errorf("column %s has %d negative values", ti.Column.Name, count)
+		},
+	}).Check(ctx, ti)
+}
+
 type UniqueCheck struct {
 	conn connectionFetcher
 }
