@@ -89,7 +89,7 @@ func Test_createTaskFromFile(t *testing.T) {
 		{
 			name: "SQL file failed to parse",
 			args: args{
-				filePath: "testdata/comments/fail.sql",
+				filePath: "testdata/comments/failparseprimarykey.sql",
 			},
 			wantErr: true,
 		},
