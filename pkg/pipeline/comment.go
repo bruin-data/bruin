@@ -327,7 +327,7 @@ func handleColumnEntry(columnFields []string, task *Asset, value string) error {
 	case "primary_key":
 		boolValue, err := strconv.ParseBool(value)
 		if err != nil {
-			return errors.Wrap(err, "Failed parsing primary key")
+			return errors.Wrapf(err, "failed parsing primary_key for column %s", columnName)
 		}
 		task.Columns[columnIndex].PrimaryKey = boolValue
 	}
