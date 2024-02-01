@@ -79,9 +79,19 @@ func Test_createTaskFromFile(t *testing.T) {
 					IncrementalKey: "dt",
 					ClusterBy:      []string{"event_name"},
 				},
-				Columns:      []pipeline.Column{},
+				Columns: []pipeline.Column{
+					{Name: "some_column", PrimaryKey: true, Checks: make([]pipeline.ColumnCheck, 0)},
+					{Name: "some_other_column", PrimaryKey: false, Checks: make([]pipeline.ColumnCheck, 0)},
+				},
 				CustomChecks: make([]pipeline.CustomCheck, 0),
 			},
+		},
+		{
+			name: "SQL file failed to parse",
+			args: args{
+				filePath: "testdata/comments/failparseprimarykey.sql",
+			},
+			wantErr: true,
 		},
 		{
 			name: "SQL file with embedded yaml content is parsed",

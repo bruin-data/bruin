@@ -163,6 +163,7 @@ type Column struct {
 	Type        string        `json:"type"`
 	Description string        `json:"description"`
 	Checks      []ColumnCheck `json:"checks"`
+	PrimaryKey  bool          `json:"primary_key"`
 }
 
 type AssetType string

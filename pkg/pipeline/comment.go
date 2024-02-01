@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"io"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -154,7 +155,11 @@ func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath st
 		return nil, errors.Wrapf(err, "failed to get absolute path for file %s", filePath)
 	}
 
-	task := commentRowsToTask(commentRows)
+	task, err := commentRowsToTask(commentRows)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to parse comment formatted task in file %s", filePath)
+	}
+
 	task.ExecutableFile = ExecutableFile{
 		Name:    filepath.Base(filePath),
 		Path:    absFilePath,
@@ -164,7 +169,7 @@ func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath st
 	return task, nil
 }
 
-func commentRowsToTask(commentRows []string) *Asset {
+func commentRowsToTask(commentRows []string) (*Asset, error) {
 	task := Asset{
 		Parameters:   make(map[string]string),
 		DependsOn:    []string{},
@@ -248,7 +253,10 @@ func commentRowsToTask(commentRows []string) *Asset {
 				continue
 			}
 
-			handleColumnEntry(columns, &task, value)
+			err := handleColumnEntry(columns, &task, value)
+			if err != nil {
+				return nil, err
+			}
 			continue
 		}
 
@@ -284,10 +292,10 @@ func commentRowsToTask(commentRows []string) *Asset {
 
 	task.ID = hash(task.Name)
 
-	return &task
+	return &task, nil
 }
 
-func handleColumnEntry(columnFields []string, task *Asset, value string) {
+func handleColumnEntry(columnFields []string, task *Asset, value string) error {
 	columnName := columnFields[1]
 
 	columnIndex := -1
@@ -306,14 +314,23 @@ func handleColumnEntry(columnFields []string, task *Asset, value string) {
 		columnIndex = len(task.Columns) - 1
 	}
 
-	if columnFields[2] == "checks" {
+	switch columnFields[2] {
+	case "checks":
 		checks := strings.Split(value, ",")
 		for _, check := range checks {
 			task.Columns[columnIndex].Checks = append(task.Columns[columnIndex].Checks, NewColumnCheck(
 				task.Name, columnName, strings.TrimSpace(check), ColumnCheckValue{},
 			))
 		}
-	} else if columnFields[2] == "type" {
+	case "type":
 		task.Columns[columnIndex].Type = strings.ToLower(strings.TrimSpace(value))
+	case "primary_key":
+		boolValue, err := strconv.ParseBool(value)
+		if err != nil {
+			return errors.Wrapf(err, "failed parsing primary_key for column %s", columnName)
+		}
+		task.Columns[columnIndex].PrimaryKey = boolValue
 	}
+
+	return nil
 }
