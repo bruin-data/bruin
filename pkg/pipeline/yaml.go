@@ -111,6 +111,7 @@ type column struct {
 	Type        string        `yaml:"type"`
 	Description string        `yaml:"description"`
 	Tests       []columnCheck `yaml:"checks"`
+	PrimaryKey  bool          `yaml:"primary_key"`
 }
 
 type secretMapping struct {
@@ -226,6 +227,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			Type:        strings.ToLower(strings.TrimSpace(column.Type)),
 			Description: column.Description,
 			Checks:      tests,
+			PrimaryKey:  column.PrimaryKey,
 		}
 	}
 

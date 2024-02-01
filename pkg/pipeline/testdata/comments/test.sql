@@ -13,6 +13,8 @@
 -- @bruin.materialization.cluster_by: event_name
 -- @bruin.materialization.strategy: delete+insert
 -- @bruin.materialization.incremental_key: dt
+-- @bruin.columns.some_column.primary_key: true
+-- @bruin.columns.some_other_column.primary_key: false
 
 select *
 from foo;

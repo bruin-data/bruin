@@ -69,7 +69,6 @@ func (i *installReqsToHomeDir) EnsureVirtualEnvExists(ctx context.Context, repo 
 		Name: i.pathToPython,
 		Args: []string{"-m", "venv", venvPath},
 	})
-
 	if err != nil {
 		return "", errors.Wrap(err, "failed to create virtualenv")
 	}
@@ -79,7 +78,6 @@ func (i *installReqsToHomeDir) EnsureVirtualEnvExists(ctx context.Context, repo 
 		Name: Shell,
 		Args: []string{"-c", fullCommand},
 	})
-
 	if err != nil {
 		return "", errors.Wrap(err, "failed to install dependencies in the new isolated environment")
 	}

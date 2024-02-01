@@ -13,6 +13,7 @@ columns:
   - name: one
     type: integer
     description: "Just a number"
+    primary_key: true
     checks:
         - name: unique
         - name: not_null
