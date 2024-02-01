@@ -71,6 +71,7 @@ func (m *Materializer) buildIncrementalQuery(task *pipeline.Asset, query string,
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, query),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
+		fmt.Sprintf("DROP TABLE IF EXISTS %s", tempTableName),
 		"COMMIT",
 	}
 
