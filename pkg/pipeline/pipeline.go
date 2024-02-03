@@ -263,12 +263,30 @@ func uniqueAssets(assets []*Asset) []*Asset {
 
 type EmptyStringMap map[string]string
 
-func (m EmptyStringMap) MarshalJSON() ([]byte, error) {
+func (m EmptyStringMap) MarshalJSON() ([]byte, error) { //nolint: stylecheck
 	if m == nil {
 		return json.Marshal(map[string]string{})
 	}
 
 	return json.Marshal(map[string]string(m))
+}
+
+func (b *EmptyStringMap) UnmarshalJSON(data []byte) error {
+	if data == nil {
+		return nil
+	}
+
+	var v map[string]string
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+
+	if len(v) == 0 {
+		return nil
+	}
+
+	*b = v
+	return nil
 }
 
 type Pipeline struct {
