@@ -527,9 +527,15 @@ func TestColumnCheckValue_UnmarshalJSON(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
+			name:       "should unmarshal nil to nil",
+			jsonFields: nil,
+			want:       &pipeline.ColumnCheckValue{},
+			wantErr:    assert.NoError,
+		},
+		{
 			name:       "should return error for invalid type",
 			jsonFields: map[string]interface{}{"invalid": "data"},
-			want:       nil,
+			want:       &pipeline.ColumnCheckValue{},
 			wantErr:    assert.Error,
 		},
 	}
@@ -543,6 +549,8 @@ func TestColumnCheckValue_UnmarshalJSON(t *testing.T) {
 			var got pipeline.ColumnCheckValue
 			err = json.Unmarshal(jsonstr, &got)
 			tt.wantErr(t, err)
+
+			assert.Equal(t, tt.want, &got)
 		})
 	}
 }

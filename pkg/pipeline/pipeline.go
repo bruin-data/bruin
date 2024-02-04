@@ -150,6 +150,10 @@ func (ccv *ColumnCheckValue) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	if temp == nil {
+		return nil
+	}
+
 	switch v := temp.(type) {
 	case []interface{}:
 
@@ -166,10 +170,15 @@ func (ccv *ColumnCheckValue) UnmarshalJSON(data []byte) error {
 		}
 
 		return fmt.Errorf("unable to parse JSON structure %v into ColumnCheckValue", v)
-
 	case float64:
-		intVal := int(v)
-		ccv.Int = &intVal
+
+		if v == float64(int(v)) {
+			i := int(v)
+			ccv.Int = &i
+			return nil
+		}
+
+		ccv.Float = &v
 	case string:
 		ccv.String = &v
 	case bool:
