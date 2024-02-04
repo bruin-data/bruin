@@ -1,6 +1,7 @@
 package pipeline_test
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"testing"
 
@@ -443,4 +444,200 @@ func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 	assert.Equal(t, "connection1", pipeline1.GetConnectionNameForAsset(asset1))
 	assert.Equal(t, "connection2", pipeline1.GetConnectionNameForAsset(asset2))
 	assert.Equal(t, "custom-connection", pipeline1.GetConnectionNameForAsset(asset3))
+}
+
+func intPointer(i int) *int {
+	return &i
+}
+
+func floatPointer(f float64) *float64 {
+	return &f
+}
+
+func stringPointer(s string) *string {
+	return &s
+}
+
+func boolPointer(b bool) *bool {
+	return &b
+}
+
+func TestColumnCheckValue_UnmarshalJSON(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		jsonFields interface{}
+		want       *pipeline.ColumnCheckValue
+		wantErr    assert.ErrorAssertionFunc
+	}{
+		{
+			name:       "should unmarshal int array",
+			jsonFields: []int{1, 2, 3},
+			want: &pipeline.ColumnCheckValue{
+				IntArray: &[]int{1, 2, 3},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name:       "should unmarshal string array",
+			jsonFields: []string{"1", "2", "3"},
+			want: &pipeline.ColumnCheckValue{
+				StringArray: &[]string{"1", "2", "3"},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name:       "should unmarshal single int",
+			jsonFields: 123,
+			want: &pipeline.ColumnCheckValue{
+				Int: intPointer(123),
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name:       "should unmarshal single float",
+			jsonFields: 123.45,
+			want: &pipeline.ColumnCheckValue{
+				Float: floatPointer(123.45),
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name:       "should unmarshal single string",
+			jsonFields: "test",
+			want: &pipeline.ColumnCheckValue{
+				String: stringPointer("test"),
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name:       "should unmarshal bool true",
+			jsonFields: true,
+			want: &pipeline.ColumnCheckValue{
+				Bool: boolPointer(true),
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name:       "should unmarshal bool false",
+			jsonFields: false,
+			want: &pipeline.ColumnCheckValue{
+				Bool: boolPointer(false),
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name:       "should return error for invalid type",
+			jsonFields: map[string]interface{}{"invalid": "data"},
+			want:       nil,
+			wantErr:    assert.Error,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			jsonstr, err := json.Marshal(tt.jsonFields)
+			assert.NoError(t, err)
+
+			var got pipeline.ColumnCheckValue
+			err = json.Unmarshal(jsonstr, &got)
+			tt.wantErr(t, err)
+		})
+	}
+}
+
+func TestColumnCheckValue_MarshalJSON(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		ccv     *pipeline.ColumnCheckValue
+		want    string
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "marshal int array",
+			ccv: &pipeline.ColumnCheckValue{
+				IntArray: &[]int{1, 2, 3},
+			},
+			want:    "[1,2,3]",
+			wantErr: assert.NoError,
+		},
+		{
+			name: "marshal single int",
+			ccv: &pipeline.ColumnCheckValue{
+				Int: intPointer(123),
+			},
+			want:    "123",
+			wantErr: assert.NoError,
+		},
+		{
+			name: "marshal single float",
+			ccv: &pipeline.ColumnCheckValue{
+				Float: floatPointer(123.45),
+			},
+			want:    "123.45",
+			wantErr: assert.NoError,
+		},
+		{
+			name: "marshal string array",
+			ccv: &pipeline.ColumnCheckValue{
+				StringArray: &[]string{"one", "two", "three"},
+			},
+			want:    "[\"one\",\"two\",\"three\"]",
+			wantErr: assert.NoError,
+		},
+		{
+			name: "marshal single string",
+			ccv: &pipeline.ColumnCheckValue{
+				String: stringPointer("test"),
+			},
+			want:    "\"test\"",
+			wantErr: assert.NoError,
+		},
+		{
+			name: "marshal bool true",
+			ccv: &pipeline.ColumnCheckValue{
+				Bool: boolPointer(true),
+			},
+			want:    "true",
+			wantErr: assert.NoError,
+		},
+		{
+			name: "marshal bool false",
+			ccv: &pipeline.ColumnCheckValue{
+				Bool: boolPointer(false),
+			},
+			want:    "false",
+			wantErr: assert.NoError,
+		},
+		{
+			name:    "marshal nil",
+			ccv:     &pipeline.ColumnCheckValue{},
+			want:    "null",
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ccv := &pipeline.ColumnCheckValue{
+				IntArray:    tt.ccv.IntArray,
+				Int:         tt.ccv.Int,
+				Float:       tt.ccv.Float,
+				StringArray: tt.ccv.StringArray,
+				String:      tt.ccv.String,
+				Bool:        tt.ccv.Bool,
+			}
+			got, err := ccv.MarshalJSON()
+			if !tt.wantErr(t, err) {
+				return
+			}
+
+			assert.Equal(t, tt.want, string(got))
+		})
+	}
 }

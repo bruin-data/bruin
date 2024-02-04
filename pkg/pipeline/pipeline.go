@@ -121,27 +121,64 @@ type ColumnCheckValue struct {
 	Bool        *bool     `json:"bool"`
 }
 
-func (v *ColumnCheckValue) MarshalJSON() ([]byte, error) {
-	if v.IntArray != nil {
-		return json.Marshal(v.IntArray)
+func (ccv *ColumnCheckValue) MarshalJSON() ([]byte, error) {
+	if ccv.IntArray != nil {
+		return json.Marshal(ccv.IntArray)
 	}
-	if v.Int != nil {
-		return json.Marshal(v.Int)
+	if ccv.Int != nil {
+		return json.Marshal(ccv.Int)
 	}
-	if v.Float != nil {
-		return json.Marshal(v.Float)
+	if ccv.Float != nil {
+		return json.Marshal(ccv.Float)
 	}
-	if v.StringArray != nil {
-		return json.Marshal(v.StringArray)
+	if ccv.StringArray != nil {
+		return json.Marshal(ccv.StringArray)
 	}
-	if v.String != nil {
-		return json.Marshal(v.String)
+	if ccv.String != nil {
+		return json.Marshal(ccv.String)
 	}
-	if v.Bool != nil {
-		return json.Marshal(v.Bool)
+	if ccv.Bool != nil {
+		return json.Marshal(ccv.Bool)
 	}
 
 	return json.Marshal(nil)
+}
+
+func (ccv *ColumnCheckValue) UnmarshalJSON(data []byte) error {
+	var temp interface{}
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+
+	switch v := temp.(type) {
+	case []interface{}:
+
+		var intSlice []int
+		if err := json.Unmarshal(data, &intSlice); err == nil {
+			ccv.IntArray = &intSlice
+			return nil
+		}
+
+		var stringSlice []string
+		if err := json.Unmarshal(data, &stringSlice); err == nil {
+			ccv.StringArray = &stringSlice
+			return nil
+		}
+
+		return fmt.Errorf("unable to parse JSON structure %v into ColumnCheckValue", v)
+
+	case float64:
+		intVal := int(v)
+		ccv.Int = &intVal
+	case string:
+		ccv.String = &v
+	case bool:
+		ccv.Bool = &v
+	default:
+		return fmt.Errorf("unexpected type %T", v)
+	}
+
+	return nil
 }
 
 type ColumnCheck struct {
