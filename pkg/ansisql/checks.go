@@ -109,7 +109,7 @@ func (c *UniqueCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstan
 		queryInstance: &query.Query{Query: qq},
 		checkName:     "unique",
 		customError: func(count int64) error {
-			return errors.Errorf("column %s has %d non-unique values", ti.Column.Name, count)
+			return errors.Errorf("column '%s' has %d non-unique values", ti.Column.Name, count)
 		},
 	}).Check(ctx, ti)
 }
@@ -129,7 +129,7 @@ func (c *PositiveCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInst
 		queryInstance: &query.Query{Query: qq},
 		checkName:     "positive",
 		customError: func(count int64) error {
-			return errors.Errorf("column %s has %d non-positive values", ti.Column.Name, count)
+			return errors.Errorf("column '%s' has %d non-positive values", ti.Column.Name, count)
 		},
 	}).Check(ctx, ti)
 }
@@ -149,7 +149,7 @@ func (c *NonNegativeCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckI
 		queryInstance: &query.Query{Query: qq},
 		checkName:     "non_negative",
 		customError: func(count int64) error {
-			return errors.Errorf("column %s has %d negative values", ti.Column.Name, count)
+			return errors.Errorf("column '%s' has %d negative values", ti.Column.Name, count)
 		},
 	}).Check(ctx, ti)
 }
