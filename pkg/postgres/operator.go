@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -24,6 +25,7 @@ type PgClient interface {
 
 type connectionFetcher interface {
 	GetPgConnection(name string) (PgClient, error)
+	GetConnection(name string) (interface{}, error)
 }
 
 type BasicOperator struct {
@@ -72,4 +74,14 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	return conn.RunQueryWithoutResult(ctx, q)
+}
+
+func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOperator {
+	return ansisql.NewColumnCheckOperator(map[string]ansisql.CheckRunner{
+		"not_null":        ansisql.NewNotNullCheck(manager),
+		"unique":          ansisql.NewUniqueCheck(manager),
+		"positive":        ansisql.NewPositiveCheck(manager),
+		"non_negative":    ansisql.NewNonNegativeCheck(manager),
+		"accepted_values": &AcceptedValuesCheck{conn: manager},
+	})
 }

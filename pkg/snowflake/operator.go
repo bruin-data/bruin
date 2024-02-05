@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -172,7 +173,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 			return err
 		}
 
-		intRes, err := CastResultToInteger(res)
+		intRes, err := helpers.CastResultToInteger(res)
 		if err != nil {
 			return errors.Wrap(err, "failed to parse query sensor result")
 		}

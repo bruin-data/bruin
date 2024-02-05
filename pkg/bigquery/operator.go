@@ -69,17 +69,17 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	return conn.RunQueryWithoutResult(ctx, q)
 }
 
-type testRunner interface {
+type checkRunner interface {
 	Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error
 }
 
 type ColumnCheckOperator struct {
-	testRunners map[string]testRunner
+	checkRunners map[string]checkRunner
 }
 
 func NewColumnCheckOperator(manager connectionFetcher) (*ColumnCheckOperator, error) {
 	return &ColumnCheckOperator{
-		testRunners: map[string]testRunner{
+		checkRunners: map[string]checkRunner{
 			"not_null":        &NotNullCheck{conn: manager},
 			"unique":          &UniqueCheck{conn: manager},
 			"positive":        &PositiveCheck{conn: manager},
@@ -94,7 +94,7 @@ func (o ColumnCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance)
 		return errors.New("cannot run a non-column check instance")
 	}
 
-	executor, ok := o.testRunners[test.Check.Name]
+	executor, ok := o.checkRunners[test.Check.Name]
 	if !ok {
 		return errors.New("there is no executor configured for the check type, check cannot be run: " + test.Check.Name)
 	}

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
@@ -13,48 +14,6 @@ import (
 
 type NotNullCheck struct {
 	conn connectionFetcher
-}
-
-func CastResultToInteger(res [][]interface{}) (int64, error) {
-	if len(res) != 1 || len(res[0]) != 1 {
-		return 0, errors.Errorf("multiple results are returned from query, please make sure your query just expects one value - value: %v", res)
-	}
-
-	switch v := res[0][0].(type) {
-	case nil:
-		return 0, errors.Errorf("unexpected result from query, result is nil")
-	case float64:
-		return int64(v), nil
-	case float32:
-		return int64(v), nil
-	case int64:
-		return v, nil
-	case int:
-		return int64(v), nil
-	case bool:
-		if v {
-			return 1, nil
-		}
-		return 0, nil
-	case string:
-		atoi, err := strconv.Atoi(v)
-		if err == nil {
-			return int64(atoi), nil
-		}
-
-		boolValue, err := strconv.ParseBool(v)
-		if err == nil {
-			if boolValue {
-				return 1, nil
-			}
-
-			return 0, nil
-		}
-
-		return 0, errors.Errorf("unexpected result from query, cannot cast result string to integer: %v", res)
-	}
-
-	return 0, errors.Errorf("unexpected result from query during, cannot cast result to integer: %v", res)
 }
 
 func (c *NotNullCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
@@ -173,7 +132,7 @@ func (c *countableQueryCheck) check(ctx context.Context, connectionName string) 
 		return errors.Wrapf(err, "failed '%s' check", c.checkName)
 	}
 
-	count, err := CastResultToInteger(res)
+	count, err := helpers.CastResultToInteger(res)
 	if err != nil {
 		return errors.Wrapf(err, "failed to parse '%s' check result", c.checkName)
 	}
