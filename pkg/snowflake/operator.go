@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -26,6 +27,7 @@ type SfClient interface {
 
 type connectionFetcher interface {
 	GetSfConnection(name string) (SfClient, error)
+	GetConnection(name string) (interface{}, error)
 }
 
 type BasicOperator struct {
@@ -76,60 +78,14 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	return conn.RunQueryWithoutResult(ctx, q)
 }
 
-type columnCheckRunner interface {
-	Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error
-}
-
-type ColumnCheckOperator struct {
-	testRunners map[string]columnCheckRunner
-}
-
-func NewColumnCheckOperator(manager connectionFetcher) (*ColumnCheckOperator, error) {
-	return &ColumnCheckOperator{
-		testRunners: map[string]columnCheckRunner{
-			"not_null":        &NotNullCheck{conn: manager},
-			"unique":          &UniqueCheck{conn: manager},
-			"positive":        &PositiveCheck{conn: manager},
-			"accepted_values": &AcceptedValuesCheck{conn: manager},
-		},
-	}, nil
-}
-
-func (o ColumnCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
-	test, ok := ti.(*scheduler.ColumnCheckInstance)
-	if !ok {
-		return errors.New("cannot run a non-column check instance")
-	}
-
-	executor, ok := o.testRunners[test.Check.Name]
-	if !ok {
-		return errors.New("there is no executor configured for the check type, check cannot be run: " + test.Check.Name)
-	}
-
-	return executor.Check(ctx, test)
-}
-
-type customCheckRunner interface {
-	Check(ctx context.Context, ti *scheduler.CustomCheckInstance) error
-}
-
-func NewCustomCheckOperator(manager connectionFetcher) (*CustomCheckOperator, error) {
-	return &CustomCheckOperator{
-		checkRunner: &CustomCheck{conn: manager},
-	}, nil
-}
-
-type CustomCheckOperator struct {
-	checkRunner customCheckRunner
-}
-
-func (o *CustomCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
-	instance, ok := ti.(*scheduler.CustomCheckInstance)
-	if !ok {
-		return errors.New("cannot run a non-custom check instance")
-	}
-
-	return o.checkRunner.Check(ctx, instance)
+func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOperator {
+	return ansisql.NewColumnCheckOperator(map[string]ansisql.CheckRunner{
+		"not_null":        ansisql.NewNotNullCheck(manager),
+		"unique":          ansisql.NewUniqueCheck(manager),
+		"positive":        ansisql.NewPositiveCheck(manager),
+		"non_negative":    ansisql.NewNonNegativeCheck(manager),
+		"accepted_values": &AcceptedValuesCheck{conn: manager},
+	})
 }
 
 type renderer interface {

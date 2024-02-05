@@ -376,15 +376,8 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 	if shouldInitiateSnowflake {
 		sfOperator := snowflake.NewBasicOperator(conn, wholeFileExtractor, snowflake.NewMaterializer())
 
-		sfCheckRunner, err := snowflake.NewColumnCheckOperator(conn)
-		if err != nil {
-			return nil, err
-		}
-
-		sfCustomCheckRunner, err := snowflake.NewCustomCheckOperator(conn)
-		if err != nil {
-			return nil, err
-		}
+		sfCheckRunner := snowflake.NewColumnCheckOperator(conn)
+		sfCustomCheckRunner := ansisql.NewCustomCheckOperator(conn)
 
 		sfQuerySensor := snowflake.NewQuerySensor(conn, renderer, 30)
 

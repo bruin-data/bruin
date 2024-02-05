@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -34,6 +35,16 @@ type mockConnectionFetcher struct {
 	mock.Mock
 }
 
+func (m *mockConnectionFetcher) GetConnection(name string) (interface{}, error) {
+	args := m.Called(name)
+	get := args.Get(0)
+	if get == nil {
+		return nil, args.Error(1)
+	}
+
+	return get, args.Error(1)
+}
+
 func (m *mockConnectionFetcher) GetSfConnection(name string) (SfClient, error) {
 	args := m.Called(name)
 	get := args.Get(0)
@@ -44,68 +55,14 @@ func (m *mockConnectionFetcher) GetSfConnection(name string) (SfClient, error) {
 	return get.(SfClient), args.Error(1)
 }
 
-func TestNotNullCheck_Check(t *testing.T) {
-	t.Parallel()
-
-	runTestsFoCountZeroCheck(
-		t,
-		func(q *mockQuerierWithResult) columnCheckRunner {
-			conn := new(mockConnectionFetcher)
-			conn.On("GetSfConnection", "test").Return(q, nil)
-			return &NotNullCheck{conn: conn}
-		},
-		"SELECT count(*) FROM dataset.test_asset WHERE test_column IS NULL",
-		"column 'test_column' has 5 null values",
-		&pipeline.ColumnCheck{
-			Name: "not_null",
-		},
-	)
-}
-
-func TestPositiveCheck_Check(t *testing.T) {
-	t.Parallel()
-
-	runTestsFoCountZeroCheck(
-		t,
-		func(q *mockQuerierWithResult) columnCheckRunner {
-			conn := new(mockConnectionFetcher)
-			conn.On("GetSfConnection", "test").Return(q, nil)
-			return &PositiveCheck{conn: conn}
-		},
-		"SELECT count(*) FROM dataset.test_asset WHERE test_column <= 0",
-		"column 'test_column' has 5 non-positive values",
-		&pipeline.ColumnCheck{
-			Name: "positive",
-		},
-	)
-}
-
-func TestUniqueCheck_Check(t *testing.T) {
-	t.Parallel()
-
-	runTestsFoCountZeroCheck(
-		t,
-		func(q *mockQuerierWithResult) columnCheckRunner {
-			conn := new(mockConnectionFetcher)
-			conn.On("GetSfConnection", "test").Return(q, nil)
-			return &UniqueCheck{conn: conn}
-		},
-		"SELECT COUNT(test_column) - COUNT(DISTINCT test_column) FROM dataset.test_asset",
-		"column 'test_column' has 5 non-unique values",
-		&pipeline.ColumnCheck{
-			Name: "unique",
-		},
-	)
-}
-
 func TestAcceptedValuesCheck_Check(t *testing.T) {
 	t.Parallel()
 
 	runTestsFoCountZeroCheck(
 		t,
-		func(q *mockQuerierWithResult) columnCheckRunner {
+		func(q *mockQuerierWithResult) ansisql.CheckRunner {
 			conn := new(mockConnectionFetcher)
-			conn.On("GetSfConnection", "test").Return(q, nil)
+			conn.On("GetConnection", "test").Return(q, nil)
 			return &AcceptedValuesCheck{conn: conn}
 		},
 		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN ('test','test2')",
@@ -120,9 +77,9 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 
 	runTestsFoCountZeroCheck(
 		t,
-		func(q *mockQuerierWithResult) columnCheckRunner {
+		func(q *mockQuerierWithResult) ansisql.CheckRunner {
 			conn := new(mockConnectionFetcher)
-			conn.On("GetSfConnection", "test").Return(q, nil)
+			conn.On("GetConnection", "test").Return(q, nil)
 			return &AcceptedValuesCheck{conn: conn}
 		},
 		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN ('1','2')",
@@ -136,7 +93,7 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 	)
 }
 
-func runTestsFoCountZeroCheck(t *testing.T, instanceBuilder func(q *mockQuerierWithResult) columnCheckRunner, expectedQueryString string, expectedErrorMessage string, checkInstance *pipeline.ColumnCheck) {
+func runTestsFoCountZeroCheck(t *testing.T, instanceBuilder func(q *mockQuerierWithResult) ansisql.CheckRunner, expectedQueryString string, expectedErrorMessage string, checkInstance *pipeline.ColumnCheck) {
 	expectedQuery := &query.Query{Query: expectedQueryString}
 	setupFunc := func(val [][]interface{}, err error) func(n *mockQuerierWithResult) {
 		return func(q *mockQuerierWithResult) {
@@ -292,8 +249,8 @@ func TestCustomCheck(t *testing.T) {
 			tt.setup(q)
 
 			conn := new(mockConnectionFetcher)
-			conn.On("GetSfConnection", "test").Return(q, nil)
-			n := &CustomCheck{conn: conn}
+			conn.On("GetConnection", "test").Return(q, nil)
+			n := ansisql.NewCustomCheck(conn)
 
 			testInstance := &scheduler.CustomCheckInstance{
 				AssetInstance: &scheduler.AssetInstance{
