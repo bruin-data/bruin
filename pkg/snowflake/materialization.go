@@ -2,7 +2,7 @@ package snowflake
 
 import (
 	"fmt"
-	"math/rand"
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -16,14 +16,7 @@ type Materializer struct {
 
 func NewMaterializer() *Materializer {
 	return &Materializer{
-		prefixGenerator: func() string {
-			letters := []rune("abcdefghijklmnopqrstuvwxyz")
-			b := make([]rune, 8)
-			for i := range b {
-				b[i] = letters[rand.Intn(len(letters))] //nolint:all
-			}
-			return string(b)
-		},
+		prefixGenerator: helpers.PrefixGenerator,
 	}
 }
 
