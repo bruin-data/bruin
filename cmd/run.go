@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/postgres"
 	"io"
 	"log"
 	"os"
@@ -24,6 +23,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -355,7 +355,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypePostgresQuery) || estimateCustomCheckType == pipeline.AssetTypePostgresQuery {
-		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, snowflake.NewMaterializer())
+		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, postgres.NewMaterializer())
 
 		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeMain] = pgOperator
 	}

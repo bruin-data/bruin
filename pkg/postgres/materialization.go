@@ -2,9 +2,9 @@ package postgres
 
 import (
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/helpers"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
@@ -41,7 +41,7 @@ func (m Materializer) Render(task *pipeline.Asset, query string) (string, error)
 		}
 
 		if strategy == pipeline.MaterializationStrategyCreateReplace {
-			return buildCreateReplaceQuery(task, query, mat)
+			return buildCreateReplaceQuery(task, query)
 		}
 
 		if strategy == pipeline.MaterializationStrategyDeleteInsert {
@@ -71,11 +71,11 @@ func (m *Materializer) buildIncrementalQuery(task *pipeline.Asset, query string,
 	return strings.Join(queries, ";\n") + ";", nil
 }
 
-func buildCreateReplaceQuery(task *pipeline.Asset, query string, mat pipeline.Materialization) (string, error) {
-	query = helpers.TrimSuffix(query, ";")
+func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error) {
+	query = strings.TrimSuffix(query, ";")
 	return fmt.Sprintf(
 		`BEGIN TRANSACTION;
 DROP TABLE IF EXISTS %s; 
-CREATE TABLE %s AS\n%s;
+CREATE TABLE %s AS %s;
 COMMIT;`, task.Name, task.Name, query), nil
 }

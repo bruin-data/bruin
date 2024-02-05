@@ -2,15 +2,7 @@ package helpers
 
 import (
 	"math/rand"
-	"strings"
 )
-
-func TrimSuffix(s, suffix string) string {
-	if strings.HasSuffix(s, suffix) {
-		s = s[:len(s)-len(suffix)]
-	}
-	return s
-}
 
 func PrefixGenerator() string {
 	letters := []rune("abcdefghijklmnopqrstuvwxyz")

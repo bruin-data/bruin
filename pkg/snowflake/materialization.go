@@ -2,9 +2,9 @@ package snowflake
 
 import (
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/helpers"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 

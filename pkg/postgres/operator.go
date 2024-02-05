@@ -2,11 +2,11 @@ package postgres
 
 import (
 	"context"
+
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
-
-	"github.com/bruin-data/bruin/pkg/query"
 )
 
 type materializer interface {
