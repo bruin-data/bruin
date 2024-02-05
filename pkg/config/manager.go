@@ -21,7 +21,8 @@ type PostgresConnection struct {
 	Host         string `yaml:"host" json:"host"`
 	Port         int    `yaml:"port" json:"port"`
 	Database     string `yaml:"database" json:"database"`
-	PoolMaxConns int    `yaml:"pool_max_conns" json:"pool_max_conns"`
+	PoolMaxConns int    `yaml:"pool_max_conns" json:"pool_max_conns" default:"10"`
+	SslMode      string `yaml:"ssl_mode" json:"ssl_mode" default:"disable"`
 }
 
 type GoogleCloudPlatformConnection struct {

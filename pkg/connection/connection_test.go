@@ -78,3 +78,31 @@ func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 }
+
+func TestManager_AddPgConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{}
+
+	res, err := m.GetPgConnection("test")
+	assert.Error(t, err)
+	assert.Nil(t, res)
+
+	configuration := &config.PostgresConnection{
+		Name:         "test",
+		Host:         "somehost",
+		Username:     "user",
+		Password:     "pass",
+		Database:     "db",
+		Port:         15432,
+		SslMode:      "disable",
+		PoolMaxConns: 10,
+	}
+
+	err = m.AddPgConnectionFromConfig(configuration)
+	assert.NoError(t, err)
+
+	res, err = m.GetPgConnection("test")
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+}

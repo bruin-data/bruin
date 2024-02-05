@@ -42,6 +42,7 @@ func TestLoadFromFile(t *testing.T) {
 					Database:     "pgdb",
 					Port:         5432,
 					PoolMaxConns: 5,
+					SslMode:      "require",
 				},
 			},
 			Generic: []GenericConnection{

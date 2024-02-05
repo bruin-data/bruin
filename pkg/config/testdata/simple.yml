@@ -27,6 +27,7 @@ environments:
           port: 5432
           database: "pgdb"
           pool_max_conns: 5
+          ssl_mode: "require"
 
       generic:
         - name: key1
