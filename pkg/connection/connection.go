@@ -164,13 +164,18 @@ func (m *Manager) AddPgConnectionFromConfig(connection *config.PostgresConnectio
 	}
 	m.mutex.Unlock()
 
+	poolMaxConns := connection.PoolMaxConns
+	if connection.PoolMaxConns == 0 {
+		poolMaxConns = 10
+	}
+
 	client, err := postgres.NewClient(context.TODO(), postgres.Config{
 		Username:     connection.Username,
 		Password:     connection.Password,
 		Host:         connection.Host,
 		Port:         connection.Port,
 		Database:     connection.Database,
-		PoolMaxConns: connection.PoolMaxConns,
+		PoolMaxConns: poolMaxConns,
 		SslMode:      connection.SslMode,
 	})
 	if err != nil {
@@ -204,6 +209,16 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 			err := connectionManager.AddSfConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add Snowflake connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Postgres {
+		conn := conn
+		wg.Go(func() {
+			err := connectionManager.AddPgConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add Postgres connection '%s'", conn.Name))
 			}
 		})
 	}

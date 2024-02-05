@@ -48,6 +48,11 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 	"athena.sensor.query": {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
+	pipeline.AssetTypePostgresQuery: {
+		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
+	},
 	pipeline.AssetTypePython: {
 		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
 		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},

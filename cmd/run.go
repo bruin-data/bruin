@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/postgres"
 	"io"
 	"log"
 	"os"
@@ -324,12 +325,12 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 	}
 
 	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate)
-	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery {
-		wholeFileExtractor := &query.WholeFileExtractor{
-			Fs:       fs,
-			Renderer: renderer,
-		}
+	wholeFileExtractor := &query.WholeFileExtractor{
+		Fs:       fs,
+		Renderer: renderer,
+	}
 
+	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery {
 		bqOperator := bigquery.NewBasicOperator(conn, wholeFileExtractor, bigquery.Materializer{})
 
 		bqCheckRunner, err := bigquery.NewColumnCheckOperator(conn)
@@ -353,13 +354,14 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		}
 	}
 
+	if s.WillRunTaskOfType(pipeline.AssetTypePostgresQuery) || estimateCustomCheckType == pipeline.AssetTypePostgresQuery {
+		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, snowflake.NewMaterializer())
+
+		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeMain] = pgOperator
+	}
+
 	shouldInitiateSnowflake := s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuerySensor) || estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery
 	if shouldInitiateSnowflake {
-		wholeFileExtractor := &query.WholeFileExtractor{
-			Fs:       fs,
-			Renderer: renderer,
-		}
-
 		sfOperator := snowflake.NewBasicOperator(conn, wholeFileExtractor, snowflake.NewMaterializer())
 
 		sfCheckRunner, err := snowflake.NewColumnCheckOperator(conn)
