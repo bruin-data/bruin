@@ -22,6 +22,7 @@ const (
 	AssetTypeBigqueryQuery        = AssetType("bq.sql")
 	AssetTypeEmpty                = AssetType("empty")
 	AssetTypePostgresQuery        = AssetType("pg.sql")
+	AssetTypeRedshiftQuery        = AssetType("rs.sql")
 )
 
 var supportedFileSuffixes = []string{".yml", ".yaml", ".sql", ".py"}
@@ -219,7 +220,7 @@ var assetTypeConnectionMapping = map[AssetType][]string{
 	AssetTypeBigqueryQuery:        {"google_cloud_platform", "gcp"},
 	AssetTypeSnowflakeQuery:       {"snowflake", "sf"},
 	AssetTypeSnowflakeQuerySensor: {"snowflake", "sf"},
-	AssetTypePostgresQuery:        {"postgres"},
+	AssetTypePostgresQuery:        {"postgres", "redshift"},
 }
 
 type SecretMapping struct {
