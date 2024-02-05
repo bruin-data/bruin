@@ -309,7 +309,11 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 
 	// this is a heuristic we apply to find what might be the most common type of custom check in the pipeline
 	// this should go away once we incorporate URIs into the assets
-	estimateCustomCheckType := s.FindMajorityOfTypes([]pipeline.AssetType{pipeline.AssetTypeBigqueryQuery, pipeline.AssetTypeSnowflakeQuery}, pipeline.AssetTypeBigqueryQuery)
+	estimateCustomCheckType := s.FindMajorityOfTypes([]pipeline.AssetType{
+		pipeline.AssetTypeBigqueryQuery,
+		pipeline.AssetTypeSnowflakeQuery,
+		pipeline.AssetTypePostgresQuery,
+	}, pipeline.AssetTypeBigqueryQuery)
 
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
 		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, map[string]string{
