@@ -444,17 +444,29 @@ func EnsureMaterializationValuesAreValid(p *pipeline.Pipeline) ([]*Issue, error)
 						Description: "Materialization strategy 'delete+insert' requires the 'incremental_key' field to be set",
 					})
 				}
+			case pipeline.MaterializationStrategyMerge:
+				if len(asset.Columns) == 0 {
+					issues = append(issues, &Issue{
+						Task:        asset,
+						Description: "Materialization strategy 'merge' requires the 'columns' field to be set with actual columns",
+					})
+				}
+
+				primaryKeys := asset.ColumnNamesWithPrimaryKey()
+				if len(primaryKeys) == 0 {
+					issues = append(issues, &Issue{
+						Task:        asset,
+						Description: "Materialization strategy 'merge' requires the 'primary_key' field to be set on at least one column",
+					})
+				}
+
 			default:
 				issues = append(issues, &Issue{
 					Task: asset,
 					Description: fmt.Sprintf(
 						"Materialization strategy '%s' is not supported, available strategies are: %v",
 						asset.Materialization.Strategy,
-						[]pipeline.MaterializationStrategy{
-							pipeline.MaterializationStrategyCreateReplace,
-							pipeline.MaterializationStrategyAppend,
-							pipeline.MaterializationStrategyDeleteInsert,
-						},
+						pipeline.AllAvailableMaterializationStrategies,
 					),
 				})
 			}

@@ -1337,11 +1337,7 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 			want: []string{
 				fmt.Sprintf(
 					"Materialization strategy 'whatever' is not supported, available strategies are: %v",
-					[]pipeline.MaterializationStrategy{
-						pipeline.MaterializationStrategyCreateReplace,
-						pipeline.MaterializationStrategyAppend,
-						pipeline.MaterializationStrategyDeleteInsert,
-					},
+					pipeline.AllAvailableMaterializationStrategies,
 				),
 			},
 		},
@@ -1377,6 +1373,60 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 						IncrementalKey: "dt",
 						ClusterBy:      []string{"dt"},
 						PartitionBy:    "dt",
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "table materialization has merge but no columns",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyMerge,
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want: []string{
+				"Materialization strategy 'merge' requires the 'columns' field to be set with actual columns",
+				"Materialization strategy 'merge' requires the 'primary_key' field to be set on at least one column",
+			},
+		},
+		{
+			name: "table materialization has merge but no columns",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyMerge,
+					},
+					Columns: []pipeline.Column{
+						{Name: "dt"},
+						{Name: "abc"},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want: []string{
+				"Materialization strategy 'merge' requires the 'primary_key' field to be set on at least one column",
+			},
+		},
+		{
+			name: "table materialization has merge and it is successful",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyMerge,
+					},
+					Columns: []pipeline.Column{
+						{Name: "dt", PrimaryKey: true},
+						{Name: "abc"},
 					},
 				},
 			},

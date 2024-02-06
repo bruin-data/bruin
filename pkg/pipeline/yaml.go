@@ -108,11 +108,12 @@ type columnCheck struct {
 }
 
 type column struct {
-	Name        string        `yaml:"name"`
-	Type        string        `yaml:"type"`
-	Description string        `yaml:"description"`
-	Tests       []columnCheck `yaml:"checks"`
-	PrimaryKey  bool          `yaml:"primary_key"`
+	Name          string        `yaml:"name"`
+	Type          string        `yaml:"type"`
+	Description   string        `yaml:"description"`
+	Tests         []columnCheck `yaml:"checks"`
+	PrimaryKey    bool          `yaml:"primary_key"`
+	UpdateOnMerge bool          `yaml:"update_on_merge"`
 }
 
 type secretMapping struct {
@@ -224,11 +225,12 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		}
 
 		columns[index] = Column{
-			Name:        column.Name,
-			Type:        strings.ToLower(strings.TrimSpace(column.Type)),
-			Description: column.Description,
-			Checks:      tests,
-			PrimaryKey:  column.PrimaryKey,
+			Name:          column.Name,
+			Type:          strings.ToLower(strings.TrimSpace(column.Type)),
+			Description:   column.Description,
+			Checks:        tests,
+			PrimaryKey:    column.PrimaryKey,
+			UpdateOnMerge: column.UpdateOnMerge,
 		}
 	}
 

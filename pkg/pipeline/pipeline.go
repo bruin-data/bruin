@@ -91,7 +91,15 @@ const (
 	MaterializationStrategyCreateReplace MaterializationStrategy = "create+replace"
 	MaterializationStrategyDeleteInsert  MaterializationStrategy = "delete+insert"
 	MaterializationStrategyAppend        MaterializationStrategy = "append"
+	MaterializationStrategyMerge         MaterializationStrategy = "merge"
 )
+
+var AllAvailableMaterializationStrategies = []MaterializationStrategy{
+	MaterializationStrategyCreateReplace,
+	MaterializationStrategyDeleteInsert,
+	MaterializationStrategyAppend,
+	MaterializationStrategyMerge,
+}
 
 type Materialization struct {
 	Type           MaterializationType     `json:"type"`
@@ -207,11 +215,12 @@ func NewColumnCheck(assetName, columnName, name string, value ColumnCheckValue) 
 }
 
 type Column struct {
-	Name        string        `json:"name"`
-	Type        string        `json:"type"`
-	Description string        `json:"description"`
-	Checks      []ColumnCheck `json:"checks"`
-	PrimaryKey  bool          `json:"primary_key"`
+	Name          string        `json:"name"`
+	Type          string        `json:"type"`
+	Description   string        `json:"description"`
+	Checks        []ColumnCheck `json:"checks"`
+	PrimaryKey    bool          `json:"primary_key"`
+	UpdateOnMerge bool          `json:"update_on_merge"`
 }
 
 type AssetType string
@@ -295,6 +304,34 @@ func (a *Asset) GetFullDownstream() []*Asset {
 	}
 
 	return uniqueAssets(downstream)
+}
+
+func (a *Asset) ColumnNames() []string {
+	columns := make([]string, len(a.Columns))
+	for i, c := range a.Columns {
+		columns[i] = c.Name
+	}
+	return columns
+}
+
+func (a *Asset) ColumnNamesWithUpdateOnMerge() []string {
+	columns := make([]string, 0)
+	for _, c := range a.Columns {
+		if c.UpdateOnMerge {
+			columns = append(columns, c.Name)
+		}
+	}
+	return columns
+}
+
+func (a *Asset) ColumnNamesWithPrimaryKey() []string {
+	columns := make([]string, 0)
+	for _, c := range a.Columns {
+		if c.PrimaryKey {
+			columns = append(columns, c.Name)
+		}
+	}
+	return columns
 }
 
 func uniqueAssets(assets []*Asset) []*Asset {

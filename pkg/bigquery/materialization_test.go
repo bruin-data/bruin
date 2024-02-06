@@ -138,6 +138,79 @@ func TestMaterializer_Render(t *testing.T) {
 				"INSERT INTO `my.asset` SELECT * FROM __bruin_tmp\n" +
 				"COMMIT TRANSACTION;",
 		},
+		{
+			name: "merge with no columns defined fails",
+			task: &pipeline.Asset{
+				Name:    "my.asset",
+				Columns: []pipeline.Column{},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+			},
+			query:   "SELECT 1",
+			wantErr: true,
+		},
+		{
+			name: "merge with no primary key fails",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Columns: []pipeline.Column{
+					{Name: "dt"},
+					{Name: "event_type"},
+					{Name: "value"},
+					{Name: "value2"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+			},
+			query:   "SELECT 1",
+			wantErr: true,
+		},
+		{
+			name: "merge with no columns to update",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Columns: []pipeline.Column{
+					{Name: "dt", PrimaryKey: true},
+					{Name: "event_type", PrimaryKey: true},
+					{Name: "value"},
+					{Name: "value2"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+			},
+			query: "SELECT 1",
+			want: "MERGE my.asset T\n" +
+				"USING (SELECT 1) S ON T.dt = S.dt AND T.event_type = S.event_type\n" +
+				"\n" +
+				"WHEN NOT MATCHED THEN INSERT(dt, event_type, value, value2) VALUES(dt, event_type, value, value2);",
+		},
+		{
+			name: "merge with some columns to update",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Columns: []pipeline.Column{
+					{Name: "dt", PrimaryKey: true},
+					{Name: "event_type", PrimaryKey: true},
+					{Name: "value", UpdateOnMerge: true},
+					{Name: "value2"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+			},
+			query: "SELECT 1;",
+			want: "MERGE my.asset T\n" +
+				"USING (SELECT 1) S ON T.dt = S.dt AND T.event_type = S.event_type\n" +
+				"WHEN MATCHED THEN UPDATE SET T.value = S.value\n" +
+				"WHEN NOT MATCHED THEN INSERT(dt, event_type, value, value2) VALUES(dt, event_type, value, value2);",
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
