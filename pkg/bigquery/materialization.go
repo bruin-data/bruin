@@ -62,7 +62,7 @@ func mergeMaterializer(asset *pipeline.Asset, query string, mat pipeline.Materia
 
 	on := make([]string, 0, len(primaryKeys))
 	for _, key := range primaryKeys {
-		on = append(on, fmt.Sprintf("T.%s = S.%s", key, key))
+		on = append(on, fmt.Sprintf("target.%s = source.%s", key, key))
 	}
 	onQuery := strings.Join(on, " AND ")
 
@@ -73,7 +73,7 @@ func mergeMaterializer(asset *pipeline.Asset, query string, mat pipeline.Materia
 	if len(nonPrimaryKeys) > 0 {
 		matchedUpdateStatements := make([]string, 0, len(nonPrimaryKeys))
 		for _, col := range nonPrimaryKeys {
-			matchedUpdateStatements = append(matchedUpdateStatements, fmt.Sprintf("T.%s = S.%s", col, col))
+			matchedUpdateStatements = append(matchedUpdateStatements, fmt.Sprintf("target.%s = source.%s", col, col))
 		}
 
 		matchedUpdateQuery := strings.Join(matchedUpdateStatements, ", ")
@@ -81,8 +81,8 @@ func mergeMaterializer(asset *pipeline.Asset, query string, mat pipeline.Materia
 	}
 
 	mergeLines := []string{
-		fmt.Sprintf("MERGE %s T", asset.Name),
-		fmt.Sprintf("USING (%s) S ON %s", strings.TrimSuffix(query, ";"), onQuery),
+		fmt.Sprintf("MERGE %s target", asset.Name),
+		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
 		whenMatchedThenQuery,
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, allColumnValues),
 	}
