@@ -1,10 +1,12 @@
 package connection
 
 import (
+	"context"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc"
@@ -13,6 +15,7 @@ import (
 type Manager struct {
 	BigQuery  map[string]*bigquery.Client
 	Snowflake map[string]*snowflake.DB
+	Postgres  map[string]*postgres.Client
 
 	mutex sync.Mutex
 }
@@ -24,6 +27,11 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 
 	conn, err = m.GetSfConnectionWithoutDefault(name)
+	if err == nil {
+		return conn, nil
+	}
+
+	conn, err = m.GetPgConnectionWithoutDefault(name)
 	if err == nil {
 		return conn, nil
 	}
@@ -75,12 +83,34 @@ func (m *Manager) GetSfConnectionWithoutDefault(name string) (snowflake.SfClient
 	return db, nil
 }
 
-func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatformConnection) error {
-	if m.BigQuery == nil {
-		m.mutex.Lock()
-		m.BigQuery = make(map[string]*bigquery.Client)
-		m.mutex.Unlock()
+func (m *Manager) GetPgConnection(name string) (postgres.PgClient, error) {
+	db, err := m.GetPgConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
 	}
+
+	return m.GetPgConnectionWithoutDefault("postgres-default")
+}
+
+func (m *Manager) GetPgConnectionWithoutDefault(name string) (postgres.PgClient, error) {
+	if m.Postgres == nil {
+		return nil, errors.New("no postgres connections found")
+	}
+
+	db, ok := m.Postgres[name]
+	if !ok {
+		return nil, errors.New("postgres connection not found")
+	}
+
+	return db, nil
+}
+
+func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatformConnection) error {
+	m.mutex.Lock()
+	if m.BigQuery == nil {
+		m.BigQuery = make(map[string]*bigquery.Client)
+	}
+	m.mutex.Unlock()
 
 	db, err := bigquery.NewDB(&bigquery.Config{
 		ProjectID:           connection.ProjectID,
@@ -100,11 +130,11 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 }
 
 func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnection) error {
+	m.mutex.Lock()
 	if m.Snowflake == nil {
-		m.mutex.Lock()
 		m.Snowflake = make(map[string]*snowflake.DB)
-		m.mutex.Unlock()
 	}
+	m.mutex.Unlock()
 
 	db, err := snowflake.NewDB(&snowflake.Config{
 		Account:   connection.Account,
@@ -123,6 +153,38 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Snowflake[connection.Name] = db
+
+	return nil
+}
+
+func (m *Manager) AddPgConnectionFromConfig(connection *config.PostgresConnection) error {
+	m.mutex.Lock()
+	if m.Postgres == nil {
+		m.Postgres = make(map[string]*postgres.Client)
+	}
+	m.mutex.Unlock()
+
+	poolMaxConns := connection.PoolMaxConns
+	if connection.PoolMaxConns == 0 {
+		poolMaxConns = 10
+	}
+
+	client, err := postgres.NewClient(context.TODO(), postgres.Config{
+		Username:     connection.Username,
+		Password:     connection.Password,
+		Host:         connection.Host,
+		Port:         connection.Port,
+		Database:     connection.Database,
+		PoolMaxConns: poolMaxConns,
+		SslMode:      connection.SslMode,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Postgres[connection.Name] = client
 
 	return nil
 }
@@ -147,6 +209,16 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 			err := connectionManager.AddSfConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add Snowflake connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Postgres {
+		conn := conn
+		wg.Go(func() {
+			err := connectionManager.AddPgConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add Postgres connection '%s'", conn.Name))
 			}
 		})
 	}

@@ -1,6 +1,8 @@
 module github.com/bruin-data/bruin
 
-go 1.20
+go 1.21
+
+toolchain go1.21.6
 
 require (
 	cloud.google.com/go/bigquery v1.57.1
@@ -9,9 +11,11 @@ require (
 	github.com/fatih/color v1.16.0
 	github.com/go-playground/validator/v10 v10.16.0
 	github.com/google/uuid v1.4.0
+	github.com/jackc/pgx/v5 v5.5.2
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/manifoldco/promptui v0.9.0
 	github.com/noirbizarre/gonja v0.0.0-20200629003239-4d051fd0be61
+	github.com/pashagolub/pgxmock/v3 v3.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/snowflakedb/gosnowflake v1.7.1
@@ -77,6 +81,9 @@ require (
 	github.com/googleapis/gax-go/v2 v2.12.0 // indirect
 	github.com/goph/emperror v0.17.2 // indirect
 	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
+	github.com/jackc/puddle/v2 v2.2.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
 	github.com/klauspost/compress v1.17.4 // indirect
@@ -100,7 +107,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.21.0 // indirect
 	go.opentelemetry.io/otel/trace v1.21.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.16.0 // indirect
+	golang.org/x/crypto v0.17.0 // indirect
 	golang.org/x/exp v0.0.0-20231206192017-f3f8817b8deb // indirect
 	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/net v0.19.0 // indirect

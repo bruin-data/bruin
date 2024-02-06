@@ -1,11 +1,9 @@
-package snowflake
+package postgres
 
 import (
 	"context"
-	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
-	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -20,13 +18,13 @@ type queryExtractor interface {
 	ExtractQueriesFromFile(filepath string) ([]*query.Query, error)
 }
 
-type SfClient interface {
+type PgClient interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 }
 
 type connectionFetcher interface {
-	GetSfConnection(name string) (SfClient, error)
+	GetPgConnection(name string) (PgClient, error)
 	GetConnection(name string) (interface{}, error)
 }
 
@@ -70,7 +68,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 
 	q.Query = materialized
 
-	conn, err := o.connection.GetSfConnection(p.GetConnectionNameForAsset(t))
+	conn, err := o.connection.GetPgConnection(p.GetConnectionNameForAsset(t))
 	if err != nil {
 		return err
 	}
@@ -86,60 +84,4 @@ func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOpera
 		"non_negative":    ansisql.NewNonNegativeCheck(manager),
 		"accepted_values": &AcceptedValuesCheck{conn: manager},
 	})
-}
-
-type renderer interface {
-	Render(query string) string
-}
-
-type QuerySensor struct {
-	connection     connectionFetcher
-	renderer       renderer
-	secondsToSleep int64
-}
-
-func NewQuerySensor(conn connectionFetcher, renderer renderer, secondsToSleep int64) *QuerySensor {
-	return &QuerySensor{
-		connection:     conn,
-		renderer:       renderer,
-		secondsToSleep: secondsToSleep,
-	}
-}
-
-func (o *QuerySensor) Run(ctx context.Context, ti scheduler.TaskInstance) error {
-	return o.RunTask(ctx, ti.GetPipeline(), ti.GetAsset())
-}
-
-func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
-	qq, ok := t.Parameters["query"]
-	if !ok {
-		return errors.New("query sensor requires a parameter named 'query'")
-	}
-
-	qq = o.renderer.Render(qq)
-
-	conn, err := o.connection.GetSfConnection(p.GetConnectionNameForAsset(t))
-	if err != nil {
-		return err
-	}
-
-	for {
-		res, err := conn.Select(ctx, &query.Query{Query: qq})
-		if err != nil {
-			return err
-		}
-
-		intRes, err := helpers.CastResultToInteger(res)
-		if err != nil {
-			return errors.Wrap(err, "failed to parse query sensor result")
-		}
-
-		if intRes > 0 {
-			break
-		}
-
-		time.Sleep(time.Duration(o.secondsToSleep) * time.Second)
-	}
-
-	return nil
 }

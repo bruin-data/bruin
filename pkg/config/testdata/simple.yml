@@ -19,6 +19,16 @@ environments:
           role: "role"
           region: "region"
 
+      postgres:
+        - name: conn3
+          username: "pguser"
+          password: "pgpass"
+          host: "somehost"
+          port: 5432
+          database: "pgdb"
+          pool_max_conns: 5
+          ssl_mode: "require"
+
       generic:
         - name: key1
           value: value1

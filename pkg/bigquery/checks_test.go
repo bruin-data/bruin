@@ -49,7 +49,7 @@ func TestNotNullCheck_Check(t *testing.T) {
 
 	runTestsFoCountZeroCheck(
 		t,
-		func(q *mockQuerierWithResult) testRunner {
+		func(q *mockQuerierWithResult) checkRunner {
 			conn := new(mockConnectionFetcher)
 			conn.On("GetBqConnection", "test").Return(q, nil)
 			return &NotNullCheck{conn: conn}
@@ -67,7 +67,7 @@ func TestPositiveCheck_Check(t *testing.T) {
 
 	runTestsFoCountZeroCheck(
 		t,
-		func(q *mockQuerierWithResult) testRunner {
+		func(q *mockQuerierWithResult) checkRunner {
 			conn := new(mockConnectionFetcher)
 			conn.On("GetBqConnection", "test").Return(q, nil)
 			return &PositiveCheck{conn: conn}
@@ -85,7 +85,7 @@ func TestNonNegativeCheck_Check(t *testing.T) {
 
 	runTestsFoCountZeroCheck(
 		t,
-		func(q *mockQuerierWithResult) testRunner {
+		func(q *mockQuerierWithResult) checkRunner {
 			conn := new(mockConnectionFetcher)
 			conn.On("GetBqConnection", "test").Return(q, nil)
 			return &NonNegativeCheck{conn: conn}
@@ -103,7 +103,7 @@ func TestUniqueCheck_Check(t *testing.T) {
 
 	runTestsFoCountZeroCheck(
 		t,
-		func(q *mockQuerierWithResult) testRunner {
+		func(q *mockQuerierWithResult) checkRunner {
 			conn := new(mockConnectionFetcher)
 			conn.On("GetBqConnection", "test").Return(q, nil)
 			return &UniqueCheck{conn: conn}
@@ -121,7 +121,7 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 
 	runTestsFoCountZeroCheck(
 		t,
-		func(q *mockQuerierWithResult) testRunner {
+		func(q *mockQuerierWithResult) checkRunner {
 			conn := new(mockConnectionFetcher)
 			conn.On("GetBqConnection", "test").Return(q, nil)
 			return &AcceptedValuesCheck{conn: conn}
@@ -138,7 +138,7 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 
 	runTestsFoCountZeroCheck(
 		t,
-		func(q *mockQuerierWithResult) testRunner {
+		func(q *mockQuerierWithResult) checkRunner {
 			conn := new(mockConnectionFetcher)
 			conn.On("GetBqConnection", "test").Return(q, nil)
 			return &AcceptedValuesCheck{conn: conn}
@@ -154,7 +154,7 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 	)
 }
 
-func runTestsFoCountZeroCheck(t *testing.T, instanceBuilder func(q *mockQuerierWithResult) testRunner, expectedQueryString string, expectedErrorMessage string, checkInstance *pipeline.ColumnCheck) {
+func runTestsFoCountZeroCheck(t *testing.T, instanceBuilder func(q *mockQuerierWithResult) checkRunner, expectedQueryString string, expectedErrorMessage string, checkInstance *pipeline.ColumnCheck) {
 	expectedQuery := &query.Query{Query: expectedQueryString}
 	setupFunc := func(val [][]interface{}, err error) func(n *mockQuerierWithResult) {
 		return func(q *mockQuerierWithResult) {

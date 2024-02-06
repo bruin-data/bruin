@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
-	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/pkg/errors"
 )
 
@@ -17,7 +17,7 @@ type NotNullCheck struct {
 }
 
 func ensureCountZero(res [][]interface{}) (int64, error) {
-	return snowflake.CastResultToInteger(res)
+	return helpers.CastResultToInteger(res)
 }
 
 func (c *NotNullCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {

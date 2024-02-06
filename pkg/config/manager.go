@@ -14,6 +14,17 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
+type PostgresConnection struct {
+	Name         string `yaml:"name" json:"name"`
+	Username     string `yaml:"username" json:"username"`
+	Password     string `yaml:"password" json:"password"`
+	Host         string `yaml:"host" json:"host"`
+	Port         int    `yaml:"port" json:"port"`
+	Database     string `yaml:"database" json:"database"`
+	PoolMaxConns int    `yaml:"pool_max_conns" json:"pool_max_conns" default:"10"`
+	SslMode      string `yaml:"ssl_mode" json:"ssl_mode" default:"disable"`
+}
+
 type GoogleCloudPlatformConnection struct {
 	Name               string `yaml:"name"`
 	ServiceAccountJSON string `yaml:"service_account_json"`
@@ -86,6 +97,7 @@ func (c GenericConnection) MarshalJSON() ([]byte, error) {
 type Connections struct {
 	GoogleCloudPlatform []GoogleCloudPlatformConnection `yaml:"google_cloud_platform"`
 	Snowflake           []SnowflakeConnection           `yaml:"snowflake"`
+	Postgres            []PostgresConnection            `yaml:"postgres"`
 	Generic             []GenericConnection             `yaml:"generic"`
 
 	byKey map[string]any
@@ -99,6 +111,10 @@ func (c *Connections) buildConnectionKeyMap() {
 
 	for i, conn := range c.Snowflake {
 		c.byKey[conn.Name] = &(c.Snowflake[i])
+	}
+
+	for i, conn := range c.Postgres {
+		c.byKey[conn.Name] = &(c.Postgres[i])
 	}
 
 	for i, conn := range c.Generic {

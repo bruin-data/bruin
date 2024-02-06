@@ -1,4 +1,4 @@
-package snowflake
+package postgres
 
 import (
 	"fmt"
@@ -41,7 +41,7 @@ func (m Materializer) Render(task *pipeline.Asset, query string) (string, error)
 		}
 
 		if strategy == pipeline.MaterializationStrategyCreateReplace {
-			return buildCreateReplaceQuery(task, query, mat)
+			return buildCreateReplaceQuery(task, query)
 		}
 
 		if strategy == pipeline.MaterializationStrategyDeleteInsert {
@@ -71,11 +71,11 @@ func (m *Materializer) buildIncrementalQuery(task *pipeline.Asset, query string,
 	return strings.Join(queries, ";\n") + ";", nil
 }
 
-func buildCreateReplaceQuery(task *pipeline.Asset, query string, mat pipeline.Materialization) (string, error) {
-	clusterByClause := ""
-	if len(mat.ClusterBy) > 0 {
-		clusterByClause = fmt.Sprintf("CLUSTER BY (%s)", strings.Join(mat.ClusterBy, ", "))
-	}
-
-	return fmt.Sprintf("CREATE OR REPLACE TABLE %s %s AS\n%s", task.Name, clusterByClause, query), nil
+func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error) {
+	query = strings.TrimSuffix(query, ";")
+	return fmt.Sprintf(
+		`BEGIN TRANSACTION;
+DROP TABLE IF EXISTS %s; 
+CREATE TABLE %s AS %s;
+COMMIT;`, task.Name, task.Name, query), nil
 }

@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
@@ -23,6 +24,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -307,7 +309,11 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 
 	// this is a heuristic we apply to find what might be the most common type of custom check in the pipeline
 	// this should go away once we incorporate URIs into the assets
-	estimateCustomCheckType := s.FindMajorityOfTypes([]pipeline.AssetType{pipeline.AssetTypeBigqueryQuery, pipeline.AssetTypeSnowflakeQuery}, pipeline.AssetTypeBigqueryQuery)
+	estimateCustomCheckType := s.FindMajorityOfTypes([]pipeline.AssetType{
+		pipeline.AssetTypeBigqueryQuery,
+		pipeline.AssetTypeSnowflakeQuery,
+		pipeline.AssetTypePostgresQuery,
+	}, pipeline.AssetTypeBigqueryQuery)
 
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
 		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, map[string]string{
@@ -324,12 +330,12 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 	}
 
 	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate)
-	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery {
-		wholeFileExtractor := &query.WholeFileExtractor{
-			Fs:       fs,
-			Renderer: renderer,
-		}
+	wholeFileExtractor := &query.WholeFileExtractor{
+		Fs:       fs,
+		Renderer: renderer,
+	}
 
+	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery {
 		bqOperator := bigquery.NewBasicOperator(conn, wholeFileExtractor, bigquery.Materializer{})
 
 		bqCheckRunner, err := bigquery.NewColumnCheckOperator(conn)
@@ -353,24 +359,29 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		}
 	}
 
+	if s.WillRunTaskOfType(pipeline.AssetTypePostgresQuery) || estimateCustomCheckType == pipeline.AssetTypePostgresQuery {
+		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, postgres.NewMaterializer())
+
+		pgCheckRunner := postgres.NewColumnCheckOperator(conn)
+		pgCustomCheckRunner := ansisql.NewCustomCheckOperator(conn)
+
+		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeMain] = pgOperator
+		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
+		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeCustomCheck] = pgCustomCheckRunner
+
+		// we set the Python runners to run the checks on Snowflake assuming that there won't be many usecases where a user has both BQ and Snowflake
+		if estimateCustomCheckType == pipeline.AssetTypePostgresQuery {
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = pgCustomCheckRunner
+		}
+	}
+
 	shouldInitiateSnowflake := s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuerySensor) || estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery
 	if shouldInitiateSnowflake {
-		wholeFileExtractor := &query.WholeFileExtractor{
-			Fs:       fs,
-			Renderer: renderer,
-		}
-
 		sfOperator := snowflake.NewBasicOperator(conn, wholeFileExtractor, snowflake.NewMaterializer())
 
-		sfCheckRunner, err := snowflake.NewColumnCheckOperator(conn)
-		if err != nil {
-			return nil, err
-		}
-
-		sfCustomCheckRunner, err := snowflake.NewCustomCheckOperator(conn)
-		if err != nil {
-			return nil, err
-		}
+		sfCheckRunner := snowflake.NewColumnCheckOperator(conn)
+		sfCustomCheckRunner := ansisql.NewCustomCheckOperator(conn)
 
 		sfQuerySensor := snowflake.NewQuerySensor(conn, renderer, 30)
 

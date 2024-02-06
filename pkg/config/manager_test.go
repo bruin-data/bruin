@@ -33,6 +33,18 @@ func TestLoadFromFile(t *testing.T) {
 					Warehouse: "wh",
 				},
 			},
+			Postgres: []PostgresConnection{
+				{
+					Name:         "conn3",
+					Host:         "somehost",
+					Username:     "pguser",
+					Password:     "pgpass",
+					Database:     "pgdb",
+					Port:         5432,
+					PoolMaxConns: 5,
+					SslMode:      "require",
+				},
+			},
 			Generic: []GenericConnection{
 				{
 					Name:  "key1",
@@ -125,6 +137,7 @@ func TestLoadOrCreate(t *testing.T) {
 					ServiceAccountFile: "/path/to/service_account.json",
 				},
 			},
+			Postgres:  []PostgresConnection{},
 			Snowflake: []SnowflakeConnection{},
 			Generic:   []GenericConnection{},
 		},

@@ -1,10 +1,9 @@
-package snowflake
+package ansisql
 
 import (
 	"context"
 	"testing"
 
-	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -45,55 +44,61 @@ func (m *mockConnectionFetcher) GetConnection(name string) (interface{}, error) 
 	return get, args.Error(1)
 }
 
-func (m *mockConnectionFetcher) GetSfConnection(name string) (SfClient, error) {
-	args := m.Called(name)
-	get := args.Get(0)
-	if get == nil {
-		return nil, args.Error(1)
-	}
-
-	return get.(SfClient), args.Error(1)
-}
-
-func TestAcceptedValuesCheck_Check(t *testing.T) {
+func TestNotNullCheck_Check(t *testing.T) {
 	t.Parallel()
 
 	runTestsFoCountZeroCheck(
 		t,
-		func(q *mockQuerierWithResult) ansisql.CheckRunner {
+		func(q *mockQuerierWithResult) CheckRunner {
 			conn := new(mockConnectionFetcher)
 			conn.On("GetConnection", "test").Return(q, nil)
-			return &AcceptedValuesCheck{conn: conn}
+			return &NotNullCheck{conn: conn}
 		},
-		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN ('test','test2')",
-		"column 'test_column' has 5 rows that are not in the accepted values",
+		"SELECT count(*) FROM dataset.test_asset WHERE test_column IS NULL",
+		"column 'test_column' has 5 null values",
 		&pipeline.ColumnCheck{
-			Name: "accepted_values",
-			Value: pipeline.ColumnCheckValue{
-				StringArray: &[]string{"test", "test2"},
-			},
-		},
-	)
-
-	runTestsFoCountZeroCheck(
-		t,
-		func(q *mockQuerierWithResult) ansisql.CheckRunner {
-			conn := new(mockConnectionFetcher)
-			conn.On("GetConnection", "test").Return(q, nil)
-			return &AcceptedValuesCheck{conn: conn}
-		},
-		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN ('1','2')",
-		"column 'test_column' has 5 rows that are not in the accepted values",
-		&pipeline.ColumnCheck{
-			Name: "accepted_values",
-			Value: pipeline.ColumnCheckValue{
-				IntArray: &[]int{1, 2},
-			},
+			Name: "not_null",
 		},
 	)
 }
 
-func runTestsFoCountZeroCheck(t *testing.T, instanceBuilder func(q *mockQuerierWithResult) ansisql.CheckRunner, expectedQueryString string, expectedErrorMessage string, checkInstance *pipeline.ColumnCheck) {
+func TestPositiveCheck_Check(t *testing.T) {
+	t.Parallel()
+
+	runTestsFoCountZeroCheck(
+		t,
+		func(q *mockQuerierWithResult) CheckRunner {
+			conn := new(mockConnectionFetcher)
+			conn.On("GetConnection", "test").Return(q, nil)
+			return &PositiveCheck{conn: conn}
+		},
+		"SELECT count(*) FROM dataset.test_asset WHERE test_column <= 0",
+		"column 'test_column' has 5 non-positive values",
+		&pipeline.ColumnCheck{
+			Name: "positive",
+		},
+	)
+}
+
+func TestUniqueCheck_Check(t *testing.T) {
+	t.Parallel()
+
+	runTestsFoCountZeroCheck(
+		t,
+		func(q *mockQuerierWithResult) CheckRunner {
+			conn := new(mockConnectionFetcher)
+			conn.On("GetConnection", "test").Return(q, nil)
+			return &UniqueCheck{conn: conn}
+		},
+		"SELECT COUNT(test_column) - COUNT(DISTINCT test_column) FROM dataset.test_asset",
+		"column 'test_column' has 5 non-unique values",
+		&pipeline.ColumnCheck{
+			Name: "unique",
+		},
+	)
+}
+
+func runTestsFoCountZeroCheck(t *testing.T, instanceBuilder func(q *mockQuerierWithResult) CheckRunner, expectedQueryString string, expectedErrorMessage string, checkInstance *pipeline.ColumnCheck) {
 	expectedQuery := &query.Query{Query: expectedQueryString}
 	setupFunc := func(val [][]interface{}, err error) func(n *mockQuerierWithResult) {
 		return func(q *mockQuerierWithResult) {
@@ -250,7 +255,7 @@ func TestCustomCheck(t *testing.T) {
 
 			conn := new(mockConnectionFetcher)
 			conn.On("GetConnection", "test").Return(q, nil)
-			n := ansisql.NewCustomCheck(conn)
+			n := &CustomCheck{conn: conn}
 
 			testInstance := &scheduler.CustomCheckInstance{
 				AssetInstance: &scheduler.AssetInstance{

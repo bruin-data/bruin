@@ -1,4 +1,4 @@
-package snowflake
+package postgres
 
 import (
 	"context"
@@ -12,8 +12,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+type selectorFetcher interface {
+	GetConnection(name string) (interface{}, error)
+}
+
 type AcceptedValuesCheck struct {
-	conn connectionFetcher
+	conn selectorFetcher
 }
 
 func (c *AcceptedValuesCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
@@ -41,9 +45,9 @@ func (c *AcceptedValuesCheck) Check(ctx context.Context, ti *scheduler.ColumnChe
 	res := strings.Join(val, "','")
 	res = fmt.Sprintf("'%s'", res)
 
-	qq := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE CAST(%s as STRING) NOT IN (%s)", ti.GetAsset().Name, ti.Column.Name, res)
+	qq := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE CAST(%s as TEXT) NOT IN (%s)", ti.GetAsset().Name, ti.Column.Name, res)
 
-	return ansisql.NewCountableQueryCheck(c.conn, 0, &query.Query{Query: qq}, "accepted_values", func(count int64) error {
+	return ansisql.NewCountableQueryCheck(c.conn, 0, &query.Query{Query: qq}, "positive", func(count int64) error {
 		return errors.Errorf("column '%s' has %d rows that are not in the accepted values", ti.Column.Name, count)
 	}).Check(ctx, ti)
 }
