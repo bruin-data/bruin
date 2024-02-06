@@ -24,7 +24,7 @@ func TestClient_Select(t *testing.T) {
 		want      [][]interface{}
 	}{
 		{
-			name:    "Test Select rows",
+			name:    "test select rows",
 			query:   "SELECT * FROM table",
 			wantErr: "",
 			want:    [][]interface{}{{1, "John Doe"}, {2, "Jane Doe"}},
@@ -37,7 +37,7 @@ func TestClient_Select(t *testing.T) {
 			},
 		},
 		{
-			name:    "Test Select single row",
+			name:    "test select single row",
 			query:   "SELECT * FROM table",
 			wantErr: "",
 			want:    [][]interface{}{{1, "John Doe"}},
@@ -50,7 +50,7 @@ func TestClient_Select(t *testing.T) {
 			},
 		},
 		{
-			name:    "Test Select empty rows",
+			name:    "test telect empty rows",
 			query:   "SELECT * FROM table",
 			wantErr: "",
 			want:    [][]interface{}{},
@@ -63,7 +63,7 @@ func TestClient_Select(t *testing.T) {
 			},
 		},
 		{
-			name:    "Test Select Errors",
+			name:    "test select Errors",
 			query:   "SELECT * FROM table",
 			wantErr: "Some error",
 			want:    nil,
@@ -72,7 +72,7 @@ func TestClient_Select(t *testing.T) {
 			},
 		},
 		{
-			name:    "Test Fail Scanning rows Errors",
+			name:    "test fail scanning rows errors",
 			query:   "SELECT * FROM table",
 			wantErr: "failed to collect row values: Some scan error",
 			want:    nil,
