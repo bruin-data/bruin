@@ -29,6 +29,16 @@ environments:
           pool_max_conns: 5
           ssl_mode: "require"
 
+      redshift:
+        - name: conn4
+          username: "rsuser"
+          password: "rspass"
+          host: "someredshift"
+          port: 5433
+          database: "rsdb"
+          pool_max_conns: 4
+          ssl_mode: "disable"
+
       generic:
         - name: key1
           value: value1

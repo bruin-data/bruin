@@ -3,6 +3,7 @@ package postgres
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"strconv"
 )
 
@@ -19,8 +20,8 @@ type Config struct {
 // ToDBConnectionURI returns a connection URI to be used with the pgx package.
 func (c Config) ToDBConnectionURI() string {
 	return fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s&pool_max_conns=%d",
-		c.Username,
-		c.Password,
+		url.PathEscape(c.Username),
+		url.PathEscape(c.Password),
 		net.JoinHostPort(c.Host, strconv.Itoa(c.Port)),
 		c.Database,
 		c.SslMode,
