@@ -45,6 +45,18 @@ func TestLoadFromFile(t *testing.T) {
 					SslMode:      "require",
 				},
 			},
+			RedShift: []PostgresConnection{
+				{
+					Name:         "conn4",
+					Host:         "someredshift",
+					Username:     "rsuser",
+					Password:     "rspass",
+					Database:     "rsdb",
+					Port:         5433,
+					PoolMaxConns: 4,
+					SslMode:      "disable",
+				},
+			},
 			Generic: []GenericConnection{
 				{
 					Name:  "key1",
@@ -140,6 +152,7 @@ func TestLoadOrCreate(t *testing.T) {
 			Postgres:  []PostgresConnection{},
 			Snowflake: []SnowflakeConnection{},
 			Generic:   []GenericConnection{},
+			RedShift:  []PostgresConnection{},
 		},
 	}
 
