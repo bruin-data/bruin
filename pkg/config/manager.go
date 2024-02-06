@@ -98,6 +98,7 @@ type Connections struct {
 	GoogleCloudPlatform []GoogleCloudPlatformConnection `yaml:"google_cloud_platform"`
 	Snowflake           []SnowflakeConnection           `yaml:"snowflake"`
 	Postgres            []PostgresConnection            `yaml:"postgres"`
+	RedShift            []PostgresConnection            `yaml:"redshift"`
 	Generic             []GenericConnection             `yaml:"generic"`
 
 	byKey map[string]any
@@ -115,6 +116,10 @@ func (c *Connections) buildConnectionKeyMap() {
 
 	for i, conn := range c.Postgres {
 		c.byKey[conn.Name] = &(c.Postgres[i])
+	}
+
+	for i, conn := range c.RedShift {
+		c.byKey[conn.Name] = &(c.RedShift[i])
 	}
 
 	for i, conn := range c.Generic {

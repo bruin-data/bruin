@@ -220,7 +220,8 @@ var assetTypeConnectionMapping = map[AssetType][]string{
 	AssetTypeBigqueryQuery:        {"google_cloud_platform", "gcp"},
 	AssetTypeSnowflakeQuery:       {"snowflake", "sf"},
 	AssetTypeSnowflakeQuerySensor: {"snowflake", "sf"},
-	AssetTypePostgresQuery:        {"postgres", "redshift"},
+	AssetTypePostgresQuery:        {"postgres", "pg"},
+	AssetTypeRedshiftQuery:        {"redshift", "rs"},
 }
 
 type SecretMapping struct {

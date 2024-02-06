@@ -55,7 +55,7 @@ func (m *Manager) GetBqConnectionWithoutDefault(name string) (bigquery.DB, error
 
 	db, ok := m.BigQuery[name]
 	if !ok {
-		return nil, errors.New("bigquery connection not found")
+		return nil, errors.Errorf("bigquery connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -77,7 +77,7 @@ func (m *Manager) GetSfConnectionWithoutDefault(name string) (snowflake.SfClient
 
 	db, ok := m.Snowflake[name]
 	if !ok {
-		return nil, errors.New("snowflake connection not found")
+		return nil, errors.Errorf("snowflake connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -99,7 +99,7 @@ func (m *Manager) GetPgConnectionWithoutDefault(name string) (postgres.PgClient,
 
 	db, ok := m.Postgres[name]
 	if !ok {
-		return nil, errors.New("postgres connection not found")
+		return nil, errors.Errorf("postgres connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -219,6 +219,16 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 			err := connectionManager.AddPgConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add Postgres connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.RedShift {
+		conn := conn
+		wg.Go(func() {
+			err := connectionManager.AddPgConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add RedShift connection '%s'", conn.Name))
 			}
 		})
 	}
