@@ -2,8 +2,10 @@ package pipeline
 
 import "fmt"
 
-type MaterializerFunc func(task *Asset, query string) (string, error)
-type AssetMaterializationMap map[MaterializationType]map[MaterializationStrategy]MaterializerFunc
+type (
+	MaterializerFunc        func(task *Asset, query string) (string, error)
+	AssetMaterializationMap map[MaterializationType]map[MaterializationStrategy]MaterializerFunc
+)
 
 type Materializer struct {
 	MaterializationMap AssetMaterializationMap

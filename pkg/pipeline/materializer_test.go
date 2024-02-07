@@ -1,11 +1,14 @@
 package pipeline
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMaterializer_Render(t *testing.T) {
+	t.Parallel()
+
 	materializer := Materializer{
 		MaterializationMap: make(map[MaterializationType]map[MaterializationStrategy]MaterializerFunc),
 	}
