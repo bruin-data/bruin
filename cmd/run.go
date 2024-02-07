@@ -336,7 +336,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery {
-		bqOperator := bigquery.NewBasicOperator(conn, wholeFileExtractor, bigquery.Materializer{})
+		bqOperator := bigquery.NewBasicOperator(conn, wholeFileExtractor, bigquery.NewMaterializer())
 
 		bqCheckRunner, err := bigquery.NewColumnCheckOperator(conn)
 		if err != nil {

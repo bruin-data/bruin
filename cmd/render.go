@@ -24,7 +24,7 @@ func Render() *cli.Command {
 					Fs:       fs,
 					Renderer: query.DefaultJinjaRenderer,
 				},
-				bqMaterializer: &bigquery.Materializer{},
+				bqMaterializer: bigquery.NewMaterializer(),
 				builder:        builder,
 				writer:         os.Stdout,
 			}
@@ -39,7 +39,7 @@ type queryExtractor interface {
 }
 
 type queryMaterializer interface {
-	Render(task *pipeline.Asset, query string) (string, error)
+	Render(asset *pipeline.Asset, query string) (string, error)
 }
 
 type taskCreator interface {

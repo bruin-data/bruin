@@ -7,54 +7,44 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
-type Materializer struct{}
-
-func (m Materializer) Render(task *pipeline.Asset, query string) (string, error) {
-	mat := task.Materialization
-	if mat.Type == pipeline.MaterializationTypeNone {
-		return query, nil
-	}
-
-	type materializerFunc func(task *pipeline.Asset, query string, mat pipeline.Materialization) (string, error)
-	matMap := map[pipeline.MaterializationType]map[pipeline.MaterializationStrategy]materializerFunc{
-		pipeline.MaterializationTypeView: {
-			pipeline.MaterializationStrategyNone:          viewMaterializer,
-			pipeline.MaterializationStrategyAppend:        errorMaterializer,
-			pipeline.MaterializationStrategyCreateReplace: errorMaterializer,
-			pipeline.MaterializationStrategyDeleteInsert:  errorMaterializer,
-		},
-		pipeline.MaterializationTypeTable: {
-			pipeline.MaterializationStrategyNone:          buildCreateReplaceQuery,
-			pipeline.MaterializationStrategyAppend:        buildAppendQuery,
-			pipeline.MaterializationStrategyCreateReplace: buildCreateReplaceQuery,
-			pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
-			pipeline.MaterializationStrategyMerge:         mergeMaterializer,
-		},
-	}
-
-	if matFunc, ok := matMap[mat.Type][mat.Strategy]; ok {
-		return matFunc(task, query, mat)
-	}
-
-	return "", fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
+var matMap = pipeline.AssetMaterializationMap{
+	pipeline.MaterializationTypeView: {
+		pipeline.MaterializationStrategyNone:          viewMaterializer,
+		pipeline.MaterializationStrategyAppend:        errorMaterializer,
+		pipeline.MaterializationStrategyCreateReplace: errorMaterializer,
+		pipeline.MaterializationStrategyDeleteInsert:  errorMaterializer,
+	},
+	pipeline.MaterializationTypeTable: {
+		pipeline.MaterializationStrategyNone:          buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyAppend:        buildAppendQuery,
+		pipeline.MaterializationStrategyCreateReplace: buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
+		pipeline.MaterializationStrategyMerge:         mergeMaterializer,
+	},
 }
 
-func errorMaterializer(task *pipeline.Asset, query string, mat pipeline.Materialization) (string, error) {
-	return "", fmt.Errorf("materialization strategy %s is not supported for materialization type %s", mat.Strategy, mat.Type)
+func NewMaterializer() *pipeline.Materializer {
+	return &pipeline.Materializer{
+		MaterializationMap: matMap,
+	}
 }
 
-func viewMaterializer(task *pipeline.Asset, query string, mat pipeline.Materialization) (string, error) {
-	return fmt.Sprintf("CREATE OR REPLACE VIEW `%s` AS\n%s", task.Name, query), nil
+func errorMaterializer(asset *pipeline.Asset, query string) (string, error) {
+	return "", fmt.Errorf("materialization strategy %s is not supported for materialization type %s", asset.Materialization.Strategy, asset.Materialization.Type)
 }
 
-func mergeMaterializer(asset *pipeline.Asset, query string, mat pipeline.Materialization) (string, error) {
+func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {
+	return fmt.Sprintf("CREATE OR REPLACE VIEW `%s` AS\n%s", asset.Name, query), nil
+}
+
+func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
 	if len(asset.Columns) == 0 {
-		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", mat.Strategy)
+		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
 	}
 
 	primaryKeys := asset.ColumnNamesWithPrimaryKey()
 	if len(primaryKeys) == 0 {
-		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", mat.Strategy)
+		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
 	}
 
 	nonPrimaryKeys := asset.ColumnNamesWithUpdateOnMerge()
@@ -90,11 +80,13 @@ func mergeMaterializer(asset *pipeline.Asset, query string, mat pipeline.Materia
 	return strings.Join(mergeLines, "\n") + ";", nil
 }
 
-func buildAppendQuery(task *pipeline.Asset, query string, mat pipeline.Materialization) (string, error) {
-	return fmt.Sprintf("INSERT INTO `%s` %s", task.Name, query), nil
+func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
+	return fmt.Sprintf("INSERT INTO `%s` %s", asset.Name, query), nil
 }
 
-func buildIncrementalQuery(task *pipeline.Asset, query string, mat pipeline.Materialization) (string, error) {
+func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) {
+	mat := asset.Materialization
+
 	if mat.IncrementalKey == "" {
 		return "", fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", mat.Strategy)
 	}
@@ -102,15 +94,17 @@ func buildIncrementalQuery(task *pipeline.Asset, query string, mat pipeline.Mate
 	queries := []string{
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE __bruin_tmp AS %s", query),
-		fmt.Sprintf("DELETE FROM `%s` WHERE `%s` in (SELECT DISTINCT `%s` FROM __bruin_tmp)", task.Name, mat.IncrementalKey, mat.IncrementalKey),
-		fmt.Sprintf("INSERT INTO `%s` SELECT * FROM __bruin_tmp", task.Name),
+		fmt.Sprintf("DELETE FROM `%s` WHERE `%s` in (SELECT DISTINCT `%s` FROM __bruin_tmp)", asset.Name, mat.IncrementalKey, mat.IncrementalKey),
+		fmt.Sprintf("INSERT INTO `%s` SELECT * FROM __bruin_tmp", asset.Name),
 		"COMMIT TRANSACTION",
 	}
 
 	return strings.Join(queries, "\n") + ";", nil
 }
 
-func buildCreateReplaceQuery(task *pipeline.Asset, query string, mat pipeline.Materialization) (string, error) {
+func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error) {
+	mat := asset.Materialization
+
 	partitionClause := ""
 	if mat.PartitionBy != "" {
 		partitionClause = fmt.Sprintf("PARTITION BY `%s`", mat.PartitionBy)
@@ -121,5 +115,5 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string, mat pipeline.Ma
 		clusterByClause = fmt.Sprintf("CLUSTER BY `%s`", strings.Join(mat.ClusterBy, "`, `"))
 	}
 
-	return fmt.Sprintf("CREATE OR REPLACE TABLE `%s` %s %s AS\n%s", task.Name, partitionClause, clusterByClause, query), nil
+	return fmt.Sprintf("CREATE OR REPLACE TABLE `%s` %s %s AS\n%s", asset.Name, partitionClause, clusterByClause, query), nil
 }
