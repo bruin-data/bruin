@@ -13,20 +13,20 @@ type mockNoOpRenderer struct {
 	mock.Mock
 }
 
-func (m *mockNoOpRenderer) Render(template string) string {
+func (m *mockNoOpRenderer) Render(template string) (string, error) {
 	args := m.Called(template)
 	if args.Get(0) == "default" {
-		return template
+		return template, nil
 	}
 
-	return args.String(0)
+	return args.String(0), args.Error(1)
 }
 
 func TestFileExtractor_ExtractQueriesFromFile(t *testing.T) {
 	t.Parallel()
 
 	noOpRenderer := func(mr renderer) {
-		mr.(*mockNoOpRenderer).On("Render", mock.Anything).Return("default")
+		mr.(*mockNoOpRenderer).On("Render", mock.Anything).Return("default", nil)
 	}
 
 	tests := []struct {
@@ -77,7 +77,7 @@ func TestFileExtractor_ExtractQueriesFromFile(t *testing.T) {
 			setupRenderer: func(mr renderer) {
 				mr.(*mockNoOpRenderer).
 					On("Render", mock.Anything).
-					Return("select * from users-2022-01-01")
+					Return("select * from users-2022-01-01", nil)
 			},
 			want: []*Query{
 				{
@@ -232,7 +232,7 @@ func TestWholeFileExtractor_ExtractQueriesFromFile(t *testing.T) {
 	t.Parallel()
 
 	noOpRenderer := func(mr renderer) {
-		mr.(*mockNoOpRenderer).On("Render", mock.Anything).Return("default")
+		mr.(*mockNoOpRenderer).On("Render", mock.Anything).Return("default", nil)
 	}
 
 	tests := []struct {
@@ -287,7 +287,7 @@ func TestWholeFileExtractor_ExtractQueriesFromFile(t *testing.T) {
 			setupRenderer: func(mr renderer) {
 				mr.(*mockNoOpRenderer).
 					On("Render", mock.Anything).
-					Return("select * from users-2022-01-01")
+					Return("select * from users-2022-01-01", nil)
 			},
 			want: []*Query{
 				{

@@ -134,7 +134,8 @@ group by 1`,
 			t.Parallel()
 
 			receiver := NewRenderer(tt.args)
-			got := receiver.Render(tt.query)
+			got, err := receiver.Render(tt.query)
+			require.NoError(t, err)
 
 			require.Equal(t, tt.want, got)
 		})
@@ -199,7 +200,8 @@ group by 1`,
 			t.Parallel()
 
 			receiver := NewRendererWithStartEndDates(&startDate, &endDate)
-			got := receiver.Render(tt.query)
+			got, err := receiver.Render(tt.query)
+			require.NoError(t, err)
 
 			require.Equal(t, tt.want, got)
 		})

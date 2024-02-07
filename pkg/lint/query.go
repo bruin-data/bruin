@@ -32,21 +32,29 @@ type QueryValidatorRule struct {
 	Logger      *zap.SugaredLogger
 }
 
-func (q QueryValidatorRule) Name() string {
+func (q *QueryValidatorRule) Name() string {
 	return q.Identifier
 }
 
-func (q QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.Asset, done chan<- []*Issue) {
+func (q *QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.Asset, done chan<- []*Issue) {
 	issues := make([]*Issue, 0)
 
+	q.Logger.Debugf("validating pipeline '%s' task '%s'", p.Name, task.Name)
 	queries, err := q.Extractor.ExtractQueriesFromFile(task.ExecutableFile.Path)
+	q.Logger.Debugf("got the query extract results from file for pipeline '%s' task '%s'", p.Name, task.Name)
+
 	if err != nil {
+		q.Logger.Debugf("failed to extract the queries from pipeline '%s' task '%s'", p.Name, task.Name)
 		issues = append(issues, &Issue{
 			Task:        task,
-			Description: fmt.Sprintf("Cannot read executable file '%s': %+v", task.ExecutableFile.Path, err),
+			Description: fmt.Sprintf("Cannot read executable file '%s'", task.ExecutableFile.Path),
+			Context: []string{
+				err.Error(),
+			},
 		})
 
 		done <- issues
+		q.Logger.Debugf("pushed the error for failed to extract the queries from pipeline '%s' task '%s'", p.Name, task.Name)
 		return
 	}
 
@@ -65,8 +73,11 @@ func (q QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.As
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
+	q.Logger.Debugf("Going into the query loop for asset '%s'", task.Name)
+
 	for index, foundQuery := range queries {
 		wg.Add(1)
+		q.Logger.Debugf("Spawning the %dth index validation for asset '%s'", index, task.Name)
 		go func(index int, foundQuery *query.Query) {
 			defer wg.Done()
 
@@ -127,12 +138,14 @@ func (q QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.As
 			q.Logger.Debugw("Finished with query checking", "path", task.ExecutableFile.Path, "duration", duration)
 		}(index, foundQuery)
 	}
-
+	q.Logger.Debugf("Waiting for all workers to finish for task '%s'", task.Name)
 	wg.Wait()
+	q.Logger.Debugf("Workers finished for task '%s'", task.Name)
 	done <- issues
+	q.Logger.Debugf("Pushed issues to the done channel for task '%s'", task.Name)
 }
 
-func (q QueryValidatorRule) bufferSize() int {
+func (q *QueryValidatorRule) bufferSize() int {
 	return 256
 }
 
@@ -164,21 +177,23 @@ func (q *QueryValidatorRule) Validate(p *pipeline.Pipeline) ([]*Issue, error) {
 			q.Logger.Debug("Skipping task, task type not matched")
 			continue
 		}
-		q.Logger.Debug("Processing task type")
+		q.Logger.Debugf("Processing task type: %s", task.Type)
 
 		processedTaskCount++
 		taskChannel <- task
 		q.Logger.Debugf("Pushed a task to the taskChannel")
 	}
 	q.Logger.Debugf("Processed %d tasks at path '%s', closing channel", processedTaskCount, p.DefinitionFile.Path)
-	close(taskChannel)
-	q.Logger.Debugf("Closed the channel")
 
 	for i := 0; i < processedTaskCount; i++ {
+		q.Logger.Debugf("Waiting for results for i = %d", i)
 		foundIssues := <-results
 		q.Logger.Debugf("Received issues: %d/%d", i+1, processedTaskCount)
 		issues = append(issues, foundIssues...)
 	}
+
+	close(taskChannel)
+	q.Logger.Debugf("Closed the channel")
 
 	return issues, nil
 }

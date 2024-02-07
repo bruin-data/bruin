@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/noirbizarre/gonja"
+	"github.com/pkg/errors"
 )
 
 type Renderer struct {
@@ -44,12 +45,13 @@ func NewRendererWithStartEndDates(startDate, endDate *time.Time) *Renderer {
 	}
 }
 
-func (r *Renderer) Render(query string) string {
+func (r *Renderer) Render(query string) (string, error) {
 	r.queryRenderLock.Lock()
 
 	tpl, err := gonja.FromString(query)
 	if err != nil {
-		panic(err)
+		r.queryRenderLock.Unlock()
+		return "", errors.Wrap(err, "you have found a bug in the jinja parser, please report it")
 	}
 	r.queryRenderLock.Unlock()
 
@@ -57,8 +59,8 @@ func (r *Renderer) Render(query string) string {
 	// gonja.context how often you want to.
 	out, err := tpl.Execute(r.context)
 	if err != nil {
-		panic(err)
+		return "", errors.Wrap(err, "you have found a bug in the jinja renderer, please report it")
 	}
 
-	return out
+	return out, nil
 }

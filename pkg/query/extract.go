@@ -48,7 +48,7 @@ func (q Query) String() string {
 var queryCommentRegex = regexp.MustCompile(`(?m)(?s)\/\*.*?\*\/|(^|\s)--.*?\n`)
 
 type renderer interface {
-	Render(query string) string
+	Render(query string) (string, error)
 }
 
 // FileQuerySplitterExtractor is a regular file extractor, but it splits the queries in the given file into multiple
@@ -66,7 +66,10 @@ func (f FileQuerySplitterExtractor) ExtractQueriesFromFile(filepath string) ([]*
 	}
 
 	cleanedUpQueries := queryCommentRegex.ReplaceAllLiteralString(string(contents), "\n")
-	cleanedUpQueries = f.Renderer.Render(cleanedUpQueries)
+	cleanedUpQueries, err = f.Renderer.Render(cleanedUpQueries)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not render file while extracting the queries with the split query extractor")
+	}
 
 	return splitQueries(cleanedUpQueries), nil
 }
@@ -125,7 +128,11 @@ func (f *WholeFileExtractor) ExtractQueriesFromFile(filepath string) ([]*Query, 
 		return nil, errors.Wrap(err, "could not read file")
 	}
 
-	render := f.Renderer.Render(strings.TrimSpace(string(contents)))
+	render, err := f.Renderer.Render(strings.TrimSpace(string(contents)))
+	if err != nil {
+		return nil, errors.Wrap(err, "could not render file while extracting the queries from the whole file")
+	}
+
 	return []*Query{
 		{
 			Query: render,

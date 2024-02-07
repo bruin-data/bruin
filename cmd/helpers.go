@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"log"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
@@ -38,4 +39,13 @@ func switchEnvironment(c *cli.Context, cm *config.Config, stdin io.ReadCloser) e
 	}
 
 	return nil
+}
+
+func RecoverFromPanic() {
+	if err := recover(); err != nil {
+		log.Println("=======================================")
+		log.Println("Bruin encountered an unexpected error, please report the issue to the Bruin team.")
+		log.Println(err)
+		log.Println("=======================================")
+	}
 }

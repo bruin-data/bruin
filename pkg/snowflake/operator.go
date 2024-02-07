@@ -89,7 +89,7 @@ func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOpera
 }
 
 type renderer interface {
-	Render(query string) string
+	Render(query string) (string, error)
 }
 
 type QuerySensor struct {
@@ -116,7 +116,10 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return errors.New("query sensor requires a parameter named 'query'")
 	}
 
-	qq = o.renderer.Render(qq)
+	qq, err := o.renderer.Render(qq)
+	if err != nil {
+		return errors.Wrap(err, "failed to render query sensor query")
+	}
 
 	conn, err := o.connection.GetSfConnection(p.GetConnectionNameForAsset(t))
 	if err != nil {

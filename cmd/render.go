@@ -55,6 +55,8 @@ type RenderCommand struct {
 }
 
 func (r *RenderCommand) Run(taskPath string) error {
+	defer RecoverFromPanic()
+
 	if taskPath == "" {
 		errorPrinter.Printf("Please give an asset path to render: bruin render <path to the asset file>)\n")
 		return cli.Exit("", 1)
@@ -73,7 +75,7 @@ func (r *RenderCommand) Run(taskPath string) error {
 
 	queries, err := r.extractor.ExtractQueriesFromFile(task.ExecutableFile.Path)
 	if err != nil {
-		errorPrinter.Printf("Failed to extract queries from file: %v\n", err.Error())
+		errorPrinter.Printf("Failed to extract queries from file '%s': %v\n", task.ExecutableFile.Path, err.Error())
 		return cli.Exit("", 1)
 	}
 
