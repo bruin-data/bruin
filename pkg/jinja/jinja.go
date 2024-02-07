@@ -4,12 +4,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/noirbizarre/gonja"
+	"github.com/nikolalohinski/gonja/v2"
+	"github.com/nikolalohinski/gonja/v2/exec"
 	"github.com/pkg/errors"
 )
 
 type Renderer struct {
-	context         gonja.Context
+	context         *exec.Context
 	queryRenderLock *sync.Mutex
 }
 
@@ -17,13 +18,13 @@ type Context map[string]any
 
 func NewRenderer(context Context) *Renderer {
 	return &Renderer{
-		context:         gonja.Context(context),
+		context:         exec.NewContext(context),
 		queryRenderLock: &sync.Mutex{},
 	}
 }
 
 func NewRendererWithStartEndDates(startDate, endDate *time.Time) *Renderer {
-	ctx := gonja.Context{
+	ctx := exec.NewContext(map[string]any{
 		"start_date":             startDate.Format("2006-01-02"),
 		"start_date_nodash":      startDate.Format("20060102"),
 		"start_datetime":         startDate.Format("2006-01-02T15:04:05"),
@@ -37,11 +38,7 @@ func NewRendererWithStartEndDates(startDate, endDate *time.Time) *Renderer {
 			"date_add":    dateAdd,
 			"date_format": dateFormat,
 		},
-	}
-
-	cfg := gonja.NewConfig()
-	cfg.KeepTrailingNewline = true
-	env := gonja.NewEnvironment(cfg, loader)
+	})
 
 	return &Renderer{
 		context:         ctx,
@@ -61,7 +58,7 @@ func (r *Renderer) Render(query string) (string, error) {
 
 	// Now you can render the template with the given
 	// gonja.context how often you want to.
-	out, err := tpl.Execute(r.context)
+	out, err := tpl.ExecuteToString(r.context)
 	if err != nil {
 		return "", errors.Wrap(err, "you have found a bug in the jinja renderer, please report it")
 	}

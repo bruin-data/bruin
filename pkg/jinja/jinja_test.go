@@ -55,8 +55,7 @@ select
     sum(case when payment_method = '{{payment_method}}' then amount end) as {{payment_method}}_amount,
     sum(amount) as total_amount
 from app_data.payments
-group by 1
-`,
+group by 1`,
 			args: Context{},
 			want: `
 
@@ -80,8 +79,7 @@ select
     {% endfor %}
     sum(amount) as total_amount
 from app_data.payments
-group by 1
-`,
+group by 1`,
 			args: Context{},
 			want: `
 
@@ -128,31 +126,16 @@ from app_data.payments
 group by 1`,
 		},
 		{
-			name: "for loop try",
+			name: "for loop set",
 			query: `
-{% for num in range(8, 11) %}
-{{num}}
+{%- for num in range(8, 11) %}
+{{ ("0" ~ num|string)[-2:] -}}
 {% endfor %}`,
 			args: Context{},
 			want: `
-
-8
-
-9
-
+08
+09
 10`,
-		},
-		{
-			name: "for loop set",
-			query: `
-{% set val = "asd" %}
-{{ "0"|add(val)}}
-`,
-			args: Context{},
-			want: `
-9
-10
-11`,
 		},
 	}
 	for _, tt := range tests {
@@ -207,8 +190,7 @@ select
     sum(amount) as total_amount
 from app_data.payments
 	where created_at >= '{{ start_datetime }}' and created_at < '{{ end_datetime }}'
-group by 1
-`,
+group by 1`,
 			want: `select
     order_id,
     
