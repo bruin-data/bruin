@@ -14,7 +14,14 @@ export default defineConfig({
                     {text: "Concepts", link: "/getting-started/concepts"}
                 ],
             },
-          {
+            {
+                text: "Connections",
+                items: [
+                    {text: "Redshift", link: "/connections/redshift"},
+                    {text: "Postgres", link: "/connections/postgres"}
+                ],
+            },
+            {
                 text: "Assets",
                 items: [
                     {text: "Definition Schema", link: "/assets/definition-schema"},
