@@ -1,10 +1,7 @@
 /* @bruin
 
-name: dashboard.hello_bq
+name: dashboard.hello_bq2
 type: bq.sql
-
-depends:
-   - hello_python
 
 materialization:
    type: table
@@ -28,8 +25,7 @@ custom_checks:
 
 
 @bruin */
-{% for num in range(1, 26) %}
 
-{{ (num|string)[-2:] }}
-
+{% for num in range(8, 11) %}
+{{num}}
 {% endfor %}

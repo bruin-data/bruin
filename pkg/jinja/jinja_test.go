@@ -127,6 +127,33 @@ select
 from app_data.payments
 group by 1`,
 		},
+		{
+			name: "for loop try",
+			query: `
+{% for num in range(8, 11) %}
+{{num}}
+{% endfor %}`,
+			args: Context{},
+			want: `
+
+8
+
+9
+
+10`,
+		},
+		{
+			name: "for loop set",
+			query: `
+{% set val = "asd" %}
+{{ "0"|add(val)}}
+`,
+			args: Context{},
+			want: `
+9
+10
+11`,
+		},
 	}
 	for _, tt := range tests {
 		tt := tt

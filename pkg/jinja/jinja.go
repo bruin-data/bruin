@@ -39,6 +39,10 @@ func NewRendererWithStartEndDates(startDate, endDate *time.Time) *Renderer {
 		},
 	}
 
+	cfg := gonja.NewConfig()
+	cfg.KeepTrailingNewline = true
+	env := gonja.NewEnvironment(cfg, loader)
+
 	return &Renderer{
 		context:         ctx,
 		queryRenderLock: &sync.Mutex{},
