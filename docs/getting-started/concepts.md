@@ -101,6 +101,8 @@ A connection is a set of credentials that enable Bruin to communicate with an ex
 Bruin currently supports the following connection types:
 - Google Cloud Platform
 - Snowflake
+- Postgres
+- Aws Redshift
 - Generic
 
 Platform specific connections have specific schemas, and "generic" connections are built as key-value pairs to inject secrets into your assets from outside. 
