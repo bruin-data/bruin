@@ -2,7 +2,6 @@ package python
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/git"
@@ -50,7 +49,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
 					Name: Shell,
-					Args: []string{"-c", fmt.Sprintf("/test/python -u -m %s", module)},
+					Args: []string{"-c", "/test/python -u -m " + module},
 				}).Return(assert.AnError)
 
 				return &fields{

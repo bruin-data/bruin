@@ -13,6 +13,7 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	bigquery2 "google.golang.org/api/bigquery/v2"
@@ -104,11 +105,11 @@ func TestDB_IsValid(t *testing.T) {
 
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				response, err := json.Marshal(tt.response)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				w.WriteHeader(tt.statusCode)
 				_, err = w.Write(response)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}))
 			defer server.Close()
 
@@ -123,16 +124,16 @@ func TestDB_IsValid(t *testing.T) {
 					}),
 				}),
 			)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			client.Location = "US"
 
 			d := Client{client: client}
 
 			got, err := d.IsValid(context.Background(), &query.Query{Query: tt.query})
 			if tt.err == nil {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tt.err.Error())
+				require.EqualError(t, err, tt.err.Error())
 			}
 
 			assert.Equal(t, tt.want, got)
@@ -236,14 +237,14 @@ func TestDB_RunQueryWithoutResult(t *testing.T) {
 					}),
 				}),
 			)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			client.Location = "US"
 
 			d := Client{client: client}
 
 			err = d.RunQueryWithoutResult(context.Background(), &query.Query{Query: tt.query})
 			if tt.err == nil {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
 				assert.EqualError(t, err, tt.err.Error())
 			}
@@ -267,25 +268,25 @@ func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse,
 			w.WriteHeader(qrr.statusCode)
 
 			response, err := json.Marshal(qrr.response)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			_, err = w.Write(response)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			return
 		} else if r.Method == "POST" && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries", projectID)) {
 			w.WriteHeader(jsr.statusCode)
 
 			response, err := json.Marshal(jsr.response)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			_, err = w.Write(response)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			return
 		}
 
 		w.WriteHeader(http.StatusInternalServerError)
 		_, err := w.Write([]byte("there is no test definition found for the given request"))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 }
 
@@ -434,16 +435,16 @@ func TestDB_Select(t *testing.T) {
 					}),
 				}),
 			)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			client.Location = "US"
 
 			d := Client{client: client}
 
 			got, err := d.Select(context.Background(), &query.Query{Query: tt.query})
 			if tt.err == nil {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.EqualError(t, err, tt.err.Error())
+				require.EqualError(t, err, tt.err.Error())
 			}
 
 			assert.Equal(t, tt.want, got)

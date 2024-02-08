@@ -57,14 +57,14 @@ func (m *Materializer) buildIncrementalQuery(task *pipeline.Asset, query string,
 		return "", fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", strategy)
 	}
 
-	tempTableName := fmt.Sprintf("__bruin_tmp_%s", m.prefixGenerator())
+	tempTableName := "__bruin_tmp_" + m.prefixGenerator()
 
 	queries := []string{
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, query),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
-		fmt.Sprintf("DROP TABLE IF EXISTS %s", tempTableName),
+		"DROP TABLE IF EXISTS " + tempTableName,
 		"COMMIT",
 	}
 

@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoadFromFile(t *testing.T) {
@@ -200,10 +201,10 @@ func TestLoadOrCreate(t *testing.T) {
 			name: "return the config if it exists",
 			setup: func(t *testing.T, args args) {
 				err := existingConfig.PersistToFs(args.fs)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				err = afero.WriteFile(args.fs, "/some/path/to/.gitignore", []byte("file1"), 0o644)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			},
 			want:    existingConfig,
 			wantErr: assert.NoError,
@@ -243,12 +244,12 @@ func TestLoadOrCreate(t *testing.T) {
 			}
 
 			exists, err := afero.Exists(a.fs, configPath)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.True(t, exists)
 
 			if tt.want != nil {
 				content, err := afero.ReadFile(a.fs, "/some/path/to/.gitignore")
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Contains(t, string(content), "config.yml", "config file content: %s", content)
 			}
 		})
@@ -287,17 +288,17 @@ func TestConfig_SelectEnvironment(t *testing.T) {
 	}
 
 	err := conf.SelectEnvironment("prod")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, prodEnv, conf.SelectedEnvironment)
 	assert.Equal(t, "prod", conf.SelectedEnvironmentName)
 
 	err = conf.SelectEnvironment("non-existing")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Equal(t, prodEnv, conf.SelectedEnvironment)
 	assert.Equal(t, "prod", conf.SelectedEnvironmentName)
 
 	err = conf.SelectEnvironment("default")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, defaultEnv, conf.SelectedEnvironment)
 	assert.Equal(t, "default", conf.SelectedEnvironmentName)
 }

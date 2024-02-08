@@ -1,13 +1,13 @@
 package python
 
 import (
-	"fmt"
 	"path/filepath"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFindModulePath(t *testing.T) {
@@ -68,9 +68,9 @@ func TestFindModulePath(t *testing.T) {
 			got, err := finder.FindModulePath(tt.args.repo, tt.args.executable)
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 			assert.Equal(t, tt.want, got)
 		})
@@ -157,7 +157,7 @@ func TestFindRequirementsTxt(t *testing.T) {
 			name: "no requirements.txt file found even if the root path ends with a slash",
 			args: args{
 				repo: &git.Repo{
-					Path: fmt.Sprintf("%s/", repoPath),
+					Path: repoPath + "/",
 				},
 				executable: &pipeline.ExecutableFile{
 					Path: abs("./testdata/reqfinder/main.py"),

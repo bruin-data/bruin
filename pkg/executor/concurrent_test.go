@@ -8,6 +8,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
@@ -67,7 +68,7 @@ func TestConcurrent_Start(t *testing.T) {
 	}
 
 	ex, err := NewConcurrent(logger, ops, 8)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	ex.Start(s.WorkQueue, s.Results)
 
 	results := s.Run(context.Background())

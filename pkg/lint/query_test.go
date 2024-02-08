@@ -9,6 +9,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
@@ -254,9 +255,9 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 
 			got, err := q.Validate(tt.p)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.ElementsMatch(t, tt.want, got)

@@ -6,6 +6,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExtractAndRenderCouldWorkTogether(t *testing.T) {
@@ -107,7 +108,7 @@ with dummy_dates as (
 
 	fs := afero.NewMemMapFs()
 	err := afero.WriteFile(fs, "somefile.sql", []byte(query), 0o644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	extractor := FileQuerySplitterExtractor{
 		Fs: fs,
@@ -116,6 +117,6 @@ with dummy_dates as (
 		}),
 	}
 	res, err := extractor.ExtractQueriesFromFile("somefile.sql")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expectedQueries, res)
 }

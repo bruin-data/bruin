@@ -7,8 +7,8 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockOperator struct {
@@ -48,7 +48,7 @@ func TestLocal_RunSingleTask(t *testing.T) {
 
 		err := l.RunSingleTask(context.Background(), instance)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		mockOperator.AssertExpectations(t)
 	})
 
@@ -67,7 +67,7 @@ func TestLocal_RunSingleTask(t *testing.T) {
 
 		err := l.RunSingleTask(context.Background(), instance)
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		mockOperator.AssertExpectations(t)
 	})
 
@@ -88,7 +88,7 @@ func TestLocal_RunSingleTask(t *testing.T) {
 
 		err := l.RunSingleTask(context.Background(), instance)
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		mockOperator.AssertExpectations(t)
 	})
 }
