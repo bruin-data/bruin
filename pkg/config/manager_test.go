@@ -40,10 +40,10 @@ func TestLoadFromFile(t *testing.T) {
 					Username:     "pguser",
 					Password:     "pgpass",
 					Database:     "pgdb",
+					Schema:       "non_public_schema",
 					Port:         5432,
 					PoolMaxConns: 5,
 					SslMode:      "require",
-					Schema:       "non_public_schema",
 				},
 			},
 			RedShift: []PostgresConnection{

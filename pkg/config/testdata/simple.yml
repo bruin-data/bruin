@@ -26,9 +26,9 @@ environments:
           host: "somehost"
           port: 5432
           database: "pgdb"
+          schema: "non_public_schema"
           pool_max_conns: 5
           ssl_mode: "require"
-          schema: "non_public_schema"
 
       redshift:
         - name: conn4

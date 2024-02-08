@@ -175,6 +175,7 @@ func (m *Manager) AddPgConnectionFromConfig(connection *config.PostgresConnectio
 		Host:         connection.Host,
 		Port:         connection.Port,
 		Database:     connection.Database,
+		Schema:       connection.Schema,
 		PoolMaxConns: poolMaxConns,
 		SslMode:      connection.SslMode,
 	})
