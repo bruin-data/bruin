@@ -394,9 +394,9 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 
 			got, err := checker(&tt.args.pipeline)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, tt.want, got)
@@ -1108,9 +1108,9 @@ func TestEnsureAthenaSQLTypeTasksHasDatabaseAndS3FilePath(t *testing.T) {
 			t.Parallel()
 			got, err := EnsureAthenaSQLTypeTasksHasDatabaseAndS3FilePath(tt.args.p)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 			assert.Equal(t, tt.want, got)
 		})
@@ -1231,9 +1231,9 @@ func TestEnsureSlackFieldInPipelineIsValid(t *testing.T) {
 			t.Parallel()
 			got, err := EnsureSlackFieldInPipelineIsValid(tt.args.p)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 			assert.Equalf(t, tt.want, got, "EnsureSlackFieldInPipelineIsValid(%v)", tt.args.p)
 		})

@@ -358,7 +358,7 @@ func EnsureAthenaSQLTypeTasksHasDatabaseAndS3FilePath(p *pipeline.Pipeline) ([]*
 				issues = append(issues, &Issue{
 					Task:        task,
 					Description: athenaSQLInvalidS3FilePath,
-					Context:     []string{fmt.Sprintf("Given `s3_file_path` is: %s", s3FilePathVar)},
+					Context:     []string{"Given `s3_file_path` is: " + s3FilePathVar},
 				})
 			}
 		}

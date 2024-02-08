@@ -55,13 +55,13 @@ func Run(isDebug *bool) *cli.Command {
 			&cli.StringFlag{
 				Name:        "start-date",
 				Usage:       "the start date of the range the pipeline will run for in YYYY-MM-DD or YYYY-MM-DD HH:MM:SS format",
-				DefaultText: fmt.Sprintf("yesterday, e.g. %s", time.Now().AddDate(0, 0, -1).Format("2006-01-02")),
+				DefaultText: "yesterday, e.g. " + time.Now().AddDate(0, 0, -1).Format("2006-01-02"),
 				Value:       time.Now().AddDate(0, 0, -1).Format("2006-01-02"),
 			},
 			&cli.StringFlag{
 				Name:        "end-date",
 				Usage:       "the end date of the range the pipeline will run for in YYYY-MM-DD or YYYY-MM-DD HH:MM:SS format",
-				DefaultText: fmt.Sprintf("today, e.g. %s", time.Now().Format("2006-01-02")),
+				DefaultText: "today, e.g. " + time.Now().Format("2006-01-02"),
 				Value:       time.Now().Format("2006-01-02"),
 			},
 			&cli.StringFlag{
@@ -141,7 +141,7 @@ func Run(isDebug *bool) *cli.Command {
 				defer fn()
 				color.Output = os.Stdout
 
-				err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, fmt.Sprintf("%s/*.log", LogsFolder))
+				err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, LogsFolder+"/*.log")
 				if err != nil {
 					errorPrinter.Printf("Failed to add the log file to .gitignore: %v\n", err)
 					return cli.Exit("", 1)

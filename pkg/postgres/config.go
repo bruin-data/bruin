@@ -13,13 +13,14 @@ type Config struct {
 	Host         string
 	Port         int
 	Database     string
+	Schema       string
 	PoolMaxConns int
 	SslMode      string
 }
 
 // ToDBConnectionURI returns a connection URI to be used with the pgx package.
 func (c Config) ToDBConnectionURI() string {
-	return fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s&pool_max_conns=%d",
+	connectionURI := fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s&pool_max_conns=%d",
 		url.PathEscape(c.Username),
 		url.PathEscape(c.Password),
 		net.JoinHostPort(c.Host, strconv.Itoa(c.Port)),
@@ -27,4 +28,9 @@ func (c Config) ToDBConnectionURI() string {
 		c.SslMode,
 		c.PoolMaxConns,
 	)
+	if c.Schema != "" {
+		connectionURI += "&search_path=%s" + c.Schema
+	}
+
+	return connectionURI
 }

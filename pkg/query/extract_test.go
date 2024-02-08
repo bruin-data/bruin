@@ -217,9 +217,9 @@ set min_level_req = 22;
 
 			got, err := f.ExtractQueriesFromFile(tt.path)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, tt.want, got)
@@ -361,9 +361,9 @@ func TestWholeFileExtractor_ExtractQueriesFromFile(t *testing.T) {
 
 			got, err := f.ExtractQueriesFromFile(tt.path)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, tt.want, got)

@@ -5,6 +5,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMaterializer_Render(t *testing.T) {
@@ -115,9 +116,9 @@ COMMIT;`,
 			render, err := m.Render(tt.task, tt.query)
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			assert.Equal(t, tt.want, render)

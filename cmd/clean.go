@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -54,7 +53,7 @@ func (r *CleanCommand) Run(inputPath string) error {
 
 	logsFolder := path.Join(repoRoot.Path, LogsFolder)
 
-	contents, err := filepath.Glob(fmt.Sprintf("%s/*.log", logsFolder))
+	contents, err := filepath.Glob(logsFolder + "/*.log")
 	if err != nil {
 		return errors.Wrap(err, "failed to find the logs folder")
 	}

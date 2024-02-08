@@ -67,7 +67,7 @@ func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
 		}
 
 		matchedUpdateQuery := strings.Join(matchedUpdateStatements, ", ")
-		whenMatchedThenQuery = fmt.Sprintf("WHEN MATCHED THEN UPDATE SET %s", matchedUpdateQuery)
+		whenMatchedThenQuery = "WHEN MATCHED THEN UPDATE SET " + matchedUpdateQuery
 	}
 
 	mergeLines := []string{
@@ -93,7 +93,7 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 
 	queries := []string{
 		"BEGIN TRANSACTION",
-		fmt.Sprintf("CREATE TEMP TABLE __bruin_tmp AS %s", query),
+		"CREATE TEMP TABLE __bruin_tmp AS " + query,
 		fmt.Sprintf("DELETE FROM `%s` WHERE `%s` in (SELECT DISTINCT `%s` FROM __bruin_tmp)", asset.Name, mat.IncrementalKey, mat.IncrementalKey),
 		fmt.Sprintf("INSERT INTO `%s` SELECT * FROM __bruin_tmp", asset.Name),
 		"COMMIT TRANSACTION",

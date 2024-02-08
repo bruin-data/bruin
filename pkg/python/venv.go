@@ -59,7 +59,7 @@ func (i *installReqsToHomeDir) EnsureVirtualEnvExists(ctx context.Context, repo 
 
 	reqsPathExists := path.DirExists(i.fs, venvPath)
 	if reqsPathExists {
-		activateFileExists := path.FileExists(i.fs, fmt.Sprintf("%s/bin/activate", venvPath))
+		activateFileExists := path.FileExists(i.fs, venvPath+"/bin/activate")
 		if activateFileExists {
 			return venvPath, nil
 		}
