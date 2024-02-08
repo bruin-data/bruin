@@ -13,6 +13,7 @@ type Config struct {
 	Host         string
 	Port         int
 	Database     string
+	Schema       string
 	PoolMaxConns int
 	SslMode      string
 }
