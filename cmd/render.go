@@ -8,6 +8,7 @@ import (
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/urfave/cli/v2"
@@ -22,7 +23,7 @@ func Render() *cli.Command {
 			r := RenderCommand{
 				extractor: &query.WholeFileExtractor{
 					Fs:       fs,
-					Renderer: query.DefaultJinjaRenderer,
+					Renderer: jinja.NewRendererWithYesterday(),
 				},
 				bqMaterializer: bigquery.NewMaterializer(),
 				builder:        builder,

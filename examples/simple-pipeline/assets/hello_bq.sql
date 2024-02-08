@@ -32,3 +32,4 @@ custom_checks:
 select 1 as one
 union all
 select 2 as one
+and {{ start_date }}

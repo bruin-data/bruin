@@ -5,7 +5,6 @@ import (
 	"os"
 	path2 "path"
 	"strings"
-	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
@@ -86,11 +85,7 @@ func Lint(isDebug *bool) *cli.Command {
 
 			logger.Debugf("successfully loaded %d rules", len(rules))
 
-			yesterday := time.Now().AddDate(0, 0, -1)
-
-			startDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
-			endDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 0, time.UTC)
-			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate)
+			renderer := jinja.NewRendererWithYesterday()
 
 			if len(cm.SelectedEnvironment.Connections.GoogleCloudPlatform) > 0 {
 				rules = append(rules, &lint.QueryValidatorRule{

@@ -46,6 +46,13 @@ func NewRendererWithStartEndDates(startDate, endDate *time.Time) *Renderer {
 	}
 }
 
+func NewRendererWithYesterday() *Renderer {
+	yesterday := time.Now().AddDate(0, 0, -1)
+	startDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 0, time.UTC)
+	return NewRendererWithStartEndDates(&startDate, &endDate)
+}
+
 func (r *Renderer) Render(query string) (string, error) {
 	r.queryRenderLock.Lock()
 
