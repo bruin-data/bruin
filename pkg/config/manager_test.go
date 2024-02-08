@@ -43,6 +43,7 @@ func TestLoadFromFile(t *testing.T) {
 					Port:         5432,
 					PoolMaxConns: 5,
 					SslMode:      "require",
+					Schema:       "non_public_schema",
 				},
 			},
 			RedShift: []PostgresConnection{

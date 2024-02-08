@@ -28,6 +28,7 @@ environments:
           database: "pgdb"
           pool_max_conns: 5
           ssl_mode: "require"
+          schema: "non_public_schema"
 
       redshift:
         - name: conn4

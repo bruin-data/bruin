@@ -26,7 +26,12 @@ func NewClient(ctx context.Context, c Config) (*Client, error) {
 		return nil, err
 	}
 
-	_, err = conn.Exec(ctx, fmt.Sprintf("SET search_path TO %s", c.Schema))
+	if c.Schema != "" {
+		_, err = conn.Exec(ctx, fmt.Sprintf("SET search_path TO %s", c.Schema))
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return &Client{connection: conn}, nil
 }
