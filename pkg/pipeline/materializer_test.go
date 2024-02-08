@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,6 +24,6 @@ func TestMaterializer_Render(t *testing.T) {
 	expected := "SELECT * FROM table"
 
 	result, err := materializer.Render(asset, query)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expected, result)
 }

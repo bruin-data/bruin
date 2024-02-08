@@ -274,9 +274,9 @@ func Test_createTaskFromFile(t *testing.T) {
 			got, err := pipeline.CreateTaskFromFileComments(afero.NewOsFs())(tt.args.filePath)
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			if tt.want == nil {

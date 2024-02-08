@@ -6,6 +6,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -57,7 +58,7 @@ func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 	m := Manager{}
 
 	res, err := m.GetBqConnection("test")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, res)
 
 	connection := &config.GoogleCloudPlatformConnection{
@@ -72,10 +73,10 @@ func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 	})
 
 	err = m.AddBqConnectionFromConfig(connection)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	res, err = m.GetBqConnection("test")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
 
@@ -85,7 +86,7 @@ func TestManager_AddPgConnectionFromConfig(t *testing.T) {
 	m := Manager{}
 
 	res, err := m.GetPgConnection("test")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, res)
 
 	configuration := &config.PostgresConnection{
@@ -100,9 +101,9 @@ func TestManager_AddPgConnectionFromConfig(t *testing.T) {
 	}
 
 	err = m.AddPgConnectionFromConfig(configuration)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	res, err = m.GetPgConnection("test")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, res)
 }

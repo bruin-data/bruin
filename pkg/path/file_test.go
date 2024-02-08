@@ -202,7 +202,7 @@ func TestDirExists(t *testing.T) {
 
 	fs := afero.NewMemMapFs()
 	err := fs.MkdirAll("/path1/path2/path3", 0o644)
-	assert.NoError(t, err, "failed to create the in-memory directory")
+	require.NoError(t, err, "failed to create the in-memory directory")
 
 	err = fs.MkdirAll("/path1/path2/venv", 0o644)
 	require.NoError(t, err, "failed to create the in-memory directory")
@@ -271,7 +271,7 @@ func TestWriteYaml(t *testing.T) {
 			tt.wantErr(t, WriteYaml(fs, tt.args.path, tt.args.content))
 
 			file, err := afero.ReadFile(fs, tt.args.path)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.want, string(file))
 		})
 	}

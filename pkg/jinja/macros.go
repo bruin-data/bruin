@@ -1,7 +1,6 @@
 package jinja
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/date"
@@ -35,12 +34,12 @@ func dateAdd(args ...interface{}) string {
 	if inputFormat == "" {
 		inputDate, err = date.ParseTime(inputDateString)
 		if err != nil {
-			return fmt.Sprintf("invalid date format:%s", inputDateString)
+			return "invalid date format:" + inputDateString
 		}
 	} else {
 		inputDate, err = time.Parse(inputFormat, inputDateString)
 		if err != nil {
-			return fmt.Sprintf("invalid date format:%s", inputDateString)
+			return "invalid date format:" + inputDateString
 		}
 	}
 
@@ -91,12 +90,12 @@ func dateFormat(args ...interface{}) string {
 	if inputFormat == "" {
 		inputDate, err = date.ParseTime(inputDateString)
 		if err != nil {
-			return fmt.Sprintf("invalid date format:%s", inputDateString)
+			return "invalid date format:" + inputDateString
 		}
 	} else {
 		inputDate, err = time.Parse(inputFormat, inputDateString)
 		if err != nil {
-			return fmt.Sprintf("invalid date format:%s", inputFormat)
+			return "invalid date format:" + inputFormat
 		}
 	}
 

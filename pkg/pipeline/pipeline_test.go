@@ -8,6 +8,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
@@ -209,9 +210,9 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 
 			got, err := p.CreatePipelineFromPath(tt.args.pathToPipeline)
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			if tt.want == nil {
@@ -390,11 +391,11 @@ func TestPipeline_GetAssetByPath(t *testing.T) {
 	}
 	builder := pipeline.NewBuilder(config, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs)
 	p, err := builder.CreatePipelineFromPath("./testdata/pipeline/first-pipeline")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	absPath := func(path string) string {
 		absolutePath, err := filepath.Abs(path)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		return absolutePath
 	}
 
@@ -544,7 +545,7 @@ func TestColumnCheckValue_UnmarshalJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			jsonstr, err := json.Marshal(tt.jsonFields)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			var got pipeline.ColumnCheckValue
 			err = json.Unmarshal(jsonstr, &got)

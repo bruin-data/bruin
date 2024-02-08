@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pashagolub/pgxmock/v3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestClient_Select(t *testing.T) {
@@ -106,10 +107,10 @@ func TestClient_Select(t *testing.T) {
 			})
 
 			if tt.wantErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
 				assert.Equal(t, tt.wantErr, err.Error())
-				assert.Error(t, err)
+				require.Error(t, err)
 			}
 
 			assert.Equal(t, tt.want, result)
