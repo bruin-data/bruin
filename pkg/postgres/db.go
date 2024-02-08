@@ -2,8 +2,6 @@ package postgres
 
 import (
 	"context"
-	"fmt"
-
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -24,13 +22,6 @@ func NewClient(ctx context.Context, c Config) (*Client, error) {
 	conn, err := pgxpool.New(ctx, c.ToDBConnectionURI())
 	if err != nil {
 		return nil, err
-	}
-
-	if c.Schema != "" {
-		_, err = conn.Exec(ctx, fmt.Sprintf("SET search_path TO %s", c.Schema))
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	return &Client{connection: conn}, nil
