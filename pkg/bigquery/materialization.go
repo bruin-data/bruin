@@ -99,7 +99,7 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 		"COMMIT TRANSACTION",
 	}
 
-	return strings.Join(queries, "\n") + ";", nil
+	return strings.Join(queries, ";\n") + ";", nil
 }
 
 func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error) {

@@ -28,8 +28,7 @@ custom_checks:
 
 
 @bruin */
-{% for num in range(1, 26) %}
 
-{{ (num|string)[-2:] }}
-
-{% endfor %}
+select 1 as one
+union all
+select 2 as one
