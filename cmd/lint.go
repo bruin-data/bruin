@@ -5,10 +5,12 @@ import (
 	"os"
 	path2 "path"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -84,6 +86,12 @@ func Lint(isDebug *bool) *cli.Command {
 
 			logger.Debugf("successfully loaded %d rules", len(rules))
 
+			yesterday := time.Now().AddDate(0, 0, -1)
+
+			startDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
+			endDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 0, time.UTC)
+			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate)
+
 			if len(cm.SelectedEnvironment.Connections.GoogleCloudPlatform) > 0 {
 				rules = append(rules, &lint.QueryValidatorRule{
 					Identifier:  "bigquery-validator",
@@ -91,7 +99,7 @@ func Lint(isDebug *bool) *cli.Command {
 					Connections: connectionManager,
 					Extractor: &query.WholeFileExtractor{
 						Fs:       fs,
-						Renderer: query.DefaultJinjaRenderer,
+						Renderer: renderer,
 					},
 					WorkerCount: 32,
 					Logger:      logger,
@@ -107,7 +115,7 @@ func Lint(isDebug *bool) *cli.Command {
 					Connections: connectionManager,
 					Extractor: &query.WholeFileExtractor{
 						Fs:       fs,
-						Renderer: query.DefaultJinjaRenderer,
+						Renderer: renderer,
 					},
 					WorkerCount: 32,
 					Logger:      logger,
