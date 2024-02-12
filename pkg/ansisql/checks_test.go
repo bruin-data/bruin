@@ -149,6 +149,11 @@ func runTestsFoCountZeroCheck(t *testing.T, instanceBuilder func(q *mockQuerierW
 			setup:   setupFunc([][]interface{}{{"0"}}, nil),
 			wantErr: assert.NoError,
 		},
+		{
+			name:    "no null values found, result is a string float, test passed",
+			setup:   setupFunc([][]interface{}{{"0.000000"}}, nil),
+			wantErr: assert.NoError,
+		},
 	}
 	for _, tt := range tests {
 		tt := tt

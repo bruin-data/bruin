@@ -43,6 +43,11 @@ func CastResultToInteger(res [][]interface{}) (int64, error) {
 			return int64(atoi), nil
 		}
 
+		floatValue, err := strconv.ParseFloat(v, 64)
+		if err == nil {
+			return int64(floatValue), nil
+		}
+
 		boolValue, err := strconv.ParseBool(v)
 		if err == nil {
 			if boolValue {
