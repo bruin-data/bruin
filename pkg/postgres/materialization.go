@@ -47,6 +47,10 @@ func (m Materializer) Render(task *pipeline.Asset, query string) (string, error)
 		if strategy == pipeline.MaterializationStrategyDeleteInsert {
 			return m.buildIncrementalQuery(task, query, mat, strategy)
 		}
+
+		if strategy == pipeline.MaterializationStrategyMerge {
+			return m.buildMergeQuery(task, query)
+		}
 	}
 
 	return "", fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
@@ -69,6 +73,49 @@ func (m *Materializer) buildIncrementalQuery(task *pipeline.Asset, query string,
 	}
 
 	return strings.Join(queries, ";\n") + ";", nil
+}
+
+func (m *Materializer) buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
+	if len(asset.Columns) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
+	}
+
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
+	}
+
+	nonPrimaryKeys := asset.ColumnNamesWithUpdateOnMerge()
+	columnNames := asset.ColumnNames()
+
+	on := make([]string, 0, len(primaryKeys))
+	for _, key := range primaryKeys {
+		on = append(on, fmt.Sprintf("target.%s = source.%s", key, key))
+	}
+	onQuery := strings.Join(on, " AND ")
+
+	allColumnValues := strings.Join(columnNames, ", ")
+
+	whenMatchedThenQuery := ""
+
+	if len(nonPrimaryKeys) > 0 {
+		matchedUpdateStatements := make([]string, 0, len(nonPrimaryKeys))
+		for _, col := range nonPrimaryKeys {
+			matchedUpdateStatements = append(matchedUpdateStatements, fmt.Sprintf("%s = source.%s", col, col))
+		}
+
+		matchedUpdateQuery := strings.Join(matchedUpdateStatements, ", ")
+		whenMatchedThenQuery = fmt.Sprintf("WHEN MATCHED THEN UPDATE SET %s", matchedUpdateQuery)
+	}
+
+	mergeLines := []string{
+		fmt.Sprintf("MERGE INTO %s target", asset.Name),
+		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
+		whenMatchedThenQuery,
+		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, allColumnValues),
+	}
+
+	return strings.Join(mergeLines, "\n") + ";", nil
 }
 
 func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error) {
