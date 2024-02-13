@@ -38,6 +38,10 @@ import (
 const LogsFolder = "logs"
 
 func Run(isDebug *bool) *cli.Command {
+	yesterday := time.Now().AddDate(0, 0, -1)
+	defaultStartDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
+	defaultEndDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 0, time.UTC)
+
 	return &cli.Command{
 		Name:      "run",
 		Usage:     "run a Bruin pipeline",
@@ -55,14 +59,14 @@ func Run(isDebug *bool) *cli.Command {
 			&cli.StringFlag{
 				Name:        "start-date",
 				Usage:       "the start date of the range the pipeline will run for in YYYY-MM-DD or YYYY-MM-DD HH:MM:SS format",
-				DefaultText: "yesterday, e.g. " + time.Now().AddDate(0, 0, -1).Format("2006-01-02"),
-				Value:       time.Now().AddDate(0, 0, -1).Format("2006-01-02"),
+				DefaultText: "beginning of yesterday, e.g. " + defaultStartDate.Format("2006-01-02 15:04:05"),
+				Value:       defaultStartDate.Format("2006-01-02 15:04:05"),
 			},
 			&cli.StringFlag{
 				Name:        "end-date",
 				Usage:       "the end date of the range the pipeline will run for in YYYY-MM-DD or YYYY-MM-DD HH:MM:SS format",
-				DefaultText: "today, e.g. " + time.Now().Format("2006-01-02"),
-				Value:       time.Now().Format("2006-01-02"),
+				DefaultText: "end of yesterday, e.g. " + defaultEndDate.Format("2006-01-02 15:04:05"),
+				Value:       defaultEndDate.Format("2006-01-02 15:04:05"),
 			},
 			&cli.StringFlag{
 				Name:    "environment",
