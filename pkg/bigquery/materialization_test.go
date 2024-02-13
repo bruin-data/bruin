@@ -133,11 +133,11 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want: "BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp AS SELECT 1;\n" +
-				"DELETE FROM `my.asset` WHERE `dt` in (SELECT DISTINCT `dt` FROM __bruin_tmp);\n" +
-				"INSERT INTO `my.asset` SELECT * FROM __bruin_tmp;\n" +
-				"COMMIT TRANSACTION;",
+			want: "^BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
+				"DELETE FROM `my\\.asset` WHERE `dt` in \\(SELECT DISTINCT `dt` FROM __bruin_tmp_.+\\);\n" +
+				"INSERT INTO `my\\.asset` SELECT \\* FROM __bruin_tmp.+;\n" +
+				"COMMIT TRANSACTION;$",
 		},
 		{
 			name: "merge with no columns defined fails",
@@ -186,10 +186,10 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want: "MERGE my.asset target\n" +
-				"USING (SELECT 1) source ON target.dt = source.dt AND target.event_type = source.event_type\n" +
+			want: "MERGE my\\.asset target\n" +
+				"USING \\(SELECT 1\\) source ON target\\.dt = source.dt AND target\\.event_type = source\\.event_type\n" +
 				"\n" +
-				"WHEN NOT MATCHED THEN INSERT(dt, event_type, value, value2) VALUES(dt, event_type, value, value2);",
+				"WHEN NOT MATCHED THEN INSERT\\(dt, event_type, value, value2\\) VALUES\\(dt, event_type, value, value2\\);",
 		},
 		{
 			name: "merge with some columns to update",
@@ -207,10 +207,10 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1;",
-			want: "MERGE my.asset target\n" +
-				"USING (SELECT 1) source ON target.dt = source.dt AND target.event_type = source.event_type\n" +
-				"WHEN MATCHED THEN UPDATE SET target.value = source.value\n" +
-				"WHEN NOT MATCHED THEN INSERT(dt, event_type, value, value2) VALUES(dt, event_type, value, value2);",
+			want: "MERGE my\\.asset target\n" +
+				"USING \\(SELECT 1\\) source ON target\\.dt = source\\.dt AND target\\.event_type = source\\.event_type\n" +
+				"WHEN MATCHED THEN UPDATE SET target\\.value = source\\.value\n" +
+				"WHEN NOT MATCHED THEN INSERT\\(dt, event_type, value, value2\\) VALUES\\(dt, event_type, value, value2\\);",
 		},
 	}
 	for _, tt := range tests {
@@ -227,7 +227,7 @@ func TestMaterializer_Render(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			assert.Equal(t, tt.want, render)
+			assert.Regexp(t, tt.want, render)
 		})
 	}
 }

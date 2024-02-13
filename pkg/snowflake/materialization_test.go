@@ -32,7 +32,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want:  "CREATE OR REPLACE VIEW my.asset AS\nSELECT 1",
+			want:  "^CREATE OR REPLACE VIEW my\\.asset AS\nSELECT 1$",
 		},
 		{
 			name: "materialize to a table, no partition or cluster, default to create+replace",
@@ -56,7 +56,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want:  "CREATE OR REPLACE TABLE my.asset CLUSTER BY (event_type) AS\nSELECT 1",
+			want:  "^CREATE OR REPLACE TABLE my\\.asset CLUSTER BY \\(event_type\\) AS\nSELECT 1$",
 		},
 		{
 			name: "materialize to a table with cluster, multiple fields to cluster",
@@ -69,7 +69,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want:  "CREATE OR REPLACE TABLE my.asset CLUSTER BY (event_type, event_name) AS\nSELECT 1",
+			want:  "^CREATE OR REPLACE TABLE my\\.asset CLUSTER BY \\(event_type, event_name\\) AS\nSELECT 1$",
 		},
 		{
 			name: "materialize to a table with append",
@@ -118,12 +118,59 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want: "BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_abc AS SELECT 1;\n" +
-				"DELETE FROM my.asset WHERE dt in (SELECT DISTINCT dt FROM __bruin_tmp_abc);\n" +
-				"INSERT INTO my.asset SELECT * FROM __bruin_tmp_abc;\n" +
-				"DROP TABLE IF EXISTS __bruin_tmp_abc;\n" +
-				"COMMIT;",
+			want: "^BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
+				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
+				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp_.+;\n" +
+				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
+				"COMMIT;$",
+		},
+		{
+			name: "merge without columns",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{},
+			},
+			query:   "SELECT 1 as id",
+			wantErr: true,
+		},
+		{
+			name: "merge without primary keys",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "int"},
+				},
+			},
+			query:   "SELECT 1 as id",
+			wantErr: true,
+		},
+		{
+			name: "merge with primary keys",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "int", PrimaryKey: true},
+					{Name: "name", Type: "varchar", PrimaryKey: false, UpdateOnMerge: true},
+				},
+			},
+			query: "SELECT 1 as id, 'abc' as name",
+			want: "^MERGE INTO my\\.asset target\n" +
+				"USING \\(SELECT 1 as id, 'abc' as name\\) source ON target\\.id = source.id\n" +
+				"WHEN MATCHED THEN UPDATE SET target\\.name = source\\.name\n" +
+				"WHEN NOT MATCHED THEN INSERT\\(id, name\\) VALUES\\(id, name\\);$",
 		},
 	}
 	for _, tt := range tests {
@@ -131,11 +178,7 @@ func TestMaterializer_Render(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			m := Materializer{
-				prefixGenerator: func() string {
-					return "abc"
-				},
-			}
+			m := NewMaterializer()
 			render, err := m.Render(tt.task, tt.query)
 
 			if tt.wantErr {
@@ -144,7 +187,7 @@ func TestMaterializer_Render(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			assert.Equal(t, tt.want, render)
+			assert.Regexp(t, tt.want, render)
 		})
 	}
 }
