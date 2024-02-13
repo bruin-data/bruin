@@ -8,56 +8,49 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
-type randomSuffixGenerator func() string
-
-type Materializer struct {
-	prefixGenerator randomSuffixGenerator
+var matMap = pipeline.AssetMaterializationMap{
+	pipeline.MaterializationTypeView: {
+		pipeline.MaterializationStrategyNone:          viewMaterializer,
+		pipeline.MaterializationStrategyAppend:        errorMaterializer,
+		pipeline.MaterializationStrategyCreateReplace: errorMaterializer,
+		pipeline.MaterializationStrategyDeleteInsert:  errorMaterializer,
+	},
+	pipeline.MaterializationTypeTable: {
+		pipeline.MaterializationStrategyNone:          buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyAppend:        buildAppendQuery,
+		pipeline.MaterializationStrategyCreateReplace: buildCreateReplaceQuery,
+		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
+		pipeline.MaterializationStrategyMerge:         errorMaterializer,
+	},
 }
 
-func NewMaterializer() *Materializer {
-	return &Materializer{
-		prefixGenerator: helpers.PrefixGenerator,
+func NewMaterializer() *pipeline.Materializer {
+	return &pipeline.Materializer{
+		MaterializationMap: matMap,
 	}
 }
 
-func (m Materializer) Render(task *pipeline.Asset, query string) (string, error) {
+func errorMaterializer(asset *pipeline.Asset, query string) (string, error) {
+	return "", fmt.Errorf("materialization strategy %s is not supported for materialization type %s", asset.Materialization.Strategy, asset.Materialization.Type)
+}
+
+func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {
+	return fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", asset.Name, query), nil
+}
+
+func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
+	return fmt.Sprintf("INSERT INTO %s %s", asset.Name, query), nil
+}
+
+func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 	mat := task.Materialization
-	if mat.Type == pipeline.MaterializationTypeNone {
-		return query, nil
-	}
+	strategy := pipeline.MaterializationStrategyDeleteInsert
 
-	if mat.Type == pipeline.MaterializationTypeView {
-		return fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", task.Name, query), nil
-	}
-
-	if mat.Type == pipeline.MaterializationTypeTable {
-		strategy := mat.Strategy
-		if strategy == pipeline.MaterializationStrategyNone {
-			strategy = pipeline.MaterializationStrategyCreateReplace
-		}
-
-		if strategy == pipeline.MaterializationStrategyAppend {
-			return fmt.Sprintf("INSERT INTO %s %s", task.Name, query), nil
-		}
-
-		if strategy == pipeline.MaterializationStrategyCreateReplace {
-			return buildCreateReplaceQuery(task, query, mat)
-		}
-
-		if strategy == pipeline.MaterializationStrategyDeleteInsert {
-			return m.buildIncrementalQuery(task, query, mat, strategy)
-		}
-	}
-
-	return "", fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
-}
-
-func (m *Materializer) buildIncrementalQuery(task *pipeline.Asset, query string, mat pipeline.Materialization, strategy pipeline.MaterializationStrategy) (string, error) {
 	if mat.IncrementalKey == "" {
 		return "", fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", strategy)
 	}
 
-	tempTableName := "__bruin_tmp_" + m.prefixGenerator()
+	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
 	queries := []string{
 		"BEGIN TRANSACTION",
@@ -71,7 +64,9 @@ func (m *Materializer) buildIncrementalQuery(task *pipeline.Asset, query string,
 	return strings.Join(queries, ";\n") + ";", nil
 }
 
-func buildCreateReplaceQuery(task *pipeline.Asset, query string, mat pipeline.Materialization) (string, error) {
+func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error) {
+	mat := task.Materialization
+
 	clusterByClause := ""
 	if len(mat.ClusterBy) > 0 {
 		clusterByClause = fmt.Sprintf("CLUSTER BY (%s)", strings.Join(mat.ClusterBy, ", "))
