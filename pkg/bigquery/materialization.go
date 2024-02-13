@@ -2,6 +2,7 @@ package bigquery
 
 import (
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -91,11 +92,13 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 		return "", fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", mat.Strategy)
 	}
 
+	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
+
 	queries := []string{
 		"BEGIN TRANSACTION",
-		"CREATE TEMP TABLE __bruin_tmp AS " + query,
-		fmt.Sprintf("DELETE FROM `%s` WHERE `%s` in (SELECT DISTINCT `%s` FROM __bruin_tmp)", asset.Name, mat.IncrementalKey, mat.IncrementalKey),
-		fmt.Sprintf("INSERT INTO `%s` SELECT * FROM __bruin_tmp", asset.Name),
+		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, query),
+		fmt.Sprintf("DELETE FROM `%s` WHERE `%s` in (SELECT DISTINCT `%s` FROM %s)", asset.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
+		fmt.Sprintf("INSERT INTO `%s` SELECT * FROM %s", asset.Name, tempTableName),
 		"COMMIT TRANSACTION",
 	}
 
