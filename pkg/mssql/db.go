@@ -2,9 +2,9 @@ package mssql
 
 import (
 	"context"
+
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
-
 	_ "github.com/microsoft/go-mssqldb"
 )
 
