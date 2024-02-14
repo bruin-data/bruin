@@ -26,6 +26,16 @@ type PostgresConnection struct {
 	SslMode      string `yaml:"ssl_mode" json:"ssl_mode" default:"disable"`
 }
 
+type MsSQLConnection struct {
+	Name     string `yaml:"name" json:"name"`
+	Username string `yaml:"username" json:"username"`
+	Password string `yaml:"password" json:"password"`
+	Host     string `yaml:"host"     json:"host"`
+	Port     int    `yaml:"port"     json:"port"`
+	Instance string `yaml:"instance" json:"instance"`
+	Database string `yaml:"database" json:"database"`
+}
+
 type GoogleCloudPlatformConnection struct {
 	Name               string `yaml:"name"`
 	ServiceAccountJSON string `yaml:"service_account_json"`
@@ -100,6 +110,7 @@ type Connections struct {
 	Snowflake           []SnowflakeConnection           `yaml:"snowflake"`
 	Postgres            []PostgresConnection            `yaml:"postgres"`
 	RedShift            []PostgresConnection            `yaml:"redshift"`
+	MsSQL               []MsSQLConnection               `yaml:"mssql"`
 	Generic             []GenericConnection             `yaml:"generic"`
 
 	byKey map[string]any
