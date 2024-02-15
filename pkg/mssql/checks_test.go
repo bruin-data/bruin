@@ -45,14 +45,14 @@ func (m *mockConnectionFetcher) GetConnection(name string) (interface{}, error) 
 	return get, args.Error(1)
 }
 
-func (m *mockConnectionFetcher) GetMsConnection(name string) (*DB, error) {
+func (m *mockConnectionFetcher) GetMsConnection(name string) (MsClient, error) {
 	args := m.Called(name)
 	get := args.Get(0)
 	if get == nil {
 		return nil, args.Error(1)
 	}
 
-	return get.(*DB), args.Error(1)
+	return get.(MsClient), args.Error(1)
 }
 
 func TestAcceptedValuesCheck_Check(t *testing.T) {

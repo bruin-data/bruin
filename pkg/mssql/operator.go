@@ -24,7 +24,7 @@ type queryExtractor interface {
 }
 
 type connectionFetcher interface {
-	GetMsConnection(name string) (*DB, error)
+	GetMsConnection(name string) (MsClient, error)
 	GetConnection(name string) (interface{}, error)
 }
 

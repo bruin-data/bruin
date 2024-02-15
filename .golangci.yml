@@ -73,6 +73,7 @@ linters-settings:
       - bigquery.DB
       - snowflake.SfClient
       - postgres.PgClient
+      - mssql.MsClient
   goconst:
     min-len: 5
     min-occurrences: 5

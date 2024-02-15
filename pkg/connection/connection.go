@@ -107,7 +107,7 @@ func (m *Manager) GetPgConnectionWithoutDefault(name string) (postgres.PgClient,
 	return db, nil
 }
 
-func (m *Manager) GetMsConnection(name string) (*mssql.DB, error) {
+func (m *Manager) GetMsConnection(name string) (mssql.MsClient, error) {
 	db, err := m.GetMsConnectionWithoutDefault(name)
 	if err == nil {
 		return db, nil
@@ -116,7 +116,7 @@ func (m *Manager) GetMsConnection(name string) (*mssql.DB, error) {
 	return m.GetMsConnectionWithoutDefault("mssql-default")
 }
 
-func (m *Manager) GetMsConnectionWithoutDefault(name string) (*mssql.DB, error) {
+func (m *Manager) GetMsConnectionWithoutDefault(name string) (mssql.MsClient, error) {
 	if m.MsSQL == nil {
 		return nil, errors.New("no mssql connections found")
 	}
