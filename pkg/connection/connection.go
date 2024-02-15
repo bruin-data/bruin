@@ -38,6 +38,11 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return conn, nil
 	}
 
+	conn, err = m.GetMsConnectionWithoutDefault(name)
+	if err == nil {
+		return conn, nil
+	}
+
 	return nil, errors.New("connection not found")
 }
 
