@@ -2,11 +2,12 @@ package mssql
 
 import (
 	"context"
+	"strings"
+
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/microsoft/go-mssqldb"
 	"github.com/pkg/errors"
-	"strings"
 )
 
 type DB struct {

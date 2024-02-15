@@ -3,11 +3,12 @@ package mssql
 import (
 	"context"
 	"errors"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestDB_Select(t *testing.T) {

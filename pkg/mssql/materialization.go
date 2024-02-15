@@ -3,9 +3,10 @@ package mssql
 import (
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
-	"strings"
 )
 
 var matMap = pipeline.AssetMaterializationMap{
@@ -47,8 +48,8 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error)
 
 	queries := []string{
 		"BEGIN TRANSACTION",
-		fmt.Sprintf("DROP TABLE IF EXISTS %s;", task.Name),
-		fmt.Sprintf("SELECT tmp.* INTO %s FROM (%s) AS tmp;", task.Name, query),
+		"DROP TABLE IF EXISTS " + task.Name,
+		fmt.Sprintf("SELECT tmp.* INTO %s FROM (%s) AS tmp", task.Name, query),
 		"COMMIT",
 	}
 
@@ -71,7 +72,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 
 	queries := []string{
 		"BEGIN TRANSACTION",
-		fmt.Sprintf("SELECT alias.* INTO %s FROM (%s) AS alias;", tempTableName, query),
+		fmt.Sprintf("SELECT alias.* INTO %s FROM (%s) AS alias", tempTableName, query),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
