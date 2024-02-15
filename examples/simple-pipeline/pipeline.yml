@@ -6,3 +6,4 @@ default_connections:
   google_cloud_platform: "gcp"
   snowflake: "snowflake"
   postgres: "postgres"
+  mssql: "mssql"
