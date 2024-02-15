@@ -318,6 +318,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		pipeline.AssetTypeBigqueryQuery,
 		pipeline.AssetTypeSnowflakeQuery,
 		pipeline.AssetTypePostgresQuery,
+		pipeline.AssetTypeMsSQLQuery,
 	}, pipeline.AssetTypeBigqueryQuery)
 
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {

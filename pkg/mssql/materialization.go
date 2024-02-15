@@ -45,7 +45,14 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error)
 		return "", errors.New("MsSQL assets do not support `cluster_by`")
 	}
 
-	return fmt.Sprintf("DROP TABLE IF EXISTS %s; SELECT tmp.* INTO %s FROM (%s) AS tmp;", task.Name, task.Name, query), nil
+	queries := []string{
+		"BEGIN TRANSACTION",
+		fmt.Sprintf("DROP TABLE IF EXISTS %s;", task.Name),
+		fmt.Sprintf("SELECT tmp.* INTO %s FROM (%s) AS tmp;", task.Name, query),
+		"COMMIT",
+	}
+
+	return strings.Join(queries, ";\n") + ";", nil
 }
 
 func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
