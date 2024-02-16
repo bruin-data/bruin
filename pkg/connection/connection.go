@@ -6,6 +6,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/pkg/errors"
@@ -16,6 +17,7 @@ type Manager struct {
 	BigQuery  map[string]*bigquery.Client
 	Snowflake map[string]*snowflake.DB
 	Postgres  map[string]*postgres.Client
+	MsSQL     map[string]*mssql.DB
 
 	mutex sync.Mutex
 }
@@ -32,6 +34,11 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 
 	conn, err = m.GetPgConnectionWithoutDefault(name)
+	if err == nil {
+		return conn, nil
+	}
+
+	conn, err = m.GetMsConnectionWithoutDefault(name)
 	if err == nil {
 		return conn, nil
 	}
@@ -100,6 +107,28 @@ func (m *Manager) GetPgConnectionWithoutDefault(name string) (postgres.PgClient,
 	db, ok := m.Postgres[name]
 	if !ok {
 		return nil, errors.Errorf("postgres connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetMsConnection(name string) (mssql.MsClient, error) {
+	db, err := m.GetMsConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetMsConnectionWithoutDefault("mssql-default")
+}
+
+func (m *Manager) GetMsConnectionWithoutDefault(name string) (mssql.MsClient, error) {
+	if m.MsSQL == nil {
+		return nil, errors.New("no mssql connections found")
+	}
+
+	db, ok := m.MsSQL[name]
+	if !ok {
+		return nil, errors.Errorf("mssql connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -190,6 +219,31 @@ func (m *Manager) AddPgConnectionFromConfig(connection *config.PostgresConnectio
 	return nil
 }
 
+func (m *Manager) AddMsSQLConnectionFromConfig(connection *config.MsSQLConnection) error {
+	m.mutex.Lock()
+	if m.MsSQL == nil {
+		m.MsSQL = make(map[string]*mssql.DB)
+	}
+	m.mutex.Unlock()
+
+	client, err := mssql.NewDB(&mssql.Config{
+		Username: connection.Username,
+		Password: connection.Password,
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Database: connection.Database,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.MsSQL[connection.Name] = client
+
+	return nil
+}
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	connectionManager := &Manager{}
 
@@ -230,6 +284,16 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 			err := connectionManager.AddPgConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add RedShift connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.MsSQL {
+		conn := conn
+		wg.Go(func() {
+			err := connectionManager.AddMsSQLConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add MsSQL connection '%s'", conn.Name))
 			}
 		})
 	}

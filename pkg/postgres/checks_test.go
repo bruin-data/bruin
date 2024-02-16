@@ -1,4 +1,4 @@
-package snowflake
+package postgres
 
 import (
 	"context"
@@ -45,14 +45,14 @@ func (m *mockConnectionFetcher) GetConnection(name string) (interface{}, error) 
 	return get, args.Error(1)
 }
 
-func (m *mockConnectionFetcher) GetSfConnection(name string) (SfClient, error) {
+func (m *mockConnectionFetcher) GetPgConnection(name string) (PgClient, error) {
 	args := m.Called(name)
 	get := args.Get(0)
 	if get == nil {
 		return nil, args.Error(1)
 	}
 
-	return get.(SfClient), args.Error(1)
+	return get.(PgClient), args.Error(1)
 }
 
 func TestAcceptedValuesCheck_Check(t *testing.T) {
@@ -65,7 +65,7 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 			conn.On("GetConnection", "test").Return(q, nil)
 			return &AcceptedValuesCheck{conn: conn}
 		},
-		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN ('test','test2')",
+		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as TEXT) NOT IN ('test','test2')",
 		"column 'test_column' has 5 rows that are not in the accepted values",
 		&pipeline.ColumnCheck{
 			Name: "accepted_values",
@@ -82,7 +82,7 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 			conn.On("GetConnection", "test").Return(q, nil)
 			return &AcceptedValuesCheck{conn: conn}
 		},
-		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN ('1','2')",
+		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as TEXT) NOT IN ('1','2')",
 		"column 'test_column' has 5 rows that are not in the accepted values",
 		&pipeline.ColumnCheck{
 			Name: "accepted_values",

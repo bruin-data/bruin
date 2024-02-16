@@ -59,6 +59,17 @@ func TestLoadFromFile(t *testing.T) {
 					SslMode:      "disable",
 				},
 			},
+			MsSQL: []MsSQLConnection{
+				{
+					Name:     "conn5",
+					Host:     "somemssql",
+					Username: "msuser",
+					Password: "mspass",
+					Database: "mssqldb",
+					Port:     1433,
+					Instance: "instance",
+				},
+			},
 			Generic: []GenericConnection{
 				{
 					Name:  "key1",
@@ -155,6 +166,7 @@ func TestLoadOrCreate(t *testing.T) {
 			Snowflake: []SnowflakeConnection{},
 			Generic:   []GenericConnection{},
 			RedShift:  []PostgresConnection{},
+			MsSQL:     []MsSQLConnection{},
 		},
 	}
 
