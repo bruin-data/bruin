@@ -40,6 +40,15 @@ environments:
           pool_max_conns: 4
           ssl_mode: "disable"
 
+      mssql:
+        - name: conn5
+          username: "msuser"
+          password: "mspass"
+          host: "somemssql"
+          port: 1433
+          database: "mssqldb"
+          instance: "instance"
+
       generic:
         - name: key1
           value: value1

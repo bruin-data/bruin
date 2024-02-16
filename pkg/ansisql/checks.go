@@ -47,7 +47,7 @@ func (c *CountableQueryCheck) CustomCheck(ctx context.Context, ti *scheduler.Cus
 func (c *CountableQueryCheck) check(ctx context.Context, connectionName string) error {
 	q, err := c.conn.GetConnection(connectionName)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get connection for '%s' check", c.checkName)
+		return errors.Wrapf(err, "failed to get connection '%s' for '%s' check", connectionName, c.checkName)
 	}
 
 	s, ok := q.(selector)

@@ -107,3 +107,29 @@ func TestManager_AddPgConnectionFromConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
+
+func TestManager_AddMsSQLConnectionFromConfigConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{}
+
+	res, err := m.GetMsConnection("test")
+	require.Error(t, err)
+	assert.Nil(t, res)
+
+	configuration := &config.MsSQLConnection{
+		Name:     "test",
+		Host:     "somehost",
+		Username: "user",
+		Password: "pass",
+		Database: "db",
+		Port:     15432,
+	}
+
+	err = m.AddMsSQLConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, err = m.GetMsConnection("test")
+	require.NoError(t, err)
+	assert.NotNil(t, res)
+}

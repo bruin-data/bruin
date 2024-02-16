@@ -58,7 +58,7 @@ func (m *mockConnectionFetcher) GetSfConnection(name string) (SfClient, error) {
 func TestAcceptedValuesCheck_Check(t *testing.T) {
 	t.Parallel()
 
-	runTestsFoCountZeroCheck(
+	runTestsForCountZeroCheck(
 		t,
 		func(q *mockQuerierWithResult) ansisql.CheckRunner {
 			conn := new(mockConnectionFetcher)
@@ -75,7 +75,7 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 		},
 	)
 
-	runTestsFoCountZeroCheck(
+	runTestsForCountZeroCheck(
 		t,
 		func(q *mockQuerierWithResult) ansisql.CheckRunner {
 			conn := new(mockConnectionFetcher)
@@ -93,7 +93,7 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 	)
 }
 
-func runTestsFoCountZeroCheck(t *testing.T, instanceBuilder func(q *mockQuerierWithResult) ansisql.CheckRunner, expectedQueryString string, expectedErrorMessage string, checkInstance *pipeline.ColumnCheck) {
+func runTestsForCountZeroCheck(t *testing.T, instanceBuilder func(q *mockQuerierWithResult) ansisql.CheckRunner, expectedQueryString string, expectedErrorMessage string, checkInstance *pipeline.ColumnCheck) {
 	expectedQuery := &query.Query{Query: expectedQueryString}
 	setupFunc := func(val [][]interface{}, err error) func(n *mockQuerierWithResult) {
 		return func(q *mockQuerierWithResult) {
