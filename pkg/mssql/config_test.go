@@ -13,9 +13,8 @@ func TestConfig_ToDBConnectionURI(t *testing.T) {
 		Password: "password",
 		Host:     "localhost",
 		Port:     1433,
-		Instance: "instance",
 		Database: "database",
 	}
 
-	assert.Equal(t, "sqlserver://user:password@localhost:1433/instance?app+name=Bruin&database=database", c.ToDBConnectionURI())
+	assert.Equal(t, "sqlserver://user:password@localhost:1433/database?app+name=Bruin", c.ToDBConnectionURI())
 }
