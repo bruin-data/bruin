@@ -15,7 +15,7 @@ type Config struct {
 
 func (c *Config) ToDBConnectionURI() string {
 	query := url.Values{}
-	query.Add("app name", "Bruin")
+	query.Add("app name", "Bruin CLI")
 
 	u := &url.URL{
 		Scheme:   "sqlserver",

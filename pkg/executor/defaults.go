@@ -63,6 +63,11 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
 		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
 	},
+	pipeline.AssetTypeSynapseQuery: {
+		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
+	},
 	pipeline.AssetTypePython: {
 		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
 		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},

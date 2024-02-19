@@ -319,6 +319,8 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		pipeline.AssetTypeSnowflakeQuery,
 		pipeline.AssetTypePostgresQuery,
 		pipeline.AssetTypeMsSQLQuery,
+		pipeline.AssetTypeRedshiftQuery,
+		pipeline.AssetTypeSynapseQuery,
 	}, pipeline.AssetTypeBigqueryQuery)
 
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
@@ -410,7 +412,8 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		}
 	}
 
-	if s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuery) || estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery {
+	if s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuery) || estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery ||
+		s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuery) || estimateCustomCheckType == pipeline.AssetTypeSynapseQuery {
 		msOperator := mssql.NewBasicOperator(conn, wholeFileExtractor, mssql.NewMaterializer())
 
 		msCheckRunner := mssql.NewColumnCheckOperator(conn)
@@ -421,8 +424,12 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		mainExecutors[pipeline.AssetTypeMsSQLQuery][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
 		mainExecutors[pipeline.AssetTypeMsSQLQuery][scheduler.TaskInstanceTypeCustomCheck] = msCustomCheckRunner
 
+		mainExecutors[pipeline.AssetTypeSynapseQuery][scheduler.TaskInstanceTypeMain] = msOperator
+		mainExecutors[pipeline.AssetTypeSynapseQuery][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
+		mainExecutors[pipeline.AssetTypeSynapseQuery][scheduler.TaskInstanceTypeCustomCheck] = msCustomCheckRunner
+
 		// we set the Python runners to run the checks on MsSQL
-		if estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery {
+		if estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery || estimateCustomCheckType == pipeline.AssetTypeSynapseQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = msCustomCheckRunner
 		}
