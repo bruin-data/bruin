@@ -298,6 +298,16 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		})
 	}
 
+	for _, conn := range cm.SelectedEnvironment.Connections.Synapse {
+		conn := conn
+		wg.Go(func() {
+			err := connectionManager.AddMsSQLConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add Synapse connection '%s'", conn.Name))
+			}
+		})
+	}
+
 	wg.Wait()
 
 	return connectionManager, nil
