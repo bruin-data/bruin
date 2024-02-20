@@ -102,7 +102,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 		fmt.Sprintf("SELECT alias.* INTO %s FROM (%s) AS alias;", tempTableName, query),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s);", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s;", task.Name, tempTableName),
-		"DROP TABLE;" + tempTableName,
+		fmt.Sprintf("DROP TABLE %s;", tempTableName),
 	}
 
 	return queries, nil
