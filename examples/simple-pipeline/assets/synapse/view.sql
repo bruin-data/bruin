@@ -1,12 +1,10 @@
 /* @bruin
 
-name: hello_synapse_table
+name: synapse_view
 type: synapse.sql
 
 materialization:
-   type: table
-   strategy: delete+insert
-   incremental_key: id
+   type: view
 
 columns:
   - name: id
@@ -36,12 +34,12 @@ columns:
 
 @bruin */
 
-SELECT 1 as id, 'spain' as country , 'juan1' as name
+SELECT 1 as id, 'spain' as country , 'juan' as name
 union all
-SELECT 2 as id, 'germany' as country , 'markus1' as name
+SELECT 2 as id, 'germany' as country , 'markus' as name
 union all
-SELECT 3 as id, 'germany' as country , 'franz3' as name
+SELECT 3 as id, 'germany' as country , 'franz' as name
 union all
-SELECT 4 as id, 'france' as country , 'antoin5' as name
+SELECT 4 as id, 'france' as country , 'antoine' as name
 union all
-SELECT 5 as id, 'poland' as country , 'maciej7' as name
+SELECT 5 as id, 'poland' as country , 'maciej' as name

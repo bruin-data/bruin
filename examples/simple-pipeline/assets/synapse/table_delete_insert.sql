@@ -1,6 +1,6 @@
 /* @bruin
 
-name: hello_synapse_table
+name: hello_synapse_table_delete_insert
 type: synapse.sql
 
 materialization:
