@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/synapse"
 	"io"
 	"log"
 	"os"
@@ -414,6 +415,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 	if s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuery) || estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuery) || estimateCustomCheckType == pipeline.AssetTypeSynapseQuery {
 		msOperator := mssql.NewBasicOperator(conn, wholeFileExtractor, mssql.NewMaterializer())
+		synapseOperator := mssql.NewBasicOperator(conn, wholeFileExtractor, synapse.NewMaterializer())
 
 		msCheckRunner := mssql.NewColumnCheckOperator(conn)
 
@@ -423,7 +425,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		mainExecutors[pipeline.AssetTypeMsSQLQuery][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
 		mainExecutors[pipeline.AssetTypeMsSQLQuery][scheduler.TaskInstanceTypeCustomCheck] = msCustomCheckRunner
 
-		mainExecutors[pipeline.AssetTypeSynapseQuery][scheduler.TaskInstanceTypeMain] = msOperator
+		mainExecutors[pipeline.AssetTypeSynapseQuery][scheduler.TaskInstanceTypeMain] = synapseOperator
 		mainExecutors[pipeline.AssetTypeSynapseQuery][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
 		mainExecutors[pipeline.AssetTypeSynapseQuery][scheduler.TaskInstanceTypeCustomCheck] = msCustomCheckRunner
 
