@@ -7,3 +7,4 @@ default_connections:
   snowflake: "snowflake"
   postgres: "postgres"
   mssql: "mssql"
+  synapse: "synapse"
