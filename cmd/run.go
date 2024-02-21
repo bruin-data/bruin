@@ -30,6 +30,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/synapse"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -319,6 +320,8 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		pipeline.AssetTypeSnowflakeQuery,
 		pipeline.AssetTypePostgresQuery,
 		pipeline.AssetTypeMsSQLQuery,
+		pipeline.AssetTypeRedshiftQuery,
+		pipeline.AssetTypeSynapseQuery,
 	}, pipeline.AssetTypeBigqueryQuery)
 
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
@@ -367,18 +370,17 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 
 	if s.WillRunTaskOfType(pipeline.AssetTypePostgresQuery) || estimateCustomCheckType == pipeline.AssetTypePostgresQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeRedshiftQuery) || estimateCustomCheckType == pipeline.AssetTypeRedshiftQuery {
-		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, postgres.NewMaterializer())
-
-		pgCheckRunner := postgres.NewColumnCheckOperator(conn)
 		pgCustomCheckRunner := ansisql.NewCustomCheckOperator(conn)
-
-		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeMain] = pgOperator
-		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
-		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeCustomCheck] = pgCustomCheckRunner
+		pgCheckRunner := postgres.NewColumnCheckOperator(conn)
+		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, postgres.NewMaterializer())
 
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeMain] = pgOperator
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeCustomCheck] = pgCustomCheckRunner
+
+		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeMain] = pgOperator
+		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
+		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeCustomCheck] = pgCustomCheckRunner
 
 		// we set the Python runners to run the checks on Snowflake assuming that there won't be many usecases where a user has both BQ and Snowflake
 		if estimateCustomCheckType == pipeline.AssetTypePostgresQuery || estimateCustomCheckType == pipeline.AssetTypeRedshiftQuery {
@@ -410,8 +412,10 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		}
 	}
 
-	if s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuery) || estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery {
+	if s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuery) || estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery ||
+		s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuery) || estimateCustomCheckType == pipeline.AssetTypeSynapseQuery {
 		msOperator := mssql.NewBasicOperator(conn, wholeFileExtractor, mssql.NewMaterializer())
+		synapseOperator := synapse.NewBasicOperator(conn, wholeFileExtractor, synapse.NewMaterializer())
 
 		msCheckRunner := mssql.NewColumnCheckOperator(conn)
 
@@ -421,8 +425,12 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		mainExecutors[pipeline.AssetTypeMsSQLQuery][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
 		mainExecutors[pipeline.AssetTypeMsSQLQuery][scheduler.TaskInstanceTypeCustomCheck] = msCustomCheckRunner
 
+		mainExecutors[pipeline.AssetTypeSynapseQuery][scheduler.TaskInstanceTypeMain] = synapseOperator
+		mainExecutors[pipeline.AssetTypeSynapseQuery][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
+		mainExecutors[pipeline.AssetTypeSynapseQuery][scheduler.TaskInstanceTypeCustomCheck] = msCustomCheckRunner
+
 		// we set the Python runners to run the checks on MsSQL
-		if estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery {
+		if estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery || estimateCustomCheckType == pipeline.AssetTypeSynapseQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = msCustomCheckRunner
 		}

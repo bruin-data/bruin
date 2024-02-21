@@ -67,7 +67,16 @@ func TestLoadFromFile(t *testing.T) {
 					Password: "mspass",
 					Database: "mssqldb",
 					Port:     1433,
-					Instance: "instance",
+				},
+			},
+			Synapse: []MsSQLConnection{
+				{
+					Name:     "conn6",
+					Host:     "somemsynapse",
+					Username: "syuser",
+					Password: "sypass",
+					Database: "sydb",
+					Port:     1434,
 				},
 			},
 			Generic: []GenericConnection{
@@ -167,6 +176,7 @@ func TestLoadOrCreate(t *testing.T) {
 			Generic:   []GenericConnection{},
 			RedShift:  []PostgresConnection{},
 			MsSQL:     []MsSQLConnection{},
+			Synapse:   []MsSQLConnection{},
 		},
 	}
 
