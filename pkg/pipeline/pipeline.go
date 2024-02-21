@@ -24,6 +24,7 @@ const (
 	AssetTypePostgresQuery        = AssetType("pg.sql")
 	AssetTypeRedshiftQuery        = AssetType("rs.sql")
 	AssetTypeMsSQLQuery           = AssetType("ms.sql")
+	AssetTypeSynapseQuery         = AssetType("synapse.sql")
 )
 
 var supportedFileSuffixes = []string{".yml", ".yaml", ".sql", ".py"}
@@ -233,6 +234,7 @@ var assetTypeConnectionMapping = map[AssetType][]string{
 	AssetTypePostgresQuery:        {"postgres", "pg"},
 	AssetTypeRedshiftQuery:        {"redshift", "rs"},
 	AssetTypeMsSQLQuery:           {"mssql", "ms"},
+	AssetTypeSynapseQuery:         {"synapse", "sy"},
 }
 
 type SecretMapping struct {

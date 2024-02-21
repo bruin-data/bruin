@@ -47,7 +47,14 @@ environments:
           host: "somemssql"
           port: 1433
           database: "mssqldb"
-          instance: "instance"
+
+      synapse:
+        - name: conn6
+          username: "syuser"
+          password: "sypass"
+          host: "somemsynapse"
+          port: 1434
+          database: "sydb"
 
       generic:
         - name: key1

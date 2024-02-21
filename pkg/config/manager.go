@@ -32,7 +32,6 @@ type MsSQLConnection struct {
 	Password string `yaml:"password" json:"password"`
 	Host     string `yaml:"host"     json:"host"`
 	Port     int    `yaml:"port"     json:"port"`
-	Instance string `yaml:"instance" json:"instance"`
 	Database string `yaml:"database" json:"database"`
 }
 
@@ -111,6 +110,7 @@ type Connections struct {
 	Postgres            []PostgresConnection            `yaml:"postgres"`
 	RedShift            []PostgresConnection            `yaml:"redshift"`
 	MsSQL               []MsSQLConnection               `yaml:"mssql"`
+	Synapse             []MsSQLConnection               `yaml:"synapse"`
 	Generic             []GenericConnection             `yaml:"generic"`
 
 	byKey map[string]any
@@ -132,6 +132,14 @@ func (c *Connections) buildConnectionKeyMap() {
 
 	for i, conn := range c.RedShift {
 		c.byKey[conn.Name] = &(c.RedShift[i])
+	}
+
+	for i, conn := range c.MsSQL {
+		c.byKey[conn.Name] = &(c.MsSQL[i])
+	}
+
+	for i, conn := range c.Synapse {
+		c.byKey[conn.Name] = &(c.Synapse[i])
 	}
 
 	for i, conn := range c.Generic {
