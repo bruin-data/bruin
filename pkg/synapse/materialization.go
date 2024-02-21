@@ -79,6 +79,7 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, erro
 		fmt.Sprintf("SELECT tmp.* INTO %s FROM (%s) AS tmp;", tempTableName, query),
 		fmt.Sprintf("IF OBJECT_ID('%s', 'U') IS NOT NULL DROP TABLE %s;", task.Name, task.Name),
 		fmt.Sprintf("SELECT * INTO %s FROM %s;", task.Name, tempTableName),
+		fmt.Sprintf("DROP TABLE %s;", tempTableName),
 	}
 
 	return []string{strings.Join(queries, "\n")}, nil
