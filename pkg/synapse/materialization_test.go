@@ -48,7 +48,8 @@ func TestMaterializer_Render(t *testing.T) {
 			query: "SELECT 1",
 			want: []string{"^SELECT tmp\\.\\* INTO #bruin_tmp_.+ FROM \\(SELECT 1\\) AS tmp;\n" +
 				"IF OBJECT_ID\\('my\\.asset', 'U'\\) IS NOT NULL DROP TABLE my\\.asset;\n" +
-				"SELECT \\* INTO my\\.asset FROM #bruin_tmp_.+;$"},
+				"SELECT \\* INTO my\\.asset FROM #bruin_tmp_.+;\n" +
+				"DROP TABLE #bruin_tmp_.+;$"},
 		},
 		{
 			name: "materialize to a table with cluster is unsupported",
