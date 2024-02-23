@@ -650,3 +650,17 @@ func TestColumnCheckValue_MarshalJSON(t *testing.T) {
 		})
 	}
 }
+
+func TestPipeline_GetAssetByName(t *testing.T) {
+	t.Parallel()
+
+	asset1 := &pipeline.Asset{Name: "asset1"}
+	asset2 := &pipeline.Asset{Name: "asset2"}
+	p := &pipeline.Pipeline{
+		Assets: []*pipeline.Asset{asset1, asset2},
+	}
+
+	assert.Equal(t, asset1, p.GetAssetByName("asset1"))
+	assert.Equal(t, asset2, p.GetAssetByName("asset2"))
+	assert.Nil(t, p.GetAssetByName("somerandomasset"))
+}

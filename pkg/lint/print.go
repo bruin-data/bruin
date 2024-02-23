@@ -37,7 +37,7 @@ func (l *Printer) printPipelineSummary(pipelineIssues *PipelineIssues) {
 	successPrinter.Println()
 
 	pipelineDirectory := l.relativePipelinePath(pipelineIssues.Pipeline)
-	pipelinePrinter.Printf("Pipeline: %s %s\n", pipelineIssues.Pipeline.Name, faint(fmt.Sprintf("(%s)", pipelineDirectory)))
+	pipelinePrinter.Printf("LevelPipeline: %s %s\n", pipelineIssues.Pipeline.Name, faint(fmt.Sprintf("(%s)", pipelineDirectory)))
 
 	if len(pipelineIssues.Issues) == 0 {
 		successPrinter.Println("  No issues found")

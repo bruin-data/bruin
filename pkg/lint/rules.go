@@ -1,9 +1,11 @@
 package lint
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/executor"
@@ -35,11 +37,6 @@ const (
 	pipelineSlackFieldEmptyChannel     = "Slack notifications must have a `channel` attribute"
 	pipelineSlackChannelFieldNotUnique = "The `channel` attribute under the Slack notifications must be unique"
 
-	athenaSQLEmptyDatabaseField       = "The `database` parameter cannot be empty"
-	athenaSQLInvalidS3FilePath        = "The `s3_file_path` parameter must start with `s3://`"
-	athenaSQLMissingDatabaseParameter = "The `database` parameter is required for Athena SQL tasks"
-	athenaSQLEmptyS3FilePath          = "The `s3_file_path` parameter cannot be empty"
-
 	materializationStrategyIsNotSupportedForViews     = "Materialization strategy is not supported for views"
 	materializationPartitionByNotSupportedForViews    = "Materialization partition by is not supported for views because views cannot be partitioned"
 	materializationIncrementalKeyNotSupportedForViews = "Materialization incremental key is not supported for views because views cannot be updated incrementally"
@@ -52,21 +49,34 @@ func EnsureTaskNameIsValid(pipeline *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
 	for _, task := range pipeline.Assets {
-		if task.Name == "" {
-			issues = append(issues, &Issue{
-				Task:        task,
-				Description: taskNameMustExist,
-			})
-
-			continue
+		assetIssues, err := EnsureTaskNameIsValidForASingleAsset(context.TODO(), pipeline, task)
+		if err != nil {
+			return assetIssues, err
 		}
 
-		if match := validIDRegexCompiled.MatchString(task.Name); !match {
-			issues = append(issues, &Issue{
-				Task:        task,
-				Description: taskNameMustBeAlphanumeric,
-			})
-		}
+		issues = append(issues, assetIssues...)
+	}
+
+	return issues, nil
+}
+
+func EnsureTaskNameIsValidForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	if asset.Name == "" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: taskNameMustExist,
+		})
+
+		return issues, nil
+	}
+
+	if match := validIDRegexCompiled.MatchString(asset.Name); !match {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: taskNameMustBeAlphanumeric,
+		})
 	}
 
 	return issues, nil
@@ -107,54 +117,101 @@ func EnsureTaskNameIsUnique(p *pipeline.Pipeline) ([]*Issue, error) {
 	return issues, nil
 }
 
+func EnsureTaskNameIsUniqueForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if asset.Name == "" {
+		return issues, nil
+	}
+
+	taskPaths := []string{asset.DefinitionFile.Path}
+
+	for _, a := range p.Assets {
+		if a.Name == "" {
+			continue
+		}
+
+		if a.Name == asset.Name && a.DefinitionFile.Path != asset.DefinitionFile.Path {
+			taskPaths = append(taskPaths, a.DefinitionFile.Path)
+		}
+	}
+
+	if len(taskPaths) == 1 {
+		return issues, nil
+	}
+
+	slices.Sort(taskPaths)
+	issues = append(issues, &Issue{
+		Task:        asset,
+		Description: fmt.Sprintf("Asset name '%s' is not unique, please make sure all the task names are unique", asset.Name),
+		Context:     taskPaths,
+	})
+
+	return issues, nil
+}
+
 func EnsureExecutableFileIsValid(fs afero.Fs) PipelineValidator {
 	return func(p *pipeline.Pipeline) ([]*Issue, error) {
+		assetValidatorFunc := EnsureExecutableFileIsValidForASingleAsset(fs)
 		issues := make([]*Issue, 0)
 		for _, task := range p.Assets {
-			if task.DefinitionFile.Type == pipeline.CommentTask {
-				continue
+			assetIssues, err := assetValidatorFunc(context.TODO(), p, task)
+			if err != nil {
+				return issues, err
 			}
 
-			if task.ExecutableFile.Path == "" {
-				if task.Type == pipeline.AssetTypePython {
-					issues = append(issues, &Issue{
-						Task:        task,
-						Description: executableFileCannotBeEmpty,
-					})
-				}
-				continue
-			}
+			issues = append(issues, assetIssues...)
+		}
 
-			fileInfo, err := fs.Stat(task.ExecutableFile.Path)
-			if errors.Is(err, os.ErrNotExist) {
+		return issues, nil
+	}
+}
+
+func EnsureExecutableFileIsValidForASingleAsset(fs afero.Fs) AssetValidator {
+	return func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+		issues := make([]*Issue, 0)
+		if asset.DefinitionFile.Type == pipeline.CommentTask {
+			return issues, nil
+		}
+
+		if asset.ExecutableFile.Path == "" {
+			if asset.Type == pipeline.AssetTypePython {
 				issues = append(issues, &Issue{
-					Task:        task,
-					Description: executableFileDoesNotExist,
-				})
-				continue
-			}
-
-			if fileInfo.IsDir() {
-				issues = append(issues, &Issue{
-					Task:        task,
-					Description: executableFileIsADirectory,
-				})
-				continue
-			}
-
-			if fileInfo.Size() == 0 {
-				issues = append(issues, &Issue{
-					Task:        task,
-					Description: executableFileIsEmpty,
+					Task:        asset,
+					Description: executableFileCannotBeEmpty,
 				})
 			}
+			return issues, nil
+		}
 
-			if isFileExecutable(fileInfo.Mode()) {
-				issues = append(issues, &Issue{
-					Task:        task,
-					Description: executableFileIsNotExecutable,
-				})
-			}
+		fileInfo, err := fs.Stat(asset.ExecutableFile.Path)
+		if errors.Is(err, os.ErrNotExist) {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: executableFileDoesNotExist,
+			})
+			return issues, nil
+		}
+
+		if fileInfo.IsDir() {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: executableFileIsADirectory,
+			})
+			return issues, nil
+		}
+
+		if fileInfo.Size() == 0 {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: executableFileIsEmpty,
+			})
+		}
+
+		if isFileExecutable(fileInfo.Mode()) {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: executableFileIsNotExecutable,
+			})
 		}
 
 		return issues, nil
@@ -196,13 +253,33 @@ func EnsureDependencyExists(p *pipeline.Pipeline) ([]*Issue, error) {
 
 	issues := make([]*Issue, 0)
 	for _, task := range p.Assets {
-		for _, dep := range task.DependsOn {
-			if _, ok := taskMap[dep]; !ok {
-				issues = append(issues, &Issue{
-					Task:        task,
-					Description: fmt.Sprintf("Dependency '%s' does not exist", dep),
-				})
-			}
+		assetIssues, err := EnsureDependencyExistsForASingleAsset(context.TODO(), p, task)
+		if err != nil {
+			return nil, err
+		}
+
+		issues = append(issues, assetIssues...)
+	}
+
+	return issues, nil
+}
+
+func EnsureDependencyExistsForASingleAsset(ctx context.Context, p *pipeline.Pipeline, task *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	for _, dep := range task.DependsOn {
+		if dep == "" {
+			issues = append(issues, &Issue{
+				Task:        task,
+				Description: "Assets cannot have empty dependencies",
+			})
+		}
+
+		upstream := p.GetAssetByName(dep)
+		if upstream == nil {
+			issues = append(issues, &Issue{
+				Task:        task,
+				Description: fmt.Sprintf("Dependency '%s' does not exist", dep),
+			})
 		}
 	}
 
@@ -234,20 +311,32 @@ func EnsureOnlyAcceptedTaskTypesAreThere(p *pipeline.Pipeline) ([]*Issue, error)
 	issues := make([]*Issue, 0)
 
 	for _, task := range p.Assets {
-		if task.Type == "" {
-			issues = append(issues, &Issue{
-				Task:        task,
-				Description: taskTypeMustExist,
-			})
-			continue
+		assetIssues, err := EnsureTypeIsCorrectForASingleAsset(context.TODO(), p, task)
+		if err != nil {
+			return nil, err
 		}
 
-		if _, ok := executor.DefaultExecutorsV2[task.Type]; !ok {
-			issues = append(issues, &Issue{
-				Task:        task,
-				Description: fmt.Sprintf("Invalid task type '%s'", task.Type),
-			})
-		}
+		issues = append(issues, assetIssues...)
+	}
+
+	return issues, nil
+}
+
+func EnsureTypeIsCorrectForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if asset.Type == "" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: taskTypeMustExist,
+		})
+		return issues, nil
+	}
+
+	if _, ok := executor.DefaultExecutorsV2[asset.Type]; !ok {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Invalid asset type '%s'", asset.Type),
+		})
 	}
 
 	return issues, nil
@@ -325,48 +414,6 @@ func isStringInArray(arr []string, str string) bool {
 	return false
 }
 
-func EnsureAthenaSQLTypeTasksHasDatabaseAndS3FilePath(p *pipeline.Pipeline) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
-	for _, task := range p.Assets {
-		if task.Type == "athena.sql" {
-			databaseVar, ok := task.Parameters["database"]
-
-			if !ok {
-				issues = append(issues, &Issue{
-					Task:        task,
-					Description: athenaSQLMissingDatabaseParameter,
-				})
-			}
-
-			if ok && databaseVar == "" {
-				issues = append(issues, &Issue{
-					Task:        task,
-					Description: athenaSQLEmptyDatabaseField,
-				})
-			}
-
-			s3FilePathVar, ok := task.Parameters["s3_file_path"]
-
-			if !ok {
-				issues = append(issues, &Issue{
-					Task:        task,
-					Description: athenaSQLEmptyS3FilePath,
-				})
-			}
-
-			if ok && !strings.HasPrefix(s3FilePathVar, "s3://") {
-				issues = append(issues, &Issue{
-					Task:        task,
-					Description: athenaSQLInvalidS3FilePath,
-					Context:     []string{"Given `s3_file_path` is: " + s3FilePathVar},
-				})
-			}
-		}
-	}
-
-	return issues, nil
-}
-
 func EnsureSlackFieldInPipelineIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
@@ -395,94 +442,107 @@ func EnsureSlackFieldInPipelineIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
 func EnsureMaterializationValuesAreValid(p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	for _, asset := range p.Assets {
-		switch asset.Materialization.Type {
-		case pipeline.MaterializationTypeNone:
-			continue
-		case pipeline.MaterializationTypeView:
-			if asset.Materialization.Strategy != pipeline.MaterializationStrategyNone {
+		assetIssues, err := EnsureMaterializationValuesAreValidForSingleAsset(context.TODO(), p, asset)
+		if err != nil {
+			return issues, err
+		}
+
+		issues = append(issues, assetIssues...)
+	}
+
+	return issues, nil
+}
+
+func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	switch asset.Materialization.Type {
+	case pipeline.MaterializationTypeNone:
+		return issues, nil
+	case pipeline.MaterializationTypeView:
+		if asset.Materialization.Strategy != pipeline.MaterializationStrategyNone {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: materializationStrategyIsNotSupportedForViews,
+			})
+		}
+
+		if asset.Materialization.IncrementalKey != "" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: materializationIncrementalKeyNotSupportedForViews,
+			})
+		}
+
+		if asset.Materialization.ClusterBy != nil {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: materializationClusterByNotSupportedForViews,
+			})
+		}
+
+		if asset.Materialization.PartitionBy != "" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: materializationPartitionByNotSupportedForViews,
+			})
+		}
+
+	case pipeline.MaterializationTypeTable:
+		if asset.Materialization.Strategy == pipeline.MaterializationStrategyNone {
+			return issues, nil
+		}
+
+		switch asset.Materialization.Strategy {
+		case pipeline.MaterializationStrategyNone:
+		case pipeline.MaterializationStrategyCreateReplace:
+		case pipeline.MaterializationStrategyAppend:
+			return issues, nil
+		case pipeline.MaterializationStrategyDeleteInsert:
+			if asset.Materialization.IncrementalKey == "" {
 				issues = append(issues, &Issue{
 					Task:        asset,
-					Description: materializationStrategyIsNotSupportedForViews,
+					Description: "Materialization strategy 'delete+insert' requires the 'incremental_key' field to be set",
 				})
 			}
-
-			if asset.Materialization.IncrementalKey != "" {
+		case pipeline.MaterializationStrategyMerge:
+			if len(asset.Columns) == 0 {
 				issues = append(issues, &Issue{
 					Task:        asset,
-					Description: materializationIncrementalKeyNotSupportedForViews,
+					Description: "Materialization strategy 'merge' requires the 'columns' field to be set with actual columns",
 				})
 			}
 
-			if asset.Materialization.ClusterBy != nil {
+			primaryKeys := asset.ColumnNamesWithPrimaryKey()
+			if len(primaryKeys) == 0 {
 				issues = append(issues, &Issue{
 					Task:        asset,
-					Description: materializationClusterByNotSupportedForViews,
+					Description: "Materialization strategy 'merge' requires the 'primary_key' field to be set on at least one column",
 				})
 			}
 
-			if asset.Materialization.PartitionBy != "" {
-				issues = append(issues, &Issue{
-					Task:        asset,
-					Description: materializationPartitionByNotSupportedForViews,
-				})
-			}
-
-		case pipeline.MaterializationTypeTable:
-			if asset.Materialization.Strategy == pipeline.MaterializationStrategyNone {
-				continue
-			}
-
-			switch asset.Materialization.Strategy {
-			case pipeline.MaterializationStrategyNone:
-			case pipeline.MaterializationStrategyCreateReplace:
-			case pipeline.MaterializationStrategyAppend:
-				continue
-			case pipeline.MaterializationStrategyDeleteInsert:
-				if asset.Materialization.IncrementalKey == "" {
-					issues = append(issues, &Issue{
-						Task:        asset,
-						Description: "Materialization strategy 'delete+insert' requires the 'incremental_key' field to be set",
-					})
-				}
-			case pipeline.MaterializationStrategyMerge:
-				if len(asset.Columns) == 0 {
-					issues = append(issues, &Issue{
-						Task:        asset,
-						Description: "Materialization strategy 'merge' requires the 'columns' field to be set with actual columns",
-					})
-				}
-
-				primaryKeys := asset.ColumnNamesWithPrimaryKey()
-				if len(primaryKeys) == 0 {
-					issues = append(issues, &Issue{
-						Task:        asset,
-						Description: "Materialization strategy 'merge' requires the 'primary_key' field to be set on at least one column",
-					})
-				}
-
-			default:
-				issues = append(issues, &Issue{
-					Task: asset,
-					Description: fmt.Sprintf(
-						"Materialization strategy '%s' is not supported, available strategies are: %v",
-						asset.Materialization.Strategy,
-						pipeline.AllAvailableMaterializationStrategies,
-					),
-				})
-			}
 		default:
 			issues = append(issues, &Issue{
 				Task: asset,
 				Description: fmt.Sprintf(
-					"Materialization type '%s' is not supported, available types are: %v",
-					asset.Materialization.Type,
-					[]pipeline.MaterializationType{
-						pipeline.MaterializationTypeNone,
-						pipeline.MaterializationTypeView,
-					},
+					"Materialization strategy '%s' is not supported, available strategies are: %v",
+					asset.Materialization.Strategy,
+					pipeline.AllAvailableMaterializationStrategies,
 				),
 			})
 		}
+	default:
+		issues = append(issues, &Issue{
+			Task: asset,
+			Description: fmt.Sprintf(
+				"Materialization type '%s' is not supported, available types are: %v",
+				asset.Materialization.Type,
+				[]pipeline.MaterializationType{
+					pipeline.MaterializationTypeNone,
+					pipeline.MaterializationTypeView,
+				},
+			),
+		})
 	}
 
 	return issues, nil
@@ -491,25 +551,37 @@ func EnsureMaterializationValuesAreValid(p *pipeline.Pipeline) ([]*Issue, error)
 func EnsureSnowflakeSensorHasQueryParameter(p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	for _, asset := range p.Assets {
-		if asset.Type != pipeline.AssetTypeSnowflakeQuerySensor {
-			continue
+		assetIssues, err := EnsureSnowflakeSensorHasQueryParameterForASingleAsset(context.TODO(), p, asset)
+		if err != nil {
+			return issues, err
 		}
 
-		query, ok := asset.Parameters["query"]
-		if !ok {
-			issues = append(issues, &Issue{
-				Task:        asset,
-				Description: "Snowflake query sensor requires a `query` parameter",
-			})
-			continue
-		}
+		issues = append(issues, assetIssues...)
+	}
 
-		if query == "" {
-			issues = append(issues, &Issue{
-				Task:        asset,
-				Description: "Snowflake query sensor requires a `query` parameter that is not empty",
-			})
-		}
+	return issues, nil
+}
+
+func EnsureSnowflakeSensorHasQueryParameterForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if asset.Type != pipeline.AssetTypeSnowflakeQuerySensor {
+		return issues, nil
+	}
+
+	query, ok := asset.Parameters["query"]
+	if !ok {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Snowflake query sensor requires a `query` parameter",
+		})
+		return issues, nil
+	}
+
+	if query == "" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Snowflake query sensor requires a `query` parameter that is not empty",
+		})
 	}
 
 	return issues, nil
