@@ -35,6 +35,11 @@ func Lint(isDebug *bool) *cli.Command {
 				Aliases: []string{"f"},
 				Usage:   "force the validation even if the environment is a production environment",
 			},
+			&cli.StringFlag{
+				Name:    "asset",
+				Aliases: []string{"a"},
+				Usage:   "the specific asset to validate, either name or the path works",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			fmt.Println()
@@ -119,10 +124,19 @@ func Lint(isDebug *bool) *cli.Command {
 				logger.Debug("no Snowflake connections found, skipping Snowflake validation")
 			}
 
-			linter := lint.NewLinter(path.GetPipelinePaths, builder, rules, logger)
-
-			infoPrinter.Printf("Validating pipelines in '%s' for '%s' environment...\n", rootPath, cm.SelectedEnvironmentName)
-			result, err := linter.Lint(rootPath, pipelineDefinitionFile)
+			asset := c.String("asset")
+			var result *lint.PipelineAnalysisResult
+			if asset == "" {
+				linter := lint.NewLinter(path.GetPipelinePaths, builder, rules, logger)
+				logger.Debugf("running %d rules for pipeline validation", len(rules))
+				infoPrinter.Printf("Validating pipelines in '%s' for '%s' environment...\n", rootPath, cm.SelectedEnvironmentName)
+				result, err = linter.Lint(rootPath, pipelineDefinitionFile)
+			} else {
+				rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
+				logger.Debugf("running %d rules for asset-only validation", len(rules))
+				linter := lint.NewLinter(path.GetPipelinePaths, builder, rules, logger)
+				result, err = linter.LintAsset(rootPath, pipelineDefinitionFile, asset)
+			}
 
 			printer := lint.Printer{RootCheckPath: rootPath}
 			err = reportLintErrors(result, err, printer)
