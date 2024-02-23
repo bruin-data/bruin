@@ -38,10 +38,9 @@ func TestClient_Select(t *testing.T) {
 			},
 		},
 		{
-			name:    "test select single row",
-			query:   "SELECT * FROM table",
-			wantErr: "",
-			want:    [][]interface{}{{1, "John Doe"}},
+			name:  "test select single row",
+			query: "SELECT * FROM table",
+			want:  [][]interface{}{{1, "John Doe"}},
 			setupMock: func(mock pgxmock.PgxPoolIface) {
 				rows := pgxmock.NewRowsWithColumnDefinition(
 					pgconn.FieldDescription{Name: "id"},
@@ -51,10 +50,9 @@ func TestClient_Select(t *testing.T) {
 			},
 		},
 		{
-			name:    "test telect empty rows",
-			query:   "SELECT * FROM table",
-			wantErr: "",
-			want:    [][]interface{}{},
+			name:  "test select empty rows",
+			query: "SELECT * FROM table",
+			want:  [][]interface{}{},
 			setupMock: func(mock pgxmock.PgxPoolIface) {
 				rows := pgxmock.NewRowsWithColumnDefinition(
 					pgconn.FieldDescription{Name: "id"},
@@ -64,7 +62,7 @@ func TestClient_Select(t *testing.T) {
 			},
 		},
 		{
-			name:    "test select Errors",
+			name:    "test select errors",
 			query:   "SELECT * FROM table",
 			wantErr: "Some error",
 			want:    nil,

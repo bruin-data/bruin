@@ -28,17 +28,18 @@ test-unit:
 	@go test -race -tags unit -cover ./...
 
 format: tools
-	@echo "$(OK_COLOR)>> [$@] go vet: running$(NO_COLOR)"
-	@go vet ./...
+	@echo "$(OK_COLOR)>> [go vet] running$(NO_COLOR)" & \
+	go vet ./... &
 
-	@echo "$(OK_COLOR)>> [$@] gci: running$(NO_COLOR)"
-	@gci write cmd pkg main.go
+	@echo "$(OK_COLOR)>> [gci] running$(NO_COLOR)" & \
+	gci write cmd pkg main.go &
 
-	@echo "$(OK_COLOR)>> [$@] gofumpt: running$(NO_COLOR)"
-	@gofumpt -w cmd pkg
+	@echo "$(OK_COLOR)>> [gofumpt] running$(NO_COLOR)" & \
+	gofumpt -w cmd pkg &
 
-	@echo "$(OK_COLOR)>> [$@] golangci-lint: running$(NO_COLOR)"
-	@golangci-lint run
+	@echo "$(OK_COLOR)>> [golangci-lint] running$(NO_COLOR)" & \
+	golangci-lint run & \
+	wait
 
 tools:
 	@if ! command -v gci > /dev/null ; then \

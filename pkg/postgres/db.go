@@ -46,12 +46,16 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 
 	defer rows.Close()
 
-	results, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) ([]interface{}, error) {
+	collectedRows, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) ([]interface{}, error) {
 		return row.Values()
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to collect row values")
 	}
 
-	return results, nil
+	if len(collectedRows) == 0 {
+		return make([][]interface{}, 0), nil
+	}
+
+	return collectedRows, nil
 }
