@@ -2,6 +2,7 @@ package lint
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -34,6 +35,15 @@ type QueryValidatorRule struct {
 
 func (q *QueryValidatorRule) Name() string {
 	return q.Identifier
+}
+
+func (q *QueryValidatorRule) GetApplicableLevels() []Level {
+	// we need to implement this rule for asset level as well
+	return []Level{LevelPipeline}
+}
+
+func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	return nil, errors.New("query validator has not been implemented on the asset level yet")
 }
 
 func (q *QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.Asset, done chan<- []*Issue) {

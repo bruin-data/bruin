@@ -432,6 +432,17 @@ func (p *Pipeline) HasAssetType(taskType AssetType) bool {
 	return ok
 }
 
+func (p *Pipeline) ensureTaskNameMapIsFilled() {
+	if p.tasksByName != nil {
+		return
+	}
+
+	p.tasksByName = make(map[string]*Asset)
+	for _, asset := range p.Assets {
+		p.tasksByName[asset.Name] = asset
+	}
+}
+
 func (p *Pipeline) GetAssetByPath(assetPath string) *Asset {
 	assetPath, err := filepath.Abs(assetPath)
 	if err != nil {
@@ -445,6 +456,17 @@ func (p *Pipeline) GetAssetByPath(assetPath string) *Asset {
 	}
 
 	return nil
+}
+
+func (p *Pipeline) GetAssetByName(assetName string) *Asset {
+	p.ensureTaskNameMapIsFilled()
+
+	asset, ok := p.tasksByName[assetName]
+	if !ok {
+		return nil
+	}
+
+	return asset
 }
 
 type TaskCreator func(path string) (*Asset, error)

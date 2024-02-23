@@ -41,9 +41,17 @@ func Lint(isDebug *bool) *cli.Command {
 
 			logger := makeLogger(*isDebug)
 
-			rootPath := c.Args().Get(0)
-			if rootPath == "" {
-				rootPath = "."
+			repoOrAsset := c.Args().Get(0)
+			rootPath := repoOrAsset
+			asset := ""
+			if isPathReferencingAsset(repoOrAsset) {
+				asset = repoOrAsset
+				pipelineRootFromAsset, err := path.GetPipelineRootFromTask(repoOrAsset, pipelineDefinitionFile)
+				if err != nil {
+					errorPrinter.Printf("Failed to find the pipeline root for the given asset: %v\n", err)
+					return cli.Exit("", 1)
+				}
+				rootPath = pipelineRootFromAsset
 			}
 
 			logger.Debugf("using root path '%s'", rootPath)
@@ -119,13 +127,21 @@ func Lint(isDebug *bool) *cli.Command {
 				logger.Debug("no Snowflake connections found, skipping Snowflake validation")
 			}
 
-			linter := lint.NewLinter(path.GetPipelinePaths, builder, rules, logger)
-
-			infoPrinter.Printf("Validating pipelines in '%s' for '%s' environment...\n", rootPath, cm.SelectedEnvironmentName)
-			result, err := linter.Lint(rootPath, pipelineDefinitionFile)
+			var result *lint.PipelineAnalysisResult
+			if asset == "" {
+				linter := lint.NewLinter(path.GetPipelinePaths, builder, rules, logger)
+				logger.Debugf("running %d rules for pipeline validation", len(rules))
+				infoPrinter.Printf("Validating pipelines in '%s' for '%s' environment...\n", rootPath, cm.SelectedEnvironmentName)
+				result, err = linter.Lint(rootPath, pipelineDefinitionFile)
+			} else {
+				rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
+				logger.Debugf("running %d rules for asset-only validation", len(rules))
+				linter := lint.NewLinter(path.GetPipelinePaths, builder, rules, logger)
+				result, err = linter.LintAsset(rootPath, pipelineDefinitionFile, asset)
+			}
 
 			printer := lint.Printer{RootCheckPath: rootPath}
-			err = reportLintErrors(result, err, printer)
+			err = reportLintErrors(result, err, printer, asset)
 			if err != nil {
 				return cli.Exit("", 1)
 			}
@@ -134,9 +150,9 @@ func Lint(isDebug *bool) *cli.Command {
 	}
 }
 
-func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer lint.Printer) error {
+func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer lint.Printer, asset string) error {
 	if err != nil {
-		errorPrinter.Println("\nAn error occurred while linting the pipelines:")
+		errorPrinter.Println("\nAn error occurred while linting:")
 
 		errorList := unwrapAllErrors(err)
 		for i, e := range errorList {
@@ -162,7 +178,11 @@ func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer li
 			issueStr += "s"
 		}
 
-		errorPrinter.Printf("\n✘ Checked %d %s and found %d %s, please check above.\n", pipelineCount, pipelineStr, errorCount, issueStr)
+		if asset == "" {
+			errorPrinter.Printf("\n✘ Checked %d %s and found %d %s, please check above.\n", pipelineCount, pipelineStr, errorCount, issueStr)
+		} else {
+			errorPrinter.Printf("\n✘ Checked %s and found %d %s, please check above.\n", asset, errorCount, issueStr)
+		}
 		return errors.New("validation failed")
 	}
 

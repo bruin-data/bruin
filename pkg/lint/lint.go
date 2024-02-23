@@ -1,6 +1,7 @@
 package lint
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sort"
@@ -14,6 +15,7 @@ import (
 type (
 	pipelineFinder    func(root, pipelineDefinitionFile string) ([]string, error)
 	PipelineValidator func(pipeline *pipeline.Pipeline) ([]*Issue, error)
+	AssetValidator    func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error)
 )
 
 type pipelineBuilder interface {
@@ -29,19 +31,35 @@ type Issue struct {
 type Rule interface {
 	Name() string
 	Validate(pipeline *pipeline.Pipeline) ([]*Issue, error)
+	ValidateAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error)
+	GetApplicableLevels() []Level
 }
 
 type SimpleRule struct {
-	Identifier string
-	Validator  PipelineValidator
+	Identifier       string
+	Validator        PipelineValidator
+	AssetValidator   AssetValidator
+	ApplicableLevels []Level
 }
 
 func (g *SimpleRule) Validate(pipeline *pipeline.Pipeline) ([]*Issue, error) {
 	return g.Validator(pipeline)
 }
 
+func (g *SimpleRule) ValidateAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	if g.AssetValidator == nil {
+		return []*Issue{}, errors.New(fmt.Sprintf("the rule '%s' cannot be used to validate assets, please open an issue", g.Identifier))
+	}
+
+	return g.AssetValidator(ctx, pipeline, asset)
+}
+
 func (g *SimpleRule) Name() string {
 	return g.Identifier
+}
+
+func (g *SimpleRule) GetApplicableLevels() []Level {
+	return g.ApplicableLevels
 }
 
 type Linter struct {
@@ -61,6 +79,78 @@ func NewLinter(findPipelines pipelineFinder, builder pipelineBuilder, rules []Ru
 }
 
 func (l *Linter) Lint(rootPath, pipelineDefinitionFileName string) (*PipelineAnalysisResult, error) {
+	pipelines, err := l.extractPipelinesFromPath(rootPath, pipelineDefinitionFileName)
+	if err != nil {
+		return nil, err
+	}
+
+	return l.LintPipelines(pipelines)
+}
+
+func (l *Linter) LintAsset(rootPath, pipelineDefinitionFileName, assetNameOrPath string) (*PipelineAnalysisResult, error) {
+	pipelines, err := l.extractPipelinesFromPath(rootPath, pipelineDefinitionFileName)
+	if err != nil {
+		return nil, err
+	}
+
+	var assetPipeline *pipeline.Pipeline
+	var asset *pipeline.Asset
+	for _, fp := range pipelines {
+		asset = fp.GetAssetByPath(assetNameOrPath)
+		if asset != nil {
+			assetPipeline = fp
+			l.logger.Debugf("found an asset with path under the pipeline '%s'", fp.DefinitionFile.Path)
+			break
+		}
+	}
+
+	if asset == nil {
+		l.logger.Debugf("couldn't find an asset with the path '%s', trying it as a name instead", assetNameOrPath)
+
+		matchedAssetCount := 0
+		for _, fp := range pipelines {
+			maybeAsset := fp.GetAssetByName(assetNameOrPath)
+			if maybeAsset != nil {
+				matchedAssetCount++
+				asset = maybeAsset
+				assetPipeline = fp
+			}
+		}
+
+		if matchedAssetCount > 1 {
+			return nil, errors.Errorf("there are %d assets with the name '%s', you'll have to use an asset path or go to the pipeline directory", matchedAssetCount, assetNameOrPath)
+		}
+	}
+
+	if asset == nil {
+		return nil, errors.Errorf("failed to find an asset with the path or name '%s' under the path '%s'", assetNameOrPath, rootPath)
+	}
+
+	pipelineResult := &PipelineIssues{
+		Pipeline: assetPipeline,
+		Issues:   make(map[Rule][]*Issue),
+	}
+
+	// now the actual validation starts
+	for _, rule := range l.rules {
+		issues, err := rule.ValidateAsset(context.TODO(), assetPipeline, asset)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(issues) > 0 {
+			pipelineResult.Issues[rule] = issues
+		}
+	}
+
+	return &PipelineAnalysisResult{
+		Pipelines: []*PipelineIssues{
+			pipelineResult,
+		},
+	}, nil
+}
+
+func (l *Linter) extractPipelinesFromPath(rootPath string, pipelineDefinitionFileName string) ([]*pipeline.Pipeline, error) {
 	pipelinePaths, err := l.findPipelines(rootPath, pipelineDefinitionFileName)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -95,8 +185,7 @@ func (l *Linter) Lint(rootPath, pipelineDefinitionFileName string) (*PipelineAna
 	}
 
 	l.logger.Debugf("constructed %d pipelines", len(pipelines))
-
-	return l.LintPipelines(pipelines)
+	return pipelines, nil
 }
 
 type PipelineAnalysisResult struct {

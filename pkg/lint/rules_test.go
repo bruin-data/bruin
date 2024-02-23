@@ -1,6 +1,7 @@
 package lint
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -622,7 +623,7 @@ func TestEnsureOnlyAcceptedTaskTypesAreThere(t *testing.T) {
 					Task: &pipeline.Asset{
 						Type: "some.random.type",
 					},
-					Description: "Invalid task type 'some.random.type'",
+					Description: "Invalid asset type 'some.random.type'",
 				},
 			},
 		},
@@ -659,23 +660,19 @@ func TestEnsureOnlyAcceptedTaskTypesAreThere(t *testing.T) {
 
 func TestEnsureTaskNameIsUnique(t *testing.T) {
 	t.Parallel()
-	type args struct {
-		p *pipeline.Pipeline
-	}
+
 	tests := []struct {
 		name    string
-		args    args
+		p       *pipeline.Pipeline
 		want    []*Issue
 		wantErr bool
 	}{
 		{
 			name: "empty name is skipped",
-			args: args{
-				p: &pipeline.Pipeline{
-					Assets: []*pipeline.Asset{
-						{
-							Name: "",
-						},
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "",
 					},
 				},
 			},
@@ -684,26 +681,25 @@ func TestEnsureTaskNameIsUnique(t *testing.T) {
 		},
 		{
 			name: "duplicates are reported",
-			args: args{
-				p: &pipeline.Pipeline{
-					Assets: []*pipeline.Asset{
-						{
-							Name: "name1",
-							DefinitionFile: pipeline.TaskDefinitionFile{
-								Path: "path1",
-							},
+
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "name1",
+						DefinitionFile: pipeline.TaskDefinitionFile{
+							Path: "path1",
 						},
-						{
-							Name: "name2",
-							DefinitionFile: pipeline.TaskDefinitionFile{
-								Path: "path2",
-							},
+					},
+					{
+						Name: "name2",
+						DefinitionFile: pipeline.TaskDefinitionFile{
+							Path: "path2",
 						},
-						{
-							Name: "name1",
-							DefinitionFile: pipeline.TaskDefinitionFile{
-								Path: "path3",
-							},
+					},
+					{
+						Name: "name1",
+						DefinitionFile: pipeline.TaskDefinitionFile{
+							Path: "path3",
 						},
 					},
 				},
@@ -728,7 +724,124 @@ func TestEnsureTaskNameIsUnique(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := EnsureTaskNameIsUnique(tt.args.p)
+			got, err := EnsureTaskNameIsUnique(tt.p)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestEnsureTaskNameIsUniqueForASingleAsset(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		p       *pipeline.Pipeline
+		asset   *pipeline.Asset
+		want    []*Issue
+		wantErr bool
+	}{
+		{
+			name: "empty name is skipped",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "",
+					},
+				},
+			},
+			asset:   &pipeline.Asset{Name: ""},
+			want:    noIssues,
+			wantErr: false,
+		},
+		{
+			name: "duplicates are reported",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "name1",
+						DefinitionFile: pipeline.TaskDefinitionFile{
+							Path: "path1",
+						},
+					},
+					{
+						Name: "name2",
+						DefinitionFile: pipeline.TaskDefinitionFile{
+							Path: "path2",
+						},
+					},
+					{
+						Name: "name1",
+						DefinitionFile: pipeline.TaskDefinitionFile{
+							Path: "path3",
+						},
+					},
+				},
+			},
+			asset: &pipeline.Asset{
+				Name: "name1",
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "path3",
+				},
+			},
+			want: []*Issue{
+				{
+					Task: &pipeline.Asset{
+						Name: "name1",
+						DefinitionFile: pipeline.TaskDefinitionFile{
+							Path: "path3",
+						},
+					},
+					Description: "Asset name 'name1' is not unique, please make sure all the task names are unique",
+					Context:     []string{"path1", "path3"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "no duplicates are found, all good",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "name1",
+						DefinitionFile: pipeline.TaskDefinitionFile{
+							Path: "path1",
+						},
+					},
+					{
+						Name: "name2",
+						DefinitionFile: pipeline.TaskDefinitionFile{
+							Path: "path2",
+						},
+					},
+					{
+						Name: "name3",
+						DefinitionFile: pipeline.TaskDefinitionFile{
+							Path: "path3",
+						},
+					},
+				},
+			},
+			asset: &pipeline.Asset{
+				Name: "name1",
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: "path1",
+				},
+			},
+			want: noIssues,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := EnsureTaskNameIsUniqueForASingleAsset(context.Background(), tt.p, tt.asset)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -890,229 +1003,6 @@ func TestEnsurePipelineHasNoCycles(t *testing.T) {
 			}
 
 			require.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func TestEnsureAthenaSQLTypeTasksHasDatabaseAndS3FilePath(t *testing.T) {
-	t.Parallel()
-	type args struct {
-		p *pipeline.Pipeline
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    []*Issue
-		wantErr bool
-	}{
-		{
-			name: "no athena.sql task type",
-			args: args{
-				p: &pipeline.Pipeline{
-					Assets: []*pipeline.Asset{
-						{
-							Name: "task1",
-						},
-						{
-							Name: "task2",
-						},
-					},
-				},
-			},
-			want: noIssues,
-		},
-		{
-			name: "all fields and values are correct, no issues",
-			args: args{
-				p: &pipeline.Pipeline{
-					Assets: []*pipeline.Asset{
-						{
-							Name: "task1",
-							Type: "athena.sql",
-							Parameters: map[string]string{
-								"database":     "database",
-								"s3_file_path": "s3://",
-							},
-						},
-					},
-				},
-			},
-			want: noIssues,
-		},
-		{
-			name: "database value is empty, caught",
-			args: args{
-				p: &pipeline.Pipeline{
-					Assets: []*pipeline.Asset{
-						{
-							Name: "task1",
-							Type: "athena.sql",
-							Parameters: map[string]string{
-								"database":     "",
-								"s3_file_path": "s3://",
-							},
-						},
-					},
-				},
-			},
-			want: []*Issue{
-				{
-					Task: &pipeline.Asset{
-						Name: "task1",
-						Type: "athena.sql",
-						Parameters: map[string]string{
-							"database":     "",
-							"s3_file_path": "s3://",
-						},
-					},
-					Description: athenaSQLEmptyDatabaseField,
-				},
-			},
-		},
-		{
-			name: "s3 file path value is wrong, caught",
-			args: args{
-				p: &pipeline.Pipeline{
-					Assets: []*pipeline.Asset{
-						{
-							Name: "task1",
-							Type: "athena.sql",
-							Parameters: map[string]string{
-								"database":     "database",
-								"s3_file_path": "wrongs3://",
-							},
-						},
-					},
-				},
-			},
-			want: []*Issue{
-				{
-					Task: &pipeline.Asset{
-						Name: "task1",
-						Type: "athena.sql",
-						Parameters: map[string]string{
-							"database":     "database",
-							"s3_file_path": "wrongs3://",
-						},
-					},
-					Description: athenaSQLInvalidS3FilePath,
-					Context:     []string{"Given `s3_file_path` is: wrongs3://"},
-				},
-			},
-		},
-		{
-			name: "database and s3_file_path fields are wrong, caught",
-			args: args{
-				p: &pipeline.Pipeline{
-					Assets: []*pipeline.Asset{
-						{
-							Name: "task1",
-							Type: "athena.sql",
-							Parameters: map[string]string{
-								"wrongdb": "database",
-								"wrongs3": "s3://",
-							},
-						},
-					},
-				},
-			},
-			want: []*Issue{
-				{
-					Task: &pipeline.Asset{
-						Name: "task1",
-						Type: "athena.sql",
-						Parameters: map[string]string{
-							"wrongdb": "database",
-							"wrongs3": "s3://",
-						},
-					},
-					Description: athenaSQLMissingDatabaseParameter,
-				},
-				{
-					Task: &pipeline.Asset{
-						Name: "task1",
-						Type: "athena.sql",
-						Parameters: map[string]string{
-							"wrongdb": "database",
-							"wrongs3": "s3://",
-						},
-					},
-					Description: athenaSQLEmptyS3FilePath,
-				},
-			},
-		},
-		{
-			name: "database field is wrong, caught",
-			args: args{
-				p: &pipeline.Pipeline{
-					Assets: []*pipeline.Asset{
-						{
-							Name: "task1",
-							Type: "athena.sql",
-							Parameters: map[string]string{
-								"wrongdb":      "database",
-								"s3_file_path": "s3://",
-							},
-						},
-					},
-				},
-			},
-			want: []*Issue{
-				{
-					Task: &pipeline.Asset{
-						Name: "task1",
-						Type: "athena.sql",
-						Parameters: map[string]string{
-							"wrongdb":      "database",
-							"s3_file_path": "s3://",
-						},
-					},
-					Description: athenaSQLMissingDatabaseParameter,
-				},
-			},
-		},
-		{
-			name: "s3_file_path field is wrong, caught",
-			args: args{
-				p: &pipeline.Pipeline{
-					Assets: []*pipeline.Asset{
-						{
-							Name: "task1",
-							Type: "athena.sql",
-							Parameters: map[string]string{
-								"database": "database",
-								"wrongs3":  "s3://",
-							},
-						},
-					},
-				},
-			},
-			want: []*Issue{
-				{
-					Task: &pipeline.Asset{
-						Name: "task1",
-						Type: "athena.sql",
-						Parameters: map[string]string{
-							"database": "database",
-							"wrongs3":  "s3://",
-						},
-					},
-					Description: athenaSQLEmptyS3FilePath,
-				},
-			},
-		},
-	}
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got, err := EnsureAthenaSQLTypeTasksHasDatabaseAndS3FilePath(tt.args.p)
-			if tt.wantErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -1356,8 +1246,8 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 				fmt.Sprintf(
 					"Materialization type 'whatever' is not supported, available types are: %v",
 					[]pipeline.MaterializationType{
-						pipeline.MaterializationTypeNone,
 						pipeline.MaterializationTypeView,
+						pipeline.MaterializationTypeTable,
 					},
 				),
 			},
