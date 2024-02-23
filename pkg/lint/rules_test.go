@@ -1246,8 +1246,8 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 				fmt.Sprintf(
 					"Materialization type 'whatever' is not supported, available types are: %v",
 					[]pipeline.MaterializationType{
-						pipeline.MaterializationTypeNone,
 						pipeline.MaterializationTypeView,
+						pipeline.MaterializationTypeTable,
 					},
 				),
 			},

@@ -538,8 +538,8 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 				"Materialization type '%s' is not supported, available types are: %v",
 				asset.Materialization.Type,
 				[]pipeline.MaterializationType{
-					pipeline.MaterializationTypeNone,
 					pipeline.MaterializationTypeView,
+					pipeline.MaterializationTypeTable,
 				},
 			),
 		})
