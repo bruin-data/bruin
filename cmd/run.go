@@ -325,17 +325,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 	}, pipeline.AssetTypeBigqueryQuery)
 
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
-		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, map[string]string{
-			"BRUIN_START_DATE":             startDate.Format("2006-01-02"),
-			"BRUIN_START_DATE_NODASH":      startDate.Format("20060102"),
-			"BRUIN_START_DATETIME":         startDate.Format("2006-01-02T15:04:05"),
-			"BRUIN_START_DATETIME_WITH_TZ": startDate.Format(time.RFC3339),
-			"BRUIN_END_DATE":               endDate.Format("2006-01-02"),
-			"BRUIN_END_DATE_NODASH":        endDate.Format("20060102"),
-			"BRUIN_END_DATETIME":           endDate.Format("2006-01-02T15:04:05"),
-			"BRUIN_END_DATETIME_WITH_TZ":   endDate.Format(time.RFC3339),
-			"BRUIN_RUN_ID":                 runID,
-		})
+		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinja.PythonEnvVariables(&startDate, &endDate, runID))
 	}
 
 	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate)
