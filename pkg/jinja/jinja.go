@@ -25,19 +25,14 @@ func NewRenderer(context Context) *Renderer {
 
 func NewRendererWithStartEndDates(startDate, endDate *time.Time) *Renderer {
 	ctx := exec.NewContext(map[string]any{
-		"start_date":             startDate.Format("2006-01-02"),
-		"start_date_nodash":      startDate.Format("20060102"),
-		"start_datetime":         startDate.Format("2006-01-02T15:04:05"),
-		"start_datetime_with_tz": startDate.Format(time.RFC3339),
-		"end_date":               endDate.Format("2006-01-02"),
-		"end_date_nodash":        endDate.Format("20060102"),
-		"end_datetime":           endDate.Format("2006-01-02T15:04:05"),
-		"end_datetime_with_tz":   endDate.Format(time.RFC3339),
-
-		"utils": map[string]interface{}{
-			"date_add":    dateAdd,
-			"date_format": dateFormat,
-		},
+		"start_date":        startDate.Format("2006-01-02"),
+		"start_date_nodash": startDate.Format("20060102"),
+		"start_datetime":    startDate.Format("2006-01-02T15:04:05"),
+		"start_timestamp":   startDate.Format("2006-01-02T15:04:05.000000Z07:00"),
+		"end_date":          endDate.Format("2006-01-02"),
+		"end_date_nodash":   endDate.Format("20060102"),
+		"end_datetime":      endDate.Format("2006-01-02T15:04:05"),
+		"end_timestamp":     endDate.Format("2006-01-02T15:04:05.000000Z07:00"),
 	})
 
 	return &Renderer{
@@ -49,7 +44,7 @@ func NewRendererWithStartEndDates(startDate, endDate *time.Time) *Renderer {
 func NewRendererWithYesterday() *Renderer {
 	yesterday := time.Now().AddDate(0, 0, -1)
 	startDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
-	endDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 0, time.UTC)
+	endDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
 	return NewRendererWithStartEndDates(&startDate, &endDate)
 }
 

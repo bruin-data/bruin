@@ -19,22 +19,22 @@ func TestJinjaRenderer_RenderQuery(t *testing.T) {
 	}{
 		{
 			name:  "simple render for ds",
-			query: "set analysis_end_date = '{{ ds }}'::date; select * from {{ ref('abc') }} and {{ utils.date_add('some-other') }} and {{ utils.multiparam('val1', 'val2') }}",
+			query: "set analysis_end_date = '{{ ds }}'::date; select * from {{ ref('abc') }}",
 			args: Context{
 				"ds": "2022-02-03",
 				"ref": func(str string) string {
 					return "some-ref-here"
 				},
-				"utils": map[string]any{
-					"date_add": func(str string) string {
-						return "some-date-here"
-					},
-					"multiparam": func(str1, str2 string) string {
-						return str1 + "-" + str2
-					},
-				},
 			},
-			want: "set analysis_end_date = '2022-02-03'::date; select * from some-ref-here and some-date-here and val1-val2",
+			want: "set analysis_end_date = '2022-02-03'::date; select * from some-ref-here",
+		},
+		{
+			name:  "add_days",
+			query: "{{ start_date | add_days(3) | add_days(1) | add_days(-5) | date_format('%Y/%m/%d') }}",
+			args: Context{
+				"start_date": "2022-02-03",
+			},
+			want: "2022/02/02",
 		},
 		{
 			name:  "multiple variables",
@@ -158,8 +158,7 @@ func TestJinjaRendererWithStartEndDate(t *testing.T) {
 	startDate, err := time.Parse("2006-01-02 15:04:05", "2022-02-03 04:00:00")
 	require.NoError(t, err)
 
-	endDate, err := time.Parse("2006-01-02 15:04:05", "2022-02-04 04:00:00")
-	require.NoError(t, err)
+	endDate := time.Date(2022, 2, 4, 4, 0, 0, 948740170, time.UTC)
 
 	tests := []struct {
 		name    string
@@ -169,8 +168,8 @@ func TestJinjaRendererWithStartEndDate(t *testing.T) {
 	}{
 		{
 			name:  "simple render for ds",
-			query: "set analysis_end_date = '{{ end_date }}'::date; {{ utils.date_add(end_datetime, 3) }}",
-			want:  "set analysis_end_date = '2022-02-04'::date; 2022-02-07",
+			query: "{{ end_date }}, {{ end_datetime | add_days(3) }}, {{ end_timestamp | add_days(3) }}, {{ end_timestamp | add_days(2) | date_format('%Y-%m-%d') }}",
+			want:  "2022-02-04, 2022-02-07T04:00:00, 2022-02-07T04:00:00.948740Z, 2022-02-06",
 		},
 		{
 			name:  "things that are not in the template should be remove",
