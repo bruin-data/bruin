@@ -38,6 +38,7 @@ func (q *QueryValidatorRule) Name() string {
 }
 
 func (q *QueryValidatorRule) GetApplicableLevels() []Level {
+	// we need to implement this rule for asset level as well
 	return []Level{LevelPipeline}
 }
 

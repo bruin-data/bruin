@@ -222,7 +222,7 @@ func Run(isDebug *bool) *cli.Command {
 
 				linter := lint.NewLinter(path.GetPipelinePaths, builder, rules, logger)
 				res, err := linter.LintPipelines([]*pipeline.Pipeline{foundPipeline})
-				err = reportLintErrors(res, err, lint.Printer{RootCheckPath: pipelinePath})
+				err = reportLintErrors(res, err, lint.Printer{RootCheckPath: pipelinePath}, "")
 				if err != nil {
 					return cli.Exit("", 1)
 				}

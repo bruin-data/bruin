@@ -35,20 +35,23 @@ func Lint(isDebug *bool) *cli.Command {
 				Aliases: []string{"f"},
 				Usage:   "force the validation even if the environment is a production environment",
 			},
-			&cli.StringFlag{
-				Name:    "asset",
-				Aliases: []string{"a"},
-				Usage:   "the specific asset to validate, either name or the path works",
-			},
 		},
 		Action: func(c *cli.Context) error {
 			fmt.Println()
 
 			logger := makeLogger(*isDebug)
 
-			rootPath := c.Args().Get(0)
-			if rootPath == "" {
-				rootPath = "."
+			repoOrAsset := c.Args().Get(0)
+			rootPath := repoOrAsset
+			asset := ""
+			if isPathReferencingAsset(repoOrAsset) {
+				asset = repoOrAsset
+				pipelineRootFromAsset, err := path.GetPipelineRootFromTask(repoOrAsset, pipelineDefinitionFile)
+				if err != nil {
+					errorPrinter.Printf("Failed to find the pipeline root for the given asset: %v\n", err)
+					return cli.Exit("", 1)
+				}
+				rootPath = pipelineRootFromAsset
 			}
 
 			logger.Debugf("using root path '%s'", rootPath)
@@ -124,7 +127,6 @@ func Lint(isDebug *bool) *cli.Command {
 				logger.Debug("no Snowflake connections found, skipping Snowflake validation")
 			}
 
-			asset := c.String("asset")
 			var result *lint.PipelineAnalysisResult
 			if asset == "" {
 				linter := lint.NewLinter(path.GetPipelinePaths, builder, rules, logger)
@@ -139,7 +141,7 @@ func Lint(isDebug *bool) *cli.Command {
 			}
 
 			printer := lint.Printer{RootCheckPath: rootPath}
-			err = reportLintErrors(result, err, printer)
+			err = reportLintErrors(result, err, printer, asset)
 			if err != nil {
 				return cli.Exit("", 1)
 			}
@@ -148,9 +150,9 @@ func Lint(isDebug *bool) *cli.Command {
 	}
 }
 
-func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer lint.Printer) error {
+func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer lint.Printer, asset string) error {
 	if err != nil {
-		errorPrinter.Println("\nAn error occurred while linting the pipelines:")
+		errorPrinter.Println("\nAn error occurred while linting:")
 
 		errorList := unwrapAllErrors(err)
 		for i, e := range errorList {
@@ -176,7 +178,11 @@ func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer li
 			issueStr += "s"
 		}
 
-		errorPrinter.Printf("\n✘ Checked %d %s and found %d %s, please check above.\n", pipelineCount, pipelineStr, errorCount, issueStr)
+		if asset == "" {
+			errorPrinter.Printf("\n✘ Checked %d %s and found %d %s, please check above.\n", pipelineCount, pipelineStr, errorCount, issueStr)
+		} else {
+			errorPrinter.Printf("\n✘ Checked %s and found %d %s, please check above.\n", asset, errorCount, issueStr)
+		}
 		return errors.New("validation failed")
 	}
 
