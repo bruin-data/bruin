@@ -7,7 +7,7 @@ depends:
    - hello_python
 
 materialization:
-   type: tablsdfde
+   type: table
 
 columns:
   - name: one
