@@ -73,8 +73,6 @@ nfpms:
       - apk
       - deb
       - rpm
-      - termux.deb
-      - archlinux
     dependencies:
       - git
 
