@@ -85,8 +85,6 @@ func (q *QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.A
 		return
 	}
 
-	fmt.Println("aha bura asil")
-
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
