@@ -116,7 +116,7 @@ func Lint(isDebug *bool) *cli.Command {
 					Identifier:  "snowflake-validator",
 					TaskType:    pipeline.AssetTypeSnowflakeQuery,
 					Connections: connectionManager,
-					Extractor: &query.WholeFileExtractor{
+					Extractor: &query.FileQuerySplitterExtractor{
 						Fs:       fs,
 						Renderer: renderer,
 					},

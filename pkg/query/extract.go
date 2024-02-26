@@ -14,17 +14,33 @@ type Query struct {
 }
 
 func (q Query) ToExplainQuery() string {
+	// take only the first 10 characters since the actual queries may be pretty large
+	lowerQuery := strings.ToLower(q.Query[:min(10, len(q.Query))])
+	if strings.HasPrefix(lowerQuery, "explain ") {
+		return ensureSemicolon(q.Query)
+	}
+
+	if strings.HasPrefix(lowerQuery, "use ") {
+		return ensureSemicolon(q.Query)
+	}
+
 	eq := ""
 	if len(q.VariableDefinitions) > 0 {
 		eq += strings.Join(q.VariableDefinitions, ";\n") + ";\n"
 	}
 
 	eq += "EXPLAIN " + q.Query
-	if !strings.HasSuffix(eq, ";") {
-		eq += ";"
-	}
+	eq = ensureSemicolon(eq)
 
 	return eq
+}
+
+func ensureSemicolon(query string) string {
+	if !strings.HasSuffix(query, ";") {
+		return query + ";"
+	}
+
+	return query
 }
 
 func (q Query) ToDryRunQuery() string {

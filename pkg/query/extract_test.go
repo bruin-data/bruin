@@ -392,6 +392,20 @@ func TestQuery_ToExplainQuery(t *testing.T) {
 			want: "EXPLAIN select * from users;",
 		},
 		{
+			name: "query already has an EXPLAIN prefix",
+			fields: fields{
+				Query: "EXPLAIN select * from users",
+			},
+			want: "EXPLAIN select * from users;",
+		},
+		{
+			name: "query is a USE statement, cannot be explained, should be kept the same",
+			fields: fields{
+				Query: "USE select * from users",
+			},
+			want: "USE select * from users;",
+		},
+		{
 			name: "no variable definitions",
 			fields: fields{
 				VariableDefinitions: []string{
