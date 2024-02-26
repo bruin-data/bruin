@@ -202,10 +202,12 @@ func TestRenderCommand_Run(t *testing.T) {
 			}
 
 			render := &RenderCommand{
-				extractor:      f.extractor,
-				bqMaterializer: f.bqMaterializer,
-				builder:        f.builder,
-				writer:         f.writer,
+				extractor: f.extractor,
+				materializers: map[pipeline.AssetType]queryMaterializer{
+					pipeline.AssetTypeBigqueryQuery: f.bqMaterializer,
+				},
+				builder: f.builder,
+				writer:  f.writer,
 			}
 
 			tt.wantErr(t, render.Run(tt.args.taskPath))

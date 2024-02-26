@@ -9,8 +9,11 @@ import (
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/urfave/cli/v2"
 )
 
@@ -25,9 +28,16 @@ func Render() *cli.Command {
 					Fs:       fs,
 					Renderer: jinja.NewRendererWithYesterday(),
 				},
-				bqMaterializer: bigquery.NewMaterializer(),
-				builder:        builder,
-				writer:         os.Stdout,
+				materializers: map[pipeline.AssetType]queryMaterializer{
+					pipeline.AssetTypeBigqueryQuery:  bigquery.NewMaterializer(),
+					pipeline.AssetTypeSnowflakeQuery: snowflake.NewMaterializer(),
+					pipeline.AssetTypeRedshiftQuery:  postgres.NewMaterializer(),
+					pipeline.AssetTypePostgresQuery:  postgres.NewMaterializer(),
+					pipeline.AssetTypeMsSQLQuery:     mssql.NewMaterializer(),
+					pipeline.AssetTypeSynapseQuery:   mssql.NewMaterializer(),
+				},
+				builder: builder,
+				writer:  os.Stdout,
 			}
 
 			return r.Run(c.Args().Get(0))
@@ -48,9 +58,9 @@ type taskCreator interface {
 }
 
 type RenderCommand struct {
-	extractor      queryExtractor
-	bqMaterializer queryMaterializer
-	builder        taskCreator
+	extractor     queryExtractor
+	materializers map[pipeline.AssetType]queryMaterializer
+	builder       taskCreator
 
 	writer io.Writer
 }
@@ -82,8 +92,8 @@ func (r *RenderCommand) Run(taskPath string) error {
 
 	qq := queries[0]
 
-	if task.Type == pipeline.AssetTypeBigqueryQuery {
-		materialized, err := r.bqMaterializer.Render(task, qq.Query)
+	if materializer, ok := r.materializers[task.Type]; ok {
+		materialized, err := materializer.Render(task, qq.Query)
 		if err != nil {
 			errorPrinter.Printf("Failed to materialize the query: %v\n", err.Error())
 			return cli.Exit("", 1)
