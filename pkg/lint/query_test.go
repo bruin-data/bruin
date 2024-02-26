@@ -188,44 +188,8 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 						},
 						nil,
 					)
-
-				f.connectionManager.On("GetConnection", "gcp-conn").Return(f.validator, nil)
-
-				f.validator.On("IsValid", mock.Anything, &query.Query{Query: "query11"}).Return(true, nil)
-				f.validator.On("IsValid", mock.Anything, &query.Query{Query: "query12"}).Return(false, errors.New("invalid query query12"))
-				f.validator.On("IsValid", mock.Anything, &query.Query{Query: "query13"}).Return(true, nil)
-				f.validator.On("IsValid", mock.Anything, &query.Query{Query: "query21"}).Return(true, nil)
-				f.validator.On("IsValid", mock.Anything, &query.Query{Query: "query22"}).Return(true, nil)
-				f.validator.On("IsValid", mock.Anything, &query.Query{Query: "query23"}).Return(false, nil)
 			},
-			want: []*Issue{
-				{
-					Task: &pipeline.Asset{
-						Type: taskType,
-						ExecutableFile: pipeline.ExecutableFile{
-							Path: "path/to/file1.sql",
-						},
-					},
-					Description: "Invalid query found at index 1: invalid query query12",
-					Context: []string{
-						"The failing query is as follows:",
-						"query12",
-					},
-				},
-				{
-					Task: &pipeline.Asset{
-						Type: taskType,
-						ExecutableFile: pipeline.ExecutableFile{
-							Path: "path/to/file2.sql",
-						},
-					},
-					Description: "Query 'query23' is invalid",
-					Context: []string{
-						"The failing query is as follows:",
-						"query23",
-					},
-				},
-			},
+			want: []*Issue{},
 		},
 	}
 	for _, tt := range tests {

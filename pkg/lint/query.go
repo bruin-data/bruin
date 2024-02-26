@@ -78,7 +78,14 @@ func (q *QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.A
 
 		done <- issues
 		return
+	} else if len(queries) > 1 {
+		// this has to be the case until we find a nicer solution for no-dry-run databases
+		q.Logger.Warnf("Found %d queries in file '%s', we cannot validate script assets, skipping query validation", len(queries), task.ExecutableFile.Path)
+		done <- issues
+		return
 	}
+
+	fmt.Println("aha bura asil")
 
 	var mu sync.Mutex
 	var wg sync.WaitGroup
