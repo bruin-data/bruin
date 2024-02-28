@@ -84,4 +84,7 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 	"appsflyer.export.bq": {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
+	pipeline.AssetTypeIngestr: {
+		scheduler.TaskInstanceTypeMain: NoOpOperator{},
+	},
 }

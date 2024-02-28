@@ -10,7 +10,7 @@ func GetRules(fs afero.Fs) ([]Rule, error) {
 	rules := []Rule{
 		&SimpleRule{
 			Identifier:       "task-name-valid",
-			Validator:        EnsureTaskNameIsValid,
+			Validator:        CallFuncForEveryAsset(EnsureTaskNameIsValidForASingleAsset),
 			AssetValidator:   EnsureTaskNameIsValidForASingleAsset,
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
@@ -22,13 +22,13 @@ func GetRules(fs afero.Fs) ([]Rule, error) {
 		},
 		&SimpleRule{
 			Identifier:       "dependency-exists",
-			Validator:        EnsureDependencyExists,
+			Validator:        CallFuncForEveryAsset(EnsureDependencyExistsForASingleAsset),
 			AssetValidator:   EnsureDependencyExistsForASingleAsset,
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
 		&SimpleRule{
 			Identifier:       "valid-executable-file",
-			Validator:        EnsureExecutableFileIsValid(fs),
+			Validator:        CallFuncForEveryAsset(EnsureExecutableFileIsValidForASingleAsset(fs)),
 			AssetValidator:   EnsureExecutableFileIsValidForASingleAsset(fs),
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
@@ -44,7 +44,7 @@ func GetRules(fs afero.Fs) ([]Rule, error) {
 		},
 		&SimpleRule{
 			Identifier:       "valid-task-type",
-			Validator:        EnsureOnlyAcceptedTaskTypesAreThere,
+			Validator:        CallFuncForEveryAsset(EnsureTypeIsCorrectForASingleAsset),
 			AssetValidator:   EnsureTypeIsCorrectForASingleAsset,
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
@@ -60,14 +60,20 @@ func GetRules(fs afero.Fs) ([]Rule, error) {
 		},
 		&SimpleRule{
 			Identifier:       "materialization-config",
-			Validator:        EnsureMaterializationValuesAreValid,
+			Validator:        CallFuncForEveryAsset(EnsureMaterializationValuesAreValidForSingleAsset),
 			AssetValidator:   EnsureMaterializationValuesAreValidForSingleAsset,
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
 		&SimpleRule{
 			Identifier:       "valid-snowflake-query-sensor",
-			Validator:        EnsureSnowflakeSensorHasQueryParameter,
+			Validator:        CallFuncForEveryAsset(EnsureSnowflakeSensorHasQueryParameterForASingleAsset),
 			AssetValidator:   EnsureSnowflakeSensorHasQueryParameterForASingleAsset,
+			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
+		},
+		&SimpleRule{
+			Identifier:       "valid-ingestr",
+			Validator:        CallFuncForEveryAsset(EnsureIngestrAssetIsValidForASingleAsset),
+			AssetValidator:   EnsureIngestrAssetIsValidForASingleAsset,
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
 	}

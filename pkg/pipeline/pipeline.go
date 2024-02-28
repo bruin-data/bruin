@@ -25,6 +25,7 @@ const (
 	AssetTypeRedshiftQuery        = AssetType("rs.sql")
 	AssetTypeMsSQLQuery           = AssetType("ms.sql")
 	AssetTypeSynapseQuery         = AssetType("synapse.sql")
+	AssetTypeIngestr              = AssetType("ingestr")
 )
 
 var supportedFileSuffixes = []string{".yml", ".yaml", ".sql", ".py"}

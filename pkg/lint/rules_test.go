@@ -87,7 +87,7 @@ func TestEnsureTaskNameIsNotEmpty(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := EnsureTaskNameIsValid(tt.args.pipeline)
+			got, err := CallFuncForEveryAsset(EnsureTaskNameIsValidForASingleAsset)(tt.args.pipeline)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -391,7 +391,7 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 				tt.args.setupFilesystem(t, fs)
 			}
 
-			checker := EnsureExecutableFileIsValid(fs)
+			checker := CallFuncForEveryAsset(EnsureExecutableFileIsValidForASingleAsset(fs))
 
 			got, err := checker(&tt.args.pipeline)
 			if tt.wantErr {
@@ -486,7 +486,7 @@ func TestEnsureDependencyExists(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := EnsureDependencyExists(tt.args.p)
+			got, err := CallFuncForEveryAsset(EnsureDependencyExistsForASingleAsset)(tt.args.p)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -646,7 +646,7 @@ func TestEnsureOnlyAcceptedTaskTypesAreThere(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := EnsureOnlyAcceptedTaskTypesAreThere(tt.args.p)
+			got, err := CallFuncForEveryAsset(EnsureTypeIsCorrectForASingleAsset)(tt.args.p)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -1328,7 +1328,7 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := EnsureMaterializationValuesAreValid(&pipeline.Pipeline{
+			got, err := CallFuncForEveryAsset(EnsureMaterializationValuesAreValidForSingleAsset)(&pipeline.Pipeline{
 				Assets: tt.assets,
 			})
 
@@ -1410,7 +1410,7 @@ func TestEnsureSnowflakeSensorHasQueryParameter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := EnsureSnowflakeSensorHasQueryParameter(tt.p)
+			got, err := CallFuncForEveryAsset(EnsureSnowflakeSensorHasQueryParameterForASingleAsset)(tt.p)
 			if !tt.wantErr(t, err) {
 				return
 			}
@@ -1423,6 +1423,73 @@ func TestEnsureSnowflakeSensorHasQueryParameter(t *testing.T) {
 				}
 
 				assert.Equal(t, tt.want, gotMessages)
+			} else {
+				assert.Equal(t, []*Issue{}, got)
+			}
+		})
+	}
+}
+
+func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := "Ingestr assets require the following parameters: source, source_connection, source_table, destination, destination_connection, destination_table"
+	tests := []struct {
+		name           string
+		asset          *pipeline.Asset
+		wantErrMessage string
+		wantErr        assert.ErrorAssertionFunc
+	}{
+		{
+			name: "empty asset",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+			},
+			wantErrMessage: expectedErr,
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "asset with some params missing",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source": "source",
+				},
+			},
+			wantErrMessage: expectedErr,
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "asset with all params there",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source":                 "source",
+					"source_connection":      "source_connection",
+					"source_table":           "source_table",
+					"destination":            "destination",
+					"destination_connection": "destination_connection",
+					"destination_table":      "destination_table",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			p := &pipeline.Pipeline{Assets: []*pipeline.Asset{tt.asset}}
+			got, err := EnsureIngestrAssetIsValidForASingleAsset(context.Background(), p, tt.asset)
+			if !tt.wantErr(t, err) {
+				return
+			}
+
+			if tt.wantErrMessage != "" {
+				assert.Len(t, got, 1)
+				assert.Equal(t, tt.wantErrMessage, got[0].Description)
 			} else {
 				assert.Equal(t, []*Issue{}, got)
 			}

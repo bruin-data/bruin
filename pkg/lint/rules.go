@@ -45,21 +45,6 @@ const (
 
 var validIDRegexCompiled = regexp.MustCompile(validIDRegex)
 
-func EnsureTaskNameIsValid(pipeline *pipeline.Pipeline) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
-
-	for _, task := range pipeline.Assets {
-		assetIssues, err := EnsureTaskNameIsValidForASingleAsset(context.TODO(), pipeline, task)
-		if err != nil {
-			return assetIssues, err
-		}
-
-		issues = append(issues, assetIssues...)
-	}
-
-	return issues, nil
-}
-
 func EnsureTaskNameIsValidForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
@@ -149,23 +134,6 @@ func EnsureTaskNameIsUniqueForASingleAsset(ctx context.Context, p *pipeline.Pipe
 	return issues, nil
 }
 
-func EnsureExecutableFileIsValid(fs afero.Fs) PipelineValidator {
-	return func(p *pipeline.Pipeline) ([]*Issue, error) {
-		assetValidatorFunc := EnsureExecutableFileIsValidForASingleAsset(fs)
-		issues := make([]*Issue, 0)
-		for _, task := range p.Assets {
-			assetIssues, err := assetValidatorFunc(context.TODO(), p, task)
-			if err != nil {
-				return issues, err
-			}
-
-			issues = append(issues, assetIssues...)
-		}
-
-		return issues, nil
-	}
-}
-
 func EnsureExecutableFileIsValidForASingleAsset(fs afero.Fs) AssetValidator {
 	return func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 		issues := make([]*Issue, 0)
@@ -237,31 +205,55 @@ func EnsurePipelineNameIsValid(pipeline *pipeline.Pipeline) ([]*Issue, error) {
 	return issues, nil
 }
 
-func isFileExecutable(mode os.FileMode) bool {
-	return mode&0o111 != 0
+func CallFuncForEveryAsset(callable AssetValidator) func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+	return func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+		issues := make([]*Issue, 0)
+		for _, task := range pipeline.Assets {
+			assetIssues, err := callable(context.TODO(), pipeline, task)
+			if err != nil {
+				return issues, err
+			}
+
+			issues = append(issues, assetIssues...)
+		}
+
+		return issues, nil
+	}
 }
 
-func EnsureDependencyExists(p *pipeline.Pipeline) ([]*Issue, error) {
-	taskMap := map[string]bool{}
-	for _, task := range p.Assets {
-		if task.Name == "" {
-			continue
-		}
-
-		taskMap[task.Name] = true
+func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if asset.Type != pipeline.AssetTypeIngestr {
+		return issues, nil
 	}
 
-	issues := make([]*Issue, 0)
-	for _, task := range p.Assets {
-		assetIssues, err := EnsureDependencyExistsForASingleAsset(context.TODO(), p, task)
-		if err != nil {
-			return nil, err
+	requiredKeys := []string{"source", "source_connection", "source_table", "destination", "destination_connection", "destination_table"}
+	for _, key := range requiredKeys {
+		if asset.Parameters == nil {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Ingestr assets require the following parameters: " + strings.Join(requiredKeys, ", "),
+			})
+
+			return issues, nil
 		}
 
-		issues = append(issues, assetIssues...)
+		value, exists := asset.Parameters[key]
+		if !exists || value == "" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Ingestr assets require the following parameters: " + strings.Join(requiredKeys, ", "),
+			})
+
+			return issues, nil
+		}
 	}
 
 	return issues, nil
+}
+
+func isFileExecutable(mode os.FileMode) bool {
+	return mode&0o111 != 0
 }
 
 func EnsureDependencyExistsForASingleAsset(ctx context.Context, p *pipeline.Pipeline, task *pipeline.Asset) ([]*Issue, error) {
@@ -302,21 +294,6 @@ func EnsurePipelineScheduleIsValidCron(p *pipeline.Pipeline) ([]*Issue, error) {
 		issues = append(issues, &Issue{
 			Description: fmt.Sprintf("Invalid cron schedule '%s'", p.Schedule),
 		})
-	}
-
-	return issues, nil
-}
-
-func EnsureOnlyAcceptedTaskTypesAreThere(p *pipeline.Pipeline) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
-
-	for _, task := range p.Assets {
-		assetIssues, err := EnsureTypeIsCorrectForASingleAsset(context.TODO(), p, task)
-		if err != nil {
-			return nil, err
-		}
-
-		issues = append(issues, assetIssues...)
 	}
 
 	return issues, nil
@@ -439,20 +416,6 @@ func EnsureSlackFieldInPipelineIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
 	return issues, nil
 }
 
-func EnsureMaterializationValuesAreValid(p *pipeline.Pipeline) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
-	for _, asset := range p.Assets {
-		assetIssues, err := EnsureMaterializationValuesAreValidForSingleAsset(context.TODO(), p, asset)
-		if err != nil {
-			return issues, err
-		}
-
-		issues = append(issues, assetIssues...)
-	}
-
-	return issues, nil
-}
-
 func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
@@ -543,20 +506,6 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 				},
 			),
 		})
-	}
-
-	return issues, nil
-}
-
-func EnsureSnowflakeSensorHasQueryParameter(p *pipeline.Pipeline) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
-	for _, asset := range p.Assets {
-		assetIssues, err := EnsureSnowflakeSensorHasQueryParameterForASingleAsset(context.TODO(), p, asset)
-		if err != nil {
-			return issues, err
-		}
-
-		issues = append(issues, assetIssues...)
 	}
 
 	return issues, nil
