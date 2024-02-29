@@ -1,13 +1,11 @@
 package cmd
 
 import (
-	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/examples"
 	"github.com/urfave/cli/v2"
-	"gopkg.in/yaml.v3"
 	"log"
 	"os"
 	"path/filepath"
-	"time"
 )
 
 func Init(isDebug *bool) *cli.Command {
@@ -61,36 +59,32 @@ func Init(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			pipeline := pipeline.Pipeline{
-				LegacyID:          "",
-				Name:              inputPath,
-				Schedule:          "daily",
-				StartDate:         time.Now().Format("2006-01-02"),
-				DefinitionFile:    pipeline.DefinitionFile{},
-				DefaultParameters: nil,
-				DefaultConnections: map[string]string{
-					"postgres": "example-postgres-connection",
-				},
-				Assets:        nil,
-				Notifications: pipeline.Notifications{},
-				Catchup:       false,
-				Retries:       0,
-				TasksByType:   nil,
-			}
-
-			yamlData, err := yaml.Marshal(&pipeline)
+			err = writeFile(inputPath, ".bruin.yml", examples.InitPipelineConfig)
 			if err != nil {
-				errorPrinter.Printf("Failed to marshal the pipeline definition to yaml: %v\n", err)
 				return cli.Exit("", 1)
 			}
 
-			err = os.WriteFile(filepath.Join(inputPath, "pipeline.yml"), yamlData, 0644)
+			err = writeFile(inputPath, "assets/example.sql", examples.InitPipelineAsset)
 			if err != nil {
-				errorPrinter.Printf("Failed to create the pipeline.yml file: %v\n", err)
+				return cli.Exit("", 1)
+			}
+
+			err = writeFile(inputPath, "pipeline.yml", examples.InitPipeline)
+			if err != nil {
 				return cli.Exit("", 1)
 			}
 
 			return nil
 		},
 	}
+}
+
+func writeFile(basePath, filePath string, content []byte) error {
+	err := os.WriteFile(filepath.Join(basePath, filePath), content, 0644)
+	if err != nil {
+		errorPrinter.Printf("Could not create .bruin.yml file\n, %v", err)
+		return err
+	}
+
+	return nil
 }
