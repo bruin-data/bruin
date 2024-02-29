@@ -1,12 +1,17 @@
 package cmd
 
 import (
-	"github.com/bruin-data/bruin/examples"
+	"fmt"
+	"github.com/bruin-data/bruin/templates"
 	"github.com/urfave/cli/v2"
+	fs2 "io/fs"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 )
+
+const DEFAULT_TEMPLATE = "default"
 
 func Init(isDebug *bool) *cli.Command {
 	return &cli.Command{
@@ -47,44 +52,59 @@ func Init(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			err = os.Mkdir(filepath.Join(inputPath, "assets"), 0755)
+			templateName := DEFAULT_TEMPLATE
+			_, err = templates.Templates.ReadDir(templateName)
 			if err != nil {
-				errorPrinter.Printf("Failed to create the folder %s: %v\n", filepath.Join(inputPath, "assets"), err)
+				errorPrinter.Printf("Template %s not found\n", templateName)
 				return cli.Exit("", 1)
 			}
 
-			err = os.WriteFile(filepath.Join(inputPath, ".gitignore"), []byte(".bruin.yml\n"), 0644)
-			if err != nil {
-				errorPrinter.Printf("Could not create .gitignore file\n, %v", err)
-				return cli.Exit("", 1)
-			}
+			err = fs2.WalkDir(templates.Templates, templateName, func(path string, d fs2.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
 
-			err = writeFile(inputPath, ".bruin.yml", examples.InitPipelineConfig)
-			if err != nil {
-				return cli.Exit("", 1)
-			}
+				// Walk returns the root as if it was its own content
+				if path == templateName {
+					return nil
+				}
 
-			err = writeFile(inputPath, "assets/example.sql", examples.InitPipelineAsset)
-			if err != nil {
-				return cli.Exit("", 1)
-			}
+				// Walk returns the root as if it was its own content
+				if d.IsDir() {
+					return nil
+				}
 
-			err = writeFile(inputPath, "pipeline.yml", examples.InitPipeline)
+				fileContents, err := templates.Templates.ReadFile(path)
+				if err != nil {
+					return err
+				}
+
+				relativePath, baseName := filepath.Split(path)
+				relativePath = strings.TrimPrefix(relativePath, templateName)
+				absolutePath := inputPath + relativePath
+
+				fmt.Println("Creating file " + baseName)
+				fmt.Println("in folder " + absolutePath)
+				fmt.Sprintln("%s bytes", len(fileContents))
+
+				// ignore the error
+				_ = os.Mkdir(absolutePath, os.ModePerm)
+
+				err = os.WriteFile(filepath.Join(absolutePath, baseName), fileContents, 0644)
+				if err != nil {
+					errorPrinter.Printf("Could not writen the %s file\n, %v", filepath.Join(absolutePath, baseName), err)
+					return err
+				}
+
+				return nil
+			})
+
 			if err != nil {
+				errorPrinter.Printf("Could not copy template %s: %s\n", templateName, err)
 				return cli.Exit("", 1)
 			}
 
 			return nil
 		},
 	}
-}
-
-func writeFile(basePath, filePath string, content []byte) error {
-	err := os.WriteFile(filepath.Join(basePath, filePath), content, 0644)
-	if err != nil {
-		errorPrinter.Printf("Could not create .bruin.yml file\n, %v", err)
-		return err
-	}
-
-	return nil
 }

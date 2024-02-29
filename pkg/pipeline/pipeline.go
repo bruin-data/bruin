@@ -382,19 +382,19 @@ func (b *EmptyStringMap) UnmarshalJSON(data []byte) error {
 }
 
 type Pipeline struct {
-	LegacyID           string         `yaml:"id,omitempty" json:"legacy_id"`
+	LegacyID           string         `yaml:"id" json:"legacy_id"`
 	Name               string         `yaml:"name" json:"name"`
 	Schedule           schedule       `yaml:"schedule" json:"schedule"`
 	StartDate          string         `yaml:"start_date" json:"start_date"`
-	DefinitionFile     DefinitionFile `yaml:"definition_file,omitempty" json:"definition_file"`
-	DefaultParameters  EmptyStringMap `yaml:"default_parameters,omitempty" json:"default_parameters"`
-	DefaultConnections EmptyStringMap `yaml:"default_connections,omitempty" json:"default_connections"`
-	Assets             []*Asset       `yaml:"assets,omitempty" json:"assets"`
-	Notifications      Notifications  `yaml:"notifications,omitempty" json:"notifications"`
-	Catchup            bool           `yaml:"catchup,omitempty" json:"catchup"`
-	Retries            int            `yaml:"retries,omitempty" json:"retries"`
+	DefinitionFile     DefinitionFile `json:"definition_file"`
+	DefaultParameters  EmptyStringMap `yaml:"default_parameters" json:"default_parameters"`
+	DefaultConnections EmptyStringMap `yaml:"default_connections" json:"default_connections"`
+	Assets             []*Asset       `json:"assets"`
+	Notifications      Notifications  `yaml:"notifications" json:"notifications"`
+	Catchup            bool           `yaml:"catchup" json:"catchup"`
+	Retries            int            `yaml:"retries" json:"retries"`
 
-	TasksByType map[AssetType][]*Asset `yaml:"-" json:"-"`
+	TasksByType map[AssetType][]*Asset `json:"-"`
 	tasksByName map[string]*Asset
 }
 
