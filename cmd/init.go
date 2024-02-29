@@ -1,19 +1,20 @@
 package cmd
 
 import (
-	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/templates"
-	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
 	fs2 "io/fs"
 	"log"
 	"os"
 	path2 "path"
 	"path/filepath"
 	"strings"
+
+	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/templates"
+	"github.com/spf13/afero"
+	"github.com/urfave/cli/v2"
 )
 
-const DEFAULT_TEMPLATE = "default"
+const DefaultTemplate = "default"
 
 func Init(isDebug *bool) *cli.Command {
 	return &cli.Command{
@@ -48,13 +49,13 @@ func Init(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			err := os.Mkdir(inputPath, 0755)
+			err := os.Mkdir(inputPath, 0o755)
 			if err != nil {
 				errorPrinter.Printf("Failed to create the folder %s: %v\n", inputPath, err)
 				return cli.Exit("", 1)
 			}
 
-			templateName := DEFAULT_TEMPLATE
+			templateName := DefaultTemplate
 			_, err = templates.Templates.ReadDir(templateName)
 			if err != nil {
 				errorPrinter.Printf("Template %s not found\n", templateName)
@@ -88,7 +89,7 @@ func Init(isDebug *bool) *cli.Command {
 				// ignore the error
 				_ = os.Mkdir(absolutePath, os.ModePerm)
 
-				err = os.WriteFile(filepath.Join(absolutePath, baseName), fileContents, 0644)
+				err = os.WriteFile(filepath.Join(absolutePath, baseName), fileContents, 0o644) //nolint:gosec
 				if err != nil {
 					errorPrinter.Printf("Could not write the %s file\n, %v", filepath.Join(absolutePath, baseName), err)
 					return err
@@ -102,7 +103,6 @@ func Init(isDebug *bool) *cli.Command {
 
 				return nil
 			})
-
 			if err != nil {
 				errorPrinter.Printf("Could not copy template %s: %s\n", templateName, err)
 				return cli.Exit("", 1)
