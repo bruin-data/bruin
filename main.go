@@ -31,6 +31,7 @@ func main() {
 			cmd.Render(),
 			cmd.Lineage(),
 			cmd.CleanCmd(),
+			cmd.Init(&isDebug),
 		},
 	}
 
