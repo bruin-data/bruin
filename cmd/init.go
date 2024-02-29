@@ -1,12 +1,14 @@
 package cmd
 
 import (
-	"fmt"
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/templates"
+	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
 	fs2 "io/fs"
 	"log"
 	"os"
+	path2 "path"
 	"path/filepath"
 	"strings"
 )
@@ -83,16 +85,18 @@ func Init(isDebug *bool) *cli.Command {
 				relativePath = strings.TrimPrefix(relativePath, templateName)
 				absolutePath := inputPath + relativePath
 
-				fmt.Println("Creating file " + baseName)
-				fmt.Println("in folder " + absolutePath)
-				fmt.Sprintln("%s bytes", len(fileContents))
-
 				// ignore the error
 				_ = os.Mkdir(absolutePath, os.ModePerm)
 
 				err = os.WriteFile(filepath.Join(absolutePath, baseName), fileContents, 0644)
 				if err != nil {
-					errorPrinter.Printf("Could not writen the %s file\n, %v", filepath.Join(absolutePath, baseName), err)
+					errorPrinter.Printf("Could not write the %s file\n, %v", filepath.Join(absolutePath, baseName), err)
+					return err
+				}
+
+				_, err = config.LoadOrCreate(afero.NewOsFs(), path2.Join(inputPath, ".bruin.yml"))
+				if err != nil {
+					errorPrinter.Printf("Could not write .bruin.yml file\n, %v", err)
 					return err
 				}
 
