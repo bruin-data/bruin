@@ -1,0 +1,11 @@
+[package]
+name = "parser"
+version = "0.1.0"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+libc = "0.2.2"
+serde_json = "1.0.112"
+sqlparser = { version = "0.41.0", features = ["serde"] }
