@@ -9,10 +9,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var Filters = exec.FilterSet{
-	"add_days":    addDays,
-	"date_format": formatDate,
-}
+var Filters exec.FilterSet
 
 func init() { //nolint:gochecknoinits
 	Filters = gonja.DefaultEnvironment.Filters
