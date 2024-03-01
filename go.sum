@@ -258,6 +258,8 @@ github.com/mtibben/percent v0.2.1/go.mod h1:KG9uO+SZkUp+VkRHsCdYQV3XSZrrSpR3O9ib
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
 github.com/nikolalohinski/gonja/v2 v2.1.5 h1:oD8R+GpKMw6Xex9hmWvCQiWlvHfnbmSmu3F5nZ5eRI4=
 github.com/nikolalohinski/gonja/v2 v2.1.5/go.mod h1:l9DuWJvT/BddBr2SsmEimESD6msSqRw7u5HzI2Um+sc=
+github.com/nikolalohinski/gonja/v2 v2.2.0 h1:tAs3BDHNjvPj48F2BL5t7iVhN32HhgeldAl3EmdsLh8=
+github.com/nikolalohinski/gonja/v2 v2.2.0/go.mod h1:l9DuWJvT/BddBr2SsmEimESD6msSqRw7u5HzI2Um+sc=
 github.com/onsi/ginkgo/v2 v2.11.0 h1:WgqUCUt/lT6yXoQ8Wef0fsNn5cAuMK7+KT9UFRz2tcU=
 github.com/onsi/ginkgo/v2 v2.11.0/go.mod h1:ZhrRA5XmEE3x3rhlzamx/JJvujdZoJ2uvgI7kR0iZvM=
 github.com/onsi/gomega v1.27.8 h1:gegWiwZjBsf2DgiSbf5hpokZ98JVDMcWkUiigk6/KXc=
