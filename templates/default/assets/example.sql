@@ -1,0 +1,46 @@
+/* @bruin
+
+name: example
+type: pg.sql
+
+materialization:
+   type: table
+
+columns:
+  - name: id
+    type: integer
+    description: "Just a number"
+    primary_key: true
+    checks:
+        - name: not_null
+        - name: positive
+        - name: non_negative
+
+  - name: country
+    type: varchar
+    description: "the country"
+    primary_key: true
+    checks:
+        - name: not_null
+
+  - name: name
+    type: varchar
+    update_on_merge: true
+    description: "Just a name"
+    checks:
+        - name: unique
+        - name: not_null
+
+
+@bruin */
+
+SELECT 1 as id, 'Spain' as country , 'Juan' as name
+union all
+SELECT 2 as id, 'Germany' as country , 'Markus' as name
+union all
+SELECT 3 as id, 'France' as country , 'Antoine' as name
+union all
+SELECT 4 as id, 'Poland' as country , 'Franciszek' as name
+
+
+
