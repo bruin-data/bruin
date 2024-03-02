@@ -3,6 +3,7 @@ package path
 import (
 	"path/filepath"
 	"strings"
+	"testing"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/pkg/errors"
@@ -86,4 +87,15 @@ func DirExists(fs afero.Fs, searchDir string) bool {
 func FileExists(fs afero.Fs, searchFile string) bool {
 	res, err := afero.Exists(fs, searchFile)
 	return err == nil && res
+}
+
+func AbsPathForTests(t *testing.T, path string) string {
+	t.Helper()
+
+	absolutePath, err := filepath.Abs(path)
+	if err != nil {
+		t.Fatalf("failed to get absolute path for %s: %v", path, err)
+	}
+
+	return absolutePath
 }

@@ -1,0 +1,21 @@
+{
+  "legacy_id": "",
+  "name": "pipeline-with-no-assets",
+  "schedule": "",
+  "start_date": "",
+  "definition_file": {
+    "name": "pipeline.yml",
+    "path": "/Users/burak/Code/personal/bruin/internal/bruin-cli/pkg/pipeline/testdata/pipeline/pipeline-with-no-assets/pipeline.yml"
+  },
+  "default_parameters": {},
+  "default_connections": {
+    "gcpConnectionId": "gcp-connection-id-here",
+    "slack": "slack-connection"
+  },
+  "assets": [],
+  "notifications": {
+    "slack": []
+  },
+  "catchup": false,
+  "retries": 0
+}

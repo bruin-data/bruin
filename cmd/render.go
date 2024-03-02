@@ -36,7 +36,7 @@ func Render() *cli.Command {
 					pipeline.AssetTypeMsSQLQuery:     mssql.NewMaterializer(),
 					pipeline.AssetTypeSynapseQuery:   mssql.NewMaterializer(),
 				},
-				builder: builder,
+				builder: DefaultPipelineBuilder,
 				writer:  os.Stdout,
 			}
 

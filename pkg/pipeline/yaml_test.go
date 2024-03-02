@@ -1,9 +1,9 @@
 package pipeline_test
 
 import (
-	"path/filepath"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -12,11 +12,6 @@ import (
 
 func TestCreateTaskFromYamlDefinition(t *testing.T) {
 	t.Parallel()
-
-	absPath := func(path string) string {
-		absolutePath, _ := filepath.Abs(path)
-		return absolutePath
-	}
 
 	type args struct {
 		filePath string
@@ -55,7 +50,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Type:        "bq.sql",
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "hello.sql",
-					Path:    absPath("testdata/yaml/task1/hello.sql"),
+					Path:    path.AbsPathForTests(t, "testdata/yaml/task1/hello.sql"),
 					Content: mustRead(t, "testdata/yaml/task1/hello.sql"),
 				},
 				Parameters: map[string]string{
@@ -123,7 +118,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Type:        "bash",
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "hello.sh",
-					Path:    absPath("testdata/yaml/task-with-nested/some/dir/hello.sh"),
+					Path:    path.AbsPathForTests(t, "testdata/yaml/task-with-nested/some/dir/hello.sh"),
 					Content: mustRead(t, "testdata/yaml/task-with-nested/some/dir/hello.sh"),
 				},
 				Parameters: map[string]string{
@@ -149,7 +144,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Type:        "bash",
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "hello.sh",
-					Path:    absPath("testdata/yaml/task-with-toplevel-runfile/hello.sh"),
+					Path:    path.AbsPathForTests(t, "testdata/yaml/task-with-toplevel-runfile/hello.sh"),
 					Content: mustRead(t, "testdata/yaml/task-with-toplevel-runfile/hello.sh"),
 				},
 				Parameters: map[string]string{

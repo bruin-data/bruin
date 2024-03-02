@@ -1,10 +1,10 @@
 package pipeline_test
 
 import (
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -22,11 +22,6 @@ func Test_createTaskFromFile(t *testing.T) {
 
 	type args struct {
 		filePath string
-	}
-
-	absPath := func(path string) string {
-		absolutePath, _ := filepath.Abs(path)
-		return absolutePath
 	}
 
 	tests := []struct {
@@ -61,7 +56,7 @@ func Test_createTaskFromFile(t *testing.T) {
 				Type:        "bq.sql",
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "test.sql",
-					Path:    absPath("testdata/comments/test.sql"),
+					Path:    path.AbsPathForTests(t, "testdata/comments/test.sql"),
 					Content: mustRead(t, "testdata/comments/test.sql"),
 				},
 				Parameters: map[string]string{
@@ -105,7 +100,7 @@ func Test_createTaskFromFile(t *testing.T) {
 				Type:        "bq.sql",
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "embeddedyaml.sql",
-					Path:    absPath("testdata/comments/embeddedyaml.sql"),
+					Path:    path.AbsPathForTests(t, "testdata/comments/embeddedyaml.sql"),
 					Content: "select *\nfrom foo;",
 				},
 				Parameters: map[string]string{
@@ -137,7 +132,7 @@ func Test_createTaskFromFile(t *testing.T) {
 		{
 			name: "Python file parsed",
 			args: args{
-				filePath: absPath("testdata/comments/test.py"), // giving an absolute path here tests the case of double-absolute paths
+				filePath: path.AbsPathForTests(t, "testdata/comments/test.py"), // giving an absolute path here tests the case of double-absolute paths
 			},
 			want: &pipeline.Asset{
 				ID:          "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
@@ -146,7 +141,7 @@ func Test_createTaskFromFile(t *testing.T) {
 				Type:        "bq.sql",
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "test.py",
-					Path:    absPath("testdata/comments/test.py"),
+					Path:    path.AbsPathForTests(t, "testdata/comments/test.py"),
 					Content: mustRead(t, "testdata/comments/test.py"),
 				},
 				Parameters: map[string]string{
@@ -196,7 +191,7 @@ func Test_createTaskFromFile(t *testing.T) {
 		{
 			name: "Python file with comment block parsed",
 			args: args{
-				filePath: absPath("testdata/comments/testblockcomments.py"),
+				filePath: path.AbsPathForTests(t, "testdata/comments/testblockcomments.py"),
 			},
 			want: &pipeline.Asset{
 				ID:          "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
@@ -205,7 +200,7 @@ func Test_createTaskFromFile(t *testing.T) {
 				Type:        "python",
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "testblockcomments.py",
-					Path:    absPath("testdata/comments/testblockcomments.py"),
+					Path:    path.AbsPathForTests(t, "testdata/comments/testblockcomments.py"),
 					Content: "print('hello world')",
 				},
 				Parameters: map[string]string{

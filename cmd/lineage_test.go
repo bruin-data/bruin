@@ -4,10 +4,10 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"path/filepath"
 	"sync"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -39,11 +39,6 @@ func (m *mockPrinter) Print(a ...interface{}) (int, error) {
 func TestLineageCommand_Run(t *testing.T) {
 	t.Parallel()
 
-	absPath := func(path string) string {
-		absolutePath, _ := filepath.Abs(path)
-		return absolutePath
-	}
-
 	type args struct {
 		assetPath string
 		full      bool
@@ -65,21 +60,21 @@ func TestLineageCommand_Run(t *testing.T) {
 		{
 			name: "failed to find pipeline",
 			args: args{
-				assetPath: absPath("./testdata"),
+				assetPath: path.AbsPathForTests(t, "./testdata"),
 			},
 			wantErr: assert.Error,
 		},
 		{
 			name: "failed to find asset",
 			args: args{
-				assetPath: absPath("./testdata/simple-pipeline/assets"),
+				assetPath: path.AbsPathForTests(t, "./testdata/simple-pipeline/assets"),
 			},
 			wantErr: assert.Error,
 		},
 		{
 			name: "generate lineage for no upstream asset",
 			args: args{
-				assetPath: absPath("./testdata/simple-pipeline/assets/hello_bq.sql"),
+				assetPath: path.AbsPathForTests(t, "./testdata/simple-pipeline/assets/hello_bq.sql"),
 			},
 			want: `
 Lineage: 'dashboard.hello_bq'
@@ -102,7 +97,7 @@ Total: 1
 		{
 			name: "generate full lineage",
 			args: args{
-				assetPath: absPath("./testdata/simple-pipeline/assets/hello_bq.sql"),
+				assetPath: path.AbsPathForTests(t, "./testdata/simple-pipeline/assets/hello_bq.sql"),
 				full:      true,
 			},
 			want: `

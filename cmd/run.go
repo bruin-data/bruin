@@ -159,7 +159,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			runDownstreamTasks := false
 			if runningForAnAsset {
-				task, err = builder.CreateAssetFromFile(inputPath)
+				task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath)
 				if err != nil {
 					errorPrinter.Printf("Failed to build task: %v\n", err.Error())
 					return cli.Exit("", 1)
@@ -203,7 +203,7 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			foundPipeline, err := builder.CreatePipelineFromPath(pipelinePath)
+			foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath)
 			if err != nil {
 				errorPrinter.Println("failed to build pipeline, are you sure you have referred the right path?")
 				errorPrinter.Println("\nHint: You need to run this command with a path to either the pipeline directory or the asset file itself directly.")
@@ -220,7 +220,7 @@ func Run(isDebug *bool) *cli.Command {
 					return cli.Exit("", 1)
 				}
 
-				linter := lint.NewLinter(path.GetPipelinePaths, builder, rules, logger)
+				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
 				res, err := linter.LintPipelines([]*pipeline.Pipeline{foundPipeline})
 				err = reportLintErrors(res, err, lint.Printer{RootCheckPath: pipelinePath}, "")
 				if err != nil {

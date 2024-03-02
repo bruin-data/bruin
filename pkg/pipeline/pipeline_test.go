@@ -2,9 +2,10 @@ package pipeline_test
 
 import (
 	"encoding/json"
-	"path/filepath"
 	"testing"
 
+	"github.com/bruin-data/bruin/cmd"
+	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -13,11 +14,6 @@ import (
 
 func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 	t.Parallel()
-
-	absPath := func(path string) string {
-		absolutePath, _ := filepath.Abs(path)
-		return absolutePath
-	}
 
 	type fields struct {
 		tasksDirectoryName string
@@ -35,12 +31,12 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		Type:        "bash",
 		ExecutableFile: pipeline.ExecutableFile{
 			Name:    "hello.sh",
-			Path:    absPath("testdata/pipeline/first-pipeline/tasks/task1/hello.sh"),
+			Path:    path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/task1/hello.sh"),
 			Content: mustRead(t, "testdata/pipeline/first-pipeline/tasks/task1/hello.sh"),
 		},
 		DefinitionFile: pipeline.TaskDefinitionFile{
 			Name: "task.yml",
-			Path: absPath("testdata/pipeline/first-pipeline/tasks/task1/task.yml"),
+			Path: path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/task1/task.yml"),
 			Type: pipeline.YamlTask,
 		},
 		Parameters: map[string]string{
@@ -65,7 +61,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		},
 		DefinitionFile: pipeline.TaskDefinitionFile{
 			Name: "task.yaml",
-			Path: absPath("testdata/pipeline/first-pipeline/tasks/task2/task.yaml"),
+			Path: path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/task2/task.yaml"),
 			Type: pipeline.YamlTask,
 		},
 		DependsOn:    []string{},
@@ -81,12 +77,12 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		Type:        "python",
 		ExecutableFile: pipeline.ExecutableFile{
 			Name:    "test.py",
-			Path:    absPath("testdata/pipeline/first-pipeline/tasks/test.py"),
+			Path:    path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/test.py"),
 			Content: mustRead(t, "testdata/pipeline/first-pipeline/tasks/test.py"),
 		},
 		DefinitionFile: pipeline.TaskDefinitionFile{
 			Name: "test.py",
-			Path: absPath("testdata/pipeline/first-pipeline/tasks/test.py"),
+			Path: path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/test.py"),
 			Type: pipeline.CommentTask,
 		},
 		Parameters: map[string]string{
@@ -110,12 +106,12 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		Type:        "bq.sql",
 		ExecutableFile: pipeline.ExecutableFile{
 			Name:    "test.sql",
-			Path:    absPath("testdata/pipeline/first-pipeline/tasks/test.sql"),
+			Path:    path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/test.sql"),
 			Content: mustRead(t, "testdata/pipeline/first-pipeline/tasks/test.sql"),
 		},
 		DefinitionFile: pipeline.TaskDefinitionFile{
 			Name: "test.sql",
-			Path: absPath("testdata/pipeline/first-pipeline/tasks/test.sql"),
+			Path: path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/test.sql"),
 			Type: pipeline.CommentTask,
 		},
 		Parameters: map[string]string{
@@ -137,7 +133,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		Schedule: "",
 		DefinitionFile: pipeline.DefinitionFile{
 			Name: "pipeline.yml",
-			Path: absPath("testdata/pipeline/first-pipeline/pipeline.yml"),
+			Path: path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/pipeline.yml"),
 		},
 		DefaultParameters: map[string]string{
 			"param1": "value1",
@@ -296,6 +292,50 @@ func TestTask_RelativePathToPipelineRoot(t *testing.T) {
 	}
 }
 
+func TestPipeline_JsonMarshal(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		pipelinePath string
+		jsonPath     string
+	}{
+		{
+			name:         "first-pipeline",
+			pipelinePath: "./testdata/pipeline/first-pipeline",
+			jsonPath:     "./testdata/pipeline/first-pipeline.json",
+		},
+		{
+			name:         "second-pipeline",
+			pipelinePath: "./testdata/pipeline/second-pipeline",
+			jsonPath:     "./testdata/pipeline/second-pipeline.json",
+		},
+		{
+			name:         "pipeline-with-no-assets",
+			pipelinePath: "./testdata/pipeline/pipeline-with-no-assets",
+			jsonPath:     "./testdata/pipeline/pipeline-with-no-assets.json",
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p, err := cmd.DefaultPipelineBuilder.CreatePipelineFromPath(tt.pipelinePath)
+			require.NoError(t, err)
+
+			got, err := json.Marshal(p)
+			require.NoError(t, err)
+
+			// uncomment the line below to refresh the data
+			// err = afero.WriteFile(afero.NewOsFs(), tt.jsonPath, got, 0644)
+
+			expected := mustRead(t, tt.jsonPath)
+
+			assert.JSONEq(t, expected, string(got))
+		})
+	}
+}
+
 func TestPipeline_HasTaskType(t *testing.T) {
 	t.Parallel()
 
@@ -393,12 +433,6 @@ func TestPipeline_GetAssetByPath(t *testing.T) {
 	p, err := builder.CreatePipelineFromPath("./testdata/pipeline/first-pipeline")
 	require.NoError(t, err)
 
-	absPath := func(path string) string {
-		absolutePath, err := filepath.Abs(path)
-		require.NoError(t, err)
-		return absolutePath
-	}
-
 	asset := p.GetAssetByPath("testdata/pipeline/first-pipeline/tasks/task1/task.yml")
 	assert.NotNil(t, asset)
 	assert.Equal(t, "task1", asset.Name)
@@ -407,11 +441,11 @@ func TestPipeline_GetAssetByPath(t *testing.T) {
 	assert.NotNil(t, asset)
 	assert.Equal(t, "task1", asset.Name)
 
-	asset = p.GetAssetByPath(absPath("./testdata/pipeline/first-pipeline/tasks/task1/task.yml"))
+	asset = p.GetAssetByPath(path.AbsPathForTests(t, "./testdata/pipeline/first-pipeline/tasks/task1/task.yml"))
 	assert.NotNil(t, asset)
 	assert.Equal(t, "task1", asset.Name)
 
-	asset = p.GetAssetByPath(absPath("../pipeline/testdata/../testdata/pipeline/first-pipeline/tasks/task1/task.yml"))
+	asset = p.GetAssetByPath(path.AbsPathForTests(t, "../pipeline/testdata/../testdata/pipeline/first-pipeline/tasks/task1/task.yml"))
 	assert.NotNil(t, asset)
 	assert.Equal(t, "task1", asset.Name)
 }

@@ -21,7 +21,7 @@ func Lineage() *cli.Command {
 		},
 		Action: func(c *cli.Context) error {
 			r := LineageCommand{
-				builder:      builder,
+				builder:      DefaultPipelineBuilder,
 				infoPrinter:  infoPrinter,
 				errorPrinter: errorPrinter,
 			}
@@ -55,7 +55,7 @@ func (r *LineageCommand) Run(assetPath string, fullLineage bool) error {
 		return cli.Exit("", 1)
 	}
 
-	foundPipeline, err := builder.CreatePipelineFromPath(pipelinePath)
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath)
 	if err != nil {
 		r.errorPrinter.Println("failed to build pipeline, are you sure you have referred the right path?")
 		r.errorPrinter.Println("\nHint: You need to run this command with a path to the asset file itself directly, and it needs to be inside a pipeline.")

@@ -1,0 +1,5 @@
+name: pipeline-with-no-assets
+schedule: ""
+default_connections:
+    slack: "slack-connection"
+    gcpConnectionId: "gcp-connection-id-here"

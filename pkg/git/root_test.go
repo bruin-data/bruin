@@ -1,21 +1,15 @@
 package git
 
 import (
-	"path/filepath"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRepo(t *testing.T) {
 	t.Parallel()
-
-	absPath := func(path string) string {
-		abs, err := filepath.Abs(path)
-		assert.NoError(t, err)
-		return abs
-	}
 
 	tests := []struct {
 		name    string
@@ -32,14 +26,14 @@ func TestRepo(t *testing.T) {
 			name: "can find its own repo root",
 			path: ".",
 			want: &Repo{
-				Path: absPath("../../."),
+				Path: path.AbsPathForTests(t, "../../."),
 			},
 		},
 		{
 			name: "can find its own repo root even if a file is given",
 			path: "./root_test.go",
 			want: &Repo{
-				Path: absPath("../../."),
+				Path: path.AbsPathForTests(t, "../../."),
 			},
 		},
 	}

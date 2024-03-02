@@ -1,0 +1,80 @@
+{
+  "legacy_id": "",
+  "name": "first-pipeline",
+  "schedule": "",
+  "start_date": "",
+  "definition_file": {
+    "name": "pipeline.yml",
+    "path": "/Users/burak/Code/personal/bruin/internal/bruin-cli/pkg/pipeline/testdata/pipeline/second-pipeline/pipeline.yml"
+  },
+  "default_parameters": {},
+  "default_connections": {
+    "gcpConnectionId": "gcp-connection-id-here",
+    "slack": "slack-connection"
+  },
+  "assets": [
+    {
+      "id": "eb9126984939a8f3e6e882cd0cd171af872274bd3dd18148b3d95afc01efa6b1",
+      "name": "gcs-to-bq",
+      "description": "",
+      "type": "bq.transfer",
+      "executable_file": {
+        "name": "",
+        "path": "",
+        "content": ""
+      },
+      "definition_file": {
+        "name": "task.yml",
+        "path": "/Users/burak/Code/personal/bruin/internal/bruin-cli/pkg/pipeline/testdata/pipeline/second-pipeline/tasks/test1/task.yml",
+        "type": "yaml"
+      },
+      "parameters": {
+        "location": "europe-west1",
+        "project_id": "some-project-id",
+        "transfer_config_id": "some-uuid"
+      },
+      "connection": "",
+      "secrets": [],
+      "upstream": [],
+      "materialization": null,
+      "columns": [],
+      "custom_checks": [],
+      "image": "",
+      "metadata": {}
+    },
+    {
+      "id": "a01e7580b118b5fbbdc1f7c8de6b8c377c684727e4e8ad574e9153a3dbd46dd1",
+      "name": "gcs-to-bq-2",
+      "description": "",
+      "type": "bq.transfer",
+      "executable_file": {
+        "name": "",
+        "path": "",
+        "content": ""
+      },
+      "definition_file": {
+        "name": "task.yml",
+        "path": "/Users/burak/Code/personal/bruin/internal/bruin-cli/pkg/pipeline/testdata/pipeline/second-pipeline/tasks/test2/task.yml",
+        "type": "yaml"
+      },
+      "parameters": {
+        "location": "europe-west1",
+        "project_id": "a-new-project-id",
+        "transfer_config_id": "some-uuid"
+      },
+      "connection": "",
+      "secrets": [],
+      "upstream": [],
+      "materialization": null,
+      "columns": [],
+      "custom_checks": [],
+      "image": "",
+      "metadata": {}
+    }
+  ],
+  "notifications": {
+    "slack": []
+  },
+  "catchup": false,
+  "retries": 0
+}
