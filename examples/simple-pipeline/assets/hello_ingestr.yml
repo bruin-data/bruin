@@ -1,0 +1,11 @@
+name: ingestor_test
+type: ingestr
+
+parameters:
+  source: postgres
+  source_connection: neon
+  source_table: 'public.test_merge'
+
+  destination: postgres
+  destination_connection: neon
+  destination_table: 'public.ingestr_destination'

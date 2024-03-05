@@ -273,7 +273,17 @@ func (s *Scheduler) FindMajorityOfTypes(taskTypes []pipeline.AssetType, defaultI
 	}
 
 	for _, instance := range s.taskInstances {
-		assetType := instance.GetAsset().Type
+		asset := instance.GetAsset()
+		assetType := asset.Type
+
+		var err error
+		if assetType == pipeline.AssetTypeIngestr {
+			assetType, err = asset.GetIngestrDestinationType()
+			if err != nil {
+				continue
+			}
+		}
+
 		if !searchTypeMap[assetType] {
 			continue
 		}
