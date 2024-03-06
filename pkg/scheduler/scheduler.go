@@ -254,6 +254,11 @@ func (s *Scheduler) GetTaskInstancesByStatus(status TaskInstanceStatus) []TaskIn
 func (s *Scheduler) WillRunTaskOfType(taskType pipeline.AssetType) bool {
 	instances := s.GetTaskInstancesByStatus(Pending)
 	for _, instance := range instances {
+		asset := instance.GetAsset()
+		assetType := asset.Type
+		if assetType == pipeline.AssetTypeIngestr {
+			assetType, _ = asset.GetIngestrDestinationType()
+		}
 		if instance.GetAsset().Type == taskType {
 			return true
 		}
