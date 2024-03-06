@@ -2,6 +2,9 @@ package pipeline_test
 
 import (
 	"encoding/json"
+	"log"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/cmd"
@@ -329,7 +332,11 @@ func TestPipeline_JsonMarshal(t *testing.T) {
 			// uncomment the line below to refresh the data
 			// err = afero.WriteFile(afero.NewOsFs(), tt.jsonPath, got, 0644)
 
-			expected := mustRead(t, tt.jsonPath)
+			dir, err := os.Getwd()
+			if err != nil {
+				log.Fatal(err)
+			}
+			expected := strings.ReplaceAll(mustRead(t, tt.jsonPath), "__BASEDIR__", dir)
 
 			assert.JSONEq(t, expected, string(got))
 		})

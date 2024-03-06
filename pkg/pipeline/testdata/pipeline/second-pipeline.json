@@ -5,7 +5,7 @@
   "start_date": "",
   "definition_file": {
     "name": "pipeline.yml",
-    "path": "/Users/burak/Code/personal/bruin/internal/bruin-cli/pkg/pipeline/testdata/pipeline/second-pipeline/pipeline.yml"
+    "path": "__BASEDIR__/testdata/pipeline/second-pipeline/pipeline.yml"
   },
   "default_parameters": {},
   "default_connections": {
@@ -25,7 +25,7 @@
       },
       "definition_file": {
         "name": "task.yml",
-        "path": "/Users/burak/Code/personal/bruin/internal/bruin-cli/pkg/pipeline/testdata/pipeline/second-pipeline/tasks/test1/task.yml",
+        "path": "__BASEDIR__/testdata/pipeline/second-pipeline/tasks/test1/task.yml",
         "type": "yaml"
       },
       "parameters": {
@@ -54,7 +54,7 @@
       },
       "definition_file": {
         "name": "task.yml",
-        "path": "/Users/burak/Code/personal/bruin/internal/bruin-cli/pkg/pipeline/testdata/pipeline/second-pipeline/tasks/test2/task.yml",
+        "path": "__BASEDIR__/testdata/pipeline/second-pipeline/tasks/test2/task.yml",
         "type": "yaml"
       },
       "parameters": {

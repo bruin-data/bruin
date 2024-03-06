@@ -5,7 +5,7 @@
   "start_date": "",
   "definition_file": {
     "name": "pipeline.yml",
-    "path": "/Users/burak/Code/personal/bruin/internal/bruin-cli/pkg/pipeline/testdata/pipeline/pipeline-with-no-assets/pipeline.yml"
+    "path": "__BASEDIR__/testdata/pipeline/pipeline-with-no-assets/pipeline.yml"
   },
   "default_parameters": {},
   "default_connections": {
