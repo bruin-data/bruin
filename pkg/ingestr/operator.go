@@ -4,16 +4,26 @@ import (
 	"context"
 	"errors"
 
+	"fmt"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/docker/docker/client"
 )
 
-type BasicOperator struct{}
+const IngestrVersion = "v0.2.2"
 
-func NewBasicOperator() *BasicOperator {
-	return &BasicOperator{}
+type BasicOperator struct {
+	client *client.Client
+}
+
+func NewBasicOperator() (*BasicOperator, error) {
+	dockerClient, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create docker client: %s", err.Error())
+	}
+	return &BasicOperator{client: dockerClient}, nil
 }
 
 func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
