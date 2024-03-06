@@ -2,8 +2,8 @@ package ingestr
 
 import (
 	"context"
+	"errors"
 
-	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -20,11 +20,10 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 }
 
 func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
-	return nil
+	return errors.New("Ingestr tasks not implemented")
 }
 
 type IngestrCheckOperator struct {
-	conn    *connection.Manager
 	configs *map[pipeline.AssetType]executor.Config
 }
 
@@ -35,20 +34,21 @@ func (i IngestrCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance
 		return err
 	}
 
-	columnChecker := (*i.configs)[assetType][scheduler.TaskInstanceTypeColumnCheck]
+	columnChecker, ok := (*i.configs)[assetType][scheduler.TaskInstanceTypeColumnCheck]
+	if !ok {
+		return errors.New("missing column check configuration")
+	}
 
 	return columnChecker.Run(ctx, ti)
 }
 
-func NewColumnCheckOperator(conn *connection.Manager, configs *map[pipeline.AssetType]executor.Config) *IngestrCheckOperator {
+func NewColumnCheckOperator(configs *map[pipeline.AssetType]executor.Config) *IngestrCheckOperator {
 	return &IngestrCheckOperator{
-		conn:    conn,
 		configs: configs,
 	}
 }
 
 type IngestrCustomCheckOperator struct {
-	conn    *connection.Manager
 	configs *map[pipeline.AssetType]executor.Config
 }
 
@@ -59,14 +59,16 @@ func (i IngestrCustomCheckOperator) Run(ctx context.Context, ti scheduler.TaskIn
 		return err
 	}
 
-	columnChecker := (*i.configs)[assetType][scheduler.TaskInstanceTypeCustomCheck]
+	columnChecker, ok := (*i.configs)[assetType][scheduler.TaskInstanceTypeCustomCheck]
+	if !ok {
+		return errors.New("missing column check configuration")
+	}
 
 	return columnChecker.Run(ctx, ti)
 }
 
-func NewCustomCheckOperator(conn *connection.Manager, configs *map[pipeline.AssetType]executor.Config) *IngestrCustomCheckOperator {
+func NewCustomCheckOperator(configs *map[pipeline.AssetType]executor.Config) *IngestrCustomCheckOperator {
 	return &IngestrCustomCheckOperator{
-		conn:    conn,
 		configs: configs,
 	}
 }

@@ -429,8 +429,8 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeIngestr) || estimateCustomCheckType == pipeline.AssetTypeIngestr {
 		ingestrOperator := ingestr.NewBasicOperator()
-		ingestrCheckRunner := ingestr.NewColumnCheckOperator(conn, &mainExecutors)
-		ingestrCustomCheckRunner := ingestr.NewCustomCheckOperator(conn, &mainExecutors)
+		ingestrCheckRunner := ingestr.NewColumnCheckOperator(&mainExecutors)
+		ingestrCustomCheckRunner := ingestr.NewCustomCheckOperator(&mainExecutors)
 
 		mainExecutors[pipeline.AssetTypeIngestr][scheduler.TaskInstanceTypeMain] = ingestrOperator
 		mainExecutors[pipeline.AssetTypeIngestr][scheduler.TaskInstanceTypeColumnCheck] = ingestrCheckRunner
