@@ -339,15 +339,6 @@ func (a *Asset) ColumnNamesWithPrimaryKey() []string {
 	return columns
 }
 
-func (a *Asset) GetIngestrDestinationType() (AssetType, error) {
-	value, ok := a.Parameters["destination"]
-	if !ok {
-		return "", errors.New("`destination` parameter not found")
-	}
-
-	return AssetType(value), nil
-}
-
 func uniqueAssets(assets []*Asset) []*Asset {
 	seenValues := make(map[string]bool, len(assets))
 	unique := make([]*Asset, 0, len(assets))

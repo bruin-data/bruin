@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/ingestr"
 	"strings"
 	"sync"
 
@@ -257,7 +258,7 @@ func (s *Scheduler) WillRunTaskOfType(taskType pipeline.AssetType) bool {
 		asset := instance.GetAsset()
 		assetType := asset.Type
 		if assetType == pipeline.AssetTypeIngestr {
-			assetType, _ = asset.GetIngestrDestinationType()
+			assetType, _ = ingestr.GetIngestrDestinationType(asset)
 		}
 		if assetType == taskType {
 			return true
@@ -283,7 +284,7 @@ func (s *Scheduler) FindMajorityOfTypes(taskTypes []pipeline.AssetType, defaultI
 
 		var err error
 		if assetType == pipeline.AssetTypeIngestr {
-			assetType, err = asset.GetIngestrDestinationType()
+			assetType, err = ingestr.GetIngestrDestinationType(asset)
 			if err != nil {
 				continue
 			}
