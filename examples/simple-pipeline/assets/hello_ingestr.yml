@@ -9,3 +9,20 @@ parameters:
   destination: postgres
   destination_connection: neon
   destination_table: 'public.ingestr_destination'
+
+
+columns:
+  - name: one
+    type: integer
+    description: "Just a number"
+    checks:
+      - name: unique
+      - name: not_null
+      - name: positive
+      - name: accepted_values
+        value: [1, 2]
+
+custom_checks:
+  - name: This is a custom check name
+    value: 2
+    query: select count(*) from hello_ms
