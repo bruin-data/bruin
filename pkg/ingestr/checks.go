@@ -9,7 +9,10 @@ import (
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"io"
 )
 
 const IngestrVersion = "v0.2.2"
@@ -19,10 +22,31 @@ type BasicOperator struct {
 }
 
 func NewBasicOperator() (*BasicOperator, error) {
-	dockerClient, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation())
+	ctx := context.TODO()
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client: %s", err.Error())
 	}
+	defer dockerClient.Close()
+
+	dockerImage := fmt.Sprintf("ghcr.io/bruin-data/ingestr:%s", IngestrVersion)
+	reader, err := dockerClient.ImagePull(ctx, dockerImage, types.ImagePullOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch docker image: %s", err.Error())
+	}
+	defer reader.Close()
+	io.Copy(io.Discard, reader)
+	//io.Copy(os.Stdout, reader)
+
+	resp, err := dockerClient.ContainerCreate(ctx, &container.Config{
+		Image: "ingestr",
+		Cmd:   []string{"echo", "hello world"},
+		Tty:   false,
+	}, nil, nil, nil, "")
+	if err != nil {
+		panic(err)
+	}
+
 	return &BasicOperator{client: dockerClient}, nil
 }
 
