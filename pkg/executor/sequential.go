@@ -13,8 +13,7 @@ type Operator interface {
 }
 
 type (
-	OperatorMap       map[pipeline.AssetType]Operator
-	OperatorSecondMap map[string]Operator
+	OperatorMap map[pipeline.AssetType]Operator
 )
 
 type Sequential struct {

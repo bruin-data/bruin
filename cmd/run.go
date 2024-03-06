@@ -20,6 +20,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/date"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/ingestr"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/mssql"
@@ -424,6 +425,16 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = msCustomCheckRunner
 		}
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeIngestr) || estimateCustomCheckType == pipeline.AssetTypeIngestr {
+		ingestrOperator := ingestr.NewBasicOperator()
+		ingestrCheckRunner := ingestr.NewColumnCheckOperator(&mainExecutors)
+		ingestrCustomCheckRunner := ingestr.NewCustomCheckOperator(&mainExecutors)
+
+		mainExecutors[pipeline.AssetTypeIngestr][scheduler.TaskInstanceTypeMain] = ingestrOperator
+		mainExecutors[pipeline.AssetTypeIngestr][scheduler.TaskInstanceTypeColumnCheck] = ingestrCheckRunner
+		mainExecutors[pipeline.AssetTypeIngestr][scheduler.TaskInstanceTypeCustomCheck] = ingestrCustomCheckRunner
 	}
 
 	return mainExecutors, nil

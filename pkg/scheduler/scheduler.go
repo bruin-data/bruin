@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"strings"
 	"sync"
 
@@ -254,7 +255,12 @@ func (s *Scheduler) GetTaskInstancesByStatus(status TaskInstanceStatus) []TaskIn
 func (s *Scheduler) WillRunTaskOfType(taskType pipeline.AssetType) bool {
 	instances := s.GetTaskInstancesByStatus(Pending)
 	for _, instance := range instances {
-		if instance.GetAsset().Type == taskType {
+		asset := instance.GetAsset()
+		assetType := asset.Type
+		if assetType == pipeline.AssetTypeIngestr {
+			assetType, _ = helpers.GetIngestrDestinationType(asset)
+		}
+		if assetType == taskType {
 			return true
 		}
 	}
@@ -273,7 +279,17 @@ func (s *Scheduler) FindMajorityOfTypes(taskTypes []pipeline.AssetType, defaultI
 	}
 
 	for _, instance := range s.taskInstances {
-		assetType := instance.GetAsset().Type
+		asset := instance.GetAsset()
+		assetType := asset.Type
+
+		var err error
+		if assetType == pipeline.AssetTypeIngestr {
+			assetType, err = helpers.GetIngestrDestinationType(asset)
+			if err != nil {
+				continue
+			}
+		}
+
 		if !searchTypeMap[assetType] {
 			continue
 		}
