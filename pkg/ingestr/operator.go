@@ -3,20 +3,12 @@ package ingestr
 import (
 	"context"
 	"errors"
+	"github.com/bruin-data/bruin/pkg/helpers"
 
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 )
-
-func GetIngestrDestinationType(asset *pipeline.Asset) (pipeline.AssetType, error) {
-	value, ok := asset.Parameters["destination"]
-	if !ok {
-		return "", errors.New("`destination` parameter not found")
-	}
-
-	return pipeline.AssetType(value), nil
-}
 
 type BasicOperator struct{}
 
@@ -38,7 +30,7 @@ type IngestrCheckOperator struct {
 
 func (i IngestrCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	asset := ti.GetAsset()
-	assetType, err := GetIngestrDestinationType(asset)
+	assetType, err := helpers.GetIngestrDestinationType(asset)
 	if err != nil {
 		return err
 	}
@@ -63,7 +55,7 @@ type IngestrCustomCheckOperator struct {
 
 func (i IngestrCustomCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	asset := ti.GetAsset()
-	assetType, err := GetIngestrDestinationType(asset)
+	assetType, err := helpers.GetIngestrDestinationType(asset)
 	if err != nil {
 		return err
 	}

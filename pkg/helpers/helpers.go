@@ -1,11 +1,21 @@
 package helpers
 
 import (
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"math/rand"
 	"strconv"
 
 	"github.com/pkg/errors"
 )
+
+func GetIngestrDestinationType(asset *pipeline.Asset) (pipeline.AssetType, error) {
+	value, ok := asset.Parameters["destination"]
+	if !ok {
+		return "", errors.New("`destination` parameter not found")
+	}
+
+	return pipeline.AssetType(value), nil
+}
 
 func PrefixGenerator() string {
 	letters := []rune("abcdefghijklmnopqrstuvwxyz")
