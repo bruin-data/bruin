@@ -259,7 +259,7 @@ func (s *Scheduler) WillRunTaskOfType(taskType pipeline.AssetType) bool {
 		if assetType == pipeline.AssetTypeIngestr {
 			assetType, _ = asset.GetIngestrDestinationType()
 		}
-		if instance.GetAsset().Type == taskType {
+		if assetType == taskType {
 			return true
 		}
 	}
