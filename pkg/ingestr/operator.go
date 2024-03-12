@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
-	"io"
 )
 
 const IngestrVersion = "v0.2.2"
@@ -20,7 +21,7 @@ type BasicOperator struct {
 }
 
 type pipelineConnection interface {
-	GetConnectionURI() string
+	GetConnectionURI() (string, error)
 }
 
 func NewBasicOperator(conn *connection.Manager) (*BasicOperator, error) {
@@ -31,14 +32,17 @@ func NewBasicOperator(conn *connection.Manager) (*BasicOperator, error) {
 	}
 	defer dockerClient.Close()
 
-	dockerImage := fmt.Sprintf("ghcr.io/bruin-data/ingestr:%s", IngestrVersion)
+	dockerImage := "ghcr.io/bruin-data/ingestr:" + IngestrVersion
 	reader, err := dockerClient.ImagePull(ctx, dockerImage, types.ImagePullOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch docker image: %s", err.Error())
 	}
 	defer reader.Close()
-	io.Copy(io.Discard, reader)
-	//io.Copy(os.Stdout, reader) // To see output
+	_, err = io.Copy(io.Discard, reader)
+	// _, err = io.Copy(os.Stdout, reader) // To see output
+	if err != nil {
+		return nil, fmt.Errorf("error while copying output: %s", err.Error())
+	}
 
 	return &BasicOperator{client: dockerClient, conn: conn}, nil
 }
@@ -52,7 +56,10 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	if err != nil {
 		return fmt.Errorf("source connection %s not found", sourceConnectionName)
 	}
-	sourceURI := sourceConnection.(pipelineConnection).GetConnectionURI()
+	sourceURI, err := sourceConnection.(pipelineConnection).GetConnectionURI()
+	if err != nil {
+		return errors.New("could not get the source uri")
+	}
 	sourceTable, ok := ti.GetAsset().Parameters["source_table"]
 	if !ok {
 		return errors.New("source table not configured")
@@ -66,7 +73,10 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	if err != nil {
 		return fmt.Errorf("destination connection %s not found", destConnectionName)
 	}
-	destURI := destConnection.(pipelineConnection).GetConnectionURI()
+	destURI, err := destConnection.(pipelineConnection).GetConnectionURI()
+	if err != nil {
+		return errors.New("could not get the source uri")
+	}
 	destTable, ok := ti.GetAsset().Parameters["source_table"]
 	if !ok {
 		return errors.New("source table not configured")
