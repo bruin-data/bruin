@@ -3,10 +3,10 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/helpers"
 	"strings"
 	"sync"
 
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/google/uuid"
 	"go.uber.org/zap"

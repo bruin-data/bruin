@@ -1,10 +1,10 @@
 package helpers
 
 import (
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"math/rand"
 	"strconv"
 
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
 )
 

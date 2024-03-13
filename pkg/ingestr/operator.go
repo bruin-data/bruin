@@ -3,9 +3,9 @@ package ingestr
 import (
 	"context"
 	"errors"
-	"github.com/bruin-data/bruin/pkg/helpers"
 
 	"github.com/bruin-data/bruin/pkg/executor"
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 )
@@ -21,7 +21,7 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 }
 
 func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
-	return errors.New("Ingestr tasks not implemented")
+	return errors.New("ingestr tasks not implemented")
 }
 
 type IngestrCheckOperator struct {
