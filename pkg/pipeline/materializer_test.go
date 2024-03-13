@@ -20,7 +20,7 @@ func TestMaterializer_Render(t *testing.T) {
 		},
 	}
 
-	query := "SELECT * FROM table"
+	query := "/* @bruin some yaml @bruin*/SELECT * FROM table"
 	expected := "SELECT * FROM table"
 
 	result, err := materializer.Render(asset, query)
