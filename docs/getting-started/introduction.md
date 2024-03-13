@@ -38,4 +38,16 @@ go install github.com/bruin-data/bruin@v0.1.5
 ### Pre-built binaries
 You can download [one of the pre-built releases](https://github.com/bruin-data/bruin/releases) for your environment.
 
+### Creating your first Bruin project
+
+To create a bruin project basic structure you can just run
+
+```
+bruin init {folder name} [template name]
+```
+
+you can see the available template names by running `bruin help init`
+
+
+
 
