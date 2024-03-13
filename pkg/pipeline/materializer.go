@@ -17,7 +17,7 @@ type Materializer struct {
 func (m *Materializer) Render(asset *Asset, query string) (string, error) {
 	mat := asset.Materialization
 	if mat.Type == MaterializationTypeNone {
-		return query, nil
+		return removeComments(query), nil
 	}
 
 	if matFunc, ok := m.MaterializationMap[mat.Type][mat.Strategy]; ok {
@@ -35,6 +35,6 @@ func (m *Materializer) Render(asset *Asset, query string) (string, error) {
 func removeComments(query string) string {
 	bytes := []byte(query)
 	re := regexp.MustCompile("(?s)/\\*.*?\\*/")
-	newBytes := re.ReplaceAll(bytes, nil)
+	newBytes := re.ReplaceAll(bytes, []byte(""))
 	return string(newBytes)
 }
