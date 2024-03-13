@@ -1,6 +1,9 @@
 package pipeline
 
-import "fmt"
+import (
+	"fmt"
+	"regexp"
+)
 
 type (
 	MaterializerFunc        func(task *Asset, query string) (string, error)
@@ -18,8 +21,20 @@ func (m *Materializer) Render(asset *Asset, query string) (string, error) {
 	}
 
 	if matFunc, ok := m.MaterializationMap[mat.Type][mat.Strategy]; ok {
-		return matFunc(asset, query)
+		materializedQuery, err := matFunc(asset, query)
+		if err != nil {
+			return "", err
+		}
+
+		return removeComments(materializedQuery), nil
 	}
 
 	return "", fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
+}
+
+func removeComments(query string) string {
+	bytes := []byte(query)
+	re := regexp.MustCompile("(?s)/\\*.*?\\*/")
+	newBytes := re.ReplaceAll(bytes, nil)
+	return string(newBytes)
 }
