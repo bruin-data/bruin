@@ -21,7 +21,14 @@ func Init(isDebug *bool) *cli.Command {
 		Name:      "init",
 		Usage:     "init a Bruin pipeline",
 		ArgsUsage: "[name of the folder pipeline]",
-		Flags:     []cli.Flag{},
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "template",
+				Aliases: []string{"t"},
+				Value:   DefaultTemplate,
+				Usage:   "bruin template to use",
+			},
+		},
 		Action: func(c *cli.Context) error {
 			defer func() {
 				if err := recover(); err != nil {
@@ -55,7 +62,7 @@ func Init(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			templateName := DefaultTemplate
+			templateName := c.String("template")
 			_, err = templates.Templates.ReadDir(templateName)
 			if err != nil {
 				errorPrinter.Printf("Template %s not found\n", templateName)
