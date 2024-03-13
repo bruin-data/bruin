@@ -49,7 +49,7 @@ func Init(isDebug *bool) *cli.Command {
 
 			inputPath := c.Args().Get(0)
 			if inputPath == "" {
-				errorPrinter.Printf("Please provide a name for bruin to create a folder where the pipeline will be created: bruin init <name of folder to be created>)\n")
+				errorPrinter.Printf("Please provide a name for bruin to create a folder where the pipeline will be created: bruin init <name of folder to be created> [template name])\n")
 				return cli.Exit("", 1)
 			}
 
