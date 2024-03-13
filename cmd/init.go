@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	fs2 "io/fs"
 	"log"
 	"os"
@@ -17,11 +18,25 @@ import (
 const DefaultTemplate = "default"
 
 func Init(isDebug *bool) *cli.Command {
+	folders, err := templates.Templates.ReadDir(".")
+	if err != nil {
+		panic("Error retrieving bruin templates")
+	}
+	templateList := make([]string, 0)
+	for _, entry := range folders {
+		if entry.IsDir() {
+			templateList = append(templateList, entry.Name())
+		}
+	}
+
 	return &cli.Command{
-		Name:      "init",
-		Usage:     "init a Bruin pipeline",
-		ArgsUsage: "[name of the folder pipeline]",
-		Flags:     []cli.Flag{},
+		Name:  "init",
+		Usage: "init a Bruin pipeline",
+		ArgsUsage: fmt.Sprintf(
+			"[name of the folder where the pipeline will be created [template name to be used:%s]]",
+			strings.Join(templateList, "|"),
+		),
+		Flags: []cli.Flag{},
 		Action: func(c *cli.Context) error {
 			defer func() {
 				if err := recover(); err != nil {
@@ -34,7 +49,7 @@ func Init(isDebug *bool) *cli.Command {
 
 			inputPath := c.Args().Get(0)
 			if inputPath == "" {
-				errorPrinter.Printf("Please provide a name for bruin to create a folder where the pipeline will be created: bruin init <name of folder to be created>)\n")
+				errorPrinter.Printf("Please provide a name for bruin to create a folder where the pipeline will be created: bruin init <name of folder to be created> [template name])\n")
 				return cli.Exit("", 1)
 			}
 
@@ -55,7 +70,10 @@ func Init(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			templateName := DefaultTemplate
+			templateName := c.Args().Get(1)
+			if templateName == "" {
+				templateName = DefaultTemplate
+			}
 			_, err = templates.Templates.ReadDir(templateName)
 			if err != nil {
 				errorPrinter.Printf("Template %s not found\n", templateName)

@@ -3,11 +3,12 @@ package ingestr
 import (
 	"context"
 	"errors"
+	"testing"
+
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 type checker struct {
@@ -82,9 +83,7 @@ func TestColumnCheckOperatorOperator(t *testing.T) {
 				require.NoError(t, err)
 			}
 		})
-
 	}
-
 }
 
 func TestCustomColumnCheckOperatorOperator(t *testing.T) {
@@ -151,7 +150,5 @@ func TestCustomColumnCheckOperatorOperator(t *testing.T) {
 				require.NoError(t, err)
 			}
 		})
-
 	}
-
 }
