@@ -12,6 +12,7 @@ type (
 
 type Materializer struct {
 	MaterializationMap AssetMaterializationMap
+	fullRefresh        bool
 }
 
 func (m *Materializer) Render(asset *Asset, query string) (string, error) {
@@ -20,7 +21,12 @@ func (m *Materializer) Render(asset *Asset, query string) (string, error) {
 		return removeComments(query), nil
 	}
 
-	if matFunc, ok := m.MaterializationMap[mat.Type][mat.Strategy]; ok {
+	strategy := mat.Strategy
+	if m.fullRefresh && mat.Type == MaterializationTypeTable && mat.Strategy != MaterializationStrategyNone {
+		strategy = MaterializationStrategyCreateReplace
+	}
+
+	if matFunc, ok := m.MaterializationMap[mat.Type][strategy]; ok {
 		materializedQuery, err := matFunc(asset, query)
 		if err != nil {
 			return "", err

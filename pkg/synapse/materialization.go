@@ -32,6 +32,7 @@ var matMap = AssetMaterializationMap{
 
 type Materializer struct {
 	MaterializationMap AssetMaterializationMap
+	fullRefresh        bool
 }
 
 func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, error) {
@@ -40,7 +41,12 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 		return []string{query}, nil
 	}
 
-	if matFunc, ok := m.MaterializationMap[mat.Type][mat.Strategy]; ok {
+	strategy := mat.Strategy
+	if m.fullRefresh && mat.Type == pipeline.MaterializationTypeTable && mat.Strategy != pipeline.MaterializationStrategyNone {
+		strategy = pipeline.MaterializationStrategyCreateReplace
+	}
+
+	if matFunc, ok := m.MaterializationMap[mat.Type][strategy]; ok {
 		return matFunc(asset, query)
 	}
 
