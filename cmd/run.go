@@ -406,7 +406,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 	if s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuery) || estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuery) || estimateCustomCheckType == pipeline.AssetTypeSynapseQuery {
 		msOperator := mssql.NewBasicOperator(conn, wholeFileExtractor, mssql.NewMaterializer())
-		synapseOperator := synapse.NewBasicOperator(conn, wholeFileExtractor, synapse.NewMaterializer())
+		synapseOperator := synapse.NewBasicOperator(conn, wholeFileExtractor, synapse.NewMaterializer(false))
 
 		msCheckRunner := mssql.NewColumnCheckOperator(conn)
 

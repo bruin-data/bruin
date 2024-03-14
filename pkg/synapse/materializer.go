@@ -31,8 +31,9 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 	return []string{}, fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
 }
 
-func NewMaterializer() *Materializer {
+func NewMaterializer(fullRefresh bool) *Materializer {
 	return &Materializer{
 		MaterializationMap: matMap,
+		fullRefresh:        fullRefresh,
 	}
 }
