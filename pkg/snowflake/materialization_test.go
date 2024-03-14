@@ -11,11 +11,12 @@ import (
 func TestMaterializer_Render(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name    string
-		task    *pipeline.Asset
-		query   string
-		want    string
-		wantErr bool
+		name        string
+		task        *pipeline.Asset
+		query       string
+		want        string
+		wantErr     bool
+		fullRefresh bool
 	}{
 		{
 			name:  "no materialization, return raw query",
@@ -44,6 +45,19 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1",
 			want:  "CREATE OR REPLACE TABLE my.asset  AS\nSELECT 1",
+		},
+		{
+			name: "materialize to a table, full refresh defaults to create+replace",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT 1",
+			want:        "CREATE OR REPLACE TABLE my.asset  AS\nSELECT 1",
 		},
 		{
 			name: "materialize to a table with cluster, single field to cluster",
@@ -178,7 +192,7 @@ func TestMaterializer_Render(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			m := NewMaterializer()
+			m := NewMaterializer(tt.fullRefresh)
 			render, err := m.Render(tt.task, tt.query)
 
 			if tt.wantErr {

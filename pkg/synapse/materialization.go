@@ -30,29 +30,6 @@ var matMap = AssetMaterializationMap{
 	},
 }
 
-type Materializer struct {
-	MaterializationMap AssetMaterializationMap
-}
-
-func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, error) {
-	mat := asset.Materialization
-	if mat.Type == pipeline.MaterializationTypeNone {
-		return []string{query}, nil
-	}
-
-	if matFunc, ok := m.MaterializationMap[mat.Type][mat.Strategy]; ok {
-		return matFunc(asset, query)
-	}
-
-	return []string{}, fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
-}
-
-func NewMaterializer() *Materializer {
-	return &Materializer{
-		MaterializationMap: matMap,
-	}
-}
-
 func errorMaterializer(asset *pipeline.Asset, _ string) ([]string, error) {
 	return []string{""}, fmt.Errorf("materialization strategy %s is not supported for materialization type %s", asset.Materialization.Strategy, asset.Materialization.Type)
 }

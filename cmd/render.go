@@ -14,6 +14,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/synapse"
 	"github.com/urfave/cli/v2"
 )
 
@@ -22,19 +23,27 @@ func Render() *cli.Command {
 		Name:      "render",
 		Usage:     "render a single Bruin SQL asset",
 		ArgsUsage: "[path to the asset definition]",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "full-refresh",
+				Aliases: []string{"r"},
+				Usage:   "truncate the table before running",
+			},
+		},
 		Action: func(c *cli.Context) error {
+			fullRefresh := c.Bool("full-refresh")
 			r := RenderCommand{
 				extractor: &query.WholeFileExtractor{
 					Fs:       fs,
 					Renderer: jinja.NewRendererWithYesterday(),
 				},
 				materializers: map[pipeline.AssetType]queryMaterializer{
-					pipeline.AssetTypeBigqueryQuery:  bigquery.NewMaterializer(),
-					pipeline.AssetTypeSnowflakeQuery: snowflake.NewMaterializer(),
-					pipeline.AssetTypeRedshiftQuery:  postgres.NewMaterializer(),
-					pipeline.AssetTypePostgresQuery:  postgres.NewMaterializer(),
-					pipeline.AssetTypeMsSQLQuery:     mssql.NewMaterializer(),
-					pipeline.AssetTypeSynapseQuery:   mssql.NewMaterializer(),
+					pipeline.AssetTypeBigqueryQuery:  bigquery.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeSnowflakeQuery: snowflake.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeRedshiftQuery:  postgres.NewMaterializer(fullRefresh),
+					pipeline.AssetTypePostgresQuery:  postgres.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeMsSQLQuery:     mssql.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeSynapseQuery:   synapse.NewRenderer(fullRefresh),
 				},
 				builder: DefaultPipelineBuilder,
 				writer:  os.Stdout,

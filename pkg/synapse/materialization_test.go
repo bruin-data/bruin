@@ -11,11 +11,12 @@ import (
 func TestMaterializer_Render(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name    string
-		task    *pipeline.Asset
-		query   string
-		want    []string
-		wantErr bool
+		name        string
+		task        *pipeline.Asset
+		query       string
+		want        []string
+		wantErr     bool
+		fullRefresh bool
 	}{
 		{
 			name:  "no materialization, return raw query",
@@ -66,7 +67,7 @@ func TestMaterializer_Render(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "materialize to a table with append",
+			name: "materialize to a table with append and full refresh results in create_replace",
 			task: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
@@ -74,8 +75,12 @@ func TestMaterializer_Render(t *testing.T) {
 					Strategy: pipeline.MaterializationStrategyAppend,
 				},
 			},
-			query: "SELECT 1",
-			want:  []string{"INSERT INTO my.asset SELECT 1"},
+			query:       "SELECT 1",
+			fullRefresh: true,
+			want: []string{"^SELECT tmp\\.\\* INTO #bruin_tmp_.+ FROM \\(SELECT 1\\) AS tmp;\n" +
+				"IF OBJECT_ID\\('my\\.asset', 'U'\\) IS NOT NULL DROP TABLE my\\.asset;\n" +
+				"SELECT \\* INTO my\\.asset FROM #bruin_tmp_.+;\n" +
+				"DROP TABLE #bruin_tmp_.+;$"},
 		},
 		{
 			name: "incremental strategies require the incremental_key to be set",
@@ -172,7 +177,7 @@ func TestMaterializer_Render(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			m := NewMaterializer()
+			m := NewMaterializer(tt.fullRefresh)
 			render, err := m.Render(tt.task, tt.query)
 
 			if tt.wantErr {

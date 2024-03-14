@@ -85,6 +85,11 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "no-log-file",
 				Usage: "do not create a log file for this run",
 			},
+			&cli.BoolFlag{
+				Name:    "full-refresh",
+				Aliases: []string{"r"},
+				Usage:   "truncate the table before running",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			defer func() {
@@ -242,7 +247,7 @@ func Run(isDebug *bool) *cli.Command {
 				s.MarkTask(task, scheduler.Pending, runDownstreamTasks)
 			}
 
-			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, runID)
+			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, runID, c.Bool("full-refresh"))
 			if err != nil {
 				errorPrinter.Printf(err.Error())
 				return cli.Exit("", 1)
@@ -311,7 +316,7 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	}
 }
 
-func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connection.Manager, startDate, endDate time.Time, runID string) (map[pipeline.AssetType]executor.Config, error) {
+func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connection.Manager, startDate, endDate time.Time, runID string, fullRefresh bool) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
 
 	// this is a heuristic we apply to find what might be the most common type of custom check in the pipeline
@@ -336,7 +341,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery {
-		bqOperator := bigquery.NewBasicOperator(conn, wholeFileExtractor, bigquery.NewMaterializer())
+		bqOperator := bigquery.NewBasicOperator(conn, wholeFileExtractor, bigquery.NewMaterializer(fullRefresh))
 
 		bqCheckRunner, err := bigquery.NewColumnCheckOperator(conn)
 		if err != nil {
@@ -363,7 +368,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		s.WillRunTaskOfType(pipeline.AssetTypeRedshiftQuery) || estimateCustomCheckType == pipeline.AssetTypeRedshiftQuery {
 		pgCustomCheckRunner := ansisql.NewCustomCheckOperator(conn)
 		pgCheckRunner := postgres.NewColumnCheckOperator(conn)
-		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, postgres.NewMaterializer())
+		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, postgres.NewMaterializer(fullRefresh))
 
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeMain] = pgOperator
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
@@ -382,7 +387,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 
 	shouldInitiateSnowflake := s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuerySensor) || estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery
 	if shouldInitiateSnowflake {
-		sfOperator := snowflake.NewBasicOperator(conn, wholeFileExtractor, snowflake.NewMaterializer())
+		sfOperator := snowflake.NewBasicOperator(conn, wholeFileExtractor, snowflake.NewMaterializer(fullRefresh))
 
 		sfCheckRunner := snowflake.NewColumnCheckOperator(conn)
 		sfCustomCheckRunner := ansisql.NewCustomCheckOperator(conn)
@@ -405,8 +410,8 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuery) || estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuery) || estimateCustomCheckType == pipeline.AssetTypeSynapseQuery {
-		msOperator := mssql.NewBasicOperator(conn, wholeFileExtractor, mssql.NewMaterializer())
-		synapseOperator := synapse.NewBasicOperator(conn, wholeFileExtractor, synapse.NewMaterializer())
+		msOperator := mssql.NewBasicOperator(conn, wholeFileExtractor, mssql.NewMaterializer(fullRefresh))
+		synapseOperator := synapse.NewBasicOperator(conn, wholeFileExtractor, synapse.NewMaterializer(fullRefresh))
 
 		msCheckRunner := mssql.NewColumnCheckOperator(conn)
 
