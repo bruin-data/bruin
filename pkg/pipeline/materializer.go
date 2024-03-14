@@ -22,7 +22,7 @@ func (m *Materializer) Render(asset *Asset, query string) (string, error) {
 	}
 
 	strategy := mat.Strategy
-	if m.FullRefresh && mat.Type == MaterializationTypeTable && mat.Strategy != MaterializationStrategyNone {
+	if m.FullRefresh && mat.Type == MaterializationTypeTable {
 		strategy = MaterializationStrategyCreateReplace
 	}
 

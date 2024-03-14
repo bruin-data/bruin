@@ -22,7 +22,7 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 	}
 
 	strategy := mat.Strategy
-	if m.fullRefresh && mat.Type == pipeline.MaterializationTypeTable && mat.Strategy != pipeline.MaterializationStrategyNone {
+	if m.fullRefresh && mat.Type == pipeline.MaterializationTypeTable {
 		strategy = pipeline.MaterializationStrategyCreateReplace
 	}
 
