@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/synapse"
 	"io"
 	"os"
 	"strings"
@@ -34,7 +35,7 @@ func Render() *cli.Command {
 					pipeline.AssetTypeRedshiftQuery:  postgres.NewMaterializer(),
 					pipeline.AssetTypePostgresQuery:  postgres.NewMaterializer(),
 					pipeline.AssetTypeMsSQLQuery:     mssql.NewMaterializer(),
-					pipeline.AssetTypeSynapseQuery:   mssql.NewMaterializer(),
+					pipeline.AssetTypeSynapseQuery:   synapse.NewRenderer(false),
 				},
 				builder: DefaultPipelineBuilder,
 				writer:  os.Stdout,

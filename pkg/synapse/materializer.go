@@ -3,6 +3,7 @@ package synapse
 import (
 	"fmt"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"strings"
 )
 
 // The other packages all use a materializer that renders the query to a single string. Due to the quirks of synapse
@@ -24,6 +25,7 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 		strategy = pipeline.MaterializationStrategyCreateReplace
 	}
 
+	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
 	if matFunc, ok := m.MaterializationMap[mat.Type][strategy]; ok {
 		return matFunc(asset, query)
 	}
@@ -36,4 +38,24 @@ func NewMaterializer(fullRefresh bool) *Materializer {
 		MaterializationMap: matMap,
 		fullRefresh:        fullRefresh,
 	}
+}
+
+type Renderer struct {
+	mat *Materializer
+}
+
+func NewRenderer(fullRefresh bool) *Renderer {
+	return &Renderer{
+		mat: NewMaterializer(fullRefresh),
+	}
+}
+
+func (r *Renderer) Render(asset *pipeline.Asset, query string) (string, error) {
+	queries, err := r.mat.Render(asset, query)
+	if err != nil {
+		return "", err
+	}
+
+	result := strings.Join(queries, ";")
+	return result, nil
 }
