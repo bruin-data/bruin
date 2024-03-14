@@ -24,9 +24,10 @@ var matMap = pipeline.AssetMaterializationMap{
 	},
 }
 
-func NewMaterializer() *pipeline.Materializer {
+func NewMaterializer(fullRefresh bool) *pipeline.Materializer {
 	return &pipeline.Materializer{
 		MaterializationMap: matMap,
+		FullRefresh:        fullRefresh,
 	}
 }
 

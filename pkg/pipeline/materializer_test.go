@@ -52,7 +52,7 @@ func TestMaterializer_Render(t *testing.T) {
 
 			materializer := Materializer{
 				MaterializationMap: tt.matMap,
-				fullRefresh:        tt.fullRefresh,
+				FullRefresh:        tt.fullRefresh,
 			}
 
 			asset := &Asset{

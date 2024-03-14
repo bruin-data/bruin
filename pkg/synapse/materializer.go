@@ -2,13 +2,14 @@ package synapse
 
 import (
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"strings"
+
+	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
 // The other packages all use a materializer that renders the query to a single string. Due to the quirks of synapse
 // we need to create a different materializer that returns a slice of strings, since synapse server requires us to send separate batches
-// for certain things
+// for certain things.
 type Materializer struct {
 	MaterializationMap AssetMaterializationMap
 	fullRefresh        bool

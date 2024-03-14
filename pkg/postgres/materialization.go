@@ -8,9 +8,10 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
-func NewMaterializer() *pipeline.Materializer {
+func NewMaterializer(fullRefresh bool) *pipeline.Materializer {
 	return &pipeline.Materializer{
 		MaterializationMap: matMap,
+		FullRefresh:        fullRefresh,
 	}
 }
 

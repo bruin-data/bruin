@@ -12,7 +12,7 @@ type (
 
 type Materializer struct {
 	MaterializationMap AssetMaterializationMap
-	fullRefresh        bool
+	FullRefresh        bool
 }
 
 func (m *Materializer) Render(asset *Asset, query string) (string, error) {
@@ -22,7 +22,7 @@ func (m *Materializer) Render(asset *Asset, query string) (string, error) {
 	}
 
 	strategy := mat.Strategy
-	if m.fullRefresh && mat.Type == MaterializationTypeTable && mat.Strategy != MaterializationStrategyNone {
+	if m.FullRefresh && mat.Type == MaterializationTypeTable && mat.Strategy != MaterializationStrategyNone {
 		strategy = MaterializationStrategyCreateReplace
 	}
 
@@ -40,7 +40,7 @@ func (m *Materializer) Render(asset *Asset, query string) (string, error) {
 
 func removeComments(query string) string {
 	bytes := []byte(query)
-	re := regexp.MustCompile("(?s)/\\*.*?\\*/")
+	re := regexp.MustCompile(`/\* *@bruin[\s\w\S]*@bruin *\*/`)
 	newBytes := re.ReplaceAll(bytes, []byte(""))
 	return string(newBytes)
 }
