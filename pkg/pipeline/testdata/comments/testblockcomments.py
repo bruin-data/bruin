@@ -37,6 +37,7 @@ custom_checks:
 secrets:
     - key: secret1
       inject_as: INJECTED_SECRET1
+    - key: secret2
 
 @bruin """
 

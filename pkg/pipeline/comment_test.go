@@ -214,6 +214,10 @@ func Test_createTaskFromFile(t *testing.T) {
 						SecretKey:   "secret1",
 						InjectedKey: "INJECTED_SECRET1",
 					},
+					{
+						SecretKey:   "secret2",
+						InjectedKey: "secret2",
+					},
 				},
 				DependsOn: []string{"task1", "task2", "task3", "task4", "task5"},
 				Columns: []pipeline.Column{

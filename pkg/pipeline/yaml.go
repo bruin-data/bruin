@@ -264,7 +264,12 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 	}
 
 	for index, m := range definition.Secrets {
-		task.Secrets[index] = SecretMapping(m)
+		mapping := SecretMapping(m)
+		if mapping.InjectedKey == "" {
+			mapping.InjectedKey = mapping.SecretKey
+		}
+
+		task.Secrets[index] = mapping
 	}
 
 	return &task, nil
