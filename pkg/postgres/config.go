@@ -29,7 +29,7 @@ func (c Config) ToDBConnectionURI() string {
 		c.PoolMaxConns,
 	)
 	if c.Schema != "" {
-		connectionURI += "&search_path=%s" + c.Schema
+		connectionURI += "&search_path=" + c.Schema
 	}
 
 	return connectionURI
