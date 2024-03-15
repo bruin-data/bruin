@@ -34,3 +34,18 @@ func (c Config) ToDBConnectionURI() string {
 
 	return connectionURI
 }
+
+func (c Config) ToIngestrUrl() string {
+	connString := fmt.Sprintf("postgresql://%s:%s@%s/%s",
+		url.PathEscape(c.Username),
+		url.PathEscape(c.Password),
+		net.JoinHostPort(c.Host, strconv.Itoa(c.Port)),
+		c.Database,
+	)
+
+	if c.SslMode != "" {
+		connString += "?sslmode=" + c.SslMode
+	}
+
+	return connString
+}
