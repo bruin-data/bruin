@@ -36,7 +36,7 @@ func errorMaterializer(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {
-	return fmt.Sprintf("CREATE OR REPLACE VIEW `%s` AS\n%s", asset.Name, query), nil
+	return fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", asset.Name, query), nil
 }
 
 func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
@@ -83,7 +83,7 @@ func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
-	return fmt.Sprintf("INSERT INTO `%s` %s", asset.Name, query), nil
+	return fmt.Sprintf("INSERT INTO %s %s", asset.Name, query), nil
 }
 
 func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -98,8 +98,8 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 	queries := []string{
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, query),
-		fmt.Sprintf("DELETE FROM `%s` WHERE `%s` in (SELECT DISTINCT `%s` FROM %s)", asset.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
-		fmt.Sprintf("INSERT INTO `%s` SELECT * FROM %s", asset.Name, tempTableName),
+		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", asset.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
+		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", asset.Name, tempTableName),
 		"COMMIT TRANSACTION",
 	}
 
@@ -111,13 +111,13 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 
 	partitionClause := ""
 	if mat.PartitionBy != "" {
-		partitionClause = fmt.Sprintf("PARTITION BY `%s`", mat.PartitionBy)
+		partitionClause = "PARTITION BY " + mat.PartitionBy
 	}
 
 	clusterByClause := ""
 	if len(mat.ClusterBy) > 0 {
-		clusterByClause = fmt.Sprintf("CLUSTER BY `%s`", strings.Join(mat.ClusterBy, "`, `"))
+		clusterByClause = "CLUSTER BY " + strings.Join(mat.ClusterBy, ", ")
 	}
 
-	return fmt.Sprintf("CREATE OR REPLACE TABLE `%s` %s %s AS\n%s", asset.Name, partitionClause, clusterByClause, query), nil
+	return fmt.Sprintf("CREATE OR REPLACE TABLE %s %s %s AS\n%s", asset.Name, partitionClause, clusterByClause, query), nil
 }
