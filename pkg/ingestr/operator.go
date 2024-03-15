@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -14,6 +15,7 @@ import (
 )
 
 const IngestrVersion = "v0.2.2"
+const DockerImage = "ghcr.io/bruin-data/ingestr:" + IngestrVersion
 
 type BasicOperator struct {
 	client *client.Client
@@ -38,8 +40,7 @@ func NewBasicOperator(conn *connection.Manager) (*BasicOperator, error) {
 		return nil, fmt.Errorf("failed to fetch docker image: %s", err.Error())
 	}
 	defer reader.Close()
-	_, err = io.Copy(io.Discard, reader)
-	// _, err = io.Copy(os.Stdout, reader) // To see output
+	_, err = io.Copy(os.Stdout, reader)
 	if err != nil {
 		return nil, fmt.Errorf("error while copying output: %s", err.Error())
 	}
@@ -77,27 +78,28 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	if err != nil {
 		return errors.New("could not get the source uri")
 	}
-	destTable, ok := ti.GetAsset().Parameters["source_table"]
+	destTable, ok := ti.GetAsset().Parameters["destination_table"]
 	if !ok {
 		return errors.New("source table not configured")
 	}
-
+	
 	resp, err := o.client.ContainerCreate(ctx, &container.Config{
-		Image: "ingestr",
+		Image: DockerImage,
 		Cmd: []string{
-			"ingestr",
 			"ingest",
 			"--source-uri",
 			sourceURI,
 			"--source-table",
 			sourceTable,
-			"--destination-uri",
+			"--dest-uri",
 			destURI,
-			"--destination-table",
+			"--dest-table",
 			destTable,
+			"--yes",
 		},
-		Tty: false,
-		Env: []string{"FOO=bar"},
+		AttachStdout: true,
+		Tty:          false,
+		Env:          []string{},
 	}, nil, nil, nil, "")
 	if err != nil {
 		return fmt.Errorf("failed to create docker container: %s", err.Error())
@@ -116,6 +118,7 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 			return fmt.Errorf("failed after waiting for docker container to start: %s", err.Error())
 		}
 	case <-statusCh:
+		fmt.Println(statusCh)
 	}
 
 	return nil
