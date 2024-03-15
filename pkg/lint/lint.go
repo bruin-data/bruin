@@ -2,6 +2,7 @@ package lint
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -26,6 +27,23 @@ type Issue struct {
 	Task        *pipeline.Asset
 	Description string
 	Context     []string
+}
+
+func (i *Issue) MarshalJSON() ([]byte, error) {
+	ctx := make([]string, 0, len(i.Context))
+	if i.Context != nil {
+		ctx = i.Context
+	}
+
+	return json.Marshal(struct {
+		Asset       string   `json:"asset"`
+		Description string   `json:"description"`
+		Context     []string `json:"context"`
+	}{
+		Asset:       i.Task.Name,
+		Description: i.Description,
+		Context:     ctx,
+	})
 }
 
 type Rule interface {
@@ -189,7 +207,11 @@ func (l *Linter) extractPipelinesFromPath(rootPath string, pipelineDefinitionFil
 }
 
 type PipelineAnalysisResult struct {
-	Pipelines []*PipelineIssues
+	Pipelines []*PipelineIssues `json:"pipelines"`
+}
+
+func (p *PipelineAnalysisResult) MarshalJSON() ([]byte, error) {
+	return json.Marshal(p.Pipelines)
 }
 
 // ErrorCount returns the number of errors found in an analysis result.
@@ -207,6 +229,28 @@ func (p *PipelineAnalysisResult) ErrorCount() int {
 type PipelineIssues struct {
 	Pipeline *pipeline.Pipeline
 	Issues   map[Rule][]*Issue
+}
+
+func (p *PipelineIssues) MarshalJSON() ([]byte, error) {
+	issuesByAsset := make(map[string][]*Issue)
+
+	for _, issues := range p.Issues {
+		for _, issue := range issues {
+			if issue.Task == nil {
+				continue
+			}
+
+			issuesByAsset[issue.Task.Name] = append(issuesByAsset[issue.Task.Name], issue)
+		}
+	}
+
+	return json.Marshal(struct {
+		Pipeline string              `json:"pipeline"`
+		Issues   map[string][]*Issue `json:"issues"`
+	}{
+		Pipeline: p.Pipeline.Name,
+		Issues:   issuesByAsset,
+	})
 }
 
 func (l *Linter) LintPipelines(pipelines []*pipeline.Pipeline) (*PipelineAnalysisResult, error) {

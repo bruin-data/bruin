@@ -1,12 +1,14 @@
 package lint
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/fatih/color"
+	"github.com/pkg/errors"
 )
 
 type Printer struct {
@@ -31,6 +33,16 @@ func (l *Printer) PrintIssues(analysis *PipelineAnalysisResult) {
 	for _, pipelineIssues := range analysis.Pipelines {
 		l.printPipelineSummary(pipelineIssues)
 	}
+}
+
+func (l *Printer) PrintJSON(analysis *PipelineAnalysisResult) error {
+	jsonRes, err := json.MarshalIndent(analysis, "", "  ")
+	if err != nil {
+		return errors.Wrap(err, "failed to convert lint result to JSON")
+	}
+
+	fmt.Println(string(jsonRes))
+	return nil
 }
 
 func (l *Printer) printPipelineSummary(pipelineIssues *PipelineIssues) {

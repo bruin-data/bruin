@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	path2 "path"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
@@ -35,9 +37,20 @@ func Lint(isDebug *bool) *cli.Command {
 				Aliases: []string{"f"},
 				Usage:   "force the validation even if the environment is a production environment",
 			},
+			&cli.StringFlag{
+				Name:    "output",
+				Aliases: []string{"o"},
+				Usage:   "the output type, possible values are: plain, json",
+			},
 		},
 		Action: func(c *cli.Context) error {
-			fmt.Println()
+			// if the output is JSON then we intend to discard all the nicer pretty-print statements
+			// and only print the JSON output directly to the stdout
+			if c.String("output") == "json" {
+				color.Output = io.Discard
+			} else {
+				fmt.Println()
+			}
 
 			logger := makeLogger(*isDebug)
 
@@ -141,6 +154,15 @@ func Lint(isDebug *bool) *cli.Command {
 			}
 
 			printer := lint.Printer{RootCheckPath: rootPath}
+			if strings.ToLower(strings.TrimSpace(c.String("output"))) == "json" {
+				err = printer.PrintJSON(result)
+				if err != nil {
+					return cli.Exit(err.Error(), 1)
+				}
+
+				return nil
+			}
+
 			err = reportLintErrors(result, err, printer, asset)
 			if err != nil {
 				return cli.Exit("", 1)
