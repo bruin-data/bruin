@@ -25,7 +25,7 @@ func NewDB(c *Config) (*DB, error) {
 }
 
 func (db *DB) GetConnectionURI() (string, error) {
-	return db.config.ToDBConnectionURI(), nil
+	return db.config.ToIngestrURL(), nil
 }
 
 func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
