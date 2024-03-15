@@ -7,8 +7,8 @@ parameters:
   source_table: 'public.test_merge'
 
   destination: postgres
-  destination_connection: neon
-  destination_table: 'public.ingestr_destination'
+  destination_connection: local
+  destination_table: 'public.ingestr_destiny'
 
 
 columns:
