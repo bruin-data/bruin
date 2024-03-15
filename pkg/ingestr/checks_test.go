@@ -71,7 +71,7 @@ func TestColumnCheckOperatorOperator(t *testing.T) {
 					DefinitionFile:  pipeline.TaskDefinitionFile{},
 					Materialization: pipeline.Materialization{},
 					Parameters: map[string]string{
-						"destination": "pg.sql",
+						"destination": "postgres",
 					},
 				},
 			}
@@ -138,7 +138,7 @@ func TestCustomColumnCheckOperatorOperator(t *testing.T) {
 					DefinitionFile:  pipeline.TaskDefinitionFile{},
 					Materialization: pipeline.Materialization{},
 					Parameters: map[string]string{
-						"destination": "pg.sql",
+						"destination": "postgres",
 					},
 				},
 			}
