@@ -4,14 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"os"
-
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"io"
 )
 
 const IngestrVersion = "v0.2.2"
@@ -40,7 +38,8 @@ func NewBasicOperator(conn *connection.Manager) (*BasicOperator, error) {
 		return nil, fmt.Errorf("failed to fetch docker image: %s", err.Error())
 	}
 	defer reader.Close()
-	_, err = io.Copy(os.Stdout, reader)
+	_, err = io.Copy(io.Discard, reader)
+	// _, err = io.Copy(os.Stdout, reader)
 	if err != nil {
 		return nil, fmt.Errorf("error while copying output: %s", err.Error())
 	}
@@ -82,7 +81,7 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	if !ok {
 		return errors.New("source table not configured")
 	}
-	
+
 	resp, err := o.client.ContainerCreate(ctx, &container.Config{
 		Image: DockerImage,
 		Cmd: []string{
@@ -97,9 +96,8 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 			destTable,
 			"--yes",
 		},
-		AttachStdout: true,
-		Tty:          false,
-		Env:          []string{},
+		// AttachStdout: true,
+		Env: []string{},
 	}, nil, nil, nil, "")
 	if err != nil {
 		return fmt.Errorf("failed to create docker container: %s", err.Error())
@@ -118,7 +116,7 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 			return fmt.Errorf("failed after waiting for docker container to start: %s", err.Error())
 		}
 	case <-statusCh:
-		fmt.Println(statusCh)
+		return nil
 	}
 
 	return nil
