@@ -1,4 +1,4 @@
-name: ingestor_test
+name: public.ingestr_destiny
 type: ingestr
 
 parameters:
@@ -12,17 +12,14 @@ parameters:
 
 
 columns:
-  - name: one
+  - name: id
     type: integer
     description: "Just a number"
     checks:
-      - name: unique
       - name: not_null
       - name: positive
-      - name: accepted_values
-        value: [1, 2]
 
 custom_checks:
   - name: This is a custom check name
-    value: 2
-    query: select count(*) from hello_ms
+    value: 6
+    query: select count(*) from public.ingestr_destiny
