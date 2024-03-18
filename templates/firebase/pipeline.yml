@@ -1,0 +1,5 @@
+name: firebase #TODO: Change this to the name of your pipeline
+schedule: daily
+start_date: "2024-01-01" #TODO: Change this to the date you want the pipeline to start running
+default_connections:
+    google_cloud_platform: gcp

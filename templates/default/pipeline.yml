@@ -3,4 +3,4 @@ schedule: daily
 start_date: "2023-03-20"
 
 default_connections:
-#  postgres: "example-postgres"
+    google_cloud_platform: gcp
