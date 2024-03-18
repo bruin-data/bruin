@@ -33,7 +33,7 @@ func Init(isDebug *bool) *cli.Command {
 		Name:  "init",
 		Usage: "init a Bruin pipeline",
 		ArgsUsage: fmt.Sprintf(
-			"[name of the folder where the pipeline will be created [template name to be used:%s]]",
+			"[name of the folder where the pipeline will be created] [template name to be used: %s]",
 			strings.Join(templateList, "|"),
 		),
 		Flags: []cli.Flag{},
@@ -76,7 +76,7 @@ func Init(isDebug *bool) *cli.Command {
 			}
 			_, err = templates.Templates.ReadDir(templateName)
 			if err != nil {
-				errorPrinter.Printf("Template %s not found\n", templateName)
+				errorPrinter.Printf("Template '%s' not found\n", templateName)
 				return cli.Exit("", 1)
 			}
 
@@ -105,17 +105,21 @@ func Init(isDebug *bool) *cli.Command {
 				absolutePath := inputPath + relativePath
 
 				// ignore the error
-				_ = os.Mkdir(absolutePath, os.ModePerm)
+				err = os.MkdirAll(absolutePath, os.ModePerm)
+				if err != nil {
+					errorPrinter.Printf("Could not create the %s folder: %v\n", absolutePath, err)
+					return err
+				}
 
 				err = os.WriteFile(filepath.Join(absolutePath, baseName), fileContents, 0o644) //nolint:gosec
 				if err != nil {
-					errorPrinter.Printf("Could not write the %s file\n, %v", filepath.Join(absolutePath, baseName), err)
+					errorPrinter.Printf("Could not write the %s file: %v\n", filepath.Join(absolutePath, baseName), err)
 					return err
 				}
 
 				_, err = config.LoadOrCreate(afero.NewOsFs(), path2.Join(inputPath, ".bruin.yml"))
 				if err != nil {
-					errorPrinter.Printf("Could not write .bruin.yml file\n, %v", err)
+					errorPrinter.Printf("Could not write .bruin.yml file: %v\n", err)
 					return err
 				}
 
