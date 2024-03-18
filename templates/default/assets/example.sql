@@ -1,7 +1,7 @@
 /* @bruin
 
 name: example
-type: pg.sql
+type: bq.sql
 
 materialization:
    type: table
@@ -41,6 +41,3 @@ union all
 SELECT 3 as id, 'France' as country , 'Antoine' as name
 union all
 SELECT 4 as id, 'Poland' as country , 'Franciszek' as name
-
-
-

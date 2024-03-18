@@ -1,0 +1,5 @@
+name: analytics_123456789.events #TODO: Change 123456789 to your analytics ID
+type: bq.sensor.query
+parameters:
+    query: "SELECT EXISTS (SELECT 1 FROM analytics_123456789.events_intraday_{{ end_date_nodash }} )" #TODO: Change 123456789 to your analytics ID
+    location: europe-west1
