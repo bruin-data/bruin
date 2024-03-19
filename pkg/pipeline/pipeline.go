@@ -228,7 +228,7 @@ type Column struct {
 
 type AssetType string
 
-var assetTypeConnectionMapping = map[AssetType][]string{
+var AssetTypeConnectionMapping = map[AssetType][]string{
 	AssetTypeBigqueryQuery:        {"google_cloud_platform", "gcp"},
 	AssetTypeSnowflakeQuery:       {"snowflake", "sf"},
 	AssetTypeSnowflakeQuerySensor: {"snowflake", "sf"},
@@ -413,7 +413,11 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) string {
 		return asset.Connection
 	}
 
-	mappings := assetTypeConnectionMapping[asset.Type]
+	if asset.Type == AssetTypeIngestr {
+		return asset.Parameters["destination_connection"]
+	}
+
+	mappings := AssetTypeConnectionMapping[asset.Type]
 	if mappings == nil {
 		return ""
 	}

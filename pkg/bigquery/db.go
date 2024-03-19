@@ -33,6 +33,7 @@ type DB interface {
 
 type Client struct {
 	client *bigquery.Client
+	config *Config
 }
 
 func NewDB(c *Config) (*Client, error) {
@@ -66,7 +67,12 @@ func NewDB(c *Config) (*Client, error) {
 
 	return &Client{
 		client: client,
+		config: c,
 	}, nil
+}
+
+func (d *Client) GetConnectionURI() (string, error) {
+	return d.config.GetConnectionURI()
 }
 
 func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {

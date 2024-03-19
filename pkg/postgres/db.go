@@ -12,6 +12,7 @@ import (
 
 type Client struct {
 	connection connection
+	config     *Config
 }
 
 type connection interface {
@@ -25,7 +26,7 @@ func NewClient(ctx context.Context, c Config) (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{connection: conn}, nil
+	return &Client{connection: conn, config: &c}, nil
 }
 
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
@@ -35,6 +36,10 @@ func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) 
 	}
 
 	return nil
+}
+
+func (c *Client) GetConnectionURI() (string, error) {
+	return c.config.ToIngestrURL(), nil
 }
 
 // Select runs a query and returns the results.

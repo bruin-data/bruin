@@ -473,6 +473,11 @@ func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 		Type:       pipeline.AssetType("sf.sql"),
 		Connection: "custom-connection",
 	}
+	asset4 := &pipeline.Asset{
+		Name:       "asset4",
+		Type:       pipeline.AssetType("ingestr"),
+		Parameters: map[string]string{"destination_connection": "connection2"},
+	}
 
 	pipeline1 := &pipeline.Pipeline{
 		Name: "pipeline1",
@@ -486,6 +491,7 @@ func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 	assert.Equal(t, "connection1", pipeline1.GetConnectionNameForAsset(asset1))
 	assert.Equal(t, "connection2", pipeline1.GetConnectionNameForAsset(asset2))
 	assert.Equal(t, "custom-connection", pipeline1.GetConnectionNameForAsset(asset3))
+	assert.Equal(t, "connection2", pipeline1.GetConnectionNameForAsset(asset4))
 }
 
 func intPointer(i int) *int {
