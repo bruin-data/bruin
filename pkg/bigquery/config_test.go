@@ -1,9 +1,10 @@
 package bigquery
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2/google"
-	"testing"
 )
 
 func TestConfig_GetConnectionURI(t *testing.T) {

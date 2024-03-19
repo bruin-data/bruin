@@ -23,7 +23,7 @@ func GetIngestrDestinationType(asset *pipeline.Asset) (pipeline.AssetType, error
 			break
 		}
 	}
-	
+
 	if assetType == "" {
 		return "", fmt.Errorf("unknown asset type %s", value)
 	}

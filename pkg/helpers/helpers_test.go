@@ -1,10 +1,11 @@
 package helpers
 
 import (
+	"testing"
+
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestGetIngestrDestinationType(t *testing.T) {
@@ -46,12 +47,13 @@ func TestGetIngestrDestinationType(t *testing.T) {
 	}
 
 	for _, tc := range tt {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			assetType, error := GetIngestrDestinationType(tc.asset)
+			assetType, err := GetIngestrDestinationType(tc.asset)
 			if tc.wantErr {
-				require.Error(t, error)
+				require.Error(t, err)
 			} else {
 				assert.Equal(t, tc.want, assetType)
 			}

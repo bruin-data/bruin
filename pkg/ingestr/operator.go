@@ -4,16 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
-	"io"
 )
 
-const IngestrVersion = "v0.2.2"
-const DockerImage = "ghcr.io/bruin-data/ingestr:" + IngestrVersion
+const (
+	IngestrVersion = "v0.2.2"
+	DockerImage    = "ghcr.io/bruin-data/ingestr:" + IngestrVersion
+)
 
 type BasicOperator struct {
 	client *client.Client

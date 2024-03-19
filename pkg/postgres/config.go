@@ -35,7 +35,7 @@ func (c Config) ToDBConnectionURI() string {
 	return connectionURI
 }
 
-func (c Config) ToIngestrUrl() string {
+func (c Config) ToIngestrURL() string {
 	connString := fmt.Sprintf("postgresql://%s:%s@%s/%s",
 		url.PathEscape(c.Username),
 		url.PathEscape(c.Password),
