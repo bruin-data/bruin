@@ -4,13 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"io"
 )
 
 const (
@@ -19,7 +21,7 @@ const (
 )
 
 type BasicOperator struct {
-	client *client.Client
+	client containerClient
 	conn   *connection.Manager
 }
 
@@ -27,9 +29,19 @@ type pipelineConnection interface {
 	GetConnectionURI() (string, error)
 }
 
-func NewBasicOperator(conn *connection.Manager) (*BasicOperator, error) {
+type containerClient interface {
+	Close() error
+	ImagePull(ctx context.Context, refStr string, options types.ImagePullOptions) (io.ReadCloser, error)
+	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (container.CreateResponse, error)
+	ContainerStart(ctx context.Context, container string, options container.StartOptions) error
+	ContainerWait(ctx context.Context, container string, condition container.WaitCondition) (<-chan container.WaitResponse, <-chan error)
+}
+
+type clientInitiator func(ops ...client.Opt) (*client.Client, error)
+
+func NewBasicOperator(conn *connection.Manager, initiator clientInitiator) (*BasicOperator, error) {
 	ctx := context.TODO()
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	dockerClient, err := initiator(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client: %s", err.Error())
 	}

@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/docker/docker/client"
 	"io"
 	"log"
 	"os"
@@ -433,7 +434,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeIngestr) || estimateCustomCheckType == pipeline.AssetTypeIngestr {
-		ingestrOperator, err := ingestr.NewBasicOperator(conn)
+		ingestrOperator, err := ingestr.NewBasicOperator(conn, client.NewClientWithOpts)
 		if err != nil {
 			return nil, err
 		}
