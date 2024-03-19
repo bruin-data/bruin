@@ -11,7 +11,7 @@ import (
 func TestGetIngestrDestinationType(t *testing.T) {
 	t.Parallel()
 
-	tt := []struct {
+	tests := []struct {
 		name    string
 		asset   *pipeline.Asset
 		want    pipeline.AssetType
@@ -30,7 +30,7 @@ func TestGetIngestrDestinationType(t *testing.T) {
 			name: "gcp",
 			asset: &pipeline.Asset{
 				Parameters: map[string]string{
-					"destination": "postgres",
+					"destination": "gcp",
 				},
 			},
 			want: pipeline.AssetTypeBigqueryQuery,
@@ -46,7 +46,7 @@ func TestGetIngestrDestinationType(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tt {
+	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
