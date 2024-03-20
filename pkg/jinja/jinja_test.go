@@ -172,6 +172,11 @@ func TestJinjaRendererWithStartEndDate(t *testing.T) {
 			want:  "2022-02-04, 2022-02-07T04:00:00, 2022-02-07T04:00:00.948740Z, 2022-02-06",
 		},
 		{
+			name:  "simple render for ds",
+			query: "{{ end_date }}, {{ end_datetime | date_add(3) }}, {{ end_timestamp | date_add(3) }}, {{ end_timestamp | date_add(2) | date_format('%Y-%m-%d') }}",
+			want:  "2022-02-04, 2022-02-07T04:00:00, 2022-02-07T04:00:00.948740Z, 2022-02-06",
+		},
+		{
 			name:  "things that are not in the template should be remove",
 			query: "set analysis_end_date = '{{ whatever }}'::date;",
 			want:  "set analysis_end_date = ''::date;",

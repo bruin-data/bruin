@@ -18,6 +18,11 @@ func init() { //nolint:gochecknoinits
 		panic(err)
 	}
 
+	err = Filters.Register("date_add", addDays)
+	if err != nil {
+		panic(err)
+	}
+
 	err = Filters.Register("date_format", formatDate)
 	if err != nil {
 		panic(err)
