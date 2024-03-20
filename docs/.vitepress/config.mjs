@@ -27,6 +27,13 @@ export default defineConfig({
                     {text: "Definition Schema", link: "/assets/definition-schema"},
                 ],
             },
+            {
+                text: "Templating",
+                items: [
+                    {text: "Overview", link: "/templating/templating"},
+                    {text: "Filters", link: "/templating/filters"},
+                ],
+            },
         ],
 
         socialLinks: [{icon: "github", link: "https://github.com/bruin-data/bruin"}],

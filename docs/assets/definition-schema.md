@@ -49,13 +49,13 @@ Must consist of letters and dot `.` character.
 The type of the asset, determines how the execution will happen. Must be one of the types [here](https://github.com/bruin-data/bruin/blob/main/pkg/executor/defaults.go).
 - **Type:** `String` 
 
-## `depends`:
+## `depends`
 The list of assets this asset depends on. This list determines the execution order.
 In other words, the asset will be executed only when all of the assets in the `depends` list have succeeded.
 - **Type:** `String[]`
 
 ## `materialization`
-This option determines how the asset will be materialized. Bruin knows about various materialization strategies, refer to the docs on [materialization](./materialization.md) for more details.
+This option determines how the asset will be materialized. Bruin knows about various materialization strategies, refer to the docs on [materialization](./templating) for more details.
 
 - **Type:** `Object`
 - **Keys:** 
@@ -117,4 +117,30 @@ This is the column of the table that will be used for incremental updates of the
 
 ## `columns`
 
-This is a list that contains  
+This is a list that contains all the columns defined with the asset, along with their quality checks and other metadata.
+
+Here's an example column definition:
+```yaml
+columns:
+  - name: one
+    type: integer
+    description: "Just a number"
+    checks:
+        - name: unique
+        - name: not_null
+        - name: positive
+        - name: accepted_values
+          value: [1, 2]
+```
+
+Here's the underlying data type that represents the columns:
+```go
+type Column struct {
+	Name          string        `json:"name"`
+	Type          string        `json:"type"`
+	Description   string        `json:"description"`
+	Checks        []ColumnCheck `json:"checks"`
+	PrimaryKey    bool          `json:"primary_key"`
+	UpdateOnMerge bool          `json:"update_on_merge"`
+}
+```

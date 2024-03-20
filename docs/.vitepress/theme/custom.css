@@ -11,9 +11,8 @@
   --vp-c-bruin-800: "#741C1C";
   --vp-c-bruin-900: "#471111";
   --vp-c-bruin-950: "#300B0B";
-  
-  --vp-c-brand: var(--vp-c-bruin-500);
-  --vp-c-brand-1: var(--vp-c-bruin-500);
-  --vp-c-brand-2: var(--vp-c-bruin-600);
-  --vp-c-brand-3: var(--vp-c-bruin-500);
+
+  --vp-c-brand-1: #d95f5f;
+  --vp-c-brand-2: #e18080;
+  --vp-c-brand-3: #d95f5f;
 }
