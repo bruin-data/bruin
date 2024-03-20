@@ -29,8 +29,23 @@ func (c Config) ToDBConnectionURI() string {
 		c.PoolMaxConns,
 	)
 	if c.Schema != "" {
-		connectionURI += "&search_path=%s" + c.Schema
+		connectionURI += "&search_path=" + c.Schema
 	}
 
 	return connectionURI
+}
+
+func (c Config) ToIngestrURL() string {
+	connString := fmt.Sprintf("postgresql://%s:%s@%s/%s",
+		url.PathEscape(c.Username),
+		url.PathEscape(c.Password),
+		net.JoinHostPort(c.Host, strconv.Itoa(c.Port)),
+		c.Database,
+	)
+
+	if c.SslMode != "" {
+		connString += "?sslmode=" + c.SslMode
+	}
+
+	return connString
 }

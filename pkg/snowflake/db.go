@@ -16,7 +16,8 @@ const (
 )
 
 type DB struct {
-	conn *sqlx.DB
+	conn   *sqlx.DB
+	config *Config
 }
 
 func NewDB(c *Config) (*DB, error) {
@@ -32,12 +33,16 @@ func NewDB(c *Config) (*DB, error) {
 		return nil, errors.Wrapf(err, "failed to connect to snowflake")
 	}
 
-	return &DB{conn: db}, nil
+	return &DB{conn: db, config: c}, nil
 }
 
 func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
 	_, err := db.Select(ctx, query)
 	return err
+}
+
+func (db *DB) GetConnectionURI() (string, error) {
+	return db.config.DSN()
 }
 
 func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {

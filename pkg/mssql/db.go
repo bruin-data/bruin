@@ -11,7 +11,8 @@ import (
 )
 
 type DB struct {
-	conn *sqlx.DB
+	conn   *sqlx.DB
+	config *Config
 }
 
 func NewDB(c *Config) (*DB, error) {
@@ -20,7 +21,11 @@ func NewDB(c *Config) (*DB, error) {
 		return nil, err
 	}
 
-	return &DB{conn: conn}, nil
+	return &DB{conn: conn, config: c}, nil
+}
+
+func (db *DB) GetConnectionURI() (string, error) {
+	return db.config.ToIngestrURL(), nil
 }
 
 func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {

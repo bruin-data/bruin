@@ -354,6 +354,12 @@ func TestScheduler_WillRunTaskOfType(t *testing.T) {
 		},
 	}
 
+	t1000 := &pipeline.Asset{
+		Name:       "task4000",
+		Type:       "ingestr",
+		Parameters: map[string]string{"destination": "postgres"},
+	}
+
 	p := &pipeline.Pipeline{
 		Assets: []*pipeline.Asset{
 			{
@@ -389,20 +395,23 @@ func TestScheduler_WillRunTaskOfType(t *testing.T) {
 				DependsOn: []string{"task13", "task3"},
 				Type:      "empty",
 			},
+			t1000,
 		},
 	}
 
 	s := NewScheduler(zap.NewNop().Sugar(), p)
 	s.MarkAll(Succeeded)
 	s.MarkTask(t12, Pending, true)
+	s.MarkTask(t1000, Pending, true)
 
-	assert.Equal(t, 9, s.InstanceCount())
-	assert.Equal(t, 5, s.InstanceCountByStatus(Pending))
+	assert.Equal(t, 10, s.InstanceCount())
+	assert.Equal(t, 6, s.InstanceCountByStatus(Pending))
 	assert.False(t, s.WillRunTaskOfType("sf.sql"))
 	assert.False(t, s.WillRunTaskOfType("random"))
 	assert.True(t, s.WillRunTaskOfType("bq.sql"))
 	assert.True(t, s.WillRunTaskOfType("python"))
 	assert.True(t, s.WillRunTaskOfType("empty"))
+	assert.True(t, s.WillRunTaskOfType("pg.sql"))
 }
 
 func TestScheduler_FindMajorityOfTypes(t *testing.T) {
