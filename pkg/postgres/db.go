@@ -12,7 +12,12 @@ import (
 
 type Client struct {
 	connection connection
-	config     *Config
+	config     PgConfig
+}
+
+type PgConfig interface {
+	ToDBConnectionURI() string
+	GetIngestrURI() string
 }
 
 type connection interface {
@@ -20,13 +25,13 @@ type connection interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 }
 
-func NewClient(ctx context.Context, c Config) (*Client, error) {
+func NewClient(ctx context.Context, c PgConfig) (*Client, error) {
 	conn, err := pgxpool.New(ctx, c.ToDBConnectionURI())
 	if err != nil {
 		return nil, err
 	}
 
-	return &Client{connection: conn, config: &c}, nil
+	return &Client{connection: conn, config: c}, nil
 }
 
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
