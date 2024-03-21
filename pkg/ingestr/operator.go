@@ -1,6 +1,7 @@
 package ingestr
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -99,8 +100,10 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 			destTable,
 			"--yes",
 		},
-		// AttachStdout: true,
-		Env: []string{},
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          true,
+		Env:          []string{},
 	}, nil, nil, nil, "")
 	if err != nil {
 		return fmt.Errorf("failed to create docker container: %s", err.Error())
@@ -110,6 +113,24 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	if err != nil {
 		return fmt.Errorf("failed to start docker container: %s", err.Error())
 	}
+
+	go func() {
+		reader, err := o.client.ContainerLogs(context.Background(), resp.ID, container.LogsOptions{
+			ShowStdout: true,
+			ShowStderr: true,
+			Follow:     true,
+			Timestamps: false,
+		})
+		if err != nil {
+			panic(err)
+		}
+		defer reader.Close()
+
+		scanner := bufio.NewScanner(reader)
+		for scanner.Scan() {
+			fmt.Println(scanner.Text())
+		}
+	}()
 
 	statusCh, errCh := o.client.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 
