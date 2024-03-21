@@ -4,14 +4,13 @@ import (
 	"encoding/json"
 	errors "errors"
 	"fmt"
-	fs2 "io/fs"
-	"os"
-	"path"
-
 	"github.com/bruin-data/bruin/pkg/git"
 	path2 "github.com/bruin-data/bruin/pkg/path"
 	"github.com/spf13/afero"
 	"golang.org/x/oauth2/google"
+	fs2 "io/fs"
+	"os"
+	"path"
 )
 
 type PostgresConnection struct {
@@ -41,6 +40,7 @@ type GoogleCloudPlatformConnection struct {
 	ServiceAccountFile string `yaml:"service_account_file"`
 	ProjectID          string `yaml:"project_id"`
 	rawCredentials     *google.Credentials
+	Location           string `yaml:"location"`
 }
 
 func (c *GoogleCloudPlatformConnection) SetCredentials(cred *google.Credentials) {

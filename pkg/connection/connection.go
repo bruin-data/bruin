@@ -146,6 +146,7 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 		CredentialsFilePath: connection.ServiceAccountFile,
 		CredentialsJSON:     connection.ServiceAccountJSON,
 		Credentials:         connection.GetCredentials(),
+		Location:            connection.Location,
 	})
 	if err != nil {
 		return err

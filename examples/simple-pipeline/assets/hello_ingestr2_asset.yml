@@ -1,0 +1,25 @@
+name: test_data_alberto.ingestr_destiny_2
+type: ingestr
+
+parameters:
+  source: postgres
+  source_connection: neon
+  source_table: 'public.test_merge'
+
+  destination: google_cloud_platform
+  destination_connection: alberto-gcp
+  destination_table: 'test_data_alberto.ingestr_destiny_2'
+
+
+columns:
+  - name: id
+    type: integer
+    description: "Just a number"
+    checks:
+      - name: not_null
+      - name: positive
+
+custom_checks:
+  - name: This is a custom check name
+    value: 6
+    query: select count(*) from test_data_alberto.ingestr_destiny_2
