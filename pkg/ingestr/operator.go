@@ -5,7 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"io"
+	"strings"
 
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -100,7 +102,7 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 			destTable,
 			"--yes",
 		},
-		AttachStdout: true,
+		AttachStdout: false,
 		AttachStderr: true,
 		Tty:          true,
 		Env:          []string{},
@@ -127,8 +129,18 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		defer reader.Close()
 
 		scanner := bufio.NewScanner(reader)
+
+		if ctx.Value(executor.KeyPrinter) == nil {
+			return
+		}
+		writer := ctx.Value(executor.KeyPrinter).(io.Writer)
+
 		for scanner.Scan() {
-			fmt.Println(scanner.Text())
+			message := scanner.Text()
+			if !strings.HasSuffix(message, "\n") {
+				message += "\n"
+			}
+			_, _ = writer.Write([]byte(message))
 		}
 	}()
 
