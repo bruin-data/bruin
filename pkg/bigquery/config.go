@@ -46,3 +46,7 @@ func (c Config) GetConnectionURI() (string, error) {
 
 	return URI, nil
 }
+
+func (c Config) GetIngestrURI() (string, error) {
+	return c.GetConnectionURI()
+}

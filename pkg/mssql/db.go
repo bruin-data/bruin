@@ -24,8 +24,8 @@ func NewDB(c *Config) (*DB, error) {
 	return &DB{conn: conn, config: c}, nil
 }
 
-func (db *DB) GetConnectionURI() (string, error) {
-	return db.config.ToIngestrURL(), nil
+func (db *DB) GetIngestrURI() (string, error) {
+	return db.config.GetIngestrURI(), nil
 }
 
 func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {

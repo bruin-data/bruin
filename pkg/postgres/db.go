@@ -38,8 +38,8 @@ func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) 
 	return nil
 }
 
-func (c *Client) GetConnectionURI() (string, error) {
-	return c.config.ToIngestrURL(), nil
+func (c *Client) GetIngestrURI() (string, error) {
+	return c.config.GetIngestrURI(), nil
 }
 
 // Select runs a query and returns the results.

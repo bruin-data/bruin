@@ -24,7 +24,7 @@ type BasicOperator struct {
 }
 
 type pipelineConnection interface {
-	GetConnectionURI() (string, error)
+	GetIngestrURI() (string, error)
 }
 
 func NewBasicOperator(conn *connection.Manager) (*BasicOperator, error) {
@@ -59,7 +59,7 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	if err != nil {
 		return fmt.Errorf("source connection %s not found", sourceConnectionName)
 	}
-	sourceURI, err := sourceConnection.(pipelineConnection).GetConnectionURI()
+	sourceURI, err := sourceConnection.(pipelineConnection).GetIngestrURI()
 	if err != nil {
 		return errors.New("could not get the source uri")
 	}
@@ -76,7 +76,7 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	if err != nil {
 		return fmt.Errorf("destination connection %s not found", destConnectionName)
 	}
-	destURI, err := destConnection.(pipelineConnection).GetConnectionURI()
+	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
 	if err != nil {
 		return errors.New("could not get the source uri")
 	}

@@ -35,5 +35,5 @@ func TestConfig_ToIngestr(t *testing.T) {
 		SslMode:      "disable",
 	}
 
-	assert.Equal(t, "postgresql://user:password@localhost:5432/database?sslmode=disable", c.ToIngestrURL())
+	assert.Equal(t, "postgresql://user:password@localhost:5432/database?sslmode=disable", c.GetIngestrURI())
 }

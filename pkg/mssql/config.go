@@ -30,7 +30,7 @@ func (c *Config) ToDBConnectionURI() string {
 	return u.String()
 }
 
-func (c *Config) ToIngestrURL() string {
+func (c *Config) GetIngestrURI() string {
 	u := &url.URL{
 		Scheme: "mssql",
 		User:   url.UserPassword(c.Username, c.Password),
