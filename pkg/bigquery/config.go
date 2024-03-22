@@ -38,5 +38,15 @@ func (c Config) GetConnectionURI() (string, error) {
 		return "", errors.New("could not find google credentials")
 	}
 
-	return fmt.Sprintf("bigquery://%s?credentials_base64=%s", c.ProjectID, base64.StdEncoding.EncodeToString(creds)), nil
+	URI := fmt.Sprintf("bigquery://%s?credentials_base64=%s", c.ProjectID, base64.StdEncoding.EncodeToString(creds))
+
+	if c.Location != "" {
+		URI += "&location=" + c.Location
+	}
+
+	return URI, nil
+}
+
+func (c Config) GetIngestrURI() (string, error) {
+	return c.GetConnectionURI()
 }

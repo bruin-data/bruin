@@ -1,10 +1,13 @@
 package ingestr
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"io"
+	"strings"
 
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -24,7 +27,7 @@ type BasicOperator struct {
 }
 
 type pipelineConnection interface {
-	GetConnectionURI() (string, error)
+	GetIngestrURI() (string, error)
 }
 
 func NewBasicOperator(conn *connection.Manager) (*BasicOperator, error) {
@@ -59,7 +62,7 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	if err != nil {
 		return fmt.Errorf("source connection %s not found", sourceConnectionName)
 	}
-	sourceURI, err := sourceConnection.(pipelineConnection).GetConnectionURI()
+	sourceURI, err := sourceConnection.(pipelineConnection).GetIngestrURI()
 	if err != nil {
 		return errors.New("could not get the source uri")
 	}
@@ -76,7 +79,7 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	if err != nil {
 		return fmt.Errorf("destination connection %s not found", destConnectionName)
 	}
-	destURI, err := destConnection.(pipelineConnection).GetConnectionURI()
+	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
 	if err != nil {
 		return errors.New("could not get the source uri")
 	}
@@ -99,8 +102,10 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 			destTable,
 			"--yes",
 		},
-		// AttachStdout: true,
-		Env: []string{},
+		AttachStdout: false,
+		AttachStderr: true,
+		Tty:          true,
+		Env:          []string{},
 	}, nil, nil, nil, "")
 	if err != nil {
 		return fmt.Errorf("failed to create docker container: %s", err.Error())
@@ -110,6 +115,34 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	if err != nil {
 		return fmt.Errorf("failed to start docker container: %s", err.Error())
 	}
+
+	go func() {
+		reader, err := o.client.ContainerLogs(context.Background(), resp.ID, container.LogsOptions{
+			ShowStdout: true,
+			ShowStderr: true,
+			Follow:     true,
+			Timestamps: false,
+		})
+		if err != nil {
+			panic(err)
+		}
+		defer reader.Close()
+
+		scanner := bufio.NewScanner(reader)
+
+		if ctx.Value(executor.KeyPrinter) == nil {
+			return
+		}
+		writer := ctx.Value(executor.KeyPrinter).(io.Writer)
+
+		for scanner.Scan() {
+			message := scanner.Text()
+			if !strings.HasSuffix(message, "\n") {
+				message += "\n"
+			}
+			_, _ = writer.Write([]byte(message))
+		}
+	}()
 
 	statusCh, errCh := o.client.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 

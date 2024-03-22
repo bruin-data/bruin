@@ -1,0 +1,26 @@
+name: public.ingestr_destiny_3
+type: ingestr
+
+parameters:
+  source: google_cloud_platform
+  source_connection: alberto-gcp
+  source_table: 'test_data_alberto.ingestr_destiny_2'
+
+  destination: redshift
+  destination_connection: redshift-aws
+  destination_table: 'public.ingestr_destiny_3'
+
+
+
+columns:
+  - name: id
+    type: integer
+    description: "Just a number"
+    checks:
+      - name: not_null
+      - name: positive
+
+custom_checks:
+  - name: This is a custom check name
+    value: 6
+    query: select count(*) from public.ingestr_destiny_3

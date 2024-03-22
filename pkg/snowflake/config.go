@@ -30,6 +30,10 @@ func (c Config) DSN() (string, error) {
 	return gosnowflake.DSN(&snowflakeConfig)
 }
 
+func (c Config) GetIngestrURI() (string, error) {
+	return c.DSN()
+}
+
 func (c Config) IsValid() bool {
 	return c.Account != "" && c.Username != "" && c.Password != "" && c.Region != ""
 }

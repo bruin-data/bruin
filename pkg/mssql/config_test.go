@@ -29,5 +29,5 @@ func TestConfig_ToIngestr(t *testing.T) {
 		Database: "database",
 	}
 
-	assert.Equal(t, "mssql://user:password@localhost:1433/database", c.ToIngestrURL())
+	assert.Equal(t, "mssql://user:password@localhost:1433/database", c.GetIngestrURI())
 }

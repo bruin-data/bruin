@@ -71,8 +71,8 @@ func NewDB(c *Config) (*Client, error) {
 	}, nil
 }
 
-func (d *Client) GetConnectionURI() (string, error) {
-	return d.config.GetConnectionURI()
+func (d *Client) GetIngestrURI() (string, error) {
+	return d.config.GetIngestrURI()
 }
 
 func (d *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {

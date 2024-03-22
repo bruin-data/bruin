@@ -41,8 +41,8 @@ func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) err
 	return err
 }
 
-func (db *DB) GetConnectionURI() (string, error) {
-	return db.config.DSN()
+func (db *DB) GetIngestrURI() (string, error) {
+	return db.config.GetIngestrURI()
 }
 
 func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {

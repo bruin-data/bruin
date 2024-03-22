@@ -45,7 +45,7 @@ func TestConfig_GetConnectionURI(t *testing.T) {
 			Credentials:         nil,
 			Location:            "location",
 			wantErr:             false,
-			Expected:            "bigquery://project-id?credentials_base64=eyJjcmVkcyI6InNvbWUtY3JlZHMifQ==",
+			Expected:            "bigquery://project-id?credentials_base64=eyJjcmVkcyI6InNvbWUtY3JlZHMifQ==&location=location",
 		},
 		{
 			Name:                "creds json",
@@ -55,7 +55,7 @@ func TestConfig_GetConnectionURI(t *testing.T) {
 			Credentials:         nil,
 			Location:            "location",
 			wantErr:             false,
-			Expected:            "bigquery://project-id?credentials_base64=eyJjcmVkcyI6InNvbWUtY3JlZHMifQ==",
+			Expected:            "bigquery://project-id?credentials_base64=eyJjcmVkcyI6InNvbWUtY3JlZHMifQ==&location=location",
 		},
 	}
 	for _, tt := range tests {
