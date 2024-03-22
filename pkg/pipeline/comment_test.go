@@ -151,6 +151,7 @@ func Test_createTaskFromFile(t *testing.T) {
 				},
 				Connection: "conn1",
 				Image:      "python:3.11",
+				Instance:   "b1.nano",
 				Secrets:    []pipeline.SecretMapping{},
 				DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
 				Columns: []pipeline.Column{
@@ -208,7 +209,8 @@ func Test_createTaskFromFile(t *testing.T) {
 					"param2": "second-parameter",
 					"param3": "third-parameter",
 				},
-				Image: "python:3.11",
+				Image:    "python:3.11",
+				Instance: "b1.nano",
 				Secrets: []pipeline.SecretMapping{
 					{
 						SecretKey:   "secret1",

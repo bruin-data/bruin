@@ -216,6 +216,10 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 			task.Image = value
 
 			continue
+		case "instance":
+			task.Instance = value
+
+			continue
 		case "secrets":
 			values := strings.Split(value, ",")
 			for _, v := range values {

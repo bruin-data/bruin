@@ -138,6 +138,7 @@ type taskDefinition struct {
 	Secrets         []secretMapping   `yaml:"secrets"`
 	Connection      string            `yaml:"connection"`
 	Image           string            `yaml:"image"`
+	Instance        string            `yaml:"instance"`
 	Materialization materialization   `yaml:"materialization"`
 	Columns         []column          `yaml:"columns"`
 	CustomChecks    []customCheck     `yaml:"custom_checks"`
@@ -249,6 +250,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		ExecutableFile:  ExecutableFile{},
 		Materialization: mat,
 		Image:           definition.Image,
+		Instance:        definition.Instance,
 		Columns:         columns,
 		CustomChecks:    make([]CustomCheck, len(definition.CustomChecks)),
 	}

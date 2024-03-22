@@ -329,13 +329,15 @@ func TestPipeline_JsonMarshal(t *testing.T) {
 			got, err := json.Marshal(p)
 			require.NoError(t, err)
 
-			// uncomment the line below to refresh the data
-			// err = afero.WriteFile(afero.NewOsFs(), tt.jsonPath, got, 0644)
-
 			dir, err := os.Getwd()
 			if err != nil {
 				log.Fatal(err)
 			}
+
+			// uncomment the line below and run the test once to refresh the data
+			// don't forget to comment it out again
+			//err = afero.WriteFile(afero.NewOsFs(), tt.jsonPath, bytes.ReplaceAll(got, []byte(dir), []byte("__BASEDIR__")), 0644)
+
 			expected := strings.ReplaceAll(mustRead(t, tt.jsonPath), "__BASEDIR__", dir)
 
 			assert.JSONEq(t, expected, string(got))
