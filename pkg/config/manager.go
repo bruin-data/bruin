@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	errors "errors"
 	"fmt"
+	fs2 "io/fs"
+	"os"
+	"path"
+
 	"github.com/bruin-data/bruin/pkg/git"
 	path2 "github.com/bruin-data/bruin/pkg/path"
 	"github.com/spf13/afero"
 	"golang.org/x/oauth2/google"
-	fs2 "io/fs"
-	"os"
-	"path"
 )
 
 type PostgresConnection struct {

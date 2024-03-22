@@ -5,11 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/executor"
 	"io"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/connection"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -117,7 +117,7 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	}
 
 	go func() {
-		reader, err := o.client.ContainerLogs(context.Background(), resp.ID, container.LogsOptions{
+		reader, err := o.client.ContainerLogs(ctx, resp.ID, container.LogsOptions{
 			ShowStdout: true,
 			ShowStderr: true,
 			Follow:     true,

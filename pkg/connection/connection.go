@@ -188,39 +188,14 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 }
 
 func (m *Manager) AddPgConnectionFromConfig(connection *config.PostgresConnection) error {
-	m.mutex.Lock()
-	if m.Postgres == nil {
-		m.Postgres = make(map[string]*postgres.Client)
-	}
-	m.mutex.Unlock()
-
-	poolMaxConns := connection.PoolMaxConns
-	if connection.PoolMaxConns == 0 {
-		poolMaxConns = 10
-	}
-
-	client, err := postgres.NewClient(context.TODO(), postgres.Config{
-		Username:     connection.Username,
-		Password:     connection.Password,
-		Host:         connection.Host,
-		Port:         connection.Port,
-		Database:     connection.Database,
-		Schema:       connection.Schema,
-		PoolMaxConns: poolMaxConns,
-		SslMode:      connection.SslMode,
-	})
-	if err != nil {
-		return err
-	}
-
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	m.Postgres[connection.Name] = client
-
-	return nil
+	return m.addPgLikeConnectionFromConfig(connection)
 }
 
 func (m *Manager) AddRedshiftConnectionFromConfig(connection *config.PostgresConnection) error {
+	return m.addPgLikeConnectionFromConfig(connection)
+}
+
+func (m *Manager) addPgLikeConnectionFromConfig(connection *config.PostgresConnection) error {
 	m.mutex.Lock()
 	if m.Postgres == nil {
 		m.Postgres = make(map[string]*postgres.Client)
