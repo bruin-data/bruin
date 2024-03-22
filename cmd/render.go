@@ -5,9 +5,11 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/date"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -29,13 +31,34 @@ func Render() *cli.Command {
 				Aliases: []string{"r"},
 				Usage:   "truncate the table before running",
 			},
+			startDateFlag,
+			endDateFlag,
 		},
 		Action: func(c *cli.Context) error {
 			fullRefresh := c.Bool("full-refresh")
+
+			startDate, err := date.ParseTime(c.String("start-date"))
+			if err != nil {
+				errorPrinter.Printf("Please give a valid start date: bruin run --start-date <start date>)\n")
+				errorPrinter.Printf("A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats. \n")
+				errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
+				errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02 15:04:05"))
+				return cli.Exit("", 1)
+			}
+
+			endDate, err := date.ParseTime(c.String("end-date"))
+			if err != nil {
+				errorPrinter.Printf("Please give a valid end date: bruin run --start-date <start date>)\n")
+				errorPrinter.Printf("A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats. \n")
+				errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
+				errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02 15:04:05"))
+				return cli.Exit("", 1)
+			}
+
 			r := RenderCommand{
 				extractor: &query.WholeFileExtractor{
 					Fs:       fs,
-					Renderer: jinja.NewRendererWithYesterday(),
+					Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate),
 				},
 				materializers: map[pipeline.AssetType]queryMaterializer{
 					pipeline.AssetTypeBigqueryQuery:  bigquery.NewMaterializer(fullRefresh),
