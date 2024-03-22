@@ -140,6 +140,7 @@ type taskDefinition struct {
 	Image           string            `yaml:"image"`
 	Instance        string            `yaml:"instance"`
 	Materialization materialization   `yaml:"materialization"`
+	Owner           string            `yaml:"owner"`
 	Columns         []column          `yaml:"columns"`
 	CustomChecks    []customCheck     `yaml:"custom_checks"`
 }
@@ -251,6 +252,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Materialization: mat,
 		Image:           definition.Image,
 		Instance:        definition.Instance,
+		Owner:           definition.Owner,
 		Columns:         columns,
 		CustomChecks:    make([]CustomCheck, len(definition.CustomChecks)),
 	}

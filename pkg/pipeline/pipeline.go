@@ -266,6 +266,7 @@ type Asset struct {
 	CustomChecks    []CustomCheck      `json:"custom_checks"`
 	Image           string             `json:"image"`
 	Instance        string             `json:"instance"`
+	Owner           string             `json:"owner"`
 	Metadata        EmptyStringMap     `json:"metadata"`
 
 	Pipeline *Pipeline `json:"-"`

@@ -4,6 +4,7 @@ description: some description goes here
 type: python
 image: python:3.11
 instance: b1.nano
+owner: jane.doe@getbruin.com
 depends:
     - task1
     - task2
