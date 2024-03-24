@@ -2,7 +2,6 @@ package lint
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -39,11 +38,89 @@ func (q *QueryValidatorRule) Name() string {
 
 func (q *QueryValidatorRule) GetApplicableLevels() []Level {
 	// we need to implement this rule for asset level as well
-	return []Level{LevelPipeline}
+	return []Level{LevelPipeline, LevelAsset}
 }
 
 func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-	return nil, errors.New("query validator has not been implemented on the asset level yet")
+	issues := make([]*Issue, 0)
+	queries, err := q.Extractor.ExtractQueriesFromFile(asset.ExecutableFile.Path)
+	if err != nil {
+		q.Logger.Debugf("failed to extract the queries from pipeline '%s' task '%s'", p.Name, asset.Name)
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Cannot read executable file '%s'", asset.ExecutableFile.Path),
+			Context: []string{
+				err.Error(),
+			},
+		})
+
+		return issues, nil
+	}
+
+	if len(queries) == 0 {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("No queries found in executable file '%s'", asset.ExecutableFile.Path),
+		})
+
+		return issues, nil
+	} else if len(queries) > 1 {
+		// this has to be the case until we find a nicer solution for no-dry-run databases
+		// remember that BigQuery or others that support dry-run already return a single query as part of the queryExtractor implementations
+		// which means the only scenario where there are multiple queries returned is the no-dry-run databases
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Validating multiple queries in a single asset is not supported: '%s'", asset.ExecutableFile.Path),
+		})
+
+		return issues, nil
+	}
+
+	foundQuery := queries[0]
+
+	assetConnectionName := p.GetConnectionNameForAsset(asset)
+	q.Logger.Debugw("The connection will be used for asset", "asset", asset.Name, "connection", assetConnectionName)
+
+	validator, err := q.Connections.GetConnection(assetConnectionName)
+	if err != nil {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Cannot get connection for task '%s': %+v", asset.Name, err),
+		})
+
+		return issues, nil
+	}
+	validatorInstance, ok := validator.(queryValidator)
+	if !ok {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Query validator '%s' is not a valid instance", assetConnectionName),
+		})
+
+		return issues, nil
+	}
+	valid, err := validatorInstance.IsValid(context.Background(), foundQuery)
+	if err != nil {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Failed to validate query: %s", err),
+			Context: []string{
+				"The failing query is as follows:",
+				foundQuery.Query,
+			},
+		})
+	} else if !valid {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Query is invalid: %s", foundQuery.Query),
+			Context: []string{
+				"The failing query is as follows:",
+				foundQuery.Query,
+			},
+		})
+	}
+
+	return issues, nil
 }
 
 func (q *QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.Asset, done chan<- []*Issue) {
