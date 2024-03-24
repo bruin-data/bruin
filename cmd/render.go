@@ -78,7 +78,7 @@ func Render() *cli.Command {
 }
 
 type queryExtractor interface {
-	ExtractQueriesFromFile(path string) ([]*query.Query, error)
+	ExtractQueriesFromString(content string) ([]*query.Query, error)
 }
 
 type queryMaterializer interface {
@@ -116,7 +116,7 @@ func (r *RenderCommand) Run(taskPath string) error {
 		return cli.Exit("", 1)
 	}
 
-	queries, err := r.extractor.ExtractQueriesFromFile(task.ExecutableFile.Path)
+	queries, err := r.extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
 	if err != nil {
 		errorPrinter.Printf("Failed to extract queries from file '%s': %v\n", task.ExecutableFile.Path, err.Error())
 		return cli.Exit("", 1)

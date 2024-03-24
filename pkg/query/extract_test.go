@@ -22,7 +22,7 @@ func (m *mockNoOpRenderer) Render(template string) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
-func TestFileExtractor_ExtractQueriesFromFile(t *testing.T) {
+func TestFileExtractor_ExtractQueriesFromString(t *testing.T) {
 	t.Parallel()
 
 	noOpRenderer := func(mr renderer) {
@@ -30,36 +30,21 @@ func TestFileExtractor_ExtractQueriesFromFile(t *testing.T) {
 	}
 
 	tests := []struct {
-		name            string
-		setupFilesystem func(t *testing.T, fs afero.Fs)
-		setupRenderer   func(mr renderer)
-		path            string
-		want            []*Query
-		wantErr         bool
+		name          string
+		setupRenderer func(mr renderer)
+		content       string
+		want          []*Query
+		wantErr       bool
 	}{
 		{
-			name:    "file doesnt exist, fail",
-			path:    "somefile.txt",
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name: "only variables, no query",
-			path: "somefile.txt",
-			setupFilesystem: func(t *testing.T, fs afero.Fs) {
-				err := afero.WriteFile(fs, "somefile.txt", []byte("set variable1 = asd; set variable2 = 123;"), 0o644)
-				require.NoError(t, err)
-			},
+			name:          "only variables, no query",
+			content:       "set variable1 = asd; set variable2 = 123;",
 			setupRenderer: noOpRenderer,
 			want:          make([]*Query, 0),
 		},
 		{
-			name: "single query",
-			path: "somefile.txt",
-			setupFilesystem: func(t *testing.T, fs afero.Fs) {
-				err := afero.WriteFile(fs, "somefile.txt", []byte("select * from users;"), 0o644)
-				require.NoError(t, err)
-			},
+			name:          "single query",
+			content:       "select * from users;",
 			setupRenderer: noOpRenderer,
 			want: []*Query{
 				{
@@ -68,12 +53,8 @@ func TestFileExtractor_ExtractQueriesFromFile(t *testing.T) {
 			},
 		},
 		{
-			name: "single query, rendered properly",
-			path: "somefile.txt",
-			setupFilesystem: func(t *testing.T, fs afero.Fs) {
-				err := afero.WriteFile(fs, "somefile.txt", []byte("select * from users-{{ds}};"), 0o644)
-				require.NoError(t, err)
-			},
+			name:    "single query, rendered properly",
+			content: "select * from users-{{ds}};",
 			setupRenderer: func(mr renderer) {
 				mr.(*mockNoOpRenderer).
 					On("Render", mock.Anything).
@@ -87,15 +68,10 @@ func TestFileExtractor_ExtractQueriesFromFile(t *testing.T) {
 		},
 		{
 			name: "multiple queries, multiline",
-			path: "somefile.txt",
-			setupFilesystem: func(t *testing.T, fs afero.Fs) {
-				query := `select * from users;
+			content: `select * from users;
 		;;
 									select name from countries;;
-									`
-				err := afero.WriteFile(fs, "somefile.txt", []byte(query), 0o644)
-				require.NoError(t, err)
-			},
+									`,
 			setupRenderer: noOpRenderer,
 			want: []*Query{
 				{
@@ -108,17 +84,12 @@ func TestFileExtractor_ExtractQueriesFromFile(t *testing.T) {
 		},
 		{
 			name: "multiple queries, multiline, starts with a comment",
-			path: "somefile.txt",
-			setupFilesystem: func(t *testing.T, fs afero.Fs) {
-				query := `
+			content: `
 		-- here's some comment
 		select * from users;
 		;;
 									select name from countries;;
-									`
-				err := afero.WriteFile(fs, "somefile.txt", []byte(query), 0o644)
-				require.NoError(t, err)
-			},
+									`,
 			setupRenderer: noOpRenderer,
 			want: []*Query{
 				{
@@ -131,9 +102,7 @@ func TestFileExtractor_ExtractQueriesFromFile(t *testing.T) {
 		},
 		{
 			name: "multiple queries, multiline, comments in the middle",
-			path: "somefile.txt",
-			setupFilesystem: func(t *testing.T, fs afero.Fs) {
-				query := `
+			content: `
 		-- here's some comment
 		select * from users;
 		;;
@@ -143,10 +112,7 @@ func TestFileExtractor_ExtractQueriesFromFile(t *testing.T) {
 some random query between comments;
 */
 		select name from countries;;
-									`
-				err := afero.WriteFile(fs, "somefile.txt", []byte(query), 0o644)
-				require.NoError(t, err)
-			},
+									`,
 			setupRenderer: noOpRenderer,
 			want: []*Query{
 				{
@@ -159,9 +125,7 @@ some random query between comments;
 		},
 		{
 			name: "multiple queries, multiline, variable definitions are collected",
-			path: "somefile.txt",
-			setupFilesystem: func(t *testing.T, fs afero.Fs) {
-				query := `
+			content: `
 		-- here's some comment
 set analysis_period_days = 21;
 		select * from users;
@@ -172,10 +136,7 @@ set min_level_req = 22;
 			-- and a nested one event
 		
 		select name from countries;;
-									`
-				err := afero.WriteFile(fs, "somefile.txt", []byte(query), 0o644)
-				require.NoError(t, err)
-			},
+									`,
 			setupRenderer: noOpRenderer,
 			want: []*Query{
 				{
@@ -201,10 +162,6 @@ set min_level_req = 22;
 			t.Parallel()
 
 			fs := afero.NewMemMapFs()
-			if tt.setupFilesystem != nil {
-				tt.setupFilesystem(t, fs)
-			}
-
 			mr := new(mockNoOpRenderer)
 			if tt.setupRenderer != nil {
 				tt.setupRenderer(mr)
@@ -215,7 +172,7 @@ set min_level_req = 22;
 				Renderer: mr,
 			}
 
-			got, err := f.ExtractQueriesFromFile(tt.path)
+			got, err := f.ExtractQueriesFromString(tt.content)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -228,7 +185,7 @@ set min_level_req = 22;
 	}
 }
 
-func TestWholeFileExtractor_ExtractQueriesFromFile(t *testing.T) {
+func TestWholeFileExtractor_ExtractQueriesFromString(t *testing.T) {
 	t.Parallel()
 
 	noOpRenderer := func(mr renderer) {
@@ -236,26 +193,15 @@ func TestWholeFileExtractor_ExtractQueriesFromFile(t *testing.T) {
 	}
 
 	tests := []struct {
-		name            string
-		setupFilesystem func(t *testing.T, fs afero.Fs)
-		setupRenderer   func(mr renderer)
-		path            string
-		want            []*Query
-		wantErr         bool
+		name          string
+		setupRenderer func(mr renderer)
+		content       string
+		want          []*Query
+		wantErr       bool
 	}{
 		{
-			name:    "file doesnt exist, fail",
-			path:    "somefile.txt",
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name: "only variables, no query",
-			path: "somefile.txt",
-			setupFilesystem: func(t *testing.T, fs afero.Fs) {
-				err := afero.WriteFile(fs, "somefile.txt", []byte("set variable1 = asd; set variable2 = 123;"), 0o644)
-				require.NoError(t, err)
-			},
+			name:          "only variables, no query",
+			content:       "set variable1 = asd; set variable2 = 123;",
 			setupRenderer: noOpRenderer,
 			want: []*Query{
 				{
@@ -264,12 +210,8 @@ func TestWholeFileExtractor_ExtractQueriesFromFile(t *testing.T) {
 			},
 		},
 		{
-			name: "single query",
-			path: "somefile.txt",
-			setupFilesystem: func(t *testing.T, fs afero.Fs) {
-				err := afero.WriteFile(fs, "somefile.txt", []byte("select * from users;"), 0o644)
-				require.NoError(t, err)
-			},
+			name:          "single query",
+			content:       "select * from users;",
 			setupRenderer: noOpRenderer,
 			want: []*Query{
 				{
@@ -278,12 +220,8 @@ func TestWholeFileExtractor_ExtractQueriesFromFile(t *testing.T) {
 			},
 		},
 		{
-			name: "single query, rendered properly",
-			path: "somefile.txt",
-			setupFilesystem: func(t *testing.T, fs afero.Fs) {
-				err := afero.WriteFile(fs, "somefile.txt", []byte("select * from users-{{ds}};"), 0o644)
-				require.NoError(t, err)
-			},
+			name:    "single query, rendered properly",
+			content: "select * from users-{{ds}};",
 			setupRenderer: func(mr renderer) {
 				mr.(*mockNoOpRenderer).
 					On("Render", mock.Anything).
@@ -297,15 +235,10 @@ func TestWholeFileExtractor_ExtractQueriesFromFile(t *testing.T) {
 		},
 		{
 			name: "multiple queries, multiline",
-			path: "somefile.txt",
-			setupFilesystem: func(t *testing.T, fs afero.Fs) {
-				query := `  select * from users;
+			content: `  select * from users;
 		;;
 									select name from countries;;
-`
-				err := afero.WriteFile(fs, "somefile.txt", []byte(query), 0o644)
-				require.NoError(t, err)
-			},
+`,
 			setupRenderer: noOpRenderer,
 			want: []*Query{
 				{
@@ -317,17 +250,12 @@ func TestWholeFileExtractor_ExtractQueriesFromFile(t *testing.T) {
 		},
 		{
 			name: "multiple queries, multiline, starts with a comment",
-			path: "somefile.txt",
-			setupFilesystem: func(t *testing.T, fs afero.Fs) {
-				query := `
+			content: `
 		-- here's some comment
 		select * from users;
 		;;
 									select name from countries;;
-									`
-				err := afero.WriteFile(fs, "somefile.txt", []byte(query), 0o644)
-				require.NoError(t, err)
-			},
+									`,
 			setupRenderer: noOpRenderer,
 			want: []*Query{
 				{
@@ -344,22 +272,16 @@ func TestWholeFileExtractor_ExtractQueriesFromFile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			fs := afero.NewMemMapFs()
-			if tt.setupFilesystem != nil {
-				tt.setupFilesystem(t, fs)
-			}
-
 			mr := new(mockNoOpRenderer)
 			if tt.setupRenderer != nil {
 				tt.setupRenderer(mr)
 			}
 
 			f := WholeFileExtractor{
-				Fs:       fs,
 				Renderer: mr,
 			}
 
-			got, err := f.ExtractQueriesFromFile(tt.path)
+			got, err := f.ExtractQueriesFromString(tt.content)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {

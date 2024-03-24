@@ -15,8 +15,8 @@ type mockExtractor struct {
 	mock.Mock
 }
 
-func (m *mockExtractor) ExtractQueriesFromFile(filepath string) ([]*query.Query, error) {
-	res := m.Called(filepath)
+func (m *mockExtractor) ExtractQueriesFromString(content string) ([]*query.Query, error) {
+	res := m.Called(content)
 	return res.Get(0).([]*query.Query), res.Error(1)
 }
 
@@ -54,13 +54,14 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "failed to extract queries",
 			setup: func(f *fields) {
-				f.e.On("ExtractQueriesFromFile", "test-file.sql").
+				f.e.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{}, errors.New("failed to extract queries"))
 			},
 			args: args{
 				t: &pipeline.Asset{
 					ExecutableFile: pipeline.ExecutableFile{
-						Path: "test-file.sql",
+						Path:    "test-file.sql",
+						Content: "some content",
 					},
 				},
 			},
@@ -69,13 +70,14 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "no queries found in file",
 			setup: func(f *fields) {
-				f.e.On("ExtractQueriesFromFile", "test-file.sql").
+				f.e.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{}, nil)
 			},
 			args: args{
 				t: &pipeline.Asset{
 					ExecutableFile: pipeline.ExecutableFile{
-						Path: "test-file.sql",
+						Path:    "test-file.sql",
+						Content: "some content",
 					},
 				},
 			},
@@ -84,7 +86,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "multiple queries found but materialization is enabled, should fail",
 			setup: func(f *fields) {
-				f.e.On("ExtractQueriesFromFile", "test-file.sql").
+				f.e.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{
 						{Query: "query 1"},
 						{Query: "query 2"},
@@ -93,7 +95,8 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			args: args{
 				t: &pipeline.Asset{
 					ExecutableFile: pipeline.ExecutableFile{
-						Path: "test-file.sql",
+						Path:    "test-file.sql",
+						Content: "some content",
 					},
 					Materialization: pipeline.Materialization{
 						Type: pipeline.MaterializationTypeTable,
@@ -105,7 +108,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "query returned an error",
 			setup: func(f *fields) {
-				f.e.On("ExtractQueriesFromFile", "test-file.sql").
+				f.e.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{
 						{Query: "select * from users"},
 					}, nil)
@@ -119,7 +122,8 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			args: args{
 				t: &pipeline.Asset{
 					ExecutableFile: pipeline.ExecutableFile{
-						Path: "test-file.sql",
+						Path:    "test-file.sql",
+						Content: "some content",
 					},
 				},
 			},
@@ -128,7 +132,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "query successfully executed",
 			setup: func(f *fields) {
-				f.e.On("ExtractQueriesFromFile", "test-file.sql").
+				f.e.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{
 						{Query: "select * from users"},
 					}, nil)
@@ -142,7 +146,8 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			args: args{
 				t: &pipeline.Asset{
 					ExecutableFile: pipeline.ExecutableFile{
-						Path: "test-file.sql",
+						Path:    "test-file.sql",
+						Content: "some content",
 					},
 				},
 			},
@@ -151,7 +156,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "query successfully executed with materialization",
 			setup: func(f *fields) {
-				f.e.On("ExtractQueriesFromFile", "test-file.sql").
+				f.e.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{
 						{Query: "select * from users"},
 					}, nil)
@@ -171,7 +176,8 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			args: args{
 				t: &pipeline.Asset{
 					ExecutableFile: pipeline.ExecutableFile{
-						Path: "test-file.sql",
+						Path:    "test-file.sql",
+						Content: "some content",
 					},
 				},
 			},

@@ -26,8 +26,8 @@ type mockExtractor struct {
 	mock.Mock
 }
 
-func (m *mockExtractor) ExtractQueriesFromFile(filepath string) ([]*query.Query, error) {
-	res := m.Called(filepath)
+func (m *mockExtractor) ExtractQueriesFromString(content string) ([]*query.Query, error) {
+	res := m.Called(content)
 	if res.Get(0) == nil {
 		return nil, res.Error(1)
 	}
@@ -125,7 +125,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				f.builder.On("CreateAssetFromFile", "/path/to/asset").
 					Return(bqAsset, nil)
 
-				f.extractor.On("ExtractQueriesFromFile", bqAsset.ExecutableFile.Path).
+				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
 					Return(nil, assert.AnError)
 			},
 			wantErr: assert.Error,
@@ -139,7 +139,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				f.builder.On("CreateAssetFromFile", "/path/to/asset").
 					Return(bqAsset, nil)
 
-				f.extractor.On("ExtractQueriesFromFile", bqAsset.ExecutableFile.Path).
+				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
 					Return([]*query.Query{{Query: "SELECT * FROM table1"}}, nil)
 
 				f.bqMaterializer.On("Render", bqAsset, "SELECT * FROM table1").
@@ -156,7 +156,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				f.builder.On("CreateAssetFromFile", "/path/to/asset").
 					Return(bqAsset, nil)
 
-				f.extractor.On("ExtractQueriesFromFile", bqAsset.ExecutableFile.Path).
+				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
 					Return([]*query.Query{{Query: "SELECT * FROM table1"}}, nil)
 
 				f.bqMaterializer.On("Render", bqAsset, "SELECT * FROM table1").
@@ -176,7 +176,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				f.builder.On("CreateAssetFromFile", "/path/to/asset").
 					Return(nonBqAsset, nil)
 
-				f.extractor.On("ExtractQueriesFromFile", nonBqAsset.ExecutableFile.Path).
+				f.extractor.On("ExtractQueriesFromString", nonBqAsset.ExecutableFile.Content).
 					Return([]*query.Query{{Query: "SELECT * FROM nonbq.table1"}}, nil)
 
 				f.writer.On("Write", []byte("SELECT * FROM nonbq.table1\n")).

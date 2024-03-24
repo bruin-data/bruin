@@ -14,7 +14,7 @@ type materializer interface {
 }
 
 type queryExtractor interface {
-	ExtractQueriesFromFile(filepath string) ([]*query.Query, error)
+	ExtractQueriesFromString(filepath string) ([]*query.Query, error)
 }
 
 type connectionFetcher interface {
@@ -40,7 +40,7 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 }
 
 func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
-	queries, err := o.extractor.ExtractQueriesFromFile(t.ExecutableFile.Path)
+	queries, err := o.extractor.ExtractQueriesFromString(t.ExecutableFile.Content)
 	if err != nil {
 		return errors.Wrap(err, "cannot extract queries from the task file")
 	}

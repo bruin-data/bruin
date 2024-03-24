@@ -20,7 +20,7 @@ type connectionManager interface {
 }
 
 type queryExtractor interface {
-	ExtractQueriesFromFile(filepath string) ([]*query.Query, error)
+	ExtractQueriesFromString(content string) ([]*query.Query, error)
 }
 
 type QueryValidatorRule struct {
@@ -43,7 +43,7 @@ func (q *QueryValidatorRule) GetApplicableLevels() []Level {
 
 func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
-	queries, err := q.Extractor.ExtractQueriesFromFile(asset.ExecutableFile.Path)
+	queries, err := q.Extractor.ExtractQueriesFromString(asset.ExecutableFile.Content)
 	if err != nil {
 		q.Logger.Debugf("failed to extract the queries from pipeline '%s' task '%s'", p.Name, asset.Name)
 		issues = append(issues, &Issue{
@@ -54,7 +54,7 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 			},
 		})
 
-		return issues, nil
+		return issues, nil //nolint:nilerr
 	}
 
 	if len(queries) == 0 {
@@ -99,7 +99,7 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 
 		return issues, nil
 	}
-	valid, err := validatorInstance.IsValid(context.Background(), foundQuery)
+	valid, err := validatorInstance.IsValid(ctx, foundQuery)
 	if err != nil {
 		issues = append(issues, &Issue{
 			Task:        asset,
@@ -112,7 +112,7 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 	} else if !valid {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: fmt.Sprintf("Query is invalid: %s", foundQuery.Query),
+			Description: "Query is invalid: " + foundQuery.Query,
 			Context: []string{
 				"The failing query is as follows:",
 				foundQuery.Query,
@@ -127,7 +127,7 @@ func (q *QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.A
 	issues := make([]*Issue, 0)
 
 	q.Logger.Debugf("validating pipeline '%s' task '%s'", p.Name, task.Name)
-	queries, err := q.Extractor.ExtractQueriesFromFile(task.ExecutableFile.Path)
+	queries, err := q.Extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
 	q.Logger.Debugf("got the query extract results from file for pipeline '%s' task '%s'", p.Name, task.Name)
 
 	if err != nil {

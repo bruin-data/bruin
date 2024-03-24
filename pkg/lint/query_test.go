@@ -35,8 +35,8 @@ type mockExtractor struct {
 	mock.Mock
 }
 
-func (m *mockExtractor) ExtractQueriesFromFile(filepath string) ([]*query.Query, error) {
-	res := m.Called(filepath)
+func (m *mockExtractor) ExtractQueriesFromString(content string) ([]*query.Query, error) {
+	res := m.Called(content)
 	return res.Get(0).([]*query.Query), res.Error(1)
 }
 
@@ -92,13 +92,14 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 					{
 						Type: taskType,
 						ExecutableFile: pipeline.ExecutableFile{
-							Path: "path/to/file-with-no-queries.sql",
+							Path:    "path/to/file-with-no-queries.sql",
+							Content: "some content",
 						},
 					},
 				},
 			},
 			setup: func(f *fields) {
-				f.extractor.On("ExtractQueriesFromFile", "path/to/file-with-no-queries.sql").
+				f.extractor.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{}, errors.New("something failed"))
 			},
 			want: []*Issue{
@@ -106,7 +107,8 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 					Task: &pipeline.Asset{
 						Type: taskType,
 						ExecutableFile: pipeline.ExecutableFile{
-							Path: "path/to/file-with-no-queries.sql",
+							Path:    "path/to/file-with-no-queries.sql",
+							Content: "some content",
 						},
 					},
 					Description: "Cannot read executable file 'path/to/file-with-no-queries.sql'",
@@ -124,13 +126,14 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 					{
 						Type: taskType,
 						ExecutableFile: pipeline.ExecutableFile{
-							Path: "path/to/file-with-no-queries.sql",
+							Path:    "path/to/file-with-no-queries.sql",
+							Content: "some content",
 						},
 					},
 				},
 			},
 			setup: func(f *fields) {
-				f.extractor.On("ExtractQueriesFromFile", "path/to/file-with-no-queries.sql").
+				f.extractor.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{}, nil)
 			},
 			want: []*Issue{
@@ -138,7 +141,8 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 					Task: &pipeline.Asset{
 						Type: taskType,
 						ExecutableFile: pipeline.ExecutableFile{
-							Path: "path/to/file-with-no-queries.sql",
+							Path:    "path/to/file-with-no-queries.sql",
+							Content: "some content",
 						},
 					},
 					Description: "No queries found in executable file 'path/to/file-with-no-queries.sql'",
@@ -155,13 +159,15 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 					{
 						Type: taskType,
 						ExecutableFile: pipeline.ExecutableFile{
-							Path: "path/to/file1.sql",
+							Path:    "path/to/file1.sql",
+							Content: "content1",
 						},
 					},
 					{
 						Type: taskType,
 						ExecutableFile: pipeline.ExecutableFile{
-							Path: "path/to/file2.sql",
+							Path:    "path/to/file2.sql",
+							Content: "content2",
 						},
 					},
 				},
@@ -170,7 +176,7 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 				},
 			},
 			setup: func(f *fields) {
-				f.extractor.On("ExtractQueriesFromFile", "path/to/file1.sql").
+				f.extractor.On("ExtractQueriesFromString", "content1").
 					Return(
 						[]*query.Query{
 							{Query: "query11"},
@@ -179,7 +185,7 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 						},
 						nil,
 					)
-				f.extractor.On("ExtractQueriesFromFile", "path/to/file2.sql").
+				f.extractor.On("ExtractQueriesFromString", "content2").
 					Return(
 						[]*query.Query{
 							{Query: "query21"},

@@ -75,14 +75,9 @@ type FileQuerySplitterExtractor struct {
 	Renderer renderer
 }
 
-func (f FileQuerySplitterExtractor) ExtractQueriesFromFile(filepath string) ([]*Query, error) {
-	contents, err := afero.ReadFile(f.Fs, filepath)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not read file")
-	}
-
-	cleanedUpQueries := queryCommentRegex.ReplaceAllLiteralString(string(contents), "\n")
-	cleanedUpQueries, err = f.Renderer.Render(cleanedUpQueries)
+func (f FileQuerySplitterExtractor) ExtractQueriesFromString(content string) ([]*Query, error) {
+	cleanedUpQueries := queryCommentRegex.ReplaceAllLiteralString(content, "\n")
+	cleanedUpQueries, err := f.Renderer.Render(cleanedUpQueries)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not render file while extracting the queries with the split query extractor")
 	}
@@ -138,13 +133,8 @@ type WholeFileExtractor struct {
 	Renderer renderer
 }
 
-func (f *WholeFileExtractor) ExtractQueriesFromFile(filepath string) ([]*Query, error) {
-	contents, err := afero.ReadFile(f.Fs, filepath)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not read file")
-	}
-
-	render, err := f.Renderer.Render(strings.TrimSpace(string(contents)))
+func (f *WholeFileExtractor) ExtractQueriesFromString(content string) ([]*Query, error) {
+	render, err := f.Renderer.Render(strings.TrimSpace(content))
 	if err != nil {
 		return nil, errors.Wrap(err, "could not render file while extracting the queries from the whole file")
 	}

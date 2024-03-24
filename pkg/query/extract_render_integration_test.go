@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/jinja"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -106,17 +105,12 @@ with dummy_dates as (
 		},
 	}
 
-	fs := afero.NewMemMapFs()
-	err := afero.WriteFile(fs, "somefile.sql", []byte(query), 0o644)
-	require.NoError(t, err)
-
 	extractor := FileQuerySplitterExtractor{
-		Fs: fs,
 		Renderer: jinja.NewRenderer(jinja.Context{
 			"ds": "2022-01-01",
 		}),
 	}
-	res, err := extractor.ExtractQueriesFromFile("somefile.sql")
+	res, err := extractor.ExtractQueriesFromString(query)
 	require.NoError(t, err)
 	assert.Equal(t, expectedQueries, res)
 }
