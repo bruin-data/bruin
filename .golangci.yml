@@ -9,6 +9,12 @@ run:
     - bin
   allow-parallel-runners: true
 
+issues:
+  exclude-rules:
+    - path: 'pkg/connection/connection.go'
+      linters:
+        - dupl
+
 linters:
   disable:
     - scopelint
