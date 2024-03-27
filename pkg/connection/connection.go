@@ -2,11 +2,11 @@ package connection
 
 import (
 	"context"
-	"github.com/bruin-data/bruin/pkg/mongo"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/mongo"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/snowflake"
@@ -25,29 +25,29 @@ type Manager struct {
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
-	conn, err := m.GetBqConnectionWithoutDefault(name)
+	connBigQuery, err := m.GetBqConnectionWithoutDefault(name)
 	if err == nil {
-		return conn, nil
+		return connBigQuery, nil
 	}
 
-	conn, err = m.GetSfConnectionWithoutDefault(name)
+	connSnowflake, err := m.GetSfConnectionWithoutDefault(name)
 	if err == nil {
-		return conn, nil
+		return connSnowflake, nil
 	}
 
-	conn, err = m.GetPgConnectionWithoutDefault(name)
+	connPostgres, err := m.GetPgConnectionWithoutDefault(name)
 	if err == nil {
-		return conn, nil
+		return connPostgres, nil
 	}
 
-	conn, err = m.GetMsConnectionWithoutDefault(name)
+	connMSSql, err := m.GetMsConnectionWithoutDefault(name)
 	if err == nil {
-		return conn, nil
+		return connMSSql, nil
 	}
 
-	conn, err = m.GetMongoConnectionWithoutDefault(name)
+	connMongo, err := m.GetMongoConnectionWithoutDefault(name)
 	if err == nil {
-		return conn, nil
+		return connMongo, nil
 	}
 
 	return nil, errors.New("connection not found")
@@ -141,7 +141,7 @@ func (m *Manager) GetMsConnectionWithoutDefault(name string) (mssql.MsClient, er
 	return db, nil
 }
 
-func (m *Manager) GetMongoConnection(name string) (mongo.MongoClient, error) {
+func (m *Manager) GetMongoConnection(name string) (*mongo.DB, error) {
 	db, err := m.GetMongoConnectionWithoutDefault(name)
 	if err == nil {
 		return db, nil
@@ -150,7 +150,7 @@ func (m *Manager) GetMongoConnection(name string) (mongo.MongoClient, error) {
 	return m.GetMongoConnectionWithoutDefault("mongo-default")
 }
 
-func (m *Manager) GetMongoConnectionWithoutDefault(name string) (mongo.MongoClient, error) {
+func (m *Manager) GetMongoConnectionWithoutDefault(name string) (*mongo.DB, error) {
 	if m.Mongo == nil {
 		return nil, errors.New("no mongo connections found")
 	}

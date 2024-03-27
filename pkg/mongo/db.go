@@ -5,6 +5,10 @@ type DB struct {
 	Name   string
 }
 
+type MongoConnection interface {
+	GetIngestrURI() (string, error)
+}
+
 func NewDB(c *Config) (*DB, error) {
 	return &DB{config: c, Name: c.Database}, nil
 }
