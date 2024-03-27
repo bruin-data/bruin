@@ -56,6 +56,14 @@ environments:
           port: 1434
           database: "sydb"
 
+      mongo:
+        - name: conn7
+          username: "mongouser"
+          password: "mongopass"
+          host: "mongohost"
+          port: 27017
+          database: "mongodb"
+
       generic:
         - name: key1
           value: value1
