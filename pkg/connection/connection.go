@@ -6,6 +6,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/mongo"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/snowflake"
@@ -18,29 +19,35 @@ type Manager struct {
 	Snowflake map[string]*snowflake.DB
 	Postgres  map[string]*postgres.Client
 	MsSQL     map[string]*mssql.DB
+	Mongo     map[string]*mongo.DB
 
 	mutex sync.Mutex
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
-	conn, err := m.GetBqConnectionWithoutDefault(name)
+	connBigQuery, err := m.GetBqConnectionWithoutDefault(name)
 	if err == nil {
-		return conn, nil
+		return connBigQuery, nil
 	}
 
-	conn, err = m.GetSfConnectionWithoutDefault(name)
+	connSnowflake, err := m.GetSfConnectionWithoutDefault(name)
 	if err == nil {
-		return conn, nil
+		return connSnowflake, nil
 	}
 
-	conn, err = m.GetPgConnectionWithoutDefault(name)
+	connPostgres, err := m.GetPgConnectionWithoutDefault(name)
 	if err == nil {
-		return conn, nil
+		return connPostgres, nil
 	}
 
-	conn, err = m.GetMsConnectionWithoutDefault(name)
+	connMSSql, err := m.GetMsConnectionWithoutDefault(name)
 	if err == nil {
-		return conn, nil
+		return connMSSql, nil
+	}
+
+	connMongo, err := m.GetMongoConnectionWithoutDefault(name)
+	if err == nil {
+		return connMongo, nil
 	}
 
 	return nil, errors.New("connection not found")
@@ -129,6 +136,28 @@ func (m *Manager) GetMsConnectionWithoutDefault(name string) (mssql.MsClient, er
 	db, ok := m.MsSQL[name]
 	if !ok {
 		return nil, errors.Errorf("mssql connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetMongoConnection(name string) (*mongo.DB, error) {
+	db, err := m.GetMongoConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetMongoConnectionWithoutDefault("mongo-default")
+}
+
+func (m *Manager) GetMongoConnectionWithoutDefault(name string) (*mongo.DB, error) {
+	if m.Mongo == nil {
+		return nil, errors.New("no mongo connections found")
+	}
+
+	db, ok := m.Mongo[name]
+	if !ok {
+		return nil, errors.Errorf("mongo connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -253,6 +282,31 @@ func (m *Manager) AddMsSQLConnectionFromConfig(connection *config.MsSQLConnectio
 	return nil
 }
 
+func (m *Manager) AddMongoConnectionFromConfig(connection *config.MongoConnection) error {
+	m.mutex.Lock()
+	if m.Mongo == nil {
+		m.Mongo = make(map[string]*mongo.DB)
+	}
+	m.mutex.Unlock()
+
+	client, err := mongo.NewDB(&mongo.Config{
+		Username: connection.Username,
+		Password: connection.Password,
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Database: connection.Database,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Mongo[connection.Name] = client
+
+	return nil
+}
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	connectionManager := &Manager{}
 
@@ -313,6 +367,16 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 			err := connectionManager.AddMsSQLConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add Synapse connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Mongo {
+		conn := conn
+		wg.Go(func() {
+			err := connectionManager.AddMongoConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add Mongo connection '%s'", conn.Name))
 			}
 		})
 	}

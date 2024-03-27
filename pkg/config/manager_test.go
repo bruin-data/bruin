@@ -79,6 +79,16 @@ func TestLoadFromFile(t *testing.T) {
 					Port:     1434,
 				},
 			},
+			Mongo: []MongoConnection{
+				{
+					Name:     "conn7",
+					Host:     "mongohost",
+					Username: "mongouser",
+					Password: "mongopass",
+					Database: "mongodb",
+					Port:     27017,
+				},
+			},
 			Generic: []GenericConnection{
 				{
 					Name:  "key1",
@@ -177,6 +187,7 @@ func TestLoadOrCreate(t *testing.T) {
 			RedShift:  []PostgresConnection{},
 			MsSQL:     []MsSQLConnection{},
 			Synapse:   []MsSQLConnection{},
+			Mongo:     []MongoConnection{},
 		},
 	}
 

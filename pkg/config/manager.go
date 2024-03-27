@@ -44,6 +44,15 @@ type GoogleCloudPlatformConnection struct {
 	Location           string `yaml:"location"`
 }
 
+type MongoConnection struct {
+	Name     string `yaml:"name" json:"name"`
+	Username string `yaml:"username" json:"username"`
+	Password string `yaml:"password" json:"password"`
+	Host     string `yaml:"host"     json:"host"`
+	Port     int    `yaml:"port"     json:"port"`
+	Database string `yaml:"database" json:"database"`
+}
+
 func (c *GoogleCloudPlatformConnection) SetCredentials(cred *google.Credentials) {
 	c.rawCredentials = cred
 }
@@ -112,6 +121,7 @@ type Connections struct {
 	RedShift            []PostgresConnection            `yaml:"redshift"`
 	MsSQL               []MsSQLConnection               `yaml:"mssql"`
 	Synapse             []MsSQLConnection               `yaml:"synapse"`
+	Mongo               []MongoConnection               `yaml:"mongo"`
 	Generic             []GenericConnection             `yaml:"generic"`
 
 	byKey map[string]any
@@ -141,6 +151,10 @@ func (c *Connections) buildConnectionKeyMap() {
 
 	for i, conn := range c.Synapse {
 		c.byKey[conn.Name] = &(c.Synapse[i])
+	}
+
+	for i, conn := range c.Mongo {
+		c.byKey[conn.Name] = &(c.Mongo[i])
 	}
 
 	for i, conn := range c.Generic {

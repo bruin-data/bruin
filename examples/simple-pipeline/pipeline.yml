@@ -8,3 +8,4 @@ default_connections:
   postgres: "postgres"
   mssql: "mssql"
   synapse: "synapse"
+  mongo: "mongo"
