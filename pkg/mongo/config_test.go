@@ -1,11 +1,13 @@
 package mongo
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestConfig_GetIngestrURI(t *testing.T) {
+	t.Parallel()
 	c := Config{
 		Username: "user",
 		Password: "password",
