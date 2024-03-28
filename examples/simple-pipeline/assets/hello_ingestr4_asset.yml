@@ -1,0 +1,11 @@
+name: hello_ingestr4_asset
+type: ingestr
+
+parameters:
+  source: mongo
+  source_connection: localMongo
+  source_table: 'test-alberto.test'
+
+  destination: postgres
+  destination_connection: neon
+  destination_table: 'public.test_merge'

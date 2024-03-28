@@ -88,20 +88,25 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return errors.New("source table not configured")
 	}
 
+	cmdArgs := []string{
+		"ingest",
+		"--source-uri",
+		sourceURI,
+		"--source-table",
+		sourceTable,
+		"--dest-uri",
+		destURI,
+		"--dest-table",
+		destTable,
+		"--yes",
+	}
+
+	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
+	_, _ = writer.Write([]byte(fmt.Sprintf("Running ingestr with args: %s\n", strings.Join(cmdArgs, " "))))
+
 	resp, err := o.client.ContainerCreate(ctx, &container.Config{
-		Image: DockerImage,
-		Cmd: []string{
-			"ingest",
-			"--source-uri",
-			sourceURI,
-			"--source-table",
-			sourceTable,
-			"--dest-uri",
-			destURI,
-			"--dest-table",
-			destTable,
-			"--yes",
-		},
+		Image:        DockerImage,
+		Cmd:          cmdArgs,
 		AttachStdout: false,
 		AttachStderr: true,
 		Tty:          true,
@@ -133,7 +138,6 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		if ctx.Value(executor.KeyPrinter) == nil {
 			return
 		}
-		writer := ctx.Value(executor.KeyPrinter).(io.Writer)
 
 		for scanner.Scan() {
 			message := scanner.Text()
