@@ -217,14 +217,14 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 }
 
 func (m *Manager) AddPgConnectionFromConfig(connection *config.PostgresConnection) error {
-	return m.addPgLikeConnectionFromConfig(connection)
+	return m.addPgLikeConnectionFromConfig(connection, false)
 }
 
 func (m *Manager) AddRedshiftConnectionFromConfig(connection *config.PostgresConnection) error {
-	return m.addPgLikeConnectionFromConfig(connection)
+	return m.addPgLikeConnectionFromConfig(connection, true)
 }
 
-func (m *Manager) addPgLikeConnectionFromConfig(connection *config.PostgresConnection) error {
+func (m *Manager) addPgLikeConnectionFromConfig(connection *config.PostgresConnection, redshift bool) error {
 	m.mutex.Lock()
 	if m.Postgres == nil {
 		m.Postgres = make(map[string]*postgres.Client)
@@ -236,16 +236,32 @@ func (m *Manager) addPgLikeConnectionFromConfig(connection *config.PostgresConne
 		poolMaxConns = 10
 	}
 
-	client, err := postgres.NewClient(context.TODO(), postgres.RedShiftConfig{
-		Username:     connection.Username,
-		Password:     connection.Password,
-		Host:         connection.Host,
-		Port:         connection.Port,
-		Database:     connection.Database,
-		Schema:       connection.Schema,
-		PoolMaxConns: poolMaxConns,
-		SslMode:      connection.SslMode,
-	})
+	var client *postgres.Client
+	var err error
+	if redshift {
+		client, err = postgres.NewClient(context.TODO(), postgres.RedShiftConfig{
+			Username:     connection.Username,
+			Password:     connection.Password,
+			Host:         connection.Host,
+			Port:         connection.Port,
+			Database:     connection.Database,
+			Schema:       connection.Schema,
+			PoolMaxConns: poolMaxConns,
+			SslMode:      connection.SslMode,
+		})
+	} else {
+		client, err = postgres.NewClient(context.TODO(), postgres.Config{
+			Username:     connection.Username,
+			Password:     connection.Password,
+			Host:         connection.Host,
+			Port:         connection.Port,
+			Database:     connection.Database,
+			Schema:       connection.Schema,
+			PoolMaxConns: poolMaxConns,
+			SslMode:      connection.SslMode,
+		})
+	}
+
 	if err != nil {
 		return err
 	}
