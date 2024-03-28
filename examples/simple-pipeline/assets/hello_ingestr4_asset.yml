@@ -9,4 +9,3 @@ parameters:
   destination: postgres
   destination_connection: neon
   destination_table: 'public.test_merge'
-  
