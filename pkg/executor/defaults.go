@@ -12,7 +12,7 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
 		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
 	},
-	"bq.sensor.table": {
+	pipeline.AssetTypeBigqueryTableSensor: {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
 	"bq.sensor.query": {
