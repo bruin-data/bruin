@@ -1433,7 +1433,7 @@ func TestEnsureSnowflakeSensorHasQueryParameter(t *testing.T) {
 func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 	t.Parallel()
 
-	expectedErr := "Ingestr assets require the following parameters: source, source_connection, source_table, destination, destination_connection, destination_table"
+	expectedErr := "Ingestr assets require the following parameters: source_connection, source_table, destination, destination_connection, destination_table"
 	tests := []struct {
 		name           string
 		asset          *pipeline.Asset
@@ -1464,7 +1464,6 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
 				Parameters: map[string]string{
-					"source":                 "source",
 					"source_connection":      "source_connection",
 					"source_table":           "source_table",
 					"destination":            "destination",
