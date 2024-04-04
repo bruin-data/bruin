@@ -3,7 +3,6 @@ package helpers
 import (
 	"fmt"
 	"math/rand"
-	"slices"
 	"strconv"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -11,24 +10,17 @@ import (
 )
 
 func GetIngestrDestinationType(asset *pipeline.Asset) (pipeline.AssetType, error) {
-	value, ok := asset.Parameters["destination"]
+	ingestrDestination, ok := asset.Parameters["destination"]
 	if !ok {
 		return "", errors.New("`destination` parameter not found")
 	}
 
-	var assetType pipeline.AssetType
-	for key, val := range pipeline.AssetTypeConnectionMapping {
-		if slices.Contains(val, value) {
-			assetType = key
-			break
-		}
+	value, ok := pipeline.IngestrTypeConnectionMapping[ingestrDestination]
+	if !ok {
+		return "", fmt.Errorf("unknown destination %s", ingestrDestination)
 	}
 
-	if assetType == "" {
-		return "", fmt.Errorf("unknown asset type %s", value)
-	}
-
-	return assetType, nil
+	return value, nil
 }
 
 func PrefixGenerator() string {

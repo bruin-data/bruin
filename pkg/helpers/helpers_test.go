@@ -30,7 +30,7 @@ func TestGetIngestrDestinationType(t *testing.T) {
 			name: "gcp",
 			asset: &pipeline.Asset{
 				Parameters: map[string]string{
-					"destination": "gcp",
+					"destination": "bigquery",
 				},
 			},
 			want: pipeline.AssetTypeBigqueryQuery,

@@ -238,6 +238,15 @@ var AssetTypeConnectionMapping = map[AssetType][]string{
 	AssetTypeSynapseQuery:         {"synapse", "sy"},
 }
 
+var IngestrTypeConnectionMapping = map[string]AssetType{
+	"bigquery":  AssetTypeBigqueryQuery,
+	"snowflake": AssetTypeSnowflakeQuery,
+	"postgres":  AssetTypePostgresQuery,
+	"redshift":  AssetTypeRedshiftQuery,
+	"mssql":     AssetTypeMsSQLQuery,
+	"synapse":   AssetTypeSynapseQuery,
+}
+
 type SecretMapping struct {
 	SecretKey   string `json:"secret_key"`
 	InjectedKey string `json:"injected_key"`
@@ -417,10 +426,11 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) string {
 
 	connectionType := asset.Type
 	if connectionType == AssetTypeIngestr {
-		connectionType = AssetType(asset.Parameters["destination"])
+		connectionType = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
 	}
 
 	mappings := AssetTypeConnectionMapping[connectionType]
+
 	if mappings == nil {
 		return ""
 	}

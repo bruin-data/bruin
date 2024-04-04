@@ -1,15 +1,14 @@
 name: test_data_alberto.ingestr_destiny_2
 type: ingestr
-connection: alberto-gcp
 
 parameters:
   source_connection: neon
   source_table: 'public.test_merge'
 
-  destination: google_cloud_platform
+  destination: bigquery
 
 columns:
-  - name: id
+  - name: qty
     type: integer
     description: "Just a number"
     checks:
@@ -18,5 +17,5 @@ columns:
 
 custom_checks:
   - name: This is a custom check name
-    value: 6
+    value: 5
     query: select count(*) from test_data_alberto.ingestr_destiny_2
