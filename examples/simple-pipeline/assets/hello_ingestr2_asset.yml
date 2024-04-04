@@ -9,7 +9,7 @@ parameters:
   destination: bigquery
 
 columns:
-  - name: id
+  - name: qty
     type: integer
     description: "Just a number"
     checks:
@@ -18,5 +18,5 @@ columns:
 
 custom_checks:
   - name: This is a custom check name
-    value: 6
+    value: 5
     query: select count(*) from test_data_alberto.ingestr_destiny_2
