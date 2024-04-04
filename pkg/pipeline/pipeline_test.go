@@ -478,7 +478,7 @@ func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 	asset4 := &pipeline.Asset{
 		Name:       "asset4",
 		Type:       pipeline.AssetType("ingestr"),
-		Parameters: map[string]string{"destination_connection": "connection2"},
+		Connection: "connection2",
 	}
 
 	pipeline1 := &pipeline.Pipeline{

@@ -1,15 +1,12 @@
 name: test_data_alberto.ingestr_destiny_2
 type: ingestr
+connection: alberto-gcp
 
 parameters:
-  source: postgres
   source_connection: neon
   source_table: 'public.test_merge'
 
   destination: google_cloud_platform
-  destination_connection: alberto-gcp
-  destination_table: 'test_data_alberto.ingestr_destiny_2'
-
 
 columns:
   - name: id
