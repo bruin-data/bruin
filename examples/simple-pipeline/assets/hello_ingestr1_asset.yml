@@ -1,14 +1,12 @@
 name: public.ingestr_destiny
 type: ingestr
+connection: local
 
 parameters:
-  source: postgres
   source_connection: neon
   source_table: 'public.test_merge'
 
   destination: postgres
-  destination_connection: local
-  destination_table: 'public.ingestr_destiny'
 
 
 columns:

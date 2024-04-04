@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	IngestrVersion = "v0.2.2"
+	IngestrVersion = "v0.2.6"
 	DockerImage    = "ghcr.io/bruin-data/ingestr:" + IngestrVersion
 )
 
@@ -58,35 +58,38 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	if !ok {
 		return errors.New("source connection not configured")
 	}
+
 	sourceConnection, err := o.conn.GetConnection(sourceConnectionName)
 	if err != nil {
 		return fmt.Errorf("source connection %s not found", sourceConnectionName)
 	}
+
 	sourceURI, err := sourceConnection.(pipelineConnection).GetIngestrURI()
 	if err != nil {
 		return errors.New("could not get the source uri")
 	}
+
 	sourceTable, ok := ti.GetAsset().Parameters["source_table"]
 	if !ok {
 		return errors.New("source table not configured")
 	}
 
-	destConnectionName, ok := ti.GetAsset().Parameters["destination_connection"]
-	if !ok {
-		return errors.New("destination connection not configured")
+	destConnectionName := ti.GetAsset().Connection
+	if destConnectionName == "" {
+		return errors.New("Connection not configured")
 	}
+
 	destConnection, err := o.conn.GetConnection(destConnectionName)
 	if err != nil {
 		return fmt.Errorf("destination connection %s not found", destConnectionName)
 	}
+
 	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
 	if err != nil {
 		return errors.New("could not get the source uri")
 	}
-	destTable, ok := ti.GetAsset().Parameters["destination_table"]
-	if !ok {
-		return errors.New("source table not configured")
-	}
+
+	destTable := ti.GetAsset().Name
 
 	cmdArgs := []string{
 		"ingest",
