@@ -71,18 +71,17 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return errors.New("source table not configured")
 	}
 
-	destConnectionName, ok := ti.GetAsset().Parameters["destination_connection"]
-	if !ok {
-		return errors.New("destination connection not configured")
-	}
+	destConnectionName := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
 	destConnection, err := o.conn.GetConnection(destConnectionName)
 	if err != nil {
 		return fmt.Errorf("destination connection %s not found", destConnectionName)
 	}
+
 	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
 	if err != nil {
 		return errors.New("could not get the source uri")
 	}
+
 	destTable, ok := ti.GetAsset().Parameters["destination_table"]
 	if !ok {
 		return errors.New("source table not configured")

@@ -415,11 +415,12 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) string {
 		return asset.Connection
 	}
 
+	connectionType := asset.Type
 	if asset.Type == AssetTypeIngestr {
-		return asset.Parameters["destination_connection"]
+		connectionType = AssetType(asset.Parameters["destination"])
 	}
 
-	mappings := AssetTypeConnectionMapping[asset.Type]
+	mappings := AssetTypeConnectionMapping[connectionType]
 	if mappings == nil {
 		return ""
 	}
