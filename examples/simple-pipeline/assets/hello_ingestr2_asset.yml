@@ -6,7 +6,7 @@ parameters:
   source_connection: neon
   source_table: 'public.test_merge'
 
-  destination: google_cloud_platform
+  destination: bigquery
 
 columns:
   - name: id
