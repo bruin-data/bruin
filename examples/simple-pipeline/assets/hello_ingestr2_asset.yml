@@ -1,6 +1,5 @@
 name: test_data_alberto.ingestr_destiny_2
 type: ingestr
-connection: alberto-gcp
 
 parameters:
   source_connection: neon
