@@ -74,11 +74,7 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return errors.New("source table not configured")
 	}
 
-	destConnectionName := ti.GetAsset().Connection
-	if destConnectionName == "" {
-		return errors.New("Connection not configured")
-	}
-
+	destConnectionName := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
 	destConnection, err := o.conn.GetConnection(destConnectionName)
 	if err != nil {
 		return fmt.Errorf("destination connection %s not found", destConnectionName)

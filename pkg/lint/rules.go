@@ -227,7 +227,7 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 		return issues, nil
 	}
 
-	requiredKeys := []string{"source_connection", "source_table", "destination", "destination_connection", "destination_table"}
+	requiredKeys := []string{"source_connection", "source_table", "destination"}
 	for _, key := range requiredKeys {
 		if asset.Parameters == nil {
 			issues = append(issues, &Issue{
