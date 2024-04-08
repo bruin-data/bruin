@@ -15,9 +15,12 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-const DefaultTemplate = "default"
+const (
+	DefaultTemplate   = "default"
+	DefaultFolderName = "bruin-pipeline"
+)
 
-func Init(isDebug *bool) *cli.Command {
+func Init() *cli.Command {
 	folders, err := templates.Templates.ReadDir(".")
 	if err != nil {
 		panic("Error retrieving bruin templates")
@@ -33,7 +36,7 @@ func Init(isDebug *bool) *cli.Command {
 		Name:  "init",
 		Usage: "init a Bruin pipeline",
 		ArgsUsage: fmt.Sprintf(
-			"[name of the folder where the pipeline will be created] [template name to be used: %s]",
+			"[template name to be used: %s] [name of the folder where the pipeline will be created]",
 			strings.Join(templateList, "|"),
 		),
 		Flags: []cli.Flag{},
@@ -47,10 +50,24 @@ func Init(isDebug *bool) *cli.Command {
 				}
 			}()
 
-			inputPath := c.Args().Get(0)
-			if inputPath == "" {
-				errorPrinter.Printf("Please provide a name for bruin to create a folder where the pipeline will be created: bruin init <name of folder to be created> [template name])\n")
+			templateName := c.Args().Get(0)
+			if templateName == "" {
+				templateName = DefaultTemplate
+			}
+
+			_, err = templates.Templates.ReadDir(templateName)
+			if err != nil {
+				errorPrinter.Printf("Template '%s' not found\n", templateName)
 				return cli.Exit("", 1)
+			}
+
+			inputPath := c.Args().Get(1)
+			if inputPath == "" {
+				if templateName == DefaultTemplate {
+					inputPath = DefaultFolderName
+				} else {
+					inputPath = templateName
+				}
 			}
 
 			// Check if the folder already exists
@@ -67,16 +84,6 @@ func Init(isDebug *bool) *cli.Command {
 			err := os.Mkdir(inputPath, 0o755)
 			if err != nil {
 				errorPrinter.Printf("Failed to create the folder %s: %v\n", inputPath, err)
-				return cli.Exit("", 1)
-			}
-
-			templateName := c.Args().Get(1)
-			if templateName == "" {
-				templateName = DefaultTemplate
-			}
-			_, err = templates.Templates.ReadDir(templateName)
-			if err != nil {
-				errorPrinter.Printf("Template '%s' not found\n", templateName)
 				return cli.Exit("", 1)
 			}
 
