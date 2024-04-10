@@ -54,6 +54,7 @@ func (l *localPythonRunner) Run(ctx context.Context, execCtx *executionContext) 
 	}
 
 	log(ctx, "requirements.txt found, setting up the isolated environment...")
+	log(ctx, "requirements.txt path: "+execCtx.requirementsTxt)
 	depsPath, err := l.requirementsInstaller.EnsureVirtualEnvExists(ctx, execCtx.repo, execCtx.requirementsTxt)
 	if err != nil {
 		return err
