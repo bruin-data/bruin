@@ -55,6 +55,9 @@ func Lint(isDebug *bool) *cli.Command {
 			logger := makeLogger(*isDebug)
 
 			repoOrAsset := c.Args().Get(0)
+			if repoOrAsset == "" {
+				repoOrAsset = "."
+			}
 			rootPath := repoOrAsset
 			asset := ""
 			if isPathReferencingAsset(repoOrAsset) {
