@@ -97,5 +97,5 @@ func AbsPathForTests(t *testing.T, path string) string {
 		t.Fatalf("failed to get absolute path for %s: %v", path, err)
 	}
 
-	return absolutePath
+	return strings.Replace(absolutePath, string(filepath.Separator), "/", -1)
 }
