@@ -16,20 +16,31 @@ func (m *NoRequirementsFoundError) Error() string {
 	return "no requirements.txt file found for the given module"
 }
 
-type ModulePathFinder struct{}
+type ModulePathFinder struct {
+	PathSeparatorOverride int32
+}
 
-func (*ModulePathFinder) FindModulePath(repo *git.Repo, executable *pipeline.ExecutableFile) (string, error) {
-	executablePath := filepath.Clean(executable.Path)
-	if !strings.HasPrefix(executablePath, repo.Path) {
+func (m *ModulePathFinder) FindModulePath(repo *git.Repo, executable *pipeline.ExecutableFile) (string, error) {
+	separator := os.PathSeparator
+	if m.PathSeparatorOverride != 0 {
+		separator = m.PathSeparatorOverride
+	}
+
+	// Normalize paths by replacing OS-specific separators with a slash
+	normalizedRepoPath := strings.ReplaceAll(repo.Path, string(separator), "/")
+	normalizedExecutablePath := strings.ReplaceAll(executable.Path, string(separator), "/")
+	normalizedExecutablePath = filepath.Clean(normalizedExecutablePath)
+
+	if !strings.HasPrefix(normalizedExecutablePath, normalizedRepoPath) {
 		return "", errors.New("executable is not in the repository")
 	}
 
-	relativePath, err := filepath.Rel(repo.Path, executablePath)
+	relativePath, err := filepath.Rel(normalizedRepoPath, normalizedExecutablePath)
 	if err != nil {
 		return "", err
 	}
 
-	moduleName := strings.ReplaceAll(relativePath, string(filepath.Separator), ".")
+	moduleName := strings.ReplaceAll(relativePath, "/", ".")
 	moduleName = strings.TrimSuffix(moduleName, ".py")
 	return moduleName, nil
 }
@@ -37,7 +48,7 @@ func (*ModulePathFinder) FindModulePath(repo *git.Repo, executable *pipeline.Exe
 func (m *ModulePathFinder) FindRequirementsTxtInPath(path string, executable *pipeline.ExecutableFile) (string, error) {
 	executablePath := filepath.Clean(executable.Path)
 	if !strings.HasPrefix(executablePath, path) {
-		return "", errors.New("executable is not in the repository")
+		return "", errors.New("executable is not in the repository to find the requirements")
 	}
 
 	requirementsTxt := findFileUntilParent("requirements.txt", filepath.Dir(executablePath), path)

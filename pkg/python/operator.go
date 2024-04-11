@@ -7,12 +7,14 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
+	"go.uber.org/zap"
 )
 
 type executionContext struct {
@@ -98,10 +100,20 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		return errors.Wrap(err, "failed to find repo to run Python")
 	}
 
+	logger := zap.NewNop().Sugar()
+	if ctx.Value(executor.ContextLogger) != nil {
+		logger = ctx.Value(executor.ContextLogger).(*zap.SugaredLogger)
+	}
+
+	logger.Debugf("running Python task %s in repo %s", t.Name, repo.Path)
+
 	module, err := o.module.FindModulePath(repo, &t.ExecutableFile)
 	if err != nil {
+		logger.Debugf("failed to find module path for asset, repo: %s - executable: %s", repo.Path, t.ExecutableFile.Path)
 		return errors.Wrap(err, "failed to build a module path")
 	}
+
+	logger.Debugf("using module path: %s", module)
 
 	requirementsTxt, err := o.module.FindRequirementsTxtInPath(repo.Path, &t.ExecutableFile)
 	if err != nil {

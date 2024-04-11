@@ -31,6 +31,7 @@ type contextKey int
 
 const (
 	KeyPrinter contextKey = iota
+	ContextLogger
 
 	timeFormat = "2006-01-02 15:04:05"
 )
@@ -98,6 +99,7 @@ func (w worker) run(taskChannel <-chan scheduler.TaskInstance, results chan<- *s
 		}
 
 		ctx := context.WithValue(context.Background(), KeyPrinter, printer)
+		ctx = context.WithValue(ctx, ContextLogger, w.logger)
 		err := w.executor.RunSingleTask(ctx, task)
 
 		duration := time.Since(start)

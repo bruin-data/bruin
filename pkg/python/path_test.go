@@ -14,8 +14,9 @@ func TestFindModulePath(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
-		repo       *git.Repo
-		executable *pipeline.ExecutableFile
+		repo              *git.Repo
+		executable        *pipeline.ExecutableFile
+		seperatorOverride int32
 	}
 	tests := []struct {
 		name    string
@@ -59,12 +60,31 @@ func TestFindModulePath(t *testing.T) {
 			},
 			want: "pipeline1.tasks.my-module.script",
 		},
+		{
+			name: "can find the module path even with indirect directory references on Windows",
+			args: args{
+				repo: &git.Repo{
+					Path: "C:\\Users\\robin\\Projects\\my-pipeline",
+				},
+				executable: &pipeline.ExecutableFile{
+					Path: "C:\\Users\\robin\\Projects\\my-pipeline\\..\\..\\Projects\\my-pipeline\\pipeline1\\tasks\\my-module\\script.py",
+				},
+				seperatorOverride: '\\',
+			},
+			want: "pipeline1.tasks.my-module.script",
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			finder := &ModulePathFinder{}
+
+			separator := filepath.Separator
+			if tt.args.seperatorOverride != 0 {
+				separator = tt.args.seperatorOverride
+			}
+
+			finder := &ModulePathFinder{PathSeparatorOverride: separator}
 			got, err := finder.FindModulePath(tt.args.repo, tt.args.executable)
 
 			if tt.wantErr {
