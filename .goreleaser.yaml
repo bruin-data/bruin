@@ -72,7 +72,6 @@ nfpms:
     formats:
       - apk
       - deb
-      - rpm
     dependencies:
       - git
 
