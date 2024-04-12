@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -100,6 +101,12 @@ func TestEnsureTaskNameIsNotEmpty(t *testing.T) {
 
 func TestEnsureExecutableFileIsValid(t *testing.T) {
 	t.Parallel()
+
+	// this is done outside because windows and unix treat paths differently
+	// which means we cannot simply put some-path/some-file.sh in the test cases, we need to dynamically join them.
+	// e.g. Windows created `some-path\some-file.sh` while macOS creates `some-path/some-file.sh`
+	filePath := filepath.Join("some-path", "some-file.sh")
+	secondFilePath := filepath.Join("some-path", "some-other-file.sh")
 
 	type args struct {
 		setupFilesystem func(t *testing.T, fs afero.Fs)
@@ -203,7 +210,7 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 			name: "executable is a directory",
 			args: args{
 				setupFilesystem: func(t *testing.T, fs afero.Fs) {
-					err := fs.MkdirAll("some-path/some-file", 0o644)
+					err := fs.MkdirAll(filePath, 0o644)
 					require.NoError(t, err, "failed to create the in-memory directory")
 				},
 				pipeline: pipeline.Pipeline{
@@ -214,7 +221,7 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 							},
 							ExecutableFile: pipeline.ExecutableFile{
 								Name: "some-file",
-								Path: "some-path/some-file",
+								Path: filePath,
 							},
 						},
 					},
@@ -228,7 +235,7 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 						},
 						ExecutableFile: pipeline.ExecutableFile{
 							Name: "some-file",
-							Path: "some-path/some-file",
+							Path: filePath,
 						},
 					},
 					Description: executableFileIsADirectory,
@@ -239,10 +246,9 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 			name: "executable is an empty file",
 			args: args{
 				setupFilesystem: func(t *testing.T, fs afero.Fs) {
-					fileName := "some-path/some-file.sh"
-					file, err := fs.Create(fileName)
+					file, err := fs.Create(filePath)
 					require.NoError(t, err)
-					err = fs.Chmod(fileName, 0o755)
+					err = fs.Chmod(filePath, 0o755)
 					require.NoError(t, err)
 					require.NoError(t, file.Close())
 				},
@@ -254,7 +260,7 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 							},
 							ExecutableFile: pipeline.ExecutableFile{
 								Name: "some-file.sh",
-								Path: "some-path/some-file.sh",
+								Path: filePath,
 							},
 						},
 					},
@@ -268,7 +274,7 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 						},
 						ExecutableFile: pipeline.ExecutableFile{
 							Name: "some-file.sh",
-							Path: "some-path/some-file.sh",
+							Path: filePath,
 						},
 					},
 					Description: executableFileIsEmpty,
@@ -280,7 +286,7 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 						},
 						ExecutableFile: pipeline.ExecutableFile{
 							Name: "some-file.sh",
-							Path: "some-path/some-file.sh",
+							Path: filePath,
 						},
 					},
 					Description: executableFileIsNotExecutable,
@@ -291,10 +297,9 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 			name: "executable file has the wrong permissions",
 			args: args{
 				setupFilesystem: func(t *testing.T, fs afero.Fs) {
-					fileName := "some-path/some-file.sh"
-					file, err := fs.Create(fileName)
+					file, err := fs.Create(filePath)
 					require.NoError(t, err)
-					err = fs.Chmod(fileName, os.FileMode(0o100))
+					err = fs.Chmod(filePath, os.FileMode(0o100))
 					require.NoError(t, err)
 					defer func() { require.NoError(t, file.Close()) }()
 
@@ -309,7 +314,7 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 							},
 							ExecutableFile: pipeline.ExecutableFile{
 								Name: "some-file.sh",
-								Path: "some-path/some-file.sh",
+								Path: filePath,
 							},
 						},
 					},
@@ -323,7 +328,7 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 						},
 						ExecutableFile: pipeline.ExecutableFile{
 							Name: "some-file.sh",
-							Path: "some-path/some-file.sh",
+							Path: filePath,
 						},
 					},
 					Description: executableFileIsNotExecutable,
@@ -334,21 +339,21 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 			name: "all good for the executable, no issues found",
 			args: args{
 				setupFilesystem: func(t *testing.T, fs afero.Fs) {
-					file, err := fs.Create("some-path/some-file.sh")
+					file, err := fs.Create(filePath)
 					require.NoError(t, err)
 					defer func() { require.NoError(t, file.Close()) }()
 
-					err = fs.Chmod("some-path/some-file.sh", 0o644)
+					err = fs.Chmod(filePath, 0o644)
 					require.NoError(t, err)
 
 					_, err = file.Write([]byte("some content"))
 					require.NoError(t, err)
 
-					file, err = fs.Create("some-path/some-other-file.sh")
+					file, err = fs.Create(secondFilePath)
 					require.NoError(t, err)
 					defer func() { require.NoError(t, file.Close()) }()
 
-					err = fs.Chmod("some-path/some-other-file.sh", 0o644)
+					err = fs.Chmod(secondFilePath, 0o644)
 					require.NoError(t, err)
 
 					_, err = file.Write([]byte("some other content"))
@@ -362,7 +367,7 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 							},
 							ExecutableFile: pipeline.ExecutableFile{
 								Name: "some-file.sh",
-								Path: "some-path/some-file.sh",
+								Path: filePath,
 							},
 						},
 						{
@@ -371,7 +376,7 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 							},
 							ExecutableFile: pipeline.ExecutableFile{
 								Name: "some-other-file.sh",
-								Path: "some-path/some-other-file.sh",
+								Path: secondFilePath,
 							},
 						},
 					},
