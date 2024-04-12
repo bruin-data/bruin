@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -258,31 +259,31 @@ func TestTask_RelativePathToPipelineRoot(t *testing.T) {
 			name: "simple relative path returned",
 			pipeline: &pipeline.Pipeline{
 				DefinitionFile: pipeline.DefinitionFile{
-					Path: "/users/user1/pipelines/pipeline1/pipeline.yml",
+					Path: filepath.Join(string(filepath.Separator), "users", "user1", "pipelines", "pipeline1", "pipeline.yml"),
 				},
 			},
 			task: &pipeline.Asset{
 				Name: "test-task",
 				DefinitionFile: pipeline.TaskDefinitionFile{
-					Path: "/users/user1/pipelines/pipeline1/tasks/task-folder/task1.sql",
+					Path: filepath.Join(string(filepath.Separator), "users", "user1", "pipelines", "pipeline1", "tasks", "task-folder", "task1.sql"),
 				},
 			},
-			want: "tasks/task-folder/task1.sql",
+			want: filepath.Join("tasks", "task-folder", "task1.sql"),
 		},
 		{
 			name: "relative path is calculated even if the tasks are on a parent folder",
 			pipeline: &pipeline.Pipeline{
 				DefinitionFile: pipeline.DefinitionFile{
-					Path: "/users/user1/pipelines/pipeline1/pipeline.yml",
+					Path: filepath.Join(string(filepath.Separator), "users", "user1", "pipelines", "pipeline1", "pipeline.yml"),
 				},
 			},
 			task: &pipeline.Asset{
 				Name: "test-task",
 				DefinitionFile: pipeline.TaskDefinitionFile{
-					Path: "/users/user1/pipelines/task-folder/task1.sql",
+					Path: filepath.Join(string(filepath.Separator), "users", "user1", "pipelines", "task-folder", "task1.sql"),
 				},
 			},
-			want: "../task-folder/task1.sql",
+			want: filepath.Join("..", "task-folder", "task1.sql"),
 		},
 	}
 	for _, tt := range tests {

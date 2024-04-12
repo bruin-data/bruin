@@ -54,7 +54,7 @@ func GetPipelineRootFromTask(taskPath, pipelineDefinitionFile string) (string, e
 	}
 
 	currentFolder := absoluteTaskPath
-	for currentFolder != "/" {
+	for currentFolder != filepath.VolumeName(currentFolder)+string(os.PathSeparator) && currentFolder != "/" {
 		tryPath := filepath.Join(currentFolder, pipelineDefinitionFile)
 		if _, err := os.Stat(tryPath); err == nil {
 			return currentFolder, nil

@@ -99,3 +99,14 @@ func AbsPathForTests(t *testing.T, path string) string {
 
 	return strings.ReplaceAll(absolutePath, string(filepath.Separator), "/")
 }
+
+func AbsPathCrossPlatform(t *testing.T, path string) string {
+	t.Helper()
+
+	absolutePath, err := filepath.Abs(path)
+	if err != nil {
+		t.Fatalf("failed to get absolute path for %s: %v", path, err)
+	}
+
+	return absolutePath
+}

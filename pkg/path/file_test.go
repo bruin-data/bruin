@@ -1,6 +1,7 @@
 package path
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -106,6 +107,8 @@ func Test_readYamlFileFromPath(t *testing.T) {
 func TestExcludeItemsInDirectoryContainingFile(t *testing.T) {
 	t.Parallel()
 
+	var baseDir = filepath.Join("pipeline", "tasks")
+
 	type args struct {
 		filePaths []string
 		file      string
@@ -119,19 +122,19 @@ func TestExcludeItemsInDirectoryContainingFile(t *testing.T) {
 			name: "all sub-items in directory for task.yml are removed",
 			args: args{
 				filePaths: []string{
-					"pipeline/tasks/task1/task.yml",
-					"pipeline/tasks/task1/runfile.sh",
-					"pipeline/tasks/task1/some/nested/dir/code.py",
-					"pipeline/tasks/task1/some/nested/dir/another/task.yml",
-					"pipeline/tasks/task2/task1/code2.py",
-					"pipeline/tasks/task3.py",
+					filepath.Join(baseDir, "task1", "task.yml"),
+					filepath.Join(baseDir, "task1", "runfile.sh"),
+					filepath.Join(baseDir, "task1", "some", "nested", "dir", "code.py"),
+					filepath.Join(baseDir, "task1", "some", "nested", "dir", "another", "task.yml"),
+					filepath.Join(baseDir, "task2", "task1", "code2.py"),
+					filepath.Join(baseDir, "task3.py"),
 				},
 				file: "task.yml",
 			},
 			want: []string{
-				"pipeline/tasks/task1/task.yml",
-				"pipeline/tasks/task2/task1/code2.py",
-				"pipeline/tasks/task3.py",
+				filepath.Join(baseDir, "task1", "task.yml"),
+				filepath.Join(baseDir, "task2", "task1", "code2.py"),
+				filepath.Join(baseDir, "task3.py"),
 			},
 		},
 		{
@@ -145,27 +148,27 @@ func TestExcludeItemsInDirectoryContainingFile(t *testing.T) {
 		{
 			name: "only task.yml works fine",
 			args: args{
-				filePaths: []string{"path/to/task.yml"},
+				filePaths: []string{filepath.Join("path", "to", "task.yml")},
 				file:      "task.yml",
 			},
-			want: []string{"path/to/task.yml"},
+			want: []string{filepath.Join("path", "to", "task.yml")},
 		},
 		{
 			name: "no task.yml is also okay",
 			args: args{
 				filePaths: []string{
-					"pipeline/tasks/task1/runfile.sh",
-					"pipeline/tasks/task1/some/nested/dir/code.py",
-					"pipeline/tasks/task2/task1/code2.py",
-					"pipeline/tasks/task3.py",
+					filepath.Join(baseDir, "task1", "runfile.sh"),
+					filepath.Join(baseDir, "task1", "some", "nested", "dir", "code.py"),
+					filepath.Join(baseDir, "task2", "task1", "code2.py"),
+					filepath.Join(baseDir, "task3.py"),
 				},
 				file: "task.yml",
 			},
 			want: []string{
-				"pipeline/tasks/task1/runfile.sh",
-				"pipeline/tasks/task1/some/nested/dir/code.py",
-				"pipeline/tasks/task2/task1/code2.py",
-				"pipeline/tasks/task3.py",
+				filepath.Join(baseDir, "task1", "runfile.sh"),
+				filepath.Join(baseDir, "task1", "some", "nested", "dir", "code.py"),
+				filepath.Join(baseDir, "task2", "task1", "code2.py"),
+				filepath.Join(baseDir, "task3.py"),
 			},
 		},
 	}

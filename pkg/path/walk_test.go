@@ -57,10 +57,13 @@ func TestGetPipelinePaths(t *testing.T) {
 func TestGetPipelineRootFromTask(t *testing.T) {
 	t.Parallel()
 
-	firstPipelineAbsolute, err := filepath.Abs("testdata/walk/task-to-pipeline/first-pipeline")
+	firstFilePath := filepath.Join("testdata", "walk", "task-to-pipeline", "first-pipeline")
+	secondFilePath := filepath.Join("testdata", "walk", "task-to-pipeline", "second-pipeline")
+
+	firstPipelineAbsolute, err := filepath.Abs(firstFilePath)
 	require.NoError(t, err)
 
-	secondPipelineAbsolute, err := filepath.Abs("testdata/walk/task-to-pipeline/second-pipeline")
+	secondPipelineAbsolute, err := filepath.Abs(secondFilePath)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -72,19 +75,19 @@ func TestGetPipelineRootFromTask(t *testing.T) {
 	}{
 		{
 			name:                   "pipeline is found from a deeply nested task",
-			taskPath:               "testdata/walk/task-to-pipeline/first-pipeline/tasks/helloworld/task.yml",
+			taskPath:               filepath.Join("testdata", "walk", "task-to-pipeline", "first-pipeline", "tasks", "helloworld", "task.yml"),
 			pipelineDefinitionFile: "pipeline.yml",
 			want:                   firstPipelineAbsolute,
 		},
 		{
 			name:                   "pipeline is found from a shallow nested task",
-			taskPath:               "testdata/walk/task-to-pipeline/second-pipeline/tasks/task1.yml",
+			taskPath:               filepath.Join("testdata", "walk", "task-to-pipeline", "second-pipeline", "tasks", "task1.yml"),
 			pipelineDefinitionFile: "pipeline.yml",
 			want:                   secondPipelineAbsolute,
 		},
 		{
 			name:                   "pipeline is found even if definition file name is different",
-			taskPath:               "testdata/walk/task-to-pipeline/second-pipeline/tasks/test2/task.yml",
+			taskPath:               filepath.Join("testdata", "walk", "task-to-pipeline", "second-pipeline", "tasks", "test2", "task.yml"),
 			pipelineDefinitionFile: "task1.yml",
 			want:                   filepath.Join(secondPipelineAbsolute, "tasks"),
 		},
