@@ -74,6 +74,10 @@ func GetAllFilesRecursive(root string, suffixes []string) ([]string, error) {
 		}
 
 		if d.IsDir() {
+			if slices.Contains(SkipDirs, d.Name()) {
+				return filepath.SkipDir
+			}
+
 			return nil
 		}
 
