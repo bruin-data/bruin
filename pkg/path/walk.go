@@ -4,10 +4,13 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/pkg/errors"
 )
+
+var SkipDirs = []string{".git", ".github", ".vscode", "node_modules", "dist", "build", "target", "vendor", ".venv", ".env", "env", "dbt_packages"}
 
 func GetPipelinePaths(root, pipelineDefinitionFile string) ([]string, error) {
 	var pipelinePaths []string
@@ -17,6 +20,10 @@ func GetPipelinePaths(root, pipelineDefinitionFile string) ([]string, error) {
 		}
 
 		if d.IsDir() {
+			if slices.Contains(SkipDirs, d.Name()) {
+				return filepath.SkipDir
+			}
+
 			return nil
 		}
 
