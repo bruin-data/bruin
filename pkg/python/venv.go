@@ -57,6 +57,9 @@ func (i *installReqsToHomeDir) EnsureVirtualEnvExists(ctx context.Context, repo 
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
+	fmt.Println("----- path to venv", venvPath)
+	fmt.Println("----- path to pip", i.pathToPip)
+
 	reqsPathExists := path.DirExists(i.fs, venvPath)
 	if reqsPathExists {
 		activateFileExists := path.FileExists(i.fs, venvPath+"/bin/activate")
@@ -73,7 +76,14 @@ func (i *installReqsToHomeDir) EnsureVirtualEnvExists(ctx context.Context, repo 
 		return "", errors.Wrap(err, "failed to create virtualenv")
 	}
 
-	fullCommand := fmt.Sprintf(". %s/bin/activate && %s install -r %s --quiet --quiet && echo 'installed all the dependencies'", venvPath, i.pathToPip, requirementsTxt)
+	fmt.Println("yarattik virtualenv")
+	fmt.Println("path to venv", venvPath)
+	fmt.Println("path to pip", i.pathToPip)
+
+	pipVenvPath := fmt.Sprintf("%s/bin/pip3", venvPath)
+
+	fullCommand := fmt.Sprintf(". %s/bin/activate && %s install -r %s --quiet --quiet && echo 'installed all the dependencies'", venvPath, pipVenvPath, requirementsTxt)
+	fmt.Println("--- FULLCOMMAND", fullCommand)
 	err = i.cmd.Run(ctx, repo, &command{
 		Name: Shell,
 		Args: []string{"-c", fullCommand},
