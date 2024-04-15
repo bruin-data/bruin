@@ -535,3 +535,29 @@ func EnsureSnowflakeSensorHasQueryParameterForASingleAsset(ctx context.Context, 
 
 	return issues, nil
 }
+
+func EnsureBigQueryTableSensorHasTableParameterForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if asset.Type != pipeline.AssetTypeBigqueryTableSensor {
+		return issues, nil
+	}
+
+	table, ok := asset.Parameters["table"]
+	if !ok {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "BigQuery table sensor requires a `table` parameter",
+		})
+		return issues, nil
+	}
+	tableItems := strings.Split(table, ".")
+
+	if len(tableItems) != 3 {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "BigQuery table sensor `table` parameter must be in the format `project.dataset.table`",
+		})
+	}
+
+	return issues, nil
+}

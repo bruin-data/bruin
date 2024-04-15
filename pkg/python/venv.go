@@ -24,7 +24,6 @@ type installReqsToHomeDir struct {
 	config       configManager
 	cmd          cmd
 	pathToPython string
-	pathToPip    string
 
 	lock sync.Mutex
 }
@@ -73,7 +72,8 @@ func (i *installReqsToHomeDir) EnsureVirtualEnvExists(ctx context.Context, repo 
 		return "", errors.Wrap(err, "failed to create virtualenv")
 	}
 
-	fullCommand := fmt.Sprintf(". %s/bin/activate && %s install -r %s --quiet --quiet && echo 'installed all the dependencies'", venvPath, i.pathToPip, requirementsTxt)
+	pipVenvPath := venvPath + "/bin/pip3"
+	fullCommand := fmt.Sprintf(". %s/bin/activate && %s install -r %s --quiet --quiet && echo 'installed all the dependencies'", venvPath, pipVenvPath, requirementsTxt)
 	err = i.cmd.Run(ctx, repo, &command{
 		Name: Shell,
 		Args: []string{"-c", fullCommand},

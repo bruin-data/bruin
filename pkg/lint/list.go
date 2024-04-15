@@ -71,6 +71,12 @@ func GetRules(fs afero.Fs) ([]Rule, error) {
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "valid-bigquery-table-sensor",
+			Validator:        CallFuncForEveryAsset(EnsureBigQueryTableSensorHasTableParameterForASingleAsset),
+			AssetValidator:   EnsureBigQueryTableSensorHasTableParameterForASingleAsset,
+			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "valid-ingestr",
 			Validator:        CallFuncForEveryAsset(EnsureIngestrAssetIsValidForASingleAsset),
 			AssetValidator:   EnsureIngestrAssetIsValidForASingleAsset,

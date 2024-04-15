@@ -61,11 +61,6 @@ func NewLocalOperator(config *config.Config, envVariables map[string]string) *Lo
 		panic("No executable found for Python, neither 'python3' nor 'python', are you sure Python is installed?")
 	}
 
-	pathToPip, err := findPathToExecutable([]string{"pip3", "pip"})
-	if err != nil {
-		panic("No executable found for pip, neither 'pip3' nor 'pip', are you sure pip is installed?")
-	}
-
 	return &LocalOperator{
 		repoFinder: &git.RepoFinder{},
 		module:     &ModulePathFinder{},
@@ -76,7 +71,6 @@ func NewLocalOperator(config *config.Config, envVariables map[string]string) *Lo
 				cmd:          cmdRunner,
 				config:       user.NewConfigManager(fs),
 				pathToPython: pathToPython,
-				pathToPip:    pathToPip,
 			},
 			pathToPython: pathToPython,
 		},

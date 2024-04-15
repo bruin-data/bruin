@@ -1430,6 +1430,101 @@ func TestEnsureSnowflakeSensorHasQueryParameter(t *testing.T) {
 	}
 }
 
+func TestEnsureBigQueryTableSensorHasTableParameter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		p       *pipeline.Pipeline
+		want    []string
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "no table param",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "task1",
+						Type: pipeline.AssetTypeBigqueryTableSensor,
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want:    []string{"BigQuery table sensor requires a `table` parameter"},
+		},
+		{
+			name: "table param exists but empty",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "task1",
+						Type: pipeline.AssetTypeBigqueryTableSensor,
+						Parameters: map[string]string{
+							"table": "",
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want:    []string{"BigQuery table sensor `table` parameter must be in the format `project.dataset.table`"},
+		},
+		{
+			name: "table param exists but missing",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "task1",
+						Type: pipeline.AssetTypeBigqueryTableSensor,
+						Parameters: map[string]string{
+							"table": "a.b",
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want:    []string{"BigQuery table sensor `table` parameter must be in the format `project.dataset.table`"},
+		},
+		{
+			name: "no issues",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "task1",
+						Type: pipeline.AssetTypeBigqueryTableSensor,
+						Parameters: map[string]string{
+							"table": "a.b.c",
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := CallFuncForEveryAsset(EnsureBigQueryTableSensorHasTableParameterForASingleAsset)(tt.p)
+			if !tt.wantErr(t, err) {
+				return
+			}
+
+			// I am doing this because I don't care if I get a nil or empty slice
+			if tt.want != nil {
+				gotMessages := make([]string, len(got))
+				for i, issue := range got {
+					gotMessages[i] = issue.Description
+				}
+
+				assert.Equal(t, tt.want, gotMessages)
+			} else {
+				assert.Equal(t, []*Issue{}, got)
+			}
+		})
+	}
+}
+
 func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 	t.Parallel()
 
