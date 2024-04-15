@@ -126,7 +126,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 				reqs.On("EnsureVirtualEnvExists", mock.Anything, repo, requirementsTxt).
 					Return(venvPath, nil)
 
-				expectedCommand := ". /path/to/venv/bin/activate && echo 'activated virtualenv' && /test/python -u -m path.to.module"
+				expectedCommand := ". /path/to/venv/bin/activate && echo 'activated virtualenv' && /path/to/venv/bin/python3 -u -m path.to.module"
 
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
@@ -149,7 +149,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 				reqs.On("EnsureVirtualEnvExists", mock.Anything, repo, requirementsTxt).
 					Return(venvPath, nil)
 
-				expectedCommand := ". /path/to/venv/bin/activate && echo 'activated virtualenv' && /test/python -u -m path.to.module"
+				expectedCommand := ". /path/to/venv/bin/activate && echo 'activated virtualenv' && /path/to/venv/bin/python3 -u -m path.to.module"
 
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{

@@ -64,6 +64,7 @@ func (l *localPythonRunner) Run(ctx context.Context, execCtx *executionContext) 
 		return l.cmd.Run(ctx, execCtx.repo, noDependencyCommand)
 	}
 
+	// if there's a virtualenv, use the Python there explicitly, otherwise aliases change the runtime used
 	pythonCommandForScript = fmt.Sprintf("%s/bin/python3 -u -m %s", depsPath, execCtx.module)
 	fullCommand := fmt.Sprintf(". %s/bin/activate && echo 'activated virtualenv' && %s", depsPath, pythonCommandForScript)
 	return l.cmd.Run(ctx, execCtx.repo, &command{
