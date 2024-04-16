@@ -39,6 +39,9 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 	"gcs.sensor.object": {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
+	"dbt": {
+		scheduler.TaskInstanceTypeMain: NoOpOperator{},
+	},
 	pipeline.AssetTypeEmpty: {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
