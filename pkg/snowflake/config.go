@@ -31,7 +31,11 @@ func (c Config) DSN() (string, error) {
 }
 
 func (c Config) GetIngestrURI() (string, error) {
-	return c.DSN()
+	dsn, err := c.DSN()
+	if err != nil {
+		return "", err
+	}
+	return "snowflake://" + dsn, nil
 }
 
 func (c Config) IsValid() bool {
