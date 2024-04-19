@@ -2,6 +2,7 @@ package snowflake
 
 import (
 	"github.com/snowflakedb/gosnowflake"
+	"net/url"
 )
 
 type Config struct {
@@ -31,11 +32,25 @@ func (c Config) DSN() (string, error) {
 }
 
 func (c Config) GetIngestrURI() (string, error) {
-	dsn, err := c.DSN()
-	if err != nil {
-		return "", err
+	u := &url.URL{
+		Scheme: "snowflake",
+		User:   url.UserPassword(c.Username, c.Password),
+		Host:   c.Account,
+		Path:   c.Database,
 	}
-	return "snowflake://" + dsn, nil
+
+	values := u.Query()
+	if c.Warehouse != "" {
+		values.Add("warehouse", c.Warehouse)
+	}
+
+	if c.Role != "" {
+		values.Add("role", c.Role)
+	}
+
+	u.RawQuery = values.Encode()
+
+	return u.String(), nil
 }
 
 func (c Config) IsValid() bool {
