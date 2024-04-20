@@ -101,7 +101,7 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	}
 
 	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
-	_, _ = writer.Write([]byte(fmt.Sprintf("Running ingestr with args: %s\n", strings.Join(cmdArgs, " "))))
+	_, _ = writer.Write([]byte("Triggering ingestr...\n"))
 
 	resp, err := o.client.ContainerCreate(ctx, &container.Config{
 		Image:        DockerImage,
@@ -154,8 +154,12 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		if err != nil {
 			return fmt.Errorf("failed after waiting for docker container to start: %s", err.Error())
 		}
-	case <-statusCh:
-		return nil
+	case res := <-statusCh:
+		if res.Error != nil {
+			return fmt.Errorf("failed after waiting for docker container to finish: %s", res.Error.Message)
+		}
+
+		_, _ = writer.Write([]byte(fmt.Sprintf("ingestr container completed with response code: %d\n", res.StatusCode)))
 	}
 
 	return nil

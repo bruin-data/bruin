@@ -1,8 +1,9 @@
 package snowflake
 
 import (
-	"github.com/snowflakedb/gosnowflake"
 	"net/url"
+
+	"github.com/snowflakedb/gosnowflake"
 )
 
 type Config struct {
