@@ -1,22 +1,26 @@
-name: release
+name: Release
 
 on:
-  release:
-    types:
-      - created
+  push:
+    tags:
+      - '*'
 
 jobs:
-  publish:
+  goreleaser:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
 
-      - run: make build
-      - name: Upload
-        uses: softprops/action-gh-release@v1
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
         with:
-          files: ./bin/bruin
-          tag_name: ${{ github.event.release.tag_name }}
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
