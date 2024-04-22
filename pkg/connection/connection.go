@@ -176,7 +176,7 @@ func (m *Manager) GetMySQLConnection(name string) (*mysql.Client, error) {
 		return db, nil
 	}
 
-	return m.GetMySQLConnectionWithoutDefault("mongo-default")
+	return m.GetMySQLConnectionWithoutDefault("mysql-default")
 }
 
 func (m *Manager) GetMySQLConnectionWithoutDefault(name string) (*mysql.Client, error) {

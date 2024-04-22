@@ -163,11 +163,11 @@ func (c *Connections) buildConnectionKeyMap() {
 		c.byKey[conn.Name] = &(c.Synapse[i])
 	}
 
-	for i, conn := range c.MySQL {
+	for i, conn := range c.Mongo {
 		c.byKey[conn.Name] = &(c.Mongo[i])
 	}
 
-	for i, conn := range c.MsSQL {
+	for i, conn := range c.MySQL {
 		c.byKey[conn.Name] = &(c.MySQL[i])
 	}
 
