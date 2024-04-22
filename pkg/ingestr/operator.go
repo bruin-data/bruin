@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	IngestrVersion = "v0.2.6"
+	IngestrVersion = "v0.3.1"
 	DockerImage    = "ghcr.io/bruin-data/ingestr:" + IngestrVersion
 )
 
@@ -38,8 +38,7 @@ func NewBasicOperator(conn *connection.Manager) (*BasicOperator, error) {
 	}
 	defer dockerClient.Close()
 
-	dockerImage := "ghcr.io/bruin-data/ingestr:" + IngestrVersion
-	reader, err := dockerClient.ImagePull(ctx, dockerImage, types.ImagePullOptions{})
+	reader, err := dockerClient.ImagePull(ctx, DockerImage, types.ImagePullOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch docker image: %s", err.Error())
 	}
@@ -98,6 +97,8 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		"--dest-table",
 		destTable,
 		"--yes",
+		"--progress",
+		"log",
 	}
 
 	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
@@ -110,7 +111,9 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		AttachStderr: true,
 		Tty:          true,
 		Env:          []string{},
-	}, nil, nil, nil, "")
+	}, &container.HostConfig{
+		NetworkMode: "host",
+	}, nil, nil, "")
 	if err != nil {
 		return fmt.Errorf("failed to create docker container: %s", err.Error())
 	}
@@ -150,6 +153,10 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	statusCh, errCh := o.client.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 
 	select {
+	case <-ctx.Done():
+		_, _ = writer.Write([]byte("Stopping the ingestr container\n"))
+		_ = o.client.ContainerStop(ctx, resp.ID, container.StopOptions{})
+		return ctx.Err()
 	case err := <-errCh:
 		if err != nil {
 			return fmt.Errorf("failed after waiting for docker container to start: %s", err.Error())
@@ -157,6 +164,10 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	case res := <-statusCh:
 		if res.Error != nil {
 			return fmt.Errorf("failed after waiting for docker container to finish: %s", res.Error.Message)
+		}
+
+		if res.StatusCode != 0 {
+			return fmt.Errorf("ingestr container failed with status code %d, please check the logs above for errors", res.StatusCode)
 		}
 
 		_, _ = writer.Write([]byte(fmt.Sprintf("ingestr container completed with response code: %d\n", res.StatusCode)))
