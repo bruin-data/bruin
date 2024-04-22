@@ -64,6 +64,14 @@ environments:
           port: 27017
           database: "mongodb"
 
+      mysql:
+        - name: conn8
+          username: "mysqluser"
+          password: "mysqlpass"
+          host: "mysqlhost"
+          port: 3306
+          database: "mysqldb"
+
       generic:
         - name: key1
           value: value1

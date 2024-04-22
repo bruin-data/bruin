@@ -89,6 +89,16 @@ func TestLoadFromFile(t *testing.T) {
 					Port:     27017,
 				},
 			},
+			MySQL: []MySQLConnection{
+				{
+					Name:     "conn8",
+					Host:     "mysqlhost",
+					Username: "mysqluser",
+					Password: "mysqlpass",
+					Database: "mysqldb",
+					Port:     3306,
+				},
+			},
 			Generic: []GenericConnection{
 				{
 					Name:  "key1",
@@ -188,6 +198,7 @@ func TestLoadOrCreate(t *testing.T) {
 			MsSQL:     []MsSQLConnection{},
 			Synapse:   []MsSQLConnection{},
 			Mongo:     []MongoConnection{},
+			MySQL:     []MySQLConnection{},
 		},
 	}
 

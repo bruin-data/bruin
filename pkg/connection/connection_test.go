@@ -187,3 +187,29 @@ func TestManager_AddMongoConnectionFromConfigConnectionFromConfig(t *testing.T) 
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
+
+func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{}
+
+	res, err := m.GetMySQLConnection("test")
+	require.Error(t, err)
+	assert.Nil(t, res)
+
+	configuration := &config.MySQLConnection{
+		Name:     "test",
+		Host:     "somehost",
+		Username: "user",
+		Password: "pass",
+		Database: "db",
+		Port:     15432,
+	}
+
+	err = m.AddMySQLConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, err = m.GetMySQLConnection("test")
+	require.NoError(t, err)
+	assert.NotNil(t, res)
+}

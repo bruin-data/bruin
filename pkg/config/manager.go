@@ -53,6 +53,15 @@ type MongoConnection struct {
 	Database string `yaml:"database" json:"database"`
 }
 
+type MySQLConnection struct {
+	Name     string `yaml:"name" json:"name"`
+	Username string `yaml:"username" json:"username"`
+	Password string `yaml:"password" json:"password"`
+	Host     string `yaml:"host"     json:"host"`
+	Port     int    `yaml:"port"     json:"port"`
+	Database string `yaml:"database" json:"database"`
+}
+
 func (c *GoogleCloudPlatformConnection) SetCredentials(cred *google.Credentials) {
 	c.rawCredentials = cred
 }
@@ -122,6 +131,7 @@ type Connections struct {
 	MsSQL               []MsSQLConnection               `yaml:"mssql"`
 	Synapse             []MsSQLConnection               `yaml:"synapse"`
 	Mongo               []MongoConnection               `yaml:"mongo"`
+	MySQL               []MySQLConnection               `yaml:"mysql"`
 	Generic             []GenericConnection             `yaml:"generic"`
 
 	byKey map[string]any
@@ -153,8 +163,12 @@ func (c *Connections) buildConnectionKeyMap() {
 		c.byKey[conn.Name] = &(c.Synapse[i])
 	}
 
-	for i, conn := range c.Mongo {
+	for i, conn := range c.MySQL {
 		c.byKey[conn.Name] = &(c.Mongo[i])
+	}
+
+	for i, conn := range c.MsSQL {
+		c.byKey[conn.Name] = &(c.MySQL[i])
 	}
 
 	for i, conn := range c.Generic {
