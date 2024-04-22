@@ -9,3 +9,4 @@ default_connections:
   mssql: "mssql"
   synapse: "synapse"
   mongo: "mongo"
+  mysql: "some-mysql"

@@ -8,6 +8,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/mongo"
 	"github.com/bruin-data/bruin/pkg/mssql"
+	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/pkg/errors"
@@ -20,6 +21,7 @@ type Manager struct {
 	Postgres  map[string]*postgres.Client
 	MsSQL     map[string]*mssql.DB
 	Mongo     map[string]*mongo.DB
+	Mysql     map[string]*mysql.Client
 
 	mutex sync.Mutex
 }
@@ -48,6 +50,11 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	connMongo, err := m.GetMongoConnectionWithoutDefault(name)
 	if err == nil {
 		return connMongo, nil
+	}
+
+	connMysql, err := m.GetMySQLConnectionWithoutDefault(name)
+	if err == nil {
+		return connMysql, nil
 	}
 
 	return nil, errors.New("connection not found")
@@ -158,6 +165,28 @@ func (m *Manager) GetMongoConnectionWithoutDefault(name string) (*mongo.DB, erro
 	db, ok := m.Mongo[name]
 	if !ok {
 		return nil, errors.Errorf("mongo connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetMySQLConnection(name string) (*mysql.Client, error) {
+	db, err := m.GetMySQLConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetMySQLConnectionWithoutDefault("mongo-default")
+}
+
+func (m *Manager) GetMySQLConnectionWithoutDefault(name string) (*mysql.Client, error) {
+	if m.Mysql == nil {
+		return nil, errors.New("no mysql connections found")
+	}
+
+	db, ok := m.Mysql[name]
+	if !ok {
+		return nil, errors.Errorf("mysql connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -323,6 +352,31 @@ func (m *Manager) AddMongoConnectionFromConfig(connection *config.MongoConnectio
 	return nil
 }
 
+func (m *Manager) AddMySQLConnectionFromConfig(connection *config.MySQLConnection) error {
+	m.mutex.Lock()
+	if m.Mysql == nil {
+		m.Mysql = make(map[string]*mysql.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := mysql.NewClient(&mysql.Config{
+		Username: connection.Username,
+		Password: connection.Password,
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Database: connection.Database,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Mysql[connection.Name] = client
+
+	return nil
+}
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	connectionManager := &Manager{}
 
@@ -393,6 +447,16 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 			err := connectionManager.AddMongoConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add Mongo connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.MySQL {
+		conn := conn
+		wg.Go(func() {
+			err := connectionManager.AddMySQLConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add mysql connection '%s'", conn.Name))
 			}
 		})
 	}

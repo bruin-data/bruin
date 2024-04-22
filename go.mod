@@ -11,6 +11,7 @@ require (
 	github.com/docker/docker v25.0.3+incompatible
 	github.com/fatih/color v1.16.0
 	github.com/go-playground/validator/v10 v10.19.0
+	github.com/go-sql-driver/mysql v1.6.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.5.5
 	github.com/jmoiron/sqlx v1.3.5
