@@ -27,6 +27,7 @@ export default defineConfig({
                             {text: "Postgres", link: "/connections/postgres"},
                             {text: "Redshift", link: "/connections/redshift"},
                             {text: "Snowflake", link: "/connections/snowflake"},
+                            {text: "MongoDB", link: "/connections/mongo"},
                         ]
                     },
                 ],
