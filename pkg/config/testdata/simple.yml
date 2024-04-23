@@ -72,6 +72,10 @@ environments:
           port: 3306
           database: "mysqldb"
 
+      notion:
+        - name: conn9
+          token: "XXXXYYYYZZZZ"
+
       generic:
         - name: key1
           value: value1

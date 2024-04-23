@@ -9,6 +9,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/mongo"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
+	"github.com/bruin-data/bruin/pkg/notion"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/pkg/errors"
@@ -22,6 +23,7 @@ type Manager struct {
 	MsSQL     map[string]*mssql.DB
 	Mongo     map[string]*mongo.DB
 	Mysql     map[string]*mysql.Client
+	Notion    map[string]*notion.Client
 
 	mutex sync.Mutex
 }
@@ -55,6 +57,11 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	connMysql, err := m.GetMySQLConnectionWithoutDefault(name)
 	if err == nil {
 		return connMysql, nil
+	}
+
+	connNotion, err := m.GetNotionConnectionWithoutDefault(name)
+	if err == nil {
+		return connNotion, nil
 	}
 
 	return nil, errors.New("connection not found")
@@ -187,6 +194,28 @@ func (m *Manager) GetMySQLConnectionWithoutDefault(name string) (*mysql.Client, 
 	db, ok := m.Mysql[name]
 	if !ok {
 		return nil, errors.Errorf("mysql connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetNotionConnection(name string) (*notion.Client, error) {
+	db, err := m.GetNotionConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetNotionConnectionWithoutDefault("notion-default")
+}
+
+func (m *Manager) GetNotionConnectionWithoutDefault(name string) (*notion.Client, error) {
+	if m.Notion == nil {
+		return nil, errors.New("no notion connections found")
+	}
+
+	db, ok := m.Notion[name]
+	if !ok {
+		return nil, errors.Errorf("notion connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -377,6 +406,27 @@ func (m *Manager) AddMySQLConnectionFromConfig(connection *config.MySQLConnectio
 	return nil
 }
 
+func (m *Manager) AddNotionConnectionFromConfig(connection *config.NotionConnection) error {
+	m.mutex.Lock()
+	if m.Notion == nil {
+		m.Notion = make(map[string]*notion.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := notion.NewClient(&notion.Config{
+		Token: connection.Token,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Notion[connection.Name] = client
+
+	return nil
+}
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	connectionManager := &Manager{}
 
@@ -457,6 +507,16 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 			err := connectionManager.AddMySQLConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add mysql connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Notion {
+		conn := conn
+		wg.Go(func() {
+			err := connectionManager.AddNotionConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add notion connection '%s'", conn.Name))
 			}
 		})
 	}

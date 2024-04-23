@@ -213,3 +213,25 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
+
+func TestManager_AddMNotionConnectionFromConfigConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{}
+
+	res, err := m.GetNotionConnection("test")
+	require.Error(t, err)
+	assert.Nil(t, res)
+
+	configuration := &config.NotionConnection{
+		Name:  "test",
+		Token: "token",
+	}
+
+	err = m.AddNotionConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, err = m.GetNotionConnection("test")
+	require.NoError(t, err)
+	assert.NotNil(t, res)
+}

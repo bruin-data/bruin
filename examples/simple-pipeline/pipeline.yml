@@ -10,3 +10,5 @@ default_connections:
   synapse: "synapse"
   mongo: "mongo"
   mysql: "some-mysql"
+  notion: "some-notion"
+
