@@ -62,6 +62,11 @@ type MySQLConnection struct {
 	Database string `yaml:"database" json:"database"`
 }
 
+type NotionConnection struct {
+	Name   string `yaml:"name" json:"name"`
+	APIKey string `yaml:"api_key" json:"api_key"`
+}
+
 func (c *GoogleCloudPlatformConnection) SetCredentials(cred *google.Credentials) {
 	c.rawCredentials = cred
 }
@@ -132,6 +137,7 @@ type Connections struct {
 	Synapse             []MsSQLConnection               `yaml:"synapse"`
 	Mongo               []MongoConnection               `yaml:"mongo"`
 	MySQL               []MySQLConnection               `yaml:"mysql"`
+	Notion              []NotionConnection              `yaml:"notion"`
 	Generic             []GenericConnection             `yaml:"generic"`
 
 	byKey map[string]any
@@ -169,6 +175,10 @@ func (c *Connections) buildConnectionKeyMap() {
 
 	for i, conn := range c.MySQL {
 		c.byKey[conn.Name] = &(c.MySQL[i])
+	}
+
+	for i, conn := range c.Notion {
+		c.byKey[conn.Name] = &(c.Notion[i])
 	}
 
 	for i, conn := range c.Generic {
