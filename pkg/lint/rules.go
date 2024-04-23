@@ -249,6 +249,14 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 		}
 	}
 
+	updateOnMergeKeys := asset.ColumnNamesWithUpdateOnMerge()
+	if len(updateOnMergeKeys) > 0 {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Ingestr assets do not support the 'update_on_merge' field, the strategy used decide the update behavior",
+		})
+	}
+
 	return issues, nil
 }
 

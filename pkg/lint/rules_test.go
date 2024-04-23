@@ -1555,6 +1555,25 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			wantErr:        assert.NoError,
 		},
 		{
+			name: "asset with all params there but has some update-on-merge columns",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection":      "source_connection",
+					"source_table":           "source_table",
+					"destination":            "destination",
+					"destination_connection": "destination_connection",
+					"destination_table":      "destination_table",
+				},
+				Columns: []pipeline.Column{
+					{Name: "dt", PrimaryKey: true},
+					{Name: "abc", UpdateOnMerge: true},
+				},
+			},
+			wantErrMessage: "Ingestr assets do not support the 'update_on_merge' field, the strategy used decide the update behavior",
+			wantErr:        assert.NoError,
+		},
+		{
 			name: "asset with all params there",
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
