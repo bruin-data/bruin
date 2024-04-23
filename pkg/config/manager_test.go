@@ -99,6 +99,12 @@ func TestLoadFromFile(t *testing.T) {
 					Port:     3306,
 				},
 			},
+			Notion: []NotionConnection{
+				{
+					Name:   "conn9",
+					APIKey: "XXXXYYYYZZZZ",
+				},
+			},
 			Generic: []GenericConnection{
 				{
 					Name:  "key1",
@@ -199,6 +205,7 @@ func TestLoadOrCreate(t *testing.T) {
 			Synapse:   []MsSQLConnection{},
 			Mongo:     []MongoConnection{},
 			MySQL:     []MySQLConnection{},
+			Notion:    []NotionConnection{},
 		},
 	}
 
