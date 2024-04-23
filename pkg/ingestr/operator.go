@@ -21,9 +21,13 @@ const (
 	DockerImage    = "ghcr.io/bruin-data/ingestr:" + IngestrVersion
 )
 
+type connectionFetcher interface {
+	GetConnection(name string) (interface{}, error)
+}
+
 type BasicOperator struct {
 	client *client.Client
-	conn   *connection.Manager
+	conn   connectionFetcher
 }
 
 type pipelineConnection interface {
@@ -52,53 +56,10 @@ func NewBasicOperator(conn *connection.Manager) (*BasicOperator, error) {
 	return &BasicOperator{client: dockerClient, conn: conn}, nil
 }
 
-func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
-	sourceConnectionName, ok := ti.GetAsset().Parameters["source_connection"]
-	if !ok {
-		return errors.New("source connection not configured")
-	}
-
-	sourceConnection, err := o.conn.GetConnection(sourceConnectionName)
+func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	cmdArgs, err := o.ConvertTaskInstanceToIngestrCommand(ti)
 	if err != nil {
-		return fmt.Errorf("source connection %s not found", sourceConnectionName)
-	}
-
-	sourceURI, err := sourceConnection.(pipelineConnection).GetIngestrURI()
-	if err != nil {
-		return errors.New("could not get the source uri")
-	}
-
-	sourceTable, ok := ti.GetAsset().Parameters["source_table"]
-	if !ok {
-		return errors.New("source table not configured")
-	}
-
-	destConnectionName := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
-	destConnection, err := o.conn.GetConnection(destConnectionName)
-	if err != nil {
-		return fmt.Errorf("destination connection %s not found", destConnectionName)
-	}
-
-	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
-	if err != nil {
-		return errors.New("could not get the source uri")
-	}
-
-	destTable := ti.GetAsset().Name
-
-	cmdArgs := []string{
-		"ingest",
-		"--source-uri",
-		sourceURI,
-		"--source-table",
-		sourceTable,
-		"--dest-uri",
-		destURI,
-		"--dest-table",
-		destTable,
-		"--yes",
-		"--progress",
-		"log",
+		return err
 	}
 
 	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
@@ -174,4 +135,73 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	}
 
 	return nil
+}
+
+func (o *BasicOperator) ConvertTaskInstanceToIngestrCommand(ti scheduler.TaskInstance) ([]string, error) {
+	sourceConnectionName, ok := ti.GetAsset().Parameters["source_connection"]
+	if !ok {
+		return nil, errors.New("source connection not configured")
+	}
+
+	sourceConnection, err := o.conn.GetConnection(sourceConnectionName)
+	if err != nil {
+		return nil, fmt.Errorf("source connection %s not found", sourceConnectionName)
+	}
+
+	sourceURI, err := sourceConnection.(pipelineConnection).GetIngestrURI()
+	if err != nil {
+		return nil, errors.New("could not get the source uri")
+	}
+
+	sourceTable, ok := ti.GetAsset().Parameters["source_table"]
+	if !ok {
+		return nil, errors.New("source table not configured")
+	}
+
+	destConnectionName := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
+	destConnection, err := o.conn.GetConnection(destConnectionName)
+	if err != nil {
+		return nil, fmt.Errorf("destination connection %s not found", destConnectionName)
+	}
+
+	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
+	if err != nil {
+		return nil, errors.New("could not get the source uri")
+	}
+
+	destTable := ti.GetAsset().Name
+
+	cmdArgs := []string{
+		"ingest",
+		"--source-uri",
+		sourceURI,
+		"--source-table",
+		sourceTable,
+		"--dest-uri",
+		destURI,
+		"--dest-table",
+		destTable,
+		"--yes",
+		"--progress",
+		"log",
+	}
+
+	incrementalStrategy, ok := ti.GetAsset().Parameters["incremental_strategy"]
+	if ok {
+		cmdArgs = append(cmdArgs, "--incremental-strategy", incrementalStrategy)
+	}
+
+	incrementalKey, ok := ti.GetAsset().Parameters["incremental_key"]
+	if ok {
+		cmdArgs = append(cmdArgs, "--incremental-key", incrementalKey)
+	}
+
+	primaryKeys := ti.GetAsset().ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) > 0 {
+		for _, pk := range primaryKeys {
+			cmdArgs = append(cmdArgs, "--primary-key", pk)
+		}
+	}
+
+	return cmdArgs, nil
 }
