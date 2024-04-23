@@ -4,7 +4,7 @@ In order to have set up a Postgres connection, you need to add a configuration i
 
 ```yaml
     connections:
-      redshift:
+      postgres:
         - name: "connection_name"
           username: "pguser"
           password: "XXXXXXXXXX"
@@ -12,6 +12,8 @@ In order to have set up a Postgres connection, you need to add a configuration i
           port: 5432
           database: "dev"
           ssl_mode: "allow"
+          schema: "schema_name" # optional
+          pool_max_conns: 5 # optional
 ```
 
 `ssl_mode` should be one of the modes describe in the [documentation](https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION).
