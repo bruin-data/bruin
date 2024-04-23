@@ -18,8 +18,17 @@ export default defineConfig({
             {
                 text: "Connections",
                 items: [
-                    {text: "Redshift", link: "/connections/redshift"},
-                    {text: "Postgres", link: "/connections/postgres"}
+                    {
+                        text: "Overview", link: "/connections/overview", items: [
+
+                            {text: "Redshift", link: "/connections/redshift"},
+                            {text: "Postgres", link: "/connections/postgres"},
+                            {text: "Google Cloud Platform", link: "/connections/google_cloud_platform"},
+                            {text: "Microsoft SQL Server", link: "/connections/mssql"},
+                            {text: "MySQL", link: "/connections/mysql"},
+                            {text: "Snowflake", link: "/connections/snowflake"},
+                        ]
+                    },
                 ],
             },
             {
