@@ -414,7 +414,7 @@ func (m *Manager) AddNotionConnectionFromConfig(connection *config.NotionConnect
 	m.mutex.Unlock()
 
 	client, err := notion.NewClient(&notion.Config{
-		ApiKey: connection.APIKey,
+		APIKey: connection.APIKey,
 	})
 	if err != nil {
 		return err
