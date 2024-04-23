@@ -1,9 +1,9 @@
 package notion
 
 type Config struct {
-	Token string
+	ApiKey string
 }
 
 func (c Config) GetIngestrURI() string {
-	return "notion://?api_key=" + c.Token
+	return "notion://?api_key=" + c.ApiKey
 }

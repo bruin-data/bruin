@@ -224,8 +224,8 @@ func TestManager_AddMNotionConnectionFromConfigConnectionFromConfig(t *testing.T
 	assert.Nil(t, res)
 
 	configuration := &config.NotionConnection{
-		Name:  "test",
-		Token: "token",
+		Name:   "test",
+		APIKey: "xXXXXxxxxxYYY",
 	}
 
 	err = m.AddNotionConnectionFromConfig(configuration)

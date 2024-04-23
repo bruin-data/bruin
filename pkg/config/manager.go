@@ -63,8 +63,8 @@ type MySQLConnection struct {
 }
 
 type NotionConnection struct {
-	Name  string `yaml:"name" json:"name"`
-	Token string `yaml:"token" json:"token"`
+	Name   string `yaml:"name" json:"name"`
+	APIKey string `yaml:"api_key" json:"api_key"`
 }
 
 func (c *GoogleCloudPlatformConnection) SetCredentials(cred *google.Credentials) {

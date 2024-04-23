@@ -101,8 +101,8 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			Notion: []NotionConnection{
 				{
-					Name:  "conn9",
-					Token: "XXXXYYYYZZZZ",
+					Name:   "conn9",
+					APIKey: "XXXXYYYYZZZZ",
 				},
 			},
 			Generic: []GenericConnection{

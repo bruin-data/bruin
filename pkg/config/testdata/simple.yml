@@ -74,7 +74,7 @@ environments:
 
       notion:
         - name: conn9
-          token: "XXXXYYYYZZZZ"
+          api_key: "XXXXYYYYZZZZ"
 
       generic:
         - name: key1
