@@ -203,5 +203,15 @@ func (o *BasicOperator) ConvertTaskInstanceToIngestrCommand(ti scheduler.TaskIns
 		}
 	}
 
+	loaderFileFormat, ok := ti.GetAsset().Parameters["loader_file_format"]
+	if ok {
+		cmdArgs = append(cmdArgs, "--loader-file-format", loaderFileFormat)
+	}
+
+	sqlBackend, ok := ti.GetAsset().Parameters["sql_backend"]
+	if ok {
+		cmdArgs = append(cmdArgs, "--sql-backend", sqlBackend)
+	}
+
 	return cmdArgs, nil
 }
