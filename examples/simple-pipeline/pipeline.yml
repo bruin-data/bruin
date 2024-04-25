@@ -11,4 +11,5 @@ default_connections:
   mongo: "mongo"
   mysql: "some-mysql"
   notion: "some-notion"
+  hana: "some-hana"
 

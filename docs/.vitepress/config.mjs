@@ -28,6 +28,7 @@ export default defineConfig({
                             {text: "Redshift", link: "/connections/redshift"},
                             {text: "Snowflake", link: "/connections/snowflake"},
                             {text: "MongoDB", link: "/connections/mongo"},
+                            {text: "SAP HANA", link: "/connections/sap_hana"},
                         ]
                     },
                 ],
