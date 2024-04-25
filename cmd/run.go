@@ -197,9 +197,10 @@ func Run(isDebug *bool) *cli.Command {
 				infoPrinter.Println("Ignoring the '--downstream' flag since you are running the whole pipeline")
 			}
 
-			cm, err := config.LoadOrCreate(afero.NewOsFs(), path2.Join(repoRoot.Path, ".bruin.yml"))
+			configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
+			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
 			if err != nil {
-				errorPrinter.Printf("Failed to load the config file: %v\n", err)
+				errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
 				return cli.Exit("", 1)
 			}
 
