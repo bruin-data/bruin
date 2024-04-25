@@ -216,6 +216,7 @@ func TestLoadOrCreate(t *testing.T) {
 			Mongo:     []MongoConnection{},
 			MySQL:     []MySQLConnection{},
 			Notion:    []NotionConnection{},
+			HANA:      []HANAConnection{},
 		},
 	}
 
