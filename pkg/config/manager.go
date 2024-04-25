@@ -67,6 +67,15 @@ type NotionConnection struct {
 	APIKey string `yaml:"api_key" json:"api_key"`
 }
 
+type HANAConnection struct {
+	Name     string `yaml:"name" json:"name"`
+	Username string `yaml:"username" json:"username"`
+	Password string `yaml:"password" json:"password"`
+	Host     string `yaml:"host"     json:"host"`
+	Port     int    `yaml:"port"     json:"port"`
+	Database string `yaml:"database" json:"database"`
+}
+
 func (c *GoogleCloudPlatformConnection) SetCredentials(cred *google.Credentials) {
 	c.rawCredentials = cred
 }
@@ -138,6 +147,7 @@ type Connections struct {
 	Mongo               []MongoConnection               `yaml:"mongo"`
 	MySQL               []MySQLConnection               `yaml:"mysql"`
 	Notion              []NotionConnection              `yaml:"notion"`
+	HANA                []HANAConnection                `yaml:"hana"`
 	Generic             []GenericConnection             `yaml:"generic"`
 
 	byKey map[string]any
@@ -179,6 +189,10 @@ func (c *Connections) buildConnectionKeyMap() {
 
 	for i, conn := range c.Notion {
 		c.byKey[conn.Name] = &(c.Notion[i])
+	}
+
+	for i, conn := range c.HANA {
+		c.byKey[conn.Name] = &(c.HANA[i])
 	}
 
 	for i, conn := range c.Generic {

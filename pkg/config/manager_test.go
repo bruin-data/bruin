@@ -105,6 +105,16 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "XXXXYYYYZZZZ",
 				},
 			},
+			HANA: []HANAConnection{
+				{
+					Name:     "conn10",
+					Host:     "hanahost",
+					Username: "hanauser",
+					Password: "hanapass",
+					Database: "hanadb",
+					Port:     39013,
+				},
+			},
 			Generic: []GenericConnection{
 				{
 					Name:  "key1",

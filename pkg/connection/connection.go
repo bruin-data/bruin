@@ -2,6 +2,7 @@ package connection
 
 import (
 	"context"
+	"github.com/bruin-data/bruin/pkg/hana"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
@@ -24,6 +25,7 @@ type Manager struct {
 	Mongo     map[string]*mongo.DB
 	Mysql     map[string]*mysql.Client
 	Notion    map[string]*notion.Client
+	HANA      map[string]*hana.Client
 
 	mutex sync.Mutex
 }
@@ -62,6 +64,11 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	connNotion, err := m.GetNotionConnectionWithoutDefault(name)
 	if err == nil {
 		return connNotion, nil
+	}
+
+	connHANA, err := m.GetHANAConnectionWithoutDefault(name)
+	if err == nil {
+		return connHANA, nil
 	}
 
 	return nil, errors.New("connection not found")
@@ -216,6 +223,28 @@ func (m *Manager) GetNotionConnectionWithoutDefault(name string) (*notion.Client
 	db, ok := m.Notion[name]
 	if !ok {
 		return nil, errors.Errorf("notion connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetHANAConnection(name string) (*hana.Client, error) {
+	db, err := m.GetHANAConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetHANAConnectionWithoutDefault("hana-default")
+}
+
+func (m *Manager) GetHANAConnectionWithoutDefault(name string) (*hana.Client, error) {
+	if m.HANA == nil {
+		return nil, errors.New("no hana connections found")
+	}
+
+	db, ok := m.HANA[name]
+	if !ok {
+		return nil, errors.Errorf("hana connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -427,6 +456,31 @@ func (m *Manager) AddNotionConnectionFromConfig(connection *config.NotionConnect
 	return nil
 }
 
+func (m *Manager) AddHANAConnectionFromConfig(connection *config.HANAConnection) error {
+	m.mutex.Lock()
+	if m.HANA == nil {
+		m.HANA = make(map[string]*hana.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := hana.NewClient(&hana.Config{
+		Username: connection.Username,
+		Password: connection.Password,
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Database: connection.Database,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.HANA[connection.Name] = client
+
+	return nil
+}
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	connectionManager := &Manager{}
 
@@ -517,6 +571,16 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 			err := connectionManager.AddNotionConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add notion connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.HANA {
+		conn := conn
+		wg.Go(func() {
+			err := connectionManager.AddHANAConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add hana connection '%s'", conn.Name))
 			}
 		})
 	}

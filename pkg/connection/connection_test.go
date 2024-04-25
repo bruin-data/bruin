@@ -214,7 +214,7 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 	assert.NotNil(t, res)
 }
 
-func TestManager_AddMNotionConnectionFromConfigConnectionFromConfig(t *testing.T) {
+func TestManager_AddNotionConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
 	m := Manager{}
@@ -225,13 +225,39 @@ func TestManager_AddMNotionConnectionFromConfigConnectionFromConfig(t *testing.T
 
 	configuration := &config.NotionConnection{
 		Name:   "test",
-		APIKey: "xXXXXxxxxxYYY",
+		APIKey: "xXXXXxxxxxYYY	",
 	}
 
 	err = m.AddNotionConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
 	res, err = m.GetNotionConnection("test")
+	require.NoError(t, err)
+	assert.NotNil(t, res)
+}
+
+func TestManager_AddHANAConnectionFromConfigConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{}
+
+	res, err := m.GetHANAConnection("test")
+	require.Error(t, err)
+	assert.Nil(t, res)
+
+	configuration := &config.HANAConnection{
+		Name:     "test",
+		Username: "user",
+		Password: "pass",
+		Host:     "somehost",
+		Port:     15432,
+		Database: "db",
+	}
+
+	err = m.AddHANAConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, err = m.GetHANAConnection("test")
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }

@@ -76,6 +76,14 @@ environments:
         - name: conn9
           api_key: "XXXXYYYYZZZZ"
 
+      hana:
+        - name: conn10
+          username: "hanauser"
+          password: "hanapass"
+          host: "hanahost"
+          port: 39013
+          database: "hanadb"
+
       generic:
         - name: key1
           value: value1
