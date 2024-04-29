@@ -134,7 +134,7 @@ Total: 2
 				errorPrinter: mp,
 			}
 
-			res := r.Run(tt.args.assetPath, tt.args.full)
+			res := r.Run(tt.args.assetPath, tt.args.full, "plain")
 			tt.wantErr(t, res)
 			if tt.want != "" {
 				assert.Equal(t, tt.want, buf.String())

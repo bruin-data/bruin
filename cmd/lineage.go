@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
 )
 
@@ -18,6 +20,11 @@ func Lineage() *cli.Command {
 				Name:  "full",
 				Usage: "display all the upstream and downstream dependencies even if they are not direct dependencies",
 			},
+			&cli.StringFlag{
+				Name:    "output",
+				Aliases: []string{"o"},
+				Usage:   "the output type, possible values are: plain, json",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			r := LineageCommand{
@@ -26,7 +33,7 @@ func Lineage() *cli.Command {
 				errorPrinter: errorPrinter,
 			}
 
-			return r.Run(c.Args().Get(0), c.Bool("full"))
+			return r.Run(c.Args().Get(0), c.Bool("full"), c.String("output"))
 		},
 	}
 }
@@ -43,7 +50,7 @@ type LineageCommand struct {
 	errorPrinter printer
 }
 
-func (r *LineageCommand) Run(assetPath string, fullLineage bool) error {
+func (r *LineageCommand) Run(assetPath string, fullLineage bool, output string) error {
 	if assetPath == "" {
 		r.errorPrinter.Printf("Please give an asset path to get lineage of: bruin lineage <path to the asset definition>)\n")
 		return cli.Exit("", 1)
@@ -70,7 +77,6 @@ func (r *LineageCommand) Run(assetPath string, fullLineage bool) error {
 
 		return cli.Exit("", 1)
 	}
-	r.infoPrinter.Printf("\nLineage: '%s'", asset.Name)
 
 	upstream := asset.GetUpstream()
 	downstream := asset.GetDownstream()
@@ -79,10 +85,71 @@ func (r *LineageCommand) Run(assetPath string, fullLineage bool) error {
 		downstream = asset.GetFullDownstream()
 	}
 
+	if output == "json" {
+		return r.printLineageJSON(asset, upstream, downstream)
+	}
+
+	r.infoPrinter.Printf("\nLineage: '%s'", asset.Name)
+
 	r.printLineageSummary(foundPipeline, upstream, "Upstream Dependencies", "Asset has no upstream dependencies.")
 	r.printLineageSummary(foundPipeline, downstream, "Downstream Dependencies", "Asset has no downstream dependencies.")
 
 	return err
+}
+
+func (r *LineageCommand) printLineageJSON(asset *pipeline.Asset, upstream, downstream []*pipeline.Asset) error {
+	type dependencySummary struct {
+		Name           string                       `json:"name"`
+		Type           pipeline.AssetType           `json:"type"`
+		ExecutableFile *pipeline.ExecutableFile     `json:"executable_file"`
+		DefinitionFile *pipeline.TaskDefinitionFile `json:"definition_file"`
+	}
+
+	type jsonSummary struct {
+		AssetName  string               `json:"name"`
+		Upstream   []*dependencySummary `json:"upstream"`
+		Downstream []*dependencySummary `json:"downstream"`
+	}
+
+	summary := jsonSummary{
+		AssetName:  asset.Name,
+		Upstream:   make([]*dependencySummary, len(upstream)),
+		Downstream: make([]*dependencySummary, len(downstream)),
+	}
+
+	for i, u := range upstream {
+		summary.Upstream[i] = &dependencySummary{
+			Name: u.Name,
+			Type: u.Type,
+			ExecutableFile: &pipeline.ExecutableFile{
+				Name:    u.ExecutableFile.Name,
+				Path:    u.ExecutableFile.Path,
+				Content: "",
+			},
+			DefinitionFile: &u.DefinitionFile,
+		}
+	}
+
+	for i, d := range downstream {
+		summary.Downstream[i] = &dependencySummary{
+			Name: d.Name,
+			Type: d.Type,
+			ExecutableFile: &pipeline.ExecutableFile{
+				Name:    d.ExecutableFile.Name,
+				Path:    d.ExecutableFile.Path,
+				Content: "",
+			},
+			DefinitionFile: &d.DefinitionFile,
+		}
+	}
+
+	jsonVersion, err := json.Marshal(summary)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal the lineage summary to json")
+	}
+
+	fmt.Println(string(jsonVersion))
+	return nil
 }
 
 func (r *LineageCommand) printLineageSummary(p *pipeline.Pipeline, assets []*pipeline.Asset, title string, absenceMessage string) {
