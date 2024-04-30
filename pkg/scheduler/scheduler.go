@@ -59,6 +59,7 @@ const (
 	TaskInstanceTypeMain TaskInstanceType = iota
 	TaskInstanceTypeColumnCheck
 	TaskInstanceTypeCustomCheck
+	TaskInstanceTypeMetadataPush
 )
 
 type TaskInstance interface {
@@ -70,6 +71,7 @@ type TaskInstance interface {
 	GetStatus() TaskInstanceStatus
 	MarkAs(status TaskInstanceStatus)
 	Completed() bool
+	Blocking() bool
 
 	GetUpstream() []TaskInstance
 	GetDownstream() []TaskInstance
@@ -98,6 +100,10 @@ func (t *AssetInstance) GetStatus() TaskInstanceStatus {
 
 func (t *AssetInstance) Completed() bool {
 	return t.status == Failed || t.status == Succeeded || t.status == UpstreamFailed
+}
+
+func (t *AssetInstance) Blocking() bool {
+	return true
 }
 
 func (t *AssetInstance) MarkAs(status TaskInstanceStatus) {
@@ -144,6 +150,10 @@ func (t *ColumnCheckInstance) GetType() TaskInstanceType {
 	return TaskInstanceTypeColumnCheck
 }
 
+func (t *ColumnCheckInstance) Blocking() bool {
+	return true
+}
+
 type CustomCheckInstance struct {
 	*AssetInstance
 
@@ -152,6 +162,22 @@ type CustomCheckInstance struct {
 
 func (t *CustomCheckInstance) GetType() TaskInstanceType {
 	return TaskInstanceTypeCustomCheck
+}
+
+func (t *CustomCheckInstance) Blocking() bool {
+	return true
+}
+
+type MetadataPushInstance struct {
+	*AssetInstance
+}
+
+func (t *MetadataPushInstance) GetType() TaskInstanceType {
+	return TaskInstanceTypeMetadataPush
+}
+
+func (t *MetadataPushInstance) Blocking() bool {
+	return false
 }
 
 type TaskExecutionResult struct {
@@ -311,7 +337,7 @@ func (s *Scheduler) FindMajorityOfTypes(taskTypes []pipeline.AssetType, defaultI
 	return maxTaskType
 }
 
-func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline) *Scheduler {
+func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, pushMetadata bool) *Scheduler {
 	instances := make([]TaskInstance, 0)
 
 	for _, task := range p.Assets {
@@ -363,6 +389,21 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline) *Scheduler {
 					downstream: make([]TaskInstance, 0),
 				},
 				Check: &c,
+			}
+			instances = append(instances, testInstance)
+		}
+
+		if pushMetadata {
+			testInstance := &MetadataPushInstance{
+				AssetInstance: &AssetInstance{
+					ID:         uuid.New().String(),
+					HumanID:    fmt.Sprintf("%s:metadata-push", task.Name),
+					Pipeline:   p,
+					Asset:      task,
+					status:     Pending,
+					upstream:   make([]TaskInstance, 0),
+					downstream: make([]TaskInstance, 0),
+				},
 			}
 			instances = append(instances, testInstance)
 		}
@@ -434,8 +475,11 @@ func (s *Scheduler) constructInstanceRelationships() {
 		}
 
 		assetName := ti.GetAsset().Name
+
+		// add the upstream-downstream relationships for the main task to its quality checks
 		s.taskNameMap[assetName].AddUpstreamByType(TaskInstanceTypeColumnCheck, ti)
 		s.taskNameMap[assetName].AddUpstreamByType(TaskInstanceTypeCustomCheck, ti)
+		s.taskNameMap[assetName].AddUpstreamByType(TaskInstanceTypeMetadataPush, ti)
 
 		for _, dep := range ti.GetAsset().DependsOn {
 			upstreamInstances, ok := s.taskNameMap[dep]
@@ -445,6 +489,10 @@ func (s *Scheduler) constructInstanceRelationships() {
 
 			for _, instances := range upstreamInstances {
 				for _, upstream := range instances {
+					if !upstream.Blocking() {
+						continue
+					}
+
 					ti.AddUpstream(upstream)
 					upstream.AddDownstream(ti)
 				}

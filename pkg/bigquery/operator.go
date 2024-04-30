@@ -2,6 +2,7 @@ package bigquery
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -123,4 +124,19 @@ func (o *CustomCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance
 	}
 
 	return o.checkRunner.Check(ctx, instance)
+}
+
+type MetadataPushOperator struct {
+	connection connectionFetcher
+}
+
+func NewMetadataPushOperator(conn connectionFetcher) *MetadataPushOperator {
+	return &MetadataPushOperator{
+		connection: conn,
+	}
+}
+
+func (o *MetadataPushOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	fmt.Println("running metadata pushhh")
+	return nil
 }
