@@ -2,8 +2,9 @@ package bigquery
 
 import (
 	"context"
-	"fmt"
+	"io"
 
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -142,6 +143,31 @@ func NewMetadataPushOperator(conn connectionFetcher) *MetadataPushOperator {
 }
 
 func (o *MetadataPushOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
-	fmt.Println("running metadata pushhh")
+	conn, err := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
+	if err != nil {
+		return err
+	}
+
+	client, err := o.connection.GetBqConnection(conn)
+	if err != nil {
+		return err
+	}
+
+	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
+	if writer == nil {
+		return errors.New("no writer found in context")
+	}
+
+	err = client.UpdateTableMetadataIfNotExist(ctx, ti.GetAsset())
+	if err != nil {
+		var noMetadata NoMetadataUpdatedError
+		if errors.As(err, &noMetadata) {
+			_, _ = writer.Write([]byte("No metadata found to be pushed to BigQuery, skipping...\n"))
+			return nil
+		}
+
+		return err
+	}
+
 	return nil
 }

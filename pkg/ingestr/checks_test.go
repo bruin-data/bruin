@@ -57,7 +57,6 @@ func TestColumnCheckOperatorOperator(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run("Run", func(t *testing.T) {
 			t.Parallel()
 			op := IngestrCheckOperator{
@@ -124,7 +123,6 @@ func TestCustomColumnCheckOperatorOperator(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run("Run", func(t *testing.T) {
 			t.Parallel()
 			op := &IngestrCustomCheckOperator{

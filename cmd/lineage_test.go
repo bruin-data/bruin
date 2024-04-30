@@ -121,8 +121,7 @@ Total: 2
 		},
 	}
 
-	for _, tc := range tests {
-		tt := tc
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := bytes.NewBuffer(nil)
 			mp := &mockPrinter{buf: buf}

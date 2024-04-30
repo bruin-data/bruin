@@ -1,5 +1,8 @@
 run:
-  skip-dirs:
+  allow-parallel-runners: true
+
+issues:
+  exclude-dirs:
     - vendor
     - .git
     - .idea
@@ -7,13 +10,13 @@ run:
     - .github
     - resources
     - bin
-  allow-parallel-runners: true
-
-issues:
   exclude-rules:
     - path: 'pkg/connection/connection.go'
       linters:
         - dupl
+    - path: (.+)_test.go
+      linters:
+        - gosec
 
 linters:
   disable:
@@ -48,6 +51,7 @@ linters:
     - depguard
     - tagalign
     - gocyclo
+    - exportloopref
   presets:
     - bugs
     - comment
@@ -96,3 +100,7 @@ linters-settings:
       - "suite-dont-use-pkg"
       - "suite-extra-assert-call"
       - "suite-thelper"
+
+  gosec:
+    excludes:
+      - G601

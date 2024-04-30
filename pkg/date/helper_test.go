@@ -37,7 +37,6 @@ func Test_parseTime(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
 
@@ -75,7 +74,6 @@ func TestConvertPythonDateFormat(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
 			actual := ConvertPythonDateFormatToGolang(tt.input)

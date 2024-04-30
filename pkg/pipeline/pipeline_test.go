@@ -195,7 +195,6 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -287,7 +286,6 @@ func TestTask_RelativePathToPipelineRoot(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.want, tt.pipeline.RelativeAssetPath(tt.task))
@@ -320,7 +318,6 @@ func TestPipeline_JsonMarshal(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			p, err := cmd.DefaultPipelineBuilder.CreatePipelineFromPath(tt.pipelinePath)
@@ -386,7 +383,6 @@ func TestPipeline_HasTaskType(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.want, tt.pipeline.HasAssetType(pipeline.AssetType(tt.taskType)))
@@ -615,7 +611,6 @@ func TestColumnCheckValue_UnmarshalJSON(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			jsonstr, err := json.Marshal(tt.jsonFields)
@@ -703,7 +698,6 @@ func TestColumnCheckValue_MarshalJSON(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

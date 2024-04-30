@@ -355,10 +355,8 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, pushMetadata 
 		}
 		instances = append(instances, instance)
 
-		for _, column := range task.Columns {
-			col := column
-			for _, test := range column.Checks {
-				t := test
+		for _, col := range task.Columns {
+			for _, t := range col.Checks {
 				testInstance := &ColumnCheckInstance{
 					AssetInstance: &AssetInstance{
 						ID:         uuid.New().String(),
@@ -377,8 +375,7 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, pushMetadata 
 			}
 		}
 
-		for _, check := range task.CustomChecks {
-			c := check
+		for _, c := range task.CustomChecks {
 			humanIDName := strings.ReplaceAll(strings.ToLower(c.Name), " ", "_")
 			testInstance := &CustomCheckInstance{
 				AssetInstance: &AssetInstance{

@@ -227,6 +227,16 @@ type Column struct {
 	UpdateOnMerge bool          `json:"update_on_merge"`
 }
 
+func (c *Column) HasCheck(check string) bool {
+	for _, cc := range c.Checks {
+		if cc.Name == check {
+			return true
+		}
+	}
+
+	return false
+}
+
 type AssetType string
 
 var AssetTypeConnectionMapping = map[AssetType]string{
