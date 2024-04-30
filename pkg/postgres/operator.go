@@ -67,8 +67,12 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	q.Query = materialized
+	connName, err := p.GetConnectionNameForAsset(t)
+	if err != nil {
+		return err
+	}
 
-	conn, err := o.connection.GetPgConnection(p.GetConnectionNameForAsset(t))
+	conn, err := o.connection.GetPgConnection(connName)
 	if err != nil {
 		return err
 	}

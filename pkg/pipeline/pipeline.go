@@ -229,14 +229,15 @@ type Column struct {
 
 type AssetType string
 
-var AssetTypeConnectionMapping = map[AssetType][]string{
-	AssetTypeBigqueryQuery:        {"google_cloud_platform", "gcp"},
-	AssetTypeSnowflakeQuery:       {"snowflake", "sf"},
-	AssetTypeSnowflakeQuerySensor: {"snowflake", "sf"},
-	AssetTypePostgresQuery:        {"postgres", "pg"},
-	AssetTypeRedshiftQuery:        {"redshift", "rs"},
-	AssetTypeMsSQLQuery:           {"mssql", "ms"},
-	AssetTypeSynapseQuery:         {"synapse", "sy"},
+var AssetTypeConnectionMapping = map[AssetType]string{
+	AssetTypeBigqueryQuery:        "google_cloud_platform",
+	AssetTypeBigqueryTableSensor:  "google_cloud_platform",
+	AssetTypeSnowflakeQuery:       "snowflake",
+	AssetTypeSnowflakeQuerySensor: "snowflake",
+	AssetTypePostgresQuery:        "postgres",
+	AssetTypeRedshiftQuery:        "redshift",
+	AssetTypeMsSQLQuery:           "mssql",
+	AssetTypeSynapseQuery:         "synapse",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -420,29 +421,54 @@ type Pipeline struct {
 	tasksByName map[string]*Asset
 }
 
-func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) string {
+func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 	if asset.Connection != "" {
-		return asset.Connection
+		return asset.Connection, nil
 	}
 
-	connectionType := asset.Type
-	if connectionType == AssetTypeIngestr {
-		connectionType = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
+	assetType := asset.Type
+	if assetType == AssetTypeIngestr {
+		assetType = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
 	}
 
-	mappings := AssetTypeConnectionMapping[connectionType]
-
-	if mappings == nil {
-		return ""
+	mapping, ok := AssetTypeConnectionMapping[assetType]
+	if !ok {
+		return "", errors.Errorf("no connection mapping found for asset type '%s'", assetType)
 	}
 
-	for _, mapping := range mappings {
-		if p.DefaultConnections[mapping] != "" {
-			return p.DefaultConnections[mapping]
-		}
+	conn, ok := p.DefaultConnections[mapping]
+	if ok {
+		return conn, nil
 	}
 
-	return ""
+	switch mapping {
+	case "aws":
+		return "aws-default", nil
+	case "gcp":
+		return "gcp-default", nil
+	case "google_cloud_platform":
+		return "gcp-default", nil
+	case "snowflake":
+		return "snowflake-default", nil
+	case "postgres":
+		return "postgres-default", nil
+	case "redshift":
+		return "redshift-default", nil
+	case "mssql":
+		return "mssql-default", nil
+	case "synapse":
+		return "synapse-default", nil
+	case "mongo":
+		return "mongo-default", nil
+	case "mysql":
+		return "mysql-default", nil
+	case "notion":
+		return "notion-default", nil
+	case "hana":
+		return "hana-default", nil
+	default:
+		return "", errors.Errorf("no default connection found for type '%s'", assetType)
+	}
 }
 
 func (p *Pipeline) RelativeAssetPath(t *Asset) string {

@@ -42,6 +42,8 @@ func (s TaskInstanceType) String() string {
 		return "column_test"
 	case TaskInstanceTypeCustomCheck:
 		return "custom_test"
+	case TaskInstanceTypeMetadataPush:
+		return "metadata_push"
 	}
 	return "unknown"
 }
@@ -397,7 +399,7 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, pushMetadata 
 			testInstance := &MetadataPushInstance{
 				AssetInstance: &AssetInstance{
 					ID:         uuid.New().String(),
-					HumanID:    fmt.Sprintf("%s:metadata-push", task.Name),
+					HumanID:    task.Name + ":metadata-push",
 					Pipeline:   p,
 					Asset:      task,
 					status:     Pending,

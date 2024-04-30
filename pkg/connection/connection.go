@@ -75,12 +75,7 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 }
 
 func (m *Manager) GetBqConnection(name string) (bigquery.DB, error) {
-	db, err := m.GetBqConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetBqConnectionWithoutDefault("gcp-default")
+	return m.GetBqConnectionWithoutDefault(name)
 }
 
 func (m *Manager) GetBqConnectionWithoutDefault(name string) (bigquery.DB, error) {

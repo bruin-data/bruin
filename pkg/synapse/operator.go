@@ -62,7 +62,12 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, err := o.connection.GetMsConnection(p.GetConnectionNameForAsset(t))
+	connName, err := p.GetConnectionNameForAsset(t)
+	if err != nil {
+		return err
+	}
+
+	conn, err := o.connection.GetMsConnection(connName)
 	if err != nil {
 		return err
 	}

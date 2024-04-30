@@ -121,6 +121,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			},
 			args: args{
 				t: &pipeline.Asset{
+					Type: pipeline.AssetTypeSynapseQuery,
 					ExecutableFile: pipeline.ExecutableFile{
 						Path:    "test-file.sql",
 						Content: "some content",
@@ -145,6 +146,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			},
 			args: args{
 				t: &pipeline.Asset{
+					Type: pipeline.AssetTypeSynapseQuery,
 					ExecutableFile: pipeline.ExecutableFile{
 						Path:    "test-file.sql",
 						Content: "some content",
@@ -175,6 +177,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			},
 			args: args{
 				t: &pipeline.Asset{
+					Type: pipeline.AssetTypeSynapseQuery,
 					ExecutableFile: pipeline.ExecutableFile{
 						Path:    "test-file.sql",
 						Content: "some content",
@@ -193,7 +196,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			extractor := new(mockExtractor)
 			mat := new(mockMaterializer)
 			conn := new(mockConnectionFetcher)
-			conn.On("GetMsConnection", mock.Anything).Return(client, nil)
+			conn.On("GetMsConnection", "synapse-default").Return(client, nil)
 
 			if tt.setup != nil {
 				tt.setup(&fields{

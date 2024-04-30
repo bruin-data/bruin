@@ -37,11 +37,21 @@ func NewCountableQueryCheck(conn connectionFetcher, expectedQueryResult int64, q
 }
 
 func (c *CountableQueryCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
-	return c.check(ctx, ti.Pipeline.GetConnectionNameForAsset(ti.GetAsset()))
+	conn, err := ti.Pipeline.GetConnectionNameForAsset(ti.GetAsset())
+	if err != nil {
+		return err
+	}
+
+	return c.check(ctx, conn)
 }
 
 func (c *CountableQueryCheck) CustomCheck(ctx context.Context, ti *scheduler.CustomCheckInstance) error {
-	return c.check(ctx, ti.Pipeline.GetConnectionNameForAsset(ti.GetAsset()))
+	conn, err := ti.Pipeline.GetConnectionNameForAsset(ti.GetAsset())
+	if err != nil {
+		return err
+	}
+
+	return c.check(ctx, conn)
 }
 
 func (c *CountableQueryCheck) check(ctx context.Context, connectionName string) error {

@@ -121,6 +121,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			},
 			args: args{
 				t: &pipeline.Asset{
+					Type: pipeline.AssetTypePostgresQuery,
 					ExecutableFile: pipeline.ExecutableFile{
 						Path:    "test-file.sql",
 						Content: "some query",
@@ -145,6 +146,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			},
 			args: args{
 				t: &pipeline.Asset{
+					Type: pipeline.AssetTypePostgresQuery,
 					ExecutableFile: pipeline.ExecutableFile{
 						Path:    "test-file.sql",
 						Content: "some query",
@@ -169,6 +171,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			},
 			args: args{
 				t: &pipeline.Asset{
+					Type: pipeline.AssetTypePostgresQuery,
 					ExecutableFile: pipeline.ExecutableFile{
 						Path:    "test-file.sql",
 						Content: "some query",

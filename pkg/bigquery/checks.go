@@ -135,11 +135,21 @@ type countableQueryCheck struct {
 }
 
 func (c *countableQueryCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
-	return c.check(ctx, ti.Pipeline.GetConnectionNameForAsset(ti.GetAsset()))
+	conn, err := ti.Pipeline.GetConnectionNameForAsset(ti.GetAsset())
+	if err != nil {
+		return err
+	}
+
+	return c.check(ctx, conn)
 }
 
 func (c *countableQueryCheck) CustomCheck(ctx context.Context, ti *scheduler.CustomCheckInstance) error {
-	return c.check(ctx, ti.Pipeline.GetConnectionNameForAsset(ti.GetAsset()))
+	conn, err := ti.Pipeline.GetConnectionNameForAsset(ti.GetAsset())
+	if err != nil {
+		return err
+	}
+
+	return c.check(ctx, conn)
 }
 
 func (c *countableQueryCheck) check(ctx context.Context, connectionName string) error {

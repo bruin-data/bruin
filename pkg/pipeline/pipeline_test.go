@@ -462,38 +462,63 @@ func TestPipeline_GetAssetByPath(t *testing.T) {
 func TestPipeline_GetConnectionNameForAsset(t *testing.T) {
 	t.Parallel()
 
-	asset1 := &pipeline.Asset{
-		Name: "asset1",
-		Type: pipeline.AssetType("bq.sql"),
-	}
-	asset2 := &pipeline.Asset{
-		Name: "asset2",
-		Type: pipeline.AssetType("sf.sql"),
-	}
-	asset3 := &pipeline.Asset{
-		Name:       "asset3",
-		Type:       pipeline.AssetType("sf.sql"),
-		Connection: "custom-connection",
-	}
-	asset4 := &pipeline.Asset{
-		Name:       "asset4",
-		Type:       pipeline.AssetType("ingestr"),
-		Connection: "connection2",
-	}
-
 	pipeline1 := &pipeline.Pipeline{
 		Name: "pipeline1",
 		DefaultConnections: map[string]string{
-			"gcp":       "connection1",
-			"snowflake": "connection2",
+			"google_cloud_platform": "default-gcp-connection",
+			"snowflake":             "default-snowflake-connection",
 		},
-		Assets: []*pipeline.Asset{asset1, asset2, asset3},
 	}
 
-	assert.Equal(t, "connection1", pipeline1.GetConnectionNameForAsset(asset1))
-	assert.Equal(t, "connection2", pipeline1.GetConnectionNameForAsset(asset2))
-	assert.Equal(t, "custom-connection", pipeline1.GetConnectionNameForAsset(asset3))
-	assert.Equal(t, "connection2", pipeline1.GetConnectionNameForAsset(asset4))
+	t.Run("should return the connection on the asset if exists", func(t *testing.T) {
+		t.Parallel()
+		found, err := pipeline1.GetConnectionNameForAsset(&pipeline.Asset{
+			Type:       "sf.sql",
+			Connection: "custom-connection",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "custom-connection", found)
+	})
+
+	t.Run("should return the connection on the asset if exists for ingestr", func(t *testing.T) {
+		t.Parallel()
+
+		found, err := pipeline1.GetConnectionNameForAsset(&pipeline.Asset{
+			Type:       "ingestr",
+			Connection: "connection2",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "connection2", found)
+	})
+
+	t.Run("if ingestr asset doesn't have the connection overridden, should take it from the destination type", func(t *testing.T) {
+		t.Parallel()
+		found, err := pipeline1.GetConnectionNameForAsset(&pipeline.Asset{
+			Type:       "ingestr",
+			Parameters: map[string]string{"destination": "bigquery"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "default-gcp-connection", found)
+	})
+
+	t.Run("should return the right connection if the asset type is known", func(t *testing.T) {
+		t.Parallel()
+		found, err := pipeline1.GetConnectionNameForAsset(&pipeline.Asset{
+			Type: "sf.sql",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "default-snowflake-connection", found)
+	})
+
+	t.Run("should return the default name if the platform is known", func(t *testing.T) {
+		t.Parallel()
+		found, err := pipeline1.GetConnectionNameForAsset(&pipeline.Asset{
+			Name: "asset4",
+			Type: "pg.sql",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "postgres-default", found)
+	})
 }
 
 func intPointer(i int) *int {
