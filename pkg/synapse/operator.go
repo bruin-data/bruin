@@ -75,7 +75,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 	}
 
-	return conn.RunQueryWithoutResult(ctx, q)
+	return nil
 }
 
 func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOperator {
