@@ -155,7 +155,7 @@ func (o *MetadataPushOperator) Run(ctx context.Context, ti scheduler.TaskInstanc
 
 	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
 	if writer == nil {
-		return errors.New("no writer found in context")
+		return errors.New("no writer found in context, please create an issue for this: https://github.com/bruin-data/bruin/issues")
 	}
 
 	err = client.UpdateTableMetadataIfNotExist(ctx, ti.GetAsset())
