@@ -82,6 +82,10 @@ func Run(isDebug *bool) *cli.Command {
 				Usage:   "the environment to use",
 			},
 			&cli.BoolFlag{
+				Name:  "push-metadata",
+				Usage: "push the metadata to the destination database if supports, currently supported: BigQuery",
+			},
+			&cli.BoolFlag{
 				Name:    "force",
 				Aliases: []string{"f"},
 				Usage:   "force the validation even if the environment is a production environment",
@@ -243,7 +247,7 @@ func Run(isDebug *bool) *cli.Command {
 				infoPrinter.Printf(" - custom checks: %d\n", len(task.CustomChecks))
 			}
 
-			s := scheduler.NewScheduler(logger, foundPipeline, true)
+			s := scheduler.NewScheduler(logger, foundPipeline, c.Bool("push-metadata"))
 
 			infoPrinter.Printf("\nStarting the pipeline execution...\n\n")
 
