@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"runtime/debug"
 	"time"
 
 	"github.com/bruin-data/bruin/cmd"
@@ -9,12 +11,30 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+var Version = "development"
+
 func main() {
 	isDebug := false
 	color.NoColor = false
 
+	cli.VersionPrinter = func(cCtx *cli.Context) {
+		var commit = func() string {
+			if info, ok := debug.ReadBuildInfo(); ok {
+				for _, setting := range info.Settings {
+					if setting.Key == "vcs.revision" {
+						return setting.Value
+					}
+				}
+			}
+			return ""
+		}()
+
+		fmt.Printf("bruin CLI %s (%s)\n", cCtx.App.Version, commit)
+	}
+
 	app := &cli.App{
 		Name:     "bruin",
+		Version:  Version,
 		Usage:    "The CLI used for managing Bruin-powered data pipelines",
 		Compiled: time.Now(),
 		Flags: []cli.Flag{
