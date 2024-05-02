@@ -3,8 +3,10 @@ package bigquery
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 	"google.golang.org/api/googleapi"
@@ -26,9 +28,14 @@ type Selector interface {
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 }
 
+type MetadataUpdater interface {
+	UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipeline.Asset) error
+}
+
 type DB interface {
 	Querier
 	Selector
+	MetadataUpdater
 }
 
 type Client struct {
@@ -129,6 +136,70 @@ func (d *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 	}
 
 	return result, nil
+}
+
+type NoMetadataUpdatedError struct{}
+
+func (m NoMetadataUpdatedError) Error() string {
+	return "no metadata found for the given asset to be pushed to BigQuery"
+}
+
+func (d *Client) UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	anyColumnHasDescription := false
+	colsByName := make(map[string]*pipeline.Column, len(asset.Columns))
+	for _, col := range asset.Columns {
+		colsByName[col.Name] = &col
+		if col.Description != "" {
+			anyColumnHasDescription = true
+		}
+	}
+
+	if asset.Description == "" && (asset.Columns == nil || len(asset.Columns) == 0 || !anyColumnHasDescription) {
+		return NoMetadataUpdatedError{}
+	}
+
+	tableComponents := strings.Split(asset.Name, ".")
+	if len(tableComponents) != 2 {
+		return fmt.Errorf("asset name must be in schema.table format to update the metadata, '%s' given", asset.Name)
+	}
+
+	tableRef := d.client.Dataset(tableComponents[0]).Table(tableComponents[1])
+	meta, err := tableRef.Metadata(ctx)
+	if err != nil {
+		return err
+	}
+
+	schema := meta.Schema
+	colsChanged := false
+	for _, field := range schema {
+		if col, ok := colsByName[field.Name]; ok {
+			field.Description = col.Description
+			colsChanged = true
+		}
+	}
+
+	update := bigquery.TableMetadataToUpdate{}
+
+	if colsChanged {
+		update.Schema = schema
+	}
+
+	if asset.Description != "" {
+		update.Description = asset.Description
+	}
+
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) > 0 {
+		update.TableConstraints = &bigquery.TableConstraints{
+			PrimaryKey: &bigquery.PrimaryKey{Columns: primaryKeys},
+		}
+	}
+
+	if _, err = tableRef.Update(ctx, update, meta.ETag); err != nil {
+		return errors.Wrap(err, "failed to update table metadata")
+	}
+
+	return nil
 }
 
 func formatError(err error) error {

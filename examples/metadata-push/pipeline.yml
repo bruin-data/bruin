@@ -1,0 +1,14 @@
+name: bruin-init
+schedule: daily
+start_date: "2023-03-20"
+
+default_connections:
+  snowflake: "snowflake"
+  postgres: "postgres"
+  mssql: "mssql"
+  synapse: "synapse"
+  mongo: "mongo"
+  mysql: "some-mysql"
+  notion: "some-notion"
+  hana: "some-hana"
+

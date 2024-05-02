@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -99,7 +100,6 @@ func TestDB_IsValid(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -220,7 +220,6 @@ func TestDB_RunQueryWithoutResult(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			server := httptest.NewServer(mockBqHandler(t, projectID, jobID, tt.jobSubmitResponse, tt.queryResultResponse))
@@ -285,7 +284,7 @@ func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse,
 		}
 
 		w.WriteHeader(http.StatusInternalServerError)
-		_, err := w.Write([]byte("there is no test definition found for the given request"))
+		_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
 		require.NoError(t, err)
 	})
 }
@@ -418,7 +417,6 @@ func TestDB_Select(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			server := httptest.NewServer(mockBqHandler(t, projectID, jobID, tt.jobSubmitResponse, tt.queryResultResponse))
@@ -448,6 +446,185 @@ func TestDB_Select(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
+	t.Parallel()
+
+	projectID := "test-project"
+	schema := "myschema"
+	table := "mytable"
+	assetName := fmt.Sprintf("%s.%s", schema, table)
+
+	tests := []struct {
+		name          string
+		asset         *pipeline.Asset
+		tableResponse *bigquery2.Table
+		err           error
+	}{
+		{
+			name:  "asset has no metadata",
+			asset: &pipeline.Asset{},
+			err:   NoMetadataUpdatedError{},
+		},
+		{
+			name: "asset has description",
+			asset: &pipeline.Asset{
+				Name:        assetName,
+				Description: "test123",
+			},
+			tableResponse: &bigquery2.Table{
+				Description: "some old description",
+			},
+		},
+		{
+			name: "asset has description",
+			asset: &pipeline.Asset{
+				Name:        assetName,
+				Description: "test123",
+				Columns: []pipeline.Column{
+					{
+						Name:        "col1",
+						Description: "first col",
+						PrimaryKey:  true,
+					},
+					{
+						Name:        "col2",
+						Description: "second col",
+						PrimaryKey:  true,
+					},
+					{
+						Name:        "col3",
+						Description: "third col",
+					},
+					{
+						Name:        "some missing column", // this one should not be put into the patch request
+						Description: "fourth col",
+					},
+				},
+			},
+			tableResponse: &bigquery2.Table{
+				Description: "some old description",
+				Schema: &bigquery2.TableSchema{
+					Fields: []*bigquery2.TableFieldSchema{
+						{
+							Name:        "col1",
+							Description: "old description",
+						},
+						{
+							Name:        "col2",
+							Description: "second old description",
+						},
+						{
+							Name:        "col3",
+							Description: "second old description",
+						},
+						{
+							Name:        "an_existing_but_not_documented_column",
+							Description: "some old description",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if !strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/datasets/%s/tables/%s", projectID, schema, table)) {
+					w.WriteHeader(http.StatusInternalServerError)
+					_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
+					require.NoError(t, err)
+					return
+				}
+
+				switch r.Method {
+				// this is the request that fetches the table metadata
+				case http.MethodGet:
+					w.WriteHeader(http.StatusOK)
+
+					response, err := json.Marshal(tt.tableResponse)
+					require.NoError(t, err)
+
+					_, err = w.Write(response)
+					require.NoError(t, err)
+					return
+
+				// this is the request that updates the table metadata with the new details
+				case http.MethodPatch:
+					w.WriteHeader(http.StatusOK)
+
+					// read the body
+					var table bigquery2.Table
+					err := json.NewDecoder(r.Body).Decode(&table)
+					require.NoError(t, err)
+
+					colsByName := make(map[string]*pipeline.Column, len(tt.asset.Columns))
+					for _, col := range tt.asset.Columns {
+						colsByName[col.Name] = &col
+					}
+
+					// ensure the asset description is saved
+					require.Equal(t, tt.asset.Description, table.Description)
+
+					if table.Schema != nil {
+						// ensure the column description is saved
+						for _, col := range table.Schema.Fields {
+							if c, ok := colsByName[col.Name]; ok {
+								require.Equal(t, c.Description, col.Description)
+							}
+						}
+
+						// ensure we didn't drop any columns that we didn't have documented
+						require.Equal(t, len(tt.tableResponse.Schema.Fields), len(table.Schema.Fields))
+
+						// ensure the primary keys are set correctly
+						primaryKeys := tt.asset.ColumnNamesWithPrimaryKey()
+						require.Equal(t, primaryKeys, table.TableConstraints.PrimaryKey.Columns)
+					} else {
+						require.Nil(t, tt.tableResponse.Schema)
+					}
+
+					response, err := json.Marshal(tt.tableResponse)
+					require.NoError(t, err)
+
+					_, err = w.Write(response)
+					require.NoError(t, err)
+					return
+				}
+
+				w.WriteHeader(http.StatusInternalServerError)
+				_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
+				require.NoError(t, err)
+			}))
+			defer server.Close()
+
+			client, err := bigquery.NewClient(
+				context.Background(),
+				projectID,
+				option.WithEndpoint(server.URL),
+				option.WithCredentials(&google.Credentials{
+					ProjectID: projectID,
+					TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+						AccessToken: "some-token",
+					}),
+				}),
+			)
+			require.NoError(t, err)
+			client.Location = "US"
+
+			d := Client{client: client}
+
+			err = d.UpdateTableMetadataIfNotExist(context.Background(), tt.asset)
+			if tt.err == nil {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, err, tt.err.Error())
+			}
 		})
 	}
 }

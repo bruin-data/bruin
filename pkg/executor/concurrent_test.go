@@ -49,7 +49,6 @@ func TestConcurrent_Start(t *testing.T) {
 
 	mockOperator := new(mockOperator)
 	for _, a := range p.Assets {
-		a := a
 		mockOperator.On("Run", mock.Anything, mock.MatchedBy(func(ti scheduler.TaskInstance) bool {
 			return ti.GetAsset().Name == a.Name
 		})).
@@ -58,7 +57,7 @@ func TestConcurrent_Start(t *testing.T) {
 	}
 
 	logger := zap.NewNop().Sugar()
-	s := scheduler.NewScheduler(logger, p)
+	s := scheduler.NewScheduler(logger, p, false)
 	assert.Equal(t, 5, s.InstanceCount())
 
 	ops := map[pipeline.AssetType]Config{

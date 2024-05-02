@@ -83,7 +83,6 @@ func TestEnsureTaskNameIsNotEmpty(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -382,7 +381,6 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -482,7 +480,6 @@ func TestEnsureDependencyExists(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -561,7 +558,6 @@ func TestEnsurePipelineScheduleIsValidCron(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -642,7 +638,6 @@ func TestEnsureOnlyAcceptedTaskTypesAreThere(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -720,7 +715,6 @@ func TestEnsureTaskNameIsUnique(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -837,7 +831,6 @@ func TestEnsureTaskNameIsUniqueForASingleAsset(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -910,7 +903,6 @@ func TestEnsurePipelineNameIsValid(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -991,7 +983,6 @@ func TestEnsurePipelineHasNoCycles(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1116,7 +1107,6 @@ func TestEnsureSlackFieldInPipelineIsValid(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got, err := EnsureSlackFieldInPipelineIsValid(tt.args.p)
@@ -1324,7 +1314,6 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1406,7 +1395,6 @@ func TestEnsureSnowflakeSensorHasQueryParameter(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1501,7 +1489,6 @@ func TestEnsureBigQueryTableSensorHasTableParameter(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1590,7 +1577,6 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

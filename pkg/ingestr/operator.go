@@ -158,7 +158,11 @@ func (o *BasicOperator) ConvertTaskInstanceToIngestrCommand(ti scheduler.TaskIns
 		return nil, errors.New("source table not configured")
 	}
 
-	destConnectionName := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
+	destConnectionName, err := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
+	if err != nil {
+		return nil, err
+	}
+
 	destConnection, err := o.conn.GetConnection(destConnectionName)
 	if err != nil {
 		return nil, fmt.Errorf("destination connection %s not found", destConnectionName)

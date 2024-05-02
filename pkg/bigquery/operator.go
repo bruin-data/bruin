@@ -2,7 +2,9 @@ package bigquery
 
 import (
 	"context"
+	"io"
 
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -61,7 +63,12 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 
 	q.Query = materialized
 
-	conn, err := o.connection.GetBqConnection(p.GetConnectionNameForAsset(t))
+	connName, err := p.GetConnectionNameForAsset(t)
+	if err != nil {
+		return err
+	}
+
+	conn, err := o.connection.GetBqConnection(connName)
 	if err != nil {
 		return err
 	}
@@ -123,4 +130,44 @@ func (o *CustomCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance
 	}
 
 	return o.checkRunner.Check(ctx, instance)
+}
+
+type MetadataPushOperator struct {
+	connection connectionFetcher
+}
+
+func NewMetadataPushOperator(conn connectionFetcher) *MetadataPushOperator {
+	return &MetadataPushOperator{
+		connection: conn,
+	}
+}
+
+func (o *MetadataPushOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	conn, err := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
+	if err != nil {
+		return err
+	}
+
+	client, err := o.connection.GetBqConnection(conn)
+	if err != nil {
+		return err
+	}
+
+	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
+	if writer == nil {
+		return errors.New("no writer found in context, please create an issue for this: https://github.com/bruin-data/bruin/issues")
+	}
+
+	err = client.UpdateTableMetadataIfNotExist(ctx, ti.GetAsset())
+	if err != nil {
+		var noMetadata NoMetadataUpdatedError
+		if errors.As(err, &noMetadata) {
+			_, _ = writer.Write([]byte("No metadata found to be pushed to BigQuery, skipping...\n"))
+			return nil
+		}
+
+		return err
+	}
+
+	return nil
 }

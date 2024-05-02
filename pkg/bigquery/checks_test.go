@@ -30,6 +30,11 @@ func (m *mockQuerierWithResult) RunQueryWithoutResult(ctx context.Context, query
 	return args.Error(0)
 }
 
+func (m *mockQuerierWithResult) UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	args := m.Called(ctx, asset)
+	return args.Error(0)
+}
+
 type mockConnectionFetcher struct {
 	mock.Mock
 }
@@ -202,7 +207,6 @@ func runTestsFoCountZeroCheck(t *testing.T, instanceBuilder func(q *mockQuerierW
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -297,7 +301,6 @@ func TestCustomCheck(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

@@ -70,7 +70,12 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 
 	q.Query = materialized
 
-	conn, err := o.connection.GetSfConnection(p.GetConnectionNameForAsset(t))
+	connName, err := p.GetConnectionNameForAsset(t)
+	if err != nil {
+		return err
+	}
+
+	conn, err := o.connection.GetSfConnection(connName)
 	if err != nil {
 		return err
 	}
@@ -121,7 +126,12 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return errors.Wrap(err, "failed to render query sensor query")
 	}
 
-	conn, err := o.connection.GetSfConnection(p.GetConnectionNameForAsset(t))
+	connName, err := p.GetConnectionNameForAsset(t)
+	if err != nil {
+		return err
+	}
+
+	conn, err := o.connection.GetSfConnection(connName)
 	if err != nil {
 		return err
 	}

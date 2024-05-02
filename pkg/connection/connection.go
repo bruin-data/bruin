@@ -75,12 +75,7 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 }
 
 func (m *Manager) GetBqConnection(name string) (bigquery.DB, error) {
-	db, err := m.GetBqConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetBqConnectionWithoutDefault("gcp-default")
+	return m.GetBqConnectionWithoutDefault(name)
 }
 
 func (m *Manager) GetBqConnectionWithoutDefault(name string) (bigquery.DB, error) {
@@ -486,7 +481,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 
 	var wg conc.WaitGroup
 	for _, conn := range cm.SelectedEnvironment.Connections.GoogleCloudPlatform {
-		conn := conn
 		wg.Go(func() {
 			err := connectionManager.AddBqConnectionFromConfig(&conn)
 			if err != nil {
@@ -496,7 +490,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	}
 
 	for _, conn := range cm.SelectedEnvironment.Connections.Snowflake {
-		conn := conn
 		wg.Go(func() {
 			err := connectionManager.AddSfConnectionFromConfig(&conn)
 			if err != nil {
@@ -506,7 +499,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	}
 
 	for _, conn := range cm.SelectedEnvironment.Connections.Postgres {
-		conn := conn
 		wg.Go(func() {
 			err := connectionManager.AddPgConnectionFromConfig(&conn)
 			if err != nil {
@@ -516,7 +508,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	}
 
 	for _, conn := range cm.SelectedEnvironment.Connections.RedShift {
-		conn := conn
 		wg.Go(func() {
 			err := connectionManager.AddRedshiftConnectionFromConfig(&conn)
 			if err != nil {
@@ -526,7 +517,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	}
 
 	for _, conn := range cm.SelectedEnvironment.Connections.MsSQL {
-		conn := conn
 		wg.Go(func() {
 			err := connectionManager.AddMsSQLConnectionFromConfig(&conn)
 			if err != nil {
@@ -536,7 +526,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	}
 
 	for _, conn := range cm.SelectedEnvironment.Connections.Synapse {
-		conn := conn
 		wg.Go(func() {
 			err := connectionManager.AddMsSQLConnectionFromConfig(&conn)
 			if err != nil {
@@ -546,7 +535,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	}
 
 	for _, conn := range cm.SelectedEnvironment.Connections.Mongo {
-		conn := conn
 		wg.Go(func() {
 			err := connectionManager.AddMongoConnectionFromConfig(&conn)
 			if err != nil {
@@ -556,7 +544,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	}
 
 	for _, conn := range cm.SelectedEnvironment.Connections.MySQL {
-		conn := conn
 		wg.Go(func() {
 			err := connectionManager.AddMySQLConnectionFromConfig(&conn)
 			if err != nil {
@@ -566,7 +553,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	}
 
 	for _, conn := range cm.SelectedEnvironment.Connections.Notion {
-		conn := conn
 		wg.Go(func() {
 			err := connectionManager.AddNotionConnectionFromConfig(&conn)
 			if err != nil {
@@ -576,7 +562,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	}
 
 	for _, conn := range cm.SelectedEnvironment.Connections.HANA {
-		conn := conn
 		wg.Go(func() {
 			err := connectionManager.AddHANAConnectionFromConfig(&conn)
 			if err != nil {

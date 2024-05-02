@@ -122,7 +122,6 @@ func TestScheduler_getScheduleableTasks(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -196,7 +195,7 @@ func TestScheduler_Run(t *testing.T) {
 		},
 	}
 
-	scheduler := NewScheduler(&zap.SugaredLogger{}, p)
+	scheduler := NewScheduler(&zap.SugaredLogger{}, p, false)
 
 	scheduler.Tick(&TaskExecutionResult{
 		Instance: &AssetInstance{
@@ -301,7 +300,7 @@ func TestScheduler_MarkTasksAndDownstream(t *testing.T) {
 		},
 	}
 
-	s := NewScheduler(zap.NewNop().Sugar(), p)
+	s := NewScheduler(zap.NewNop().Sugar(), p, false)
 	s.MarkAll(Succeeded)
 	s.MarkTask(t12, Pending, true)
 
@@ -399,7 +398,7 @@ func TestScheduler_WillRunTaskOfType(t *testing.T) {
 		},
 	}
 
-	s := NewScheduler(zap.NewNop().Sugar(), p)
+	s := NewScheduler(zap.NewNop().Sugar(), p, false)
 	s.MarkAll(Succeeded)
 	s.MarkTask(t12, Pending, true)
 	s.MarkTask(t1000, Pending, true)
@@ -454,7 +453,7 @@ func TestScheduler_FindMajorityOfTypes(t *testing.T) {
 		},
 	}
 
-	s := NewScheduler(zap.NewNop().Sugar(), p)
+	s := NewScheduler(zap.NewNop().Sugar(), p, false)
 
 	// if they are in equal counts, the default should be preferred
 	res := s.FindMajorityOfTypes([]pipeline.AssetType{"bq.sql", "sf.sql"}, "bq.sql")

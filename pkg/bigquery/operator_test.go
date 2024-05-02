@@ -2,10 +2,13 @@ package bigquery
 
 import (
 	"context"
+	"io"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -121,6 +124,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			},
 			args: args{
 				t: &pipeline.Asset{
+					Type: pipeline.AssetTypeBigqueryQuery,
 					ExecutableFile: pipeline.ExecutableFile{
 						Path:    "test-file.sql",
 						Content: "some content",
@@ -145,6 +149,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			},
 			args: args{
 				t: &pipeline.Asset{
+					Type: pipeline.AssetTypeBigqueryQuery,
 					ExecutableFile: pipeline.ExecutableFile{
 						Path:    "test-file.sql",
 						Content: "some content",
@@ -169,6 +174,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			},
 			args: args{
 				t: &pipeline.Asset{
+					Type: pipeline.AssetTypeBigqueryQuery,
 					ExecutableFile: pipeline.ExecutableFile{
 						Path:    "test-file.sql",
 						Content: "some content",
@@ -179,7 +185,6 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -187,7 +192,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			extractor := new(mockExtractor)
 			mat := new(mockMaterializer)
 			conn := new(mockConnectionFetcher)
-			conn.On("GetBqConnection", mock.Anything).Return(client, nil)
+			conn.On("GetBqConnection", "gcp-default").Return(client, nil)
 
 			if tt.setup != nil {
 				tt.setup(&fields{
@@ -204,6 +209,87 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			}
 
 			err := o.RunTask(context.Background(), &pipeline.Pipeline{}, tt.args.t)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestMetadataPushOperator_Run(t *testing.T) {
+	t.Parallel()
+
+	type fields struct {
+		q *mockQuerierWithResult
+	}
+
+	asset := &pipeline.Asset{
+		Type: pipeline.AssetTypeBigqueryQuery,
+		ExecutableFile: pipeline.ExecutableFile{
+			Path:    "test-file.sql",
+			Content: "some content",
+		},
+	}
+
+	tests := []struct {
+		name    string
+		setup   func(f *fields)
+		t       *pipeline.Asset
+		wantErr bool
+	}{
+		{
+			name: "no metadata to push",
+			setup: func(f *fields) {
+				f.q.On("UpdateTableMetadataIfNotExist", mock.Anything, asset).
+					Return(NoMetadataUpdatedError{})
+			},
+			t:       asset,
+			wantErr: false,
+		},
+		{
+			name: "other errors are propagated",
+			setup: func(f *fields) {
+				f.q.On("UpdateTableMetadataIfNotExist", mock.Anything, asset).
+					Return(errors.New("something failed"))
+			},
+			t:       asset,
+			wantErr: true,
+		},
+		{
+			name: "metadata is pushed successfully",
+			setup: func(f *fields) {
+				f.q.On("UpdateTableMetadataIfNotExist", mock.Anything, asset).
+					Return(nil)
+			},
+			t:       asset,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			client := new(mockQuerierWithResult)
+			conn := new(mockConnectionFetcher)
+			conn.On("GetBqConnection", "gcp-default").Return(client, nil)
+
+			if tt.setup != nil {
+				tt.setup(&fields{
+					q: client,
+				})
+			}
+
+			o := MetadataPushOperator{
+				connection: conn,
+			}
+
+			taskInstance := scheduler.AssetInstance{Asset: tt.t, Pipeline: &pipeline.Pipeline{}}
+
+			ctx := context.WithValue(context.Background(), executor.KeyPrinter, io.Discard)
+
+			err := o.Run(ctx, &taskInstance)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

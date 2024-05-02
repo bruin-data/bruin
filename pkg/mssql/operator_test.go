@@ -121,6 +121,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			},
 			args: args{
 				t: &pipeline.Asset{
+					Type: pipeline.AssetTypeMsSQLQuery,
 					ExecutableFile: pipeline.ExecutableFile{
 						Path:    "test-file.sql",
 						Content: "some content",
@@ -145,6 +146,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			},
 			args: args{
 				t: &pipeline.Asset{
+					Type: pipeline.AssetTypeMsSQLQuery,
 					ExecutableFile: pipeline.ExecutableFile{
 						Path:    "test-file.sql",
 						Content: "some content",
@@ -169,6 +171,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			},
 			args: args{
 				t: &pipeline.Asset{
+					Type: pipeline.AssetTypeMsSQLQuery,
 					ExecutableFile: pipeline.ExecutableFile{
 						Path:    "test-file.sql",
 						Content: "some content",
@@ -179,7 +182,6 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -187,7 +189,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			extractor := new(mockExtractor)
 			mat := new(mockMaterializer)
 			conn := new(mockConnectionFetcher)
-			conn.On("GetMsConnection", mock.Anything).Return(client, nil)
+			conn.On("GetMsConnection", "mssql-default").Return(client, nil)
 
 			if tt.setup != nil {
 				tt.setup(&fields{

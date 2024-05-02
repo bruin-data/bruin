@@ -78,7 +78,16 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 
 	foundQuery := queries[0]
 
-	assetConnectionName := p.GetConnectionNameForAsset(asset)
+	assetConnectionName, err := p.GetConnectionNameForAsset(asset)
+	if err != nil {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Cannot get connection for task '%s': %+v", asset.Name, err),
+		})
+
+		return issues, nil
+	}
+
 	q.Logger.Debugw("The connection will be used for asset", "asset", asset.Name, "connection", assetConnectionName)
 
 	validator, err := q.Connections.GetConnection(assetConnectionName)
@@ -176,7 +185,15 @@ func (q *QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.A
 			q.Logger.Debugw("Checking if a query is valid", "path", task.ExecutableFile.Path)
 			start := time.Now()
 
-			assetConnectionName := p.GetConnectionNameForAsset(task)
+			assetConnectionName, err := p.GetConnectionNameForAsset(task)
+			if err != nil {
+				mu.Lock()
+				issues = append(issues, &Issue{
+					Task:        task,
+					Description: fmt.Sprintf("Cannot get connection for task '%s': %+v", task.Name, err),
+				})
+				mu.Unlock()
+			}
 			q.Logger.Debugw("The connection will be used for asset", "asset", task.Name, "connection", assetConnectionName)
 
 			validator, err := q.Connections.GetConnection(assetConnectionName)

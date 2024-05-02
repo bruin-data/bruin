@@ -82,6 +82,10 @@ func Run(isDebug *bool) *cli.Command {
 				Usage:   "the environment to use",
 			},
 			&cli.BoolFlag{
+				Name:  "push-metadata",
+				Usage: "push the metadata to the destination database if supports, currently supported: BigQuery",
+			},
+			&cli.BoolFlag{
 				Name:    "force",
 				Aliases: []string{"f"},
 				Usage:   "force the validation even if the environment is a production environment",
@@ -243,7 +247,7 @@ func Run(isDebug *bool) *cli.Command {
 				infoPrinter.Printf(" - custom checks: %d\n", len(task.CustomChecks))
 			}
 
-			s := scheduler.NewScheduler(logger, foundPipeline)
+			s := scheduler.NewScheduler(logger, foundPipeline, c.Bool("push-metadata"))
 
 			infoPrinter.Printf("\nStarting the pipeline execution...\n\n")
 
@@ -359,14 +363,18 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 			return nil, err
 		}
 
+		metadataPushOperator := bigquery.NewMetadataPushOperator(conn)
+
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeMain] = bqOperator
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeCustomCheck] = bqCustomCheckRunner
+		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeMetadataPush] = metadataPushOperator
 
 		// we set the Python runners to run the checks on BigQuery assuming that there won't be many usecases where a user has both BQ and Snowflake
 		if estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = bqCustomCheckRunner
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMetadataPush] = metadataPushOperator
 		}
 	}
 
