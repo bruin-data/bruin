@@ -427,10 +427,6 @@ func TestScheduler_FindMajorityOfTypes(t *testing.T) {
 				Type: "sf.sql",
 			},
 			{
-				Name: "random-asset",
-				Type: "random",
-			},
-			{
 				Name:      "task13",
 				DependsOn: []string{"task12"},
 				Type:      "bq.sql",
@@ -456,22 +452,6 @@ func TestScheduler_FindMajorityOfTypes(t *testing.T) {
 	s := NewScheduler(zap.NewNop().Sugar(), p, false)
 
 	// if they are in equal counts, the default should be preferred
-	res := s.FindMajorityOfTypes([]pipeline.AssetType{"bq.sql", "sf.sql"}, "bq.sql")
-	assert.Equal(t, pipeline.AssetType("bq.sql"), res)
-
-	// if one of them is a winner, winner should be returned
-	res = s.FindMajorityOfTypes([]pipeline.AssetType{"python", "random"}, "sf.sql")
-	assert.Equal(t, pipeline.AssetType("python"), res)
-
-	// if none exists, default should be returned
-	res = s.FindMajorityOfTypes([]pipeline.AssetType{"abc", "xyz"}, "sf.sql")
-	assert.Equal(t, pipeline.AssetType("sf.sql"), res)
-
-	// if only one exists, that should be returned
-	res = s.FindMajorityOfTypes([]pipeline.AssetType{"abc", "xyz", "random"}, "sf.sql")
-	assert.Equal(t, pipeline.AssetType("random"), res)
-
-	// if they are in equal counts, the order shouldn't matter
-	res = s.FindMajorityOfTypes([]pipeline.AssetType{"sf.sql", "bq.sql"}, "sf.sql")
-	assert.Equal(t, pipeline.AssetType("sf.sql"), res)
+	assert.Equal(t, pipeline.AssetType("bq.sql"), s.FindMajorityOfTypes("bq.sql"))
+	assert.Equal(t, pipeline.AssetType("sf.sql"), s.FindMajorityOfTypes("sf.sql"))
 }

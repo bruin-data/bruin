@@ -439,6 +439,8 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 	assetType := asset.Type
 	if assetType == AssetTypeIngestr {
 		assetType = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
+	} else if assetType == AssetTypePython || assetType == AssetTypeEmpty {
+		assetType = p.GetMajorityAssetTypesFromSQLAssets(AssetTypeBigqueryQuery)
 	}
 
 	mapping, ok := AssetTypeConnectionMapping[assetType]
@@ -479,6 +481,59 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 	default:
 		return "", errors.Errorf("no default connection found for type '%s'", assetType)
 	}
+}
+
+func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) AssetType {
+	taskTypeCounts := map[AssetType]int{
+		AssetTypeBigqueryQuery:  0,
+		AssetTypeSnowflakeQuery: 0,
+		AssetTypePostgresQuery:  0,
+		AssetTypeMsSQLQuery:     0,
+		AssetTypeRedshiftQuery:  0,
+		AssetTypeSynapseQuery:   0,
+	}
+	maxTasks := 0
+	maxTaskType := defaultIfNone
+
+	searchTypeMap := make(map[AssetType]bool)
+	for t := range taskTypeCounts {
+		searchTypeMap[t] = true
+	}
+
+	for _, asset := range p.Assets {
+		assetType := asset.Type
+
+		if assetType == AssetTypeIngestr {
+			ingestrDestination, ok := asset.Parameters["destination"]
+			if !ok {
+				continue
+			}
+
+			assetType, ok = IngestrTypeConnectionMapping[ingestrDestination]
+			if !ok {
+				continue
+			}
+		}
+
+		if !searchTypeMap[assetType] {
+			continue
+		}
+
+		if _, ok := taskTypeCounts[assetType]; !ok {
+			taskTypeCounts[assetType] = 0
+		}
+
+		taskTypeCounts[assetType]++
+
+		if taskTypeCounts[assetType] > maxTasks {
+			maxTasks = taskTypeCounts[assetType]
+			maxTaskType = assetType
+		} else if taskTypeCounts[assetType] == maxTasks {
+			maxTaskType = defaultIfNone
+		}
+	}
+
+	return maxTaskType
 }
 
 func (p *Pipeline) RelativeAssetPath(t *Asset) string {

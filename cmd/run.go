@@ -208,6 +208,8 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			logger.Debugf("loaded the config from path '%s'", configFilePath)
+
 			err = switchEnvironment(c, cm, os.Stdin)
 			if err != nil {
 				return err
@@ -331,14 +333,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 
 	// this is a heuristic we apply to find what might be the most common type of custom check in the pipeline
 	// this should go away once we incorporate URIs into the assets
-	estimateCustomCheckType := s.FindMajorityOfTypes([]pipeline.AssetType{
-		pipeline.AssetTypeBigqueryQuery,
-		pipeline.AssetTypeSnowflakeQuery,
-		pipeline.AssetTypePostgresQuery,
-		pipeline.AssetTypeMsSQLQuery,
-		pipeline.AssetTypeRedshiftQuery,
-		pipeline.AssetTypeSynapseQuery,
-	}, pipeline.AssetTypeBigqueryQuery)
+	estimateCustomCheckType := s.FindMajorityOfTypes(pipeline.AssetTypeBigqueryQuery)
 
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
 		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinja.PythonEnvVariables(&startDate, &endDate, runID))

@@ -208,6 +208,7 @@ func (i InstancesByType) AddDownstreamByType(instanceType TaskInstanceType, down
 type Scheduler struct {
 	logger           *zap.SugaredLogger
 	taskScheduleLock sync.Mutex
+	pipeline         *pipeline.Pipeline
 
 	taskInstances []TaskInstance
 	taskNameMap   map[string]InstancesByType
@@ -296,47 +297,8 @@ func (s *Scheduler) WillRunTaskOfType(taskType pipeline.AssetType) bool {
 	return false
 }
 
-func (s *Scheduler) FindMajorityOfTypes(taskTypes []pipeline.AssetType, defaultIfNone pipeline.AssetType) pipeline.AssetType {
-	taskTypeCounts := make(map[pipeline.AssetType]int)
-	maxTasks := 0
-	maxTaskType := defaultIfNone
-
-	searchTypeMap := make(map[pipeline.AssetType]bool)
-	for _, t := range taskTypes {
-		searchTypeMap[t] = true
-	}
-
-	for _, instance := range s.taskInstances {
-		asset := instance.GetAsset()
-		assetType := asset.Type
-
-		var err error
-		if assetType == pipeline.AssetTypeIngestr {
-			assetType, err = helpers.GetIngestrDestinationType(asset)
-			if err != nil {
-				continue
-			}
-		}
-
-		if !searchTypeMap[assetType] {
-			continue
-		}
-
-		if _, ok := taskTypeCounts[assetType]; !ok {
-			taskTypeCounts[assetType] = 0
-		}
-
-		taskTypeCounts[assetType]++
-
-		if taskTypeCounts[assetType] > maxTasks {
-			maxTasks = taskTypeCounts[assetType]
-			maxTaskType = assetType
-		} else if taskTypeCounts[assetType] == maxTasks {
-			maxTaskType = defaultIfNone
-		}
-	}
-
-	return maxTaskType
+func (s *Scheduler) FindMajorityOfTypes(defaultIfNone pipeline.AssetType) pipeline.AssetType {
+	return s.pipeline.GetMajorityAssetTypesFromSQLAssets(defaultIfNone)
 }
 
 func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, pushMetadata bool) *Scheduler {
@@ -410,6 +372,7 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, pushMetadata 
 
 	s := &Scheduler{
 		logger:           logger,
+		pipeline:         p,
 		taskInstances:    instances,
 		taskScheduleLock: sync.Mutex{},
 		WorkQueue:        make(chan TaskInstance, 100),

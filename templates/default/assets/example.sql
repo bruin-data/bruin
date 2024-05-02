@@ -1,10 +1,16 @@
 /* @bruin
 
-name: example
+name: myschema.example
 type: bq.sql
 
 materialization:
    type: table
+
+description: |
+  # Example table
+  This asset is an example table with some quality checks to help you get started.
+
+  You can write Markdown here, it supports `inline codeblocks` or larger blocks of code. It supports **bold** and *italic* text.
 
 columns:
   - name: id
@@ -14,7 +20,6 @@ columns:
     checks:
         - name: not_null
         - name: positive
-        - name: non_negative
 
   - name: country
     type: varchar
@@ -31,6 +36,11 @@ columns:
         - name: unique
         - name: not_null
 
+custom_checks:
+  - name: match column counts
+    value: 4
+    query: |
+      SELECT COUNT(*) as count FROM myschema.example
 
 @bruin */
 
