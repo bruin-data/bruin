@@ -3,7 +3,6 @@ package ingestr
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -145,7 +145,7 @@ func (o *BasicOperator) ConvertTaskInstanceToIngestrCommand(ti scheduler.TaskIns
 
 	sourceConnection, err := o.conn.GetConnection(sourceConnectionName)
 	if err != nil {
-		return nil, fmt.Errorf("source connection %s not found", sourceConnectionName)
+		return nil, errors.Wrapf(err, "source connection %s not found", sourceConnectionName)
 	}
 
 	sourceURI, err := sourceConnection.(pipelineConnection).GetIngestrURI()
