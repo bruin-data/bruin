@@ -1,0 +1,7 @@
+name: raw.notion
+type: ingestr
+
+parameters:
+  source_connection: my-notion-connection
+  source_table: <your-table-id-here>
+  destination: bigquery
