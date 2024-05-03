@@ -15,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc"
+	"golang.org/x/exp/maps"
 )
 
 type Manager struct {
@@ -31,47 +32,57 @@ type Manager struct {
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
+	availableConnectionNames := make([]string, 0)
+
 	connBigQuery, err := m.GetBqConnectionWithoutDefault(name)
 	if err == nil {
 		return connBigQuery, nil
 	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.BigQuery)...)
 
 	connSnowflake, err := m.GetSfConnectionWithoutDefault(name)
 	if err == nil {
 		return connSnowflake, nil
 	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Snowflake)...)
 
 	connPostgres, err := m.GetPgConnectionWithoutDefault(name)
 	if err == nil {
 		return connPostgres, nil
 	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Postgres)...)
 
 	connMSSql, err := m.GetMsConnectionWithoutDefault(name)
 	if err == nil {
 		return connMSSql, nil
 	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.MsSQL)...)
 
 	connMongo, err := m.GetMongoConnectionWithoutDefault(name)
 	if err == nil {
 		return connMongo, nil
 	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Mongo)...)
 
 	connMysql, err := m.GetMySQLConnectionWithoutDefault(name)
 	if err == nil {
 		return connMysql, nil
 	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Mysql)...)
 
 	connNotion, err := m.GetNotionConnectionWithoutDefault(name)
 	if err == nil {
 		return connNotion, nil
 	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Notion)...)
 
 	connHANA, err := m.GetHANAConnectionWithoutDefault(name)
 	if err == nil {
 		return connHANA, nil
 	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.HANA)...)
 
-	return nil, errors.New("connection not found")
+	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
 
 func (m *Manager) GetBqConnection(name string) (bigquery.DB, error) {

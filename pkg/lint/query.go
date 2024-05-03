@@ -43,6 +43,11 @@ func (q *QueryValidatorRule) GetApplicableLevels() []Level {
 
 func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
+	if asset.Type != q.TaskType {
+		q.Logger.Debug("Skipping task, task type not matched")
+		return issues, nil
+	}
+
 	queries, err := q.Extractor.ExtractQueriesFromString(asset.ExecutableFile.Content)
 	if err != nil {
 		q.Logger.Debugf("failed to extract the queries from pipeline '%s' task '%s'", p.Name, asset.Name)
