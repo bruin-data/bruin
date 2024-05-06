@@ -107,7 +107,7 @@ func Test_readYamlFileFromPath(t *testing.T) {
 func TestExcludeItemsInDirectoryContainingFile(t *testing.T) {
 	t.Parallel()
 
-	var baseDir = filepath.Join("pipeline", "tasks")
+	baseDir := filepath.Join("pipeline", "tasks")
 
 	type args struct {
 		filePaths []string

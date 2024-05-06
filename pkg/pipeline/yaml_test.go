@@ -51,7 +51,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Type:        "bq.sql",
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "hello.sql",
-					Path:    path.AbsPathCrossPlatform(t, filepath.Join("testdata", "yaml", "task1", "hello.sql")),
+					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task1", "hello.sql")),
 					Content: mustRead(t, filepath.Join("testdata", "yaml", "task1", "hello.sql")),
 				},
 				Parameters: map[string]string{
@@ -119,7 +119,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Type:        "bash",
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "hello.sh",
-					Path:    path.AbsPathCrossPlatform(t, filepath.Join("testdata", "yaml", "task-with-nested", "some", "dir", "hello.sh")),
+					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-nested", "some", "dir", "hello.sh")),
 					Content: mustRead(t, filepath.Join("testdata", "yaml", "task-with-nested", "some", "dir", "hello.sh")),
 				},
 				Parameters: map[string]string{
@@ -145,7 +145,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Type:        "bash",
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "hello.sh",
-					Path:    path.AbsPathCrossPlatform(t, filepath.Join("testdata", "yaml", "task-with-toplevel-runfile", "hello.sh")),
+					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-toplevel-runfile", "hello.sh")),
 					Content: mustRead(t, filepath.Join("testdata", "yaml", "task-with-toplevel-runfile", "hello.sh")),
 				},
 				Parameters: map[string]string{

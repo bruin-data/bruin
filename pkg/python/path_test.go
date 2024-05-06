@@ -28,11 +28,12 @@ func TestFindModulePath(t *testing.T) {
 			name: "the executable is in a different path",
 			args: args{
 				repo: &git.Repo{
-					Path: "/Users/robin/Projects/my-pipeline",
+					Path: filepath.Join("Users", "robin", "Projects", "my-pipeline"),
 				},
 				executable: &pipeline.ExecutableFile{
-					Path: "/Users/robin/Projects/other-project/pipeline1/tasks/my-module/script.py",
+					Path: filepath.Join("Users", "robin", "Projects", "other-project", "pipeline1", "tasks", "my-module", "script.py"),
 				},
+				seperatorOverride: '/',
 			},
 			wantErr: true,
 		},
@@ -40,10 +41,10 @@ func TestFindModulePath(t *testing.T) {
 			name: "can find the module path",
 			args: args{
 				repo: &git.Repo{
-					Path: "/Users/robin/Projects/my-pipeline",
+					Path: filepath.Join("Users", "robin", "Projects", "my-pipeline"),
 				},
 				executable: &pipeline.ExecutableFile{
-					Path: "/Users/robin/Projects/my-pipeline/pipeline1/tasks/my-module/script.py",
+					Path: filepath.Join("Users", "robin", "Projects", "my-pipeline", "pipeline1", "tasks", "my-module", "script.py"),
 				},
 			},
 			want: "pipeline1.tasks.my-module.script",
@@ -52,24 +53,11 @@ func TestFindModulePath(t *testing.T) {
 			name: "can find the module path even with indirect directory references",
 			args: args{
 				repo: &git.Repo{
-					Path: "/Users/robin/Projects/my-pipeline",
+					Path: filepath.Join("Users", "robin", "Projects", "my-pipeline"),
 				},
 				executable: &pipeline.ExecutableFile{
-					Path: "/Users/robin/Projects/my-pipeline/../../Projects/my-pipeline/pipeline1/tasks/my-module/script.py",
+					Path: filepath.Join("Users", "robin", "Projects", "my-pipeline", "..", "..", "Projects", "my-pipeline", "pipeline1", "tasks", "my-module", "script.py"),
 				},
-			},
-			want: "pipeline1.tasks.my-module.script",
-		},
-		{
-			name: "can find the module path even with indirect directory references on Windows",
-			args: args{
-				repo: &git.Repo{
-					Path: "C:\\Users\\robin\\Projects\\my-pipeline",
-				},
-				executable: &pipeline.ExecutableFile{
-					Path: "C:\\Users\\robin\\Projects\\my-pipeline\\..\\..\\Projects\\my-pipeline\\pipeline1\\tasks\\my-module\\script.py",
-				},
-				seperatorOverride: '\\',
 			},
 			want: "pipeline1.tasks.my-module.script",
 		},
@@ -78,12 +66,7 @@ func TestFindModulePath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			separator := filepath.Separator
-			if tt.args.seperatorOverride != 0 {
-				separator = tt.args.seperatorOverride
-			}
-
-			finder := &ModulePathFinder{PathSeparatorOverride: separator}
+			finder := &ModulePathFinder{}
 			got, err := finder.FindModulePath(tt.args.repo, tt.args.executable)
 
 			if tt.wantErr {

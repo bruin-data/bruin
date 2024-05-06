@@ -17,6 +17,7 @@ issues:
     - path: (.+)_test.go
       linters:
         - gosec
+        - dupl
 
 linters:
   disable:
