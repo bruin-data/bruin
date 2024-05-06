@@ -21,6 +21,7 @@ const (
 	AssetTypeSnowflakeQuerySensor = AssetType("sf.sensor.query")
 	AssetTypeBigqueryQuery        = AssetType("bq.sql")
 	AssetTypeBigqueryTableSensor  = AssetType("bq.sensor.table")
+	AssetTypeBigqueryQuerySensor  = AssetType("bq.sensor.query")
 	AssetTypeEmpty                = AssetType("empty")
 	AssetTypePostgresQuery        = AssetType("pg.sql")
 	AssetTypeRedshiftQuery        = AssetType("rs.sql")

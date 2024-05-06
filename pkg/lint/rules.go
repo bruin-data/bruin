@@ -569,3 +569,28 @@ func EnsureBigQueryTableSensorHasTableParameterForASingleAsset(ctx context.Conte
 
 	return issues, nil
 }
+
+func EnsureBigQueryQuerySensorHasTableParameterForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if asset.Type != pipeline.AssetTypeBigqueryQuerySensor {
+		return issues, nil
+	}
+
+	query, ok := asset.Parameters["query"]
+	if !ok {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "BigQuery query sensor requires a `query` parameter",
+		})
+		return issues, nil
+	}
+
+	if query == "" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "BigQuery query sensor requires a `query` parameter that is not empty",
+		})
+	}
+
+	return issues, nil
+}

@@ -15,7 +15,7 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 	pipeline.AssetTypeBigqueryTableSensor: {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
-	"bq.sensor.query": {
+	pipeline.AssetTypeBigqueryQuerySensor: {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
 	"bq.cost_tracker": {
