@@ -262,6 +262,10 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 	config.fs = fs
 	config.path = path
 
+	if config.DefaultEnvironmentName == "" {
+		config.DefaultEnvironmentName = "default"
+	}
+
 	e := config.Environments[config.DefaultEnvironmentName]
 
 	config.SelectedEnvironment = &e
