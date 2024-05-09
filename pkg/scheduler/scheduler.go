@@ -153,7 +153,7 @@ func (t *ColumnCheckInstance) GetType() TaskInstanceType {
 }
 
 func (t *ColumnCheckInstance) Blocking() bool {
-	return true
+	return t.Check.Blocking
 }
 
 type CustomCheckInstance struct {
@@ -167,7 +167,7 @@ func (t *CustomCheckInstance) GetType() TaskInstanceType {
 }
 
 func (t *CustomCheckInstance) Blocking() bool {
-	return true
+	return t.Check.Blocking
 }
 
 type MetadataPushInstance struct {
