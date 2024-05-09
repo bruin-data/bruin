@@ -29,9 +29,15 @@ columns:
       checks:
           - name: not_null
           - name: unique
+            blocking: false
 
 custom_checks:
     - name: check1
+      query: select 5
+      value: 16
+      blocking: false
+
+    - name: check2
       query: select 5
       value: 16
 

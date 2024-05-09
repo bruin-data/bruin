@@ -35,6 +35,7 @@ custom_checks:
     - name: check1
       query: select 5
       value: 16
+      blocking: false
 
 secrets:
     - key: secret1
