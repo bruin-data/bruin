@@ -206,16 +206,18 @@ func (ccv *ColumnCheckValue) UnmarshalJSON(data []byte) error {
 }
 
 type ColumnCheck struct {
-	ID    string           `json:"id"`
-	Name  string           `json:"name"`
-	Value ColumnCheckValue `json:"value"`
+	ID       string           `json:"id"`
+	Name     string           `json:"name"`
+	Value    ColumnCheckValue `json:"value"`
+	Blocking bool             `json:"blocking"`
 }
 
-func NewColumnCheck(assetName, columnName, name string, value ColumnCheckValue) ColumnCheck {
+func NewColumnCheck(assetName, columnName, name string, value ColumnCheckValue, blocking bool) ColumnCheck {
 	return ColumnCheck{
-		ID:    hash(fmt.Sprintf("%s-%s-%s", assetName, columnName, name)),
-		Name:  strings.TrimSpace(name),
-		Value: value,
+		ID:       hash(fmt.Sprintf("%s-%s-%s", assetName, columnName, name)),
+		Name:     strings.TrimSpace(name),
+		Value:    value,
+		Blocking: blocking,
 	}
 }
 
@@ -266,10 +268,11 @@ type SecretMapping struct {
 }
 
 type CustomCheck struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Query string `json:"query"`
-	Value int64  `json:"value"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Query    string `json:"query"`
+	Value    int64  `json:"value"`
+	Blocking bool   `json:"blocking"`
 }
 
 type Asset struct {

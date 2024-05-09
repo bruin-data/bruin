@@ -103,8 +103,9 @@ func (a *columnCheckValue) UnmarshalYAML(value *yaml.Node) error {
 }
 
 type columnCheck struct {
-	Name  string           `yaml:"name"`
-	Value columnCheckValue `yaml:"value"`
+	Name     string           `yaml:"name"`
+	Value    columnCheckValue `yaml:"value"`
+	Blocking *bool            `yaml:"blocking"`
 }
 
 type column struct {
@@ -122,9 +123,10 @@ type secretMapping struct {
 }
 
 type customCheck struct {
-	Name  string `yaml:"name"`
-	Query string `yaml:"query"`
-	Value int64  `yaml:"value"`
+	Name     string `yaml:"name"`
+	Query    string `yaml:"query"`
+	Value    int64  `yaml:"value"`
+	Blocking *bool  `yaml:"blocking"`
 }
 
 type taskDefinition struct {
@@ -223,7 +225,12 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 
 			seenTests[test.Name] = true
 
-			tests = append(tests, NewColumnCheck(definition.Name, column.Name, test.Name, ColumnCheckValue(test.Value)))
+			blocking := true
+			if test.Blocking != nil {
+				blocking = *test.Blocking
+			}
+
+			tests = append(tests, NewColumnCheck(definition.Name, column.Name, test.Name, ColumnCheckValue(test.Value), blocking))
 		}
 
 		columns[index] = Column{
@@ -258,12 +265,18 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 	}
 
 	for index, check := range definition.CustomChecks {
+		blocking := true
+		if check.Blocking != nil {
+			blocking = *check.Blocking
+		}
+
 		// set the ID as the hash of the name
 		task.CustomChecks[index] = CustomCheck{
-			ID:    hash(fmt.Sprintf("%s-%s", task.Name, check.Name)),
-			Name:  check.Name,
-			Query: check.Query,
-			Value: check.Value,
+			ID:       hash(fmt.Sprintf("%s-%s", task.Name, check.Name)),
+			Name:     check.Name,
+			Query:    check.Query,
+			Value:    check.Value,
+			Blocking: blocking,
 		}
 	}
 
