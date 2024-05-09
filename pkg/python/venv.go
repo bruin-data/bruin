@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"runtime"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/git"
@@ -56,7 +57,7 @@ func (i *installReqsToHomeDir) EnsureVirtualEnvExists(ctx context.Context, repo 
 
 	reqsPathExists := path.DirExists(i.fs, venvPath)
 	if reqsPathExists {
-		activateFileExists := path.FileExists(i.fs, venvPath+"/bin/activate")
+		activateFileExists := path.FileExists(i.fs, fmt.Sprintf("%s/%s/activate", venvPath, VirtualEnvBinaryFolder))
 		if activateFileExists {
 			return venvPath, nil
 		}
@@ -70,8 +71,12 @@ func (i *installReqsToHomeDir) EnsureVirtualEnvExists(ctx context.Context, repo 
 		return "", errors.Wrap(err, "failed to create virtualenv")
 	}
 
-	pipVenvPath := venvPath + "/bin/pip3"
-	fullCommand := fmt.Sprintf(". %s/bin/activate && %s install -r %s --quiet --quiet && echo 'installed all the dependencies'", venvPath, pipVenvPath, requirementsTxt)
+	pipVenvPath := fmt.Sprintf("%s/%s/pip3", venvPath, VirtualEnvBinaryFolder)
+	fullCommand := fmt.Sprintf("%s/%s/activate && %s install -r %s --quiet --quiet && echo 'installed all the dependencies'", venvPath, VirtualEnvBinaryFolder, pipVenvPath, requirementsTxt)
+	if runtime.GOOS != "windows" {
+		fullCommand = ". " + fullCommand
+	}
+
 	err = i.cmd.Run(ctx, repo, &command{
 		Name: Shell,
 		Args: []string{ShellSubcommandFlag, fullCommand},

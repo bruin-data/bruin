@@ -2,6 +2,8 @@ package python
 
 import (
 	"context"
+	"fmt"
+	"runtime"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/git"
@@ -141,7 +143,7 @@ func Test_installReqsToHomeDir_EnsureVirtualEnvExists(t *testing.T) {
 				createRequirementsFile(fs, "req1\nreq2")
 
 				require.NoError(t, fs.MkdirAll("/path/to/venv", 0o755))
-				_, err := fs.Create("/path/to/venv/bin/activate")
+				_, err := fs.Create(fmt.Sprintf("/path/to/venv/%s/activate", VirtualEnvBinaryFolder))
 				require.NoError(t, err)
 				return &fields{
 					fs:     fs,
@@ -172,9 +174,15 @@ func Test_installReqsToHomeDir_EnsureVirtualEnvExists(t *testing.T) {
 					Name: "/test/python",
 					Args: []string{"-m", "venv", "/path/to/venv"},
 				}).Return(nil)
+
+				expectedCommand := fmt.Sprintf("/path/to/venv/%s/activate && /path/to/venv/%s/pip3 install -r /path1/requirements.txt --quiet --quiet && echo 'installed all the dependencies'", VirtualEnvBinaryFolder, VirtualEnvBinaryFolder)
+				if runtime.GOOS != "windows" {
+					expectedCommand = ". " + expectedCommand
+				}
+
 				fakeCmd.On("Run", mock.Anything, repo, &command{
 					Name: Shell,
-					Args: []string{ShellSubcommandFlag, ". /path/to/venv/bin/activate && /path/to/venv/bin/pip3 install -r /path1/requirements.txt --quiet --quiet && echo 'installed all the dependencies'"},
+					Args: []string{ShellSubcommandFlag, expectedCommand},
 				}).Return(nil)
 
 				return &fields{

@@ -4,6 +4,8 @@
 package python
 
 const (
-	Shell               = "cmd"
-	ShellSubcommandFlag = "/c"
+	Shell                   = "cmd"
+	ShellSubcommandFlag     = "/c"
+	VirtualEnvBinaryFolder  = "Scripts"
+	DefaultPythonExecutable = "python"
 )
