@@ -46,7 +46,7 @@ func (l *localPythonRunner) Run(ctx context.Context, execCtx *executionContext) 
 	pythonCommandForScript := fmt.Sprintf("%s -u -m %s", l.pathToPython, execCtx.module)
 	noDependencyCommand := &command{
 		Name:    Shell,
-		Args:    []string{"-c", pythonCommandForScript},
+		Args:    []string{ShellSubcommandFlag, pythonCommandForScript},
 		EnvVars: execCtx.envVariables,
 	}
 	if execCtx.requirementsTxt == "" {
@@ -70,7 +70,7 @@ func (l *localPythonRunner) Run(ctx context.Context, execCtx *executionContext) 
 	fullCommand := fmt.Sprintf(". %s/bin/activate && echo 'activated virtualenv' && %s", depsPath, pythonCommandForScript)
 	return l.cmd.Run(ctx, execCtx.repo, &command{
 		Name:    Shell,
-		Args:    []string{"-c", fullCommand},
+		Args:    []string{ShellSubcommandFlag, fullCommand},
 		EnvVars: execCtx.envVariables,
 	})
 }

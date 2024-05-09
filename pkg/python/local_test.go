@@ -49,7 +49,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
 					Name: Shell,
-					Args: []string{"-c", "/test/python -u -m " + module},
+					Args: []string{ShellSubcommandFlag, "/test/python -u -m " + module},
 				}).Return(assert.AnError)
 
 				return &fields{
@@ -69,7 +69,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
 					Name: Shell,
-					Args: []string{"-c", "/test/python -u -m path.to.module"},
+					Args: []string{ShellSubcommandFlag, "/test/python -u -m path.to.module"},
 				}).Return(nil)
 
 				return &fields{
@@ -108,7 +108,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
 					Name: Shell,
-					Args: []string{"-c", "/test/python -u -m path.to.module"},
+					Args: []string{ShellSubcommandFlag, "/test/python -u -m path.to.module"},
 				}).Return(nil)
 
 				return &fields{
@@ -131,7 +131,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
 					Name: Shell,
-					Args: []string{"-c", expectedCommand},
+					Args: []string{ShellSubcommandFlag, expectedCommand},
 				}).Return(assert.AnError)
 
 				return &fields{
@@ -154,7 +154,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
 					Name: Shell,
-					Args: []string{"-c", expectedCommand},
+					Args: []string{ShellSubcommandFlag, expectedCommand},
 				}).Return(nil)
 
 				return &fields{

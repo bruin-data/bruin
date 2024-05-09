@@ -14,7 +14,7 @@ import (
 func mustRead(t *testing.T, file string) string {
 	content, err := afero.ReadFile(afero.NewOsFs(), file)
 	require.NoError(t, err)
-	return strings.TrimSpace(string(content))
+	return strings.ReplaceAll(strings.TrimSpace(string(content)), "\r\n", "\n")
 }
 
 func Test_createTaskFromFile(t *testing.T) {

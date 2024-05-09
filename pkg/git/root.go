@@ -3,7 +3,7 @@ package git
 import (
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -36,7 +36,7 @@ func rootPath(inputPath string) (string, error) {
 	command := exec.Command("git", "rev-parse", "--show-toplevel")
 	command.Dir = inputPath
 	if !isDirectory(inputPath) {
-		command.Dir = path.Dir(inputPath)
+		command.Dir = filepath.Dir(inputPath)
 	}
 
 	res, err := command.Output()

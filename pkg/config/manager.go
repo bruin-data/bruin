@@ -6,7 +6,7 @@ import (
 	"fmt"
 	fs2 "io/fs"
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/bruin-data/bruin/pkg/git"
 	path2 "github.com/bruin-data/bruin/pkg/path"
@@ -311,5 +311,5 @@ func LoadOrCreate(fs afero.Fs, path string) (*Config, error) {
 }
 
 func ensureConfigIsInGitignore(fs afero.Fs, filePath string) error {
-	return git.EnsureGivenPatternIsInGitignore(fs, path.Dir(filePath), path.Base(filePath))
+	return git.EnsureGivenPatternIsInGitignore(fs, filepath.Dir(filePath), filepath.Base(filePath))
 }
