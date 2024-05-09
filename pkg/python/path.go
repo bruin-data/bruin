@@ -21,26 +21,17 @@ type ModulePathFinder struct {
 }
 
 func (m *ModulePathFinder) FindModulePath(repo *git.Repo, executable *pipeline.ExecutableFile) (string, error) {
-	separator := os.PathSeparator
-	if m.PathSeparatorOverride != 0 {
-		separator = m.PathSeparatorOverride
-	}
-
 	// Normalize paths by replacing OS-specific separators with a slash
-	normalizedRepoPath := strings.ReplaceAll(repo.Path, string(separator), "/")
-	normalizedExecutablePath := strings.ReplaceAll(executable.Path, string(separator), "/")
-	normalizedExecutablePath = filepath.Clean(normalizedExecutablePath)
-
-	if !strings.HasPrefix(normalizedExecutablePath, normalizedRepoPath) {
+	if !strings.HasPrefix(filepath.Clean(executable.Path), repo.Path) {
 		return "", errors.New("executable is not in the repository")
 	}
 
-	relativePath, err := filepath.Rel(normalizedRepoPath, normalizedExecutablePath)
+	relativePath, err := filepath.Rel(repo.Path, filepath.Clean(executable.Path))
 	if err != nil {
 		return "", err
 	}
 
-	moduleName := strings.ReplaceAll(relativePath, "/", ".")
+	moduleName := strings.ReplaceAll(relativePath, string(os.PathSeparator), ".")
 	moduleName = strings.TrimSuffix(moduleName, ".py")
 	return moduleName, nil
 }

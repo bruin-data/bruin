@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -258,31 +260,31 @@ func TestTask_RelativePathToPipelineRoot(t *testing.T) {
 			name: "simple relative path returned",
 			pipeline: &pipeline.Pipeline{
 				DefinitionFile: pipeline.DefinitionFile{
-					Path: "/users/user1/pipelines/pipeline1/pipeline.yml",
+					Path: filepath.Join(string(filepath.Separator), "users", "user1", "pipelines", "pipeline1", "pipeline.yml"),
 				},
 			},
 			task: &pipeline.Asset{
 				Name: "test-task",
 				DefinitionFile: pipeline.TaskDefinitionFile{
-					Path: "/users/user1/pipelines/pipeline1/tasks/task-folder/task1.sql",
+					Path: filepath.Join(string(filepath.Separator), "users", "user1", "pipelines", "pipeline1", "tasks", "task-folder", "task1.sql"),
 				},
 			},
-			want: "tasks/task-folder/task1.sql",
+			want: filepath.Join("tasks", "task-folder", "task1.sql"),
 		},
 		{
 			name: "relative path is calculated even if the tasks are on a parent folder",
 			pipeline: &pipeline.Pipeline{
 				DefinitionFile: pipeline.DefinitionFile{
-					Path: "/users/user1/pipelines/pipeline1/pipeline.yml",
+					Path: filepath.Join(string(filepath.Separator), "users", "user1", "pipelines", "pipeline1", "pipeline.yml"),
 				},
 			},
 			task: &pipeline.Asset{
 				Name: "test-task",
 				DefinitionFile: pipeline.TaskDefinitionFile{
-					Path: "/users/user1/pipelines/task-folder/task1.sql",
+					Path: filepath.Join(string(filepath.Separator), "users", "user1", "pipelines", "task-folder", "task1.sql"),
 				},
 			},
-			want: "../task-folder/task1.sql",
+			want: filepath.Join("..", "task-folder", "task1.sql"),
 		},
 	}
 	for _, tt := range tests {
@@ -297,24 +299,28 @@ func TestPipeline_JsonMarshal(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name         string
-		pipelinePath string
-		jsonPath     string
+		name            string
+		pipelinePath    string
+		unixJSONPath    string
+		windowsJSONPath string
 	}{
 		{
-			name:         "first-pipeline",
-			pipelinePath: "./testdata/pipeline/first-pipeline",
-			jsonPath:     "./testdata/pipeline/first-pipeline.json",
+			name:            "first-pipeline",
+			pipelinePath:    "./testdata/pipeline/first-pipeline",
+			unixJSONPath:    "./testdata/pipeline/first-pipeline_unix.json",
+			windowsJSONPath: "./testdata/pipeline/first-pipeline_windows.json",
 		},
 		{
-			name:         "second-pipeline",
-			pipelinePath: "./testdata/pipeline/second-pipeline",
-			jsonPath:     "./testdata/pipeline/second-pipeline.json",
+			name:            "second-pipeline",
+			pipelinePath:    "./testdata/pipeline/second-pipeline",
+			unixJSONPath:    "./testdata/pipeline/second-pipeline_unix.json",
+			windowsJSONPath: "./testdata/pipeline/second-pipeline_windows.json",
 		},
 		{
-			name:         "pipeline-with-no-assets",
-			pipelinePath: "./testdata/pipeline/pipeline-with-no-assets",
-			jsonPath:     "./testdata/pipeline/pipeline-with-no-assets.json",
+			name:            "pipeline-with-no-assets",
+			pipelinePath:    "./testdata/pipeline/pipeline-with-no-assets",
+			unixJSONPath:    "./testdata/pipeline/pipeline-with-no-assets_unix.json",
+			windowsJSONPath: "./testdata/pipeline/pipeline-with-no-assets_windows.json",
 		},
 	}
 	for _, tt := range tests {
@@ -331,11 +337,19 @@ func TestPipeline_JsonMarshal(t *testing.T) {
 				log.Fatal(err)
 			}
 
+			path := tt.unixJSONPath
+			if runtime.GOOS == "windows" {
+				path = tt.windowsJSONPath
+
+				// we do this because of JSON marshalling
+				dir = strings.ReplaceAll(dir, "\\", "\\\\")
+			}
+
 			// uncomment the line below and run the test once to refresh the data
 			// don't forget to comment it out again
-			// err = afero.WriteFile(afero.NewOsFs(), tt.jsonPath, bytes.ReplaceAll(got, []byte(dir), []byte("__BASEDIR__")), 0644)
+			// err = afero.WriteFile(afero.NewOsFs(), path, bytes.ReplaceAll(got, []byte(dir), []byte("__BASEDIR__")), 0644)
 
-			expected := strings.ReplaceAll(mustRead(t, tt.jsonPath), "__BASEDIR__", dir)
+			expected := strings.ReplaceAll(mustRead(t, path), "__BASEDIR__", dir)
 
 			assert.JSONEq(t, expected, string(got))
 		})

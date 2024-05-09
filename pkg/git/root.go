@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"runtime"
 	"strings"
 )
 
@@ -42,7 +43,13 @@ func rootPath(inputPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(string(res)), nil
+	cleanPath := strings.TrimSpace(string(res))
+
+	if runtime.GOOS == "windows" {
+		cleanPath = strings.Replace(cleanPath, "/", "\\", -1)
+	}
+
+	return cleanPath, nil
 }
 
 // isDirectory determines if a file represented by `path` is a directory or not.

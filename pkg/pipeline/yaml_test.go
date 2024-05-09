@@ -1,6 +1,7 @@
 package pipeline_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/path"
@@ -34,14 +35,14 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 		{
 			name: "fails for non-yaml files",
 			args: args{
-				filePath: "testdata/yaml/task1/hello.sql",
+				filePath: filepath.Join("testdata", "yaml", "task1", "hello.sql"),
 			},
 			wantErr: true,
 		},
 		{
 			name: "reads a valid simple file",
 			args: args{
-				filePath: "testdata/yaml/task1/task.yml",
+				filePath: filepath.Join("testdata", "yaml", "task1", "task.yml"),
 			},
 			want: &pipeline.Asset{
 				ID:          "afa27b44d43b02a9fea41d13cedc2e4016cfcf87c5dbf990e593669aa8ce286d",
@@ -50,8 +51,8 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Type:        "bq.sql",
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "hello.sql",
-					Path:    path.AbsPathForTests(t, "testdata/yaml/task1/hello.sql"),
-					Content: mustRead(t, "testdata/yaml/task1/hello.sql"),
+					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task1", "hello.sql")),
+					Content: mustRead(t, filepath.Join("testdata", "yaml", "task1", "hello.sql")),
 				},
 				Parameters: map[string]string{
 					"param1": "value1",
@@ -109,7 +110,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 		{
 			name: "nested runfile paths work correctly",
 			args: args{
-				filePath: "testdata/yaml/task-with-nested/task.yml",
+				filePath: filepath.Join("testdata", "yaml", "task-with-nested", "task.yml"),
 			},
 			want: &pipeline.Asset{
 				ID:          "afa27b44d43b02a9fea41d13cedc2e4016cfcf87c5dbf990e593669aa8ce286d",
@@ -118,8 +119,8 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Type:        "bash",
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "hello.sh",
-					Path:    path.AbsPathForTests(t, "testdata/yaml/task-with-nested/some/dir/hello.sh"),
-					Content: mustRead(t, "testdata/yaml/task-with-nested/some/dir/hello.sh"),
+					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-nested", "some", "dir", "hello.sh")),
+					Content: mustRead(t, filepath.Join("testdata", "yaml", "task-with-nested", "some", "dir", "hello.sh")),
 				},
 				Parameters: map[string]string{
 					"param1": "value1",
@@ -135,7 +136,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 		{
 			name: "top-level runfile paths are still joined correctly",
 			args: args{
-				filePath: "testdata/yaml/task-with-toplevel-runfile/task.yml",
+				filePath: filepath.Join("testdata", "yaml", "task-with-toplevel-runfile", "task.yml"),
 			},
 			want: &pipeline.Asset{
 				ID:          "afa27b44d43b02a9fea41d13cedc2e4016cfcf87c5dbf990e593669aa8ce286d",
@@ -144,8 +145,8 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Type:        "bash",
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "hello.sh",
-					Path:    path.AbsPathForTests(t, "testdata/yaml/task-with-toplevel-runfile/hello.sh"),
-					Content: mustRead(t, "testdata/yaml/task-with-toplevel-runfile/hello.sh"),
+					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-toplevel-runfile", "hello.sh")),
+					Content: mustRead(t, filepath.Join("testdata", "yaml", "task-with-toplevel-runfile", "hello.sh")),
 				},
 				Parameters: map[string]string{
 					"param1": "value1",
@@ -161,7 +162,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 		{
 			name: "the ones with missing runfile are ignored",
 			args: args{
-				filePath: "testdata/yaml/task-with-no-runfile/task.yml",
+				filePath: filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml"),
 			},
 			want: &pipeline.Asset{
 				ID:          "afa27b44d43b02a9fea41d13cedc2e4016cfcf87c5dbf990e593669aa8ce286d",
@@ -182,7 +183,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 		{
 			name: "depends must be an array of strings",
 			args: args{
-				filePath: "testdata/yaml/random-structure/task.yml",
+				filePath: filepath.Join("testdata", "yaml", "random-structure", "task.yml"),
 			},
 			wantErr: true,
 			err:     errors.New("`depends` field must be an array of strings"),
