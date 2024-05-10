@@ -610,11 +610,11 @@ type builder struct {
 }
 
 type ParseError struct {
-	msg string
+	Msg string
 }
 
 func (e *ParseError) Error() string {
-	return e.msg
+	return e.Msg
 }
 
 func NewBuilder(config BuilderConfig, yamlTaskCreator TaskCreator, commentTaskCreator TaskCreator, fs afero.Fs) *builder {
@@ -637,7 +637,7 @@ func (b *builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 	var pipeline Pipeline
 	err := path.ReadYaml(b.fs, pipelineFilePath, &pipeline)
 	if err != nil && errors.As(err, &yamlError) {
-		return nil, &ParseError{msg: fmt.Sprintf("error parsing pipeline file at '%s':%s", pipelineFilePath, err.Error())}
+		return nil, &ParseError{Msg: fmt.Sprintf("error parsing pipeline file at '%s':%s", pipelineFilePath, err.Error())}
 	}
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading pipeline file at '%s'", pipelineFilePath)

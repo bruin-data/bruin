@@ -158,7 +158,7 @@ func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
 		var definition taskDefinition
 		err = path.ReadYaml(fs, filePath, &definition)
 		if err != nil && errors.As(err, &yamlError) {
-			return nil, &ParseError{msg: err.Error()}
+			return nil, &ParseError{Msg: err.Error()}
 		}
 		if err != nil {
 			return nil, err
