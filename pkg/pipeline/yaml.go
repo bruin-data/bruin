@@ -154,8 +154,12 @@ func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
 			return nil, errors.Wrap(err, "failed to get absolute path for the definition file")
 		}
 
+		yamlError := new(path.YamlParseError)
 		var definition taskDefinition
 		err = path.ReadYaml(fs, filePath, &definition)
+		if err != nil && errors.As(err, &yamlError) {
+			return nil, &ParseError{msg: err.Error()}
+		}
 		if err != nil {
 			return nil, err
 		}

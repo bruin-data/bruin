@@ -11,6 +11,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type YamlParseError struct {
+	msg string
+}
+
+func (e *YamlParseError) Error() string {
+	return e.msg
+}
+
 func ReadYaml(fs afero.Fs, path string, out interface{}) error {
 	buf, err := afero.ReadFile(fs, path)
 	if err != nil {
@@ -37,7 +45,7 @@ func WriteYaml(fs afero.Fs, path string, content interface{}) error {
 func ConvertYamlToObject(buf []byte, out interface{}) error {
 	err := yaml.Unmarshal(buf, out)
 	if err != nil {
-		return err
+		return &YamlParseError{msg: err.Error()}
 	}
 
 	validate := validator.New()
