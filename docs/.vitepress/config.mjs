@@ -37,6 +37,7 @@ export default defineConfig({
                 text: "Assets",
                 items: [
                     {text: "Definition Schema", link: "/assets/definition-schema"},
+                    {text: "Google BigQuery", link: "/assets/bigquery"},
                 ],
             },
             {

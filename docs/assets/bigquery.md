@@ -3,10 +3,10 @@
 Coming soon...
 
 # BigQuery Sensors
-## bq.sensor.table
+## `bq.sensor.table`
 Checks if a table exists in BigQuery, runs every 5 minutes until this table is available.
 ### Parameters
-**table**: Full path to the table. Always needs full path to the table including project id, dataset and table id.
+**`table`**: `project-id.dataset_id.table_id` format, requires all of the identifiers as a full name.
 ### Template
 ```yaml
 name: string
@@ -23,10 +23,10 @@ parameters:
     table: "your-project-id.analytics_123456789.events_{{ end_date_nodash }}"
 ```
 
-## bq.sensor.query
-Checks if a table query returns any results in BigQuery, runs every 5 minutes until this table is available.
+## `bq.sensor.query`
+Checks if a query returns any results in BigQuery, runs every 5 minutes until this query returns any results.
 ### Parameters
-**table**: Full path to the table. Always needs full path to the table including project id, dataset and table id.
+**`query`**: Query you expect to return any results
 ### Template
 ```yaml
 name: string
@@ -50,5 +50,5 @@ Checks if there is any data after end timestamp, by assuming that older data is 
 name: analytics_123456789.events
 type: bq.sensor.query
 parameters:
-    query: select exists(select 1 from upstream_table where ts > "{{ end_timestamp }}"
+    query: select exists(select 1 from upstream_table where inserted_at > "{{ end_timestamp }}"
 ```
