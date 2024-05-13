@@ -80,6 +80,24 @@ func TestPositiveCheck_Check(t *testing.T) {
 	)
 }
 
+func TestNegativeCheck_Check(t *testing.T) {
+	t.Parallel()
+
+	runTestsFoCountZeroCheck(
+		t,
+		func(q *mockQuerierWithResult) CheckRunner {
+			conn := new(mockConnectionFetcher)
+			conn.On("GetConnection", "test").Return(q, nil)
+			return &NegativeCheck{conn: conn}
+		},
+		"SELECT count(*) FROM dataset.test_asset WHERE test_column >= 0",
+		"column 'test_column' has 5 non negative values",
+		&pipeline.ColumnCheck{
+			Name: "negative",
+		},
+	)
+}
+
 func TestUniqueCheck_Check(t *testing.T) {
 	t.Parallel()
 

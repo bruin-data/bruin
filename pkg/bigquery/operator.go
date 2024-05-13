@@ -91,6 +91,7 @@ func NewColumnCheckOperator(manager connectionFetcher) (*ColumnCheckOperator, er
 			"unique":          &UniqueCheck{conn: manager},
 			"positive":        &PositiveCheck{conn: manager},
 			"non_negative":    &NonNegativeCheck{conn: manager},
+			"negative":        &NegativeCheck{conn: manager},
 			"accepted_values": &AcceptedValuesCheck{conn: manager},
 		},
 	}, nil
