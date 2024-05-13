@@ -97,6 +97,27 @@ func (c *UniqueCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstan
 	}).Check(ctx, ti)
 }
 
+type RegexCheck struct {
+	conn connectionFetcher
+}
+
+func (c *RegexCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
+	qq := fmt.Sprintf(
+		"SELECT count(*) FROM %s WHERE REGEXP_CONTAINS(%s, r'%s') = false",
+		ti.GetAsset().Name,
+		ti.Column.Name,
+		ti.Check.Value,
+	)
+	return (&countableQueryCheck{
+		conn:          c.conn,
+		queryInstance: &query.Query{Query: qq},
+		checkName:     "regex",
+		customError: func(count int64) error {
+			return errors.Errorf("column %s has %d values that don't satisfy the regular expression %s", ti.Column.Name, count)
+		},
+	}).Check(ctx, ti)
+}
+
 type AcceptedValuesCheck struct {
 	conn connectionFetcher
 }
