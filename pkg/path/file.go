@@ -52,7 +52,7 @@ func ConvertYamlToObject(buf []byte, out interface{}) error {
 
 	err = validate.Struct(out)
 	if err != nil {
-		return err
+		return &YamlParseError{msg: err.Error()}
 	}
 
 	return nil

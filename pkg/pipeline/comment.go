@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"path/filepath"
 	"strconv"
@@ -64,12 +65,12 @@ func isEmbeddedYamlComment(file afero.File, prefixes []string) bool {
 func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 	rows, commentRowEnd := readUntilComments(file, possiblePrefixesForCommentBlocks, possibleSuffixesForCommentBlocks)
 	if rows == "" {
-		return nil, errors.New("no embedded YAML found in the comments")
+		return nil, &ParseError{"no embedded YAML found in the comments"}
 	}
 
 	task, err := ConvertYamlToTask([]byte(rows))
 	if err != nil {
-		return nil, err
+		return nil, &ParseError{err.Error()}
 	}
 
 	absFilePath, err := filepath.Abs(filePath)
@@ -157,7 +158,7 @@ func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath st
 
 	task, err := commentRowsToTask(commentRows)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse comment formatted task in file %s", filePath)
+		return nil, &ParseError{fmt.Sprintf("failed to parse comment formatted task in file %s", filePath)}
 	}
 
 	task.ExecutableFile = ExecutableFile{

@@ -26,7 +26,7 @@ func mustBeStringArray(fieldName string, value *yaml.Node) ([]string, error) {
 	var multi []string
 	err := value.Decode(&multi)
 	if err != nil {
-		return nil, errors.New("`" + fieldName + "` field must be an array of strings")
+		return nil, &ParseError{Msg: "`" + fieldName + "` field must be an array of strings"}
 	}
 	return multi, nil
 }
@@ -83,7 +83,7 @@ func (a *columnCheckValue) UnmarshalYAML(value *yaml.Node) error {
 		var multi []string
 		err = value.Decode(&multi)
 		if err != nil {
-			return err
+			return &ParseError{Msg: err.Error()}
 		}
 
 		*a = columnCheckValue{StringArray: &multi}
@@ -96,7 +96,7 @@ func (a *columnCheckValue) UnmarshalYAML(value *yaml.Node) error {
 	case bool:
 		*a = columnCheckValue{Bool: &v}
 	default:
-		return fmt.Errorf("unexpected type %T", v)
+		return &ParseError{Msg: fmt.Sprintf("unexpected type %T", v)}
 	}
 
 	return nil
