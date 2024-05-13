@@ -113,7 +113,7 @@ func (c *RegexCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstanc
 		queryInstance: &query.Query{Query: qq},
 		checkName:     "regex",
 		customError: func(count int64) error {
-			return errors.Errorf("column %s has %d values that don't satisfy the regular expression %s", ti.Column.Name, count)
+			return errors.Errorf("column %s has %d values that don't satisfy the regular expression %s", ti.Column.Name, count, ti.Check.Value)
 		},
 	}).Check(ctx, ti)
 }
