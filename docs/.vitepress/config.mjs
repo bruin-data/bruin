@@ -36,8 +36,12 @@ export default defineConfig({
             {
                 text: "Assets",
                 items: [
-                    {text: "Definition Schema", link: "/assets/definition-schema"},
-                    {text: "Google BigQuery", link: "/assets/bigquery"},
+                    {text: "Definition Schema", link: "/assets/definition-schema", items:[
+                        {text: "Google BigQuery", link: "/assets/bigquery"},
+                        {text: "Snowflake", link: "/assets/snowflake"},
+                        {text: "Python", link: "/assets/python"},
+                        {text: "Ingestr", link: "/assets/ingestr"},
+                    ]},
                 ],
             },
             {
