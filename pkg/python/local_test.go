@@ -129,7 +129,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 					Return(venvPath, nil)
 
 				expectedCommand := fmt.Sprintf("/path/to/venv/%s/activate && echo 'activated virtualenv' && /path/to/venv/%s/%s -u -m path.to.module", VirtualEnvBinaryFolder, VirtualEnvBinaryFolder, DefaultPythonExecutable)
-				if runtime.GOOS != "windows" {
+				if runtime.GOOS != WINDOWS {
 					expectedCommand = ". " + expectedCommand
 				}
 
@@ -155,7 +155,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 					Return(venvPath, nil)
 
 				expectedCommand := fmt.Sprintf("/path/to/venv/%s/activate && echo 'activated virtualenv' && /path/to/venv/%s/%s -u -m path.to.module", VirtualEnvBinaryFolder, VirtualEnvBinaryFolder, DefaultPythonExecutable)
-				if runtime.GOOS != "windows" {
+				if runtime.GOOS != WINDOWS {
 					expectedCommand = ". " + expectedCommand
 				}
 

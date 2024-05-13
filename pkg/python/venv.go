@@ -73,7 +73,7 @@ func (i *installReqsToHomeDir) EnsureVirtualEnvExists(ctx context.Context, repo 
 
 	pipVenvPath := fmt.Sprintf("%s/%s/pip3", venvPath, VirtualEnvBinaryFolder)
 	fullCommand := fmt.Sprintf("%s/%s/activate && %s install -r %s --quiet --quiet && echo 'installed all the dependencies'", venvPath, VirtualEnvBinaryFolder, pipVenvPath, requirementsTxt)
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS != WINDOWS {
 		fullCommand = ". " + fullCommand
 	}
 

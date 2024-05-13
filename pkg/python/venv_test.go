@@ -176,7 +176,7 @@ func Test_installReqsToHomeDir_EnsureVirtualEnvExists(t *testing.T) {
 				}).Return(nil)
 
 				expectedCommand := fmt.Sprintf("/path/to/venv/%s/activate && /path/to/venv/%s/pip3 install -r /path1/requirements.txt --quiet --quiet && echo 'installed all the dependencies'", VirtualEnvBinaryFolder, VirtualEnvBinaryFolder)
-				if runtime.GOOS != "windows" {
+				if runtime.GOOS != WINDOWS {
 					expectedCommand = ". " + expectedCommand
 				}
 

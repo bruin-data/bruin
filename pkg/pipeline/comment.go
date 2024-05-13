@@ -2,7 +2,6 @@ package pipeline
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"path/filepath"
 	"strconv"
@@ -158,7 +157,7 @@ func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath st
 
 	task, err := commentRowsToTask(commentRows)
 	if err != nil {
-		return nil, &ParseError{fmt.Sprintf("failed to parse comment formatted task in file %s", filePath)}
+		return nil, &ParseError{"failed to parse comment formatted task in file " + filePath}
 	}
 
 	task.ExecutableFile = ExecutableFile{

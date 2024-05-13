@@ -16,6 +16,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const WINDOWS = "windows"
+
 type cmd interface {
 	Run(ctx context.Context, repo *git.Repo, command *command) error
 }
@@ -69,7 +71,7 @@ func (l *localPythonRunner) Run(ctx context.Context, execCtx *executionContext) 
 	// if there's a virtualenv, use the Python there explicitly, otherwise aliases change the runtime used
 	pythonCommandForScript = fmt.Sprintf("%s/%s/%s -u -m %s", depsPath, VirtualEnvBinaryFolder, DefaultPythonExecutable, execCtx.module)
 	fullCommand := fmt.Sprintf("%s/%s/activate && echo 'activated virtualenv' && %s", depsPath, VirtualEnvBinaryFolder, pythonCommandForScript)
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS != WINDOWS {
 		fullCommand = ". " + fullCommand
 	}
 
