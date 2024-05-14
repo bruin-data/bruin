@@ -52,13 +52,13 @@ func (c *AcceptedValuesCheck) Check(ctx context.Context, ti *scheduler.ColumnChe
 	}).Check(ctx, ti)
 }
 
-type RegexCheck struct {
+type PatternCheck struct {
 	conn connectionFetcher
 }
 
-func (c *RegexCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
+func (c *PatternCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
 	if ti.Check.Value.String == nil {
-		return errors.Errorf("unexpected value %s for regex check, the value must be a string", ti.Check.Value.ToString())
+		return errors.Errorf("unexpected value %s for pattern check, the value must be a string", ti.Check.Value.ToString())
 	}
 	qq := fmt.Sprintf(
 		"SELECT count(*) FROM %s WHERE %s !~ '%s'",
@@ -67,7 +67,7 @@ func (c *RegexCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstanc
 		*ti.Check.Value.String,
 	)
 
-	return ansisql.NewCountableQueryCheck(c.conn, 0, &query.Query{Query: qq}, "regex", func(count int64) error {
-		return errors.Errorf("column %s has %d values that don't satisfy the regular expression %s", ti.Column.Name, count, *ti.Check.Value.String)
+	return ansisql.NewCountableQueryCheck(c.conn, 0, &query.Query{Query: qq}, "pattern", func(count int64) error {
+		return errors.Errorf("column %s has %d values that don't satisfy the pattern %s", ti.Column.Name, count, *ti.Check.Value.String)
 	}).Check(ctx, ti)
 }

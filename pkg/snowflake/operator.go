@@ -91,7 +91,7 @@ func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOpera
 		"non_negative":    ansisql.NewNonNegativeCheck(manager),
 		"negative":        ansisql.NewNegativeCheck(manager),
 		"accepted_values": &AcceptedValuesCheck{conn: manager},
-		"regex":           &RegexCheck{conn: manager},
+		"pattern":         &PatternCheck{conn: manager},
 	})
 }
 
