@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/path"
@@ -132,7 +133,7 @@ type ColumnCheckValue struct {
 	Int         *int      `json:"int"`
 	Float       *float64  `json:"float"`
 	StringArray *[]string `json:"string_array"`
-	String      *string   `json:"string"`
+	StringVal   *string   `json:"string"`
 	Bool        *bool     `json:"bool"`
 }
 
@@ -149,8 +150,8 @@ func (ccv *ColumnCheckValue) MarshalJSON() ([]byte, error) {
 	if ccv.StringArray != nil {
 		return json.Marshal(ccv.StringArray)
 	}
-	if ccv.String != nil {
-		return json.Marshal(ccv.String)
+	if ccv.StringVal != nil {
+		return json.Marshal(ccv.StringVal)
 	}
 	if ccv.Bool != nil {
 		return json.Marshal(ccv.Bool)
@@ -195,7 +196,7 @@ func (ccv *ColumnCheckValue) UnmarshalJSON(data []byte) error {
 
 		ccv.Float = &v
 	case string:
-		ccv.String = &v
+		ccv.StringVal = &v
 	case bool:
 		ccv.Bool = &v
 	default:
@@ -203,6 +204,33 @@ func (ccv *ColumnCheckValue) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
+}
+
+func (ccv *ColumnCheckValue) String() string {
+	if ccv.IntArray != nil {
+		var ints []string
+		for _, i := range *ccv.IntArray {
+			ints = append(ints, strconv.Itoa(i))
+		}
+		return fmt.Sprintf("[%s]", strings.Join(ints, ", "))
+	}
+	if ccv.Int != nil {
+		return strconv.Itoa(*ccv.Int)
+	}
+	if ccv.Float != nil {
+		return fmt.Sprintf("%f", *ccv.Float)
+	}
+	if ccv.StringArray != nil {
+		return strings.Join(*ccv.StringArray, ", ")
+	}
+	if ccv.StringVal != nil {
+		return *ccv.StringVal
+	}
+	if ccv.Bool != nil {
+		return fmt.Sprintf("%t", *ccv.Bool)
+	}
+
+	return ""
 }
 
 type ColumnCheck struct {
