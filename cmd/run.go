@@ -423,6 +423,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		synapseOperator := synapse.NewBasicOperator(conn, wholeFileExtractor, synapse.NewMaterializer(fullRefresh))
 
 		msCheckRunner := mssql.NewColumnCheckOperator(conn)
+		synapseCheckRunner := synapse.NewColumnCheckOperator(conn)
 
 		msCustomCheckRunner := ansisql.NewCustomCheckOperator(conn)
 
@@ -431,7 +432,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		mainExecutors[pipeline.AssetTypeMsSQLQuery][scheduler.TaskInstanceTypeCustomCheck] = msCustomCheckRunner
 
 		mainExecutors[pipeline.AssetTypeSynapseQuery][scheduler.TaskInstanceTypeMain] = synapseOperator
-		mainExecutors[pipeline.AssetTypeSynapseQuery][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
+		mainExecutors[pipeline.AssetTypeSynapseQuery][scheduler.TaskInstanceTypeColumnCheck] = synapseCheckRunner
 		mainExecutors[pipeline.AssetTypeSynapseQuery][scheduler.TaskInstanceTypeCustomCheck] = msCustomCheckRunner
 
 		// we set the Python runners to run the checks on MsSQL

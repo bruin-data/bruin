@@ -21,6 +21,7 @@ var ValidQualityChecks = map[string]bool{
 	"accepted_values": true,
 	"negative":        true,
 	"non_negative":    true,
+	"pattern":         true,
 }
 
 func mustBeStringArray(fieldName string, value *yaml.Node) ([]string, error) {
