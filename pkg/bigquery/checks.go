@@ -106,7 +106,7 @@ func (c *PatternCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInsta
 		return errors.Errorf("unexpected value %s for pattern check, the value must be a string", ti.Check.Value.ToString())
 	}
 	qq := fmt.Sprintf(
-		"SELECT count(*) FROM %s WHERE REGEXP_CONTAINS(%s, r'%s') = false",
+		"SELECT count(*) FROM %s WHERE REGEXP_CONTAINS(%s, r'%s')",
 		ti.GetAsset().Name,
 		ti.Column.Name,
 		*ti.Check.Value.String,

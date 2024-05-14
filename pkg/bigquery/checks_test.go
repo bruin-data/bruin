@@ -336,3 +336,26 @@ func TestCustomCheck(t *testing.T) {
 		})
 	}
 }
+
+func TestPatternCheck_Check(t *testing.T) {
+	t.Parallel()
+
+	var pattern = "(a|b)"
+
+	runTestsFoCountZeroCheck(
+		t,
+		func(q *mockQuerierWithResult) checkRunner {
+			conn := new(mockConnectionFetcher)
+			conn.On("GetBqConnection", "test").Return(q, nil)
+			return &PatternCheck{conn: conn}
+		},
+		"SELECT count(*) FROM dataset.test_asset WHERE REGEXP_CONTAINS(test_column, r'(a|b)')",
+		"column test_column has 5 values that don't satisfy the pattern (a|b)",
+		&pipeline.ColumnCheck{
+			Name: "pattern",
+			Value: pipeline.ColumnCheckValue{
+				String: &pattern,
+			},
+		},
+	)
+}

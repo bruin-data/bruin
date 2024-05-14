@@ -65,6 +65,6 @@ func (c *PatternCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInsta
 	)
 
 	return ansisql.NewCountableQueryCheck(c.conn, 0, &query.Query{Query: qq}, "pattern", func(count int64) error {
-		return errors.Errorf("column %s has %d values that don't satisfy the patttern %s", ti.Column.Name, count, *ti.Check.Value.String)
+		return errors.Errorf("column %s has %d values that don't satisfy the pattern %s", ti.Column.Name, count, *ti.Check.Value.String)
 	}).Check(ctx, ti)
 }
