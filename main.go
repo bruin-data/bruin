@@ -52,6 +52,7 @@ func main() {
 			cmd.Lineage(),
 			cmd.CleanCmd(),
 			cmd.Init(),
+			cmd.Internal(),
 		},
 	}
 

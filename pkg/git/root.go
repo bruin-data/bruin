@@ -13,7 +13,7 @@ type RepoFinder struct{}
 
 // Repo represents the path of a given git repository.
 type Repo struct {
-	Path string
+	Path string `json:"path"`
 }
 
 // Repo uses git by spawning a process to locate the top level directory.
