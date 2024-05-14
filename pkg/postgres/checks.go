@@ -51,3 +51,20 @@ func (c *AcceptedValuesCheck) Check(ctx context.Context, ti *scheduler.ColumnChe
 		return errors.Errorf("column '%s' has %d rows that are not in the accepted values", ti.Column.Name, count)
 	}).Check(ctx, ti)
 }
+
+type RegexCheck struct {
+	conn connectionFetcher
+}
+
+func (c *RegexCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
+	qq := fmt.Sprintf(
+		"SELECT count(*) FROM %s WHERE %s !~ '%s'",
+		ti.GetAsset().Name,
+		ti.Column.Name,
+		ti.Check.Value,
+	)
+
+	return ansisql.NewCountableQueryCheck(c.conn, 0, &query.Query{Query: qq}, "regex", func(count int64) error {
+		return errors.Errorf("column %s has %d values that don't satisfy the regular expression %s", ti.Column.Name, count, ti.Check.Value)
+	}).Check(ctx, ti)
+}
