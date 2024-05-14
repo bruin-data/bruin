@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/path"
@@ -203,6 +204,33 @@ func (ccv *ColumnCheckValue) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
+}
+
+func (ccv *ColumnCheckValue) ToString() string {
+	if ccv.IntArray != nil {
+		var ints []string
+		for _, i := range *ccv.IntArray {
+			ints = append(ints, strconv.Itoa(i))
+		}
+		return fmt.Sprintf("[%s]", strings.Join(ints, ", "))
+	}
+	if ccv.Int != nil {
+		return strconv.Itoa(*ccv.Int)
+	}
+	if ccv.Float != nil {
+		return fmt.Sprintf("%f", *ccv.Float)
+	}
+	if ccv.StringArray != nil {
+		return strings.Join(*ccv.StringArray, ", ")
+	}
+	if ccv.String != nil {
+		return *ccv.String
+	}
+	if ccv.Bool != nil {
+		return fmt.Sprintf("%t", *ccv.Bool)
+	}
+
+	return ""
 }
 
 type ColumnCheck struct {

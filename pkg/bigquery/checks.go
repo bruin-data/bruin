@@ -97,6 +97,30 @@ func (c *UniqueCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstan
 	}).Check(ctx, ti)
 }
 
+type PatternCheck struct {
+	conn connectionFetcher
+}
+
+func (c *PatternCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
+	if ti.Check.Value.String == nil {
+		return errors.Errorf("unexpected value %s for pattern check, the value must be a string", ti.Check.Value.ToString())
+	}
+	qq := fmt.Sprintf(
+		"SELECT count(*) FROM %s WHERE REGEXP_CONTAINS(%s, r'%s')",
+		ti.GetAsset().Name,
+		ti.Column.Name,
+		*ti.Check.Value.String,
+	)
+	return (&countableQueryCheck{
+		conn:          c.conn,
+		queryInstance: &query.Query{Query: qq},
+		checkName:     "pattern",
+		customError: func(count int64) error {
+			return errors.Errorf("column %s has %d values that don't satisfy the pattern %s", ti.Column.Name, count, *ti.Check.Value.String)
+		},
+	}).Check(ctx, ti)
+}
+
 type AcceptedValuesCheck struct {
 	conn connectionFetcher
 }

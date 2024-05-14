@@ -275,3 +275,26 @@ func TestCustomCheck(t *testing.T) {
 		})
 	}
 }
+
+func TestPatternCheck_Check(t *testing.T) {
+	t.Parallel()
+
+	var pattern = "(a|b)"
+
+	runTestsForCountZeroCheck(
+		t,
+		func(q *mockQuerierWithResult) ansisql.CheckRunner {
+			conn := new(mockConnectionFetcher)
+			conn.On("GetConnection", "test").Return(q, nil)
+			return &PatternCheck{conn: conn}
+		},
+		"SELECT count(*) FROM dataset.test_asset WHERE test_column NOT LIKE '(a|b)'",
+		"column test_column has 5 values that don't satisfy the pattern (a|b)",
+		&pipeline.ColumnCheck{
+			Name: "pattern",
+			Value: pipeline.ColumnCheckValue{
+				String: &pattern,
+			},
+		},
+	)
+}

@@ -93,6 +93,7 @@ func NewColumnCheckOperator(manager connectionFetcher) (*ColumnCheckOperator, er
 			"non_negative":    &NonNegativeCheck{conn: manager},
 			"negative":        &NegativeCheck{conn: manager},
 			"accepted_values": &AcceptedValuesCheck{conn: manager},
+			"pattern":         &PatternCheck{conn: manager},
 		},
 	}, nil
 }
