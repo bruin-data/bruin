@@ -16,7 +16,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const WINDOWS = "windows"
+const (
+	Windows    = "windows"
+	ExtraBytes = 4
+)
 
 type cmd interface {
 	Run(ctx context.Context, repo *git.Repo, command *command) error
@@ -71,7 +74,8 @@ func (l *localPythonRunner) Run(ctx context.Context, execCtx *executionContext) 
 	// if there's a virtualenv, use the Python there explicitly, otherwise aliases change the runtime used
 	pythonCommandForScript = fmt.Sprintf("%s/%s/%s -u -m %s", depsPath, VirtualEnvBinaryFolder, DefaultPythonExecutable, execCtx.module)
 	fullCommand := fmt.Sprintf("%s/%s/activate && echo 'activated virtualenv' && %s", depsPath, VirtualEnvBinaryFolder, pythonCommandForScript)
-	if runtime.GOOS != WINDOWS {
+
+	if runtime.GOOS != Windows {
 		fullCommand = ". " + fullCommand
 	}
 
@@ -139,7 +143,7 @@ func consumePipe(pipe io.Reader, output io.Writer) error {
 	scanner := bufio.NewScanner(pipe)
 	for scanner.Scan() {
 		// the size of the slice here is important, the added 4 at the end includes the 3 bytes for the prefix and the 1 byte for the newline
-		msg := make([]byte, len(scanner.Bytes())+4)
+		msg := make([]byte, len(scanner.Bytes())+ExtraBytes)
 		copy(msg, ">> ")
 		copy(msg[3:], scanner.Bytes())
 		msg[len(msg)-1] = '\n'

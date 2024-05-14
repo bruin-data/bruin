@@ -41,6 +41,7 @@ const (
 	materializationPartitionByNotSupportedForViews    = "Materialization partition by is not supported for views because views cannot be partitioned"
 	materializationIncrementalKeyNotSupportedForViews = "Materialization incremental key is not supported for views because views cannot be updated incrementally"
 	materializationClusterByNotSupportedForViews      = "Materialization cluster by is not supported for views because views cannot be clustered"
+	TableNamespaceSizeBigQuery                        = 3
 )
 
 var validIDRegexCompiled = regexp.MustCompile(validIDRegex)
@@ -560,7 +561,7 @@ func EnsureBigQueryTableSensorHasTableParameterForASingleAsset(ctx context.Conte
 	}
 	tableItems := strings.Split(table, ".")
 
-	if len(tableItems) != 3 {
+	if len(tableItems) != TableNamespaceSizeBigQuery {
 		issues = append(issues, &Issue{
 			Task:        asset,
 			Description: "BigQuery table sensor `table` parameter must be in the format `project.dataset.table`",

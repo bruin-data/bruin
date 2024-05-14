@@ -62,6 +62,7 @@ const (
 	TaskInstanceTypeColumnCheck
 	TaskInstanceTypeCustomCheck
 	TaskInstanceTypeMetadataPush
+	QueueSize = 100
 )
 
 type TaskInstance interface {
@@ -375,7 +376,7 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, pushMetadata 
 		pipeline:         p,
 		taskInstances:    instances,
 		taskScheduleLock: sync.Mutex{},
-		WorkQueue:        make(chan TaskInstance, 100),
+		WorkQueue:        make(chan TaskInstance, QueueSize),
 		Results:          make(chan *TaskExecutionResult),
 	}
 	s.initialize()

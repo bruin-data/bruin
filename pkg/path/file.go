@@ -11,6 +11,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	FilePermissions = 0o644
+)
+
 type YamlParseError struct {
 	msg string
 }
@@ -34,7 +38,7 @@ func WriteYaml(fs afero.Fs, path string, content interface{}) error {
 		return errors.Wrapf(err, "failed to marshal object to yaml")
 	}
 
-	err = afero.WriteFile(fs, path, buf, 0o644)
+	err = afero.WriteFile(fs, path, buf, FilePermissions)
 	if err != nil {
 		return errors.Wrapf(err, "failed to write YAML file to %s", path)
 	}

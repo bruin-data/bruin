@@ -13,9 +13,11 @@ type Query struct {
 	Query               string
 }
 
+const TruncatedQueryLength = 10
+
 func (q Query) ToExplainQuery() string {
 	// take only the first 10 characters since the actual queries may be pretty large
-	lowerQuery := strings.ToLower(q.Query[:min(10, len(q.Query))])
+	lowerQuery := strings.ToLower(q.Query[:min(TruncatedQueryLength, len(q.Query))])
 	if strings.HasPrefix(lowerQuery, "explain ") {
 		return ensureSemicolon(q.Query)
 	}

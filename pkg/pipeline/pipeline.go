@@ -227,7 +227,7 @@ func (ccv *ColumnCheckValue) ToString() string {
 		return *ccv.String
 	}
 	if ccv.Bool != nil {
-		return fmt.Sprintf("%t", *ccv.Bool)
+		return strconv.FormatBool(*ccv.Bool)
 	}
 
 	return ""

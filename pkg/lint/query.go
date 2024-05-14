@@ -11,6 +11,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const ValidatorBufferSize = 256
+
 type queryValidator interface {
 	IsValid(ctx context.Context, query *query.Query) (bool, error)
 }
@@ -260,7 +262,7 @@ func (q *QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.A
 }
 
 func (q *QueryValidatorRule) bufferSize() int {
-	return 256
+	return ValidatorBufferSize
 }
 
 func (q *QueryValidatorRule) Validate(p *pipeline.Pipeline) ([]*Issue, error) {

@@ -38,7 +38,11 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-const LogsFolder = "logs"
+const (
+	LogsFolder     = "logs"
+	SecondsToSleep = 30
+	WorkerCountRun = 16
+)
 
 var (
 	yesterday        = time.Now().AddDate(0, 0, -1)
@@ -72,7 +76,7 @@ func Run(isDebug *bool) *cli.Command {
 			&cli.IntFlag{
 				Name:  "workers",
 				Usage: "number of workers to run the tasks in parallel",
-				Value: 16,
+				Value: WorkerCountRun,
 			},
 			startDateFlag,
 			endDateFlag,
@@ -401,7 +405,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 		sfCheckRunner := snowflake.NewColumnCheckOperator(conn)
 		sfCustomCheckRunner := ansisql.NewCustomCheckOperator(conn)
 
-		sfQuerySensor := snowflake.NewQuerySensor(conn, renderer, 30)
+		sfQuerySensor := snowflake.NewQuerySensor(conn, renderer, SecondsToSleep)
 
 		mainExecutors[pipeline.AssetTypeSnowflakeQuery][scheduler.TaskInstanceTypeMain] = sfOperator
 		mainExecutors[pipeline.AssetTypeSnowflakeQuery][scheduler.TaskInstanceTypeColumnCheck] = sfCheckRunner
@@ -492,13 +496,13 @@ func (c *clearFileWriter) Write(p []byte) (int, error) {
 }
 
 func logOutput(logPath string) (func(), error) {
-	err := os.MkdirAll(filepath.Dir(logPath), 0o755)
+	err := os.MkdirAll(filepath.Dir(logPath), FolderPermissions)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create log directory")
 	}
 
 	// open file read/write | create if not exist | clear file at open if exists
-	f, err := os.OpenFile(logPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
+	f, err := os.OpenFile(logPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, path.FilePermissions)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open log file")
 	}

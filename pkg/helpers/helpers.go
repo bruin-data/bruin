@@ -9,6 +9,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	PrefixSize = 8
+)
+
 func GetIngestrDestinationType(asset *pipeline.Asset) (pipeline.AssetType, error) {
 	ingestrDestination, ok := asset.Parameters["destination"]
 	if !ok {
@@ -25,7 +29,7 @@ func GetIngestrDestinationType(asset *pipeline.Asset) (pipeline.AssetType, error
 
 func PrefixGenerator() string {
 	letters := []rune("abcdefghijklmnopqrstuvwxyz")
-	b := make([]rune, 8)
+	b := make([]rune, PrefixSize)
 	for i := range b {
 		b[i] = letters[rand.Intn(len(letters))] //nolint:all
 	}

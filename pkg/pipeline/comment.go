@@ -11,7 +11,11 @@ import (
 	"github.com/spf13/afero"
 )
 
-const configMarker = "@bruin."
+const (
+	configMarker    = "@bruin."
+	ParameterLength = 2
+	ColumnsLength   = 3
+)
 
 var commentMarkers = map[string]string{
 	".sql": "--",
@@ -242,7 +246,7 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 
 		if strings.HasPrefix(key, "parameters.") {
 			parameters := strings.Split(key, ".")
-			if len(parameters) != 2 {
+			if len(parameters) != ParameterLength {
 				continue
 			}
 
@@ -253,7 +257,7 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 		if strings.HasPrefix(key, "columns.") {
 			// columns.colname.checks: not_null
 			columns := strings.Split(key, ".")
-			if len(columns) != 3 {
+			if len(columns) != ColumnsLength {
 				continue
 			}
 
@@ -266,7 +270,7 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 
 		if strings.HasPrefix(key, "materialization.") {
 			materializationKeys := strings.Split(key, ".")
-			if len(materializationKeys) != 2 {
+			if len(materializationKeys) != ParameterLength {
 				continue
 			}
 

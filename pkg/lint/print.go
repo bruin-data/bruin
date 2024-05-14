@@ -20,6 +20,8 @@ type taskSummary struct {
 	issues []*Issue
 }
 
+const Padding = 11
+
 var (
 	faint           = color.New(color.Faint).SprintFunc()
 	successPrinter  = color.New(color.FgGreen)
@@ -150,7 +152,7 @@ func printIssueContext(context []string, lastIssue bool) {
 			connector = "└─"
 		}
 
-		contextPrinter.Printf("    %s   %s %s\n", beginning, connector, padLinesIfMultiline(row, 11))
+		contextPrinter.Printf("    %s   %s %s\n", beginning, connector, padLinesIfMultiline(row, Padding))
 	}
 }
 

@@ -20,6 +20,10 @@ var scopes = []string{
 	"https://www.googleapis.com/auth/drive",
 }
 
+const (
+	TableFormatLenght = 2
+)
+
 type Querier interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 }
@@ -159,7 +163,7 @@ func (d *Client) UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipel
 	}
 
 	tableComponents := strings.Split(asset.Name, ".")
-	if len(tableComponents) != 2 {
+	if len(tableComponents) != TableFormatLenght {
 		return fmt.Errorf("asset name must be in schema.table format to update the metadata, '%s' given", asset.Name)
 	}
 

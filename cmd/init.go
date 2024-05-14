@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	path3 "github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/templates"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
@@ -18,6 +19,7 @@ import (
 const (
 	DefaultTemplate   = "default"
 	DefaultFolderName = "bruin-pipeline"
+	FolderPermissions = 0o755
 )
 
 func Init() *cli.Command {
@@ -81,7 +83,7 @@ func Init() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			err := os.Mkdir(inputPath, 0o755)
+			err := os.Mkdir(inputPath, FolderPermissions)
 			if err != nil {
 				errorPrinter.Printf("Failed to create the folder %s: %v\n", inputPath, err)
 				return cli.Exit("", 1)
@@ -118,7 +120,7 @@ func Init() *cli.Command {
 					return err
 				}
 
-				err = os.WriteFile(filepath.Join(absolutePath, baseName), fileContents, 0o644) //nolint:gosec
+				err = os.WriteFile(filepath.Join(absolutePath, baseName), fileContents, path3.FilePermissions)
 				if err != nil {
 					errorPrinter.Printf("Could not write the %s file: %v\n", filepath.Join(absolutePath, baseName), err)
 					return err

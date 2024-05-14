@@ -21,6 +21,8 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+const WorkerCount = 32
+
 func Lint(isDebug *bool) *cli.Command {
 	return &cli.Command{
 		Name:      "validate",
@@ -121,7 +123,7 @@ func Lint(isDebug *bool) *cli.Command {
 						Fs:       fs,
 						Renderer: renderer,
 					},
-					WorkerCount: 32,
+					WorkerCount: WorkerCount,
 					Logger:      logger,
 				})
 			} else {
@@ -137,7 +139,7 @@ func Lint(isDebug *bool) *cli.Command {
 						Fs:       fs,
 						Renderer: renderer,
 					},
-					WorkerCount: 32,
+					WorkerCount: WorkerCount,
 					Logger:      logger,
 				})
 			} else {
@@ -228,7 +230,7 @@ func unwrapAllErrors(err error) []string {
 
 	errorItems := flattenErrors(err)
 	count := len(errorItems)
-	if count < 2 {
+	if count <= 1 {
 		return errorItems
 	}
 
