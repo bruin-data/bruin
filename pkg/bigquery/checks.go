@@ -102,18 +102,21 @@ type RegexCheck struct {
 }
 
 func (c *RegexCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
+	if ti.Check.Value.String == nil {
+		return errors.Errorf("unexpected value %s for regex check, the value must be a string", ti.Check.Value.ToString())
+	}
 	qq := fmt.Sprintf(
 		"SELECT count(*) FROM %s WHERE REGEXP_CONTAINS(%s, r'%s') = false",
 		ti.GetAsset().Name,
 		ti.Column.Name,
-		ti.Check.Value,
+		*ti.Check.Value.String,
 	)
 	return (&countableQueryCheck{
 		conn:          c.conn,
 		queryInstance: &query.Query{Query: qq},
 		checkName:     "regex",
 		customError: func(count int64) error {
-			return errors.Errorf("column %s has %d values that don't satisfy the regular expression %s", ti.Column.Name, count, ti.Check.Value)
+			return errors.Errorf("column %s has %d values that don't satisfy the regular expression %s", ti.Column.Name, count, *ti.Check.Value.String)
 		},
 	}).Check(ctx, ti)
 }
