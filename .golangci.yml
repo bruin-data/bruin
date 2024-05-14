@@ -23,6 +23,8 @@ linters:
   disable:
     - scopelint
     - goerr113
+    - err113
+    - mnd
     - wrapcheck
     - funlen
     - maligned
