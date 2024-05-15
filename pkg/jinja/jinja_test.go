@@ -38,12 +38,12 @@ func TestJinjaRenderer_RenderQuery(t *testing.T) {
 		},
 		{
 			name:  "multiple variables",
-			query: "set analysis_end_date = '{{ ds }}'::date and '{{testVar}}' == 'testvar' and another date {{    ds }} - {{ someMissingVariable }};",
+			query: "set analysis_end_date = '{{ ds }}'::date and '{{testVar}}' == 'testvar' and another date {{    ds }}",
 			args: Context{
 				"ds":      "2022-02-03",
 				"testVar": "testvar",
 			},
-			want: "set analysis_end_date = '2022-02-03'::date and 'testvar' == 'testvar' and another date 2022-02-03 - ;",
+			want: "set analysis_end_date = '2022-02-03'::date and 'testvar' == 'testvar' and another date 2022-02-03",
 		},
 		{
 			name: "jinja variables work as well",
@@ -176,9 +176,9 @@ func TestJinjaRendererWithStartEndDate(t *testing.T) {
 			want:  "2022-02-04, 2022-02-07T04:00:00, 2022-02-07T04:00:00.948740Z, 2022-02-06",
 		},
 		{
-			name:  "things that are not in the template should be remove",
-			query: "set analysis_end_date = '{{ whatever }}'::date;",
-			want:  "set analysis_end_date = ''::date;",
+			name:    "things that are not in the template should be remove",
+			query:   "set analysis_end_date = '{{ whatever }}'::date;",
+			wantErr: true,
 		},
 		{
 			name: "array variables work",
@@ -212,9 +212,55 @@ group by 1`,
 
 			receiver := NewRendererWithStartEndDates(&startDate, &endDate)
 			got, err := receiver.Render(tt.query)
-			require.NoError(t, err)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 
 			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestJinjaRendererErrorHandling(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		query   string
+		wantErr string
+	}{
+		{
+			name:    "missing filter",
+			query:   "{{ 'value' | random_filter_that_doesnt_exist('abc') }}",
+			wantErr: "filter 'random_filter_that_doesnt_exist' not found",
+		},
+		{
+			name:    "missing variable",
+			query:   "{{ some_random_variable }}",
+			wantErr: "missing variable 'some_random_variable'",
+		},
+		{
+			name:    "missing endfor",
+			query:   "{% for i in range(1, 10) %}{{ i }}",
+			wantErr: "missing 'endfor' at (Line: 1 Col: 35, near \"\")",
+		},
+		{
+			name:    "missing endif",
+			query:   "{% if true %}{{ i }}",
+			wantErr: "missing end of the 'if' condition at (Line: 1 Col: 21, near \"\"), did you forget to add 'endif'?",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			receiver := NewRenderer(Context{})
+			_, err := receiver.Render(tt.query)
+			require.Error(t, err)
+
+			require.Equal(t, tt.wantErr, err.Error())
 		})
 	}
 }

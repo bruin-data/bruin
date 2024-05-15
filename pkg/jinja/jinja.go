@@ -1,6 +1,8 @@
 package jinja
 
 import (
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,6 +15,15 @@ type Renderer struct {
 	context         *exec.Context
 	queryRenderLock *sync.Mutex
 }
+
+func init() { //nolint: gochecknoinits
+	gonja.DefaultConfig.StrictUndefined = true
+}
+
+var (
+	missingVariableRegex = regexp.MustCompile(`name\s+"([^"]+)"`)
+	locationRegex        = regexp.MustCompile(`\(Line: \d+ Col: \d+, near ".*?"\)`)
+)
 
 type Context map[string]any
 
@@ -68,7 +79,12 @@ func (r *Renderer) Render(query string) (string, error) {
 	tpl, err := gonja.FromString(query)
 	if err != nil {
 		r.queryRenderLock.Unlock()
-		return "", errors.Wrap(err, "you have found a bug in the jinja parser, please report it")
+		customError := findParserErrorType(err)
+		if customError == "" {
+			return "", errors.Wrap(err, "you have found a bug in the jinja parser, please report it")
+		}
+
+		return "", errors.New(customError)
 	}
 	r.queryRenderLock.Unlock()
 
@@ -76,8 +92,46 @@ func (r *Renderer) Render(query string) (string, error) {
 	// gonja.context how often you want to.
 	out, err := tpl.ExecuteToString(r.context)
 	if err != nil {
-		return "", errors.Wrap(err, "you have found a bug in the jinja renderer, please report it")
+		customError := findRenderErrorType(err)
+		if customError == "" {
+			return "", errors.Wrap(err, "you have found a bug in the jinja renderer, please report it")
+		}
+
+		return "", errors.New(customError)
 	}
 
 	return out, nil
+}
+
+func findRenderErrorType(err error) string {
+	message := err.Error()
+	errorBits := strings.Split(message, ": ")
+	innermostErr := errorBits[len(errorBits)-1]
+
+	if strings.HasPrefix(innermostErr, "filter '") && strings.HasSuffix(innermostErr, "' not found") {
+		return innermostErr
+	} else if strings.HasPrefix(innermostErr, "Unable to evaluate name ") {
+		match := missingVariableRegex.FindStringSubmatch(innermostErr)
+		if len(match) <= 2 {
+			return "missing variable '" + match[1] + "'"
+		}
+
+		return innermostErr
+	}
+
+	return ""
+}
+
+func findParserErrorType(err error) string {
+	message := err.Error()
+
+	if strings.Contains(message, "Unexpected EOF, expected tag else or endfor") {
+		match := locationRegex.FindString(message)
+		return "missing 'endfor' at " + match
+	} else if strings.Contains(message, "Unexpected EOF, expected tag elif or else or endif") {
+		match := locationRegex.FindString(message)
+		return "missing end of the 'if' condition at " + match + ", did you forget to add 'endif'?"
+	}
+
+	return ""
 }
