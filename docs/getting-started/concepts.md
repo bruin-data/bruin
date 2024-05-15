@@ -7,7 +7,7 @@ Anything that carries value that is derived from data is an asset from our persp
 
 In more concrete terms, an asset can be:
 - a table/view in your database
-- a file in S3
+- a file in S3 / GCS
 - a machine learning model
 - an MS Excel/Google Sheets/Airbyte/Notion document
 
