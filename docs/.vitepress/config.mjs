@@ -47,6 +47,22 @@ export default defineConfig({
                     {text: "Filters", link: "/templating/filters"},
                 ],
             },
+            {
+                text: "Quality checks",
+                items: [
+                    {
+                        text: "Overview", link: "/quality/overview", items: [
+                            {text: "Not null", link: "/quality/not_null"},
+                            {text: "Unique", link: "/quality/unique"},
+                            {text: "Positive", link: "/quality/positive"},
+                            {text: "Non Negative", link: "/quality/non_negative"},
+                            {text: "Negative", link: "/quality/negative"},
+                            {text: "Accepted values", link: "/quality/accepted_values"},
+                            {text: "Pattern", link: "/quality/pattern"},
+                        ]
+                    },
+                ],
+            },
         ],
 
         socialLinks: [{icon: "github", link: "https://github.com/bruin-data/bruin"}],
