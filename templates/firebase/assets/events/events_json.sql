@@ -50,10 +50,10 @@ columns:
     - name: app_version
       type: STRING
       description: The version of the app
-    - name: ep
+    - name: event_params
       type: STRING
       description: The event parameters as JSON
-    - name: up
+    - name: user_properties
       type: STRING
       description: The user properties as JSON
     - name: screen
@@ -88,8 +88,8 @@ SELECT
     lower(event_name) as event_name,
     fn.parse_version(app_info.version) as app_version,
 
-    fn.event_params_to_json(event_params) as ep,
-    fn.user_properties_to_json(user_properties) as up,
+    fn.event_params_to_json(event_params) as event_params,
+    fn.user_properties_to_json(user_properties) as user_properties,
     (
       select array_agg(struct(
         safe_cast(replace(key, "firebase_exp_", "") as int64) as id, 
@@ -130,4 +130,4 @@ SELECT
     event_value_in_usd,
     to_json(privacy_info) as privacy_info,
 from `analytics_123456789.events_*` --TODO: Change 123456789 to your analytics ID
-where fn.date_in_range(_TABLE_SUFFIX, '{{ start_date_nodash }}', '{{ end_date_nodash }}')
+where fn.date_in_range(_TABLE_SUFFIX, '{{ start_date }}', '{{ end_date }}')
