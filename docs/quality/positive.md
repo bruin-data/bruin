@@ -1,6 +1,6 @@
 # Positive
 
-This check will verify that the values of the column are all positive
+This check will verify that the values of the column are all positive, i.e. greater than zero.
 
 ### Example
 
