@@ -9,6 +9,7 @@ In more concrete terms, an asset can be:
 - a table/view in your database
 - a file in S3
 - a machine learning model
+- an MS Excel/Google Sheets/Airbyte/Notion document
 
 This abstraction enables building multi-language data pipelines that are agnostic of a database/destinations.
 You will primarily be interacting with assets when using Bruin.
@@ -112,4 +113,3 @@ Connections are defined in the `.bruin.yml` file locally. A connection has a nam
 ## Default Connections
 Default connections are top-level defaults that reduces repetition by stating what connections to use on types of assets.
 For instance, a pipeline might have SQL queries that run on Google BigQuery or Snowflake, and based on the type of an asset Bruin picks the appropriate connection.
-
