@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -33,6 +34,11 @@ func Render() *cli.Command {
 			},
 			startDateFlag,
 			endDateFlag,
+			&cli.StringFlag{
+				Name:    "output",
+				Aliases: []string{"o"},
+				Usage:   "output format (json)",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			fullRefresh := c.Bool("full-refresh")
@@ -70,6 +76,7 @@ func Render() *cli.Command {
 				},
 				builder: DefaultPipelineBuilder,
 				writer:  os.Stdout,
+				output:  c.String("output"),
 			}
 
 			return r.Run(c.Args().Get(0))
@@ -94,6 +101,7 @@ type RenderCommand struct {
 	materializers map[pipeline.AssetType]queryMaterializer
 	builder       taskCreator
 
+	output string
 	writer io.Writer
 }
 
@@ -101,24 +109,24 @@ func (r *RenderCommand) Run(taskPath string) error {
 	defer RecoverFromPanic()
 
 	if taskPath == "" {
-		errorPrinter.Printf("Please give an asset path to render: bruin render <path to the asset file>)\n")
+		r.printErrorOrJsonf("Please give an asset path to render: bruin render <path to the asset file>)\n")
 		return cli.Exit("", 1)
 	}
 
 	task, err := r.builder.CreateAssetFromFile(taskPath)
 	if err != nil {
-		errorPrinter.Printf("Failed to build asset: %v\n", err.Error())
+		r.printErrorOrJsonf("Failed to build asset: %v\n", err.Error())
 		return cli.Exit("", 1)
 	}
 
 	if task == nil {
-		errorPrinter.Printf("The given file path doesn't seem to be a Bruin asset definition: '%s'\n", taskPath)
+		r.printErrorOrJsonf("The given file path doesn't seem to be a Bruin asset definition: '%s'\n", taskPath)
 		return cli.Exit("", 1)
 	}
 
 	queries, err := r.extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
 	if err != nil {
-		errorPrinter.Printf("Failed to extract queries from file '%s': %v\n", task.ExecutableFile.Path, err.Error())
+		r.printErrorOrJsonf(err.Error())
 		return cli.Exit("", 1)
 	}
 
@@ -127,15 +135,32 @@ func (r *RenderCommand) Run(taskPath string) error {
 	if materializer, ok := r.materializers[task.Type]; ok {
 		materialized, err := materializer.Render(task, qq.Query)
 		if err != nil {
-			errorPrinter.Printf("Failed to materialize the query: %v\n", err.Error())
+			r.printErrorOrJsonf("Failed to materialize the query: %v\n", err.Error())
 			return cli.Exit("", 1)
 		}
 
 		qq.Query = materialized
-		qq.Query = highlightCode(qq.Query, "sql")
+		if r.output != "json" {
+			qq.Query = highlightCode(qq.Query, "sql")
+		}
 	}
 
-	_, err = r.writer.Write([]byte(fmt.Sprintf("%s\n", qq)))
+	if r.output == "json" {
+		js, err := json.Marshal(map[string]string{"query": qq.Query})
+		if err != nil {
+			r.printErrorOrJsonf("Failed to render the query: %v\n", err.Error())
+			return cli.Exit("", 1)
+		}
+		_, err = r.writer.Write(js)
+		if err != nil {
+			r.printErrorOrJsonf("Failed to write the query: %v\n", err.Error())
+			return cli.Exit("", 1)
+		}
+
+		return nil
+	} else {
+		_, err = r.writer.Write([]byte(fmt.Sprintf("%s\n", qq)))
+	}
 
 	return err
 }
@@ -157,4 +182,26 @@ func highlightCode(code string, language string) string {
 	}
 
 	return b.String()
+}
+
+func (r *RenderCommand) printErrorOrJSON(msg string) {
+	if r.output == "json" {
+		js, err := json.Marshal(map[string]string{"error": msg})
+		if err != nil {
+			errorPrinter.Printf("Failed to render error message '%s': %v\n", msg, err.Error())
+			return
+		}
+		_, err = r.writer.Write(js)
+		if err != nil {
+			errorPrinter.Printf("Failed to write error message: %v\n", err.Error())
+		}
+
+		return
+	}
+
+	errorPrinter.Printf(msg)
+}
+
+func (r *RenderCommand) printErrorOrJsonf(msg string, args ...interface{}) {
+	r.printErrorOrJSON(fmt.Sprintf(msg, args...))
 }
