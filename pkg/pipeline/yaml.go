@@ -111,6 +111,7 @@ type columnCheck struct {
 }
 
 type column struct {
+	Extends       string        `yaml:"extends"`
 	Name          string        `yaml:"name"`
 	Type          string        `yaml:"type"`
 	Description   string        `yaml:"description"`
@@ -241,13 +242,27 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			tests = append(tests, NewColumnCheck(definition.Name, column.Name, test.Name, ColumnCheckValue(test.Value), blocking))
 		}
 
+		var entityDefinition *EntityAttribute
+		if column.Extends != "" {
+			fromBits := strings.Split(column.Extends, ".")
+			if len(fromBits) != 2 {
+				return nil, &ParseError{Msg: "'from' field must be in the format `entity.attribute`"}
+			}
+
+			entityDefinition = &EntityAttribute{
+				Entity:    strings.TrimSpace(fromBits[0]),
+				Attribute: strings.TrimSpace(fromBits[1]),
+			}
+		}
+
 		columns[index] = Column{
-			Name:          column.Name,
-			Type:          strings.ToLower(strings.TrimSpace(column.Type)),
-			Description:   column.Description,
-			Checks:        tests,
-			PrimaryKey:    column.PrimaryKey,
-			UpdateOnMerge: column.UpdateOnMerge,
+			Name:            column.Name,
+			Type:            strings.ToLower(strings.TrimSpace(column.Type)),
+			Description:     column.Description,
+			Checks:          tests,
+			PrimaryKey:      column.PrimaryKey,
+			UpdateOnMerge:   column.UpdateOnMerge,
+			EntityAttribute: entityDefinition,
 		}
 	}
 

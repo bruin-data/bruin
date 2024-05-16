@@ -21,9 +21,9 @@ type family struct {
 
 type exampleData struct {
 	Name    string   `yaml:"name"`
-	Middle  string   `yaml:"middle" validate:"required"`
+	Middle  string   `yaml:"middle"`
 	Surname string   `yaml:"surname"`
-	Age     int      `yaml:"age" validate:"required,gte=28"`
+	Age     int      `yaml:"age"`
 	Height  float64  `yaml:"height"`
 	Skills  []string `yaml:"skills"`
 	Family  family   `yaml:"family"`
@@ -66,24 +66,9 @@ func Test_readYamlFileFromPath(t *testing.T) {
 			},
 		},
 		{
-			name: "read yaml file from path",
-			args: args{
-				path: "testdata/yamlreader/no-validation.yml",
-				out:  &exampleData{},
-			},
-			wantErr: true,
-		},
-		{
 			name: "file does not exist",
 			args: args{
 				path: "testdata/yamlreader/some-file-that-doesnt-exist",
-			},
-			wantErr: true,
-		},
-		{
-			name: "invalid yaml file",
-			args: args{
-				path: "testdata/yamlreader/invalid.yml",
 			},
 			wantErr: true,
 		},

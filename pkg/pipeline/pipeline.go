@@ -3,6 +3,7 @@ package pipeline
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/entity"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -255,13 +256,19 @@ func NewColumnCheck(assetName, columnName, name string, value ColumnCheckValue, 
 	}
 }
 
+type EntityAttribute struct {
+	Entity    string `json:"entity"`
+	Attribute string `json:"attribute"`
+}
+
 type Column struct {
-	Name          string        `json:"name"`
-	Type          string        `json:"type"`
-	Description   string        `json:"description"`
-	Checks        []ColumnCheck `json:"checks"`
-	PrimaryKey    bool          `json:"primary_key"`
-	UpdateOnMerge bool          `json:"update_on_merge"`
+	EntityAttribute *EntityAttribute `json:"entity_attribute"`
+	Name            string           `json:"name"`
+	Type            string           `json:"type"`
+	Description     string           `json:"description"`
+	Checks          []ColumnCheck    `json:"checks"`
+	PrimaryKey      bool             `json:"primary_key"`
+	UpdateOnMerge   bool             `json:"update_on_merge"`
 }
 
 func (c *Column) HasCheck(check string) bool {
@@ -400,6 +407,48 @@ func (a *Asset) ColumnNamesWithPrimaryKey() []string {
 		}
 	}
 	return columns
+}
+
+func (a *Asset) EnrichFromEntityAttributes(entities []*entity.Entity) error {
+	entityMap := make(map[string]*entity.Entity, len(entities))
+	for _, e := range entities {
+		entityMap[e.Name] = e
+	}
+
+	for i, c := range a.Columns {
+		if c.EntityAttribute == nil {
+			fmt.Println("entity ettribute is nil")
+			continue
+		}
+
+		fmt.Println("entity attirubte found")
+
+		entity := c.EntityAttribute.Entity
+
+		e, ok := entityMap[entity]
+		if !ok {
+			return errors.Errorf("entity '%s' not found", entity)
+		}
+
+		attr, ok := e.Attributes[c.EntityAttribute.Attribute]
+		if !ok {
+			return errors.Errorf("attribute '%s' not found in entity '%s'", c.EntityAttribute.Attribute, entity)
+		}
+
+		if c.Name == "" {
+			a.Columns[i].Name = attr.Name
+		}
+
+		if c.Type == "" {
+			a.Columns[i].Type = attr.Type
+		}
+
+		if c.Description == "" {
+			a.Columns[i].Description = attr.Description
+		}
+	}
+
+	return nil
 }
 
 func uniqueAssets(assets []*Asset) []*Asset {
