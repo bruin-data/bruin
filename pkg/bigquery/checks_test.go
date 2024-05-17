@@ -340,7 +340,7 @@ func TestCustomCheck(t *testing.T) {
 func TestPatternCheck_Check(t *testing.T) {
 	t.Parallel()
 
-	var pattern = "(a|b)"
+	pattern := "(a|b)"
 
 	runTestsFoCountZeroCheck(
 		t,
