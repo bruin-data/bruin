@@ -107,7 +107,7 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 	if err != nil {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: fmt.Sprintf("Cannot get connection for task '%s': %+v", asset.Name, err),
+			Description: fmt.Sprintf("Cannot get connection for task '%s': %v", asset.Name, err),
 		})
 
 		return issues, nil
@@ -119,7 +119,7 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 	if err != nil {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: fmt.Sprintf("Cannot get connection for task '%s': %+v", asset.Name, err),
+			Description: fmt.Sprintf("Cannot get connection for task '%s': %v", asset.Name, err),
 		})
 
 		return issues, nil
@@ -230,7 +230,7 @@ func (q *QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.A
 				mu.Lock()
 				issues = append(issues, &Issue{
 					Task:        task,
-					Description: fmt.Sprintf("Cannot get connection for task '%s': %+v", task.Name, err),
+					Description: fmt.Sprintf("Cannot get connection for task '%s': %v", task.Name, err),
 				})
 				mu.Unlock()
 			}
@@ -241,7 +241,7 @@ func (q *QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.A
 				mu.Lock()
 				issues = append(issues, &Issue{
 					Task:        task,
-					Description: fmt.Sprintf("Cannot get connection for task '%s': %+v", task.Name, err),
+					Description: fmt.Sprintf("Cannot get connection for task '%s': %v", task.Name, err),
 				})
 				mu.Unlock()
 

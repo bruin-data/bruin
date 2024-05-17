@@ -18,6 +18,33 @@ type Entity struct {
 	Attributes  map[string]*Attribute `json:"attributes" yaml:"attributes"`
 }
 
+type EntityReader struct {
+	RootPath  string
+	FileNames []string
+
+	entities []*Entity
+}
+
+func (r *EntityReader) GetEntities() ([]*Entity, error) {
+	if r.entities != nil {
+		return r.entities, nil
+	}
+
+	entities := make([]*Entity, 0)
+
+	for _, fileName := range r.FileNames {
+		entitiesFromFile, err := LoadEntitiesFromFile(fileName)
+		if err != nil {
+			continue
+		}
+
+		entities = append(entities, entitiesFromFile...)
+	}
+
+	r.entities = entities
+	return entities, nil
+}
+
 func LoadEntitiesFromFile(path string) ([]*Entity, error) {
 	entities := make(map[string]Entity, 0)
 	err := path2.ReadYaml(afero.NewOsFs(), path, &entities)

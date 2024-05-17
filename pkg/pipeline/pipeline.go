@@ -742,11 +742,17 @@ type BuilderConfig struct {
 	TasksFileSuffixes   []string
 }
 
+type entityReader interface {
+	GetEntities() ([]*entity.Entity, error)
+}
+
 type builder struct {
 	config             BuilderConfig
 	yamlTaskCreator    TaskCreator
 	commentTaskCreator TaskCreator
 	fs                 afero.Fs
+
+	EntityReader entityReader
 }
 
 type ParseError struct {
@@ -836,6 +842,14 @@ func (b *builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 		pipeline.tasksByName[task.Name] = task
 	}
 
+	var entities []*entity.Entity
+	if b.EntityReader != nil {
+		entities, err = b.EntityReader.GetEntities()
+		if err != nil {
+			return nil, errors.Wrap(err, "error getting entities")
+		}
+	}
+
 	for _, asset := range pipeline.Assets {
 		for _, upstream := range asset.DependsOn {
 			u, ok := pipeline.tasksByName[upstream]
@@ -845,6 +859,13 @@ func (b *builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 
 			asset.AddUpstream(u)
 			u.AddDownstream(asset)
+
+			if entities != nil {
+				err := asset.EnrichFromEntityAttributes(entities)
+				if err != nil {
+					return nil, errors.Wrap(err, "error enriching asset from entity attributes")
+				}
+			}
 		}
 	}
 

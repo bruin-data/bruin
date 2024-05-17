@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/entity"
 	"io"
 	"os"
 	path2 "path"
@@ -146,16 +147,22 @@ func Lint(isDebug *bool) *cli.Command {
 				logger.Debug("no Snowflake connections found, skipping Snowflake validation")
 			}
 
+			builder := DefaultPipelineBuilder
+			builder.EntityReader = &entity.EntityReader{
+				RootPath:  repoRoot.Path,
+				FileNames: []string{"entities.yml", "entities.yaml"},
+			}
+
 			var result *lint.PipelineAnalysisResult
 			if asset == "" {
-				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
+				linter := lint.NewLinter(path.GetPipelinePaths, builder, rules, logger)
 				logger.Debugf("running %d rules for pipeline validation", len(rules))
 				infoPrinter.Printf("Validating pipelines in '%s' for '%s' environment...\n", rootPath, cm.SelectedEnvironmentName)
 				result, err = linter.Lint(rootPath, pipelineDefinitionFile)
 			} else {
 				rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
 				logger.Debugf("running %d rules for asset-only validation", len(rules))
-				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
+				linter := lint.NewLinter(path.GetPipelinePaths, builder, rules, logger)
 				result, err = linter.LintAsset(rootPath, pipelineDefinitionFile, asset)
 			}
 
