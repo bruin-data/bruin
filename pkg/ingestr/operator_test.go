@@ -1,6 +1,7 @@
 package ingestr
 
 import (
+	"context"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -43,9 +44,10 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 	}
 
 	tests := []struct {
-		name  string
-		asset *pipeline.Asset
-		want  []string
+		name        string
+		asset       *pipeline.Asset
+		fullRefresh bool
+		want        []string
 	}{
 		{
 			name: "create+replace, basic scenario",
@@ -149,6 +151,41 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 				"--primary-key", "date",
 			},
 		},
+		{
+			name:        "full refresh - incremental strategy, incremental key updated_at, multiple pk",
+			fullRefresh: true,
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "bq",
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "date", PrimaryKey: true},
+					{Name: "name"},
+					{Name: "updated_at"},
+				},
+				Parameters: map[string]string{
+					"source_connection":    "sf",
+					"source_table":         "source-table",
+					"destination":          "bigquery",
+					"incremental_strategy": "merge",
+					"incremental_key":      "updated_at",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "snowflake-uri-here",
+				"--source-table", "source-table",
+				"--dest-uri", "bigquery-uri-here",
+				"--dest-table", "asset-name",
+				"--yes",
+				"--progress", "log",
+				"--incremental-strategy", "merge",
+				"--incremental-key", "updated_at",
+				"--primary-key", "id",
+				"--primary-key", "date",
+				"--full-refresh",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -163,7 +200,9 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 				Asset:    tt.asset,
 			}
 
-			got, err := o.ConvertTaskInstanceToIngestrCommand(&ti)
+			ctx := context.WithValue(context.Background(), pipeline.RunConfigFullRefresh, tt.fullRefresh)
+
+			got, err := o.ConvertTaskInstanceToIngestrCommand(ctx, &ti)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})

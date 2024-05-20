@@ -9,6 +9,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/executor"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -57,7 +58,7 @@ func NewBasicOperator(conn *connection.Manager) (*BasicOperator, error) {
 }
 
 func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
-	cmdArgs, err := o.ConvertTaskInstanceToIngestrCommand(ti)
+	cmdArgs, err := o.ConvertTaskInstanceToIngestrCommand(ctx, ti)
 	if err != nil {
 		return err
 	}
@@ -137,7 +138,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	return nil
 }
 
-func (o *BasicOperator) ConvertTaskInstanceToIngestrCommand(ti scheduler.TaskInstance) ([]string, error) {
+func (o *BasicOperator) ConvertTaskInstanceToIngestrCommand(ctx context.Context, ti scheduler.TaskInstance) ([]string, error) {
 	sourceConnectionName, ok := ti.GetAsset().Parameters["source_connection"]
 	if !ok {
 		return nil, errors.New("source connection not configured")
@@ -215,6 +216,11 @@ func (o *BasicOperator) ConvertTaskInstanceToIngestrCommand(ti scheduler.TaskIns
 	sqlBackend, ok := ti.GetAsset().Parameters["sql_backend"]
 	if ok {
 		cmdArgs = append(cmdArgs, "--sql-backend", sqlBackend)
+	}
+
+	fullRefresh := ctx.Value(pipeline.RunConfigFullRefresh)
+	if fullRefresh != nil && fullRefresh.(bool) {
+		cmdArgs = append(cmdArgs, "--full-refresh")
 	}
 
 	return cmdArgs, nil

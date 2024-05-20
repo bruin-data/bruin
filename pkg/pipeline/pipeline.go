@@ -13,6 +13,8 @@ import (
 	"github.com/spf13/afero"
 )
 
+type RunConfig string
+
 const (
 	CommentTask TaskDefinitionType = "comment"
 	YamlTask    TaskDefinitionType = "yaml"
@@ -29,6 +31,8 @@ const (
 	AssetTypeMsSQLQuery           = AssetType("ms.sql")
 	AssetTypeSynapseQuery         = AssetType("synapse.sql")
 	AssetTypeIngestr              = AssetType("ingestr")
+
+	RunConfigFullRefresh = RunConfig("full-refresh")
 )
 
 var supportedFileSuffixes = []string{".yml", ".yaml", ".sql", ".py"}

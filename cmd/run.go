@@ -273,8 +273,11 @@ func Run(isDebug *bool) *cli.Command {
 
 			ex.Start(s.WorkQueue, s.Results)
 
+			runCtx := context.Background()
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, c.Bool("full-refresh"))
+
 			start := time.Now()
-			results := s.Run(context.Background())
+			results := s.Run(runCtx)
 			duration := time.Since(start)
 
 			successPrinter.Printf("\n\nExecuted %d tasks in %s\n", len(results), duration.Truncate(time.Millisecond).String())
