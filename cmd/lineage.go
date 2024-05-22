@@ -107,12 +107,14 @@ func (r *LineageCommand) printLineageJSON(asset *pipeline.Asset, upstream, downs
 
 	type jsonSummary struct {
 		AssetName  string               `json:"name"`
+		Type       pipeline.AssetType   `json:"type"`
 		Upstream   []*dependencySummary `json:"upstream"`
 		Downstream []*dependencySummary `json:"downstream"`
 	}
 
 	summary := jsonSummary{
 		AssetName:  asset.Name,
+		Type:       asset.Type,
 		Upstream:   make([]*dependencySummary, len(upstream)),
 		Downstream: make([]*dependencySummary, len(downstream)),
 	}
