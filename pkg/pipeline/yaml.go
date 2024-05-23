@@ -125,10 +125,11 @@ type secretMapping struct {
 }
 
 type customCheck struct {
-	Name     string `yaml:"name"`
-	Query    string `yaml:"query"`
-	Value    int64  `yaml:"value"`
-	Blocking *bool  `yaml:"blocking"`
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
+	Query       string `yaml:"query"`
+	Value       int64  `yaml:"value"`
+	Blocking    *bool  `yaml:"blocking"`
 }
 
 type taskDefinition struct {
@@ -278,11 +279,12 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 
 		// set the ID as the hash of the name
 		task.CustomChecks[index] = CustomCheck{
-			ID:       hash(fmt.Sprintf("%s-%s", task.Name, check.Name)),
-			Name:     check.Name,
-			Query:    check.Query,
-			Value:    check.Value,
-			Blocking: blocking,
+			ID:          hash(fmt.Sprintf("%s-%s", task.Name, check.Name)),
+			Name:        check.Name,
+			Description: check.Description,
+			Query:       check.Query,
+			Value:       check.Value,
+			Blocking:    blocking,
 		}
 	}
 

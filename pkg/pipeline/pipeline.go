@@ -300,11 +300,12 @@ type SecretMapping struct {
 }
 
 type CustomCheck struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Query    string `json:"query"`
-	Value    int64  `json:"value"`
-	Blocking bool   `json:"blocking"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Query       string `json:"query"`
+	Value       int64  `json:"value"`
+	Blocking    bool   `json:"blocking"`
 }
 
 type Asset struct {

@@ -34,6 +34,7 @@ columns:
 custom_checks:
     - name: check1
       query: select 5
+      description: test description
       value: 16
       blocking: false
 
