@@ -168,7 +168,7 @@
         {
           "id": "a26c19e73c6b5cdee1b1bfe135a475979f360b9e7fdfc19a7fca1832d034adbc",
           "name": "check1",
-          "description": "",
+          "description": "test description",
           "query": "select 5",
           "value": 16,
           "blocking": false
