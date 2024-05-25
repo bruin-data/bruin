@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	IngestrVersion = "v0.5.0"
+	IngestrVersion = "v0.5.1"
 	DockerImage    = "ghcr.io/bruin-data/ingestr:" + IngestrVersion
 )
 
