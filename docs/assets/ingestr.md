@@ -1,8 +1,7 @@
 # Ingestr Assets
-## ingestr
-Ingestr moves is a Python package that allows you to easily move data between platforms.
+[Ingestr](https://github.com/bruin-data/ingestr) is a Python package that allows you to easily move data between platforms. Bruin supports `ingestr` natively as an asset type.
 
-With Ingestr you can move data from:
+Using Ingestr, you can move data from:
 * your production databases like:
     * MSSQL
     * MySQL
@@ -18,19 +17,25 @@ With Ingestr you can move data from:
     * Facebook Ads
     * Google Ads
 
- to your data warehouses:
+to your data warehouses:
 * Google BigQuery 
 * Snowflake 
 * AWS Redshift 
 * Azure Synapse 
 * Postgres 
 
-### Template
+> [!INFO]
+> You can read more about the capabilities of ingestr [in its documentation](https://bruin-data.github.io/ingestr/).
+
+
+
+## Template
 ```yaml
 name: string
 type: ingestr
 connection: string # optional, by default uses the default connection for destination platform in pipeline.yml
 parameters:
+  source: string # optional, used when inferring the source from connection is not enough, e.g. GCP connection + GSheets source
   source_connection: string
   source_table: string
   destination: bigquery | snowflake | redshift | synapse
@@ -42,9 +47,15 @@ parameters:
   loader_file_format: jsonl | csv | parquet
 ```
 
-###  Examples
 
-#### Move MySQL table to BigQuery
+> [!INFO]
+> Ingestr assets require Docker to be installed in your machine. If you are using [Bruin Cloud](https://getbruin.com), you don't need to worry about this.
+
+
+##  Examples
+The examples below show how to use the `ingestr` asset type in your pipeline. Feel free to change them as you wish according to your needs.
+
+### Copy a table from MySQL to BigQuery
 ```yaml
 name: raw.transactions
 type: ingestr
@@ -54,7 +65,8 @@ parameters:
   destination: bigquery
 ```
 
-#### Move MSSQL table to Snowflake incrementally using `updated_at` column
+### Copy a table from Microsoft SQL Server to Snowflake incrementally
+This example shows how to use `updated_at` column to incrementally load the data from Microsoft SQL Server to Snowflake.
 ```yaml
 name: raw.transactions
 type: ingestr
@@ -64,4 +76,17 @@ parameters:
   destination: snowflake
   incremental_strategy: append
   incremental_key: updated_at
+```
+
+### Copy data from Google Sheets to Snowflake
+This example shows how to copy data from Google Sheets into your Snowflake database
+
+```yaml
+name: raw.manual_orders
+type: ingestr
+parameters:
+  source: gsheets
+  source_connection: gcp-default
+  source_table: <mysheetid>.<sheetname>
+  destination: snowflake
 ```
