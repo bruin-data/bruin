@@ -32,9 +32,9 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 	t.Parallel()
 
 	mockBq := new(mockConnection)
-	mockBq.On("GetIngestrURI").Return("bigquery-uri-here", nil)
+	mockBq.On("GetIngestrURI").Return("bigquery://uri-here", nil)
 	mockSf := new(mockConnection)
-	mockSf.On("GetIngestrURI").Return("snowflake-uri-here", nil)
+	mockSf.On("GetIngestrURI").Return("snowflake://uri-here", nil)
 
 	fetcher := simpleConnectionFetcher{
 		connections: map[string]*mockConnection{
@@ -60,7 +60,21 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 					"destination":       "bigquery",
 				},
 			},
-			want: []string{"ingest", "--source-uri", "snowflake-uri-here", "--source-table", "source-table", "--dest-uri", "bigquery-uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+			want: []string{"ingest", "--source-uri", "snowflake://uri-here", "--source-table", "source-table", "--dest-uri", "bigquery://uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+		},
+		{
+			name: "basic scenario with Google Sheets override",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "sf",
+				Parameters: map[string]string{
+					"source_connection": "bq",
+					"source":            "gsheets",
+					"source_table":      "source-table",
+					"destination":       "bigquery",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "gsheets://uri-here", "--source-table", "source-table", "--dest-uri", "snowflake://uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log"},
 		},
 		{
 			name: "incremental strategy, incremental key updated_at",
@@ -77,9 +91,9 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			},
 			want: []string{
 				"ingest",
-				"--source-uri", "snowflake-uri-here",
+				"--source-uri", "snowflake://uri-here",
 				"--source-table", "source-table",
-				"--dest-uri", "bigquery-uri-here",
+				"--dest-uri", "bigquery://uri-here",
 				"--dest-table", "asset-name",
 				"--yes",
 				"--progress", "log",
@@ -107,9 +121,9 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			},
 			want: []string{
 				"ingest",
-				"--source-uri", "snowflake-uri-here",
+				"--source-uri", "snowflake://uri-here",
 				"--source-table", "source-table",
-				"--dest-uri", "bigquery-uri-here",
+				"--dest-uri", "bigquery://uri-here",
 				"--dest-table", "asset-name",
 				"--yes",
 				"--progress", "log",
@@ -139,9 +153,9 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			},
 			want: []string{
 				"ingest",
-				"--source-uri", "snowflake-uri-here",
+				"--source-uri", "snowflake://uri-here",
 				"--source-table", "source-table",
-				"--dest-uri", "bigquery-uri-here",
+				"--dest-uri", "bigquery://uri-here",
 				"--dest-table", "asset-name",
 				"--yes",
 				"--progress", "log",
@@ -173,9 +187,9 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			},
 			want: []string{
 				"ingest",
-				"--source-uri", "snowflake-uri-here",
+				"--source-uri", "snowflake://uri-here",
 				"--source-table", "source-table",
-				"--dest-uri", "bigquery-uri-here",
+				"--dest-uri", "bigquery://uri-here",
 				"--dest-table", "asset-name",
 				"--yes",
 				"--progress", "log",

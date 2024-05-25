@@ -3,9 +3,9 @@ type: ingestr
 connection: local
 
 parameters:
+  source: gsheets
   source_connection: neon
   source_table: 'public.test_merge'
-
   destination: postgres
 
 

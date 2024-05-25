@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	IngestrVersion = "v0.4.1"
+	IngestrVersion = "v0.5.0"
 	DockerImage    = "ghcr.io/bruin-data/ingestr:" + IngestrVersion
 )
 
@@ -152,6 +152,12 @@ func (o *BasicOperator) ConvertTaskInstanceToIngestrCommand(ctx context.Context,
 	sourceURI, err := sourceConnection.(pipelineConnection).GetIngestrURI()
 	if err != nil {
 		return nil, errors.New("could not get the source uri")
+	}
+
+	// some connection types can be shared among sources, therefore inferring source URI from the connection type is not
+	// always feasible. In the case of GSheets, we have to reuse the same GCP credentials, but change the prefix with gsheets://
+	if ti.GetAsset().Parameters["source"] == "gsheets" {
+		sourceURI = strings.ReplaceAll(sourceURI, "bigquery://", "gsheets://")
 	}
 
 	sourceTable, ok := ti.GetAsset().Parameters["source_table"]
