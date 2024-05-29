@@ -8,27 +8,16 @@ package sqlparser
 #include "../../lib/parser.h"
 */
 import "C"
-import "fmt"
+import (
+	"encoding/json"
+)
 
-func ParseUsedTables() {
-	contents2 := `
-            with t1 as (
-            select *
-            from table1
-        ),
-        t2 as (
-            select *
-            from table2
-        )
-        select *
-        from t1
-        join t2
-            using(a)`
-
-	res := C.extract_table_names(C.CString(contents2))
+func ParseUsedTables(query string) ([]string, error) {
+	res := C.extract_table_names(C.CString(query))
 	usedTables := C.GoString(res)
 
-	println(usedTables)
+	var tables []string
+	err := json.Unmarshal([]byte(usedTables), &tables)
 
-	fmt.Println("This is a highly experimental command that doesn't really do anything, it just exists to check the cross-build abilities of CGo.")
+	return tables, err
 }
