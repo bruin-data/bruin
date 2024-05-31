@@ -23,13 +23,18 @@ type queryExtractor interface {
 	ExtractQueriesFromString(content string) ([]*query.Query, error)
 }
 
+type materializer interface {
+	Render(task *pipeline.Asset, query string) (string, error)
+}
+
 type QueryValidatorRule struct {
-	Identifier  string
-	TaskType    pipeline.AssetType
-	Connections connectionManager
-	Extractor   queryExtractor
-	WorkerCount int
-	Logger      *zap.SugaredLogger
+	Identifier   string
+	TaskType     pipeline.AssetType
+	Connections  connectionManager
+	Extractor    queryExtractor
+	Materializer materializer
+	WorkerCount  int
+	Logger       *zap.SugaredLogger
 }
 
 func (q *QueryValidatorRule) Name() string {
@@ -82,6 +87,21 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 	}
 
 	foundQuery := queries[0]
+
+	if q.Materializer != nil {
+		materialized, err := q.Materializer.Render(asset, foundQuery.Query)
+		if err != nil {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Failed to materialize query: %s", err),
+				Context: []string{
+					"The failing query is as follows:",
+					foundQuery.Query,
+				},
+			})
+		}
+		foundQuery.Query = materialized
+	}
 
 	assetConnectionName, err := p.GetConnectionNameForAsset(asset)
 	if err != nil {
@@ -189,6 +209,21 @@ func (q *QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.A
 
 			q.Logger.Debugw("Checking if a query is valid", "path", task.ExecutableFile.Path)
 			start := time.Now()
+
+			if q.Materializer != nil {
+				materialized, err := q.Materializer.Render(task, foundQuery.Query)
+				if err != nil {
+					issues = append(issues, &Issue{
+						Task:        task,
+						Description: fmt.Sprintf("Failed to materialize query: %s", err),
+						Context: []string{
+							"The failing query is as follows:",
+							foundQuery.Query,
+						},
+					})
+				}
+				foundQuery.Query = materialized
+			}
 
 			assetConnectionName, err := p.GetConnectionNameForAsset(task)
 			if err != nil {

@@ -40,6 +40,15 @@ func (m *mockExtractor) ExtractQueriesFromString(content string) ([]*query.Query
 	return res.Get(0).([]*query.Query), res.Error(1)
 }
 
+type mockMaterializer struct {
+	mock.Mock
+}
+
+func (m *mockMaterializer) Render(task *pipeline.Asset, query string) (string, error) {
+	res := m.Called(task, query)
+	return res.Get(0).(string), res.Error(1)
+}
+
 func TestQueryValidatorRule_Validate(t *testing.T) {
 	t.Parallel()
 
@@ -50,6 +59,7 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 		validator         *mockValidator
 		extractor         *mockExtractor
 		connectionManager *mockConnectionManager
+		materializer      *mockMaterializer
 	}
 
 	tests := []struct {
@@ -197,6 +207,80 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 			},
 			want: []*Issue{},
 		},
+		{
+			name: "two tasks to extract, all materialized",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Type: taskType,
+						ExecutableFile: pipeline.ExecutableFile{
+							Path:    "path/to/file1.sql",
+							Content: "content1",
+						},
+						Materialization: pipeline.Materialization{
+							Type: "table",
+						},
+					},
+					{
+						Type: taskType,
+						ExecutableFile: pipeline.ExecutableFile{
+							Path:    "path/to/file2.sql",
+							Content: "content2",
+						},
+						Materialization: pipeline.Materialization{
+							Type: "table",
+						},
+					},
+				},
+				DefaultConnections: map[string]string{
+					"google_cloud_platform": "gcp-conn",
+				},
+			},
+			setup: func(f *fields) {
+				f.extractor.On("ExtractQueriesFromString", "content1").
+					Return(
+						[]*query.Query{
+							{Query: "query11"},
+						},
+						nil,
+					)
+				f.extractor.On("ExtractQueriesFromString", "content2").
+					Return(
+						[]*query.Query{
+							{Query: "query21"},
+						},
+						nil,
+					)
+
+				f.connectionManager.On("GetConnection", "gcp-conn").Return(f.validator, nil)
+
+				f.materializer.On("Render", &pipeline.Asset{
+					Type: taskType,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path:    "path/to/file1.sql",
+						Content: "content1",
+					},
+					Materialization: pipeline.Materialization{
+						Type: "table",
+					},
+				}, "query11").Return("materialized-query11", nil)
+
+				f.materializer.On("Render", &pipeline.Asset{
+					Type: taskType,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path:    "path/to/file2.sql",
+						Content: "content2",
+					},
+					Materialization: pipeline.Materialization{
+						Type: "table",
+					},
+				}, "query21").Return("materialized-query21", nil)
+
+				f.validator.On("IsValid", mock.Anything, &query.Query{Query: "materialized-query11"}).Return(true, nil)
+				f.validator.On("IsValid", mock.Anything, &query.Query{Query: "materialized-query21"}).Return(true, nil)
+			},
+			want: []*Issue{},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -205,21 +289,24 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 			validator := new(mockValidator)
 			extractor := new(mockExtractor)
 			conn := new(mockConnectionManager)
+			mat := new(mockMaterializer)
 
 			if tt.setup != nil {
 				tt.setup(&fields{
 					validator:         validator,
 					extractor:         extractor,
 					connectionManager: conn,
+					materializer:      mat,
 				})
 			}
 
 			q := &QueryValidatorRule{
-				TaskType:    taskType,
-				Extractor:   extractor,
-				Connections: conn,
-				Logger:      zap.NewNop().Sugar(),
-				WorkerCount: 1,
+				TaskType:     taskType,
+				Extractor:    extractor,
+				Connections:  conn,
+				Logger:       zap.NewNop().Sugar(),
+				WorkerCount:  1,
+				Materializer: mat,
 			}
 
 			got, err := q.Validate(tt.p)
