@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -49,76 +50,14 @@ func (m *mockConnectionFetcher) GetBqConnection(name string) (DB, error) {
 	return get.(DB), args.Error(1)
 }
 
-func TestNotNullCheck_Check(t *testing.T) {
-	t.Parallel()
+func (m *mockConnectionFetcher) GetConnection(name string) (interface{}, error) {
+	args := m.Called(name)
+	get := args.Get(0)
+	if get == nil {
+		return nil, args.Error(1)
+	}
 
-	runTestsFoCountZeroCheck(
-		t,
-		func(q *mockQuerierWithResult) checkRunner {
-			conn := new(mockConnectionFetcher)
-			conn.On("GetBqConnection", "test").Return(q, nil)
-			return &NotNullCheck{conn: conn}
-		},
-		"SELECT count(*) FROM dataset.test_asset WHERE test_column IS NULL",
-		"column test_column has 5 null values",
-		&pipeline.ColumnCheck{
-			Name: "not_null",
-		},
-	)
-}
-
-func TestPositiveCheck_Check(t *testing.T) {
-	t.Parallel()
-
-	runTestsFoCountZeroCheck(
-		t,
-		func(q *mockQuerierWithResult) checkRunner {
-			conn := new(mockConnectionFetcher)
-			conn.On("GetBqConnection", "test").Return(q, nil)
-			return &PositiveCheck{conn: conn}
-		},
-		"SELECT count(*) FROM dataset.test_asset WHERE test_column <= 0",
-		"column test_column has 5 non-positive values",
-		&pipeline.ColumnCheck{
-			Name: "positive",
-		},
-	)
-}
-
-func TestNonNegativeCheck_Check(t *testing.T) {
-	t.Parallel()
-
-	runTestsFoCountZeroCheck(
-		t,
-		func(q *mockQuerierWithResult) checkRunner {
-			conn := new(mockConnectionFetcher)
-			conn.On("GetBqConnection", "test").Return(q, nil)
-			return &NonNegativeCheck{conn: conn}
-		},
-		"SELECT count(*) FROM dataset.test_asset WHERE test_column < 0",
-		"column test_column has 5 negative values",
-		&pipeline.ColumnCheck{
-			Name: "non_negative",
-		},
-	)
-}
-
-func TestUniqueCheck_Check(t *testing.T) {
-	t.Parallel()
-
-	runTestsFoCountZeroCheck(
-		t,
-		func(q *mockQuerierWithResult) checkRunner {
-			conn := new(mockConnectionFetcher)
-			conn.On("GetBqConnection", "test").Return(q, nil)
-			return &UniqueCheck{conn: conn}
-		},
-		"SELECT COUNT(test_column) - COUNT(DISTINCT test_column) FROM dataset.test_asset",
-		"column test_column has 5 non-unique values",
-		&pipeline.ColumnCheck{
-			Name: "unique",
-		},
-	)
+	return get.(DB), args.Error(1)
 }
 
 func TestAcceptedValuesCheck_Check(t *testing.T) {
@@ -128,7 +67,7 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 		t,
 		func(q *mockQuerierWithResult) checkRunner {
 			conn := new(mockConnectionFetcher)
-			conn.On("GetBqConnection", "test").Return(q, nil)
+			conn.On("GetConnection", "test").Return(q, nil)
 			return &AcceptedValuesCheck{conn: conn}
 		},
 		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN (\"test\",\"test2\")",
@@ -145,7 +84,7 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 		t,
 		func(q *mockQuerierWithResult) checkRunner {
 			conn := new(mockConnectionFetcher)
-			conn.On("GetBqConnection", "test").Return(q, nil)
+			conn.On("GetConnection", "test").Return(q, nil)
 			return &AcceptedValuesCheck{conn: conn}
 		},
 		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN (\"1\",\"2\")",
@@ -308,8 +247,8 @@ func TestCustomCheck(t *testing.T) {
 			tt.setup(q)
 
 			conn := new(mockConnectionFetcher)
-			conn.On("GetBqConnection", "test").Return(q, nil)
-			n := &CustomCheck{conn: conn}
+			conn.On("GetConnection", "test").Return(q, nil)
+			n := ansisql.NewCustomCheck(conn)
 
 			testInstance := &scheduler.CustomCheckInstance{
 				AssetInstance: &scheduler.AssetInstance{
@@ -346,7 +285,7 @@ func TestPatternCheck_Check(t *testing.T) {
 		t,
 		func(q *mockQuerierWithResult) checkRunner {
 			conn := new(mockConnectionFetcher)
-			conn.On("GetBqConnection", "test").Return(q, nil)
+			conn.On("GetConnection", "test").Return(q, nil)
 			return &PatternCheck{conn: conn}
 		},
 		"SELECT count(*) FROM dataset.test_asset WHERE REGEXP_CONTAINS(test_column, r'(a|b)')",

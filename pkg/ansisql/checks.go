@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/bruin-data/bruin/pkg/helpers"
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
@@ -184,16 +185,31 @@ func (c *NegativeCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInst
 	}).Check(ctx, ti)
 }
 
+type renderer interface {
+	Render(query string) (string, error)
+}
+
 type CustomCheck struct {
-	conn connectionFetcher
+	conn     connectionFetcher
+	renderer renderer
 }
 
 func NewCustomCheck(conn connectionFetcher) *CustomCheck {
-	return &CustomCheck{conn: conn}
+	return &CustomCheck{conn: conn, renderer: jinja.NewRendererWithYesterday()}
 }
 
 func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstance) error {
-	return NewCountableQueryCheck(c.conn, ti.Check.Value, &query.Query{Query: ti.Check.Query}, ti.Check.Name, func(count int64) error {
+	qq := ti.Check.Query
+	if c.renderer != nil {
+		rendered, err := c.renderer.Render(qq)
+		if err != nil {
+			return errors.Wrap(err, "failed to render custom check query")
+		}
+
+		qq = rendered
+	}
+
+	return NewCountableQueryCheck(c.conn, ti.Check.Value, &query.Query{Query: qq}, ti.Check.Name, func(count int64) error {
 		return errors.Errorf("custom check '%s' has returned %d instead of the expected %d", ti.Check.Name, count, ti.Check.Value)
 	}).CustomCheck(ctx, ti)
 }
@@ -234,9 +250,9 @@ type CustomCheckOperator struct {
 	checkRunner CustomCheckRunner
 }
 
-func NewCustomCheckOperator(manager connectionFetcher) *CustomCheckOperator {
+func NewCustomCheckOperator(manager connectionFetcher, r *jinja.Renderer) *CustomCheckOperator {
 	return &CustomCheckOperator{
-		checkRunner: &CustomCheck{conn: manager},
+		checkRunner: &CustomCheck{conn: manager, renderer: r},
 	}
 }
 

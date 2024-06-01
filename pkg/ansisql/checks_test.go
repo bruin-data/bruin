@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -215,11 +216,12 @@ func runTestsFoCountZeroCheck(t *testing.T, instanceBuilder func(q *mockQuerierW
 func TestCustomCheck(t *testing.T) {
 	t.Parallel()
 
-	expectedQueryString := "SELECT 1"
-	expectedQuery := &query.Query{Query: expectedQueryString}
+	checkQuery := "SELECT {{ 1+2 }}"
+	expectedRenderedQuery := "SELECT 3"
+	checkQueryInstance := &query.Query{Query: expectedRenderedQuery}
 	setupFunc := func(val [][]interface{}, err error) func(n *mockQuerierWithResult) {
 		return func(q *mockQuerierWithResult) {
-			q.On("Select", mock.Anything, expectedQuery).
+			q.On("Select", mock.Anything, checkQueryInstance).
 				Return(val, err).
 				Once()
 		}
@@ -276,7 +278,7 @@ func TestCustomCheck(t *testing.T) {
 
 			conn := new(mockConnectionFetcher)
 			conn.On("GetConnection", "test").Return(q, nil)
-			n := &CustomCheck{conn: conn}
+			n := &CustomCheck{conn: conn, renderer: jinja.NewRendererWithYesterday()}
 
 			testInstance := &scheduler.CustomCheckInstance{
 				AssetInstance: &scheduler.AssetInstance{
@@ -294,7 +296,7 @@ func TestCustomCheck(t *testing.T) {
 				Check: &pipeline.CustomCheck{
 					Name:  "check1",
 					Value: 5,
-					Query: expectedQueryString,
+					Query: checkQuery,
 				},
 			}
 

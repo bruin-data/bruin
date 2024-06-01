@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -21,6 +22,7 @@ type queryExtractor interface {
 
 type connectionFetcher interface {
 	GetBqConnection(name string) (DB, error)
+	GetConnection(name string) (interface{}, error)
 }
 
 type BasicOperator struct {
@@ -87,11 +89,11 @@ type ColumnCheckOperator struct {
 func NewColumnCheckOperator(manager connectionFetcher) (*ColumnCheckOperator, error) {
 	return &ColumnCheckOperator{
 		checkRunners: map[string]checkRunner{
-			"not_null":        &NotNullCheck{conn: manager},
-			"unique":          &UniqueCheck{conn: manager},
-			"positive":        &PositiveCheck{conn: manager},
-			"non_negative":    &NonNegativeCheck{conn: manager},
-			"negative":        &NegativeCheck{conn: manager},
+			"not_null":        ansisql.NewNotNullCheck(manager),
+			"unique":          ansisql.NewUniqueCheck(manager),
+			"positive":        ansisql.NewPositiveCheck(manager),
+			"non_negative":    ansisql.NewNonNegativeCheck(manager),
+			"negative":        ansisql.NewNegativeCheck(manager),
 			"accepted_values": &AcceptedValuesCheck{conn: manager},
 			"pattern":         &PatternCheck{conn: manager},
 		},
@@ -110,29 +112,6 @@ func (o ColumnCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance)
 	}
 
 	return executor.Check(ctx, test)
-}
-
-type customCheckRunner interface {
-	Check(ctx context.Context, ti *scheduler.CustomCheckInstance) error
-}
-
-func NewCustomCheckOperator(manager connectionFetcher) (*CustomCheckOperator, error) {
-	return &CustomCheckOperator{
-		checkRunner: &CustomCheck{conn: manager},
-	}, nil
-}
-
-type CustomCheckOperator struct {
-	checkRunner customCheckRunner
-}
-
-func (o *CustomCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
-	instance, ok := ti.(*scheduler.CustomCheckInstance)
-	if !ok {
-		return errors.New("cannot run a non-custom check instance")
-	}
-
-	return o.checkRunner.Check(ctx, instance)
 }
 
 type MetadataPushOperator struct {
