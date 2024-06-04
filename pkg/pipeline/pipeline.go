@@ -326,6 +326,7 @@ type Asset struct {
 	Instance        string             `json:"instance"`
 	Owner           string             `json:"owner"`
 	Metadata        EmptyStringMap     `json:"metadata"`
+	Tags            EmptyStringArray   `json:"tags"`
 
 	Pipeline *Pipeline `json:"-"`
 
@@ -438,6 +439,34 @@ func (b *EmptyStringMap) UnmarshalJSON(data []byte) error {
 	}
 
 	*b = v
+	return nil
+}
+
+type EmptyStringArray []string
+
+func (a EmptyStringArray) MarshalJSON() ([]byte, error) {
+	if a == nil {
+		return json.Marshal([]string{})
+	}
+
+	return json.Marshal([]string(a))
+}
+
+func (a *EmptyStringArray) UnmarshalJSON(data []byte) error {
+	if data == nil {
+		return nil
+	}
+
+	var v []string
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+
+	if len(v) == 0 {
+		return nil
+	}
+
+	*a = v
 	return nil
 }
 
@@ -624,6 +653,19 @@ func (p *Pipeline) GetAssetByName(assetName string) *Asset {
 	}
 
 	return asset
+}
+
+func (p *Pipeline) GetAssetsByTag(tag string) []*Asset {
+	assets := make([]*Asset, 0)
+	for _, asset := range p.Assets {
+		for _, t := range asset.Tags {
+			if t == tag {
+				assets = append(assets, asset)
+			}
+		}
+	}
+
+	return assets
 }
 
 type TaskCreator func(path string) (*Asset, error)

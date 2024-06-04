@@ -42,7 +42,8 @@
       "image": "",
       "instance": "",
       "owner": "",
-      "metadata": {}
+      "metadata": {},
+      "tags": []
     },
     {
       "id": "a01e7580b118b5fbbdc1f7c8de6b8c377c684727e4e8ad574e9153a3dbd46dd1",
@@ -73,7 +74,8 @@
       "image": "",
       "instance": "",
       "owner": "",
-      "metadata": {}
+      "metadata": {},
+      "tags": []
     },
     {
       "id": "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
@@ -177,7 +179,8 @@
       "image": "python:3.11",
       "instance": "b1.nano",
       "owner": "jane.doe@getbruin.com",
-      "metadata": {}
+      "metadata": {},
+      "tags": ["tag1", "tag2:value2"]
     }
   ],
   "notifications": {
