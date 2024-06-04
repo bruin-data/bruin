@@ -99,6 +99,11 @@ func Run(isDebug *bool) *cli.Command {
 				Aliases: []string{"r"},
 				Usage:   "truncate the table before running",
 			},
+			&cli.StringFlag{
+				Name:    "tag",
+				Aliases: []string{"t"},
+				Usage:   "pick the assets with the given tag",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			defer func() {
@@ -170,8 +175,12 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			runningForAnAsset := isPathReferencingAsset(inputPath)
-			var task *pipeline.Asset
+			if runningForAnAsset && c.String("tag") != "" {
+				errorPrinter.Printf("You cannot use the '--tag' flag when running a single asset.\n")
+				return cli.Exit("", 1)
+			}
 
+			var task *pipeline.Asset
 			runDownstreamTasks := false
 			if runningForAnAsset {
 				task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath)
@@ -251,13 +260,30 @@ func Run(isDebug *bool) *cli.Command {
 
 			s := scheduler.NewScheduler(logger, foundPipeline, c.Bool("push-metadata"))
 
-			infoPrinter.Printf("\nStarting the pipeline execution...\n\n")
+			infoPrinter.Printf("\nStarting the pipeline execution...\n")
 
 			if task != nil {
 				logger.Debug("marking single task to run: ", task.Name)
 				s.MarkAll(scheduler.Succeeded)
 				s.MarkTask(task, scheduler.Pending, runDownstreamTasks)
 			}
+
+			tag := c.String("tag")
+			if tag != "" {
+				assetsByTag := foundPipeline.GetAssetsByTag(tag)
+				if len(assetsByTag) == 0 {
+					errorPrinter.Printf("No assets found with the tag '%s'\n", tag)
+					return cli.Exit("", 1)
+				}
+
+				logger.Debugf("marking assets with tag '%s' to run", tag)
+				s.MarkAll(scheduler.Succeeded)
+				s.MarkByTag(tag, scheduler.Pending, runDownstreamTasks)
+
+				infoPrinter.Printf("Running only the assets with tag '%s', found %d assets.\n", tag, len(assetsByTag))
+			}
+
+			infoPrinter.Println()
 
 			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, runID, c.Bool("full-refresh"))
 			if err != nil {

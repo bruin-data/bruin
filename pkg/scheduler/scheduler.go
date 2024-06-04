@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
@@ -244,6 +245,21 @@ func (s *Scheduler) MarkTask(task *pipeline.Asset, status TaskInstanceStatus, do
 		for _, i := range instance {
 			s.MarkTaskInstance(i, status, downstream)
 		}
+	}
+}
+
+func (s *Scheduler) MarkByTag(tag string, status TaskInstanceStatus, downstream bool) {
+	for _, instance := range s.taskInstances {
+		asset := instance.GetAsset()
+		if len(asset.Tags) == 0 {
+			continue
+		}
+
+		if !slices.Contains(asset.Tags, tag) {
+			continue
+		}
+
+		s.MarkTaskInstance(instance, status, downstream)
 	}
 }
 

@@ -93,7 +93,7 @@ You should get an output that looks like this:
 Pipeline: bruin-example (.)
   No issues found
 
-✓ Successfully validated 2 tasks across 1 pipeline, all good.
+✓ Successfully validated 2 assets across 1 pipeline, all good.
 ```
 
 If you have defined your credentials, bruin will automatically detect them and validate all of your queries using

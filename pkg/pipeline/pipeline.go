@@ -655,6 +655,19 @@ func (p *Pipeline) GetAssetByName(assetName string) *Asset {
 	return asset
 }
 
+func (p *Pipeline) GetAssetsByTag(tag string) []*Asset {
+	assets := make([]*Asset, 0)
+	for _, asset := range p.Assets {
+		for _, t := range asset.Tags {
+			if t == tag {
+				assets = append(assets, asset)
+			}
+		}
+	}
+
+	return assets
+}
+
 type TaskCreator func(path string) (*Asset, error)
 
 type BuilderConfig struct {

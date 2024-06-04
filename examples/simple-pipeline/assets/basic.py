@@ -1,24 +1,10 @@
 """ @bruin
 name: basic
 type: python
-columns:
-    - name: date
-      checks:
-        - name: not_null
-    - name: wind
-      checks:
-        - name: not_null
+tags:
+    - tag1
+    - tag2
 
-custom_checks:
-    - name: check1
-      query:
-        SELECT COUNT(DISTINCT power_plant_id)
-        FROM earth_external.epias_power_generation
-        WHERE loaded_at = (
-            SELECT MAX(loaded_at)
-            FROM `earth_external.epias_power_generation`
-        )
-      value: 12
 @bruin """
 
 import json

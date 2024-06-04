@@ -221,7 +221,7 @@ func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer li
 		taskCount += len(p.Pipeline.Assets)
 	}
 
-	successPrinter.Printf("\n✓ Successfully validated %d tasks across %d %s, all good.\n", taskCount, pipelineCount, pipelineStr)
+	successPrinter.Printf("\n✓ Successfully validated %d assets across %d %s, all good.\n", taskCount, pipelineCount, pipelineStr)
 	return nil
 }
 
