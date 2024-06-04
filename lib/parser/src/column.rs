@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use sqlparser::ast::{Expr, Ident, SelectItem, SetExpr, Statement};
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
@@ -27,6 +29,10 @@ impl Column {
     }
 }
 
+struct Table {
+    references: Vec<RealColumn>,
+}
+
 pub fn extract_columns_from_query(sql: &str) -> Vec<Column> {
     let dialect = GenericDialect {};
     let statements = Parser::parse_sql(&dialect, sql).unwrap();
@@ -45,7 +51,7 @@ pub fn extract_columns_from_query(sql: &str) -> Vec<Column> {
                                 Expr::Identifier(ident) => {
                                     let mut col = Column::new(ident.value);
                                     col.add_reference(RealColumn {
-                                        name: ident.value,
+                                        name: col.name.clone(),
                                         table: None
                                     });
 
@@ -59,14 +65,6 @@ pub fn extract_columns_from_query(sql: &str) -> Vec<Column> {
                                     });
 
                                     columns.push(col);
-                                }
-                                Expr::Case {
-                                    operand,
-                                    conditions,
-                                    results,
-                                    else_result,
-                                } => {
-                                    handle_case_expr(operand, conditions, results, else_result);
                                 }
                                 _ => {
                                     println!("Expr: {:?}", expr);
@@ -91,18 +89,26 @@ pub fn extract_columns_from_query(sql: &str) -> Vec<Column> {
                                     results,
                                     else_result,
                                 } => {
-                                    // let idents =
-                                    //     handle_case_expr(operand, conditions, results, else_result);
-                                    // for ident in idents {
-                                    //     columns.push(Column::new(
-                                    //         ident.value,
-                                    //         Some(alias.value.clone()),
-                                    //     ));
-                                    // }
+                                    handle_case_expr(alias.value.clone(), operand, conditions, results, else_result, &mut columns);
                                 }
                                 _ => {}
                             },
                             _ => {}
+                        }
+                    }
+
+                    // extract columns from where clause
+                    if let Some(expr) = select.selection {
+                        let idents = find_idents(&expr);
+                        for ident in idents {
+                            let rc = RealColumn {
+                                name: ident.value.clone(),
+                                table: None
+                            };
+
+                            let mut col = Column::new(ident.value.clone());
+                            col.add_reference(rc);
+                            columns.push(col);
                         }
                     }
                 }
@@ -115,7 +121,30 @@ pub fn extract_columns_from_query(sql: &str) -> Vec<Column> {
     columns
 }
 
-fn handle_case_expr(
+fn handle_case_expr(name: String, operand: Option<Box<Expr>>, conditions: Vec<Expr>, results: Vec<Expr>, else_result: Option<Box<Expr>>, columns: &mut Vec<Column>) {
+    let mut col = Column::new(name);
+
+    // initialize an empty hashmap for seen idents
+    let mut seen_idents = HashMap::new();
+
+    let idents = find_idents_for_case(operand, conditions, results, else_result);
+    for ident in idents {
+        let rc = RealColumn {
+            name: ident.value.clone(),
+            table: None
+        };
+
+        if seen_idents.contains_key(&ident.value) {
+            continue;
+        }
+    
+        col.add_reference(rc);
+        seen_idents.insert(ident.value.clone(), true);
+    }
+    columns.push(col);
+}
+
+fn find_idents_for_case(
     operand: Option<Box<Expr>>,
     conditions: Vec<Expr>,
     results: Vec<Expr>,
@@ -250,25 +279,31 @@ mod tests {
         FROM items
         WHERE in_stock = true";
 
-        // let expected: Vec<Column> = vec![
-        //     Column {
-        //         name: "item_id".to_string(),
-        //         references: vec![RealColumn {
-        //             name: "item_id".to_string(),
-        //             table: "items".to_string(),
-        //         }],
-        //     },
-        //     Column {
-        //         name: "price_category".to_string(),
-        //         references: Vec::new(),
-        //     },
-        //     Column {
-        //         name: "t2.somecol".to_string(),
-        //         alias: "price_category".to_string(),
-        //         references: Vec::new(),
-        //     },
-        // ];
+        let expected: Vec<Column> = vec![
+            Column {
+                name: "item_id".to_string(),
+                references: vec![RealColumn {
+                    name: "item_id".to_string(),
+                    table: None,
+                }],
+            },
+            Column {
+                name: "price_category".to_string(),
+                references: vec![
+                    RealColumn {
+                        name: "price".to_string(),
+                        table: None,
+                    },
+                    RealColumn {
+                        name: "t2.somecol".to_string(),
+                        table: None,
+                    }
+                ],
+            },
+        ];
 
-        extract_columns_from_query(query);
+        let res = extract_columns_from_query(query);
+
+        assert_eq!(res, expected);
     }
 }
