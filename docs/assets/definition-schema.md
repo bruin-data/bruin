@@ -16,6 +16,10 @@ depends:
 materialization:
    type: table
 
+tags:
+   - dashboard
+   - team:xyz
+   
 columns:
   - name: one
     type: integer
@@ -112,6 +116,11 @@ Define the columns that will be used for the clustering of the resulting table. 
 ### `materialization > incremental_key`
 
 This is the column of the table that will be used for incremental updates of the table.
+- **Type:** `String[]`
+- **Default:** `[]`
+
+## `tags`
+A list of tags that can be used to categorize the asset. This is useful for searching and filtering assets when running.
 - **Type:** `String[]`
 - **Default:** `[]`
 
