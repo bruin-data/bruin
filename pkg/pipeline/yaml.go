@@ -148,6 +148,7 @@ type taskDefinition struct {
 	Owner           string            `yaml:"owner"`
 	Columns         []column          `yaml:"columns"`
 	CustomChecks    []customCheck     `yaml:"custom_checks"`
+	Tags            []string          `yaml:"tags"`
 }
 
 func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
@@ -267,6 +268,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Image:           definition.Image,
 		Instance:        definition.Instance,
 		Owner:           definition.Owner,
+		Tags:            definition.Tags,
 		Columns:         columns,
 		CustomChecks:    make([]CustomCheck, len(definition.CustomChecks)),
 	}

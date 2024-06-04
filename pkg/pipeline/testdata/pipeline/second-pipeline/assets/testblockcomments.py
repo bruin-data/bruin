@@ -5,6 +5,9 @@ type: python
 image: python:3.11
 instance: b1.nano
 owner: jane.doe@getbruin.com
+tags:
+    - tag1
+    - tag2:value2
 depends:
     - task1
     - task2
