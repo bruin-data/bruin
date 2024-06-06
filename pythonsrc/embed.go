@@ -1,4 +1,4 @@
-package python_src
+package pythonsrc
 
 import (
 	"embed"

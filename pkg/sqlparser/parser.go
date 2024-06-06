@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/internal/data"
-	"github.com/bruin-data/bruin/python_src"
+	"github.com/bruin-data/bruin/pythonsrc"
 	"github.com/kluctl/go-embed-python/embed_util"
 	"github.com/kluctl/go-embed-python/python"
 	"github.com/pkg/errors"
@@ -42,7 +42,7 @@ func NewSQLParser() (*SQLParser, error) {
 	}
 	ep.AddPythonPath(sqlglotDir.GetExtractedPath())
 
-	rendererSrc, err := embed_util.NewEmbeddedFilesWithTmpDir(python_src.RendererSource, tmpDir+"-jinja2-renderer", true)
+	rendererSrc, err := embed_util.NewEmbeddedFilesWithTmpDir(pythonsrc.RendererSource, tmpDir+"-jinja2-renderer", true)
 	if err != nil {
 		return nil, err
 	}
