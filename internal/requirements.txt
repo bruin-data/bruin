@@ -1,0 +1,2 @@
+sqlglot==25.0.2
+sqlglotrs==0.2.5
