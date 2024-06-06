@@ -53,7 +53,6 @@ func main() {
 			cmd.CleanCmd(),
 			cmd.Init(),
 			cmd.Internal(),
-			cmd.ParseSql(),
 		},
 	}
 
