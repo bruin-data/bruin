@@ -3,11 +3,11 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/sqlparser"
 
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	color2 "github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 )
@@ -18,7 +18,7 @@ func Internal() *cli.Command {
 		Hidden: true,
 		Subcommands: []*cli.Command{
 			ParseAsset(),
-			SqlParseTest(),
+			SQLParseTest(),
 		},
 	}
 }
@@ -39,11 +39,11 @@ func ParseAsset() *cli.Command {
 	}
 }
 
-func SqlParseTest() *cli.Command {
+func SQLParseTest() *cli.Command {
 	return &cli.Command{
 		Name: "sqlparse-test",
 		Action: func(c *cli.Context) error {
-			p, err := sqlparser.NewSqlParser()
+			p, err := sqlparser.NewSQLParser()
 			if err != nil {
 				errorPrinter.Printf("failed to initialize sqlparser module: %+v\n", err)
 				return cli.Exit("", 1)

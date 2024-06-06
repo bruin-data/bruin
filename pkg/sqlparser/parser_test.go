@@ -1,12 +1,13 @@
 package sqlparser
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestSqlParser_Lineage(t *testing.T) {
-	s, err := NewSqlParser()
+	s, err := NewSQLParser()
 	require.NoError(t, err)
 
 	err = s.Start()
@@ -303,7 +304,7 @@ func TestSqlParser_Lineage(t *testing.T) {
 		}
 	})
 
-	//wg.Wait()
+	// wg.Wait()
 	s.Close()
 	require.NoError(t, err)
 }

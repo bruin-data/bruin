@@ -4,22 +4,22 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"github.com/bruin-data/bruin/internal/data"
-	"github.com/bruin-data/bruin/python_src"
-	"github.com/kluctl/go-embed-python/embed_util"
-	"github.com/kluctl/go-embed-python/python"
-	"github.com/pkg/errors"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/bruin-data/bruin/internal/data"
+	"github.com/bruin-data/bruin/python_src"
+	"github.com/kluctl/go-embed-python/embed_util"
+	"github.com/kluctl/go-embed-python/python"
+	"github.com/pkg/errors"
 )
 
-type SqlParser struct {
+type SQLParser struct {
 	ep          *python.EmbeddedPython
-	extractDir  string
 	sqlglotDir  *embed_util.EmbeddedFiles
 	rendererSrc *embed_util.EmbeddedFiles
 
@@ -29,7 +29,7 @@ type SqlParser struct {
 	mutex  sync.Mutex
 }
 
-func NewSqlParser() (*SqlParser, error) {
+func NewSQLParser() (*SQLParser, error) {
 	tmpDir := filepath.Join(os.TempDir(), "bruin-cli-embedded")
 
 	ep, err := python.NewEmbeddedPythonWithTmpDir(tmpDir+"-python", true)
@@ -47,14 +47,14 @@ func NewSqlParser() (*SqlParser, error) {
 		return nil, err
 	}
 
-	return &SqlParser{
+	return &SQLParser{
 		ep:          ep,
 		sqlglotDir:  sqlglotDir,
 		rendererSrc: rendererSrc,
 	}, nil
 }
 
-func (s *SqlParser) Start() error {
+func (s *SQLParser) Start() error {
 	args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
 	cmd := s.ep.PythonCmd(args...)
 	cmd.Stderr = os.Stderr
@@ -108,7 +108,7 @@ type Lineage struct {
 	Columns []ColumnLineage `json:"columns"`
 }
 
-func (s *SqlParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage, error) {
+func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage, error) {
 	command := parserCommand{
 		Command: "lineage",
 		Contents: map[string]interface{}{
@@ -132,7 +132,7 @@ func (s *SqlParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage,
 	return &lineage, nil
 }
 
-func (s *SqlParser) sendCommand(pc *parserCommand) (string, error) {
+func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -151,7 +151,7 @@ func (s *SqlParser) sendCommand(pc *parserCommand) (string, error) {
 	reader := bufio.NewReader(s.stdout)
 
 	line := bytes.NewBuffer(nil)
-	for true {
+	for {
 		l, p, err := reader.ReadLine()
 		if err != nil {
 			return "", err
@@ -165,7 +165,7 @@ func (s *SqlParser) sendCommand(pc *parserCommand) (string, error) {
 	return line.String(), nil
 }
 
-func (s *SqlParser) Close() error {
+func (s *SQLParser) Close() error {
 	if s.stdin != nil {
 		_, err := s.sendCommand(&parserCommand{
 			Command: "exit",
@@ -185,7 +185,6 @@ func (s *SqlParser) Close() error {
 
 	if s.cmd != nil {
 		if s.cmd.Process != nil {
-
 			timer := time.AfterFunc(5*time.Second, func() {
 				_ = s.cmd.Process.Kill()
 			})
