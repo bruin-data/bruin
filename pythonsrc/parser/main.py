@@ -24,12 +24,22 @@ def extract_columns(parsed):
 
     return cols
 
+def get_table_name(table: exp.Table):
+    db_name = ""
+    if hasattr(table, "catalog") and len(table.catalog) > 0:
+        db_name = table.catalog + "."
+    schema_name = ""
+    if hasattr(table, "db") and len(table.db) > 0:
+        schema_name = table.db + "."
+    return db_name + schema_name + table.name
+
+
 def get_tables(query: str, dialect: str):
     parsed = parse_one(query, dialect=dialect)
     tables = extract_tables(parsed)
 
     return {
-        "tables": list(set([table.name for table in tables])),
+        "tables": list(set([get_table_name(table) for table in tables])),
     }
 
 def get_column_lineage(query: str, schema: dict, dialect: str):

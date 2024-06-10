@@ -391,6 +391,27 @@ func TestSqlParser_GetTables(t *testing.T) {
         using(a)`,
 			want: []string{"table1", "table2"},
 		},
+		{
+			name: "multiple joins",
+			sql: `SELECT *
+from raw.Bookings as bookings
+    inner join raw.Sessions as sessions on bookings.SessionId = sessions.Id
+    inner join dashboard.users as coaches on Coaches.Id = bookings.CoachId
+    inner join raw.Languages as languages on bookings.LanguageId = languages.Id
+    inner join raw.Programmes as programmes on Bookings.ProgrammeId = Programmes.Id
+    inner join dashboard.organizations as organizations on Programmes.OrganizationId = Organizations.Id
+    left join dashboard.users as users on Users.Id = bookings.UserId
+    left join raw.Teams teams on teams.Id = bookings.TeamId`,
+			want: []string{
+				"dashboard.organizations",
+				"dashboard.users",
+				"raw.Bookings",
+				"raw.Languages",
+				"raw.Programmes",
+				"raw.Sessions",
+				"raw.Teams",
+			},
+		},
 	}
 
 	t.Run("blocking group", func(t *testing.T) {
