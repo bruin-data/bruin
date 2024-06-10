@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -130,6 +131,32 @@ func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage,
 	}
 
 	return &lineage, nil
+}
+
+func (s *SQLParser) UsedTables(sql, dialect string) ([]string, error) {
+	command := parserCommand{
+		Command: "get-tables",
+		Contents: map[string]interface{}{
+			"query":   sql,
+			"dialect": dialect,
+		},
+	}
+
+	resp, err := s.sendCommand(&command)
+	if err != nil {
+		return nil, err
+	}
+
+	var tables struct {
+		Tables []string `json:"tables"`
+	}
+	err = json.Unmarshal([]byte(resp), &tables)
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(tables.Tables)
+
+	return tables.Tables, nil
 }
 
 func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
