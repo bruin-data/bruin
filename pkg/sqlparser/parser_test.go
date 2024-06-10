@@ -308,3 +308,109 @@ func TestSqlParser_Lineage(t *testing.T) {
 	s.Close()
 	require.NoError(t, err)
 }
+
+func TestSqlParser_GetTables(t *testing.T) {
+	s, err := NewSQLParser()
+	require.NoError(t, err)
+
+	err = s.Start()
+	require.NoError(t, err)
+
+	tests := []struct {
+		name    string
+		sql     string
+		want    []string
+		wantErr bool
+	}{
+		{
+			name: "nested subqueries",
+			sql: `
+            select *
+            from table1
+            join (
+                select *
+                from (
+                    select *
+                    from table2
+                ) t2
+            ) t3
+                using(a)
+        `,
+			want: []string{"table1", "table2"},
+		},
+		{
+			name: "nested subqueries with repeated aliases",
+			sql: `
+					select *
+			from table1
+			join (
+				select *
+				from (
+					select *
+					from table2
+				) t2
+			) t2
+				using(a)
+			join (
+				select *
+				from (
+					select *
+					from table3
+				) t2
+			) t3
+				using(b)`,
+			want: []string{"table1", "table2", "table3"},
+		},
+		{
+			name: "unions",
+			sql: `
+					select * from table1
+        union all
+        select * from table2
+        union all
+        select * from table3`,
+			want: []string{"table1", "table2", "table3"},
+		},
+		{
+			name: "multiple nested joins",
+			sql: `with t1 as (
+        select *
+        from table1
+        join table2
+            using(a)
+    ),
+    t2 as (
+        select *
+        from table2
+        left join table1
+            using(a)
+    )
+    select t1.*, t2.b as b2, t2.c as c2
+    from t1
+    join t2
+        using(a)`,
+			want: []string{"table1", "table2"},
+		},
+	}
+
+	t.Run("blocking group", func(t *testing.T) {
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				got, err := s.UsedTables(tt.sql, "bigquery")
+				if tt.wantErr {
+					require.Error(t, err)
+				} else {
+					require.NoError(t, err)
+				}
+
+				require.Equal(t, tt.want, got)
+			})
+		}
+	})
+
+	// wg.Wait()
+	s.Close()
+	require.NoError(t, err)
+}

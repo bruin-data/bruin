@@ -4,6 +4,15 @@ from sqlglot.optimizer import optimize, qualify
 from sqlglot.lineage import Node
 
 
+def extract_tables(parsed):
+    root = build_scope(parsed)
+    tables = []
+    for scope in root.traverse():
+        for alias, (node, source) in scope.selected_sources.items():
+            if isinstance(source, exp.Table):
+                tables.append(source)
+
+    return tables
 
 def extract_columns(parsed):
     cols = []
@@ -15,6 +24,13 @@ def extract_columns(parsed):
 
     return cols
 
+def get_tables(query: str, dialect: str):
+    parsed = parse_one(query, dialect=dialect)
+    tables = extract_tables(parsed)
+
+    return {
+        "tables": list(set([table.name for table in tables])),
+    }
 
 def get_column_lineage(query: str, schema: dict, dialect: str):
     parsed = parse_one(query, dialect=dialect)
