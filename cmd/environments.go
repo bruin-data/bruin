@@ -14,8 +14,8 @@ import (
 
 func Environments(isDebug *bool) *cli.Command {
 	return &cli.Command{
-		Name:   "environments",
-		Hidden: true,
+		Name:  "environments",
+		Usage: "manage environments defined in .bruin.yml",
 		Subcommands: []*cli.Command{
 			ListEnvironments(isDebug),
 		},
@@ -25,7 +25,7 @@ func Environments(isDebug *bool) *cli.Command {
 func ListEnvironments(isDebug *bool) *cli.Command {
 	return &cli.Command{
 		Name:  "list",
-		Usage: "list environments for the current path",
+		Usage: "list environments found in the current repo",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "output",
