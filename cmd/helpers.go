@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -48,4 +49,19 @@ func RecoverFromPanic() {
 		log.Println(err)
 		log.Println("=======================================")
 	}
+}
+
+func printErrorJSON(err error) {
+	type ErrorResponse struct {
+		Error error `json:"error"`
+	}
+
+	js, err := json.Marshal(ErrorResponse{
+		Error: err,
+	})
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	fmt.Println(js)
 }

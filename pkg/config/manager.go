@@ -228,6 +228,17 @@ type Config struct {
 	Environments            map[string]Environment `yaml:"environments"`
 }
 
+func (c *Config) GetEnvironmentNames() []string {
+	envs := make([]string, len(c.Environments))
+	i := 0
+	for name := range c.Environments {
+		envs[i] = name
+		i++
+	}
+
+	return envs
+}
+
 func (c *Config) GetSecretByKey(key string) (string, error) {
 	return c.SelectedEnvironment.GetSecretByKey(key)
 }
