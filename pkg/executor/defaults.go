@@ -42,6 +42,9 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 	"dbt": {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
+	"dbt.test": {
+		scheduler.TaskInstanceTypeMain: NoOpOperator{},
+	},
 	pipeline.AssetTypeEmpty: {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
