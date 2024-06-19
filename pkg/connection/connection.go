@@ -6,12 +6,14 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/mongo"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/notion"
 	"github.com/bruin-data/bruin/pkg/postgres"
+	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc"
@@ -27,6 +29,8 @@ type Manager struct {
 	Mysql     map[string]*mysql.Client
 	Notion    map[string]*notion.Client
 	HANA      map[string]*hana.Client
+	Shopify   map[string]*shopify.Client
+	Gorgias   map[string]*gorgias.Client
 
 	mutex sync.Mutex
 }
@@ -81,6 +85,18 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connHANA, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.HANA)...)
+
+	connShopify, err := m.GetShopifyConnectionWithoutDefault(name)
+	if err == nil {
+		return connShopify, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Shopify)...)
+
+	connGorgias, err := m.GetGorgiasConnectionWithoutDefault(name)
+	if err == nil {
+		return connGorgias, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Gorgias)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -251,6 +267,50 @@ func (m *Manager) GetHANAConnectionWithoutDefault(name string) (*hana.Client, er
 	db, ok := m.HANA[name]
 	if !ok {
 		return nil, errors.Errorf("hana connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetShopifyConnection(name string) (*shopify.Client, error) {
+	db, err := m.GetShopifyConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetShopifyConnectionWithoutDefault("shopify-default")
+}
+
+func (m *Manager) GetShopifyConnectionWithoutDefault(name string) (*shopify.Client, error) {
+	if m.Shopify == nil {
+		return nil, errors.New("no shopify connections found")
+	}
+
+	db, ok := m.Shopify[name]
+	if !ok {
+		return nil, errors.Errorf("shopify connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetGorgiasConnection(name string) (*gorgias.Client, error) {
+	db, err := m.GetGorgiasConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetGorgiasConnectionWithoutDefault("gorgias-default")
+}
+
+func (m *Manager) GetGorgiasConnectionWithoutDefault(name string) (*gorgias.Client, error) {
+	if m.Gorgias == nil {
+		return nil, errors.New("no gorgias connections found")
+	}
+
+	db, ok := m.Gorgias[name]
+	if !ok {
+		return nil, errors.Errorf("hana gorgias not found for '%s'", name)
 	}
 
 	return db, nil
@@ -462,6 +522,51 @@ func (m *Manager) AddNotionConnectionFromConfig(connection *config.NotionConnect
 	return nil
 }
 
+func (m *Manager) AddShopifyConnectionFromConfig(connection *config.ShopifyConnection) error {
+	m.mutex.Lock()
+	if m.Shopify == nil {
+		m.Shopify = make(map[string]*shopify.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := shopify.NewClient(&shopify.Config{
+		APIKey: connection.APIKey,
+		URL:    connection.URL,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Shopify[connection.Name] = client
+
+	return nil
+}
+
+func (m *Manager) AddGorgiasConnectionFromConfig(connection *config.GorgiasConnection) error {
+	m.mutex.Lock()
+	if m.Gorgias == nil {
+		m.Gorgias = make(map[string]*gorgias.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := gorgias.NewClient(&gorgias.Config{
+		APIKey: connection.APIKey,
+		Domain: connection.Domain,
+		Email:  connection.Email,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Gorgias[connection.Name] = client
+
+	return nil
+}
+
 func (m *Manager) AddHANAConnectionFromConfig(connection *config.HANAConnection) error {
 	m.mutex.Lock()
 	if m.HANA == nil {
@@ -572,11 +677,20 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		})
 	}
 
-	for _, conn := range cm.SelectedEnvironment.Connections.HANA {
+	for _, conn := range cm.SelectedEnvironment.Connections.Shopify {
 		wg.Go(func() {
-			err := connectionManager.AddHANAConnectionFromConfig(&conn)
+			err := connectionManager.AddShopifyConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add hana connection '%s'", conn.Name))
+				panic(errors.Wrapf(err, "failed to add shopify connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Gorgias {
+		wg.Go(func() {
+			err := connectionManager.AddGorgiasConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add gorgias connection '%s'", conn.Name))
 			}
 		})
 	}

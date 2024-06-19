@@ -84,6 +84,19 @@ environments:
           port: 39013
           database: "hanadb"
 
+      shopify:
+        - name: conn11
+          api_key: "shopifykey"
+          url: "shopifyurl"
+
+      gorgias:
+        - name: conn12
+          api_key: "gorgiaskey"
+          domain: "gorgiasurl"
+          email: "gorgiasemail"
+
+
+
       generic:
         - name: key1
           value: value1
