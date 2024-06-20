@@ -235,6 +235,53 @@ func TestManager_AddNotionConnectionFromConfigConnectionFromConfig(t *testing.T)
 	assert.NotNil(t, res)
 }
 
+func TestManager_AddShopiyConnectionFromConfigConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{}
+
+	res, err := m.GetShopifyConnection("test")
+	require.Error(t, err)
+	assert.Nil(t, res)
+
+	configuration := &config.ShopifyConnection{
+		Name:   "test",
+		APIKey: "xXXXXxxxxxYYY",
+		URL:    "testxxx",
+	}
+
+	err = m.AddShopifyConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, err = m.GetShopifyConnection("test")
+	require.NoError(t, err)
+	assert.NotNil(t, res)
+}
+
+func TestManager_AddGorgiasConnectionFromConfigConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{}
+
+	res, err := m.GetGorgiasConnection("test")
+	require.Error(t, err)
+	assert.Nil(t, res)
+
+	configuration := &config.GorgiasConnection{
+		Name:   "test",
+		APIKey: "xXXXXxxxxxYYY",
+		Domain: "domain",
+		Email:  "email",
+	}
+
+	err = m.AddGorgiasConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, err = m.GetGorgiasConnection("test")
+	require.NoError(t, err)
+	assert.NotNil(t, res)
+}
+
 func TestManager_AddHANAConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 

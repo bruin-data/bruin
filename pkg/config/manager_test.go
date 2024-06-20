@@ -115,6 +115,21 @@ func TestLoadFromFile(t *testing.T) {
 					Port:     39013,
 				},
 			},
+			Shopify: []ShopifyConnection{
+				{
+					Name:   "conn11",
+					APIKey: "shopifykey",
+					URL:    "shopifyurl",
+				},
+			},
+			Gorgias: []GorgiasConnection{
+				{
+					Name:   "conn12",
+					APIKey: "gorgiaskey",
+					Domain: "gorgiasurl",
+					Email:  "gorgiasemail",
+				},
+			},
 			Generic: []GenericConnection{
 				{
 					Name:  "key1",
@@ -216,6 +231,8 @@ func TestLoadOrCreate(t *testing.T) {
 			MySQL:     []MySQLConnection{},
 			Notion:    []NotionConnection{},
 			HANA:      []HANAConnection{},
+			Shopify:   []ShopifyConnection{},
+			Gorgias:   []GorgiasConnection{},
 		},
 	}
 
