@@ -10,5 +10,5 @@ type Config struct {
 }
 
 func (c *Config) GetIngestrURI() string {
-	return fmt.Sprintf("gorgias://%s?api_key=%s", c.URL, c.APIKey)
+	return fmt.Sprintf("shopify://%s?api_key=%s", c.URL, c.APIKey)
 }
