@@ -45,12 +45,25 @@ type GoogleCloudPlatformConnection struct {
 }
 
 type MongoConnection struct {
-	Name     string `yaml:"name" json:"name"`
+	Name     string `yaml:"name"`
 	Username string `yaml:"username" json:"username"`
 	Password string `yaml:"password" json:"password"`
 	Host     string `yaml:"host"     json:"host"`
 	Port     int    `yaml:"port"     json:"port"`
 	Database string `yaml:"database" json:"database"`
+}
+
+type ShopifyConnection struct {
+	Name   string `yaml:"name"`
+	URL    string `yaml:"url"`
+	APIKey string `yaml:"api_key"`
+}
+
+type GorgiasConnection struct {
+	Name   string `yaml:"name"`
+	Domain string `yaml:"domain"`
+	APIKey string `yaml:"api_key"`
+	Email  string `yaml:"email"`
 }
 
 type MySQLConnection struct {
@@ -148,6 +161,8 @@ type Connections struct {
 	MySQL               []MySQLConnection               `yaml:"mysql"`
 	Notion              []NotionConnection              `yaml:"notion"`
 	HANA                []HANAConnection                `yaml:"hana"`
+	Shopify             []ShopifyConnection             `yaml:"shopify"`
+	Gorgias             []GorgiasConnection             `yaml:"gorgias"`
 	Generic             []GenericConnection             `yaml:"generic"`
 
 	byKey map[string]any
@@ -193,6 +208,14 @@ func (c *Connections) buildConnectionKeyMap() {
 
 	for i, conn := range c.HANA {
 		c.byKey[conn.Name] = &(c.HANA[i])
+	}
+
+	for i, conn := range c.Shopify {
+		c.byKey[conn.Name] = &(c.Shopify[i])
+	}
+
+	for i, conn := range c.Gorgias {
+		c.byKey[conn.Name] = &(c.Gorgias[i])
 	}
 
 	for i, conn := range c.Generic {

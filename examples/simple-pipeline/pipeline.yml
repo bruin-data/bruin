@@ -12,4 +12,6 @@ default_connections:
   mysql: "some-mysql"
   notion: "some-notion"
   hana: "some-hana"
+  shopify: "some-shopify"
+  gorgias: "some-gorgias"
 

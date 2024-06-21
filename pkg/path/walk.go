@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var SkipDirs = []string{".git", ".github", ".vscode", "node_modules", "dist", "build", "target", "vendor", ".venv", ".env", "env", "dbt_packages"}
+var SkipDirs = []string{".git", ".github", ".vscode", "node_modules", "dist", "build", "target", "vendor", ".venv", ".env", "env", "venv", "dbt_packages"}
 
 func GetPipelinePaths(root, pipelineDefinitionFile string) ([]string, error) {
 	var pipelinePaths []string
