@@ -480,6 +480,20 @@ func (ac AssetCollection) MarshalJSON() ([]byte, error) {
 	return json.Marshal([]*Asset(ac))
 }
 
+func PipelineFromPath(filePath string, fs afero.Fs) (*Pipeline, error) {
+	yamlError := new(path.YamlParseError)
+	var pl Pipeline
+	err := path.ReadYaml(fs, filePath, &pl)
+	if err != nil && errors.As(err, &yamlError) {
+		return nil, &ParseError{Msg: "error parsing bruin pipeline definition :" + err.Error()}
+	}
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing bruin pipeline file at '%s'", filePath)
+	}
+
+	return &pl, nil
+}
+
 type Pipeline struct {
 	LegacyID           string          `yaml:"id" json:"legacy_id"`
 	Name               string          `yaml:"name" json:"name"`
@@ -708,14 +722,10 @@ func (b *builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 	} else {
 		pathToPipeline = filepath.Dir(pathToPipeline)
 	}
-	yamlError := new(path.YamlParseError)
-	var pipeline Pipeline
-	err := path.ReadYaml(b.fs, pipelineFilePath, &pipeline)
-	if err != nil && errors.As(err, &yamlError) {
-		return nil, &ParseError{Msg: fmt.Sprintf("error parsing pipeline file at '%s':%s", pipelineFilePath, err.Error())}
-	}
+
+	pipeline, err := PipelineFromPath(pipelineFilePath, b.fs)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error reading pipeline file at '%s'", pipelineFilePath)
+		return nil, err
 	}
 
 	// this is needed until we migrate all the pipelines to use the new naming convention
@@ -787,7 +797,7 @@ func (b *builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 		}
 	}
 
-	return &pipeline, nil
+	return pipeline, nil
 }
 
 func fileHasSuffix(arr []string, str string) bool {
