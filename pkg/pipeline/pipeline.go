@@ -3,7 +3,7 @@ package pipeline
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/entity"
+	"github.com/bruin-data/bruin/pkg/glossary"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -409,8 +409,8 @@ func (a *Asset) ColumnNamesWithPrimaryKey() []string {
 	return columns
 }
 
-func (a *Asset) EnrichFromEntityAttributes(entities []*entity.Entity) error {
-	entityMap := make(map[string]*entity.Entity, len(entities))
+func (a *Asset) EnrichFromEntityAttributes(entities []*glossary.Entity) error {
+	entityMap := make(map[string]*glossary.Entity, len(entities))
 	for _, e := range entities {
 		entityMap[e.Name] = e
 	}
@@ -742,8 +742,8 @@ type BuilderConfig struct {
 	TasksFileSuffixes   []string
 }
 
-type entityReader interface {
-	GetEntities() ([]*entity.Entity, error)
+type glossaryReader interface {
+	GetEntities() ([]*glossary.Entity, error)
 }
 
 type builder struct {
@@ -752,7 +752,7 @@ type builder struct {
 	commentTaskCreator TaskCreator
 	fs                 afero.Fs
 
-	EntityReader entityReader
+	GlossaryReader glossaryReader
 }
 
 type ParseError struct {
@@ -842,9 +842,9 @@ func (b *builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 		pipeline.tasksByName[task.Name] = task
 	}
 
-	var entities []*entity.Entity
-	if b.EntityReader != nil {
-		entities, err = b.EntityReader.GetEntities()
+	var entities []*glossary.Entity
+	if b.GlossaryReader != nil {
+		entities, err = b.GlossaryReader.GetEntities()
 		if err != nil {
 			return nil, errors.Wrap(err, "error getting entities")
 		}

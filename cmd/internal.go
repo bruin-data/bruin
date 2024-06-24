@@ -3,8 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/entity"
-
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -146,7 +144,7 @@ func (r *ParseCommand) Run(assetPath string) error {
 		return cli.Exit("", 1)
 	}
 
-	entities, err := entity.LoadEntitiesFromFile(repo.Path + "/entities.yaml")
+	entities, err := glossary.LoadEntitiesFromFile(repo.Path + "/entities.yaml")
 	if err != nil {
 		r.errorPrinter.Println(err)
 		return cli.Exit("", 1)

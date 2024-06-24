@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/entity"
+	"github.com/bruin-data/bruin/pkg/glossary"
 	"io"
 	"os"
 	path2 "path"
@@ -148,9 +148,9 @@ func Lint(isDebug *bool) *cli.Command {
 			}
 
 			builder := DefaultPipelineBuilder
-			builder.EntityReader = &entity.EntityReader{
+			builder.GlossaryReader = &glossary.GlossaryReader{
 				RootPath:  repoRoot.Path,
-				FileNames: []string{"entities.yml", "entities.yaml"},
+				FileNames: []string{"glossary.yml", "glossary.yaml"},
 			}
 
 			var result *lint.PipelineAnalysisResult
