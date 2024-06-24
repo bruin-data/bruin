@@ -33,6 +33,8 @@ const (
 	AssetTypeIngestr              = AssetType("ingestr")
 
 	RunConfigFullRefresh = RunConfig("full-refresh")
+	RunConfigStartDate   = RunConfig("start-date")
+	RunConfigEndDate     = RunConfig("end-date")
 )
 
 var supportedFileSuffixes = []string{".yml", ".yaml", ".sql", ".py"}

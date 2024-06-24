@@ -297,10 +297,12 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			ex.Start(s.WorkQueue, s.Results)
-
 			runCtx := context.Background()
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, c.Bool("full-refresh"))
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
+
+			ex.Start(runCtx, s.WorkQueue, s.Results)
 
 			start := time.Now()
 			results := s.Run(runCtx)

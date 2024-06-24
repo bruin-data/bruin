@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/executor"
@@ -222,6 +224,21 @@ func (o *BasicOperator) ConvertTaskInstanceToIngestrCommand(ctx context.Context,
 	sqlBackend, ok := ti.GetAsset().Parameters["sql_backend"]
 	if ok {
 		cmdArgs = append(cmdArgs, "--sql-backend", sqlBackend)
+	}
+
+	injectIntervals, ok := ti.GetAsset().Parameters["inject_intervals"]
+	if ok {
+		boolInject, err := strconv.ParseBool(injectIntervals)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to parse inject_intervals")
+		}
+
+		if boolInject {
+			startDateString := ctx.Value(pipeline.RunConfigStartDate).(time.Time).Format(time.RFC3339)
+			endDateString := ctx.Value(pipeline.RunConfigEndDate).(time.Time).Format(time.RFC3339)
+
+			cmdArgs = append(cmdArgs, "--interval-start", startDateString, "--interval-end", endDateString)
+		}
 	}
 
 	fullRefresh := ctx.Value(pipeline.RunConfigFullRefresh)

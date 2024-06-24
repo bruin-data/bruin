@@ -69,9 +69,9 @@ func NewConcurrent(
 	}, nil
 }
 
-func (c Concurrent) Start(input chan scheduler.TaskInstance, result chan<- *scheduler.TaskExecutionResult) {
+func (c Concurrent) Start(ctx context.Context, input chan scheduler.TaskInstance, result chan<- *scheduler.TaskExecutionResult) {
 	for i := 0; i < c.workerCount; i++ {
-		go c.workers[i].run(input, result)
+		go c.workers[i].run(ctx, input, result)
 	}
 }
 
@@ -83,7 +83,7 @@ type worker struct {
 	printLock *sync.Mutex
 }
 
-func (w worker) run(taskChannel <-chan scheduler.TaskInstance, results chan<- *scheduler.TaskExecutionResult) {
+func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstance, results chan<- *scheduler.TaskExecutionResult) {
 	for task := range taskChannel {
 		w.printLock.Lock()
 		w.printer.Printf("[%s] Starting: %s\n", time.Now().Format(timeFormat), task.GetHumanID())
@@ -98,9 +98,9 @@ func (w worker) run(taskChannel <-chan scheduler.TaskInstance, results chan<- *s
 			worker:      w.id,
 		}
 
-		ctx := context.WithValue(context.Background(), KeyPrinter, printer)
-		ctx = context.WithValue(ctx, ContextLogger, w.logger)
-		err := w.executor.RunSingleTask(ctx, task)
+		executionCtx := context.WithValue(ctx, KeyPrinter, printer)
+		executionCtx = context.WithValue(executionCtx, ContextLogger, w.logger)
+		err := w.executor.RunSingleTask(executionCtx, task)
 
 		duration := time.Since(start)
 		durationString := fmt.Sprintf("(%s)", duration.Truncate(time.Millisecond).String())

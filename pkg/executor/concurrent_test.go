@@ -68,7 +68,7 @@ func TestConcurrent_Start(t *testing.T) {
 
 	ex, err := NewConcurrent(logger, ops, 8)
 	require.NoError(t, err)
-	ex.Start(s.WorkQueue, s.Results)
+	ex.Start(context.Background(), s.WorkQueue, s.Results)
 
 	results := s.Run(context.Background())
 	assert.Len(t, results, len(p.Assets))

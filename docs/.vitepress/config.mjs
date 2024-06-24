@@ -21,14 +21,15 @@ export default defineConfig({
                     {
                         text: "Overview", link: "/connections/overview", items: [
                             {text: "Google Cloud Platform", link: "/connections/google_cloud_platform"},
+                            {text: "Gorgias", link: "/connections/gorgias"},
                             {text: "Microsoft SQL Server", link: "/connections/mssql"},
+                            {text: "MongoDB", link: "/connections/mongo"},
                             {text: "MySQL", link: "/connections/mysql"},
                             {text: "Notion", link: "/connections/notion"},
                             {text: "Postgres", link: "/connections/postgres"},
                             {text: "Redshift", link: "/connections/redshift"},
-                            {text: "Snowflake", link: "/connections/snowflake"},
-                            {text: "MongoDB", link: "/connections/mongo"},
                             {text: "SAP HANA", link: "/connections/sap_hana"},
+                            {text: "Snowflake", link: "/connections/snowflake"},
                         ]
                     },
                 ],

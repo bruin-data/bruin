@@ -1,0 +1,9 @@
+name: gorgias_raw.satisfaction_surveys
+type: ingestr
+depends:
+  - gorgias_raw.ticket_messages
+
+parameters:
+  source_connection: gorgias
+  source_table: satisfaction_surveys
+  destination: bigquery

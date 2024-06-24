@@ -1,0 +1,9 @@
+name: gorgias_raw.ticket_messages
+type: ingestr
+depends:
+  - gorgias_raw.tickets
+
+parameters:
+  source_connection: gorgias
+  source_table: tickets
+  destination: bigquery
