@@ -34,7 +34,8 @@ environments:
 bruin CLI can run the whole pipeline or any task with the downstreams:
 
 ```shell
-bruin run assets/gorgias.asset.yml
+# this will get all the satisfaction surveys starting from 2024-01-01
+bruin --start-date 2024-01-01 run assets/satisfaction_surveys.asset.yml
 ```
 
 ```shell
