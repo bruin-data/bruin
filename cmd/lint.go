@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/glossary"
 	"io"
 	"os"
 	path2 "path"
@@ -12,6 +11,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/path"

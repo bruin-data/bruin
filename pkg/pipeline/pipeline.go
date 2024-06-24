@@ -3,12 +3,12 @@ package pipeline
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/glossary"
 	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"

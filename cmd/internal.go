@@ -3,11 +3,14 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	color2 "github.com/fatih/color"
+	"github.com/sourcegraph/conc"
 	"github.com/urfave/cli/v2"
 )
 
@@ -113,48 +116,49 @@ func (r *ParseCommand) Run(assetPath string) error {
 		return cli.Exit("", 1)
 	}
 
-	asset, err := r.builder.CreateAssetFromFile(assetPath)
-	if err != nil {
-		errorPrinter.Printf("Failed to build asset: %v\n", err.Error())
-		return cli.Exit("", 1)
-	}
-
-	if asset == nil {
-		errorPrinter.Printf("The given file path doesn't seem to be a Bruin asset definition: '%s'\n", assetPath)
-		return cli.Exit("", 1)
-	}
-
 	pipelinePath, err := path.GetPipelineRootFromTask(assetPath, pipelineDefinitionFile)
 	if err != nil {
 		r.errorPrinter.Printf("Failed to find the pipeline this asset belongs to: '%s'\n", assetPath)
 		return cli.Exit("", 1)
 	}
 
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath)
+	repoRoot, err := git.FindRepoFromPath(assetPath)
 	if err != nil {
+		errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
+		return cli.Exit("", 1)
+	}
+
+	builder := DefaultPipelineBuilder
+	builder.GlossaryReader = &glossary.GlossaryReader{
+		RootPath:  repoRoot.Path,
+		FileNames: []string{"glossary.yml", "glossary.yaml"},
+	}
+
+	var wg conc.WaitGroup
+
+	var foundPipeline *pipeline.Pipeline
+	var pipelineFindErr error
+	wg.Go(func() { foundPipeline, pipelineFindErr = builder.CreatePipelineFromPath(pipelinePath) })
+
+	var repo *git.Repo
+	var repoFindErr error
+	wg.Go(func() { repo, repoFindErr = git.FindRepoFromPath(pipelinePath) })
+
+	wg.Wait()
+
+	if pipelineFindErr != nil {
 		r.errorPrinter.Println("failed to build pipeline, are you sure you have referred the right path?")
 		r.errorPrinter.Println("\nHint: You need to run this command with a path to the asset file itself directly, and it needs to be inside a pipeline.")
 
 		return cli.Exit("", 1)
 	}
 
-	repo, err := git.FindRepoFromPath(pipelinePath)
-	if err != nil {
+	if repoFindErr != nil {
 		r.errorPrinter.Println(err)
 		return cli.Exit("", 1)
 	}
 
-	entities, err := glossary.LoadEntitiesFromFile(repo.Path + "/entities.yaml")
-	if err != nil {
-		r.errorPrinter.Println(err)
-		return cli.Exit("", 1)
-	}
-
-	err = asset.EnrichFromEntityAttributes(entities)
-	if err != nil {
-		r.errorPrinter.Println(err)
-		return cli.Exit("", 1)
-	}
+	asset := foundPipeline.GetAssetByPath(assetPath)
 
 	foundPipeline.Assets = nil
 

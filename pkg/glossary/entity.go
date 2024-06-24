@@ -59,12 +59,13 @@ func (r *GlossaryReader) GetGlossary() (*Glossary, error) {
 }
 
 func (r *GlossaryReader) GetEntities() ([]*Entity, error) {
-	if r.glossary != nil {
+	if r.glossary == nil {
 		_, err := r.GetGlossary()
 		if err != nil {
 			return nil, err
 		}
 	}
+
 	return r.glossary.Entities, nil
 }
 
