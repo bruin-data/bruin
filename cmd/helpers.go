@@ -53,15 +53,15 @@ func RecoverFromPanic() {
 
 func printErrorJSON(err error) {
 	type ErrorResponse struct {
-		Error error `json:"error"`
+		Error string `json:"error"`
 	}
 
-	js, err := json.Marshal(ErrorResponse{
-		Error: err,
+	js, marshalError := json.Marshal(ErrorResponse{
+		Error: err.Error(),
 	})
-	if err != nil {
-		fmt.Println(err)
+	if marshalError != nil {
+		fmt.Println(marshalError)
 	}
 
-	fmt.Println(js)
+	fmt.Println(string(js))
 }

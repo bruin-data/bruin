@@ -18,7 +18,7 @@
       "name": "gcs-to-bq",
       "description": "",
       "type": "bq.transfer",
-      "tags":[],
+      "tags": [],
       "executable_file": {
         "name": "",
         "path": "",
@@ -50,7 +50,7 @@
       "name": "gcs-to-bq-2",
       "description": "",
       "type": "bq.transfer",
-      "tags":[],
+      "tags": [],
       "executable_file": {
         "name": "",
         "path": "",
@@ -82,7 +82,10 @@
       "name": "some-python-task",
       "description": "some description goes here",
       "type": "python",
-      "tags": ["tag1", "tag2:value2"],
+      "tags": [
+        "tag1",
+        "tag2:value2"
+      ],
       "executable_file": {
         "name": "testblockcomments.py",
         "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\testblockcomments.py",
@@ -122,6 +125,7 @@
           "name": "col1",
           "type": "string",
           "description": "",
+          "entity_attribute": null,
           "checks": [
             {
               "id": "08745666ad3e043ceb0321ed502e9a2d20248d62b2ee7dd1c600fc5c944af238",
@@ -149,6 +153,7 @@
           "name": "col2",
           "type": "string",
           "description": "",
+          "entity_attribute": null,
           "checks": [
             {
               "id": "7870f9ce39b0d29451a41e2d8240c02713ce80647db886fe5e5cc69227dd86d3",

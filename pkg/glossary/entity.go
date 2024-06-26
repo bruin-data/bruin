@@ -4,6 +4,8 @@ import (
 	path2 "github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
+	"os"
+	"path"
 )
 
 type Attribute struct {
@@ -33,7 +35,11 @@ type glossaryYaml struct {
 	Entities map[string]*Entity `yaml:"entities"`
 }
 
-func (g Glossary) Merge(anotherGlossary *Glossary) {
+func (g *Glossary) Merge(anotherGlossary *Glossary) {
+	if g.Entities == nil {
+		g.Entities = make([]*Entity, 0)
+	}
+
 	g.Entities = append(g.Entities, anotherGlossary.Entities...)
 }
 
@@ -45,9 +51,15 @@ func (r *GlossaryReader) GetGlossary() (*Glossary, error) {
 	var glossary Glossary
 
 	for _, fileName := range r.FileNames {
-		entitiesFromFile, err := LoadGlossaryFromFile(fileName)
+		pathToLook := path.Join(r.RootPath, fileName)
+
+		entitiesFromFile, err := LoadGlossaryFromFile(pathToLook)
 		if err != nil {
-			continue
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+
+			return nil, errors.Wrap(err, "failed to load entities from file")
 		}
 
 		glossary.Merge(entitiesFromFile)
@@ -71,7 +83,7 @@ func (r *GlossaryReader) GetEntities() ([]*Entity, error) {
 
 func LoadGlossaryFromFile(path string) (*Glossary, error) {
 	var glossary glossaryYaml
-	err := path2.ReadYaml(afero.NewOsFs(), path, &glossary)
+	err := path2.ReadYaml(afero.NewCacheOnReadFs(afero.NewOsFs(), afero.NewMemMapFs(), 30), path, &glossary)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read entities")
 	}

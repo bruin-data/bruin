@@ -10,7 +10,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	color2 "github.com/fatih/color"
-	"github.com/sourcegraph/conc"
 	"github.com/urfave/cli/v2"
 )
 
@@ -118,13 +117,13 @@ func (r *ParseCommand) Run(assetPath string) error {
 
 	pipelinePath, err := path.GetPipelineRootFromTask(assetPath, pipelineDefinitionFile)
 	if err != nil {
-		r.errorPrinter.Printf("Failed to find the pipeline this asset belongs to: '%s'\n", assetPath)
+		printErrorJSON(err)
 		return cli.Exit("", 1)
 	}
 
 	repoRoot, err := git.FindRepoFromPath(assetPath)
 	if err != nil {
-		errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
+		printErrorJSON(err)
 		return cli.Exit("", 1)
 	}
 
@@ -134,27 +133,10 @@ func (r *ParseCommand) Run(assetPath string) error {
 		FileNames: []string{"glossary.yml", "glossary.yaml"},
 	}
 
-	var wg conc.WaitGroup
+	foundPipeline, err := builder.CreatePipelineFromPath(pipelinePath)
+	if err != nil {
+		printErrorJSON(err)
 
-	var foundPipeline *pipeline.Pipeline
-	var pipelineFindErr error
-	wg.Go(func() { foundPipeline, pipelineFindErr = builder.CreatePipelineFromPath(pipelinePath) })
-
-	var repo *git.Repo
-	var repoFindErr error
-	wg.Go(func() { repo, repoFindErr = git.FindRepoFromPath(pipelinePath) })
-
-	wg.Wait()
-
-	if pipelineFindErr != nil {
-		r.errorPrinter.Println("failed to build pipeline, are you sure you have referred the right path?")
-		r.errorPrinter.Println("\nHint: You need to run this command with a path to the asset file itself directly, and it needs to be inside a pipeline.")
-
-		return cli.Exit("", 1)
-	}
-
-	if repoFindErr != nil {
-		r.errorPrinter.Println(err)
 		return cli.Exit("", 1)
 	}
 
@@ -169,7 +151,7 @@ func (r *ParseCommand) Run(assetPath string) error {
 	}{
 		Asset:    asset,
 		Pipeline: foundPipeline,
-		Repo:     repo,
+		Repo:     repoRoot,
 	})
 
 	fmt.Println(string(js))

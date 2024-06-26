@@ -417,11 +417,8 @@ func (a *Asset) EnrichFromEntityAttributes(entities []*glossary.Entity) error {
 
 	for i, c := range a.Columns {
 		if c.EntityAttribute == nil {
-			fmt.Println("entity ettribute is nil")
 			continue
 		}
-
-		fmt.Println("entity attirubte found")
 
 		entity := c.EntityAttribute.Entity
 
@@ -859,12 +856,12 @@ func (b *builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 
 			asset.AddUpstream(u)
 			u.AddDownstream(asset)
+		}
 
-			if entities != nil {
-				err := asset.EnrichFromEntityAttributes(entities)
-				if err != nil {
-					return nil, errors.Wrap(err, "error enriching asset from entity attributes")
-				}
+		if len(entities) > 0 {
+			err := asset.EnrichFromEntityAttributes(entities)
+			if err != nil {
+				return nil, errors.Wrap(err, "error enriching asset from entity attributes")
 			}
 		}
 	}
