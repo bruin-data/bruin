@@ -1,1 +1,196 @@
-{"legacy_id":"","name":"first-pipeline","schedule":"","start_date":"","definition_file":{"name":"pipeline.yml","path":"__BASEDIR__/testdata/pipeline/second-pipeline/pipeline.yml"},"default_parameters":{},"default_connections":{"gcpConnectionId":"gcp-connection-id-here","slack":"slack-connection"},"assets":[{"id":"eb9126984939a8f3e6e882cd0cd171af872274bd3dd18148b3d95afc01efa6b1","name":"gcs-to-bq","description":"","type":"bq.transfer","executable_file":{"name":"","path":"","content":""},"definition_file":{"name":"task.yml","path":"__BASEDIR__/testdata/pipeline/second-pipeline/assets/test1/task.yml","type":"yaml"},"parameters":{"location":"europe-west1","project_id":"some-project-id","transfer_config_id":"some-uuid"},"connection":"","secrets":[],"upstream":[],"materialization":null,"columns":[],"custom_checks":[],"image":"","instance":"","owner":"","metadata":{},"tags":[]},{"id":"a01e7580b118b5fbbdc1f7c8de6b8c377c684727e4e8ad574e9153a3dbd46dd1","name":"gcs-to-bq-2","description":"","type":"bq.transfer","executable_file":{"name":"","path":"","content":""},"definition_file":{"name":"task.yml","path":"__BASEDIR__/testdata/pipeline/second-pipeline/assets/test2/task.yml","type":"yaml"},"parameters":{"location":"europe-west1","project_id":"a-new-project-id","transfer_config_id":"some-uuid"},"connection":"","secrets":[],"upstream":[],"materialization":null,"columns":[],"custom_checks":[],"image":"","instance":"","owner":"","metadata":{},"tags":[]},{"id":"21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9","name":"some-python-task","description":"some description goes here","type":"python","executable_file":{"name":"testblockcomments.py","path":"__BASEDIR__/testdata/pipeline/second-pipeline/assets/testblockcomments.py","content":"print('hello world')"},"definition_file":{"name":"testblockcomments.py","path":"__BASEDIR__/testdata/pipeline/second-pipeline/assets/testblockcomments.py","type":"comment"},"parameters":{"param1":"first-parameter","param2":"second-parameter","param3":"third-parameter"},"connection":"","secrets":[{"secret_key":"secret1","injected_key":"INJECTED_SECRET1"},{"secret_key":"secret2","injected_key":"secret2"}],"upstream":["task1","task2","task3","task4","task5"],"materialization":null,"columns":[{"entity_attribute":null,"name":"col1","type":"string","description":"","checks":[{"id":"08745666ad3e043ceb0321ed502e9a2d20248d62b2ee7dd1c600fc5c944af238","name":"not_null","value":null,"blocking":true},{"id":"29f700e6438c361ab038fcb611a71dab5a6949f3942b75c52402dce7a17cf698","name":"positive","value":null,"blocking":true},{"id":"6660a3e1f845f9046ff2cda9ef8ae9357c4008c43724ebaf834186e5c2bd7a35","name":"unique","value":null,"blocking":true}],"primary_key":false,"update_on_merge":false},{"entity_attribute":null,"name":"col2","type":"string","description":"","checks":[{"id":"7870f9ce39b0d29451a41e2d8240c02713ce80647db886fe5e5cc69227dd86d3","name":"not_null","value":null,"blocking":true},{"id":"68e80e2b513c908c9c1d3aac2f96bd535f43f2c62a78c6744dee8ae767e60e5d","name":"unique","value":null,"blocking":true}],"primary_key":false,"update_on_merge":false}],"custom_checks":[{"id":"a26c19e73c6b5cdee1b1bfe135a475979f360b9e7fdfc19a7fca1832d034adbc","name":"check1","description":"test description","query":"select 5","value":16,"blocking":false}],"image":"python:3.11","instance":"b1.nano","owner":"jane.doe@getbruin.com","metadata":{},"tags":["tag1","tag2:value2"]}],"notifications":{"slack":[]},"catchup":false,"retries":0}
+{
+  "legacy_id": "",
+  "name": "first-pipeline",
+  "schedule": "",
+  "start_date": "",
+  "definition_file": {
+    "name": "pipeline.yml",
+    "path": "__BASEDIR__/testdata/pipeline/second-pipeline/pipeline.yml"
+  },
+  "default_parameters": {},
+  "default_connections": {
+    "gcpConnectionId": "gcp-connection-id-here",
+    "slack": "slack-connection"
+  },
+  "assets": [
+    {
+      "id": "eb9126984939a8f3e6e882cd0cd171af872274bd3dd18148b3d95afc01efa6b1",
+      "name": "gcs-to-bq",
+      "description": "",
+      "type": "bq.transfer",
+      "executable_file": {
+        "name": "",
+        "path": "",
+        "content": ""
+      },
+      "definition_file": {
+        "name": "task.yml",
+        "path": "__BASEDIR__/testdata/pipeline/second-pipeline/assets/test1/task.yml",
+        "type": "yaml"
+      },
+      "parameters": {
+        "location": "europe-west1",
+        "project_id": "some-project-id",
+        "transfer_config_id": "some-uuid"
+      },
+      "connection": "",
+      "secrets": [],
+      "upstream": [],
+      "materialization": null,
+      "columns": [],
+      "custom_checks": [],
+      "image": "",
+      "instance": "",
+      "owner": "",
+      "metadata": {},
+      "tags": []
+    },
+    {
+      "id": "a01e7580b118b5fbbdc1f7c8de6b8c377c684727e4e8ad574e9153a3dbd46dd1",
+      "name": "gcs-to-bq-2",
+      "description": "",
+      "type": "bq.transfer",
+      "executable_file": {
+        "name": "",
+        "path": "",
+        "content": ""
+      },
+      "definition_file": {
+        "name": "task.yml",
+        "path": "__BASEDIR__/testdata/pipeline/second-pipeline/assets/test2/task.yml",
+        "type": "yaml"
+      },
+      "parameters": {
+        "location": "europe-west1",
+        "project_id": "a-new-project-id",
+        "transfer_config_id": "some-uuid"
+      },
+      "connection": "",
+      "secrets": [],
+      "upstream": [],
+      "materialization": null,
+      "columns": [],
+      "custom_checks": [],
+      "image": "",
+      "instance": "",
+      "owner": "",
+      "metadata": {},
+      "tags": []
+    },
+    {
+      "id": "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
+      "name": "some-python-task",
+      "description": "some description goes here",
+      "type": "python",
+      "executable_file": {
+        "name": "testblockcomments.py",
+        "path": "__BASEDIR__/testdata/pipeline/second-pipeline/assets/testblockcomments.py",
+        "content": "print('hello world')"
+      },
+      "definition_file": {
+        "name": "testblockcomments.py",
+        "path": "__BASEDIR__/testdata/pipeline/second-pipeline/assets/testblockcomments.py",
+        "type": "comment"
+      },
+      "parameters": {
+        "param1": "first-parameter",
+        "param2": "second-parameter",
+        "param3": "third-parameter"
+      },
+      "connection": "",
+      "secrets": [
+        {
+          "secret_key": "secret1",
+          "injected_key": "INJECTED_SECRET1"
+        },
+        {
+          "secret_key": "secret2",
+          "injected_key": "secret2"
+        }
+      ],
+      "upstream": [
+        "task1",
+        "task2",
+        "task3",
+        "task4",
+        "task5"
+      ],
+      "materialization": null,
+      "columns": [
+        {
+          "entity_attribute": null,
+          "name": "col1",
+          "type": "string",
+          "description": "",
+          "checks": [
+            {
+              "id": "08745666ad3e043ceb0321ed502e9a2d20248d62b2ee7dd1c600fc5c944af238",
+              "name": "not_null",
+              "value": null,
+              "blocking": true
+            },
+            {
+              "id": "29f700e6438c361ab038fcb611a71dab5a6949f3942b75c52402dce7a17cf698",
+              "name": "positive",
+              "value": null,
+              "blocking": true
+            },
+            {
+              "id": "6660a3e1f845f9046ff2cda9ef8ae9357c4008c43724ebaf834186e5c2bd7a35",
+              "name": "unique",
+              "value": null,
+              "blocking": true
+            }
+          ],
+          "primary_key": false,
+          "update_on_merge": false
+        },
+        {
+          "entity_attribute": null,
+          "name": "col2",
+          "type": "string",
+          "description": "",
+          "checks": [
+            {
+              "id": "7870f9ce39b0d29451a41e2d8240c02713ce80647db886fe5e5cc69227dd86d3",
+              "name": "not_null",
+              "value": null,
+              "blocking": true
+            },
+            {
+              "id": "68e80e2b513c908c9c1d3aac2f96bd535f43f2c62a78c6744dee8ae767e60e5d",
+              "name": "unique",
+              "value": null,
+              "blocking": true
+            }
+          ],
+          "primary_key": false,
+          "update_on_merge": false
+        }
+      ],
+      "custom_checks": [
+        {
+          "id": "a26c19e73c6b5cdee1b1bfe135a475979f360b9e7fdfc19a7fca1832d034adbc",
+          "name": "check1",
+          "description": "test description",
+          "query": "select 5",
+          "value": 16,
+          "blocking": false
+        }
+      ],
+      "image": "python:3.11",
+      "instance": "b1.nano",
+      "owner": "jane.doe@getbruin.com",
+      "metadata": {},
+      "tags": [
+        "tag1",
+        "tag2:value2"
+      ]
+    }
+  ],
+  "notifications": {
+    "slack": []
+  },
+  "catchup": false,
+  "retries": 0
+}
