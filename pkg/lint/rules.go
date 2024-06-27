@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -301,6 +302,22 @@ func EnsurePipelineScheduleIsValidCron(p *pipeline.Pipeline) ([]*Issue, error) {
 	if err != nil {
 		issues = append(issues, &Issue{
 			Description: fmt.Sprintf("Invalid cron schedule '%s'", p.Schedule),
+		})
+	}
+
+	return issues, nil
+}
+
+func EnsurePipelineStartDateIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if p.StartDate == "" {
+		return issues, nil
+	}
+
+	_, err := time.Parse("2006-01-02", p.StartDate)
+	if err != nil {
+		issues = append(issues, &Issue{
+			Description: fmt.Sprintf("start_date must be in the format of YYYY-MM-DD in the pipeline definition, '%s' given", p.StartDate),
 		})
 	}
 

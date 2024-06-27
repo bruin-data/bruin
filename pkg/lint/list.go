@@ -82,6 +82,11 @@ func GetRules(fs afero.Fs) ([]Rule, error) {
 			AssetValidator:   EnsureIngestrAssetIsValidForASingleAsset,
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
+		&SimpleRule{
+			Identifier:       "valid-pipeline-start-date",
+			Validator:        EnsurePipelineStartDateIsValid,
+			ApplicableLevels: []Level{LevelPipeline},
+		},
 	}
 
 	return rules, nil

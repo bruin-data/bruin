@@ -1678,3 +1678,48 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 		})
 	}
 }
+
+func TestEnsurePipelineStartDateIsValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		p       *pipeline.Pipeline
+		want    []*Issue
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "empty start date is skipped",
+			p: &pipeline.Pipeline{
+				StartDate: "",
+			},
+			want:    noIssues,
+			wantErr: assert.NoError,
+		},
+		{
+			name: "invalid start date is reported",
+			p: &pipeline.Pipeline{
+				StartDate: "20240101",
+			},
+			want:    []*Issue{{Description: "start_date must be in the format of YYYY-MM-DD in the pipeline definition, '20240101' given"}},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "valid start date is not reported as error",
+			p: &pipeline.Pipeline{
+				StartDate: "2024-01-01",
+			},
+			want:    noIssues,
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := EnsurePipelineStartDateIsValid(tt.p)
+			tt.wantErr(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
