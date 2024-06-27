@@ -6,13 +6,21 @@ export default defineConfig({
     description: "Open-source multi-language data pipelines",
     base: '/bruin/',
     themeConfig: {
+        outline: 'deep',
         nav: [{text: "Home", link: "/"}],
         sidebar: [
             {
                 text: "Getting Started",
                 items: [
                     {text: "Introduction", link: "/getting-started/introduction"},
-                    {text: "Concepts", link: "/getting-started/concepts"}
+                    {
+                        text: "Concepts",
+                        link: "/getting-started/concepts",
+                        items: [
+                            {text: "Design Principles", link: "/getting-started/concepts/design-principles"},
+                            {text: "Glossary", link: "/getting-started/concepts/glossary"},
+                        ]
+                    }
                 ],
             },
             {

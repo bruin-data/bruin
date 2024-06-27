@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
@@ -44,13 +43,6 @@ func WriteYaml(fs afero.Fs, path string, content interface{}) error {
 
 func ConvertYamlToObject(buf []byte, out interface{}) error {
 	err := yaml.Unmarshal(buf, out)
-	if err != nil {
-		return &YamlParseError{msg: err.Error()}
-	}
-
-	validate := validator.New()
-
-	err = validate.Struct(out)
 	if err != nil {
 		return &YamlParseError{msg: err.Error()}
 	}

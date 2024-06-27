@@ -118,6 +118,7 @@
       "materialization": null,
       "columns": [
         {
+          "entity_attribute": null,
           "name": "col1",
           "type": "string",
           "description": "",
@@ -145,6 +146,7 @@
           "update_on_merge": false
         },
         {
+          "entity_attribute": null,
           "name": "col2",
           "type": "string",
           "description": "",
@@ -180,7 +182,10 @@
       "instance": "b1.nano",
       "owner": "jane.doe@getbruin.com",
       "metadata": {},
-      "tags": ["tag1", "tag2:value2"]
+      "tags": [
+        "tag1",
+        "tag2:value2"
+      ]
     }
   ],
   "notifications": {

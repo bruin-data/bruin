@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -255,13 +256,19 @@ func NewColumnCheck(assetName, columnName, name string, value ColumnCheckValue, 
 	}
 }
 
+type EntityAttribute struct {
+	Entity    string `json:"entity"`
+	Attribute string `json:"attribute"`
+}
+
 type Column struct {
-	Name          string        `json:"name"`
-	Type          string        `json:"type"`
-	Description   string        `json:"description"`
-	Checks        []ColumnCheck `json:"checks"`
-	PrimaryKey    bool          `json:"primary_key"`
-	UpdateOnMerge bool          `json:"update_on_merge"`
+	EntityAttribute *EntityAttribute `json:"entity_attribute"`
+	Name            string           `json:"name"`
+	Type            string           `json:"type"`
+	Description     string           `json:"description"`
+	Checks          []ColumnCheck    `json:"checks"`
+	PrimaryKey      bool             `json:"primary_key"`
+	UpdateOnMerge   bool             `json:"update_on_merge"`
 }
 
 func (c *Column) HasCheck(check string) bool {
@@ -400,6 +407,45 @@ func (a *Asset) ColumnNamesWithPrimaryKey() []string {
 		}
 	}
 	return columns
+}
+
+func (a *Asset) EnrichFromEntityAttributes(entities []*glossary.Entity) error {
+	entityMap := make(map[string]*glossary.Entity, len(entities))
+	for _, e := range entities {
+		entityMap[e.Name] = e
+	}
+
+	for i, c := range a.Columns {
+		if c.EntityAttribute == nil {
+			continue
+		}
+
+		entity := c.EntityAttribute.Entity
+
+		e, ok := entityMap[entity]
+		if !ok {
+			return errors.Errorf("entity '%s' not found", entity)
+		}
+
+		attr, ok := e.Attributes[c.EntityAttribute.Attribute]
+		if !ok {
+			return errors.Errorf("attribute '%s' not found in entity '%s'", c.EntityAttribute.Attribute, entity)
+		}
+
+		if c.Name == "" {
+			a.Columns[i].Name = attr.Name
+		}
+
+		if c.Type == "" {
+			a.Columns[i].Type = attr.Type
+		}
+
+		if c.Description == "" {
+			a.Columns[i].Description = attr.Description
+		}
+	}
+
+	return nil
 }
 
 func uniqueAssets(assets []*Asset) []*Asset {
@@ -693,11 +739,17 @@ type BuilderConfig struct {
 	TasksFileSuffixes   []string
 }
 
+type glossaryReader interface {
+	GetEntities() ([]*glossary.Entity, error)
+}
+
 type builder struct {
 	config             BuilderConfig
 	yamlTaskCreator    TaskCreator
 	commentTaskCreator TaskCreator
 	fs                 afero.Fs
+
+	GlossaryReader glossaryReader
 }
 
 type ParseError struct {
@@ -787,6 +839,14 @@ func (b *builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 		pipeline.tasksByName[task.Name] = task
 	}
 
+	var entities []*glossary.Entity
+	if b.GlossaryReader != nil {
+		entities, err = b.GlossaryReader.GetEntities()
+		if err != nil {
+			return nil, errors.Wrap(err, "error getting entities")
+		}
+	}
+
 	for _, asset := range pipeline.Assets {
 		for _, upstream := range asset.DependsOn {
 			u, ok := pipeline.tasksByName[upstream]
@@ -796,6 +856,13 @@ func (b *builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 
 			asset.AddUpstream(u)
 			u.AddDownstream(asset)
+		}
+
+		if len(entities) > 0 {
+			err := asset.EnrichFromEntityAttributes(entities)
+			if err != nil {
+				return nil, errors.Wrap(err, "error enriching asset from entity attributes")
+			}
 		}
 	}
 

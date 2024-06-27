@@ -11,6 +11,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/path"
@@ -146,16 +147,22 @@ func Lint(isDebug *bool) *cli.Command {
 				logger.Debug("no Snowflake connections found, skipping Snowflake validation")
 			}
 
+			builder := DefaultPipelineBuilder
+			builder.GlossaryReader = &glossary.GlossaryReader{
+				RootPath:  repoRoot.Path,
+				FileNames: []string{"glossary.yml", "glossary.yaml"},
+			}
+
 			var result *lint.PipelineAnalysisResult
 			if asset == "" {
-				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
+				linter := lint.NewLinter(path.GetPipelinePaths, builder, rules, logger)
 				logger.Debugf("running %d rules for pipeline validation", len(rules))
 				infoPrinter.Printf("Validating pipelines in '%s' for '%s' environment...\n", rootPath, cm.SelectedEnvironmentName)
 				result, err = linter.Lint(rootPath, pipelineDefinitionFile)
 			} else {
 				rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
 				logger.Debugf("running %d rules for asset-only validation", len(rules))
-				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
+				linter := lint.NewLinter(path.GetPipelinePaths, builder, rules, logger)
 				result, err = linter.LintAsset(rootPath, pipelineDefinitionFile, asset)
 			}
 

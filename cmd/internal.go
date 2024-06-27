@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
@@ -114,36 +115,32 @@ func (r *ParseCommand) Run(assetPath string) error {
 		return cli.Exit("", 1)
 	}
 
-	asset, err := r.builder.CreateAssetFromFile(assetPath)
-	if err != nil {
-		errorPrinter.Printf("Failed to build asset: %v\n", err.Error())
-		return cli.Exit("", 1)
-	}
-
-	if asset == nil {
-		errorPrinter.Printf("The given file path doesn't seem to be a Bruin asset definition: '%s'\n", assetPath)
-		return cli.Exit("", 1)
-	}
-
 	pipelinePath, err := path.GetPipelineRootFromTask(assetPath, pipelineDefinitionFile)
 	if err != nil {
-		r.errorPrinter.Printf("Failed to find the pipeline this asset belongs to: '%s'\n", assetPath)
+		printErrorJSON(err)
 		return cli.Exit("", 1)
 	}
 
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath)
+	repoRoot, err := git.FindRepoFromPath(assetPath)
 	if err != nil {
-		r.errorPrinter.Println("failed to build pipeline, are you sure you have referred the right path?")
-		r.errorPrinter.Println("\nHint: You need to run this command with a path to the asset file itself directly, and it needs to be inside a pipeline.")
-
+		printErrorJSON(err)
 		return cli.Exit("", 1)
 	}
 
-	repo, err := git.FindRepoFromPath(pipelinePath)
+	builder := DefaultPipelineBuilder
+	builder.GlossaryReader = &glossary.GlossaryReader{
+		RootPath:  repoRoot.Path,
+		FileNames: []string{"glossary.yml", "glossary.yaml"},
+	}
+
+	foundPipeline, err := builder.CreatePipelineFromPath(pipelinePath)
 	if err != nil {
-		r.errorPrinter.Println(err)
+		printErrorJSON(err)
+
 		return cli.Exit("", 1)
 	}
+
+	asset := foundPipeline.GetAssetByPath(assetPath)
 
 	foundPipeline.Assets = nil
 
@@ -154,7 +151,7 @@ func (r *ParseCommand) Run(assetPath string) error {
 	}{
 		Asset:    asset,
 		Pipeline: foundPipeline,
-		Repo:     repo,
+		Repo:     repoRoot,
 	})
 
 	fmt.Println(string(js))
