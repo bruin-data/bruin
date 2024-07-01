@@ -37,6 +37,7 @@
       "connection": "",
       "secrets": [],
       "upstream": [],
+      "upstreams": [],
       "materialization": null,
       "columns": [],
       "custom_checks": [],
@@ -69,6 +70,7 @@
       "connection": "",
       "secrets": [],
       "upstream": [],
+      "upstreams": [],
       "materialization": null,
       "columns": [],
       "custom_checks": [],
@@ -118,6 +120,13 @@
         "task3",
         "task4",
         "task5"
+      ],
+      "upstreams": [
+        {"type" : "asset", "value" : "task1"},
+        {"type" : "asset", "value" : "task2"},
+        {"type" : "asset", "value" : "task3"},
+        {"type" : "asset", "value" : "task4"},
+        {"type" : "asset", "value" : "task5"}
       ],
       "materialization": null,
       "columns": [

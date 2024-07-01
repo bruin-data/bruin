@@ -41,6 +41,9 @@
       "upstream": [
         "gcs-to-bq"
       ],
+      "upstreams": [
+        {"type" : "asset", "value" : "gcs-to-bq"}
+      ],
       "materialization": null,
       "columns": [],
       "custom_checks": [],
@@ -73,6 +76,7 @@
       "connection": "",
       "secrets": [],
       "upstream": [],
+      "upstreams": [],
       "materialization": null,
       "columns": [],
       "custom_checks": [],
@@ -112,6 +116,14 @@
         "task5",
         "task3"
       ],
+      "upstreams": [
+        {"type" : "asset", "value" : "task1"},
+        {"type" : "asset", "value" : "task2"},
+        {"type" : "asset", "value" : "task3"},
+        {"type" : "asset", "value" : "task4"},
+        {"type" : "asset", "value" : "task5"},
+        {"type" : "asset", "value" : "task3"}
+      ],
       "materialization": null,
       "columns": [],
       "custom_checks": [],
@@ -149,6 +161,14 @@
         "task4",
         "task5",
         "task3"
+      ],
+      "upstreams": [
+        {"type" : "asset", "value" : "task1"},
+        {"type" : "asset", "value" : "task2"},
+        {"type" : "asset", "value" : "task3"},
+        {"type" : "asset", "value" : "task4"},
+        {"type" : "asset", "value" : "task5"},
+        {"type" : "asset", "value" : "task3"}
       ],
       "materialization": null,
       "columns": [],
