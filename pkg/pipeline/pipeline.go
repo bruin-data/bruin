@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -308,6 +309,11 @@ type CustomCheck struct {
 	Blocking    bool   `json:"blocking"`
 }
 
+type Upstream struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
+
 type Asset struct {
 	ID              string             `json:"id"`
 	Name            string             `json:"name"`
@@ -332,6 +338,32 @@ type Asset struct {
 
 	upstream   []*Asset
 	downstream []*Asset
+	Upstreams  []Upstream `json:"upstreams"`
+}
+
+func (a Asset) MarshalJSON() ([]byte, error) {
+	type Alias Asset
+
+	ups := make([]Upstream, 0, len(a.DependsOn))
+	for _, u := range a.DependsOn {
+		isURI, err := regexp.MatchString("^[a-zA-Z]+://.+$", u)
+		if err != nil {
+			return nil, err
+		}
+		upstreamType := "asset"
+		if isURI {
+			upstreamType = "uri"
+		}
+		ups = append(ups, Upstream{Type: upstreamType, Value: u})
+	}
+
+	return json.Marshal(&struct {
+		Upstreams []Upstream `json:"upstreams"`
+		Alias
+	}{
+		Upstreams: ups,
+		Alias:     (Alias)(a),
+	})
 }
 
 func (a *Asset) AddUpstream(asset *Asset) {
