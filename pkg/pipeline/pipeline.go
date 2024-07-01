@@ -740,16 +740,20 @@ type BuilderConfig struct {
 }
 
 type glossaryReader interface {
-	GetEntities() ([]*glossary.Entity, error)
+	GetEntities(pathToPipeline string) ([]*glossary.Entity, error)
 }
 
-type builder struct {
+type Builder struct {
 	config             BuilderConfig
 	yamlTaskCreator    TaskCreator
 	commentTaskCreator TaskCreator
 	fs                 afero.Fs
 
 	GlossaryReader glossaryReader
+}
+
+func (b *Builder) SetGlossaryReader(reader glossaryReader) {
+	b.GlossaryReader = reader
 }
 
 type ParseError struct {
@@ -760,16 +764,17 @@ func (e *ParseError) Error() string {
 	return e.Msg
 }
 
-func NewBuilder(config BuilderConfig, yamlTaskCreator TaskCreator, commentTaskCreator TaskCreator, fs afero.Fs) *builder {
-	return &builder{
+func NewBuilder(config BuilderConfig, yamlTaskCreator TaskCreator, commentTaskCreator TaskCreator, fs afero.Fs, gr glossaryReader) *Builder {
+	return &Builder{
 		config:             config,
 		yamlTaskCreator:    yamlTaskCreator,
 		commentTaskCreator: commentTaskCreator,
 		fs:                 fs,
+		GlossaryReader:     gr,
 	}
 }
 
-func (b *builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, error) {
+func (b *Builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, error) {
 	pipelineFilePath := pathToPipeline
 	if !strings.HasSuffix(pipelineFilePath, b.config.PipelineFileName) {
 		pipelineFilePath = filepath.Join(pathToPipeline, b.config.PipelineFileName)
@@ -841,7 +846,7 @@ func (b *builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 
 	var entities []*glossary.Entity
 	if b.GlossaryReader != nil {
-		entities, err = b.GlossaryReader.GetEntities()
+		entities, err = b.GlossaryReader.GetEntities(pathToPipeline)
 		if err != nil {
 			return nil, errors.Wrap(err, "error getting entities")
 		}
@@ -878,7 +883,7 @@ func fileHasSuffix(arr []string, str string) bool {
 	return false
 }
 
-func (b *builder) CreateAssetFromFile(path string) (*Asset, error) {
+func (b *Builder) CreateAssetFromFile(path string) (*Asset, error) {
 	isSeparateDefinitionFile := false
 	creator := b.commentTaskCreator
 

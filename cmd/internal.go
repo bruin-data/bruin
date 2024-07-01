@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/bruin-data/bruin/pkg/git"
-	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
@@ -127,13 +126,7 @@ func (r *ParseCommand) Run(assetPath string) error {
 		return cli.Exit("", 1)
 	}
 
-	builder := DefaultPipelineBuilder
-	builder.GlossaryReader = &glossary.GlossaryReader{
-		RootPath:  repoRoot.Path,
-		FileNames: []string{"glossary.yml", "glossary.yaml"},
-	}
-
-	foundPipeline, err := builder.CreatePipelineFromPath(pipelinePath)
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath)
 	if err != nil {
 		printErrorJSON(err)
 

@@ -1,11 +1,14 @@
 package glossary
 
 import (
+	"os"
+	"path"
+	"sync"
+
+	"github.com/bruin-data/bruin/pkg/git"
 	path2 "github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"os"
-	"path"
 )
 
 type Attribute struct {
@@ -20,11 +23,16 @@ type Entity struct {
 	Attributes  map[string]*Attribute `json:"attributes" yaml:"attributes"`
 }
 
+type repoFinder interface {
+	Repo(path string) (*git.Repo, error)
+}
+
 type GlossaryReader struct {
-	RootPath  string
-	FileNames []string
+	FileNames  []string
+	RepoFinder repoFinder
 
 	glossary *Glossary
+	mutex    sync.Mutex
 }
 
 type Glossary struct {
@@ -43,15 +51,16 @@ func (g *Glossary) Merge(anotherGlossary *Glossary) {
 	g.Entities = append(g.Entities, anotherGlossary.Entities...)
 }
 
-func (r *GlossaryReader) GetGlossary() (*Glossary, error) {
-	if r.glossary != nil {
-		return r.glossary, nil
-	}
-
+func (r *GlossaryReader) GetGlossary(pipelinePath string) (*Glossary, error) {
 	var glossary Glossary
 
+	repo, err := r.RepoFinder.Repo(pipelinePath)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to find repo")
+	}
+
 	for _, fileName := range r.FileNames {
-		pathToLook := path.Join(r.RootPath, fileName)
+		pathToLook := path.Join(repo.Path, fileName)
 
 		entitiesFromFile, err := LoadGlossaryFromFile(pathToLook)
 		if err != nil {
@@ -65,17 +74,23 @@ func (r *GlossaryReader) GetGlossary() (*Glossary, error) {
 		glossary.Merge(entitiesFromFile)
 	}
 
+	r.mutex.Lock()
 	r.glossary = &glossary
+	r.mutex.Unlock()
 
 	return r.glossary, nil
 }
 
-func (r *GlossaryReader) GetEntities() ([]*Entity, error) {
+func (r *GlossaryReader) GetEntities(pathToPipeline string) ([]*Entity, error) {
+	r.mutex.Lock()
 	if r.glossary == nil {
-		_, err := r.GetGlossary()
+		r.mutex.Unlock()
+		_, err := r.GetGlossary(pathToPipeline)
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		r.mutex.Unlock()
 	}
 
 	return r.glossary.Entities, nil

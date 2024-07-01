@@ -1,11 +1,14 @@
 package glossary
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGlossary_Merge(t *testing.T) {
+	t.Parallel()
+
 	mainGlossary := &Glossary{}
 
 	anotherGlossary := &Glossary{
@@ -25,6 +28,6 @@ func TestGlossary_Merge(t *testing.T) {
 
 	mainGlossary.Merge(anotherGlossary)
 
-	assert.Equal(t, 1, len(mainGlossary.Entities))
+	assert.Len(t, mainGlossary.Entities, 1)
 	assert.Equal(t, anotherGlossary, mainGlossary)
 }

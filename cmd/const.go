@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/fatih/color"
 	"github.com/spf13/afero"
@@ -24,5 +26,10 @@ var (
 		TasksFileSuffixes:   []string{"task.yml", "task.yaml", "asset.yml", "asset.yaml"},
 	}
 
-	DefaultPipelineBuilder = pipeline.NewBuilder(builderConfig, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs)
+	glossaryReader = &glossary.GlossaryReader{
+		RepoFinder: &git.RepoFinder{},
+		FileNames:  []string{"glossary.yml", "glossary.yaml"},
+	}
+
+	DefaultPipelineBuilder = pipeline.NewBuilder(builderConfig, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, glossaryReader)
 )

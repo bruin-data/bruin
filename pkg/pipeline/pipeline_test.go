@@ -206,7 +206,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 				TasksFileSuffixes:   []string{"task.yml", "task.yaml"},
 			}
 
-			p := pipeline.NewBuilder(builderConfig, tt.fields.yamlTaskCreator, tt.fields.commentTaskCreator, fs)
+			p := pipeline.NewBuilder(builderConfig, tt.fields.yamlTaskCreator, tt.fields.commentTaskCreator, fs, nil)
 
 			got, err := p.CreatePipelineFromPath(tt.args.pathToPipeline)
 			if tt.wantErr {
@@ -347,7 +347,7 @@ func TestPipeline_JsonMarshal(t *testing.T) {
 
 			// uncomment the line below and run the test once to refresh the data
 			// don't forget to comment it out again
-			//err = afero.WriteFile(afero.NewOsFs(), path, bytes.ReplaceAll(got, []byte(dir), []byte("__BASEDIR__")), 0o644)
+			// err = afero.WriteFile(afero.NewOsFs(), path, bytes.ReplaceAll(got, []byte(dir), []byte("__BASEDIR__")), 0o644)
 
 			expected := strings.ReplaceAll(mustRead(t, path), "__BASEDIR__", dir)
 
@@ -448,7 +448,7 @@ func TestPipeline_GetAssetByPath(t *testing.T) {
 		TasksDirectoryNames: []string{"tasks", "assets"},
 		TasksFileSuffixes:   []string{"task.yml", "task.yaml"},
 	}
-	builder := pipeline.NewBuilder(config, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs)
+	builder := pipeline.NewBuilder(config, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil)
 	p, err := builder.CreatePipelineFromPath("./testdata/pipeline/first-pipeline")
 	require.NoError(t, err)
 

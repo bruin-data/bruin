@@ -130,7 +130,7 @@ Total: 2
 
 			fs := afero.NewOsFs()
 			r := &LineageCommand{
-				builder:      pipeline.NewBuilder(builderConfig, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs),
+				builder:      pipeline.NewBuilder(builderConfig, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil),
 				infoPrinter:  mp,
 				errorPrinter: mp,
 			}
