@@ -345,11 +345,12 @@ func (a Asset) MarshalJSON() ([]byte, error) {
 	type Alias Asset
 
 	ups := make([]Upstream, 0, len(a.DependsOn))
+
+	regex := regexp.MustCompile("^[a-zA-Z]+://.+$")
+
 	for _, u := range a.DependsOn {
-		isURI, err := regexp.MatchString("^[a-zA-Z]+://.+$", u)
-		if err != nil {
-			return nil, err
-		}
+		isURI := regex.MatchString(u)
+
 		upstreamType := "asset"
 		if isURI {
 			upstreamType = "uri"
