@@ -282,6 +282,7 @@ func (c *Config) SelectEnvironment(name string) error {
 
 	c.SelectedEnvironment = &e
 	c.SelectedEnvironmentName = name
+	c.SelectedEnvironment.Connections.buildConnectionKeyMap()
 	return nil
 }
 

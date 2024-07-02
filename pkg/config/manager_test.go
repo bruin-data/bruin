@@ -366,16 +366,16 @@ func TestConfig_SelectEnvironment(t *testing.T) {
 
 	err := conf.SelectEnvironment("prod")
 	require.NoError(t, err)
-	assert.Equal(t, prodEnv, conf.SelectedEnvironment)
+	assert.EqualExportedValues(t, prodEnv, conf.SelectedEnvironment)
 	assert.Equal(t, "prod", conf.SelectedEnvironmentName)
 
 	err = conf.SelectEnvironment("non-existing")
 	require.Error(t, err)
-	assert.Equal(t, prodEnv, conf.SelectedEnvironment)
+	assert.EqualExportedValues(t, prodEnv, conf.SelectedEnvironment)
 	assert.Equal(t, "prod", conf.SelectedEnvironmentName)
 
 	err = conf.SelectEnvironment("default")
 	require.NoError(t, err)
-	assert.Equal(t, defaultEnv, conf.SelectedEnvironment)
+	assert.EqualExportedValues(t, defaultEnv, conf.SelectedEnvironment)
 	assert.Equal(t, "default", conf.SelectedEnvironmentName)
 }
