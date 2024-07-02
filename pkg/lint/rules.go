@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/executor"
+	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
 	"github.com/robfig/cron/v3"
@@ -607,6 +608,69 @@ func EnsureBigQueryQuerySensorHasTableParameterForASingleAsset(ctx context.Conte
 			Task:        asset,
 			Description: "BigQuery query sensor requires a `query` parameter that is not empty",
 		})
+	}
+
+	return issues, nil
+}
+
+type GlossaryChecker struct {
+	gr            *glossary.GlossaryReader
+	foundGlossary *glossary.Glossary
+}
+
+func (g *GlossaryChecker) EnsureAssetEntitiesExistInGlossary(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if asset.Columns == nil {
+		return issues, nil
+	}
+
+	if g.foundGlossary == nil {
+		foundGlossary, err := g.gr.GetGlossary(p.DefinitionFile.Path)
+		if err != nil {
+			g.foundGlossary = &glossary.Glossary{Entities: make([]*glossary.Entity, 0)}
+			return issues, err
+		}
+
+		g.foundGlossary = foundGlossary
+	}
+
+	for _, column := range asset.Columns {
+		if column.EntityAttribute == nil {
+			continue
+		}
+
+		if column.EntityAttribute.Entity == "" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Entity name cannot be empty",
+			})
+			continue
+		}
+
+		if column.EntityAttribute.Attribute == "" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Attribute name cannot be empty",
+			})
+			continue
+		}
+
+		entity := g.foundGlossary.GetEntity(column.EntityAttribute.Entity)
+		if entity == nil {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Entity '%s' does not exist in the glossary", column.EntityAttribute.Entity),
+			})
+			continue
+		}
+
+		attribute := entity.GetAttribute(column.EntityAttribute.Attribute)
+		if attribute == nil {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Attribute '%s' does not exist in the entity '%s'", column.EntityAttribute.Attribute, column.EntityAttribute.Entity),
+			})
+		}
 	}
 
 	return issues, nil

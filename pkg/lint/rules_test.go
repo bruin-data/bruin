@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -1720,6 +1721,162 @@ func TestEnsurePipelineStartDateIsValid(t *testing.T) {
 			got, err := EnsurePipelineStartDateIsValid(tt.p)
 			tt.wantErr(t, err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestGlossaryChecker_EnsureAssetEntitiesExistInGlossary(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		asset   *pipeline.Asset
+		want    []string
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "asset with no cols skipped",
+			asset: &pipeline.Asset{
+				Name: "asset1",
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "asset with no attribute reference skipped",
+			asset: &pipeline.Asset{
+				Name: "asset1",
+				Columns: []pipeline.Column{
+					{Name: "col1"},
+					{Name: "col2"},
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "asset with empty entity is reported",
+			asset: &pipeline.Asset{
+				Name: "asset1",
+				Columns: []pipeline.Column{
+					{Name: "col1"},
+					{
+						Name: "col2",
+						EntityAttribute: &pipeline.EntityAttribute{
+							Entity: "",
+						},
+					},
+				},
+			},
+			want:    []string{"Entity name cannot be empty"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "asset with empty attribute is reported",
+			asset: &pipeline.Asset{
+				Name: "asset1",
+				Columns: []pipeline.Column{
+					{Name: "col1"},
+					{
+						Name: "col2",
+						EntityAttribute: &pipeline.EntityAttribute{
+							Entity:    "SomeEntity",
+							Attribute: "",
+						},
+					},
+				},
+			},
+			want:    []string{"Attribute name cannot be empty"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "asset with missing entity reference is reported",
+			asset: &pipeline.Asset{
+				Name: "asset1",
+				Columns: []pipeline.Column{
+					{Name: "col1"},
+					{
+						Name: "col2",
+						EntityAttribute: &pipeline.EntityAttribute{
+							Entity:    "SomeEntity",
+							Attribute: "SomeAttribute",
+						},
+					},
+				},
+			},
+			want:    []string{"Entity 'SomeEntity' does not exist in the glossary"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "asset with missing attribute reference is reported",
+			asset: &pipeline.Asset{
+				Name: "asset1",
+				Columns: []pipeline.Column{
+					{Name: "col1"},
+					{
+						Name: "col2",
+						EntityAttribute: &pipeline.EntityAttribute{
+							Entity:    "entity1",
+							Attribute: "SomeAttribute",
+						},
+					},
+				},
+			},
+			want:    []string{"Attribute 'SomeAttribute' does not exist in the entity 'entity1'"},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "asset with accurate entity is not reported",
+			asset: &pipeline.Asset{
+				Name: "asset1",
+				Columns: []pipeline.Column{
+					{Name: "col1"},
+					{
+						Name: "col2",
+						EntityAttribute: &pipeline.EntityAttribute{
+							Entity:    "entity1",
+							Attribute: "attr2",
+						},
+					},
+				},
+			},
+			want:    []string{},
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			checker := GlossaryChecker{
+				foundGlossary: &glossary.Glossary{
+					Entities: []*glossary.Entity{
+						{
+							Name: "entity1",
+							Attributes: map[string]*glossary.Attribute{
+								"attr1": {
+									Name: "attr1",
+								},
+								"attr2": {
+									Name: "attr2",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			got, err := checker.EnsureAssetEntitiesExistInGlossary(context.Background(), &pipeline.Pipeline{}, tt.asset)
+			if !tt.wantErr(t, err) {
+				return
+			}
+
+			gotMessages := make([]string, len(got))
+			for i, issue := range got {
+				gotMessages[i] = issue.Description
+			}
+
+			assert.Equal(t, tt.want, gotMessages)
 		})
 	}
 }

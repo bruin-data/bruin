@@ -23,6 +23,10 @@ type Entity struct {
 	Attributes  map[string]*Attribute `json:"attributes" yaml:"attributes"`
 }
 
+func (e Entity) GetAttribute(name string) *Attribute {
+	return e.Attributes[name]
+}
+
 type repoFinder interface {
 	Repo(path string) (*git.Repo, error)
 }
@@ -37,6 +41,16 @@ type GlossaryReader struct {
 
 type Glossary struct {
 	Entities []*Entity `yaml:"entities"`
+}
+
+func (g *Glossary) GetEntity(name string) *Entity {
+	for _, entity := range g.Entities {
+		if entity.Name == name {
+			return entity
+		}
+	}
+
+	return nil
 }
 
 type glossaryYaml struct {
@@ -74,23 +88,19 @@ func (r *GlossaryReader) GetGlossary(pipelinePath string) (*Glossary, error) {
 		glossary.Merge(entitiesFromFile)
 	}
 
-	r.mutex.Lock()
 	r.glossary = &glossary
-	r.mutex.Unlock()
 
 	return r.glossary, nil
 }
 
 func (r *GlossaryReader) GetEntities(pathToPipeline string) ([]*Entity, error) {
 	r.mutex.Lock()
+	defer r.mutex.Unlock()
 	if r.glossary == nil {
-		r.mutex.Unlock()
 		_, err := r.GetGlossary(pathToPipeline)
 		if err != nil {
 			return nil, err
 		}
-	} else {
-		r.mutex.Unlock()
 	}
 
 	return r.glossary.Entities, nil
