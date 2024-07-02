@@ -3,10 +3,19 @@ package lint
 import (
 	"slices"
 
+	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/spf13/afero"
 )
 
 func GetRules(fs afero.Fs) ([]Rule, error) {
+	gr := GlossaryChecker{
+		gr: &glossary.GlossaryReader{
+			RepoFinder: &git.RepoFinder{},
+			FileNames:  []string{"glossary.yml", "glossary.yaml"},
+		},
+	}
+
 	rules := []Rule{
 		&SimpleRule{
 			Identifier:       "task-name-valid",
@@ -86,6 +95,12 @@ func GetRules(fs afero.Fs) ([]Rule, error) {
 			Identifier:       "valid-pipeline-start-date",
 			Validator:        EnsurePipelineStartDateIsValid,
 			ApplicableLevels: []Level{LevelPipeline},
+		},
+		&SimpleRule{
+			Identifier:       "valid-entity-references",
+			Validator:        CallFuncForEveryAsset(gr.EnsureAssetEntitiesExistInGlossary),
+			AssetValidator:   gr.EnsureAssetEntitiesExistInGlossary,
+			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
 	}
 

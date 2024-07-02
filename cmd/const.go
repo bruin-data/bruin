@@ -26,10 +26,10 @@ var (
 		TasksFileSuffixes:   []string{"task.yml", "task.yaml", "asset.yml", "asset.yaml"},
 	}
 
-	glossaryReader = &glossary.GlossaryReader{
+	DefaultGlossaryReader = &glossary.GlossaryReader{
 		RepoFinder: &git.RepoFinder{},
 		FileNames:  []string{"glossary.yml", "glossary.yaml"},
 	}
 
-	DefaultPipelineBuilder = pipeline.NewBuilder(builderConfig, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, glossaryReader)
+	DefaultPipelineBuilder = pipeline.NewBuilder(builderConfig, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, DefaultGlossaryReader)
 )
