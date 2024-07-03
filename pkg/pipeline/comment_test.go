@@ -67,6 +67,15 @@ func Test_createTaskFromFile(t *testing.T) {
 				Connection: "conn2",
 				Secrets:    []pipeline.SecretMapping{},
 				DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
+				Upstreams: []pipeline.Upstream{
+					{Value: "task1", Type: "asset"},
+					{Value: "task2", Type: "asset"},
+					{Value: "task3", Type: "asset"},
+					{Value: "task4", Type: "asset"},
+					{Value: "task5", Type: "asset"},
+					{Value: "task3", Type: "asset"},
+				},
+
 				Materialization: pipeline.Materialization{
 					Type:           pipeline.MaterializationTypeTable,
 					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
@@ -111,6 +120,14 @@ func Test_createTaskFromFile(t *testing.T) {
 				Connection: "conn1",
 				Secrets:    []pipeline.SecretMapping{},
 				DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
+				Upstreams: []pipeline.Upstream{
+					{Value: "task1", Type: "asset"},
+					{Value: "task2", Type: "asset"},
+					{Value: "task3", Type: "asset"},
+					{Value: "task4", Type: "asset"},
+					{Value: "task5", Type: "asset"},
+					{Value: "task3", Type: "asset"},
+				},
 				Materialization: pipeline.Materialization{
 					Type:           pipeline.MaterializationTypeTable,
 					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
@@ -155,6 +172,14 @@ func Test_createTaskFromFile(t *testing.T) {
 				Instance:   "b1.nano",
 				Secrets:    []pipeline.SecretMapping{},
 				DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
+				Upstreams: []pipeline.Upstream{
+					{Value: "task1", Type: "asset"},
+					{Value: "task2", Type: "asset"},
+					{Value: "task3", Type: "asset"},
+					{Value: "task4", Type: "asset"},
+					{Value: "task5", Type: "asset"},
+					{Value: "task3", Type: "asset"},
+				},
 				Columns: []pipeline.Column{
 					{
 						Name: "col1",
@@ -228,6 +253,13 @@ func Test_createTaskFromFile(t *testing.T) {
 					},
 				},
 				DependsOn: []string{"task1", "task2", "task3", "task4", "task5"},
+				Upstreams: []pipeline.Upstream{
+					{Value: "task1", Type: "asset"},
+					{Value: "task2", Type: "asset"},
+					{Value: "task3", Type: "asset"},
+					{Value: "task4", Type: "asset"},
+					{Value: "task5", Type: "asset"},
+				},
 				Columns: []pipeline.Column{
 					{
 						Name: "col1",

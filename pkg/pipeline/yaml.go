@@ -33,12 +33,51 @@ func mustBeStringArray(fieldName string, value *yaml.Node) ([]string, error) {
 	return multi, nil
 }
 
-type depends []string
+type depends []upstream
+
+type upstream struct {
+	Value string `yaml:"value"`
+	Type  string `yaml:"type"`
+}
 
 func (a *depends) UnmarshalYAML(value *yaml.Node) error {
-	multi, err := mustBeStringArray("depends", value)
+	var multi []upstream
+	err := value.Decode(&multi)
+	if err != nil {
+		return &ParseError{Msg: "`depends` field must be an array of strings or mappings with `value` and `type` keys"}
+	}
 	*a = multi
-	return err
+
+	return nil
+}
+
+func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		*u = upstream{Value: value.Value, Type: "asset"}
+		return nil
+	}
+
+	if value.Kind != yaml.MappingNode || len(value.Content) != 4 {
+		return &ParseError{Msg: "depends field must be a string or a mapping with `value` and `type` keys"}
+	}
+
+	for _, node := range value.Content {
+		if node.Kind != yaml.ScalarNode {
+			return &ParseError{Msg: "depends field must be a string or a mapping with `value` and `type` keys"}
+		}
+	}
+
+	if value.Content[0].Value == "value" && value.Content[2].Value == "type" {
+		*u = upstream{Value: value.Content[1].Value, Type: value.Content[3].Value}
+		return nil
+	}
+
+	if value.Content[2].Value == "value" && value.Content[0].Value == "type" {
+		*u = upstream{Value: value.Content[3].Value, Type: value.Content[1].Value}
+		return nil
+	}
+
+	return &ParseError{Msg: "depends keys must be `value` and `type`"}
 }
 
 type clusterBy []string
@@ -266,8 +305,16 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		}
 	}
 
-	dependsOn := make([]string, len(definition.Depends))
-	copy(dependsOn, definition.Depends)
+	dependsOn := make([]string, 0)
+	upstreams := make([]Upstream, len(definition.Depends))
+
+	for index, dep := range definition.Depends {
+		upstreams[index] = Upstream{
+			Value: dep.Value,
+			Type:  dep.Type,
+		}
+		dependsOn = append(dependsOn, dep.Value)
+	}
 
 	task := Asset{
 		ID:              hash(definition.Name),
@@ -278,6 +325,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Connection:      definition.Connection,
 		Secrets:         make([]SecretMapping, len(definition.Secrets)),
 		DependsOn:       dependsOn,
+		Upstreams:       upstreams,
 		ExecutableFile:  ExecutableFile{},
 		Materialization: mat,
 		Image:           definition.Image,

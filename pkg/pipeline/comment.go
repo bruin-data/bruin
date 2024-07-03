@@ -177,6 +177,7 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 		CustomChecks: make([]CustomCheck, 0),
 		Secrets:      make([]SecretMapping, 0),
 		upstream:     make([]*Asset, 0),
+		Upstreams:    make([]Upstream, 0),
 	}
 
 	for _, row := range commentRows {
@@ -209,6 +210,7 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 			values := strings.Split(value, ",")
 			for _, v := range values {
 				task.DependsOn = append(task.DependsOn, strings.TrimSpace(v))
+				task.Upstreams = append(task.Upstreams, Upstream{Type: "asset", Value: strings.TrimSpace(v)})
 			}
 
 			continue
