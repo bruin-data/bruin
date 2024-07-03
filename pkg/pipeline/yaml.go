@@ -33,12 +33,36 @@ func mustBeStringArray(fieldName string, value *yaml.Node) ([]string, error) {
 	return multi, nil
 }
 
-type depends []string
+type depends []upstream
+
+type upstream struct {
+	Value string `yaml:"value"`
+	Type  string `yaml:"type"`
+}
 
 func (a *depends) UnmarshalYAML(value *yaml.Node) error {
-	multi, err := mustBeStringArray("depends", value)
-	*a = multi
-	return err
+	var multi []upstream
+	err := value.Decode(&multi)
+	if err != nil {
+		return &ParseError{Msg: "`depends` field must be an array of strings or mappings with `value` and `type` keys"}
+	}
+
+	return nil
+}
+
+func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		*u = upstream{Value: value.Value, Type: "asset"}
+		return nil
+	}
+	if value.Kind == yaml.MappingNode {
+		err := value.Decode(u)
+		if err != nil {
+			return &ParseError{Msg: err.Error()}
+		}
+	}
+
+	return &ParseError{Msg: "depends field must be a string or a mapping with `value` and `type` keys"}
 }
 
 type clusterBy []string
@@ -266,8 +290,16 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		}
 	}
 
-	dependsOn := make([]string, len(definition.Depends))
-	copy(dependsOn, definition.Depends)
+	dependsOn := make([]string, 0)
+	upstreams := make([]Upstream, len(definition.Depends))
+
+	for index, dep := range definition.Depends {
+		upstreams[index] = Upstream{
+			Value: dep.Value,
+			Type:  dep.Type,
+		}
+		dependsOn = append(dependsOn, dep.Value)
+	}
 
 	task := Asset{
 		ID:              hash(definition.Name),
@@ -278,6 +310,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Connection:      definition.Connection,
 		Secrets:         make([]SecretMapping, len(definition.Secrets)),
 		DependsOn:       dependsOn,
+		Upstreams:       upstreams,
 		ExecutableFile:  ExecutableFile{},
 		Materialization: mat,
 		Image:           definition.Image,

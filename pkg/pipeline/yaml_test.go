@@ -61,6 +61,12 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Connection: "conn1",
 				Secrets:    []pipeline.SecretMapping{},
 				DependsOn:  []string{"gcs-to-bq"},
+				Upstreams: []pipeline.Upstream{
+					{
+						Type:  "asset",
+						Value: "gcs-to-bq",
+					},
+				},
 				Materialization: pipeline.Materialization{
 					Type:           pipeline.MaterializationTypeTable,
 					Strategy:       pipeline.MaterializationStrategyCreateReplace,
@@ -130,9 +136,15 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 					"param1": "value1",
 					"param2": "value2",
 				},
-				Connection:   "conn1",
-				Secrets:      []pipeline.SecretMapping{},
-				DependsOn:    []string{"gcs-to-bq"},
+				Connection: "conn1",
+				Secrets:    []pipeline.SecretMapping{},
+				DependsOn:  []string{"gcs-to-bq"},
+				Upstreams: []pipeline.Upstream{
+					{
+						Type:  "asset",
+						Value: "gcs-to-bq",
+					},
+				},
 				Columns:      make([]pipeline.Column, 0),
 				CustomChecks: make([]pipeline.CustomCheck, 0),
 			},
@@ -156,9 +168,15 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 					"param1": "value1",
 					"param2": "value2",
 				},
-				Connection:   "conn1",
-				Secrets:      []pipeline.SecretMapping{},
-				DependsOn:    []string{"gcs-to-bq"},
+				Connection: "conn1",
+				Secrets:    []pipeline.SecretMapping{},
+				DependsOn:  []string{"gcs-to-bq"},
+				Upstreams: []pipeline.Upstream{
+					{
+						Type:  "asset",
+						Value: "gcs-to-bq",
+					},
+				},
 				Columns:      make([]pipeline.Column, 0),
 				CustomChecks: make([]pipeline.CustomCheck, 0),
 			},
@@ -177,9 +195,15 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 					"param1": "value1",
 					"param2": "value2",
 				},
-				Connection:   "conn1",
-				Secrets:      []pipeline.SecretMapping{},
-				DependsOn:    []string{"gcs-to-bq"},
+				Connection: "conn1",
+				Secrets:    []pipeline.SecretMapping{},
+				DependsOn:  []string{"gcs-to-bq"},
+				Upstreams: []pipeline.Upstream{
+					{
+						Type:  "asset",
+						Value: "gcs-to-bq",
+					},
+				},
 				Columns:      make([]pipeline.Column, 0),
 				CustomChecks: make([]pipeline.CustomCheck, 0),
 			},
@@ -190,7 +214,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				filePath: filepath.Join("testdata", "yaml", "random-structure", "task.yml"),
 			},
 			wantErr: true,
-			err:     errors.New("`depends` field must be an array of strings"),
+			err:     errors.New("`depends` field must be an array of strings or mappings with `value` and `type` keys"),
 		},
 	}
 	for _, tt := range tests {
