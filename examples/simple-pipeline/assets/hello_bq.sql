@@ -4,7 +4,8 @@ name: dashboard.hello_bq
 type: bq.sql
 
 depends:
-   - hello_python
+   - type: asset
+     value: hello_python
 
 materialization:
    type: table

@@ -927,6 +927,10 @@ func (b *Builder) CreateAssetFromFile(path string) (*Asset, error) {
 
 	task, err := creator(path)
 	if err != nil {
+		if errors.As(err, &ParseError{}) {
+			return nil, err
+		}
+
 		return nil, errors.Wrapf(err, "error creating task from file '%s'", path)
 	}
 
