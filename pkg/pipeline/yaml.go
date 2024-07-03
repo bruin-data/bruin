@@ -46,6 +46,7 @@ func (a *depends) UnmarshalYAML(value *yaml.Node) error {
 	if err != nil {
 		return &ParseError{Msg: "`depends` field must be an array of strings or mappings with `value` and `type` keys"}
 	}
+	*a = multi
 
 	return nil
 }
