@@ -150,30 +150,6 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			runID := time.Now().Format("2006_01_02_15_04_05")
-			if !c.Bool("no-log-file") {
-				logPath, err := filepath.Abs(fmt.Sprintf("%s/%s/%s.log", repoRoot.Path, LogsFolder, runID))
-				if err != nil {
-					errorPrinter.Printf("Failed to create log file: %v\n", err)
-					return cli.Exit("", 1)
-				}
-
-				fn, err2 := logOutput(logPath)
-				if err2 != nil {
-					errorPrinter.Printf("Failed to create log file: %v\n", err2)
-					return cli.Exit("", 1)
-				}
-
-				defer fn()
-				color.Output = os.Stdout
-
-				err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, LogsFolder+"/*.log")
-				if err != nil {
-					errorPrinter.Printf("Failed to add the log file to .gitignore: %v\n", err)
-					return cli.Exit("", 1)
-				}
-			}
-
 			runningForAnAsset := isPathReferencingAsset(inputPath)
 			if runningForAnAsset && c.String("tag") != "" {
 				errorPrinter.Printf("You cannot use the '--tag' flag when running a single asset.\n")
@@ -236,6 +212,36 @@ func Run(isDebug *bool) *cli.Command {
 				errorPrinter.Println("\nHint: You need to run this command with a path to either the pipeline directory or the asset file itself directly.")
 
 				return cli.Exit("", 1)
+			}
+
+			// handle log files
+			runID := time.Now().Format("2006_01_02_15_04_05")
+			if !c.Bool("no-log-file") {
+				logFileName := fmt.Sprintf("%s__%s", runID, foundPipeline.Name)
+				if runningForAnAsset {
+					logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, task.Name)
+				}
+
+				logPath, err := filepath.Abs(fmt.Sprintf("%s/%s/%s.log", repoRoot.Path, LogsFolder, logFileName))
+				if err != nil {
+					errorPrinter.Printf("Failed to create log file: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				fn, err2 := logOutput(logPath)
+				if err2 != nil {
+					errorPrinter.Printf("Failed to create log file: %v\n", err2)
+					return cli.Exit("", 1)
+				}
+
+				defer fn()
+				color.Output = os.Stdout
+
+				err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, LogsFolder+"/*.log")
+				if err != nil {
+					errorPrinter.Printf("Failed to add the log file to .gitignore: %v\n", err)
+					return cli.Exit("", 1)
+				}
 			}
 
 			infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", foundPipeline.Name, len(foundPipeline.Assets))
