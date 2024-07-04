@@ -103,7 +103,7 @@ func Lint(isDebug *bool) *cli.Command {
 
 			logger.Debugf("built the connection manager instance")
 
-			rules, err := lint.GetRules(fs)
+			rules, err := lint.GetRules(fs, &git.RepoFinder{})
 			if err != nil {
 				errorPrinter.Printf("An error occurred while building the validation rules: %v\n", err)
 				return cli.Exit("", 1)

@@ -8,10 +8,14 @@ import (
 	"github.com/spf13/afero"
 )
 
-func GetRules(fs afero.Fs) ([]Rule, error) {
+type repoFinder interface {
+	Repo(path string) (*git.Repo, error)
+}
+
+func GetRules(fs afero.Fs, finder repoFinder) ([]Rule, error) {
 	gr := GlossaryChecker{
 		gr: &glossary.GlossaryReader{
-			RepoFinder: &git.RepoFinder{},
+			RepoFinder: finder,
 			FileNames:  []string{"glossary.yml", "glossary.yaml"},
 		},
 	}
