@@ -1,0 +1,6 @@
+name: upstream.something
+
+depends:
+   - asset: some_asset
+   - uri: bigquery://project.database/schema
+   - some_other_asset

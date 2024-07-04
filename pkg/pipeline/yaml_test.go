@@ -236,3 +236,39 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 		})
 	}
 }
+
+func TestUpstreams(t *testing.T) {
+	t.Parallel()
+	creator := pipeline.CreateTaskFromYamlDefinition(afero.NewOsFs())
+	got, err := creator(filepath.Join("testdata", "yaml", "upstream.yml"))
+	require.NoError(t, err)
+
+	expected := &pipeline.Asset{
+		ID:      "5e51ec24663355d3b76b287f2c5eca1bfa17ac01da6134dbd1251c3b6ee99b56",
+		Name:    "upstream.something",
+		Secrets: make([]pipeline.SecretMapping, 0),
+		DependsOn: []string{
+			"some_asset",
+			"bigquery://project.database/schema",
+			"some_other_asset",
+		},
+		Columns:      make([]pipeline.Column, 0),
+		CustomChecks: make([]pipeline.CustomCheck, 0),
+		Upstreams: []pipeline.Upstream{
+			{
+				Type:  "asset",
+				Value: "some_asset",
+			},
+			{
+				Type:  "uri",
+				Value: "bigquery://project.database/schema",
+			},
+			{
+				Type:  "asset",
+				Value: "some_other_asset",
+			},
+		},
+	}
+
+	require.Equal(t, expected, got)
+}

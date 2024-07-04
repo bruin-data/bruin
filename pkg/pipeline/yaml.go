@@ -57,27 +57,26 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 		return nil
 	}
 
-	if value.Kind != yaml.MappingNode || len(value.Content) != 4 {
-		return &ParseError{Msg: "depends field must be a string or a mapping with `value` and `type` keys"}
+	var us map[string]string
+	err := value.Decode(&us)
+	if err != nil {
+		return &ParseError{Msg: "Malformed `depends` field"}
 	}
 
-	for _, node := range value.Content {
-		if node.Kind != yaml.ScalarNode {
-			return &ParseError{Msg: "depends field must be a string or a mapping with `value` and `type` keys"}
-		}
-	}
+	uri, foundURI := us["uri"]
+	asset, foundAsset := us["asset"]
 
-	if value.Content[0].Value == "value" && value.Content[2].Value == "type" {
-		*u = upstream{Value: value.Content[1].Value, Type: value.Content[3].Value}
+	if foundURI && !foundAsset {
+		*u = upstream{Value: uri, Type: "uri"}
 		return nil
 	}
 
-	if value.Content[2].Value == "value" && value.Content[0].Value == "type" {
-		*u = upstream{Value: value.Content[3].Value, Type: value.Content[1].Value}
+	if foundAsset && !foundURI {
+		*u = upstream{Value: asset, Type: "asset"}
 		return nil
 	}
 
-	return &ParseError{Msg: "depends keys must be `value` and `type`"}
+	return &ParseError{Msg: "Malformed `depends` field"}
 }
 
 type clusterBy []string
