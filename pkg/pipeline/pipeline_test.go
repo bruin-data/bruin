@@ -769,28 +769,3 @@ func TestPipeline_GetAssetByName(t *testing.T) {
 	assert.Equal(t, asset2, p.GetAssetByName("asset2"))
 	assert.Nil(t, p.GetAssetByName("somerandomasset"))
 }
-
-func TestUpstream_MarshalJSON(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		upstream   pipeline.Asset
-		serialized string
-		name       string
-	}{
-		{
-			upstream:   pipeline.Asset{DependsOn: []string{"asset1", "bigquery://project1.dataset1/table1"}},
-			serialized: "\"upstreams\":[{\"type\":\"asset\",\"value\":\"asset1\"},{\"type\":\"uri\",\"value\":\"bigquery://project1.dataset1/table1\"}]",
-			name:       "normal asset",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got, err := json.Marshal(tt.upstream)
-			require.NoError(t, err)
-			assert.Contains(t, string(got), tt.serialized)
-		})
-	}
-}
