@@ -324,6 +324,7 @@ type Upstream struct {
 
 type Asset struct {
 	ID              string             `json:"id"`
+	URI             string             `json:"uri"`
 	Name            string             `json:"name"`
 	Description     string             `json:"description"`
 	Type            AssetType          `json:"type"`
