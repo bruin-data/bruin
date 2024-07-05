@@ -31,6 +31,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 
 	asset1 := &pipeline.Asset{
 		ID:          "943be81e20336c53de2c8ab40991839ca3b88bcb4f854f03cdbd69825eb369b6",
+		URI:         "postgres://host:port/db",
 		Name:        "task1",
 		Description: "This is a hello world task",
 		Type:        "bash",

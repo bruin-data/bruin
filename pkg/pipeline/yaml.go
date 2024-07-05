@@ -173,6 +173,7 @@ type customCheck struct {
 
 type taskDefinition struct {
 	Name            string            `yaml:"name"`
+	URI             string            `yaml:"uri"`
 	Description     string            `yaml:"description"`
 	Type            string            `yaml:"type"`
 	RunFile         string            `yaml:"run"`
@@ -317,6 +318,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 
 	task := Asset{
 		ID:              hash(definition.Name),
+		URI:             definition.URI,
 		Name:            definition.Name,
 		Description:     definition.Description,
 		Type:            AssetType(definition.Type),
