@@ -769,3 +769,15 @@ func TestPipeline_GetAssetByName(t *testing.T) {
 	assert.Equal(t, asset2, p.GetAssetByName("asset2"))
 	assert.Nil(t, p.GetAssetByName("somerandomasset"))
 }
+
+func TestCustomMarshal(t *testing.T) {
+	t.Parallel()
+
+	asset1 := &pipeline.Asset{}
+
+	marshalled, err := json.Marshal(asset1)
+	require.NoError(t, err)
+
+	require.Contains(t, string(marshalled), "\"upstreams\":[]")
+	require.Contains(t, string(marshalled), "\"upstream\":[]")
+}

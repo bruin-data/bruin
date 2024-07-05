@@ -349,6 +349,18 @@ type Asset struct {
 	Upstreams  []Upstream `json:"upstreams"`
 }
 
+func (a *Asset) MarshalJSON() ([]byte, error) {
+	type Alias Asset
+
+	if a.Upstreams == nil {
+		a.Upstreams = make([]Upstream, 0)
+	}
+	if a.DependsOn == nil {
+		a.DependsOn = make([]string, 0)
+	}
+	return json.Marshal(Alias(*a))
+}
+
 func (a *Asset) AddUpstream(asset *Asset) {
 	a.upstream = append(a.upstream, asset)
 }
