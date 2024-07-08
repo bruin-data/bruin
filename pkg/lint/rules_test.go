@@ -454,15 +454,37 @@ func TestEnsureDependencyExists(t *testing.T) {
 					Assets: []*pipeline.Asset{
 						{
 							Name:      "task1",
-							DependsOn: []string{},
+							Upstreams: []pipeline.Upstream{},
 						},
 						{
-							Name:      "task2",
-							DependsOn: []string{"task1", "task3", "task5"},
+							Name: "task2",
+							Upstreams: []pipeline.Upstream{
+								{
+									Type:  "asset",
+									Value: "task1",
+								},
+								{
+									Type:  "asset",
+									Value: "task3",
+								},
+								{
+									Type:  "asset",
+									Value: "task5",
+								},
+							},
 						},
 						{
-							Name:      "task3",
-							DependsOn: []string{"task1", "task4"},
+							Name: "task3",
+							Upstreams: []pipeline.Upstream{
+								{
+									Type:  "asset",
+									Value: "task1",
+								},
+								{
+									Type:  "asset",
+									Value: "task4",
+								},
+							},
 						},
 					},
 				},
@@ -470,15 +492,37 @@ func TestEnsureDependencyExists(t *testing.T) {
 			want: []*Issue{
 				{
 					Task: &pipeline.Asset{
-						Name:      "task2",
-						DependsOn: []string{"task1", "task3", "task5"},
+						Name: "task2",
+						Upstreams: []pipeline.Upstream{
+							{
+								Type:  "asset",
+								Value: "task1",
+							},
+							{
+								Type:  "asset",
+								Value: "task3",
+							},
+							{
+								Type:  "asset",
+								Value: "task5",
+							},
+						},
 					},
 					Description: "Dependency 'task5' does not exist",
 				},
 				{
 					Task: &pipeline.Asset{
-						Name:      "task3",
-						DependsOn: []string{"task1", "task4"},
+						Name: "task3",
+						Upstreams: []pipeline.Upstream{
+							{
+								Type:  "asset",
+								Value: "task1",
+							},
+							{
+								Type:  "asset",
+								Value: "task4",
+							},
+						},
 					},
 					Description: "Dependency 'task4' does not exist",
 				},

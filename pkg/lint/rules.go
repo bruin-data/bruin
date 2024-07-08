@@ -268,19 +268,23 @@ func isFileExecutable(mode os.FileMode) bool {
 
 func EnsureDependencyExistsForASingleAsset(ctx context.Context, p *pipeline.Pipeline, task *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
-	for _, dep := range task.DependsOn {
-		if dep == "" {
+	for _, dep := range task.Upstreams {
+		if dep.Value == "" {
 			issues = append(issues, &Issue{
 				Task:        task,
 				Description: "Assets cannot have empty dependencies",
 			})
 		}
 
-		upstream := p.GetAssetByName(dep)
+		if dep.Type == "uri" {
+			continue
+		}
+
+		upstream := p.GetAssetByName(dep.Value)
 		if upstream == nil {
 			issues = append(issues, &Issue{
 				Task:        task,
-				Description: fmt.Sprintf("Dependency '%s' does not exist", dep),
+				Description: fmt.Sprintf("Dependency '%s' does not exist", dep.Value),
 			})
 		}
 	}
