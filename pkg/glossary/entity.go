@@ -40,7 +40,7 @@ type GlossaryReader struct {
 }
 
 type Glossary struct {
-	Entities []*Entity `yaml:"entities"`
+	Entities []*Entity `yaml:"entities" json:"entities"`
 }
 
 func (g *Glossary) GetEntity(name string) *Entity {
