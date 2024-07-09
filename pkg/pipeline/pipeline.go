@@ -318,8 +318,9 @@ type CustomCheck struct {
 }
 
 type Upstream struct {
-	Type  string `json:"type"`
-	Value string `json:"value"`
+	Type     string         `json:"type"`
+	Value    string         `json:"value"`
+	Metadata EmptyStringMap `json:"metadata,omitempty"`
 }
 
 type Asset struct {
