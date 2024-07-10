@@ -357,8 +357,11 @@ func EnsurePipelineHasNoCycles(p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
 	for _, task := range p.Assets {
-		for _, dep := range task.DependsOn {
-			if task.Name == dep {
+		for _, dep := range task.Upstreams {
+			if dep.Type == "uri" {
+				continue
+			}
+			if task.Name == dep.Value {
 				issues = append(issues, &Issue{
 					Description: pipelineContainsCycle,
 					Context:     []string{fmt.Sprintf("Asset `%s` depends on itself", task.Name)},
@@ -374,8 +377,11 @@ func EnsurePipelineHasNoCycles(p *pipeline.Pipeline) ([]*Issue, error) {
 
 	g := graph.New(len(p.Assets))
 	for _, task := range p.Assets {
-		for _, dep := range task.DependsOn {
-			g.Add(taskNameToIndex[task.Name], taskNameToIndex[dep])
+		for _, dep := range task.Upstreams {
+			if dep.Type == "uri" {
+				continue
+			}
+			g.Add(taskNameToIndex[task.Name], taskNameToIndex[dep.Value])
 		}
 	}
 
@@ -394,12 +400,15 @@ func EnsurePipelineHasNoCycles(p *pipeline.Pipeline) ([]*Issue, error) {
 		context := make([]string, 0, cycleLength)
 		for _, taskIndex := range cycle {
 			task := p.Assets[taskIndex]
-			for _, dep := range task.DependsOn {
-				if _, ok := tasksInCycle[dep]; !ok {
+			for _, dep := range task.Upstreams {
+				if dep.Type == "uri" {
+					continue
+				}
+				if _, ok := tasksInCycle[dep.Value]; !ok {
 					continue
 				}
 
-				context = append(context, fmt.Sprintf("%s ➜ %s", task.Name, dep))
+				context = append(context, fmt.Sprintf("%s ➜ %s", task.Name, dep.Value))
 			}
 		}
 
