@@ -154,6 +154,28 @@ func TestMaterializer_Render(t *testing.T) {
 				"COMMIT TRANSACTION;$",
 		},
 		{
+			name: "delete+insert builds a proper transaction where columns are defined",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey: "dt",
+				},
+				Columns: []pipeline.Column{
+					{Name: "dt", Type: "date"},
+				},
+			},
+			query: "SELECT 1",
+			want: "^DECLARE distinct_keys.+ array<date>;\n" +
+				"BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
+				"SET distinct_keys_.+ = \\(SELECT array_agg\\(distinct dt\\) FROM __bruin_tmp_.+\\);\n" +
+				"DELETE FROM my\\.asset WHERE dt in unnest\\(distinct_keys.+\\);\n" +
+				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
+				"COMMIT TRANSACTION;$",
+		},
+		{
 			name: "merge with no columns defined fails",
 			task: &pipeline.Asset{
 				Name:    "my.asset",

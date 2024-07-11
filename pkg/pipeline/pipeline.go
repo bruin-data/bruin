@@ -429,6 +429,16 @@ func (a *Asset) ColumnNamesWithPrimaryKey() []string {
 	return columns
 }
 
+func (a *Asset) GetColumnWithName(name string) *Column {
+	for _, c := range a.Columns {
+		if c.Name == name {
+			return &c
+		}
+	}
+
+	return nil
+}
+
 func (a *Asset) EnrichFromEntityAttributes(entities []*glossary.Entity) error {
 	entityMap := make(map[string]*glossary.Entity, len(entities))
 	for _, e := range entities {

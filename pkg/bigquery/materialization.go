@@ -93,6 +93,30 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 		return "", fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", mat.Strategy)
 	}
 
+	foundCol := asset.GetColumnWithName(mat.IncrementalKey)
+	if foundCol == nil {
+		return buildIncrementalQueryWithoutTempVariable(asset, query)
+	}
+
+	randPrefix := helpers.PrefixGenerator()
+	tempTableName := "__bruin_tmp_" + randPrefix
+
+	declaredVarName := "distinct_keys_" + randPrefix
+	queries := []string{
+		fmt.Sprintf("DECLARE %s array<%s>", declaredVarName, foundCol.Type),
+		"BEGIN TRANSACTION",
+		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, query),
+		fmt.Sprintf("SET %s = (SELECT array_agg(distinct dt) FROM %s)", declaredVarName, tempTableName),
+		fmt.Sprintf("DELETE FROM %s WHERE %s in unnest(%s)", asset.Name, mat.IncrementalKey, declaredVarName),
+		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", asset.Name, tempTableName),
+		"COMMIT TRANSACTION",
+	}
+
+	return strings.Join(queries, ";\n") + ";", nil
+}
+
+func buildIncrementalQueryWithoutTempVariable(asset *pipeline.Asset, query string) (string, error) {
+	mat := asset.Materialization
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
 	queries := []string{
