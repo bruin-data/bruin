@@ -278,7 +278,7 @@ func TestCustomCheck(t *testing.T) {
 
 			conn := new(mockConnectionFetcher)
 			conn.On("GetConnection", "test").Return(q, nil)
-			n := &CustomCheck{conn: conn, renderer: jinja.NewRendererWithYesterday()}
+			n := &CustomCheck{conn: conn, renderer: jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")}
 
 			testInstance := &scheduler.CustomCheckInstance{
 				AssetInstance: &scheduler.AssetInstance{

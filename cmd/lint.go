@@ -111,7 +111,7 @@ func Lint(isDebug *bool) *cli.Command {
 
 			logger.Debugf("successfully loaded %d rules", len(rules))
 
-			renderer := jinja.NewRendererWithYesterday()
+			renderer := jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")
 
 			if len(cm.SelectedEnvironment.Connections.GoogleCloudPlatform) > 0 {
 				rules = append(rules, &lint.QueryValidatorRule{

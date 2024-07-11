@@ -124,6 +124,7 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	if envVariables == nil {
 		envVariables = make(map[string]string)
 	}
+	envVariables["BRUIN_ASSET"] = t.Name
 
 	for _, mapping := range t.Secrets {
 		val, err := o.config.GetSecretByKey(mapping.SecretKey)

@@ -34,7 +34,7 @@ func NewRenderer(context Context) *Renderer {
 	}
 }
 
-func PythonEnvVariables(startDate, endDate *time.Time, runID string) map[string]string {
+func PythonEnvVariables(startDate, endDate *time.Time, pipelineName, runID string) map[string]string {
 	return map[string]string{
 		"BRUIN_START_DATE":        startDate.Format("2006-01-02"),
 		"BRUIN_START_DATE_NODASH": startDate.Format("20060102"),
@@ -45,10 +45,11 @@ func PythonEnvVariables(startDate, endDate *time.Time, runID string) map[string]
 		"BRUIN_END_DATETIME":      endDate.Format("2006-01-02T15:04:05"),
 		"BRUIN_END_TIMESTAMP":     endDate.Format("2006-01-02T15:04:05.000000Z07:00"),
 		"BRUIN_RUN_ID":            runID,
+		"BRUIN_PIPELINE":          pipelineName,
 	}
 }
 
-func NewRendererWithStartEndDates(startDate, endDate *time.Time) *Renderer {
+func NewRendererWithStartEndDates(startDate, endDate *time.Time, pipelineName, runID string) *Renderer {
 	ctx := exec.NewContext(map[string]any{
 		"start_date":        startDate.Format("2006-01-02"),
 		"start_date_nodash": startDate.Format("20060102"),
@@ -58,6 +59,8 @@ func NewRendererWithStartEndDates(startDate, endDate *time.Time) *Renderer {
 		"end_date_nodash":   endDate.Format("20060102"),
 		"end_datetime":      endDate.Format("2006-01-02T15:04:05"),
 		"end_timestamp":     endDate.Format("2006-01-02T15:04:05.000000Z07:00"),
+		"pipeline":          pipelineName,
+		"run_id":            runID,
 	})
 
 	return &Renderer{
@@ -66,11 +69,11 @@ func NewRendererWithStartEndDates(startDate, endDate *time.Time) *Renderer {
 	}
 }
 
-func NewRendererWithYesterday() *Renderer {
+func NewRendererWithYesterday(pipelineName, runID string) *Renderer {
 	yesterday := time.Now().AddDate(0, 0, -1)
 	startDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
 	endDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
-	return NewRendererWithStartEndDates(&startDate, &endDate)
+	return NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID)
 }
 
 func (r *Renderer) Render(query string) (string, error) {

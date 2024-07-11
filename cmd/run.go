@@ -291,7 +291,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			infoPrinter.Println()
 
-			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, runID, c.Bool("full-refresh"))
+			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, c.Bool("full-refresh"))
 			if err != nil {
 				errorPrinter.Printf(err.Error())
 				return cli.Exit("", 1)
@@ -365,7 +365,7 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	}
 }
 
-func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connection.Manager, startDate, endDate time.Time, runID string, fullRefresh bool) (map[pipeline.AssetType]executor.Config, error) {
+func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connection.Manager, startDate, endDate time.Time, pipelineName string, runID string, fullRefresh bool) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
 
 	// this is a heuristic we apply to find what might be the most common type of custom check in the pipeline
@@ -373,10 +373,10 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 	estimateCustomCheckType := s.FindMajorityOfTypes(pipeline.AssetTypeBigqueryQuery)
 
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
-		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinja.PythonEnvVariables(&startDate, &endDate, runID))
+		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID))
 	}
 
-	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate)
+	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID)
 	wholeFileExtractor := &query.WholeFileExtractor{
 		Fs:       fs,
 		Renderer: renderer,

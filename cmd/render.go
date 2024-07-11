@@ -64,7 +64,7 @@ func Render() *cli.Command {
 			r := RenderCommand{
 				extractor: &query.WholeFileExtractor{
 					Fs:       fs,
-					Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate),
+					Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id"),
 				},
 				materializers: map[pipeline.AssetType]queryMaterializer{
 					pipeline.AssetTypeBigqueryQuery:  bigquery.NewMaterializer(fullRefresh),

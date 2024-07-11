@@ -195,7 +195,7 @@ type CustomCheck struct {
 }
 
 func NewCustomCheck(conn connectionFetcher) *CustomCheck {
-	return &CustomCheck{conn: conn, renderer: jinja.NewRendererWithYesterday()}
+	return &CustomCheck{conn: conn, renderer: jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")}
 }
 
 func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstance) error {

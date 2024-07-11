@@ -210,7 +210,7 @@ group by 1`,
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			receiver := NewRendererWithStartEndDates(&startDate, &endDate)
+			receiver := NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id")
 			got, err := receiver.Render(tt.query)
 			if tt.wantErr {
 				require.Error(t, err)

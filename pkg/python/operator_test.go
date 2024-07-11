@@ -55,12 +55,14 @@ func TestLocalOperator_RunTask(t *testing.T) {
 	t.Parallel()
 
 	task := &pipeline.Asset{
+		Name: "my-asset",
 		ExecutableFile: pipeline.ExecutableFile{
 			Path: "/path/to/file.py",
 		},
 	}
 
 	assetWithSecrets := &pipeline.Asset{
+		Name: "my-asset",
 		ExecutableFile: pipeline.ExecutableFile{
 			Path: "/path/to/file.py",
 		},
@@ -138,7 +140,9 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					module:          "path.to.module",
 					requirementsTxt: "",
 					task:            task,
-					envVariables:    map[string]string{},
+					envVariables: map[string]string{
+						"BRUIN_ASSET": "my-asset",
+					},
 				}).
 					Return(assert.AnError)
 			},
@@ -169,6 +173,7 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					envVariables: map[string]string{
 						"key1_injected": "value1",
 						"key2":          "value2",
+						"BRUIN_ASSET":   "my-asset",
 					},
 				}).
 					Return(assert.AnError)
@@ -194,7 +199,9 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					module:          "path.to.module",
 					requirementsTxt: "/path/to/requirements.txt",
 					task:            task,
-					envVariables:    map[string]string{},
+					envVariables: map[string]string{
+						"BRUIN_ASSET": "my-asset",
+					},
 				}).Return(assert.AnError)
 			},
 			wantErr: assert.Error,
