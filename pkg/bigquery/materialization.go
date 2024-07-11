@@ -106,7 +106,7 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 		fmt.Sprintf("DECLARE %s array<%s>", declaredVarName, foundCol.Type),
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, query),
-		fmt.Sprintf("SET %s = (SELECT array_agg(distinct dt) FROM %s)", declaredVarName, tempTableName),
+		fmt.Sprintf("SET %s = (SELECT array_agg(distinct %s) FROM %s)", declaredVarName, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in unnest(%s)", asset.Name, mat.IncrementalKey, declaredVarName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", asset.Name, tempTableName),
 		"COMMIT TRANSACTION",

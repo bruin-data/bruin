@@ -160,18 +160,18 @@ func TestMaterializer_Render(t *testing.T) {
 				Materialization: pipeline.Materialization{
 					Type:           pipeline.MaterializationTypeTable,
 					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
-					IncrementalKey: "dt",
+					IncrementalKey: "somekey",
 				},
 				Columns: []pipeline.Column{
-					{Name: "dt", Type: "date"},
+					{Name: "somekey", Type: "date"},
 				},
 			},
 			query: "SELECT 1",
 			want: "^DECLARE distinct_keys.+ array<date>;\n" +
 				"BEGIN TRANSACTION;\n" +
 				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
-				"SET distinct_keys_.+ = \\(SELECT array_agg\\(distinct dt\\) FROM __bruin_tmp_.+\\);\n" +
-				"DELETE FROM my\\.asset WHERE dt in unnest\\(distinct_keys.+\\);\n" +
+				"SET distinct_keys_.+ = \\(SELECT array_agg\\(distinct somekey\\) FROM __bruin_tmp_.+\\);\n" +
+				"DELETE FROM my\\.asset WHERE somekey in unnest\\(distinct_keys.+\\);\n" +
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
 				"COMMIT TRANSACTION;$",
 		},
