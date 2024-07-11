@@ -334,7 +334,6 @@ type Asset struct {
 	Parameters      EmptyStringMap     `json:"parameters"`
 	Connection      string             `json:"connection"`
 	Secrets         []SecretMapping    `json:"secrets"`
-	DependsOn       []string           `json:"upstream"`
 	Materialization Materialization    `json:"materialization"`
 	Columns         []Column           `json:"columns"`
 	CustomChecks    []CustomCheck      `json:"custom_checks"`
@@ -352,15 +351,28 @@ type Asset struct {
 }
 
 func (a *Asset) MarshalJSON() ([]byte, error) {
-	type Alias Asset
+	type Alias struct {
+		Asset
+		DependsOn []string `json:"upstream"`
+	}
 
 	if a.Upstreams == nil {
 		a.Upstreams = make([]Upstream, 0)
 	}
-	if a.DependsOn == nil {
-		a.DependsOn = make([]string, 0)
+
+	asset := Alias{
+		Asset:     *a,
+		DependsOn: make([]string, 0),
 	}
-	return json.Marshal(Alias(*a))
+
+	for _, u := range a.Upstreams {
+		if u.Type != "asset" {
+			continue
+		}
+		asset.DependsOn = append(asset.DependsOn, u.Value)
+	}
+
+	return json.Marshal(asset)
 }
 
 func (a *Asset) AddUpstream(asset *Asset) {
@@ -883,8 +895,11 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 	}
 
 	for _, asset := range pipeline.Assets {
-		for _, upstream := range asset.DependsOn {
-			u, ok := pipeline.tasksByName[upstream]
+		for _, upstream := range asset.Upstreams {
+			if upstream.Type != "asset" {
+				continue
+			}
+			u, ok := pipeline.tasksByName[upstream.Value]
 			if !ok {
 				continue
 			}

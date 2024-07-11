@@ -459,8 +459,12 @@ func (s *Scheduler) constructInstanceRelationships() {
 		s.taskNameMap[assetName].AddUpstreamByType(TaskInstanceTypeCustomCheck, ti)
 		s.taskNameMap[assetName].AddUpstreamByType(TaskInstanceTypeMetadataPush, ti)
 
-		for _, dep := range ti.GetAsset().DependsOn {
-			upstreamInstances, ok := s.taskNameMap[dep]
+		for _, dep := range ti.GetAsset().Upstreams {
+			if dep.Type != "asset" {
+				continue
+			}
+
+			upstreamInstances, ok := s.taskNameMap[dep.Value]
 			if !ok {
 				continue
 			}

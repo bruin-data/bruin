@@ -60,7 +60,6 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				},
 				Connection: "conn1",
 				Secrets:    []pipeline.SecretMapping{},
-				DependsOn:  []string{"gcs-to-bq"},
 				Upstreams: []pipeline.Upstream{
 					{
 						Type:  "asset",
@@ -138,7 +137,6 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				},
 				Connection: "conn1",
 				Secrets:    []pipeline.SecretMapping{},
-				DependsOn:  []string{"gcs-to-bq"},
 				Upstreams: []pipeline.Upstream{
 					{
 						Type:  "asset",
@@ -170,7 +168,6 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				},
 				Connection: "conn1",
 				Secrets:    []pipeline.SecretMapping{},
-				DependsOn:  []string{"gcs-to-bq"},
 				Upstreams: []pipeline.Upstream{
 					{
 						Type:  "asset",
@@ -197,7 +194,6 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				},
 				Connection: "conn1",
 				Secrets:    []pipeline.SecretMapping{},
-				DependsOn:  []string{"gcs-to-bq"},
 				Upstreams: []pipeline.Upstream{
 					{
 						Type:  "asset",
@@ -244,14 +240,9 @@ func TestUpstreams(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := &pipeline.Asset{
-		ID:      "5e51ec24663355d3b76b287f2c5eca1bfa17ac01da6134dbd1251c3b6ee99b56",
-		Name:    "upstream.something",
-		Secrets: make([]pipeline.SecretMapping, 0),
-		DependsOn: []string{
-			"some_asset",
-			"bigquery://project.database/schema",
-			"some_other_asset",
-		},
+		ID:           "5e51ec24663355d3b76b287f2c5eca1bfa17ac01da6134dbd1251c3b6ee99b56",
+		Name:         "upstream.something",
+		Secrets:      make([]pipeline.SecretMapping, 0),
 		Columns:      make([]pipeline.Column, 0),
 		CustomChecks: make([]pipeline.CustomCheck, 0),
 		Upstreams: []pipeline.Upstream{

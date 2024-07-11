@@ -988,27 +988,40 @@ func TestEnsurePipelineHasNoCycles(t *testing.T) {
 							Name: "task0",
 						},
 						{
-							Name:      "task1",
-							DependsOn: []string{"task2", "task0"},
+							Name: "task1",
+							Upstreams: []pipeline.Upstream{
+								{Type: "asset", Value: "task2"},
+								{Type: "asset", Value: "task0"},
+							},
 						},
 						{
-							Name:      "task2",
-							DependsOn: []string{"task3"},
+							Name: "task2",
+							Upstreams: []pipeline.Upstream{
+								{Type: "asset", Value: "task3"},
+							},
 						},
 						{
-							Name:      "task3",
-							DependsOn: []string{"task1"},
+							Name: "task3",
+							Upstreams: []pipeline.Upstream{
+								{Type: "asset", Value: "task1"},
+							},
 						},
 						{
 							Name: "task4",
 						},
 						{
-							Name:      "task5",
-							DependsOn: []string{"task4", "task1"},
+							Name: "task5",
+							Upstreams: []pipeline.Upstream{
+								{Type: "asset", Value: "task4"},
+								{Type: "asset", Value: "task1"},
+							},
 						},
 						{
-							Name:      "task6",
-							DependsOn: []string{"task4", "task6"},
+							Name: "task6",
+							Upstreams: []pipeline.Upstream{
+								{Type: "asset", Value: "task4"},
+								{Type: "asset", Value: "task6"},
+							},
 						},
 					},
 				},

@@ -51,7 +51,6 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		},
 		Connection: "conn1",
 		Secrets:    []pipeline.SecretMapping{},
-		DependsOn:  []string{"gcs-to-bq"},
 		Upstreams: []pipeline.Upstream{
 			{
 				Type:  "asset",
@@ -76,7 +75,6 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			Path: path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/task2/task.yaml"),
 			Type: pipeline.YamlTask,
 		},
-		DependsOn:    []string{},
 		Upstreams:    []pipeline.Upstream{},
 		Columns:      make([]pipeline.Column, 0),
 		Secrets:      []pipeline.SecretMapping{},
@@ -105,7 +103,6 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		},
 		Connection: "first-connection",
 		Secrets:    []pipeline.SecretMapping{},
-		DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
 		Upstreams: []pipeline.Upstream{
 			{Type: "asset", Value: "task1"},
 			{Type: "asset", Value: "task2"},
@@ -141,7 +138,6 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		},
 		Connection: "conn2",
 		Secrets:    []pipeline.SecretMapping{},
-		DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
 		Upstreams: []pipeline.Upstream{
 			{Type: "asset", Value: "task1"},
 			{Type: "asset", Value: "task2"},

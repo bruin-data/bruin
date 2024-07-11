@@ -25,16 +25,23 @@ func TestScheduler_getScheduleableTasks(t *testing.T) {
 			Name: "task21",
 		},
 		{
-			Name:      "task12",
-			DependsOn: []string{"task11"},
+			Name: "task12",
+			Upstreams: []pipeline.Upstream{
+				{Type: "asset", Value: "task11"},
+			},
 		},
 		{
-			Name:      "task22",
-			DependsOn: []string{"task21"},
+			Name: "task22",
+			Upstreams: []pipeline.Upstream{
+				{Type: "asset", Value: "task21"},
+			},
 		},
 		{
-			Name:      "task3",
-			DependsOn: []string{"task12", "task22"},
+			Name: "task3",
+			Upstreams: []pipeline.Upstream{
+				{Type: "asset", Value: "task12"},
+				{Type: "asset", Value: "task22"},
+			},
 		},
 	}
 
@@ -171,8 +178,10 @@ func TestScheduler_Run(t *testing.T) {
 				Name: "task21",
 			},
 			{
-				Name:      "task12",
-				DependsOn: []string{"task11"},
+				Name: "task12",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task11"},
+				},
 				Columns: []pipeline.Column{
 					{
 						Name: "col1",
@@ -185,12 +194,17 @@ func TestScheduler_Run(t *testing.T) {
 				},
 			},
 			{
-				Name:      "task22",
-				DependsOn: []string{"task21"},
+				Name: "task22",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task21"},
+				},
 			},
 			{
-				Name:      "task3",
-				DependsOn: []string{"task12", "task22"},
+				Name: "task3",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task12"},
+					{Type: "asset", Value: "task22"},
+				},
 			},
 		},
 	}
@@ -268,8 +282,10 @@ func TestScheduler_MarkTasksAndDownstream(t *testing.T) {
 	t.Parallel()
 
 	t12 := &pipeline.Asset{
-		Name:      "task12",
-		DependsOn: []string{"task11"},
+		Name: "task12",
+		Upstreams: []pipeline.Upstream{
+			{Type: "asset", Value: "task11"},
+		},
 	}
 
 	p := &pipeline.Pipeline{
@@ -282,20 +298,30 @@ func TestScheduler_MarkTasksAndDownstream(t *testing.T) {
 			},
 			t12,
 			{
-				Name:      "task13",
-				DependsOn: []string{"task12"},
+				Name: "task13",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task12"},
+				},
 			},
 			{
-				Name:      "task22",
-				DependsOn: []string{"task21"},
+				Name: "task22",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task21"},
+				},
 			},
 			{
-				Name:      "task3",
-				DependsOn: []string{"task12", "task22"},
+				Name: "task3",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task12"},
+					{Type: "asset", Value: "task22"},
+				},
 			},
 			{
-				Name:      "task4",
-				DependsOn: []string{"task13", "task3"},
+				Name: "task4",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task13"},
+					{Type: "asset", Value: "task3"},
+				},
 			},
 		},
 	}
@@ -339,9 +365,11 @@ func TestScheduler_WillRunTaskOfType(t *testing.T) {
 	t.Parallel()
 
 	t12 := &pipeline.Asset{
-		Name:      "task12",
-		DependsOn: []string{"task11"},
-		Type:      "bq.sql",
+		Name: "task12",
+		Upstreams: []pipeline.Upstream{
+			{Type: "asset", Value: "task11"},
+		},
+		Type: "bq.sql",
 		Columns: []pipeline.Column{
 			{
 				Checks: []pipeline.ColumnCheck{
@@ -375,24 +403,34 @@ func TestScheduler_WillRunTaskOfType(t *testing.T) {
 			},
 			t12,
 			{
-				Name:      "task13",
-				DependsOn: []string{"task12"},
-				Type:      "bq.sql",
+				Name: "task13",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task12"},
+				},
+				Type: "bq.sql",
 			},
 			{
-				Name:      "task22",
-				DependsOn: []string{"task21"},
-				Type:      "python",
+				Name: "task22",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task21"},
+				},
+				Type: "python",
 			},
 			{
-				Name:      "task3",
-				DependsOn: []string{"task12", "task22"},
-				Type:      "python",
+				Name: "task3",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task12"},
+					{Type: "asset", Value: "task22"},
+				},
+				Type: "python",
 			},
 			{
-				Name:      "task4",
-				DependsOn: []string{"task13", "task3"},
-				Type:      "empty",
+				Name: "task4",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task13"},
+					{Type: "asset", Value: "task3"},
+				},
+				Type: "empty",
 			},
 			t1000,
 		},
@@ -427,24 +465,34 @@ func TestScheduler_FindMajorityOfTypes(t *testing.T) {
 				Type: "sf.sql",
 			},
 			{
-				Name:      "task13",
-				DependsOn: []string{"task12"},
-				Type:      "bq.sql",
+				Name: "task13",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task12"},
+				},
+				Type: "bq.sql",
 			},
 			{
-				Name:      "task22",
-				DependsOn: []string{"task21"},
-				Type:      "python",
+				Name: "task22",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task21"},
+				},
+				Type: "python",
 			},
 			{
-				Name:      "task3",
-				DependsOn: []string{"task12", "task22"},
-				Type:      "python",
+				Name: "task3",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task12"},
+					{Type: "asset", Value: "task22"},
+				},
+				Type: "python",
 			},
 			{
-				Name:      "task4",
-				DependsOn: []string{"task13", "task3"},
-				Type:      "sf.sql",
+				Name: "task4",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task13"},
+					{Type: "asset", Value: "task3"},
+				},
+				Type: "sf.sql",
 			},
 		},
 	}

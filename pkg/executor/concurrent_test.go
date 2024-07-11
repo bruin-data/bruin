@@ -26,21 +26,28 @@ func TestConcurrent_Start(t *testing.T) {
 	}
 
 	t12 := &pipeline.Asset{
-		Name:      "task12",
-		Type:      "test",
-		DependsOn: []string{"task11"},
+		Name: "task12",
+		Type: "test",
+		Upstreams: []pipeline.Upstream{
+			{Value: "task11", Type: "asset"},
+		},
 	}
 
 	t22 := &pipeline.Asset{
-		Name:      "task22",
-		Type:      "test",
-		DependsOn: []string{"task21"},
+		Name: "task22",
+		Type: "test",
+		Upstreams: []pipeline.Upstream{
+			{Value: "task21", Type: "asset"},
+		},
 	}
 
 	t3 := &pipeline.Asset{
-		Name:      "task3",
-		Type:      "test",
-		DependsOn: []string{"task12", "task22"},
+		Name: "task3",
+		Type: "test",
+		Upstreams: []pipeline.Upstream{
+			{Value: "task12", Type: "asset"},
+			{Value: "task22", Type: "asset"},
+		},
 	}
 
 	p := &pipeline.Pipeline{
