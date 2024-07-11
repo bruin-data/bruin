@@ -172,7 +172,6 @@ func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath st
 func commentRowsToTask(commentRows []string) (*Asset, error) {
 	task := Asset{
 		Parameters:   make(map[string]string),
-		DependsOn:    []string{},
 		Columns:      make([]Column, 0),
 		CustomChecks: make([]CustomCheck, 0),
 		Secrets:      make([]SecretMapping, 0),
@@ -209,7 +208,6 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 		case "depends":
 			values := strings.Split(value, ",")
 			for _, v := range values {
-				task.DependsOn = append(task.DependsOn, strings.TrimSpace(v))
 				task.Upstreams = append(task.Upstreams, Upstream{Type: "asset", Value: strings.TrimSpace(v)})
 			}
 
