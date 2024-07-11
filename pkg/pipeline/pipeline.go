@@ -334,7 +334,6 @@ type Asset struct {
 	Parameters      EmptyStringMap     `json:"parameters"`
 	Connection      string             `json:"connection"`
 	Secrets         []SecretMapping    `json:"secrets"`
-	DependsOn       []string           `json:"upstream"`
 	Materialization Materialization    `json:"materialization"`
 	Columns         []Column           `json:"columns"`
 	CustomChecks    []CustomCheck      `json:"custom_checks"`
@@ -352,13 +351,28 @@ type Asset struct {
 }
 
 func (a *Asset) MarshalJSON() ([]byte, error) {
-	type Alias Asset
+	type Alias struct {
+		Asset
+		DependsOn []string `json:"upstream"`
+	}
 
 	if a.Upstreams == nil {
 		a.Upstreams = make([]Upstream, 0)
 	}
 
-	return json.Marshal(Alias(*a))
+	asset := Alias{
+		Asset:     *a,
+		DependsOn: make([]string, 0),
+	}
+
+	for _, u := range a.Upstreams {
+		if u.Type != "asset" {
+			continue
+		}
+		asset.DependsOn = append(asset.DependsOn, u.Value)
+	}
+
+	return json.Marshal(asset)
 }
 
 func (a *Asset) AddUpstream(asset *Asset) {

@@ -66,7 +66,6 @@ func Test_createTaskFromFile(t *testing.T) {
 				},
 				Connection: "conn2",
 				Secrets:    []pipeline.SecretMapping{},
-				DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
 				Upstreams: []pipeline.Upstream{
 					{Value: "task1", Type: "asset"},
 					{Value: "task2", Type: "asset"},
@@ -119,7 +118,6 @@ func Test_createTaskFromFile(t *testing.T) {
 				},
 				Connection: "conn1",
 				Secrets:    []pipeline.SecretMapping{},
-				DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
 				Upstreams: []pipeline.Upstream{
 					{Value: "task1", Type: "asset"},
 					{Value: "task2", Type: "asset"},
@@ -171,7 +169,6 @@ func Test_createTaskFromFile(t *testing.T) {
 				Image:      "python:3.11",
 				Instance:   "b1.nano",
 				Secrets:    []pipeline.SecretMapping{},
-				DependsOn:  []string{"task1", "task2", "task3", "task4", "task5", "task3"},
 				Upstreams: []pipeline.Upstream{
 					{Value: "task1", Type: "asset"},
 					{Value: "task2", Type: "asset"},
@@ -252,7 +249,6 @@ func Test_createTaskFromFile(t *testing.T) {
 						InjectedKey: "secret2",
 					},
 				},
-				DependsOn: []string{"task1", "task2", "task3", "task4", "task5"},
 				Upstreams: []pipeline.Upstream{
 					{Value: "task1", Type: "asset"},
 					{Value: "task2", Type: "asset"},

@@ -305,7 +305,6 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		}
 	}
 
-	dependsOn := make([]string, 0)
 	upstreams := make([]Upstream, len(definition.Depends))
 
 	for index, dep := range definition.Depends {
@@ -313,7 +312,6 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			Value: dep.Value,
 			Type:  dep.Type,
 		}
-		dependsOn = append(dependsOn, dep.Value)
 	}
 
 	task := Asset{
@@ -325,7 +323,6 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Parameters:      definition.Parameters,
 		Connection:      definition.Connection,
 		Secrets:         make([]SecretMapping, len(definition.Secrets)),
-		DependsOn:       dependsOn,
 		Upstreams:       upstreams,
 		ExecutableFile:  ExecutableFile{},
 		Materialization: mat,
