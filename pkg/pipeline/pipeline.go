@@ -357,9 +357,7 @@ func (a *Asset) MarshalJSON() ([]byte, error) {
 	if a.Upstreams == nil {
 		a.Upstreams = make([]Upstream, 0)
 	}
-	if a.DependsOn == nil {
-		a.DependsOn = make([]string, 0)
-	}
+
 	return json.Marshal(Alias(*a))
 }
 
@@ -873,8 +871,11 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 	}
 
 	for _, asset := range pipeline.Assets {
-		for _, upstream := range asset.DependsOn {
-			u, ok := pipeline.tasksByName[upstream]
+		for _, upstream := range asset.Upstreams {
+			if upstream.Type != "asset" {
+				continue
+			}
+			u, ok := pipeline.tasksByName[upstream.Value]
 			if !ok {
 				continue
 			}
