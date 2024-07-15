@@ -99,7 +99,7 @@ Total: 1
 		{
 			name: "generate full lineage",
 			args: args{
-				assetPath: path.AbsPathForTests(t, "./testdata/simple-pipeline/assets/hello_bq.sql"),
+				assetPath: path.AbsPathForTests(t, "./testdata/lineage/assets/hello_bq.sql"),
 				full:      true,
 			},
 			want: `
@@ -107,17 +107,15 @@ Lineage: 'dashboard.hello_bq'
 
 Upstream Dependencies
 ========================
-- hello_python (assets/hello_python.py)
+- hello_python (assets/nested/hello_python.py)
+- bigquery://project_id/dataset_id/table_id (EXTERNAL)
 
-Total: 1
+Total: 2
 
 
 Downstream Dependencies
 ========================
-- nested1 (assets/nested1.sql)
-- nested2 (assets/nested2.sql)
-
-Total: 2
+Asset has no downstream dependencies.
 `,
 			wantErr: assert.NoError,
 		},
