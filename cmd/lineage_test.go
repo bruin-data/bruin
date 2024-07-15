@@ -139,6 +139,7 @@ Asset has no downstream dependencies.
 				want := tt.want
 				if runtime.GOOS == "windows" {
 					want = strings.ReplaceAll(want, "assets/", "assets\\")
+					want = strings.ReplaceAll(want, "nested/", "nested\\")
 				}
 
 				assert.Equal(t, want, buf.String())
