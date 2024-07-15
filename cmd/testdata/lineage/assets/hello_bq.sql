@@ -5,6 +5,7 @@ type: bq.sql
 
 depends:
    - hello_python
+   - uri: bigquery://project_id/dataset_id/table_id
 
 materialization:
    type: table
