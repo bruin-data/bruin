@@ -91,8 +91,15 @@ func (r *LineageCommand) Run(assetPath string, fullLineage bool, output string) 
 
 	r.infoPrinter.Printf("\nLineage: '%s'", asset.Name)
 
-	r.printLineageSummary(foundPipeline, upstream, "Upstream Dependencies", "Asset has no upstream dependencies.")
-	r.printLineageSummary(foundPipeline, downstream, "Downstream Dependencies", "Asset has no downstream dependencies.")
+	externalDependencies := []pipeline.Upstream{}
+	for _, u := range asset.Upstreams {
+		if u.Type == "uri" {
+			externalDependencies = append(externalDependencies, u)
+		}
+	}
+
+	r.printLineageSummary(foundPipeline, upstream, &externalDependencies, "Upstream Dependencies", "Asset has no upstream dependencies.")
+	r.printLineageSummary(foundPipeline, downstream, &[]pipeline.Upstream{}, "Downstream Dependencies", "Asset has no downstream dependencies.")
 
 	return err
 }
@@ -100,15 +107,16 @@ func (r *LineageCommand) Run(assetPath string, fullLineage bool, output string) 
 func (r *LineageCommand) printLineageJSON(asset *pipeline.Asset, upstream, downstream []*pipeline.Asset) error {
 	type dependencySummary struct {
 		Name           string                       `json:"name"`
-		Type           pipeline.AssetType           `json:"type"`
-		ExecutableFile *pipeline.ExecutableFile     `json:"executable_file"`
-		DefinitionFile *pipeline.TaskDefinitionFile `json:"definition_file"`
+		Type           pipeline.AssetType           `json:"type,omitempty"`
+		ExecutableFile *pipeline.ExecutableFile     `json:"executable_file,omitempty"`
+		DefinitionFile *pipeline.TaskDefinitionFile `json:"definition_file,omitempty"`
+		External       *bool                        `json:"external,omitempty"`
 	}
 
 	type jsonSummary struct {
 		AssetName  string               `json:"name"`
 		Type       pipeline.AssetType   `json:"type"`
-		Upstream   []*dependencySummary `json:"upstream"`
+		Upstream   []*dependencySummary `json:"upstreams"`
 		Downstream []*dependencySummary `json:"downstream"`
 	}
 
@@ -130,6 +138,18 @@ func (r *LineageCommand) printLineageJSON(asset *pipeline.Asset, upstream, downs
 			},
 			DefinitionFile: &u.DefinitionFile,
 		}
+	}
+
+	for _, d := range asset.Upstreams {
+		if d.Type == "asset" {
+			continue
+		}
+
+		t := true
+		summary.Upstream = append(summary.Upstream, &dependencySummary{
+			Name:     d.Value,
+			External: &t,
+		})
 	}
 
 	for i, d := range downstream {
@@ -154,16 +174,20 @@ func (r *LineageCommand) printLineageJSON(asset *pipeline.Asset, upstream, downs
 	return nil
 }
 
-func (r *LineageCommand) printLineageSummary(p *pipeline.Pipeline, assets []*pipeline.Asset, title string, absenceMessage string) {
+func (r *LineageCommand) printLineageSummary(p *pipeline.Pipeline, assets []*pipeline.Asset, additional *[]pipeline.Upstream, title string, absenceMessage string) {
 	r.infoPrinter.Print("\n\n")
 	r.infoPrinter.Println(title)
 	r.infoPrinter.Println("========================")
-	if len(assets) == 0 {
+	if len(assets)+len(*additional) == 0 {
 		r.infoPrinter.Println(absenceMessage)
 	} else {
 		for _, u := range assets {
 			r.infoPrinter.Printf("- %s %s\n", u.Name, faint(fmt.Sprintf("(%s)", p.RelativeAssetPath(u))))
 		}
-		r.infoPrinter.Printf("\nTotal: %d\n", len(assets))
+
+		for _, u := range *additional {
+			r.infoPrinter.Printf("- %s %s\n", u.Value, faint("(EXTERNAL)"))
+		}
+		r.infoPrinter.Printf("\nTotal: %d\n", len(assets)+len(*additional))
 	}
 }
