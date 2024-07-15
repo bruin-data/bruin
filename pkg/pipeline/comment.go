@@ -175,7 +175,7 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 		Columns:      make([]Column, 0),
 		CustomChecks: make([]CustomCheck, 0),
 		Secrets:      make([]SecretMapping, 0),
-		upstream:     make([]*Asset, 0),
+		upstream:     make([]*DependencySummary, 0),
 		Upstreams:    make([]Upstream, 0),
 	}
 

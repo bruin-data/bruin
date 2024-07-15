@@ -323,6 +323,14 @@ type Upstream struct {
 	Metadata EmptyStringMap `json:"metadata,omitempty"`
 }
 
+type DependencySummary struct {
+	Name           string             `json:"name"`
+	Type           AssetType          `json:"type"`
+	External       bool               `json:"external"`
+	ExecutableFile ExecutableFile     `json:"executable_file"`
+	DefinitionFile TaskDefinitionFile `json:"definition_file"`
+}
+
 type Asset struct {
 	ID              string             `json:"id"`
 	URI             string             `json:"uri"`
@@ -345,7 +353,7 @@ type Asset struct {
 
 	Pipeline *Pipeline `json:"-"`
 
-	upstream   []*Asset
+	upstream   []*DependencySummary
 	downstream []*Asset
 	Upstreams  []Upstream `json:"upstreams"`
 }
@@ -375,23 +383,49 @@ func (a *Asset) MarshalJSON() ([]byte, error) {
 	return json.Marshal(asset)
 }
 
-func (a *Asset) AddUpstream(asset *Asset) {
-	a.upstream = append(a.upstream, asset)
+func (a *Asset) AddUpstream(upstream *Upstream) {
+	if upstream.Type == "uri" {
+		dependency := DependencySummary{
+			Name:     upstream.Value,
+			External: true,
+		}
+		a.upstream = append(a.upstream, &dependency)
+
+		return
+	}
+
+	asset, found := a.Pipeline.tasksByName[upstream.Value]
+	if !found {
+		return
+	}
+	dependency := DependencySummary{
+		Name:           upstream.Value,
+		Type:           asset.Type,
+		External:       false,
+		ExecutableFile: asset.ExecutableFile,
+		DefinitionFile: asset.DefinitionFile,
+	}
+
+	a.upstream = append(a.upstream, &dependency)
 }
 
-func (a *Asset) GetUpstream() []*Asset {
+func (a *Asset) GetUpstream() []*DependencySummary {
 	return a.upstream
 }
 
-func (a *Asset) GetFullUpstream() []*Asset {
-	upstream := make([]*Asset, 0)
+func (a *Asset) GetFullUpstream() []*DependencySummary {
+	upstream := make([]*DependencySummary, 0)
 
-	for _, asset := range a.upstream {
-		upstream = append(upstream, asset)
+	for _, u := range a.upstream {
+		upstream = append(upstream, u)
+		asset, found := a.Pipeline.tasksByName[u.Name]
+		if !found {
+			continue
+		}
 		upstream = append(upstream, asset.GetFullUpstream()...)
 	}
 
-	return uniqueAssets(upstream)
+	return uniqueDependencies(upstream)
 }
 
 func (a *Asset) AddDownstream(asset *Asset) {
@@ -493,6 +527,20 @@ func (a *Asset) EnrichFromEntityAttributes(entities []*glossary.Entity) error {
 func uniqueAssets(assets []*Asset) []*Asset {
 	seenValues := make(map[string]bool, len(assets))
 	unique := make([]*Asset, 0, len(assets))
+	for _, value := range assets {
+		if seenValues[value.Name] {
+			continue
+		}
+
+		seenValues[value.Name] = true
+		unique = append(unique, value)
+	}
+	return unique
+}
+
+func uniqueDependencies(assets []*DependencySummary) []*DependencySummary {
+	seenValues := make(map[string]bool, len(assets))
+	unique := make([]*DependencySummary, 0, len(assets))
 	for _, value := range assets {
 		if seenValues[value.Name] {
 			continue
@@ -873,7 +921,7 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 			task.Type = AssetTypePython
 		}
 
-		task.upstream = make([]*Asset, 0)
+		task.upstream = make([]*DependencySummary, 0)
 		task.downstream = make([]*Asset, 0)
 
 		pipeline.Assets = append(pipeline.Assets, task)
@@ -896,6 +944,7 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 
 	for _, asset := range pipeline.Assets {
 		for _, upstream := range asset.Upstreams {
+			asset.AddUpstream(&upstream)
 			if upstream.Type != "asset" {
 				continue
 			}
@@ -904,7 +953,6 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 				continue
 			}
 
-			asset.AddUpstream(u)
 			u.AddDownstream(asset)
 		}
 

@@ -92,12 +92,12 @@ func (r *LineageCommand) Run(assetPath string, fullLineage bool, output string) 
 	r.infoPrinter.Printf("\nLineage: '%s'", asset.Name)
 
 	r.printLineageSummary(foundPipeline, upstream, "Upstream Dependencies", "Asset has no upstream dependencies.")
-	r.printLineageSummary(foundPipeline, downstream, "Downstream Dependencies", "Asset has no downstream dependencies.")
+	r.printLineageDownstreamSummary(foundPipeline, downstream, "Downstream Dependencies", "Asset has no downstream dependencies.")
 
 	return err
 }
 
-func (r *LineageCommand) printLineageJSON(asset *pipeline.Asset, upstream, downstream []*pipeline.Asset) error {
+func (r *LineageCommand) printLineageJSON(asset *pipeline.Asset, upstream []*pipeline.DependencySummary, downstream []*pipeline.Asset) error {
 	type dependencySummary struct {
 		Name           string                       `json:"name"`
 		Type           pipeline.AssetType           `json:"type"`
@@ -106,29 +106,25 @@ func (r *LineageCommand) printLineageJSON(asset *pipeline.Asset, upstream, downs
 	}
 
 	type jsonSummary struct {
-		AssetName  string               `json:"name"`
-		Type       pipeline.AssetType   `json:"type"`
-		Upstream   []*dependencySummary `json:"upstream"`
-		Downstream []*dependencySummary `json:"downstream"`
+		AssetName  string                        `json:"name"`
+		Type       pipeline.AssetType            `json:"type"`
+		Upstream   []*pipeline.DependencySummary `json:"upstream"`
+		Downstream []*dependencySummary          `json:"downstream"`
 	}
 
 	summary := jsonSummary{
 		AssetName:  asset.Name,
 		Type:       asset.Type,
-		Upstream:   make([]*dependencySummary, len(upstream)),
+		Upstream:   make([]*pipeline.DependencySummary, len(upstream)),
 		Downstream: make([]*dependencySummary, len(downstream)),
 	}
 
 	for i, u := range upstream {
-		summary.Upstream[i] = &dependencySummary{
-			Name: u.Name,
-			Type: u.Type,
-			ExecutableFile: &pipeline.ExecutableFile{
-				Name:    u.ExecutableFile.Name,
-				Path:    u.ExecutableFile.Path,
-				Content: "",
-			},
-			DefinitionFile: &u.DefinitionFile,
+		summary.Upstream[i] = &pipeline.DependencySummary{
+			Name:           u.Name,
+			Type:           u.Type,
+			ExecutableFile: u.ExecutableFile,
+			DefinitionFile: u.DefinitionFile,
 		}
 	}
 
@@ -154,7 +150,22 @@ func (r *LineageCommand) printLineageJSON(asset *pipeline.Asset, upstream, downs
 	return nil
 }
 
-func (r *LineageCommand) printLineageSummary(p *pipeline.Pipeline, assets []*pipeline.Asset, title string, absenceMessage string) {
+func (r *LineageCommand) printLineageSummary(p *pipeline.Pipeline, upstream []*pipeline.DependencySummary, title string, absenceMessage string) {
+	r.infoPrinter.Print("\n\n")
+	r.infoPrinter.Println(title)
+	r.infoPrinter.Println("========================")
+	if len(upstream) == 0 {
+		r.infoPrinter.Println(absenceMessage)
+	} else {
+		for _, u := range upstream {
+			asset := p.GetAssetByName(u.Name)
+			r.infoPrinter.Printf("- %s %s\n", u.Name, faint(fmt.Sprintf("(%s)", p.RelativeAssetPath(asset))))
+		}
+		r.infoPrinter.Printf("\nTotal: %d\n", len(upstream))
+	}
+}
+
+func (r *LineageCommand) printLineageDownstreamSummary(p *pipeline.Pipeline, assets []*pipeline.Asset, title string, absenceMessage string) {
 	r.infoPrinter.Print("\n\n")
 	r.infoPrinter.Println(title)
 	r.infoPrinter.Println("========================")

@@ -114,7 +114,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		Columns:      make([]pipeline.Column, 0),
 		CustomChecks: make([]pipeline.CustomCheck, 0),
 	}
-	asset3.AddUpstream(asset1)
+	asset3.AddUpstream(&pipeline.Upstream{Type: "asset", Value: "task1"})
 	asset1.AddDownstream(asset3)
 
 	asset4 := &pipeline.Asset{
@@ -149,7 +149,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		Columns:      make([]pipeline.Column, 0),
 		CustomChecks: make([]pipeline.CustomCheck, 0),
 	}
-	asset4.AddUpstream(asset1)
+	asset3.AddUpstream(&pipeline.Upstream{Type: "asset", Value: "task1"})
 	asset1.AddDownstream(asset4)
 
 	expectedPipeline := &pipeline.Pipeline{
@@ -435,7 +435,11 @@ func TestAsset_AddUpstream(t *testing.T) {
 	connect := func(upstream *pipeline.Asset, downstream *pipeline.Asset) {
 		t.Helper()
 		upstream.AddDownstream(downstream)
-		downstream.AddUpstream(upstream)
+		dependency := pipeline.Upstream{
+			Type:  "asset",
+			Value: upstream.Name,
+		}
+		downstream.AddUpstream(&dependency)
 	}
 
 	connect(asset1, asset2)
