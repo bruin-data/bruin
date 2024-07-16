@@ -22,7 +22,7 @@
       "name": "task1",
       "description": "This is a hello world task",
       "type": "bash",
-      "tags":[],
+      "tags": [],
       "executable_file": {
         "name": "hello.sh",
         "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\task1\\hello.sh",
@@ -43,7 +43,10 @@
         "gcs-to-bq"
       ],
       "upstreams": [
-        {"type" : "asset", "value" : "gcs-to-bq"}
+        {
+          "type": "asset",
+          "value": "gcs-to-bq"
+        }
       ],
       "materialization": null,
       "columns": [],
@@ -51,7 +54,8 @@
       "image": "",
       "instance": "",
       "owner": "",
-      "metadata": {}
+      "metadata": {},
+      "snowflake": null
     },
     {
       "id": "c69409a1840ddb3639a4acbaaec46c238c63b6431cc74ee5254b6dcef7b88c4b",
@@ -59,7 +63,7 @@
       "name": "second-task",
       "description": "",
       "type": "bq.transfer",
-      "tags":[],
+      "tags": [],
       "executable_file": {
         "name": "",
         "path": "",
@@ -85,7 +89,8 @@
       "image": "",
       "instance": "",
       "owner": "",
-      "metadata": {}
+      "metadata": {},
+      "snowflake": null
     },
     {
       "id": "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
@@ -93,7 +98,7 @@
       "name": "some-python-task",
       "description": "some description goes here",
       "type": "python",
-      "tags":[],
+      "tags": [],
       "executable_file": {
         "name": "test.py",
         "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\test.py",
@@ -120,12 +125,30 @@
         "task3"
       ],
       "upstreams": [
-        {"type" : "asset", "value" : "task1"},
-        {"type" : "asset", "value" : "task2"},
-        {"type" : "asset", "value" : "task3"},
-        {"type" : "asset", "value" : "task4"},
-        {"type" : "asset", "value" : "task5"},
-        {"type" : "asset", "value" : "task3"}
+        {
+          "type": "asset",
+          "value": "task1"
+        },
+        {
+          "type": "asset",
+          "value": "task2"
+        },
+        {
+          "type": "asset",
+          "value": "task3"
+        },
+        {
+          "type": "asset",
+          "value": "task4"
+        },
+        {
+          "type": "asset",
+          "value": "task5"
+        },
+        {
+          "type": "asset",
+          "value": "task3"
+        }
       ],
       "materialization": null,
       "columns": [],
@@ -133,7 +156,8 @@
       "image": "",
       "instance": "",
       "owner": "",
-      "metadata": {}
+      "metadata": {},
+      "snowflake": null
     },
     {
       "id": "5812ba61bb0f08ce192bf074c9de21c19355e08cd52e75d008bbff59e5729e5b",
@@ -141,7 +165,7 @@
       "name": "some-sql-task",
       "description": "some description goes here",
       "type": "bq.sql",
-      "tags":[],
+      "tags": [],
       "executable_file": {
         "name": "test.sql",
         "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\test.sql",
@@ -167,12 +191,30 @@
         "task3"
       ],
       "upstreams": [
-        {"type" : "asset", "value" : "task1"},
-        {"type" : "asset", "value" : "task2"},
-        {"type" : "asset", "value" : "task3"},
-        {"type" : "asset", "value" : "task4"},
-        {"type" : "asset", "value" : "task5"},
-        {"type" : "asset", "value" : "task3"}
+        {
+          "type": "asset",
+          "value": "task1"
+        },
+        {
+          "type": "asset",
+          "value": "task2"
+        },
+        {
+          "type": "asset",
+          "value": "task3"
+        },
+        {
+          "type": "asset",
+          "value": "task4"
+        },
+        {
+          "type": "asset",
+          "value": "task5"
+        },
+        {
+          "type": "asset",
+          "value": "task3"
+        }
       ],
       "materialization": null,
       "columns": [],
@@ -180,7 +222,8 @@
       "image": "",
       "instance": "",
       "owner": "",
-      "metadata": {}
+      "metadata": {},
+      "snowflake": null
     }
   ],
   "notifications": {
