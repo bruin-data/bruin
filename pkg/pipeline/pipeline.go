@@ -323,6 +323,18 @@ type Upstream struct {
 	Metadata EmptyStringMap `json:"metadata,omitempty"`
 }
 
+type SnowflakeConfig struct {
+	Warehouse string `json:"warehouse"`
+}
+
+func (s SnowflakeConfig) MarshalJSON() ([]byte, error) {
+	if s.Warehouse == "" {
+		return json.Marshal(nil)
+	}
+
+	return json.Marshal(s)
+}
+
 type Asset struct {
 	ID              string             `json:"id"`
 	URI             string             `json:"uri"`
@@ -342,6 +354,7 @@ type Asset struct {
 	Owner           string             `json:"owner"`
 	Metadata        EmptyStringMap     `json:"metadata"`
 	Tags            EmptyStringArray   `json:"tags"`
+	Snowflake       SnowflakeConfig    `json:"snowflake"`
 
 	Pipeline *Pipeline `json:"-"`
 

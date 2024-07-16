@@ -171,6 +171,10 @@ type customCheck struct {
 	Blocking    *bool  `yaml:"blocking"`
 }
 
+type snowflake struct {
+	Warehouse string `yaml:"warehouse"`
+}
+
 type taskDefinition struct {
 	Name            string            `yaml:"name"`
 	URI             string            `yaml:"uri"`
@@ -189,6 +193,7 @@ type taskDefinition struct {
 	Columns         []column          `yaml:"columns"`
 	CustomChecks    []customCheck     `yaml:"custom_checks"`
 	Tags            []string          `yaml:"tags"`
+	Snowflake       snowflake         `yaml:"snowflake"`
 }
 
 func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
@@ -332,6 +337,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Tags:            definition.Tags,
 		Columns:         columns,
 		CustomChecks:    make([]CustomCheck, len(definition.CustomChecks)),
+		Snowflake:       SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},
 	}
 
 	for index, check := range definition.CustomChecks {
