@@ -1,6 +1,6 @@
 name: bruin-init
-schedule: daily
-start_date: "2023-03-20"
+schedule: dailyadds
+start_date: "2023-03-20asdasd"
 
 default_connections:
   google_cloud_platform: "alberto-gcp"

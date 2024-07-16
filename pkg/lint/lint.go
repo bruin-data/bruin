@@ -7,6 +7,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
@@ -51,6 +52,7 @@ type Rule interface {
 	Validate(pipeline *pipeline.Pipeline) ([]*Issue, error)
 	ValidateAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error)
 	GetApplicableLevels() []Level
+	GetSeverity() ValidatorSeverity
 }
 
 type SimpleRule struct {
@@ -58,6 +60,7 @@ type SimpleRule struct {
 	Validator        PipelineValidator
 	AssetValidator   AssetValidator
 	ApplicableLevels []Level
+	Severity         ValidatorSeverity
 }
 
 func (g *SimpleRule) Validate(pipeline *pipeline.Pipeline) ([]*Issue, error) {
@@ -80,6 +83,10 @@ func (g *SimpleRule) GetApplicableLevels() []Level {
 	return g.ApplicableLevels
 }
 
+func (g *SimpleRule) GetSeverity() ValidatorSeverity {
+	return g.Severity
+}
+
 type Linter struct {
 	findPipelines pipelineFinder
 	builder       pipelineBuilder
@@ -97,11 +104,13 @@ func NewLinter(findPipelines pipelineFinder, builder pipelineBuilder, rules []Ru
 }
 
 func (l *Linter) Lint(rootPath, pipelineDefinitionFileName string) (*PipelineAnalysisResult, error) {
+	extractStart := time.Now()
 	pipelines, err := l.extractPipelinesFromPath(rootPath, pipelineDefinitionFileName)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println("Extracting pipelines took: ", time.Since(extractStart))
 	return l.LintPipelines(pipelines)
 }
 
@@ -218,8 +227,24 @@ func (p *PipelineAnalysisResult) MarshalJSON() ([]byte, error) {
 func (p *PipelineAnalysisResult) ErrorCount() int {
 	count := 0
 	for _, pipelineIssues := range p.Pipelines {
-		for _, issues := range pipelineIssues.Issues {
-			count += len(issues)
+		for rule, issues := range pipelineIssues.Issues {
+			if rule.GetSeverity() == ValidatorSeverityCritical {
+				count += len(issues)
+			}
+		}
+	}
+
+	return count
+}
+
+// WarningCount returns the number of warnings, a.k.a non-critical issues found in an analysis result.
+func (p *PipelineAnalysisResult) WarningCount() int {
+	count := 0
+	for _, pipelineIssues := range p.Pipelines {
+		for rule, issues := range pipelineIssues.Issues {
+			if rule.GetSeverity() == ValidatorSeverityWarning {
+				count += len(issues)
+			}
 		}
 	}
 
@@ -278,10 +303,13 @@ func RunLintRulesOnPipeline(p *pipeline.Pipeline, rules []Rule) (*PipelineIssues
 	}
 
 	for _, rule := range rules {
+		start := time.Now()
 		issues, err := rule.Validate(p)
 		if err != nil {
 			return nil, err
 		}
+
+		fmt.Printf("Rule %s took: %s\n", rule.Name(), time.Since(start))
 
 		if len(issues) > 0 {
 			pipelineResult.Issues[rule] = issues

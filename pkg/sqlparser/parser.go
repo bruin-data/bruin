@@ -23,6 +23,7 @@ type SQLParser struct {
 	ep          *python.EmbeddedPython
 	sqlglotDir  *embed_util.EmbeddedFiles
 	rendererSrc *embed_util.EmbeddedFiles
+	started     bool
 
 	stdout io.ReadCloser
 	stdin  io.WriteCloser
@@ -56,6 +57,10 @@ func NewSQLParser() (*SQLParser, error) {
 }
 
 func (s *SQLParser) Start() error {
+	if s.started {
+		return nil
+	}
+
 	args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
 	cmd := s.ep.PythonCmd(args...)
 	cmd.Stderr = os.Stderr
@@ -86,6 +91,7 @@ func (s *SQLParser) Start() error {
 		return errors.Wrap(err, "failed to send init command")
 	}
 
+	s.started = true
 	return nil
 }
 
@@ -144,16 +150,22 @@ func (s *SQLParser) UsedTables(sql, dialect string) ([]string, error) {
 
 	resp, err := s.sendCommand(&command)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to send command")
 	}
 
 	var tables struct {
 		Tables []string `json:"tables"`
+		Error  string   `json:"error"`
 	}
 	err = json.Unmarshal([]byte(resp), &tables)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to unmarshal response")
 	}
+
+	if tables.Error != "" {
+		return nil, errors.New(tables.Error)
+	}
+
 	sort.Strings(tables.Tables)
 
 	return tables.Tables, nil
@@ -172,7 +184,7 @@ func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
 
 	_, err = s.stdin.Write(jsonCommand)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "failed to write command to stdin")
 	}
 
 	reader := bufio.NewReader(s.stdout)

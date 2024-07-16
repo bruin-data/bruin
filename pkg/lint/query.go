@@ -46,6 +46,10 @@ func (q *QueryValidatorRule) GetApplicableLevels() []Level {
 	return []Level{LevelPipeline, LevelAsset}
 }
 
+func (q *QueryValidatorRule) GetSeverity() ValidatorSeverity {
+	return ValidatorSeverityCritical
+}
+
 func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if asset.Type != q.TaskType {

@@ -15,17 +15,19 @@ type Printer struct {
 	RootCheckPath string
 }
 
-type taskSummary struct {
-	rule   Rule
-	issues []*Issue
+type taskSummary map[Rule][]*Issue
+type ruleIssue struct {
+	rule  Rule
+	issue *Issue
 }
 
 var (
 	faint           = color.New(color.Faint).SprintFunc()
 	successPrinter  = color.New(color.FgGreen)
 	pipelinePrinter = color.New(color.FgBlue, color.Bold)
-	taskNamePrinter = color.New(color.FgYellow, color.Bold)
+	taskNamePrinter = color.New(color.FgWhite, color.Bold)
 	issuePrinter    = color.New(color.FgRed)
+	warningPrinter  = color.New(color.FgYellow)
 	contextPrinter  = color.New(color.FgRed)
 )
 
@@ -56,53 +58,38 @@ func (l *Printer) printPipelineSummary(pipelineIssues *PipelineIssues) {
 		return
 	}
 
-	genericIssues := make([]*taskSummary, 0, len(pipelineIssues.Issues))
-	taskIssueMap := make(map[*pipeline.Asset]*taskSummary)
+	genericIssues := make(map[Rule][]*Issue, 0)
+	taskIssueMap := make(map[*pipeline.Asset][]*ruleIssue, 0)
 
 	for rule, issues := range pipelineIssues.Issues {
-		genericIssuesForRule := &taskSummary{
-			rule:   rule,
-			issues: []*Issue{},
-		}
-
 		for _, issue := range issues {
 			if issue.Task == nil {
-				generisIssues := genericIssuesForRule.issues
-				generisIssues = append(generisIssues, issue)
-				genericIssuesForRule.issues = generisIssues
+				if _, ok := genericIssues[rule]; !ok {
+					genericIssues[rule] = make([]*Issue, 0)
+				}
+
+				genericIssues[rule] = append(genericIssues[rule], issue)
 				continue
 			}
 
 			// create the defaults if there are no issues for this task yet
 			if _, ok := taskIssueMap[issue.Task]; !ok {
-				taskIssueMap[issue.Task] = &taskSummary{
-					rule:   rule,
-					issues: []*Issue{},
-				}
+				taskIssueMap[issue.Task] = make([]*ruleIssue, 0)
 			}
 
-			taskIssues := taskIssueMap[issue.Task].issues
-			taskIssues = append(taskIssues, issue)
-
-			taskIssueMap[issue.Task] = &taskSummary{
-				rule:   rule,
-				issues: taskIssues,
-			}
-		}
-
-		if len(genericIssuesForRule.issues) > 0 {
-			genericIssues = append(genericIssues, genericIssuesForRule)
+			taskIssueMap[issue.Task] = append(taskIssueMap[issue.Task], &ruleIssue{rule, issue})
 		}
 	}
 
-	for _, taskSummary := range genericIssues {
-		printIssues(taskSummary.rule, taskSummary.issues)
+	printGenericIssues(genericIssues)
+	if len(genericIssues) > 0 && len(taskIssueMap) > 0 {
+		issuePrinter.Println()
 	}
 
 	for task, summary := range taskIssueMap {
 		relativeTaskPath := pipelineIssues.Pipeline.RelativeAssetPath(task)
 		taskNamePrinter.Printf("  %s %s\n", task.Name, faint(fmt.Sprintf("(%s)", relativeTaskPath)))
-		printIssues(summary.rule, summary.issues)
+		printAssetIssues(summary)
 
 		issuePrinter.Println()
 	}
@@ -124,20 +111,56 @@ func (l Printer) relativePipelinePath(p *pipeline.Pipeline) string {
 	return pipelineDirectory
 }
 
-func printIssues(rule Rule, issues []*Issue) {
-	issueCount := len(issues)
-	for index, issue := range issues {
+func printGenericIssues(genericIssues map[Rule][]*Issue) {
+	totalIssueCount := 0
+	for _, issues := range genericIssues {
+		totalIssueCount += len(issues)
+	}
+
+	printedIssueCount := 0
+	for rule, issues := range genericIssues {
+		pp := issuePrinter
+		if rule.GetSeverity() == ValidatorSeverityWarning {
+			pp = warningPrinter
+		}
+
+		for _, issue := range issues {
+			printedIssueCount++
+
+			connector := "├──"
+			if printedIssueCount == totalIssueCount {
+				connector = "└──"
+			}
+
+			pp.Printf("    %s %s %s\n", connector, issue.Description, faint(fmt.Sprintf("(%s)", rule.Name())))
+			printIssueContext(pp, issue.Context, printedIssueCount == totalIssueCount)
+		}
+	}
+
+}
+func printAssetIssues(assetIssues []*ruleIssue) {
+	issueCount := len(assetIssues)
+	for index, ruleIssue := range assetIssues {
+		rule := ruleIssue.rule
+		issue := ruleIssue.issue
+
+		pp := issuePrinter
+		if rule.GetSeverity() == ValidatorSeverityWarning {
+			pp = warningPrinter
+		}
+
 		connector := "├──"
 		if index == issueCount-1 {
 			connector = "└──"
 		}
 
-		issuePrinter.Printf("    %s %s %s\n", connector, issue.Description, faint(fmt.Sprintf("(%s)", rule.Name())))
-		printIssueContext(issue.Context, index == issueCount-1)
+		pp.Printf("    %s %s %s\n", connector, issue.Description, faint(fmt.Sprintf("(%s)", rule.Name())))
+		printIssueContext(pp, issue.Context, index == issueCount-1)
 	}
+
 }
 
-func printIssueContext(context []string, lastIssue bool) {
+func printIssueContext(printer *color.Color, context []string, lastIssue bool) {
 	issueCount := len(context)
 	beginning := "│"
 	if lastIssue {
@@ -150,7 +173,7 @@ func printIssueContext(context []string, lastIssue bool) {
 			connector = "└─"
 		}
 
-		contextPrinter.Printf("    %s   %s %s\n", beginning, connector, padLinesIfMultiline(row, 11))
+		printer.Printf("    %s   %s %s\n", beginning, connector, padLinesIfMultiline(row, 11))
 	}
 }
 

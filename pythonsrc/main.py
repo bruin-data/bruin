@@ -1,14 +1,23 @@
 import json
 import sys
+import logging
 from parser.main import get_column_lineage, get_tables
+
+logging.basicConfig(filename="/Users/burak/Code/personal/bruin/internal/bruin-cli/pylog.log",
+                    filemode='a',
+                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+                    datefmt='%H:%M:%S',
+                    level=logging.DEBUG)
 
 def main():
     while True:
+        logging.info("running loop")
         cmd = sys.stdin.readline()
         if not cmd:
             break
 
         cmd = json.loads(cmd)
+        logging.info("-- loaded json", cmd)
 
         result = {}
         if cmd["command"] == "init":
@@ -26,6 +35,8 @@ def main():
             break
         else:
             raise Exception("invalid cmd")
+
+        logging.info("-- returning json", result)
 
         result = json.dumps(result)
 
