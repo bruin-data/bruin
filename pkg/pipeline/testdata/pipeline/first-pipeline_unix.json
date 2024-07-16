@@ -38,15 +38,6 @@
       },
       "connection": "conn1",
       "secrets": [],
-      "upstream": [
-        "gcs-to-bq"
-      ],
-      "upstreams": [
-        {
-          "type": "asset",
-          "value": "gcs-to-bq"
-        }
-      ],
       "materialization": null,
       "columns": [],
       "custom_checks": [],
@@ -54,7 +45,16 @@
       "instance": "",
       "owner": "",
       "metadata": {},
-      "tags": []
+      "tags": [],
+      "upstreams": [
+        {
+          "type": "asset",
+          "value": "gcs-to-bq"
+        }
+      ],
+      "upstream": [
+        "gcs-to-bq"
+      ]
     },
     {
       "id": "c69409a1840ddb3639a4acbaaec46c238c63b6431cc74ee5254b6dcef7b88c4b",
@@ -79,8 +79,6 @@
       },
       "connection": "",
       "secrets": [],
-      "upstream": [],
-      "upstreams": [],
       "materialization": null,
       "columns": [],
       "custom_checks": [],
@@ -88,7 +86,9 @@
       "instance": "",
       "owner": "",
       "metadata": {},
-      "tags": []
+      "tags": [],
+      "upstreams": [],
+      "upstream": []
     },
     {
       "id": "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
@@ -113,14 +113,14 @@
       },
       "connection": "first-connection",
       "secrets": [],
-      "upstream": [
-        "task1",
-        "task2",
-        "task3",
-        "task4",
-        "task5",
-        "task3"
-      ],
+      "materialization": null,
+      "columns": [],
+      "custom_checks": [],
+      "image": "",
+      "instance": "",
+      "owner": "",
+      "metadata": {},
+      "tags": [],
       "upstreams": [
         {
           "type": "asset",
@@ -147,14 +147,14 @@
           "value": "task3"
         }
       ],
-      "materialization": null,
-      "columns": [],
-      "custom_checks": [],
-      "image": "",
-      "instance": "",
-      "owner": "",
-      "metadata": {},
-      "tags": []
+      "upstream": [
+        "task1",
+        "task2",
+        "task3",
+        "task4",
+        "task5",
+        "task3"
+      ]
     },
     {
       "id": "5812ba61bb0f08ce192bf074c9de21c19355e08cd52e75d008bbff59e5729e5b",
@@ -178,14 +178,14 @@
       },
       "connection": "conn2",
       "secrets": [],
-      "upstream": [
-        "task1",
-        "task2",
-        "task3",
-        "task4",
-        "task5",
-        "task3"
-      ],
+      "materialization": null,
+      "columns": [],
+      "custom_checks": [],
+      "image": "",
+      "instance": "",
+      "owner": "",
+      "metadata": {},
+      "tags": [],
       "upstreams": [
         {
           "type": "asset",
@@ -212,14 +212,14 @@
           "value": "task3"
         }
       ],
-      "materialization": null,
-      "columns": [],
-      "custom_checks": [],
-      "image": "",
-      "instance": "",
-      "owner": "",
-      "metadata": {},
-      "tags": []
+      "upstream": [
+        "task1",
+        "task2",
+        "task3",
+        "task4",
+        "task5",
+        "task3"
+      ]
     }
   ],
   "notifications": {

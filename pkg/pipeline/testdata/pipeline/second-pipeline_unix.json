@@ -36,8 +36,6 @@
       },
       "connection": "",
       "secrets": [],
-      "upstream": [],
-      "upstreams": [],
       "materialization": null,
       "columns": [],
       "custom_checks": [],
@@ -45,7 +43,9 @@
       "instance": "",
       "owner": "",
       "metadata": {},
-      "tags": []
+      "tags": [],
+      "upstreams": [],
+      "upstream": []
     },
     {
       "id": "a01e7580b118b5fbbdc1f7c8de6b8c377c684727e4e8ad574e9153a3dbd46dd1",
@@ -70,8 +70,6 @@
       },
       "connection": "",
       "secrets": [],
-      "upstream": [],
-      "upstreams": [],
       "materialization": null,
       "columns": [],
       "custom_checks": [],
@@ -79,7 +77,9 @@
       "instance": "",
       "owner": "",
       "metadata": {},
-      "tags": []
+      "tags": [],
+      "upstreams": [],
+      "upstream": []
     },
     {
       "id": "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
@@ -112,20 +112,6 @@
           "secret_key": "secret2",
           "injected_key": "secret2"
         }
-      ],
-      "upstream": [
-        "task1",
-        "task2",
-        "task3",
-        "task4",
-        "task5"
-      ],
-      "upstreams": [
-        {"type" : "asset", "value" : "task1"},
-        {"type" : "asset", "value" : "task2"},
-        {"type" : "asset", "value" : "task3"},
-        {"type" : "asset", "value" : "task4"},
-        {"type" : "asset", "value" : "task5"}
       ],
       "materialization": null,
       "columns": [
@@ -197,6 +183,35 @@
       "tags": [
         "tag1",
         "tag2:value2"
+      ],
+      "upstreams": [
+        {
+          "type": "asset",
+          "value": "task1"
+        },
+        {
+          "type": "asset",
+          "value": "task2"
+        },
+        {
+          "type": "asset",
+          "value": "task3"
+        },
+        {
+          "type": "asset",
+          "value": "task4"
+        },
+        {
+          "type": "asset",
+          "value": "task5"
+        }
+      ],
+      "upstream": [
+        "task1",
+        "task2",
+        "task3",
+        "task4",
+        "task5"
       ]
     }
   ],
