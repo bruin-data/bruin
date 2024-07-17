@@ -231,7 +231,13 @@ func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer li
 		} else {
 			infoPrinter.Printf("\n✘ Checked '%s' and found %s, please check above.\n", asset, foundMessage)
 		}
-		return errors.New("validation failed")
+
+		if errorCount > 0 {
+			return errors.New("validation failed")
+		}
+
+		// warnings should not return failure
+		return nil
 	}
 
 	taskCount := 0
