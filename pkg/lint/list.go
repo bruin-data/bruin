@@ -1,13 +1,13 @@
 package lint
 
 import (
-	"github.com/bruin-data/bruin/pkg/jinja"
-	"github.com/bruin-data/bruin/pkg/sqlparser"
-	"github.com/pkg/errors"
 	"slices"
 
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
+	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
 

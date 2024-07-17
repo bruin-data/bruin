@@ -2,6 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"os"
+	path2 "path"
+	"strings"
+
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
@@ -15,10 +20,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
-	"io"
-	"os"
-	path2 "path"
-	"strings"
 )
 
 func Lint(isDebug *bool) *cli.Command {
@@ -228,7 +229,7 @@ func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer li
 		if asset == "" {
 			infoPrinter.Printf("\n✘ Checked %d %s and %s, please check above.\n", pipelineCount, pipelineStr, foundMessage)
 		} else {
-			infoPrinter.Printf("\n✘ Checked %s and found %s, please check above.\n", asset, errorCount, foundMessage)
+			infoPrinter.Printf("\n✘ Checked '%s' and found %s, please check above.\n", asset, foundMessage)
 		}
 		return errors.New("validation failed")
 	}

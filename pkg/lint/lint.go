@@ -4,14 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"sort"
-	"strings"
-	"time"
-
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"os"
+	"sort"
+	"strings"
 )
 
 type (
@@ -104,13 +102,11 @@ func NewLinter(findPipelines pipelineFinder, builder pipelineBuilder, rules []Ru
 }
 
 func (l *Linter) Lint(rootPath, pipelineDefinitionFileName string) (*PipelineAnalysisResult, error) {
-	extractStart := time.Now()
 	pipelines, err := l.extractPipelinesFromPath(rootPath, pipelineDefinitionFileName)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("Extracting pipelines took: ", time.Since(extractStart))
 	return l.LintPipelines(pipelines)
 }
 
@@ -303,13 +299,10 @@ func RunLintRulesOnPipeline(p *pipeline.Pipeline, rules []Rule) (*PipelineIssues
 	}
 
 	for _, rule := range rules {
-		start := time.Now()
 		issues, err := rule.Validate(p)
 		if err != nil {
 			return nil, err
 		}
-
-		fmt.Printf("Rule %s took: %s\n", rule.Name(), time.Since(start))
 
 		if len(issues) > 0 {
 			pipelineResult.Issues[rule] = issues

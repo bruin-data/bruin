@@ -759,13 +759,7 @@ func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.P
 	}
 
 	tables, err := u.parser.UsedTables(renderedQ, dialect)
-
 	if err != nil {
-		issues = append(issues, &Issue{
-			Task:        asset,
-			Description: "Failed to get used tables",
-			Context:     []string{err.Error()},
-		})
 		return issues, nil
 	}
 
@@ -793,28 +787,26 @@ func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.P
 	}
 
 	for usedTable, actualReferenceName := range usedTableNameMap {
+		// if the used table contains a full name with multiple dots treat it as an absolute reference, ignore it
 		if strings.Count(usedTable, ".") > 1 {
 			continue
 		}
 
-		if _, ok := depsNameMap[usedTable]; !ok {
-			// report this issue only if there's an asset with the same name
-			if _, ok := pipelineAssetNames[usedTable]; ok {
-				issues = append(issues, &Issue{
-					Task:        asset,
-					Description: fmt.Sprintf("Table '%s' is used in the query but not referenced in the 'depends' array.", actualReferenceName),
-				})
-			}
+		// if the table is in the dependency list already, move on
+		if _, ok := depsNameMap[usedTable]; ok {
+			continue
 		}
-	}
 
-	for dep, actualDependencyName := range depsNameMap {
-		if _, ok := usedTableNameMap[dep]; !ok {
-			issues = append(issues, &Issue{
-				Task:        asset,
-				Description: fmt.Sprintf("Dependency '%s' exists in the 'depends' list but not used in the query, should be safe to remove.", actualDependencyName),
-			})
+		// report this issue only if there's an asset with the same name, otherwise ignore
+		if _, ok := pipelineAssetNames[usedTable]; !ok {
+			continue
 		}
+
+		// otherwise, report the issue
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Table '%s' is used in the query but not referenced in the 'depends' array.", actualReferenceName),
+		})
 	}
 
 	return issues, nil

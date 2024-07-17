@@ -15,11 +15,13 @@ type Printer struct {
 	RootCheckPath string
 }
 
-type taskSummary map[Rule][]*Issue
-type ruleIssue struct {
-	rule  Rule
-	issue *Issue
-}
+type (
+	taskSummary map[Rule][]*Issue
+	ruleIssue   struct {
+		rule  Rule
+		issue *Issue
+	}
+)
 
 var (
 	faint           = color.New(color.Faint).SprintFunc()
@@ -136,8 +138,8 @@ func printGenericIssues(genericIssues map[Rule][]*Issue) {
 			printIssueContext(pp, issue.Context, printedIssueCount == totalIssueCount)
 		}
 	}
-
 }
+
 func printAssetIssues(assetIssues []*ruleIssue) {
 	issueCount := len(assetIssues)
 	for index, ruleIssue := range assetIssues {
@@ -157,7 +159,6 @@ func printAssetIssues(assetIssues []*ruleIssue) {
 		pp.Printf("    %s %s %s\n", connector, issue.Description, faint(fmt.Sprintf("(%s)", rule.Name())))
 		printIssueContext(pp, issue.Context, index == issueCount-1)
 	}
-
 }
 
 func printIssueContext(printer *color.Color, context []string, lastIssue bool) {

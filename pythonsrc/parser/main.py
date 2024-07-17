@@ -38,9 +38,12 @@ def get_table_name(table: exp.Table):
 
 
 def get_tables(query: str, dialect: str):
-    parsed = parse_one(query, dialect=dialect)
-    if parsed is None:
-        return {"tables": [], "error": "unable to parse query"}
+    try:
+        parsed = parse_one(query, dialect=dialect)
+        if parsed is None:
+            return {"tables": [], "error": "unable to parse query"}
+    except Exception as e:
+        return {"tables": [], "error": str(e)}
 
     try:
         tables = extract_tables(parsed)
