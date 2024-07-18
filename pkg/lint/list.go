@@ -8,6 +8,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
+	"github.com/samber/lo"
 	"github.com/spf13/afero"
 )
 
@@ -15,7 +16,7 @@ type repoFinder interface {
 	Repo(path string) (*git.Repo, error)
 }
 
-func GetRules(fs afero.Fs, finder repoFinder) ([]Rule, error) {
+func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, error) {
 	gr := GlossaryChecker{
 		gr: &glossary.GlossaryReader{
 			RepoFinder: finder,
@@ -133,6 +134,12 @@ func GetRules(fs afero.Fs, finder repoFinder) ([]Rule, error) {
 			renderer: jinja.NewRendererWithYesterday("your-pipeline", "some-run-id"),
 			parser:   parser,
 		},
+	}
+
+	if excludeWarnings {
+		return lo.Filter(rules, func(rule Rule, index int) bool {
+			return rule.GetSeverity() != ValidatorSeverityWarning
+		}), nil
 	}
 
 	return rules, nil

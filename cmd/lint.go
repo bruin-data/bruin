@@ -43,6 +43,10 @@ func Lint(isDebug *bool) *cli.Command {
 				Aliases: []string{"o"},
 				Usage:   "the output type, possible values are: plain, json",
 			},
+			&cli.BoolFlag{
+				Name:  "exclude-warnings",
+				Usage: "exclude warning validations from the output",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			// if the output is JSON then we intend to discard all the nicer pretty-print statements
@@ -103,7 +107,7 @@ func Lint(isDebug *bool) *cli.Command {
 
 			logger.Debugf("built the connection manager instance")
 
-			rules, err := lint.GetRules(fs, &git.RepoFinder{})
+			rules, err := lint.GetRules(fs, &git.RepoFinder{}, c.Bool("exclude-warnings"))
 			if err != nil {
 				errorPrinter.Printf("An error occurred while building the validation rules: %v\n", err)
 				return cli.Exit("", 1)
