@@ -703,7 +703,6 @@ var assetTypeDialectMap = map[pipeline.AssetType]string{
 
 type sqlParser interface {
 	UsedTables(sql, dialect string) ([]string, error)
-	Start() error
 }
 
 type jinjaRenderer interface {
@@ -715,15 +714,15 @@ type UsedTableValidatorRule struct {
 	parser   sqlParser
 }
 
-func (q UsedTableValidatorRule) Name() string {
+func (u UsedTableValidatorRule) Name() string {
 	return "used-tables"
 }
 
-func (q UsedTableValidatorRule) GetApplicableLevels() []Level {
+func (u UsedTableValidatorRule) GetApplicableLevels() []Level {
 	return []Level{LevelPipeline, LevelAsset}
 }
 
-func (q UsedTableValidatorRule) GetSeverity() ValidatorSeverity {
+func (u UsedTableValidatorRule) GetSeverity() ValidatorSeverity {
 	return ValidatorSeverityWarning
 }
 
@@ -750,17 +749,12 @@ func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.P
 			Description: "Failed to render the query before parsing the SQL",
 			Context:     []string{err.Error()},
 		})
-		return issues, nil
-	}
-
-	err = u.parser.Start()
-	if err != nil {
-		return issues, errors.Wrap(err, "failed to start the sql parser")
+		return issues, nil //nolint:nilerr
 	}
 
 	tables, err := u.parser.UsedTables(renderedQ, dialect)
 	if err != nil {
-		return issues, nil
+		return issues, nil //nolint:nilerr
 	}
 
 	if len(tables) == 0 && len(asset.Upstreams) == 0 {

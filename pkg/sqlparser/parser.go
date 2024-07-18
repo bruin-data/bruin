@@ -29,6 +29,8 @@ type SQLParser struct {
 	stdin  io.WriteCloser
 	cmd    *exec.Cmd
 	mutex  sync.Mutex
+
+	startMutex sync.Mutex
 }
 
 func NewSQLParser() (*SQLParser, error) {
@@ -57,6 +59,8 @@ func NewSQLParser() (*SQLParser, error) {
 }
 
 func (s *SQLParser) Start() error {
+	s.startMutex.Lock()
+	defer s.startMutex.Unlock()
 	if s.started {
 		return nil
 	}
@@ -140,6 +144,11 @@ func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage,
 }
 
 func (s *SQLParser) UsedTables(sql, dialect string) ([]string, error) {
+	err := s.Start()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to start sql parser")
+	}
+
 	command := parserCommand{
 		Command: "get-tables",
 		Contents: map[string]interface{}{

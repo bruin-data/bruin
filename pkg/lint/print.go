@@ -16,8 +16,7 @@ type Printer struct {
 }
 
 type (
-	taskSummary map[Rule][]*Issue
-	ruleIssue   struct {
+	ruleIssue struct {
 		rule  Rule
 		issue *Issue
 	}
@@ -30,7 +29,6 @@ var (
 	taskNamePrinter = color.New(color.FgWhite, color.Bold)
 	issuePrinter    = color.New(color.FgRed)
 	warningPrinter  = color.New(color.FgYellow)
-	contextPrinter  = color.New(color.FgRed)
 )
 
 func (l *Printer) PrintIssues(analysis *PipelineAnalysisResult) {

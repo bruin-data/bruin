@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/pipeline"
-	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"os"
 	"sort"
 	"strings"
+
+	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 type (
