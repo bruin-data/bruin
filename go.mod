@@ -8,7 +8,7 @@ require (
 	cloud.google.com/go/bigquery v1.59.1
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/alecthomas/chroma/v2 v2.13.0
-	github.com/docker/docker v25.0.3+incompatible
+	github.com/docker/docker v25.0.5+incompatible
 	github.com/fatih/color v1.16.0
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/google/uuid v1.6.0
