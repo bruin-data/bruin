@@ -91,6 +91,8 @@ linters-settings:
   goconst:
     min-len: 5
     min-occurrences: 5
+  nestif:
+    min-complexity: 10
   testifylint:
     enable:
       - "bool-compare"

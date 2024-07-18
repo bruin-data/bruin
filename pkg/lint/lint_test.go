@@ -472,8 +472,8 @@ func TestLinter_LintAsset(t *testing.T) {
 func TestPipelineAnalysisResult_ErrorCount(t *testing.T) {
 	t.Parallel()
 
-	rule1 := &SimpleRule{Identifier: "rule1"}
-	rule2 := &SimpleRule{Identifier: "rule2"}
+	rule1 := &SimpleRule{Identifier: "rule1", Severity: ValidatorSeverityCritical}
+	rule2 := &SimpleRule{Identifier: "rule2", Severity: ValidatorSeverityCritical}
 	tests := []struct {
 		name      string
 		pipelines []*PipelineIssues

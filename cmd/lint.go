@@ -43,6 +43,10 @@ func Lint(isDebug *bool) *cli.Command {
 				Aliases: []string{"o"},
 				Usage:   "the output type, possible values are: plain, json",
 			},
+			&cli.BoolFlag{
+				Name:  "exclude-warnings",
+				Usage: "exclude warning validations from the output",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			// if the output is JSON then we intend to discard all the nicer pretty-print statements
@@ -103,7 +107,7 @@ func Lint(isDebug *bool) *cli.Command {
 
 			logger.Debugf("built the connection manager instance")
 
-			rules, err := lint.GetRules(fs, &git.RepoFinder{})
+			rules, err := lint.GetRules(fs, &git.RepoFinder{}, c.Bool("exclude-warnings"))
 			if err != nil {
 				errorPrinter.Printf("An error occurred while building the validation rules: %v\n", err)
 				return cli.Exit("", 1)
@@ -180,7 +184,7 @@ func Lint(isDebug *bool) *cli.Command {
 
 func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer lint.Printer, asset string) error {
 	if err != nil {
-		errorPrinter.Println("\nAn error occurred while linting:")
+		errorPrinter.Println("\nAn error occurred while linting asset:")
 
 		errorList := unwrapAllErrors(err)
 		for i, e := range errorList {
@@ -194,24 +198,50 @@ func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer li
 
 	// prepare the final message
 	errorCount := result.ErrorCount()
+	warningCount := result.WarningCount()
 	pipelineCount := len(result.Pipelines)
 	pipelineStr := "pipeline"
 	if pipelineCount > 1 {
 		pipelineStr += "s"
 	}
 
-	if errorCount > 0 {
+	if errorCount > 0 || warningCount > 0 {
 		issueStr := "issue"
 		if errorCount > 1 {
 			issueStr += "s"
 		}
 
-		if asset == "" {
-			errorPrinter.Printf("\n✘ Checked %d %s and found %d %s, please check above.\n", pipelineCount, pipelineStr, errorCount, issueStr)
-		} else {
-			errorPrinter.Printf("\n✘ Checked %s and found %d %s, please check above.\n", asset, errorCount, issueStr)
+		warningStr := "warning"
+		if warningCount > 1 {
+			warningStr += "s"
 		}
-		return errors.New("validation failed")
+
+		foundMessage := "found"
+		if errorCount > 0 {
+			errorColoredMessage := color.New(color.FgRed).SprintFunc()
+			foundMessage += errorColoredMessage(fmt.Sprintf(" %d %s", errorCount, issueStr))
+		}
+
+		if warningCount > 0 {
+			if errorCount > 0 {
+				foundMessage += " and"
+			}
+			warningColoredMessage := color.New(color.FgYellow).SprintFunc()
+			foundMessage += warningColoredMessage(fmt.Sprintf(" %d %s", warningCount, warningStr))
+		}
+
+		if asset == "" {
+			infoPrinter.Printf("\n✘ Checked %d %s and %s, please check above.\n", pipelineCount, pipelineStr, foundMessage)
+		} else {
+			infoPrinter.Printf("\n✘ Checked '%s' and found %s, please check above.\n", asset, foundMessage)
+		}
+
+		if errorCount > 0 {
+			return errors.New("validation failed")
+		}
+
+		// warnings should not return failure
+		return nil
 	}
 
 	taskCount := 0

@@ -6,6 +6,9 @@ from sqlglot.lineage import Node
 
 def extract_tables(parsed):
     root = build_scope(parsed)
+    if root is None:
+        raise Exception("unable to build scope")
+
     tables = []
     for scope in root.traverse():
         for alias, (node, source) in scope.selected_sources.items():
@@ -35,8 +38,17 @@ def get_table_name(table: exp.Table):
 
 
 def get_tables(query: str, dialect: str):
-    parsed = parse_one(query, dialect=dialect)
-    tables = extract_tables(parsed)
+    try:
+        parsed = parse_one(query, dialect=dialect)
+        if parsed is None:
+            return {"tables": [], "error": "unable to parse query"}
+    except Exception as e:
+        return {"tables": [], "error": str(e)}
+
+    try:
+        tables = extract_tables(parsed)
+    except Exception as e:
+        return {"tables": [], "error": str(e)}
 
     return {
         "tables": list(set([get_table_name(table) for table in tables])),

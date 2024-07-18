@@ -247,7 +247,7 @@ func Run(isDebug *bool) *cli.Command {
 			infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", foundPipeline.Name, len(foundPipeline.Assets))
 
 			if !runningForAnAsset {
-				rules, err := lint.GetRules(fs, &git.RepoFinder{})
+				rules, err := lint.GetRules(fs, &git.RepoFinder{}, true)
 				if err != nil {
 					errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
 					return cli.Exit("", 1)

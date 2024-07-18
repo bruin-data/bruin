@@ -4,7 +4,7 @@ name: dashboard.hello_bq
 type: bq.sql
 
 depends:
-   - hello_python
+   - hello_pythonsdf
 
 materialization:
    type: table
@@ -29,9 +29,7 @@ custom_checks:
 
 @bruin */
 
-select 1 as one
-union all
-select 2 as one
+select 1 as one, col1 from missingdep.here
 --     and {{ start_date }}
 --     and {{ end_timestamp }}
 --     and {{ end_timestamp | add_days(2) }}

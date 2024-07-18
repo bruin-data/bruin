@@ -47,6 +47,13 @@ const (
 
 var validIDRegexCompiled = regexp.MustCompile(validIDRegex)
 
+type ValidatorSeverity int
+
+const (
+	ValidatorSeverityWarning ValidatorSeverity = iota
+	ValidatorSeverityCritical
+)
+
 func EnsureTaskNameIsValidForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
@@ -684,6 +691,116 @@ func (g *GlossaryChecker) EnsureAssetEntitiesExistInGlossary(ctx context.Context
 				Description: fmt.Sprintf("Attribute '%s' does not exist in the entity '%s'", column.EntityAttribute.Attribute, column.EntityAttribute.Entity),
 			})
 		}
+	}
+
+	return issues, nil
+}
+
+var assetTypeDialectMap = map[pipeline.AssetType]string{
+	"bq.sql": "bigquery",
+	"sf.sql": "snowflake",
+}
+
+type sqlParser interface {
+	UsedTables(sql, dialect string) ([]string, error)
+}
+
+type jinjaRenderer interface {
+	Render(query string) (string, error)
+}
+
+type UsedTableValidatorRule struct {
+	renderer jinjaRenderer
+	parser   sqlParser
+}
+
+func (u UsedTableValidatorRule) Name() string {
+	return "used-tables"
+}
+
+func (u UsedTableValidatorRule) GetApplicableLevels() []Level {
+	return []Level{LevelPipeline, LevelAsset}
+}
+
+func (u UsedTableValidatorRule) GetSeverity() ValidatorSeverity {
+	return ValidatorSeverityWarning
+}
+
+func (u UsedTableValidatorRule) Validate(p *pipeline.Pipeline) ([]*Issue, error) {
+	return CallFuncForEveryAsset(u.ValidateAsset)(p)
+}
+
+func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	dialect, ok := assetTypeDialectMap[asset.Type]
+	if !ok {
+		return issues, nil
+	}
+
+	if asset.Materialization.Type == "" {
+		return issues, nil
+	}
+
+	renderedQ, err := u.renderer.Render(asset.ExecutableFile.Content)
+	if err != nil {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Failed to render the query before parsing the SQL",
+			Context:     []string{err.Error()},
+		})
+		return issues, nil //nolint:nilerr
+	}
+
+	tables, err := u.parser.UsedTables(renderedQ, dialect)
+	if err != nil {
+		return issues, nil //nolint:nilerr
+	}
+
+	if len(tables) == 0 && len(asset.Upstreams) == 0 {
+		return issues, nil
+	}
+
+	pipelineAssetNames := make(map[string]bool, len(p.Assets))
+	for _, a := range p.Assets {
+		pipelineAssetNames[strings.ToLower(a.Name)] = true
+	}
+
+	usedTableNameMap := make(map[string]string, len(tables))
+	for _, table := range tables {
+		usedTableNameMap[strings.ToLower(table)] = table
+	}
+
+	depsNameMap := make(map[string]string, len(asset.Upstreams))
+	for _, upstream := range asset.Upstreams {
+		if upstream.Type != "asset" {
+			continue
+		}
+
+		depsNameMap[strings.ToLower(upstream.Value)] = upstream.Value
+	}
+
+	for usedTable, actualReferenceName := range usedTableNameMap {
+		// if the used table contains a full name with multiple dots treat it as an absolute reference, ignore it
+		if strings.Count(usedTable, ".") > 1 {
+			continue
+		}
+
+		// if the table is in the dependency list already, move on
+		if _, ok := depsNameMap[usedTable]; ok {
+			continue
+		}
+
+		// report this issue only if there's an asset with the same name, otherwise ignore
+		if _, ok := pipelineAssetNames[usedTable]; !ok {
+			continue
+		}
+
+		// otherwise, report the issue
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("Table '%s' is used in the query but not referenced in the 'depends' array.", actualReferenceName),
+		})
 	}
 
 	return issues, nil
