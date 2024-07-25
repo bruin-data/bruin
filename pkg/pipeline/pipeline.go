@@ -666,6 +666,14 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 	}
 }
 
+// WipeContentOfAssets removes the content of the executable files of all assets in the pipeline.
+// This is useful when we want to serialize the pipeline to JSON and we don't want to include the content of the assets.
+func (p *Pipeline) WipeContentOfAssets() {
+	for _, asset := range p.Assets {
+		asset.ExecutableFile.Content = ""
+	}
+}
+
 func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) AssetType {
 	taskTypeCounts := map[AssetType]int{
 		AssetTypeBigqueryQuery:  0,
