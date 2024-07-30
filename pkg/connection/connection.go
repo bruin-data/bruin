@@ -489,6 +489,7 @@ func (m *Manager) AddMySQLConnectionFromConfig(connection *config.MySQLConnectio
 		Host:     connection.Host,
 		Port:     connection.Port,
 		Database: connection.Database,
+		Driver:   connection.Driver,
 	})
 	if err != nil {
 		return err

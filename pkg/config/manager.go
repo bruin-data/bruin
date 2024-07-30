@@ -73,6 +73,7 @@ type MySQLConnection struct {
 	Host     string `yaml:"host"     json:"host"`
 	Port     int    `yaml:"port"     json:"port"`
 	Database string `yaml:"database" json:"database"`
+	Driver   string `yaml:"driver" json:"driver"`
 }
 
 type NotionConnection struct {

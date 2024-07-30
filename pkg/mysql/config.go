@@ -11,6 +11,7 @@ type Config struct {
 	Host     string
 	Port     int
 	Database string
+	Driver   string
 }
 
 func (c Config) GetIngestrURI() string {
@@ -18,8 +19,13 @@ func (c Config) GetIngestrURI() string {
 		c.Port = 3306
 	}
 	host := fmt.Sprintf("%s:%d", c.Host, c.Port)
+	scheme := "mysql"
+	if c.Driver != "" {
+		scheme += "+" + c.Driver
+	}
+
 	u := &url.URL{
-		Scheme: "mysql",
+		Scheme: scheme,
 		User:   url.UserPassword(c.Username, c.Password),
 		Host:   host,
 		Path:   c.Database,
