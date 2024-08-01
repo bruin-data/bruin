@@ -1185,6 +1185,88 @@ func TestEnsureSlackFieldInPipelineIsValid(t *testing.T) {
 	}
 }
 
+func TestMSTeamsFieldInPipelineIsValid(t *testing.T) {
+	t.Parallel()
+	type args struct {
+		p *pipeline.Pipeline
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*Issue
+		wantErr bool
+	}{
+		{
+			name: "no issues",
+			args: args{
+				p: &pipeline.Pipeline{
+					Notifications: pipeline.Notifications{
+						MSTeams: []pipeline.MSTeamsNotification{
+							{
+								Connection: "some_conn",
+							},
+						},
+					},
+				},
+			},
+			want: noIssues,
+		},
+		{
+			name: "empty channel field",
+			args: args{
+				p: &pipeline.Pipeline{
+					Notifications: pipeline.Notifications{
+						MSTeams: []pipeline.MSTeamsNotification{
+							{
+								Connection: "some_conn",
+							},
+							{
+								Connection: "some_conn",
+							},
+						},
+					},
+				},
+			},
+			want: []*Issue{
+				{
+					Description: pipelineMSTeamsConnectionFieldNotUnique,
+				},
+			},
+		},
+		{
+			name: "no slack name and connection field",
+			args: args{
+				p: &pipeline.Pipeline{
+					Notifications: pipeline.Notifications{
+						MSTeams: []pipeline.MSTeamsNotification{
+							{
+								Connection: "",
+							},
+						},
+					},
+				},
+			},
+			want: []*Issue{
+				{
+					Description: pipelineMSTeamsConnectionFieldEmpty,
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := EnsureMSTeamsFieldInPipelineIsValid(tt.args.p)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equalf(t, tt.want, got, "EnsureMSTeamsFieldInPipelineIsValid(%v)", tt.args.p)
+		})
+	}
+}
+
 func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 	t.Parallel()
 

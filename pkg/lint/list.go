@@ -90,6 +90,12 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 			ApplicableLevels: []Level{LevelPipeline},
 		},
 		&SimpleRule{
+			Identifier:       "valid-ms-teams-notification",
+			Severity:         ValidatorSeverityCritical,
+			Validator:        EnsureMSTeamsFieldInPipelineIsValid,
+			ApplicableLevels: []Level{LevelPipeline},
+		},
+		&SimpleRule{
 			Identifier:       "materialization-config",
 			Severity:         ValidatorSeverityCritical,
 			Validator:        CallFuncForEveryAsset(EnsureMaterializationValuesAreValidForSingleAsset),

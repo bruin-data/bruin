@@ -67,11 +67,16 @@ type TaskSchedule struct {
 }
 
 type Notifications struct {
-	Slack []SlackNotification `json:"slack"`
+	Slack   []SlackNotification   `json:"slack"`
+	MSTeams []MSTeamsNotification `json:"ms_teams"`
 }
 
 type SlackNotification struct {
 	Channel string `json:"channel"`
+}
+
+type MSTeamsNotification struct {
+	Connection string `json:"connection"`
 }
 
 func (n Notifications) MarshalJSON() ([]byte, error) {

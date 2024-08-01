@@ -39,6 +39,9 @@ const (
 	pipelineSlackFieldEmptyChannel     = "Slack notifications must have a `channel` attribute"
 	pipelineSlackChannelFieldNotUnique = "The `channel` attribute under the Slack notifications must be unique"
 
+	pipelineMSTeamsConnectionFieldNotUnique = "The `conncetion` attribute under the MS Teams notifications must be unique"
+	pipelineMSTeamsConnectionFieldEmpty     = "MS Teams notifications `connection` attribute must not be empty"
+
 	materializationStrategyIsNotSupportedForViews     = "Materialization strategy is not supported for views"
 	materializationPartitionByNotSupportedForViews    = "Materialization partition by is not supported for views because views cannot be partitioned"
 	materializationIncrementalKeyNotSupportedForViews = "Materialization incremental key is not supported for views because views cannot be updated incrementally"
@@ -457,6 +460,30 @@ func EnsureSlackFieldInPipelineIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
 		}
 
 		slackChannels = append(slackChannels, channelWithoutHash)
+	}
+
+	return issues, nil
+}
+
+func EnsureMSTeamsFieldInPipelineIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	MSTeamsConnections := make([]string, 0, len(p.Notifications.MSTeams))
+	for _, notification := range p.Notifications.MSTeams {
+		if notification.Connection == "" {
+			issues = append(issues, &Issue{
+				Description: pipelineMSTeamsConnectionFieldEmpty,
+			})
+			continue
+		}
+
+		if isStringInArray(MSTeamsConnections, notification.Connection) {
+			issues = append(issues, &Issue{
+				Description: pipelineMSTeamsConnectionFieldNotUnique,
+			})
+		}
+
+		MSTeamsConnections = append(MSTeamsConnections, notification.Connection)
 	}
 
 	return issues, nil
