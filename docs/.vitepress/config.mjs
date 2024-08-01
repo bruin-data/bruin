@@ -76,6 +76,12 @@ export default defineConfig({
                     },
                 ],
             },
+            {
+                text: "Bruin Cloud",
+                items: [
+                    {text: "Cross-pipeline dependencies", link: "/cloud/cross-pipeline"},
+                ],
+            },
         ],
 
         socialLinks: [{icon: "github", link: "https://github.com/bruin-data/bruin"}],
