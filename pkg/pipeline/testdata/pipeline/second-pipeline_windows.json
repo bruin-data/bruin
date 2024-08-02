@@ -204,7 +204,8 @@
     }
   ],
   "notifications": {
-    "slack": []
+    "slack": [],
+    "ms_teams": []
   },
   "catchup": false,
   "retries": 0

@@ -68,7 +68,7 @@ type TaskSchedule struct {
 
 type Notifications struct {
 	Slack   []SlackNotification   `json:"slack"`
-	MSTeams []MSTeamsNotification `json:"ms_teams"`
+	MSTeams []MSTeamsNotification `yaml:"ms_teams" json:"ms_teams"`
 }
 
 type SlackNotification struct {
@@ -76,21 +76,29 @@ type SlackNotification struct {
 }
 
 type MSTeamsNotification struct {
-	Connection string `json:"connection"`
+	Connection string `yaml:"connection" json:"connection"`
 }
 
 func (n Notifications) MarshalJSON() ([]byte, error) {
 	slack := make([]SlackNotification, 0, len(n.Slack))
+	MSTeams := make([]MSTeamsNotification, 0, len(n.MSTeams))
 	for _, s := range n.Slack {
 		if !reflect.ValueOf(s).IsZero() {
 			slack = append(slack, s)
 		}
 	}
+	for _, s := range n.MSTeams {
+		if !reflect.ValueOf(s).IsZero() {
+			MSTeams = append(MSTeams, s)
+		}
+	}
 
 	return json.Marshal(struct {
-		Slack []SlackNotification `json:"slack"`
+		Slack   []SlackNotification   `json:"slack"`
+		MSTeams []MSTeamsNotification `json:"ms_teams"`
 	}{
-		Slack: slack,
+		Slack:   slack,
+		MSTeams: MSTeams,
 	})
 }
 
