@@ -227,7 +227,16 @@
     }
   ],
   "notifications": {
-    "slack": []
+    "slack": [
+      {
+        "channel": "#channel1"
+      }
+    ],
+    "ms_teams": [
+      {
+        "connection": "some_conn"
+      }
+    ]
   },
   "catchup": false,
   "retries": 3
