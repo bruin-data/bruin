@@ -46,7 +46,8 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
 	pipeline.AssetTypeEmpty: {
-		scheduler.TaskInstanceTypeMain: NoOpOperator{},
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 	},
 	pipeline.AssetTypePostgresQuery: {
 		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
