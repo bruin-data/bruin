@@ -6,6 +6,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/mongo"
@@ -21,16 +22,17 @@ import (
 )
 
 type Manager struct {
-	BigQuery  map[string]*bigquery.Client
-	Snowflake map[string]*snowflake.DB
-	Postgres  map[string]*postgres.Client
-	MsSQL     map[string]*mssql.DB
-	Mongo     map[string]*mongo.DB
-	Mysql     map[string]*mysql.Client
-	Notion    map[string]*notion.Client
-	HANA      map[string]*hana.Client
-	Shopify   map[string]*shopify.Client
-	Gorgias   map[string]*gorgias.Client
+	BigQuery   map[string]*bigquery.Client
+	Snowflake  map[string]*snowflake.DB
+	Postgres   map[string]*postgres.Client
+	MsSQL      map[string]*mssql.DB
+	Databricks map[string]*databricks.DB
+	Mongo      map[string]*mongo.DB
+	Mysql      map[string]*mysql.Client
+	Notion     map[string]*notion.Client
+	HANA       map[string]*hana.Client
+	Shopify    map[string]*shopify.Client
+	Gorgias    map[string]*gorgias.Client
 
 	mutex sync.Mutex
 }
@@ -179,6 +181,28 @@ func (m *Manager) GetMsConnectionWithoutDefault(name string) (mssql.MsClient, er
 	db, ok := m.MsSQL[name]
 	if !ok {
 		return nil, errors.Errorf("mssql connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetDatabricksConnection(name string) (databricks.Client, error) {
+	db, err := m.GetDatabricksConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetDatabricksConnectionWithoutDefault("databricks-default")
+}
+
+func (m *Manager) GetDatabricksConnectionWithoutDefault(name string) (databricks.Client, error) {
+	if m.Databricks == nil {
+		return nil, errors.New("no databricks connections found")
+	}
+
+	db, ok := m.Databricks[name]
+	if !ok {
+		return nil, errors.Errorf("databricks connection not found for '%s'", name)
 	}
 
 	return db, nil

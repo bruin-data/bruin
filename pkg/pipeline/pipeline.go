@@ -30,6 +30,7 @@ const (
 	AssetTypePostgresQuery        = AssetType("pg.sql")
 	AssetTypeRedshiftQuery        = AssetType("rs.sql")
 	AssetTypeMsSQLQuery           = AssetType("ms.sql")
+	AssetTypeDatabricksQuery      = AssetType("databricks.sql")
 	AssetTypeSynapseQuery         = AssetType("synapse.sql")
 	AssetTypeIngestr              = AssetType("ingestr")
 
@@ -304,16 +305,18 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypePostgresQuery:        "postgres",
 	AssetTypeRedshiftQuery:        "redshift",
 	AssetTypeMsSQLQuery:           "mssql",
+	AssetTypeDatabricksQuery:      "databricks",
 	AssetTypeSynapseQuery:         "synapse",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
-	"bigquery":  AssetTypeBigqueryQuery,
-	"snowflake": AssetTypeSnowflakeQuery,
-	"postgres":  AssetTypePostgresQuery,
-	"redshift":  AssetTypeRedshiftQuery,
-	"mssql":     AssetTypeMsSQLQuery,
-	"synapse":   AssetTypeSynapseQuery,
+	"bigquery":   AssetTypeBigqueryQuery,
+	"snowflake":  AssetTypeSnowflakeQuery,
+	"postgres":   AssetTypePostgresQuery,
+	"redshift":   AssetTypeRedshiftQuery,
+	"mssql":      AssetTypeMsSQLQuery,
+	"databricks": AssetTypeDatabricksQuery,
+	"synapse":    AssetTypeSynapseQuery,
 }
 
 type SecretMapping struct {
@@ -664,6 +667,8 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "redshift-default", nil
 	case "mssql":
 		return "mssql-default", nil
+	case "databricks":
+		return "databricks-default", nil
 	case "synapse":
 		return "synapse-default", nil
 	case "mongo":
@@ -689,12 +694,13 @@ func (p *Pipeline) WipeContentOfAssets() {
 
 func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) AssetType {
 	taskTypeCounts := map[AssetType]int{
-		AssetTypeBigqueryQuery:  0,
-		AssetTypeSnowflakeQuery: 0,
-		AssetTypePostgresQuery:  0,
-		AssetTypeMsSQLQuery:     0,
-		AssetTypeRedshiftQuery:  0,
-		AssetTypeSynapseQuery:   0,
+		AssetTypeBigqueryQuery:   0,
+		AssetTypeSnowflakeQuery:  0,
+		AssetTypePostgresQuery:   0,
+		AssetTypeMsSQLQuery:      0,
+		AssetTypeDatabricksQuery: 0,
+		AssetTypeRedshiftQuery:   0,
+		AssetTypeSynapseQuery:    0,
 	}
 	maxTasks := 0
 	maxTaskType := defaultIfNone

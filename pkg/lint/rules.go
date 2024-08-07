@@ -39,7 +39,7 @@ const (
 	pipelineSlackFieldEmptyChannel     = "Slack notifications must have a `channel` attribute"
 	pipelineSlackChannelFieldNotUnique = "The `channel` attribute under the Slack notifications must be unique"
 
-	pipelineMSTeamsConnectionFieldNotUnique = "The `conncetion` attribute under the MS Teams notifications must be unique"
+	pipelineMSTeamsConnectionFieldNotUnique = "The `connection` attribute under the MS Teams notifications must be unique"
 	pipelineMSTeamsConnectionFieldEmpty     = "MS Teams notifications `connection` attribute must not be empty"
 
 	materializationStrategyIsNotSupportedForViews     = "Materialization strategy is not supported for views"
