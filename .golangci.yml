@@ -88,6 +88,7 @@ linters-settings:
       - snowflake.SfClient
       - postgres.PgClient
       - mssql.MsClient
+      - databricks.Client
   goconst:
     min-len: 5
     min-occurrences: 5

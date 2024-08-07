@@ -44,7 +44,7 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error)
 	mat := task.Materialization
 
 	if len(mat.ClusterBy) > 0 {
-		return "", errors.New("Databricks assets do not support `cluster_by`")
+		return "", errors.New("databricks assets do not support `cluster_by`")
 	}
 
 	queries := []string{

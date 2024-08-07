@@ -2,11 +2,11 @@ package connection
 
 import (
 	"context"
-	"github.com/bruin-data/bruin/pkg/databricks"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/mongo"

@@ -1,7 +1,6 @@
 package databricks
 
 import (
-	"fmt"
 	"net/url"
 )
 
@@ -15,7 +14,7 @@ type Config struct {
 func (c *Config) ToDBConnectionURI() string {
 	u := &url.URL{
 		User: url.UserPassword("token", c.Token),
-		Host: fmt.Sprintf("%s:%d", c.Host),
+		Host: c.Host,
 		Path: c.Path,
 	}
 
