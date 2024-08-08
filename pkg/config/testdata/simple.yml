@@ -53,6 +53,7 @@ environments:
           host: "hostbricks"
           path: "sql"
           token: "aaaaaaaa"
+          port: 443
 
       synapse:
         - name: conn6

@@ -75,6 +75,7 @@ func TestLoadFromFile(t *testing.T) {
 					Host:  "hostbricks",
 					Path:  "sql",
 					Token: "aaaaaaaa",
+					Port:  443,
 				},
 			},
 			Synapse: []MsSQLConnection{
