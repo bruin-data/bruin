@@ -64,6 +64,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.MsSQL)...)
 
+	connDatabricks, err := m.GetDatabricksConnectionWithoutDefault(name)
+	if err == nil {
+		return connDatabricks, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Databricks)...)
+
 	connMongo, err := m.GetMongoConnectionWithoutDefault(name)
 	if err == nil {
 		return connMongo, nil
@@ -475,6 +481,30 @@ func (m *Manager) AddMsSQLConnectionFromConfig(connection *config.MsSQLConnectio
 	return nil
 }
 
+func (m *Manager) AddDatabricksConnectionFromConfig(connection *config.DatabricksConnection) error {
+	m.mutex.Lock()
+	if m.Databricks == nil {
+		m.Databricks = make(map[string]*databricks.DB)
+	}
+	m.mutex.Unlock()
+
+	client, err := databricks.NewDB(&databricks.Config{
+		Token: connection.Token,
+		Host:  connection.Host,
+		Path:  connection.Path,
+		Port:  connection.Port,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Databricks[connection.Name] = client
+
+	return nil
+}
+
 func (m *Manager) AddMongoConnectionFromConfig(connection *config.MongoConnection) error {
 	m.mutex.Lock()
 	if m.Mongo == nil {
@@ -662,6 +692,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 			err := connectionManager.AddMsSQLConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add MsSQL connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Databricks {
+		wg.Go(func() {
+			err := connectionManager.AddDatabricksConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add Databricks connection '%s'", conn.Name))
 			}
 		})
 	}

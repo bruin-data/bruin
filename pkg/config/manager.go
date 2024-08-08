@@ -35,6 +35,14 @@ type MsSQLConnection struct {
 	Database string `yaml:"database" json:"database"`
 }
 
+type DatabricksConnection struct {
+	Name  string `yaml:"name"  json:"name"`
+	Token string `yaml:"token" json:"token"`
+	Path  string `yaml:"path"  json:"path"`
+	Host  string `yaml:"host"  json:"host"`
+	Port  int    `yaml:"port"     json:"port"`
+}
+
 type GoogleCloudPlatformConnection struct {
 	Name               string `yaml:"name"`
 	ServiceAccountJSON string `yaml:"service_account_json"`
@@ -157,6 +165,7 @@ type Connections struct {
 	Postgres            []PostgresConnection            `yaml:"postgres"`
 	RedShift            []PostgresConnection            `yaml:"redshift"`
 	MsSQL               []MsSQLConnection               `yaml:"mssql"`
+	Databricks          []DatabricksConnection          `yaml:"databricks"`
 	Synapse             []MsSQLConnection               `yaml:"synapse"`
 	Mongo               []MongoConnection               `yaml:"mongo"`
 	MySQL               []MySQLConnection               `yaml:"mysql"`
@@ -189,6 +198,10 @@ func (c *Connections) buildConnectionKeyMap() {
 
 	for i, conn := range c.MsSQL {
 		c.byKey[conn.Name] = &(c.MsSQL[i])
+	}
+
+	for i, conn := range c.Databricks {
+		c.byKey[conn.Name] = &(c.Databricks[i])
 	}
 
 	for i, conn := range c.Synapse {

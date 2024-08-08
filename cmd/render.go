@@ -10,6 +10,7 @@ import (
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/date"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/mssql"
@@ -67,12 +68,13 @@ func Render() *cli.Command {
 					Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id"),
 				},
 				materializers: map[pipeline.AssetType]queryMaterializer{
-					pipeline.AssetTypeBigqueryQuery:  bigquery.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeSnowflakeQuery: snowflake.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeRedshiftQuery:  postgres.NewMaterializer(fullRefresh),
-					pipeline.AssetTypePostgresQuery:  postgres.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeMsSQLQuery:     mssql.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeSynapseQuery:   synapse.NewRenderer(fullRefresh),
+					pipeline.AssetTypeBigqueryQuery:   bigquery.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeSnowflakeQuery:  snowflake.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeRedshiftQuery:   postgres.NewMaterializer(fullRefresh),
+					pipeline.AssetTypePostgresQuery:   postgres.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeMsSQLQuery:      mssql.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeDatabricksQuery: databricks.NewRenderer(fullRefresh),
+					pipeline.AssetTypeSynapseQuery:    synapse.NewRenderer(fullRefresh),
 				},
 				builder: DefaultPipelineBuilder,
 				writer:  os.Stdout,

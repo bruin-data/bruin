@@ -65,7 +65,7 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 			conn.On("GetConnection", "test").Return(q, nil)
 			return &AcceptedValuesCheck{conn: conn}
 		},
-		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as VARCHAR) NOT IN ('test','test2')",
+		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN ('test','test2')",
 		"column 'test_column' has 5 rows that are not in the accepted values",
 		&pipeline.ColumnCheck{
 			Name: "accepted_values",
@@ -82,7 +82,7 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 			conn.On("GetConnection", "test").Return(q, nil)
 			return &AcceptedValuesCheck{conn: conn}
 		},
-		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as VARCHAR) NOT IN ('1','2')",
+		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN ('1','2')",
 		"column 'test_column' has 5 rows that are not in the accepted values",
 		&pipeline.ColumnCheck{
 			Name: "accepted_values",
