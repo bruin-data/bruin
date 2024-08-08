@@ -48,6 +48,12 @@ environments:
           port: 1433
           database: "mssqldb"
 
+      databricks:
+        - name: conn55
+          host: "hostbricks"
+          path: "sql"
+          token: "aaaaaaaa"
+
       synapse:
         - name: conn6
           username: "syuser"

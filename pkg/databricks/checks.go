@@ -41,7 +41,7 @@ func (c *AcceptedValuesCheck) Check(ctx context.Context, ti *scheduler.ColumnChe
 	res := strings.Join(val, "','")
 	res = fmt.Sprintf("'%s'", res)
 
-	qq := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE CAST(%s as VARCHAR) NOT IN (%s)", ti.GetAsset().Name, ti.Column.Name, res)
+	qq := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE CAST(%s as STRING) NOT IN (%s)", ti.GetAsset().Name, ti.Column.Name, res)
 
 	return ansisql.NewCountableQueryCheck(c.conn, 0, &query.Query{Query: qq}, "accepted_values", func(count int64) error {
 		return errors.Errorf("column '%s' has %d rows that are not in the accepted values", ti.Column.Name, count)

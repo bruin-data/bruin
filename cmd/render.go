@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/databricks"
 	"io"
 	"os"
 	"strings"
@@ -67,12 +68,13 @@ func Render() *cli.Command {
 					Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id"),
 				},
 				materializers: map[pipeline.AssetType]queryMaterializer{
-					pipeline.AssetTypeBigqueryQuery:  bigquery.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeSnowflakeQuery: snowflake.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeRedshiftQuery:  postgres.NewMaterializer(fullRefresh),
-					pipeline.AssetTypePostgresQuery:  postgres.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeMsSQLQuery:     mssql.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeSynapseQuery:   synapse.NewRenderer(fullRefresh),
+					pipeline.AssetTypeBigqueryQuery:   bigquery.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeSnowflakeQuery:  snowflake.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeRedshiftQuery:   postgres.NewMaterializer(fullRefresh),
+					pipeline.AssetTypePostgresQuery:   postgres.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeMsSQLQuery:      mssql.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeDatabricksQuery: databricks.NewRenderer(fullRefresh),
+					pipeline.AssetTypeSynapseQuery:    synapse.NewRenderer(fullRefresh),
 				},
 				builder: DefaultPipelineBuilder,
 				writer:  os.Stdout,

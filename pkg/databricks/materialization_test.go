@@ -14,7 +14,7 @@ func TestMaterializer_Render(t *testing.T) {
 		name        string
 		task        *pipeline.Asset
 		query       string
-		want        string
+		want        []string
 		wantErr     bool
 		fullRefresh bool
 	}{
@@ -22,7 +22,7 @@ func TestMaterializer_Render(t *testing.T) {
 			name:  "no materialization, return raw query",
 			task:  &pipeline.Asset{},
 			query: "SELECT 1",
-			want:  "SELECT 1",
+			want:  []string{"SELECT 1"},
 		},
 		{
 			name: "materialize to a view",
@@ -33,7 +33,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want:  "^CREATE OR ALTER VIEW my\\.asset AS\nSELECT 1$",
+			want:  []string{"^DROP TABLE IF EXISTS my\\.asset; CREATE OR REPLACE VIEW my\\.asset AS SELECT 1$"},
 		},
 		{
 			name: "materialize to a table, no partition or cluster, default to create+replace",
@@ -44,10 +44,10 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want: "BEGIN TRANSACTION;\n" +
+			want: []string{"BEGIN TRANSACTION;\n" +
 				"DROP TABLE IF EXISTS my\\.asset;\n" +
 				"SELECT tmp\\.\\* INTO my.asset FROM \\(SELECT 1\\) AS tmp;\n" +
-				"COMMIT;",
+				"COMMIT;"},
 		},
 		{
 			name: "materialize to a table, no partition or cluster, full refresh defaults to create+replace",
@@ -60,10 +60,10 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			fullRefresh: true,
 			query:       "SELECT 1",
-			want: "BEGIN TRANSACTION;\n" +
+			want: []string{"BEGIN TRANSACTION;\n" +
 				"DROP TABLE IF EXISTS my\\.asset;\n" +
 				"SELECT tmp\\.\\* INTO my.asset FROM \\(SELECT 1\\) AS tmp;\n" +
-				"COMMIT;",
+				"COMMIT;"},
 		},
 		{
 			name: "materialize to a table with cluster, single field to cluster",
@@ -101,7 +101,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want:  "INSERT INTO my.asset SELECT 1",
+			want:  []string{"INSERT INTO my.asset SELECT 1"},
 		},
 		{
 			name: "incremental strategies require the incremental_key to be set",
@@ -138,12 +138,12 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want: "^BEGIN TRANSACTION;\n" +
+			want: []string{"^BEGIN TRANSACTION;\n" +
 				"SELECT alias\\.\\* INTO __bruin_tmp_.+ AS alias;\n" +
 				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp_.+;\n" +
 				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
-				"COMMIT;$",
+				"COMMIT;$"},
 		},
 		{
 			name: "merge without columns",
@@ -187,10 +187,10 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1 as id, 'abc' as name",
-			want: "^MERGE INTO my\\.asset target\n" +
+			want: []string{"^MERGE INTO my\\.asset target\n" +
 				"USING \\(SELECT 1 as id, 'abc' as name\\) source ON target\\.id = source.id\n" +
 				"WHEN MATCHED THEN UPDATE SET target\\.name = source\\.name\n" +
-				"WHEN NOT MATCHED THEN INSERT\\(id, name\\) VALUES\\(id, name\\);$",
+				"WHEN NOT MATCHED THEN INSERT\\(id, name\\) VALUES\\(id, name\\);$"},
 		},
 	}
 	for _, tt := range tests {
@@ -204,9 +204,8 @@ func TestMaterializer_Render(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
+				assert.Regexp(t, tt.want, render)
 			}
-
-			assert.Regexp(t, tt.want, render)
 		})
 	}
 }

@@ -11,7 +11,7 @@ import (
 )
 
 type materializer interface {
-	Render(task *pipeline.Asset, query string) (string, error)
+	Render(task *pipeline.Asset, query string) ([]string, error)
 }
 
 type Client interface {
@@ -61,12 +61,10 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	q := queries[0]
-	materialized, err := o.materializer.Render(t, q.String())
+	materializedQueries, err := o.materializer.Render(t, q.String())
 	if err != nil {
 		return err
 	}
-
-	q.Query = materialized
 
 	connName, err := p.GetConnectionNameForAsset(t)
 	if err != nil {
@@ -78,7 +76,15 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	return conn.RunQueryWithoutResult(ctx, q)
+	for _, queryString := range materializedQueries {
+		p := &query.Query{Query: queryString}
+		err = conn.RunQueryWithoutResult(ctx, p)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOperator {

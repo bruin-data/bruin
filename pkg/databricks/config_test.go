@@ -12,9 +12,10 @@ func TestConfig_ToIngestr(t *testing.T) {
 		Host:  "localhost",
 		Token: "xxxxxx",
 		Path:  "sql/1.0/endpoints/a1b234c5678901d2",
+		Port:  443,
 	}
 
-	expected := "token:xxxxxx@localhost/sql/1.0/endpoints/a1b234c5678901d2"
+	expected := "token:xxxxxx@localhost:443/sql/1.0/endpoints/a1b234c5678901d2"
 
 	assert.Equal(t, expected, c.ToDBConnectionURI())
 }
