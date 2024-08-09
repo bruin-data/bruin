@@ -58,7 +58,7 @@ func (c *PatternCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInsta
 	}
 
 	qq := fmt.Sprintf(
-		"SELECT count(*) FROM %s WHERE %s NOT LIKE '%s'",
+		"SELECT count(*) FROM %s WHERE %s NOT rlike '%s'",
 		ti.GetAsset().Name,
 		ti.Column.Name,
 		*ti.Check.Value.String,

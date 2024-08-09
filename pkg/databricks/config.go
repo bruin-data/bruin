@@ -25,7 +25,6 @@ func (c *Config) ToDBConnectionURI() string {
 	}
 	if c.Schema != "" {
 		query.Add("schema", c.Schema)
-
 	}
 	dsn := url.URL{
 		User:     url.UserPassword("token", c.Token),

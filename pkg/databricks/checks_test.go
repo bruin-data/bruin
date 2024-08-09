@@ -288,7 +288,7 @@ func TestPatternCheck_Check(t *testing.T) {
 			conn.On("GetConnection", "test").Return(q, nil)
 			return &PatternCheck{conn: conn}
 		},
-		"SELECT count(*) FROM dataset.test_asset WHERE test_column NOT LIKE '(a|b)'",
+		"SELECT count(*) FROM dataset.test_asset WHERE test_column NOT rlike '(a|b)'",
 		"column test_column has 5 values that don't satisfy the pattern (a|b)",
 		&pipeline.ColumnCheck{
 			Name: "pattern",
