@@ -2,8 +2,6 @@ package connection
 
 import (
 	"context"
-	"sync"
-
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
@@ -19,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc"
 	"golang.org/x/exp/maps"
+	"sync"
 )
 
 type Manager struct {
@@ -33,8 +32,8 @@ type Manager struct {
 	HANA       map[string]*hana.Client
 	Shopify    map[string]*shopify.Client
 	Gorgias    map[string]*gorgias.Client
-
-	mutex sync.Mutex
+	Aws        map[string]*config.AwsConnection
+	mutex      sync.Mutex
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
@@ -109,6 +108,15 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
 
+func (m *Manager) GetAwsConnection(name string) (*config.AwsConnection, error) {
+	db, err := m.GetAwsConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetAwsConnectionWithoutDefault("aws-default")
+}
+
 func (m *Manager) GetBqConnection(name string) (bigquery.DB, error) {
 	return m.GetBqConnectionWithoutDefault(name)
 }
@@ -141,6 +149,19 @@ func (m *Manager) GetSfConnectionWithoutDefault(name string) (snowflake.SfClient
 	}
 
 	db, ok := m.Snowflake[name]
+	if !ok {
+		return nil, errors.Errorf("snowflake connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetAwsConnectionWithoutDefault(name string) (*config.AwsConnection, error) {
+	if m.Aws == nil {
+		return nil, errors.New("no AWS connections found")
+	}
+
+	db, ok := m.Aws[name]
 	if !ok {
 		return nil, errors.Errorf("snowflake connection not found for '%s'", name)
 	}
@@ -399,6 +420,19 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 	return nil
 }
 
+func (m *Manager) AddAwsConnectionFromConfig(connection *config.AwsConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	if m.Aws == nil {
+		m.Aws = make(map[string]*config.AwsConnection)
+	}
+
+	m.Aws[connection.Name] = connection
+
+	return nil
+}
+
 func (m *Manager) AddPgConnectionFromConfig(connection *config.PostgresConnection) error {
 	return m.addPgLikeConnectionFromConfig(connection, false)
 }
@@ -651,6 +685,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	connectionManager := &Manager{}
 
 	var wg conc.WaitGroup
+	for _, conn := range cm.SelectedEnvironment.Connections.AwsConnection {
+		wg.Go(func() {
+			err := connectionManager.AddAwsConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add AWS connection '%s'", conn.Name))
+			}
+		})
+	}
+
 	for _, conn := range cm.SelectedEnvironment.Connections.GoogleCloudPlatform {
 		wg.Go(func() {
 			err := connectionManager.AddBqConnectionFromConfig(&conn)

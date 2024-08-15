@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -388,4 +389,55 @@ func TestConfig_SelectEnvironment(t *testing.T) {
 	require.NoError(t, err)
 	assert.EqualExportedValues(t, defaultEnv, conf.SelectedEnvironment)
 	assert.Equal(t, "default", conf.SelectedEnvironmentName)
+}
+
+func TestAwsConnection_ToAthenaDsn(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		conn    AwsConnection
+		want    string
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "empty connection",
+			conn: AwsConnection{
+				Region: "us-west-2",
+			},
+			wantErr: assert.Error,
+		},
+		{
+			name: "invalid s3 path",
+			conn: AwsConnection{
+				AccessKey:        "access-key",
+				SecretKey:        "secret-key",
+				QueryResultsPath: "gcs://bucket/prefix",
+				Region:           "us-west-2",
+			},
+			wantErr: assert.Error,
+		},
+		{
+			name: "valid connection",
+			conn: AwsConnection{
+				AccessKey:        "access-key",
+				SecretKey:        "secret-key",
+				QueryResultsPath: "s3://bucket/prefix",
+				Region:           "us-west-2",
+			},
+			want:    "s3://bucket/prefix?accessID=access-key&region=us-west-2&secretAccessKey=secret-key",
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := tt.conn.ToAthenaDsn()
+			if !tt.wantErr(t, err, fmt.Sprintf("ToAthenaDsn()")) {
+				return
+			}
+			assert.Equalf(t, tt.want, got, "ToAthenaDsn()")
+		})
+	}
 }
