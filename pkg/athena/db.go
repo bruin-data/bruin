@@ -3,12 +3,12 @@ package athena
 import (
 	"context"
 	"database/sql"
-	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/pkg/errors"
 	"log"
 	"sync"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/pkg/errors"
 	_ "github.com/uber/athenadriver/go"
 )
 

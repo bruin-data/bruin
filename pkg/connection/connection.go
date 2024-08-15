@@ -2,6 +2,8 @@ package connection
 
 import (
 	"context"
+	"sync"
+
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
@@ -17,7 +19,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc"
 	"golang.org/x/exp/maps"
-	"sync"
 )
 
 type Manager struct {
