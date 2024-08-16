@@ -52,7 +52,7 @@ export default defineConfig({
                         {text: "Python", link: "/assets/python"},
                         {text: "Ingestr", link: "/assets/ingestr"},
                         {text: "Databricks", link: "/assets/databricks"},
-                        {text: "MS SQL", link: "/assets/mssql"},
+                        {text: "SQL Server", link: "/assets/mssql"},
                         {text: "Postgres", link: "/assets/postgres"},
                         {text: "Synapse", link: "/assets/synapse"},
                         {text: "Redshift", link: "/assets/redshift"},
