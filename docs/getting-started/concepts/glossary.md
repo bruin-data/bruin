@@ -1,6 +1,6 @@
 # Glossary
 
-Bruin focuses on enabling independent teams designing independent data products. These products are ought to be built and developed independently, while all working towards a cohesive data strategy. 
+Bruin focuses on enabling independent teams designing independent data products. These products ought to be built and developed independently, while all working towards a cohesive data strategy. 
 
 One of the most important aspects of this aligned approach to building data products is agreeing on the language. For instance, if you go to an e-commerce company and ask different individuals in different teams "what is a customer for you?", you will get different answers:
 - a CRM manager might say: "a customer is someone who signed up to our email list.
