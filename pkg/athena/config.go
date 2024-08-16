@@ -1,8 +1,9 @@
 package athena
 
 import (
-	drv "github.com/uber/athenadriver/go"
 	"log"
+
+	drv "github.com/uber/athenadriver/go"
 )
 
 type Config struct {

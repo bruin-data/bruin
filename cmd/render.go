@@ -3,13 +3,13 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/athena"
 	"io"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/alecthomas/chroma/v2/quick"
+	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/date"

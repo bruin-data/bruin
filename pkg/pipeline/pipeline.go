@@ -357,6 +357,14 @@ func (s SnowflakeConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s)
 }
 
+func (s AthenaConfig) MarshalJSON() ([]byte, error) {
+	if s.Location == "" {
+		return json.Marshal(nil)
+	}
+
+	return json.Marshal(s)
+}
+
 type Asset struct {
 	ID              string             `json:"id"`
 	URI             string             `json:"uri"`

@@ -175,6 +175,10 @@ type snowflake struct {
 	Warehouse string `yaml:"warehouse"`
 }
 
+type athena struct {
+	QueryResultsPath string `yaml:"query_results_path"`
+}
+
 type taskDefinition struct {
 	Name            string            `yaml:"name"`
 	URI             string            `yaml:"uri"`
@@ -194,6 +198,7 @@ type taskDefinition struct {
 	CustomChecks    []customCheck     `yaml:"custom_checks"`
 	Tags            []string          `yaml:"tags"`
 	Snowflake       snowflake         `yaml:"snowflake"`
+	Athena          athena            `yaml:"athena"`
 }
 
 func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
@@ -342,6 +347,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Columns:         columns,
 		CustomChecks:    make([]CustomCheck, len(definition.CustomChecks)),
 		Snowflake:       SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},
+		Athena:          AthenaConfig{Location: definition.Athena.QueryResultsPath},
 	}
 
 	for index, check := range definition.CustomChecks {

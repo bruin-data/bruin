@@ -2,11 +2,11 @@ package athena
 
 import (
 	"context"
-	"github.com/jmoiron/sqlx"
 	"strings"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	_ "github.com/uber/athenadriver/go"
 )

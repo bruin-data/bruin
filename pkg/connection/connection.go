@@ -2,9 +2,9 @@ package connection
 
 import (
 	"context"
-	"github.com/bruin-data/bruin/pkg/athena"
 	"sync"
 
+	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
