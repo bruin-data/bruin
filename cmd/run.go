@@ -503,10 +503,9 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeAthenaQuery) || estimateCustomCheckType == pipeline.AssetTypeAthenaQuery {
-		athenaConnFetcher := athena.NewAthenaConnectionFetcher(conn)
-		athenaOperator := athena.NewBasicOperator(athenaConnFetcher, wholeFileExtractor, athena.NewMaterializer(fullRefresh))
+		athenaOperator := athena.NewBasicOperator(conn, wholeFileExtractor, athena.NewMaterializer(fullRefresh))
 		athenaCustomCheckRunner := ansisql.NewCustomCheckOperator(conn, renderer)
-		athenaCheckRunner := athena.NewColumnCheckOperator(athenaConnFetcher)
+		athenaCheckRunner := athena.NewColumnCheckOperator(conn)
 
 		mainExecutors[pipeline.AssetTypeAthenaQuery][scheduler.TaskInstanceTypeMain] = athenaOperator
 		mainExecutors[pipeline.AssetTypeAthenaQuery][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner

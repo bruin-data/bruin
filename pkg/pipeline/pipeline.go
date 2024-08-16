@@ -708,6 +708,7 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 		AssetTypeDatabricksQuery: 0,
 		AssetTypeRedshiftQuery:   0,
 		AssetTypeSynapseQuery:    0,
+		AssetTypeAthenaQuery:     0,
 	}
 	maxTasks := 0
 	maxTaskType := defaultIfNone

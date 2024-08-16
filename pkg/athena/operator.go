@@ -16,17 +16,18 @@ type materializer interface {
 	Render(task *pipeline.Asset, query string) (string, error)
 }
 
-type queryExtractor interface {
-	ExtractQueriesFromString(content string) ([]*query.Query, error)
-}
-
-type AthenaQuerier interface {
+type Client interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 }
 
+type queryExtractor interface {
+	ExtractQueriesFromString(content string) ([]*query.Query, error)
+}
+
 type connectionFetcher interface {
-	GetAthenaClient(name string) (AthenaQuerier, error)
+	GetAwsConnection(name string) (Client, error)
+	GetConnection(name string) (interface{}, error)
 }
 
 type BasicOperator struct {
@@ -74,7 +75,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, err := o.connection.GetAthenaClient(connName)
+	conn, err := o.connection.GetAwsConnection(connName)
 	if err != nil {
 		return err
 	}
@@ -82,15 +83,15 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	return conn.RunQueryWithoutResult(ctx, q)
 }
 
-func NewColumnCheckOperator(manager *AthenaConnectionFetcher) *ansisql.ColumnCheckOperator {
+func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOperator {
 	return ansisql.NewColumnCheckOperator(map[string]ansisql.CheckRunner{
-		"not_null":     ansisql.NewNotNullCheck(manager),
-		"unique":       ansisql.NewUniqueCheck(manager),
-		"positive":     ansisql.NewPositiveCheck(manager),
-		"non_negative": ansisql.NewNonNegativeCheck(manager),
-		"negative":     ansisql.NewNegativeCheck(manager),
-		//"accepted_values": &AcceptedValuesCheck{conn: manager},
-		//"pattern":         &PatternCheck{conn: manager},
+		"not_null":        ansisql.NewNotNullCheck(manager),
+		"unique":          ansisql.NewUniqueCheck(manager),
+		"positive":        ansisql.NewPositiveCheck(manager),
+		"non_negative":    ansisql.NewNonNegativeCheck(manager),
+		"negative":        ansisql.NewNegativeCheck(manager),
+		"accepted_values": &AcceptedValuesCheck{conn: manager},
+		"pattern":         &PatternCheck{conn: manager},
 	})
 }
 
@@ -132,7 +133,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return err
 	}
 
-	conn, err := o.connection.GetAthenaClient(connName)
+	conn, err := o.connection.GetAwsConnection(connName)
 	if err != nil {
 		return err
 	}

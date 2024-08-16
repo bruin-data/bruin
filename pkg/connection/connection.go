@@ -2,6 +2,7 @@ package connection
 
 import (
 	"context"
+	"github.com/bruin-data/bruin/pkg/athena"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
@@ -33,7 +34,7 @@ type Manager struct {
 	HANA       map[string]*hana.Client
 	Shopify    map[string]*shopify.Client
 	Gorgias    map[string]*gorgias.Client
-	Aws        map[string]*config.AwsConnection
+	Aws        map[string]*athena.DB
 	mutex      sync.Mutex
 }
 
@@ -109,13 +110,26 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
 
-func (m *Manager) GetAwsConnection(name string) (*config.AwsConnection, error) {
+func (m *Manager) GetAwsConnection(name string) (athena.Client, error) {
 	db, err := m.GetAwsConnectionWithoutDefault(name)
 	if err == nil {
 		return db, nil
 	}
 
 	return m.GetAwsConnectionWithoutDefault("aws-default")
+}
+
+func (m *Manager) GetAwsConnectionWithoutDefault(name string) (athena.Client, error) {
+	if m.Aws == nil {
+		return nil, errors.New("no AWS connections found")
+	}
+
+	db, ok := m.Aws[name]
+	if !ok {
+		return nil, errors.Errorf("AWS connection not found for '%s'", name)
+	}
+
+	return db, nil
 }
 
 func (m *Manager) GetBqConnection(name string) (bigquery.DB, error) {
@@ -150,19 +164,6 @@ func (m *Manager) GetSfConnectionWithoutDefault(name string) (snowflake.SfClient
 	}
 
 	db, ok := m.Snowflake[name]
-	if !ok {
-		return nil, errors.Errorf("snowflake connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetAwsConnectionWithoutDefault(name string) (*config.AwsConnection, error) {
-	if m.Aws == nil {
-		return nil, errors.New("no AWS connections found")
-	}
-
-	db, ok := m.Aws[name]
 	if !ok {
 		return nil, errors.Errorf("snowflake connection not found for '%s'", name)
 	}
@@ -426,10 +427,15 @@ func (m *Manager) AddAwsConnectionFromConfig(connection *config.AwsConnection) e
 	defer m.mutex.Unlock()
 
 	if m.Aws == nil {
-		m.Aws = make(map[string]*config.AwsConnection)
+		m.Aws = make(map[string]*athena.DB)
 	}
 
-	m.Aws[connection.Name] = connection
+	m.Aws[connection.Name] = athena.NewDB(&athena.Config{
+		Region:          connection.Region,
+		OutputBucket:    connection.QueryResultsPath,
+		AccessID:        connection.AccessKey,
+		SecretAccessKey: connection.SecretKey,
+	})
 
 	return nil
 }

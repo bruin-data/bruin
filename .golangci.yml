@@ -89,6 +89,7 @@ linters-settings:
       - postgres.PgClient
       - mssql.MsClient
       - databricks.Client
+      - athena.Client
   goconst:
     min-len: 5
     min-occurrences: 5

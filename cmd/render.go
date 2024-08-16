@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/athena"
 	"io"
 	"os"
 	"strings"
@@ -75,6 +76,7 @@ func Render() *cli.Command {
 					pipeline.AssetTypeMsSQLQuery:      mssql.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeDatabricksQuery: databricks.NewRenderer(fullRefresh),
 					pipeline.AssetTypeSynapseQuery:    synapse.NewRenderer(fullRefresh),
+					pipeline.AssetTypeAthenaQuery:     athena.NewMaterializer(fullRefresh),
 				},
 				builder: DefaultPipelineBuilder,
 				writer:  os.Stdout,

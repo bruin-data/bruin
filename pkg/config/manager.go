@@ -5,7 +5,6 @@ import (
 	errors "errors"
 	"fmt"
 	fs2 "io/fs"
-	"net/url"
 	"os"
 	"path/filepath"
 
@@ -74,82 +73,6 @@ type AwsConnection struct {
 	AccessKey        string `yaml:"access_key"`
 	SecretKey        string `yaml:"secret_key"`
 	QueryResultsPath string `yaml:"query_results_path"`
-}
-
-func (a *AwsConnection) EnsureConnectionIsValid() error {
-	if a.QueryResultsPath == "" {
-		return errors.New("query_results_path is required to connect AWS Athena")
-	}
-
-	if a.AccessKey == "" {
-		return errors.New("access_key is required to connect AWS Athena")
-	}
-
-	if a.SecretKey == "" {
-		return errors.New("secret_key is required to connect AWS Athena")
-	}
-
-	return nil
-}
-
-func (a *AwsConnection) ToAthenaDsn() (string, error) {
-	err := a.EnsureConnectionIsValid()
-	if err != nil {
-		return "", err
-	}
-
-	// parse query results path into a url instance
-	u, err := url.Parse(a.QueryResultsPath)
-	if err != nil {
-		return "", err
-	}
-
-	if u.Scheme != "s3" {
-		return "", errors.New("query_results_path must be an S3 path, starting with s3://")
-	}
-
-	values := u.Query()
-	if a.Region != "" {
-		values.Add("region", a.Region)
-	}
-
-	values.Add("accessID", a.AccessKey)
-	values.Add("secretAccessKey", a.SecretKey)
-
-	u.RawQuery = values.Encode()
-
-	return u.String(), nil
-}
-
-func (a *AwsConnection) ToIngestrURI() (string, error) {
-	err := a.EnsureConnectionIsValid()
-	if err != nil {
-		return "", err
-	}
-
-	// parse query results path into a url instance
-	u, err := url.Parse(a.QueryResultsPath)
-	if err != nil {
-		return "", err
-	}
-
-	if u.Scheme != "s3" {
-		return "", errors.New("query_results_path must be an S3 path, starting with s3://")
-	}
-
-	u.Scheme = "athena"
-
-	values := u.Query()
-	if a.Region != "" {
-		values.Add("region", a.Region)
-	}
-
-	values.Add("accessID", a.AccessKey)
-	values.Add("secretAccessKey", a.SecretKey)
-
-	u.RawQuery = values.Encode()
-
-	return u.String(), nil
 }
 
 type GorgiasConnection struct {
