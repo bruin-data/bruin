@@ -1,20 +1,32 @@
-# MS Sql Assets
+# MS SQL Assets
 ## ms.sql
-Runs a materialized Microsoft SQL asset or an sql script.
+Runs a materialized MS SQL asset or an SQL script.
 For detailed parameters, you can check [Definition Schema](definition-schema.md) page.
 
-
 ### Examples
-Create a table using table materialization
+Run an MS SQL script to generate sales report
 ```sql
 /* @bruin
-name: events.install
+name: sales_report
 type: ms.sql
-materialization:
-    type: table
 @bruin */
 
-select user_id, ts, platform, country
-from analytics.events
-where event_name = "install"
+with monthly_sales as (
+    select
+        product_id,
+    year(order_date) as order_year,
+    month(order_date) as order_month,
+    sum(quantity) as total_quantity,
+    sum(price) as total_sales
+from sales.orders
+group by product_id, year(order_date), month(order_date)
+    )
+select
+    product_id,
+    order_year,
+    order_month,
+    total_quantity,
+    total_sales
+from monthly_sales
+order by order_year, order_month;
 ```

@@ -1,21 +1,44 @@
 # Databricks Assets
 ## databricks.sql
-Runs a materialized Databricks asset or an sql script.
+Runs a materialized Databricks asset or an SQL script.
 For detailed parameters, you can check [Definition Schema](definition-schema.md) page.
-Note that the asset name must comply with the following schema: `[catalog].[schema].[asset_name]`.
-
 
 ### Examples
-Create a table using table materialization
+Create a temporary view for top customers
 ```sql
 /* @bruin
-name: events.install
+name: top_customers.view
 type: databricks.sql
 materialization:
-    type: table
+    type: view
 @bruin */
 
-select user_id, ts, platform, country
-from analytics.events
-where event_name = "install"
+create temporary view top_customers as
+select customer_id, sum(total_amount) as total_spent
+from transactions
+group by customer_id
+order by total_spent desc
+limit 100;
+```
+
+Run a Databricks script to update customer segmentation
+```sql
+/* @bruin
+name: update_customer_segmentation
+type: databricks.sql
+@bruin */
+
+create or replace table customer_segmentation as
+select
+    customer_id,
+    case
+        when total_spent > 1000 then 'Gold'
+        when total_spent > 500 then 'Silver'
+        else 'Bronze'
+    end as segment
+from (
+    select customer_id, sum(amount) as total_spent
+    from transactions
+    group by customer_id
+);
 ```
