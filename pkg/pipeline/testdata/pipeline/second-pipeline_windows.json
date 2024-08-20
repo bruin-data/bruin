@@ -56,9 +56,9 @@
       "type": "bq.transfer",
       "tags": [],
       "executable_file": {
-        "name": "",
-        "path": "",
-        "content": ""
+        "name": "task.yml",
+        "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test2\\task.yml",
+        "content": "name: gcs-to-bq-2\ntype: bq.transfer\nparameters:\n  transfer_config_id: \"some-uuid\"\n  project_id: \"a-new-project-id\"\n  location: \"europe-west1\"\n"
       },
       "definition_file": {
         "name": "task.yml",
