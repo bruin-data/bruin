@@ -188,6 +188,11 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Name:        "hello-world",
 				Description: "This is a hello world task",
 				Type:        "bash",
+				ExecutableFile: pipeline.ExecutableFile{
+					Name:    "task.yml",
+					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml")),
+					Content: mustRead(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml")),
+				},
 				Parameters: map[string]string{
 					"param1": "value1",
 					"param2": "value2",
@@ -245,6 +250,11 @@ func TestUpstreams(t *testing.T) {
 		Secrets:      make([]pipeline.SecretMapping, 0),
 		Columns:      make([]pipeline.Column, 0),
 		CustomChecks: make([]pipeline.CustomCheck, 0),
+		ExecutableFile: pipeline.ExecutableFile{
+			Name:    "upstream.yml",
+			Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "upstream.yml")),
+			Content: mustRead(t, filepath.Join("testdata", "yaml", "upstream.yml")),
+		},
 		Upstreams: []pipeline.Upstream{
 			{
 				Type:  "asset",

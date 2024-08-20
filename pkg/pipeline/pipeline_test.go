@@ -70,6 +70,11 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			"project_id":         "a-new-project-id",
 			"location":           "europe-west1",
 		},
+		ExecutableFile: pipeline.ExecutableFile{
+			Name:    "task.yaml",
+			Path:    path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/task2/task.yaml"),
+			Content: mustRead(t, "testdata/pipeline/first-pipeline/tasks/task2/task.yaml"),
+		},
 		DefinitionFile: pipeline.TaskDefinitionFile{
 			Name: "task.yaml",
 			Path: path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/task2/task.yaml"),
