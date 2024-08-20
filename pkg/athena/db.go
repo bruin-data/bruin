@@ -8,7 +8,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	_ "github.com/uber/athenadriver/go"
+	drv "github.com/uber/athenadriver/go"
 )
 
 type DB struct {
@@ -91,7 +91,7 @@ func (d *DB) initializeDb() error {
 		return errors.New("failed to create DSN for Athena")
 	}
 
-	conn, err := sqlx.Open("athena", athenaUri)
+	conn, err := sqlx.Open(drv.DriverName, athenaUri)
 	if err != nil {
 		return errors.Errorf("Failed to open database connection: %v", err)
 	}

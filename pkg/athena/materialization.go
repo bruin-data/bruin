@@ -8,14 +8,12 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
-func NewMaterializer(fullRefresh bool) *pipeline.Materializer {
-	return &pipeline.Materializer{
-		MaterializationMap: matMap,
-		FullRefresh:        fullRefresh,
-	}
-}
+type (
+	MaterializerFunc        func(task *pipeline.Asset, query string) ([]string, error)
+	AssetMaterializationMap map[pipeline.MaterializationType]map[pipeline.MaterializationStrategy]MaterializerFunc
+)
 
-var matMap = pipeline.AssetMaterializationMap{
+var matMap = AssetMaterializationMap{
 	pipeline.MaterializationTypeView: {
 		pipeline.MaterializationStrategyNone:          viewMaterializer,
 		pipeline.MaterializationStrategyAppend:        errorMaterializer,
@@ -31,48 +29,46 @@ var matMap = pipeline.AssetMaterializationMap{
 	},
 }
 
-func errorMaterializer(asset *pipeline.Asset, query string) (string, error) {
-	return "", fmt.Errorf("materialization strategy %s is not supported for materialization type %s", asset.Materialization.Strategy, asset.Materialization.Type)
+func errorMaterializer(asset *pipeline.Asset, query string) ([]string, error) {
+	return []string{""}, fmt.Errorf("materialization strategy %s is not supported for materialization type %s", asset.Materialization.Strategy, asset.Materialization.Type)
 }
 
-func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {
-	return fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", asset.Name, query), nil
+func viewMaterializer(asset *pipeline.Asset, query string) ([]string, error) {
+	return []string{fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", asset.Name, query)}, nil
 }
 
-func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
-	return fmt.Sprintf("INSERT INTO %s %s", asset.Name, query), nil
+func buildAppendQuery(asset *pipeline.Asset, query string) ([]string, error) {
+	return []string{fmt.Sprintf("INSERT INTO %s %s", asset.Name, query)}, nil
 }
 
-func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
+func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error) {
 	mat := task.Materialization
 	strategy := pipeline.MaterializationStrategyDeleteInsert
 
 	if mat.IncrementalKey == "" {
-		return "", fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", strategy)
+		return []string{""}, fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", strategy)
 	}
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
 	queries := []string{
-		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, query),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
-		"COMMIT",
 	}
 
-	return strings.Join(queries, ";\n") + ";", nil
+	return queries, nil
 }
 
-func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
+func buildMergeQuery(asset *pipeline.Asset, query string) ([]string, error) {
 	if len(asset.Columns) == 0 {
-		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
+		return []string{""}, fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
 	}
 
 	primaryKeys := asset.ColumnNamesWithPrimaryKey()
 	if len(primaryKeys) == 0 {
-		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
+		return []string{""}, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
 	}
 
 	nonPrimaryKeys := asset.ColumnNamesWithUpdateOnMerge()
@@ -98,21 +94,21 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 		whenMatchedThenQuery = "WHEN MATCHED THEN UPDATE SET " + matchedUpdateQuery
 	}
 
-	mergeLines := []string{
+	queries := []string{
 		fmt.Sprintf("MERGE INTO %s target", asset.Name),
 		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
 		whenMatchedThenQuery,
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, allColumnValues),
 	}
 
-	return strings.Join(mergeLines, "\n") + ";", nil
+	return queries, nil
 }
 
-func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error) {
+func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, error) {
 	query = strings.TrimSuffix(query, ";")
-	return fmt.Sprintf(
-		`BEGIN TRANSACTION;
-DROP TABLE IF EXISTS %s; 
-CREATE TABLE %s AS %s;
-COMMIT;`, task.Name, task.Name, query), nil
+	return []string{
+		fmt.Sprintf("DROP TABLE IF EXISTS %s;", task.Name),
+		fmt.Sprintf("CREATE TABLE %s AS %s;", task.Name, query),
+		"COMMIT;",
+	}, nil
 }

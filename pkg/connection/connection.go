@@ -107,6 +107,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Gorgias)...)
 
+	awsConnection, err := m.GetAwsConnectionWithoutDefault(name)
+	if err == nil {
+		return awsConnection, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Aws)...)
+
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
 

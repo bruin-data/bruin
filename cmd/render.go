@@ -76,7 +76,7 @@ func Render() *cli.Command {
 					pipeline.AssetTypeMsSQLQuery:      mssql.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeDatabricksQuery: databricks.NewRenderer(fullRefresh),
 					pipeline.AssetTypeSynapseQuery:    synapse.NewRenderer(fullRefresh),
-					pipeline.AssetTypeAthenaQuery:     athena.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeAthenaQuery:     athena.NewRenderer(fullRefresh),
 				},
 				builder: DefaultPipelineBuilder,
 				writer:  os.Stdout,
