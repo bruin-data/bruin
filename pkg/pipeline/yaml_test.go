@@ -12,6 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func normalizeLineEndings(s string) string {
+	return strings.ReplaceAll(s, "\r\n", "\n")
+}
 func TestCreateTaskFromYamlDefinition(t *testing.T) {
 	t.Parallel()
 
@@ -194,7 +197,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "task.yml",
 					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml")),
-					Content: strings.ReplaceAll(mustRead(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml")), "\r\n", "\n"),
+					Content: normalizeLineEndings(mustRead(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml"))),
 				},
 				Parameters: map[string]string{
 					"param1": "value1",
