@@ -2,6 +2,7 @@ package pipeline_test
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/path"
@@ -240,10 +241,16 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 
 func TestUpstreams(t *testing.T) {
 	t.Parallel()
+
+	// Create the task from the YAML definition
 	creator := pipeline.CreateTaskFromYamlDefinition(afero.NewOsFs())
 	got, err := creator(filepath.Join("testdata", "yaml", "upstream.yml"))
 	require.NoError(t, err)
 
+	// Normalize the line endings in the actual content
+	got.ExecutableFile.Content = strings.ReplaceAll(got.ExecutableFile.Content, "\r\n", "\n")
+
+	// Define the expected result, normalizing the content
 	expected := &pipeline.Asset{
 		ID:           "5e51ec24663355d3b76b287f2c5eca1bfa17ac01da6134dbd1251c3b6ee99b56",
 		Name:         "upstream.something",
@@ -253,7 +260,7 @@ func TestUpstreams(t *testing.T) {
 		ExecutableFile: pipeline.ExecutableFile{
 			Name:    "upstream.yml",
 			Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "upstream.yml")),
-			Content: mustRead(t, filepath.Join("testdata", "yaml", "upstream.yml")),
+			Content: strings.ReplaceAll(mustRead(t, filepath.Join("testdata", "yaml", "upstream.yml")), "\r\n", "\n"),
 		},
 		Upstreams: []pipeline.Upstream{
 			{
@@ -271,5 +278,6 @@ func TestUpstreams(t *testing.T) {
 		},
 	}
 
+	// Compare the expected and actual results
 	require.Equal(t, expected, got)
 }
