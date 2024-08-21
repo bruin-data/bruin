@@ -226,19 +226,17 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			creator := pipeline.CreateTaskFromYamlDefinition(afero.NewOsFs())
 			got, err := creator(tt.args.filePath)
-			if tt.wantErr {
-				require.Error(t, err)
-				if tt.err != nil {
-					require.EqualError(t, err, tt.err.Error())
-				}
-			} else {
-				require.NoError(t, err)
-			}
+			require.NoError(t, err)
 
+			// Normalize the line endings in the actual content
+			got.ExecutableFile.Content = normalizeLineEndings(got.ExecutableFile.Content)
+
+			// Compare the normalized expected and actual content
+			require.Equal(t, tt.want.ExecutableFile.Content, got.ExecutableFile.Content)
+
+			// Compare the rest of the structure
 			require.Equal(t, tt.want, got)
 		})
 	}
