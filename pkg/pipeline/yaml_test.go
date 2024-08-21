@@ -181,7 +181,9 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 		},
 		{
 			name: "the ones with missing runfile are ignored",
-			args: args{
+			args: struct {
+				filePath string
+			}{
 				filePath: filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml"),
 			},
 			want: &pipeline.Asset{
@@ -192,7 +194,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "task.yml",
 					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml")),
-					Content: mustRead(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml")),
+					Content: strings.ReplaceAll(mustRead(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml")), "\r\n", "\n"),
 				},
 				Parameters: map[string]string{
 					"param1": "value1",
