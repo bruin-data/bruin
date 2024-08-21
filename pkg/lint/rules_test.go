@@ -2152,8 +2152,8 @@ func TestUsedTableValidatorRule_ValidateAsset(t *testing.T) {
 				}, nil)
 			},
 			want: []string{
-				"Table 'asset4' is used in the query but not referenced in the 'depends' array.",
 				"Table 'asset3' is used in the query but not referenced in the 'depends' array.",
+				"Table 'asset4' is used in the query but not referenced in the 'depends' array.",
 			},
 			wantErr: assert.NoError,
 		},
