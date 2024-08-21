@@ -192,7 +192,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "task.yml",
 					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml")),
-					Content: mustRead(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml")),
+					Content: mustReadWithoutReplacement(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml")),
 				},
 				Parameters: map[string]string{
 					"param1": "value1",

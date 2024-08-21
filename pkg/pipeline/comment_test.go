@@ -1,7 +1,6 @@
 package pipeline_test
 
 import (
-	"runtime"
 	"strings"
 	"testing"
 
@@ -15,9 +14,12 @@ import (
 func mustRead(t *testing.T, file string) string {
 	content, err := afero.ReadFile(afero.NewOsFs(), file)
 	require.NoError(t, err)
-	if runtime.GOOS != "windows" {
-		return strings.ReplaceAll(strings.TrimSpace(string(content)), "\r\n", "\n")
-	}
+	return strings.TrimSpace(string(content))
+}
+
+func mustReadWithoutReplacement(t *testing.T, file string) string {
+	content, err := afero.ReadFile(afero.NewOsFs(), file)
+	require.NoError(t, err)
 	return strings.TrimSpace(string(content))
 }
 
