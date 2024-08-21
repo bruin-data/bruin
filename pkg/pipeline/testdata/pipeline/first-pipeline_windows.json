@@ -67,7 +67,7 @@
       "executable_file": {
         "name": "task.yaml",
         "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\task2\\task.yaml",
-        "content": "name: second-task\r\ntype: bq.transfer\r\nparameters:\r\n  transfer_config_id: \"some-uuid\"\r\n  project_id: \"a-new-project-id\"\r\n  location: \"europe-west1\""
+        "content": "name: second-task\\r\\ntype: bq.transfer\\r\\nparameters:\\r\\n  transfer_config_id: \\\"some-uuid\\\"\\r\\n  project_id: \\\"a-new-project-id\\\"\\r\\n  location: \\\"europe-west1\\\""
       },
       "definition_file": {
         "name": "task.yaml",
