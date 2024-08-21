@@ -191,7 +191,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "task.yml",
 					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml")),
-					Content: mustRead(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml")),
+					Content: "name: hello-world\r\ndescription: This is a hello world task\r\ntype: bash\r\ndepends:\r\n  - gcs-to-bq\r\nparameters:\r\n  param1: value1\r\n  param2: value2\r\nconnection: conn1",
 				},
 				Parameters: map[string]string{
 					"param1": "value1",
