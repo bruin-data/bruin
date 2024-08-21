@@ -9,7 +9,7 @@ import (
 )
 
 type (
-	MaterializerFunc        func(task *pipeline.Asset, query string) ([]string, error)
+	MaterializerFunc        func(task *pipeline.Asset, query, location string) ([]string, error)
 	AssetMaterializationMap map[pipeline.MaterializationType]map[pipeline.MaterializationStrategy]MaterializerFunc
 )
 
@@ -29,19 +29,19 @@ var matMap = AssetMaterializationMap{
 	},
 }
 
-func errorMaterializer(asset *pipeline.Asset, query string) ([]string, error) {
+func errorMaterializer(asset *pipeline.Asset, query, location string) ([]string, error) {
 	return []string{""}, fmt.Errorf("materialization strategy %s is not supported for materialization type %s", asset.Materialization.Strategy, asset.Materialization.Type)
 }
 
-func viewMaterializer(asset *pipeline.Asset, query string) ([]string, error) {
+func viewMaterializer(asset *pipeline.Asset, query, location string) ([]string, error) {
 	return []string{fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", asset.Name, query)}, nil
 }
 
-func buildAppendQuery(asset *pipeline.Asset, query string) ([]string, error) {
+func buildAppendQuery(asset *pipeline.Asset, query, location string) ([]string, error) {
 	return []string{fmt.Sprintf("INSERT INTO %s %s", asset.Name, query)}, nil
 }
 
-func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error) {
+func buildIncrementalQuery(task *pipeline.Asset, query, location string) ([]string, error) {
 	mat := task.Materialization
 	strategy := pipeline.MaterializationStrategyDeleteInsert
 
@@ -61,7 +61,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 	return queries, nil
 }
 
-func buildMergeQuery(asset *pipeline.Asset, query string) ([]string, error) {
+func buildMergeQuery(asset *pipeline.Asset, query, location string) ([]string, error) {
 	if len(asset.Columns) == 0 {
 		return []string{""}, fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
 	}
@@ -104,7 +104,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) ([]string, error) {
 	return queries, nil
 }
 
-func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, error) {
+func buildCreateReplaceQuery(task *pipeline.Asset, query, location string) ([]string, error) {
 	query = strings.TrimSuffix(query, ";")
 	return []string{
 		fmt.Sprintf("DROP TABLE IF EXISTS %s;", task.Name),

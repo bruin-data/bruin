@@ -28,7 +28,7 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 
 	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
 	if matFunc, ok := m.MaterializationMap[mat.Type][strategy]; ok {
-		return matFunc(asset, query)
+		return matFunc(asset, query, "")
 	}
 
 	return []string{}, fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
