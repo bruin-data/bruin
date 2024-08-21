@@ -21,9 +21,9 @@
       "type": "bq.transfer",
       "tags": [],
       "executable_file": {
-        "name": "",
-        "path": "",
-        "content": ""
+        "name": "task.yml",
+        "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test1\\task.yml",
+        "content": "name: gcs-to-bq\r\ntype: bq.transfer\r\nparameters:\r\n  transfer_config_id: some-uuid\r\n  project_id: \"some-project-id\"\r\n  location: \"europe-west1\"\r\n"
       },
       "definition_file": {
         "name": "task.yml",
@@ -56,9 +56,9 @@
       "type": "bq.transfer",
       "tags": [],
       "executable_file": {
-        "name": "",
-        "path": "",
-        "content": ""
+        "name": "task.yml",
+        "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test2\\task.yml",
+        "content": "name: gcs-to-bq-2\r\ntype: bq.transfer\r\nparameters:\r\n  transfer_config_id: \"some-uuid\"\r\n  project_id: \"a-new-project-id\"\r\n  location: \"europe-west1\"\r\n"
       },
       "definition_file": {
         "name": "task.yml",

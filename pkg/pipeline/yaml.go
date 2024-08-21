@@ -223,7 +223,11 @@ func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
 			return nil, err
 		}
 
-		executableFile := ExecutableFile{}
+		executableFile := ExecutableFile{
+			Name:    filepath.Base(filePath),
+			Path:    filePath,
+			Content: string(buf),
+		}
 		if definition.RunFile != "" {
 			relativeRunFilePath := filepath.Join(filepath.Dir(filePath), definition.RunFile)
 			absRunFile, err := filepath.Abs(relativeRunFilePath)

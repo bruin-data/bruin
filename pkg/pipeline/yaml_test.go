@@ -2,6 +2,7 @@ package pipeline_test
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/path"
@@ -188,6 +189,11 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Name:        "hello-world",
 				Description: "This is a hello world task",
 				Type:        "bash",
+				ExecutableFile: pipeline.ExecutableFile{
+					Name:    "task.yml",
+					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml")),
+					Content: mustReadWithoutReplacement(t, filepath.Join("testdata", "yaml", "task-with-no-runfile", "task.yml")),
+				},
 				Parameters: map[string]string{
 					"param1": "value1",
 					"param2": "value2",
@@ -235,16 +241,27 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 
 func TestUpstreams(t *testing.T) {
 	t.Parallel()
+
+	// Create the task from the YAML definition
 	creator := pipeline.CreateTaskFromYamlDefinition(afero.NewOsFs())
 	got, err := creator(filepath.Join("testdata", "yaml", "upstream.yml"))
 	require.NoError(t, err)
 
+	// Normalize the line endings in the actual content
+	got.ExecutableFile.Content = strings.ReplaceAll(got.ExecutableFile.Content, "\r\n", "\n")
+
+	// Define the expected result, normalizing the content
 	expected := &pipeline.Asset{
 		ID:           "5e51ec24663355d3b76b287f2c5eca1bfa17ac01da6134dbd1251c3b6ee99b56",
 		Name:         "upstream.something",
 		Secrets:      make([]pipeline.SecretMapping, 0),
 		Columns:      make([]pipeline.Column, 0),
 		CustomChecks: make([]pipeline.CustomCheck, 0),
+		ExecutableFile: pipeline.ExecutableFile{
+			Name:    "upstream.yml",
+			Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "upstream.yml")),
+			Content: strings.ReplaceAll(mustRead(t, filepath.Join("testdata", "yaml", "upstream.yml")), "\r\n", "\n"),
+		},
 		Upstreams: []pipeline.Upstream{
 			{
 				Type:  "asset",
@@ -261,5 +278,6 @@ func TestUpstreams(t *testing.T) {
 		},
 	}
 
+	// Compare the expected and actual results
 	require.Equal(t, expected, got)
 }
