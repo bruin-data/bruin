@@ -3,7 +3,7 @@ name: bruin.drivers
 type: databricks.sql
 materialization:
    type: table
-   strategy: merge
+   # strategy: merge
    incremental_key: id
 columns:
   - name: id
@@ -29,7 +29,7 @@ columns:
         - name: not_null
 @bruin */
 
-SELECT 1 as id, 'spain' as country , 'juan1' as name
+SELECT 1 as id, 'spain' as country , 'alberto' as name
 union all
 SELECT 2 as id, 'germany' as country , 'frank' as name
 union all

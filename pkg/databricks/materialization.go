@@ -111,11 +111,17 @@ func buildMergeQuery(asset *pipeline.Asset, query string) ([]string, error) {
 func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, error) {
 	mat := task.Materialization
 
+	assetNameParts := strings.Split(task.Name, ".")
+	if len(assetNameParts) != 2 {
+		return []string{}, errors.New("databricks asset names must be in the format `database.table`")
+	}
+	databaseName := assetNameParts[0]
+
 	if len(mat.ClusterBy) > 0 {
 		return []string{}, errors.New("databricks assets do not support `cluster_by`")
 	}
 
-	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
+	tempTableName := databaseName + ".__bruin_tmp_" + helpers.PrefixGenerator()
 
 	query = strings.TrimSuffix(query, ";")
 
