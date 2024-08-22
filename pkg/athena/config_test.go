@@ -9,13 +9,13 @@ import (
 func TestConfig_ToDSNNoQuery(t *testing.T) {
 	t.Parallel()
 	c := Config{
-		OutputBucket:    "bucket",
+		OutputBucket:    "s3://bucket",
 		Region:          "us-west-2",
 		AccessID:        "access",
 		SecretAccessKey: "secret",
 	}
 
-	expected := "token:xxxxxx@localhost:443/sql/1.0/endpoints/a1b234c5678901d2"
+	expected := "s3://bucket?WGRemoteCreation=true&accessID=access&db=default&missingAsEmptyString=true&region=us-west-2&resultPollIntervalSeconds=3&secretAccessKey=secret"
 
 	assert.Equal(t, expected, c.ToDBConnectionURI())
 }

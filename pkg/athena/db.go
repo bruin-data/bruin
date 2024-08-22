@@ -24,6 +24,10 @@ func NewDB(c *Config) *DB {
 	}
 }
 
+func (db *DB) GetResultsLocation() string {
+	return db.config.OutputBucket
+}
+
 func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
 	_, err := db.Select(ctx, query)
 	return err

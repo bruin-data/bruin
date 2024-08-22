@@ -1,9 +1,10 @@
 /* @bruin
-name: passengers
+name: travellers
 type: athena.sql
 materialization:
    type: table
-   # strategy: delete+insert
+   # strategy: append
+   strategy: merge
    incremental_key: id
 columns:
   - name: id

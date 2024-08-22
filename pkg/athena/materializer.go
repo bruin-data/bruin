@@ -15,7 +15,7 @@ type Materializer struct {
 	fullRefresh        bool
 }
 
-func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, error) {
+func (m *Materializer) Render(asset *pipeline.Asset, query, location string) ([]string, error) {
 	mat := asset.Materialization
 	if mat.Type == pipeline.MaterializationTypeNone {
 		return []string{query}, nil
@@ -28,7 +28,7 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 
 	query = strings.TrimSuffix(strings.TrimSpace(query), ";")
 	if matFunc, ok := m.MaterializationMap[mat.Type][strategy]; ok {
-		return matFunc(asset, query, "")
+		return matFunc(asset, query, location)
 	}
 
 	return []string{}, fmt.Errorf("unsupported materialization type - strategy combination: (`%s` - `%s`)", mat.Type, mat.Strategy)
@@ -52,7 +52,7 @@ func NewRenderer(fullRefresh bool) *Renderer {
 }
 
 func (r *Renderer) Render(asset *pipeline.Asset, query string) (string, error) {
-	queries, err := r.mat.Render(asset, query)
+	queries, err := r.mat.Render(asset, query, "s3://{output bucket}")
 	if err != nil {
 		return "", err
 	}

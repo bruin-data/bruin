@@ -13,12 +13,13 @@ import (
 )
 
 type materializer interface {
-	Render(task *pipeline.Asset, query string) ([]string, error)
+	Render(task *pipeline.Asset, query, location string) ([]string, error)
 }
 
 type Client interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
+	GetResultsLocation() string
 }
 
 type queryExtractor interface {
@@ -62,18 +63,18 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.New("cannot enable materialization for tasks with multiple queries")
 	}
 
-	q := queries[0]
-	materializedQueries, err := o.materializer.Render(t, q.String())
-	if err != nil {
-		return err
-	}
-
 	connName, err := p.GetConnectionNameForAsset(t)
 	if err != nil {
 		return err
 	}
 
 	conn, err := o.connection.GetAwsConnection(connName)
+	if err != nil {
+		return err
+	}
+
+	q := queries[0]
+	materializedQueries, err := o.materializer.Render(t, q.String(), conn.GetResultsLocation())
 	if err != nil {
 		return err
 	}

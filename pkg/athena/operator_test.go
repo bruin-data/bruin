@@ -24,9 +24,9 @@ type mockMaterializer struct {
 	mock.Mock
 }
 
-func (m *mockMaterializer) Render(t *pipeline.Asset, query string) (string, error) {
+func (m *mockMaterializer) Render(t *pipeline.Asset, query string) ([]string, error) {
 	res := m.Called(t, query)
-	return res.Get(0).(string), res.Error(1)
+	return res.Get(0).([]string), res.Error(1)
 }
 
 func TestBasicOperator_RunTask(t *testing.T) {

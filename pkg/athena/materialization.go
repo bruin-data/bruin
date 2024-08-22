@@ -52,7 +52,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query, location string) ([]stri
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
 	queries := []string{
-		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, query),
+		fmt.Sprintf("CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s') AS %s", tempTableName, location, tempTableName, query),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
@@ -80,6 +80,11 @@ func buildMergeQuery(asset *pipeline.Asset, query, location string) ([]string, e
 	}
 	onQuery := strings.Join(on, " AND ")
 
+	columnNamesWithSource := make([]string, len(columnNames))
+	for i, col := range columnNames {
+		columnNamesWithSource[i] = "source." + col
+	}
+
 	allColumnValues := strings.Join(columnNames, ", ")
 
 	whenMatchedThenQuery := ""
@@ -98,17 +103,21 @@ func buildMergeQuery(asset *pipeline.Asset, query, location string) ([]string, e
 		fmt.Sprintf("MERGE INTO %s target", asset.Name),
 		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
 		whenMatchedThenQuery,
-		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, allColumnValues),
+		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, strings.Join(columnNamesWithSource, ", ")),
 	}
 
-	return queries, nil
+	return []string{strings.Join(queries, " ")}, nil
 }
 
 func buildCreateReplaceQuery(task *pipeline.Asset, query, location string) ([]string, error) {
 	query = strings.TrimSuffix(query, ";")
 	return []string{
-		fmt.Sprintf("DROP TABLE IF EXISTS %s;", task.Name),
-		fmt.Sprintf("CREATE TABLE %s AS %s;", task.Name, query),
-		"COMMIT;",
+		fmt.Sprintf(
+			"CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s') AS %s",
+			task.Name,
+			location,
+			task.Name,
+			query,
+		),
 	}, nil
 }
