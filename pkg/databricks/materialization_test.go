@@ -1,10 +1,10 @@
 package databricks
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMaterializer_Render(t *testing.T) {
@@ -44,9 +44,9 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_.+ AS SELECT 1;",
+				"CREATE TABLE my\\.__bruin_tmp_.+ AS SELECT 1;",
 				"DROP TABLE IF EXISTS my\\.asset;",
-				"ALTER TABLE __bruin_tmp_.+ RENAME TO my\\.asset;",
+				"ALTER TABLE my\\.__bruin_tmp_.+ RENAME TO my\\.asset;",
 			},
 		},
 		{
@@ -61,9 +61,9 @@ func TestMaterializer_Render(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT 1",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_.+ AS SELECT 1;",
+				"CREATE TABLE my\\.__bruin_tmp_.+ AS SELECT 1;",
 				"DROP TABLE IF EXISTS my\\.asset;",
-				"ALTER TABLE __bruin_tmp_.+ RENAME TO my\\.asset;",
+				"ALTER TABLE my\\.__bruin_tmp_.+ RENAME TO my\\.asset;",
 			},
 		},
 		{
