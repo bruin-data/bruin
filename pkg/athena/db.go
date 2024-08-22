@@ -34,7 +34,7 @@ func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) err
 }
 
 func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
-	err := db.initializeDb()
+	err := db.initializeDB()
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 	return result, err
 }
 
-func (db *DB) initializeDb() error {
+func (db *DB) initializeDB() error {
 	db.mutex.Lock()
 	defer db.mutex.Unlock()
 
@@ -90,12 +90,12 @@ func (db *DB) initializeDb() error {
 		return nil
 	}
 
-	athenaUri := db.config.ToDBConnectionURI()
-	if athenaUri == "" {
+	athenaURI := db.config.ToDBConnectionURI()
+	if athenaURI == "" {
 		return errors.New("failed to create DSN for Athena")
 	}
 
-	conn, err := sqlx.Open(drv.DriverName, athenaUri)
+	conn, err := sqlx.Open(drv.DriverName, athenaURI)
 	if err != nil {
 		return errors.Errorf("Failed to open database connection: %v", err)
 	}

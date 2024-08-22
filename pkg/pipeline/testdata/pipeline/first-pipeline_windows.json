@@ -42,6 +42,7 @@
       "upstream": [
         "gcs-to-bq"
       ],
+      "athena" : null,
       "upstreams": [
         {
           "type": "asset",
