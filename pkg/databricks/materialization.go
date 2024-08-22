@@ -105,7 +105,7 @@ func buildMergeQuery(asset *pipeline.Asset, query string) ([]string, error) {
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, allColumnValues),
 	}
 
-	return []string{strings.Join(mergeLines, " ")}, nil
+	return mergeLines, nil
 }
 
 func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, error) {
@@ -115,9 +115,13 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, erro
 		return []string{}, errors.New("databricks assets do not support `cluster_by`")
 	}
 
+	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
+
 	query = strings.TrimSuffix(query, ";")
 
 	return []string{
-		fmt.Sprintf(`CREATE OR REPLACE TABLE %s AS %s;`, task.Name, query),
+		fmt.Sprintf(`CREATE TABLE %s AS %s;`, tempTableName, query),
+		fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, task.Name),
+		fmt.Sprintf(`ALTER TABLE %s RENAME TO %s;`, tempTableName, task.Name),
 	}, nil
 }
