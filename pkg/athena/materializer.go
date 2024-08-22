@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
@@ -13,6 +14,7 @@ import (
 type Materializer struct {
 	MaterializationMap AssetMaterializationMap
 	fullRefresh        bool
+	randomName         func() string
 }
 
 func (m *Materializer) Render(asset *pipeline.Asset, query, location string) ([]string, error) {
@@ -38,6 +40,7 @@ func NewMaterializer(fullRefresh bool) *Materializer {
 	return &Materializer{
 		MaterializationMap: matMap,
 		fullRefresh:        fullRefresh,
+		randomName:         helpers.PrefixGenerator,
 	}
 }
 

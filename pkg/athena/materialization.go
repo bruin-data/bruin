@@ -30,7 +30,7 @@ var matMap = AssetMaterializationMap{
 }
 
 func errorMaterializer(asset *pipeline.Asset, query, location string) ([]string, error) {
-	return []string{""}, fmt.Errorf("materialization strategy %s is not supported for materialization type %s", asset.Materialization.Strategy, asset.Materialization.Type)
+	return []string{}, fmt.Errorf("materialization strategy %s is not supported for materialization type %s", asset.Materialization.Strategy, asset.Materialization.Type)
 }
 
 func viewMaterializer(asset *pipeline.Asset, query, location string) ([]string, error) {
@@ -46,7 +46,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query, location string) ([]stri
 	strategy := pipeline.MaterializationStrategyDeleteInsert
 
 	if mat.IncrementalKey == "" {
-		return []string{""}, fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", strategy)
+		return []string{}, fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", strategy)
 	}
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
@@ -63,12 +63,12 @@ func buildIncrementalQuery(task *pipeline.Asset, query, location string) ([]stri
 
 func buildMergeQuery(asset *pipeline.Asset, query, location string) ([]string, error) {
 	if len(asset.Columns) == 0 {
-		return []string{""}, fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
+		return []string{}, fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
 	}
 
 	primaryKeys := asset.ColumnNamesWithPrimaryKey()
 	if len(primaryKeys) == 0 {
-		return []string{""}, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
+		return []string{}, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
 	}
 
 	nonPrimaryKeys := asset.ColumnNamesWithUpdateOnMerge()

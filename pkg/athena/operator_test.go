@@ -24,7 +24,7 @@ type mockMaterializer struct {
 	mock.Mock
 }
 
-func (m *mockMaterializer) Render(t *pipeline.Asset, query string) ([]string, error) {
+func (m *mockMaterializer) Render(t *pipeline.Asset, query, location string) ([]string, error) {
 	res := m.Called(t, query)
 	return res.Get(0).([]string), res.Error(1)
 }
@@ -114,7 +114,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 					}, nil)
 
 				f.m.On("Render", mock.Anything, "select * from users").
-					Return("select * from users", nil)
+					Return([]string{"select * from users"}, nil)
 
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).
 					Return(errors.New("failed to run query"))
@@ -139,7 +139,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 					}, nil)
 
 				f.m.On("Render", mock.Anything, "select * from users").
-					Return("select * from users", nil)
+					Return([]string{"select * from users"}, nil)
 
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).
 					Return(nil)
@@ -164,7 +164,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 					}, nil)
 
 				f.m.On("Render", mock.Anything, "select * from users").
-					Return("CREATE TABLE x AS select * from users", nil)
+					Return([]string{"CREATE TABLE x AS select * from users"}, nil)
 
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE TABLE x AS select * from users"}).
 					Return(nil)
@@ -189,7 +189,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			extractor := new(mockExtractor)
 			mat := new(mockMaterializer)
 			conn := new(mockConnectionFetcher)
-			conn.On("GetSfConnection", mock.Anything).Return(client, nil)
+			conn.On("GetAwsConnection", mock.Anything).Return(client, nil)
 
 			if tt.setup != nil {
 				tt.setup(&fields{

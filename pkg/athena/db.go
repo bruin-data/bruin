@@ -82,15 +82,15 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 	return result, err
 }
 
-func (d *DB) initializeDb() error {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
+func (db *DB) initializeDb() error {
+	db.mutex.Lock()
+	defer db.mutex.Unlock()
 
-	if d.conn != nil {
+	if db.conn != nil {
 		return nil
 	}
 
-	athenaUri := d.config.ToDBConnectionURI()
+	athenaUri := db.config.ToDBConnectionURI()
 	if athenaUri == "" {
 		return errors.New("failed to create DSN for Athena")
 	}
@@ -100,6 +100,6 @@ func (d *DB) initializeDb() error {
 		return errors.Errorf("Failed to open database connection: %v", err)
 	}
 
-	d.conn = conn
+	db.conn = conn
 	return nil
 }

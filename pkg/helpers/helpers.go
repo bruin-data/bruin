@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"flag"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -24,6 +25,11 @@ func GetIngestrDestinationType(asset *pipeline.Asset) (pipeline.AssetType, error
 }
 
 func PrefixGenerator() string {
+	// Always return same when testing
+	if flag.Lookup("test.v") != nil {
+		return "abcefghi"
+	}
+
 	letters := []rune("abcdefghijklmnopqrstuvwxyz")
 	b := make([]rune, 8)
 	for i := range b {

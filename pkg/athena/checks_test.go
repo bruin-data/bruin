@@ -31,6 +31,10 @@ func (m *mockQuerierWithResult) RunQueryWithoutResult(ctx context.Context, query
 	return args.Error(0)
 }
 
+func (m *mockQuerierWithResult) GetResultsLocation() string {
+	return "s3://test-bucket/test-location:"
+}
+
 type mockConnectionFetcher struct {
 	mock.Mock
 }
