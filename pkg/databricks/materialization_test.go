@@ -1,11 +1,10 @@
 package databricks
 
 import (
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestMaterializer_Render(t *testing.T) {
@@ -33,7 +32,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want:  []string{"^DROP TABLE IF EXISTS my\\.asset; CREATE OR REPLACE VIEW my\\.asset AS SELECT 1$"},
+			want:  []string{"^DROP TABLE IF EXISTS my\\.asset", "CREATE OR REPLACE VIEW my\\.asset AS SELECT 1$"},
 		},
 		{
 			name: "materialize to a table, no partition or cluster, default to create+replace",
@@ -44,10 +43,11 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want: []string{"BEGIN TRANSACTION;\n" +
-				"DROP TABLE IF EXISTS my\\.asset;\n" +
-				"SELECT tmp\\.\\* INTO my.asset FROM \\(SELECT 1\\) AS tmp;\n" +
-				"COMMIT;"},
+			want: []string{
+				"CREATE TABLE __bruin_tmp_.+ AS SELECT 1;",
+				"DROP TABLE IF EXISTS my\\.asset;",
+				"ALTER TABLE __bruin_tmp_.+ RENAME TO my\\.asset;",
+			},
 		},
 		{
 			name: "materialize to a table, no partition or cluster, full refresh defaults to create+replace",
@@ -60,10 +60,11 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			fullRefresh: true,
 			query:       "SELECT 1",
-			want: []string{"BEGIN TRANSACTION;\n" +
-				"DROP TABLE IF EXISTS my\\.asset;\n" +
-				"SELECT tmp\\.\\* INTO my.asset FROM \\(SELECT 1\\) AS tmp;\n" +
-				"COMMIT;"},
+			want: []string{
+				"CREATE TABLE __bruin_tmp_.+ AS SELECT 1;",
+				"DROP TABLE IF EXISTS my\\.asset;",
+				"ALTER TABLE __bruin_tmp_.+ RENAME TO my\\.asset;",
+			},
 		},
 		{
 			name: "materialize to a table with cluster, single field to cluster",
@@ -138,12 +139,12 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want: []string{"^BEGIN TRANSACTION;\n" +
-				"SELECT alias\\.\\* INTO __bruin_tmp_.+ AS alias;\n" +
-				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
-				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp_.+;\n" +
-				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
-				"COMMIT;$"},
+			want: []string{
+				"CREATE TEMPORARY VIEW __bruin_tmp_.+ AS SELECT 1",
+				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\)",
+				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp_.+",
+				"DROP VIEW IF EXISTS __bruin_tmp_.+",
+			},
 		},
 		{
 			name: "merge without columns",
@@ -187,10 +188,12 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1 as id, 'abc' as name",
-			want: []string{"^MERGE INTO my\\.asset target\n" +
-				"USING \\(SELECT 1 as id, 'abc' as name\\) source ON target\\.id = source.id\n" +
-				"WHEN MATCHED THEN UPDATE SET target\\.name = source\\.name\n" +
-				"WHEN NOT MATCHED THEN INSERT\\(id, name\\) VALUES\\(id, name\\);$"},
+			want: []string{
+				"MERGE INTO my\\.asset target",
+				"USING \\(SELECT 1 as id, 'abc' as name\\) source ON target\\.id = source.id",
+				"WHEN MATCHED THEN UPDATE SET name = source\\.name",
+				"WHEN NOT MATCHED THEN INSERT\\(id, name\\) VALUES\\(id, name\\)",
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -204,7 +207,9 @@ func TestMaterializer_Render(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Regexp(t, tt.want, render)
+				for index, want := range tt.want {
+					require.Regexp(t, want, render[index])
+				}
 			}
 		})
 	}
