@@ -44,7 +44,11 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want:  []string{"CREATE TABLE my.asset WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset') AS SELECT 1"},
+			want: []string{
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS SELECT 1",
+				"DROP TABLE IF EXISTS my.asset",
+				"ALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset",
+			},
 		},
 		{
 			name: "materialize to a table, full refresh defaults to create+replace",
@@ -57,7 +61,11 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			fullRefresh: true,
 			query:       "SELECT 1",
-			want:        []string{"CREATE TABLE my.asset WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset') AS SELECT 1"},
+			want: []string{
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS SELECT 1",
+				"DROP TABLE IF EXISTS my.asset",
+				"ALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset",
+			},
 		},
 		{
 			name: "materialize to a table with append",

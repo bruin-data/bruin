@@ -111,13 +111,18 @@ func buildMergeQuery(asset *pipeline.Asset, query, location string) ([]string, e
 
 func buildCreateReplaceQuery(task *pipeline.Asset, query, location string) ([]string, error) {
 	query = strings.TrimSuffix(query, ";")
+
+	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
+
 	return []string{
 		fmt.Sprintf(
 			"CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s') AS %s",
-			task.Name,
+			tempTableName,
 			location,
-			task.Name,
+			tempTableName,
 			query,
 		),
+		"DROP TABLE IF EXISTS %s" + task.Name,
+		fmt.Sprintf("ALTER TABLE %s RENAME TO %s", tempTableName, task.Name),
 	}, nil
 }
