@@ -19,8 +19,8 @@ var commentMarkers = map[string]string{
 }
 
 var (
-	possiblePrefixesForCommentBlocks = []string{"/* @bruin", "/*  @bruin", "/*   @bruin", `""" @bruin`, `"""  @bruin`, `"""   @bruin`}
-	possibleSuffixesForCommentBlocks = []string{"@bruin */", "@bruin  */", "@bruin   */", `@bruin """`, `@bruin  """`, `@bruin   """`}
+	possiblePrefixesForCommentBlocks = []string{"/* @bruin", "/*  @bruin", "/*   @bruin", `"""@bruin`, `""" @bruin`, `"""  @bruin`, `"""   @bruin`}
+	possibleSuffixesForCommentBlocks = []string{"@bruin */", "@bruin  */", "@bruin   */", `@bruin"""`, `@bruin """`, `@bruin  """`, `@bruin   """`}
 )
 
 func CreateTaskFromFileComments(fs afero.Fs) TaskCreator {
