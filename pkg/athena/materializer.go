@@ -9,7 +9,7 @@ import (
 )
 
 // The other packages all use a materializer that renders the query to a single string. Due to the quirks of athena
-// we need to create a different materializer that returns a slice of strings, since databricks server requires us to send separate batches
+// we need to create a different materializer that returns a slice of strings, since athena server requires us to send separate batches
 // for certain things.
 type Materializer struct {
 	MaterializationMap AssetMaterializationMap

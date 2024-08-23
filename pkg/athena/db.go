@@ -29,7 +29,11 @@ func (db *DB) GetResultsLocation() string {
 }
 
 func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
-	_, err := db.Select(ctx, query)
+	err := db.initializeDB()
+	if err != nil {
+		return err
+	}
+	_, err = db.Select(ctx, query)
 	return err
 }
 

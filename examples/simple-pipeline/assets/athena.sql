@@ -5,7 +5,7 @@ materialization:
    type: table
    # strategy: append
    strategy: merge
-   incremental_key: id
+   # incremental_key: id
 columns:
   - name: id
     type: integer
