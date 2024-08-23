@@ -67,6 +67,14 @@ type ShopifyConnection struct {
 	APIKey string `yaml:"api_key"`
 }
 
+type AwsConnection struct {
+	Name             string `yaml:"name"`
+	Region           string `yaml:"region"`
+	AccessKey        string `yaml:"access_key"`
+	SecretKey        string `yaml:"secret_key"`
+	QueryResultsPath string `yaml:"query_results_path"`
+}
+
 type GorgiasConnection struct {
 	Name   string `yaml:"name"`
 	Domain string `yaml:"domain"`
@@ -160,6 +168,7 @@ func (c GenericConnection) MarshalJSON() ([]byte, error) {
 }
 
 type Connections struct {
+	AwsConnection       []AwsConnection                 `yaml:"aws"`
 	GoogleCloudPlatform []GoogleCloudPlatformConnection `yaml:"google_cloud_platform"`
 	Snowflake           []SnowflakeConnection           `yaml:"snowflake"`
 	Postgres            []PostgresConnection            `yaml:"postgres"`
@@ -180,6 +189,11 @@ type Connections struct {
 
 func (c *Connections) buildConnectionKeyMap() {
 	c.byKey = make(map[string]any)
+
+	for i, conn := range c.AwsConnection {
+		c.byKey[conn.Name] = &(c.AwsConnection[i])
+	}
+
 	for i, conn := range c.GoogleCloudPlatform {
 		c.byKey[conn.Name] = &(c.GoogleCloudPlatform[i])
 	}

@@ -29,6 +29,7 @@ const (
 	AssetTypeEmpty                = AssetType("empty")
 	AssetTypePostgresQuery        = AssetType("pg.sql")
 	AssetTypeRedshiftQuery        = AssetType("rs.sql")
+	AssetTypeAthenaQuery          = AssetType("athena.sql")
 	AssetTypeMsSQLQuery           = AssetType("ms.sql")
 	AssetTypeDatabricksQuery      = AssetType("databricks.sql")
 	AssetTypeSynapseQuery         = AssetType("synapse.sql")
@@ -307,6 +308,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeMsSQLQuery:           "mssql",
 	AssetTypeDatabricksQuery:      "databricks",
 	AssetTypeSynapseQuery:         "synapse",
+	AssetTypeAthenaQuery:          "aws",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -343,8 +345,20 @@ type SnowflakeConfig struct {
 	Warehouse string `json:"warehouse"`
 }
 
+type AthenaConfig struct {
+	Location string `json:"location"`
+}
+
 func (s SnowflakeConfig) MarshalJSON() ([]byte, error) {
 	if s.Warehouse == "" {
+		return json.Marshal(nil)
+	}
+
+	return json.Marshal(s)
+}
+
+func (s AthenaConfig) MarshalJSON() ([]byte, error) {
+	if s.Location == "" {
 		return json.Marshal(nil)
 	}
 
@@ -371,6 +385,7 @@ type Asset struct {
 	Metadata        EmptyStringMap     `json:"metadata"`
 	Tags            EmptyStringArray   `json:"tags"`
 	Snowflake       SnowflakeConfig    `json:"snowflake"`
+	Athena          AthenaConfig       `json:"athena"`
 
 	Pipeline *Pipeline `json:"-"`
 
@@ -701,6 +716,7 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 		AssetTypeDatabricksQuery: 0,
 		AssetTypeRedshiftQuery:   0,
 		AssetTypeSynapseQuery:    0,
+		AssetTypeAthenaQuery:     0,
 	}
 	maxTasks := 0
 	maxTaskType := defaultIfNone

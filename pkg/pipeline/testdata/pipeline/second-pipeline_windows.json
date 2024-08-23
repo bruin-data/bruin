@@ -38,6 +38,7 @@
       "connection": "",
       "secrets": [],
       "upstream": [],
+      "athena": null,
       "upstreams": [],
       "materialization": null,
       "columns": [],
@@ -74,6 +75,7 @@
       "secrets": [],
       "upstream": [],
       "upstreams": [],
+      "athena": null,
       "materialization": null,
       "columns": [],
       "custom_checks": [],
@@ -126,6 +128,7 @@
         "task4",
         "task5"
       ],
+      "athena": null,
       "upstreams": [
         {"type" : "asset", "value" : "task1"},
         {"type" : "asset", "value" : "task2"},

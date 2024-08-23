@@ -47,6 +47,7 @@
       "metadata": {},
       "tags": [],
       "snowflake": null,
+"athena":null,
       "upstreams": [
         {
           "type": "asset",
@@ -89,6 +90,7 @@
       "metadata": {},
       "tags": [],
       "snowflake": null,
+      "athena":null,
       "upstreams": [],
       "upstream": []
     },
@@ -124,6 +126,7 @@
       "metadata": {},
       "tags": [],
       "snowflake": null,
+      "athena":null,
       "upstreams": [
         {
           "type": "asset",
@@ -190,6 +193,7 @@
       "metadata": {},
       "tags": [],
       "snowflake": null,
+      "athena":null,
       "upstreams": [
         {
           "type": "asset",

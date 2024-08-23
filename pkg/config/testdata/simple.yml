@@ -102,6 +102,13 @@ environments:
           domain: "gorgiasurl"
           email: "gorgiasemail"
 
+      aws:
+        - name: conn13
+          access_key: "awskey"
+          secret_key: "awssecret"
+          query_results_path: "s3://bucket/prefix"
+          region: "us-west-2"
+
 
 
       generic:
