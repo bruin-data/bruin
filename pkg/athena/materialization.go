@@ -122,7 +122,7 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query, location string) ([]st
 			tempTableName,
 			query,
 		),
-		"DROP TABLE IF EXISTS %s" + task.Name,
+		"DROP TABLE IF EXISTS " + task.Name,
 		fmt.Sprintf("ALTER TABLE %s RENAME TO %s", tempTableName, task.Name),
 	}, nil
 }
