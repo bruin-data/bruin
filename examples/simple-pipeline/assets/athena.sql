@@ -4,7 +4,7 @@ type: athena.sql
 materialization:
    type: table
    # strategy: append
-   strategy: merge
+   # strategy: merge
    # incremental_key: id
 columns:
   - name: id
