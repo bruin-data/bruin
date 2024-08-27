@@ -5,21 +5,27 @@ import (
 	"fmt"
 	"io"
 	"os"
+	path2 "path"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/date"
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/mssql"
+	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/synapse"
+	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
 )
 
@@ -63,6 +69,58 @@ func Render() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			inputPath := c.Args().Get(0)
+			if inputPath == "" {
+				errorPrinter.Printf("Please give an asset path to render: bruin render <path to the asset file>)\n")
+				return cli.Exit("", 1)
+			}
+
+			pipelinePath, err := path.GetPipelineRootFromTask(inputPath, pipelineDefinitionFile)
+			if err != nil {
+				errorPrinter.Printf("Failed to get the pipeline path: %v\n", err)
+				return cli.Exit("", 1)
+			}
+			pipelineDefinitionFullPath := filepath.Join(pipelinePath, pipelineDefinitionFile)
+			pl, err := pipeline.PipelineFromPath(pipelineDefinitionFullPath, fs)
+			if err != nil {
+				errorPrinter.Printf("Failed to read the pipeline definition file: %v\n", err)
+				return cli.Exit("", 1)
+			}
+
+			asset, err := DefaultPipelineBuilder.CreateAssetFromFile(inputPath)
+			if err != nil {
+				errorPrinter.Printf("Failed to read the asset definition file: %v\n", err)
+				return cli.Exit("", 1)
+			}
+
+			resultsLocation := "s3://{destination-bucket}"
+			if asset.Type == pipeline.AssetTypeAthenaQuery {
+				connName, err := pl.GetConnectionNameForAsset(asset)
+				if err != nil {
+					errorPrinter.Printf("Failed to get the connection name for the asset: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				repoRoot, err := git.FindRepoFromPath(inputPath)
+				if err != nil {
+					errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
+					return cli.Exit("", 1)
+				}
+				configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
+				cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+				if err != nil {
+					errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
+					return cli.Exit("", 1)
+				}
+
+				for _, conn := range cm.SelectedEnvironment.Connections.AwsConnection {
+					if conn.Name == connName {
+						resultsLocation = conn.QueryResultsPath
+						break
+					}
+				}
+			}
+
 			r := RenderCommand{
 				extractor: &query.WholeFileExtractor{
 					Fs:       fs,
@@ -76,14 +134,14 @@ func Render() *cli.Command {
 					pipeline.AssetTypeMsSQLQuery:      mssql.NewMaterializer(fullRefresh),
 					pipeline.AssetTypeDatabricksQuery: databricks.NewRenderer(fullRefresh),
 					pipeline.AssetTypeSynapseQuery:    synapse.NewRenderer(fullRefresh),
-					pipeline.AssetTypeAthenaQuery:     athena.NewRenderer(fullRefresh),
+					pipeline.AssetTypeAthenaQuery:     athena.NewRenderer(fullRefresh, resultsLocation),
 				},
 				builder: DefaultPipelineBuilder,
 				writer:  os.Stdout,
 				output:  c.String("output"),
 			}
 
-			return r.Run(c.Args().Get(0))
+			return r.Run(inputPath)
 		},
 	}
 }

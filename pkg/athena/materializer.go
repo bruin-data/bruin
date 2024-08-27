@@ -45,17 +45,19 @@ func NewMaterializer(fullRefresh bool) *Materializer {
 }
 
 type Renderer struct {
-	mat *Materializer
+	mat      *Materializer
+	location string
 }
 
-func NewRenderer(fullRefresh bool) *Renderer {
+func NewRenderer(fullRefresh bool, location string) *Renderer {
 	return &Renderer{
-		mat: NewMaterializer(fullRefresh),
+		mat:      NewMaterializer(fullRefresh),
+		location: location,
 	}
 }
 
 func (r *Renderer) Render(asset *pipeline.Asset, query string) (string, error) {
-	queries, err := r.mat.Render(asset, query, "s3://{output bucket}")
+	queries, err := r.mat.Render(asset, query, r.location)
 	if err != nil {
 		return "", err
 	}
