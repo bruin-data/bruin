@@ -47,7 +47,7 @@ A Microsoft Teams webhook can be configured per channel, which means you can sen
 The full spec for Microsoft Teams notifications is like this:
 ```yaml
 notifications:
-  slack:
+  teams:
     - connection: "the-name-of-the-ms-teams-connection"
       success: true
       failure: true
