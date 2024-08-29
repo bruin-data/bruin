@@ -86,6 +86,7 @@ export default defineConfig({
                 text: "Bruin Cloud",
                 items: [
                     {text: "Cross-pipeline dependencies", link: "/cloud/cross-pipeline"},
+                    {text: "Notifications", link: "/cloud/notifications"},
                 ],
             },
         ],
