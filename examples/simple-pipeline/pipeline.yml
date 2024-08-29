@@ -14,4 +14,5 @@ default_connections:
   hana: "some-hana"
   shopify: "some-shopify"
   gorgias: "some-gorgias"
+  aws: "my-aws"
 
