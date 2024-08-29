@@ -66,7 +66,10 @@ func (s *SQLParser) Start() error {
 	}
 
 	args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
-	cmd := s.ep.PythonCmd(args...)
+	cmd, err := s.ep.PythonCmd(args...)
+	if err != nil {
+		return err
+	}
 	cmd.Stderr = os.Stderr
 
 	stdout, err := cmd.StdoutPipe()
