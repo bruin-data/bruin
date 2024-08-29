@@ -47,7 +47,7 @@
       "metadata": {},
       "tags": [],
       "snowflake": null,
-"athena":null,
+      "athena": null,
       "upstreams": [
         {
           "type": "asset",
@@ -90,7 +90,7 @@
       "metadata": {},
       "tags": [],
       "snowflake": null,
-      "athena":null,
+      "athena": null,
       "upstreams": [],
       "upstream": []
     },
@@ -126,7 +126,7 @@
       "metadata": {},
       "tags": [],
       "snowflake": null,
-      "athena":null,
+      "athena": null,
       "upstreams": [
         {
           "type": "asset",
@@ -193,7 +193,7 @@
       "metadata": {},
       "tags": [],
       "snowflake": null,
-      "athena":null,
+      "athena": null,
       "upstreams": [
         {
           "type": "asset",
@@ -233,12 +233,16 @@
   "notifications": {
     "slack": [
       {
-        "channel": "#channel1"
+        "channel": "#channel1",
+        "success": true,
+        "failure": true
       }
     ],
     "ms_teams": [
       {
-        "connection": "some_conn"
+        "connection": "some_conn",
+        "success": true,
+        "failure": true
       }
     ]
   },

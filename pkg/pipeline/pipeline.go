@@ -12,6 +12,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
+	"gopkg.in/yaml.v3"
 )
 
 type RunConfig string
@@ -69,16 +70,60 @@ type TaskSchedule struct {
 }
 
 type Notifications struct {
-	Slack   []SlackNotification   `json:"slack"`
+	Slack   []SlackNotification   `yaml:"slack" json:"slack"`
 	MSTeams []MSTeamsNotification `yaml:"ms_teams" json:"ms_teams"`
 }
 
+type DefaultTrueBool struct {
+	Value *bool
+}
+
+func (b *DefaultTrueBool) UnmarshalJSON(data []byte) error {
+	if data == nil {
+		return nil
+	}
+
+	var v bool
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+
+	b.Value = &v
+	return nil
+}
+
+func (b DefaultTrueBool) MarshalJSON() ([]byte, error) {
+	if b.Value == nil {
+		return json.Marshal(true)
+	}
+
+	return json.Marshal(*b.Value)
+}
+
+func (b *DefaultTrueBool) UnmarshalYAML(value *yaml.Node) error {
+	var multi *bool
+	err := value.Decode(&multi)
+	if err != nil {
+		return err
+	}
+	b.Value = multi
+
+	return nil
+}
+
+type NotificationCommon struct {
+	Success DefaultTrueBool `yaml:"success" json:"success"`
+	Failure DefaultTrueBool `yaml:"failure" json:"failure"`
+}
+
 type SlackNotification struct {
-	Channel string `json:"channel"`
+	Channel            string `json:"channel"`
+	NotificationCommon `yaml:",inline" json:",inline"`
 }
 
 type MSTeamsNotification struct {
-	Connection string `yaml:"connection" json:"connection"`
+	Connection         string `yaml:"connection" json:"connection"`
+	NotificationCommon `yaml:",inline" json:",inline"`
 }
 
 func (n Notifications) MarshalJSON() ([]byte, error) {

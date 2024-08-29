@@ -7,8 +7,10 @@ default_connections:
 default_parameters:
   param1: "value1"
   param2: "value2"
+
 notifications:
   slack:
     - channel: "#channel1"
+      success: true
   ms_teams:
     - connection: some_conn

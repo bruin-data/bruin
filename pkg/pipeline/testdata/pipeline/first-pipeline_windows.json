@@ -42,7 +42,7 @@
       "upstream": [
         "gcs-to-bq"
       ],
-      "athena" : null,
+      "athena": null,
       "upstreams": [
         {
           "type": "asset",
@@ -57,7 +57,7 @@
       "owner": "",
       "metadata": {},
       "snowflake": null,
-      "athena":null
+      "athena": null
     },
     {
       "id": "c69409a1840ddb3639a4acbaaec46c238c63b6431cc74ee5254b6dcef7b88c4b",
@@ -93,7 +93,7 @@
       "owner": "",
       "metadata": {},
       "snowflake": null,
-      "athena":null
+      "athena": null
     },
     {
       "id": "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
@@ -161,7 +161,7 @@
       "owner": "",
       "metadata": {},
       "snowflake": null,
-      "athena":null
+      "athena": null
     },
     {
       "id": "5812ba61bb0f08ce192bf074c9de21c19355e08cd52e75d008bbff59e5729e5b",
@@ -228,18 +228,22 @@
       "owner": "",
       "metadata": {},
       "snowflake": null,
-      "athena":null
+      "athena": null
     }
   ],
   "notifications": {
     "slack": [
       {
-        "channel": "#channel1"
+        "channel": "#channel1",
+        "success": true,
+        "failure": true
       }
     ],
     "ms_teams": [
       {
-        "connection": "some_conn"
+        "connection": "some_conn",
+        "success": true,
+        "failure": true
       }
     ]
   },

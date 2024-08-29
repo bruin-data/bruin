@@ -377,6 +377,10 @@ func TestPipeline_JsonMarshal(t *testing.T) {
 			expected := strings.ReplaceAll(mustRead(t, path), "__BASEDIR__", dir)
 
 			assert.JSONEq(t, expected, string(got))
+
+			var rebuiltPipeline pipeline.Pipeline
+			err = json.Unmarshal(got, &rebuiltPipeline)
+			require.NoError(t, err)
 		})
 	}
 }
