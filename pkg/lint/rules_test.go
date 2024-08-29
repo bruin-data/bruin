@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/glossary"
@@ -2208,6 +2209,8 @@ func TestUsedTableValidatorRule_ValidateAsset(t *testing.T) {
 			for i, issue := range got {
 				issueMessages[i] = issue.Description
 			}
+
+			sort.Strings(issueMessages)
 
 			assert.Equal(t, tt.want, issueMessages)
 		})
