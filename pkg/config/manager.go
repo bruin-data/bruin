@@ -68,11 +68,18 @@ type ShopifyConnection struct {
 }
 
 type AwsConnection struct {
+	Name      string `yaml:"name"`
+	AccessKey string `yaml:"access_key"`
+	SecretKey string `yaml:"secret_key"`
+}
+
+type AthenaConnection struct {
 	Name             string `yaml:"name"`
-	Region           string `yaml:"region"`
 	AccessKey        string `yaml:"access_key"`
 	SecretKey        string `yaml:"secret_key"`
 	QueryResultsPath string `yaml:"query_results_path"`
+	Region           string `yaml:"region"`
+	Database         string `yaml:"database"`
 }
 
 type GorgiasConnection struct {
@@ -169,6 +176,7 @@ func (c GenericConnection) MarshalJSON() ([]byte, error) {
 
 type Connections struct {
 	AwsConnection       []AwsConnection                 `yaml:"aws"`
+	AthenaConnection    []AthenaConnection              `yaml:"athena"`
 	GoogleCloudPlatform []GoogleCloudPlatformConnection `yaml:"google_cloud_platform"`
 	Snowflake           []SnowflakeConnection           `yaml:"snowflake"`
 	Postgres            []PostgresConnection            `yaml:"postgres"`

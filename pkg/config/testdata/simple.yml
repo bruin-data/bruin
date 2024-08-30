@@ -106,8 +106,13 @@ environments:
         - name: conn13
           access_key: "awskey"
           secret_key: "awssecret"
+      athena:
+        - name: conn14
+          access_key: "athena_key"
+          secret_key: "athena_secret"
           query_results_path: "s3://bucket/prefix"
           region: "us-west-2"
+          database: "athena_db"
 
 
 

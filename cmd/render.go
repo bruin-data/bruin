@@ -113,7 +113,7 @@ func Render() *cli.Command {
 					return cli.Exit("", 1)
 				}
 
-				for _, conn := range cm.SelectedEnvironment.Connections.AwsConnection {
+				for _, conn := range cm.SelectedEnvironment.Connections.AthenaConnection {
 					if conn.Name == connName {
 						resultsLocation = conn.QueryResultsPath
 						break

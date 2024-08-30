@@ -49,7 +49,7 @@ func (m *mockConnectionFetcher) GetConnection(name string) (interface{}, error) 
 	return get, args.Error(1)
 }
 
-func (m *mockConnectionFetcher) GetAwsConnection(name string) (Client, error) {
+func (m *mockConnectionFetcher) GetAthenaConnection(name string) (Client, error) {
 	args := m.Called(name)
 	get := args.Get(0)
 	if get == nil {
@@ -263,7 +263,7 @@ func TestCustomCheck(t *testing.T) {
 					Pipeline: &pipeline.Pipeline{
 						Name: "test",
 						DefaultConnections: map[string]string{
-							"aws": "test",
+							"athena": "test",
 						},
 					},
 				},
