@@ -353,7 +353,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeMsSQLQuery:           "mssql",
 	AssetTypeDatabricksQuery:      "databricks",
 	AssetTypeSynapseQuery:         "synapse",
-	AssetTypeAthenaQuery:          "aws",
+	AssetTypeAthenaQuery:          "athena",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{

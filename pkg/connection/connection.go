@@ -34,7 +34,7 @@ type Manager struct {
 	HANA       map[string]*hana.Client
 	Shopify    map[string]*shopify.Client
 	Gorgias    map[string]*gorgias.Client
-	Aws        map[string]*athena.DB
+	Athena     map[string]*athena.DB
 	mutex      sync.Mutex
 }
 
@@ -107,30 +107,30 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Gorgias)...)
 
-	awsConnection, err := m.GetAwsConnectionWithoutDefault(name)
+	athenaConnection, err := m.GetAthenaConnectionWithoutDefault(name)
 	if err == nil {
-		return awsConnection, nil
+		return athenaConnection, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Aws)...)
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Athena)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
 
-func (m *Manager) GetAwsConnection(name string) (athena.Client, error) {
-	db, err := m.GetAwsConnectionWithoutDefault(name)
+func (m *Manager) GetAthenaConnection(name string) (athena.Client, error) {
+	db, err := m.GetAthenaConnectionWithoutDefault(name)
 	if err == nil {
 		return db, nil
 	}
 
-	return m.GetAwsConnectionWithoutDefault("aws-default")
+	return m.GetAthenaConnectionWithoutDefault("aws-default")
 }
 
-func (m *Manager) GetAwsConnectionWithoutDefault(name string) (athena.Client, error) {
-	if m.Aws == nil {
+func (m *Manager) GetAthenaConnectionWithoutDefault(name string) (athena.Client, error) {
+	if m.Athena == nil {
 		return nil, errors.New("no AWS connections found")
 	}
 
-	db, ok := m.Aws[name]
+	db, ok := m.Athena[name]
 	if !ok {
 		return nil, errors.Errorf("AWS connection not found for '%s'", name)
 	}
@@ -428,19 +428,20 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 	return nil
 }
 
-func (m *Manager) AddAwsConnectionFromConfig(connection *config.AwsConnection) error {
+func (m *Manager) AddAthenaConnectionFromConfig(connection *config.AthenaConnection) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	if m.Aws == nil {
-		m.Aws = make(map[string]*athena.DB)
+	if m.Athena == nil {
+		m.Athena = make(map[string]*athena.DB)
 	}
 
-	m.Aws[connection.Name] = athena.NewDB(&athena.Config{
+	m.Athena[connection.Name] = athena.NewDB(&athena.Config{
 		Region:          connection.Region,
 		OutputBucket:    connection.QueryResultsPath,
 		AccessID:        connection.AccessKey,
 		SecretAccessKey: connection.SecretKey,
+		Database:        connection.Database,
 	})
 
 	return nil
@@ -698,9 +699,9 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	connectionManager := &Manager{}
 
 	var wg conc.WaitGroup
-	for _, conn := range cm.SelectedEnvironment.Connections.AwsConnection {
+	for _, conn := range cm.SelectedEnvironment.Connections.AthenaConnection {
 		wg.Go(func() {
-			err := connectionManager.AddAwsConnectionFromConfig(&conn)
+			err := connectionManager.AddAthenaConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add AWS connection '%s'", conn.Name))
 			}
