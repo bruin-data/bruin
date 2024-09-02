@@ -715,6 +715,8 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 	switch mapping {
 	case "aws":
 		return "aws-default", nil
+	case "athena":
+		return "athena-default", nil
 	case "gcp":
 		return "gcp-default", nil
 	case "google_cloud_platform":

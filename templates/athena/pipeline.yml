@@ -1,0 +1,6 @@
+name: athena-pipeline
+schedule: daily
+start_date: "2023-03-20"
+
+default_connections:
+    athena: my-athena-conn
