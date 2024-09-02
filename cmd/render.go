@@ -88,7 +88,7 @@ func Render() *cli.Command {
 			}
 
 			asset, err := DefaultPipelineBuilder.CreateAssetFromFile(inputPath)
-			if err != nil {
+			if err != nil || asset == nil {
 				errorPrinter.Printf("Failed to read the asset definition file: %v\n", err)
 				return cli.Exit("", 1)
 			}
