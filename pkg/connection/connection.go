@@ -122,17 +122,17 @@ func (m *Manager) GetAthenaConnection(name string) (athena.Client, error) {
 		return db, nil
 	}
 
-	return m.GetAthenaConnectionWithoutDefault("aws-default")
+	return m.GetAthenaConnectionWithoutDefault("athena-default")
 }
 
 func (m *Manager) GetAthenaConnectionWithoutDefault(name string) (athena.Client, error) {
 	if m.Athena == nil {
-		return nil, errors.New("no AWS connections found")
+		return nil, errors.New("no Athena connections found")
 	}
 
 	db, ok := m.Athena[name]
 	if !ok {
-		return nil, errors.Errorf("AWS connection not found for '%s'", name)
+		return nil, errors.Errorf("Athena connection not found for '%s'", name)
 	}
 
 	return db, nil
