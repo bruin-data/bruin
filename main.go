@@ -54,6 +54,7 @@ func main() {
 			cmd.Init(),
 			cmd.Internal(),
 			cmd.Environments(&isDebug),
+			cmd.Connections(),
 		},
 	}
 

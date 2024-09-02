@@ -175,92 +175,117 @@ func (c GenericConnection) MarshalJSON() ([]byte, error) {
 }
 
 type Connections struct {
-	AwsConnection       []AwsConnection                 `yaml:"aws"`
-	AthenaConnection    []AthenaConnection              `yaml:"athena"`
-	GoogleCloudPlatform []GoogleCloudPlatformConnection `yaml:"google_cloud_platform"`
-	Snowflake           []SnowflakeConnection           `yaml:"snowflake"`
-	Postgres            []PostgresConnection            `yaml:"postgres"`
-	RedShift            []PostgresConnection            `yaml:"redshift"`
-	MsSQL               []MsSQLConnection               `yaml:"mssql"`
-	Databricks          []DatabricksConnection          `yaml:"databricks"`
-	Synapse             []MsSQLConnection               `yaml:"synapse"`
-	Mongo               []MongoConnection               `yaml:"mongo"`
-	MySQL               []MySQLConnection               `yaml:"mysql"`
-	Notion              []NotionConnection              `yaml:"notion"`
-	HANA                []HANAConnection                `yaml:"hana"`
-	Shopify             []ShopifyConnection             `yaml:"shopify"`
-	Gorgias             []GorgiasConnection             `yaml:"gorgias"`
-	Generic             []GenericConnection             `yaml:"generic"`
+	AwsConnection       []AwsConnection                 `yaml:"aws" json:"aws"`
+	AthenaConnection    []AthenaConnection              `yaml:"athena" json:"athena"`
+	GoogleCloudPlatform []GoogleCloudPlatformConnection `yaml:"google_cloud_platform" json:"google_cloud_platform"`
+	Snowflake           []SnowflakeConnection           `yaml:"snowflake" json:"snowflake"`
+	Postgres            []PostgresConnection            `yaml:"postgres" json:"postgres"`
+	RedShift            []PostgresConnection            `yaml:"redshift" json:"redshift"`
+	MsSQL               []MsSQLConnection               `yaml:"mssql" json:"mssql"`
+	Databricks          []DatabricksConnection          `yaml:"databricks" json:"databricks"`
+	Synapse             []MsSQLConnection               `yaml:"synapse" json:"synapse"`
+	Mongo               []MongoConnection               `yaml:"mongo" json:"mongo"`
+	MySQL               []MySQLConnection               `yaml:"mysql" json:"mysql"`
+	Notion              []NotionConnection              `yaml:"notion" json:"notion"`
+	HANA                []HANAConnection                `yaml:"hana" json:"hana"`
+	Shopify             []ShopifyConnection             `yaml:"shopify" json:"shopify"`
+	Gorgias             []GorgiasConnection             `yaml:"gorgias" json:"gorgias"`
+	Generic             []GenericConnection             `yaml:"generic" json:"generic"`
 
-	byKey map[string]any
+	byKey       map[string]any
+	typeNameMap map[string]string
+}
+
+func (c *Connections) ConnectionsSummaryList() map[string]string {
+	if c.typeNameMap == nil {
+		c.buildConnectionKeyMap()
+	}
+
+	return c.typeNameMap
 }
 
 func (c *Connections) buildConnectionKeyMap() {
 	c.byKey = make(map[string]any)
+	c.typeNameMap = make(map[string]string)
 
 	for i, conn := range c.AwsConnection {
 		c.byKey[conn.Name] = &(c.AwsConnection[i])
+		c.typeNameMap[conn.Name] = "aws"
 	}
 
 	for i, conn := range c.GoogleCloudPlatform {
 		c.byKey[conn.Name] = &(c.GoogleCloudPlatform[i])
+		c.typeNameMap[conn.Name] = "google_cloud_platform"
 	}
 
 	for i, conn := range c.Snowflake {
 		c.byKey[conn.Name] = &(c.Snowflake[i])
+		c.typeNameMap[conn.Name] = "snowflake"
 	}
 
 	for i, conn := range c.Postgres {
 		c.byKey[conn.Name] = &(c.Postgres[i])
+		c.typeNameMap[conn.Name] = "postgres"
 	}
 
 	for i, conn := range c.RedShift {
 		c.byKey[conn.Name] = &(c.RedShift[i])
+		c.typeNameMap[conn.Name] = "redshift"
 	}
 
 	for i, conn := range c.MsSQL {
 		c.byKey[conn.Name] = &(c.MsSQL[i])
+		c.typeNameMap[conn.Name] = "mssql"
 	}
 
 	for i, conn := range c.Databricks {
 		c.byKey[conn.Name] = &(c.Databricks[i])
+		c.typeNameMap[conn.Name] = "databricks"
 	}
 
 	for i, conn := range c.Synapse {
 		c.byKey[conn.Name] = &(c.Synapse[i])
+		c.typeNameMap[conn.Name] = "synapse"
 	}
 
 	for i, conn := range c.Mongo {
 		c.byKey[conn.Name] = &(c.Mongo[i])
+		c.typeNameMap[conn.Name] = "mongo"
 	}
 
 	for i, conn := range c.MySQL {
 		c.byKey[conn.Name] = &(c.MySQL[i])
+		c.typeNameMap[conn.Name] = "mysql"
 	}
 
 	for i, conn := range c.Notion {
 		c.byKey[conn.Name] = &(c.Notion[i])
+		c.typeNameMap[conn.Name] = "notion"
 	}
 
 	for i, conn := range c.HANA {
 		c.byKey[conn.Name] = &(c.HANA[i])
+		c.typeNameMap[conn.Name] = "hana"
 	}
 
 	for i, conn := range c.Shopify {
 		c.byKey[conn.Name] = &(c.Shopify[i])
+		c.typeNameMap[conn.Name] = "shopify"
 	}
 
 	for i, conn := range c.Gorgias {
 		c.byKey[conn.Name] = &(c.Gorgias[i])
+		c.typeNameMap[conn.Name] = "gorgias"
 	}
 
 	for i, conn := range c.Generic {
 		c.byKey[conn.Name] = &(c.Generic[i])
+		c.typeNameMap[conn.Name] = "generic"
 	}
 }
 
 type Environment struct {
-	Connections Connections `yaml:"connections"`
+	Connections Connections `yaml:"connections" json:"connections"`
 }
 
 func (e *Environment) GetSecretByKey(key string) (string, error) {
@@ -281,10 +306,10 @@ type Config struct {
 	fs   afero.Fs
 	path string
 
-	DefaultEnvironmentName  string                 `yaml:"default_environment"`
-	SelectedEnvironmentName string                 `yaml:"-"`
-	SelectedEnvironment     *Environment           `yaml:"-"`
-	Environments            map[string]Environment `yaml:"environments"`
+	DefaultEnvironmentName  string                 `yaml:"default_environment" json:"default_environment_name"`
+	SelectedEnvironmentName string                 `yaml:"-" json:"selected_environment_name"`
+	SelectedEnvironment     *Environment           `yaml:"-" json:"selected_environment"`
+	Environments            map[string]Environment `yaml:"environments" json:"environments"`
 }
 
 func (c *Config) GetEnvironmentNames() []string {
