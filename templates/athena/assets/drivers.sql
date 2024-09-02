@@ -1,5 +1,5 @@
 /* @bruin
-name: travellers
+name: drivers
 type: athena.sql
 materialization:
    type: table

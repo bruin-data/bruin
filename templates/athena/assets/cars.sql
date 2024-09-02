@@ -4,12 +4,12 @@ type: athena.sql
 materialization:
    type: table
    strategy: delete+insert
+   incremental_key: id
 columns:
   - name: id
     type: integer
     description: "identifier of the car"
     primary_key: true
-    incremental_key: id
     checks:
         - name: not_null
         - name: positive
