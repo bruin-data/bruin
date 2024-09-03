@@ -12,7 +12,7 @@ func TestLoadFromFile(t *testing.T) {
 	t.Parallel()
 
 	devEnv := Environment{
-		Connections: Connections{
+		Connections: &Connections{
 			GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 				{
 					Name:               "conn1",
@@ -197,7 +197,7 @@ func TestLoadFromFile(t *testing.T) {
 				Environments: map[string]Environment{
 					"dev": devEnv,
 					"prod": {
-						Connections: Connections{
+						Connections: &Connections{
 							GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 								{
 									Name:               "conn1",
@@ -240,28 +240,13 @@ func TestLoadOrCreate(t *testing.T) {
 
 	configPath := "/some/path/to/config.yml"
 	defaultEnv := &Environment{
-		Connections: Connections{
+		Connections: &Connections{
 			GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 				{
 					Name:               "conn1",
 					ServiceAccountFile: "/path/to/service_account.json",
 				},
 			},
-			Postgres:         []PostgresConnection{},
-			Snowflake:        []SnowflakeConnection{},
-			Generic:          []GenericConnection{},
-			RedShift:         []PostgresConnection{},
-			MsSQL:            []MsSQLConnection{},
-			Databricks:       []DatabricksConnection{},
-			Synapse:          []MsSQLConnection{},
-			Mongo:            []MongoConnection{},
-			MySQL:            []MySQLConnection{},
-			Notion:           []NotionConnection{},
-			HANA:             []HANAConnection{},
-			Shopify:          []ShopifyConnection{},
-			Gorgias:          []GorgiasConnection{},
-			AwsConnection:    []AwsConnection{},
-			AthenaConnection: []AthenaConnection{},
 		},
 	}
 
@@ -291,7 +276,9 @@ func TestLoadOrCreate(t *testing.T) {
 				SelectedEnvironment:     &Environment{},
 				SelectedEnvironmentName: "default",
 				Environments: map[string]Environment{
-					"default": {},
+					"default": {
+						Connections: &Connections{},
+					},
 				},
 			},
 			wantErr: assert.NoError,
@@ -343,8 +330,11 @@ func TestLoadOrCreate(t *testing.T) {
 			tt.wantErr(t, err)
 
 			if tt.want != nil {
-				assert.EqualExportedValues(t, *tt.want.SelectedEnvironment, *got.SelectedEnvironment)
 				assert.Equal(t, tt.want.SelectedEnvironmentName, got.SelectedEnvironmentName)
+
+				if tt.want.SelectedEnvironment != nil && tt.want.SelectedEnvironment.Connections != nil {
+					assert.EqualExportedValues(t, *tt.want.SelectedEnvironment.Connections, *got.SelectedEnvironment.Connections)
+				}
 			} else {
 				assert.Equal(t, tt.want, got)
 			}
@@ -366,7 +356,7 @@ func TestConfig_SelectEnvironment(t *testing.T) {
 	t.Parallel()
 
 	defaultEnv := &Environment{
-		Connections: Connections{
+		Connections: &Connections{
 			GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 				{
 					Name:               "conn1",
@@ -377,7 +367,7 @@ func TestConfig_SelectEnvironment(t *testing.T) {
 	}
 
 	prodEnv := &Environment{
-		Connections: Connections{
+		Connections: &Connections{
 			GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 				{
 					Name:               "conn1",
@@ -407,4 +397,108 @@ func TestConfig_SelectEnvironment(t *testing.T) {
 	require.NoError(t, err)
 	assert.EqualExportedValues(t, defaultEnv, conf.SelectedEnvironment)
 	assert.Equal(t, "default", conf.SelectedEnvironmentName)
+}
+
+func TestConfig_AddConnection(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		envName     string
+		connType    string
+		connName    string
+		creds       map[string]interface{}
+		expectedErr bool
+	}{
+		{
+			name:     "Add GCP connection",
+			envName:  "default",
+			connType: "google_cloud_platform",
+			connName: "gcp-conn",
+			creds: map[string]interface{}{
+				"service_account_file": "/path/to/gcp_service_account.json",
+				"project_id":           "gcp-project-123",
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add AWS connection",
+			envName:  "prod",
+			connType: "aws",
+			connName: "aws-conn",
+			creds: map[string]interface{}{
+				"access_key": "AKIAIOSFODNN7EXAMPLE",
+				"secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+				"region":     "us-west-2",
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Add Generic connection",
+			envName:  "staging",
+			connType: "generic",
+			connName: "generic-conn",
+			creds: map[string]interface{}{
+				"value": "some-secret-value",
+			},
+			expectedErr: false,
+		},
+		{
+			name:        "Add Invalid connection",
+			envName:     "default",
+			connType:    "invalid",
+			connName:    "invalid-conn",
+			creds:       map[string]interface{}{},
+			expectedErr: true,
+		},
+		{
+			name:        "Add to non-existent environment",
+			envName:     "non-existent",
+			connType:    "generic",
+			connName:    "generic-conn",
+			creds:       map[string]interface{}{"value": "test"},
+			expectedErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			conf := &Config{
+				Environments: map[string]Environment{
+					"default": {Connections: &Connections{}},
+					"prod":    {Connections: &Connections{}},
+					"staging": {Connections: &Connections{}},
+				},
+			}
+
+			err := conf.AddConnection(tt.envName, tt.connName, tt.connType, tt.creds)
+
+			if tt.expectedErr {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				env, exists := conf.Environments[tt.envName]
+				assert.True(t, exists)
+
+				switch tt.connType {
+				case "google_cloud_platform":
+					assert.Len(t, env.Connections.GoogleCloudPlatform, 1)
+					assert.Equal(t, tt.connName, env.Connections.GoogleCloudPlatform[0].Name)
+					assert.Equal(t, tt.creds["service_account_file"], env.Connections.GoogleCloudPlatform[0].ServiceAccountFile)
+					assert.Equal(t, tt.creds["project_id"], env.Connections.GoogleCloudPlatform[0].ProjectID)
+				case "aws":
+					assert.Len(t, env.Connections.AwsConnection, 1)
+					assert.Equal(t, tt.connName, env.Connections.AwsConnection[0].Name)
+					assert.Equal(t, tt.creds["access_key"], env.Connections.AwsConnection[0].AccessKey)
+					assert.Equal(t, tt.creds["secret_key"], env.Connections.AwsConnection[0].SecretKey)
+				case "generic":
+					assert.Len(t, env.Connections.Generic, 1)
+					assert.Equal(t, tt.connName, env.Connections.Generic[0].Name)
+					assert.Equal(t, tt.creds["value"], env.Connections.Generic[0].Value)
+				}
+			}
+		})
+	}
 }

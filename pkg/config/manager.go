@@ -10,107 +10,108 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/git"
 	path2 "github.com/bruin-data/bruin/pkg/path"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/afero"
 	"golang.org/x/oauth2/google"
 )
 
 type PostgresConnection struct {
-	Name         string `yaml:"name" json:"name"`
-	Username     string `yaml:"username" json:"username"`
-	Password     string `yaml:"password" json:"password"`
-	Host         string `yaml:"host" json:"host"`
-	Port         int    `yaml:"port" json:"port"`
-	Database     string `yaml:"database" json:"database"`
-	Schema       string `yaml:"schema" json:"schema"`
-	PoolMaxConns int    `yaml:"pool_max_conns" json:"pool_max_conns" default:"10"`
-	SslMode      string `yaml:"ssl_mode" json:"ssl_mode" default:"disable"`
+	Name         string `yaml:"name" json:"name" mapstructure:"name"`
+	Username     string `yaml:"username" json:"username" mapstructure:"username"`
+	Password     string `yaml:"password" json:"password" mapstructure:"password"`
+	Host         string `yaml:"host" json:"host" mapstructure:"host"`
+	Port         int    `yaml:"port" json:"port" mapstructure:"port"`
+	Database     string `yaml:"database" json:"database" mapstructure:"database"`
+	Schema       string `yaml:"schema" json:"schema" mapstructure:"schema"`
+	PoolMaxConns int    `yaml:"pool_max_conns" json:"pool_max_conns" mapstructure:"pool_max_conns" default:"10"`
+	SslMode      string `yaml:"ssl_mode" json:"ssl_mode" mapstructure:"ssl_mode" default:"disable"`
 }
 
 type MsSQLConnection struct {
-	Name     string `yaml:"name" json:"name"`
-	Username string `yaml:"username" json:"username"`
-	Password string `yaml:"password" json:"password"`
-	Host     string `yaml:"host"     json:"host"`
-	Port     int    `yaml:"port"     json:"port"`
-	Database string `yaml:"database" json:"database"`
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port"     json:"port" mapstructure:"port"`
+	Database string `yaml:"database" json:"database" mapstructure:"database"`
 }
 
 type DatabricksConnection struct {
-	Name  string `yaml:"name"  json:"name"`
-	Token string `yaml:"token" json:"token"`
-	Path  string `yaml:"path"  json:"path"`
-	Host  string `yaml:"host"  json:"host"`
-	Port  int    `yaml:"port"     json:"port"`
+	Name  string `yaml:"name"  json:"name" mapstructure:"name"`
+	Token string `yaml:"token" json:"token" mapstructure:"token"`
+	Path  string `yaml:"path"  json:"path" mapstructure:"path"`
+	Host  string `yaml:"host"  json:"host" mapstructure:"host"`
+	Port  int    `yaml:"port"  json:"port" mapstructure:"port"`
 }
 
 type GoogleCloudPlatformConnection struct {
-	Name               string `yaml:"name"`
-	ServiceAccountJSON string `yaml:"service_account_json"`
-	ServiceAccountFile string `yaml:"service_account_file"`
-	ProjectID          string `yaml:"project_id"`
+	Name               string `yaml:"name" json:"name" mapstructure:"name"`
+	ServiceAccountJSON string `yaml:"service_account_json" json:"service_account_json" mapstructure:"service_account_json"`
+	ServiceAccountFile string `yaml:"service_account_file" json:"service_account_file" mapstructure:"service_account_file"`
+	ProjectID          string `yaml:"project_id" json:"project_id" mapstructure:"project_id"`
+	Location           string `yaml:"location" json:"location" mapstructure:"location"`
 	rawCredentials     *google.Credentials
-	Location           string `yaml:"location"`
 }
 
 type MongoConnection struct {
-	Name     string `yaml:"name"`
-	Username string `yaml:"username" json:"username"`
-	Password string `yaml:"password" json:"password"`
-	Host     string `yaml:"host"     json:"host"`
-	Port     int    `yaml:"port"     json:"port"`
-	Database string `yaml:"database" json:"database"`
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port"     json:"port" mapstructure:"port"`
+	Database string `yaml:"database" json:"database" mapstructure:"database"`
 }
 
 type ShopifyConnection struct {
-	Name   string `yaml:"name"`
-	URL    string `yaml:"url"`
-	APIKey string `yaml:"api_key"`
+	Name   string `yaml:"name" json:"name" mapstructure:"name"`
+	URL    string `yaml:"url" json:"url" mapstructure:"url"`
+	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
 }
 
 type AwsConnection struct {
-	Name      string `yaml:"name"`
-	AccessKey string `yaml:"access_key"`
-	SecretKey string `yaml:"secret_key"`
+	Name      string `yaml:"name" json:"name" mapstructure:"name"`
+	AccessKey string `yaml:"access_key" json:"access_key" mapstructure:"access_key"`
+	SecretKey string `yaml:"secret_key" json:"secret_key" mapstructure:"secret_key"`
 }
 
 type AthenaConnection struct {
-	Name             string `yaml:"name"`
-	AccessKey        string `yaml:"access_key"`
-	SecretKey        string `yaml:"secret_key"`
-	QueryResultsPath string `yaml:"query_results_path"`
-	Region           string `yaml:"region"`
-	Database         string `yaml:"database"`
+	Name             string `yaml:"name" json:"name" mapstructure:"name"`
+	AccessKey        string `yaml:"access_key" json:"access_key" mapstructure:"access_key"`
+	SecretKey        string `yaml:"secret_key" json:"secret_key" mapstructure:"secret_key"`
+	QueryResultsPath string `yaml:"query_results_path" json:"query_results_path" mapstructure:"query_results_path"`
+	Region           string `yaml:"region" json:"region" mapstructure:"region"`
+	Database         string `yaml:"database" json:"database" mapstructure:"database"`
 }
 
 type GorgiasConnection struct {
-	Name   string `yaml:"name"`
-	Domain string `yaml:"domain"`
-	APIKey string `yaml:"api_key"`
-	Email  string `yaml:"email"`
+	Name   string `yaml:"name" json:"name" mapstructure:"name"`
+	Domain string `yaml:"domain" json:"domain" mapstructure:"domain"`
+	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+	Email  string `yaml:"email" json:"email" mapstructure:"email"`
 }
 
 type MySQLConnection struct {
-	Name     string `yaml:"name" json:"name"`
-	Username string `yaml:"username" json:"username"`
-	Password string `yaml:"password" json:"password"`
-	Host     string `yaml:"host"     json:"host"`
-	Port     int    `yaml:"port"     json:"port"`
-	Database string `yaml:"database" json:"database"`
-	Driver   string `yaml:"driver" json:"driver"`
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port"     json:"port" mapstructure:"port"`
+	Database string `yaml:"database" json:"database" mapstructure:"database"`
+	Driver   string `yaml:"driver" json:"driver" mapstructure:"driver"`
 }
 
 type NotionConnection struct {
-	Name   string `yaml:"name" json:"name"`
-	APIKey string `yaml:"api_key" json:"api_key"`
+	Name   string `yaml:"name" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
 }
 
 type HANAConnection struct {
-	Name     string `yaml:"name" json:"name"`
-	Username string `yaml:"username" json:"username"`
-	Password string `yaml:"password" json:"password"`
-	Host     string `yaml:"host"     json:"host"`
-	Port     int    `yaml:"port"     json:"port"`
-	Database string `yaml:"database" json:"database"`
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port"     json:"port" mapstructure:"port"`
+	Database string `yaml:"database" json:"database" mapstructure:"database"`
 }
 
 func (c *GoogleCloudPlatformConnection) SetCredentials(cred *google.Credentials) {
@@ -138,15 +139,15 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 }
 
 type SnowflakeConnection struct {
-	Name      string `yaml:"name"`
-	Account   string `yaml:"account"`
-	Username  string `yaml:"username"`
-	Password  string `yaml:"password"`
-	Region    string `yaml:"region"`
-	Role      string `yaml:"role"`
-	Database  string `yaml:"database"`
-	Schema    string `yaml:"schema"`
-	Warehouse string `yaml:"warehouse"`
+	Name      string `yaml:"name" json:"name" mapstructure:"name"`
+	Account   string `yaml:"account" json:"account" mapstructure:"account"`
+	Username  string `yaml:"username" json:"username" mapstructure:"username"`
+	Password  string `yaml:"password" json:"password" mapstructure:"password"`
+	Region    string `yaml:"region" json:"region" mapstructure:"region"`
+	Role      string `yaml:"role" json:"role" mapstructure:"role"`
+	Database  string `yaml:"database" json:"database" mapstructure:"database"`
+	Schema    string `yaml:"schema" json:"schema" mapstructure:"schema"`
+	Warehouse string `yaml:"warehouse" json:"warehouse" mapstructure:"warehouse"`
 }
 
 func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
@@ -163,8 +164,8 @@ func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
 }
 
 type GenericConnection struct {
-	Name  string `yaml:"name"`
-	Value string `yaml:"value"`
+	Name  string `yaml:"name" json:"name" mapstructure:"name"`
+	Value string `yaml:"value" json:"value" mapstructure:"value"`
 }
 
 func (c GenericConnection) MarshalJSON() ([]byte, error) {
@@ -175,22 +176,22 @@ func (c GenericConnection) MarshalJSON() ([]byte, error) {
 }
 
 type Connections struct {
-	AwsConnection       []AwsConnection                 `yaml:"aws" json:"aws"`
-	AthenaConnection    []AthenaConnection              `yaml:"athena" json:"athena"`
-	GoogleCloudPlatform []GoogleCloudPlatformConnection `yaml:"google_cloud_platform" json:"google_cloud_platform"`
-	Snowflake           []SnowflakeConnection           `yaml:"snowflake" json:"snowflake"`
-	Postgres            []PostgresConnection            `yaml:"postgres" json:"postgres"`
-	RedShift            []PostgresConnection            `yaml:"redshift" json:"redshift"`
-	MsSQL               []MsSQLConnection               `yaml:"mssql" json:"mssql"`
-	Databricks          []DatabricksConnection          `yaml:"databricks" json:"databricks"`
-	Synapse             []MsSQLConnection               `yaml:"synapse" json:"synapse"`
-	Mongo               []MongoConnection               `yaml:"mongo" json:"mongo"`
-	MySQL               []MySQLConnection               `yaml:"mysql" json:"mysql"`
-	Notion              []NotionConnection              `yaml:"notion" json:"notion"`
-	HANA                []HANAConnection                `yaml:"hana" json:"hana"`
-	Shopify             []ShopifyConnection             `yaml:"shopify" json:"shopify"`
-	Gorgias             []GorgiasConnection             `yaml:"gorgias" json:"gorgias"`
-	Generic             []GenericConnection             `yaml:"generic" json:"generic"`
+	AwsConnection       []AwsConnection                 `yaml:"aws,omitempty" json:"aws" mapstructure:"aws"`
+	AthenaConnection    []AthenaConnection              `yaml:"athena,omitempty" json:"athena" mapstructure:"athena"`
+	GoogleCloudPlatform []GoogleCloudPlatformConnection `yaml:"google_cloud_platform,omitempty" json:"google_cloud_platform" mapstructure:"google_cloud_platform"`
+	Snowflake           []SnowflakeConnection           `yaml:"snowflake,omitempty" json:"snowflake" mapstructure:"snowflake"`
+	Postgres            []PostgresConnection            `yaml:"postgres,omitempty" json:"postgres" mapstructure:"postgres"`
+	RedShift            []PostgresConnection            `yaml:"redshift,omitempty" json:"redshift" mapstructure:"redshift"`
+	MsSQL               []MsSQLConnection               `yaml:"mssql,omitempty" json:"mssql" mapstructure:"mssql"`
+	Databricks          []DatabricksConnection          `yaml:"databricks,omitempty" json:"databricks" mapstructure:"databricks"`
+	Synapse             []MsSQLConnection               `yaml:"synapse,omitempty" json:"synapse" mapstructure:"synapse"`
+	Mongo               []MongoConnection               `yaml:"mongo,omitempty" json:"mongo" mapstructure:"mongo"`
+	MySQL               []MySQLConnection               `yaml:"mysql,omitempty" json:"mysql" mapstructure:"mysql"`
+	Notion              []NotionConnection              `yaml:"notion,omitempty" json:"notion" mapstructure:"notion"`
+	HANA                []HANAConnection                `yaml:"hana,omitempty" json:"hana" mapstructure:"hana"`
+	Shopify             []ShopifyConnection             `yaml:"shopify,omitempty" json:"shopify" mapstructure:"shopify"`
+	Gorgias             []GorgiasConnection             `yaml:"gorgias,omitempty" json:"gorgias" mapstructure:"gorgias"`
+	Generic             []GenericConnection             `yaml:"generic,omitempty" json:"generic" mapstructure:"generic"`
 
 	byKey       map[string]any
 	typeNameMap map[string]string
@@ -202,6 +203,15 @@ func (c *Connections) ConnectionsSummaryList() map[string]string {
 	}
 
 	return c.typeNameMap
+}
+
+func (c *Connections) Exists(name string) bool {
+	if c.byKey == nil {
+		c.buildConnectionKeyMap()
+	}
+
+	_, ok := c.typeNameMap[name]
+	return ok
 }
 
 func (c *Connections) buildConnectionKeyMap() {
@@ -285,7 +295,7 @@ func (c *Connections) buildConnectionKeyMap() {
 }
 
 type Environment struct {
-	Connections Connections `yaml:"connections" json:"connections"`
+	Connections *Connections `yaml:"connections" json:"connections" mapstructure:"connections"`
 }
 
 func (e *Environment) GetSecretByKey(key string) (string, error) {
@@ -306,10 +316,10 @@ type Config struct {
 	fs   afero.Fs
 	path string
 
-	DefaultEnvironmentName  string                 `yaml:"default_environment" json:"default_environment_name"`
-	SelectedEnvironmentName string                 `yaml:"-" json:"selected_environment_name"`
-	SelectedEnvironment     *Environment           `yaml:"-" json:"selected_environment"`
-	Environments            map[string]Environment `yaml:"environments" json:"environments"`
+	DefaultEnvironmentName  string                 `yaml:"default_environment" json:"default_environment_name" mapstructure:"default_environment_name"`
+	SelectedEnvironmentName string                 `yaml:"-" json:"selected_environment_name" mapstructure:"selected_environment_name"`
+	SelectedEnvironment     *Environment           `yaml:"-" json:"selected_environment" mapstructure:"selected_environment"`
+	Environments            map[string]Environment `yaml:"environments" json:"environments" mapstructure:"environments"`
 }
 
 func (c *Config) GetEnvironmentNames() []string {
@@ -362,11 +372,10 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 		config.DefaultEnvironmentName = "default"
 	}
 
-	e := config.Environments[config.DefaultEnvironmentName]
-
-	config.SelectedEnvironment = &e
-	config.SelectedEnvironmentName = config.DefaultEnvironmentName
-	config.SelectedEnvironment.Connections.buildConnectionKeyMap()
+	err = config.SelectEnvironment(config.DefaultEnvironmentName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select default environment: %w", err)
+	}
 
 	return &config, nil
 }
@@ -382,7 +391,7 @@ func LoadOrCreate(fs afero.Fs, path string) (*Config, error) {
 	}
 
 	defaultEnv := Environment{
-		Connections: Connections{},
+		Connections: &Connections{},
 	}
 	config = &Config{
 		fs:   fs,
@@ -408,4 +417,138 @@ func LoadOrCreate(fs afero.Fs, path string) (*Config, error) {
 
 func ensureConfigIsInGitignore(fs afero.Fs, filePath string) error {
 	return git.EnsureGivenPatternIsInGitignore(fs, filepath.Dir(filePath), filepath.Base(filePath))
+}
+
+func (c *Config) AddConnection(environmentName, name, connType string, creds map[string]interface{}) error {
+	// Check if the environment exists
+	env, exists := c.Environments[environmentName]
+	if !exists {
+		return fmt.Errorf("environment '%s' does not exist", environmentName)
+	}
+
+	switch connType {
+	case "aws":
+		var conn AwsConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.AwsConnection = append(env.Connections.AwsConnection, conn)
+	case "google_cloud_platform":
+		var conn GoogleCloudPlatformConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.GoogleCloudPlatform = append(env.Connections.GoogleCloudPlatform, conn)
+	case "athena":
+		var conn AthenaConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.AthenaConnection = append(env.Connections.AthenaConnection, conn)
+	case "snowflake":
+		var conn SnowflakeConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Snowflake = append(env.Connections.Snowflake, conn)
+	case "postgres":
+		var conn PostgresConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Postgres = append(env.Connections.Postgres, conn)
+	case "redshift":
+		var conn PostgresConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.RedShift = append(env.Connections.RedShift, conn)
+	case "mssql":
+		var conn MsSQLConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.MsSQL = append(env.Connections.MsSQL, conn)
+	case "databricks":
+		var conn DatabricksConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Databricks = append(env.Connections.Databricks, conn)
+	case "synapse":
+		var conn MsSQLConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Synapse = append(env.Connections.Synapse, conn)
+	case "mongo":
+		var conn MongoConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Mongo = append(env.Connections.Mongo, conn)
+	case "mysql":
+		var conn MySQLConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.MySQL = append(env.Connections.MySQL, conn)
+	case "notion":
+		var conn NotionConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Notion = append(env.Connections.Notion, conn)
+	case "hana":
+		var conn HANAConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.HANA = append(env.Connections.HANA, conn)
+	case "shopify":
+		var conn ShopifyConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Shopify = append(env.Connections.Shopify, conn)
+	case "gorgias":
+		var conn GorgiasConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Gorgias = append(env.Connections.Gorgias, conn)
+	case "generic":
+		var conn GenericConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Generic = append(env.Connections.Generic, conn)
+	default:
+		return fmt.Errorf("unsupported connection type: %s", connType)
+	}
+
+	// Update the environment in the config
+	c.Environments[environmentName] = env
+	if environmentName == c.SelectedEnvironmentName {
+		c.SelectedEnvironment = &env
+		c.SelectedEnvironment.Connections.buildConnectionKeyMap()
+	}
+
+	return nil
 }

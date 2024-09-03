@@ -12,8 +12,10 @@ require (
 	github.com/docker/docker v25.0.3+incompatible
 	github.com/fatih/color v1.16.0
 	github.com/go-sql-driver/mysql v1.6.0
+	github.com/go-viper/mapstructure/v2 v2.1.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.5.5
+	github.com/jedib0t/go-pretty/v6 v6.5.9
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/kluctl/go-embed-python v0.0.0-3.12.3-20240415-2
 	github.com/manifoldco/promptui v0.9.0
@@ -109,7 +111,6 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20231201235250-de7065d80cb9 // indirect
 	github.com/jackc/puddle/v2 v2.2.1 // indirect
-	github.com/jedib0t/go-pretty/v6 v6.5.9 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
