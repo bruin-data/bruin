@@ -502,3 +502,105 @@ func TestConfig_AddConnection(t *testing.T) {
 		})
 	}
 }
+
+func TestDeleteConnection(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		envName     string
+		connName    string
+		setupConfig func() *Config
+		expectedErr bool
+	}{
+		{
+			name:     "Delete existing GCP connection",
+			envName:  "default",
+			connName: "gcp-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"default": {
+							Connections: &Connections{
+								GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+									{Name: "gcp-conn", ServiceAccountFile: "file.json", ProjectID: "project"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete existing AWS connection",
+			envName:  "prod",
+			connName: "aws-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"prod": {
+							Connections: &Connections{
+								AwsConnection: []AwsConnection{
+									{Name: "aws-conn", AccessKey: "key", SecretKey: "secret"},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedErr: false,
+		},
+		{
+			name:     "Delete non-existent connection",
+			envName:  "staging",
+			connName: "non-existent-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{
+						"staging": {Connections: &Connections{}},
+					},
+				}
+			},
+			expectedErr: true,
+		},
+		{
+			name:     "Delete from non-existent environment",
+			envName:  "non-existent",
+			connName: "any-conn",
+			setupConfig: func() *Config {
+				return &Config{
+					Environments: map[string]Environment{},
+				}
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			conf := tt.setupConfig()
+
+			err := conf.DeleteConnection(tt.envName, tt.connName)
+
+			if tt.expectedErr {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				env, exists := conf.Environments[tt.envName]
+				assert.True(t, exists)
+
+				switch tt.connName {
+				case "gcp-conn":
+					assert.Empty(t, env.Connections.GoogleCloudPlatform)
+				case "aws-conn":
+					assert.Empty(t, env.Connections.AwsConnection)
+				}
+
+				assert.False(t, env.Connections.Exists(tt.connName))
+			}
+		})
+	}
+}

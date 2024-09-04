@@ -21,6 +21,7 @@ func Connections() *cli.Command {
 		Subcommands: []*cli.Command{
 			ListConnections(),
 			AddConnection(),
+			DeleteConnection(),
 		},
 	}
 }
@@ -58,7 +59,7 @@ func AddConnection() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "environment",
-				Aliases:  []string{"e"},
+				Aliases:  []string{"e", "env"},
 				Usage:    "the name of the environment to add the connection to",
 				Required: true,
 			},
@@ -144,6 +145,80 @@ func AddConnection() *cli.Command {
 			}
 
 			infoPrinter.Printf("Successfully added connection: %s\n", name)
+			return nil
+		},
+	}
+}
+
+func DeleteConnection() *cli.Command {
+	return &cli.Command{
+		Name:  "delete",
+		Usage: "Delete a connection from an environment",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "environment",
+				Aliases:  []string{"e", "env"},
+				Usage:    "the name of the environment to delete the connection from",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "name",
+				Aliases:  []string{"n"},
+				Usage:    "the name of the connection to delete",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:        "output",
+				Aliases:     []string{"o"},
+				DefaultText: "plain",
+				Usage:       "the output type, possible values are: plain, json",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			environment := c.String("environment")
+			name := c.String("name")
+			output := c.String("output")
+
+			repoRoot, err := git.FindRepoFromPath(".")
+			if err != nil {
+				printErrorForOutput(output, errors2.Wrap(err, "failed to find the git repository root"))
+				return cli.Exit("", 1)
+			}
+
+			configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
+			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+			if err != nil {
+				printErrorForOutput(output, errors2.Wrap(err, "failed to load or create config"))
+				return cli.Exit("", 1)
+			}
+
+			err = cm.DeleteConnection(environment, name)
+			if err != nil {
+				printErrorForOutput(output, errors2.Wrap(err, "failed to delete connection"))
+				return cli.Exit("", 1)
+			}
+
+			err = cm.Persist()
+			if err != nil {
+				printErrorForOutput(output, errors2.Wrap(err, "failed to persist config"))
+				return cli.Exit("", 1)
+			}
+
+			if output == "json" {
+				jsonOutput := map[string]string{
+					"status":  "success",
+					"message": fmt.Sprintf("Successfully deleted connection: %s from environment: %s", name, environment),
+				}
+				jsonBytes, err := json.Marshal(jsonOutput)
+				if err != nil {
+					printErrorForOutput(output, errors2.Wrap(err, "failed to marshal JSON"))
+					return cli.Exit("", 1)
+				}
+				fmt.Println(string(jsonBytes))
+				return nil
+			}
+
+			infoPrinter.Printf("Successfully deleted connection: %s from environment: %s\n", name, environment)
 			return nil
 		},
 	}

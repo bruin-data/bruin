@@ -11,8 +11,8 @@ hero:
       text: Getting Started
       link: /getting-started/introduction
     - theme: alt
-      text: API Examples
-      link: /api-examples
+      text: Design Principles
+      link: /getting-started/concepts/design-principles
   image:
     src: /BruinLogo-square.svg
     alt: Bruin

@@ -24,6 +24,13 @@ export default defineConfig({
                 ],
             },
             {
+                text: "Commands",
+                items: [
+                    {text: "Init", link: "/commands/init"},
+                    {text: "Connections", link: "/commands/connections"},
+                ],
+            },
+            {
                 text: "Connections",
                 items: [
                     {

@@ -27,6 +27,10 @@ type PostgresConnection struct {
 	SslMode      string `yaml:"ssl_mode" json:"ssl_mode" mapstructure:"ssl_mode" default:"disable"`
 }
 
+func (c PostgresConnection) GetName() string {
+	return c.Name
+}
+
 type MsSQLConnection struct {
 	Name     string `yaml:"name" json:"name" mapstructure:"name"`
 	Username string `yaml:"username" json:"username" mapstructure:"username"`
@@ -36,12 +40,20 @@ type MsSQLConnection struct {
 	Database string `yaml:"database" json:"database" mapstructure:"database"`
 }
 
+func (c MsSQLConnection) GetName() string {
+	return c.Name
+}
+
 type DatabricksConnection struct {
 	Name  string `yaml:"name"  json:"name" mapstructure:"name"`
 	Token string `yaml:"token" json:"token" mapstructure:"token"`
 	Path  string `yaml:"path"  json:"path" mapstructure:"path"`
 	Host  string `yaml:"host"  json:"host" mapstructure:"host"`
 	Port  int    `yaml:"port"  json:"port" mapstructure:"port"`
+}
+
+func (c DatabricksConnection) GetName() string {
+	return c.Name
 }
 
 type GoogleCloudPlatformConnection struct {
@@ -53,65 +65,31 @@ type GoogleCloudPlatformConnection struct {
 	rawCredentials     *google.Credentials
 }
 
-type MongoConnection struct {
-	Name     string `yaml:"name" json:"name" mapstructure:"name"`
-	Username string `yaml:"username" json:"username" mapstructure:"username"`
-	Password string `yaml:"password" json:"password" mapstructure:"password"`
-	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
-	Port     int    `yaml:"port"     json:"port" mapstructure:"port"`
-	Database string `yaml:"database" json:"database" mapstructure:"database"`
+func (c GoogleCloudPlatformConnection) GetName() string {
+	return c.Name
 }
 
-type ShopifyConnection struct {
-	Name   string `yaml:"name" json:"name" mapstructure:"name"`
-	URL    string `yaml:"url" json:"url" mapstructure:"url"`
-	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
-}
+func (c GoogleCloudPlatformConnection) MarshalYAML() (interface{}, error) {
+	m := make(map[string]interface{})
 
-type AwsConnection struct {
-	Name      string `yaml:"name" json:"name" mapstructure:"name"`
-	AccessKey string `yaml:"access_key" json:"access_key" mapstructure:"access_key"`
-	SecretKey string `yaml:"secret_key" json:"secret_key" mapstructure:"secret_key"`
-}
+	if c.Name != "" {
+		m["name"] = c.Name
+	}
+	if c.ProjectID != "" {
+		m["project_id"] = c.ProjectID
+	}
+	if c.Location != "" {
+		m["location"] = c.Location
+	}
 
-type AthenaConnection struct {
-	Name             string `yaml:"name" json:"name" mapstructure:"name"`
-	AccessKey        string `yaml:"access_key" json:"access_key" mapstructure:"access_key"`
-	SecretKey        string `yaml:"secret_key" json:"secret_key" mapstructure:"secret_key"`
-	QueryResultsPath string `yaml:"query_results_path" json:"query_results_path" mapstructure:"query_results_path"`
-	Region           string `yaml:"region" json:"region" mapstructure:"region"`
-	Database         string `yaml:"database" json:"database" mapstructure:"database"`
-}
+	// Include only one of ServiceAccountJSON or ServiceAccountFile, whichever is not empty
+	if c.ServiceAccountJSON != "" {
+		m["service_account_json"] = c.ServiceAccountJSON
+	} else if c.ServiceAccountFile != "" {
+		m["service_account_file"] = c.ServiceAccountFile
+	}
 
-type GorgiasConnection struct {
-	Name   string `yaml:"name" json:"name" mapstructure:"name"`
-	Domain string `yaml:"domain" json:"domain" mapstructure:"domain"`
-	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
-	Email  string `yaml:"email" json:"email" mapstructure:"email"`
-}
-
-type MySQLConnection struct {
-	Name     string `yaml:"name" json:"name" mapstructure:"name"`
-	Username string `yaml:"username" json:"username" mapstructure:"username"`
-	Password string `yaml:"password" json:"password" mapstructure:"password"`
-	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
-	Port     int    `yaml:"port"     json:"port" mapstructure:"port"`
-	Database string `yaml:"database" json:"database" mapstructure:"database"`
-	Driver   string `yaml:"driver" json:"driver" mapstructure:"driver"`
-}
-
-type NotionConnection struct {
-	Name   string `yaml:"name" json:"name" mapstructure:"name"`
-	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
-}
-
-type HANAConnection struct {
-	Name     string `yaml:"name" json:"name" mapstructure:"name"`
-	Username string `yaml:"username" json:"username" mapstructure:"username"`
-	Password string `yaml:"password" json:"password" mapstructure:"password"`
-	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
-	Port     int    `yaml:"port"     json:"port" mapstructure:"port"`
-	Database string `yaml:"database" json:"database" mapstructure:"database"`
+	return m, nil
 }
 
 func (c *GoogleCloudPlatformConnection) SetCredentials(cred *google.Credentials) {
@@ -136,6 +114,99 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 		"service_account_json": c.ServiceAccountJSON,
 		"project_id":           c.ProjectID,
 	})
+}
+
+type MongoConnection struct {
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port"     json:"port" mapstructure:"port"`
+	Database string `yaml:"database" json:"database" mapstructure:"database"`
+}
+
+func (c MongoConnection) GetName() string {
+	return c.Name
+}
+
+type ShopifyConnection struct {
+	Name   string `yaml:"name" json:"name" mapstructure:"name"`
+	URL    string `yaml:"url" json:"url" mapstructure:"url"`
+	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c ShopifyConnection) GetName() string {
+	return c.Name
+}
+
+type AwsConnection struct {
+	Name      string `yaml:"name" json:"name" mapstructure:"name"`
+	AccessKey string `yaml:"access_key" json:"access_key" mapstructure:"access_key"`
+	SecretKey string `yaml:"secret_key" json:"secret_key" mapstructure:"secret_key"`
+}
+
+func (c AwsConnection) GetName() string {
+	return c.Name
+}
+
+type AthenaConnection struct {
+	Name             string `yaml:"name" json:"name" mapstructure:"name"`
+	AccessKey        string `yaml:"access_key" json:"access_key" mapstructure:"access_key"`
+	SecretKey        string `yaml:"secret_key" json:"secret_key" mapstructure:"secret_key"`
+	QueryResultsPath string `yaml:"query_results_path" json:"query_results_path" mapstructure:"query_results_path"`
+	Region           string `yaml:"region" json:"region" mapstructure:"region"`
+	Database         string `yaml:"database" json:"database" mapstructure:"database"`
+}
+
+func (c AthenaConnection) GetName() string {
+	return c.Name
+}
+
+type GorgiasConnection struct {
+	Name   string `yaml:"name" json:"name" mapstructure:"name"`
+	Domain string `yaml:"domain" json:"domain" mapstructure:"domain"`
+	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+	Email  string `yaml:"email" json:"email" mapstructure:"email"`
+}
+
+func (c GorgiasConnection) GetName() string {
+	return c.Name
+}
+
+type MySQLConnection struct {
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port"     json:"port" mapstructure:"port"`
+	Database string `yaml:"database" json:"database" mapstructure:"database"`
+	Driver   string `yaml:"driver" json:"driver" mapstructure:"driver"`
+}
+
+func (c MySQLConnection) GetName() string {
+	return c.Name
+}
+
+type NotionConnection struct {
+	Name   string `yaml:"name" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c NotionConnection) GetName() string {
+	return c.Name
+}
+
+type HANAConnection struct {
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port"     json:"port" mapstructure:"port"`
+	Database string `yaml:"database" json:"database" mapstructure:"database"`
+}
+
+func (c HANAConnection) GetName() string {
+	return c.Name
 }
 
 type SnowflakeConnection struct {
@@ -163,6 +234,10 @@ func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
 	})
 }
 
+func (c *SnowflakeConnection) GetName() string {
+	return c.Name
+}
+
 type GenericConnection struct {
 	Name  string `yaml:"name" json:"name" mapstructure:"name"`
 	Value string `yaml:"value" json:"value" mapstructure:"value"`
@@ -173,6 +248,10 @@ func (c GenericConnection) MarshalJSON() ([]byte, error) {
 		"name":  c.Name,
 		"value": c.Value,
 	})
+}
+
+func (c GenericConnection) GetName() string {
+	return c.Name
 }
 
 type Connections struct {
@@ -551,4 +630,74 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 	}
 
 	return nil
+}
+
+func (c *Config) DeleteConnection(environmentName, connectionName string) error {
+	err := c.SelectEnvironment(environmentName)
+	if err != nil {
+		return err
+	}
+
+	env, exists := c.Environments[environmentName]
+	if !exists {
+		return fmt.Errorf("environment '%s' does not exist", environmentName)
+	}
+
+	connType, exists := env.Connections.typeNameMap[connectionName]
+	if !exists {
+		return fmt.Errorf("connection '%s' does not exist in environment '%s'", connectionName, environmentName)
+	}
+
+	switch connType {
+	case "google_cloud_platform":
+		env.Connections.GoogleCloudPlatform = removeConnection(env.Connections.GoogleCloudPlatform, connectionName)
+	case "mssql":
+		env.Connections.MsSQL = removeConnection(env.Connections.MsSQL, connectionName)
+	case "databricks":
+		env.Connections.Databricks = removeConnection(env.Connections.Databricks, connectionName)
+	case "mongo":
+		env.Connections.Mongo = removeConnection(env.Connections.Mongo, connectionName)
+	case "aws":
+		env.Connections.AwsConnection = removeConnection(env.Connections.AwsConnection, connectionName)
+	case "athena":
+		env.Connections.AthenaConnection = removeConnection(env.Connections.AthenaConnection, connectionName)
+	case "mysql":
+		env.Connections.MySQL = removeConnection(env.Connections.MySQL, connectionName)
+	case "notion":
+		env.Connections.Notion = removeConnection(env.Connections.Notion, connectionName)
+	case "hana":
+		env.Connections.HANA = removeConnection(env.Connections.HANA, connectionName)
+	case "shopify":
+		env.Connections.Shopify = removeConnection(env.Connections.Shopify, connectionName)
+	case "gorgias":
+		env.Connections.Gorgias = removeConnection(env.Connections.Gorgias, connectionName)
+	case "generic":
+		env.Connections.Generic = removeConnection(env.Connections.Generic, connectionName)
+	default:
+		return fmt.Errorf("unsupported connection type: %s", connType)
+	}
+
+	// Update the environment in the config
+	c.Environments[environmentName] = env
+	if environmentName == c.SelectedEnvironmentName {
+		c.SelectedEnvironment = &env
+		c.SelectedEnvironment.Connections.buildConnectionKeyMap()
+	}
+
+	delete(env.Connections.typeNameMap, connectionName)
+
+	return nil
+}
+
+type Named interface {
+	GetName() string
+}
+
+func removeConnection[T interface{ GetName() string }](connections []T, name string) []T {
+	for i, conn := range connections {
+		if conn.GetName() == name {
+			return append(connections[:i], connections[i+1:]...)
+		}
+	}
+	return connections
 }
