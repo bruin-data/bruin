@@ -83,10 +83,10 @@ func (c GoogleCloudPlatformConnection) MarshalYAML() (interface{}, error) {
 	}
 
 	// Include only one of ServiceAccountJSON or ServiceAccountFile, whichever is not empty
-	if c.ServiceAccountJSON != "" {
-		m["service_account_json"] = c.ServiceAccountJSON
-	} else if c.ServiceAccountFile != "" {
+	if c.ServiceAccountFile != "" {
 		m["service_account_file"] = c.ServiceAccountFile
+	} else if c.ServiceAccountJSON != "" {
+		m["service_account_json"] = c.ServiceAccountJSON
 	}
 
 	return m, nil
@@ -111,7 +111,9 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(map[string]string{
+		"name":                 c.Name,
 		"service_account_json": c.ServiceAccountJSON,
+		"service_account_file": c.ServiceAccountFile,
 		"project_id":           c.ProjectID,
 	})
 }
@@ -255,22 +257,22 @@ func (c GenericConnection) GetName() string {
 }
 
 type Connections struct {
-	AwsConnection       []AwsConnection                 `yaml:"aws,omitempty" json:"aws" mapstructure:"aws"`
-	AthenaConnection    []AthenaConnection              `yaml:"athena,omitempty" json:"athena" mapstructure:"athena"`
-	GoogleCloudPlatform []GoogleCloudPlatformConnection `yaml:"google_cloud_platform,omitempty" json:"google_cloud_platform" mapstructure:"google_cloud_platform"`
-	Snowflake           []SnowflakeConnection           `yaml:"snowflake,omitempty" json:"snowflake" mapstructure:"snowflake"`
-	Postgres            []PostgresConnection            `yaml:"postgres,omitempty" json:"postgres" mapstructure:"postgres"`
-	RedShift            []PostgresConnection            `yaml:"redshift,omitempty" json:"redshift" mapstructure:"redshift"`
-	MsSQL               []MsSQLConnection               `yaml:"mssql,omitempty" json:"mssql" mapstructure:"mssql"`
-	Databricks          []DatabricksConnection          `yaml:"databricks,omitempty" json:"databricks" mapstructure:"databricks"`
-	Synapse             []MsSQLConnection               `yaml:"synapse,omitempty" json:"synapse" mapstructure:"synapse"`
-	Mongo               []MongoConnection               `yaml:"mongo,omitempty" json:"mongo" mapstructure:"mongo"`
-	MySQL               []MySQLConnection               `yaml:"mysql,omitempty" json:"mysql" mapstructure:"mysql"`
-	Notion              []NotionConnection              `yaml:"notion,omitempty" json:"notion" mapstructure:"notion"`
-	HANA                []HANAConnection                `yaml:"hana,omitempty" json:"hana" mapstructure:"hana"`
-	Shopify             []ShopifyConnection             `yaml:"shopify,omitempty" json:"shopify" mapstructure:"shopify"`
-	Gorgias             []GorgiasConnection             `yaml:"gorgias,omitempty" json:"gorgias" mapstructure:"gorgias"`
-	Generic             []GenericConnection             `yaml:"generic,omitempty" json:"generic" mapstructure:"generic"`
+	AwsConnection       []AwsConnection                 `yaml:"aws,omitempty" json:"aws,omitempty" mapstructure:"aws"`
+	AthenaConnection    []AthenaConnection              `yaml:"athena,omitempty" json:"athena,omitempty" mapstructure:"athena"`
+	GoogleCloudPlatform []GoogleCloudPlatformConnection `yaml:"google_cloud_platform,omitempty" json:"google_cloud_platform,omitempty" mapstructure:"google_cloud_platform"`
+	Snowflake           []SnowflakeConnection           `yaml:"snowflake,omitempty" json:"snowflake,omitempty" mapstructure:"snowflake"`
+	Postgres            []PostgresConnection            `yaml:"postgres,omitempty" json:"postgres,omitempty" mapstructure:"postgres"`
+	RedShift            []PostgresConnection            `yaml:"redshift,omitempty" json:"redshift,omitempty" mapstructure:"redshift"`
+	MsSQL               []MsSQLConnection               `yaml:"mssql,omitempty" json:"mssql,omitempty" mapstructure:"mssql"`
+	Databricks          []DatabricksConnection          `yaml:"databricks,omitempty" json:"databricks,omitempty" mapstructure:"databricks"`
+	Synapse             []MsSQLConnection               `yaml:"synapse,omitempty" json:"synapse,omitempty" mapstructure:"synapse"`
+	Mongo               []MongoConnection               `yaml:"mongo,omitempty" json:"mongo,omitempty" mapstructure:"mongo"`
+	MySQL               []MySQLConnection               `yaml:"mysql,omitempty" json:"mysql,omitempty" mapstructure:"mysql"`
+	Notion              []NotionConnection              `yaml:"notion,omitempty" json:"notion,omitempty" mapstructure:"notion"`
+	HANA                []HANAConnection                `yaml:"hana,omitempty" json:"hana,omitempty" mapstructure:"hana"`
+	Shopify             []ShopifyConnection             `yaml:"shopify,omitempty" json:"shopify,omitempty" mapstructure:"shopify"`
+	Gorgias             []GorgiasConnection             `yaml:"gorgias,omitempty" json:"gorgias,omitempty" mapstructure:"gorgias"`
+	Generic             []GenericConnection             `yaml:"generic,omitempty" json:"generic,omitempty" mapstructure:"generic"`
 
 	byKey       map[string]any
 	typeNameMap map[string]string
