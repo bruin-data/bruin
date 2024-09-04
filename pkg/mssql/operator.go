@@ -84,7 +84,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOperator {
 	return ansisql.NewColumnCheckOperator(map[string]ansisql.CheckRunner{
 		"not_null":        ansisql.NewNotNullCheck(manager),
-		"unique":          ansisql.NewUniqueCheck(manager),
+		"unique":          &UniqueCheck{conn: manager},
 		"positive":        ansisql.NewPositiveCheck(manager),
 		"non_negative":    ansisql.NewNonNegativeCheck(manager),
 		"negative":        ansisql.NewNegativeCheck(manager),
