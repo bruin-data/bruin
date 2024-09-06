@@ -64,6 +64,7 @@ export default defineConfig({
                         {text: "Synapse", link: "/assets/synapse"},
                         {text: "Redshift", link: "/assets/redshift"},
                     ]},
+                    {text: "Materialization", link: "/assets/materialization"},
                 ],
             },
             {

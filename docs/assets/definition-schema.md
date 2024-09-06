@@ -59,7 +59,7 @@ In other words, the asset will be executed only when all of the assets in the `d
 - **Type:** `String[]`
 
 ## `materialization`
-This option determines how the asset will be materialized. Bruin knows about various materialization strategies, refer to the docs on [materialization](./templating) for more details.
+This option determines how the asset will be materialized. Bruin knows about various materialization strategies, refer to the docs on [materialization](./materialization) for more details.
 
 - **Type:** `Object`
 - **Keys:** 
@@ -99,6 +99,7 @@ The strategy used for the materialization, can be one of the following:
 - `create+replace`: overwrite the existing table with the new version.
 - `delete+insert`: incrementally update the table by only refreshing a certain partition.
 - `append`: only append the new data to the table, never overwrite.
+- `merge`: merge the existing records with the new records, requires a primary key to be set.
 
 ### `materialization > partition_by`
 Define the column that will be used for the partitioning of the resulting table. This is used to instruct the data warehouse to set the column for the partition key.
