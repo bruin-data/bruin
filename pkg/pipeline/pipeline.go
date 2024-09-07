@@ -95,7 +95,7 @@ func (b *DefaultTrueBool) UnmarshalJSON(data []byte) error {
 
 func (b DefaultTrueBool) MarshalJSON() ([]byte, error) {
 	if b.Value == nil {
-		return json.Marshal(true)
+		return []byte("true"), nil
 	}
 
 	return json.Marshal(*b.Value)
@@ -185,7 +185,7 @@ type Materialization struct {
 
 func (m Materialization) MarshalJSON() ([]byte, error) {
 	if m.Type == "" && m.Strategy == "" && m.PartitionBy == "" && len(m.ClusterBy) == 0 && m.IncrementalKey == "" {
-		return json.Marshal(nil)
+		return []byte("null"), nil
 	}
 
 	type Alias Materialization
@@ -225,7 +225,7 @@ func (ccv *ColumnCheckValue) MarshalJSON() ([]byte, error) {
 		return json.Marshal(ccv.Bool)
 	}
 
-	return json.Marshal(nil)
+	return []byte("null"), nil
 }
 
 func (ccv *ColumnCheckValue) UnmarshalJSON(data []byte) error {
@@ -397,7 +397,7 @@ type AthenaConfig struct {
 
 func (s SnowflakeConfig) MarshalJSON() ([]byte, error) {
 	if s.Warehouse == "" {
-		return json.Marshal(nil)
+		return []byte("null"), nil
 	}
 
 	return json.Marshal(s)
@@ -405,7 +405,7 @@ func (s SnowflakeConfig) MarshalJSON() ([]byte, error) {
 
 func (s AthenaConfig) MarshalJSON() ([]byte, error) {
 	if s.Location == "" {
-		return json.Marshal(nil)
+		return []byte("null"), nil
 	}
 
 	return json.Marshal(s)
@@ -626,7 +626,7 @@ type EmptyStringArray []string
 
 func (a EmptyStringArray) MarshalJSON() ([]byte, error) {
 	if a == nil {
-		return json.Marshal([]string{})
+		return []byte{'[', ']'}, nil
 	}
 
 	return json.Marshal([]string(a))
@@ -654,7 +654,7 @@ type AssetCollection []*Asset
 
 func (ac AssetCollection) MarshalJSON() ([]byte, error) {
 	if ac == nil {
-		return []byte("[]"), nil
+		return []byte{'[', ']'}, nil
 	}
 	dst := bytes.NewBuffer(make([]byte, 0, len(ac)*100))
 	enc := json.NewEncoder(dst)
