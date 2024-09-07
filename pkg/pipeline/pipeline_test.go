@@ -2,14 +2,15 @@ package pipeline_test
 
 import (
 	"encoding/json"
+	"github.com/bruin-data/bruin/cmd"
 	"log"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
-	"github.com/bruin-data/bruin/cmd"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
@@ -781,9 +782,47 @@ func TestCustomMarshal(t *testing.T) {
 
 	asset1 := &pipeline.Asset{}
 
-	marshalled, err := json.Marshal(asset1)
+	marshalled, err := json.Marshal(pipeline.AssetCollection{asset1})
 	require.NoError(t, err)
 
 	require.Contains(t, string(marshalled), "\"upstreams\":[]")
 	require.Contains(t, string(marshalled), "\"upstream\":[]")
+}
+
+func generateRandomContent() string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const length = 5000
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
+}
+
+func BenchmarkAssetMarshalJSON(b *testing.B) {
+	assets := make(pipeline.AssetCollection, 0)
+	for i := 0; i < 1000; i++ {
+		assets = append(assets, &pipeline.Asset{
+			ID:   "test-asset",
+			Name: "Test Asset",
+			Type: pipeline.AssetTypeBigqueryQuery,
+			Upstreams: []pipeline.Upstream{
+				{Type: "asset", Value: "upstream1"},
+				{Type: "asset", Value: "upstream2"},
+				{Type: "non-asset", Value: "other"},
+			},
+			ExecutableFile: pipeline.ExecutableFile{
+				Name:    "dadada",
+				Content: generateRandomContent(),
+			},
+		})
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := json.Marshal(assets)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
 }

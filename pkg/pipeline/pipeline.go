@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -439,7 +440,7 @@ type Asset struct {
 	Upstreams  []Upstream `json:"upstreams"`
 }
 
-func (a *Asset) MarshalJSON() ([]byte, error) {
+func (a *Asset) AppendJSON(enc *json.Encoder) error {
 	type Alias struct {
 		Asset
 		DependsOn []string `json:"upstream"`
@@ -461,7 +462,7 @@ func (a *Asset) MarshalJSON() ([]byte, error) {
 		asset.DependsOn = append(asset.DependsOn, u.Value)
 	}
 
-	return json.Marshal(asset)
+	return enc.Encode(asset)
 }
 
 func (a *Asset) AddUpstream(asset *Asset) {
@@ -655,8 +656,17 @@ func (ac AssetCollection) MarshalJSON() ([]byte, error) {
 	if ac == nil {
 		return []byte("[]"), nil
 	}
-
-	return json.Marshal([]*Asset(ac))
+	dst := bytes.NewBuffer(make([]byte, 0, len(ac)*100))
+	enc := json.NewEncoder(dst)
+	dst.WriteByte('[')
+	for i, a := range ac {
+		if i > 0 {
+			dst.WriteByte(',')
+		}
+		a.AppendJSON(enc)
+	}
+	dst.WriteByte(']')
+	return dst.Bytes(), nil
 }
 
 func PipelineFromPath(filePath string, fs afero.Fs) (*Pipeline, error) {
