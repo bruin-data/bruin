@@ -2,7 +2,6 @@ package pipeline_test
 
 import (
 	"encoding/json"
-	"github.com/bruin-data/bruin/cmd"
 	"log"
 	"math/rand"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bruin-data/bruin/cmd"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
@@ -777,18 +777,6 @@ func TestPipeline_GetAssetByName(t *testing.T) {
 	assert.Nil(t, p.GetAssetByName("somerandomasset"))
 }
 
-func TestCustomMarshal(t *testing.T) {
-	t.Parallel()
-
-	asset1 := &pipeline.Asset{}
-
-	marshalled, err := json.Marshal(pipeline.AssetCollection{asset1})
-	require.NoError(t, err)
-
-	require.Contains(t, string(marshalled), "\"upstreams\":[]")
-	require.Contains(t, string(marshalled), "\"upstream\":[]")
-}
-
 func generateRandomContent() string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	const length = 5000
@@ -800,7 +788,7 @@ func generateRandomContent() string {
 }
 
 func BenchmarkAssetMarshalJSON(b *testing.B) {
-	assets := make(pipeline.AssetCollection, 0)
+	assets := make([]*pipeline.Asset, 0)
 	for i := 0; i < 1000; i++ {
 		assets = append(assets, &pipeline.Asset{
 			ID:   "test-asset",

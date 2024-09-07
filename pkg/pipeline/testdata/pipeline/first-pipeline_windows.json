@@ -39,9 +39,6 @@
       },
       "connection": "conn1",
       "secrets": [],
-      "upstream": [
-        "gcs-to-bq"
-      ],
       "athena": null,
       "upstreams": [
         {
@@ -83,7 +80,6 @@
       },
       "connection": "",
       "secrets": [],
-      "upstream": [],
       "upstreams": [],
       "materialization": null,
       "columns": [],
@@ -119,14 +115,6 @@
       },
       "connection": "first-connection",
       "secrets": [],
-      "upstream": [
-        "task1",
-        "task2",
-        "task3",
-        "task4",
-        "task5",
-        "task3"
-      ],
       "upstreams": [
         {
           "type": "asset",
@@ -186,14 +174,6 @@
       },
       "connection": "conn2",
       "secrets": [],
-      "upstream": [
-        "task1",
-        "task2",
-        "task3",
-        "task4",
-        "task5",
-        "task3"
-      ],
       "upstreams": [
         {
           "type": "asset",

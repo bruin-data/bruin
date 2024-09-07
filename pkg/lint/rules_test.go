@@ -2045,7 +2045,7 @@ func TestUsedTableValidatorRule_ValidateAsset(t *testing.T) {
 	t.Parallel()
 
 	pp := &pipeline.Pipeline{
-		Assets: pipeline.AssetCollection{
+		Assets: []*pipeline.Asset{
 			{
 				Name: "asset1",
 			},

@@ -37,7 +37,6 @@
       },
       "connection": "",
       "secrets": [],
-      "upstream": [],
       "athena": null,
       "upstreams": [],
       "materialization": null,
@@ -73,7 +72,6 @@
       },
       "connection": "",
       "secrets": [],
-      "upstream": [],
       "upstreams": [],
       "athena": null,
       "materialization": null,
@@ -120,13 +118,6 @@
           "secret_key": "secret2",
           "injected_key": "secret2"
         }
-      ],
-      "upstream": [
-        "task1",
-        "task2",
-        "task3",
-        "task4",
-        "task5"
       ],
       "athena": null,
       "upstreams": [

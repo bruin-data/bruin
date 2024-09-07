@@ -53,9 +53,6 @@
           "type": "asset",
           "value": "gcs-to-bq"
         }
-      ],
-      "upstream": [
-        "gcs-to-bq"
       ]
     },
     {
@@ -91,8 +88,7 @@
       "tags": [],
       "snowflake": null,
       "athena": null,
-      "upstreams": [],
-      "upstream": []
+      "upstreams": []
     },
     {
       "id": "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
@@ -152,14 +148,6 @@
           "type": "asset",
           "value": "task3"
         }
-      ],
-      "upstream": [
-        "task1",
-        "task2",
-        "task3",
-        "task4",
-        "task5",
-        "task3"
       ]
     },
     {
@@ -219,14 +207,6 @@
           "type": "asset",
           "value": "task3"
         }
-      ],
-      "upstream": [
-        "task1",
-        "task2",
-        "task3",
-        "task4",
-        "task5",
-        "task3"
       ]
     }
   ],

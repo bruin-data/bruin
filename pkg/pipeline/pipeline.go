@@ -1,7 +1,6 @@
 package pipeline
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -440,31 +439,6 @@ type Asset struct {
 	Upstreams  []Upstream `json:"upstreams"`
 }
 
-func (a *Asset) AppendJSON(enc *json.Encoder) error {
-	type Alias struct {
-		Asset
-		DependsOn []string `json:"upstream"`
-	}
-
-	if a.Upstreams == nil {
-		a.Upstreams = make([]Upstream, 0)
-	}
-
-	asset := Alias{
-		Asset:     *a,
-		DependsOn: make([]string, 0),
-	}
-
-	for _, u := range a.Upstreams {
-		if u.Type != "asset" {
-			continue
-		}
-		asset.DependsOn = append(asset.DependsOn, u.Value)
-	}
-
-	return enc.Encode(asset)
-}
-
 func (a *Asset) AddUpstream(asset *Asset) {
 	a.upstream = append(a.upstream, asset)
 }
@@ -650,25 +624,6 @@ func (a *EmptyStringArray) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type AssetCollection []*Asset
-
-func (ac AssetCollection) MarshalJSON() ([]byte, error) {
-	if ac == nil {
-		return []byte{'[', ']'}, nil
-	}
-	dst := bytes.NewBuffer(make([]byte, 0, len(ac)*100))
-	enc := json.NewEncoder(dst)
-	dst.WriteByte('[')
-	for i, a := range ac {
-		if i > 0 {
-			dst.WriteByte(',')
-		}
-		a.AppendJSON(enc)
-	}
-	dst.WriteByte(']')
-	return dst.Bytes(), nil
-}
-
 func PipelineFromPath(filePath string, fs afero.Fs) (*Pipeline, error) {
 	yamlError := new(path.YamlParseError)
 	var pl Pipeline
@@ -680,21 +635,22 @@ func PipelineFromPath(filePath string, fs afero.Fs) (*Pipeline, error) {
 		return nil, errors.Wrapf(err, "error parsing bruin pipeline file at '%s'", filePath)
 	}
 
+	pl.Assets = make([]*Asset, 0)
 	return &pl, nil
 }
 
 type Pipeline struct {
-	LegacyID           string          `yaml:"id" json:"legacy_id"`
-	Name               string          `yaml:"name" json:"name"`
-	Schedule           schedule        `yaml:"schedule" json:"schedule"`
-	StartDate          string          `yaml:"start_date" json:"start_date"`
-	DefinitionFile     DefinitionFile  `json:"definition_file"`
-	DefaultParameters  EmptyStringMap  `yaml:"default_parameters" json:"default_parameters"`
-	DefaultConnections EmptyStringMap  `yaml:"default_connections" json:"default_connections"`
-	Assets             AssetCollection `json:"assets"`
-	Notifications      Notifications   `yaml:"notifications" json:"notifications"`
-	Catchup            bool            `yaml:"catchup" json:"catchup"`
-	Retries            int             `yaml:"retries" json:"retries"`
+	LegacyID           string         `yaml:"id" json:"legacy_id"`
+	Name               string         `yaml:"name" json:"name"`
+	Schedule           schedule       `yaml:"schedule" json:"schedule"`
+	StartDate          string         `yaml:"start_date" json:"start_date"`
+	DefinitionFile     DefinitionFile `json:"definition_file"`
+	DefaultParameters  EmptyStringMap `yaml:"default_parameters" json:"default_parameters"`
+	DefaultConnections EmptyStringMap `yaml:"default_connections" json:"default_connections"`
+	Assets             []*Asset       `json:"assets"`
+	Notifications      Notifications  `yaml:"notifications" json:"notifications"`
+	Catchup            bool           `yaml:"catchup" json:"catchup"`
+	Retries            int            `yaml:"retries" json:"retries"`
 
 	TasksByType map[AssetType][]*Asset `json:"-"`
 	tasksByName map[string]*Asset
