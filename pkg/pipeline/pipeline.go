@@ -598,7 +598,7 @@ type EmptyStringMap map[string]string
 
 func (m EmptyStringMap) MarshalJSON() ([]byte, error) { //nolint: stylecheck
 	if m == nil {
-		return json.Marshal(map[string]string{})
+		return []byte{'{', '}'}, nil
 	}
 
 	return json.Marshal(map[string]string(m))
