@@ -432,8 +432,6 @@ type Asset struct {
 	Snowflake       SnowflakeConfig    `json:"snowflake"`
 	Athena          AthenaConfig       `json:"athena"`
 
-	Pipeline *Pipeline `json:"-"`
-
 	upstream   []*Asset
 	downstream []*Asset
 	Upstreams  []Upstream `json:"upstreams"`
