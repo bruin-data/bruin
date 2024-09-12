@@ -225,6 +225,7 @@ type SnowflakeConnection struct {
 
 func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]string{
+		"name":      c.Name,
 		"account":   c.Account,
 		"username":  c.Username,
 		"password":  c.Password,

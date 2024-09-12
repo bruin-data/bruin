@@ -3,7 +3,6 @@ package pipeline_test
 import (
 	"encoding/json"
 	"log"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -777,38 +776,13 @@ func TestPipeline_GetAssetByName(t *testing.T) {
 	assert.Nil(t, p.GetAssetByName("somerandomasset"))
 }
 
-func generateRandomContent() string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	const length = 5000
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
-	}
-	return string(b)
-}
-
 func BenchmarkAssetMarshalJSON(b *testing.B) {
-	assets := make([]*pipeline.Asset, 0)
-	for i := 0; i < 1000; i++ {
-		assets = append(assets, &pipeline.Asset{
-			ID:   "test-asset",
-			Name: "Test Asset",
-			Type: pipeline.AssetTypeBigqueryQuery,
-			Upstreams: []pipeline.Upstream{
-				{Type: "asset", Value: "upstream1"},
-				{Type: "asset", Value: "upstream2"},
-				{Type: "non-asset", Value: "other"},
-			},
-			ExecutableFile: pipeline.ExecutableFile{
-				Name:    "dadada",
-				Content: generateRandomContent(),
-			},
-		})
-	}
+	got, err := cmd.DefaultPipelineBuilder.CreatePipelineFromPath("./testdata/pipeline/first-pipeline")
+	require.NoError(b, err)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := json.Marshal(assets)
+		_, err := json.Marshal(got)
 		if err != nil {
 			b.Fatal(err)
 		}
