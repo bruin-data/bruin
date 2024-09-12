@@ -237,7 +237,7 @@ func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (c *SnowflakeConnection) GetName() string {
+func (c SnowflakeConnection) GetName() string {
 	return c.Name
 }
 
@@ -664,6 +664,10 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.AwsConnection = removeConnection(env.Connections.AwsConnection, connectionName)
 	case "athena":
 		env.Connections.AthenaConnection = removeConnection(env.Connections.AthenaConnection, connectionName)
+	case "postgres":
+		env.Connections.Postgres = removeConnection(env.Connections.Postgres, connectionName)
+	case "redshift":
+		env.Connections.RedShift = removeConnection(env.Connections.RedShift, connectionName)
 	case "mysql":
 		env.Connections.MySQL = removeConnection(env.Connections.MySQL, connectionName)
 	case "notion":
@@ -672,6 +676,10 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.HANA = removeConnection(env.Connections.HANA, connectionName)
 	case "shopify":
 		env.Connections.Shopify = removeConnection(env.Connections.Shopify, connectionName)
+	case "snowflake":
+		env.Connections.Snowflake = removeConnection(env.Connections.Snowflake, connectionName)
+	case "synapse":
+		env.Connections.Synapse = removeConnection(env.Connections.Synapse, connectionName)
 	case "gorgias":
 		env.Connections.Gorgias = removeConnection(env.Connections.Gorgias, connectionName)
 	case "generic":
