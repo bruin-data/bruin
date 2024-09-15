@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -55,6 +56,11 @@ func Format(isDebug *bool) *cli.Command {
 			assetFinderPool := pool.New().WithMaxGoroutines(32)
 			assetPaths := path.GetAllPossibleAssetPaths(repoOrAsset, assetsDirectoryNames, pipeline.SupportedFileSuffixes)
 
+			if len(assetPaths) == 0 {
+				infoPrinter.Println("No assets were found in the given path, aborting.")
+				return cli.Exit("", 1)
+			}
+
 			logger.Debugf("found %d asset paths", len(assetPaths))
 
 			errorList := make([]error, 0)
@@ -85,10 +91,38 @@ func Format(isDebug *bool) *cli.Command {
 
 			assetFinderPool.Wait()
 			if len(errorList) == 0 {
-				infoPrinter.Printf("Successfully processed %d assets.\n", processedAssetCount)
+				if output == "json" {
+					return nil
+				}
+
+				if processedAssetCount == 0 {
+					infoPrinter.Println("No actual assets were found in the given path, nothing has changed.")
+					return nil
+				}
+
+				assetStr := "asset"
+				if processedAssetCount > 1 {
+					assetStr += "s"
+				}
+				infoPrinter.Printf("Successfully formatted %d %s.\n", processedAssetCount, assetStr)
+				return nil
 			}
 
-			return nil
+			if output == "json" {
+				jsMessage, err := json.Marshal(errorList)
+				if err != nil {
+					printErrorJSON(err)
+				}
+				fmt.Println(jsMessage)
+				return cli.Exit("", 1)
+			}
+
+			errorPrinter.Println("Some errors occurred:")
+			for _, err := range errorList {
+				errorPrinter.Println("  - " + err.Error())
+			}
+
+			return cli.Exit("", 1)
 		},
 	}
 }

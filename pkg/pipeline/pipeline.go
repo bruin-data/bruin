@@ -71,8 +71,8 @@ type TaskSchedule struct {
 }
 
 type Notifications struct {
-	Slack   []SlackNotification   `yaml:"slack" json:"slack"`
-	MSTeams []MSTeamsNotification `yaml:"ms_teams" json:"ms_teams"`
+	Slack   []SlackNotification   `yaml:"slack" json:"slack" mapstructure:"slack"`
+	MSTeams []MSTeamsNotification `yaml:"ms_teams" json:"ms_teams" mapstructure:"ms_teams"`
 }
 
 type DefaultTrueBool struct {
@@ -129,18 +129,18 @@ func (b DefaultTrueBool) MarshalYAML() (interface{}, error) {
 }
 
 type NotificationCommon struct {
-	Success DefaultTrueBool `yaml:"success" json:"success"`
-	Failure DefaultTrueBool `yaml:"failure" json:"failure"`
+	Success DefaultTrueBool `yaml:"success" json:"success" mapstructure:"success"`
+	Failure DefaultTrueBool `yaml:"failure" json:"failure" mapstructure:"failure"`
 }
 
 type SlackNotification struct {
 	Channel            string `json:"channel"`
-	NotificationCommon `yaml:",inline" json:",inline"`
+	NotificationCommon `yaml:",inline" json:",inline" mapstructure:",inline"`
 }
 
 type MSTeamsNotification struct {
-	Connection         string `yaml:"connection" json:"connection"`
-	NotificationCommon `yaml:",inline" json:",inline"`
+	Connection         string `yaml:"connection" json:"connection" mapstructure:"connection"`
+	NotificationCommon `yaml:",inline" json:",inline" mapstructure:",inline"`
 }
 
 func (n Notifications) MarshalJSON() ([]byte, error) {
@@ -192,11 +192,11 @@ var AllAvailableMaterializationStrategies = []MaterializationStrategy{
 }
 
 type Materialization struct {
-	Type           MaterializationType     `json:"type" yaml:"type,omitempty"`
-	Strategy       MaterializationStrategy `json:"strategy" yaml:"strategy,omitempty"`
-	PartitionBy    string                  `json:"partition_by" yaml:"partition_by,omitempty"`
-	ClusterBy      []string                `json:"cluster_by" yaml:"cluster_by,omitempty"`
-	IncrementalKey string                  `json:"incremental_key" yaml:"incremental_key,omitempty"`
+	Type           MaterializationType     `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	Strategy       MaterializationStrategy `json:"strategy" yaml:"strategy,omitempty" mapstructure:"strategy"`
+	PartitionBy    string                  `json:"partition_by" yaml:"partition_by,omitempty" mapstructure:"partition_by"`
+	ClusterBy      []string                `json:"cluster_by" yaml:"cluster_by,omitempty" mapstructure:"cluster_by"`
+	IncrementalKey string                  `json:"incremental_key" yaml:"incremental_key,omitempty" mapstructure:"incremental_key"`
 }
 
 func (m Materialization) MarshalJSON() ([]byte, error) {
@@ -341,10 +341,10 @@ func (ccv *ColumnCheckValue) ToString() string {
 }
 
 type ColumnCheck struct {
-	ID       string           `json:"id" yaml:"-"`
-	Name     string           `json:"name" yaml:"name,omitempty"`
-	Value    ColumnCheckValue `json:"value" yaml:"value,omitempty"`
-	Blocking DefaultTrueBool  `json:"blocking" yaml:"blocking,omitempty"`
+	ID       string           `json:"id" yaml:"-" mapstructure:"-"`
+	Name     string           `json:"name" yaml:"name,omitempty" mapstructure:"name"`
+	Value    ColumnCheckValue `json:"value" yaml:"value,omitempty" mapstructure:"value"`
+	Blocking DefaultTrueBool  `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 }
 
 func NewColumnCheck(assetName, columnName, name string, value ColumnCheckValue, blocking *bool) ColumnCheck {
@@ -362,14 +362,14 @@ type EntityAttribute struct {
 }
 
 type Column struct {
-	EntityAttribute *EntityAttribute `json:"entity_attribute" yaml:"-"`
-	Name            string           `json:"name" yaml:"name,omitempty"`
-	Type            string           `json:"type" yaml:"type,omitempty"`
-	Description     string           `json:"description" yaml:"description,omitempty"`
-	Checks          []ColumnCheck    `json:"checks" yaml:"checks,omitempty"`
-	PrimaryKey      bool             `json:"primary_key" yaml:"primary_key,omitempty"`
-	UpdateOnMerge   bool             `json:"update_on_merge" yaml:"update_on_merge,omitempty"`
-	Extends         string           `json:"-" yaml:"extends,omitempty"`
+	EntityAttribute *EntityAttribute `json:"entity_attribute" yaml:"-" mapstructure:"-"`
+	Name            string           `json:"name" yaml:"name,omitempty" mapstructure:"name"`
+	Type            string           `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	Description     string           `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	Checks          []ColumnCheck    `json:"checks" yaml:"checks,omitempty" mapstructure:"checks"`
+	PrimaryKey      bool             `json:"primary_key" yaml:"primary_key,omitempty" mapstructure:"primary_key"`
+	UpdateOnMerge   bool             `json:"update_on_merge" yaml:"update_on_merge,omitempty" mapstructure:"update_on_merge"`
+	Extends         string           `json:"-" yaml:"extends,omitempty" mapstructure:"extends"`
 }
 
 func (c *Column) HasCheck(check string) bool {
@@ -413,18 +413,18 @@ type SecretMapping struct {
 }
 
 type CustomCheck struct {
-	ID          string          `json:"id" yaml:"-"`
-	Name        string          `json:"name" yaml:"name"`
-	Description string          `json:"description" yaml:"description,omitempty"`
-	Query       string          `json:"query" yaml:"query"`
-	Value       int64           `json:"value" yaml:"value,omitempty"`
-	Blocking    DefaultTrueBool `json:"blocking" yaml:"blocking,omitempty"`
+	ID          string          `json:"id" yaml:"-" mapstructure:"-"`
+	Name        string          `json:"name" yaml:"name" mapstructure:"name"`
+	Description string          `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	Query       string          `json:"query" yaml:"query" mapstructure:"query"`
+	Value       int64           `json:"value" yaml:"value,omitempty" mapstructure:"value"`
+	Blocking    DefaultTrueBool `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 }
 
 type Upstream struct {
-	Type     string         `json:"type" yaml:"type"`
-	Value    string         `json:"value" yaml:"value"`
-	Metadata EmptyStringMap `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Type     string         `json:"type" yaml:"type" mapstructure:"type"`
+	Value    string         `json:"value" yaml:"value" mapstructure:"value"`
+	Metadata EmptyStringMap `json:"metadata,omitempty" yaml:"metadata,omitempty" mapstructure:"metadata"`
 }
 
 func (u Upstream) MarshalYAML() (interface{}, error) {
@@ -466,30 +466,30 @@ func (s AthenaConfig) MarshalJSON() ([]byte, error) {
 }
 
 type Asset struct {
-	ID              string             `json:"id" yaml:"-"`
-	URI             string             `json:"uri" yaml:"uri,omitempty"`
-	Name            string             `json:"name" yaml:"name,omitempty"`
-	Description     string             `json:"description" yaml:"description,omitempty"`
-	Type            AssetType          `json:"type" yaml:"type,omitempty"`
-	ExecutableFile  ExecutableFile     `json:"executable_file" yaml:"-"`
-	DefinitionFile  TaskDefinitionFile `json:"definition_file" yaml:"-"`
-	Parameters      EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty"`
-	Connection      string             `json:"connection" yaml:"connection,omitempty"`
-	Secrets         []SecretMapping    `json:"secrets" yaml:"secrets,omitempty"`
-	Materialization Materialization    `json:"materialization" yaml:"materialization,omitempty"`
-	Columns         []Column           `json:"columns" yaml:"columns,omitempty"`
-	CustomChecks    []CustomCheck      `json:"custom_checks" yaml:"custom_checks,omitempty"`
-	Image           string             `json:"image" yaml:"image,omitempty"`
-	Instance        string             `json:"instance" yaml:"instance,omitempty"`
-	Owner           string             `json:"owner" yaml:"owner,omitempty"`
-	Metadata        EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty"`
-	Tags            EmptyStringArray   `json:"tags" yaml:"tags,omitempty"`
-	Snowflake       SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty"`
-	Athena          AthenaConfig       `json:"athena" yaml:"athena,omitempty"`
+	ID              string             `json:"id" yaml:"-" mapstructure:"-"`
+	URI             string             `json:"uri" yaml:"uri,omitempty" mapstructure:"uri"`
+	Name            string             `json:"name" yaml:"name,omitempty" mapstructure:"name"`
+	Description     string             `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	Type            AssetType          `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	ExecutableFile  ExecutableFile     `json:"executable_file" yaml:"-" mapstructure:"-"`
+	DefinitionFile  TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
+	Parameters      EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
+	Connection      string             `json:"connection" yaml:"connection,omitempty" mapstructure:"connection"`
+	Secrets         []SecretMapping    `json:"secrets" yaml:"secrets,omitempty" mapstructure:"secrets"`
+	Materialization Materialization    `json:"materialization" yaml:"materialization,omitempty" mapstructure:"materialization"`
+	Columns         []Column           `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
+	CustomChecks    []CustomCheck      `json:"custom_checks" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
+	Image           string             `json:"image" yaml:"image,omitempty" mapstructure:"image"`
+	Instance        string             `json:"instance" yaml:"instance,omitempty" mapstructure:"instance"`
+	Owner           string             `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
+	Metadata        EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
+	Tags            EmptyStringArray   `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
+	Snowflake       SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
+	Athena          AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
 
 	upstream   []*Asset
 	downstream []*Asset
-	Upstreams  []Upstream `json:"upstreams" yaml:"depends,omitempty"`
+	Upstreams  []Upstream `json:"upstreams" yaml:"depends,omitempty" mapstructure:"depends"`
 }
 
 func (a *Asset) AddUpstream(asset *Asset) {
@@ -816,17 +816,17 @@ func PipelineFromPath(filePath string, fs afero.Fs) (*Pipeline, error) {
 }
 
 type Pipeline struct {
-	LegacyID           string         `yaml:"id" json:"legacy_id"`
-	Name               string         `yaml:"name" json:"name"`
-	Schedule           schedule       `yaml:"schedule" json:"schedule"`
-	StartDate          string         `yaml:"start_date" json:"start_date"`
+	LegacyID           string         `json:"legacy_id" yaml:"id" mapstructure:"id"`
+	Name               string         `json:"name" yaml:"name" mapstructure:"name"`
+	Schedule           schedule       `json:"schedule" yaml:"schedule" mapstructure:"schedule"`
+	StartDate          string         `json:"start_date" yaml:"start_date" mapstructure:"start_date"`
 	DefinitionFile     DefinitionFile `json:"definition_file"`
-	DefaultParameters  EmptyStringMap `yaml:"default_parameters" json:"default_parameters"`
-	DefaultConnections EmptyStringMap `yaml:"default_connections" json:"default_connections"`
+	DefaultParameters  EmptyStringMap `json:"default_parameters" yaml:"default_parameters" mapstructure:"default_parameters"`
+	DefaultConnections EmptyStringMap `json:"default_connections" yaml:"default_connections" mapstructure:"default_connections"`
 	Assets             []*Asset       `json:"assets"`
-	Notifications      Notifications  `yaml:"notifications" json:"notifications"`
-	Catchup            bool           `yaml:"catchup" json:"catchup"`
-	Retries            int            `yaml:"retries" json:"retries"`
+	Notifications      Notifications  `json:"notifications" yaml:"notifications" mapstructure:"notifications"`
+	Catchup            bool           `json:"catchup" yaml:"catchup" mapstructure:"catchup"`
+	Retries            int            `json:"retries" yaml:"retries" mapstructure:"retries"`
 
 	TasksByType map[AssetType][]*Asset `json:"-"`
 	tasksByName map[string]*Asset
