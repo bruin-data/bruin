@@ -1,0 +1,19 @@
+name: ingestr.table1
+type: ingestr
+parameters:
+    destination: bigquery
+    source_connection: neon
+    source_table: public.test_merge
+
+columns:
+    - name: qty
+      type: integer
+      description: Just a number
+      checks:
+        - name: not_null
+        - name: positive
+
+custom_checks:
+    - name: This is a custom check name
+      query: select count(*) from test_data_alberto.ingestr_destiny_2
+      value: 5

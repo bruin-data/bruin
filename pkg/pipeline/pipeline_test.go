@@ -793,14 +793,29 @@ func TestAsset_Persist(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		assetPath string
-		wantErr   assert.ErrorAssertionFunc
+		name         string
+		assetPath    string
+		expectedPath string
 	}{
 		{
-			name:      "yaml sql is saved the same",
-			assetPath: path.AbsPathForTests(t, "testdata/persist/yaml.sql"),
-			wantErr:   assert.NoError,
+			name:         "yaml sql is saved the same",
+			assetPath:    path.AbsPathForTests(t, "testdata/persist/embedded_yaml.sql"),
+			expectedPath: path.AbsPathForTests(t, "testdata/persist/embedded_yaml.expected.sql"),
+		},
+		{
+			name:         "simple sql is saved the same",
+			assetPath:    path.AbsPathForTests(t, "testdata/persist/simple.sql"),
+			expectedPath: path.AbsPathForTests(t, "testdata/persist/simple.expected.sql"),
+		},
+		{
+			name:         "python assets are handled",
+			assetPath:    path.AbsPathForTests(t, "testdata/persist/basic.py"),
+			expectedPath: path.AbsPathForTests(t, "testdata/persist/basic.expected.py"),
+		},
+		{
+			name:         "YAML assets are handled",
+			assetPath:    path.AbsPathForTests(t, "testdata/persist/ingestr.asset.yml"),
+			expectedPath: path.AbsPathForTests(t, "testdata/persist/ingestr.expected.yml"),
 		},
 	}
 	for _, tt := range tests {
@@ -808,9 +823,19 @@ func TestAsset_Persist(t *testing.T) {
 			t.Parallel()
 
 			a, err := cmd.DefaultPipelineBuilder.CreateAssetFromFile(tt.assetPath)
+			require.NoError(t, err)
 
-			tt.wantErr(t, err)
-			tt.wantErr(t, a.Persist())
+			fs := afero.NewMemMapFs()
+			err = a.Persist(fs)
+			require.NoError(t, err)
+
+			actual, err := afero.ReadFile(fs, a.DefinitionFile.Path)
+			require.NoError(t, err)
+
+			expected, err := afero.ReadFile(afero.NewOsFs(), tt.expectedPath)
+			require.NoError(t, err)
+
+			assert.Equal(t, string(expected), string(actual))
 		})
 	}
 }

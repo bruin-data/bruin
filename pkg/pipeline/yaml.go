@@ -311,6 +311,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			PrimaryKey:      column.PrimaryKey,
 			UpdateOnMerge:   column.UpdateOnMerge,
 			EntityAttribute: entityDefinition,
+			Extends:         column.Extends,
 		}
 	}
 

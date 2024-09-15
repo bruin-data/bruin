@@ -11,7 +11,10 @@ import (
 	"github.com/spf13/afero"
 )
 
-const configMarker = "@bruin."
+const (
+	configMarkerString            = "@bruin"
+	configMarkerForInlineComments = "@bruin."
+)
 
 var commentMarkers = map[string]string{
 	".sql": "--",
@@ -137,8 +140,8 @@ func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath st
 		}
 
 		commentValue := strings.TrimSpace(strings.TrimPrefix(rowText, commentMarker))
-		if strings.HasPrefix(commentValue, configMarker) {
-			commentRows = append(commentRows, strings.TrimPrefix(commentValue, configMarker))
+		if strings.HasPrefix(commentValue, configMarkerForInlineComments) {
+			commentRows = append(commentRows, strings.TrimPrefix(commentValue, configMarkerForInlineComments))
 		}
 	}
 

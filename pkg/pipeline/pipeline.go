@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -117,6 +118,14 @@ func (b *DefaultTrueBool) Bool() bool {
 	}
 
 	return *b.Value
+}
+
+func (b DefaultTrueBool) MarshalYAML() (interface{}, error) {
+	if b.Value == nil {
+		return nil, nil
+	}
+
+	return *b.Value, nil
 }
 
 type NotificationCommon struct {
@@ -353,13 +362,14 @@ type EntityAttribute struct {
 }
 
 type Column struct {
-	EntityAttribute *EntityAttribute `json:"entity_attribute"`
-	Name            string           `json:"name"`
-	Type            string           `json:"type"`
-	Description     string           `json:"description"`
-	Checks          []ColumnCheck    `json:"checks"`
-	PrimaryKey      bool             `json:"primary_key"`
-	UpdateOnMerge   bool             `json:"update_on_merge"`
+	EntityAttribute *EntityAttribute `json:"entity_attribute" yaml:"-"`
+	Name            string           `json:"name" yaml:"name,omitempty"`
+	Type            string           `json:"type" yaml:"type,omitempty"`
+	Description     string           `json:"description" yaml:"description,omitempty"`
+	Checks          []ColumnCheck    `json:"checks" yaml:"checks,omitempty"`
+	PrimaryKey      bool             `json:"primary_key" yaml:"primary_key,omitempty"`
+	UpdateOnMerge   bool             `json:"update_on_merge" yaml:"update_on_merge,omitempty"`
+	Extends         string           `json:"-" yaml:"extends,omitempty"`
 }
 
 func (c *Column) HasCheck(check string) bool {
@@ -403,18 +413,32 @@ type SecretMapping struct {
 }
 
 type CustomCheck struct {
-	ID          string          `json:"id"`
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	Query       string          `json:"query"`
-	Value       int64           `json:"value"`
-	Blocking    DefaultTrueBool `json:"blocking"`
+	ID          string          `json:"id" yaml:"-"`
+	Name        string          `json:"name" yaml:"name"`
+	Description string          `json:"description" yaml:"description,omitempty"`
+	Query       string          `json:"query" yaml:"query"`
+	Value       int64           `json:"value" yaml:"value,omitempty"`
+	Blocking    DefaultTrueBool `json:"blocking" yaml:"blocking,omitempty"`
 }
 
 type Upstream struct {
-	Type     string         `json:"type"`
-	Value    string         `json:"value"`
-	Metadata EmptyStringMap `json:"metadata,omitempty"`
+	Type     string         `json:"type" yaml:"type"`
+	Value    string         `json:"value" yaml:"value"`
+	Metadata EmptyStringMap `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+}
+
+func (u Upstream) MarshalYAML() (interface{}, error) {
+	if u.Type == "" || u.Type == "asset" {
+		return u.Value, nil
+	}
+
+	if strings.ToLower(u.Type) == "uri" {
+		return map[string]string{
+			"uri": u.Value,
+		}, nil
+	}
+
+	return nil, nil
 }
 
 type SnowflakeConfig struct {
@@ -447,8 +471,8 @@ type Asset struct {
 	Name            string             `json:"name" yaml:"name,omitempty"`
 	Description     string             `json:"description" yaml:"description,omitempty"`
 	Type            AssetType          `json:"type" yaml:"type,omitempty"`
-	ExecutableFile  ExecutableFile     `json:"executable_file" yaml:"executable_file,omitempty"`
-	DefinitionFile  TaskDefinitionFile `json:"definition_file" yaml:"definition_file,omitempty"`
+	ExecutableFile  ExecutableFile     `json:"executable_file" yaml:"-"`
+	DefinitionFile  TaskDefinitionFile `json:"definition_file" yaml:"-"`
 	Parameters      EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty"`
 	Connection      string             `json:"connection" yaml:"connection,omitempty"`
 	Secrets         []SecretMapping    `json:"secrets" yaml:"secrets,omitempty"`
@@ -465,11 +489,44 @@ type Asset struct {
 
 	upstream   []*Asset
 	downstream []*Asset
-	Upstreams  []Upstream `json:"upstreams" yaml:"-"`
+	Upstreams  []Upstream `json:"upstreams" yaml:"depends,omitempty"`
 }
 
 func (a *Asset) AddUpstream(asset *Asset) {
 	a.upstream = append(a.upstream, asset)
+}
+
+// removeRedundanciesBeforePersisting aims to remove unnecessary configuration from the asset.
+// This is particularly useful when we save a formatted version of the asset itself.
+func (a *Asset) removeRedundanciesBeforePersisting() {
+	a.clearDuplicateUpstreams()
+	if a.Type == AssetTypePython {
+		a.Type = ""
+	}
+}
+
+// removeRedundanciesBeforePersisting aims to remove unnecessary configuration from the asset.
+// This is particularly useful when we save a formatted version of the asset itself.
+func (a *Asset) clearDuplicateUpstreams() {
+	if a.Upstreams == nil {
+		return
+	}
+
+	seenUpstreams := make(map[string]bool, len(a.Upstreams))
+	uniqueUpstreams := make([]*Upstream, 0, len(a.Upstreams))
+	for _, u := range a.Upstreams {
+		key := fmt.Sprintf("%s-%s", u.Type, u.Value)
+		if _, ok := seenUpstreams[key]; ok {
+			continue
+		}
+		seenUpstreams[key] = true
+		uniqueUpstreams = append(uniqueUpstreams, &u)
+	}
+
+	a.Upstreams = make([]Upstream, len(uniqueUpstreams))
+	for i, val := range uniqueUpstreams {
+		a.Upstreams[i] = *val
+	}
 }
 
 func (a *Asset) GetUpstream() []*Asset {
@@ -583,16 +640,48 @@ func (a *Asset) EnrichFromEntityAttributes(entities []*glossary.Entity) error {
 	return nil
 }
 
-func (a *Asset) Persist() error {
-	// path := a.ExecutableFile.Path
+func (a *Asset) Persist(fs afero.Fs) error {
+	if a == nil {
+		return errors.New("failed to build an asset, therefore cannot persist it")
+	}
+
+	a.removeRedundanciesBeforePersisting()
 
 	yamlConfig, err := yaml.Marshal(a)
 	if err != nil {
-		return nil
+		return err
 	}
 
-	print(string(yamlConfig))
-	return nil
+	keysToAddSpace := []string{"custom_checks", "depends", "columns", "materialization"}
+	for _, key := range keysToAddSpace {
+		yamlConfig = bytes.ReplaceAll(yamlConfig, []byte("\n"+key+":"), []byte("\n\n"+key+":"))
+	}
+
+	filePath := a.ExecutableFile.Path
+	beginning := ""
+	end := ""
+	executableContent := ""
+
+	if strings.HasSuffix(a.ExecutableFile.Path, ".sql") {
+		// we are dealing with a SQL asset with an embedded YAML block, treat accordingly.
+		beginning = "/* " + configMarkerString + "\n\n"
+		end = "\n" + configMarkerString + " */" + "\n\n"
+		executableContent = a.ExecutableFile.Content
+	}
+
+	if strings.HasSuffix(a.ExecutableFile.Path, ".py") {
+		// we are dealing with a Python asset with an embedded YAML block, treat accordingly.
+		beginning = `""" ` + configMarkerString + "\n\n"
+		end = "\n" + configMarkerString + ` """` + "\n\n"
+		executableContent = a.ExecutableFile.Content
+	}
+
+	stringVersion := beginning + string(yamlConfig) + end + executableContent
+	if !strings.HasSuffix(stringVersion, "\n") {
+		stringVersion += "\n"
+	}
+
+	return afero.WriteFile(fs, filePath, []byte(stringVersion), 0o644)
 }
 
 func uniqueAssets(assets []*Asset) []*Asset {
@@ -912,7 +1001,7 @@ type ParseError struct {
 	Msg string
 }
 
-func (e *ParseError) Error() string {
+func (e ParseError) Error() string {
 	return e.Msg
 }
 
