@@ -346,11 +346,6 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 	}
 
 	for index, check := range definition.CustomChecks {
-		blocking := true
-		if check.Blocking != nil {
-			blocking = *check.Blocking
-		}
-
 		// set the ID as the hash of the name
 		task.CustomChecks[index] = CustomCheck{
 			ID:          hash(fmt.Sprintf("%s-%s", task.Name, check.Name)),
@@ -358,7 +353,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			Description: check.Description,
 			Query:       check.Query,
 			Value:       check.Value,
-			Blocking:    blocking,
+			Blocking:    DefaultTrueBool{Value: check.Blocking},
 		}
 	}
 
