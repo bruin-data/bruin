@@ -51,6 +51,7 @@ func main() {
 			cmd.Render(),
 			cmd.Lineage(),
 			cmd.CleanCmd(),
+			cmd.Format(&isDebug),
 			cmd.Init(),
 			cmd.Internal(),
 			cmd.Environments(&isDebug),

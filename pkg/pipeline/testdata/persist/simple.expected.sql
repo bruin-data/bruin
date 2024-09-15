@@ -4,7 +4,7 @@ name: some-sql-task
 type: bq.sql
 
 materialization:
-    type: table
+  type: table
 
 @bruin */
 

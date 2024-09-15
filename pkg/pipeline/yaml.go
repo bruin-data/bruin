@@ -305,7 +305,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 
 		columns[index] = Column{
 			Name:            column.Name,
-			Type:            strings.ToLower(strings.TrimSpace(column.Type)),
+			Type:            strings.TrimSpace(column.Type),
 			Description:     column.Description,
 			Checks:          tests,
 			PrimaryKey:      column.PrimaryKey,

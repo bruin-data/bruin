@@ -20,9 +20,11 @@ var (
 	errorPrinter   = color.New(color.FgRed, color.Bold)
 	successPrinter = color.New(color.FgGreen, color.Bold)
 
+	assetsDirectoryNames = []string{"tasks", "assets"}
+
 	builderConfig = pipeline.BuilderConfig{
 		PipelineFileName:    pipelineDefinitionFile,
-		TasksDirectoryNames: []string{"tasks", "assets"},
+		TasksDirectoryNames: assetsDirectoryNames,
 		TasksFileSuffixes:   []string{"task.yml", "task.yaml", "asset.yml", "asset.yaml"},
 	}
 

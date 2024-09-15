@@ -42,7 +42,7 @@ const (
 	RunConfigEndDate     = RunConfig("end-date")
 )
 
-var supportedFileSuffixes = []string{".yml", ".yaml", ".sql", ".py"}
+var SupportedFileSuffixes = []string{".yml", ".yaml", ".sql", ".py"}
 
 type (
 	schedule           string
@@ -500,6 +500,7 @@ func (a *Asset) AddUpstream(asset *Asset) {
 // This is particularly useful when we save a formatted version of the asset itself.
 func (a *Asset) removeRedundanciesBeforePersisting() {
 	a.clearDuplicateUpstreams()
+	a.removeExtraSpacesAtLineEndingsInTextContent()
 	if a.Type == AssetTypePython {
 		a.Type = ""
 	}
@@ -526,6 +527,43 @@ func (a *Asset) clearDuplicateUpstreams() {
 	a.Upstreams = make([]Upstream, len(uniqueUpstreams))
 	for i, val := range uniqueUpstreams {
 		a.Upstreams[i] = *val
+	}
+}
+
+func ClearSpacesAtLineEndings(content string) string {
+	lines := strings.Split(content, "\n")
+	for i, l := range lines {
+		for strings.HasSuffix(l, " ") {
+			l = strings.TrimSuffix(l, " ")
+		}
+		lines[i] = l
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// removeExtraSpacesAtLineEndingsInTextContent clears text content from various strings that might be multi-line.
+//
+// You might be thinking "why the hell would anyone want to do that?", but hear me out.
+//
+// Basically, when marshalling a string to YAML, the go-yaml library will have two ways of representing strings:
+//   - if the string contains no lines that end with a space, it'll convert them to multi-line yaml, which is good.
+//   - however, if there's a space at the end of any line within that multi-line string, then the lib will instead convert
+//     the content to be a single-line string with escaped "\n" characters, which breaks all the existing multi-line documentation.
+//
+// This was the only solution I could think of to not break multi-line strings, happy to hear better ideas that would make the existing tests pass.
+// I am also open to performance improvements here, as I think this is a suboptimal implementation.
+func (a *Asset) removeExtraSpacesAtLineEndingsInTextContent() {
+	if a.Description != "" && strings.Contains(a.Description, "\n") {
+		a.Description = ClearSpacesAtLineEndings(a.Description)
+	}
+
+	for i := range a.Columns {
+		a.Columns[i].Description = ClearSpacesAtLineEndings(a.Columns[i].Description)
+	}
+	for i := range a.CustomChecks {
+		a.CustomChecks[i].Description = ClearSpacesAtLineEndings(a.CustomChecks[i].Description)
+		a.CustomChecks[i].Query = ClearSpacesAtLineEndings(a.CustomChecks[i].Query)
 	}
 }
 
@@ -647,10 +685,16 @@ func (a *Asset) Persist(fs afero.Fs) error {
 
 	a.removeRedundanciesBeforePersisting()
 
-	yamlConfig, err := yaml.Marshal(a)
+	buf := bytes.NewBuffer(nil)
+	enc := yaml.NewEncoder(buf)
+	enc.SetIndent(2)
+
+	err := enc.Encode(a)
 	if err != nil {
 		return err
 	}
+
+	yamlConfig := buf.Bytes()
 
 	keysToAddSpace := []string{"custom_checks", "depends", "columns", "materialization"}
 	for _, key := range keysToAddSpace {
@@ -1048,7 +1092,7 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 	taskFiles := make([]string, 0)
 	for _, tasksDirectoryName := range b.config.TasksDirectoryNames {
 		tasksPath := filepath.Join(pathToPipeline, tasksDirectoryName)
-		files, err := path.GetAllFilesRecursive(tasksPath, supportedFileSuffixes)
+		files, err := path.GetAllFilesRecursive(tasksPath, SupportedFileSuffixes)
 		if err != nil {
 			continue
 		}

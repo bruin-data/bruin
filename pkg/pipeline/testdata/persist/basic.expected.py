@@ -2,8 +2,8 @@
 
 name: basic
 tags:
-    - tag1
-    - tag2
+  - tag1
+  - tag2
 
 @bruin """
 
