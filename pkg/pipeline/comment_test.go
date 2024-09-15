@@ -26,6 +26,9 @@ func mustReadWithoutReplacement(t *testing.T, file string) string {
 func Test_createTaskFromFile(t *testing.T) {
 	t.Parallel()
 
+	falseValue := false
+	trueValue := true
+
 	type args struct {
 		filePath string
 	}
@@ -191,17 +194,17 @@ func Test_createTaskFromFile(t *testing.T) {
 							{
 								ID:       "08745666ad3e043ceb0321ed502e9a2d20248d62b2ee7dd1c600fc5c944af238",
 								Name:     "not_null",
-								Blocking: true,
+								Blocking: pipeline.DefaultTrueBool{Value: &trueValue},
 							},
 							{
 								ID:       "29f700e6438c361ab038fcb611a71dab5a6949f3942b75c52402dce7a17cf698",
 								Name:     "positive",
-								Blocking: true,
+								Blocking: pipeline.DefaultTrueBool{Value: &trueValue},
 							},
 							{
 								ID:       "6660a3e1f845f9046ff2cda9ef8ae9357c4008c43724ebaf834186e5c2bd7a35",
 								Name:     "unique",
-								Blocking: true,
+								Blocking: pipeline.DefaultTrueBool{Value: &trueValue},
 							},
 						},
 					},
@@ -210,12 +213,12 @@ func Test_createTaskFromFile(t *testing.T) {
 							{
 								ID:       "7870f9ce39b0d29451a41e2d8240c02713ce80647db886fe5e5cc69227dd86d3",
 								Name:     "not_null",
-								Blocking: true,
+								Blocking: pipeline.DefaultTrueBool{Value: &trueValue},
 							},
 							{
 								ID:       "68e80e2b513c908c9c1d3aac2f96bd535f43f2c62a78c6744dee8ae767e60e5d",
 								Name:     "unique",
-								Blocking: true,
+								Blocking: pipeline.DefaultTrueBool{Value: &trueValue},
 							},
 						},
 					},
@@ -268,19 +271,16 @@ func Test_createTaskFromFile(t *testing.T) {
 						Type: "string",
 						Checks: []pipeline.ColumnCheck{
 							{
-								ID:       "08745666ad3e043ceb0321ed502e9a2d20248d62b2ee7dd1c600fc5c944af238",
-								Name:     "not_null",
-								Blocking: true,
+								ID:   "08745666ad3e043ceb0321ed502e9a2d20248d62b2ee7dd1c600fc5c944af238",
+								Name: "not_null",
 							},
 							{
-								ID:       "29f700e6438c361ab038fcb611a71dab5a6949f3942b75c52402dce7a17cf698",
-								Name:     "positive",
-								Blocking: true,
+								ID:   "29f700e6438c361ab038fcb611a71dab5a6949f3942b75c52402dce7a17cf698",
+								Name: "positive",
 							},
 							{
-								ID:       "6660a3e1f845f9046ff2cda9ef8ae9357c4008c43724ebaf834186e5c2bd7a35",
-								Name:     "unique",
-								Blocking: true,
+								ID:   "6660a3e1f845f9046ff2cda9ef8ae9357c4008c43724ebaf834186e5c2bd7a35",
+								Name: "unique",
 							},
 						},
 					},
@@ -289,14 +289,13 @@ func Test_createTaskFromFile(t *testing.T) {
 						Type: "string",
 						Checks: []pipeline.ColumnCheck{
 							{
-								ID:       "7870f9ce39b0d29451a41e2d8240c02713ce80647db886fe5e5cc69227dd86d3",
-								Name:     "not_null",
-								Blocking: true,
+								ID:   "7870f9ce39b0d29451a41e2d8240c02713ce80647db886fe5e5cc69227dd86d3",
+								Name: "not_null",
 							},
 							{
 								ID:       "68e80e2b513c908c9c1d3aac2f96bd535f43f2c62a78c6744dee8ae767e60e5d",
 								Name:     "unique",
-								Blocking: false,
+								Blocking: pipeline.DefaultTrueBool{Value: &falseValue},
 							},
 						},
 					},

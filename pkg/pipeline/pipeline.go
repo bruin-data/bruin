@@ -111,6 +111,14 @@ func (b *DefaultTrueBool) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+func (b *DefaultTrueBool) Bool() bool {
+	if b.Value == nil {
+		return true
+	}
+
+	return *b.Value
+}
+
 type NotificationCommon struct {
 	Success DefaultTrueBool `yaml:"success" json:"success"`
 	Failure DefaultTrueBool `yaml:"failure" json:"failure"`
@@ -175,11 +183,11 @@ var AllAvailableMaterializationStrategies = []MaterializationStrategy{
 }
 
 type Materialization struct {
-	Type           MaterializationType     `json:"type"`
-	Strategy       MaterializationStrategy `json:"strategy"`
-	PartitionBy    string                  `json:"partition_by"`
-	ClusterBy      []string                `json:"cluster_by"`
-	IncrementalKey string                  `json:"incremental_key"`
+	Type           MaterializationType     `json:"type" yaml:"type,omitempty"`
+	Strategy       MaterializationStrategy `json:"strategy" yaml:"strategy,omitempty"`
+	PartitionBy    string                  `json:"partition_by" yaml:"partition_by,omitempty"`
+	ClusterBy      []string                `json:"cluster_by" yaml:"cluster_by,omitempty"`
+	IncrementalKey string                  `json:"incremental_key" yaml:"incremental_key,omitempty"`
 }
 
 func (m Materialization) MarshalJSON() ([]byte, error) {
@@ -225,6 +233,29 @@ func (ccv *ColumnCheckValue) MarshalJSON() ([]byte, error) {
 	}
 
 	return []byte("null"), nil
+}
+
+func (ccv ColumnCheckValue) MarshalYAML() (interface{}, error) {
+	if ccv.IntArray != nil {
+		return ccv.IntArray, nil
+	}
+	if ccv.Int != nil {
+		return ccv.Int, nil
+	}
+	if ccv.Float != nil {
+		return ccv.Float, nil
+	}
+	if ccv.StringArray != nil {
+		return ccv.StringArray, nil
+	}
+	if ccv.String != nil {
+		return ccv.String, nil
+	}
+	if ccv.Bool != nil {
+		return ccv.Bool, nil
+	}
+
+	return nil, nil
 }
 
 func (ccv *ColumnCheckValue) UnmarshalJSON(data []byte) error {
@@ -301,18 +332,18 @@ func (ccv *ColumnCheckValue) ToString() string {
 }
 
 type ColumnCheck struct {
-	ID       string           `json:"id"`
-	Name     string           `json:"name"`
-	Value    ColumnCheckValue `json:"value"`
-	Blocking bool             `json:"blocking"`
+	ID       string           `json:"id" yaml:"-"`
+	Name     string           `json:"name" yaml:"name,omitempty"`
+	Value    ColumnCheckValue `json:"value" yaml:"value,omitempty"`
+	Blocking DefaultTrueBool  `json:"blocking" yaml:"blocking,omitempty"`
 }
 
-func NewColumnCheck(assetName, columnName, name string, value ColumnCheckValue, blocking bool) ColumnCheck {
+func NewColumnCheck(assetName, columnName, name string, value ColumnCheckValue, blocking *bool) ColumnCheck {
 	return ColumnCheck{
 		ID:       hash(fmt.Sprintf("%s-%s-%s", assetName, columnName, name)),
 		Name:     strings.TrimSpace(name),
 		Value:    value,
-		Blocking: blocking,
+		Blocking: DefaultTrueBool{Value: blocking},
 	}
 }
 
@@ -411,30 +442,30 @@ func (s AthenaConfig) MarshalJSON() ([]byte, error) {
 }
 
 type Asset struct {
-	ID              string             `json:"id"`
-	URI             string             `json:"uri"`
-	Name            string             `json:"name"`
-	Description     string             `json:"description"`
-	Type            AssetType          `json:"type"`
-	ExecutableFile  ExecutableFile     `json:"executable_file"`
-	DefinitionFile  TaskDefinitionFile `json:"definition_file"`
-	Parameters      EmptyStringMap     `json:"parameters"`
-	Connection      string             `json:"connection"`
-	Secrets         []SecretMapping    `json:"secrets"`
-	Materialization Materialization    `json:"materialization"`
-	Columns         []Column           `json:"columns"`
-	CustomChecks    []CustomCheck      `json:"custom_checks"`
-	Image           string             `json:"image"`
-	Instance        string             `json:"instance"`
-	Owner           string             `json:"owner"`
-	Metadata        EmptyStringMap     `json:"metadata"`
-	Tags            EmptyStringArray   `json:"tags"`
-	Snowflake       SnowflakeConfig    `json:"snowflake"`
-	Athena          AthenaConfig       `json:"athena"`
+	ID              string             `json:"id" yaml:"-"`
+	URI             string             `json:"uri" yaml:"uri,omitempty"`
+	Name            string             `json:"name" yaml:"name,omitempty"`
+	Description     string             `json:"description" yaml:"description,omitempty"`
+	Type            AssetType          `json:"type" yaml:"type,omitempty"`
+	ExecutableFile  ExecutableFile     `json:"executable_file" yaml:"executable_file,omitempty"`
+	DefinitionFile  TaskDefinitionFile `json:"definition_file" yaml:"definition_file,omitempty"`
+	Parameters      EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty"`
+	Connection      string             `json:"connection" yaml:"connection,omitempty"`
+	Secrets         []SecretMapping    `json:"secrets" yaml:"secrets,omitempty"`
+	Materialization Materialization    `json:"materialization" yaml:"materialization,omitempty"`
+	Columns         []Column           `json:"columns" yaml:"columns,omitempty"`
+	CustomChecks    []CustomCheck      `json:"custom_checks" yaml:"custom_checks,omitempty"`
+	Image           string             `json:"image" yaml:"image,omitempty"`
+	Instance        string             `json:"instance" yaml:"instance,omitempty"`
+	Owner           string             `json:"owner" yaml:"owner,omitempty"`
+	Metadata        EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty"`
+	Tags            EmptyStringArray   `json:"tags" yaml:"tags,omitempty"`
+	Snowflake       SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty"`
+	Athena          AthenaConfig       `json:"athena" yaml:"athena,omitempty"`
 
 	upstream   []*Asset
 	downstream []*Asset
-	Upstreams  []Upstream `json:"upstreams"`
+	Upstreams  []Upstream `json:"upstreams" yaml:"-"`
 }
 
 func (a *Asset) AddUpstream(asset *Asset) {
@@ -549,6 +580,18 @@ func (a *Asset) EnrichFromEntityAttributes(entities []*glossary.Entity) error {
 		}
 	}
 
+	return nil
+}
+
+func (a *Asset) Persist() error {
+	// path := a.ExecutableFile.Path
+
+	yamlConfig, err := yaml.Marshal(a)
+	if err != nil {
+		return nil
+	}
+
+	print(string(yamlConfig))
 	return nil
 }
 

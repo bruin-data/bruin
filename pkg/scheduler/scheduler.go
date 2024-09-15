@@ -154,7 +154,7 @@ func (t *ColumnCheckInstance) GetType() TaskInstanceType {
 }
 
 func (t *ColumnCheckInstance) Blocking() bool {
-	return t.Check.Blocking
+	return t.Check.Blocking.Bool()
 }
 
 type CustomCheckInstance struct {

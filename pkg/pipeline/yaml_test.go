@@ -82,14 +82,12 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 						Type:        "string",
 						Checks: []pipeline.ColumnCheck{
 							{
-								ID:       "1cde48c4bee4ad881c5d315dbfd136c708bfe4522ca7b74997017302b38ba763",
-								Name:     "unique",
-								Blocking: true,
+								ID:   "1cde48c4bee4ad881c5d315dbfd136c708bfe4522ca7b74997017302b38ba763",
+								Name: "unique",
 							},
 							{
-								ID:       "7838b56dee5c090c3c04c356c8c1c249be0830efb1df36eb427b91eeb905875a",
-								Name:     "not_null",
-								Blocking: true,
+								ID:   "7838b56dee5c090c3c04c356c8c1c249be0830efb1df36eb427b91eeb905875a",
+								Name: "not_null",
 							},
 							{
 								ID:   "8656942c1be105de34e9c1f500ad64b34f2c0ecf31e762ac6319e6b8cf9bbdcd",
@@ -97,7 +95,6 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 								Value: pipeline.ColumnCheckValue{
 									StringArray: &[]string{"a", "b", "c"},
 								},
-								Blocking: true,
 							},
 							{
 								ID:   "ea4d2fa734a840d95f0d1a65cfc451d8f8e9d121ea972c5d2c6bf365a6a24b74",
@@ -105,7 +102,6 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 								Value: pipeline.ColumnCheckValue{
 									Int: &[]int{3}[0],
 								},
-								Blocking: true,
 							},
 						},
 					},

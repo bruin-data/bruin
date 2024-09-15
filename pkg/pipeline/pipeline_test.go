@@ -788,3 +788,29 @@ func BenchmarkAssetMarshalJSON(b *testing.B) {
 		}
 	}
 }
+
+func TestAsset_Persist(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		assetPath string
+		wantErr   assert.ErrorAssertionFunc
+	}{
+		{
+			name:      "yaml sql is saved the same",
+			assetPath: path.AbsPathForTests(t, "testdata/persist/yaml.sql"),
+			wantErr:   assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			a, err := cmd.DefaultPipelineBuilder.CreateAssetFromFile(tt.assetPath)
+
+			tt.wantErr(t, err)
+			tt.wantErr(t, a.Persist())
+		})
+	}
+}

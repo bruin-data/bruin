@@ -318,12 +318,14 @@ func handleColumnEntry(columnFields []string, task *Asset, value string) error {
 		columnIndex = len(task.Columns) - 1
 	}
 
+	trueValue := true
+
 	switch columnFields[2] {
 	case "checks":
 		checks := strings.Split(value, ",")
 		for _, check := range checks {
 			task.Columns[columnIndex].Checks = append(task.Columns[columnIndex].Checks, NewColumnCheck(
-				task.Name, columnName, strings.TrimSpace(check), ColumnCheckValue{}, true,
+				task.Name, columnName, strings.TrimSpace(check), ColumnCheckValue{}, &trueValue,
 			))
 		}
 	case "type":

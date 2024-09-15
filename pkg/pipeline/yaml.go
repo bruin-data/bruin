@@ -287,12 +287,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 
 			seenTests[test.Name] = true
 
-			blocking := true
-			if test.Blocking != nil {
-				blocking = *test.Blocking
-			}
-
-			tests = append(tests, NewColumnCheck(definition.Name, column.Name, test.Name, ColumnCheckValue(test.Value), blocking))
+			tests = append(tests, NewColumnCheck(definition.Name, column.Name, test.Name, ColumnCheckValue(test.Value), test.Blocking))
 		}
 
 		var entityDefinition *EntityAttribute
