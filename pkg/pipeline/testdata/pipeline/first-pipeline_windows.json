@@ -101,7 +101,7 @@
       "executable_file": {
         "name": "test.py",
         "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\test.py",
-        "content": "# @bruin.name: some-python-task\n# @bruin.description: some description goes here\n# @bruin.depends: task1, task2\n# @bruin.depends: task3,task4\n# @bruin.depends: task5, task3\n# @bruin.parameters.param1: first-parameter\n# @bruin.parameters.param2: second-parameter\n# @bruin.parameters.param3: third-parameter\n# @bruin.connection: first-connection\n\nprint('hello world')"
+        "content": "print('hello world')"
       },
       "definition_file": {
         "name": "test.py",
@@ -161,7 +161,7 @@
       "executable_file": {
         "name": "test.sql",
         "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\test.sql",
-        "content": "-- @bruin.name: some-sql-task\n-- @bruin.description: some description goes here\n-- @bruin.type: bq.sql\n-- @bruin.depends: task1, task2\n-- @bruin.depends: task3,task4\n-- @bruin.depends: task5, task3\n-- @bruin.parameters.param1: first-parameter\n-- @bruin.parameters.param2: second-parameter\n-- @bruin.connection: conn2\n\nselect *\nfrom foo;"
+        "content": "select *\nfrom foo;"
       },
       "definition_file": {
         "name": "test.sql",

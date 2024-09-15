@@ -501,7 +501,9 @@ func (a *Asset) AddUpstream(asset *Asset) {
 func (a *Asset) removeRedundanciesBeforePersisting() {
 	a.clearDuplicateUpstreams()
 	a.removeExtraSpacesAtLineEndingsInTextContent()
-	if a.Type == AssetTypePython {
+
+	// python assets don't require a type anymore
+	if a.Type == AssetTypePython && strings.HasSuffix(a.ExecutableFile.Path, ".py") {
 		a.Type = ""
 	}
 }

@@ -66,7 +66,7 @@ func Test_createTaskFromFile(t *testing.T) {
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "test.sql",
 					Path:    path.AbsPathForTests(t, "testdata/comments/test.sql"),
-					Content: mustRead(t, "testdata/comments/test.sql"),
+					Content: "select *\nfrom foo;",
 				},
 				Parameters: map[string]string{
 					"param1":       "first-parameter",
@@ -166,7 +166,7 @@ func Test_createTaskFromFile(t *testing.T) {
 				ExecutableFile: pipeline.ExecutableFile{
 					Name:    "test.py",
 					Path:    path.AbsPathForTests(t, "testdata/comments/test.py"),
-					Content: mustRead(t, "testdata/comments/test.py"),
+					Content: "print('hello world')",
 				},
 				Parameters: map[string]string{
 					"param1": "first-parameter",

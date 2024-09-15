@@ -94,7 +94,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		ExecutableFile: pipeline.ExecutableFile{
 			Name:    "test.py",
 			Path:    path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/test.py"),
-			Content: mustRead(t, "testdata/pipeline/first-pipeline/tasks/test.py"),
+			Content: "print('hello world')",
 		},
 		DefinitionFile: pipeline.TaskDefinitionFile{
 			Name: "test.py",
@@ -130,7 +130,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		ExecutableFile: pipeline.ExecutableFile{
 			Name:    "test.sql",
 			Path:    path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/test.sql"),
-			Content: mustRead(t, "testdata/pipeline/first-pipeline/tasks/test.sql"),
+			Content: "select *\nfrom foo;",
 		},
 		DefinitionFile: pipeline.TaskDefinitionFile{
 			Name: "test.sql",
@@ -830,8 +830,8 @@ func TestAsset_Persist(t *testing.T) {
 			a, err := cmd.DefaultPipelineBuilder.CreateAssetFromFile(tt.assetPath)
 			require.NoError(t, err)
 
-			//a.ExecutableFile.Path = tt.expectedPath
-			//a.DefinitionFile.Path = tt.expectedPath
+			// a.ExecutableFile.Path = tt.expectedPath
+			// a.DefinitionFile.Path = tt.expectedPath
 
 			fs := afero.NewMemMapFs()
 			err = a.Persist(fs)

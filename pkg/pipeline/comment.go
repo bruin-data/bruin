@@ -133,9 +133,9 @@ func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath st
 	var commentRows []string
 	for scanner.Scan() {
 		rowText := scanner.Text()
-		allRows = append(allRows, rowText)
 
 		if !strings.HasPrefix(rowText, commentMarker) {
+			allRows = append(allRows, rowText)
 			continue
 		}
 
@@ -166,7 +166,7 @@ func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath st
 	task.ExecutableFile = ExecutableFile{
 		Name:    filepath.Base(filePath),
 		Path:    absFilePath,
-		Content: strings.Join(allRows, "\n"),
+		Content: strings.TrimSpace(strings.Join(allRows, "\n")),
 	}
 
 	return task, nil
