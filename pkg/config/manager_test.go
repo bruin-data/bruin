@@ -139,6 +139,12 @@ func TestLoadFromFile(t *testing.T) {
 					Email:  "gorgiasemail",
 				},
 			},
+			Klaviyo: []KlaviyoConnection{
+				{
+					Name:   "conn15",
+					APIKey: "klaviyokey",
+				},
+			},
 			AthenaConnection: []AthenaConnection{
 				{
 					Name:             "conn14",

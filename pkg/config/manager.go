@@ -88,7 +88,6 @@ func (c GoogleCloudPlatformConnection) MarshalYAML() (interface{}, error) {
 	} else if c.ServiceAccountJSON != "" {
 		m["service_account_json"] = c.ServiceAccountJSON
 	}
-
 	return m, nil
 }
 
@@ -172,6 +171,15 @@ type GorgiasConnection struct {
 }
 
 func (c GorgiasConnection) GetName() string {
+	return c.Name
+}
+
+type KlaviyoConnection struct {
+	Name   string `yaml:"name" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c KlaviyoConnection) GetName() string {
 	return c.Name
 }
 
@@ -273,6 +281,7 @@ type Connections struct {
 	HANA                []HANAConnection                `yaml:"hana,omitempty" json:"hana,omitempty" mapstructure:"hana"`
 	Shopify             []ShopifyConnection             `yaml:"shopify,omitempty" json:"shopify,omitempty" mapstructure:"shopify"`
 	Gorgias             []GorgiasConnection             `yaml:"gorgias,omitempty" json:"gorgias,omitempty" mapstructure:"gorgias"`
+	Klaviyo             []KlaviyoConnection             `yaml:"klaviyo,omitempty" json:"klaviyo,omitempty" mapstructure:"klaviyo"`
 	Generic             []GenericConnection             `yaml:"generic,omitempty" json:"generic,omitempty" mapstructure:"generic"`
 
 	byKey       map[string]any
@@ -368,6 +377,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.Gorgias {
 		c.byKey[conn.Name] = &(c.Gorgias[i])
 		c.typeNameMap[conn.Name] = "gorgias"
+	}
+
+	for i, conn := range c.Klaviyo {
+		c.byKey[conn.Name] = &(c.Klaviyo[i])
+		c.typeNameMap[conn.Name] = "klaviyo"
 	}
 
 	for i, conn := range c.Generic {
@@ -614,6 +628,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Gorgias = append(env.Connections.Gorgias, conn)
+	case "klaviyo":
+		var conn KlaviyoConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Klaviyo = append(env.Connections.Klaviyo, conn)
 	case "generic":
 		var conn GenericConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -682,6 +703,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Synapse = removeConnection(env.Connections.Synapse, connectionName)
 	case "gorgias":
 		env.Connections.Gorgias = removeConnection(env.Connections.Gorgias, connectionName)
+	case "klaviyo":
+		env.Connections.Klaviyo = removeConnection(env.Connections.Klaviyo, connectionName)
 	case "generic":
 		env.Connections.Generic = removeConnection(env.Connections.Generic, connectionName)
 	default:

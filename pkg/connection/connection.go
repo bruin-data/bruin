@@ -10,6 +10,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/hana"
+	"github.com/bruin-data/bruin/pkg/klaviyo"
 	"github.com/bruin-data/bruin/pkg/mongo"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
@@ -34,6 +35,7 @@ type Manager struct {
 	HANA       map[string]*hana.Client
 	Shopify    map[string]*shopify.Client
 	Gorgias    map[string]*gorgias.Client
+	Klaviyo    map[string]*klaviyo.Client
 	Athena     map[string]*athena.DB
 	mutex      sync.Mutex
 }
@@ -106,6 +108,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connGorgias, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Gorgias)...)
+
+	connKlaviyo, err := m.GetKlaviyoConnectionWithoutDefault(name)
+	if err == nil {
+		return connKlaviyo, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Klaviyo)...)
 
 	athenaConnection, err := m.GetAthenaConnectionWithoutDefault(name)
 	if err == nil {
@@ -348,6 +356,28 @@ func (m *Manager) GetShopifyConnectionWithoutDefault(name string) (*shopify.Clie
 	db, ok := m.Shopify[name]
 	if !ok {
 		return nil, errors.Errorf("shopify connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetKlaviyoConnection(name string) (*klaviyo.Client, error) {
+	db, err := m.GetKlaviyoConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetKlaviyoConnectionWithoutDefault("klaviyo-default")
+}
+
+func (m *Manager) GetKlaviyoConnectionWithoutDefault(name string) (*klaviyo.Client, error) {
+	if m.Klaviyo == nil {
+		return nil, errors.New("no klaviyo connections found")
+	}
+
+	db, ok := m.Klaviyo[name]
+	if !ok {
+		return nil, errors.Errorf("klaviyo connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -670,6 +700,27 @@ func (m *Manager) AddGorgiasConnectionFromConfig(connection *config.GorgiasConne
 	return nil
 }
 
+func (m *Manager) AddKlaviyoConnectionFromConfig(connection *config.KlaviyoConnection) error {
+	m.mutex.Lock()
+	if m.Klaviyo == nil {
+		m.Klaviyo = make(map[string]*klaviyo.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := klaviyo.NewClient(klaviyo.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Klaviyo[connection.Name] = client
+
+	return nil
+}
+
 func (m *Manager) AddHANAConnectionFromConfig(connection *config.HANAConnection) error {
 	m.mutex.Lock()
 	if m.HANA == nil {
@@ -812,6 +863,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 			err := connectionManager.AddGorgiasConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add gorgias connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Klaviyo {
+		wg.Go(func() {
+			err := connectionManager.AddKlaviyoConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add klaviyo connection '%s'", conn.Name))
 			}
 		})
 	}
