@@ -843,7 +843,10 @@ func TestAsset_Persist(t *testing.T) {
 			expected, err := afero.ReadFile(afero.NewOsFs(), tt.expectedPath)
 			require.NoError(t, err)
 
-			assert.Equal(t, string(expected), string(actual))
+			expectedStr := strings.ReplaceAll(string(expected), "\r\n", "\n")
+			actualStr := strings.ReplaceAll(string(actual), "\r\n", "\n")
+
+			assert.Equal(t, expectedStr, actualStr)
 		})
 	}
 }
