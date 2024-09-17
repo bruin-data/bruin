@@ -46,6 +46,7 @@ export default defineConfig({
                             {text: "SAP HANA", link: "/connections/sap_hana"},
                             {text: "Snowflake", link: "/connections/snowflake"},
                             {text: "Databricks", link: "/connections/databricks"},
+                            {text: "AWS Athena", link: "/connections/athena"},
                         ]
                     },
                 ],
@@ -63,6 +64,7 @@ export default defineConfig({
                         {text: "Postgres", link: "/assets/postgres"},
                         {text: "Synapse", link: "/assets/synapse"},
                         {text: "Redshift", link: "/assets/redshift"},
+                        {text: "AWS Athena", link: "/assets/athena"},
                     ]},
                     {text: "Materialization", link: "/assets/materialization"},
                 ],
