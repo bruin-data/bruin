@@ -273,6 +273,6 @@ func printErrorForOutput(output string, err error) {
 	if output == "json" {
 		printErrorJSON(err)
 	} else {
-		errorPrinter.Printf(err.Error())
+		errorPrinter.Println(err.Error())
 	}
 }

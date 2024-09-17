@@ -11,7 +11,10 @@ import (
 	"github.com/spf13/afero"
 )
 
-const configMarker = "@bruin."
+const (
+	configMarkerString            = "@bruin"
+	configMarkerForInlineComments = "@bruin."
+)
 
 var commentMarkers = map[string]string{
 	".sql": "--",
@@ -130,15 +133,15 @@ func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath st
 	var commentRows []string
 	for scanner.Scan() {
 		rowText := scanner.Text()
-		allRows = append(allRows, rowText)
 
 		if !strings.HasPrefix(rowText, commentMarker) {
+			allRows = append(allRows, rowText)
 			continue
 		}
 
 		commentValue := strings.TrimSpace(strings.TrimPrefix(rowText, commentMarker))
-		if strings.HasPrefix(commentValue, configMarker) {
-			commentRows = append(commentRows, strings.TrimPrefix(commentValue, configMarker))
+		if strings.HasPrefix(commentValue, configMarkerForInlineComments) {
+			commentRows = append(commentRows, strings.TrimPrefix(commentValue, configMarkerForInlineComments))
 		}
 	}
 
@@ -163,7 +166,7 @@ func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath st
 	task.ExecutableFile = ExecutableFile{
 		Name:    filepath.Base(filePath),
 		Path:    absFilePath,
-		Content: strings.Join(allRows, "\n"),
+		Content: strings.TrimSpace(strings.Join(allRows, "\n")),
 	}
 
 	return task, nil
@@ -318,12 +321,14 @@ func handleColumnEntry(columnFields []string, task *Asset, value string) error {
 		columnIndex = len(task.Columns) - 1
 	}
 
+	trueValue := true
+
 	switch columnFields[2] {
 	case "checks":
 		checks := strings.Split(value, ",")
 		for _, check := range checks {
 			task.Columns[columnIndex].Checks = append(task.Columns[columnIndex].Checks, NewColumnCheck(
-				task.Name, columnName, strings.TrimSpace(check), ColumnCheckValue{}, true,
+				task.Name, columnName, strings.TrimSpace(check), ColumnCheckValue{}, &trueValue,
 			))
 		}
 	case "type":

@@ -1,6 +1,6 @@
 """ @bruin
-
 name: basic
+type: python
 tags:
     - tag1
     - tag2

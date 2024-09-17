@@ -100,3 +100,23 @@ func GetAllFilesRecursive(root string, suffixes []string) ([]string, error) {
 
 	return paths, nil
 }
+
+func GetAllPossibleAssetPaths(pipelinePath string, assetsDirectoryNames []string, supportedFileSuffixes []string) []string {
+	taskFiles := make([]string, 0)
+
+	files, err := GetAllFilesRecursive(pipelinePath, supportedFileSuffixes)
+	if err != nil {
+		return taskFiles
+	}
+
+	for _, file := range files {
+		for _, dir := range assetsDirectoryNames {
+			if strings.Contains(file, "/"+dir+"/") {
+				taskFiles = append(taskFiles, file)
+				break
+			}
+		}
+	}
+
+	return taskFiles
+}

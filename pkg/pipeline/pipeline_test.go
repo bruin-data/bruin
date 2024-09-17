@@ -94,7 +94,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		ExecutableFile: pipeline.ExecutableFile{
 			Name:    "test.py",
 			Path:    path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/test.py"),
-			Content: mustRead(t, "testdata/pipeline/first-pipeline/tasks/test.py"),
+			Content: "print('hello world')",
 		},
 		DefinitionFile: pipeline.TaskDefinitionFile{
 			Name: "test.py",
@@ -130,7 +130,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		ExecutableFile: pipeline.ExecutableFile{
 			Name:    "test.sql",
 			Path:    path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/tasks/test.sql"),
-			Content: mustRead(t, "testdata/pipeline/first-pipeline/tasks/test.sql"),
+			Content: "select *\nfrom foo;",
 		},
 		DefinitionFile: pipeline.TaskDefinitionFile{
 			Name: "test.sql",
@@ -786,5 +786,110 @@ func BenchmarkAssetMarshalJSON(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func TestAsset_Persist(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		assetPath    string
+		expectedPath string
+	}{
+		{
+			name:         "yaml sql is saved the same",
+			assetPath:    path.AbsPathForTests(t, "testdata/persist/embedded_yaml.sql"),
+			expectedPath: path.AbsPathForTests(t, "testdata/persist/embedded_yaml.expected.sql"),
+		},
+		{
+			name:         "simple sql is saved the same",
+			assetPath:    path.AbsPathForTests(t, "testdata/persist/simple.sql"),
+			expectedPath: path.AbsPathForTests(t, "testdata/persist/simple.expected.sql"),
+		},
+		{
+			name:         "python assets are handled",
+			assetPath:    path.AbsPathForTests(t, "testdata/persist/basic.py"),
+			expectedPath: path.AbsPathForTests(t, "testdata/persist/basic.expected.py"),
+		},
+		{
+			name:         "YAML assets are handled",
+			assetPath:    path.AbsPathForTests(t, "testdata/persist/ingestr.asset.yml"),
+			expectedPath: path.AbsPathForTests(t, "testdata/persist/ingestr.expected.yml"),
+		},
+		{
+			name:         "multiline strings are handled in YAML",
+			assetPath:    path.AbsPathForTests(t, "testdata/persist/big.sql"),
+			expectedPath: path.AbsPathForTests(t, "testdata/persist/big.expected.sql"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			a, err := cmd.DefaultPipelineBuilder.CreateAssetFromFile(tt.assetPath)
+			require.NoError(t, err)
+
+			// a.ExecutableFile.Path = tt.expectedPath
+			// a.DefinitionFile.Path = tt.expectedPath
+
+			fs := afero.NewMemMapFs()
+			err = a.Persist(fs)
+			require.NoError(t, err)
+
+			actual, err := afero.ReadFile(fs, a.DefinitionFile.Path)
+			require.NoError(t, err)
+
+			expected, err := afero.ReadFile(afero.NewOsFs(), tt.expectedPath)
+			require.NoError(t, err)
+
+			expectedStr := strings.ReplaceAll(string(expected), "\r\n", "\n")
+			actualStr := strings.ReplaceAll(string(actual), "\r\n", "\n")
+
+			assert.Equal(t, expectedStr, actualStr)
+		})
+	}
+}
+
+func TestClearSpacesAtLineEndings(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		content string
+		want    string
+	}{
+		{
+			content: "some extra space   ",
+			want:    "some extra space",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.content, func(t *testing.T) {
+			t.Parallel()
+			assert.Equalf(t, tt.want, pipeline.ClearSpacesAtLineEndings(tt.content), "ClearSpacesAtLineEndings(%v)", tt.content)
+		})
+	}
+}
+
+func BenchmarkClearSpacesAtLineEndings(b *testing.B) {
+	content := `
+  This asset contains one line per booking, along with the booking's details. It is meant to serve as the single-source-of-truth for the booking entity.  
+
+  ## Primary Terms
+  - Booking: the representation of the real-life booking the user had with their coach
+  - Booking Status: an enum representing the state of the booking at the time
+  - Cancellation Reason: The reason used to cancel the booking, available only for cancelled bookings.
+
+  ## Sample Query
+  
+	SELECT Organization, count(*)
+	FROM dashboard.bookings
+	GROUP BY 1
+	ORDER BY 2 DESC
+
+  If you are interested in changing/managing individual bookings, please visit [Pace platform](https://pace.neooptima.com/).
+`
+	for i := 0; i < b.N; i++ {
+		pipeline.ClearSpacesAtLineEndings(content)
 	}
 }

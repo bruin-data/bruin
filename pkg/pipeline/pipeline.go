@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -41,7 +42,7 @@ const (
 	RunConfigEndDate     = RunConfig("end-date")
 )
 
-var supportedFileSuffixes = []string{".yml", ".yaml", ".sql", ".py"}
+var SupportedFileSuffixes = []string{".yml", ".yaml", ".sql", ".py"}
 
 type (
 	schedule           string
@@ -70,8 +71,8 @@ type TaskSchedule struct {
 }
 
 type Notifications struct {
-	Slack   []SlackNotification   `yaml:"slack" json:"slack"`
-	MSTeams []MSTeamsNotification `yaml:"ms_teams" json:"ms_teams"`
+	Slack   []SlackNotification   `yaml:"slack" json:"slack" mapstructure:"slack"`
+	MSTeams []MSTeamsNotification `yaml:"ms_teams" json:"ms_teams" mapstructure:"ms_teams"`
 }
 
 type DefaultTrueBool struct {
@@ -111,19 +112,35 @@ func (b *DefaultTrueBool) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+func (b *DefaultTrueBool) Bool() bool {
+	if b.Value == nil {
+		return true
+	}
+
+	return *b.Value
+}
+
+func (b DefaultTrueBool) MarshalYAML() (interface{}, error) {
+	if b.Value == nil {
+		return nil, nil
+	}
+
+	return *b.Value, nil
+}
+
 type NotificationCommon struct {
-	Success DefaultTrueBool `yaml:"success" json:"success"`
-	Failure DefaultTrueBool `yaml:"failure" json:"failure"`
+	Success DefaultTrueBool `yaml:"success" json:"success" mapstructure:"success"`
+	Failure DefaultTrueBool `yaml:"failure" json:"failure" mapstructure:"failure"`
 }
 
 type SlackNotification struct {
 	Channel            string `json:"channel"`
-	NotificationCommon `yaml:",inline" json:",inline"`
+	NotificationCommon `yaml:",inline" json:",inline" mapstructure:",inline"`
 }
 
 type MSTeamsNotification struct {
-	Connection         string `yaml:"connection" json:"connection"`
-	NotificationCommon `yaml:",inline" json:",inline"`
+	Connection         string `yaml:"connection" json:"connection" mapstructure:"connection"`
+	NotificationCommon `yaml:",inline" json:",inline" mapstructure:",inline"`
 }
 
 func (n Notifications) MarshalJSON() ([]byte, error) {
@@ -175,11 +192,11 @@ var AllAvailableMaterializationStrategies = []MaterializationStrategy{
 }
 
 type Materialization struct {
-	Type           MaterializationType     `json:"type"`
-	Strategy       MaterializationStrategy `json:"strategy"`
-	PartitionBy    string                  `json:"partition_by"`
-	ClusterBy      []string                `json:"cluster_by"`
-	IncrementalKey string                  `json:"incremental_key"`
+	Type           MaterializationType     `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	Strategy       MaterializationStrategy `json:"strategy" yaml:"strategy,omitempty" mapstructure:"strategy"`
+	PartitionBy    string                  `json:"partition_by" yaml:"partition_by,omitempty" mapstructure:"partition_by"`
+	ClusterBy      []string                `json:"cluster_by" yaml:"cluster_by,omitempty" mapstructure:"cluster_by"`
+	IncrementalKey string                  `json:"incremental_key" yaml:"incremental_key,omitempty" mapstructure:"incremental_key"`
 }
 
 func (m Materialization) MarshalJSON() ([]byte, error) {
@@ -225,6 +242,29 @@ func (ccv *ColumnCheckValue) MarshalJSON() ([]byte, error) {
 	}
 
 	return []byte("null"), nil
+}
+
+func (ccv ColumnCheckValue) MarshalYAML() (interface{}, error) {
+	if ccv.IntArray != nil {
+		return ccv.IntArray, nil
+	}
+	if ccv.Int != nil {
+		return ccv.Int, nil
+	}
+	if ccv.Float != nil {
+		return ccv.Float, nil
+	}
+	if ccv.StringArray != nil {
+		return ccv.StringArray, nil
+	}
+	if ccv.String != nil {
+		return ccv.String, nil
+	}
+	if ccv.Bool != nil {
+		return ccv.Bool, nil
+	}
+
+	return nil, nil
 }
 
 func (ccv *ColumnCheckValue) UnmarshalJSON(data []byte) error {
@@ -301,18 +341,18 @@ func (ccv *ColumnCheckValue) ToString() string {
 }
 
 type ColumnCheck struct {
-	ID       string           `json:"id"`
-	Name     string           `json:"name"`
-	Value    ColumnCheckValue `json:"value"`
-	Blocking bool             `json:"blocking"`
+	ID       string           `json:"id" yaml:"-" mapstructure:"-"`
+	Name     string           `json:"name" yaml:"name,omitempty" mapstructure:"name"`
+	Value    ColumnCheckValue `json:"value" yaml:"value,omitempty" mapstructure:"value"`
+	Blocking DefaultTrueBool  `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 }
 
-func NewColumnCheck(assetName, columnName, name string, value ColumnCheckValue, blocking bool) ColumnCheck {
+func NewColumnCheck(assetName, columnName, name string, value ColumnCheckValue, blocking *bool) ColumnCheck {
 	return ColumnCheck{
 		ID:       hash(fmt.Sprintf("%s-%s-%s", assetName, columnName, name)),
 		Name:     strings.TrimSpace(name),
 		Value:    value,
-		Blocking: blocking,
+		Blocking: DefaultTrueBool{Value: blocking},
 	}
 }
 
@@ -322,13 +362,14 @@ type EntityAttribute struct {
 }
 
 type Column struct {
-	EntityAttribute *EntityAttribute `json:"entity_attribute"`
-	Name            string           `json:"name"`
-	Type            string           `json:"type"`
-	Description     string           `json:"description"`
-	Checks          []ColumnCheck    `json:"checks"`
-	PrimaryKey      bool             `json:"primary_key"`
-	UpdateOnMerge   bool             `json:"update_on_merge"`
+	EntityAttribute *EntityAttribute `json:"entity_attribute" yaml:"-" mapstructure:"-"`
+	Name            string           `json:"name" yaml:"name,omitempty" mapstructure:"name"`
+	Type            string           `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	Description     string           `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	Checks          []ColumnCheck    `json:"checks" yaml:"checks,omitempty" mapstructure:"checks"`
+	PrimaryKey      bool             `json:"primary_key" yaml:"primary_key,omitempty" mapstructure:"primary_key"`
+	UpdateOnMerge   bool             `json:"update_on_merge" yaml:"update_on_merge,omitempty" mapstructure:"update_on_merge"`
+	Extends         string           `json:"-" yaml:"extends,omitempty" mapstructure:"extends"`
 }
 
 func (c *Column) HasCheck(check string) bool {
@@ -372,18 +413,32 @@ type SecretMapping struct {
 }
 
 type CustomCheck struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Query       string `json:"query"`
-	Value       int64  `json:"value"`
-	Blocking    bool   `json:"blocking"`
+	ID          string          `json:"id" yaml:"-" mapstructure:"-"`
+	Name        string          `json:"name" yaml:"name" mapstructure:"name"`
+	Description string          `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	Query       string          `json:"query" yaml:"query" mapstructure:"query"`
+	Value       int64           `json:"value" yaml:"value,omitempty" mapstructure:"value"`
+	Blocking    DefaultTrueBool `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 }
 
 type Upstream struct {
-	Type     string         `json:"type"`
-	Value    string         `json:"value"`
-	Metadata EmptyStringMap `json:"metadata,omitempty"`
+	Type     string         `json:"type" yaml:"type" mapstructure:"type"`
+	Value    string         `json:"value" yaml:"value" mapstructure:"value"`
+	Metadata EmptyStringMap `json:"metadata,omitempty" yaml:"metadata,omitempty" mapstructure:"metadata"`
+}
+
+func (u Upstream) MarshalYAML() (interface{}, error) {
+	if u.Type == "" || u.Type == "asset" {
+		return u.Value, nil
+	}
+
+	if strings.ToLower(u.Type) == "uri" {
+		return map[string]string{
+			"uri": u.Value,
+		}, nil
+	}
+
+	return nil, nil
 }
 
 type SnowflakeConfig struct {
@@ -411,34 +466,107 @@ func (s AthenaConfig) MarshalJSON() ([]byte, error) {
 }
 
 type Asset struct {
-	ID              string             `json:"id"`
-	URI             string             `json:"uri"`
-	Name            string             `json:"name"`
-	Description     string             `json:"description"`
-	Type            AssetType          `json:"type"`
-	ExecutableFile  ExecutableFile     `json:"executable_file"`
-	DefinitionFile  TaskDefinitionFile `json:"definition_file"`
-	Parameters      EmptyStringMap     `json:"parameters"`
-	Connection      string             `json:"connection"`
-	Secrets         []SecretMapping    `json:"secrets"`
-	Materialization Materialization    `json:"materialization"`
-	Columns         []Column           `json:"columns"`
-	CustomChecks    []CustomCheck      `json:"custom_checks"`
-	Image           string             `json:"image"`
-	Instance        string             `json:"instance"`
-	Owner           string             `json:"owner"`
-	Metadata        EmptyStringMap     `json:"metadata"`
-	Tags            EmptyStringArray   `json:"tags"`
-	Snowflake       SnowflakeConfig    `json:"snowflake"`
-	Athena          AthenaConfig       `json:"athena"`
+	ID              string             `json:"id" yaml:"-" mapstructure:"-"`
+	URI             string             `json:"uri" yaml:"uri,omitempty" mapstructure:"uri"`
+	Name            string             `json:"name" yaml:"name,omitempty" mapstructure:"name"`
+	Description     string             `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	Type            AssetType          `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	ExecutableFile  ExecutableFile     `json:"executable_file" yaml:"-" mapstructure:"-"`
+	DefinitionFile  TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
+	Parameters      EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
+	Connection      string             `json:"connection" yaml:"connection,omitempty" mapstructure:"connection"`
+	Secrets         []SecretMapping    `json:"secrets" yaml:"secrets,omitempty" mapstructure:"secrets"`
+	Materialization Materialization    `json:"materialization" yaml:"materialization,omitempty" mapstructure:"materialization"`
+	Columns         []Column           `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
+	CustomChecks    []CustomCheck      `json:"custom_checks" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
+	Image           string             `json:"image" yaml:"image,omitempty" mapstructure:"image"`
+	Instance        string             `json:"instance" yaml:"instance,omitempty" mapstructure:"instance"`
+	Owner           string             `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
+	Metadata        EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
+	Tags            EmptyStringArray   `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
+	Snowflake       SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
+	Athena          AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
 
 	upstream   []*Asset
 	downstream []*Asset
-	Upstreams  []Upstream `json:"upstreams"`
+	Upstreams  []Upstream `json:"upstreams" yaml:"depends,omitempty" mapstructure:"depends"`
 }
 
 func (a *Asset) AddUpstream(asset *Asset) {
 	a.upstream = append(a.upstream, asset)
+}
+
+// removeRedundanciesBeforePersisting aims to remove unnecessary configuration from the asset.
+// This is particularly useful when we save a formatted version of the asset itself.
+func (a *Asset) removeRedundanciesBeforePersisting() {
+	a.clearDuplicateUpstreams()
+	a.removeExtraSpacesAtLineEndingsInTextContent()
+
+	// python assets don't require a type anymore
+	if a.Type == AssetTypePython && strings.HasSuffix(a.ExecutableFile.Path, ".py") {
+		a.Type = ""
+	}
+}
+
+// removeRedundanciesBeforePersisting aims to remove unnecessary configuration from the asset.
+// This is particularly useful when we save a formatted version of the asset itself.
+func (a *Asset) clearDuplicateUpstreams() {
+	if a.Upstreams == nil {
+		return
+	}
+
+	seenUpstreams := make(map[string]bool, len(a.Upstreams))
+	uniqueUpstreams := make([]*Upstream, 0, len(a.Upstreams))
+	for _, u := range a.Upstreams {
+		key := fmt.Sprintf("%s-%s", u.Type, u.Value)
+		if _, ok := seenUpstreams[key]; ok {
+			continue
+		}
+		seenUpstreams[key] = true
+		uniqueUpstreams = append(uniqueUpstreams, &u)
+	}
+
+	a.Upstreams = make([]Upstream, len(uniqueUpstreams))
+	for i, val := range uniqueUpstreams {
+		a.Upstreams[i] = *val
+	}
+}
+
+func ClearSpacesAtLineEndings(content string) string {
+	lines := strings.Split(content, "\n")
+	for i, l := range lines {
+		for strings.HasSuffix(l, " ") {
+			l = strings.TrimSuffix(l, " ")
+		}
+		lines[i] = l
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// removeExtraSpacesAtLineEndingsInTextContent clears text content from various strings that might be multi-line.
+//
+// You might be thinking "why the hell would anyone want to do that?", but hear me out.
+//
+// Basically, when marshalling a string to YAML, the go-yaml library will have two ways of representing strings:
+//   - if the string contains no lines that end with a space, it'll convert them to multi-line yaml, which is good.
+//   - however, if there's a space at the end of any line within that multi-line string, then the lib will instead convert
+//     the content to be a single-line string with escaped "\n" characters, which breaks all the existing multi-line documentation.
+//
+// This was the only solution I could think of to not break multi-line strings, happy to hear better ideas that would make the existing tests pass.
+// I am also open to performance improvements here, as I think this is a suboptimal implementation.
+func (a *Asset) removeExtraSpacesAtLineEndingsInTextContent() {
+	if a.Description != "" && strings.Contains(a.Description, "\n") {
+		a.Description = ClearSpacesAtLineEndings(a.Description)
+	}
+
+	for i := range a.Columns {
+		a.Columns[i].Description = ClearSpacesAtLineEndings(a.Columns[i].Description)
+	}
+	for i := range a.CustomChecks {
+		a.CustomChecks[i].Description = ClearSpacesAtLineEndings(a.CustomChecks[i].Description)
+		a.CustomChecks[i].Query = ClearSpacesAtLineEndings(a.CustomChecks[i].Query)
+	}
 }
 
 func (a *Asset) GetUpstream() []*Asset {
@@ -552,6 +680,56 @@ func (a *Asset) EnrichFromEntityAttributes(entities []*glossary.Entity) error {
 	return nil
 }
 
+func (a *Asset) Persist(fs afero.Fs) error {
+	if a == nil {
+		return errors.New("failed to build an asset, therefore cannot persist it")
+	}
+
+	a.removeRedundanciesBeforePersisting()
+
+	buf := bytes.NewBuffer(nil)
+	enc := yaml.NewEncoder(buf)
+	enc.SetIndent(2)
+
+	err := enc.Encode(a)
+	if err != nil {
+		return err
+	}
+
+	yamlConfig := buf.Bytes()
+
+	keysToAddSpace := []string{"custom_checks", "depends", "columns", "materialization"}
+	for _, key := range keysToAddSpace {
+		yamlConfig = bytes.ReplaceAll(yamlConfig, []byte("\n"+key+":"), []byte("\n\n"+key+":"))
+	}
+
+	filePath := a.ExecutableFile.Path
+	beginning := ""
+	end := ""
+	executableContent := ""
+
+	if strings.HasSuffix(a.ExecutableFile.Path, ".sql") {
+		// we are dealing with a SQL asset with an embedded YAML block, treat accordingly.
+		beginning = "/* " + configMarkerString + "\n\n"
+		end = "\n" + configMarkerString + " */" + "\n\n"
+		executableContent = a.ExecutableFile.Content
+	}
+
+	if strings.HasSuffix(a.ExecutableFile.Path, ".py") {
+		// we are dealing with a Python asset with an embedded YAML block, treat accordingly.
+		beginning = `""" ` + configMarkerString + "\n\n"
+		end = "\n" + configMarkerString + ` """` + "\n\n"
+		executableContent = a.ExecutableFile.Content
+	}
+
+	stringVersion := beginning + string(yamlConfig) + end + executableContent
+	if !strings.HasSuffix(stringVersion, "\n") {
+		stringVersion += "\n"
+	}
+
+	return afero.WriteFile(fs, filePath, []byte(stringVersion), 0o644)
+}
+
 func uniqueAssets(assets []*Asset) []*Asset {
 	seenValues := make(map[string]bool, len(assets))
 	unique := make([]*Asset, 0, len(assets))
@@ -638,17 +816,17 @@ func PipelineFromPath(filePath string, fs afero.Fs) (*Pipeline, error) {
 }
 
 type Pipeline struct {
-	LegacyID           string         `yaml:"id" json:"legacy_id"`
-	Name               string         `yaml:"name" json:"name"`
-	Schedule           schedule       `yaml:"schedule" json:"schedule"`
-	StartDate          string         `yaml:"start_date" json:"start_date"`
+	LegacyID           string         `json:"legacy_id" yaml:"id" mapstructure:"id"`
+	Name               string         `json:"name" yaml:"name" mapstructure:"name"`
+	Schedule           schedule       `json:"schedule" yaml:"schedule" mapstructure:"schedule"`
+	StartDate          string         `json:"start_date" yaml:"start_date" mapstructure:"start_date"`
 	DefinitionFile     DefinitionFile `json:"definition_file"`
-	DefaultParameters  EmptyStringMap `yaml:"default_parameters" json:"default_parameters"`
-	DefaultConnections EmptyStringMap `yaml:"default_connections" json:"default_connections"`
+	DefaultParameters  EmptyStringMap `json:"default_parameters" yaml:"default_parameters" mapstructure:"default_parameters"`
+	DefaultConnections EmptyStringMap `json:"default_connections" yaml:"default_connections" mapstructure:"default_connections"`
 	Assets             []*Asset       `json:"assets"`
-	Notifications      Notifications  `yaml:"notifications" json:"notifications"`
-	Catchup            bool           `yaml:"catchup" json:"catchup"`
-	Retries            int            `yaml:"retries" json:"retries"`
+	Notifications      Notifications  `json:"notifications" yaml:"notifications" mapstructure:"notifications"`
+	Catchup            bool           `json:"catchup" yaml:"catchup" mapstructure:"catchup"`
+	Retries            int            `json:"retries" yaml:"retries" mapstructure:"retries"`
 
 	TasksByType map[AssetType][]*Asset `json:"-"`
 	tasksByName map[string]*Asset
@@ -875,7 +1053,7 @@ type ParseError struct {
 	Msg string
 }
 
-func (e *ParseError) Error() string {
+func (e ParseError) Error() string {
 	return e.Msg
 }
 
@@ -922,7 +1100,7 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 	taskFiles := make([]string, 0)
 	for _, tasksDirectoryName := range b.config.TasksDirectoryNames {
 		tasksPath := filepath.Join(pathToPipeline, tasksDirectoryName)
-		files, err := path.GetAllFilesRecursive(tasksPath, supportedFileSuffixes)
+		files, err := path.GetAllFilesRecursive(tasksPath, SupportedFileSuffixes)
 		if err != nil {
 			continue
 		}

@@ -287,12 +287,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 
 			seenTests[test.Name] = true
 
-			blocking := true
-			if test.Blocking != nil {
-				blocking = *test.Blocking
-			}
-
-			tests = append(tests, NewColumnCheck(definition.Name, column.Name, test.Name, ColumnCheckValue(test.Value), blocking))
+			tests = append(tests, NewColumnCheck(definition.Name, column.Name, test.Name, ColumnCheckValue(test.Value), test.Blocking))
 		}
 
 		var entityDefinition *EntityAttribute
@@ -310,12 +305,13 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 
 		columns[index] = Column{
 			Name:            column.Name,
-			Type:            strings.ToLower(strings.TrimSpace(column.Type)),
+			Type:            strings.TrimSpace(column.Type),
 			Description:     column.Description,
 			Checks:          tests,
 			PrimaryKey:      column.PrimaryKey,
 			UpdateOnMerge:   column.UpdateOnMerge,
 			EntityAttribute: entityDefinition,
+			Extends:         column.Extends,
 		}
 	}
 
@@ -351,11 +347,6 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 	}
 
 	for index, check := range definition.CustomChecks {
-		blocking := true
-		if check.Blocking != nil {
-			blocking = *check.Blocking
-		}
-
 		// set the ID as the hash of the name
 		task.CustomChecks[index] = CustomCheck{
 			ID:          hash(fmt.Sprintf("%s-%s", task.Name, check.Name)),
@@ -363,7 +354,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			Description: check.Description,
 			Query:       check.Query,
 			Value:       check.Value,
-			Blocking:    blocking,
+			Blocking:    DefaultTrueBool{Value: check.Blocking},
 		}
 	}
 

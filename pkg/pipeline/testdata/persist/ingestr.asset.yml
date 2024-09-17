@@ -1,0 +1,27 @@
+name: ingestr.table1
+type: ingestr
+
+# do we retain comments?
+
+columns:
+  - name: qty
+    type: integer
+    description: "Just a number"
+    checks:
+      - name: not_null
+      - name: positive
+
+
+
+
+parameters:
+  source_connection: neon
+  source_table: 'public.test_merge'
+
+  destination: bigquery
+
+
+custom_checks:
+  - name: This is a custom check name
+    value: 5
+    query: select count(*) from test_data_alberto.ingestr_destiny_2
