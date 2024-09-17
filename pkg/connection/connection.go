@@ -196,12 +196,12 @@ func (m *Manager) GetPgConnection(name string) (postgres.PgClient, error) {
 
 func (m *Manager) GetPgConnectionWithoutDefault(name string) (postgres.PgClient, error) {
 	if m.Postgres == nil {
-		return nil, errors.New("no postgres connections found")
+		return nil, errors.New("no postgres/redshift connections found")
 	}
 
 	db, ok := m.Postgres[name]
 	if !ok {
-		return nil, errors.Errorf("postgres connection not found for '%s'", name)
+		return nil, errors.Errorf("postgres/redshift connection not found for '%s'", name)
 	}
 
 	return db, nil
