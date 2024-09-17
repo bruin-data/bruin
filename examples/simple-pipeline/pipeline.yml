@@ -15,4 +15,5 @@ default_connections:
   shopify: "some-shopify"
   gorgias: "some-gorgias"
   aws: "my-aws"
+  klaviyo: "my-klaviyo"
 

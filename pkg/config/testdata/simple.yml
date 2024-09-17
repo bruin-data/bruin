@@ -113,8 +113,9 @@ environments:
           query_results_path: "s3://bucket/prefix"
           region: "us-west-2"
           database: "athena_db"
-
-
+      klaviyo:
+        - name: conn15
+          api_key: "klaviyokey"
 
       generic:
         - name: key1
