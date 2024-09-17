@@ -705,6 +705,12 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "notion-default", nil
 	case "hana":
 		return "hana-default", nil
+	case "shopify":
+		return "shopify-default", nil
+	case "gorgias":
+		return "gorgias-default", nil
+	case "klaviyo":
+		return "klaviyo-default", nil
 	default:
 		return "", errors.Errorf("no default connection found for type '%s'", assetType)
 	}
