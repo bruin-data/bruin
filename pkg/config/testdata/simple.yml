@@ -116,7 +116,9 @@ environments:
       klaviyo:
         - name: conn15
           api_key: "klaviyokey"
-
+      adjust:
+        - name: conn16
+          api_key: "adjustokey"
       generic:
         - name: key1
           value: value1

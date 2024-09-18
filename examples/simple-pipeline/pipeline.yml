@@ -16,4 +16,5 @@ default_connections:
   gorgias: "some-gorgias"
   aws: "my-aws"
   klaviyo: "my-klaviyo"
+  adjust: "my-adjust"
 
