@@ -14,3 +14,5 @@ notifications:
       success: true
   ms_teams:
     - connection: some_conn
+  discord:
+    - connection: some_discord_conn

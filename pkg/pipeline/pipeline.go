@@ -73,6 +73,7 @@ type TaskSchedule struct {
 type Notifications struct {
 	Slack   []SlackNotification   `yaml:"slack" json:"slack" mapstructure:"slack"`
 	MSTeams []MSTeamsNotification `yaml:"ms_teams" json:"ms_teams" mapstructure:"ms_teams"`
+	Discord []DiscordNotification `yaml:"discord" json:"discord" mapstructure:"discord"`
 }
 
 type DefaultTrueBool struct {
@@ -143,9 +144,15 @@ type MSTeamsNotification struct {
 	NotificationCommon `yaml:",inline" json:",inline" mapstructure:",inline"`
 }
 
+type DiscordNotification struct {
+	Connection         string `yaml:"connection" json:"connection" mapstructure:"connection"`
+	NotificationCommon `yaml:",inline" json:",inline" mapstructure:",inline"`
+}
+
 func (n Notifications) MarshalJSON() ([]byte, error) {
 	slack := make([]SlackNotification, 0, len(n.Slack))
 	MSTeams := make([]MSTeamsNotification, 0, len(n.MSTeams))
+	discord := make([]DiscordNotification, 0, len(n.MSTeams))
 	for _, s := range n.Slack {
 		if !reflect.ValueOf(s).IsZero() {
 			slack = append(slack, s)
@@ -156,13 +163,20 @@ func (n Notifications) MarshalJSON() ([]byte, error) {
 			MSTeams = append(MSTeams, s)
 		}
 	}
+	for _, s := range n.Discord {
+		if !reflect.ValueOf(s).IsZero() {
+			discord = append(discord, s)
+		}
+	}
 
 	return json.Marshal(struct {
 		Slack   []SlackNotification   `json:"slack"`
 		MSTeams []MSTeamsNotification `json:"ms_teams"`
+		Discord []DiscordNotification `json:"discord"`
 	}{
 		Slack:   slack,
 		MSTeams: MSTeams,
+		Discord: discord,
 	})
 }
 

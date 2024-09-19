@@ -15,6 +15,7 @@
   "assets": [],
   "notifications": {
     "slack": [],
+    "discord": [],
     "ms_teams" : []
   },
   "catchup": false,

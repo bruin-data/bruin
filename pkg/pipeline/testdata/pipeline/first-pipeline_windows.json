@@ -219,6 +219,13 @@
         "failure": true
       }
     ],
+    "discord": [
+      {
+        "connection": "some_discord_conn",
+        "success": true,
+        "failure": true
+      }
+    ],
     "ms_teams": [
       {
         "connection": "some_conn",
