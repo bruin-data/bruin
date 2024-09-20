@@ -9,7 +9,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/alecthomas/chroma/v2 v2.13.0
 	github.com/databricks/databricks-sql-go v1.6.0
-	github.com/docker/docker v25.0.3+incompatible
+	github.com/docker/docker v25.0.6+incompatible
 	github.com/fatih/color v1.16.0
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/go-viper/mapstructure/v2 v2.1.0
