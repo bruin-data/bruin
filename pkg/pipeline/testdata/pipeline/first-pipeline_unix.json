@@ -7,6 +7,9 @@
     "name": "pipeline.yml",
     "path": "__BASEDIR__/testdata/pipeline/first-pipeline/pipeline.yml"
   },
+  "metadata_push": {
+    "bigquery": false
+  },
   "default_parameters": {
     "param1": "value1",
     "param2": "value2"

@@ -829,6 +829,10 @@ func PipelineFromPath(filePath string, fs afero.Fs) (*Pipeline, error) {
 	return &pl, nil
 }
 
+type MetadataPush struct {
+	BigQuery bool `json:"bigquery" yaml:"bigquery" mapstructure:"bigquery"`
+}
+
 type Pipeline struct {
 	LegacyID           string         `json:"legacy_id" yaml:"id" mapstructure:"id"`
 	Name               string         `json:"name" yaml:"name" mapstructure:"name"`
@@ -840,6 +844,7 @@ type Pipeline struct {
 	Assets             []*Asset       `json:"assets"`
 	Notifications      Notifications  `json:"notifications" yaml:"notifications" mapstructure:"notifications"`
 	Catchup            bool           `json:"catchup" yaml:"catchup" mapstructure:"catchup"`
+	MetadataPush       MetadataPush   `json:"metadata_push" yaml:"metadata_push" mapstructure:"metadata_push"`
 	Retries            int            `json:"retries" yaml:"retries" mapstructure:"retries"`
 
 	TasksByType map[AssetType][]*Asset `json:"-"`

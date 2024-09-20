@@ -12,6 +12,9 @@
     "gcpConnectionId": "gcp-connection-id-here",
     "slack": "slack-connection"
   },
+  "metadata_push": {
+    "bigquery": false
+  },
   "assets": [
     {
       "id": "eb9126984939a8f3e6e882cd0cd171af872274bd3dd18148b3d95afc01efa6b1",
