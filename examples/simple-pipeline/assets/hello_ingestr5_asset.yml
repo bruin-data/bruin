@@ -1,6 +1,6 @@
 name: public.adjust
 type: ingestr
-connection: neon
+connection: postgres
 
 parameters:
   source_connection: new_adjust
