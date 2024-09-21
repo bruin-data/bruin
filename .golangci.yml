@@ -23,7 +23,7 @@ issues:
 linters:
   disable:
     - scopelint
-    - goerr113
+    - err113
     - err113
     - mnd
     - wrapcheck
