@@ -108,8 +108,9 @@ func Run(isDebug *bool) *cli.Command {
 				Usage:   "pick the assets with the given tag",
 			},
 			&cli.StringSliceFlag{
-				Name:  "only",
-				Usage: "",
+				Name:        "only",
+				DefaultText: "'main', 'checks', 'push-metadata'",
+				Usage:       "limit the types of tasks to run. By default it will run main and checks, while push-metadata is optional if defined in the pipeline definition",
 			},
 		},
 		Action: func(c *cli.Context) error {
