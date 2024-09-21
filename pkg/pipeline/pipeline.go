@@ -833,6 +833,10 @@ type MetadataPush struct {
 	BigQuery bool `json:"bigquery" yaml:"bigquery" mapstructure:"bigquery"`
 }
 
+func (mp *MetadataPush) HasAnyEnabled() bool {
+	return mp.BigQuery
+}
+
 type Pipeline struct {
 	LegacyID           string         `json:"legacy_id" yaml:"id" mapstructure:"id"`
 	Name               string         `json:"name" yaml:"name" mapstructure:"name"`

@@ -64,7 +64,7 @@ func TestConcurrent_Start(t *testing.T) {
 	}
 
 	logger := zap.NewNop().Sugar()
-	s := scheduler.NewScheduler(logger, p, false)
+	s := scheduler.NewScheduler(logger, p)
 	assert.Equal(t, 5, s.InstanceCount())
 
 	ops := map[pipeline.AssetType]Config{

@@ -29,6 +29,8 @@ func (s TaskInstanceStatus) String() string {
 		return "upstream_failed"
 	case Succeeded:
 		return "succeeded"
+	case Skipped:
+		return "skipped"
 	}
 	return "unknown"
 }
@@ -56,6 +58,7 @@ const (
 	Failed
 	UpstreamFailed
 	Succeeded
+	Skipped
 )
 
 const (
@@ -70,6 +73,7 @@ type TaskInstance interface {
 	GetAsset() *pipeline.Asset
 	GetType() TaskInstanceType
 	GetHumanID() string
+	GetHumanReadableDescription() string
 
 	GetStatus() TaskInstanceStatus
 	MarkAs(status TaskInstanceStatus)
@@ -95,6 +99,10 @@ type AssetInstance struct {
 
 func (t *AssetInstance) GetHumanID() string {
 	return t.HumanID
+}
+
+func (t *AssetInstance) GetHumanReadableDescription() string {
+	return t.Asset.Name
 }
 
 func (t *AssetInstance) GetStatus() TaskInstanceStatus {
@@ -153,6 +161,10 @@ func (t *ColumnCheckInstance) GetType() TaskInstanceType {
 	return TaskInstanceTypeColumnCheck
 }
 
+func (t *ColumnCheckInstance) GetHumanReadableDescription() string {
+	return fmt.Sprintf("%s - Column '%s' / Check '%s'", t.Asset.Name, t.Column.Name, t.Check.Name)
+}
+
 func (t *ColumnCheckInstance) Blocking() bool {
 	return t.Check.Blocking.Bool()
 }
@@ -167,6 +179,10 @@ func (t *CustomCheckInstance) GetType() TaskInstanceType {
 	return TaskInstanceTypeCustomCheck
 }
 
+func (t *CustomCheckInstance) GetHumanReadableDescription() string {
+	return fmt.Sprintf("%s - Custom Check '%s'", t.Asset.Name, t.Check.Name)
+}
+
 func (t *CustomCheckInstance) Blocking() bool {
 	return t.Check.Blocking.Bool()
 }
@@ -177,6 +193,10 @@ type MetadataPushInstance struct {
 
 func (t *MetadataPushInstance) GetType() TaskInstanceType {
 	return TaskInstanceTypeMetadataPush
+}
+
+func (t *MetadataPushInstance) GetHumanReadableDescription() string {
+	return t.Asset.Name + " - Metadata Push"
 }
 
 func (t *MetadataPushInstance) Blocking() bool {
@@ -239,12 +259,26 @@ func (s *Scheduler) MarkAll(status TaskInstanceStatus) {
 	}
 }
 
-func (s *Scheduler) MarkTask(task *pipeline.Asset, status TaskInstanceStatus, downstream bool) {
+func (s *Scheduler) MarkAsset(task *pipeline.Asset, status TaskInstanceStatus, downstream bool) {
 	instancesByType := s.taskNameMap[task.Name]
 	for _, instance := range instancesByType {
 		for _, i := range instance {
 			s.MarkTaskInstance(i, status, downstream)
 		}
+	}
+}
+
+func (s *Scheduler) MarkPendingInstancesByType(instanceType TaskInstanceType, status TaskInstanceStatus) {
+	for _, instance := range s.taskInstances {
+		if instance.GetStatus() != Pending {
+			continue
+		}
+
+		if instance.GetType() != instanceType {
+			continue
+		}
+
+		s.MarkTaskInstance(instance, status, false)
 	}
 }
 
@@ -317,7 +351,7 @@ func (s *Scheduler) FindMajorityOfTypes(defaultIfNone pipeline.AssetType) pipeli
 	return s.pipeline.GetMajorityAssetTypesFromSQLAssets(defaultIfNone)
 }
 
-func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, pushMetadata bool) *Scheduler {
+func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline) *Scheduler {
 	instances := make([]TaskInstance, 0)
 
 	for _, task := range p.Assets {
@@ -370,8 +404,8 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, pushMetadata 
 			instances = append(instances, testInstance)
 		}
 
-		if pushMetadata {
-			testInstance := &MetadataPushInstance{
+		if p.MetadataPush.HasAnyEnabled() {
+			instances = append(instances, &MetadataPushInstance{
 				AssetInstance: &AssetInstance{
 					ID:         uuid.New().String(),
 					HumanID:    task.Name + ":metadata-push",
@@ -381,8 +415,7 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, pushMetadata 
 					upstream:   make([]TaskInstance, 0),
 					downstream: make([]TaskInstance, 0),
 				},
-			}
-			instances = append(instances, testInstance)
+			})
 		}
 	}
 
@@ -484,9 +517,13 @@ func (s *Scheduler) constructInstanceRelationships() {
 }
 
 func (s *Scheduler) Run(ctx context.Context) []*TaskExecutionResult {
-	go s.Kickstart()
-
 	results := make([]*TaskExecutionResult, 0)
+	if len(s.GetTaskInstancesByStatus(Pending)) == 0 {
+		s.logger.Debug("no tasks to run, finishing the scheduler loop")
+		return nil
+	}
+
+	go s.Kickstart()
 
 	s.logger.Debug("started the scheduler loop")
 	for {

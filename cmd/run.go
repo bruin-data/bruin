@@ -9,6 +9,7 @@ import (
 	path2 "path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -105,6 +106,10 @@ func Run(isDebug *bool) *cli.Command {
 				Name:    "tag",
 				Aliases: []string{"t"},
 				Usage:   "pick the assets with the given tag",
+			},
+			&cli.StringSliceFlag{
+				Name:  "only",
+				Usage: "",
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -263,17 +268,39 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			} else {
 				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
-				infoPrinter.Printf(" - custom checks: %d\n", len(task.CustomChecks))
 			}
 
-			s := scheduler.NewScheduler(logger, foundPipeline, c.Bool("push-metadata"))
+			runMain := true
+			runChecks := true
+			runPushMetadata := c.Bool("push-metadata") || foundPipeline.MetadataPush.HasAnyEnabled()
 
-			infoPrinter.Printf("\nStarting the pipeline execution...\n")
+			onlyFlags := c.StringSlice("only")
+			if len(onlyFlags) > 0 {
+				runMain = slices.Contains(onlyFlags, "main")
+				runChecks = slices.Contains(onlyFlags, "checks")
+				runPushMetadata = slices.Contains(onlyFlags, "push-metadata")
 
+				for _, flag := range onlyFlags {
+					if flag != "main" && flag != "checks" && flag != "push-metadata" {
+						errorPrinter.Printf("Invalid value for '--only' flag: '%s', available values are 'main', 'checks', and 'push-metadata'\n", flag)
+						return cli.Exit("", 1)
+					}
+				}
+			}
+
+			s := scheduler.NewScheduler(logger, foundPipeline)
+
+			// mark all the instances to be skipped, then conditionally mark the ones to run to be pending
+			s.MarkAll(scheduler.Pending)
 			if task != nil {
 				logger.Debug("marking single task to run: ", task.Name)
 				s.MarkAll(scheduler.Succeeded)
-				s.MarkTask(task, scheduler.Pending, runDownstreamTasks)
+				s.MarkAsset(task, scheduler.Pending, runDownstreamTasks)
+
+				if c.String("tag") != "" {
+					errorPrinter.Printf("You cannot use the '--tag' flag when running a single asset.\n")
+					return cli.Exit("", 1)
+				}
 			}
 
 			tag := c.String("tag")
@@ -291,6 +318,26 @@ func Run(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("Running only the assets with tag '%s', found %d assets.\n", tag, len(assetsByTag))
 			}
 
+			if !runMain {
+				logger.Debug("disabling main instances if any")
+				s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeMain, scheduler.Succeeded)
+			}
+			if !runChecks {
+				logger.Debug("disabling check instances if any")
+				s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeColumnCheck, scheduler.Succeeded)
+				s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeCustomCheck, scheduler.Succeeded)
+			}
+			if !runPushMetadata {
+				logger.Debug("disabling metadata push instances if any")
+				s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeMetadataPush, scheduler.Succeeded)
+			}
+
+			if s.InstanceCountByStatus(scheduler.Pending) == 0 {
+				warningPrinter.Println("No tasks to run.")
+				return nil
+			}
+
+			infoPrinter.Printf("\nStarting the pipeline execution...\n")
 			infoPrinter.Println()
 
 			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, c.Bool("full-refresh"))
@@ -336,7 +383,7 @@ func Run(isDebug *bool) *cli.Command {
 func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) {
 	errorPrinter.Printf("\nFailed tasks: %d\n", len(errorsInTaskResults))
 	for _, t := range errorsInTaskResults {
-		errorPrinter.Printf("  - %s\n", t.Instance.GetAsset().Name)
+		errorPrinter.Printf("  - %s\n", t.Instance.GetHumanReadableDescription())
 		errorPrinter.Printf("    └── %s\n\n", t.Error.Error())
 	}
 

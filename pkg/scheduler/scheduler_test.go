@@ -209,7 +209,7 @@ func TestScheduler_Run(t *testing.T) {
 		},
 	}
 
-	scheduler := NewScheduler(&zap.SugaredLogger{}, p, false)
+	scheduler := NewScheduler(&zap.SugaredLogger{}, p)
 
 	scheduler.Tick(&TaskExecutionResult{
 		Instance: &AssetInstance{
@@ -326,9 +326,9 @@ func TestScheduler_MarkTasksAndDownstream(t *testing.T) {
 		},
 	}
 
-	s := NewScheduler(zap.NewNop().Sugar(), p, false)
+	s := NewScheduler(zap.NewNop().Sugar(), p)
 	s.MarkAll(Succeeded)
-	s.MarkTask(t12, Pending, true)
+	s.MarkAsset(t12, Pending, true)
 
 	s.Kickstart()
 
@@ -436,10 +436,10 @@ func TestScheduler_WillRunTaskOfType(t *testing.T) {
 		},
 	}
 
-	s := NewScheduler(zap.NewNop().Sugar(), p, false)
+	s := NewScheduler(zap.NewNop().Sugar(), p)
 	s.MarkAll(Succeeded)
-	s.MarkTask(t12, Pending, true)
-	s.MarkTask(t1000, Pending, true)
+	s.MarkAsset(t12, Pending, true)
+	s.MarkAsset(t1000, Pending, true)
 
 	assert.Equal(t, 10, s.InstanceCount())
 	assert.Equal(t, 6, s.InstanceCountByStatus(Pending))
@@ -497,7 +497,7 @@ func TestScheduler_FindMajorityOfTypes(t *testing.T) {
 		},
 	}
 
-	s := NewScheduler(zap.NewNop().Sugar(), p, false)
+	s := NewScheduler(zap.NewNop().Sugar(), p)
 
 	// if they are in equal counts, the default should be preferred
 	assert.Equal(t, pipeline.AssetType("bq.sql"), s.FindMajorityOfTypes("bq.sql"))
