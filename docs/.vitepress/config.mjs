@@ -7,10 +7,14 @@ export default defineConfig({
     base: '/bruin/',
     themeConfig: {
         outline: 'deep',
+        search: {
+            provider: 'local'
+        },
         nav: [{text: "Home", link: "/"}],
         sidebar: [
             {
                 text: "Getting Started",
+                collapsed: false,
                 items: [
                     {text: "Introduction", link: "/getting-started/introduction"},
                     {
@@ -25,6 +29,7 @@ export default defineConfig({
             },
             {
                 text: "Commands",
+                collapsed: false,
                 items: [
                     {text: "Init", link: "/commands/init"},
                     {text: "Connections", link: "/commands/connections"},
@@ -33,6 +38,7 @@ export default defineConfig({
             },
             {
                 text: "Connections",
+                collapsed: false,
                 items: [
                     {
                         text: "Overview", link: "/connections/overview", items: [
@@ -54,6 +60,7 @@ export default defineConfig({
             },
             {
                 text: "Assets",
+                collapsed: false,
                 items: [
                     {text: "Definition Schema", link: "/assets/definition-schema", items:[
                         {text: "Google BigQuery", link: "/assets/bigquery"},
@@ -72,6 +79,7 @@ export default defineConfig({
             },
             {
                 text: "Templating",
+                collapsed: false,
                 items: [
                     {text: "Overview", link: "/templating/templating"},
                     {text: "Filters", link: "/templating/filters"},
@@ -79,6 +87,7 @@ export default defineConfig({
             },
             {
                 text: "Quality checks",
+                collapsed: false,
                 items: [
                     {
                         text: "Overview", link: "/quality/overview", items: [
@@ -95,6 +104,7 @@ export default defineConfig({
             },
             {
                 text: "Bruin Cloud",
+                collapsed: false,
                 items: [
                     {text: "Cross-pipeline dependencies", link: "/cloud/cross-pipeline"},
                     {text: "Notifications", link: "/cloud/notifications"},
