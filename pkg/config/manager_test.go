@@ -172,6 +172,13 @@ func TestLoadFromFile(t *testing.T) {
 					Value: "value2",
 				},
 			},
+			FacebookAds: []FacebookAdsConnection{
+				{
+					Name:      "conn17",
+					APIKey:    "Facebookkey",
+					ACCOUNTID: "Id123",
+				},
+			},
 		},
 	}
 

@@ -183,6 +183,16 @@ func (c KlaviyoConnection) GetName() string {
 	return c.Name
 }
 
+type FacebookAdsConnection struct {
+	Name        string `yaml:"name" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
+	AccountId   string `yaml:"account_id" json:"account_id" mapstructure:"account_id"`
+}
+
+func (c FacebookAdsConnection) GetName() string {
+	return c.Name
+}
+
 type MySQLConnection struct {
 	Name     string `yaml:"name" json:"name" mapstructure:"name"`
 	Username string `yaml:"username" json:"username" mapstructure:"username"`
@@ -283,6 +293,7 @@ type Connections struct {
 	Gorgias             []GorgiasConnection             `yaml:"gorgias,omitempty" json:"gorgias,omitempty" mapstructure:"gorgias"`
 	Klaviyo             []KlaviyoConnection             `yaml:"klaviyo,omitempty" json:"klaviyo,omitempty" mapstructure:"klaviyo"`
 	Generic             []GenericConnection             `yaml:"generic,omitempty" json:"generic,omitempty" mapstructure:"generic"`
+	FacebookAds         []FacebookAdsConnection         `yaml:"facebookads,omitempty" json:"facebookads,omitempty" mapstructure:"facebookads"`
 
 	byKey       map[string]any
 	typeNameMap map[string]string
@@ -387,6 +398,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.Generic {
 		c.byKey[conn.Name] = &(c.Generic[i])
 		c.typeNameMap[conn.Name] = "generic"
+	}
+
+	for i, conn := range c.FacebookAds {
+		c.byKey[conn.Name] = &(c.FacebookAds[i])
+		c.typeNameMap[conn.Name] = "facebookads"
 	}
 }
 
@@ -642,6 +658,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Generic = append(env.Connections.Generic, conn)
+	case "facebookads":
+		var conn FacebookAdsConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.FacebookAds = append(env.Connections.FacebookAds, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -707,6 +730,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Klaviyo = removeConnection(env.Connections.Klaviyo, connectionName)
 	case "generic":
 		env.Connections.Generic = removeConnection(env.Connections.Generic, connectionName)
+	case "facebookads":
+		env.Connections.FacebookAds = removeConnection(env.Connections.FacebookAds, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
