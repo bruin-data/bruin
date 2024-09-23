@@ -254,7 +254,8 @@ func TestSqlParser_Lineage(t *testing.T) {
 						WHEN regions.name = 'North' THEN 'N'
 						WHEN regions.name = 'South' THEN 'S'
 						ELSE 'Other'
-					END as region_abbr
+					END as region_abbr,
+				    'fixed' as fixed
 				FROM sales
 				JOIN regions ON sales.region_id = regions.id
 			`,
@@ -264,6 +265,10 @@ func TestSqlParser_Lineage(t *testing.T) {
 			},
 			want: &Lineage{
 				Columns: []ColumnLineage{
+					{
+						Name:     "fixed",
+						Upstream: []UpstreamColumn{},
+					},
 					{
 						Name: "id",
 						Upstream: []UpstreamColumn{

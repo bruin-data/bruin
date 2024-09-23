@@ -65,10 +65,13 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
         ll = lineage.lineage(col, optimized, schema, dialect=dialect)
 
         cl = []
-        leaves = []
+        leaves: list[Node] = []
         find_leaf_nodes(ll, leaves)
 
         for ds in leaves:
+            if isinstance(ds.expression.this, exp.Literal):
+                continue
+
             cl.append(
                 {"column": ds.name.split(".")[-1], "table": ds.expression.this.name}
             )

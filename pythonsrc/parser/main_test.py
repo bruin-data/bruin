@@ -189,7 +189,8 @@ test_cases = [
                     WHEN regions.name = 'North' THEN 'N'
                     WHEN regions.name = 'South' THEN 'S'
                     ELSE 'Other'
-                END as region_abbr
+                END as region_abbr,
+                'fixed' as fixed
             FROM sales
             JOIN regions ON sales.region_id = regions.id
         """,
@@ -198,13 +199,14 @@ test_cases = [
             "regions": {"id": "str", "name": "str"},
         },
         "expected": [
+            {"name": "fixed", "upstream": []},
             {"name": "id", "upstream": [{"column": "id", "table": "sales"}]},
             {
                 "name": "region_abbr",
                 "upstream": [{"column": "name", "table": "regions"}],
             },
             {"name": "sale_size", "upstream": [{"column": "amount", "table": "sales"}]},
-        ],
+        ]
     },
 ]
 
