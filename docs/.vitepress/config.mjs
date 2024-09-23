@@ -110,6 +110,18 @@ export default defineConfig({
                     {text: "Notifications", link: "/cloud/notifications"},
                 ],
             },
+            {
+                text:"Bruin VSCode Extension",
+                collapsed: false,
+                items: [
+                    {text: "Overview", link: "/vscode-extension/overview",
+                    items: [
+                        {text: "Installation", link: "/vscode-extension/installation"},
+                        {text: "Features", link: "/vscode-extension/features"},
+                    ]
+                },
+                ]
+            }
         ],
 
         socialLinks: [{icon: "github", link: "https://github.com/bruin-data/bruin"}],
