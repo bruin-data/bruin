@@ -117,7 +117,7 @@ export default defineConfig({
                     {text: "Overview", link: "/vscode-extension/overview",
                     items: [
                         {text: "Installation", link: "/vscode-extension/installation"},
-                        {text: "Features", link: "/vscode-extension/features"},
+                        //{text: "Features", link: "/vscode-extension/features"},
                     ]
                 },
                 ]
