@@ -183,6 +183,15 @@ func (c KlaviyoConnection) GetName() string {
 	return c.Name
 }
 
+type AdjustConnection struct {
+	Name   string `yaml:"name" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c AdjustConnection) GetName() string {
+	return c.Name
+}
+
 type FacebookAdsConnection struct {
 	Name        string `yaml:"name" json:"name" mapstructure:"name"`
 	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
@@ -292,6 +301,7 @@ type Connections struct {
 	Shopify             []ShopifyConnection             `yaml:"shopify,omitempty" json:"shopify,omitempty" mapstructure:"shopify"`
 	Gorgias             []GorgiasConnection             `yaml:"gorgias,omitempty" json:"gorgias,omitempty" mapstructure:"gorgias"`
 	Klaviyo             []KlaviyoConnection             `yaml:"klaviyo,omitempty" json:"klaviyo,omitempty" mapstructure:"klaviyo"`
+	Adjust              []AdjustConnection              `yaml:"adjust,omitempty" json:"adjust,omitempty" mapstructure:"adjust"`
 	Generic             []GenericConnection             `yaml:"generic,omitempty" json:"generic,omitempty" mapstructure:"generic"`
 	FacebookAds         []FacebookAdsConnection         `yaml:"facebookads,omitempty" json:"facebookads,omitempty" mapstructure:"facebookads"`
 
@@ -393,6 +403,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.Klaviyo {
 		c.byKey[conn.Name] = &(c.Klaviyo[i])
 		c.typeNameMap[conn.Name] = "klaviyo"
+	}
+
+	for i, conn := range c.Adjust {
+		c.byKey[conn.Name] = &(c.Adjust[i])
+		c.typeNameMap[conn.Name] = "adjust"
 	}
 
 	for i, conn := range c.Generic {
@@ -651,6 +666,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Klaviyo = append(env.Connections.Klaviyo, conn)
+	case "adjust":
+		var conn AdjustConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Adjust = append(env.Connections.Adjust, conn)
 	case "generic":
 		var conn GenericConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -728,6 +750,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Gorgias = removeConnection(env.Connections.Gorgias, connectionName)
 	case "klaviyo":
 		env.Connections.Klaviyo = removeConnection(env.Connections.Klaviyo, connectionName)
+	case "adjust":
+		env.Connections.Adjust = removeConnection(env.Connections.Adjust, connectionName)
 	case "generic":
 		env.Connections.Generic = removeConnection(env.Connections.Generic, connectionName)
 	case "facebookads":

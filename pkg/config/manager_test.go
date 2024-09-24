@@ -145,6 +145,12 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "klaviyokey",
 				},
 			},
+			Adjust: []AdjustConnection{
+				{
+					Name:   "conn16",
+					APIKey: "adjustokey",
+				},
+			},
 			AthenaConnection: []AthenaConnection{
 				{
 					Name:             "conn14",

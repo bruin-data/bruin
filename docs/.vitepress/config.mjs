@@ -42,6 +42,7 @@ export default defineConfig({
                 items: [
                     {
                         text: "Overview", link: "/connections/overview", items: [
+                            {text: "Adjust", link: "/connections/adjust.md"},
                             {text: "Google Cloud Platform", link: "/connections/google_cloud_platform"},
                             {text: "Gorgias", link: "/connections/gorgias"},
                             {text: "Microsoft SQL Server", link: "/connections/mssql"},
@@ -110,6 +111,18 @@ export default defineConfig({
                     {text: "Notifications", link: "/cloud/notifications"},
                 ],
             },
+            {
+                text:"Bruin VSCode Extension",
+                collapsed: false,
+                items: [
+                    {text: "Overview", link: "/vscode-extension/overview",
+                    items: [
+                        {text: "Installation", link: "/vscode-extension/installation"},
+                        //{text: "Features", link: "/vscode-extension/features"},
+                    ]
+                },
+                ]
+            }
         ],
 
         socialLinks: [{icon: "github", link: "https://github.com/bruin-data/bruin"}],

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/bruin-data/bruin/pkg/adjust"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -38,6 +39,7 @@ type Manager struct {
 	Shopify     map[string]*shopify.Client
 	Gorgias     map[string]*gorgias.Client
 	Klaviyo     map[string]*klaviyo.Client
+	Adjust     map[string]*adjust.Client
 	Athena      map[string]*athena.DB
 	FacebookAds map[string]*facebookads.Client
 	mutex       sync.Mutex
@@ -117,6 +119,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connKlaviyo, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Klaviyo)...)
+
+	connAdjust, err := m.GetAdjustConnectionWithoutDefault(name)
+	if err == nil {
+		return connAdjust, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Adjust)...)
 
 	athenaConnection, err := m.GetAthenaConnectionWithoutDefault(name)
 	if err == nil {
@@ -388,6 +396,28 @@ func (m *Manager) GetKlaviyoConnectionWithoutDefault(name string) (*klaviyo.Clie
 	db, ok := m.Klaviyo[name]
 	if !ok {
 		return nil, errors.Errorf("klaviyo connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetAdjustConnection(name string) (*adjust.Client, error) {
+	db, err := m.GetAdjustConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetAdjustConnectionWithoutDefault("adjust-default")
+}
+
+func (m *Manager) GetAdjustConnectionWithoutDefault(name string) (*adjust.Client, error) {
+	if m.Adjust == nil {
+		return nil, errors.New("no adjust connections found")
+	}
+
+	db, ok := m.Adjust[name]
+	if !ok {
+		return nil, errors.Errorf("adjust connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -753,6 +783,27 @@ func (m *Manager) AddKlaviyoConnectionFromConfig(connection *config.KlaviyoConne
 	return nil
 }
 
+func (m *Manager) AddAdjustConnectionFromConfig(connection *config.AdjustConnection) error {
+	m.mutex.Lock()
+	if m.Adjust == nil {
+		m.Adjust = make(map[string]*adjust.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := adjust.NewClient(adjust.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Adjust[connection.Name] = client
+
+	return nil
+}
+
 func (m *Manager) AddHANAConnectionFromConfig(connection *config.HANAConnection) error {
 	m.mutex.Lock()
 	if m.HANA == nil {
@@ -926,6 +977,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 			err := connectionManager.AddKlaviyoConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add klaviyo connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Adjust {
+		wg.Go(func() {
+			err := connectionManager.AddAdjustConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add adjust connection '%s'", conn.Name))
 			}
 		})
 	}
