@@ -40,3 +40,22 @@ select
 from sales_data
 group by order_date;
 ```
+
+Bruin athena assets support partition by one column only
+```sql
+/* @bruin
+name: daily_sales_analysis.view
+type: athena.sql
+materialization:
+    type: table
+    partition_by: order_date # <----------
+@bruin */
+
+select
+    order_date,
+    sum(total_amount) as total_sales,
+    count(distinct order_id) as total_orders,
+    avg(total_amount) as avg_order_value
+from sales_data
+group by order_date;
+```
