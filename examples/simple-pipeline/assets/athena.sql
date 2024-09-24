@@ -1,8 +1,9 @@
 /* @bruin
-name: travellers
+name: destinations
 type: athena.sql
 materialization:
    type: table
+   partition_by: id
    # strategy: append
    # strategy: merge
    # incremental_key: id
