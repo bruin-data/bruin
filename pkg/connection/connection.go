@@ -2,7 +2,6 @@ package connection
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
@@ -39,7 +38,7 @@ type Manager struct {
 	Shopify     map[string]*shopify.Client
 	Gorgias     map[string]*gorgias.Client
 	Klaviyo     map[string]*klaviyo.Client
-	Adjust     map[string]*adjust.Client
+	Adjust      map[string]*adjust.Client
 	Athena      map[string]*athena.DB
 	FacebookAds map[string]*facebookads.Client
 	mutex       sync.Mutex
@@ -133,7 +132,6 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Athena)...)
 
 	connFacebookAds, err := m.GetFacebookAdsConnectionWithoutDefault(name)
-	fmt.Printf("connFacebookAds", connFacebookAds)
 	if err == nil {
 		return connFacebookAds, nil
 	}

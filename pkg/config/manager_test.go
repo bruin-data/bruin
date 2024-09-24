@@ -180,9 +180,9 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			FacebookAds: []FacebookAdsConnection{
 				{
-					Name:      "conn17",
-					APIKey:    "Facebookkey",
-					ACCOUNTID: "Id123",
+					Name:        "conn17",
+					AccessToken: "Facebookkey",
+					AccountId:   "Id123",
 				},
 			},
 		},
