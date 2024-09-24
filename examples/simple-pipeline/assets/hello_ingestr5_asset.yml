@@ -1,0 +1,9 @@
+name: public.adjust
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: new_adjust
+  source_table: 'creatives'
+
+  destination: postgres
