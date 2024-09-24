@@ -1,6 +1,6 @@
 name: bruin-init
 schedule: dailyadds
-start_date: "2023-03-20asdasd"
+start_date: "2023-03-20"
 
 default_connections:
   google_cloud_platform: "alberto-gcp"
@@ -17,4 +17,4 @@ default_connections:
   aws: "my-aws"
   klaviyo: "my-klaviyo"
   adjust: "my-adjust"
-
+  facebookads: "my-facebookads"

@@ -910,6 +910,8 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "shopify-default", nil
 	case "gorgias":
 		return "gorgias-default", nil
+	case "facebookads":
+		return "facebookads-default", nil
 	case "klaviyo":
 		return "klaviyo-default", nil
 	case "adjust":
