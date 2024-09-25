@@ -195,7 +195,7 @@ func (c AdjustConnection) GetName() string {
 type FacebookAdsConnection struct {
 	Name        string `yaml:"name" json:"name" mapstructure:"name"`
 	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
-	AccountId   string `yaml:"account_id" json:"account_id" mapstructure:"account_id"`
+	AccountID   string `yaml:"account_id" json:"account_id" mapstructure:"account_id"`
 }
 
 func (c FacebookAdsConnection) GetName() string {

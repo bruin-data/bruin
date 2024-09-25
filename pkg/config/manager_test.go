@@ -182,7 +182,7 @@ func TestLoadFromFile(t *testing.T) {
 				{
 					Name:        "conn17",
 					AccessToken: "Facebookkey",
-					AccountId:   "Id123",
+					AccountID:   "Id123",
 				},
 			},
 		},

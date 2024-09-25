@@ -7,14 +7,5 @@ type Parser interface {
 }
 
 type LineageExtractor struct {
-	parser Parser
+	// parser Parser
 }
-
-//
-//func (l *LineageExtractor) Extract(pipeline *Pipeline, asset *Asset) (*sqlparser.Lineage, error) {
-//	sql := asset.Query
-//	schema := asset.Schema
-//	dialect := asset.Dialect
-//
-//	return l.parser.ColumnLineage(sql, dialect, schema)
-//}

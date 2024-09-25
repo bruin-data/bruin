@@ -423,7 +423,7 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 	estimateCustomCheckType := s.FindMajorityOfTypes(pipeline.AssetTypeBigqueryQuery)
 
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
-		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID))
+		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh))
 	}
 
 	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID)

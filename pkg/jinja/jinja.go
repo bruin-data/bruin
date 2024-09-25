@@ -34,8 +34,8 @@ func NewRenderer(context Context) *Renderer {
 	}
 }
 
-func PythonEnvVariables(startDate, endDate *time.Time, pipelineName, runID string) map[string]string {
-	return map[string]string{
+func PythonEnvVariables(startDate, endDate *time.Time, pipelineName, runID string, fullRefresh bool) map[string]string {
+	vars := map[string]string{
 		"BRUIN_START_DATE":        startDate.Format("2006-01-02"),
 		"BRUIN_START_DATE_NODASH": startDate.Format("20060102"),
 		"BRUIN_START_DATETIME":    startDate.Format("2006-01-02T15:04:05"),
@@ -46,7 +46,14 @@ func PythonEnvVariables(startDate, endDate *time.Time, pipelineName, runID strin
 		"BRUIN_END_TIMESTAMP":     endDate.Format("2006-01-02T15:04:05.000000Z07:00"),
 		"BRUIN_RUN_ID":            runID,
 		"BRUIN_PIPELINE":          pipelineName,
+		"BRUIN_FULL_REFRESH":      "",
 	}
+
+	if fullRefresh {
+		vars["BRUIN_FULL_REFRESH"] = "1"
+	}
+
+	return vars
 }
 
 func NewRendererWithStartEndDates(startDate, endDate *time.Time, pipelineName, runID string) *Renderer {

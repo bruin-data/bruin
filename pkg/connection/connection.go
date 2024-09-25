@@ -836,7 +836,7 @@ func (m *Manager) AddFacebookAdsConnectionFromConfig(connection *config.Facebook
 
 	client, err := facebookads.NewClient(facebookads.Config{
 		AccessToken: connection.AccessToken,
-		AccountId:   connection.AccountId,
+		AccountID:   connection.AccountID,
 	})
 	if err != nil {
 		return err
