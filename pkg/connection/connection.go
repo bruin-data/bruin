@@ -4,10 +4,12 @@ import (
 	"context"
 	"sync"
 
+	"github.com/bruin-data/bruin/pkg/adjust"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
+	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/klaviyo"
@@ -24,20 +26,22 @@ import (
 )
 
 type Manager struct {
-	BigQuery   map[string]*bigquery.Client
-	Snowflake  map[string]*snowflake.DB
-	Postgres   map[string]*postgres.Client
-	MsSQL      map[string]*mssql.DB
-	Databricks map[string]*databricks.DB
-	Mongo      map[string]*mongo.DB
-	Mysql      map[string]*mysql.Client
-	Notion     map[string]*notion.Client
-	HANA       map[string]*hana.Client
-	Shopify    map[string]*shopify.Client
-	Gorgias    map[string]*gorgias.Client
-	Klaviyo    map[string]*klaviyo.Client
-	Athena     map[string]*athena.DB
-	mutex      sync.Mutex
+	BigQuery    map[string]*bigquery.Client
+	Snowflake   map[string]*snowflake.DB
+	Postgres    map[string]*postgres.Client
+	MsSQL       map[string]*mssql.DB
+	Databricks  map[string]*databricks.DB
+	Mongo       map[string]*mongo.DB
+	Mysql       map[string]*mysql.Client
+	Notion      map[string]*notion.Client
+	HANA        map[string]*hana.Client
+	Shopify     map[string]*shopify.Client
+	Gorgias     map[string]*gorgias.Client
+	Klaviyo     map[string]*klaviyo.Client
+	Adjust      map[string]*adjust.Client
+	Athena      map[string]*athena.DB
+	FacebookAds map[string]*facebookads.Client
+	mutex       sync.Mutex
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
@@ -115,11 +119,23 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Klaviyo)...)
 
+	connAdjust, err := m.GetAdjustConnectionWithoutDefault(name)
+	if err == nil {
+		return connAdjust, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Adjust)...)
+
 	athenaConnection, err := m.GetAthenaConnectionWithoutDefault(name)
 	if err == nil {
 		return athenaConnection, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Athena)...)
+
+	connFacebookAds, err := m.GetFacebookAdsConnectionWithoutDefault(name)
+	if err == nil {
+		return connFacebookAds, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.FacebookAds)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -383,6 +399,28 @@ func (m *Manager) GetKlaviyoConnectionWithoutDefault(name string) (*klaviyo.Clie
 	return db, nil
 }
 
+func (m *Manager) GetAdjustConnection(name string) (*adjust.Client, error) {
+	db, err := m.GetAdjustConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetAdjustConnectionWithoutDefault("adjust-default")
+}
+
+func (m *Manager) GetAdjustConnectionWithoutDefault(name string) (*adjust.Client, error) {
+	if m.Adjust == nil {
+		return nil, errors.New("no adjust connections found")
+	}
+
+	db, ok := m.Adjust[name]
+	if !ok {
+		return nil, errors.Errorf("adjust connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
 func (m *Manager) GetGorgiasConnection(name string) (*gorgias.Client, error) {
 	db, err := m.GetGorgiasConnectionWithoutDefault(name)
 	if err == nil {
@@ -400,6 +438,28 @@ func (m *Manager) GetGorgiasConnectionWithoutDefault(name string) (*gorgias.Clie
 	db, ok := m.Gorgias[name]
 	if !ok {
 		return nil, errors.Errorf("hana gorgias not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetFacebookAdsConnection(name string) (*facebookads.Client, error) {
+	db, err := m.GetFacebookAdsConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetFacebookAdsConnectionWithoutDefault("facebookads-default")
+}
+
+func (m *Manager) GetFacebookAdsConnectionWithoutDefault(name string) (*facebookads.Client, error) {
+	if m.FacebookAds == nil {
+		return nil, errors.New("no facebookads connections found")
+	}
+
+	db, ok := m.FacebookAds[name]
+	if !ok {
+		return nil, errors.Errorf("facebookads connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -721,6 +781,27 @@ func (m *Manager) AddKlaviyoConnectionFromConfig(connection *config.KlaviyoConne
 	return nil
 }
 
+func (m *Manager) AddAdjustConnectionFromConfig(connection *config.AdjustConnection) error {
+	m.mutex.Lock()
+	if m.Adjust == nil {
+		m.Adjust = make(map[string]*adjust.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := adjust.NewClient(adjust.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Adjust[connection.Name] = client
+
+	return nil
+}
+
 func (m *Manager) AddHANAConnectionFromConfig(connection *config.HANAConnection) error {
 	m.mutex.Lock()
 	if m.HANA == nil {
@@ -742,6 +823,28 @@ func (m *Manager) AddHANAConnectionFromConfig(connection *config.HANAConnection)
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.HANA[connection.Name] = client
+
+	return nil
+}
+
+func (m *Manager) AddFacebookAdsConnectionFromConfig(connection *config.FacebookAdsConnection) error {
+	m.mutex.Lock()
+	if m.FacebookAds == nil {
+		m.FacebookAds = make(map[string]*facebookads.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := facebookads.NewClient(facebookads.Config{
+		AccessToken: connection.AccessToken,
+		AccountId:   connection.AccountId,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.FacebookAds[connection.Name] = client
 
 	return nil
 }
@@ -872,6 +975,24 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 			err := connectionManager.AddKlaviyoConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add klaviyo connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Adjust {
+		wg.Go(func() {
+			err := connectionManager.AddAdjustConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add adjust connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.FacebookAds {
+		wg.Go(func() {
+			err := connectionManager.AddFacebookAdsConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add facebookads connection '%s'", conn.Name))
 			}
 		})
 	}

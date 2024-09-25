@@ -145,6 +145,12 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "klaviyokey",
 				},
 			},
+			Adjust: []AdjustConnection{
+				{
+					Name:   "conn16",
+					APIKey: "adjustokey",
+				},
+			},
 			AthenaConnection: []AthenaConnection{
 				{
 					Name:             "conn14",
@@ -170,6 +176,13 @@ func TestLoadFromFile(t *testing.T) {
 				{
 					Name:  "key2",
 					Value: "value2",
+				},
+			},
+			FacebookAds: []FacebookAdsConnection{
+				{
+					Name:        "conn17",
+					AccessToken: "Facebookkey",
+					AccountId:   "Id123",
 				},
 			},
 		},

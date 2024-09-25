@@ -116,7 +116,13 @@ environments:
       klaviyo:
         - name: conn15
           api_key: "klaviyokey"
-
+      adjust:
+        - name: conn16
+          api_key: "adjustokey"
+      facebookads:
+        - name: conn17
+          access_token: "Facebookkey"
+          account_id: "Id123"
       generic:
         - name: key1
           value: value1
