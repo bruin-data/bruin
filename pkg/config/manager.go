@@ -192,6 +192,15 @@ func (c AdjustConnection) GetName() string {
 	return c.Name
 }
 
+type StripeConnection struct {
+	Name   string `yaml:"name" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c StripeConnection) GetName() string {
+	return c.Name
+}
+
 type FacebookAdsConnection struct {
 	Name        string `yaml:"name" json:"name" mapstructure:"name"`
 	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
@@ -304,6 +313,7 @@ type Connections struct {
 	Adjust              []AdjustConnection              `yaml:"adjust,omitempty" json:"adjust,omitempty" mapstructure:"adjust"`
 	Generic             []GenericConnection             `yaml:"generic,omitempty" json:"generic,omitempty" mapstructure:"generic"`
 	FacebookAds         []FacebookAdsConnection         `yaml:"facebookads,omitempty" json:"facebookads,omitempty" mapstructure:"facebookads"`
+	Stripe              []StripeConnection              `yaml:"stripe,omitempty" json:"stripe,omitempty" mapstructure:"stripe"`
 
 	byKey       map[string]any
 	typeNameMap map[string]string
@@ -418,6 +428,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.FacebookAds {
 		c.byKey[conn.Name] = &(c.FacebookAds[i])
 		c.typeNameMap[conn.Name] = "facebookads"
+	}
+
+	for i, conn := range c.Stripe {
+		c.byKey[conn.Name] = &(c.Stripe[i])
+		c.typeNameMap[conn.Name] = "stripe"
 	}
 }
 
@@ -673,6 +688,11 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Adjust = append(env.Connections.Adjust, conn)
+	case "stripe":
+		var conn StripeConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
 	case "generic":
 		var conn GenericConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -756,6 +776,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Generic = removeConnection(env.Connections.Generic, connectionName)
 	case "facebookads":
 		env.Connections.FacebookAds = removeConnection(env.Connections.FacebookAds, connectionName)
+	case "stripe":
+		env.Connections.Stripe = removeConnection(env.Connections.Stripe, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
