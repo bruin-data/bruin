@@ -185,6 +185,12 @@ func TestLoadFromFile(t *testing.T) {
 					AccountID:   "Id123",
 				},
 			},
+			Stripe: []StripeConnection{
+				{
+					Name:   "conn18",
+					APIKey: "stripekey",
+				},
+			},
 		},
 	}
 

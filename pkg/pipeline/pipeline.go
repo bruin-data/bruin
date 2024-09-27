@@ -916,6 +916,8 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "klaviyo-default", nil
 	case "adjust":
 		return "adjust-default", nil
+	case "stripe":
+		return "stripe-default", nil
 	default:
 		return "", errors.Errorf("no default connection found for type '%s'", assetType)
 	}
