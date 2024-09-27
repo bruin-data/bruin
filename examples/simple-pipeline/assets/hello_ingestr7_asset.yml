@@ -3,7 +3,7 @@ type: ingestr
 connection: postgres
 
 parameters:
-  source_connection: new_stripe
+  source_connection: my-stripe
   source_table: 'customer'
 
   destination: postgres
