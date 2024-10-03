@@ -1,12 +1,8 @@
 /* @bruin
 
 name: some-sql-task
-description: some description goes here
 type: bq.sql
-parameters:
-  param1: first-parameter
-  param2: second-parameter
-  s3_file_path: s3://bucket/path
+description: some description goes here
 connection: conn1
 
 materialization:
@@ -16,6 +12,19 @@ materialization:
   cluster_by:
     - event_name
   incremental_key: dt
+
+depends:
+  - task1
+  - task2
+  - task4
+  - task3
+  - task5
+  - uri: xyz
+
+parameters:
+  param1: first-parameter
+  param2: second-parameter
+  s3_file_path: s3://bucket/path
 
 columns:
   - name: col1
@@ -36,16 +45,8 @@ columns:
 
 custom_checks:
   - name: check1
-    query: select * from table1
     value: 16
-
-depends:
-  - task1
-  - task2
-  - task4
-  - task3
-  - task5
-  - uri: xyz
+    query: select * from table1
 
 @bruin */
 

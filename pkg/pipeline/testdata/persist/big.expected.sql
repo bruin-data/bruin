@@ -1,6 +1,7 @@
 /* @bruin
 
 name: dashboard.bookings
+type: bq.sql
 description: |
   This asset contains one line per booking, along with the booking's details. It is meant to serve as the single-source-of-truth for the booking entity.
 
@@ -17,21 +18,29 @@ description: |
   ORDER BY 2 DESC
   ```
 
-  If you are interested in changing/managing individual bookings, please visit [Pace platform](https://pace.neooptima.com/).
-type: bq.sql
-
 materialization:
   type: table
+
+depends:
+  - raw.Bookings
+  - raw.Sessions
+  - raw.Languages
+  - raw.Programmes
+  - dashboard.organizations
+  - raw.Teams
+  - dashboard.users
+  - dashboard.session_type_mapping
+owner: sabri.karagonen@getbruin.com
 
 columns:
   - name: BookingId
     type: STRING
     description: Unique identifier for the booking
+    primary_key: true
     checks:
       - name: not_null
       - name: unique
       - name: positive
-    primary_key: true
   - name: UserId
     type: STRING
     description: Unique identifier for the user
@@ -75,6 +84,7 @@ columns:
 
 custom_checks:
   - name: Mike Blackburn has 16 credits in June
+    value: 16
     query: |
       SELECT
         count(*)
@@ -82,8 +92,8 @@ custom_checks:
       where CoachName='Mike Blackburn'
         and date_trunc(StartDateDt, month) = "2022-06-01"
         and credits_spent = 1
-    value: 16
   - name: Mike Blackburn has 1 cancelled booking in June
+    value: 1
     query: |
       SELECT
         count(*)
@@ -92,8 +102,8 @@ custom_checks:
         and date_trunc(StartDateDt, month) = "2022-06-01"
         and credits_spent = 1
         and Status = "Cancelled"
-    value: 1
   - name: Mike Blackburn has 15 finished bookings in June
+    value: 15
     query: |
       SELECT
         count(*)
@@ -102,8 +112,8 @@ custom_checks:
         and date_trunc(StartDateDt, month) = "2022-06-01"
         and credits_spent =1
         and Status = "Finished"
-    value: 15
   - name: Mike Blackburn has 4 rebookings in June
+    value: 4
     query: |
       WITH
       user_coach_bookings as
@@ -121,8 +131,8 @@ custom_checks:
           select
               sum(rebookings) as rebookings,
           from user_coach_bookings
-    value: 4
   - name: Laura Roberts has 8 credits in June
+    value: 8
     query: |
       SELECT
         count(*)
@@ -130,7 +140,6 @@ custom_checks:
       where CoachName='Laura Roberts'
         and date_trunc(StartDateDt, month) = "2022-06-01"
         and credits_spent =1
-    value: 8
   - name: Laura Roberts has none cancelled booking in June
     query: |
       SELECT
@@ -141,6 +150,7 @@ custom_checks:
         and credits_spent =1
         and Status = "Cancelled"
   - name: Laura Roberts has 8 finished bookings in June
+    value: 8
     query: |
       SELECT
         count(*)
@@ -149,8 +159,8 @@ custom_checks:
         and date_trunc(StartDateDt, month) = "2022-06-01"
         and credits_spent =1
         and Status = "Finished"
-    value: 8
   - name: Laura Roberts has 2 rebookings in June
+    value: 2
     query: |
       WITH
       user_coach_bookings as
@@ -168,8 +178,8 @@ custom_checks:
           select
               sum(rebookings) as rebookings,
           from user_coach_bookings
-    value: 2
   - name: Mark Pringle has 5 credits in June
+    value: 5
     query: |
       SELECT
         count(*)
@@ -177,8 +187,8 @@ custom_checks:
       where CoachName='Mark Pringle'
         and date_trunc(StartDateDt, month) = "2022-06-01"
         and credits_spent =1
-    value: 5
   - name: Mark Pringle has 5 finished bookings in June
+    value: 5
     query: |
       SELECT
         count(*)
@@ -187,7 +197,6 @@ custom_checks:
         and date_trunc(StartDateDt, month) = "2022-06-01"
         and credits_spent =1
         and Status = "Finished"
-    value: 5
   - name: Mark Pringle has none rebooking in June
     query: |
       WITH
@@ -220,17 +229,6 @@ custom_checks:
           count(*)
         from `raw.Bookings`
       )
-owner: sabri.karagonen@getbruin.com
-
-depends:
-  - raw.Bookings
-  - raw.Sessions
-  - raw.Languages
-  - raw.Programmes
-  - dashboard.organizations
-  - raw.Teams
-  - dashboard.users
-  - dashboard.session_type_mapping
 
 @bruin */
 

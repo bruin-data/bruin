@@ -20,7 +20,6 @@ description: |
   ORDER BY 2 DESC
   ```
 
-  If you are interested in changing/managing individual bookings, please visit [Pace platform](https://pace.neooptima.com/).
 depends:
   - raw.Bookings
   - raw.Sessions
