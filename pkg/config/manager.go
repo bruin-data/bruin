@@ -45,11 +45,13 @@ func (c MsSQLConnection) GetName() string {
 }
 
 type DatabricksConnection struct {
-	Name  string `yaml:"name"  json:"name" mapstructure:"name"`
-	Token string `yaml:"token" json:"token" mapstructure:"token"`
-	Path  string `yaml:"path"  json:"path" mapstructure:"path"`
-	Host  string `yaml:"host"  json:"host" mapstructure:"host"`
-	Port  int    `yaml:"port"  json:"port" mapstructure:"port"`
+	Name    string `yaml:"name"  json:"name" mapstructure:"name"`
+	Token   string `yaml:"token" json:"token" mapstructure:"token"`
+	Path    string `yaml:"path"  json:"path" mapstructure:"path"`
+	Host    string `yaml:"host"  json:"host" mapstructure:"host"`
+	Port    int    `yaml:"port"  json:"port" mapstructure:"port"`
+	Catalog string `yaml:"catalog"  json:"catalog" mapstructure:"catalog"`
+	Schema  string `yaml:"schema"  json:"schema" mapstructure:"schema"`
 }
 
 func (c DatabricksConnection) GetName() string {
