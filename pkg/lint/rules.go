@@ -308,6 +308,10 @@ func EnsurePipelineScheduleIsValidCron(p *pipeline.Pipeline) ([]*Issue, error) {
 		return issues, nil
 	}
 
+	if p.Schedule == "continuous" || p.Schedule == "@continuous" {
+		return issues, nil
+	}
+
 	schedule := p.Schedule
 	if schedule == "daily" || schedule == "hourly" || schedule == "weekly" || schedule == "monthly" {
 		schedule = "@" + schedule
