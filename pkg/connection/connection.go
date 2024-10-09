@@ -20,6 +20,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/stripe"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc"
 	"golang.org/x/exp/maps"
@@ -41,6 +42,7 @@ type Manager struct {
 	Adjust      map[string]*adjust.Client
 	Athena      map[string]*athena.DB
 	FacebookAds map[string]*facebookads.Client
+	Stripe      map[string]*stripe.Client
 	mutex       sync.Mutex
 }
 
@@ -136,6 +138,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connFacebookAds, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.FacebookAds)...)
+
+	connStripe, err := m.GetStripeConnectionWithoutDefault(name)
+	if err == nil {
+		return connStripe, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Stripe)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -421,6 +429,28 @@ func (m *Manager) GetAdjustConnectionWithoutDefault(name string) (*adjust.Client
 	return db, nil
 }
 
+func (m *Manager) GetStripeConnection(name string) (*stripe.Client, error) {
+	db, err := m.GetStripeConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetStripeConnectionWithoutDefault("stripe-default")
+}
+
+func (m *Manager) GetStripeConnectionWithoutDefault(name string) (*stripe.Client, error) {
+	if m.Stripe == nil {
+		return nil, errors.New("no stripe connections found")
+	}
+
+	db, ok := m.Stripe[name]
+	if !ok {
+		return nil, errors.Errorf("stripe connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
 func (m *Manager) GetGorgiasConnection(name string) (*gorgias.Client, error) {
 	db, err := m.GetGorgiasConnectionWithoutDefault(name)
 	if err == nil {
@@ -627,10 +657,12 @@ func (m *Manager) AddDatabricksConnectionFromConfig(connection *config.Databrick
 	m.mutex.Unlock()
 
 	client, err := databricks.NewDB(&databricks.Config{
-		Token: connection.Token,
-		Host:  connection.Host,
-		Path:  connection.Path,
-		Port:  connection.Port,
+		Token:   connection.Token,
+		Host:    connection.Host,
+		Path:    connection.Path,
+		Port:    connection.Port,
+		Catalog: connection.Catalog,
+		Schema:  connection.Schema,
 	})
 	if err != nil {
 		return err
@@ -849,6 +881,27 @@ func (m *Manager) AddFacebookAdsConnectionFromConfig(connection *config.Facebook
 	return nil
 }
 
+func (m *Manager) AddStripeConnectionFromConfig(connection *config.StripeConnection) error {
+	m.mutex.Lock()
+	if m.Stripe == nil {
+		m.Stripe = make(map[string]*stripe.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := stripe.NewClient(&stripe.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Stripe[connection.Name] = client
+
+	return nil
+}
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	connectionManager := &Manager{}
 
@@ -993,6 +1046,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 			err := connectionManager.AddFacebookAdsConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add facebookads connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Stripe {
+		wg.Go(func() {
+			err := connectionManager.AddStripeConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add stripe connection '%s'", conn.Name))
 			}
 		})
 	}

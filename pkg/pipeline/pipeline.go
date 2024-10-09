@@ -380,10 +380,10 @@ type Column struct {
 	Name            string           `json:"name" yaml:"name,omitempty" mapstructure:"name"`
 	Type            string           `json:"type" yaml:"type,omitempty" mapstructure:"type"`
 	Description     string           `json:"description" yaml:"description,omitempty" mapstructure:"description"`
-	Checks          []ColumnCheck    `json:"checks" yaml:"checks,omitempty" mapstructure:"checks"`
 	PrimaryKey      bool             `json:"primary_key" yaml:"primary_key,omitempty" mapstructure:"primary_key"`
 	UpdateOnMerge   bool             `json:"update_on_merge" yaml:"update_on_merge,omitempty" mapstructure:"update_on_merge"`
 	Extends         string           `json:"-" yaml:"extends,omitempty" mapstructure:"extends"`
+	Checks          []ColumnCheck    `json:"checks" yaml:"checks,omitempty" mapstructure:"checks"`
 }
 
 func (c *Column) HasCheck(check string) bool {
@@ -426,13 +426,29 @@ type SecretMapping struct {
 	InjectedKey string `json:"injected_key"`
 }
 
+func (s SecretMapping) MarshalYAML() (interface{}, error) {
+	if s.SecretKey == "" {
+		return nil, nil
+	}
+
+	type Alias struct {
+		Key      string `yaml:"key"`
+		InjectAs string `yaml:"inject_as"`
+	}
+
+	return Alias{
+		Key:      s.SecretKey,
+		InjectAs: s.InjectedKey,
+	}, nil
+}
+
 type CustomCheck struct {
 	ID          string          `json:"id" yaml:"-" mapstructure:"-"`
 	Name        string          `json:"name" yaml:"name" mapstructure:"name"`
 	Description string          `json:"description" yaml:"description,omitempty" mapstructure:"description"`
-	Query       string          `json:"query" yaml:"query" mapstructure:"query"`
 	Value       int64           `json:"value" yaml:"value,omitempty" mapstructure:"value"`
 	Blocking    DefaultTrueBool `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
+	Query       string          `json:"query" yaml:"query" mapstructure:"query"`
 }
 
 type Upstream struct {
@@ -483,27 +499,27 @@ type Asset struct {
 	ID              string             `json:"id" yaml:"-" mapstructure:"-"`
 	URI             string             `json:"uri" yaml:"uri,omitempty" mapstructure:"uri"`
 	Name            string             `json:"name" yaml:"name,omitempty" mapstructure:"name"`
-	Description     string             `json:"description" yaml:"description,omitempty" mapstructure:"description"`
 	Type            AssetType          `json:"type" yaml:"type,omitempty" mapstructure:"type"`
-	ExecutableFile  ExecutableFile     `json:"executable_file" yaml:"-" mapstructure:"-"`
-	DefinitionFile  TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
-	Parameters      EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
+	Description     string             `json:"description" yaml:"description,omitempty" mapstructure:"description"`
 	Connection      string             `json:"connection" yaml:"connection,omitempty" mapstructure:"connection"`
-	Secrets         []SecretMapping    `json:"secrets" yaml:"secrets,omitempty" mapstructure:"secrets"`
+	Tags            EmptyStringArray   `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
 	Materialization Materialization    `json:"materialization" yaml:"materialization,omitempty" mapstructure:"materialization"`
-	Columns         []Column           `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
-	CustomChecks    []CustomCheck      `json:"custom_checks" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
+	Upstreams       []Upstream         `json:"upstreams" yaml:"depends,omitempty" mapstructure:"depends"`
 	Image           string             `json:"image" yaml:"image,omitempty" mapstructure:"image"`
 	Instance        string             `json:"instance" yaml:"instance,omitempty" mapstructure:"instance"`
 	Owner           string             `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
+	ExecutableFile  ExecutableFile     `json:"executable_file" yaml:"-" mapstructure:"-"`
+	DefinitionFile  TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
+	Parameters      EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
+	Secrets         []SecretMapping    `json:"secrets" yaml:"secrets,omitempty" mapstructure:"secrets"`
+	Columns         []Column           `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
+	CustomChecks    []CustomCheck      `json:"custom_checks" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
 	Metadata        EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
-	Tags            EmptyStringArray   `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
 	Snowflake       SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena          AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
 
 	upstream   []*Asset
 	downstream []*Asset
-	Upstreams  []Upstream `json:"upstreams" yaml:"depends,omitempty" mapstructure:"depends"`
 }
 
 func (a *Asset) AddUpstream(asset *Asset) {
@@ -712,7 +728,7 @@ func (a *Asset) Persist(fs afero.Fs) error {
 
 	yamlConfig := buf.Bytes()
 
-	keysToAddSpace := []string{"custom_checks", "depends", "columns", "materialization"}
+	keysToAddSpace := []string{"custom_checks", "depends", "columns", "materialization", "secrets", "parameters"}
 	for _, key := range keysToAddSpace {
 		yamlConfig = bytes.ReplaceAll(yamlConfig, []byte("\n"+key+":"), []byte("\n\n"+key+":"))
 	}
@@ -916,6 +932,8 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "klaviyo-default", nil
 	case "adjust":
 		return "adjust-default", nil
+	case "stripe":
+		return "stripe-default", nil
 	default:
 		return "", errors.Errorf("no default connection found for type '%s'", assetType)
 	}

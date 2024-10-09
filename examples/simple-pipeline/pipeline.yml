@@ -18,3 +18,4 @@ default_connections:
   klaviyo: "my-klaviyo"
   adjust: "my-adjust"
   facebookads: "my-facebookads"
+  stripe: "my-stripe"

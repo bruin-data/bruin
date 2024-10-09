@@ -123,6 +123,9 @@ environments:
         - name: conn17
           access_token: "Facebookkey"
           account_id: "Id123"
+      stripe:
+        - name: conn18
+          api_key: "stripekey"
       generic:
         - name: key1
           value: value1

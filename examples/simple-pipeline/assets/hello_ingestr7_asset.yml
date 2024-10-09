@@ -1,0 +1,9 @@
+name: public.stripe
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my-stripe
+  source_table: 'customer'
+
+  destination: postgres

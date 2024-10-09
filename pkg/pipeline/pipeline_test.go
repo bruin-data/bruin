@@ -886,8 +886,6 @@ func BenchmarkClearSpacesAtLineEndings(b *testing.B) {
 	FROM dashboard.bookings
 	GROUP BY 1
 	ORDER BY 2 DESC
-
-  If you are interested in changing/managing individual bookings, please visit [Pace platform](https://pace.neooptima.com/).
 `
 	for i := 0; i < b.N; i++ {
 		pipeline.ClearSpacesAtLineEndings(content)
