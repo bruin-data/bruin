@@ -32,17 +32,41 @@ Binaries are available on the [releases page](https://github.com/bruin-data/brui
 
 ### via Golang installer
 
-You need to have Golang installed in the first place, then you can run the following command:
+You need to have Golang installed in the first place:
+Releases are available [here](https://go.dev/dl/).
+Installation instructions are available [here](https://go.dev/doc/install).
+
+> [!IMPORTANT]
+> Please make sure to add GOPATH to your executable path permanently.
+
+```shell
+export PATH="$PATH:/usr/local/go/bin"
+export PATH="$PATH:$(go env GOBIN):$(go env GOPATH)/bin"
+```
+
+Test whether you installed Golang successfully:
+```shell
+go version
+```
+
+Then you can run the following command:
 
 ```shell
 go install github.com/bruin-data/bruin@latest
 ```
 
-> [!IMPORTANT]
-> Please make sure to add GOPATH to your executable path.
-
+Test whether you installed Bruin successfully:
+```shell
+bruin
+```
 
 ## Getting Started
+
+Change working directory to your project directory and run:
+
+```shell
+bruin init
+```
 
 All you need is a simple `pipeline.yml` in your Git repo:
 
