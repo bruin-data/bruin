@@ -131,6 +131,9 @@ environments:
           value: value1
         - name: key2
           value: value2
+      appsflyer:
+        - name: conn19
+          appkey: "appsflyerkey"
 
   prod:
     connections:
