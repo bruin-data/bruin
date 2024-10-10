@@ -2216,3 +2216,125 @@ func TestUsedTableValidatorRule_ValidateAsset(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateDuplicateColumnNames(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		p       *pipeline.Pipeline
+		want    []*Issue
+		wantErr bool
+	}{
+		{
+			name: "no duplicate column names",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "asset1",
+						Columns: []pipeline.Column{
+							{Name: "col1"},
+							{Name: "col2"},
+							{Name: "col3"},
+						},
+					},
+					{
+						Name: "asset2",
+						Columns: []pipeline.Column{
+							{Name: "col4"},
+							{Name: "col5"},
+						},
+					},
+				},
+			},
+			want:    nil,
+			wantErr: false,
+		},
+		{
+			name: "duplicate column names in one asset",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "asset1",
+						Columns: []pipeline.Column{
+							{Name: "col1"},
+							{Name: "col2"},
+							{Name: "Col1"},
+						},
+					},
+				},
+			},
+			want: []*Issue{
+				{
+					Task:        &pipeline.Asset{Name: "asset1"},
+					Description: "Duplicate column name 'Col1' found ",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "duplicate column names in multiple assets",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "asset1",
+						Columns: []pipeline.Column{
+							{Name: "col1"},
+							{Name: "col2"},
+							{Name: "Col1"},
+						},
+					},
+					{
+						Name: "asset2",
+						Columns: []pipeline.Column{
+							{Name: "col3"},
+							{Name: "COL3"},
+							{Name: "col4"},
+						},
+					},
+				},
+			},
+			want: []*Issue{
+				{
+					Task:        &pipeline.Asset{Name: "asset1"},
+					Description: "Duplicate column name 'Col1' found ",
+				},
+				{
+					Task:        &pipeline.Asset{Name: "asset2"},
+					Description: "Duplicate column name 'COL3' found ",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "no columns in assets",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "asset1",
+					},
+					{
+						Name: "asset2",
+					},
+				},
+			},
+			want:    nil,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel() // Keep this line to run tests in parallel
+
+			got, err := ValidateDuplicateColumnNames(tt.p)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

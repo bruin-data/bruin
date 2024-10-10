@@ -343,6 +343,38 @@ func EnsurePipelineStartDateIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
 	return issues, nil
 }
 
+// ValidateDuplicateColumnNames checks for duplicate column names within each asset of the pipeline.
+// It returns a slice of Issues, each representing a duplicate column name found.
+//
+// The function performs a case-insensitive comparison of column names.
+//
+// Parameters:
+//   - p: A pointer to the pipeline.Pipeline struct containing the assets to be validated.
+//
+// Returns:
+//   - A slice of *Issue, each describing a duplicate column name found.
+//   - An error, which is always nil in this implementation.
+func ValidateDuplicateColumnNames(p *pipeline.Pipeline) ([]*Issue, error) {
+	var issues []*Issue
+
+	for _, asset := range p.Assets {
+		columnNames := make(map[string]bool)
+		for _, column := range asset.Columns {
+			lowercaseName := strings.ToLower(column.Name)
+			if columnNames[lowercaseName] {
+				issues = append(issues, &Issue{
+					Task:        &pipeline.Asset{Name: asset.Name},
+					Description: fmt.Sprintf("Duplicate column name '%s' found ", column.Name),
+				})
+			} else {
+				columnNames[lowercaseName] = true
+			}
+		}
+	}
+
+	return issues, nil
+}
+
 func EnsureTypeIsCorrectForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if asset.Type == "" {
