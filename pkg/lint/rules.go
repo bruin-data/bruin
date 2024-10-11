@@ -343,13 +343,15 @@ func EnsurePipelineStartDateIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
 	return issues, nil
 }
 
-// ValidateDuplicateColumnNames checks for duplicate column names within each asset of the pipeline.
+// ValidateDuplicateColumnNames checks for duplicate column names within a single asset.
 // It returns a slice of Issues, each representing a duplicate column name found.
 //
 // The function performs a case-insensitive comparison of column names.
 //
 // Parameters:
-//   - p: A pointer to the pipeline.Pipeline struct containing the assets to be validated.
+//   - ctx: The context for the validation operation
+//   - p: A pointer to the pipeline.Pipeline struct
+//   - asset: The pipeline.Asset to be validated for duplicate column names.
 //
 // Returns:
 //   - A slice of *Issue, each describing a duplicate column name found.
