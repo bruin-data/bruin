@@ -11,7 +11,6 @@ type AppsflyerConfig interface {
 }
 
 func NewClient(c Config) (*Client, error) {
-	fmt.Println("Initializing AppsFlyer client with API key:", c.ApiKey)
 	return &Client{
 		config: c,
 	}, nil

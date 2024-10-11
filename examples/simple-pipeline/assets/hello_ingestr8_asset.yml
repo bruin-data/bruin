@@ -3,6 +3,6 @@ type: ingestr
 connection: postgres
 
 parameters:
-  source-connection: my-appsflyer
-  source-table: 'Creatives'
+  source-connection: new_appsflyer
+  source-table: 'Campaigns'
   destination: postgres

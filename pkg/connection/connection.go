@@ -949,7 +949,6 @@ func (m *Manager) AddAppsflyerConnectionFromConfig(connection *config.AppsflyerC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Appsflyer[connection.Name] = client
-	fmt.Println("appdflyer client", m.Appsflyer[connection.Name])
 
 	return nil
 }
