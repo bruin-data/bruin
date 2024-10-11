@@ -19,6 +19,9 @@ Bruin is built to make your life easier when it comes to data transformations:
 - 🔒 secrets injection via environment variables
 - 📦 easy to install and use
 
+## Docs
+You can see our documentation [here](https://bruin-data.github.io/bruin/).
+
 ## Installation
 
 ### macOS

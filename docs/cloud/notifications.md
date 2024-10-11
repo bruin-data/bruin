@@ -47,8 +47,24 @@ A Microsoft Teams webhook can be configured per channel, which means you can sen
 The full spec for Microsoft Teams notifications is like this:
 ```yaml
 notifications:
-  teams:
+  ms_teams:
     - connection: "the-name-of-the-ms-teams-connection"
+      success: true
+      failure: true
+```
+
+## Discord
+
+> [!INFO]
+> You need to create a Discord connection in Bruin Cloud before you can use Discord notifications. You can do this by navigating to the `Connections` tab in the Bruin Cloud UI.
+
+A Discord webhook can be configured per channel, which means you can send notifications to multiple channels by adding separate connections.
+
+The full spec for Discord notifications is like this:
+```yaml
+notifications:
+  discord:
+    - connection: "the-name-of-the-discord-connection"
       success: true
       failure: true
 ```

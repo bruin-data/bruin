@@ -6,5 +6,4 @@ type Config struct {
 
 func (c *Config) GetIngestrURI() string {
 	return "stripe://?api_key=" + c.APIKey
-
 }

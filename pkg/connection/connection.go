@@ -15,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/gorgias"
+	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/klaviyo"
 	"github.com/bruin-data/bruin/pkg/mongo"
 	"github.com/bruin-data/bruin/pkg/mssql"
@@ -23,6 +24,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/stripe"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc"
 	"golang.org/x/exp/maps"
@@ -689,10 +691,12 @@ func (m *Manager) AddDatabricksConnectionFromConfig(connection *config.Databrick
 	m.mutex.Unlock()
 
 	client, err := databricks.NewDB(&databricks.Config{
-		Token: connection.Token,
-		Host:  connection.Host,
-		Path:  connection.Path,
-		Port:  connection.Port,
+		Token:   connection.Token,
+		Host:    connection.Host,
+		Path:    connection.Path,
+		Port:    connection.Port,
+		Catalog: connection.Catalog,
+		Schema:  connection.Schema,
 	})
 	if err != nil {
 		return err

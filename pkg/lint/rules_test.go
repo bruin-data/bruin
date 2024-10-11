@@ -2216,3 +2216,92 @@ func TestUsedTableValidatorRule_ValidateAsset(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateDuplicateColumnNames(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		asset   *pipeline.Asset
+		want    []*Issue
+		wantErr bool
+	}{
+		{
+			name: "no duplicate column names",
+			asset: &pipeline.Asset{
+				Name: "asset1",
+				Columns: []pipeline.Column{
+					{Name: "col1"},
+					{Name: "col2"},
+					{Name: "col3"},
+				},
+			},
+			want:    nil,
+			wantErr: false,
+		},
+		{
+			name: "duplicate column names",
+			asset: &pipeline.Asset{
+				Name: "asset1",
+				Columns: []pipeline.Column{
+					{Name: "col1"},
+					{Name: "col2"},
+					{Name: "Col1"},
+				},
+			},
+			want: []*Issue{
+				{
+					Task:        &pipeline.Asset{Name: "asset1", Columns: []pipeline.Column{{Name: "col1"}, {Name: "col2"}, {Name: "Col1"}}},
+					Description: "Duplicate column name 'Col1' found ",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "multiple duplicate column names",
+			asset: &pipeline.Asset{
+				Name: "asset1",
+				Columns: []pipeline.Column{
+					{Name: "col1"},
+					{Name: "Col1"},
+					{Name: "col2"},
+					{Name: "COL2"},
+				},
+			},
+			want: []*Issue{
+				{
+					Task:        &pipeline.Asset{Name: "asset1", Columns: []pipeline.Column{{Name: "col1"}, {Name: "Col1"}, {Name: "col2"}, {Name: "COL2"}}},
+					Description: "Duplicate column name 'Col1' found ",
+				},
+				{
+					Task:        &pipeline.Asset{Name: "asset1", Columns: []pipeline.Column{{Name: "col1"}, {Name: "Col1"}, {Name: "col2"}, {Name: "COL2"}}},
+					Description: "Duplicate column name 'COL2' found ",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "no columns in asset",
+			asset: &pipeline.Asset{
+				Name: "asset1",
+			},
+			want:    nil,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := ValidateDuplicateColumnNames(context.Background(), &pipeline.Pipeline{}, tt.asset)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

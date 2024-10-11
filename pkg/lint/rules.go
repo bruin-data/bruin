@@ -308,6 +308,10 @@ func EnsurePipelineScheduleIsValidCron(p *pipeline.Pipeline) ([]*Issue, error) {
 		return issues, nil
 	}
 
+	if p.Schedule == "continuous" || p.Schedule == "@continuous" {
+		return issues, nil
+	}
+
 	schedule := p.Schedule
 	if schedule == "daily" || schedule == "hourly" || schedule == "weekly" || schedule == "monthly" {
 		schedule = "@" + schedule
@@ -336,6 +340,37 @@ func EnsurePipelineStartDateIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
 		})
 	}
 
+	return issues, nil
+}
+
+// ValidateDuplicateColumnNames checks for duplicate column names within a single asset.
+// It returns a slice of Issues, each representing a duplicate column name found.
+//
+// The function performs a case-insensitive comparison of column names.
+//
+// Parameters:
+//   - ctx: The context for the validation operation
+//   - p: A pointer to the pipeline.Pipeline struct
+//   - asset: The pipeline.Asset to be validated for duplicate column names.
+//
+// Returns:
+//   - A slice of *Issue, each describing a duplicate column name found.
+//   - An error, which is always nil in this implementation.
+func ValidateDuplicateColumnNames(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	var issues []*Issue
+
+	columnNames := make(map[string]bool)
+	for _, column := range asset.Columns {
+		lowercaseName := strings.ToLower(column.Name)
+		if columnNames[lowercaseName] {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Duplicate column name '%s' found ", column.Name),
+			})
+		} else {
+			columnNames[lowercaseName] = true
+		}
+	}
 	return issues, nil
 }
 
