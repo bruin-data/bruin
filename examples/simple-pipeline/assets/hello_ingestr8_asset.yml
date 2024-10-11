@@ -1,0 +1,8 @@
+name: public.appsflyer
+type: ingestr
+connection: postgres
+
+parameters:
+  source-connection: my-appsflyer
+  source-table: 'Creatives'
+  destination: postgres

@@ -324,9 +324,8 @@ type Connections struct {
 	FacebookAds         []FacebookAdsConnection         `yaml:"facebookads,omitempty" json:"facebookads,omitempty" mapstructure:"facebookads"`
 	Stripe              []StripeConnection              `yaml:"stripe,omitempty" json:"stripe,omitempty" mapstructure:"stripe"`
 	Appsflyer           []AppsflyerConnection           `yaml:"appsflyer,omitempty" json:"appsflyer,omitempty" mapstructure:"appsflyer"`
-
-	byKey       map[string]any
-	typeNameMap map[string]string
+	byKey               map[string]any
+	typeNameMap         map[string]string
 }
 
 func (c *Connections) ConnectionsSummaryList() map[string]string {

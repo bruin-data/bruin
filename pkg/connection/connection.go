@@ -2,11 +2,13 @@ package connection
 
 import (
 	"context"
+	"fmt"
 	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/stripe"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
+	"github.com/bruin-data/bruin/pkg/appsflyer"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -43,6 +45,7 @@ type Manager struct {
 	Athena      map[string]*athena.DB
 	FacebookAds map[string]*facebookads.Client
 	Stripe      map[string]*stripe.Client
+	Appsflyer   map[string]*appsflyer.Client
 	mutex       sync.Mutex
 }
 
@@ -144,6 +147,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connStripe, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Stripe)...)
+
+	connAppsflyer, err := m.GetAppsflyerConnectionWithoutDefault(name)
+	if err == nil {
+		return connAppsflyer, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Appsflyer)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -490,6 +499,29 @@ func (m *Manager) GetFacebookAdsConnectionWithoutDefault(name string) (*facebook
 	db, ok := m.FacebookAds[name]
 	if !ok {
 		return nil, errors.Errorf("facebookads connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetAppsflyerConnection(name string) (*appsflyer.Client, error) {
+	fmt.Println("Attempting to retrieve AppsFlyer connection with name:", name)
+	db, err := m.GetAppsflyerConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetAppsflyerConnectionWithoutDefault("appsflyer-default")
+}
+
+func (m *Manager) GetAppsflyerConnectionWithoutDefault(name string) (*appsflyer.Client, error) {
+	if m.Appsflyer == nil {
+		return nil, errors.New("no appsflyer connections found")
+	}
+
+	db, ok := m.Appsflyer[name]
+	if !ok {
+		return nil, errors.Errorf("appsflyer connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -900,6 +932,28 @@ func (m *Manager) AddStripeConnectionFromConfig(connection *config.StripeConnect
 	return nil
 }
 
+func (m *Manager) AddAppsflyerConnectionFromConfig(connection *config.AppsflyerConnection) error {
+	m.mutex.Lock()
+	if m.Appsflyer == nil {
+		m.Appsflyer = make(map[string]*appsflyer.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := appsflyer.NewClient(appsflyer.Config{
+		ApiKey: connection.ApiKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Appsflyer[connection.Name] = client
+	fmt.Println("appdflyer client", m.Appsflyer[connection.Name])
+
+	return nil
+}
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	connectionManager := &Manager{}
 
@@ -1053,6 +1107,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 			err := connectionManager.AddStripeConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add stripe connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Appsflyer {
+		wg.Go(func() {
+			err := connectionManager.AddAppsflyerConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add appsflyer connection '%s'", conn.Name))
 			}
 		})
 	}
