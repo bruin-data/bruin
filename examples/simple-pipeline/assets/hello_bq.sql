@@ -7,7 +7,7 @@ materialization:
   type: table
 
 depends:
-  - hello_pythonsdf
+  - hello_python
 
 secrets:
   - key: key1
@@ -34,7 +34,7 @@ custom_checks:
 
 @bruin */
 
-select 1 as one, col1 from missingdep.here
+select 1 as one, col1 from dashboard.hello_sf
 --     and {{ start_date }}
 --     and {{ end_timestamp }}
 --     and {{ end_timestamp | add_days(2) }}
