@@ -354,24 +354,21 @@ func EnsurePipelineStartDateIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
 // Returns:
 //   - A slice of *Issue, each describing a duplicate column name found.
 //   - An error, which is always nil in this implementation.
-func ValidateDuplicateColumnNames(p *pipeline.Pipeline) ([]*Issue, error) {
+func ValidateDuplicateColumnNames(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	var issues []*Issue
 
-	for _, asset := range p.Assets {
-		columnNames := make(map[string]bool)
-		for _, column := range asset.Columns {
-			lowercaseName := strings.ToLower(column.Name)
-			if columnNames[lowercaseName] {
-				issues = append(issues, &Issue{
-					Task:        &pipeline.Asset{Name: asset.Name},
-					Description: fmt.Sprintf("Duplicate column name '%s' found ", column.Name),
-				})
-			} else {
-				columnNames[lowercaseName] = true
-			}
+	columnNames := make(map[string]bool)
+	for _, column := range asset.Columns {
+		lowercaseName := strings.ToLower(column.Name)
+		if columnNames[lowercaseName] {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Duplicate column name '%s' found ", column.Name),
+			})
+		} else {
+			columnNames[lowercaseName] = true
 		}
 	}
-
 	return issues, nil
 }
 

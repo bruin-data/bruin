@@ -139,7 +139,8 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 		&SimpleRule{
 			Identifier:       "duplicate-column-names",
 			Severity:         ValidatorSeverityCritical,
-			Validator:        ValidateDuplicateColumnNames,
+			Validator:        CallFuncForEveryAsset(ValidateDuplicateColumnNames),
+			AssetValidator:   ValidateDuplicateColumnNames,
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
 		UsedTableValidatorRule{

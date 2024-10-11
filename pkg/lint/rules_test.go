@@ -2222,101 +2222,68 @@ func TestValidateDuplicateColumnNames(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		p       *pipeline.Pipeline
+		asset   *pipeline.Asset
 		want    []*Issue
 		wantErr bool
 	}{
 		{
 			name: "no duplicate column names",
-			p: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
-					{
-						Name: "asset1",
-						Columns: []pipeline.Column{
-							{Name: "col1"},
-							{Name: "col2"},
-							{Name: "col3"},
-						},
-					},
-					{
-						Name: "asset2",
-						Columns: []pipeline.Column{
-							{Name: "col4"},
-							{Name: "col5"},
-						},
-					},
+			asset: &pipeline.Asset{
+				Name: "asset1",
+				Columns: []pipeline.Column{
+					{Name: "col1"},
+					{Name: "col2"},
+					{Name: "col3"},
 				},
 			},
 			want:    nil,
 			wantErr: false,
 		},
 		{
-			name: "duplicate column names in one asset",
-			p: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
-					{
-						Name: "asset1",
-						Columns: []pipeline.Column{
-							{Name: "col1"},
-							{Name: "col2"},
-							{Name: "Col1"},
-						},
-					},
+			name: "duplicate column names",
+			asset: &pipeline.Asset{
+				Name: "asset1",
+				Columns: []pipeline.Column{
+					{Name: "col1"},
+					{Name: "col2"},
+					{Name: "Col1"},
 				},
 			},
 			want: []*Issue{
 				{
-					Task:        &pipeline.Asset{Name: "asset1"},
+					Task:        &pipeline.Asset{Name: "asset1", Columns: []pipeline.Column{{Name: "col1"}, {Name: "col2"}, {Name: "Col1"}}},
 					Description: "Duplicate column name 'Col1' found ",
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "duplicate column names in multiple assets",
-			p: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
-					{
-						Name: "asset1",
-						Columns: []pipeline.Column{
-							{Name: "col1"},
-							{Name: "col2"},
-							{Name: "Col1"},
-						},
-					},
-					{
-						Name: "asset2",
-						Columns: []pipeline.Column{
-							{Name: "col3"},
-							{Name: "COL3"},
-							{Name: "col4"},
-						},
-					},
+			name: "multiple duplicate column names",
+			asset: &pipeline.Asset{
+				Name: "asset1",
+				Columns: []pipeline.Column{
+					{Name: "col1"},
+					{Name: "Col1"},
+					{Name: "col2"},
+					{Name: "COL2"},
 				},
 			},
 			want: []*Issue{
 				{
-					Task:        &pipeline.Asset{Name: "asset1"},
+					Task:        &pipeline.Asset{Name: "asset1", Columns: []pipeline.Column{{Name: "col1"}, {Name: "Col1"}, {Name: "col2"}, {Name: "COL2"}}},
 					Description: "Duplicate column name 'Col1' found ",
 				},
 				{
-					Task:        &pipeline.Asset{Name: "asset2"},
-					Description: "Duplicate column name 'COL3' found ",
+					Task:        &pipeline.Asset{Name: "asset1", Columns: []pipeline.Column{{Name: "col1"}, {Name: "Col1"}, {Name: "col2"}, {Name: "COL2"}}},
+					Description: "Duplicate column name 'COL2' found ",
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "no columns in assets",
-			p: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
-					{
-						Name: "asset1",
-					},
-					{
-						Name: "asset2",
-					},
-				},
+			name: "no columns in asset",
+			asset: &pipeline.Asset{
+				Name: "asset1",
 			},
 			want:    nil,
 			wantErr: false,
@@ -2325,9 +2292,9 @@ func TestValidateDuplicateColumnNames(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel() // Keep this line to run tests in parallel
+			t.Parallel()
 
-			got, err := ValidateDuplicateColumnNames(tt.p)
+			got, err := ValidateDuplicateColumnNames(context.Background(), &pipeline.Pipeline{}, tt.asset)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
