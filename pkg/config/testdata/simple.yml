@@ -128,7 +128,7 @@ environments:
           api_key: "stripekey"
       appsflyer:
         - name: conn19
-          api_key: "appsflyerokey"
+          api_key: "appsflyerkey"
       generic:
         - name: key1
           value: value1
