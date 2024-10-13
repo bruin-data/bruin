@@ -74,19 +74,19 @@ This approach has a couple of advantages:
 ## Dependencies with different schemas
 
 When the upstream and downstream both have the same schedule, it's easy to determine when does the downstream need to run. 
-E.g if both every 5 minutes, then if downstream has a data interval from 2025-10-11 15:30:00 to 2025-10-11 15:35:00,
+E.g if both every 5 minutes, then if downstream has a data interval from `2025-10-11 15:30:00`to `2025-10-11 15:35:00`,
 then the upstream should have a successful run for the same interval.
 
 In the case of mixed schedules it's a bit more complicated but still possible.
-Imagine we have a downstream that runs every 5 minutes and we have a run with the data interval  2025-10-11 15:30:00 to 2025-10-11 15:35:00.
+Imagine we have a downstream that runs every 5 minutes and we have a run with the data interval  `2025-10-11 15:30:00`to `2025-10-11 15:35:00`.
 This downstream has an external dependency that runs every 2 minutes.
 
-The in order to run the downstream we will wait until the upstream has succesful runs with data intervals covering fully the dowsntream data interval.
-For example for the aforementioned 2025-10-11 15:30:00 to 2025-10-11 15:35:00, we would need dowstream to have for example.
+The in order to run the downstream we will wait until the upstream has successful runs with data intervals covering fully the downstream data interval.
+For example for the aforementioned `2025-10-11 15:30:00`to `2025-10-11 15:35:00`, we would need downstream to have for example.
 
- * 2025-10-11 15:30:00 to 2025-10-11 15:32:00
- * 2025-10-11 15:32:00 to 2025-10-11 15:34:00
- * 2025-10-11 15:34:00 to 2025-10-11 15:36:00
+ * `2025-10-11 15:30:00`to `2025-10-11 15:32:00
+ * `2025-10-11 15:32:00`to `2025-10-11 15:34:00
+ * `2025-10-11 15:34:00`to `2025-10-11 15:36:00
 
 These intervals fully cover the original downstream interval and thus the downstream can run.
 
