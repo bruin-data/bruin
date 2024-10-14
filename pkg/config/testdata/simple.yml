@@ -126,6 +126,9 @@ environments:
       stripe:
         - name: conn18
           api_key: "stripekey"
+      appsflyer:
+        - name: conn19
+          api_key: "appsflyerkey"
       generic:
         - name: key1
           value: value1

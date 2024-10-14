@@ -2,12 +2,6 @@
 
 Bruin Cloud allows defining dependencies between pipelines. This allows you to run pipelines and refresh assets in parallel, while ensuring assets that need to wait on each other wait until the upstream dependencies are ready.
 
-> [!INFO]
-> Cross-pipeline asset dependencies are only available for assets that have the same schedule at the moment.
-
-
-Before we get into the details, a little primer on URIs.
-
 ## URIs
 
 Bruin considers assets unique; however, asset names often do not fulfill the uniqueness criteria across multiple repos, projects and pipelines. While asset names are required to be unique within the same pipeline, there can be assets with the same name across different pipelines. For instance, a mobile gaming company may have a pipeline for each game, and each pipeline may have an asset named `raw.events`. This poses a problem of uniqueness for dependencies that span pipelines and repos. 
@@ -74,10 +68,27 @@ This approach has a couple of advantages:
 - It allows for a more granular control over the dependencies, as you can define dependencies on a per-asset basis.
 
 ## Limitations
-- The cross-pipeline dependencies can only be defined on assets that have the *exact same schedule*. 
-  - This is a temporary limitation that will be removed for the general availability of the feature.
 - `bruin validate` CLI command validates the structure of the dependencies, but cannot validate if the URI actually exists.
 - The downstream will wait for 12 hours maximum for the upstream to pass, then it will fail. This is to prevent the downstream from waiting indefinitely for the upstream to pass.
+
+## Dependencies with different schemas
+
+When the upstream and downstream both have the same schedule, it's easy to determine when does the downstream need to run. 
+E.g if both every 5 minutes, then if downstream has a data interval from 2025-10-11 15:30:00 to 2025-10-11 15:35:00,
+then the upstream should have a successful run for the same interval.
+
+In the case of mixed schedules it's a bit more complicated but still possible.
+Imagine we have a downstream that runs every 5 minutes and we have a run with the data interval  2025-10-11 15:30:00 to 2025-10-11 15:35:00.
+This downstream has an external dependency that runs every 2 minutes.
+
+The in order to run the downstream we will wait until the upstream has succesful runs with data intervals covering fully the dowsntream data interval.
+For example for the aforementioned 2025-10-11 15:30:00 to 2025-10-11 15:35:00, we would need dowstream to have for example.
+
+ * 2025-10-11 15:30:00 to 2025-10-11 15:32:00
+ * 2025-10-11 15:32:00 to 2025-10-11 15:34:00
+ * 2025-10-11 15:34:00 to 2025-10-11 15:36:00
+
+These intervals fully cover the original downstream interval and thus the downstream can run.
 
 
 

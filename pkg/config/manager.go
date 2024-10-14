@@ -213,6 +213,15 @@ func (c FacebookAdsConnection) GetName() string {
 	return c.Name
 }
 
+type AppsflyerConnection struct {
+	Name   string `yaml:"name" json:"name" mapstructure:"name"`
+	ApiKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c AppsflyerConnection) GetName() string {
+	return c.Name
+}
+
 type MySQLConnection struct {
 	Name     string `yaml:"name" json:"name" mapstructure:"name"`
 	Username string `yaml:"username" json:"username" mapstructure:"username"`
@@ -316,9 +325,9 @@ type Connections struct {
 	Generic             []GenericConnection             `yaml:"generic,omitempty" json:"generic,omitempty" mapstructure:"generic"`
 	FacebookAds         []FacebookAdsConnection         `yaml:"facebookads,omitempty" json:"facebookads,omitempty" mapstructure:"facebookads"`
 	Stripe              []StripeConnection              `yaml:"stripe,omitempty" json:"stripe,omitempty" mapstructure:"stripe"`
-
-	byKey       map[string]any
-	typeNameMap map[string]string
+	Appsflyer           []AppsflyerConnection           `yaml:"appsflyer,omitempty" json:"appsflyer,omitempty" mapstructure:"appsflyer"`
+	byKey               map[string]any
+	typeNameMap         map[string]string
 }
 
 func (c *Connections) ConnectionsSummaryList() map[string]string {
@@ -435,6 +444,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.Stripe {
 		c.byKey[conn.Name] = &(c.Stripe[i])
 		c.typeNameMap[conn.Name] = "stripe"
+	}
+
+	for i, conn := range c.Appsflyer {
+		c.byKey[conn.Name] = &(c.Appsflyer[i])
+		c.typeNameMap[conn.Name] = "appsflyer"
 	}
 }
 
@@ -709,6 +723,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.FacebookAds = append(env.Connections.FacebookAds, conn)
+	case "appsflyer":
+		var conn AppsflyerConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Appsflyer = append(env.Connections.Appsflyer, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -780,6 +801,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.FacebookAds = removeConnection(env.Connections.FacebookAds, connectionName)
 	case "stripe":
 		env.Connections.Stripe = removeConnection(env.Connections.Stripe, connectionName)
+	case "appsflyer":
+		env.Connections.Appsflyer = removeConnection(env.Connections.Appsflyer, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}

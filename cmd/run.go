@@ -169,7 +169,8 @@ func Run(isDebug *bool) *cli.Command {
 			if runningForAnAsset {
 				task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath)
 				if err != nil {
-					errorPrinter.Printf("Failed to build task: %v\n", err.Error())
+					errorPrinter.Printf("Failed to build asset: %v. Are you sure you used the correct path?\n", err.Error())
+
 					return cli.Exit("", 1)
 				}
 

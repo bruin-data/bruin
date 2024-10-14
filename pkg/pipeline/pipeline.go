@@ -934,6 +934,8 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "adjust-default", nil
 	case "stripe":
 		return "stripe-default", nil
+	case "appsflyer":
+		return "appsflyer-default", nil
 	default:
 		return "", errors.Errorf("no default connection found for type '%s'", assetType)
 	}
@@ -1239,7 +1241,7 @@ func (b *Builder) CreateAssetFromFile(path string) (*Asset, error) {
 			return nil, err
 		}
 
-		return nil, errors.Wrapf(err, "error creating task from file '%s'", path)
+		return nil, errors.Wrapf(err, "error creating asset from file '%s'", path)
 	}
 
 	if task == nil {

@@ -136,6 +136,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 			AssetValidator:   gr.EnsureAssetEntitiesExistInGlossary,
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
+		&SimpleRule{
+			Identifier:       "duplicate-column-names",
+			Severity:         ValidatorSeverityCritical,
+			Validator:        CallFuncForEveryAsset(ValidateDuplicateColumnNames),
+			AssetValidator:   ValidateDuplicateColumnNames,
+			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
+		},
 		UsedTableValidatorRule{
 			renderer: jinja.NewRendererWithYesterday("your-pipeline", "some-run-id"),
 			parser:   parser,

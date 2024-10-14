@@ -191,6 +191,12 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "stripekey",
 				},
 			},
+			Appsflyer: []AppsflyerConnection{
+				{
+					Name:   "conn19",
+					ApiKey: "appsflyerkey",
+				},
+			},
 		},
 	}
 
