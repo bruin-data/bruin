@@ -43,6 +43,7 @@ export default defineConfig({
                     {
                         text: "Overview", link: "/connections/overview", items: [
                             {text: "Adjust", link: "/connections/adjust.md"},
+                            {text: "Appsflyer", link: "/connections/appsflyer.md"},
                             {text: "Google Cloud Platform", link: "/connections/google_cloud_platform"},
                             {text: "Gorgias", link: "/connections/gorgias"},
                             {text: "Microsoft SQL Server", link: "/connections/mssql"},
