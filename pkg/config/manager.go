@@ -356,6 +356,11 @@ func (c *Connections) buildConnectionKeyMap() {
 		c.typeNameMap[conn.Name] = "aws"
 	}
 
+	for i, conn := range c.AthenaConnection {
+		c.byKey[conn.Name] = &(c.AthenaConnection[i])
+		c.typeNameMap[conn.Name] = "athena"
+	}
+
 	for i, conn := range c.GoogleCloudPlatform {
 		c.byKey[conn.Name] = &(c.GoogleCloudPlatform[i])
 		c.typeNameMap[conn.Name] = "google_cloud_platform"
