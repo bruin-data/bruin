@@ -22,7 +22,7 @@ type ModulePathFinder struct {
 
 func (m *ModulePathFinder) FindModulePath(repo *git.Repo, executable *pipeline.ExecutableFile) (string, error) {
 	// Normalize paths by replacing OS-specific separators with a slash
-	if !strings.HasPrefix(filepath.Clean(executable.Path), repo.Path) {
+	if !strings.HasPrefix(strings.ToLower(filepath.Clean(executable.Path)), strings.ToLower(repo.Path)) {
 		return "", errors.New("executable is not in the repository")
 	}
 
