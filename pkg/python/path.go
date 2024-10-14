@@ -37,10 +37,12 @@ func (m *ModulePathFinder) FindModulePath(repo *git.Repo, executable *pipeline.E
 }
 
 func (m *ModulePathFinder) FindRequirementsTxtInPath(path string, executable *pipeline.ExecutableFile) (string, error) {
-	executablePath := filepath.Clean(executable.Path)
-	if !strings.HasPrefix(executablePath, path) {
+	lowerExecutable := filepath.Clean(strings.ToLower(executable.Path))
+	if !strings.HasPrefix(lowerExecutable, strings.ToLower(path)) {
 		return "", errors.New("executable is not in the repository to find the requirements")
 	}
+
+	executablePath := filepath.Clean(executable.Path)
 
 	requirementsTxt := findFileUntilParent("requirements.txt", filepath.Dir(executablePath), path)
 	if requirementsTxt == "" {
