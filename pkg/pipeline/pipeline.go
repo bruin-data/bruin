@@ -934,6 +934,8 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "adjust-default", nil
 	case "stripe":
 		return "stripe-default", nil
+	case "appsflyer":
+		return "appsflyer-default", nil
 	default:
 		return "", errors.Errorf("no default connection found for type '%s'", assetType)
 	}
