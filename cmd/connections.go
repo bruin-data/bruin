@@ -4,17 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/connection"
-	"github.com/bruin-data/bruin/pkg/query"
-	"os"
-	path2 "path"
-
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/jedib0t/go-pretty/v6/table"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
+	"os"
+	path2 "path"
 )
 
 func Connections() *cli.Command {
@@ -343,12 +341,7 @@ func TestConnection() *cli.Command {
 					return cli.Exit("", 1)
 				}
 
-				// Define a query using the Query struct
-				Query := query.Query{
-					Query: "SELECT 1", // Your SQL query here
-				}
-
-				err = db.RunQueryWithoutResult(context.Background(), &Query)
+				err = db.Test(context.Background())
 				if err != nil {
 					printErrorForOutput(output, errors2.Wrap(err, "failed to run test query on Snowflake connection"))
 					return cli.Exit("", 1)
