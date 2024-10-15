@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/connection"
+	"github.com/bruin-data/bruin/pkg/query"
 	"os"
 	path2 "path"
 
@@ -22,6 +25,7 @@ func Connections() *cli.Command {
 			ListConnections(),
 			AddConnection(),
 			DeleteConnection(),
+			TestConnection(),
 		},
 	}
 }
@@ -274,5 +278,102 @@ func printErrorForOutput(output string, err error) {
 		printErrorJSON(err)
 	} else {
 		errorPrinter.Println(err.Error())
+	}
+}
+
+func TestConnection() *cli.Command {
+	return &cli.Command{
+		Name:  "test",
+		Usage: "Test the validity of a connection in an environment",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "environment",
+				Aliases:  []string{"e", "env"},
+				Usage:    "the name of the environment (e.g., dev, prod)",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "type",
+				Usage:    "the type of the connection (e.g., snowflake)",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "name",
+				Aliases:  []string{"n"},
+				Usage:    "the name of the connection to test",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:        "output",
+				Aliases:     []string{"o"},
+				DefaultText: "plain",
+				Usage:       "the output type, possible values are: plain, json",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			// Extract command-line arguments
+			environment := c.String("environment")
+			connType := c.String("type")
+			name := c.String("name")
+			output := c.String("output")
+
+			repoRoot, err := git.FindRepoFromPath(".")
+			if err != nil {
+				printErrorForOutput(output, errors2.Wrap(err, "failed to find the git repository root"))
+				return cli.Exit("", 1)
+			}
+
+			configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
+			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+			if err != nil {
+				printErrorForOutput(output, errors2.Wrap(err, "failed to load or create config"))
+				return cli.Exit("", 1)
+			}
+
+			manager, err := connection.NewManagerFromConfig(cm)
+			if err != nil {
+				printErrorForOutput(output, errors2.Wrap(err, "failed to create connection manager"))
+				return cli.Exit("", 1)
+			}
+
+			if connType == "snowflake" {
+				db, err := manager.GetSfConnectionWithoutDefault(name)
+				if err != nil {
+					printErrorForOutput(output, errors2.Wrap(err, "failed to get Snowflake connection"))
+					return cli.Exit("", 1)
+				}
+
+				// Define a query using the Query struct
+				Query := query.Query{
+					Query: "SELECT 1", // Your SQL query here
+				}
+
+				err = db.RunQueryWithoutResult(context.Background(), &Query)
+				if err != nil {
+					printErrorForOutput(output, errors2.Wrap(err, "failed to run test query on Snowflake connection"))
+					return cli.Exit("", 1)
+				}
+				fmt.Printf("Successfully tested Snowflake connection: %s in environment: %s\n", name, environment)
+
+				if output == "json" {
+					jsonOutput := map[string]string{
+						"status":  "success",
+						"message": fmt.Sprintf("Successfully tested connection: %s with type: %s in environment: %s", name, connType, environment),
+					}
+					jsonBytes, err := json.Marshal(jsonOutput)
+					if err != nil {
+						printErrorForOutput(output, errors2.Wrap(err, "failed to marshal JSON"))
+						return cli.Exit("", 1)
+					}
+					fmt.Println(string(jsonBytes))
+					return nil
+				}
+
+				infoPrinter.Printf("Successfully tested connection: %s with type: %s in environment: %s\n", name, connType, environment)
+				return nil
+			}
+
+			return cli.Exit(fmt.Sprintf("Unsupported connection type: %s", connType), 1)
+		},
 	}
 }
