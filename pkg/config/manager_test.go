@@ -197,6 +197,13 @@ func TestLoadFromFile(t *testing.T) {
 					ApiKey: "appsflyerkey",
 				},
 			},
+			Kafka: []KafkaConnection{
+				{
+					Name:             "conn20",
+					BootstrapServers: "BootstrapServerskey",
+					GroupId:          "kafka123",
+				},
+			},
 		},
 	}
 
