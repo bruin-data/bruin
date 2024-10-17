@@ -28,6 +28,7 @@ const (
 	AssetTypeBigqueryQuery        = AssetType("bq.sql")
 	AssetTypeBigqueryTableSensor  = AssetType("bq.sensor.table")
 	AssetTypeBigqueryQuerySensor  = AssetType("bq.sensor.query")
+	AssetTypeDuckDBQuery          = AssetType("duckdb.sql")
 	AssetTypeEmpty                = AssetType("empty")
 	AssetTypePostgresQuery        = AssetType("pg.sql")
 	AssetTypeRedshiftQuery        = AssetType("rs.sql")
@@ -409,6 +410,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeDatabricksQuery:      "databricks",
 	AssetTypeSynapseQuery:         "synapse",
 	AssetTypeAthenaQuery:          "athena",
+	AssetTypeDuckDBQuery:          "duckdb",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -938,6 +940,8 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "appsflyer-default", nil
 	case "kafka":
 		return "kafka-default", nil
+	case "duckdb":
+		return "duckdb-default", nil
 	default:
 		return "", errors.Errorf("no default connection found for type '%s'", assetType)
 	}
