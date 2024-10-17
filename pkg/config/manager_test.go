@@ -197,6 +197,12 @@ func TestLoadFromFile(t *testing.T) {
 					ApiKey: "appsflyerkey",
 				},
 			},
+			DuckDB: []DuckDBConnection{
+				{
+					Name: "conn20",
+					Path: "/path/to/duck.db",
+				},
+			},
 		},
 	}
 

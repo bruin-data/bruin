@@ -90,6 +90,7 @@ linters-settings:
       - mssql.MsClient
       - databricks.Client
       - athena.Client
+      - duckdb.Client
   goconst:
     min-len: 5
     min-occurrences: 5
