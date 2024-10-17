@@ -1,6 +1,6 @@
 # Snowflake
 
-In order to have set up a Postgres connection, you need to add a configuration item to `connections` in the `.bruin.yml` file.
+In order to have set up a Snowflake connection, you need to add a configuration item to `connections` in the `.bruin.yml` file.
 
 There's 2 different ways to fill it in
 

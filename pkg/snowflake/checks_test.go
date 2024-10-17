@@ -31,6 +31,11 @@ func (m *mockQuerierWithResult) RunQueryWithoutResult(ctx context.Context, query
 	return args.Error(0)
 }
 
+func (m *mockQuerierWithResult) Test(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
 type mockConnectionFetcher struct {
 	mock.Mock
 }
