@@ -129,6 +129,9 @@ environments:
       appsflyer:
         - name: conn19
           api_key: "appsflyerkey"
+      duckdb:
+        - name: conn20
+          path: "/path/to/duck.db"
       generic:
         - name: key1
           value: value1
