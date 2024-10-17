@@ -176,6 +176,104 @@ func TestMaterializer_Render(t *testing.T) {
 				"COMMIT TRANSACTION;$",
 		},
 		{
+			name: "time_interval strategies require the incremental_key to be set",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					//Strategy: pipeline.MaterializationStrategyDeleteInsert, -- TIME INTERVAL
+				},
+			},
+			query:   "SELECT 1",
+			wantErr: true,
+		},
+		{
+			name: "time_interval strategies require the incremental_key to be defined in columns",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					//Strategy: pipeline.MaterializationStrategyDeleteInsert, -- TIME INTERVAL
+					IncrementalKey: "somekey",
+				},
+			},
+			query:   "SELECT 1",
+			wantErr: true,
+		},
+		{
+			name: "time_interval strategies require the incremental_key column to be date / timestamp / datetime",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					//Strategy: pipeline.MaterializationStrategyDeleteInsert, -- TIME INTERVAL
+					IncrementalKey: "somekey",
+				},
+				Columns: []pipeline.Column{
+					{Name: "somekey", Type: "string"},
+				},
+			},
+			query:   "SELECT 1",
+			wantErr: true,
+		},
+		{
+			name: "time_interval builds a proper transaction where columns are defined (date)",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					//Strategy:       pipeline.MaterializationStrategyDeleteInsert, --- TIME INTERVAL
+					IncrementalKey: "somekey",
+				},
+				Columns: []pipeline.Column{
+					{Name: "somekey", Type: "date"},
+				},
+			},
+			query: "SELECT 1",
+			want: "BEGIN TRANSACTION;\n" +
+				"DELETE FROM my\\.asset WHERE somekey between '{{ start_date }}' and '{{ end_date '}};\n" +
+				"INSERT INTO my\\.asset SELECT 1" +
+				"COMMIT TRANSACTION;$",
+		},
+		{
+			name: "time_interval builds a proper transaction where columns are defined (datetime)",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					//Strategy:       pipeline.MaterializationStrategyDeleteInsert, --- TIME INTERVAL
+					IncrementalKey: "somekey",
+				},
+				Columns: []pipeline.Column{
+					{Name: "somekey", Type: "date"},
+				},
+			},
+			query: "SELECT 1",
+			want: "BEGIN TRANSACTION;\n" +
+				"DELETE FROM my\\.asset WHERE somekey between '{{ start_datetime }}' and '{{ end_datetime '}};\n" +
+				"INSERT INTO my\\.asset SELECT 1" +
+				"COMMIT TRANSACTION;$",
+		},
+		{
+			name: "time_interval builds a proper transaction where columns are defined (timestamp)",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					//Strategy:       pipeline.MaterializationStrategyDeleteInsert, --- TIME INTERVAL
+					IncrementalKey: "somekey",
+				},
+				Columns: []pipeline.Column{
+					{Name: "somekey", Type: "timestamp"},
+				},
+			},
+			query: "SELECT 1",
+			want: "BEGIN TRANSACTION;\n" +
+				"DELETE FROM my\\.asset WHERE somekey between '{{ start_timestamp }}' and '{{ end_timestamp '}};\n" +
+				"INSERT INTO my\\.asset SELECT 1" +
+				"COMMIT TRANSACTION;$",
+		},
+		{
 			name: "merge with no columns defined fails",
 			task: &pipeline.Asset{
 				Name:    "my.asset",
