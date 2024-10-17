@@ -11,6 +11,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
+	"github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/hana"
@@ -48,6 +49,7 @@ type Manager struct {
 	Stripe      map[string]*stripe.Client
 	Appsflyer   map[string]*appsflyer.Client
 	Kafka       map[string]*kafka.Client
+	DuckDB      map[string]*duckdb.Client
 	mutex       sync.Mutex
 }
 
@@ -162,6 +164,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Kafka)...)
 
+	connDuckDB, err := m.GetDuckDBConnectionWithoutDefault(name)
+	if err == nil {
+		return connDuckDB, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.DuckDB)...)
+
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
 
@@ -180,6 +188,28 @@ func (m *Manager) GetAthenaConnectionWithoutDefault(name string) (athena.Client,
 	}
 
 	db, ok := m.Athena[name]
+	if !ok {
+		return nil, errors.Errorf("Athena connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetDuckDBConnection(name string) (duckdb.DuckDBClient, error) {
+	db, err := m.GetDuckDBConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetDuckDBConnectionWithoutDefault("duckdb-default")
+}
+
+func (m *Manager) GetDuckDBConnectionWithoutDefault(name string) (duckdb.DuckDBClient, error) {
+	if m.DuckDB == nil {
+		return nil, errors.New("no Athena connections found")
+	}
+
+	db, ok := m.DuckDB[name]
 	if !ok {
 		return nil, errors.Errorf("Athena connection not found for '%s'", name)
 	}
@@ -1001,16 +1031,39 @@ func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnectio
 		SaslPassword:     connection.SaslPassword,
 		BatchTimeout:     connection.BatchTimeout,
 	})
+
+	if err != nil {
+		return err
+	}
+
+	m.Kafka[connection.Name] = client
+
+	return nil
+}
+
+func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnection) error {
+	m.mutex.Lock()
+	if m.DuckDB == nil {
+		m.DuckDB = make(map[string]*duckdb.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := duckdb.NewClient(duckdb.Config{
+		Path: connection.Path,
+	})
+
 	if err != nil {
 		return err
 	}
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	m.Kafka[connection.Name] = client
+
+	m.DuckDB[connection.Name] = client
 
 	return nil
 }
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	connectionManager := &Manager{}
 
@@ -1185,6 +1238,16 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 			}
 		})
 	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.DuckDB {
+		wg.Go(func() {
+			err := connectionManager.AddDuckDBConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add duckdb connection '%s'", conn.Name))
+			}
+		})
+	}
+
 	wg.Wait()
 
 	return connectionManager, nil

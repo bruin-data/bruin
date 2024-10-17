@@ -23,7 +23,7 @@ type connection interface {
 	ExecContext(ctx context.Context, sql string, arguments ...any) (sql.Result, error)
 }
 
-func NewClient(_ context.Context, c DuckDBConfig) (*Client, error) {
+func NewClient(c DuckDBConfig) (*Client, error) {
 	conn, err := sqlx.Open("duckdb", c.ToDBConnectionURI())
 	if err != nil {
 		return nil, err

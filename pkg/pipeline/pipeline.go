@@ -477,16 +477,16 @@ type SnowflakeConfig struct {
 	Warehouse string `json:"warehouse"`
 }
 
-type AthenaConfig struct {
-	Location string `json:"location"`
-}
-
 func (s SnowflakeConfig) MarshalJSON() ([]byte, error) {
 	if s.Warehouse == "" {
 		return []byte("null"), nil
 	}
 
 	return json.Marshal(s)
+}
+
+type AthenaConfig struct {
+	Location string `json:"location"`
 }
 
 func (s AthenaConfig) MarshalJSON() ([]byte, error) {
@@ -965,6 +965,7 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 		AssetTypeRedshiftQuery:   0,
 		AssetTypeSynapseQuery:    0,
 		AssetTypeAthenaQuery:     0,
+		AssetTypeDuckDBQuery:     0,
 	}
 	maxTasks := 0
 	maxTaskType := defaultIfNone
