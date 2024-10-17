@@ -206,12 +206,12 @@ func (m *Manager) GetDuckDBConnection(name string) (duckdb.DuckDBClient, error) 
 
 func (m *Manager) GetDuckDBConnectionWithoutDefault(name string) (duckdb.DuckDBClient, error) {
 	if m.DuckDB == nil {
-		return nil, errors.New("no Athena connections found")
+		return nil, errors.New("no DuckDB connections found")
 	}
 
 	db, ok := m.DuckDB[name]
 	if !ok {
-		return nil, errors.Errorf("Athena connection not found for '%s'", name)
+		return nil, errors.Errorf("DuckDB connection not found for '%s'", name)
 	}
 
 	return db, nil
