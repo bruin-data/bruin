@@ -136,7 +136,7 @@ func Render() *cli.Command {
 					pipeline.AssetTypeDatabricksQuery: databricks.NewRenderer(fullRefresh),
 					pipeline.AssetTypeSynapseQuery:    synapse.NewRenderer(fullRefresh),
 					pipeline.AssetTypeAthenaQuery:     athena.NewRenderer(fullRefresh, resultsLocation),
-					pipeline.AssetTypeDuckDBQuery:     duckdb.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeDuckDBQuery:     duck.NewMaterializer(fullRefresh),
 				},
 				builder: DefaultPipelineBuilder,
 				writer:  os.Stdout,

@@ -567,9 +567,9 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeDuckDBQuery) || estimateCustomCheckType == pipeline.AssetTypeDuckDBQuery {
-		duckDBOperator := duckdb.NewBasicOperator(conn, wholeFileExtractor, duckdb.NewMaterializer(fullRefresh))
+		duckDBOperator := duck.NewBasicOperator(conn, wholeFileExtractor, duck.NewMaterializer(fullRefresh))
 		duckDBCustomCheckRunner := ansisql.NewCustomCheckOperator(conn, renderer)
-		duckDBCheckRunner := duckdb.NewColumnCheckOperator(conn)
+		duckDBCheckRunner := duck.NewColumnCheckOperator(conn)
 
 		mainExecutors[pipeline.AssetTypeDuckDBQuery][scheduler.TaskInstanceTypeMain] = duckDBOperator
 		mainExecutors[pipeline.AssetTypeDuckDBQuery][scheduler.TaskInstanceTypeColumnCheck] = duckDBCheckRunner

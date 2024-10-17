@@ -47,7 +47,7 @@ type Manager struct {
 	FacebookAds map[string]*facebookads.Client
 	Stripe      map[string]*stripe.Client
 	Appsflyer   map[string]*appsflyer.Client
-	DuckDB      map[string]*duckdb.Client
+	DuckDB      map[string]*duck.Client
 	mutex       sync.Mutex
 }
 
@@ -187,7 +187,7 @@ func (m *Manager) GetAthenaConnectionWithoutDefault(name string) (athena.Client,
 	return db, nil
 }
 
-func (m *Manager) GetDuckDBConnection(name string) (duckdb.DuckDBClient, error) {
+func (m *Manager) GetDuckDBConnection(name string) (duck.DuckDBClient, error) {
 	db, err := m.GetDuckDBConnectionWithoutDefault(name)
 	if err == nil {
 		return db, nil
@@ -196,7 +196,7 @@ func (m *Manager) GetDuckDBConnection(name string) (duckdb.DuckDBClient, error) 
 	return m.GetDuckDBConnectionWithoutDefault("duckdb-default")
 }
 
-func (m *Manager) GetDuckDBConnectionWithoutDefault(name string) (duckdb.DuckDBClient, error) {
+func (m *Manager) GetDuckDBConnectionWithoutDefault(name string) (duck.DuckDBClient, error) {
 	if m.DuckDB == nil {
 		return nil, errors.New("no DuckDB connections found")
 	}
@@ -988,11 +988,11 @@ func (m *Manager) AddAppsflyerConnectionFromConfig(connection *config.AppsflyerC
 func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnection) error {
 	m.mutex.Lock()
 	if m.DuckDB == nil {
-		m.DuckDB = make(map[string]*duckdb.Client)
+		m.DuckDB = make(map[string]*duck.Client)
 	}
 	m.mutex.Unlock()
 
-	client, err := duckdb.NewClient(duckdb.Config{
+	client, err := duck.NewClient(duck.Config{
 		Path: connection.Path,
 	})
 	if err != nil {
