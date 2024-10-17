@@ -1,4 +1,4 @@
-package duckdb
+package duck
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/marcboeker/go-duckdb"
 )
 
 type Client struct {

@@ -1,4 +1,4 @@
-package duckdb
+package duck
 
 import (
 	"fmt"
