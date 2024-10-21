@@ -346,6 +346,7 @@ func TestConnection() *cli.Command {
 					printErrorForOutput(output, errors2.Wrap(err, "failed to run test query on Snowflake connection"))
 					return cli.Exit("", 1)
 				}
+
 				fmt.Printf("Successfully tested Snowflake connection: %s in environment: %s\n", name, environment)
 
 				if output == "json" {
