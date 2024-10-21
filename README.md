@@ -23,15 +23,18 @@ Bruin is built to make your life easier when it comes to data transformations:
 You can see our documentation [here](https://bruin-data.github.io/bruin/).
 
 ## Installation
+Binaries are available on the [releases page](https://github.com/bruin-data/bruin/releases).
 
-### macOS
+
+### macOS (Homebrew)
 ```shell
-brew tap bruin-data/tap
-brew install bruin
+brew install bruin-data/tap/bruin
 ```
 
-### Linux
-Binaries are available on the [releases page](https://github.com/bruin-data/bruin/releases).
+### Linux/MacOS/Windows(Bash)
+```shell
+curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sudo bash -s -- -b /usr/local/bin
+```
 
 ### via Golang installer
 
