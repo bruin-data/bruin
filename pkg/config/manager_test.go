@@ -200,7 +200,7 @@ func TestLoadFromFile(t *testing.T) {
 			Kafka: []KafkaConnection{
 				{
 					Name:             "conn20",
-					BootstrapServers: "BootstrapServerskey",
+					BootstrapServers: "localhost:9093",
 					GroupId:          "kafka123",
 				},
 			},

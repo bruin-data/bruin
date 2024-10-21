@@ -131,7 +131,7 @@ environments:
           api_key: "appsflyerkey"
       kafka:
         - name: conn20
-          bootstrap_servers: "BootstrapServerskey"
+          bootstrap_servers: "localhost:9093"
           group_id: "kafka123"
       generic:
         - name: key1
