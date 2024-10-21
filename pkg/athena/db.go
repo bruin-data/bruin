@@ -107,3 +107,15 @@ func (db *DB) initializeDB() error {
 	db.conn = conn
 	return nil
 }
+
+func (db *DB) Test(ctx context.Context) error {
+	q := query.Query{
+		Query: "SELECT 1",
+	}
+	err := db.RunQueryWithoutResult(ctx, &q)
+	if err != nil {
+		return errors.Wrap(err, "failed to run test query on Snowflake connection")
+	}
+
+	return nil
+}

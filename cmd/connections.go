@@ -292,7 +292,7 @@ func TestConnection() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:     "type",
-				Usage:    "the type of the connection (e.g., snowflake)",
+				Usage:    "the type of the connection (e.g., snowflake, bigquery)",
 				Required: true,
 			},
 			&cli.StringFlag{
@@ -334,40 +334,61 @@ func TestConnection() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			if connType == "snowflake" {
+			var testErr error
+
+			// Handling Snowflake connection
+			switch connType {
+			case "snowflake":
 				db, err := manager.GetSfConnectionWithoutDefault(name)
 				if err != nil {
 					printErrorForOutput(output, errors2.Wrap(err, "failed to get Snowflake connection"))
 					return cli.Exit("", 1)
 				}
+				testErr = db.Test(context.Background())
 
-				err = db.Test(context.Background())
+			// Handling BigQuery connection
+			case "bigquery":
+				bqClient, err := manager.GetBqConnectionWithoutDefault(name)
 				if err != nil {
-					printErrorForOutput(output, errors2.Wrap(err, "failed to run test query on Snowflake connection"))
+					printErrorForOutput(output, errors2.Wrap(err, "failed to get BigQuery connection"))
 					return cli.Exit("", 1)
 				}
-
-				fmt.Printf("Successfully tested Snowflake connection: %s in environment: %s\n", name, environment)
-
-				if output == "json" {
-					jsonOutput := map[string]string{
-						"status":  "success",
-						"message": fmt.Sprintf("Successfully tested connection: %s with type: %s in environment: %s", name, connType, environment),
-					}
-					jsonBytes, err := json.Marshal(jsonOutput)
-					if err != nil {
-						printErrorForOutput(output, errors2.Wrap(err, "failed to marshal JSON"))
-						return cli.Exit("", 1)
-					}
-					fmt.Println(string(jsonBytes))
-					return nil
+				testErr = bqClient.Test(context.Background())
+			case "athena":
+				bqClient, err := manager.GetAthenaConnectionWithoutDefault(name)
+				if err != nil {
+					printErrorForOutput(output, errors2.Wrap(err, "failed to get BigQuery connection"))
+					return cli.Exit("", 1)
 				}
+				testErr = bqClient.Test(context.Background())
 
-				infoPrinter.Printf("Successfully tested connection: %s with type: %s in environment: %s\n", name, connType, environment)
-				return nil
+			default:
+				return cli.Exit(fmt.Sprintf("Unsupported connection type: %s", connType), 1)
 			}
 
-			return cli.Exit(fmt.Sprintf("Unsupported connection type: %s", connType), 1)
+			// Handle the test result
+			if testErr != nil {
+				printErrorForOutput(output, errors2.Wrap(testErr, fmt.Sprintf("failed to run test query on %s connection", connType)))
+				return cli.Exit("", 1)
+			}
+
+			// Output the result in either plain or JSON format
+			if output == "json" {
+				jsonOutput := map[string]string{
+					"status":  "success",
+					"message": fmt.Sprintf("Successfully tested connection: %s with type: %s in environment: %s", name, connType, environment),
+				}
+				jsonBytes, err := json.Marshal(jsonOutput)
+				if err != nil {
+					printErrorForOutput(output, errors2.Wrap(err, "failed to marshal JSON"))
+					return cli.Exit("", 1)
+				}
+				fmt.Println(string(jsonBytes))
+			} else {
+				fmt.Printf("Successfully tested connection: %s with type: %s in environment: %s\n", name, connType, environment)
+			}
+
+			return nil
 		},
 	}
 }
