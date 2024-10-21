@@ -35,7 +35,7 @@ A different way to do this is to use the account locator (If you are using cloud
           schema: "schema_name" # optional
           warehouse: "warehouse_name" # optional
           role: "data_analyst" # optional
-          region: "eu-west1.gcp" # DEPRECATED: Append the region directly to the accountname, e.g., `account: "AAAAAAA.<region>"` or `account: "AAAAAAA
+          region: "eu-west1.gcp" # DEPRECATED: Append the region directly to the accountname, e.g., `account: "AAAAAAA.<region>"` or `account: "AAAAAAA.<region>.<platform>"`"`
 
 ```
 
