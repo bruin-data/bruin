@@ -14,6 +14,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/hana"
+	"github.com/bruin-data/bruin/pkg/kafka"
 	"github.com/bruin-data/bruin/pkg/klaviyo"
 	"github.com/bruin-data/bruin/pkg/mongo"
 	"github.com/bruin-data/bruin/pkg/mssql"
@@ -46,6 +47,7 @@ type Manager struct {
 	FacebookAds map[string]*facebookads.Client
 	Stripe      map[string]*stripe.Client
 	Appsflyer   map[string]*appsflyer.Client
+	Kafka       map[string]*kafka.Client
 	mutex       sync.Mutex
 }
 
@@ -153,6 +155,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connAppsflyer, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Appsflyer)...)
+
+	connKafka, err := m.GetKafkaConnectionWithoutDefault(name)
+	if err == nil {
+		return connKafka, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Kafka)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -522,6 +530,28 @@ func (m *Manager) GetAppsflyerConnectionWithoutDefault(name string) (*appsflyer.
 	db, ok := m.Appsflyer[name]
 	if !ok {
 		return nil, errors.Errorf("appsflyer connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetKafkaConnection(name string) (*kafka.Client, error) {
+	db, err := m.GetKafkaConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetKafkaConnectionWithoutDefault("kafka-default")
+}
+
+func (m *Manager) GetKafkaConnectionWithoutDefault(name string) (*kafka.Client, error) {
+	if m.Kafka == nil {
+		return nil, errors.New("no kafka connections found")
+	}
+
+	db, ok := m.Kafka[name]
+	if !ok {
+		return nil, errors.Errorf("kafka connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -955,6 +985,32 @@ func (m *Manager) AddAppsflyerConnectionFromConfig(connection *config.AppsflyerC
 	return nil
 }
 
+func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnection) error {
+	m.mutex.Lock()
+	if m.Kafka == nil {
+		m.Kafka = make(map[string]*kafka.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := kafka.NewClient(kafka.Config{
+		BootstrapServers: connection.BootstrapServers,
+		GroupId:          connection.GroupId,
+		BatchSize:        connection.BatchSize,
+		SaslMechanisms:   connection.SaslMechanisms,
+		SaslUsername:     connection.SaslUsername,
+		SaslPassword:     connection.SaslPassword,
+		BatchTimeout:     connection.BatchTimeout,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Kafka[connection.Name] = client
+
+	return nil
+}
 func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	connectionManager := &Manager{}
 
@@ -1121,6 +1177,14 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		})
 	}
 
+	for _, conn := range cm.SelectedEnvironment.Connections.Kafka {
+		wg.Go(func() {
+			err := connectionManager.AddKafkaConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add kafka connection '%s'", conn.Name))
+			}
+		})
+	}
 	wg.Wait()
 
 	return connectionManager, nil

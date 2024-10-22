@@ -20,3 +20,4 @@ default_connections:
   facebookads: "my-facebookads"
   stripe: "my-stripe"
   appsflyer: "my-appsflyer"
+  kafka: "my-kafka"

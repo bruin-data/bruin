@@ -222,6 +222,22 @@ func (c AppsflyerConnection) GetName() string {
 	return c.Name
 }
 
+type KafkaConnection struct {
+	Name             string `yaml:"name" json:"name" mapstructure:"name"`
+	BootstrapServers string `yaml:"bootstrap_servers" json:"bootstrap_servers" mapstructure:"bootstrap_servers"`
+	GroupId          string `yaml:"group_id" json:"group_id" mapstructure:"group_id"`
+	SecurityProtocol string `yaml:"security_protocol" json:"security_protocol" mapstructure:"security_protocol"`
+	SaslMechanisms   string `yaml:"sasl_mechanisms" json:"sasl_mechanisms" mapstructure:"sasl_mechanisms"`
+	SaslUsername     string `yaml:"sasl_username" json:"sasl_username" mapstructure:"sasl_username"`
+	SaslPassword     string `yaml:"sasl_password" json:"sasl_password" mapstructure:"sasl_password"`
+	BatchSize        string `yaml:"batch_size" json:"batch_size" mapstructure:"batch_size"`
+	BatchTimeout     string `yaml:"batch_timeout" json:"batch_timeout" mapstructure:"batch_timeout"`
+}
+
+func (c KafkaConnection) GetName() string {
+	return c.Name
+}
+
 type MySQLConnection struct {
 	Name     string `yaml:"name" json:"name" mapstructure:"name"`
 	Username string `yaml:"username" json:"username" mapstructure:"username"`
@@ -326,6 +342,7 @@ type Connections struct {
 	FacebookAds         []FacebookAdsConnection         `yaml:"facebookads,omitempty" json:"facebookads,omitempty" mapstructure:"facebookads"`
 	Stripe              []StripeConnection              `yaml:"stripe,omitempty" json:"stripe,omitempty" mapstructure:"stripe"`
 	Appsflyer           []AppsflyerConnection           `yaml:"appsflyer,omitempty" json:"appsflyer,omitempty" mapstructure:"appsflyer"`
+	Kafka               []KafkaConnection               `yaml:"kafka,omitempty" json:"kafka,omitempty" mapstructure:"kafka"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -454,6 +471,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.Appsflyer {
 		c.byKey[conn.Name] = &(c.Appsflyer[i])
 		c.typeNameMap[conn.Name] = "appsflyer"
+	}
+
+	for i, conn := range c.Kafka {
+		c.byKey[conn.Name] = &(c.Kafka[i])
+		c.typeNameMap[conn.Name] = "kafka"
 	}
 }
 
@@ -735,6 +757,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Appsflyer = append(env.Connections.Appsflyer, conn)
+	case "kafka":
+		var conn KafkaConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Kafka = append(env.Connections.Kafka, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -808,6 +837,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Stripe = removeConnection(env.Connections.Stripe, connectionName)
 	case "appsflyer":
 		env.Connections.Appsflyer = removeConnection(env.Connections.Appsflyer, connectionName)
+	case "kafka":
+		env.Connections.Kafka = removeConnection(env.Connections.Kafka, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
