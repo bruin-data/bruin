@@ -17,7 +17,7 @@ It's important to note that other clients should not be connected to the databas
 ## Assets
 
 Duck DB assets should use the type `duckdb.sql` and if you specify a connection it must be of the `duckdb` type.
-For detailed parameters, you can check [Definition Schema](definition-schema.md) page.
+For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 
 ### Examples
