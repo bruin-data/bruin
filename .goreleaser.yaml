@@ -1,4 +1,4 @@
-version: 1 
+version: 2
 
 builds:
   - env:
@@ -12,7 +12,9 @@ builds:
     goarch:
         - amd64
         - arm64
-
+    ignore:
+      - goos: windows
+        goarch: arm64
 archives:
   - format: tar.gz
     name_template: >-
@@ -43,7 +45,7 @@ brews:
       email: burak.karakan@getbruin.com
 
     # Folder inside the repository to put the formula.
-    folder: Formula
+    directory: Formula
 
     # The project name and current git tag are used in the format string.
     #

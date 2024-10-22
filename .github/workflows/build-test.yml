@@ -41,3 +41,4 @@ jobs:
           go-version-file: 'go.mod'
 
       - run: make format
+
