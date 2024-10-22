@@ -1031,7 +1031,6 @@ func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnectio
 		SaslPassword:     connection.SaslPassword,
 		BatchTimeout:     connection.BatchTimeout,
 	})
-
 	if err != nil {
 		return err
 	}
@@ -1051,7 +1050,6 @@ func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnect
 	client, err := duck.NewClient(duck.Config{
 		Path: connection.Path,
 	})
-
 	if err != nil {
 		return err
 	}

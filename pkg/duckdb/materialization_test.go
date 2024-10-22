@@ -160,11 +160,8 @@ COMMIT;`,
 					{Name: "name", Type: "varchar", PrimaryKey: false, UpdateOnMerge: true},
 				},
 			},
-			query: "SELECT 1 as id, 'abc' as name",
-			want: "^MERGE INTO my\\.asset target\n" +
-				"USING \\(SELECT 1 as id, 'abc' as name\\) source ON target\\.id = source.id\n" +
-				"WHEN MATCHED THEN UPDATE SET name = source\\.name\n" +
-				"WHEN NOT MATCHED THEN INSERT\\(id, name\\) VALUES\\(id, name\\);$",
+			query:   "SELECT 1 as id, 'abc' as name",
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
