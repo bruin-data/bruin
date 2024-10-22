@@ -40,7 +40,7 @@ $VERSION = $TAG -replace '^v', ''
 
 Log-Info "Found version ${VERSION} for ${TAG}/Windows/${ARCH}"
 
-$NAME = "${BINARY}_Windows_${ARCH}.zip"
+$NAME = "bruin_Windows_${ARCH}.zip"
 
 $DOWNLOAD_URL = "${GITHUB_DOWNLOAD}/${TAG}/${NAME}"
 
