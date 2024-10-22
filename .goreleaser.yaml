@@ -2,7 +2,7 @@ version: 2
 
 builds:
   - env:
-      - CGO_ENABLED=0
+      - CGO_ENABLED=1
     ldflags:
       - "-s -w -X main.Version={{ .Env.VERSION }}"
     goos:
