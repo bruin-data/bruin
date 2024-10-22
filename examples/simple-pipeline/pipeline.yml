@@ -21,3 +21,4 @@ default_connections:
   stripe: "my-stripe"
   appsflyer: "my-appsflyer"
   kafka: "my-kafka"
+  hubspot: "my-hubspot"
