@@ -1,12 +1,10 @@
 /* @bruin
-name: destinations
+name: sources_view
 type: duckdb.sql
 materialization:
    type: table
-   partition_by: id
-   # strategy: append
-   # strategy: merge
-   # incremental_key: id
+   strategy: merge
+   incremental_key: id
 columns:
   - name: id
     type: integer
@@ -29,9 +27,11 @@ columns:
     checks:
         - name: unique
         - name: not_null
-@bruin */
+#        - name: pattern
+#        value: "^[A-Z][a-z]*$"
+   @bruin */
 
-SELECT 1 as id, 'spain' as country , 'juan1' as name
+SELECT 1 as id, 'spain' as country , 'alberto' as name
 union all
 SELECT 2 as id, 'germany' as country , 'frank' as name
 union all
@@ -41,4 +41,4 @@ SELECT 4 as id, 'france' as country , 'petit' as name
 union all
 SELECT 5 as id, 'poland' as country , 'polski' as name
 union all
-SELECT 6 as id, 'russia' as country , 'ivan' as name
+SELECT 6 as id, 'india' as country , 'yuvraj' as name
