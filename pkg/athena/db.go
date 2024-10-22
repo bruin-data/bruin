@@ -94,7 +94,11 @@ func (db *DB) initializeDB() error {
 		return nil
 	}
 
-	athenaURI := db.config.ToDBConnectionURI()
+	athenaURI, err := db.config.ToDBConnectionURI()
+	if err != nil {
+		return errors.Wrap(err, "failed to create DSN for Athena")
+	}
+
 	if athenaURI == "" {
 		return errors.New("failed to create DSN for Athena")
 	}
