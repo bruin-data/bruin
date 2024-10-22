@@ -1,4 +1,4 @@
-version: 1
+version: 1 
 
 builds:
   - env:
@@ -12,9 +12,6 @@ builds:
     goarch:
         - amd64
         - arm64
-    ignore:
-      - goos: windows
-        goarch: arm64
 
 archives:
   - format: tar.gz
