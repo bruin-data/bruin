@@ -56,6 +56,7 @@ export default defineConfig({
                             {text: "Snowflake", link: "/connections/snowflake"},
                             {text: "Databricks", link: "/connections/databricks"},
                             {text: "AWS Athena", link: "/connections/athena"},
+                            {text: "DuckDB", link: "/connections/duckdb"},
                         ]
                     },
                 ],
