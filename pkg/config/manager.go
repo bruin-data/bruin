@@ -194,6 +194,15 @@ func (c AdjustConnection) GetName() string {
 	return c.Name
 }
 
+type DuckDBConnection struct {
+	Name string `yaml:"name" json:"name" mapstructure:"name"`
+	Path string `yaml:"path" json:"path" mapstructure:"path"`
+}
+
+func (d DuckDBConnection) GetName() string {
+	return d.Name
+}
+
 type StripeConnection struct {
 	Name   string `yaml:"name" json:"name" mapstructure:"name"`
 	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
@@ -343,6 +352,7 @@ type Connections struct {
 	Stripe              []StripeConnection              `yaml:"stripe,omitempty" json:"stripe,omitempty" mapstructure:"stripe"`
 	Appsflyer           []AppsflyerConnection           `yaml:"appsflyer,omitempty" json:"appsflyer,omitempty" mapstructure:"appsflyer"`
 	Kafka               []KafkaConnection               `yaml:"kafka,omitempty" json:"kafka,omitempty" mapstructure:"kafka"`
+	DuckDB              []DuckDBConnection              `yaml:"duckdb,omitempty" json:"duckdb,omitempty" mapstructure:"duckdb"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -476,6 +486,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.Kafka {
 		c.byKey[conn.Name] = &(c.Kafka[i])
 		c.typeNameMap[conn.Name] = "kafka"
+	}
+
+	for i, conn := range c.DuckDB {
+		c.byKey[conn.Name] = &(c.DuckDB[i])
+		c.typeNameMap[conn.Name] = "duckdb"
 	}
 }
 
