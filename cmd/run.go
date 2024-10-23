@@ -209,9 +209,9 @@ func Run(isDebug *bool) *cli.Command {
 				return err
 			}
 
-			connectionManager, err := connection.NewManagerFromConfig(cm)
-			if err != nil {
-				errorPrinter.Printf("Failed to register connections: %v\n", err)
+			connectionManager, errs := connection.NewManagerFromConfig(cm)
+			if len(errs) > 0 {
+				printErrors(errs, c.String("output"), "Failed to register connections")
 				return cli.Exit("", 1)
 			}
 
