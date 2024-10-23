@@ -16,7 +16,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/date"
-	"github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/mssql"
@@ -136,7 +135,6 @@ func Render() *cli.Command {
 					pipeline.AssetTypeDatabricksQuery: databricks.NewRenderer(fullRefresh),
 					pipeline.AssetTypeSynapseQuery:    synapse.NewRenderer(fullRefresh),
 					pipeline.AssetTypeAthenaQuery:     athena.NewRenderer(fullRefresh, resultsLocation),
-					pipeline.AssetTypeDuckDBQuery:     duck.NewMaterializer(fullRefresh),
 				},
 				builder: DefaultPipelineBuilder,
 				writer:  os.Stdout,
