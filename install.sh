@@ -38,11 +38,13 @@ parse_args() {
   shift $((OPTIND - 1))
   TAG=$1
 }
+
 # this function wraps all the destructive operations
 # if a curl|bash cuts off the end of the script due to
 # network, either nothing will happen or will syntax error
 # out preventing half-done work
 execute() {
+  
   tmpdir=$(mktemp -d)
   log_debug "downloading files into ${tmpdir}"
   http_download "${tmpdir}/${TARBALL}" "${TARBALL_URL}"
@@ -64,36 +66,55 @@ execute() {
   echo "everything's installed!"
   echo
 
-  # Detect the current shell
   current_shell=$(basename "$SHELL")
 
   echo "To add ${BINDIR} to your PATH, either restart your shell or run:"
-  echo
-
+ 
   case "$current_shell" in
-    bash|sh|zsh)
+    bash|sh)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
       eval "$export_command"
       echo "Executed: $export_command"
-      echo "# Add the following line to your ~/.${current_shell}rc file to make it permanent:"
-      echo "# $export_command"
+      echo "# Adding the following line to your ~/.${current_shell}rc file:"
+      echo "$export_command" >> "$HOME/.${current_shell}rc"
+      echo "# Added: $export_command"
+      # Export PATH in the current shell
+      export PATH="$PATH:${BINDIR}"
+      ;;
+    zsh)
+      export_command="export PATH=\"\$PATH:${BINDIR}\""
+      eval "$export_command"
+      echo "Executed: $export_command"
+      echo "# Adding the following line to your ~/.zshrc file:"
+      echo "$export_command" >> "$HOME/.zshrc"
+      echo "# Added: $export_command"
+      # Export PATH in the current shell
+      export PATH="$PATH:${BINDIR}"
       ;;
     fish)
       export_command="set -gx PATH \$PATH ${BINDIR}"
       fish -c "$export_command"
       echo "Executed: $export_command"
-      echo "# Add the following line to your ~/.config/fish/config.fish file to make it permanent:"
-      echo "# $export_command"
+      echo "# Adding the following line to your ~/.config/fish/config.fish file:"
+      echo "$export_command" >> "$HOME/.config/fish/config.fish"
+      echo "# Added: $export_command"
+      # Export PATH in the current shell (for fish, this is already done by the fish -c command)
       ;;
     *)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
       eval "$export_command"
       echo "Executed: $export_command (for most shells)"
       echo "For fish shell, use: set -gx PATH \$PATH ${BINDIR}"
-      echo "# Add the appropriate line to your shell's configuration file to make it permanent."
+      echo "# Unable to automatically add to your shell's configuration file."
+      echo "# Please manually add the appropriate line to your shell's configuration file to make it permanent."
+      # Export PATH in the current shell
+      export PATH="$PATH:${BINDIR}"
       ;;
   esac
+  echo "The PATH has been updated in your current shell session. You can now use the installed binaries without restarting your shell."
 }
+
+
 get_binaries() {
   case "$PLATFORM" in
     darwin/amd64) BINARIES="bruin" ;;
@@ -423,5 +444,8 @@ TARBALL_URL=${GITHUB_DOWNLOAD}/${TAG}/${TARBALL}
 
 
 execute
+
+
+
 
 
