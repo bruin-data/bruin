@@ -65,3 +65,11 @@ func printErrorJSON(err error) {
 
 	fmt.Println(string(js))
 }
+
+func printError(err error, output string, message string) {
+	if output == "json" {
+		printErrorJSON(err)
+	} else {
+		errorPrinter.Printf("%s: %v\n", message, err)
+	}
+}
