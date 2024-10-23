@@ -938,6 +938,8 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "appsflyer-default", nil
 	case "kafka":
 		return "kafka-default", nil
+	case "hubspot":
+		return "hubspot-default", nil
 	default:
 		return "", errors.Errorf("no default connection found for type '%s'", assetType)
 	}

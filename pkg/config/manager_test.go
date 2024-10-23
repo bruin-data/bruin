@@ -204,6 +204,12 @@ func TestLoadFromFile(t *testing.T) {
 					GroupId:          "kafka123",
 				},
 			},
+			Hubspot: []HubspotConnection{
+				{
+					Name:   "conn21",
+					ApiKey: "hubspotkey",
+				},
+			},
 		},
 	}
 
