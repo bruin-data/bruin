@@ -114,7 +114,7 @@ func (db *DB) Test(ctx context.Context) error {
 	}
 	err := db.RunQueryWithoutResult(ctx, &q)
 	if err != nil {
-		return errors.Wrap(err, "failed to run test query on Snowflake connection")
+		return errors.Wrap(err, "failed to run test query on Athena connection")
 	}
 
 	return nil
