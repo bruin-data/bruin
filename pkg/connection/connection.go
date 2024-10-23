@@ -1015,29 +1015,44 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	connectionManager := &Manager{}
 
 	var wg conc.WaitGroup
+
+	var errList []error
+	var mu sync.Mutex
+
 	for _, conn := range cm.SelectedEnvironment.Connections.AthenaConnection {
 		wg.Go(func() {
 			err := connectionManager.AddAthenaConnectionFromConfig(&conn)
+
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add AWS connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add AWS connection '%s'", conn.Name))
+				mu.Unlock()
 			}
+
 		})
 	}
 
 	for _, conn := range cm.SelectedEnvironment.Connections.GoogleCloudPlatform {
 		wg.Go(func() {
 			err := connectionManager.AddBqConnectionFromConfig(&conn)
+
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add BigQuery connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add BigQuery connection '%s'", conn.Name))
+				mu.Unlock()
 			}
+
 		})
 	}
 
 	for _, conn := range cm.SelectedEnvironment.Connections.Snowflake {
 		wg.Go(func() {
 			err := connectionManager.AddSfConnectionFromConfig(&conn)
+
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add Snowflake connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add Snowflake connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1045,8 +1060,11 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Postgres {
 		wg.Go(func() {
 			err := connectionManager.AddPgConnectionFromConfig(&conn)
+
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add Postgres connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add Postgres connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1054,8 +1072,11 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.RedShift {
 		wg.Go(func() {
 			err := connectionManager.AddRedshiftConnectionFromConfig(&conn)
+
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add RedShift connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add RedShift connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1063,8 +1084,11 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.MsSQL {
 		wg.Go(func() {
 			err := connectionManager.AddMsSQLConnectionFromConfig(&conn)
+
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add MsSQL connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add MsSQL connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1072,8 +1096,11 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Databricks {
 		wg.Go(func() {
 			err := connectionManager.AddDatabricksConnectionFromConfig(&conn)
+
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add Databricks connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add Databricks connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1082,7 +1109,9 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		wg.Go(func() {
 			err := connectionManager.AddMsSQLConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add Synapse connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add Synapse connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1090,8 +1119,11 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Mongo {
 		wg.Go(func() {
 			err := connectionManager.AddMongoConnectionFromConfig(&conn)
+
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add Mongo connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add Mongo connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1099,8 +1131,11 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.MySQL {
 		wg.Go(func() {
 			err := connectionManager.AddMySQLConnectionFromConfig(&conn)
+
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add mysql connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add mysql connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1108,8 +1143,11 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Notion {
 		wg.Go(func() {
 			err := connectionManager.AddNotionConnectionFromConfig(&conn)
+
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add notion connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add notion connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1117,8 +1155,11 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Shopify {
 		wg.Go(func() {
 			err := connectionManager.AddShopifyConnectionFromConfig(&conn)
+
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add shopify connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add shopify connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1126,8 +1167,11 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Gorgias {
 		wg.Go(func() {
 			err := connectionManager.AddGorgiasConnectionFromConfig(&conn)
+
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add gorgias connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add gorgias connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1135,8 +1179,11 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Klaviyo {
 		wg.Go(func() {
 			err := connectionManager.AddKlaviyoConnectionFromConfig(&conn)
+
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add klaviyo connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add klaviyo connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1144,8 +1191,11 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Adjust {
 		wg.Go(func() {
 			err := connectionManager.AddAdjustConnectionFromConfig(&conn)
+
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add adjust connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add adjust connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1153,8 +1203,11 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.FacebookAds {
 		wg.Go(func() {
 			err := connectionManager.AddFacebookAdsConnectionFromConfig(&conn)
+
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add facebookads connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add facebookads connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1162,8 +1215,11 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Stripe {
 		wg.Go(func() {
 			err := connectionManager.AddStripeConnectionFromConfig(&conn)
+
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add stripe connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add stripe connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1171,8 +1227,11 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Appsflyer {
 		wg.Go(func() {
 			err := connectionManager.AddAppsflyerConnectionFromConfig(&conn)
+
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add appsflyer connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add appsflyer connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1186,6 +1245,10 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		})
 	}
 	wg.Wait()
+
+	if len(errList) > 0 {
+		return nil, errors.New("multiple connection errors occurred: " + fmt.Sprint(errList))
+	}
 
 	return connectionManager, nil
 }
