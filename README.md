@@ -31,9 +31,9 @@ Binaries are available on the [releases page](https://github.com/bruin-data/brui
 brew install bruin-data/tap/bruin
 ```
 
-### Linux/MacOS/Windows(Bash)
+### Linux/MacOS
 ```shell
-curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sudo bash -s -- -b /usr/local/bin
+curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh
 ```
 
 ### via Golang installer

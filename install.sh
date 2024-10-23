@@ -26,7 +26,7 @@ parse_args() {
   #BINDIR is ./bin unless set be ENV
   # over-ridden by flag below
 
-  BINDIR=${BINDIR:-./bin}
+  BINDIR=${BINDIR:-~/.local/bin}
   while getopts "b:dh?x" arg; do
     case "$arg" in
       b) BINDIR="$OPTARG" ;;
@@ -43,7 +43,6 @@ parse_args() {
 # network, either nothing will happen or will syntax error
 # out preventing half-done work
 execute() {
-
   tmpdir=$(mktemp -d)
   log_debug "downloading files into ${tmpdir}"
   http_download "${tmpdir}/${TARBALL}" "${TARBALL_URL}"
@@ -51,14 +50,49 @@ execute() {
   (cd "${tmpdir}" && untar "${TARBALL}")
 
   test ! -d "${BINDIR}" && install -d "${BINDIR}"
+  echo "installing to ${BINDIR}"
   for binexe in $BINARIES; do
     if [ "$OS" = "windows" ]; then
       binexe="${binexe}.exe"
     fi
     install "${srcdir}/${binexe}" "${BINDIR}/"
+    echo "  ${binexe}"
     log_info "installed ${BINDIR}/${binexe}"
   done
   rm -rf "${tmpdir}"
+  
+  echo "everything's installed!"
+  echo
+
+  # Detect the current shell
+  current_shell=$(basename "$SHELL")
+
+  echo "To add ${BINDIR} to your PATH, either restart your shell or run:"
+  echo
+
+  case "$current_shell" in
+    bash|sh|zsh)
+      export_command="export PATH=\"\$PATH:${BINDIR}\""
+      eval "$export_command"
+      echo "Executed: $export_command"
+      echo "# Add the following line to your ~/.${current_shell}rc file to make it permanent:"
+      echo "# $export_command"
+      ;;
+    fish)
+      export_command="set -gx PATH \$PATH ${BINDIR}"
+      fish -c "$export_command"
+      echo "Executed: $export_command"
+      echo "# Add the following line to your ~/.config/fish/config.fish file to make it permanent:"
+      echo "# $export_command"
+      ;;
+    *)
+      export_command="export PATH=\"\$PATH:${BINDIR}\""
+      eval "$export_command"
+      echo "Executed: $export_command (for most shells)"
+      echo "For fish shell, use: set -gx PATH \$PATH ${BINDIR}"
+      echo "# Add the appropriate line to your shell's configuration file to make it permanent."
+      ;;
+  esac
 }
 get_binaries() {
   case "$PLATFORM" in
@@ -389,3 +423,5 @@ TARBALL_URL=${GITHUB_DOWNLOAD}/${TAG}/${TARBALL}
 
 
 execute
+
+
