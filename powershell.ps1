@@ -49,13 +49,22 @@ if (!(Test-Path $BINDIR)) {
     New-Item -ItemType Directory -Force -Path $BINDIR | Out-Null
 }
 
-$TempFile = [System.IO.Path]::GetTempFileName()
+$TempDir = [System.IO.Path]::GetTempPath()
+$TempZipFile = Join-Path $TempDir $NAME
+
 try {
     Log-Info "Downloading from ${DOWNLOAD_URL}"
-    Invoke-WebRequest -Uri $DOWNLOAD_URL -OutFile $TempFile
+    Invoke-WebRequest -Uri $DOWNLOAD_URL -OutFile $TempZipFile
 
-    # Extract the zip file
-    Expand-Archive -Path $TempFile -DestinationPath $BINDIR -Force
+    Log-Info "Verifying downloaded file"
+    if (!(Test-Path $TempZipFile)) {
+        throw "Downloaded file not found: $TempZipFile"
+    }
+    $fileInfo = Get-Item $TempZipFile
+    Log-Info "Downloaded file size: $($fileInfo.Length) bytes"
+
+    Log-Info "Extracting ${NAME} to ${BINDIR}"
+    Expand-Archive -Path $TempZipFile -DestinationPath $BINDIR -Force
 
     $BinaryPath = Join-Path $BINDIR $BINARY
     if (Test-Path $BinaryPath) {
@@ -69,5 +78,5 @@ catch {
     exit 1
 }
 finally {
-    Remove-Item -Path $TempFile -ErrorAction SilentlyContinue
+    Remove-Item -Path $TempZipFile -ErrorAction SilentlyContinue
 }
