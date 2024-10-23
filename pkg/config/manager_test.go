@@ -204,6 +204,12 @@ func TestLoadFromFile(t *testing.T) {
 					GroupId:          "kafka123",
 				},
 			},
+			DuckDB: []DuckDBConnection{
+				{
+					Name: "conn20",
+					Path: "/path/to/duck.db",
+				},
+			},
 		},
 	}
 
