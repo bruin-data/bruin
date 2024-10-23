@@ -12,6 +12,14 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
+type ErrorResponses struct {
+	Error []string `json:"error"`
+}
+
 func switchEnvironment(c *cli.Context, cm *config.Config, stdin io.ReadCloser) error {
 	env := c.String("environment")
 	if env == "" {
@@ -49,14 +57,6 @@ func RecoverFromPanic() {
 		log.Println(err)
 		log.Println("=======================================")
 	}
-}
-
-type ErrorResponse struct {
-	Error string `json:"error"`
-}
-
-type ErrorResponses struct {
-	Error []string `json:"error"`
 }
 
 func marshal[K ErrorResponse | ErrorResponses](m K) ([]byte, error) {
