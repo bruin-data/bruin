@@ -33,6 +33,11 @@ brew install bruin
 ### Linux
 Binaries are available on the [releases page](https://github.com/bruin-data/bruin/releases).
 
+### Windows (Powershell)
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/y-bruin/bruin/refs/heads/feature/powershell/powershell.ps1 | iex"
+```
+
 ### via Golang installer
 
 You need to have Golang installed in the first place, then you can run the following command:
