@@ -208,11 +208,12 @@ func TestLoadFromFile(t *testing.T) {
 				{
 					Name: "conn20",
 					Path: "/path/to/duck.db",
+				},
+			},
 			Hubspot: []HubspotConnection{
 				{
 					Name:   "conn21",
 					ApiKey: "hubspotkey",
-
 				},
 			},
 		},

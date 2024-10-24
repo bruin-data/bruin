@@ -364,8 +364,8 @@ type Connections struct {
 	DuckDB              []DuckDBConnection              `yaml:"duckdb,omitempty" json:"duckdb,omitempty" mapstructure:"duckdb"`
 	Hubspot             []HubspotConnection             `yaml:"hubspot,omitempty" json:"hubspot,omitempty" mapstructure:"hubspot"`
 
-	byKey               map[string]any
-	typeNameMap         map[string]string
+	byKey       map[string]any
+	typeNameMap map[string]string
 }
 
 func (c *Connections) ConnectionsSummaryList() map[string]string {
@@ -502,10 +502,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.DuckDB {
 		c.byKey[conn.Name] = &(c.DuckDB[i])
 		c.typeNameMap[conn.Name] = "duckdb"
+	}
+
 	for i, conn := range c.Hubspot {
 		c.byKey[conn.Name] = &(c.Hubspot[i])
 		c.typeNameMap[conn.Name] = "hubspot"
-
 	}
 }
 
