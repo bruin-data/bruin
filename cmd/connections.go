@@ -328,9 +328,12 @@ func TestConnection() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			manager, err := connection.NewManagerFromConfig(cm)
-			if err != nil {
-				printErrorForOutput(output, errors2.Wrap(err, "failed to create connection manager"))
+			manager, errs := connection.NewManagerFromConfig(cm)
+			if len(errs) > 0 {
+				// Handle each error in the errs slice
+				for _, err := range errs {
+					printErrorForOutput(output, errors2.Wrap(err, "failed to create connection manager"))
+				}
 				return cli.Exit("", 1)
 			}
 
