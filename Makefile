@@ -58,8 +58,13 @@ tools:
 		echo ">> [$@]: golangci-lint not found: installing"; \
 		go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; \
 	fi
+	@if ! command -v modvendor > /dev/null ; then \
+		echo ">> [$@]: modvendor not found: installing"; \
+		go install github.com/goware/modvendor@latest; \
+	fi
 
 tools-update:
 	go install github.com/daixiang0/gci@latest; \
 	go install mvdan.cc/gofumpt@latest; \
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest;
+	go install github.com/goware/modvendor@latest;
