@@ -51,9 +51,9 @@ type Manager struct {
 	Appsflyer   map[string]*appsflyer.Client
 	Kafka       map[string]*kafka.Client
 
-	DuckDB      map[string]*duck.Client
-	Hubspot     map[string]*hubspot.Client
-	mutex       sync.Mutex
+	DuckDB  map[string]*duck.Client
+	Hubspot map[string]*hubspot.Client
+	mutex   sync.Mutex
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
@@ -166,7 +166,6 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connKafka, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Kafka)...)
-
 
 	connDuckDB, err := m.GetDuckDBConnectionWithoutDefault(name)
 	if err == nil {
@@ -1092,7 +1091,6 @@ func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnect
 	return nil
 }
 
-
 func (m *Manager) AddHubspotConnectionFromConfig(connection *config.HubspotConnection) error {
 	m.mutex.Lock()
 	if m.Hubspot == nil {
@@ -1115,7 +1113,6 @@ func (m *Manager) AddHubspotConnectionFromConfig(connection *config.HubspotConne
 }
 
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
-
 	connectionManager := &Manager{}
 
 	var wg conc.WaitGroup
@@ -1330,7 +1327,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 		})
 	}
 
-
 	for _, conn := range cm.SelectedEnvironment.Connections.DuckDB {
 		wg.Go(func() {
 			err := connectionManager.AddDuckDBConnectionFromConfig(&conn)
@@ -1339,7 +1335,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			}
 		})
 	}
-
 
 	for _, conn := range cm.SelectedEnvironment.Connections.Hubspot {
 		wg.Go(func() {
