@@ -9,10 +9,6 @@ materialization:
 depends:
   - hello_python
 
-secrets:
-  - key: key1
-    inject_as: inject1
-
 columns:
   - name: one
     type: integer
