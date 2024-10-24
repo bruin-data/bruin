@@ -23,15 +23,18 @@ Bruin is built to make your life easier when it comes to data transformations:
 You can see our documentation [here](https://bruin-data.github.io/bruin/).
 
 ## Installation
+Binaries are available on the [releases page](https://github.com/bruin-data/bruin/releases).
 
-### macOS
+
+### macOS (Homebrew)
 ```shell
-brew tap bruin-data/tap
-brew install bruin
+brew install bruin-data/tap/bruin
 ```
 
-### Linux
-Binaries are available on the [releases page](https://github.com/bruin-data/bruin/releases).
+### Linux/MacOS
+```shell
+curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh
+```
 
 ### via Golang installer
 
@@ -61,9 +64,12 @@ default_connections:
 create a new folder called `assets` and create your first asset there `assets/bruin-test.sql`:
 
 ```sql
--- @bruin.name: dataset.bruin_test
--- @bruin.type: bq.sql
--- @bruin.materialization.type: table
+/* @bruin
+name: dataset.bruin_test
+type: bq.sql
+materialization:
+  type: table
+@bruin */
 
 SELECT 1 as result
 ```
@@ -78,8 +84,11 @@ materialization type instead of `table` to create a view instead.
 Then let's create a Python asset `assets/hello.py`:
 
 ```python
-# @bruin.name: hello
-# @bruin.depends: dataset.bruin_test
+""" @bruin
+name: hello
+depends: 
+  - dataset.bruin_test
+@bruin """
 
 print("Hello, world!")
 ```

@@ -29,23 +29,6 @@ type Issue struct {
 	Context     []string
 }
 
-func (i *Issue) MarshalJSON() ([]byte, error) {
-	ctx := make([]string, 0, len(i.Context))
-	if i.Context != nil {
-		ctx = i.Context
-	}
-
-	return json.Marshal(struct {
-		Asset       string   `json:"asset"`
-		Description string   `json:"description"`
-		Context     []string `json:"context"`
-	}{
-		Asset:       i.Task.Name,
-		Description: i.Description,
-		Context:     ctx,
-	})
-}
-
 type Rule interface {
 	Name() string
 	Validate(pipeline *pipeline.Pipeline) ([]*Issue, error)
@@ -254,21 +237,43 @@ type PipelineIssues struct {
 }
 
 func (p *PipelineIssues) MarshalJSON() ([]byte, error) {
-	issuesByAsset := make(map[string][]*Issue)
+	type IssueSummary struct {
+		Asset       string   `json:"asset"`
+		Description string   `json:"description"`
+		Context     []string `json:"context"`
+		Severity    string   `json:"severity"`
+	}
 
-	for _, issues := range p.Issues {
+	severityNames := map[ValidatorSeverity]string{
+		ValidatorSeverityCritical: "critical",
+		ValidatorSeverityWarning:  "warning",
+	}
+
+	issuesByAsset := make(map[string][]*IssueSummary)
+
+	for rule, issues := range p.Issues {
 		for _, issue := range issues {
 			if issue.Task == nil {
 				continue
 			}
 
-			issuesByAsset[issue.Task.Name] = append(issuesByAsset[issue.Task.Name], issue)
+			ctx := make([]string, 0, len(issue.Context))
+			if issue.Context != nil {
+				ctx = issue.Context
+			}
+
+			issuesByAsset[issue.Task.Name] = append(issuesByAsset[issue.Task.Name], &IssueSummary{
+				Asset:       issue.Task.Name,
+				Description: issue.Description,
+				Context:     ctx,
+				Severity:    severityNames[rule.GetSeverity()],
+			})
 		}
 	}
 
 	return json.Marshal(struct {
-		Pipeline string              `json:"pipeline"`
-		Issues   map[string][]*Issue `json:"issues"`
+		Pipeline string                     `json:"pipeline"`
+		Issues   map[string][]*IssueSummary `json:"issues"`
 	}{
 		Pipeline: p.Pipeline.Name,
 		Issues:   issuesByAsset,

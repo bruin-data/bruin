@@ -191,6 +191,31 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "stripekey",
 				},
 			},
+			Appsflyer: []AppsflyerConnection{
+				{
+					Name:   "conn19",
+					ApiKey: "appsflyerkey",
+				},
+			},
+			Kafka: []KafkaConnection{
+				{
+					Name:             "conn20",
+					BootstrapServers: "localhost:9093",
+					GroupId:          "kafka123",
+				},
+			},
+			DuckDB: []DuckDBConnection{
+				{
+					Name: "conn20",
+					Path: "/path/to/duck.db",
+				},
+			},
+			Hubspot: []HubspotConnection{
+				{
+					Name:   "conn21",
+					ApiKey: "hubspotkey",
+				},
+			},
 		},
 	}
 

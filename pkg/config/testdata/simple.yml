@@ -126,6 +126,19 @@ environments:
       stripe:
         - name: conn18
           api_key: "stripekey"
+      appsflyer:
+        - name: conn19
+          api_key: "appsflyerkey"
+      kafka:
+        - name: conn20
+          bootstrap_servers: "localhost:9093"
+          group_id: "kafka123"
+      duckdb:
+        - name: conn20
+          path: "/path/to/duck.db"
+      hubspot:
+        - name: conn21
+          api_key: "hubspotkey"
       generic:
         - name: key1
           value: value1

@@ -1,0 +1,9 @@
+name: public.kafka
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my-kafka
+  source_table: 'kafka-bruin'
+
+  destination: postgres

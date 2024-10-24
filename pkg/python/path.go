@@ -22,7 +22,7 @@ type ModulePathFinder struct {
 
 func (m *ModulePathFinder) FindModulePath(repo *git.Repo, executable *pipeline.ExecutableFile) (string, error) {
 	// Normalize paths by replacing OS-specific separators with a slash
-	if !strings.HasPrefix(filepath.Clean(executable.Path), repo.Path) {
+	if !strings.HasPrefix(filepath.Clean(strings.ToLower(executable.Path)), strings.ToLower(repo.Path)) {
 		return "", errors.New("executable is not in the repository")
 	}
 
@@ -37,10 +37,12 @@ func (m *ModulePathFinder) FindModulePath(repo *git.Repo, executable *pipeline.E
 }
 
 func (m *ModulePathFinder) FindRequirementsTxtInPath(path string, executable *pipeline.ExecutableFile) (string, error) {
-	executablePath := filepath.Clean(executable.Path)
-	if !strings.HasPrefix(executablePath, path) {
+	lowerExecutable := filepath.Clean(strings.ToLower(executable.Path))
+	if !strings.HasPrefix(lowerExecutable, strings.ToLower(path)) {
 		return "", errors.New("executable is not in the repository to find the requirements")
 	}
+
+	executablePath := filepath.Clean(executable.Path)
 
 	requirementsTxt := findFileUntilParent("requirements.txt", filepath.Dir(executablePath), path)
 	if requirementsTxt == "" {

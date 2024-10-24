@@ -37,6 +37,14 @@ func TestJinjaRenderer_RenderQuery(t *testing.T) {
 			want: "2022/02/02",
 		},
 		{
+			name:  "add_hours",
+			query: "{{ start_datetime | add_hours(1) | add_minutes(12) | add_seconds(5) | date_format('%Y/%m/%d %H:%M:%S') }}",
+			args: Context{
+				"start_datetime": "2022-02-03T04:00:00",
+			},
+			want: "2022/02/03 05:12:05",
+		},
+		{
 			name:  "multiple variables",
 			query: "set analysis_end_date = '{{ ds }}'::date and '{{testVar}}' == 'testvar' and another date {{    ds }}",
 			args: Context{

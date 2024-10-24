@@ -2,16 +2,21 @@ package connection
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
+	"github.com/bruin-data/bruin/pkg/appsflyer"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
+	"github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/hana"
+	"github.com/bruin-data/bruin/pkg/hubspot"
+	"github.com/bruin-data/bruin/pkg/kafka"
 	"github.com/bruin-data/bruin/pkg/klaviyo"
 	"github.com/bruin-data/bruin/pkg/mongo"
 	"github.com/bruin-data/bruin/pkg/mssql"
@@ -43,7 +48,12 @@ type Manager struct {
 	Athena      map[string]*athena.DB
 	FacebookAds map[string]*facebookads.Client
 	Stripe      map[string]*stripe.Client
-	mutex       sync.Mutex
+	Appsflyer   map[string]*appsflyer.Client
+	Kafka       map[string]*kafka.Client
+
+	DuckDB  map[string]*duck.Client
+	Hubspot map[string]*hubspot.Client
+	mutex   sync.Mutex
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
@@ -145,6 +155,30 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Stripe)...)
 
+	connAppsflyer, err := m.GetAppsflyerConnectionWithoutDefault(name)
+	if err == nil {
+		return connAppsflyer, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Appsflyer)...)
+
+	connKafka, err := m.GetKafkaConnectionWithoutDefault(name)
+	if err == nil {
+		return connKafka, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Kafka)...)
+
+	connDuckDB, err := m.GetDuckDBConnectionWithoutDefault(name)
+	if err == nil {
+		return connDuckDB, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.DuckDB)...)
+
+	connHubspot, err := m.GetHubspotConnectionWithoutDefault(name)
+	if err == nil {
+		return connHubspot, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Hubspot)...)
+
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
 
@@ -165,6 +199,28 @@ func (m *Manager) GetAthenaConnectionWithoutDefault(name string) (athena.Client,
 	db, ok := m.Athena[name]
 	if !ok {
 		return nil, errors.Errorf("Athena connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetDuckDBConnection(name string) (duck.DuckDBClient, error) {
+	db, err := m.GetDuckDBConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetDuckDBConnectionWithoutDefault("duckdb-default")
+}
+
+func (m *Manager) GetDuckDBConnectionWithoutDefault(name string) (duck.DuckDBClient, error) {
+	if m.DuckDB == nil {
+		return nil, errors.New("no DuckDB connections found")
+	}
+
+	db, ok := m.DuckDB[name]
+	if !ok {
+		return nil, errors.Errorf("DuckDB connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -492,6 +548,71 @@ func (m *Manager) GetFacebookAdsConnectionWithoutDefault(name string) (*facebook
 		return nil, errors.Errorf("facebookads connection not found for '%s'", name)
 	}
 
+	return db, nil
+}
+
+func (m *Manager) GetAppsflyerConnection(name string) (*appsflyer.Client, error) {
+	fmt.Println("Attempting to retrieve AppsFlyer connection with name:", name)
+	db, err := m.GetAppsflyerConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetAppsflyerConnectionWithoutDefault("appsflyer-default")
+}
+
+func (m *Manager) GetAppsflyerConnectionWithoutDefault(name string) (*appsflyer.Client, error) {
+	if m.Appsflyer == nil {
+		return nil, errors.New("no appsflyer connections found")
+	}
+
+	db, ok := m.Appsflyer[name]
+	if !ok {
+		return nil, errors.Errorf("appsflyer connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetKafkaConnection(name string) (*kafka.Client, error) {
+	db, err := m.GetKafkaConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetKafkaConnectionWithoutDefault("kafka-default")
+}
+
+func (m *Manager) GetKafkaConnectionWithoutDefault(name string) (*kafka.Client, error) {
+	if m.Kafka == nil {
+		return nil, errors.New("no kafka connections found")
+	}
+
+	db, ok := m.Kafka[name]
+	if !ok {
+		return nil, errors.Errorf("kafka connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetHubspotConnection(name string) (*hubspot.Client, error) {
+	db, err := m.GetHubspotConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetHubspotConnectionWithoutDefault("hubspot-default")
+}
+
+func (m *Manager) GetHubspotConnectionWithoutDefault(name string) (*hubspot.Client, error) {
+	if m.Hubspot == nil {
+		return nil, errors.New("no Hubspot connections found")
+	}
+	db, ok := m.Hubspot[name]
+	if !ok {
+		return nil, errors.Errorf("hubspot connection not found for '%s'", name)
+	}
 	return db, nil
 }
 
@@ -902,15 +1023,110 @@ func (m *Manager) AddStripeConnectionFromConfig(connection *config.StripeConnect
 	return nil
 }
 
-func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
+func (m *Manager) AddAppsflyerConnectionFromConfig(connection *config.AppsflyerConnection) error {
+	m.mutex.Lock()
+	if m.Appsflyer == nil {
+		m.Appsflyer = make(map[string]*appsflyer.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := appsflyer.NewClient(appsflyer.Config{
+		ApiKey: connection.ApiKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Appsflyer[connection.Name] = client
+
+	return nil
+}
+
+func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnection) error {
+	m.mutex.Lock()
+	if m.Kafka == nil {
+		m.Kafka = make(map[string]*kafka.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := kafka.NewClient(kafka.Config{
+		BootstrapServers: connection.BootstrapServers,
+		GroupId:          connection.GroupId,
+		BatchSize:        connection.BatchSize,
+		SaslMechanisms:   connection.SaslMechanisms,
+		SaslUsername:     connection.SaslUsername,
+		SaslPassword:     connection.SaslPassword,
+		BatchTimeout:     connection.BatchTimeout,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.Kafka[connection.Name] = client
+
+	return nil
+}
+
+func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnection) error {
+	m.mutex.Lock()
+	if m.DuckDB == nil {
+		m.DuckDB = make(map[string]*duck.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := duck.NewClient(duck.Config{
+		Path: connection.Path,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.DuckDB[connection.Name] = client
+
+	return nil
+}
+
+func (m *Manager) AddHubspotConnectionFromConfig(connection *config.HubspotConnection) error {
+	m.mutex.Lock()
+	if m.Hubspot == nil {
+		m.Hubspot = make(map[string]*hubspot.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := hubspot.NewClient(hubspot.Config{
+		APIKey: connection.ApiKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Hubspot[connection.Name] = client
+
+	return nil
+}
+
+func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
 
 	var wg conc.WaitGroup
+
+	var errList []error
+	var mu sync.Mutex
+
 	for _, conn := range cm.SelectedEnvironment.Connections.AthenaConnection {
 		wg.Go(func() {
 			err := connectionManager.AddAthenaConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add AWS connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add AWS connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -919,7 +1135,9 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		wg.Go(func() {
 			err := connectionManager.AddBqConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add BigQuery connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add BigQuery connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -928,7 +1146,9 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		wg.Go(func() {
 			err := connectionManager.AddSfConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add Snowflake connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add Snowflake connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -937,7 +1157,9 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		wg.Go(func() {
 			err := connectionManager.AddPgConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add Postgres connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add Postgres connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -946,7 +1168,9 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		wg.Go(func() {
 			err := connectionManager.AddRedshiftConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add RedShift connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add RedShift connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -955,7 +1179,9 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		wg.Go(func() {
 			err := connectionManager.AddMsSQLConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add MsSQL connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add MsSQL connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -964,7 +1190,9 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		wg.Go(func() {
 			err := connectionManager.AddDatabricksConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add Databricks connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add Databricks connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -973,7 +1201,9 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		wg.Go(func() {
 			err := connectionManager.AddMsSQLConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add Synapse connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add Synapse connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -982,7 +1212,9 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		wg.Go(func() {
 			err := connectionManager.AddMongoConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add Mongo connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add Mongo connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -991,7 +1223,9 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		wg.Go(func() {
 			err := connectionManager.AddMySQLConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add mysql connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add mysql connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1000,7 +1234,9 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		wg.Go(func() {
 			err := connectionManager.AddNotionConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add notion connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add notion connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1009,7 +1245,9 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		wg.Go(func() {
 			err := connectionManager.AddShopifyConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add shopify connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add shopify connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1018,7 +1256,9 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		wg.Go(func() {
 			err := connectionManager.AddGorgiasConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add gorgias connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add gorgias connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1027,7 +1267,9 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		wg.Go(func() {
 			err := connectionManager.AddKlaviyoConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add klaviyo connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add klaviyo connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1036,7 +1278,9 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		wg.Go(func() {
 			err := connectionManager.AddAdjustConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add adjust connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add adjust connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1045,7 +1289,9 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		wg.Go(func() {
 			err := connectionManager.AddFacebookAdsConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add facebookads connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add facebookads connection '%s'", conn.Name))
+				mu.Unlock()
 			}
 		})
 	}
@@ -1054,12 +1300,52 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		wg.Go(func() {
 			err := connectionManager.AddStripeConnectionFromConfig(&conn)
 			if err != nil {
-				panic(errors.Wrapf(err, "failed to add stripe connection '%s'", conn.Name))
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add stripe connection '%s'", conn.Name))
+				mu.Unlock()
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Appsflyer {
+		wg.Go(func() {
+			err := connectionManager.AddAppsflyerConnectionFromConfig(&conn)
+			if err != nil {
+				mu.Lock()
+				errList = append(errList, errors.Wrapf(err, "failed to add appsflyer connection '%s'", conn.Name))
+				mu.Unlock()
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Kafka {
+		wg.Go(func() {
+			err := connectionManager.AddKafkaConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add kafka connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.DuckDB {
+		wg.Go(func() {
+			err := connectionManager.AddDuckDBConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add duckdb connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Hubspot {
+		wg.Go(func() {
+			err := connectionManager.AddHubspotConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add hubspot connection '%s'", conn.Name))
 			}
 		})
 	}
 
 	wg.Wait()
 
-	return connectionManager, nil
+	return connectionManager, errList
 }

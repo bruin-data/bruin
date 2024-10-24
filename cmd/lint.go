@@ -69,7 +69,7 @@ func Lint(isDebug *bool) *cli.Command {
 				asset = repoOrAsset
 				pipelineRootFromAsset, err := path.GetPipelineRootFromTask(repoOrAsset, pipelineDefinitionFile)
 				if err != nil {
-					errorPrinter.Printf("Failed to find the pipeline root for the given asset: %v\n", err)
+					printError(err, c.String("output"), "Failed to find the pipeline root for the given asset")
 					return cli.Exit("", 1)
 				}
 				rootPath = pipelineRootFromAsset
@@ -78,7 +78,7 @@ func Lint(isDebug *bool) *cli.Command {
 			logger.Debugf("using root path '%s'", rootPath)
 			repoRoot, err := git.FindRepoFromPath(rootPath)
 			if err != nil {
-				errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
+				printError(err, c.String("output"), "Failed to find the git repository root")
 				return cli.Exit("", 1)
 			}
 			logger.Debugf("found repo root '%s'", repoRoot.Path)
@@ -86,7 +86,7 @@ func Lint(isDebug *bool) *cli.Command {
 			configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
 			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
 			if err != nil {
-				errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
+				printError(err, c.String("output"), fmt.Sprintf("Failed to load the config file at '%s'", configFilePath))
 				return cli.Exit("", 1)
 			}
 
@@ -99,9 +99,9 @@ func Lint(isDebug *bool) *cli.Command {
 
 			logger.Debugf("switched to the environment '%s'", cm.SelectedEnvironmentName)
 
-			connectionManager, err := connection.NewManagerFromConfig(cm)
-			if err != nil {
-				errorPrinter.Printf("Failed to register connections: %v\n", err)
+			connectionManager, errs := connection.NewManagerFromConfig(cm)
+			if len(errs) > 0 {
+				printErrors(errs, c.String("output"), "Failed to register connections")
 				return cli.Exit("", 1)
 			}
 
@@ -109,7 +109,8 @@ func Lint(isDebug *bool) *cli.Command {
 
 			rules, err := lint.GetRules(fs, &git.RepoFinder{}, c.Bool("exclude-warnings"))
 			if err != nil {
-				errorPrinter.Printf("An error occurred while building the validation rules: %v\n", err)
+				printError(err, c.String("output"), "An error occurred while building the validation rules")
+
 				return cli.Exit("", 1)
 			}
 
@@ -167,6 +168,7 @@ func Lint(isDebug *bool) *cli.Command {
 			if strings.ToLower(strings.TrimSpace(c.String("output"))) == "json" {
 				err = printer.PrintJSON(result)
 				if err != nil {
+					printError(err, c.String("output"), "An error occurred")
 					return cli.Exit(err.Error(), 1)
 				}
 
@@ -175,6 +177,7 @@ func Lint(isDebug *bool) *cli.Command {
 
 			err = reportLintErrors(result, err, printer, asset)
 			if err != nil {
+				printError(err, c.String("output"), "An error occurred")
 				return cli.Exit("", 1)
 			}
 			return nil

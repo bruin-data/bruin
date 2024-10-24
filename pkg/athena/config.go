@@ -14,13 +14,18 @@ type Config struct {
 	Database        string
 }
 
-func (c *Config) ToDBConnectionURI() string {
+func (c *Config) ToDBConnectionURI() (string, error) {
 	conf, err := drv.NewDefaultConfig(c.OutputBucket, c.Region, c.AccessID, c.SecretAccessKey)
+	if err != nil {
+		log.Fatalf("Failed to create Athena config: %v", err)
+		return "", err
+	}
+
 	conf.SetDB(c.Database)
 	if err != nil {
 		log.Fatalf("Failed to create Athena config: %v", err)
-		return ""
+		return "", err
 	}
 
-	return conf.Stringify()
+	return conf.Stringify(), nil
 }

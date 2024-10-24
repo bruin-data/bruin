@@ -19,3 +19,6 @@ default_connections:
   adjust: "my-adjust"
   facebookads: "my-facebookads"
   stripe: "my-stripe"
+  appsflyer: "my-appsflyer"
+  kafka: "my-kafka"
+  hubspot: "my-hubspot"
