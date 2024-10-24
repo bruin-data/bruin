@@ -1,7 +1,11 @@
-# @bruin.name: secrets_example
-# @bruin.type: python
-# @bruin.secrets: KEY1:INJECTED1, KEY2_AS_IS
-# @bruin.secrets: snowflake
+""" @bruin
+name: secrets_example
+secrets:
+    - key: KEY1
+      injected_as: INJECTED1
+    - key: KEY2_AS_IS
+    - key: snowflake
+@bruin """
 import json
 import os
 

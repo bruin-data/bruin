@@ -136,6 +136,9 @@ environments:
       duckdb:
         - name: conn20
           path: "/path/to/duck.db"
+      hubspot:
+        - name: conn21
+          api_key: "hubspotkey"
       generic:
         - name: key1
           value: value1

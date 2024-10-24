@@ -942,6 +942,8 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "kafka-default", nil
 	case "duckdb":
 		return "duckdb-default", nil
+	case "hubspot":
+		return "hubspot-default", nil
 	default:
 		return "", errors.Errorf("no default connection found for type '%s'", assetType)
 	}

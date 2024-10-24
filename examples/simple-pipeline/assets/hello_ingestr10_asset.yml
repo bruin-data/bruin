@@ -1,0 +1,9 @@
+name: public.hubspot
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my-hubspot
+  source_table: 'companies'
+
+  destination: postgres

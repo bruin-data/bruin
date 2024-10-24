@@ -247,6 +247,15 @@ func (c KafkaConnection) GetName() string {
 	return c.Name
 }
 
+type HubspotConnection struct {
+	Name   string `yaml:"name" json:"name" mapstructure:"name"`
+	ApiKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c HubspotConnection) GetName() string {
+	return c.Name
+}
+
 type MySQLConnection struct {
 	Name     string `yaml:"name" json:"name" mapstructure:"name"`
 	Username string `yaml:"username" json:"username" mapstructure:"username"`
@@ -353,6 +362,8 @@ type Connections struct {
 	Appsflyer           []AppsflyerConnection           `yaml:"appsflyer,omitempty" json:"appsflyer,omitempty" mapstructure:"appsflyer"`
 	Kafka               []KafkaConnection               `yaml:"kafka,omitempty" json:"kafka,omitempty" mapstructure:"kafka"`
 	DuckDB              []DuckDBConnection              `yaml:"duckdb,omitempty" json:"duckdb,omitempty" mapstructure:"duckdb"`
+	Hubspot             []HubspotConnection             `yaml:"hubspot,omitempty" json:"hubspot,omitempty" mapstructure:"hubspot"`
+
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -491,6 +502,10 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.DuckDB {
 		c.byKey[conn.Name] = &(c.DuckDB[i])
 		c.typeNameMap[conn.Name] = "duckdb"
+	for i, conn := range c.Hubspot {
+		c.byKey[conn.Name] = &(c.Hubspot[i])
+		c.typeNameMap[conn.Name] = "hubspot"
+
 	}
 }
 
@@ -779,6 +794,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Kafka = append(env.Connections.Kafka, conn)
+	case "hubspot":
+		var conn HubspotConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Hubspot = append(env.Connections.Hubspot, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -854,6 +876,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Appsflyer = removeConnection(env.Connections.Appsflyer, connectionName)
 	case "kafka":
 		env.Connections.Kafka = removeConnection(env.Connections.Kafka, connectionName)
+	case "hubspot":
+		env.Connections.Hubspot = removeConnection(env.Connections.Hubspot, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}

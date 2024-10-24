@@ -15,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/hana"
+	"github.com/bruin-data/bruin/pkg/hubspot"
 	"github.com/bruin-data/bruin/pkg/kafka"
 	"github.com/bruin-data/bruin/pkg/klaviyo"
 	"github.com/bruin-data/bruin/pkg/mongo"
@@ -49,7 +50,9 @@ type Manager struct {
 	Stripe      map[string]*stripe.Client
 	Appsflyer   map[string]*appsflyer.Client
 	Kafka       map[string]*kafka.Client
+
 	DuckDB      map[string]*duck.Client
+	Hubspot     map[string]*hubspot.Client
 	mutex       sync.Mutex
 }
 
@@ -164,11 +167,18 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Kafka)...)
 
+
 	connDuckDB, err := m.GetDuckDBConnectionWithoutDefault(name)
 	if err == nil {
 		return connDuckDB, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.DuckDB)...)
+
+	connHubspot, err := m.GetHubspotConnectionWithoutDefault(name)
+	if err == nil {
+		return connHubspot, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Hubspot)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -584,6 +594,26 @@ func (m *Manager) GetKafkaConnectionWithoutDefault(name string) (*kafka.Client, 
 		return nil, errors.Errorf("kafka connection not found for '%s'", name)
 	}
 
+	return db, nil
+}
+
+func (m *Manager) GetHubspotConnection(name string) (*hubspot.Client, error) {
+	db, err := m.GetHubspotConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetHubspotConnectionWithoutDefault("hubspot-default")
+}
+
+func (m *Manager) GetHubspotConnectionWithoutDefault(name string) (*hubspot.Client, error) {
+	if m.Hubspot == nil {
+		return nil, errors.New("no Hubspot connections found")
+	}
+	db, ok := m.Hubspot[name]
+	if !ok {
+		return nil, errors.Errorf("hubspot connection not found for '%s'", name)
+	}
 	return db, nil
 }
 
@@ -1062,6 +1092,29 @@ func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnect
 	return nil
 }
 
+
+func (m *Manager) AddHubspotConnectionFromConfig(connection *config.HubspotConnection) error {
+	m.mutex.Lock()
+	if m.Hubspot == nil {
+		m.Hubspot = make(map[string]*hubspot.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := hubspot.NewClient(hubspot.Config{
+		APIKey: connection.ApiKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Hubspot[connection.Name] = client
+
+	return nil
+}
+
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	connectionManager := &Manager{}
 
@@ -1277,11 +1330,22 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		})
 	}
 
+
 	for _, conn := range cm.SelectedEnvironment.Connections.DuckDB {
 		wg.Go(func() {
 			err := connectionManager.AddDuckDBConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add duckdb connection '%s'", conn.Name))
+			}
+		})
+	}
+
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Hubspot {
+		wg.Go(func() {
+			err := connectionManager.AddHubspotConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add hubspot connection '%s'", conn.Name))
 			}
 		})
 	}
