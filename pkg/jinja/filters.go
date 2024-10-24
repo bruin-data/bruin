@@ -2,6 +2,7 @@ package jinja
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/date"
 	"github.com/nikolalohinski/gonja/v2"
@@ -13,23 +14,25 @@ var Filters *exec.FilterSet
 
 func init() { //nolint:gochecknoinits
 	Filters = gonja.DefaultEnvironment.Filters
-	err := Filters.Register("add_days", addDays)
-	if err != nil {
-		panic(err)
+	filterMap := map[string]exec.FilterFunction{
+		"add_days":         addDays,
+		"add_hours":        addHours,
+		"add_minutes":      addMinutes,
+		"add_seconds":      addSeconds,
+		"add_milliseconds": addMilliseconds,
+		"date_add":         addDays,
+		"date_format":      formatDate,
 	}
 
-	err = Filters.Register("date_add", addDays)
-	if err != nil {
-		panic(err)
-	}
-
-	err = Filters.Register("date_format", formatDate)
-	if err != nil {
-		panic(err)
+	for name, filter := range filterMap {
+		err := Filters.Register(name, filter)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
-func addDays(e *exec.Evaluator, in *exec.Value, params *exec.VarArgs) *exec.Value {
+func dateModifier(e *exec.Evaluator, in *exec.Value, params *exec.VarArgs, modifierFunc func(time.Time) time.Time) *exec.Value {
 	if in.IsError() {
 		return in
 	}
@@ -43,6 +46,11 @@ func addDays(e *exec.Evaluator, in *exec.Value, params *exec.VarArgs) *exec.Valu
 		return exec.AsValue(errors.Wrap(err, "invalid date format"))
 	}
 
+	parsed = modifierFunc(parsed)
+	return exec.AsValue(parsed.Format(format))
+}
+
+func addDays(e *exec.Evaluator, in *exec.Value, params *exec.VarArgs) *exec.Value {
 	// add the days
 	days := params.Args[0].String()
 	daysInt, err := strconv.Atoi(days)
@@ -50,8 +58,58 @@ func addDays(e *exec.Evaluator, in *exec.Value, params *exec.VarArgs) *exec.Valu
 		return exec.AsValue(errors.Errorf("invalid number of days for add_days, it must be a valid integer, '%s' given", days))
 	}
 
-	parsed = parsed.AddDate(0, 0, daysInt)
-	return exec.AsValue(parsed.Format(format))
+	return dateModifier(e, in, params, func(t time.Time) time.Time {
+		return t.AddDate(0, 0, daysInt)
+	})
+}
+
+func addHours(e *exec.Evaluator, in *exec.Value, params *exec.VarArgs) *exec.Value {
+	// add the days
+	hours := params.Args[0].String()
+	hoursInt, err := strconv.Atoi(hours)
+	if err != nil {
+		return exec.AsValue(errors.Errorf("invalid number of hours for add_hours, it must be a valid integer, '%s' given", hours))
+	}
+
+	return dateModifier(e, in, params, func(t time.Time) time.Time {
+		return t.Add(time.Duration(hoursInt) * time.Hour)
+	})
+}
+
+func addMinutes(e *exec.Evaluator, in *exec.Value, params *exec.VarArgs) *exec.Value {
+	minutes := params.Args[0].String()
+	minutesInt, err := strconv.Atoi(minutes)
+	if err != nil {
+		return exec.AsValue(errors.Errorf("invalid number of minutes for add_minutes, it must be a valid integer, '%s' given", minutes))
+	}
+
+	return dateModifier(e, in, params, func(t time.Time) time.Time {
+		return t.Add(time.Duration(minutesInt) * time.Minute)
+	})
+}
+
+func addSeconds(e *exec.Evaluator, in *exec.Value, params *exec.VarArgs) *exec.Value {
+	seconds := params.Args[0].String()
+	secondsInt, err := strconv.Atoi(seconds)
+	if err != nil {
+		return exec.AsValue(errors.Errorf("invalid number of seconds for add_seconds, it must be a valid integer, '%s' given", seconds))
+	}
+
+	return dateModifier(e, in, params, func(t time.Time) time.Time {
+		return t.Add(time.Duration(secondsInt) * time.Second)
+	})
+}
+
+func addMilliseconds(e *exec.Evaluator, in *exec.Value, params *exec.VarArgs) *exec.Value {
+	milliseconds := params.Args[0].String()
+	millisecondsInt, err := strconv.Atoi(milliseconds)
+	if err != nil {
+		return exec.AsValue(errors.Errorf("invalid number of milliseconds for add_milliseconds, it must be a valid integer, '%s' given", milliseconds))
+	}
+
+	return dateModifier(e, in, params, func(t time.Time) time.Time {
+		return t.Add(time.Duration(millisecondsInt) * time.Millisecond)
+	})
 }
 
 func formatDate(e *exec.Evaluator, in *exec.Value, params *exec.VarArgs) *exec.Value {

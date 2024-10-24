@@ -12,6 +12,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
+	"github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/hana"
@@ -32,24 +33,26 @@ import (
 )
 
 type Manager struct {
-	BigQuery     map[string]*bigquery.Client
-	Snowflake    map[string]*snowflake.DB
-	Postgres     map[string]*postgres.Client
-	MsSQL        map[string]*mssql.DB
-	Databricks   map[string]*databricks.DB
-	Mongo        map[string]*mongo.DB
-	Mysql        map[string]*mysql.Client
-	Notion       map[string]*notion.Client
-	HANA         map[string]*hana.Client
-	Shopify      map[string]*shopify.Client
-	Gorgias      map[string]*gorgias.Client
-	Klaviyo      map[string]*klaviyo.Client
-	Adjust       map[string]*adjust.Client
-	Athena       map[string]*athena.DB
-	FacebookAds  map[string]*facebookads.Client
-	Stripe       map[string]*stripe.Client
-	Appsflyer    map[string]*appsflyer.Client
-	Kafka        map[string]*kafka.Client
+	BigQuery    map[string]*bigquery.Client
+	Snowflake   map[string]*snowflake.DB
+	Postgres    map[string]*postgres.Client
+	MsSQL       map[string]*mssql.DB
+	Databricks  map[string]*databricks.DB
+	Mongo       map[string]*mongo.DB
+	Mysql       map[string]*mysql.Client
+	Notion      map[string]*notion.Client
+	HANA        map[string]*hana.Client
+	Shopify     map[string]*shopify.Client
+	Gorgias     map[string]*gorgias.Client
+	Klaviyo     map[string]*klaviyo.Client
+	Adjust      map[string]*adjust.Client
+	Athena      map[string]*athena.DB
+	FacebookAds map[string]*facebookads.Client
+	Stripe      map[string]*stripe.Client
+	Appsflyer   map[string]*appsflyer.Client
+	Kafka       map[string]*kafka.Client
+
+	DuckDB       map[string]*duck.Client
 	Hubspot      map[string]*hubspot.Client
 	GoogleSheets map[string]*gsheets.Client
 	mutex        sync.Mutex
@@ -166,6 +169,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Kafka)...)
 
+	connDuckDB, err := m.GetDuckDBConnectionWithoutDefault(name)
+	if err == nil {
+		return connDuckDB, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.DuckDB)...)
+
 	connHubspot, err := m.GetHubspotConnectionWithoutDefault(name)
 	if err == nil {
 		return connHubspot, nil
@@ -197,6 +206,28 @@ func (m *Manager) GetAthenaConnectionWithoutDefault(name string) (athena.Client,
 	db, ok := m.Athena[name]
 	if !ok {
 		return nil, errors.Errorf("Athena connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetDuckDBConnection(name string) (duck.DuckDBClient, error) {
+	db, err := m.GetDuckDBConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetDuckDBConnectionWithoutDefault("duckdb-default")
+}
+
+func (m *Manager) GetDuckDBConnectionWithoutDefault(name string) (duck.DuckDBClient, error) {
+	if m.DuckDB == nil {
+		return nil, errors.New("no DuckDB connections found")
+	}
+
+	db, ok := m.DuckDB[name]
+	if !ok {
+		return nil, errors.Errorf("DuckDB connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -1071,6 +1102,25 @@ func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnectio
 		return err
 	}
 
+	m.Kafka[connection.Name] = client
+
+	return nil
+}
+
+func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnection) error {
+	m.mutex.Lock()
+	if m.DuckDB == nil {
+		m.DuckDB = make(map[string]*duck.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := duck.NewClient(duck.Config{
+		Path: connection.Path,
+	})
+	if err != nil {
+		return err
+	}
+
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Kafka[connection.Name] = client
@@ -1098,6 +1148,7 @@ func (m *Manager) AddHubspotConnectionFromConfig(connection *config.HubspotConne
 
 	return nil
 }
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 	connectionManager := &Manager{}
 
@@ -1341,6 +1392,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 		})
 	}
 
+	for _, conn := range cm.SelectedEnvironment.Connections.DuckDB {
+		wg.Go(func() {
+			err := connectionManager.AddDuckDBConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add duckdb connection '%s'", conn.Name))
+			}
+		})
+	}
+
 	for _, conn := range cm.SelectedEnvironment.Connections.Hubspot {
 		wg.Go(func() {
 			err := connectionManager.AddHubspotConnectionFromConfig(&conn)
@@ -1349,6 +1409,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 			}
 		})
 	}
+
 	wg.Wait()
 
 	if len(errList) > 0 {

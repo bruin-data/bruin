@@ -64,9 +64,12 @@ default_connections:
 create a new folder called `assets` and create your first asset there `assets/bruin-test.sql`:
 
 ```sql
--- @bruin.name: dataset.bruin_test
--- @bruin.type: bq.sql
--- @bruin.materialization.type: table
+/* @bruin
+name: dataset.bruin_test
+type: bq.sql
+materialization:
+  type: table
+@bruin */
 
 SELECT 1 as result
 ```
@@ -81,8 +84,11 @@ materialization type instead of `table` to create a view instead.
 Then let's create a Python asset `assets/hello.py`:
 
 ```python
-# @bruin.name: hello
-# @bruin.depends: dataset.bruin_test
+""" @bruin
+name: hello
+depends: 
+  - dataset.bruin_test
+@bruin """
 
 print("Hello, world!")
 ```

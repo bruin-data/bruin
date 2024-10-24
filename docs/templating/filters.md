@@ -13,7 +13,51 @@ Bruin CLI supports various default filters supported by Jinja, you can see the [
 
 Bruin supports various date-related filters to format dates that can be chained together.
 
+### `add_days`
+
+Adds the given number of days to the date.
+
+```jinja
+{{ end_datetime | add_days(3) }}
+```
+
+### `add_hours`
+
+Adds the given number of hours to the date.
+
+```jinja
+{{ end_datetime | add_hours(3) }}
+```
+
+### `add_minutes`
+
+Adds the given number of minutes to the date.
+
+```jinja
+{{ end_datetime | add_minutes(3) }}
+```
+
+### `add_seconds`
+
+Adds the given number of seconds to the date.
+
+```jinja
+{{ end_datetime | add_seconds(3) }}
+```
+
+### `add_milliseconds`
+
+Adds the given number of milliseconds to the date.
+
+```jinja
+{{ end_datetime | add_milliseconds(3) }}
+```
+
 ### `date_add`
+
+> [!CAUTION]
+> The `date_add` filter is deprecated. Please use the `add_days` filter instead for better compatibility and consistency.
+
 
 Adds given number of days to the date.
 

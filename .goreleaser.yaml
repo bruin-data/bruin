@@ -1,22 +1,80 @@
 version: 2
-
+before:
+  hooks:
+    - go mod tidy
 builds:
-  - env:
-      - CGO_ENABLED=0
+  - id: bruin-darwin
+    binary: bruin
     ldflags:
-      - "-s -w -X main.Version={{ .Env.VERSION }}"
+      - -s -w -X main.version={{ .Env.VERSION }}
+    main: ./
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - darwin
+    env:
+      - CC=o64-clang
+      - CXX=o64-clang++
+      - CGO_ENABLED=1
+    flags:
+      - -trimpath
+ 
+  - id: bruin-linux-amd64
+    binary: bruin
+    main: ./
+    env:
+      - CC=x86_64-linux-gnu-gcc
+      - CXX=x86_64-linux-gnu-g++
+      - CGO_ENABLED=1
+    goarch:
+      - amd64
     goos:
       - linux
-      - windows
-      - darwin
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Env.VERSION }}"
+  - id: bruin-linux-arm64
+    binary: bruin
+    main: ./
     goarch:
-        - amd64
-        - arm64
-    ignore:
-      - goos: windows
-        goarch: arm64
+      - arm64
+    goos:
+      - linux
+    env:
+      - CC=aarch64-linux-gnu-gcc
+      - CXX=aarch64-linux-gnu-g++
+      - CGO_ENABLED=1
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Env.VERSION }}"
+  - id: bruin-windows-amd64
+    binary: bruin
+    main: ./
+    goarch:
+      - amd64
+    goos:
+      - windows
+    env:
+      - CC=x86_64-w64-mingw32-gcc
+      - CXX=x86_64-w64-mingw32-g++
+      - CGO_ENABLED=1
+    ldflags:
+      - -s -w -X main.version={{ .Env.VERSION }}"
+    flags:
+      - -trimpath
+      - -buildmode=c-archive
+
+
 archives:
   - format: tar.gz
+    builds:
+      - bruin-linux-arm64
+      - bruin-linux-amd64
+      - bruin-darwin
+      - bruin-windows-amd64
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_

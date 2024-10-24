@@ -133,6 +133,9 @@ environments:
         - name: conn20
           bootstrap_servers: "localhost:9093"
           group_id: "kafka123"
+      duckdb:
+        - name: conn20
+          path: "/path/to/duck.db"
       hubspot:
         - name: conn21
           api_key: "hubspotkey"
