@@ -20,6 +20,7 @@ type Client interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 	GetResultsLocation() string
+	Test(ctx context.Context) error
 }
 
 type queryExtractor interface {

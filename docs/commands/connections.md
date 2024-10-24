@@ -86,3 +86,11 @@ Delete a connection named "my-connection" from the "production" environment:
 ```
 bruin connections delete -e staging -n test-connection -o json
 ```
+## Test Connection
+To test if a connection is valid, you can use the test command. 
+This command runs a simple validation check for the connection.
+
+
+```bash
+bruin connections test --env <environment> --type <connection-type> --name <connection-name>
+```

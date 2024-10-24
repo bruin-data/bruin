@@ -22,6 +22,7 @@ var scopes = []string{
 
 type Querier interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
+	Test(ctx context.Context) error
 }
 
 type Selector interface {
@@ -213,4 +214,20 @@ func formatError(err error) error {
 	}
 
 	return googleError
+}
+
+// Test runs a simple query (SELECT 1) to validate the connection
+func (d *Client) Test(ctx context.Context) error {
+	// Define the test query
+	q := query.Query{
+		Query: "SELECT 1",
+	}
+
+	// Use the existing RunQueryWithoutResult method
+	err := d.RunQueryWithoutResult(ctx, &q)
+	if err != nil {
+		return errors.Wrap(err, "failed to run test query on Snowflake connection")
+	}
+
+	return nil // Return nil if the query runs successfully
 }

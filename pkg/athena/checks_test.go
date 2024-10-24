@@ -39,6 +39,11 @@ type mockConnectionFetcher struct {
 	mock.Mock
 }
 
+func (m *mockQuerierWithResult) Test(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
 func (m *mockConnectionFetcher) GetConnection(name string) (interface{}, error) {
 	args := m.Called(name)
 	get := args.Get(0)
