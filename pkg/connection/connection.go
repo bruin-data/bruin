@@ -2,7 +2,9 @@ package connection
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
@@ -11,7 +13,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
-	"github.com/bruin-data/bruin/pkg/duckdb"
+	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/hana"
@@ -623,6 +625,15 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 	}
 	m.mutex.Unlock()
 
+	file, err := ioutil.ReadFile(connection.ServiceAccountFile)
+	if err != nil {
+		return err
+	}
+	var js json.RawMessage
+	err = json.Unmarshal(file, &js)
+	if err != nil {
+		return err
+	}
 	db, err := bigquery.NewDB(&bigquery.Config{
 		ProjectID:           connection.ProjectID,
 		CredentialsFilePath: connection.ServiceAccountFile,
