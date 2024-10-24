@@ -1123,7 +1123,7 @@ func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnect
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	m.Kafka[connection.Name] = client
+	m.DuckDB[connection.Name] = client
 
 	return nil
 }
