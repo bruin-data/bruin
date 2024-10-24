@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+
+	"github.com/bruin-data/bruin/pkg/gsheets"
+
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/gsheets"
@@ -652,6 +655,10 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 		m.BigQuery = make(map[string]*bigquery.Client)
 	}
 	m.mutex.Unlock()
+
+	if len(connection.ServiceAccountFile) == 0 && len(connection.ServiceAccountJSON) == 0 {
+		return errors.New("at least one of service_account_file or service_account_json must be provided")
+	}
 
 	if len(connection.ServiceAccountFile) > 0 && connection.ServiceAccountFile != "" {
 		file, err := ioutil.ReadFile(connection.ServiceAccountFile)
