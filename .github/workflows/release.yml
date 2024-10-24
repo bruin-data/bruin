@@ -15,13 +15,13 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-
-      - name: Run GoReleaser
+      - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
-          distribution: goreleaser
+          install-only: true
           version: latest
-          args: release --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-          VERSION: ${{ github.ref_name }}
+
+      - name: Run GoReleaser
+        run: |
+          docker run  -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN= ${{ secrets.RELEASE_TOKEN }} -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 release --clean
+

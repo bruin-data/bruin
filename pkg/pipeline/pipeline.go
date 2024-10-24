@@ -28,6 +28,7 @@ const (
 	AssetTypeBigqueryQuery        = AssetType("bq.sql")
 	AssetTypeBigqueryTableSensor  = AssetType("bq.sensor.table")
 	AssetTypeBigqueryQuerySensor  = AssetType("bq.sensor.query")
+	AssetTypeDuckDBQuery          = AssetType("duckdb.sql")
 	AssetTypeEmpty                = AssetType("empty")
 	AssetTypePostgresQuery        = AssetType("pg.sql")
 	AssetTypeRedshiftQuery        = AssetType("rs.sql")
@@ -409,6 +410,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeDatabricksQuery:      "databricks",
 	AssetTypeSynapseQuery:         "synapse",
 	AssetTypeAthenaQuery:          "athena",
+	AssetTypeDuckDBQuery:          "duckdb",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -475,16 +477,16 @@ type SnowflakeConfig struct {
 	Warehouse string `json:"warehouse"`
 }
 
-type AthenaConfig struct {
-	Location string `json:"location"`
-}
-
 func (s SnowflakeConfig) MarshalJSON() ([]byte, error) {
 	if s.Warehouse == "" {
 		return []byte("null"), nil
 	}
 
 	return json.Marshal(s)
+}
+
+type AthenaConfig struct {
+	Location string `json:"location"`
 }
 
 func (s AthenaConfig) MarshalJSON() ([]byte, error) {
@@ -938,6 +940,8 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "appsflyer-default", nil
 	case "kafka":
 		return "kafka-default", nil
+	case "duckdb":
+		return "duckdb-default", nil
 	case "hubspot":
 		return "hubspot-default", nil
 	default:
@@ -963,6 +967,7 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 		AssetTypeRedshiftQuery:   0,
 		AssetTypeSynapseQuery:    0,
 		AssetTypeAthenaQuery:     0,
+		AssetTypeDuckDBQuery:     0,
 	}
 	maxTasks := 0
 	maxTaskType := defaultIfNone
