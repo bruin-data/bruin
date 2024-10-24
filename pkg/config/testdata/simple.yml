@@ -133,6 +133,9 @@ environments:
         - name: conn20
           bootstrap_servers: "localhost:9093"
           group_id: "kafka123"
+      hubspot:
+        - name: conn21
+          api_key: "hubspotkey"
       generic:
         - name: key1
           value: value1
