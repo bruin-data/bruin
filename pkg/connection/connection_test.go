@@ -72,11 +72,11 @@ func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 	})
 
 	err = m.AddBqConnectionFromConfig(connection)
-	require.NoError(t, err)
+	require.Error(t, err)
 
 	res, err = m.GetBqConnection("test")
-	require.NoError(t, err)
-	assert.NotNil(t, res)
+	require.Error(t, err)
+	assert.Nil(t, res)
 }
 
 func TestManager_AddPgConnectionFromConfig(t *testing.T) {

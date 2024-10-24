@@ -2,7 +2,9 @@ package connection
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
@@ -11,7 +13,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
-	"github.com/bruin-data/bruin/pkg/duckdb"
+	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/hana"
@@ -622,6 +624,26 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 		m.BigQuery = make(map[string]*bigquery.Client)
 	}
 	m.mutex.Unlock()
+
+	if len(connection.ServiceAccountFile) > 0 && connection.ServiceAccountFile != "" {
+		file, err := ioutil.ReadFile(connection.ServiceAccountFile)
+		if err != nil {
+			return errors.New("failed to read service account file")
+		}
+		var js json.RawMessage
+		err = json.Unmarshal(file, &js)
+		if err != nil {
+			return errors.New("not a valid JSON in service account file")
+		}
+	}
+
+	if len(connection.ServiceAccountJSON) > 0 && connection.ServiceAccountJSON != "" {
+		var js json.RawMessage
+		err := json.Unmarshal([]byte(connection.ServiceAccountJSON), &js)
+		if err != nil {
+			return errors.New("not a valid JSON in service account json")
+		}
+	}
 
 	db, err := bigquery.NewDB(&bigquery.Config{
 		ProjectID:           connection.ProjectID,
