@@ -6,6 +6,8 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -48,6 +50,7 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 		asset       *pipeline.Asset
 		fullRefresh bool
 		want        []string
+		wantMounts  []mount.Mount
 	}{
 		{
 			name: "create+replace, basic scenario",
@@ -203,6 +206,17 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			baseConfig := container.Config{
+				Image:        DockerImage,
+				AttachStdout: false,
+				AttachStderr: true,
+				Tty:          true,
+				Env:          []string{},
+			}
+			baseHostConfig := container.HostConfig{
+				NetworkMode: "host",
+			}
+
 			t.Parallel()
 
 			o := &BasicOperator{
@@ -216,9 +230,13 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 
 			ctx := context.WithValue(context.Background(), pipeline.RunConfigFullRefresh, tt.fullRefresh)
 
-			got, err := o.ConvertTaskInstanceToIngestrCommand(ctx, &ti)
+			got, gotHost, err := o.ConvertTaskInstanceToContainerConfig(ctx, &ti)
+			baseConfig.Cmd = tt.want
+			baseHostConfig.Mounts = tt.wantMounts
+
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
+			assert.Equal(t, baseConfig, *got)
+			assert.Equal(t, baseHostConfig, *gotHost)
 		})
 	}
 }
