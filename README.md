@@ -36,6 +36,11 @@ brew install bruin-data/tap/bruin
 curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh
 ```
 
+### Windows (Powershell)
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/y-bruin/bruin/refs/heads/feature/powershell/powershell.ps1 | iex"
+```
+
 ### via Golang installer
 
 You need to have Golang installed in the first place, then you can run the following command:
