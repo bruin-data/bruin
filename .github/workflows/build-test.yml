@@ -58,4 +58,4 @@ jobs:
           version: latest
       - name: Run GoReleaser
         run: |
-          docker run -it --rm -e VERSION=0.0.0  -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 release --snapshot --clean
+          docker run -e VERSION=0.0.0  -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 release --snapshot --clean
