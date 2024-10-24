@@ -31,11 +31,15 @@ Binaries are available on the [releases page](https://github.com/bruin-data/brui
 brew install bruin-data/tap/bruin
 ```
 
-### Linux/MacOS
+### Linux/MacOS(Curl)
 ```shell
 curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh
 ```
 
+### Linux/MacOS(Wget)
+```shell
+wget -qO- https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh
+```
 ### via Golang installer
 
 You need to have Golang installed in the first place, then you can run the following command:
