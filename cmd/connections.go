@@ -339,23 +339,19 @@ func TestConnection() *cli.Command {
 				printErrorForOutput(output, errors2.Wrap(err, fmt.Sprintf("failed to get %s connection", connType)))
 				return cli.Exit("", 1)
 			}
-			// Use type assertion to check if the connection supports Test
 			if tester, ok := conn.(interface {
 				Test(ctx context.Context) error
 			}); ok {
-				// If the connection supports testing, call the Test method
 				testErr := tester.Test(context.Background())
 				if testErr != nil {
 					printErrorForOutput(output, errors2.Wrap(testErr, fmt.Sprintf("failed to run test query on %s connection", connType)))
 					return cli.Exit("", 1)
 				}
 			} else {
-				// If the connection doesn't support testing, show a message
 				infoPrinter.Printf("Connection type %s does not support testing yet.\n", connType)
 				return nil
 			}
 
-			// Output the result in either plain or JSON format
 			if output == "json" {
 				jsonOutput := map[string]string{
 					"status": "success",
