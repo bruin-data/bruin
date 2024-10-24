@@ -31,7 +31,7 @@ jobs:
       - run: make test
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,12 +43,12 @@ jobs:
       - run: make format
 
   goreleaser:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
       - name: Install GoReleaser
