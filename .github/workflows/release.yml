@@ -18,8 +18,9 @@ jobs:
       - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
-          distribution: goreleaser
+          install-only: true
           version: latest
+
       - name: Run GoReleaser
         run: |
           docker run -it --rm -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN= ${{ secrets.RELEASE_TOKEN }} -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 release --clean
