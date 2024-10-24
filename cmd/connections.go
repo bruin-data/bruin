@@ -334,49 +334,31 @@ func TestConnection() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			var testErr error
-
-			// Handling Snowflake connection
-			switch connType {
-			case "snowflake":
-				db, err := manager.GetSfConnectionWithoutDefault(name)
-				if err != nil {
-					printErrorForOutput(output, errors2.Wrap(err, "failed to get Snowflake connection"))
-					return cli.Exit("", 1)
-				}
-				testErr = db.Test(context.Background())
-
-			// Handling BigQuery connection
-			case "bigquery":
-				bqClient, err := manager.GetBqConnectionWithoutDefault(name)
-				if err != nil {
-					printErrorForOutput(output, errors2.Wrap(err, "failed to get BigQuery connection"))
-					return cli.Exit("", 1)
-				}
-				testErr = bqClient.Test(context.Background())
-			case "athena":
-				bqClient, err := manager.GetAthenaConnectionWithoutDefault(name)
-				if err != nil {
-					printErrorForOutput(output, errors2.Wrap(err, "failed to get BigQuery connection"))
-					return cli.Exit("", 1)
-				}
-				testErr = bqClient.Test(context.Background())
-
-			default:
-				return cli.Exit(fmt.Sprintf("Unsupported connection type: %s", connType), 1)
-			}
-
-			// Handle the test result
-			if testErr != nil {
-				printErrorForOutput(output, errors2.Wrap(testErr, fmt.Sprintf("failed to run test query on %s connection", connType)))
+			conn, err := manager.GetConnection(name)
+			if err != nil {
+				printErrorForOutput(output, errors2.Wrap(err, fmt.Sprintf("failed to get %s connection", connType)))
 				return cli.Exit("", 1)
+			}
+			// Use type assertion to check if the connection supports Test
+			if tester, ok := conn.(interface {
+				Test(ctx context.Context) error
+			}); ok {
+				// If the connection supports testing, call the Test method
+				testErr := tester.Test(context.Background())
+				if testErr != nil {
+					printErrorForOutput(output, errors2.Wrap(testErr, fmt.Sprintf("failed to run test query on %s connection", connType)))
+					return cli.Exit("", 1)
+				}
+			} else {
+				// If the connection doesn't support testing, show a message
+				infoPrinter.Printf("Connection type %s does not support testing yet.\n", connType)
+				return nil
 			}
 
 			// Output the result in either plain or JSON format
 			if output == "json" {
 				jsonOutput := map[string]string{
-					"status":  "success",
-					"message": fmt.Sprintf("Successfully tested connection: %s with type: %s in environment: %s", name, connType, environment),
+					"status": "success",
 				}
 				jsonBytes, err := json.Marshal(jsonOutput)
 				if err != nil {
@@ -385,7 +367,7 @@ func TestConnection() *cli.Command {
 				}
 				fmt.Println(string(jsonBytes))
 			} else {
-				fmt.Printf("Successfully tested connection: %s with type: %s in environment: %s\n", name, connType, environment)
+				infoPrinter.Printf("Successfully tested connection: %s with type: %s in environment: %s\n", name, connType, environment)
 			}
 
 			return nil
