@@ -1,0 +1,9 @@
+name: public.gsheets
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my-gsheets
+  source_table: '16UY6EQ_6jnaNpRsMgbf0OpxsYh6fkdUQ2bjdNfUq2CA.Sheet1'
+
+  destination: postgres

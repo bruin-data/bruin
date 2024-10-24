@@ -520,7 +520,7 @@ func (c *Connections) buildConnectionKeyMap() {
 
 	for i, conn := range c.GoogleSheets {
 		c.byKey[conn.Name] = &(c.GoogleSheets[i])
-		c.typeNameMap[conn.Name] = "gsheets"
+		c.typeNameMap[conn.Name] = "google_sheets"
 	}
 }
 

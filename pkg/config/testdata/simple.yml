@@ -139,14 +139,15 @@ environments:
       hubspot:
         - name: conn21
           api_key: "hubspotkey"
+      google_sheets:
+          - name: con22
+            credentials_path: "/path/to/service_account.json"
       generic:
         - name: key1
           value: value1
         - name: key2
           value: value2
-      google_sheets:
-        -name: con22
-        credentials_path: "/path/to/service_account.json"
+
 
   prod:
     connections:

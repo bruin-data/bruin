@@ -181,7 +181,7 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Hubspot)...)
 
-	connGoogleSheets, err := m.GetGoogleSheetConnectionWithoutDefault(name)
+	connGoogleSheets, err := m.GetGoogleSheetsConnectionWithoutDefault(name)
 	if err == nil {
 		return connGoogleSheets, nil
 	}
@@ -623,7 +623,16 @@ func (m *Manager) GetHubspotConnectionWithoutDefault(name string) (*hubspot.Clie
 	return db, nil
 }
 
-func (m *Manager) GetGoogleSheetConnectionWithoutDefault(name string) (*gsheets.Client, error) {
+func (m *Manager) GetGoogleSheetsConnection(name string) (*gsheets.Client, error) {
+	db, err := m.GetGoogleSheetsConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetGoogleSheetsConnectionWithoutDefault("google-sheets-default")
+}
+
+func (m *Manager) GetGoogleSheetsConnectionWithoutDefault(name string) (*gsheets.Client, error) {
 	if m.GoogleSheets == nil {
 		return nil, errors.New("no google sheets connections found")
 	}

@@ -5,5 +5,5 @@ type Config struct {
 }
 
 func (c *Config) GetIngestrURI() string {
-	return "gsheets://?credentials_path=/path/to/file.json=" + c.CredentialsPath
+	return "gsheets://?credentials_path=" + c.CredentialsPath
 }
