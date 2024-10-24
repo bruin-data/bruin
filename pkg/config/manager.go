@@ -247,6 +247,15 @@ func (c HubspotConnection) GetName() string {
 	return c.Name
 }
 
+type GoogleSheetsConnection struct {
+	Name            string `yaml:"name" json:"name" mapstructure:"name"`
+	CredentialsPath string `yaml:"credentials_path" json:"credentials_path" mapstructure:"credentials_path"`
+}
+
+func (c GoogleSheetsConnection) GetName() string {
+	return c.Name
+}
+
 type MySQLConnection struct {
 	Name     string `yaml:"name" json:"name" mapstructure:"name"`
 	Username string `yaml:"username" json:"username" mapstructure:"username"`
@@ -353,6 +362,7 @@ type Connections struct {
 	Appsflyer           []AppsflyerConnection           `yaml:"appsflyer,omitempty" json:"appsflyer,omitempty" mapstructure:"appsflyer"`
 	Kafka               []KafkaConnection               `yaml:"kafka,omitempty" json:"kafka,omitempty" mapstructure:"kafka"`
 	Hubspot             []HubspotConnection             `yaml:"hubspot,omitempty" json:"hubspot,omitempty" mapstructure:"hubspot"`
+	GoogleSheets        []GoogleSheetsConnection        `yaml:"google_sheets,omitempty" json:"google_sheets,omitempty" mapstructure:"google_sheets"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -491,6 +501,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.Hubspot {
 		c.byKey[conn.Name] = &(c.Hubspot[i])
 		c.typeNameMap[conn.Name] = "hubspot"
+	}
+
+	for i, conn := range c.GoogleSheets {
+		c.byKey[conn.Name] = &(c.GoogleSheets[i])
+		c.typeNameMap[conn.Name] = "gsheets"
 	}
 }
 
@@ -786,6 +801,11 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Hubspot = append(env.Connections.Hubspot, conn)
+	case "google_sheets":
+		var conn GoogleSheetsConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -863,6 +883,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Kafka = removeConnection(env.Connections.Kafka, connectionName)
 	case "hubspot":
 		env.Connections.Hubspot = removeConnection(env.Connections.Hubspot, connectionName)
+	case "google_sheets":
+		env.Connections.GoogleSheets = removeConnection(env.Connections.GoogleSheets, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}

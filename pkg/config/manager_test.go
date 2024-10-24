@@ -210,6 +210,12 @@ func TestLoadFromFile(t *testing.T) {
 					ApiKey: "hubspotkey",
 				},
 			},
+			GoogleSheets: []GoogleSheetsConnection{
+				{
+					Name:            "conn22",
+					CredentialsPath: "/path/to/service_account.json",
+				},
+			},
 		},
 	}
 

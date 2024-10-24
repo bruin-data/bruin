@@ -3,6 +3,7 @@ package connection
 import (
 	"context"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/gsheets"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
@@ -31,26 +32,27 @@ import (
 )
 
 type Manager struct {
-	BigQuery    map[string]*bigquery.Client
-	Snowflake   map[string]*snowflake.DB
-	Postgres    map[string]*postgres.Client
-	MsSQL       map[string]*mssql.DB
-	Databricks  map[string]*databricks.DB
-	Mongo       map[string]*mongo.DB
-	Mysql       map[string]*mysql.Client
-	Notion      map[string]*notion.Client
-	HANA        map[string]*hana.Client
-	Shopify     map[string]*shopify.Client
-	Gorgias     map[string]*gorgias.Client
-	Klaviyo     map[string]*klaviyo.Client
-	Adjust      map[string]*adjust.Client
-	Athena      map[string]*athena.DB
-	FacebookAds map[string]*facebookads.Client
-	Stripe      map[string]*stripe.Client
-	Appsflyer   map[string]*appsflyer.Client
-	Kafka       map[string]*kafka.Client
-	Hubspot     map[string]*hubspot.Client
-	mutex       sync.Mutex
+	BigQuery     map[string]*bigquery.Client
+	Snowflake    map[string]*snowflake.DB
+	Postgres     map[string]*postgres.Client
+	MsSQL        map[string]*mssql.DB
+	Databricks   map[string]*databricks.DB
+	Mongo        map[string]*mongo.DB
+	Mysql        map[string]*mysql.Client
+	Notion       map[string]*notion.Client
+	HANA         map[string]*hana.Client
+	Shopify      map[string]*shopify.Client
+	Gorgias      map[string]*gorgias.Client
+	Klaviyo      map[string]*klaviyo.Client
+	Adjust       map[string]*adjust.Client
+	Athena       map[string]*athena.DB
+	FacebookAds  map[string]*facebookads.Client
+	Stripe       map[string]*stripe.Client
+	Appsflyer    map[string]*appsflyer.Client
+	Kafka        map[string]*kafka.Client
+	Hubspot      map[string]*hubspot.Client
+	GoogleSheets map[string]*gsheets.Client
+	mutex        sync.Mutex
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
@@ -170,6 +172,11 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Hubspot)...)
 
+	connGoogleSheets, err := m.GetGoogleSheetConnectionWithoutDefault(name)
+	if err == nil {
+		return connGoogleSheets, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Hubspot)...)
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
 
@@ -581,6 +588,17 @@ func (m *Manager) GetHubspotConnectionWithoutDefault(name string) (*hubspot.Clie
 	db, ok := m.Hubspot[name]
 	if !ok {
 		return nil, errors.Errorf("hubspot connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetGoogleSheetConnectionWithoutDefault(name string) (*gsheets.Client, error) {
+	if m.GoogleSheets == nil {
+		return nil, errors.New("no google sheets connections found")
+	}
+	db, ok := m.GoogleSheets[name]
+	if !ok {
+		return nil, errors.Errorf("google sheets connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -1013,6 +1031,26 @@ func (m *Manager) AddAppsflyerConnectionFromConfig(connection *config.AppsflyerC
 	return nil
 }
 
+func (m *Manager) AddGoogleSheetsConnectionFromConfig(connection *config.GoogleSheetsConnection) error {
+	m.mutex.Lock()
+	if m.GoogleSheets == nil {
+		m.GoogleSheets = make(map[string]*gsheets.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := gsheets.NewClient(gsheets.Config{
+		CredentialsPath: connection.CredentialsPath,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.GoogleSheets[connection.Name] = client
+
+	return nil
+}
 func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnection) error {
 	m.mutex.Lock()
 	if m.Kafka == nil {
@@ -1290,6 +1328,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 			err := connectionManager.AddKafkaConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add kafka connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.GoogleSheets {
+		wg.Go(func() {
+			err := connectionManager.AddGoogleSheetsConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add googlesheets connection '%s'", conn.Name))
 			}
 		})
 	}
