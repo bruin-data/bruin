@@ -51,11 +51,11 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-      - name: Run GoReleaser
+      - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: latest
-          args: release --snapshot --clean
-        env:
-          VERSION: 0.0.0-SNAPSHOT
+      - name: Run GoReleaser
+        run: |
+          docker run -it --rm -e VERSION=0.0.0  -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 release --snapshot --clean
