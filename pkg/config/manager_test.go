@@ -194,14 +194,14 @@ func TestLoadFromFile(t *testing.T) {
 			Appsflyer: []AppsflyerConnection{
 				{
 					Name:   "conn19",
-					ApiKey: "appsflyerkey",
+					APIKey: "appsflyerkey",
 				},
 			},
 			Kafka: []KafkaConnection{
 				{
 					Name:             "conn20",
 					BootstrapServers: "localhost:9093",
-					GroupId:          "kafka123",
+					GroupID:          "kafka123",
 				},
 			},
 			DuckDB: []DuckDBConnection{
@@ -213,7 +213,7 @@ func TestLoadFromFile(t *testing.T) {
 			Hubspot: []HubspotConnection{
 				{
 					Name:   "conn21",
-					ApiKey: "hubspotkey",
+					APIKey: "hubspotkey",
 				},
 			},
 			GoogleSheets: []GoogleSheetsConnection{

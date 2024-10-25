@@ -53,7 +53,7 @@ func NewConcurrent(
 	var printLock sync.Mutex
 
 	workers := make([]*worker, workerCount)
-	for i := 0; i < workerCount; i++ {
+	for i := range workerCount {
 		workers[i] = &worker{
 			id:        fmt.Sprintf("worker-%d", i),
 			executor:  executor,

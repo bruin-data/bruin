@@ -105,11 +105,11 @@ func TestDB_IsValid(t *testing.T) {
 
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				response, err := json.Marshal(tt.response)
-				require.NoError(t, err)
+				assert.NoError(t, err)
 
 				w.WriteHeader(tt.statusCode)
 				_, err = w.Write(response)
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}))
 			defer server.Close()
 
@@ -263,16 +263,16 @@ type queryResultResponse struct {
 
 func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse, qrr queryResultResponse) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries/%s?", projectID, jobID)) {
+		if r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries/%s?", projectID, jobID)) {
 			w.WriteHeader(qrr.statusCode)
 
 			response, err := json.Marshal(qrr.response)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 
 			_, err = w.Write(response)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			return
-		} else if r.Method == "POST" && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries", projectID)) {
+		} else if r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries", projectID)) {
 			w.WriteHeader(jsr.statusCode)
 
 			response, err := json.Marshal(jsr.response)
