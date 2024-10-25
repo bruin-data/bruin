@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 
 	"github.com/bruin-data/bruin/pkg/gsheets"
 
@@ -659,22 +660,34 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 	}
 
 	if len(connection.ServiceAccountFile) > 0 && connection.ServiceAccountFile != "" {
+
 		file, err := ioutil.ReadFile(connection.ServiceAccountFile)
-		if err != nil {
-			return errors.Errorf("[%s] failed to read service account file at '%s'", connection.Name, connection.ServiceAccountFile)
+		if err == nil {
+			return errors.Errorf("Please use service_account_file Instead  of  service_account_json ")
 		}
 		var js json.RawMessage
 		err = json.Unmarshal(file, &js)
 		if err != nil {
-			return errors.Errorf("[%s] not a valid JSON in service account file", connection.Name)
+			return errors.Errorf("not a valid JSON in service account file at '%s'", connection.ServiceAccountFile)
 		}
 	}
 
 	if len(connection.ServiceAccountJSON) > 0 && connection.ServiceAccountJSON != "" {
-		var js json.RawMessage
-		err := json.Unmarshal([]byte(connection.ServiceAccountJSON), &js)
+
+		_, err := os.Stat(connection.ServiceAccountJSON)
+		if err == nil {
+			return errors.New("please use service_account_file Instead  of service_account_json to define path ")
+		}
+
+		file, err := ioutil.ReadFile(connection.ServiceAccountJSON)
 		if err != nil {
-			return errors.Errorf("[%s] not a valid JSON in service account json", connection.Name)
+			file = []byte(connection.ServiceAccountJSON)
+		}
+
+		var js json.RawMessage
+		err = json.Unmarshal(file, &js)
+		if err != nil {
+			return errors.New("not a valid JSON in service account json")
 		}
 	}
 
