@@ -16,7 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/date"
-	"github.com/bruin-data/bruin/pkg/duckdb"
+	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/mssql"
@@ -26,6 +26,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/synapse"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
 )
@@ -54,43 +55,65 @@ func Render() *cli.Command {
 
 			startDate, err := date.ParseTime(c.String("start-date"))
 			if err != nil {
-				errorPrinter.Printf("Please give a valid start date: bruin run --start-date <start date>)\n")
-				errorPrinter.Printf("A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats. \n")
-				errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
-				errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02 15:04:05"))
+				if c.String("output") == "json" {
+					printErrorJSON(errors.New("Please give a valid start date: bruin run --start-date <start date>), A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats."))
+				} else {
+					errorPrinter.Printf("Please give a valid start date: bruin run --start-date <start date>)\n")
+					errorPrinter.Printf("A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats. \n")
+					errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
+					errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02 15:04:05"))
+				}
 				return cli.Exit("", 1)
 			}
 
 			endDate, err := date.ParseTime(c.String("end-date"))
 			if err != nil {
-				errorPrinter.Printf("Please give a valid end date: bruin run --start-date <start date>)\n")
-				errorPrinter.Printf("A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats. \n")
-				errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
-				errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02 15:04:05"))
+				if c.String("output") == "json" {
+					printErrorJSON(errors.New("Please give a valid end date: bruin run --end-date <end date>), A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats."))
+				} else {
+					errorPrinter.Printf("Please give a valid end date: bruin run --start-date <start date>)\n")
+					errorPrinter.Printf("A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats. \n")
+					errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
+					errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02 15:04:05"))
+				}
 				return cli.Exit("", 1)
 			}
 
 			inputPath := c.Args().Get(0)
 			if inputPath == "" {
-				errorPrinter.Printf("Please give an asset path to render: bruin render <path to the asset file>)\n")
+				if c.String("output") == "json" {
+					printErrorJSON(errors.New("Please give an asset path to render: bruin render <path to the asset file>)"))
+				} else {
+					errorPrinter.Printf("Please give an asset path to render: bruin render <path to the asset file>)\n")
+				}
+
+				return cli.Exit("", 1)
+			}
+			if _, err := os.Stat(inputPath); os.IsNotExist(err) {
+				if c.String("output") == "json" {
+					printErrorJSON(errors.New("The specified asset path does not exist: " + inputPath))
+				} else {
+					errorPrinter.Printf("The specified asset path does not exist: %s\n", inputPath)
+				}
+				return cli.Exit("", 1)
+			}
+			pipelinePath, err := path.GetPipelineRootFromTask(inputPath, pipelineDefinitionFile)
+			if err != nil {
+				printError(err, c.String("output"), "Failed to get the pipeline path:")
 				return cli.Exit("", 1)
 			}
 
-			pipelinePath, err := path.GetPipelineRootFromTask(inputPath, pipelineDefinitionFile)
-			if err != nil {
-				errorPrinter.Printf("Failed to get the pipeline path: %v\n", err)
-				return cli.Exit("", 1)
-			}
 			pipelineDefinitionFullPath := filepath.Join(pipelinePath, pipelineDefinitionFile)
 			pl, err := pipeline.PipelineFromPath(pipelineDefinitionFullPath, fs)
 			if err != nil {
-				errorPrinter.Printf("Failed to read the pipeline definition file: %v\n", err)
+				printError(err, c.String("output"), "Failed to read the pipeline definition file:")
 				return cli.Exit("", 1)
 			}
 
 			asset, err := DefaultPipelineBuilder.CreateAssetFromFile(inputPath)
+
 			if err != nil || asset == nil {
-				errorPrinter.Printf("Failed to read the asset definition file: %v\n", err)
+				printError(err, c.String("output"), "Failed to read the asset definition file: ")
 				return cli.Exit("", 1)
 			}
 
@@ -98,19 +121,19 @@ func Render() *cli.Command {
 			if asset.Type == pipeline.AssetTypeAthenaQuery {
 				connName, err := pl.GetConnectionNameForAsset(asset)
 				if err != nil {
-					errorPrinter.Printf("Failed to get the connection name for the asset: %v\n", err)
+					printError(err, c.String("output"), "Failed to get the connection name for the asset:")
 					return cli.Exit("", 1)
 				}
 
 				repoRoot, err := git.FindRepoFromPath(inputPath)
 				if err != nil {
-					errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
+					printError(err, c.String("output"), "Failed to find the git repository root:")
 					return cli.Exit("", 1)
 				}
 				configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
 				cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
 				if err != nil {
-					errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
+					printError(err, c.String("output"), fmt.Sprintf("Failed to load the config file at '%s':", configFilePath))
 					return cli.Exit("", 1)
 				}
 
