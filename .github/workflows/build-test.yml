@@ -62,3 +62,4 @@ jobs:
         env:
           SDK_PATH: ${{ steps.macos_sdk.outputs.path }}
           VERSION: 0.0.0
+          ZIG_GLOBAL_CACHE_DIR: $PWD
