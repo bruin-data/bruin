@@ -261,6 +261,10 @@ func (o *BasicOperator) ConvertTaskInstanceToContainerConfig(ctx context.Context
 		cmdArgs = append(cmdArgs, "--full-refresh")
 	}
 
+	if len(mounts) == 0 {
+		mounts = nil
+	}
+
 	return &container.Config{
 			Image:        DockerImage,
 			Cmd:          cmdArgs,
