@@ -15,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
 )
@@ -22,6 +23,9 @@ import (
 const (
 	IngestrVersion = "v0.8.5"
 	DockerImage    = "ghcr.io/bruin-data/ingestr:" + IngestrVersion
+	DuckDBDest     = "/tmp/dest.db"
+	DuckDBSource   = "/tmp/source.db"
+	DuckDBPrefix   = "duckdb:///"
 )
 
 type connectionFetcher interface {
@@ -132,6 +136,8 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 }
 
 func (o *BasicOperator) ConvertTaskInstanceToContainerConfig(ctx context.Context, ti scheduler.TaskInstance) (*container.Config, *container.HostConfig, error) {
+	mounts := []mount.Mount{}
+	// Source connection
 	sourceConnectionName, ok := ti.GetAsset().Parameters["source_connection"]
 	if !ok {
 		return nil, nil, errors.New("source connection not configured")
@@ -145,6 +151,15 @@ func (o *BasicOperator) ConvertTaskInstanceToContainerConfig(ctx context.Context
 	sourceURI, err := sourceConnection.(pipelineConnection).GetIngestrURI()
 	if err != nil {
 		return nil, nil, errors.New("could not get the source uri")
+	}
+	if strings.HasPrefix(sourceURI, DuckDBPrefix) {
+		sourcePath := strings.TrimPrefix(sourceURI, DuckDBPrefix)
+		mounts = append(mounts, mount.Mount{
+			Type:   mount.TypeBind,
+			Source: sourcePath,
+			Target: DuckDBSource,
+		})
+		sourceURI = DuckDBPrefix + DuckDBSource
 	}
 
 	// some connection types can be shared among sources, therefore inferring source URI from the connection type is not
@@ -171,6 +186,15 @@ func (o *BasicOperator) ConvertTaskInstanceToContainerConfig(ctx context.Context
 	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
 	if err != nil {
 		return nil, nil, errors.New("could not get the source uri")
+	}
+	if strings.HasPrefix(destURI, DuckDBPrefix) {
+		destPath := strings.TrimPrefix(destURI, DuckDBPrefix)
+		mounts = append(mounts, mount.Mount{
+			Type:   mount.TypeBind,
+			Source: destPath,
+			Target: DuckDBDest,
+		})
+		destURI = DuckDBPrefix + DuckDBDest
 	}
 
 	destTable := ti.GetAsset().Name
@@ -247,6 +271,7 @@ func (o *BasicOperator) ConvertTaskInstanceToContainerConfig(ctx context.Context
 		},
 		&container.HostConfig{
 			NetworkMode: "host",
+			Mounts:      mounts,
 		},
 		nil
 }

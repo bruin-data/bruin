@@ -37,11 +37,14 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 	mockBq.On("GetIngestrURI").Return("bigquery://uri-here", nil)
 	mockSf := new(mockConnection)
 	mockSf.On("GetIngestrURI").Return("snowflake://uri-here", nil)
+	mockDuck := new(mockConnection)
+	mockDuck.On("GetIngestrURI").Return("duckdb:////some/path", nil)
 
 	fetcher := simpleConnectionFetcher{
 		connections: map[string]*mockConnection{
-			"bq": mockBq,
-			"sf": mockSf,
+			"bq":   mockBq,
+			"sf":   mockSf,
+			"duck": mockDuck,
 		},
 	}
 
@@ -64,6 +67,46 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 				},
 			},
 			want: []string{"ingest", "--source-uri", "snowflake://uri-here", "--source-table", "source-table", "--dest-uri", "bigquery://uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+		},
+		{
+			name: "duck db source, basic scenario",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "bq",
+				Parameters: map[string]string{
+					"source_connection": "duck",
+					"source_table":      "source-table",
+					"destination":       "bigquery",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "duckdb:////tmp/source.db", "--source-table", "source-table", "--dest-uri", "bigquery://uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+			wantMounts: []mount.Mount{
+				{
+					Type:   mount.TypeBind,
+					Source: "/some/path",
+					Target: "/tmp/source.db",
+				},
+			},
+		},
+		{
+			name: "duck db dest, basic scenario",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "duck",
+				Parameters: map[string]string{
+					"source_connection": "sf",
+					"source_table":      "source-table",
+					"destination":       "duckdb",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "snowflake://uri-here", "--source-table", "source-table", "--dest-uri", "duckdb:////tmp/dest.db", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+			wantMounts: []mount.Mount{
+				{
+					Type:   mount.TypeBind,
+					Source: "/some/path",
+					Target: "/tmp/dest.db",
+				},
+			},
 		},
 		{
 			name: "basic scenario with Google Sheets override",
