@@ -13,68 +13,77 @@ builds:
       - arm64
     goos:
       - darwin
-    env:
-      - CC=o64-clang
-      - CXX=o64-clang++
-      - CGO_ENABLED=1
     flags:
-      - -trimpath
+    - -trimpath
+    - -buildmode=pie
+    env:
+    - CGO_ENABLED=1
+    - >-
+        {{- if eq .Os "darwin" }}
+          {{- if eq .Arch "amd64"}}CC=zig c -target x86_64-macos-none -F{{ .Env.SDK_PATH }}/System/Library/Frameworks{{- end }}
+          {{- if eq .Arch "arm64"}}CC=zig c -target aarch64-macos-none -F{{ .Env.SDK_PATH }}/System/Library/Frameworks{{- end }}
+        {{- end }}
+    - >-
+        {{- if eq .Os "darwin" }}
+          {{- if eq .Arch "amd64"}}CC=zig c++ -target x86_64-macos-none -F{{ .Env.SDK_PATH }}/System/Library/Frameworks{{- end }}
+          {{- if eq .Arch "arm64"}}CC=zig c++ -target aarch64-macos-none -F{{ .Env.SDK_PATH }}/System/Library/Frameworks{{- end }}
+        {{- end }}
  
-  - id: bruin-linux-amd64
-    binary: bruin
-    main: ./
-    env:
-      - CC=x86_64-linux-gnu-gcc
-      - CXX=x86_64-linux-gnu-g++
-      - CGO_ENABLED=1
-    goarch:
-      - amd64
-    goos:
-      - linux
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X main.version={{ .Env.VERSION }}"
-  - id: bruin-linux-arm64
+  - id: bruin-linux
     binary: bruin
     main: ./
     goarch:
       - arm64
+      - amd64
     goos:
       - linux
-    env:
-      - CC=aarch64-linux-gnu-gcc
-      - CXX=aarch64-linux-gnu-g++
-      - CGO_ENABLED=1
     flags:
-      - -trimpath
+    - -trimpath
+    env:
+    - CGO_ENABLED=1
+    - >-
+        {{- if eq .Os "linux" }}
+          {{- if eq .Arch "amd64" }}CC=zig c -target x86_64-linux-musl{{- end }}
+          {{- if eq .Arch "arm64"}}CC=zig c -target aarch64-linux-musl{{- end }}
+        {{- end }}
+    - >-
+        {{- if eq .Os "linux" }}
+          {{- if eq .Arch "amd64" }}CC=zig c++ -target x86_64-linux-musl{{- end }}
+          {{- if eq .Arch "arm64"}}CC=zig c++ -target aarch64-linux-musl{{- end }}
+        {{- end }}
     ldflags:
       - -s -w -X main.version={{ .Env.VERSION }}"
-  - id: bruin-windows-amd64
+  - id: bruin-windows
     binary: bruin
     main: ./
     goarch:
       - amd64
     goos:
       - windows
-    env:
-      - CC=x86_64-w64-mingw32-gcc
-      - CXX=x86_64-w64-mingw32-g++
-      - CGO_ENABLED=1
     ldflags:
       - -s -w -X main.version={{ .Env.VERSION }}"
     flags:
-      - -trimpath
-      - -buildmode=c-archive
+    - -trimpath
+    env:
+    - CGO_ENABLED=1
+    - >-
+        {{- if eq .Os "windows" }}
+          {{- if eq .Arch "amd64" }}CC=zig c -target x86_64-windows-gnu{{- end }}
+          {{- if eq .Arch "arm64"}}CC=zig c -target aarch64-windows-gnu{{- end }}
+        {{- end }}
+    - >-
+        {{- if eq .Os "windows" }}
+          {{- if eq .Arch "amd64" }}CC=zig c++ -target x86_64-windows-gnu{{- end }}
+          {{- if eq .Arch "arm64"}}CC=zig c++ -target aarch64-windows-gnu{{- end }}
+        {{- end }}
 
 
 archives:
   - format: tar.gz
     builds:
-      - bruin-linux-arm64
-      - bruin-linux-amd64
+      - bruin-linux
       - bruin-darwin
-      - bruin-windows-amd64
+      - bruin-windows
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_

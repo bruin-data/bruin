@@ -51,11 +51,13 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-      - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+      - uses: goto-bus-stop/setup-zig@v2
+      - name: Set output
+        id: macos_sdk
+        run: echo "path=$(xcrun --show-sdk-path)" >> $GITHUB_OUTPUT
+      - uses: goreleaser/goreleaser-action@v4          # run goreleaser
         with:
-          install-only: true
           version: latest
-      - name: Run GoReleaser
-        run: |
-          docker run -e VERSION=0.0.0  -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 release --snapshot --clean
+          args: release --snapshot --clean
+        env:
+          SDK_PATH: ${{ steps.macos_sdk.outputs.path }}
