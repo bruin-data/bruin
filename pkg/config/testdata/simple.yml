@@ -143,9 +143,9 @@ environments:
           - name: conn22
             credentials_path: "/path/to/service_account.json"
       airtable:
-        - name: conn23,
-          base_id: "123",
-          access_token: "accessKey",
+        - name: conn23
+          base_id: "123"
+          access_token: "accessKey"
       generic:
         - name: key1
           value: value1
