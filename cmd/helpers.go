@@ -12,6 +12,14 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
+type ErrorResponses struct {
+	Error []string `json:"error"`
+}
+
 func switchEnvironment(c *cli.Context, cm *config.Config, stdin io.ReadCloser) error {
 	env := c.String("environment")
 	if env == "" {
@@ -51,19 +59,45 @@ func RecoverFromPanic() {
 	}
 }
 
-func printErrorJSON(err error) {
-	type ErrorResponse struct {
-		Error string `json:"error"`
-	}
-
-	js, marshalError := json.Marshal(ErrorResponse{
-		Error: err.Error(),
-	})
+func marshal[K ErrorResponse | ErrorResponses](m K) ([]byte, error) {
+	js, marshalError := json.Marshal(m)
 	if marshalError != nil {
 		fmt.Println(marshalError)
+		return []byte{}, marshalError
 	}
+	return js, nil
+}
 
+func printErrorJSON(err error) {
+	js, err := marshal[ErrorResponse](ErrorResponse{
+		Error: err.Error(),
+	})
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	fmt.Println(string(js))
+}
+
+func printErrors(errs []error, output string, message string) {
+	if output == "json" {
+		errorList := []string{}
+		for _, v := range errs {
+			errorList = append(errorList, v.Error())
+		}
+
+		js, err := marshal[ErrorResponses](ErrorResponses{
+			Error: errorList,
+		})
+
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		fmt.Println(string(js))
+	} else {
+		errorPrinter.Printf("%s: %v\n", message, fmt.Sprint(errs))
+	}
 }
 
 func printError(err error, output string, message string) {

@@ -1158,7 +1158,7 @@ func (m *Manager) AddHubspotConnectionFromConfig(connection *config.HubspotConne
 	return nil
 }
 
-func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
+func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
 
 	var wg conc.WaitGroup
@@ -1421,9 +1421,5 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, error) {
 
 	wg.Wait()
 
-	if len(errList) > 0 {
-		return nil, errors.New("multiple connection errors occurred: " + fmt.Sprint(errList))
-	}
-
-	return connectionManager, nil
+	return connectionManager, errList
 }

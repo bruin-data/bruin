@@ -140,7 +140,7 @@ environments:
         - name: conn21
           api_key: "hubspotkey"
       google_sheets:
-          - name: con22
+          - name: conn22
             credentials_path: "/path/to/service_account.json"
       generic:
         - name: key1
