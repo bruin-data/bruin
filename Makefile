@@ -12,11 +12,9 @@ all: clean deps test build
 
 deps: tools
 	@printf "$(OK_COLOR)==> Installing dependencies$(NO_COLOR)\n"
-	@go mod vendor
+	@go mod tidy
 
-build:
-	@echo "$(OK_COLOR)==> Vendoring...$(NO_COLOR)"
-	@modvendor -copy="**/*.a **/*.h" -v
+build: deps
 	@echo "$(OK_COLOR)==> Building the application...$(NO_COLOR)"
 	@CGO_ENABLED=1 go build -v -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0))" -o "$(BUILD_DIR)/$(NAME)" "$(BUILD_SRC)"
 
