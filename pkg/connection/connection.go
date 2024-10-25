@@ -185,7 +185,7 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	if err == nil {
 		return connGoogleSheets, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Hubspot)...)
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GoogleSheets)...)
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
 
