@@ -10,8 +10,6 @@ import (
 
 	"sync"
 
-	"github.com/bruin-data/bruin/pkg/gsheets"
-
 	"github.com/bruin-data/bruin/pkg/adjust"
 	"github.com/bruin-data/bruin/pkg/appsflyer"
 	"github.com/bruin-data/bruin/pkg/athena"
