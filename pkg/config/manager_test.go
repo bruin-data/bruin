@@ -216,6 +216,13 @@ func TestLoadFromFile(t *testing.T) {
 					ApiKey: "hubspotkey",
 				},
 			},
+			Airtable: []AirtableConnection{
+				{
+					Name:        "conn23",
+					BaseId:      "123",
+					AccessToken: "accessKey",
+				},
+			},
 		},
 	}
 

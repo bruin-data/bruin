@@ -944,6 +944,8 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "duckdb-default", nil
 	case "hubspot":
 		return "hubspot-default", nil
+	case "airtable":
+		return "airtable-default", nil
 	default:
 		return "", errors.Errorf("no default connection found for type '%s'", assetType)
 	}

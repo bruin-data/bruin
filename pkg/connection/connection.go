@@ -3,6 +3,7 @@ package connection
 import (
 	"context"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/airtable"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
@@ -50,6 +51,7 @@ type Manager struct {
 	Stripe      map[string]*stripe.Client
 	Appsflyer   map[string]*appsflyer.Client
 	Kafka       map[string]*kafka.Client
+	Airtable    map[string]*airtable.Client
 
 	DuckDB  map[string]*duck.Client
 	Hubspot map[string]*hubspot.Client
@@ -179,6 +181,11 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Hubspot)...)
 
+	connAirtable, err := m.GetAirtableConnectionWithoutDefault(name)
+	if err == nil {
+		return connAirtable, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Airtable)...)
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
 
@@ -612,6 +619,26 @@ func (m *Manager) GetHubspotConnectionWithoutDefault(name string) (*hubspot.Clie
 	db, ok := m.Hubspot[name]
 	if !ok {
 		return nil, errors.Errorf("hubspot connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetAirtableConnection(name string) (*airtable.Client, error) {
+	db, err := m.GetAirtableConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetAirtableConnectionWithoutDefault("airtable-default")
+}
+
+func (m *Manager) GetAirtableConnectionWithoutDefault(name string) (*airtable.Client, error) {
+	if m.Airtable == nil {
+		return nil, errors.New("no airtable connections found")
+	}
+	db, ok := m.Airtable[name]
+	if !ok {
+		return nil, errors.Errorf("airtable connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -1112,6 +1139,25 @@ func (m *Manager) AddHubspotConnectionFromConfig(connection *config.HubspotConne
 	return nil
 }
 
+func (m *Manager) AddAirtableConnectionFromConfig(connection *config.AirtableConnection) error {
+	m.mutex.Lock()
+	if m.Airtable == nil {
+		m.Airtable = make(map[string]*airtable.Client)
+	}
+	m.mutex.Unlock()
+	client, err := airtable.NewClient(airtable.Config{
+		BaseId:      connection.BaseId,
+		AccessToken: connection.AccessToken,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Airtable[connection.Name] = client
+
+	return nil
+}
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
 
@@ -1341,6 +1387,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			err := connectionManager.AddHubspotConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add hubspot connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Airtable {
+		wg.Go(func() {
+			err := connectionManager.AddAirtableConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add airtable connection '%s'", conn.Name))
 			}
 		})
 	}

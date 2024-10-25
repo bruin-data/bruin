@@ -139,6 +139,10 @@ environments:
       hubspot:
         - name: conn21
           api_key: "hubspotkey"
+      airtable:
+        - name: conn23,
+          base_id: "123",
+          access_token: "accessKey",
       generic:
         - name: key1
           value: value1
