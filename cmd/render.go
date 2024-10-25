@@ -26,6 +26,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/synapse"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
 )
@@ -55,7 +56,7 @@ func Render() *cli.Command {
 			startDate, err := date.ParseTime(c.String("start-date"))
 			if err != nil {
 				if c.String("output") == "json" {
-					printErrorJSON(err)
+					printErrorJSON(errors.New("Please give a valid start date: bruin run --start-date <start date>), A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats."))
 				} else {
 					errorPrinter.Printf("Please give a valid start date: bruin run --start-date <start date>)\n")
 					errorPrinter.Printf("A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats. \n")
@@ -68,7 +69,7 @@ func Render() *cli.Command {
 			endDate, err := date.ParseTime(c.String("end-date"))
 			if err != nil {
 				if c.String("output") == "json" {
-					printErrorJSON(err)
+					printErrorJSON(errors.New("Please give a valid end date: bruin run --end-date <end date>), A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats."))
 				} else {
 					errorPrinter.Printf("Please give a valid end date: bruin run --start-date <start date>)\n")
 					errorPrinter.Printf("A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats. \n")
@@ -81,19 +82,27 @@ func Render() *cli.Command {
 			inputPath := c.Args().Get(0)
 			if inputPath == "" {
 				if c.String("output") == "json" {
-					printErrorJSON(err)
+					printErrorJSON(errors.New("Please give an asset path to render: bruin render <path to the asset file>)"))
 				} else {
 					errorPrinter.Printf("Please give an asset path to render: bruin render <path to the asset file>)\n")
 				}
 
 				return cli.Exit("", 1)
 			}
-
+			if _, err := os.Stat(inputPath); os.IsNotExist(err) {
+				if c.String("output") == "json" {
+					printErrorJSON(errors.New("The specified asset path does not exist: " + inputPath))
+				} else {
+					errorPrinter.Printf("The specified asset path does not exist: %s\n", inputPath)
+				}
+				return cli.Exit("", 1)
+			}
 			pipelinePath, err := path.GetPipelineRootFromTask(inputPath, pipelineDefinitionFile)
 			if err != nil {
 				printError(err, c.String("output"), "Failed to get the pipeline path:")
 				return cli.Exit("", 1)
 			}
+
 			pipelineDefinitionFullPath := filepath.Join(pipelinePath, pipelineDefinitionFile)
 			pl, err := pipeline.PipelineFromPath(pipelineDefinitionFullPath, fs)
 			if err != nil {
