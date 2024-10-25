@@ -231,6 +231,16 @@ func (c AppsflyerConnection) GetName() string {
 	return c.Name
 }
 
+type AirtableConnection struct {
+	Name        string `yaml:"name" json:"name" mapstructure:"name"`
+	BaseId      string `yaml:"base_id" json:"base_id" mapstructure:"base_id"`
+	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
+}
+
+func (c AirtableConnection) GetName() string {
+	return c.Name
+}
+
 type KafkaConnection struct {
 	Name             string `yaml:"name" json:"name" mapstructure:"name"`
 	BootstrapServers string `yaml:"bootstrap_servers" json:"bootstrap_servers" mapstructure:"bootstrap_servers"`
@@ -363,6 +373,7 @@ type Connections struct {
 	Kafka               []KafkaConnection               `yaml:"kafka,omitempty" json:"kafka,omitempty" mapstructure:"kafka"`
 	DuckDB              []DuckDBConnection              `yaml:"duckdb,omitempty" json:"duckdb,omitempty" mapstructure:"duckdb"`
 	Hubspot             []HubspotConnection             `yaml:"hubspot,omitempty" json:"hubspot,omitempty" mapstructure:"hubspot"`
+	Airtable            []AirtableConnection            `yaml:"airtable,omitempty" json:"airtable,omitempty" mapstructure:"airtable"`
 
 	byKey       map[string]any
 	typeNameMap map[string]string
@@ -507,6 +518,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.Hubspot {
 		c.byKey[conn.Name] = &(c.Hubspot[i])
 		c.typeNameMap[conn.Name] = "hubspot"
+	}
+
+	for i, conn := range c.Airtable {
+		c.byKey[conn.Name] = &(c.Airtable[i])
+		c.typeNameMap[conn.Name] = "airtable"
 	}
 }
 
@@ -802,6 +818,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Hubspot = append(env.Connections.Hubspot, conn)
+	case "airtable":
+		var conn AirtableConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Airtable = append(env.Connections.Airtable, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -879,6 +902,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Kafka = removeConnection(env.Connections.Kafka, connectionName)
 	case "hubspot":
 		env.Connections.Hubspot = removeConnection(env.Connections.Hubspot, connectionName)
+	case "airtable":
+		env.Connections.Airtable = removeConnection(env.Connections.Airtable, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}

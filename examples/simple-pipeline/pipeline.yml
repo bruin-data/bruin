@@ -22,3 +22,4 @@ default_connections:
   appsflyer: "my-appsflyer"
   kafka: "my-kafka"
   hubspot: "my-hubspot"
+  airtable: "my-airtable"
