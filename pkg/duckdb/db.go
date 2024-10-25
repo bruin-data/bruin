@@ -5,8 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/bruin-data/bruin/pkg/query"
-	"github.com/jmoiron/sqlx"
-	_ "github.com/marcboeker/go-duckdb"
+	"github.com/pkg/errors"
 )
 
 type Client struct {
@@ -25,21 +24,11 @@ type connection interface {
 }
 
 func NewClient(c DuckDBConfig) (*Client, error) {
-	conn, err := sqlx.Open("duckdb", c.ToDBConnectionURI())
-	if err != nil {
-		return nil, err
-	}
-
-	return &Client{connection: conn, config: c}, nil
+	return nil, errors.New("duckDB not supported")
 }
 
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
-	_, err := c.connection.ExecContext(ctx, query.String())
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return errors.New("duckDB not supported")
 }
 
 func (c *Client) GetIngestrURI() (string, error) {
@@ -48,34 +37,5 @@ func (c *Client) GetIngestrURI() (string, error) {
 
 // Select runs a query and returns the results.
 func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
-	rows, err := c.connection.QueryContext(ctx, query.String())
-	if err != nil {
-		return nil, err
-	}
-
-	defer rows.Close()
-
-	result := make([][]interface{}, 0)
-
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, err
-	}
-
-	for rows.Next() {
-		columns := make([]interface{}, len(cols))
-		columnPointers := make([]interface{}, len(cols))
-		for i := range columns {
-			columnPointers[i] = &columns[i]
-		}
-
-		// Scan the result into the column pointers...
-		if err := rows.Scan(columnPointers...); err != nil {
-			return nil, err
-		}
-
-		result = append(result, columns)
-	}
-
-	return result, nil
+	return nil, errors.New("duckDB not supported")
 }
