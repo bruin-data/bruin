@@ -3,8 +3,8 @@ package connection
 import (
 	"context"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/gsheets"
 	"github.com/bruin-data/bruin/pkg/airtable"
+	"github.com/bruin-data/bruin/pkg/gsheets"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
