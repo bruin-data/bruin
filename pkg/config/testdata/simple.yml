@@ -139,6 +139,9 @@ environments:
       hubspot:
         - name: conn21
           api_key: "hubspotkey"
+      google_sheets:
+          - name: conn22
+            credentials_path: "/path/to/service_account.json"
       airtable:
         - name: conn23,
           base_id: "123",

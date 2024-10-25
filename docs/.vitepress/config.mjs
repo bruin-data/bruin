@@ -46,6 +46,7 @@ export default defineConfig({
                             {text: "Airtable", link: "/connections/airtable.md"},
                             {text: "Appsflyer", link: "/connections/appsflyer.md"},
                             {text: "Google Cloud Platform", link: "/connections/google_cloud_platform"},
+                            {text: "Google Sheets", link: "/connections/google_sheets.md"},
                             {text: "Gorgias", link: "/connections/gorgias"},
                             {text: "Hubspot", link: "/connections/hubspot.md"},
                             {text: "Microsoft SQL Server", link: "/connections/mssql"},

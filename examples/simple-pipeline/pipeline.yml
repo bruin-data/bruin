@@ -22,4 +22,5 @@ default_connections:
   appsflyer: "my-appsflyer"
   kafka: "my-kafka"
   hubspot: "my-hubspot"
+  googlesheets: "my-gsheets"
   airtable: "my-airtable"
