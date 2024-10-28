@@ -669,8 +669,7 @@ func (m *Manager) GetChessConnectionWithoutDefault(name string) (*chess.Client, 
 	if !ok {
 		return nil, errors.Errorf("chess connection not found for '%s'", name)
 	}
-	print("db without", db)
-	print("ok", ok)
+
 	return db, nil
 }
 
