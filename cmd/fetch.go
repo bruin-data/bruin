@@ -8,13 +8,14 @@ import (
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
-	"github.com/spf13/afero" // Importing afero for filesystem operations
+	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
+	"os"
 	"path/filepath"
 )
 
-// FetchCommand defines the 'fetch' CLI command with subcommands
 func Fetch() *cli.Command {
 	return &cli.Command{
 		Name:  "fetch",
@@ -25,7 +26,6 @@ func Fetch() *cli.Command {
 	}
 }
 
-// querySubcommand defines the 'fetch query' subcommand for executing SQL queries
 func queryCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "query",
@@ -50,12 +50,10 @@ func queryCommand() *cli.Command {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			// Step 1: Extract arguments
 			connectionName := c.String("connection")
 			queryStr := c.String("query")
 			output := c.String("output")
 
-			// Step 2: Find the repo root and load configuration
 			repoRoot, err := git.FindRepoFromPath(".")
 			if err != nil {
 				return handleError(output, errors.Wrap(err, "failed to find the git repository root"))
@@ -68,7 +66,6 @@ func queryCommand() *cli.Command {
 				return handleError(output, errors.Wrap(err, "failed to load or create config"))
 			}
 
-			// Step 3: Retrieve the connection using the connection manager
 			manager, errs := connection.NewManagerFromConfig(cm)
 			if len(errs) > 0 {
 				for _, err := range errs {
@@ -82,11 +79,9 @@ func queryCommand() *cli.Command {
 				return handleError(output, errors.Wrap(err, "failed to get connection"))
 			}
 
-			// Step 4: Check if the connection supports querying using inline interface
 			if querier, ok := conn.(interface {
 				Select(ctx context.Context, q *query.Query) ([][]interface{}, error)
 			}); ok {
-				// Prepare the query and execute it
 				ctx := context.Background()
 				q := query.Query{Query: queryStr}
 
@@ -95,7 +90,6 @@ func queryCommand() *cli.Command {
 					return handleError(output, errors.Wrap(err, "query execution failed"))
 				}
 
-				// Step 5: Format and display the result based on output type
 				if output == "json" {
 					jsonData, err := json.Marshal(result)
 					if err != nil {
@@ -114,7 +108,6 @@ func queryCommand() *cli.Command {
 	}
 }
 
-// Helper for printing errors based on output format
 func handleError(output string, err error) error {
 	if output == "json" {
 		jsonError, _ := json.Marshal(map[string]string{"error": err.Error()})
@@ -125,12 +118,33 @@ func handleError(output string, err error) error {
 	return cli.Exit("", 1)
 }
 
-// Helper for printing in table format
+// Helper for printing in table format using go-pretty/table
 func printTable(result [][]interface{}) {
-	for _, row := range result {
-		for _, col := range row {
-			fmt.Printf("%v\t", col)
-		}
-		fmt.Println()
+	if len(result) == 0 {
+		fmt.Println("No data available")
+		return
 	}
+
+	// Initialize table writer and set output to stdout
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+
+	// Convert the first row to headers
+	headers := make(table.Row, len(result[0]))
+	for i, cell := range result[0] {
+		headers[i] = fmt.Sprintf("%v", cell)
+	}
+	t.AppendHeader(headers)
+
+	// Append the remaining rows as data rows
+	for _, row := range result[1:] {
+		rowData := make(table.Row, len(row))
+		for i, cell := range row {
+			rowData[i] = fmt.Sprintf("%v", cell)
+		}
+		t.AppendRow(rowData)
+	}
+
+	t.SetStyle(table.StyleLight)
+	t.Render()
 }
