@@ -43,7 +43,7 @@ export default defineConfig({
                     {
                         text: "Overview", link: "/connections/overview", items: [
                             {text: "Adjust", link: "/connections/adjust.md"},
-                            {text: "Appsflyer", link: "/connections/appsflyer.md"},
+                            {text: "Chess", link: "/connections/chess.md"},
                             {text: "Google Cloud Platform", link: "/connections/google_cloud_platform"},
                             {text: "Google Sheets", link: "/connections/google_sheets.md"},
                             {text: "Gorgias", link: "/connections/gorgias"},
