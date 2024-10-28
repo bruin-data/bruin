@@ -142,6 +142,10 @@ environments:
       google_sheets:
           - name: conn22
             credentials_path: "/path/to/service_account.json"
+      chess:
+        - name: conn24
+          players: []string{"Max", "Peter"}
+
       generic:
         - name: key1
           value: value1

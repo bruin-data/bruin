@@ -1,0 +1,9 @@
+name: public.chess
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my-chess
+  source_table: 'profiles'
+
+  destination: postgres
