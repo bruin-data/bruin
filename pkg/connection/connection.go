@@ -8,9 +8,6 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/bruin-data/bruin/pkg/gsheets"
-
-
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
