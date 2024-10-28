@@ -19,7 +19,6 @@ require (
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/kluctl/go-embed-python v0.0.0-3.12.3-20240415-2
 	github.com/manifoldco/promptui v0.9.0
-	github.com/marcboeker/go-duckdb v1.8.2
 	github.com/microsoft/go-mssqldb v1.7.0
 	github.com/nikolalohinski/gonja/v2 v2.2.0
 	github.com/pashagolub/pgxmock/v3 v3.3.0
@@ -57,7 +56,6 @@ require (
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/apache/arrow/go/v12 v12.0.1 // indirect
 	github.com/apache/arrow/go/v14 v14.0.2 // indirect
-	github.com/apache/arrow/go/v17 v17.0.0 // indirect
 	github.com/apache/thrift v0.20.0 // indirect
 	github.com/aws/aws-sdk-go v1.37.32 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.25.3 // indirect
@@ -123,7 +121,6 @@ require (
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect
 	github.com/minio/c2goasm v0.0.0-20190812172519-36a3d3bbc4f3 // indirect
-	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/moby/term v0.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
@@ -161,6 +158,7 @@ require (
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.22.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
+	gonum.org/v1/gonum v0.15.0 // indirect
 	google.golang.org/genproto v0.0.0-20240401170217-c3f982113cda // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240513163218-0867130af1f8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240521202816-d264139d666e // indirect

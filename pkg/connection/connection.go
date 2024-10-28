@@ -2,20 +2,29 @@ package connection
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/airtable"
-	"github.com/bruin-data/bruin/pkg/gsheets"
+
+
+
+
+	"io/ioutil"
+	"os"
+
+
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
+  "github.com/bruin-data/bruin/pkg/airtable"
 	"github.com/bruin-data/bruin/pkg/appsflyer"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
-	"github.com/bruin-data/bruin/pkg/duckdb"
+	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/gorgias"
+	"github.com/bruin-data/bruin/pkg/gsheets"
 	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/hubspot"
 	"github.com/bruin-data/bruin/pkg/kafka"
@@ -677,6 +686,42 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 	}
 	m.mutex.Unlock()
 
+	if len(connection.ServiceAccountFile) == 0 && len(connection.ServiceAccountJSON) == 0 {
+		return errors.New("at least one of service_account_file or service_account_json must be provided")
+	}
+
+	if len(connection.ServiceAccountFile) > 0 && connection.ServiceAccountFile != "" {
+
+		file, err := ioutil.ReadFile(connection.ServiceAccountFile)
+		if err == nil {
+			return errors.Errorf("Please use service_account_file Instead  of  service_account_json ")
+		}
+		var js json.RawMessage
+		err = json.Unmarshal(file, &js)
+		if err != nil {
+			return errors.Errorf("not a valid JSON in service account file at '%s'", connection.ServiceAccountFile)
+		}
+	}
+
+	if len(connection.ServiceAccountJSON) > 0 && connection.ServiceAccountJSON != "" {
+
+		_, err := os.Stat(connection.ServiceAccountJSON)
+		if err == nil {
+			return errors.New("please use service_account_file Instead  of service_account_json to define path ")
+		}
+
+		file, err := ioutil.ReadFile(connection.ServiceAccountJSON)
+		if err != nil {
+			file = []byte(connection.ServiceAccountJSON)
+		}
+
+		var js json.RawMessage
+		err = json.Unmarshal(file, &js)
+		if err != nil {
+			return errors.New("not a valid JSON in service account json")
+		}
+	}
+
 	db, err := bigquery.NewDB(&bigquery.Config{
 		ProjectID:           connection.ProjectID,
 		CredentialsFilePath: connection.ServiceAccountFile,
@@ -1118,6 +1163,7 @@ func (m *Manager) AddGoogleSheetsConnectionFromConfig(connection *config.GoogleS
 
 	return nil
 }
+
 func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnection) error {
 	m.mutex.Lock()
 	if m.Kafka == nil {
