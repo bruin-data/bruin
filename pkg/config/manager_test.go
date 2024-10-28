@@ -222,6 +222,13 @@ func TestLoadFromFile(t *testing.T) {
 					CredentialsPath: "/path/to/service_account.json",
 				},
 			},
+			Airtable: []AirtableConnection{
+				{
+					Name:        "conn23",
+					BaseId:      "123",
+					AccessToken: "accessKey",
+				},
+			},
 		},
 	}
 

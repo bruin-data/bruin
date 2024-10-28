@@ -142,12 +142,15 @@ environments:
       google_sheets:
           - name: conn22
             credentials_path: "/path/to/service_account.json"
+      airtable:
+        - name: conn23
+          base_id: "123"
+          access_token: "accessKey"
       generic:
         - name: key1
           value: value1
         - name: key2
           value: value2
-
 
   prod:
     connections:
