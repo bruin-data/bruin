@@ -122,3 +122,19 @@ func (db *DB) IsValid(ctx context.Context, query *query.Query) (bool, error) {
 
 	return err == nil, err
 }
+
+// Test runs a simple query (SELECT 1) to validate the connection
+func (db *DB) Test(ctx context.Context) error {
+	// Define the test query
+	q := query.Query{
+		Query: "SELECT 1",
+	}
+
+	// Use the existing RunQueryWithoutResult method
+	err := db.RunQueryWithoutResult(ctx, &q)
+	if err != nil {
+		return errors.Wrap(err, "failed to run test query on Snowflake connection")
+	}
+
+	return nil // Return nil if the query runs successfully
+}
