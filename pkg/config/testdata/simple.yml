@@ -144,7 +144,9 @@ environments:
             credentials_path: "/path/to/service_account.json"
       chess:
         - name: conn24
-          players: []string{"Max", "Peter"}
+          players:
+            - "Max"
+            - "Peter"
 
       airtable:
         - name: conn23
