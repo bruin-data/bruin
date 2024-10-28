@@ -89,6 +89,7 @@ func printErrors(errs []error, output string, message string) {
 		js, err := marshal[ErrorResponses](ErrorResponses{
 			Error: errorList,
 		})
+
 		if err != nil {
 			fmt.Println(err)
 			return
