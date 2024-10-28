@@ -24,3 +24,4 @@ default_connections:
   hubspot: "my-hubspot"
   googlesheets: "my-gsheets"
   chess: "my-chess"
+  airtable: "my-airtable"

@@ -228,6 +228,13 @@ func TestLoadFromFile(t *testing.T) {
 					Players: []string{"Max", "Peter"},
 				},
 			},
+			Airtable: []AirtableConnection{
+				{
+					Name:        "conn23",
+					BaseId:      "123",
+					AccessToken: "accessKey",
+				},
+			},
 		},
 	}
 

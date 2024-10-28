@@ -23,6 +23,7 @@ type queryExtractor interface {
 type SfClient interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
+	Test(ctx context.Context) error
 }
 
 type connectionFetcher interface {

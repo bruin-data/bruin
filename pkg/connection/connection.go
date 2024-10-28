@@ -2,18 +2,24 @@ package connection
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/bruin-data/bruin/pkg/chess"
 	"github.com/bruin-data/bruin/pkg/gsheets"
+
+	"io/ioutil"
+	"os"
+
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
+	"github.com/bruin-data/bruin/pkg/airtable"
 	"github.com/bruin-data/bruin/pkg/appsflyer"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
-	"github.com/bruin-data/bruin/pkg/duckdb"
+	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/hana"
@@ -52,6 +58,7 @@ type Manager struct {
 	Stripe      map[string]*stripe.Client
 	Appsflyer   map[string]*appsflyer.Client
 	Kafka       map[string]*kafka.Client
+	Airtable    map[string]*airtable.Client
 
 	DuckDB       map[string]*duck.Client
 	Hubspot      map[string]*hubspot.Client
@@ -194,6 +201,11 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connChess, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Chess)...)
+	connAirtable, err := m.GetAirtableConnectionWithoutDefault(name)
+	if err == nil {
+		return connAirtable, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Airtable)...)
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 
 }
@@ -632,6 +644,26 @@ func (m *Manager) GetHubspotConnectionWithoutDefault(name string) (*hubspot.Clie
 	return db, nil
 }
 
+func (m *Manager) GetAirtableConnection(name string) (*airtable.Client, error) {
+	db, err := m.GetAirtableConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetAirtableConnectionWithoutDefault("airtable-default")
+}
+
+func (m *Manager) GetAirtableConnectionWithoutDefault(name string) (*airtable.Client, error) {
+	if m.Airtable == nil {
+		return nil, errors.New("no airtable connections found")
+	}
+	db, ok := m.Airtable[name]
+	if !ok {
+		return nil, errors.Errorf("airtable connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
 func (m *Manager) GetGoogleSheetsConnection(name string) (*gsheets.Client, error) {
 	db, err := m.GetGoogleSheetsConnectionWithoutDefault(name)
 	if err == nil {
@@ -679,6 +711,42 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 		m.BigQuery = make(map[string]*bigquery.Client)
 	}
 	m.mutex.Unlock()
+
+	if len(connection.ServiceAccountFile) == 0 && len(connection.ServiceAccountJSON) == 0 {
+		return errors.New("at least one of service_account_file or service_account_json must be provided")
+	}
+
+	if len(connection.ServiceAccountFile) > 0 && connection.ServiceAccountFile != "" {
+
+		file, err := ioutil.ReadFile(connection.ServiceAccountFile)
+		if err == nil {
+			return errors.Errorf("Please use service_account_file Instead  of  service_account_json ")
+		}
+		var js json.RawMessage
+		err = json.Unmarshal(file, &js)
+		if err != nil {
+			return errors.Errorf("not a valid JSON in service account file at '%s'", connection.ServiceAccountFile)
+		}
+	}
+
+	if len(connection.ServiceAccountJSON) > 0 && connection.ServiceAccountJSON != "" {
+
+		_, err := os.Stat(connection.ServiceAccountJSON)
+		if err == nil {
+			return errors.New("please use service_account_file Instead  of service_account_json to define path ")
+		}
+
+		file, err := ioutil.ReadFile(connection.ServiceAccountJSON)
+		if err != nil {
+			file = []byte(connection.ServiceAccountJSON)
+		}
+
+		var js json.RawMessage
+		err = json.Unmarshal(file, &js)
+		if err != nil {
+			return errors.New("not a valid JSON in service account json")
+		}
+	}
 
 	db, err := bigquery.NewDB(&bigquery.Config{
 		ProjectID:           connection.ProjectID,
@@ -1121,6 +1189,7 @@ func (m *Manager) AddGoogleSheetsConnectionFromConfig(connection *config.GoogleS
 
 	return nil
 }
+
 func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnection) error {
 	m.mutex.Lock()
 	if m.Kafka == nil {
@@ -1162,6 +1231,7 @@ func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnect
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+
 	m.DuckDB[connection.Name] = client
 
 	return nil
@@ -1206,6 +1276,25 @@ func (m *Manager) AddHubspotConnectionFromConfig(connection *config.HubspotConne
 	return nil
 }
 
+func (m *Manager) AddAirtableConnectionFromConfig(connection *config.AirtableConnection) error {
+	m.mutex.Lock()
+	if m.Airtable == nil {
+		m.Airtable = make(map[string]*airtable.Client)
+	}
+	m.mutex.Unlock()
+	client, err := airtable.NewClient(airtable.Config{
+		BaseId:      connection.BaseId,
+		AccessToken: connection.AccessToken,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Airtable[connection.Name] = client
+
+	return nil
+}
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
 
@@ -1217,33 +1306,28 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.AthenaConnection {
 		wg.Go(func() {
 			err := connectionManager.AddAthenaConnectionFromConfig(&conn)
-
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add AWS connection '%s'", conn.Name))
 				mu.Unlock()
 			}
-
 		})
 	}
 
 	for _, conn := range cm.SelectedEnvironment.Connections.GoogleCloudPlatform {
 		wg.Go(func() {
 			err := connectionManager.AddBqConnectionFromConfig(&conn)
-
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add BigQuery connection '%s'", conn.Name))
 				mu.Unlock()
 			}
-
 		})
 	}
 
 	for _, conn := range cm.SelectedEnvironment.Connections.Snowflake {
 		wg.Go(func() {
 			err := connectionManager.AddSfConnectionFromConfig(&conn)
-
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add Snowflake connection '%s'", conn.Name))
@@ -1255,7 +1339,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Postgres {
 		wg.Go(func() {
 			err := connectionManager.AddPgConnectionFromConfig(&conn)
-
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add Postgres connection '%s'", conn.Name))
@@ -1267,7 +1350,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.RedShift {
 		wg.Go(func() {
 			err := connectionManager.AddRedshiftConnectionFromConfig(&conn)
-
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add RedShift connection '%s'", conn.Name))
@@ -1279,7 +1361,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.MsSQL {
 		wg.Go(func() {
 			err := connectionManager.AddMsSQLConnectionFromConfig(&conn)
-
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add MsSQL connection '%s'", conn.Name))
@@ -1291,7 +1372,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Databricks {
 		wg.Go(func() {
 			err := connectionManager.AddDatabricksConnectionFromConfig(&conn)
-
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add Databricks connection '%s'", conn.Name))
@@ -1314,7 +1394,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Mongo {
 		wg.Go(func() {
 			err := connectionManager.AddMongoConnectionFromConfig(&conn)
-
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add Mongo connection '%s'", conn.Name))
@@ -1326,7 +1405,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.MySQL {
 		wg.Go(func() {
 			err := connectionManager.AddMySQLConnectionFromConfig(&conn)
-
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add mysql connection '%s'", conn.Name))
@@ -1338,7 +1416,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Notion {
 		wg.Go(func() {
 			err := connectionManager.AddNotionConnectionFromConfig(&conn)
-
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add notion connection '%s'", conn.Name))
@@ -1350,7 +1427,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Shopify {
 		wg.Go(func() {
 			err := connectionManager.AddShopifyConnectionFromConfig(&conn)
-
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add shopify connection '%s'", conn.Name))
@@ -1362,7 +1438,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Gorgias {
 		wg.Go(func() {
 			err := connectionManager.AddGorgiasConnectionFromConfig(&conn)
-
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add gorgias connection '%s'", conn.Name))
@@ -1374,7 +1449,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Klaviyo {
 		wg.Go(func() {
 			err := connectionManager.AddKlaviyoConnectionFromConfig(&conn)
-
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add klaviyo connection '%s'", conn.Name))
@@ -1386,7 +1460,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Adjust {
 		wg.Go(func() {
 			err := connectionManager.AddAdjustConnectionFromConfig(&conn)
-
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add adjust connection '%s'", conn.Name))
@@ -1398,7 +1471,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.FacebookAds {
 		wg.Go(func() {
 			err := connectionManager.AddFacebookAdsConnectionFromConfig(&conn)
-
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add facebookads connection '%s'", conn.Name))
@@ -1410,7 +1482,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Stripe {
 		wg.Go(func() {
 			err := connectionManager.AddStripeConnectionFromConfig(&conn)
-
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add stripe connection '%s'", conn.Name))
@@ -1422,7 +1493,6 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	for _, conn := range cm.SelectedEnvironment.Connections.Appsflyer {
 		wg.Go(func() {
 			err := connectionManager.AddAppsflyerConnectionFromConfig(&conn)
-
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add appsflyer connection '%s'", conn.Name))
@@ -1475,6 +1545,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			}
 		})
 	}
+	for _, conn := range cm.SelectedEnvironment.Connections.Airtable {
+		wg.Go(func() {
+			err := connectionManager.AddAirtableConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add airtable connection '%s'", conn.Name))
+			}
+		})
+	}
+
 	wg.Wait()
 
 	return connectionManager, errList
