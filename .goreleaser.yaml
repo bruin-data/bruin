@@ -3,53 +3,53 @@ before:
   hooks:
     - go mod tidy
 builds:
-  - id: bruin-darwin
-    binary: bruin
-    ldflags:
-      - -s -w -X main.version={{ .Env.VERSION }}
-    main: ./
-    goarch:
-      - amd64
-      - arm64
-    goos:
-      - darwin
-    env:
-      - CC=o64-clang
-      - CXX=o64-clang++
-      - CGO_ENABLED=1
-    flags:
-      - -trimpath
+  # - id: bruin-darwin
+  #   binary: bruin
+  #   ldflags:
+  #     - -s -w -X main.version={{ .Env.VERSION }}
+  #   main: ./
+  #   goarch:
+  #     - amd64
+  #     - arm64
+  #   goos:
+  #     - darwin
+  #   env:
+  #     - CC=o64-clang
+  #     - CXX=o64-clang++
+  #     - CGO_ENABLED=1
+  #   flags:
+  #     - -trimpath
  
-  - id: bruin-linux-amd64
-    binary: bruin
-    main: ./
-    env:
-      - CC=x86_64-linux-gnu-gcc
-      - CXX=x86_64-linux-gnu-g++
-      - CGO_ENABLED=1
-    goarch:
-      - amd64
-    goos:
-      - linux
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X main.version={{ .Env.VERSION }}"
-  - id: bruin-linux-arm64
-    binary: bruin
-    main: ./
-    goarch:
-      - arm64
-    goos:
-      - linux
-    env:
-      - CC=aarch64-linux-gnu-gcc
-      - CXX=aarch64-linux-gnu-g++
-      - CGO_ENABLED=1
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X main.version={{ .Env.VERSION }}"
+  # - id: bruin-linux-amd64
+  #   binary: bruin
+  #   main: ./
+  #   env:
+  #     - CC=x86_64-linux-gnu-gcc
+  #     - CXX=x86_64-linux-gnu-g++
+  #     - CGO_ENABLED=1
+  #   goarch:
+  #     - amd64
+  #   goos:
+  #     - linux
+  #   flags:
+  #     - -trimpath
+  #   ldflags:
+  #     - -s -w -X main.version={{ .Env.VERSION }}"
+  # - id: bruin-linux-arm64
+  #   binary: bruin
+  #   main: ./
+  #   goarch:
+  #     - arm64
+  #   goos:
+  #     - linux
+  #   env:
+  #     - CC=aarch64-linux-gnu-gcc
+  #     - CXX=aarch64-linux-gnu-g++
+  #     - CGO_ENABLED=1
+  #   flags:
+  #     - -trimpath
+  #   ldflags:
+  #     - -s -w -X main.version={{ .Env.VERSION }}"
   - id: bruin-windows-amd64
     binary: bruin
     main: ./
@@ -65,15 +65,13 @@ builds:
       - -s -w -X main.version={{ .Env.VERSION }}"
     flags:
       - -trimpath
-      - -buildmode=c-archive
+      - -buildmode=exe
 
 
 archives:
   - format: tar.gz
     builds:
-      - bruin-linux-arm64
-      - bruin-linux-amd64
-      - bruin-darwin
+
       - bruin-windows-amd64
     name_template: >-
       {{ .ProjectName }}_
