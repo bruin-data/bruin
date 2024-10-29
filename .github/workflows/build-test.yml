@@ -67,7 +67,7 @@ jobs:
           VERSION: ${{ github.ref_name }}
 
 
-  goreleaser:
+  goreleaser-unix:
     runs-on: ubuntu-latest
 
     steps:
