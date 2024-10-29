@@ -20,7 +20,6 @@ require (
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/kluctl/go-embed-python v0.0.0-3.12.3-20240415-2
 	github.com/manifoldco/promptui v0.9.0
-	github.com/marcboeker/go-duckdb v1.8.2
 	github.com/microsoft/go-mssqldb v1.7.0
 	github.com/nikolalohinski/gonja/v2 v2.2.0
 	github.com/pashagolub/pgxmock/v3 v3.3.0
