@@ -421,6 +421,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"mssql":      AssetTypeMsSQLQuery,
 	"databricks": AssetTypeDatabricksQuery,
 	"synapse":    AssetTypeSynapseQuery,
+	"duckdb":     AssetTypeDuckDBQuery,
 }
 
 type SecretMapping struct {
