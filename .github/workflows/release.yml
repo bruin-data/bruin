@@ -7,7 +7,7 @@ on:
 
 
 jobs:
-  prepare-windows:
+  goreleaser:
     runs-on: windows-latest
     defaults:
       run:
@@ -19,104 +19,14 @@ jobs:
           msystem: UCRT64
           update: true
           install: git mingw-w64-ucrt-x86_64-gcc
-      - shell: bash
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-      - id: cache
-        uses: actions/cache@v3
-        with:
-          path: dist/windows
-          key: windows-${{ env.sha_short }}
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-      - name: Release
-        if: steps.cache.outputs.cache-hit != 'true'
+      - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           version: latest
-          distribution: goreleaser-pro
-          args: release --clean --split
+          args: release --clean 
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ github.ref_name }}
-          GGOOS: windows
-
-  prepare-darwin:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-go@v4
-        with:
-          go-version-file: 'go.mod'
-      - shell: bash
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-      - name: cache darwin
-        uses: actions/cache@v3
-        with:
-          path: dist/darwin
-          key: darwin-${{ env.sha_short }}
-      - name: Run GoReleaser
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: |
-          docker run  -e GGOOS=darwin -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.RELEASE_TOKEN }} -v $(pwd):/src -w /src bruin-data/goreleaser-cross-pro:v1.22 release --clean --split
-  
-        
-  prepare-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-go@v4
-        with:
-          go-version-file: 'go.mod'
-      - shell: bash
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-      - name: cache linux
-        uses: actions/cache@v3
-        with:
-          path: dist/linux
-          key: linux-${{ env.sha_short }}
-      - name: Run GoReleaser
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: |
-          docker run  -e GGOOS=linux -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.RELEASE_TOKEN }} -v $(pwd):/src -w /src bruin-data/goreleaser-cross-pro:v1.22 release --clean --split
-
-              
-  release:
-    runs-on: ubuntu-latest
-    needs: [prepare-linux, prepare-windows, prepare-darwin]
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-go@v3
-        with:
-          go-version: 1.19
-          cache: true
-      - shell: bash
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-      - uses: actions/cache@v3
-        with:
-          path: dist/linux
-          key: linux-${{ env.sha_short }}
-      - uses: actions/cache@v3
-        with:
-          path: dist/darwin
-          key: darwin-${{ env.sha_short }}
-      - uses: actions/cache@v3
-        with:
-          path: dist/windows
-          key: windows-${{ env.sha_short }}
-      - uses: goreleaser/goreleaser-action@v3
-        with:
-          distribution: goreleaser-pro
-          version: latest
-          args: continue --merge
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
-
