@@ -3,53 +3,6 @@ before:
   hooks:
     - go mod tidy
 builds:
-  - id: bruin-darwin
-    binary: bruin
-    ldflags:
-      - -s -w -X main.version={{ .Env.VERSION }}
-    main: ./
-    goarch:
-      - amd64
-      - arm64
-    goos:
-      - darwin
-    env:
-      - CC=o64-clang
-      - CXX=o64-clang++
-      - CGO_ENABLED=1
-    flags:
-      - -trimpath
- 
-  - id: bruin-linux-amd64
-    binary: bruin
-    main: ./
-    env:
-      - CC=x86_64-linux-gnu-gcc
-      - CXX=x86_64-linux-gnu-g++
-      - CGO_ENABLED=1
-    goarch:
-      - amd64
-    goos:
-      - linux
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X main.version={{ .Env.VERSION }}"
-  - id: bruin-linux-arm64
-    binary: bruin
-    main: ./
-    goarch:
-      - arm64
-    goos:
-      - linux
-    env:
-      - CC=aarch64-linux-gnu-gcc
-      - CXX=aarch64-linux-gnu-g++
-      - CGO_ENABLED=1
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X main.version={{ .Env.VERSION }}"
   - id: bruin-windows-amd64
     binary: bruin
     main: ./
@@ -67,13 +20,9 @@ builds:
       - -trimpath
       - -buildmode=exe
 
-
 archives:
   - format: tar.gz
     builds:
-      - bruin-linux-arm64
-      - bruin-linux-amd64
-      - bruin-darwin
       - bruin-windows-amd64
     name_template: >-
       {{ .ProjectName }}_
@@ -93,45 +42,5 @@ changelog:
       - "^docs:"
       - "^test:"
 
-# .goreleaser.yaml
-brews:
-  - name: bruin
-
-    # Git author used to commit to the repository.
-    commit_author:
-      name: karakanb
-      email: burak.karakan@getbruin.com
-
-    # Folder inside the repository to put the formula.
-    directory: Formula
-
-    # The project name and current git tag are used in the format string.
-    #
-    # Templates: allowed
-    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
-
-    # Your app's homepage.
-    homepage: "https://getbruin.com"
-    description: "Bruin is a command-line tool for validating and running data transformations on SQL and Python."
-
-    dependencies:
-      - name: git
-
-    repository:
-      owner: bruin-data
-      name: homebrew-tap
-
-nfpms:
-  - package_name: bruin
-    homepage: https://getbruin.com
-    maintainer: Burak Karakan <burak.karakan@getbruin.com>
-    description: "Bruin is a command-line tool for validating and running data transformations on SQL and Python."
-    vendor: Bruin Data
-    license: MIT
-    formats:
-      - apk
-      - deb
-    dependencies:
-      - git
 
 
