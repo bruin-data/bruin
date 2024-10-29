@@ -69,9 +69,7 @@ jobs:
 
   goreleaser:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: msys2 {0}
+
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
