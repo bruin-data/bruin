@@ -4,12 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/chess"
-	"github.com/bruin-data/bruin/pkg/gsheets"
-
 	"io/ioutil"
 	"os"
-
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
@@ -17,11 +13,13 @@ import (
 	"github.com/bruin-data/bruin/pkg/appsflyer"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/chess"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/gorgias"
+	"github.com/bruin-data/bruin/pkg/gsheets"
 	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/hubspot"
 	"github.com/bruin-data/bruin/pkg/kafka"
@@ -207,7 +205,6 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Airtable)...)
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
-
 }
 
 func (m *Manager) GetAthenaConnection(name string) (athena.Client, error) {
@@ -1156,7 +1153,7 @@ func (m *Manager) AddAppsflyerConnectionFromConfig(connection *config.AppsflyerC
 	m.mutex.Unlock()
 
 	client, err := appsflyer.NewClient(appsflyer.Config{
-		ApiKey: connection.ApiKey,
+		APIKey: connection.APIKey,
 	})
 	if err != nil {
 		return err
@@ -1199,7 +1196,7 @@ func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnectio
 
 	client, err := kafka.NewClient(kafka.Config{
 		BootstrapServers: connection.BootstrapServers,
-		GroupId:          connection.GroupId,
+		GroupID:          connection.GroupID,
 		BatchSize:        connection.BatchSize,
 		SaslMechanisms:   connection.SaslMechanisms,
 		SaslUsername:     connection.SaslUsername,
@@ -1263,7 +1260,7 @@ func (m *Manager) AddHubspotConnectionFromConfig(connection *config.HubspotConne
 	m.mutex.Unlock()
 
 	client, err := hubspot.NewClient(hubspot.Config{
-		APIKey: connection.ApiKey,
+		APIKey: connection.APIKey,
 	})
 	if err != nil {
 		return err
@@ -1295,6 +1292,7 @@ func (m *Manager) AddAirtableConnectionFromConfig(connection *config.AirtableCon
 
 	return nil
 }
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
 
