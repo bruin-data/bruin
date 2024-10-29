@@ -4,18 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
-
-
+	"github.com/bruin-data/bruin/pkg/chess"
+	"github.com/bruin-data/bruin/pkg/gsheets"
 
 	"io/ioutil"
 	"os"
 
-
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
-  "github.com/bruin-data/bruin/pkg/airtable"
+	"github.com/bruin-data/bruin/pkg/airtable"
 	"github.com/bruin-data/bruin/pkg/appsflyer"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
@@ -24,7 +22,6 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/gorgias"
-	"github.com/bruin-data/bruin/pkg/gsheets"
 	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/hubspot"
 	"github.com/bruin-data/bruin/pkg/kafka"
@@ -66,6 +63,7 @@ type Manager struct {
 	DuckDB       map[string]*duck.Client
 	Hubspot      map[string]*hubspot.Client
 	GoogleSheets map[string]*gsheets.Client
+	Chess        map[string]*chess.Client
 	mutex        sync.Mutex
 }
 
@@ -197,12 +195,19 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connGoogleSheets, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GoogleSheets)...)
+
+	connChess, err := m.GetChessConnectionWithoutDefault(name)
+	if err == nil {
+		return connChess, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Chess)...)
 	connAirtable, err := m.GetAirtableConnectionWithoutDefault(name)
 	if err == nil {
 		return connAirtable, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Airtable)...)
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
+
 }
 
 func (m *Manager) GetAthenaConnection(name string) (athena.Client, error) {
@@ -676,6 +681,27 @@ func (m *Manager) GetGoogleSheetsConnectionWithoutDefault(name string) (*gsheets
 	if !ok {
 		return nil, errors.Errorf("google sheets connection not found for '%s'", name)
 	}
+	return db, nil
+}
+
+func (m *Manager) GetChessConnection(name string) (*chess.Client, error) {
+	db, err := m.GetChessConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	print("db", db)
+	return m.GetChessConnectionWithoutDefault("chess-default")
+}
+
+func (m *Manager) GetChessConnectionWithoutDefault(name string) (*chess.Client, error) {
+	if m.Chess == nil {
+		return nil, errors.New("no chess connections found")
+	}
+	db, ok := m.Chess[name]
+	if !ok {
+		return nil, errors.Errorf("chess connection not found for '%s'", name)
+	}
+
 	return db, nil
 }
 
@@ -1211,6 +1237,24 @@ func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnect
 	return nil
 }
 
+func (m *Manager) AddChessConnectionFromConfig(connection *config.ChessConnection) error {
+	m.mutex.Lock()
+	if m.Chess == nil {
+		m.Chess = make(map[string]*chess.Client)
+	}
+	m.mutex.Unlock()
+	client, err := chess.NewClient(chess.Config{
+		Players: connection.Players,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Chess[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddHubspotConnectionFromConfig(connection *config.HubspotConnection) error {
 	m.mutex.Lock()
 	if m.Hubspot == nil {
@@ -1493,6 +1537,14 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 		})
 	}
 
+	for _, conn := range cm.SelectedEnvironment.Connections.Chess {
+		wg.Go(func() {
+			err := connectionManager.AddChessConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add chess connection '%s'", conn.Name))
+			}
+		})
+	}
 	for _, conn := range cm.SelectedEnvironment.Connections.Airtable {
 		wg.Go(func() {
 			err := connectionManager.AddAirtableConnectionFromConfig(&conn)

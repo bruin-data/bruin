@@ -23,4 +23,5 @@ default_connections:
   kafka: "my-kafka"
   hubspot: "my-hubspot"
   googlesheets: "my-gsheets"
+  chess: "my-chess"
   airtable: "my-airtable"

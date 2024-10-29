@@ -946,6 +946,8 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "hubspot-default", nil
 	case "google_sheets":
 		return "google-sheets-default", nil
+	case "chess":
+		return "chess-default", nil
 	case "airtable":
 		return "airtable-default", nil
 	default:

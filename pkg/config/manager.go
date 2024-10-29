@@ -275,6 +275,15 @@ func (c GoogleSheetsConnection) GetName() string {
 	return c.Name
 }
 
+type ChessConnection struct {
+	Name    string   `yaml:"name" json:"name" mapstructure:"name"`
+	Players []string `yaml:"players" json:"players" mapstructure:"players"`
+}
+
+func (c ChessConnection) GetName() string {
+	return c.Name
+}
+
 type MySQLConnection struct {
 	Name     string `yaml:"name" json:"name" mapstructure:"name"`
 	Username string `yaml:"username" json:"username" mapstructure:"username"`
@@ -383,6 +392,7 @@ type Connections struct {
 	DuckDB              []DuckDBConnection              `yaml:"duckdb,omitempty" json:"duckdb,omitempty" mapstructure:"duckdb"`
 	Hubspot             []HubspotConnection             `yaml:"hubspot,omitempty" json:"hubspot,omitempty" mapstructure:"hubspot"`
 	GoogleSheets        []GoogleSheetsConnection        `yaml:"google_sheets,omitempty" json:"google_sheets,omitempty" mapstructure:"google_sheets"`
+	Chess               []ChessConnection               `yaml:"chess,omitempty" json:"chess,omitempty" mapstructure:"chess"`
 	Airtable            []AirtableConnection            `yaml:"airtable,omitempty" json:"airtable,omitempty" mapstructure:"airtable"`
 
 	byKey       map[string]any
@@ -533,6 +543,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.GoogleSheets {
 		c.byKey[conn.Name] = &(c.GoogleSheets[i])
 		c.typeNameMap[conn.Name] = "google_sheets"
+	}
+
+	for i, conn := range c.Chess {
+		c.byKey[conn.Name] = &(c.Chess[i])
+		c.typeNameMap[conn.Name] = "chess"
 	}
 
 	for i, conn := range c.Airtable {
@@ -838,6 +853,12 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		if err := mapstructure.Decode(creds, &conn); err != nil {
 			return fmt.Errorf("failed to decode credentials: %w", err)
 		}
+	case "chess":
+		var conn ChessConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+
 	case "airtable":
 		var conn AirtableConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -924,6 +945,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Hubspot = removeConnection(env.Connections.Hubspot, connectionName)
 	case "google_sheets":
 		env.Connections.GoogleSheets = removeConnection(env.Connections.GoogleSheets, connectionName)
+	case "chess":
+		env.Connections.Chess = removeConnection(env.Connections.Chess, connectionName)
 	case "airtable":
 		env.Connections.Airtable = removeConnection(env.Connections.Airtable, connectionName)
 	default:
