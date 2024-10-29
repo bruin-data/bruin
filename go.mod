@@ -7,6 +7,7 @@ toolchain go1.22.2
 require (
 	cloud.google.com/go/bigquery v1.60.0
 	github.com/DATA-DOG/go-sqlmock v1.5.0
+	github.com/albertobruin/go-duckdb v0.0.0-20241028180825-567cf234bc18
 	github.com/alecthomas/chroma/v2 v2.13.0
 	github.com/databricks/databricks-sql-go v1.6.0
 	github.com/docker/docker v25.0.6+incompatible
@@ -19,7 +20,6 @@ require (
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/kluctl/go-embed-python v0.0.0-3.12.3-20240415-2
 	github.com/manifoldco/promptui v0.9.0
-	github.com/marcboeker/go-duckdb v1.8.2
 	github.com/microsoft/go-mssqldb v1.7.0
 	github.com/nikolalohinski/gonja/v2 v2.2.0
 	github.com/pashagolub/pgxmock/v3 v3.3.0

@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 
+	_ "github.com/albertobruin/go-duckdb"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/marcboeker/go-duckdb"
 )
 
 type Client struct {
