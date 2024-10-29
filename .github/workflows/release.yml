@@ -37,7 +37,7 @@ jobs:
           distribution: goreleaser-pro
           args: release --clean --split
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
           VERSION: ${{ github.ref_name }}
           GGOOS: windows
@@ -117,6 +117,6 @@ jobs:
           version: latest
           args: continue --merge
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
