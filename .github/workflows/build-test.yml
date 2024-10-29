@@ -43,25 +43,19 @@ jobs:
       - run: make format
 
   goreleaser:
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: msys2 {0}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: msys2/setup-msys2@v2
         with:
-          msystem: UCRT64
-          update: true
-          install: git mingw-w64-ucrt-x86_64-gcc
+          fetch-depth: 0
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
       - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
+          install-only: true
           version: latest
-          args: release --clean --snapshot
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ github.ref_name }}
+      - name: Run GoReleaser
+        run: |
+          docker run -e VERSION=0.0.0  -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 release --snapshot --clean
