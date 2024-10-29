@@ -155,7 +155,7 @@ func (d *Client) UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipel
 		}
 	}
 
-	if asset.Description == "" && (asset.Columns == nil || len(asset.Columns) == 0 || !anyColumnHasDescription) {
+	if asset.Description == "" && (len(asset.Columns) == 0 || !anyColumnHasDescription) {
 		return NoMetadataUpdatedError{}
 	}
 

@@ -180,6 +180,7 @@ func TestDB_Select(t *testing.T) {
 		})
 	}
 }
+
 func TestDB_Test(t *testing.T) {
 	t.Parallel()
 

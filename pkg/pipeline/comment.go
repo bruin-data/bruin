@@ -82,7 +82,7 @@ func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 
 	scanner := bufio.NewScanner(file)
 	content := ""
-	for i := 0; i < commentRowEnd; i++ {
+	for range commentRowEnd {
 		scanner.Scan()
 	}
 

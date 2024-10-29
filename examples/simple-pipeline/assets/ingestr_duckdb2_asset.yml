@@ -1,0 +1,8 @@
+name: public.duckdb_to_postgres
+type: ingestr
+
+parameters:
+  source_connection: duckdb-default
+  source_table: 'main.sources_view'
+
+  destination: postgres

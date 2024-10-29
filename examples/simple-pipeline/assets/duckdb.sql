@@ -3,8 +3,7 @@ name: sources_view
 type: duckdb.sql
 materialization:
    type: table
-   strategy: merge
-   incremental_key: id
+
 columns:
   - name: id
     type: integer
