@@ -4,18 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
-
-
-
+	"github.com/bruin-data/bruin/pkg/zendesk"
 	"io/ioutil"
 	"os"
-
 
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
-  "github.com/bruin-data/bruin/pkg/airtable"
+	"github.com/bruin-data/bruin/pkg/airtable"
 	"github.com/bruin-data/bruin/pkg/appsflyer"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
@@ -37,6 +33,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/stripe"
+
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc"
 	"golang.org/x/exp/maps"
@@ -66,6 +63,7 @@ type Manager struct {
 	DuckDB       map[string]*duck.Client
 	Hubspot      map[string]*hubspot.Client
 	GoogleSheets map[string]*gsheets.Client
+	Zendesk      map[string]*zendesk.Client
 	mutex        sync.Mutex
 }
 
@@ -202,6 +200,10 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connAirtable, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Airtable)...)
+	connZendesk, err := m.GetZendeskConnectionWithoutDefault(name)
+	if err == nil {
+		return connZendesk, nil
+	}
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
 
@@ -675,6 +677,28 @@ func (m *Manager) GetGoogleSheetsConnectionWithoutDefault(name string) (*gsheets
 	db, ok := m.GoogleSheets[name]
 	if !ok {
 		return nil, errors.Errorf("google sheets connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetZendeskConnection(name string) (*zendesk.Client, error) {
+	if m.Zendesk == nil {
+		return nil, errors.New("no zendesk connections found")
+	}
+	db, ok := m.Zendesk[name]
+	if !ok {
+		return nil, errors.Errorf("zendesk connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetZendeskConnectionWithoutDefault(name string) (*zendesk.Client, error) {
+	if m.Zendesk == nil {
+		return nil, errors.New("no zendesk connections found")
+	}
+	db, ok := m.Zendesk[name]
+	if !ok {
+		return nil, errors.Errorf("zendesk connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -1251,6 +1275,29 @@ func (m *Manager) AddAirtableConnectionFromConfig(connection *config.AirtableCon
 
 	return nil
 }
+
+func (m *Manager) AddZendeskConnectionFromConfig(connection *config.ZendeskConnection) error {
+	m.mutex.Lock()
+	if m.Zendesk == nil {
+		m.Zendesk = make(map[string]*zendesk.Client)
+	}
+	m.mutex.Unlock()
+	client, err := zendesk.NewClient(zendesk.Config{
+		ApiToken:   connection.ApiToken,
+		Email:      connection.Email,
+		OAuthToken: connection.OAuthToken,
+		Subdomain:  connection.Subdomain,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Zendesk[connection.Name] = client
+
+	return nil
+}
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
 

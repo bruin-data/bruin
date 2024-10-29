@@ -241,6 +241,18 @@ func (c AirtableConnection) GetName() string {
 	return c.Name
 }
 
+type ZendeskConnection struct {
+	Name       string `yaml:"name" json:"name" mapstructure:"name"`
+	ApiToken   string `yaml:"api_token" json:"api_token" mapstructure:"api_token"`
+	Email      string `yaml:"email" json:"email" mapstructure:"email"`
+	OAuthToken string `yaml:"oauth_token" json:"oauth_token" mapstructure:"oauth_token"`
+	Subdomain  string `yaml:"subdomain" json:"subdomain" mapstructure:"subdomain"`
+}
+
+func (c ZendeskConnection) GetName() string {
+	return c.Name
+}
+
 type KafkaConnection struct {
 	Name             string `yaml:"name" json:"name" mapstructure:"name"`
 	BootstrapServers string `yaml:"bootstrap_servers" json:"bootstrap_servers" mapstructure:"bootstrap_servers"`
@@ -384,6 +396,7 @@ type Connections struct {
 	Hubspot             []HubspotConnection             `yaml:"hubspot,omitempty" json:"hubspot,omitempty" mapstructure:"hubspot"`
 	GoogleSheets        []GoogleSheetsConnection        `yaml:"google_sheets,omitempty" json:"google_sheets,omitempty" mapstructure:"google_sheets"`
 	Airtable            []AirtableConnection            `yaml:"airtable,omitempty" json:"airtable,omitempty" mapstructure:"airtable"`
+	Zendesk             []ZendeskConnection             `yaml:"zendesk,omitempty" json:"zendesk,omitempty" mapstructure:"zendesk"`
 
 	byKey       map[string]any
 	typeNameMap map[string]string
@@ -538,6 +551,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.Airtable {
 		c.byKey[conn.Name] = &(c.Airtable[i])
 		c.typeNameMap[conn.Name] = "airtable"
+	}
+
+	for i, conn := range c.Zendesk {
+		c.byKey[conn.Name] = &(c.Zendesk[i])
+		c.typeNameMap[conn.Name] = "zendesk"
 	}
 }
 
@@ -845,6 +863,11 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Airtable = append(env.Connections.Airtable, conn)
+	case "zendesk":
+		var conn ZendeskConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -926,6 +949,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.GoogleSheets = removeConnection(env.Connections.GoogleSheets, connectionName)
 	case "airtable":
 		env.Connections.Airtable = removeConnection(env.Connections.Airtable, connectionName)
+	case "zendesk":
+		env.Connections.Zendesk = removeConnection(env.Connections.Zendesk, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}

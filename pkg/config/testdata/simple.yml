@@ -146,6 +146,12 @@ environments:
         - name: conn23
           base_id: "123"
           access_token: "accessKey"
+      zendesk:
+        - name: conn25,
+        - api_key: "zendeskKey",
+        - email: "zendeskemail",
+        - subdomain: "zendeskUrl",
+        - oauth_token: "token123",
       generic:
         - name: key1
           value: value1

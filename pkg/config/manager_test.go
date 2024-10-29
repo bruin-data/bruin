@@ -229,6 +229,15 @@ func TestLoadFromFile(t *testing.T) {
 					AccessToken: "accessKey",
 				},
 			},
+			Zendesk: []ZendeskConnection{
+				{
+					Name:       "conn25",
+					ApiKey:     "zendeskKey",
+					Email:      "zendeskemail",
+					Subdomain:  "zendeskUrl",
+					OAuthToken: "token123",
+				},
+			},
 		},
 	}
 
