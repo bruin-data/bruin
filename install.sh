@@ -70,13 +70,9 @@ execute() {
   echo "To add ${BINDIR} to your PATH, either restart your shell or run:"
  
   export_command="export PATH="$PATH:${BINDIR}"     
-  echo "# Adding the following line to your ~/.bashrc file:"
   echo "$export_command" >> "$HOME/.bashrc" 2>/dev/null || true
-  echo "# Added: $export_command"
 
-  echo "# Adding the following line to your ~/.zshrc file:"
   echo "$export_command" >> "$HOME/.zshrc" 2>/dev/null || true
-  echo "# Added: $export_command"
 
   export PATH="$PATH:${BINDIR}" || true
 
