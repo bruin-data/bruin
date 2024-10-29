@@ -93,7 +93,33 @@ changelog:
       - "^docs:"
       - "^test:"
 
+# .goreleaser.yaml
+brews:
+  - name: bruin
 
+    # Git author used to commit to the repository.
+    commit_author:
+      name: karakanb
+      email: burak.karakan@getbruin.com
+
+    # Folder inside the repository to put the formula.
+    directory: Formula
+
+    # The project name and current git tag are used in the format string.
+    #
+    # Templates: allowed
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+
+    # Your app's homepage.
+    homepage: "https://getbruin.com"
+    description: "Bruin is a command-line tool for validating and running data transformations on SQL and Python."
+
+    dependencies:
+      - name: git
+
+    repository:
+      owner: bruin-data
+      name: homebrew-tap
 
 nfpms:
   - package_name: bruin

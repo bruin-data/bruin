@@ -37,7 +37,7 @@ jobs:
           distribution: goreleaser-pro
           args: release --clean --split
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
           VERSION: ${{ github.ref_name }}
           GGOOS: windows
@@ -67,7 +67,7 @@ jobs:
       - name: Run GoReleaser
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          docker run --privileged   -v /var/run/docker.sock:/var/run/docker.sock -e GGOOS=darwin -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} -v $(pwd):/src -w /src evalsocket/goreleaser-cross-pro:v1.22 release --clean --split --verbose
+          docker run --privileged   -v /var/run/docker.sock:/var/run/docker.sock -e GGOOS=darwin -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.RELEASE_TOKEN }} -v $(pwd):/src -w /src evalsocket/goreleaser-cross-pro:v1.22 release --clean --split --verbose
   
         
   prepare-linux:
@@ -95,7 +95,7 @@ jobs:
       - name: Run GoReleaser
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          docker run --privileged   -v /var/run/docker.sock:/var/run/docker.sock -e GGOOS=linux -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} -v $(pwd):/src -w /src evalsocket/goreleaser-cross-pro:v1.22 release --clean --split --verbose
+          docker run --privileged   -v /var/run/docker.sock:/var/run/docker.sock -e GGOOS=linux -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.RELEASE_TOKEN }} -v $(pwd):/src -w /src evalsocket/goreleaser-cross-pro:v1.22 release --clean --split --verbose
 
               
   release:
