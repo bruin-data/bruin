@@ -148,10 +148,13 @@ environments:
           access_token: "accessKey"
       zendesk:
         - name: conn25,
-        - api_key: "zendeskKey",
-        - email: "zendeskemail",
-        - subdomain: "zendeskUrl",
-        - oauth_token: "token123",
+        - api_key: "zendeskKey"
+        - email: "zendeskemail"
+        - subdomain: "zendeskUrl"
+
+        - name: conn25-1
+        - oauth_token: "token123"
+        - subdomain: "zendeskUrlOAuth"
       generic:
         - name: key1
           value: value1

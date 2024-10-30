@@ -4,10 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/zendesk"
 	"io/ioutil"
 	"os"
-
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
@@ -33,7 +31,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/stripe"
-
+	"github.com/bruin-data/bruin/pkg/zendesk"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc"
 	"golang.org/x/exp/maps"

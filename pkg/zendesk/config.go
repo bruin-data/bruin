@@ -1,7 +1,5 @@
 package zendesk
 
-import "fmt"
-
 type Config struct {
 	ApiToken   string
 	Email      string
@@ -10,13 +8,8 @@ type Config struct {
 }
 
 func (c Config) GetIngestrURI() string {
-	if c.ApiToken != "" && c.Email != "" && c.Subdomain != "" {
+	if c.ApiToken != "" || c.Email != "" {
 		return "zendesk://" + c.Email + ":" + c.ApiToken + "@" + c.Subdomain
 	}
-
-	if c.OAuthToken != "" && c.Subdomain != "" {
-		fmt.Println("zendesk://:" + c.OAuthToken + "@" + c.Subdomain)
-		return "zendesk://:" + c.OAuthToken + "@" + c.Subdomain
-	}
-	return ""
+	return "zendesk://:" + c.OAuthToken + "@" + c.Subdomain
 }
