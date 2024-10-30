@@ -52,7 +52,7 @@ execute() {
   (cd "${tmpdir}" && untar "${TARBALL}")
 
   test ! -d "${BINDIR}" && install -d "${BINDIR}"
-  log_info "installing to ${BINDIR}"
+  echo "installing to ${BINDIR}"
   for binexe in $BINARIES; do
     if [ "$OS" = "windows" ]; then
       binexe="${binexe}.exe"
@@ -63,49 +63,55 @@ execute() {
   done
   rm -rf "${tmpdir}"
   
-
+  echo "everything's installed!"
+  echo
 
   current_shell=$(basename "$SHELL")
 
+  echo "To add ${BINDIR} to your PATH, either restart your shell or run:"
  
   case "$current_shell" in
     bash|sh)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
       eval "$export_command"
-      log_info "$export_command" >> "$HOME/.${current_shell}rc"
+      echo "Executed: $export_command"
+      echo "# Adding the following line to your ~/.${current_shell}rc file:"
+      echo "$export_command" >> "$HOME/.${current_shell}rc"
+      echo "# Added: $export_command"
+      # Export PATH in the current shell
       export PATH="$PATH:${BINDIR}"
-
-      log_info "The PATH has been updated in your current shell session. You can now use the installed binaries without restarting your shell."
       ;;
     zsh)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
       eval "$export_command"
-      log_info "$export_command" >> "$HOME/.zshrc"
+      echo "Executed: $export_command"
+      echo "# Adding the following line to your ~/.zshrc file:"
+      echo "$export_command" >> "$HOME/.zshrc"
+      echo "# Added: $export_command"
       # Export PATH in the current shell
       export PATH="$PATH:${BINDIR}"
-
-      log_info "The PATH has been updated in your current shell session. You can now use the installed binaries without restarting your shell."
       ;;
     fish)
       export_command="set -gx PATH \$PATH ${BINDIR}"
       fish -c "$export_command"
-      log_info "$export_command" >> "$HOME/.config/fish/config.fish"
+      echo "Executed: $export_command"
+      echo "# Adding the following line to your ~/.config/fish/config.fish file:"
+      echo "$export_command" >> "$HOME/.config/fish/config.fish"
+      echo "# Added: $export_command"
       # Export PATH in the current shell (for fish, this is already done by the fish -c command)
-
-      log_info "The PATH has been updated in your current shell session. You can now use the installed binaries without restarting your shell."
       ;;
     *)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
       eval "$export_command"
-      log_info "# Unable to automatically add to your shell's configuration file."
-      log_info "# Please manually add the appropriate line to your shell's configuration file to make it permanent."
+      echo "Executed: $export_command (for most shells)"
+      echo "For fish shell, use: set -gx PATH \$PATH ${BINDIR}"
+      echo "# Unable to automatically add to your shell's configuration file."
+      echo "# Please manually add the appropriate line to your shell's configuration file to make it permanent."
       # Export PATH in the current shell
       export PATH="$PATH:${BINDIR}"
       ;;
   esac
-  
-
-  log_info "everything's installed!"
+  echo "The PATH has been updated in your current shell session. You can now use the installed binaries without restarting your shell."
 }
 
 
