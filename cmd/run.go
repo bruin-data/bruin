@@ -21,7 +21,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/date"
-	"github.com/bruin-data/bruin/pkg/duckdb"
+	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/ingestr"
@@ -125,7 +125,6 @@ func Run(isDebug *bool) *cli.Command {
 			}()
 
 			logger := makeLogger(*isDebug)
-
 			inputPath := c.Args().Get(0)
 			if inputPath == "" {
 				errorPrinter.Printf("Please give a task or pipeline path: bruin run <path to the task definition>)\n")
@@ -174,7 +173,6 @@ func Run(isDebug *bool) *cli.Command {
 
 					return cli.Exit("", 1)
 				}
-
 				if task == nil {
 					errorPrinter.Printf("The given file path doesn't seem to be a Bruin task definition: '%s'\n", inputPath)
 					return cli.Exit("", 1)
@@ -253,24 +251,21 @@ func Run(isDebug *bool) *cli.Command {
 					return cli.Exit("", 1)
 				}
 			}
-
 			infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", foundPipeline.Name, len(foundPipeline.Assets))
 
-			if !runningForAnAsset {
-				rules, err := lint.GetRules(fs, &git.RepoFinder{}, true)
-				if err != nil {
-					errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
-					return cli.Exit("", 1)
-				}
+			rules, err := lint.GetRules(fs, &git.RepoFinder{}, true)
+			if err != nil {
+				errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
+				return cli.Exit("", 1)
+			}
 
-				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
-				res, err := linter.LintPipelines([]*pipeline.Pipeline{foundPipeline})
-				err = reportLintErrors(res, err, lint.Printer{RootCheckPath: pipelinePath}, "")
-				if err != nil {
-					return cli.Exit("", 1)
-				}
-			} else {
-				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
+			rules = lint.FilterRulesBySpeed(rules, true)
+
+			linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
+			res, err := linter.LintPipelines([]*pipeline.Pipeline{foundPipeline})
+			err = reportLintErrors(res, err, lint.Printer{RootCheckPath: pipelinePath}, "")
+			if err != nil {
+				return cli.Exit("", 1)
 			}
 
 			runMain := true

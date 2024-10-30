@@ -780,6 +780,10 @@ func (u UsedTableValidatorRule) Name() string {
 	return "used-tables"
 }
 
+func (u UsedTableValidatorRule) IsFast() bool {
+	return true
+}
+
 func (u UsedTableValidatorRule) GetApplicableLevels() []Level {
 	return []Level{LevelPipeline, LevelAsset}
 }
