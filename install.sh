@@ -303,13 +303,25 @@ http_download_curl() {
   local_file=$1
   source_url=$2
   header=$3
+  # Echo the curl command with header
+  echo "Executing: curl -w '%{http_code}' -sL -H \"$header\" -o \"$local_file\" \"$source_url\""
+  echo `curl -w '%{http_code}' -sL -H "$header" -o "$local_file" "$source_url"`
+  
+  # Echo the curl command without header
+  echo "Executing: curl -w '%{http_code}' -sL -o \"$local_file\" \"$source_url\""
+  echo `curl -w '%{http_code}' -sL -o "$local_file" "$source_url"`
+  
   if [ -z "$header" ]; then
-    code=$(curl -w '%{http_code}' -sL -o "$local_file" "$source_url")
+    response=$(curl -w '%{http_code}' -sL -o "$local_file" "$source_url")
+    code="${response: -3}"  # Extract the last 3 characters for the HTTP status code
   else
-    code=$(curl -w '%{http_code}' -sL -H "$header" -o "$local_file" "$source_url")
+    response=$(curl -w '%{http_code}' -sL -H "$header" -o "$local_file" "$source_url")
+    code="${response: -3}"  # Extract the last 3 characters for the HTTP status code
   fi
   if [ "$code" != "200" ]; then
     log_debug "http_download_curl received HTTP status $code"
+    log_err "http_download_curl failed to download from $source_url"
+    log_err "Response body: $response"  # Log the entire response body
     return 1
   fi
   return 0
@@ -349,6 +361,7 @@ github_release() {
   test -z "$version" && version="latest"
   giturl="https://github.com/${owner_repo}/releases/${version}"
   json=$(http_copy "$giturl" "Accept:application/json")
+  echo $json
   test -z "$json" && return 1
   version=$(echo "$json" | tr -s '\n' ' ' | sed 's/.*"tag_name":"//' | sed 's/".*//')
   test -z "$version" && return 1
