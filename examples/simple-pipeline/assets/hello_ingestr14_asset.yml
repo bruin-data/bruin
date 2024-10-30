@@ -1,0 +1,9 @@
+name: public.zendesk
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my-zendesk
+  source_table: 'chats'
+
+  destination: postgres

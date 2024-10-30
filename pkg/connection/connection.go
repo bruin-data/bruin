@@ -195,15 +195,19 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connGoogleSheets, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GoogleSheets)...)
+
 	connAirtable, err := m.GetAirtableConnectionWithoutDefault(name)
 	if err == nil {
 		return connAirtable, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Airtable)...)
+
 	connZendesk, err := m.GetZendeskConnectionWithoutDefault(name)
 	if err == nil {
+		fmt.Println("err", err)
 		return connZendesk, nil
 	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Zendesk)...)
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
 
@@ -1549,6 +1553,14 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 		})
 	}
 
+	for _, conn := range cm.SelectedEnvironment.Connections.Zendesk {
+		wg.Go(func() {
+			err := connectionManager.AddZendeskConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add zendesk connection '%s'", conn.Name))
+			}
+		})
+	}
 	wg.Wait()
 
 	return connectionManager, errList
