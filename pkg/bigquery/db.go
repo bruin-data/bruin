@@ -139,6 +139,45 @@ func (d *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 	return result, nil
 }
 
+func (d *Client) SelectWithSchema(ctx context.Context, query *query.Query) ([]string, [][]interface{}, error) {
+	q := d.client.Query(query.String())
+	rows, err := q.Read(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to initiate query read: %w", err)
+	}
+
+	// Rewind row iterator and fetch all rows into the result slice
+	result := make([][]interface{}, 0)
+	for {
+		var values []bigquery.Value
+		err := rows.Next(&values)
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to read row: %w", err)
+		}
+
+		row := make([]interface{}, len(values))
+		for i, v := range values {
+			row[i] = v
+		}
+		result = append(result, row)
+	}
+
+	// Extract column names from the schema
+	var columnNames []string
+	if rows.Schema != nil {
+		for _, field := range rows.Schema {
+			columnNames = append(columnNames, field.Name)
+		}
+	} else {
+		return nil, nil, fmt.Errorf("schema information is not available")
+	}
+
+	return columnNames, result, nil
+}
+
 type NoMetadataUpdatedError struct{}
 
 func (m NoMetadataUpdatedError) Error() string {
