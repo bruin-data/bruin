@@ -224,7 +224,7 @@ func (c FacebookAdsConnection) GetName() string {
 
 type AppsflyerConnection struct {
 	Name   string `yaml:"name" json:"name" mapstructure:"name"`
-	ApiKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
 }
 
 func (c AppsflyerConnection) GetName() string {
@@ -244,7 +244,7 @@ func (c AirtableConnection) GetName() string {
 type KafkaConnection struct {
 	Name             string `yaml:"name" json:"name" mapstructure:"name"`
 	BootstrapServers string `yaml:"bootstrap_servers" json:"bootstrap_servers" mapstructure:"bootstrap_servers"`
-	GroupId          string `yaml:"group_id" json:"group_id" mapstructure:"group_id"`
+	GroupID          string `yaml:"group_id" json:"group_id" mapstructure:"group_id"`
 	SecurityProtocol string `yaml:"security_protocol" json:"security_protocol" mapstructure:"security_protocol"`
 	SaslMechanisms   string `yaml:"sasl_mechanisms" json:"sasl_mechanisms" mapstructure:"sasl_mechanisms"`
 	SaslUsername     string `yaml:"sasl_username" json:"sasl_username" mapstructure:"sasl_username"`
@@ -259,7 +259,7 @@ func (c KafkaConnection) GetName() string {
 
 type HubspotConnection struct {
 	Name   string `yaml:"name" json:"name" mapstructure:"name"`
-	ApiKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
 }
 
 func (c HubspotConnection) GetName() string {

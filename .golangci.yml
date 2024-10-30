@@ -22,18 +22,13 @@ issues:
 
 linters:
   disable:
-    - scopelint
     - err113
     - err113
     - mnd
     - wrapcheck
     - funlen
-    - maligned
-    - golint
-    - interfacer
     - gomnd
     - gochecknoglobals
-    - exhaustivestruct
     - lll
     - wsl
     - thelper
@@ -46,7 +41,6 @@ linters:
     - exhaustruct
     - gocognit
     - tagliatelle
-    - ifshort
     - forbidigo
     - musttag
     - interfacebloat
@@ -90,7 +84,7 @@ linters-settings:
       - mssql.MsClient
       - databricks.Client
       - athena.Client
-      - duckdb.Client
+      - duckdb.DuckDBClient
   goconst:
     min-len: 5
     min-occurrences: 5

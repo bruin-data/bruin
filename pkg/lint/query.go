@@ -316,7 +316,7 @@ func (q *QueryValidatorRule) Validate(p *pipeline.Pipeline) ([]*Issue, error) {
 	results := make(chan []*Issue, q.bufferSize())
 
 	// start the workers
-	for i := 0; i < q.WorkerCount; i++ {
+	for range q.WorkerCount {
 		go func(taskChannel <-chan *pipeline.Asset, results chan<- []*Issue) {
 			for task := range taskChannel {
 				q.validateTask(p, task, results)
@@ -338,7 +338,7 @@ func (q *QueryValidatorRule) Validate(p *pipeline.Pipeline) ([]*Issue, error) {
 	}
 	q.Logger.Debugf("Processed %d tasks at path '%s', closing channel", processedTaskCount, p.DefinitionFile.Path)
 
-	for i := 0; i < processedTaskCount; i++ {
+	for i := range processedTaskCount {
 		q.Logger.Debugf("Waiting for results for i = %d", i)
 		foundIssues := <-results
 		q.Logger.Debugf("Received issues: %d/%d", i+1, processedTaskCount)

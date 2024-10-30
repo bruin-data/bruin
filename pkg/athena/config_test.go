@@ -3,7 +3,7 @@ package athena
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConfig_ToDSNNoQuery(t *testing.T) {
@@ -18,6 +18,6 @@ func TestConfig_ToDSNNoQuery(t *testing.T) {
 
 	expected := "s3://bucket?WGRemoteCreation=true&accessID=access&db=some_db&missingAsEmptyString=true&region=us-west-2&resultPollIntervalSeconds=3&secretAccessKey=secret"
 	actual, err := c.ToDBConnectionURI()
-	assert.NoError(t, err)
-	assert.Equal(t, expected, actual)
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
 }
