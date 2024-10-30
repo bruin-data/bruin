@@ -303,19 +303,14 @@ http_download_curl() {
   local_file=$1
   source_url=$2
   header=$3
-  # Echo the curl command with header
-  echo "Executing: curl -w '%{http_code}' -sL -H \"$header\" -o \"$local_file\" \"$source_url\""
-  echo `curl -w '%{http_code}' -sL -H "$header" -o "$local_file" "$source_url"`
-  
-  # Echo the curl command without header
-  echo "Executing: curl -w '%{http_code}' -sL -o \"$local_file\" \"$source_url\""
-  echo `curl -w '%{http_code}' -sL -o "$local_file" "$source_url"`
-  
   if [ -z "$header" ]; then
-    response=$(curl -w '%{http_code}' -sL -o "$local_file" "$source_url")
+    echo "Executing: curl -w '%{http_code}' -sL -H \"$header\" -o \"$local_file\" \"$source_url\""
+    response=$(curl -v -w '%{http_code}' -sL -o "$local_file" "$source_url")
     code="${response: -3}"  # Extract the last 3 characters for the HTTP status code
   else
-    response=$(curl -w '%{http_code}' -sL -H "$header" -o "$local_file" "$source_url")
+    # Echo the curl command without header
+    echo "Executing: curl -w '%{http_code}' -sL -o \"$local_file\" \"$source_url\""
+    response=$(curl -v -w '%{http_code}' -sL -H "$header" -o "$local_file" "$source_url")
     code="${response: -3}"  # Extract the last 3 characters for the HTTP status code
   fi
   if [ "$code" != "200" ]; then
