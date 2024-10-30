@@ -1,17 +1,16 @@
 package bigquery
 
 import (
+	"cloud.google.com/go/bigquery"
 	"context"
 	"fmt"
-	"strings"
-
-	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
+	"strings"
 )
 
 var scopes = []string{
@@ -24,9 +23,9 @@ type Querier interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Test(ctx context.Context) error
 }
-
 type Selector interface {
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
+	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
 }
 
 type MetadataUpdater interface {
@@ -138,16 +137,18 @@ func (d *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 
 	return result, nil
 }
-
-func (d *Client) SelectWithSchema(ctx context.Context, query *query.Query) ([]string, [][]interface{}, error) {
-	q := d.client.Query(query.String())
+func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+	q := d.client.Query(queryObj.String())
 	rows, err := q.Read(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initiate query read: %w", err)
+		return nil, fmt.Errorf("failed to initiate query read: %w", err)
 	}
 
-	// Rewind row iterator and fetch all rows into the result slice
-	result := make([][]interface{}, 0)
+	result := &query.QueryResult{
+		Columns: []string{},
+		Rows:    [][]interface{}{},
+	}
+
 	for {
 		var values []bigquery.Value
 		err := rows.Next(&values)
@@ -155,27 +156,25 @@ func (d *Client) SelectWithSchema(ctx context.Context, query *query.Query) ([]st
 			break
 		}
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to read row: %w", err)
+			return nil, fmt.Errorf("failed to read row: %w", err)
 		}
 
 		row := make([]interface{}, len(values))
 		for i, v := range values {
 			row[i] = v
 		}
-		result = append(result, row)
+		result.Rows = append(result.Rows, row)
 	}
 
-	// Extract column names from the schema
-	var columnNames []string
 	if rows.Schema != nil {
 		for _, field := range rows.Schema {
-			columnNames = append(columnNames, field.Name)
+			result.Columns = append(result.Columns, field.Name)
 		}
 	} else {
-		return nil, nil, fmt.Errorf("schema information is not available")
+		return nil, fmt.Errorf("schema information is not available")
 	}
 
-	return columnNames, result, nil
+	return result, nil
 }
 
 type NoMetadataUpdatedError struct{}
