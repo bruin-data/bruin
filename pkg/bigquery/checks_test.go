@@ -41,6 +41,17 @@ func (m *mockQuerierWithResult) UpdateTableMetadataIfNotExist(ctx context.Contex
 	return args.Error(0)
 }
 
+func (m *mockQuerierWithResult) SelectWithSchema(ctx context.Context, q *query.Query) ([]map[string]interface{}, error) {
+	// Implement this method to satisfy the bigquery.DB interface
+	args := m.Called(ctx, q)
+	get := args.Get(0)
+	if get == nil {
+		return nil, args.Error(1)
+	}
+
+	return get.([]map[string]interface{}), args.Error(1)
+}
+
 type mockConnectionFetcher struct {
 	mock.Mock
 }
