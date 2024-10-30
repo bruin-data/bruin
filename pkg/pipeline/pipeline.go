@@ -421,6 +421,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"mssql":      AssetTypeMsSQLQuery,
 	"databricks": AssetTypeDatabricksQuery,
 	"synapse":    AssetTypeSynapseQuery,
+	"duckdb":     AssetTypeDuckDBQuery,
 }
 
 type SecretMapping struct {
@@ -944,6 +945,12 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "duckdb-default", nil
 	case "hubspot":
 		return "hubspot-default", nil
+	case "google_sheets":
+		return "google-sheets-default", nil
+	case "chess":
+		return "chess-default", nil
+	case "airtable":
+		return "airtable-default", nil
 	default:
 		return "", errors.Errorf("no default connection found for type '%s'", assetType)
 	}

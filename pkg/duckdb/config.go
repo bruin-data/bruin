@@ -1,9 +1,5 @@
 package duck
 
-import (
-	"fmt"
-)
-
 type Config struct {
 	Path string
 }
@@ -14,7 +10,7 @@ func (c Config) ToDBConnectionURI() string {
 }
 
 func (c Config) GetIngestrURI() string {
-	connString := fmt.Sprintf("duckdb:///%s", c.Path)
+	connString := "duckdb:///" + c.Path
 
 	return connString
 }

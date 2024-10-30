@@ -2,18 +2,24 @@ package connection
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
+	"github.com/bruin-data/bruin/pkg/airtable"
 	"github.com/bruin-data/bruin/pkg/appsflyer"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/chess"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
-	"github.com/bruin-data/bruin/pkg/duckdb"
+	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/gorgias"
+	"github.com/bruin-data/bruin/pkg/gsheets"
 	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/hubspot"
 	"github.com/bruin-data/bruin/pkg/kafka"
@@ -50,10 +56,13 @@ type Manager struct {
 	Stripe      map[string]*stripe.Client
 	Appsflyer   map[string]*appsflyer.Client
 	Kafka       map[string]*kafka.Client
+	Airtable    map[string]*airtable.Client
 
-	DuckDB  map[string]*duck.Client
-	Hubspot map[string]*hubspot.Client
-	mutex   sync.Mutex
+	DuckDB       map[string]*duck.Client
+	Hubspot      map[string]*hubspot.Client
+	GoogleSheets map[string]*gsheets.Client
+	Chess        map[string]*chess.Client
+	mutex        sync.Mutex
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
@@ -179,6 +188,22 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Hubspot)...)
 
+	connGoogleSheets, err := m.GetGoogleSheetsConnectionWithoutDefault(name)
+	if err == nil {
+		return connGoogleSheets, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GoogleSheets)...)
+
+	connChess, err := m.GetChessConnectionWithoutDefault(name)
+	if err == nil {
+		return connChess, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Chess)...)
+	connAirtable, err := m.GetAirtableConnectionWithoutDefault(name)
+	if err == nil {
+		return connAirtable, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Airtable)...)
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
 
@@ -616,12 +641,109 @@ func (m *Manager) GetHubspotConnectionWithoutDefault(name string) (*hubspot.Clie
 	return db, nil
 }
 
+func (m *Manager) GetAirtableConnection(name string) (*airtable.Client, error) {
+	db, err := m.GetAirtableConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetAirtableConnectionWithoutDefault("airtable-default")
+}
+
+func (m *Manager) GetAirtableConnectionWithoutDefault(name string) (*airtable.Client, error) {
+	if m.Airtable == nil {
+		return nil, errors.New("no airtable connections found")
+	}
+	db, ok := m.Airtable[name]
+	if !ok {
+		return nil, errors.Errorf("airtable connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetGoogleSheetsConnection(name string) (*gsheets.Client, error) {
+	db, err := m.GetGoogleSheetsConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetGoogleSheetsConnectionWithoutDefault("google-sheets-default")
+}
+
+func (m *Manager) GetGoogleSheetsConnectionWithoutDefault(name string) (*gsheets.Client, error) {
+	if m.GoogleSheets == nil {
+		return nil, errors.New("no google sheets connections found")
+	}
+	db, ok := m.GoogleSheets[name]
+	if !ok {
+		return nil, errors.Errorf("google sheets connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetChessConnection(name string) (*chess.Client, error) {
+	db, err := m.GetChessConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	print("db", db)
+	return m.GetChessConnectionWithoutDefault("chess-default")
+}
+
+func (m *Manager) GetChessConnectionWithoutDefault(name string) (*chess.Client, error) {
+	if m.Chess == nil {
+		return nil, errors.New("no chess connections found")
+	}
+	db, ok := m.Chess[name]
+	if !ok {
+		return nil, errors.Errorf("chess connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
 func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatformConnection) error {
 	m.mutex.Lock()
 	if m.BigQuery == nil {
 		m.BigQuery = make(map[string]*bigquery.Client)
 	}
 	m.mutex.Unlock()
+
+	if len(connection.ServiceAccountFile) == 0 && len(connection.ServiceAccountJSON) == 0 {
+		return errors.New("at least one of service_account_file or service_account_json must be provided")
+	}
+
+	if len(connection.ServiceAccountFile) > 0 && connection.ServiceAccountFile != "" {
+
+		file, err := ioutil.ReadFile(connection.ServiceAccountFile)
+		if err == nil {
+			return errors.Errorf("Please use service_account_file Instead  of  service_account_json ")
+		}
+		var js json.RawMessage
+		err = json.Unmarshal(file, &js)
+		if err != nil {
+			return errors.Errorf("not a valid JSON in service account file at '%s'", connection.ServiceAccountFile)
+		}
+	}
+
+	if len(connection.ServiceAccountJSON) > 0 && connection.ServiceAccountJSON != "" {
+
+		_, err := os.Stat(connection.ServiceAccountJSON)
+		if err == nil {
+			return errors.New("please use service_account_file Instead  of service_account_json to define path ")
+		}
+
+		file, err := ioutil.ReadFile(connection.ServiceAccountJSON)
+		if err != nil {
+			file = []byte(connection.ServiceAccountJSON)
+		}
+
+		var js json.RawMessage
+		err = json.Unmarshal(file, &js)
+		if err != nil {
+			return errors.New("not a valid JSON in service account json")
+		}
+	}
 
 	db, err := bigquery.NewDB(&bigquery.Config{
 		ProjectID:           connection.ProjectID,
@@ -1031,7 +1153,7 @@ func (m *Manager) AddAppsflyerConnectionFromConfig(connection *config.AppsflyerC
 	m.mutex.Unlock()
 
 	client, err := appsflyer.NewClient(appsflyer.Config{
-		ApiKey: connection.ApiKey,
+		APIKey: connection.APIKey,
 	})
 	if err != nil {
 		return err
@@ -1040,6 +1162,27 @@ func (m *Manager) AddAppsflyerConnectionFromConfig(connection *config.AppsflyerC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Appsflyer[connection.Name] = client
+
+	return nil
+}
+
+func (m *Manager) AddGoogleSheetsConnectionFromConfig(connection *config.GoogleSheetsConnection) error {
+	m.mutex.Lock()
+	if m.GoogleSheets == nil {
+		m.GoogleSheets = make(map[string]*gsheets.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := gsheets.NewClient(gsheets.Config{
+		CredentialsPath: connection.CredentialsPath,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.GoogleSheets[connection.Name] = client
 
 	return nil
 }
@@ -1053,7 +1196,7 @@ func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnectio
 
 	client, err := kafka.NewClient(kafka.Config{
 		BootstrapServers: connection.BootstrapServers,
-		GroupId:          connection.GroupId,
+		GroupID:          connection.GroupID,
 		BatchSize:        connection.BatchSize,
 		SaslMechanisms:   connection.SaslMechanisms,
 		SaslUsername:     connection.SaslUsername,
@@ -1091,6 +1234,24 @@ func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnect
 	return nil
 }
 
+func (m *Manager) AddChessConnectionFromConfig(connection *config.ChessConnection) error {
+	m.mutex.Lock()
+	if m.Chess == nil {
+		m.Chess = make(map[string]*chess.Client)
+	}
+	m.mutex.Unlock()
+	client, err := chess.NewClient(chess.Config{
+		Players: connection.Players,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Chess[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddHubspotConnectionFromConfig(connection *config.HubspotConnection) error {
 	m.mutex.Lock()
 	if m.Hubspot == nil {
@@ -1099,7 +1260,7 @@ func (m *Manager) AddHubspotConnectionFromConfig(connection *config.HubspotConne
 	m.mutex.Unlock()
 
 	client, err := hubspot.NewClient(hubspot.Config{
-		APIKey: connection.ApiKey,
+		APIKey: connection.APIKey,
 	})
 	if err != nil {
 		return err
@@ -1108,6 +1269,26 @@ func (m *Manager) AddHubspotConnectionFromConfig(connection *config.HubspotConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Hubspot[connection.Name] = client
+
+	return nil
+}
+
+func (m *Manager) AddAirtableConnectionFromConfig(connection *config.AirtableConnection) error {
+	m.mutex.Lock()
+	if m.Airtable == nil {
+		m.Airtable = make(map[string]*airtable.Client)
+	}
+	m.mutex.Unlock()
+	client, err := airtable.NewClient(airtable.Config{
+		BaseId:      connection.BaseId,
+		AccessToken: connection.AccessToken,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Airtable[connection.Name] = client
 
 	return nil
 }
@@ -1327,6 +1508,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 		})
 	}
 
+	for _, conn := range cm.SelectedEnvironment.Connections.GoogleSheets {
+		wg.Go(func() {
+			err := connectionManager.AddGoogleSheetsConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add googlesheets connection '%s'", conn.Name))
+			}
+		})
+	}
+
 	for _, conn := range cm.SelectedEnvironment.Connections.DuckDB {
 		wg.Go(func() {
 			err := connectionManager.AddDuckDBConnectionFromConfig(&conn)
@@ -1341,6 +1531,23 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			err := connectionManager.AddHubspotConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add hubspot connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Chess {
+		wg.Go(func() {
+			err := connectionManager.AddChessConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add chess connection '%s'", conn.Name))
+			}
+		})
+	}
+	for _, conn := range cm.SelectedEnvironment.Connections.Airtable {
+		wg.Go(func() {
+			err := connectionManager.AddAirtableConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add airtable connection '%s'", conn.Name))
 			}
 		})
 	}

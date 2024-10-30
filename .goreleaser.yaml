@@ -65,7 +65,7 @@ builds:
       - -s -w -X main.version={{ .Env.VERSION }}"
     flags:
       - -trimpath
-      - -buildmode=c-archive
+      - -buildmode=exe
 
 
 archives:
@@ -133,5 +133,3 @@ nfpms:
       - deb
     dependencies:
       - git
-
-

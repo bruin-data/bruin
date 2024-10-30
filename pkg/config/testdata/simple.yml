@@ -139,6 +139,19 @@ environments:
       hubspot:
         - name: conn21
           api_key: "hubspotkey"
+      google_sheets:
+          - name: conn22
+            credentials_path: "/path/to/service_account.json"
+      chess:
+        - name: conn24
+          players:
+            - "Max"
+            - "Peter"
+
+      airtable:
+        - name: conn23
+          base_id: "123"
+          access_token: "accessKey"
       generic:
         - name: key1
           value: value1

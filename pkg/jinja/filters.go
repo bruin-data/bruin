@@ -32,7 +32,7 @@ func init() { //nolint:gochecknoinits
 	}
 }
 
-func dateModifier(e *exec.Evaluator, in *exec.Value, params *exec.VarArgs, modifierFunc func(time.Time) time.Time) *exec.Value {
+func dateModifier(_ *exec.Evaluator, in *exec.Value, params *exec.VarArgs, modifierFunc func(time.Time) time.Time) *exec.Value {
 	if in.IsError() {
 		return in
 	}
