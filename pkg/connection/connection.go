@@ -1347,7 +1347,6 @@ func (m *Manager) AddZendeskConnectionFromConfig(connection *config.ZendeskConne
 	return nil
 }
 
-
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
 
