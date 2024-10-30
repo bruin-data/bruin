@@ -2,6 +2,7 @@ package bigquery
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
@@ -41,7 +42,7 @@ func (m *mockQuerierWithResult) UpdateTableMetadataIfNotExist(ctx context.Contex
 	return args.Error(0)
 }
 
-func (m *mockQuerierWithResult) SelectWithSchema(ctx context.Context, q *query.Query) ([]map[string]interface{}, error) {
+func (m *mockQuerierWithResult) SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error) {
 	// Implement this method to satisfy the bigquery.DB interface
 	args := m.Called(ctx, q)
 	get := args.Get(0)
@@ -49,7 +50,13 @@ func (m *mockQuerierWithResult) SelectWithSchema(ctx context.Context, q *query.Q
 		return nil, args.Error(1)
 	}
 
-	return get.([]map[string]interface{}), args.Error(1)
+	// Assert type conversion to *query.QueryResult
+	result, ok := get.(*query.QueryResult)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type for query result: %T", get)
+	}
+
+	return result, args.Error(1)
 }
 
 type mockConnectionFetcher struct {
