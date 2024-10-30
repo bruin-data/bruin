@@ -5,6 +5,8 @@ on:
     tags:
       - '*'
 
+permissions:
+  contents: write
 
 jobs:
   prepare-darwin:
@@ -102,7 +104,6 @@ jobs:
 
   release-windows:
     runs-on: windows-latest
-    needs: release
     defaults:
       run:
         shell: msys2 {0}
