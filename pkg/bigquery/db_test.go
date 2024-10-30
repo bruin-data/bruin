@@ -105,11 +105,11 @@ func TestDB_IsValid(t *testing.T) {
 
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				response, err := json.Marshal(tt.response)
-				require.NoError(t, err)
+				assert.NoError(t, err)
 
 				w.WriteHeader(tt.statusCode)
 				_, err = w.Write(response)
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}))
 			defer server.Close()
 
@@ -263,29 +263,29 @@ type queryResultResponse struct {
 
 func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse, qrr queryResultResponse) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries/%s?", projectID, jobID)) {
+		if r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries/%s?", projectID, jobID)) {
 			w.WriteHeader(qrr.statusCode)
 
 			response, err := json.Marshal(qrr.response)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 
 			_, err = w.Write(response)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			return
-		} else if r.Method == "POST" && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries", projectID)) {
+		} else if r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries", projectID)) {
 			w.WriteHeader(jsr.statusCode)
 
 			response, err := json.Marshal(jsr.response)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 
 			_, err = w.Write(response)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			return
 		}
 
 		w.WriteHeader(http.StatusInternalServerError)
 		_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	})
 }
 
@@ -538,7 +538,7 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 				if !strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/datasets/%s/tables/%s", projectID, schema, table)) {
 					w.WriteHeader(http.StatusInternalServerError)
 					_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
-					require.NoError(t, err)
+					assert.NoError(t, err)
 					return
 				}
 
@@ -548,10 +548,10 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 					w.WriteHeader(http.StatusOK)
 
 					response, err := json.Marshal(tt.tableResponse)
-					require.NoError(t, err)
+					assert.NoError(t, err)
 
 					_, err = w.Write(response)
-					require.NoError(t, err)
+					assert.NoError(t, err)
 					return
 
 				// this is the request that updates the table metadata with the new details
@@ -561,7 +561,7 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 					// read the body
 					var table bigquery2.Table
 					err := json.NewDecoder(r.Body).Decode(&table)
-					require.NoError(t, err)
+					assert.NoError(t, err)
 
 					colsByName := make(map[string]*pipeline.Column, len(tt.asset.Columns))
 					for _, col := range tt.asset.Columns {
@@ -569,37 +569,37 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 					}
 
 					// ensure the asset description is saved
-					require.Equal(t, tt.asset.Description, table.Description)
+					assert.Equal(t, tt.asset.Description, table.Description)
 
 					if table.Schema != nil {
 						// ensure the column description is saved
 						for _, col := range table.Schema.Fields {
 							if c, ok := colsByName[col.Name]; ok {
-								require.Equal(t, c.Description, col.Description)
+								assert.Equal(t, c.Description, col.Description)
 							}
 						}
 
 						// ensure we didn't drop any columns that we didn't have documented
-						require.Equal(t, len(tt.tableResponse.Schema.Fields), len(table.Schema.Fields))
+						assert.Equal(t, len(tt.tableResponse.Schema.Fields), len(table.Schema.Fields))
 
 						// ensure the primary keys are set correctly
 						primaryKeys := tt.asset.ColumnNamesWithPrimaryKey()
-						require.Equal(t, primaryKeys, table.TableConstraints.PrimaryKey.Columns)
+						assert.Equal(t, primaryKeys, table.TableConstraints.PrimaryKey.Columns)
 					} else {
-						require.Nil(t, tt.tableResponse.Schema)
+						assert.Nil(t, tt.tableResponse.Schema)
 					}
 
 					response, err := json.Marshal(tt.tableResponse)
-					require.NoError(t, err)
+					assert.NoError(t, err)
 
 					_, err = w.Write(response)
-					require.NoError(t, err)
+					assert.NoError(t, err)
 					return
 				}
 
 				w.WriteHeader(http.StatusInternalServerError)
 				_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}))
 			defer server.Close()
 

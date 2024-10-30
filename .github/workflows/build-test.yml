@@ -42,20 +42,40 @@ jobs:
 
       - run: make format
 
-  goreleaser:
-    runs-on: ubuntu-latest
+  goreleaser-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
     steps:
       - uses: actions/checkout@v3
+      - uses: msys2/setup-msys2@v2
         with:
-          fetch-depth: 0
+          msystem: UCRT64
+          update: true
+          install: git mingw-w64-ucrt-x86_64-gcc
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
       - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
-          install-only: true
           version: latest
+          args: build --clean --snapshot --single-target --id bruin-windows-amd64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ github.ref_name }}
+
+
+  goreleaser-unix:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
+
       - name: Run GoReleaser
         run: |
-          docker run -e VERSION=0.0.0  -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 release --snapshot --clean
+          docker run -e VERSION=0.0.0  -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 build --snapshot --clean --id bruin-darwin --id bruin-linux-amd64 --id bruin-linux-arm64  --single-target

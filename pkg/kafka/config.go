@@ -2,7 +2,7 @@ package kafka
 
 type Config struct {
 	BootstrapServers string
-	GroupId          string
+	GroupID          string
 	SecurityProtocol string
 	SaslMechanisms   string
 	SaslUsername     string
@@ -18,8 +18,8 @@ func (c *Config) GetIngestrURI() string {
 		uri += "?bootstrap_servers=" + c.BootstrapServers
 	}
 
-	if c.GroupId != "" {
-		uri += "&group_id=" + c.GroupId
+	if c.GroupID != "" {
+		uri += "&group_id=" + c.GroupID
 	}
 
 	if c.SecurityProtocol != "" {

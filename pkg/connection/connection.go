@@ -13,6 +13,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/appsflyer"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/chess"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
@@ -61,6 +62,7 @@ type Manager struct {
 	DuckDB       map[string]*duck.Client
 	Hubspot      map[string]*hubspot.Client
 	GoogleSheets map[string]*gsheets.Client
+	Chess        map[string]*chess.Client
 	Zendesk      map[string]*zendesk.Client
 	mutex        sync.Mutex
 }
@@ -193,6 +195,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connGoogleSheets, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GoogleSheets)...)
+
+	connChess, err := m.GetChessConnectionWithoutDefault(name)
+	if err == nil {
+		return connChess, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Chess)...)
 
 	connAirtable, err := m.GetAirtableConnectionWithoutDefault(name)
 	if err == nil {
@@ -683,6 +691,27 @@ func (m *Manager) GetGoogleSheetsConnectionWithoutDefault(name string) (*gsheets
 	return db, nil
 }
 
+func (m *Manager) GetChessConnection(name string) (*chess.Client, error) {
+	db, err := m.GetChessConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	print("db", db)
+	return m.GetChessConnectionWithoutDefault("chess-default")
+}
+
+func (m *Manager) GetChessConnectionWithoutDefault(name string) (*chess.Client, error) {
+	if m.Chess == nil {
+		return nil, errors.New("no chess connections found")
+	}
+	db, ok := m.Chess[name]
+	if !ok {
+		return nil, errors.Errorf("chess connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
 func (m *Manager) GetZendeskConnection(name string) (*zendesk.Client, error) {
 	if m.Zendesk == nil {
 		return nil, errors.New("no zendesk connections found")
@@ -1156,7 +1185,7 @@ func (m *Manager) AddAppsflyerConnectionFromConfig(connection *config.AppsflyerC
 	m.mutex.Unlock()
 
 	client, err := appsflyer.NewClient(appsflyer.Config{
-		ApiKey: connection.ApiKey,
+		APIKey: connection.APIKey,
 	})
 	if err != nil {
 		return err
@@ -1199,7 +1228,7 @@ func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnectio
 
 	client, err := kafka.NewClient(kafka.Config{
 		BootstrapServers: connection.BootstrapServers,
-		GroupId:          connection.GroupId,
+		GroupID:          connection.GroupID,
 		BatchSize:        connection.BatchSize,
 		SaslMechanisms:   connection.SaslMechanisms,
 		SaslUsername:     connection.SaslUsername,
@@ -1237,6 +1266,24 @@ func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnect
 	return nil
 }
 
+func (m *Manager) AddChessConnectionFromConfig(connection *config.ChessConnection) error {
+	m.mutex.Lock()
+	if m.Chess == nil {
+		m.Chess = make(map[string]*chess.Client)
+	}
+	m.mutex.Unlock()
+	client, err := chess.NewClient(chess.Config{
+		Players: connection.Players,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Chess[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddHubspotConnectionFromConfig(connection *config.HubspotConnection) error {
 	m.mutex.Lock()
 	if m.Hubspot == nil {
@@ -1245,7 +1292,7 @@ func (m *Manager) AddHubspotConnectionFromConfig(connection *config.HubspotConne
 	m.mutex.Unlock()
 
 	client, err := hubspot.NewClient(hubspot.Config{
-		APIKey: connection.ApiKey,
+		APIKey: connection.APIKey,
 	})
 	if err != nil {
 		return err
@@ -1299,6 +1346,7 @@ func (m *Manager) AddZendeskConnectionFromConfig(connection *config.ZendeskConne
 
 	return nil
 }
+
 
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
@@ -1542,6 +1590,14 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 		})
 	}
 
+	for _, conn := range cm.SelectedEnvironment.Connections.Chess {
+		wg.Go(func() {
+			err := connectionManager.AddChessConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add chess connection '%s'", conn.Name))
+			}
+		})
+	}
 	for _, conn := range cm.SelectedEnvironment.Connections.Airtable {
 		wg.Go(func() {
 			err := connectionManager.AddAirtableConnectionFromConfig(&conn)

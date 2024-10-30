@@ -43,6 +43,7 @@ export default defineConfig({
                     {
                         text: "Overview", link: "/connections/overview", items: [
                             {text: "Adjust", link: "/connections/adjust.md"},
+                            {text: "Chess", link: "/connections/chess.md"},
                             {text: "Airtable", link: "/connections/airtable.md"},
                             {text: "Appsflyer", link: "/connections/appsflyer.md"},
                             {text: "AWS Athena", link: "/connections/athena"},

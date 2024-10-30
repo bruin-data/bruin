@@ -53,7 +53,7 @@ func NewConcurrent(
 	var printLock sync.Mutex
 
 	workers := make([]*worker, workerCount)
-	for i := 0; i < workerCount; i++ {
+	for i := range workerCount {
 		workers[i] = &worker{
 			id:        fmt.Sprintf("worker-%d", i),
 			executor:  executor,
@@ -70,7 +70,7 @@ func NewConcurrent(
 }
 
 func (c Concurrent) Start(ctx context.Context, input chan scheduler.TaskInstance, result chan<- *scheduler.TaskExecutionResult) {
-	for i := 0; i < c.workerCount; i++ {
+	for i := range c.workerCount {
 		go c.workers[i].run(ctx, input, result)
 	}
 }
