@@ -129,11 +129,15 @@ tag_to_version() {
   else
     log_info "checking GitHub for tag '${TAG}'"
   fi
+  log_debug "will get github for "$OWNER/$REPO" and tag '${TAG}'"
   REALTAG=$(github_release "$OWNER/$REPO" "${TAG}") && true
+  log_debug "REALTAG is '${REALTAG}'"
+
   if test -z "$REALTAG"; then
     log_crit "unable to find '${TAG}' - use 'latest' or see https://github.com/${PREFIX}/releases for details"
     exit 1
   fi
+  log_debug "will run for tag ${REALTAG}, version -> ${TAG#v}"
   # if version starts with 'v', remove it
   TAG="$REALTAG"
   VERSION=${TAG#v}
@@ -304,12 +308,14 @@ http_download_curl() {
   source_url=$2
   header=$3
   if [ -z "$header" ]; then
+    log_debug "Executing: curl -w '%{http_code}' -sL -o \"$local_file\" \"$source_url\""
     code=$(curl -w '%{http_code}' -sL -o "$local_file" "$source_url")
   else
+    log_debug "Executing: curl -w '%{http_code}' -sL -H \"$header\" -o \"$local_file\" \"$source_url\""
     code=$(curl -w '%{http_code}' -sL -H "$header" -o "$local_file" "$source_url")
   fi
+  log_debug "http_download_curl received HTTP status $code, return code $?"
   if [ "$code" != "200" ]; then
-    log_debug "http_download_curl received HTTP status $code"
     return 1
   fi
   return 0
@@ -348,9 +354,12 @@ github_release() {
   version=$2
   test -z "$version" && version="latest"
   giturl="https://github.com/${owner_repo}/releases/${version}"
+  log_debug "will get github releases from ${giturl}"
   json=$(http_copy "$giturl" "Accept:application/json")
+  log_debug "json release info is $json"
   test -z "$json" && return 1
   version=$(echo "$json" | tr -s '\n' ' ' | sed 's/.*"tag_name":"//' | sed 's/".*//')
+  log_debug "Version found : '$version'"
   test -z "$version" && return 1
   echo "$version"
 }
@@ -412,6 +421,7 @@ log_prefix() {
 	echo "$PREFIX"
 }
 PLATFORM="${OS}/${ARCH}"
+log_debug "Running for ${PLATFORM}"
 GITHUB_DOWNLOAD=https://github.com/${OWNER}/${REPO}/releases/download
 
 uname_os_check "$OS"
@@ -424,16 +434,21 @@ get_binaries
 tag_to_version
 
 adjust_format
+log_debug "Will download ${FORMAT} format"
 
 adjust_os
+log_debug "OS adjusted to ${OS}"
 
 adjust_arch
+log_debug "ARCH adjusted to ${ARCH}"
 
 log_info "found version: ${VERSION} for ${TAG}/${OS}/${ARCH}"
 
 NAME=${PROJECT_NAME}_${OS}_${ARCH}
 TARBALL=${NAME}.${FORMAT}
 TARBALL_URL=${GITHUB_DOWNLOAD}/${TAG}/${TARBALL}
+
+log_info "Starting the dowload of ${TARBALL_URL}"
 
 
 
