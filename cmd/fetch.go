@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -12,8 +15,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
-	"os"
-	"path/filepath"
 )
 
 func Fetch() *cli.Command {
@@ -25,6 +26,7 @@ func Fetch() *cli.Command {
 		},
 	}
 }
+
 func queryCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "query",
