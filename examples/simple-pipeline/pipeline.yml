@@ -25,3 +25,4 @@ default_connections:
   googlesheets: "my-gsheets"
   chess: "my-chess"
   airtable: "my-airtable"
+  s3: "my-s3"

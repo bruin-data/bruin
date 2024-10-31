@@ -147,11 +147,16 @@ environments:
           players:
             - "Max"
             - "Peter"
-
       airtable:
         - name: conn23
           base_id: "123"
           access_token: "accessKey"
+      s3:
+        - name: conn25
+          bucket_name:  "my-bucket",
+          path_to_file:  "/folder1/file.csv",
+          access_key_id: "123Key",
+          secret_access_key: "secretKey123"
       generic:
         - name: key1
           value: value1
