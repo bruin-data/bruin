@@ -305,12 +305,12 @@ http_download_curl() {
   header=$3
   if [ -z "$header" ]; then
     echo "Executing: curl -w '%{http_code}' -sL -H \"$header\" -o \"$local_file\" \"$source_url\""
-    response=$(curl -v -w '%{http_code}' -sL -o "$local_file" "$source_url")
+    response=$(curl -w '%{http_code}' -sL -o "$local_file" "$source_url")
     code="${response: -3}"  # Extract the last 3 characters for the HTTP status code
   else
     # Echo the curl command without header
     echo "Executing: curl -w '%{http_code}' -sL -o \"$local_file\" \"$source_url\""
-    response=$(curl -v -w '%{http_code}' -sL -H "$header" -o "$local_file" "$source_url")
+    response=$(curl -w '%{http_code}' -sL -H "$header" -o "$local_file" "$source_url")
     code="${response: -3}"  # Extract the last 3 characters for the HTTP status code
   fi
   if [ "$code" != "200" ]; then
