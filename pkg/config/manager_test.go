@@ -235,13 +235,14 @@ func TestLoadFromFile(t *testing.T) {
 					AccessToken: "accessKey",
 				},
 			},
-			S3: []S3Connection{{
-				Name:            "conn25",
-				BucketName:      "my-bucket",
-				PathToFile:      "/folder1/file.csv",
-				AccessKeyId:     "123Key",
-				SecretAccessKey: "secretKey123",
-			},
+			S3: []S3Connection{
+				{
+					Name:            "conn25",
+					BucketName:      "my-bucket",
+					PathToFile:      "/folder1/file.csv",
+					AccessKeyId:     "123Key",
+					SecretAccessKey: "secretKey123",
+				},
 			},
 		},
 	}

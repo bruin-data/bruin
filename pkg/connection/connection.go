@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/s3"
 	"io/ioutil"
 	"sync"
 
@@ -29,6 +28,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/notion"
 	"github.com/bruin-data/bruin/pkg/postgres"
+	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/stripe"
@@ -727,6 +727,7 @@ func (m *Manager) GetS3ConnectionWithoutDefault(name string) (*s3.Client, error)
 	}
 	return db, nil
 }
+
 func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatformConnection) error {
 	m.mutex.Lock()
 	if m.BigQuery == nil {
@@ -1320,8 +1321,8 @@ func (m *Manager) AddS3ConnectionFromConfig(connection *config.S3Connection) err
 	defer m.mutex.Unlock()
 	m.S3[connection.Name] = client
 	return nil
-
 }
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
 
