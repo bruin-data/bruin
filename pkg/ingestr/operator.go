@@ -26,6 +26,8 @@ const (
 	DuckDBDest     = "/tmp/dest.db"
 	DuckDBSource   = "/tmp/source.db"
 	DuckDBPrefix   = "duckdb:///"
+	GsheetsSource  = "/tmp/gsheets_source.db"
+	GsheetsPrefix  = "gsheets://?credentials_path="
 )
 
 type connectionFetcher interface {
@@ -160,6 +162,15 @@ func (o *BasicOperator) ConvertTaskInstanceToContainerConfig(ctx context.Context
 			Target: DuckDBSource,
 		})
 		sourceURI = DuckDBPrefix + DuckDBSource
+	}
+	if strings.HasPrefix(sourceURI, GsheetsPrefix) {
+		sourcePath := strings.TrimPrefix(sourceURI, GsheetsPrefix)
+		mounts = append(mounts, mount.Mount{
+			Type:   mount.TypeBind,
+			Source: sourcePath,
+			Target: GsheetsSource,
+		})
+		sourceURI = GsheetsPrefix + GsheetsSource
 	}
 
 	// some connection types can be shared among sources, therefore inferring source URI from the connection type is not
