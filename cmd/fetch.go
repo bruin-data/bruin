@@ -91,19 +91,24 @@ func queryCommand() *cli.Command {
 
 				// Output result based on format specified
 				if output == "json" {
-					// Format JSON as an array of objects with key-value pairs
-					structuredRows := make([]map[string]interface{}, len(result.Rows))
-
-					for i, row := range result.Rows {
-						rowObject := make(map[string]interface{})
-						for j, columnName := range result.Columns {
-							rowObject[columnName] = row[j]
-						}
-						structuredRows[i] = rowObject
+					type jsonResponse struct {
+						Columns []map[string]string `json:"columns"`
+						Rows    [][]interface{}     `json:"rows"`
 					}
 
-					// Marshal the structured rows
-					jsonData, err := json.Marshal(structuredRows)
+					// Construct JSON response with structured columns
+					jsonCols := make([]map[string]string, len(result.Columns))
+					for i, colName := range result.Columns {
+						jsonCols[i] = map[string]string{"name": colName}
+					}
+
+					// Prepare the final output struct
+					finalOutput := jsonResponse{
+						Columns: jsonCols,
+						Rows:    result.Rows,
+					}
+
+					jsonData, err := json.Marshal(finalOutput)
 					if err != nil {
 						return handleError(output, errors.Wrap(err, "failed to marshal result to JSON"))
 					}
