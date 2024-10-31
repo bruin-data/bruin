@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
@@ -709,42 +708,24 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 	}
 	m.mutex.Unlock()
 
+	// Check if either ServiceAccountFile or ServiceAccountJSON is provided, prioritizing ServiceAccountFile.
 	if len(connection.ServiceAccountFile) == 0 && len(connection.ServiceAccountJSON) == 0 {
-		return errors.New("at least one of service_account_file or service_account_json must be provided")
+		return errors.New("credentials are required: provide either service_account_file or service_account_json")
 	}
 
-	if len(connection.ServiceAccountFile) > 0 && connection.ServiceAccountFile != "" {
-
+	// If ServiceAccountFile is provided, validate that it is readable and contains valid JSON.
+	if len(connection.ServiceAccountFile) > 0 {
 		file, err := ioutil.ReadFile(connection.ServiceAccountFile)
-		if err == nil {
-			return errors.Errorf("Please use service_account_file Instead  of  service_account_json ")
+		if err != nil {
+			return errors.Errorf("failed to read service account file at '%s': %v", connection.ServiceAccountFile, err)
 		}
 		var js json.RawMessage
-		err = json.Unmarshal(file, &js)
-		if err != nil {
-			return errors.Errorf("not a valid JSON in service account file at '%s'", connection.ServiceAccountFile)
+		if err := json.Unmarshal(file, &js); err != nil {
+			return errors.Errorf("invalid JSON format in service account file at '%s'", connection.ServiceAccountFile)
 		}
 	}
 
-	if len(connection.ServiceAccountJSON) > 0 && connection.ServiceAccountJSON != "" {
-
-		_, err := os.Stat(connection.ServiceAccountJSON)
-		if err == nil {
-			return errors.New("please use service_account_file Instead  of service_account_json to define path ")
-		}
-
-		file, err := ioutil.ReadFile(connection.ServiceAccountJSON)
-		if err != nil {
-			file = []byte(connection.ServiceAccountJSON)
-		}
-
-		var js json.RawMessage
-		err = json.Unmarshal(file, &js)
-		if err != nil {
-			return errors.New("not a valid JSON in service account json")
-		}
-	}
-
+	// Set up the BigQuery client using the preferred credentials.
 	db, err := bigquery.NewDB(&bigquery.Config{
 		ProjectID:           connection.ProjectID,
 		CredentialsFilePath: connection.ServiceAccountFile,
@@ -756,6 +737,7 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 		return err
 	}
 
+	// Lock and store the new BigQuery client.
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.BigQuery[connection.Name] = db

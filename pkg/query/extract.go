@@ -13,6 +13,11 @@ type Query struct {
 	Query               string
 }
 
+type QueryResult struct {
+	Columns []string
+	Rows    [][]interface{}
+}
+
 func (q Query) ToExplainQuery() string {
 	// take only the first 10 characters since the actual queries may be pretty large
 	lowerQuery := strings.ToLower(q.Query[:min(10, len(q.Query))])
