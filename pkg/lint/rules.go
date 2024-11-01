@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -369,6 +370,22 @@ func ValidateDuplicateColumnNames(ctx context.Context, p *pipeline.Pipeline, ass
 			})
 		} else {
 			columnNames[lowercaseName] = true
+		}
+	}
+	return issues, nil
+}
+
+func ValidateInvalidPythonModuleName(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	var issues []*Issue
+
+	if asset.Type == "python" {
+		dirName := filepath.Dir(asset.DefinitionFile.Path)
+		if strings.Contains(asset.DefinitionFile.Path, dirName) && dirName != "assets" {
+			fmt.Println(asset.DefinitionFile.Path)
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Invalid python assets name '%s' found ", asset.Name),
+			})
 		}
 	}
 	return issues, nil
