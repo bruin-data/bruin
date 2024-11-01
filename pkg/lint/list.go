@@ -165,7 +165,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        CallFuncForEveryAsset(ValidateInvalidPythonModuleName),
-			AssetValidator:   ValidateDuplicateColumnNames,
+			AssetValidator:   ValidateInvalidPythonModuleName,
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
 		UsedTableValidatorRule{
