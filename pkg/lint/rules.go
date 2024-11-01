@@ -380,12 +380,13 @@ func ValidateInvalidPythonModuleName(ctx context.Context, p *pipeline.Pipeline, 
 
 	if asset.Type == "python" {
 		parentDirs := strings.Split(filepath.Dir(asset.DefinitionFile.Path), "/")
+		lastDir := parentDirs[len(parentDirs)-1]
 
-		if strings.Contains(asset.DefinitionFile.Path, parentDirs[len(parentDirs)-1]) && parentDirs[len(parentDirs)-1] != "assets" {
-			fmt.Println(asset.DefinitionFile.Path)
+		// Check if the last directory contains a hyphen and is not in the 'assets' directory
+		if strings.Contains(lastDir, "-") && lastDir != "assets" {
 			issues = append(issues, &Issue{
 				Task:        asset,
-				Description: fmt.Sprintf("Invalid python module found '%s' for asset  '%s' found ", parentDirs[len(parentDirs)-1], asset.Name),
+				Description: fmt.Sprintf("Invalid Python module name '%s' for asset '%s'. Directory names cannot contain hyphens ('-') as they cannot be imported in Python.", lastDir, asset.Name),
 			})
 		}
 	}
