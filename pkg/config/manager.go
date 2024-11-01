@@ -233,7 +233,7 @@ func (c AppsflyerConnection) GetName() string {
 
 type AirtableConnection struct {
 	Name        string `yaml:"name" json:"name" mapstructure:"name"`
-	BaseId      string `yaml:"base_id" json:"base_id" mapstructure:"base_id"`
+	BaseID      string `yaml:"base_id" json:"base_id" mapstructure:"base_id"`
 	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
 }
 
@@ -288,7 +288,7 @@ type S3Connection struct {
 	Name            string `yaml:"name" json:"name" mapstructure:"name"`
 	BucketName      string `yaml:"bucket_name" json:"bucket_name" mapstructure:"bucket_name"`
 	PathToFile      string `yaml:"path_to_file" json:"path_to_file" mapstructure:"path_to_file"`
-	AccessKeyId     string `yaml:"access_key_id" json:"access_key_id" mapstructure:"access_key_id"`
+	AccessKeyID     string `yaml:"access_key_id" json:"access_key_id" mapstructure:"access_key_id"`
 	SecretAccessKey string `yaml:"secret_access_key" json:"secret_access_key" mapstructure:"secret_access_key"`
 }
 

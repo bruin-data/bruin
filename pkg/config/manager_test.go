@@ -231,7 +231,7 @@ func TestLoadFromFile(t *testing.T) {
 			Airtable: []AirtableConnection{
 				{
 					Name:        "conn23",
-					BaseId:      "123",
+					BaseID:      "123",
 					AccessToken: "accessKey",
 				},
 			},
@@ -240,7 +240,7 @@ func TestLoadFromFile(t *testing.T) {
 					Name:            "conn25",
 					BucketName:      "my-bucket",
 					PathToFile:      "/folder1/file.csv",
-					AccessKeyId:     "123Key",
+					AccessKeyID:     "123Key",
 					SecretAccessKey: "secretKey123",
 				},
 			},

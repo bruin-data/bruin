@@ -1289,7 +1289,7 @@ func (m *Manager) AddAirtableConnectionFromConfig(connection *config.AirtableCon
 	}
 	m.mutex.Unlock()
 	client, err := airtable.NewClient(airtable.Config{
-		BaseId:      connection.BaseId,
+		BaseID:      connection.BaseID,
 		AccessToken: connection.AccessToken,
 	})
 	if err != nil {
@@ -1311,7 +1311,7 @@ func (m *Manager) AddS3ConnectionFromConfig(connection *config.S3Connection) err
 	client, err := s3.NewClient(s3.Config{
 		BucketName:      connection.BucketName,
 		PathToFile:      connection.PathToFile,
-		AccessKeyId:     connection.AccessKeyId,
+		AccessKeyID:     connection.AccessKeyID,
 		SecretAccessKey: connection.SecretAccessKey,
 	})
 	if err != nil {

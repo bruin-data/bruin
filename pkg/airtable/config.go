@@ -1,10 +1,10 @@
 package airtable
 
 type Config struct {
-	BaseId      string
+	BaseID      string
 	AccessToken string
 }
 
 func (c *Config) GetIngestrURI() string {
-	return "airtable://?base_id=" + c.BaseId + "&access_token=" + c.AccessToken
+	return "airtable://?base_id=" + c.BaseID + "&access_token=" + c.AccessToken
 }
