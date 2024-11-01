@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -370,6 +371,20 @@ func ValidateDuplicateColumnNames(ctx context.Context, p *pipeline.Pipeline, ass
 		} else {
 			columnNames[lowercaseName] = true
 		}
+	}
+	return issues, nil
+}
+
+func ValidateAssetDirectoryExist(p *pipeline.Pipeline) ([]*Issue, error) {
+	var issues []*Issue
+
+	parentDir := filepath.Dir(p.DefinitionFile.Path)
+
+	if _, err := os.Stat(fmt.Sprintf("%s/assets", parentDir)); os.IsNotExist(err) {
+		issues = append(issues, &Issue{
+			Task:        &pipeline.Asset{},
+			Description: fmt.Sprintf("Assets directory does not exist at '%s'", fmt.Sprintf("%s/assets", parentDir)),
+		})
 	}
 	return issues, nil
 }
