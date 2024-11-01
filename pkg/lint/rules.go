@@ -380,10 +380,10 @@ func ValidateAssetDirectoryExist(p *pipeline.Pipeline) ([]*Issue, error) {
 
 	parentDir := filepath.Dir(p.DefinitionFile.Path)
 
-	if _, err := os.Stat(fmt.Sprintf("%s/assets", parentDir)); os.IsNotExist(err) {
+	if _, err := os.Stat(parentDir + "/assets"); os.IsNotExist(err) {
 		issues = append(issues, &Issue{
 			Task:        &pipeline.Asset{},
-			Description: fmt.Sprintf("Assets directory does not exist at '%s'", fmt.Sprintf("%s/assets", parentDir)),
+			Description: fmt.Sprintf("Assets directory does not exist at '%s'", parentDir+"/assets"),
 		})
 	}
 	return issues, nil
