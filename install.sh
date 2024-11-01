@@ -308,16 +308,13 @@ http_download_curl() {
   source_url=$2
   header=$3
   if [ -z "$header" ]; then
-    log_debug "Executing: curl -w '%{http_code}' -sL -o \"$local_file\" \"$source_url\""
-    code=$(curl -w '%{http_code}' -sL -o "$local_file" "$source_url" -v)
+    log_debug "Executing: curl  -sL -o \"$local_file\" \"$source_url\""
+    code=$(curl  -sL -o "$local_file" "$source_url" -v)
   else
-    log_debug "Executing: curl -w '%{http_code}' -sL -H \"$header\" -o \"$local_file\" \"$source_url\""
-    code=$(curl -w '%{http_code}' -sL -H "$header" -o "$local_file" "$source_url" -v)
+    log_debug "Executing: curl  -sL -H \"$header\" -o \"$local_file\" \"$source_url\""
+    code=$(curl  -sL -H "$header" -o "$local_file" "$source_url" -v)
   fi
   log_debug "http_download_curl received HTTP status $code, return code $?"
-  if [ "$code" != "200" ]; then
-    return 1
-  fi
   return 0
 }
 http_download_wget() {
