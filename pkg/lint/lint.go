@@ -31,6 +31,7 @@ type Issue struct {
 
 type Rule interface {
 	Name() string
+	IsFast() bool
 	Validate(pipeline *pipeline.Pipeline) ([]*Issue, error)
 	ValidateAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error)
 	GetApplicableLevels() []Level
@@ -39,6 +40,7 @@ type Rule interface {
 
 type SimpleRule struct {
 	Identifier       string
+	Fast             bool
 	Validator        PipelineValidator
 	AssetValidator   AssetValidator
 	ApplicableLevels []Level
@@ -47,6 +49,10 @@ type SimpleRule struct {
 
 func (g *SimpleRule) Validate(pipeline *pipeline.Pipeline) ([]*Issue, error) {
 	return g.Validator(pipeline)
+}
+
+func (g *SimpleRule) IsFast() bool {
+	return g.Fast
 }
 
 func (g *SimpleRule) ValidateAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
