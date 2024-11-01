@@ -309,10 +309,10 @@ http_download_curl() {
   header=$3
   if [ -z "$header" ]; then
     log_debug "Executing: curl  -sL -o \"$local_file\" \"$source_url\""
-    code=$(curl  -sL -o "$local_file" "$source_url" -v)
+    code=$(curl  -sL -o "$local_file" "$source_url")
   else
     log_debug "Executing: curl  -sL -H \"$header\" -o \"$local_file\" \"$source_url\""
-    code=$(curl  -sL -H "$header" -o "$local_file" "$source_url" -v)
+    code=$(curl  -sL -H "$header" -o "$local_file" "$source_url")
   fi
   log_debug "http_download_curl received HTTP status $code, return code $?"
   if [ $? -ne 0 ]; then
