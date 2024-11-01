@@ -1,0 +1,9 @@
+name: public.s3
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my-s3
+  source_table: 'students_details'
+
+  destination: postgres

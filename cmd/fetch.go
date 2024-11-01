@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -12,8 +15,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
-	"os"
-	"path/filepath"
 )
 
 func Fetch() *cli.Command {
@@ -25,6 +26,7 @@ func Fetch() *cli.Command {
 		},
 	}
 }
+
 func queryCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "query",
@@ -66,7 +68,7 @@ func queryCommand() *cli.Command {
 			manager, errs := connection.NewManagerFromConfig(cm)
 			if len(errs) > 0 {
 				for _, err := range errs {
-					handleError(output, errors.Wrap(err, "failed to create connection manager"))
+					return handleError(output, errors.Wrap(err, "failed to create connection manager"))
 				}
 				return cli.Exit("", 1)
 			}
@@ -153,7 +155,11 @@ func printTable(columnNames []string, rows [][]interface{}) {
 
 func handleError(output string, err error) error {
 	if output == "json" {
-		jsonError, _ := json.Marshal(map[string]string{"error": err.Error()})
+		jsonError, err := json.Marshal(map[string]string{"error": err.Error()})
+		if err != nil {
+			fmt.Println("Error:", err.Error())
+			return cli.Exit("", 1)
+		}
 		fmt.Println(string(jsonError))
 	} else {
 		fmt.Println("Error:", err.Error())

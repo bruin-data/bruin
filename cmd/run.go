@@ -344,7 +344,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, c.Bool("full-refresh"))
 			if err != nil {
-				errorPrinter.Printf(err.Error())
+				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
 			}
 
