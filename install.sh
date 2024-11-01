@@ -72,7 +72,7 @@ execute() {
     bash|sh)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
       eval "$export_command"
-      log_info "$export_command" >> "$HOME/.${current_shell}rc"
+      echo "$export_command" >> "$HOME/.${current_shell}rc"
       export PATH="$PATH:${BINDIR}"
 
       log_info "The PATH has been updated in your current shell session. You can now use the installed binaries without restarting your shell."
@@ -80,7 +80,7 @@ execute() {
     zsh)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
       eval "$export_command"
-      log_info "$export_command" >> "$HOME/.zshrc"
+      echo "$export_command" >> "$HOME/.zshrc"
       # Export PATH in the current shell
       export PATH="$PATH:${BINDIR}"
 
@@ -89,7 +89,7 @@ execute() {
     fish)
       export_command="set -gx PATH \$PATH ${BINDIR}"
       fish -c "$export_command"
-      log_info "$export_command" >> "$HOME/.config/fish/config.fish"
+      echo "$export_command" >> "$HOME/.config/fish/config.fish"
       # Export PATH in the current shell (for fish, this is already done by the fish -c command)
 
       log_info "The PATH has been updated in your current shell session. You can now use the installed binaries without restarting your shell."
@@ -129,11 +129,15 @@ tag_to_version() {
   else
     log_info "checking GitHub for tag '${TAG}'"
   fi
+  log_debug "will get github for "$OWNER/$REPO" and tag '${TAG}'"
   REALTAG=$(github_release "$OWNER/$REPO" "${TAG}") && true
+  log_debug "REALTAG is '${REALTAG}'"
+
   if test -z "$REALTAG"; then
     log_crit "unable to find '${TAG}' - use 'latest' or see https://github.com/${PREFIX}/releases for details"
     exit 1
   fi
+  log_debug "will run for tag ${REALTAG}, version -> ${TAG#v}"
   # if version starts with 'v', remove it
   TAG="$REALTAG"
   VERSION=${TAG#v}
@@ -304,13 +308,16 @@ http_download_curl() {
   source_url=$2
   header=$3
   if [ -z "$header" ]; then
-    code=$(curl -w '%{http_code}' -sL -o "$local_file" "$source_url")
+    log_debug "Executing: curl  -sL -o \"$local_file\" \"$source_url\""
+    code=$(curl  -sL -o "$local_file" "$source_url")
   else
-    code=$(curl -w '%{http_code}' -sL -H "$header" -o "$local_file" "$source_url")
+    log_debug "Executing: curl  -sL -H \"$header\" -o \"$local_file\" \"$source_url\""
+    code=$(curl  -sL -H "$header" -o "$local_file" "$source_url")
   fi
-  if [ "$code" != "200" ]; then
-    log_debug "http_download_curl received HTTP status $code"
-    return 1
+  log_debug "http_download_curl received HTTP status $code, return code $?"
+  if [ $? -ne 0 ]; then
+    log_err "Failed to download from $source_url"
+    return 1  # Return 1 for failure
   fi
   return 0
 }
@@ -348,9 +355,12 @@ github_release() {
   version=$2
   test -z "$version" && version="latest"
   giturl="https://github.com/${owner_repo}/releases/${version}"
+  log_debug "will get github releases from ${giturl}"
   json=$(http_copy "$giturl" "Accept:application/json")
+  log_debug "json release info is $json"
   test -z "$json" && return 1
   version=$(echo "$json" | tr -s '\n' ' ' | sed 's/.*"tag_name":"//' | sed 's/".*//')
+  log_debug "Version found : '$version'"
   test -z "$version" && return 1
   echo "$version"
 }
@@ -412,6 +422,7 @@ log_prefix() {
 	echo "$PREFIX"
 }
 PLATFORM="${OS}/${ARCH}"
+log_debug "Running for ${PLATFORM}"
 GITHUB_DOWNLOAD=https://github.com/${OWNER}/${REPO}/releases/download
 
 uname_os_check "$OS"
@@ -424,16 +435,21 @@ get_binaries
 tag_to_version
 
 adjust_format
+log_debug "Will download ${FORMAT} format"
 
 adjust_os
+log_debug "OS adjusted to ${OS}"
 
 adjust_arch
+log_debug "ARCH adjusted to ${ARCH}"
 
 log_info "found version: ${VERSION} for ${TAG}/${OS}/${ARCH}"
 
 NAME=${PROJECT_NAME}_${OS}_${ARCH}
 TARBALL=${NAME}.${FORMAT}
 TARBALL_URL=${GITHUB_DOWNLOAD}/${TAG}/${TARBALL}
+
+log_info "Starting the dowload of ${TARBALL_URL}"
 
 
 
