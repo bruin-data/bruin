@@ -160,6 +160,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 			AssetValidator:   ValidateDuplicateColumnNames,
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
+		&SimpleRule{
+			Identifier:       "assets-directory-exist",
+			Fast:             true,
+			Severity:         ValidatorSeverityWarning,
+			Validator:        ValidateAssetDirectoryExist,
+			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
+		},
 		UsedTableValidatorRule{
 			renderer: jinja.NewRendererWithYesterday("your-pipeline", "some-run-id"),
 			parser:   parser,

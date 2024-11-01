@@ -28,6 +28,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/notion"
 	"github.com/bruin-data/bruin/pkg/postgres"
+	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/stripe"
@@ -61,6 +62,7 @@ type Manager struct {
 	Hubspot      map[string]*hubspot.Client
 	GoogleSheets map[string]*gsheets.Client
 	Chess        map[string]*chess.Client
+	S3           map[string]*s3.Client
 	mutex        sync.Mutex
 }
 
@@ -198,11 +200,18 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connChess, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Chess)...)
+
 	connAirtable, err := m.GetAirtableConnectionWithoutDefault(name)
 	if err == nil {
 		return connAirtable, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Airtable)...)
+
+	connS3, err := m.GetS3ConnectionWithoutDefault(name)
+	if err == nil {
+		return connS3, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.S3)...)
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
 
@@ -685,7 +694,6 @@ func (m *Manager) GetChessConnection(name string) (*chess.Client, error) {
 	if err == nil {
 		return db, nil
 	}
-	print("db", db)
 	return m.GetChessConnectionWithoutDefault("chess-default")
 }
 
@@ -698,6 +706,25 @@ func (m *Manager) GetChessConnectionWithoutDefault(name string) (*chess.Client, 
 		return nil, errors.Errorf("chess connection not found for '%s'", name)
 	}
 
+	return db, nil
+}
+
+func (m *Manager) GetS3Connection(name string) (*s3.Client, error) {
+	db, err := m.GetS3ConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetS3ConnectionWithoutDefault("s3-default")
+}
+
+func (m *Manager) GetS3ConnectionWithoutDefault(name string) (*s3.Client, error) {
+	if m.S3 == nil {
+		return nil, errors.New("no s3 connections found")
+	}
+	db, ok := m.S3[name]
+	if !ok {
+		return nil, errors.Errorf("s3 connection not found for '%s'", name)
+	}
 	return db, nil
 }
 
@@ -1275,6 +1302,27 @@ func (m *Manager) AddAirtableConnectionFromConfig(connection *config.AirtableCon
 	return nil
 }
 
+func (m *Manager) AddS3ConnectionFromConfig(connection *config.S3Connection) error {
+	m.mutex.Lock()
+	if m.S3 == nil {
+		m.S3 = make(map[string]*s3.Client)
+	}
+	m.mutex.Unlock()
+	client, err := s3.NewClient(s3.Config{
+		BucketName:      connection.BucketName,
+		PathToFile:      connection.PathToFile,
+		AccessKeyID:     connection.AccessKeyID,
+		SecretAccessKey: connection.SecretAccessKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.S3[connection.Name] = client
+	return nil
+}
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
 
@@ -1530,6 +1578,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			err := connectionManager.AddAirtableConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add airtable connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.S3 {
+		wg.Go(func() {
+			err := connectionManager.AddS3ConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add s3 connection '%s'", conn.Name))
 			}
 		})
 	}

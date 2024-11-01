@@ -74,7 +74,7 @@ execute() {
       eval "$export_command"
       echo "$export_command" >> "$HOME/.${current_shell}rc"
       export PATH="$PATH:${BINDIR}"
-
+      source "$HOME/.${current_shell}rc"
       log_info "The PATH has been updated in your current shell session. You can now use the installed binaries without restarting your shell."
       ;;
     zsh)
@@ -83,6 +83,7 @@ execute() {
       echo "$export_command" >> "$HOME/.zshrc"
       # Export PATH in the current shell
       export PATH="$PATH:${BINDIR}"
+      source "$HOME/.zshrc"
 
       log_info "The PATH has been updated in your current shell session. You can now use the installed binaries without restarting your shell."
       ;;
@@ -90,6 +91,7 @@ execute() {
       export_command="set -gx PATH \$PATH ${BINDIR}"
       fish -c "$export_command"
       echo "$export_command" >> "$HOME/.config/fish/config.fish"
+      source "$HOME/.config/fish/config.fish"
       # Export PATH in the current shell (for fish, this is already done by the fish -c command)
 
       log_info "The PATH has been updated in your current shell session. You can now use the installed binaries without restarting your shell."
@@ -454,6 +456,8 @@ log_info "Starting the dowload of ${TARBALL_URL}"
 
 
 execute
+
+
 
 
 
