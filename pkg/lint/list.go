@@ -166,9 +166,9 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 			Severity:         ValidatorSeverityCritical,
 			Validator:        CallFuncForEveryAsset(ValidateInvalidPythonModuleName),
 			AssetValidator:   ValidateInvalidPythonModuleName,
-      ApplicableLevels: []Level{LevelPipeline, LevelAsset},
-    },
-    &SimpleRule{
+			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "assets-directory-exist",
 			Fast:             true,
 			Severity:         ValidatorSeverityWarning,
