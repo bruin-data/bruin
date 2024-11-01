@@ -43,7 +43,7 @@ func (q *QueryValidatorRule) Name() string {
 }
 
 func (q *QueryValidatorRule) IsFast() bool {
-	return true
+	return false
 }
 
 func (q *QueryValidatorRule) GetApplicableLevels() []Level {
