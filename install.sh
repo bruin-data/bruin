@@ -315,6 +315,10 @@ http_download_curl() {
     code=$(curl  -sL -H "$header" -o "$local_file" "$source_url" -v)
   fi
   log_debug "http_download_curl received HTTP status $code, return code $?"
+  if [ $? -ne 0 ]; then
+    log_err "Failed to download from $source_url"
+    return 1  # Return 1 for failure
+  fi
   return 0
 }
 http_download_wget() {
