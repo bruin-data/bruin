@@ -29,6 +29,7 @@ type materializer interface {
 
 type QueryValidatorRule struct {
 	Identifier   string
+	Fast         bool
 	TaskType     pipeline.AssetType
 	Connections  connectionManager
 	Extractor    queryExtractor
@@ -39,6 +40,10 @@ type QueryValidatorRule struct {
 
 func (q *QueryValidatorRule) Name() string {
 	return q.Identifier
+}
+
+func (q *QueryValidatorRule) IsFast() bool {
+	return false
 }
 
 func (q *QueryValidatorRule) GetApplicableLevels() []Level {

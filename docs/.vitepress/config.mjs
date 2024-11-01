@@ -43,10 +43,9 @@ export default defineConfig({
                     {
                         text: "Overview", link: "/connections/overview", items: [
                             {text: "Adjust", link: "/connections/adjust.md"},
-                            {text: "Chess", link: "/connections/chess.md"},
                             {text: "Airtable", link: "/connections/airtable.md"},
-                            {text: "Appsflyer", link: "/connections/appsflyer.md"},
                             {text: "AWS Athena", link: "/connections/athena"},
+                            {text: "Chess", link: "/connections/chess.md"},
                             {text: "Databricks", link: "/connections/databricks"},
                             {text: "DuckDB", link: "/connections/duckdb"},
                             {text: "Google Cloud Platform", link: "/connections/google_cloud_platform"},
@@ -60,6 +59,7 @@ export default defineConfig({
                             {text: "Postgres", link: "/connections/postgres"},
                             {text: "Redshift", link: "/connections/redshift"},
                             {text: "SAP HANA", link: "/connections/sap_hana"},
+                            {text: "S3", link: "/connections/s3"},
                             {text: "Snowflake", link: "/connections/snowflake"},
                             {text: "Zendesk", link: "/connections/Zendesk"},
                         ]

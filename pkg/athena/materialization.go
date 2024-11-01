@@ -52,7 +52,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query, location string) ([]stri
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
 	queries := []string{
-		fmt.Sprintf("CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s') AS %s", tempTableName, location, task.Name, query),
+		fmt.Sprintf("CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s') AS %s", tempTableName, location, tempTableName, query),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
@@ -124,7 +124,7 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query, location string) ([]st
 			"CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS %s",
 			tempTableName,
 			location,
-			task.Name,
+			tempTableName,
 			partitionBy,
 			query,
 		),

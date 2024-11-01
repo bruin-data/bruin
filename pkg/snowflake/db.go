@@ -123,7 +123,7 @@ func (db *DB) IsValid(ctx context.Context, query *query.Query) (bool, error) {
 	return err == nil, err
 }
 
-// Test runs a simple query (SELECT 1) to validate the connection
+// Test runs a simple query (SELECT 1) to validate the connection.
 func (db *DB) Test(ctx context.Context) error {
 	// Define the test query
 	q := query.Query{

@@ -1,5 +1,5 @@
 name: bruin-init
-schedule: dailyadds
+schedule: "@daily"
 start_date: "2023-03-20"
 
 default_connections:
@@ -25,4 +25,5 @@ default_connections:
   googlesheets: "my-gsheets"
   chess: "my-chess"
   airtable: "my-airtable"
+  s3: "my-s3"
   zendesk : "my-zendesk"

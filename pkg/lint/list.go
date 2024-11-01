@@ -32,6 +32,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 	rules := []Rule{
 		&SimpleRule{
 			Identifier:       "task-name-valid",
+			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        CallFuncForEveryAsset(EnsureTaskNameIsValidForASingleAsset),
 			AssetValidator:   EnsureTaskNameIsValidForASingleAsset,
@@ -39,6 +40,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 		},
 		&SimpleRule{
 			Identifier:       "task-name-unique",
+			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        EnsureTaskNameIsUnique,
 			AssetValidator:   EnsureTaskNameIsUniqueForASingleAsset,
@@ -46,6 +48,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 		},
 		&SimpleRule{
 			Identifier:       "dependency-exists",
+			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        CallFuncForEveryAsset(EnsureDependencyExistsForASingleAsset),
 			AssetValidator:   EnsureDependencyExistsForASingleAsset,
@@ -53,6 +56,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 		},
 		&SimpleRule{
 			Identifier:       "valid-executable-file",
+			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        CallFuncForEveryAsset(EnsureExecutableFileIsValidForASingleAsset(fs)),
 			AssetValidator:   EnsureExecutableFileIsValidForASingleAsset(fs),
@@ -60,18 +64,21 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 		},
 		&SimpleRule{
 			Identifier:       "valid-pipeline-schedule",
+			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        EnsurePipelineScheduleIsValidCron,
 			ApplicableLevels: []Level{LevelPipeline},
 		},
 		&SimpleRule{
 			Identifier:       "valid-pipeline-name",
+			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        EnsurePipelineNameIsValid,
 			ApplicableLevels: []Level{LevelPipeline},
 		},
 		&SimpleRule{
 			Identifier:       "valid-task-type",
+			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        CallFuncForEveryAsset(EnsureTypeIsCorrectForASingleAsset),
 			AssetValidator:   EnsureTypeIsCorrectForASingleAsset,
@@ -79,24 +86,28 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 		},
 		&SimpleRule{
 			Identifier:       "acyclic-pipeline",
+			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        EnsurePipelineHasNoCycles,
 			ApplicableLevels: []Level{LevelPipeline},
 		},
 		&SimpleRule{
 			Identifier:       "valid-slack-notification",
+			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        EnsureSlackFieldInPipelineIsValid,
 			ApplicableLevels: []Level{LevelPipeline},
 		},
 		&SimpleRule{
 			Identifier:       "valid-ms-teams-notification",
+			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        EnsureMSTeamsFieldInPipelineIsValid,
 			ApplicableLevels: []Level{LevelPipeline},
 		},
 		&SimpleRule{
 			Identifier:       "materialization-config",
+			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        CallFuncForEveryAsset(EnsureMaterializationValuesAreValidForSingleAsset),
 			AssetValidator:   EnsureMaterializationValuesAreValidForSingleAsset,
@@ -104,6 +115,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 		},
 		&SimpleRule{
 			Identifier:       "valid-snowflake-query-sensor",
+			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        CallFuncForEveryAsset(EnsureSnowflakeSensorHasQueryParameterForASingleAsset),
 			AssetValidator:   EnsureSnowflakeSensorHasQueryParameterForASingleAsset,
@@ -111,6 +123,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 		},
 		&SimpleRule{
 			Identifier:       "valid-bigquery-table-sensor",
+			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        CallFuncForEveryAsset(EnsureBigQueryTableSensorHasTableParameterForASingleAsset),
 			AssetValidator:   EnsureBigQueryTableSensorHasTableParameterForASingleAsset,
@@ -118,6 +131,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 		},
 		&SimpleRule{
 			Identifier:       "valid-ingestr",
+			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        CallFuncForEveryAsset(EnsureIngestrAssetIsValidForASingleAsset),
 			AssetValidator:   EnsureIngestrAssetIsValidForASingleAsset,
@@ -125,12 +139,14 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 		},
 		&SimpleRule{
 			Identifier:       "valid-pipeline-start-date",
+			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        EnsurePipelineStartDateIsValid,
 			ApplicableLevels: []Level{LevelPipeline},
 		},
 		&SimpleRule{
 			Identifier:       "valid-entity-references",
+			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        CallFuncForEveryAsset(gr.EnsureAssetEntitiesExistInGlossary),
 			AssetValidator:   gr.EnsureAssetEntitiesExistInGlossary,
@@ -138,9 +154,17 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 		},
 		&SimpleRule{
 			Identifier:       "duplicate-column-names",
+			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
 			Validator:        CallFuncForEveryAsset(ValidateDuplicateColumnNames),
 			AssetValidator:   ValidateDuplicateColumnNames,
+			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
+		},
+		&SimpleRule{
+			Identifier:       "assets-directory-exist",
+			Fast:             true,
+			Severity:         ValidatorSeverityWarning,
+			Validator:        ValidateAssetDirectoryExist,
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
 		UsedTableValidatorRule{
@@ -166,5 +190,15 @@ func FilterRulesByLevel(rules []Rule, level Level) []Rule {
 		}
 	}
 
+	return filtered
+}
+
+func FilterRulesBySpeed(rules []Rule, fast bool) []Rule {
+	filtered := make([]Rule, 0, len(rules))
+	for _, rule := range rules {
+		if rule.IsFast() == fast {
+			filtered = append(filtered, rule)
+		}
+	}
 	return filtered
 }

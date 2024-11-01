@@ -233,7 +233,7 @@ func (c AppsflyerConnection) GetName() string {
 
 type AirtableConnection struct {
 	Name        string `yaml:"name" json:"name" mapstructure:"name"`
-	BaseId      string `yaml:"base_id" json:"base_id" mapstructure:"base_id"`
+	BaseID      string `yaml:"base_id" json:"base_id" mapstructure:"base_id"`
 	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
 }
 
@@ -293,6 +293,18 @@ type ChessConnection struct {
 }
 
 func (c ChessConnection) GetName() string {
+	return c.Name
+}
+
+type S3Connection struct {
+	Name            string `yaml:"name" json:"name" mapstructure:"name"`
+	BucketName      string `yaml:"bucket_name" json:"bucket_name" mapstructure:"bucket_name"`
+	PathToFile      string `yaml:"path_to_file" json:"path_to_file" mapstructure:"path_to_file"`
+	AccessKeyID     string `yaml:"access_key_id" json:"access_key_id" mapstructure:"access_key_id"`
+	SecretAccessKey string `yaml:"secret_access_key" json:"secret_access_key" mapstructure:"secret_access_key"`
+}
+
+func (c S3Connection) GetName() string {
 	return c.Name
 }
 
@@ -407,6 +419,7 @@ type Connections struct {
 	Chess               []ChessConnection               `yaml:"chess,omitempty" json:"chess,omitempty" mapstructure:"chess"`
 	Airtable            []AirtableConnection            `yaml:"airtable,omitempty" json:"airtable,omitempty" mapstructure:"airtable"`
 	Zendesk             []ZendeskConnection             `yaml:"zendesk,omitempty" json:"zendesk,omitempty" mapstructure:"zendesk"`
+	S3                  []S3Connection                  `yaml:"s3,omitempty" json:"s3,omitempty" mapstructure:"s3"`
 
 	byKey       map[string]any
 	typeNameMap map[string]string
@@ -571,6 +584,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.Zendesk {
 		c.byKey[conn.Name] = &(c.Zendesk[i])
 		c.typeNameMap[conn.Name] = "zendesk"
+	}
+
+	for i, conn := range c.S3 {
+		c.byKey[conn.Name] = &(c.S3[i])
+		c.typeNameMap[conn.Name] = "s3"
 	}
 }
 
@@ -889,6 +907,14 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		if err := mapstructure.Decode(creds, &conn); err != nil {
 			return fmt.Errorf("failed to decode credentials: %w", err)
 		}
+
+	case "s3":
+		var conn S3Connection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.S3 = append(env.Connections.S3, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -972,6 +998,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Chess = removeConnection(env.Connections.Chess, connectionName)
 	case "airtable":
 		env.Connections.Airtable = removeConnection(env.Connections.Airtable, connectionName)
+	case "s3":
+		env.Connections.S3 = removeConnection(env.Connections.S3, connectionName)
 	case "zendesk":
 		env.Connections.Zendesk = removeConnection(env.Connections.Zendesk, connectionName)
 	default:

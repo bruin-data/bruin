@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sync"
 
@@ -29,6 +28,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/notion"
 	"github.com/bruin-data/bruin/pkg/postgres"
+	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/stripe"
@@ -63,6 +63,7 @@ type Manager struct {
 	Hubspot      map[string]*hubspot.Client
 	GoogleSheets map[string]*gsheets.Client
 	Chess        map[string]*chess.Client
+	S3           map[string]*s3.Client
 	Zendesk      map[string]*zendesk.Client
 	mutex        sync.Mutex
 }
@@ -207,6 +208,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connAirtable, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Airtable)...)
+
+	connS3, err := m.GetS3ConnectionWithoutDefault(name)
+	if err == nil {
+		return connS3, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.S3)...)
 
 	connZendesk, err := m.GetZendeskConnectionWithoutDefault(name)
 	if err == nil {
@@ -696,7 +703,6 @@ func (m *Manager) GetChessConnection(name string) (*chess.Client, error) {
 	if err == nil {
 		return db, nil
 	}
-	print("db", db)
 	return m.GetChessConnectionWithoutDefault("chess-default")
 }
 
@@ -734,6 +740,25 @@ func (m *Manager) GetZendeskConnectionWithoutDefault(name string) (*zendesk.Clie
 	return db, nil
 }
 
+func (m *Manager) GetS3Connection(name string) (*s3.Client, error) {
+	db, err := m.GetS3ConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetS3ConnectionWithoutDefault("s3-default")
+}
+
+func (m *Manager) GetS3ConnectionWithoutDefault(name string) (*s3.Client, error) {
+	if m.S3 == nil {
+		return nil, errors.New("no s3 connections found")
+	}
+	db, ok := m.S3[name]
+	if !ok {
+		return nil, errors.Errorf("s3 connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
 func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatformConnection) error {
 	m.mutex.Lock()
 	if m.BigQuery == nil {
@@ -741,42 +766,24 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 	}
 	m.mutex.Unlock()
 
+	// Check if either ServiceAccountFile or ServiceAccountJSON is provided, prioritizing ServiceAccountFile.
 	if len(connection.ServiceAccountFile) == 0 && len(connection.ServiceAccountJSON) == 0 {
-		return errors.New("at least one of service_account_file or service_account_json must be provided")
+		return errors.New("credentials are required: provide either service_account_file or service_account_json")
 	}
 
-	if len(connection.ServiceAccountFile) > 0 && connection.ServiceAccountFile != "" {
-
-		file, err := ioutil.ReadFile(connection.ServiceAccountFile)
-		if err == nil {
-			return errors.Errorf("Please use service_account_file Instead  of  service_account_json ")
+	// If ServiceAccountFile is provided, validate that it is readable and contains valid JSON.
+	if len(connection.ServiceAccountFile) > 0 {
+		file, err := os.ReadFile(connection.ServiceAccountFile)
+		if err != nil {
+			return errors.Errorf("failed to read service account file at '%s': %v", connection.ServiceAccountFile, err)
 		}
 		var js json.RawMessage
-		err = json.Unmarshal(file, &js)
-		if err != nil {
-			return errors.Errorf("not a valid JSON in service account file at '%s'", connection.ServiceAccountFile)
+		if err := json.Unmarshal(file, &js); err != nil {
+			return errors.Errorf("invalid JSON format in service account file at '%s'", connection.ServiceAccountFile)
 		}
 	}
 
-	if len(connection.ServiceAccountJSON) > 0 && connection.ServiceAccountJSON != "" {
-
-		_, err := os.Stat(connection.ServiceAccountJSON)
-		if err == nil {
-			return errors.New("please use service_account_file Instead  of service_account_json to define path ")
-		}
-
-		file, err := ioutil.ReadFile(connection.ServiceAccountJSON)
-		if err != nil {
-			file = []byte(connection.ServiceAccountJSON)
-		}
-
-		var js json.RawMessage
-		err = json.Unmarshal(file, &js)
-		if err != nil {
-			return errors.New("not a valid JSON in service account json")
-		}
-	}
-
+	// Set up the BigQuery client using the preferred credentials.
 	db, err := bigquery.NewDB(&bigquery.Config{
 		ProjectID:           connection.ProjectID,
 		CredentialsFilePath: connection.ServiceAccountFile,
@@ -788,6 +795,7 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 		return err
 	}
 
+	// Lock and store the new BigQuery client.
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.BigQuery[connection.Name] = db
@@ -1312,7 +1320,7 @@ func (m *Manager) AddAirtableConnectionFromConfig(connection *config.AirtableCon
 	}
 	m.mutex.Unlock()
 	client, err := airtable.NewClient(airtable.Config{
-		BaseId:      connection.BaseId,
+		BaseID:      connection.BaseID,
 		AccessToken: connection.AccessToken,
 	})
 	if err != nil {
@@ -1322,6 +1330,27 @@ func (m *Manager) AddAirtableConnectionFromConfig(connection *config.AirtableCon
 	defer m.mutex.Unlock()
 	m.Airtable[connection.Name] = client
 
+	return nil
+}
+
+func (m *Manager) AddS3ConnectionFromConfig(connection *config.S3Connection) error {
+	m.mutex.Lock()
+	if m.S3 == nil {
+		m.S3 = make(map[string]*s3.Client)
+	}
+	m.mutex.Unlock()
+	client, err := s3.NewClient(s3.Config{
+		BucketName:      connection.BucketName,
+		PathToFile:      connection.PathToFile,
+		AccessKeyID:     connection.AccessKeyID,
+		SecretAccessKey: connection.SecretAccessKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.S3[connection.Name] = client
 	return nil
 }
 
@@ -1602,6 +1631,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			err := connectionManager.AddAirtableConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add airtable connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.S3 {
+		wg.Go(func() {
+			err := connectionManager.AddS3ConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add s3 connection '%s'", conn.Name))
 			}
 		})
 	}

@@ -213,7 +213,7 @@ func (r *RenderCommand) Run(taskPath string) error {
 
 	queries, err := r.extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
 	if err != nil {
-		r.printErrorOrJsonf(err.Error())
+		r.printErrorOrJSON(err.Error())
 		return cli.Exit("", 1)
 	}
 
@@ -286,7 +286,7 @@ func (r *RenderCommand) printErrorOrJSON(msg string) {
 		return
 	}
 
-	errorPrinter.Printf(msg)
+	errorPrinter.Println(msg)
 }
 
 func (r *RenderCommand) printErrorOrJsonf(msg string, args ...interface{}) {
