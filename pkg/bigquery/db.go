@@ -1,17 +1,16 @@
 package bigquery
 
 import (
+	"cloud.google.com/go/bigquery"
 	"context"
 	"fmt"
-	"strings"
-
-	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
+	"strings"
 )
 
 var scopes = []string{
@@ -138,7 +137,6 @@ func (d *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 
 	return result, nil
 }
-
 func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
 	q := d.client.Query(queryObj.String())
 	rows, err := q.Read(ctx)
