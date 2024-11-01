@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	IngestrVersion = "v0.8.5"
+	IngestrVersion = "v0.9.0"
 	DockerImage    = "ghcr.io/bruin-data/ingestr:" + IngestrVersion
 	DuckDBDest     = "/tmp/dest.db"
 	DuckDBSource   = "/tmp/source.db"
