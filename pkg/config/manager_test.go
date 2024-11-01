@@ -231,7 +231,7 @@ func TestLoadFromFile(t *testing.T) {
 			Airtable: []AirtableConnection{
 				{
 					Name:        "conn23",
-					BaseId:      "123",
+					BaseID:      "123",
 					AccessToken: "accessKey",
 				},
 			},

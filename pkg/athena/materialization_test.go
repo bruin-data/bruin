@@ -45,7 +45,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset') AS SELECT 1",
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS SELECT 1",
 				"DROP TABLE IF EXISTS my.asset",
 				"ALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset",
 			},
@@ -61,7 +61,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1 as some_column",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset', partitioning = ARRAY['some_column']) AS SELECT 1 as some_column",
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['some_column']) AS SELECT 1 as some_column",
 				"DROP TABLE IF EXISTS my.asset",
 				"ALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset",
 			},
@@ -78,7 +78,7 @@ func TestMaterializer_Render(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT 1",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset') AS SELECT 1",
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS SELECT 1",
 				"DROP TABLE IF EXISTS my.asset",
 				"ALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset",
 			},
@@ -130,7 +130,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want:  []string{"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset') AS SELECT 1", "DELETE FROM my.asset WHERE dt in (SELECT DISTINCT dt FROM __bruin_tmp_abcefghi)", "INSERT INTO my.asset SELECT * FROM __bruin_tmp_abcefghi", "DROP TABLE IF EXISTS __bruin_tmp_abcefghi"},
+			want:  []string{"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS SELECT 1", "DELETE FROM my.asset WHERE dt in (SELECT DISTINCT dt FROM __bruin_tmp_abcefghi)", "INSERT INTO my.asset SELECT * FROM __bruin_tmp_abcefghi", "DROP TABLE IF EXISTS __bruin_tmp_abcefghi"},
 		},
 		{
 			name: "merge without columns",

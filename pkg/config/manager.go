@@ -233,7 +233,7 @@ func (c AppsflyerConnection) GetName() string {
 
 type AirtableConnection struct {
 	Name        string `yaml:"name" json:"name" mapstructure:"name"`
-	BaseId      string `yaml:"base_id" json:"base_id" mapstructure:"base_id"`
+	BaseID      string `yaml:"base_id" json:"base_id" mapstructure:"base_id"`
 	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
 }
 

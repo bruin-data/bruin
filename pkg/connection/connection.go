@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
@@ -715,7 +715,7 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 
 	// If ServiceAccountFile is provided, validate that it is readable and contains valid JSON.
 	if len(connection.ServiceAccountFile) > 0 {
-		file, err := ioutil.ReadFile(connection.ServiceAccountFile)
+		file, err := os.ReadFile(connection.ServiceAccountFile)
 		if err != nil {
 			return errors.Errorf("failed to read service account file at '%s': %v", connection.ServiceAccountFile, err)
 		}
@@ -1262,7 +1262,7 @@ func (m *Manager) AddAirtableConnectionFromConfig(connection *config.AirtableCon
 	}
 	m.mutex.Unlock()
 	client, err := airtable.NewClient(airtable.Config{
-		BaseId:      connection.BaseId,
+		BaseID:      connection.BaseID,
 		AccessToken: connection.AccessToken,
 	})
 	if err != nil {

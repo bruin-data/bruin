@@ -1,16 +1,17 @@
 package bigquery
 
 import (
-	"cloud.google.com/go/bigquery"
 	"context"
 	"fmt"
+	"strings"
+
+	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
-	"strings"
 )
 
 var scopes = []string{
@@ -137,6 +138,7 @@ func (d *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 
 	return result, nil
 }
+
 func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
 	q := d.client.Query(queryObj.String())
 	rows, err := q.Read(ctx)
@@ -171,7 +173,7 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 			result.Columns = append(result.Columns, field.Name)
 		}
 	} else {
-		return nil, fmt.Errorf("schema information is not available")
+		return nil, errors.New("schema information is not available")
 	}
 
 	return result, nil
@@ -254,7 +256,7 @@ func formatError(err error) error {
 	return googleError
 }
 
-// Test runs a simple query (SELECT 1) to validate the connection
+// Test runs a simple query (SELECT 1) to validate the connection.
 func (d *Client) Test(ctx context.Context) error {
 	// Define the test query
 	q := query.Query{

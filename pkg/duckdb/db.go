@@ -53,6 +53,10 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 		return nil, err
 	}
 
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
 	defer rows.Close()
 
 	result := make([][]interface{}, 0)
