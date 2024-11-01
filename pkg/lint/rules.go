@@ -379,12 +379,13 @@ func ValidateInvalidPythonModuleName(ctx context.Context, p *pipeline.Pipeline, 
 	var issues []*Issue
 
 	if asset.Type == "python" {
-		dirName := filepath.Dir(asset.DefinitionFile.Path)
-		if strings.Contains(asset.DefinitionFile.Path, dirName) && dirName != "assets" {
+		parentDirs := strings.Split(filepath.Dir(asset.DefinitionFile.Path), "/")
+
+		if strings.Contains(asset.DefinitionFile.Path, parentDirs[len(parentDirs)-1]) && parentDirs[len(parentDirs)-1] != "assets" {
 			fmt.Println(asset.DefinitionFile.Path)
 			issues = append(issues, &Issue{
 				Task:        asset,
-				Description: fmt.Sprintf("Invalid python assets name '%s' found ", asset.Name),
+				Description: fmt.Sprintf("Invalid python module found '%s' for asset  '%s' found ", parentDirs[len(parentDirs)-1], asset.Name),
 			})
 		}
 	}
