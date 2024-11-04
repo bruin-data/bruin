@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// New helper function to validate ServiceAccountFile
+// New helper function to validate ServiceAccountFile.
 func validateServiceAccountFile(filePath string) error {
 	file, err := os.ReadFile(filePath)
 	if err != nil {
@@ -20,7 +20,7 @@ func validateServiceAccountFile(filePath string) error {
 	return nil
 }
 
-// New helper function to validate ServiceAccountJSON
+// New helper function to validate ServiceAccountJSON.
 func validateServiceAccountJSON(jsonStr string) error {
 	// Check if the path exists and is a file
 	if _, err := os.Stat(jsonStr); err == nil {
