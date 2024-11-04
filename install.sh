@@ -74,7 +74,7 @@ execute() {
       eval "$export_command"
       echo "$export_command" >> "$HOME/.${current_shell}rc"
       export PATH="$PATH:${BINDIR}"
-      source "$HOME/.${current_shell}rc"
+      . "$HOME/.${current_shell}rc"
       log_info "The PATH has been updated in your current shell session. You can now use the installed binaries without restarting your shell."
       ;;
     zsh)
