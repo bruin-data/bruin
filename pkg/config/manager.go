@@ -540,7 +540,8 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		if err := mapstructure.Decode(creds, &conn); err != nil {
 			return fmt.Errorf("failed to decode credentials: %w", err)
 		}
-
+		conn.Name = name
+		env.Connections.Zendesk = append(env.Connections.Zendesk, conn)
 	case "s3":
 		var conn S3Connection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
