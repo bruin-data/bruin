@@ -74,8 +74,7 @@ execute() {
       eval "$export_command"
       echo "$export_command" >> "$HOME/.${current_shell}rc"
       export PATH="$PATH:${BINDIR}"
-      . "$HOME/.${current_shell}rc"
-      log_info "The PATH has been updated in your current shell session. You can now use the installed binaries without restarting your shell."
+      log_info "The PATH has been updated in your current shell session. You will need to restart your shell to use the installed binaries."
       ;;
     zsh)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
@@ -83,17 +82,15 @@ execute() {
       echo "$export_command" >> "$HOME/.zshrc"
       # Export PATH in the current shell
       export PATH="$PATH:${BINDIR}"
-      zsh "$HOME/.zshrc"
-      log_info "The PATH has been updated in your current shell session. You can now use the installed binaries without restarting your shell."
+      log_info "The PATH has been updated in your current shell session. You will need to restart your shell to use the installed binaries."
       ;;
     fish)
       export_command="set -gx PATH \$PATH ${BINDIR}"
       fish -c "$export_command"
       echo "$export_command" >> "$HOME/.config/fish/config.fish"
-      fish
       # Export PATH in the current shell (for fish, this is already done by the fish -c command)
 
-      log_info "The PATH has been updated in your current shell session. You can now use the installed binaries without restarting your shell."
+      log_info "The PATH has been updated in your current shell session. You will need to restart your shell to use the installed binaries."
       ;;
     *)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
