@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/bruin-data/bruin/cmd"
@@ -11,30 +13,36 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-var Version = "development"
+var (
+	version = "dev"
+	commit  = ""
+)
 
 func main() {
 	isDebug := false
 	color.NoColor = false
 
 	cli.VersionPrinter = func(cCtx *cli.Context) {
-		var commit = func() string {
-			if info, ok := debug.ReadBuildInfo(); ok {
-				for _, setting := range info.Settings {
-					if setting.Key == "vcs.revision" {
-						return setting.Value
+		hash := commit
+		if hash == "" {
+			hash = func() string {
+				if info, ok := debug.ReadBuildInfo(); ok {
+					for _, setting := range info.Settings {
+						if setting.Key == "vcs.revision" {
+							return setting.Value
+						}
 					}
 				}
-			}
-			return ""
-		}()
+				return ""
+			}()
+		}
 
-		fmt.Printf("bruin CLI %s (%s)\n", cCtx.App.Version, commit)
+		fmt.Printf("bruin CLI %s (%s)\n", cCtx.App.Version, hash)
 	}
 
 	app := &cli.App{
 		Name:     "bruin",
-		Version:  Version,
+		Version:  version,
 		Usage:    "The CLI used for managing Bruin-powered data pipelines",
 		Compiled: time.Now(),
 		Flags: []cli.Flag{
@@ -57,6 +65,20 @@ func main() {
 			cmd.Environments(&isDebug),
 			cmd.Connections(),
 			cmd.Fetch(),
+			&cli.Command{
+				Name: "version",
+				Action: func(c *cli.Context) error {
+					fmt.Printf("Current version: %s (%s)\n", c.App.Version, commit)
+					res, err := http.Get("https://github.com/bruin-data/bruin/releases/latest")
+					if err != nil {
+						fmt.Println("Failed to check the latest version: " + err.Error())
+						return nil
+					}
+
+					fmt.Println("Latest version: " + strings.TrimPrefix(res.Request.URL.String(), "https://github.com/bruin-data/bruin/releases/tag/"))
+					return nil
+				},
+			},
 		},
 	}
 
