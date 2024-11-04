@@ -31,6 +31,9 @@ If you don't have `curl` installed, you can use `wget`:
 wget -qO- https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh
 ```
 
+> [!IMPORTANT]
+> If you are on Windows, make sure to run the command in the Git Bash or WSL terminal.
+
 ### macOS (Homebrew)
 Alternatively, if you are a macOS users, you can use Homebrew to install Bruin CLI:
 ```shell
