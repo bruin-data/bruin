@@ -10,6 +10,7 @@ import (
 
 	"github.com/bruin-data/bruin/cmd"
 	"github.com/fatih/color"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
 )
 
@@ -69,10 +70,10 @@ func main() {
 				Name: "version",
 				Action: func(c *cli.Context) error {
 					fmt.Printf("Current version: %s (%s)\n", c.App.Version, commit)
-					res, err := http.Get("https://github.com/bruin-data/bruin/releases/latest")
+					res, err := http.Get("https://github.com/bruin-data/bruin/releases/latest") //nolint
+					defer res.Body.Close()                                                      //nolint
 					if err != nil {
-						fmt.Println("Failed to check the latest version: " + err.Error())
-						return nil
+						return errors.Wrap(err, "failed to check the latest version")
 					}
 
 					fmt.Println("Latest version: " + strings.TrimPrefix(res.Request.URL.String(), "https://github.com/bruin-data/bruin/releases/tag/"))
