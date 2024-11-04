@@ -60,12 +60,11 @@ jobs:
       - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
-          version: latest
+          version: v2.3.2
           args: build --clean --snapshot --single-target --id bruin-windows-amd64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ github.ref_name }}
-
 
   goreleaser-unix:
     runs-on: ubuntu-latest
