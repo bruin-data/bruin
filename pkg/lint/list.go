@@ -163,7 +163,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 		&SimpleRule{
 			Identifier:       "invalid-python-module-name",
 			Fast:             true,
-			Severity:         ValidatorSeverityCritical,
+			Severity:         ValidatorSeverityWarning,
 			Validator:        CallFuncForEveryAsset(ValidateInvalidPythonModuleName),
 			AssetValidator:   ValidateInvalidPythonModuleName,
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
