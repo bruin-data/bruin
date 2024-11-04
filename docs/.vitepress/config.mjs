@@ -124,8 +124,8 @@ export default defineConfig({
                     {text: "Overview", link: "/vscode-extension/overview",
                     items: [
                         {text: "Installation", link: "/vscode-extension/installation"},
-                        {text: "Configuration", link: "/vscode-extension/configuration"},
                         {text: "Getting Started", link: "/vscode-extension/getting-started"},
+                        {text: "Configuration", link: "/vscode-extension/configuration"},
                         {
                             text: "Panels",
                             items: [
