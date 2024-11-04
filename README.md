@@ -19,38 +19,26 @@ Bruin is built to make your life easier when it comes to data transformations:
 - 🔒 secrets injection via environment variables
 - 📦 easy to install and use
 
-## Docs
-You can see our documentation [here](https://bruin-data.github.io/bruin/).
-
 ## Installation
-Binaries are available on the [releases page](https://github.com/bruin-data/bruin/releases).
 
-
-### macOS (Homebrew)
-```shell
-brew install bruin-data/tap/bruin
-```
-
-### Linux/MacOS(Curl)
+### Linux/MacOS/Windows
 ```shell
 curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh
 ```
 
-### Linux/MacOS(Wget)
+If you don't have `curl` installed, you can use `wget`:
 ```shell
 wget -qO- https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh
 ```
-### via Golang installer
 
-You need to have Golang installed in the first place, then you can run the following command:
-
+### macOS (Homebrew)
+Alternatively, if you are a macOS users, you can use Homebrew to install Bruin CLI:
 ```shell
-go install github.com/bruin-data/bruin@latest
+brew install bruin-data/tap/bruin
 ```
 
-> [!IMPORTANT]
-> Please make sure to add GOPATH to your executable path.
-
+## Docs
+You can see our documentation [here](https://bruin-data.github.io/bruin/).
 
 ## Getting Started
 
