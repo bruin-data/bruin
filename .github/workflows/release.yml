@@ -95,7 +95,7 @@ jobs:
       - uses: goreleaser/goreleaser-action@v3
         with:
           distribution: goreleaser-pro
-          version: latest
+          version: v2.3.2
           args: continue --merge
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
@@ -120,7 +120,7 @@ jobs:
       - name: Release
         uses: goreleaser/goreleaser-action@v6
         with:
-          version: latest
+          version: v2.3.2
           distribution: goreleaser-pro
           args: release --clean --split
         env:
