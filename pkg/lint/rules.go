@@ -379,16 +379,15 @@ func ValidateInvalidPythonModuleName(ctx context.Context, p *pipeline.Pipeline, 
 	var issues []*Issue
 
 	if asset.Type == "python" {
-
-		invalidPattern := regexp.MustCompile(`(?i)(?<!/)[a-zA-Z0-9]+-[a-zA-Z0-9]+`)
-		components := filepath.SplitList(p.DefinitionFile.Path)
+		invalidPattern := regexp.MustCompile(`(?i)[a-zA-Z0-9]+-[a-zA-Z0-9]+`)
+		components := filepath.SplitList(asset.ExecutableFile.Path)
 		for i, component := range components {
 			if component == "assets" {
 				for _, subComponent := range components[i+1:] {
 					if invalidPattern.MatchString(subComponent) {
 						issues = append(issues, &Issue{
 							Task:        asset,
-							Description: fmt.Sprintf("Invalid Python module name '%s' for asset '%s'. Directory names cannot contain hyphens ('-') as they cannot be imported in Python.", lastDir, asset.Name),
+							Description: fmt.Sprintf("Invalid Python module name '%s' for asset '%s'. Directory names cannot contain hyphens ('-') as they cannot be imported in Python.", asset.ExecutableFile.Path, asset.Name),
 						})
 					}
 				}
