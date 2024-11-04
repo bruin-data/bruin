@@ -47,7 +47,7 @@ func TestLoadFromFile(t *testing.T) {
 					SslMode:      "require",
 				},
 			},
-			RedShift: []PostgresConnection{
+			RedShift: []RedshiftConnection{
 				{
 					Name:         "conn4",
 					Host:         "someredshift",
@@ -78,7 +78,7 @@ func TestLoadFromFile(t *testing.T) {
 					Port:  443,
 				},
 			},
-			Synapse: []MsSQLConnection{
+			Synapse: []SynapseConnection{
 				{
 					Name:     "conn6",
 					Host:     "somemsynapse",

@@ -83,15 +83,14 @@ execute() {
       echo "$export_command" >> "$HOME/.zshrc"
       # Export PATH in the current shell
       export PATH="$PATH:${BINDIR}"
-      source "$HOME/.zshrc"
-
+      zsh "$HOME/.zshrc"
       log_info "The PATH has been updated in your current shell session. You can now use the installed binaries without restarting your shell."
       ;;
     fish)
       export_command="set -gx PATH \$PATH ${BINDIR}"
       fish -c "$export_command"
       echo "$export_command" >> "$HOME/.config/fish/config.fish"
-      source "$HOME/.config/fish/config.fish"
+      fish
       # Export PATH in the current shell (for fish, this is already done by the fish -c command)
 
       log_info "The PATH has been updated in your current shell session. You can now use the installed binaries without restarting your shell."
@@ -451,7 +450,7 @@ NAME=${PROJECT_NAME}_${OS}_${ARCH}
 TARBALL=${NAME}.${FORMAT}
 TARBALL_URL=${GITHUB_DOWNLOAD}/${TAG}/${TARBALL}
 
-log_info "Starting the dowload of ${TARBALL_URL}"
+log_info "Starting the download of ${TARBALL_URL}"
 
 
 

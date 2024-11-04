@@ -854,8 +854,43 @@ func (m *Manager) AddPgConnectionFromConfig(connection *config.PostgresConnectio
 	return m.addPgLikeConnectionFromConfig(connection, false)
 }
 
-func (m *Manager) AddRedshiftConnectionFromConfig(connection *config.PostgresConnection) error {
-	return m.addPgLikeConnectionFromConfig(connection, true)
+func (m *Manager) AddRedshiftConnectionFromConfig(connection *config.RedshiftConnection) error {
+	return m.addRedshiftConnectionFromConfig(connection)
+}
+
+func (m *Manager) addRedshiftConnectionFromConfig(connection *config.RedshiftConnection) error {
+	m.mutex.Lock()
+	if m.Postgres == nil {
+		m.Postgres = make(map[string]*postgres.Client)
+	}
+	m.mutex.Unlock()
+
+	poolMaxConns := connection.PoolMaxConns
+	if connection.PoolMaxConns == 0 {
+		poolMaxConns = 10
+	}
+
+	var client *postgres.Client
+	var err error
+	client, err = postgres.NewClient(context.TODO(), postgres.RedShiftConfig{
+		Username:     connection.Username,
+		Password:     connection.Password,
+		Host:         connection.Host,
+		Port:         connection.Port,
+		Database:     connection.Database,
+		Schema:       connection.Schema,
+		PoolMaxConns: poolMaxConns,
+		SslMode:      connection.SslMode,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Postgres[connection.Name] = client
+
+	return nil
 }
 
 func (m *Manager) addPgLikeConnectionFromConfig(connection *config.PostgresConnection, redshift bool) error {
@@ -908,6 +943,31 @@ func (m *Manager) addPgLikeConnectionFromConfig(connection *config.PostgresConne
 }
 
 func (m *Manager) AddMsSQLConnectionFromConfig(connection *config.MsSQLConnection) error {
+	m.mutex.Lock()
+	if m.MsSQL == nil {
+		m.MsSQL = make(map[string]*mssql.DB)
+	}
+	m.mutex.Unlock()
+
+	client, err := mssql.NewDB(&mssql.Config{
+		Username: connection.Username,
+		Password: connection.Password,
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Database: connection.Database,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.MsSQL[connection.Name] = client
+
+	return nil
+}
+
+func (m *Manager) AddSynapseSQLConnectionFromConfig(connection *config.SynapseConnection) error {
 	m.mutex.Lock()
 	if m.MsSQL == nil {
 		m.MsSQL = make(map[string]*mssql.DB)
@@ -1463,7 +1523,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 
 	for _, conn := range cm.SelectedEnvironment.Connections.Synapse {
 		wg.Go(func() {
-			err := connectionManager.AddMsSQLConnectionFromConfig(&conn)
+			err := connectionManager.AddSynapseSQLConnectionFromConfig(&conn)
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add Synapse connection '%s'", conn.Name))
