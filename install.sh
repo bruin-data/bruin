@@ -450,7 +450,7 @@ NAME=${PROJECT_NAME}_${OS}_${ARCH}
 TARBALL=${NAME}.${FORMAT}
 TARBALL_URL=${GITHUB_DOWNLOAD}/${TAG}/${TARBALL}
 
-log_info "Starting the dowload of ${TARBALL_URL}"
+log_info "Starting the download of ${TARBALL_URL}"
 
 
 
