@@ -127,7 +127,15 @@ export default defineConfig({
                     {text: "Overview", link: "/vscode-extension/overview",
                     items: [
                         {text: "Installation", link: "/vscode-extension/installation"},
-                        //{text: "Features", link: "/vscode-extension/features"},
+                        {text: "Configuration", link: "/vscode-extension/configuration"},
+                        {text: "Getting Started", link: "/vscode-extension/getting-started"},
+                        {
+                            text: "Panels",
+                            items: [
+                                { text: "Side Panel", link: "/vscode-extension/panels/side-panel" },
+                                { text: "Lineage Panel", link: "/vscode-extension/panels/lineage-panel" }
+                            ]
+                        },
                     ]
                 },
                 ]

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -23,6 +24,7 @@ func Internal() *cli.Command {
 			ParseAsset(),
 			ParsePipeline(),
 			PatchAsset(),
+			ConnectionSchemas(),
 		},
 	}
 }
@@ -55,6 +57,23 @@ func ParsePipeline() *cli.Command {
 			}
 
 			return r.ParsePipeline(c.Args().Get(0))
+		},
+	}
+}
+
+func ConnectionSchemas() *cli.Command {
+	return &cli.Command{
+		Name:  "connections",
+		Usage: "return all the possible connection types and their schemas",
+		Action: func(c *cli.Context) error {
+			jsonStringSchema, err := config.GetConnectionsSchema()
+			if err != nil {
+				printErrorJSON(err)
+				return cli.Exit("", 1)
+			}
+
+			fmt.Println(jsonStringSchema)
+			return nil
 		},
 	}
 }

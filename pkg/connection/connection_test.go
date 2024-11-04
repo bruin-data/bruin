@@ -116,7 +116,7 @@ func TestManager_AddRedshiftConnectionFromConfig(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, res)
 
-	configuration := &config.PostgresConnection{
+	configuration := &config.RedshiftConnection{
 		Name:         "test",
 		Host:         "somehost",
 		Username:     "user",
