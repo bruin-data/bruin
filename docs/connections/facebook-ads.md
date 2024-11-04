@@ -45,6 +45,6 @@ parameters:
 
 **Run the Asset to Ingest Data**
 ```
-bruin ingestr run --file facebook_ads_ingestion.yml
+bruin run --file facebook_ads_ingestion.yml
 ```
 It will ingest facebook ads data to postgres. 
