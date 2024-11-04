@@ -2,9 +2,7 @@ package connection
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
@@ -740,15 +738,17 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 		return errors.New("credentials are required: provide either service_account_file or service_account_json")
 	}
 
-	// If ServiceAccountFile is provided, validate that it is readable and contains valid JSON.
+	// Validate ServiceAccountFile if provided.
 	if len(connection.ServiceAccountFile) > 0 {
-		file, err := os.ReadFile(connection.ServiceAccountFile)
-		if err != nil {
-			return errors.Errorf("failed to read service account file at '%s': %v", connection.ServiceAccountFile, err)
+		if err := validateServiceAccountFile(connection.ServiceAccountFile); err != nil {
+			return err
 		}
-		var js json.RawMessage
-		if err := json.Unmarshal(file, &js); err != nil {
-			return errors.Errorf("invalid JSON format in service account file at '%s'", connection.ServiceAccountFile)
+	}
+
+	// Validate ServiceAccountJSON if provided.
+	if len(connection.ServiceAccountJSON) > 0 {
+		if err := validateServiceAccountJSON(connection.ServiceAccountJSON); err != nil {
+			return err
 		}
 	}
 
