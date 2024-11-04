@@ -1,6 +1,6 @@
 # Side Panel
 
-The Side Panel in the Bruin VSCode extension provides a comprehensive view of the current asset's details and includes three tabs for easy navigation.
+The Side Panel in the Bruin VSCode extension gives you a comprehensive view of the current asset's details and includes three tabs for easy navigation.
 
 ## Tabs Overview
 
@@ -9,21 +9,21 @@ The Side Panel in the Bruin VSCode extension provides a comprehensive view of th
 
 ### 2. Columns
 - Lists the columns associated with the asset.
-- Each column displays:
+- Each column shows:
   - **Name**: The name of the column.
   - **Type**: The data type of the column (e.g., string, number).
-  - **Quality Checks**: Any quality checks associated with the column.
+  - **Quality Checks**: Any quality checks linked to the column.
   - **Description**: A brief description of the column's purpose.
 
 ### 3. Settings
 The Settings tab has two main sections:
 
 #### a. Bruin CLI Management
-- Allows users to install and update the Bruin CLI.
-- A button is provided that, when clicked, sends the command to the terminal based on the operating system.
+- Allows you to install and update the Bruin CLI.
+- A button is provided that, when clicked, sends the command to the terminal based on your operating system.
 
 #### b. Connection Management
-- Users can manage their connections, including:
-  - **Add Connection**: Users can add new connections by providing the necessary credentials.
-  - **Update Connection**: Users can update existing connections.
-  - **Delete Connection**: Users can delete existing connections.
+- You can manage your connections, including:
+  - **Add Connection**: Add new connections by providing the necessary credentials.
+  - **Update Connection**: Update existing connections.
+  - **Delete Connection**: Delete existing connections.
