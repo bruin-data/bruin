@@ -65,7 +65,6 @@ builds:
       - -s -w -X main.version={{ .Env.VERSION }}"
     flags:
       - -trimpath
-      - -buildmode=exe
 
 
 archives:
