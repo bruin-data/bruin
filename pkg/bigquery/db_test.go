@@ -105,11 +105,17 @@ func TestDB_IsValid(t *testing.T) {
 
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				response, err := json.Marshal(tt.response)
-				assert.NoError(t, err)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError) // Handle error
+					return
+				}
 
 				w.WriteHeader(tt.statusCode)
 				_, err = w.Write(response)
-				assert.NoError(t, err)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError) // Handle error
+					return
+				}
 			}))
 			defer server.Close()
 
@@ -267,25 +273,35 @@ func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse,
 			w.WriteHeader(qrr.statusCode)
 
 			response, err := json.Marshal(qrr.response)
-			assert.NoError(t, err)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			_, err = w.Write(response)
-			assert.NoError(t, err)
+			if err != nil {
+				t.Fatal(err)
+			}
 			return
 		} else if r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries", projectID)) {
 			w.WriteHeader(jsr.statusCode)
 
 			response, err := json.Marshal(jsr.response)
-			assert.NoError(t, err)
+			if err != nil {
+				t.Fatal(err)
+			} // Updated error handling
 
 			_, err = w.Write(response)
-			assert.NoError(t, err)
+			if err != nil {
+				t.Fatal(err)
+			} // Updated error handling
 			return
 		}
 
 		w.WriteHeader(http.StatusInternalServerError)
 		_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
-		assert.NoError(t, err)
+		if err != nil {
+			t.Fatal(err)
+		} // Updated error handling
 	})
 }
 
@@ -561,7 +577,10 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 					// read the body
 					var table bigquery2.Table
 					err := json.NewDecoder(r.Body).Decode(&table)
-					assert.NoError(t, err)
+					if err != nil {
+						http.Error(w, err.Error(), http.StatusInternalServerError) // Handle error
+						return
+					}
 
 					colsByName := make(map[string]*pipeline.Column, len(tt.asset.Columns))
 					for _, col := range tt.asset.Columns {

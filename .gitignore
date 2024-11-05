@@ -136,3 +136,6 @@ docs/.vitepress/cache
 node_modules/
 glossary.yaml
 .vscode
+
+# pixi dev env 
+.pixi

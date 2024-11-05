@@ -253,7 +253,7 @@ func TestLoadFromFile(t *testing.T) {
 			Zendesk: []ZendeskConnection{
 				{
 					Name:      "conn25",
-					ApiToken:  "zendeskKey",
+					APIToken:  "zendeskKey",
 					Email:     "zendeskemail",
 					Subdomain: "zendeskUrl",
 				},

@@ -1465,7 +1465,7 @@ func (m *Manager) AddZendeskConnectionFromConfig(connection *config.ZendeskConne
 	}
 	m.mutex.Unlock()
 	client, err := zendesk.NewClient(zendesk.Config{
-		ApiToken:   connection.ApiToken,
+		APIToken:   connection.APIToken,
 		Email:      connection.Email,
 		OAuthToken: connection.OAuthToken,
 		Subdomain:  connection.Subdomain,

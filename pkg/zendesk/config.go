@@ -1,15 +1,15 @@
 package zendesk
 
 type Config struct {
-	ApiToken   string
+	APIToken   string
 	Email      string
 	OAuthToken string
 	Subdomain  string
 }
 
 func (c Config) GetIngestrURI() string {
-	if c.ApiToken != "" || c.Email != "" {
-		return "zendesk://" + c.Email + ":" + c.ApiToken + "@" + c.Subdomain
+	if c.APIToken != "" || c.Email != "" {
+		return "zendesk://" + c.Email + ":" + c.APIToken + "@" + c.Subdomain
 	}
 	return "zendesk://:" + c.OAuthToken + "@" + c.Subdomain
 }
