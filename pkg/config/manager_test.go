@@ -244,6 +244,19 @@ func TestLoadFromFile(t *testing.T) {
 					SecretAccessKey: "secretKey123",
 				},
 			},
+			Zendesk: []ZendeskConnection{
+				{
+					Name:      "conn25",
+					ApiToken:  "zendeskKey",
+					Email:     "zendeskemail",
+					Subdomain: "zendeskUrl",
+				},
+				{
+					Name:       "conn25-1",
+					OAuthToken: "zendeskToken",
+					Subdomain:  "zendeskUrl",
+				},
+			},
 		},
 	}
 

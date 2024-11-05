@@ -398,3 +398,15 @@ type S3Connection struct {
 func (c S3Connection) GetName() string {
 	return c.Name
 }
+
+type ZendeskConnection struct {
+	Name       string `yaml:"name" json:"name" mapstructure:"name"`
+	ApiToken   string `yaml:"api_token" json:"api_token" mapstructure:"api_token"`
+	Email      string `yaml:"email" json:"email" mapstructure:"email"`
+	OAuthToken string `yaml:"oauth_token" json:"oauth_token" mapstructure:"oauth_token"`
+	Subdomain  string `yaml:"subdomain" json:"subdomain" mapstructure:"subdomain"`
+}
+
+func (c ZendeskConnection) GetName() string {
+	return c.Name
+}

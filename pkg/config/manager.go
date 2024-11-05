@@ -42,10 +42,10 @@ type Connections struct {
 	GoogleSheets        []GoogleSheetsConnection        `yaml:"google_sheets,omitempty" json:"google_sheets,omitempty" mapstructure:"google_sheets"`
 	Chess               []ChessConnection               `yaml:"chess,omitempty" json:"chess,omitempty" mapstructure:"chess"`
 	Airtable            []AirtableConnection            `yaml:"airtable,omitempty" json:"airtable,omitempty" mapstructure:"airtable"`
+	Zendesk             []ZendeskConnection             `yaml:"zendesk,omitempty" json:"zendesk,omitempty" mapstructure:"zendesk"`
 	S3                  []S3Connection                  `yaml:"s3,omitempty" json:"s3,omitempty" mapstructure:"s3"`
-
-	byKey       map[string]any
-	typeNameMap map[string]string
+	byKey               map[string]any
+	typeNameMap         map[string]string
 }
 
 func (c *Connections) ConnectionsSummaryList() map[string]string {
@@ -212,6 +212,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.Airtable {
 		c.byKey[conn.Name] = &(c.Airtable[i])
 		c.typeNameMap[conn.Name] = "airtable"
+	}
+
+	for i, conn := range c.Zendesk {
+		c.byKey[conn.Name] = &(c.Zendesk[i])
+		c.typeNameMap[conn.Name] = "zendesk"
 	}
 
 	for i, conn := range c.S3 {
@@ -530,7 +535,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Airtable = append(env.Connections.Airtable, conn)
-
+	case "zendesk":
+		var conn ZendeskConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Zendesk = append(env.Connections.Zendesk, conn)
 	case "s3":
 		var conn S3Connection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -623,6 +634,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Airtable = removeConnection(env.Connections.Airtable, connectionName)
 	case "s3":
 		env.Connections.S3 = removeConnection(env.Connections.S3, connectionName)
+	case "zendesk":
+		env.Connections.Zendesk = removeConnection(env.Connections.Zendesk, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}

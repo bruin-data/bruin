@@ -951,6 +951,8 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "chess-default", nil
 	case "airtable":
 		return "airtable-default", nil
+	case "zendesk":
+		return "zendesk-default", nil
 	default:
 		return "", errors.Errorf("no default connection found for type '%s'", assetType)
 	}
