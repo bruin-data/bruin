@@ -5,16 +5,16 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  paths-ignore:
-    - 'docs/**'
-    - 'examples/**'
-    - 'resources/**'
-    - 'templates/**'
-    - 'install.sh'
-    - 'README.md'
-    - 'Makefile'
-    - 'package.json'
-    - 'package-lock.json'
+    paths-ignore:
+      - 'docs/**'
+      - 'examples/**'
+      - 'resources/**'
+      - 'templates/**'
+      - 'install.sh'
+      - 'README.md'
+      - 'Makefile'
+      - 'package.json'
+      - 'package-lock.json'
 jobs:
   build:
     strategy:
