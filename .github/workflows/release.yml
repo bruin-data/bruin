@@ -100,6 +100,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+      - name: Use install script
+        run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.ref }}/install.sh | sh -s -- -d
+      - name: Test Pipeline
+        run: bruin init duckdb test-pipeline && cd test-pipeline && bruin run .
 
 
   release-windows:
@@ -137,3 +141,9 @@ jobs:
           asset_name: bruin_Windows_x86_64.zip
           tag: ${{ github.ref }}
           overwrite: false
+      - name: Use install script
+        shell: bash
+        run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.ref }}/install.sh | sh -s -- -d
+      - name: Test Pipeline
+        shell: bash
+        run: /c/Users/runneradmin/.local/bin/bruin.exe init duckdb test-pipeline && cd test-pipeline && /c/Users/runneradmin/.local/bin/bruin.exe run .
