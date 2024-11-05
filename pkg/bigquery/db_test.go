@@ -267,25 +267,35 @@ func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse,
 			w.WriteHeader(qrr.statusCode)
 
 			response, err := json.Marshal(qrr.response)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			_, err = w.Write(response)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatal(err)
+			}
 			return
 		} else if r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries", projectID)) {
 			w.WriteHeader(jsr.statusCode)
 
 			response, err := json.Marshal(jsr.response)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatal(err)
+			} // Updated error handling
 
 			_, err = w.Write(response)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatal(err)
+			} // Updated error handling
 			return
 		}
 
 		w.WriteHeader(http.StatusInternalServerError)
 		_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
-		require.NoError(t, err)
+		if err != nil {
+			t.Fatal(err)
+		} // Updated error handling
 	})
 }
 
