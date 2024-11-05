@@ -22,4 +22,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           WITH_V: true
           DEFAULT_BUMP: patch
+          PRERELEASE: true
           RELEASE_BRANCHES: ${{ steps.extract_branch.outputs.branch_name }}
