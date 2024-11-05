@@ -19,7 +19,7 @@ type: ingestr
 connection: postgres
 
 parameters:
-  source_connection: klaviyo
+  source_connection: my_klaviyo
   source_table: 'events'
   destination: postgres
 ```
@@ -42,7 +42,7 @@ You need to add a configuration item to `connections` in the `.bruin.yml` file c
 ```yaml
     connections:
       klaviyo:
-        - name: "connection_name"
+        - name: "my_klaviyo"
           api_key: "YOUR_Klaviyo_API_KEY"
 ```
 **Step 3: [Run](https://bruin-data.github.io/bruin/commands/run.html) Asset to Ingest Data**

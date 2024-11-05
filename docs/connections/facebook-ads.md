@@ -12,8 +12,8 @@ To connect to Facebook Ads, you need to add a configuration item to the connecti
 
 ```yaml
 connections:
-  facebook_ads:
-    - name: "my_facebook_ads_connection"
+  facebookads:
+    - name: "my_facebookads"
       access_token: "YOUR_FACEBOOK_ACCESS_TOKEN"
       account_id: "YOUR_ACCOUNT_ID"
 ```
@@ -28,7 +28,7 @@ type: ingestr
 connection: postgres
 
 parameters:
-  source_connection: facebook_ads
+  source_connection: my_facebookads
   source_table: 'ads'
   destination: postgres
 ```

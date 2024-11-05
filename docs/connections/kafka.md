@@ -19,7 +19,7 @@ type: ingestr
 connection: postgres
 
 parameters:
-  source_connection: kafka
+  source_connection: my_kafka
   source_table: 'kafka.my_topic'
   destination: postgres
 ```
@@ -41,7 +41,7 @@ You need to add a configuration item to `connections` in the `.bruin.yml` file c
 ```yaml
     connections:
       kafka:
-        - name: "connection_name"
+        - name: "my_kafka"
           bootstrap_servers: "localhost:9093"
           group_id: "test123"
 ```
