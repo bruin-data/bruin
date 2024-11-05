@@ -173,7 +173,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 			Fast:             true,
 			Severity:         ValidatorSeverityWarning,
 			Validator:        ValidateAssetDirectoryExist,
-			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
+			ApplicableLevels: []Level{LevelPipeline},
 		},
 		UsedTableValidatorRule{
 			renderer: jinja.NewRendererWithYesterday("your-pipeline", "some-run-id"),
