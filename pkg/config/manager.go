@@ -46,8 +46,8 @@ type Connections struct {
 	S3                  []S3Connection                  `yaml:"s3,omitempty" json:"s3,omitempty" mapstructure:"s3"`
 	Slack               []SlackConnection               `yaml:"slack,omitempty" json:"slack,omitempty" mapstructure:"slack"`
 
-	byKey               map[string]any
-	typeNameMap         map[string]string
+	byKey       map[string]any
+	typeNameMap map[string]string
 }
 
 func (c *Connections) ConnectionsSummaryList() map[string]string {

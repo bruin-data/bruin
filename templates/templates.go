@@ -5,4 +5,5 @@ import (
 )
 
 //go:embed *
+//go:embed duckdb/.bruin.yml
 var Templates embed.FS

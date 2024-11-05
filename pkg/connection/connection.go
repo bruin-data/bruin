@@ -782,6 +782,7 @@ func (m *Manager) GetSlackConnectionWithoutDefault(name string) (*slack.Client, 
 	}
 	return db, nil
 }
+
 func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatformConnection) error {
 	m.mutex.Lock()
 	if m.BigQuery == nil {
@@ -1456,6 +1457,7 @@ func (m *Manager) AddSlackConnectionFromConfig(connection *config.SlackConnectio
 	m.Slack[connection.Name] = client
 	return nil
 }
+
 func (m *Manager) AddZendeskConnectionFromConfig(connection *config.ZendeskConnection) error {
 	m.mutex.Lock()
 	if m.Zendesk == nil {
