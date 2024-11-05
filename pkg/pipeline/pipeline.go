@@ -951,6 +951,8 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return "chess-default", nil
 	case "airtable":
 		return "airtable-default", nil
+	case "zendesk":
+		return "zendesk-default", nil
 	case "s3":
 		return "s3-default", nil
 	case "slack":

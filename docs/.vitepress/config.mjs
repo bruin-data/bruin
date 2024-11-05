@@ -43,8 +43,11 @@ export default defineConfig({
                     {
                         text: "Overview", link: "/connections/overview", items: [
                             {text: "Adjust", link: "/connections/adjust.md"},
-                            {text: "Chess", link: "/connections/chess.md"},
                             {text: "Airtable", link: "/connections/airtable.md"},
+                            {text: "AWS Athena", link: "/connections/athena"},
+                            {text: "Chess", link: "/connections/chess.md"},
+                            {text: "Databricks", link: "/connections/databricks"},
+                            {text: "DuckDB", link: "/connections/duckdb"},
                             {text: "Google Cloud Platform", link: "/connections/google_cloud_platform"},
                             {text: "Google Sheets", link: "/connections/google_sheets.md"},
                             {text: "Gorgias", link: "/connections/gorgias"},
@@ -59,9 +62,7 @@ export default defineConfig({
                             {text: "S3", link: "/connections/s3"},
                             {text: "Slack", link: "/connections/slack.md"},
                             {text: "Snowflake", link: "/connections/snowflake"},
-                            {text: "Databricks", link: "/connections/databricks"},
-                            {text: "AWS Athena", link: "/connections/athena"},
-                            {text: "DuckDB", link: "/connections/duckdb"},
+                            {text: "Zendesk", link: "/connections/Zendesk"},
                         ]
                     },
                 ],
@@ -125,8 +126,8 @@ export default defineConfig({
                     {text: "Overview", link: "/vscode-extension/overview",
                     items: [
                         {text: "Installation", link: "/vscode-extension/installation"},
-                        {text: "Configuration", link: "/vscode-extension/configuration"},
                         {text: "Getting Started", link: "/vscode-extension/getting-started"},
+                        {text: "Configuration", link: "/vscode-extension/configuration"},
                         {
                             text: "Panels",
                             items: [
