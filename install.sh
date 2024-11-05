@@ -207,15 +207,15 @@ CYAN='\033[0;36m'
 RESET='\033[0m' # Reset to default color
 log_tag() {
   case $1 in
-    0) echo -e "${RED}emerg${RESET}" ;;
-    1) echo -e "${MAGENTA}alert${RESET}" ;;
-    2) echo -e "${RED}crit${RESET}" ;;
-    3) echo -e "${YELLOW}err${RESET}" ;;
-    4) echo -e "${YELLOW}warning${RESET}" ;;
-    5) echo -e "${GREEN}notice${RESET}" ;;
-    6) echo -e "${BLUE}info${RESET}" ;;
-    7) echo -e "${CYAN}debug${RESET}" ;;
-    8) echo -e "${GREEN}success${RESET}" ;;  # Added success tag
+    0) echo "${RED}emerg${RESET}" ;;
+    1) echo  "${MAGENTA}alert${RESET}" ;;
+    2) echo  "${RED}crit${RESET}" ;;
+    3) echo  "${YELLOW}err${RESET}" ;;
+    4) echo  "${YELLOW}warning${RESET}" ;;
+    5) echo  "${GREEN}notice${RESET}" ;;
+    6) echo  "${BLUE}info${RESET}" ;;
+    7) echo  "${CYAN}debug${RESET}" ;;
+    8) echo  "${GREEN}success${RESET}" ;;  # Added success tag
     *) echo "$1" ;;
   esac
 }
