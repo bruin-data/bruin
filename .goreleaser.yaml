@@ -67,7 +67,6 @@ builds:
       - -trimpath
       - -buildmode=exe
 
-
 archives:
   - format: tar.gz
     builds:
