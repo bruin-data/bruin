@@ -110,18 +110,16 @@ func Init() *cli.Command {
 			}()
 
 			templateName := c.Args().Get(0)
-			if templateName == "" {
-				templateName = DefaultTemplate
-			}
+			if len(templateName) == 0 {
+				m, err := p.Run()
+				if err != nil {
+					fmt.Println("Oh no:", err)
+					os.Exit(1)
+				}
 
-			m, err := p.Run()
-			if err != nil {
-				fmt.Println("Oh no:", err)
-				os.Exit(1)
-			}
-
-			if m, ok := m.(model); ok && m.choice != "" {
-				templateName = m.choice
+				if m, ok := m.(model); ok && m.choice != "" {
+					templateName = m.choice
+				}
 			}
 
 			_, err = templates.Templates.ReadDir(templateName)
