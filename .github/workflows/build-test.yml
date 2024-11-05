@@ -65,11 +65,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ github.ref_name }}
-      - name: Set unzip alias
-        run: Set-Alias unzip Expand-Archive
       - name: Use install script
+        shell: bash
         run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.sha }}/install.sh | sh -s -- -d
       - name: Test Pipeline
+        shell: bash
         run: bruin init duckdb test-pipeline && cd test-pipeline && bruin run .
 
   goreleaser-unix:
