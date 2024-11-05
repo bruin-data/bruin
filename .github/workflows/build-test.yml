@@ -65,6 +65,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ github.ref_name }}
+      - name: Set unzip alias
+        run: Set-Alias unzip Expand-Archive
       - name: Use install script
         run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.sha }}/install.sh | sh -s -- -d
       - name: Test Pipeline
