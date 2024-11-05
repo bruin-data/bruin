@@ -105,11 +105,11 @@ func TestDB_IsValid(t *testing.T) {
 
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				response, err := json.Marshal(tt.response)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				w.WriteHeader(tt.statusCode)
 				_, err = w.Write(response)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}))
 			defer server.Close()
 
@@ -267,25 +267,25 @@ func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse,
 			w.WriteHeader(qrr.statusCode)
 
 			response, err := json.Marshal(qrr.response)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			_, err = w.Write(response)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			return
 		} else if r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries", projectID)) {
 			w.WriteHeader(jsr.statusCode)
 
 			response, err := json.Marshal(jsr.response)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			_, err = w.Write(response)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			return
 		}
 
 		w.WriteHeader(http.StatusInternalServerError)
 		_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 }
 
@@ -538,7 +538,7 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 				if !strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/datasets/%s/tables/%s", projectID, schema, table)) {
 					w.WriteHeader(http.StatusInternalServerError)
 					_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					return
 				}
 
@@ -548,10 +548,10 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 					w.WriteHeader(http.StatusOK)
 
 					response, err := json.Marshal(tt.tableResponse)
-					assert.NoError(t, err)
+					require.NoError(t, err)
 
 					_, err = w.Write(response)
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					return
 
 				// this is the request that updates the table metadata with the new details
@@ -561,7 +561,7 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 					// read the body
 					var table bigquery2.Table
 					err := json.NewDecoder(r.Body).Decode(&table)
-					assert.NoError(t, err)
+					require.NoError(t, err)
 
 					colsByName := make(map[string]*pipeline.Column, len(tt.asset.Columns))
 					for _, col := range tt.asset.Columns {
@@ -590,16 +590,16 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 					}
 
 					response, err := json.Marshal(tt.tableResponse)
-					assert.NoError(t, err)
+					require.NoError(t, err)
 
 					_, err = w.Write(response)
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					return
 				}
 
 				w.WriteHeader(http.StatusInternalServerError)
 				_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}))
 			defer server.Close()
 
