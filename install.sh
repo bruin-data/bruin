@@ -73,7 +73,7 @@ execute() {
       eval "$export_command"
       echo "$export_command" >> "$HOME/.${current_shell}rc"
       export PATH="$PATH:${BINDIR}"
-      echo "${YELLOW}To use the installed binaries, please restart the shell:${RESET}"
+      echo "${YELLOW}To use the installed binaries, please restart the shell${RESET}"
       ;;
     zsh)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
@@ -81,7 +81,7 @@ execute() {
       echo "$export_command" >> "$HOME/.zshrc"
       # Export PATH in the current shell
       export PATH="$PATH:${BINDIR}"
-      echo "${YELLOW}To use the installed binaries, please restart the shell:${RESET}"
+      echo "${YELLOW}To use the installed binaries, please restart the shell${RESET}"
       ;;
     fish)
       export_command="set -gx PATH \$PATH ${BINDIR}"
@@ -90,7 +90,7 @@ execute() {
       echo "$export_command" >> "$HOME/.config/fish/config.fish"
       # Export PATH in the current shell (for fish, this is already done by the fish -c command)
 
-      echo "${YELLOW}To use the installed binaries, please restart the shell:${RESET}"
+      echo "${YELLOW}To use the installed binaries, please restart the shell${RESET}"
       ;;
     *)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
