@@ -577,7 +577,10 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 					// read the body
 					var table bigquery2.Table
 					err := json.NewDecoder(r.Body).Decode(&table)
-					require.NoError(t, err)
+					if err != nil {
+						http.Error(w, err.Error(), http.StatusInternalServerError) // Handle error
+						return
+					}
 
 					colsByName := make(map[string]*pipeline.Column, len(tt.asset.Columns))
 					for _, col := range tt.asset.Columns {
@@ -606,16 +609,16 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 					}
 
 					response, err := json.Marshal(tt.tableResponse)
-					require.NoError(t, err)
+					assert.NoError(t, err)
 
 					_, err = w.Write(response)
-					require.NoError(t, err)
+					assert.NoError(t, err)
 					return
 				}
 
 				w.WriteHeader(http.StatusInternalServerError)
 				_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}))
 			defer server.Close()
 
