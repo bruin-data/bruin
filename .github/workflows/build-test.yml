@@ -3,6 +3,16 @@ name: build
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - 'docs/**'
+      - 'examples/**'
+      - 'resources/**'
+      - 'templates/**'
+      - 'install.sh'
+      - 'README.md'
+      - 'Makefile'
+      - 'package.json'
+      - 'package-lock.json'
   pull_request:
     branches: [ main ]
     paths-ignore:
