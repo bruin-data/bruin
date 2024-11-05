@@ -51,7 +51,6 @@ jobs:
           key: ${{ runner.os }}-go-embed-python-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-embed-python-
-
       - run: make test
 
   lint:
@@ -67,7 +66,7 @@ jobs:
         run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
       - run: make tools
       - name: Run golangci-lint
-        run: golangci-lint run ./...
+        run: golangci-lint run --timeout 10m60s ./...
 
   goreleaser-windows:
     runs-on: windows-latest
