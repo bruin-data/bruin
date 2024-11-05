@@ -244,6 +244,12 @@ func TestLoadFromFile(t *testing.T) {
 					SecretAccessKey: "secretKey123",
 				},
 			},
+			Slack: []SlackConnection{
+				{
+					Name:   "conn26",
+					APIKey: "slackkey",
+				},
+			},
 		},
 	}
 

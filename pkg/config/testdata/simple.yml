@@ -157,6 +157,9 @@ environments:
           path_to_file:  "/folder1/file.csv"
           access_key_id: "123Key"
           secret_access_key: "secretKey123"
+      slack:
+        - name: conn26
+          api_key: "slackkey"
       generic:
         - name: key1
           value: value1
