@@ -375,6 +375,24 @@ func ValidateDuplicateColumnNames(ctx context.Context, p *pipeline.Pipeline, ass
 	return issues, nil
 }
 
+func ValidateInvalidPythonModuleName(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	var issues []*Issue
+
+	if asset.Type == "python" {
+		parentDirs := strings.Split(filepath.Dir(asset.DefinitionFile.Path), "/")
+		lastDir := parentDirs[len(parentDirs)-1]
+
+		// Check if the last directory contains a hyphen and is not in the 'assets' directory
+		if strings.Contains(lastDir, "-") && lastDir != "assets" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Invalid Python module name '%s' for asset '%s'. Directory names cannot contain hyphens ('-') as they cannot be imported in Python.", lastDir, asset.Name),
+			})
+		}
+	}
+	return issues, nil
+}
+
 func ValidateAssetDirectoryExist(p *pipeline.Pipeline) ([]*Issue, error) {
 	var issues []*Issue
 
@@ -383,7 +401,7 @@ func ValidateAssetDirectoryExist(p *pipeline.Pipeline) ([]*Issue, error) {
 	if _, err := os.Stat(parentDir + "/assets"); os.IsNotExist(err) {
 		issues = append(issues, &Issue{
 			Task:        &pipeline.Asset{},
-			Description: fmt.Sprintf("Assets directory does not exist at '%s'", parentDir+"/assets"),
+			Description: fmt.Sprintf("Assets directory does not exist at '%s'", parentDir),
 		})
 	}
 	return issues, nil

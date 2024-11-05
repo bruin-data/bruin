@@ -44,7 +44,10 @@ export default defineConfig({
                         text: "Overview", link: "/connections/overview", items: [
                             {text: "Adjust", link: "/connections/adjust.md"},
                             {text: "Airtable", link: "/connections/airtable.md"},
+                            {text: "AWS Athena", link: "/connections/athena"},
                             {text: "Chess", link: "/connections/chess.md"},
+                            {text: "Databricks", link: "/connections/databricks"},
+                            {text: "DuckDB", link: "/connections/duckdb"},
                             {text: "Facebook", link: "/connections/facebook-ads.md"},
                             {text: "Google Cloud Platform", link: "/connections/google_cloud_platform"},
                             {text: "Google Sheets", link: "/connections/google_sheets.md"},
@@ -61,9 +64,7 @@ export default defineConfig({
                             {text: "SAP HANA", link: "/connections/sap_hana"},
                             {text: "S3", link: "/connections/s3"},
                             {text: "Snowflake", link: "/connections/snowflake"},
-                            {text: "Databricks", link: "/connections/databricks"},
-                            {text: "AWS Athena", link: "/connections/athena"},
-                            {text: "DuckDB", link: "/connections/duckdb"},
+                            {text: "Zendesk", link: "/connections/Zendesk"},
                         ]
                     },
                 ],
@@ -127,7 +128,15 @@ export default defineConfig({
                     {text: "Overview", link: "/vscode-extension/overview",
                     items: [
                         {text: "Installation", link: "/vscode-extension/installation"},
-                        //{text: "Features", link: "/vscode-extension/features"},
+                        {text: "Getting Started", link: "/vscode-extension/getting-started"},
+                        {text: "Configuration", link: "/vscode-extension/configuration"},
+                        {
+                            text: "Panels",
+                            items: [
+                                { text: "Side Panel", link: "/vscode-extension/panels/side-panel" },
+                                { text: "Lineage Panel", link: "/vscode-extension/panels/lineage-panel" }
+                            ]
+                        },
                     ]
                 },
                 ]

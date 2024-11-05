@@ -47,7 +47,7 @@ func TestLoadFromFile(t *testing.T) {
 					SslMode:      "require",
 				},
 			},
-			RedShift: []PostgresConnection{
+			RedShift: []RedshiftConnection{
 				{
 					Name:         "conn4",
 					Host:         "someredshift",
@@ -78,7 +78,7 @@ func TestLoadFromFile(t *testing.T) {
 					Port:  443,
 				},
 			},
-			Synapse: []MsSQLConnection{
+			Synapse: []SynapseConnection{
 				{
 					Name:     "conn6",
 					Host:     "somemsynapse",
@@ -242,6 +242,19 @@ func TestLoadFromFile(t *testing.T) {
 					PathToFile:      "/folder1/file.csv",
 					AccessKeyID:     "123Key",
 					SecretAccessKey: "secretKey123",
+				},
+			},
+			Zendesk: []ZendeskConnection{
+				{
+					Name:      "conn25",
+					ApiToken:  "zendeskKey",
+					Email:     "zendeskemail",
+					Subdomain: "zendeskUrl",
+				},
+				{
+					Name:       "conn25-1",
+					OAuthToken: "zendeskToken",
+					Subdomain:  "zendeskUrl",
 				},
 			},
 		},

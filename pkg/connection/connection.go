@@ -32,6 +32,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/stripe"
+	"github.com/bruin-data/bruin/pkg/zendesk"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc"
 	"golang.org/x/exp/maps"
@@ -63,6 +64,7 @@ type Manager struct {
 	GoogleSheets map[string]*gsheets.Client
 	Chess        map[string]*chess.Client
 	S3           map[string]*s3.Client
+	Zendesk      map[string]*zendesk.Client
 	mutex        sync.Mutex
 }
 
@@ -212,6 +214,13 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connS3, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.S3)...)
+
+	connZendesk, err := m.GetZendeskConnectionWithoutDefault(name)
+	if err == nil {
+		fmt.Println("err", err)
+		return connZendesk, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Zendesk)...)
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
 
@@ -709,6 +718,28 @@ func (m *Manager) GetChessConnectionWithoutDefault(name string) (*chess.Client, 
 	return db, nil
 }
 
+func (m *Manager) GetZendeskConnection(name string) (*zendesk.Client, error) {
+	if m.Zendesk == nil {
+		return nil, errors.New("no zendesk connections found")
+	}
+	db, ok := m.Zendesk[name]
+	if !ok {
+		return nil, errors.Errorf("zendesk connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetZendeskConnectionWithoutDefault(name string) (*zendesk.Client, error) {
+	if m.Zendesk == nil {
+		return nil, errors.New("no zendesk connections found")
+	}
+	db, ok := m.Zendesk[name]
+	if !ok {
+		return nil, errors.Errorf("zendesk connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
 func (m *Manager) GetS3Connection(name string) (*s3.Client, error) {
 	db, err := m.GetS3ConnectionWithoutDefault(name)
 	if err == nil {
@@ -823,8 +854,43 @@ func (m *Manager) AddPgConnectionFromConfig(connection *config.PostgresConnectio
 	return m.addPgLikeConnectionFromConfig(connection, false)
 }
 
-func (m *Manager) AddRedshiftConnectionFromConfig(connection *config.PostgresConnection) error {
-	return m.addPgLikeConnectionFromConfig(connection, true)
+func (m *Manager) AddRedshiftConnectionFromConfig(connection *config.RedshiftConnection) error {
+	return m.addRedshiftConnectionFromConfig(connection)
+}
+
+func (m *Manager) addRedshiftConnectionFromConfig(connection *config.RedshiftConnection) error {
+	m.mutex.Lock()
+	if m.Postgres == nil {
+		m.Postgres = make(map[string]*postgres.Client)
+	}
+	m.mutex.Unlock()
+
+	poolMaxConns := connection.PoolMaxConns
+	if connection.PoolMaxConns == 0 {
+		poolMaxConns = 10
+	}
+
+	var client *postgres.Client
+	var err error
+	client, err = postgres.NewClient(context.TODO(), postgres.RedShiftConfig{
+		Username:     connection.Username,
+		Password:     connection.Password,
+		Host:         connection.Host,
+		Port:         connection.Port,
+		Database:     connection.Database,
+		Schema:       connection.Schema,
+		PoolMaxConns: poolMaxConns,
+		SslMode:      connection.SslMode,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Postgres[connection.Name] = client
+
+	return nil
 }
 
 func (m *Manager) addPgLikeConnectionFromConfig(connection *config.PostgresConnection, redshift bool) error {
@@ -877,6 +943,31 @@ func (m *Manager) addPgLikeConnectionFromConfig(connection *config.PostgresConne
 }
 
 func (m *Manager) AddMsSQLConnectionFromConfig(connection *config.MsSQLConnection) error {
+	m.mutex.Lock()
+	if m.MsSQL == nil {
+		m.MsSQL = make(map[string]*mssql.DB)
+	}
+	m.mutex.Unlock()
+
+	client, err := mssql.NewDB(&mssql.Config{
+		Username: connection.Username,
+		Password: connection.Password,
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Database: connection.Database,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.MsSQL[connection.Name] = client
+
+	return nil
+}
+
+func (m *Manager) AddSynapseSQLConnectionFromConfig(connection *config.SynapseConnection) error {
 	m.mutex.Lock()
 	if m.MsSQL == nil {
 		m.MsSQL = make(map[string]*mssql.DB)
@@ -1323,6 +1414,28 @@ func (m *Manager) AddS3ConnectionFromConfig(connection *config.S3Connection) err
 	return nil
 }
 
+func (m *Manager) AddZendeskConnectionFromConfig(connection *config.ZendeskConnection) error {
+	m.mutex.Lock()
+	if m.Zendesk == nil {
+		m.Zendesk = make(map[string]*zendesk.Client)
+	}
+	m.mutex.Unlock()
+	client, err := zendesk.NewClient(zendesk.Config{
+		ApiToken:   connection.ApiToken,
+		Email:      connection.Email,
+		OAuthToken: connection.OAuthToken,
+		Subdomain:  connection.Subdomain,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Zendesk[connection.Name] = client
+
+	return nil
+}
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
 
@@ -1410,7 +1523,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 
 	for _, conn := range cm.SelectedEnvironment.Connections.Synapse {
 		wg.Go(func() {
-			err := connectionManager.AddMsSQLConnectionFromConfig(&conn)
+			err := connectionManager.AddSynapseSQLConnectionFromConfig(&conn)
 			if err != nil {
 				mu.Lock()
 				errList = append(errList, errors.Wrapf(err, "failed to add Synapse connection '%s'", conn.Name))
@@ -1591,6 +1704,14 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 		})
 	}
 
+	for _, conn := range cm.SelectedEnvironment.Connections.Zendesk {
+		wg.Go(func() {
+			err := connectionManager.AddZendeskConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add zendesk connection '%s'", conn.Name))
+			}
+		})
+	}
 	wg.Wait()
 
 	return connectionManager, errList

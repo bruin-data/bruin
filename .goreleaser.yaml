@@ -6,7 +6,7 @@ builds:
   - id: bruin-darwin
     binary: bruin
     ldflags:
-      - -s -w -X main.version={{ .Env.VERSION }}
+      - -s -w -X main.version={{ .Env.VERSION }} -X main.commit={{ .Env.COMMIT_SHA }}
     main: ./
     goarch:
       - amd64
