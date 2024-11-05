@@ -68,9 +68,12 @@ jobs:
       - name: Use install script
         shell: bash
         run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.sha }}/install.sh | sh -s -- -d
+      - name: Display the path
+        shell: bash
+        run: echo $PATH
       - name: Test Pipeline
         shell: bash
-        run: bruin.exe init duckdb test-pipeline && cd test-pipeline && bruin run .
+        run: bruin init duckdb test-pipeline && cd test-pipeline && bruin run .
 
   goreleaser-unix:
     runs-on: ubuntu-latest
