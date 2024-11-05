@@ -37,8 +37,8 @@ const (
 
 	pipelineContainsCycle = "The pipeline has a cycle with dependencies, make sure there are no cyclic dependencies"
 
-	pipelineSlackFieldEmptyChannel     = "slack notifications must have a `channel` attribute"
-	pipelineSlackChannelFieldNotUnique = "The `channel` attribute under the slack notifications must be unique"
+	pipelineSlackFieldEmptyChannel     = "Slack notifications must have a `channel` attribute"
+	pipelineSlackChannelFieldNotUnique = "The `channel` attribute under the Slack notifications must be unique"
 
 	pipelineMSTeamsConnectionFieldNotUnique = "The `connection` attribute under the MS Teams notifications must be unique"
 	pipelineMSTeamsConnectionFieldEmpty     = "MS Teams notifications `connection` attribute must not be empty"
