@@ -9,6 +9,11 @@ import (
 
 // New helper function to validate ServiceAccountFile.
 func validateServiceAccountFile(filePath string) error {
+	var jsonStr json.RawMessage
+	if err := json.Unmarshal([]byte(filePath), &jsonStr); err == nil {
+		return errors.New("please use service_account_json instead of service_account_file to define json")
+	}
+
 	file, err := os.ReadFile(filePath)
 	if err != nil {
 		return errors.Errorf("failed to read service account file at '%s': %v", filePath, err)
