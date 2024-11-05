@@ -5,7 +5,17 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-
+  paths-ignore:
+    - 'docs/**'
+    - 'examples/**'
+    - 'examples/**'
+    - 'resources/**'
+    - 'templates/**'
+    - 'install.sh'
+    - 'README.md'
+    - 'Makefile'
+    - 'package.json'
+    - 'package-lock.json'
 jobs:
   build:
     strategy:
@@ -39,8 +49,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
-
-      - run: make format
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - name: Run golangci-lint
+        run: golangci-lint run ./...
 
   goreleaser-windows:
     runs-on: windows-latest
