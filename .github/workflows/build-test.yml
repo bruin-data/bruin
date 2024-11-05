@@ -8,7 +8,6 @@ on:
   paths-ignore:
     - 'docs/**'
     - 'examples/**'
-    - 'examples/**'
     - 'resources/**'
     - 'templates/**'
     - 'install.sh'
