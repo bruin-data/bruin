@@ -52,14 +52,14 @@ execute() {
   (cd "${tmpdir}" && untar "${TARBALL}")
 
   test ! -d "${BINDIR}" && install -d "${BINDIR}"
-  log_info "installing to ${BINDIR}"
+  log_debug "installing to ${BINDIR}"
   for binexe in $BINARIES; do
     if [ "$OS" = "windows" ]; then
       binexe="${binexe}.exe"
     fi
     install "${srcdir}/${binexe}" "${BINDIR}/"
     echo "  ${binexe}"
-    log_info "installed ${BINDIR}/${binexe}"
+    log_debug "installed ${BINDIR}/${binexe}"
   done
   rm -rf "${tmpdir}"
   
@@ -74,7 +74,7 @@ execute() {
       eval "$export_command"
       echo "$export_command" >> "$HOME/.${current_shell}rc"
       export PATH="$PATH:${BINDIR}"
-      log_info "The PATH has been updated in your current shell session. You will need to restart your shell to use the installed binaries."
+      log_info "You will need to restart your shell to use the installed binaries."
       ;;
     zsh)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
@@ -82,7 +82,7 @@ execute() {
       echo "$export_command" >> "$HOME/.zshrc"
       # Export PATH in the current shell
       export PATH="$PATH:${BINDIR}"
-      log_info "The PATH has been updated in your current shell session. You will need to restart your shell to use the installed binaries."
+      log_info "You will need to restart your shell to use the installed binaries."
       ;;
     fish)
       export_command="set -gx PATH \$PATH ${BINDIR}"
@@ -90,7 +90,7 @@ execute() {
       echo "$export_command" >> "$HOME/.config/fish/config.fish"
       # Export PATH in the current shell (for fish, this is already done by the fish -c command)
 
-      log_info "The PATH has been updated in your current shell session. You will need to restart your shell to use the installed binaries."
+      log_info "You will need to restart your shell to use the installed binaries."
       ;;
     *)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
@@ -102,8 +102,6 @@ execute() {
       ;;
   esac
   
-
-  log_info "everything's installed!"
 }
 
 
@@ -447,7 +445,7 @@ NAME=${PROJECT_NAME}_${OS}_${ARCH}
 TARBALL=${NAME}.${FORMAT}
 TARBALL_URL=${GITHUB_DOWNLOAD}/${TAG}/${TARBALL}
 
-log_info "Starting the download of ${TARBALL_URL}"
+log_debug "Starting the download of ${TARBALL_URL}"
 
 
 
