@@ -24,4 +24,4 @@ To access and modify the Bruin extension settings:
 4. Adjust the settings for **Default Folding State** and **Path Separator** as needed.
 
 
-![Extension Config](../vscode-extension/extension-config.png)
+![Extension Config](../public/vscode-extension/extension-config.png)

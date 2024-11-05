@@ -6,19 +6,19 @@ The Bruin VSCode extension complements the Bruin CLI by offering a more visual a
 
 - **Syntax Coloring, Autocompletion, and Snippets**: Enjoy syntax coloring, autocompletion, and ready-to-use snippets to make coding smoother and more intuitive.
 
-![Syntaxe Coloring](../vscode-extension/syntaxe-coloring.png)
+![Syntaxe Coloring](../public/vscode-extension/syntaxe-coloring.png)
 
 - **Bruin CLI Integration**: Run Bruin CLI commands effortlessly through easy-to-use buttons and panels.
 
-![CLI Integration](../vscode-extension/action-buttons.gif)
+![CLI Integration](../public/vscode-extension/action-buttons.gif)
 
 - **Data Asset Lineage Visualization**: Get a clear view of how data assets connect and interact, helping you understand your data's flow and dependencies.
 
-![Lineage Overview](../vscode-extension/panels/lineage-panel/lineage-overview.png)
+![Lineage Overview](../public/vscode-extension/panels/lineage-panel/lineage-overview.png)
 
 - **Real-time Updates and Feedback**: Stay informed with instant updates and error messages right in VSCode.
 
-![Real-Time Feedback](../vscode-extension/real-time-feedback.gif)
+![Real-Time Feedback](../public/vscode-extension/real-time-feedback.gif)
 <!-- ### What is a Bruin Section?
 A **Bruin section** refers to a block of code within SQL or Python files that is specifically designated for Bruin-related functionality. These sections are typically enclosed within specific delimiters, allowing the extension to identify and manage them effectively. Users can fold or expand these sections to improve code readability and organization.
 
