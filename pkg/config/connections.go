@@ -410,3 +410,12 @@ type ZendeskConnection struct {
 func (c ZendeskConnection) GetName() string {
 	return c.Name
 }
+
+type SlackConnection struct {
+	Name   string `yaml:"name" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c SlackConnection) GetName() string {
+	return c.Name
+}

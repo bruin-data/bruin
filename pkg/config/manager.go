@@ -44,6 +44,8 @@ type Connections struct {
 	Airtable            []AirtableConnection            `yaml:"airtable,omitempty" json:"airtable,omitempty" mapstructure:"airtable"`
 	Zendesk             []ZendeskConnection             `yaml:"zendesk,omitempty" json:"zendesk,omitempty" mapstructure:"zendesk"`
 	S3                  []S3Connection                  `yaml:"s3,omitempty" json:"s3,omitempty" mapstructure:"s3"`
+	Slack               []SlackConnection               `yaml:"slack,omitempty" json:"slack,omitempty" mapstructure:"slack"`
+
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -222,6 +224,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.S3 {
 		c.byKey[conn.Name] = &(c.S3[i])
 		c.typeNameMap[conn.Name] = "s3"
+	}
+
+	for i, conn := range c.Slack {
+		c.byKey[conn.Name] = &(c.Slack[i])
+		c.typeNameMap[conn.Name] = "slack"
 	}
 }
 
@@ -549,6 +556,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.S3 = append(env.Connections.S3, conn)
+	case "slack":
+		var conn SlackConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Slack = append(env.Connections.Slack, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -634,6 +648,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Airtable = removeConnection(env.Connections.Airtable, connectionName)
 	case "s3":
 		env.Connections.S3 = removeConnection(env.Connections.S3, connectionName)
+	case "slack":
+		env.Connections.Slack = removeConnection(env.Connections.Slack, connectionName)
 	case "zendesk":
 		env.Connections.Zendesk = removeConnection(env.Connections.Zendesk, connectionName)
 	default:

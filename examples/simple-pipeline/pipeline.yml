@@ -26,4 +26,5 @@ default_connections:
   chess: "my-chess"
   airtable: "my-airtable"
   s3: "my-s3"
+  slack: "my-slack"
   zendesk : "my-zendesk"

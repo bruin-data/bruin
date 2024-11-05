@@ -30,6 +30,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/shopify"
+	"github.com/bruin-data/bruin/pkg/slack"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/stripe"
 	"github.com/bruin-data/bruin/pkg/zendesk"
@@ -64,6 +65,7 @@ type Manager struct {
 	GoogleSheets map[string]*gsheets.Client
 	Chess        map[string]*chess.Client
 	S3           map[string]*s3.Client
+	Slack        map[string]*slack.Client
 	Zendesk      map[string]*zendesk.Client
 	mutex        sync.Mutex
 }
@@ -214,6 +216,11 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connS3, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.S3)...)
+	connSlack, err := m.GetSlackConnectionWithoutDefault(name)
+	if err == nil {
+		return connSlack, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Slack)...)
 
 	connZendesk, err := m.GetZendeskConnectionWithoutDefault(name)
 	if err == nil {
@@ -759,6 +766,24 @@ func (m *Manager) GetS3ConnectionWithoutDefault(name string) (*s3.Client, error)
 	return db, nil
 }
 
+func (m *Manager) GetSlackConnection(name string) (*slack.Client, error) {
+	db, err := m.GetSlackConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetSlackConnectionWithoutDefault("slack-default")
+}
+
+func (m *Manager) GetSlackConnectionWithoutDefault(name string) (*slack.Client, error) {
+	if m.Slack == nil {
+		return nil, errors.New("no slack connections found")
+	}
+	db, ok := m.Slack[name]
+	if !ok {
+		return nil, errors.Errorf("slack connection not found for '%s'", name)
+	}
+	return db, nil
+}
 func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatformConnection) error {
 	m.mutex.Lock()
 	if m.BigQuery == nil {
@@ -1414,6 +1439,23 @@ func (m *Manager) AddS3ConnectionFromConfig(connection *config.S3Connection) err
 	return nil
 }
 
+func (m *Manager) AddSlackConnectionFromConfig(connection *config.SlackConnection) error {
+	m.mutex.Lock()
+	if m.Slack == nil {
+		m.Slack = make(map[string]*slack.Client)
+	}
+	m.mutex.Unlock()
+	client, err := slack.NewClient(slack.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Slack[connection.Name] = client
+	return nil
+}
 func (m *Manager) AddZendeskConnectionFromConfig(connection *config.ZendeskConnection) error {
 	m.mutex.Lock()
 	if m.Zendesk == nil {
@@ -1700,6 +1742,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			err := connectionManager.AddS3ConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add s3 connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Slack {
+		wg.Go(func() {
+			err := connectionManager.AddSlackConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add slack connection '%s'", conn.Name))
 			}
 		})
 	}
