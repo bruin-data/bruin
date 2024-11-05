@@ -375,6 +375,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			if len(errorsInTaskResults) > 0 {
 				printErrorsInResults(errorsInTaskResults, s)
+				return cli.Exit("", 1)
 			}
 
 			return nil
