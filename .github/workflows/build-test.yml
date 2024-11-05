@@ -65,6 +65,7 @@ jobs:
           go-version-file: 'go.mod'
       - name: Install golangci-lint
         run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - run: make tools
       - name: Run golangci-lint
         run: golangci-lint run ./...
 
