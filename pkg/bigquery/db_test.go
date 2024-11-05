@@ -105,11 +105,17 @@ func TestDB_IsValid(t *testing.T) {
 
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				response, err := json.Marshal(tt.response)
-				require.NoError(t, err)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError) // Handle error
+					return
+				}
 
 				w.WriteHeader(tt.statusCode)
 				_, err = w.Write(response)
-				require.NoError(t, err)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError) // Handle error
+					return
+				}
 			}))
 			defer server.Close()
 
