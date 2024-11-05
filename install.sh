@@ -52,14 +52,14 @@ execute() {
   (cd "${tmpdir}" && untar "${TARBALL}")
 
   test ! -d "${BINDIR}" && install -d "${BINDIR}"
-  log_info "installing to ${BINDIR}"
+  log_debug "installing to ${BINDIR}"
   for binexe in $BINARIES; do
     if [ "$OS" = "windows" ]; then
       binexe="${binexe}.exe"
     fi
     install "${srcdir}/${binexe}" "${BINDIR}/"
     echo "  ${binexe}"
-    log_info "installed ${BINDIR}/${binexe}"
+    log_debug "installed ${BINDIR}/${binexe}"
   done
   rm -rf "${tmpdir}"
   
@@ -67,14 +67,13 @@ execute() {
 
   current_shell=$(basename "$SHELL")
 
- 
   case "$current_shell" in
     bash|sh)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
       eval "$export_command"
       echo "$export_command" >> "$HOME/.${current_shell}rc"
       export PATH="$PATH:${BINDIR}"
-      log_info "The PATH has been updated in your current shell session. You will need to restart your shell to use the installed binaries."
+      echo "${YELLOW}To use the installed binaries, please restart the shell${RESET}"
       ;;
     zsh)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
@@ -82,15 +81,16 @@ execute() {
       echo "$export_command" >> "$HOME/.zshrc"
       # Export PATH in the current shell
       export PATH="$PATH:${BINDIR}"
-      log_info "The PATH has been updated in your current shell session. You will need to restart your shell to use the installed binaries."
+      echo "${YELLOW}To use the installed binaries, please restart the shell${RESET}"
       ;;
     fish)
       export_command="set -gx PATH \$PATH ${BINDIR}"
       fish -c "$export_command"
+
       echo "$export_command" >> "$HOME/.config/fish/config.fish"
       # Export PATH in the current shell (for fish, this is already done by the fish -c command)
 
-      log_info "The PATH has been updated in your current shell session. You will need to restart your shell to use the installed binaries."
+      echo "${YELLOW}To use the installed binaries, please restart the shell${RESET}"
       ;;
     *)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
@@ -102,8 +102,6 @@ execute() {
       ;;
   esac
   
-
-  log_info "everything's installed!"
 }
 
 
@@ -198,16 +196,21 @@ log_priority() {
   fi
   [ "$1" -le "$_logp" ]
 }
+
+BLUE='\033[0;34m'    # Blue
+RED='\033[0;31m'     # Red
+YELLOW='\033[0;33m'  # Yellow
+GREEN='\033[0;32m'  # Green
+CYAN='\033[0;36m'    # Cyan
+RESET='\033[0m' # Reset to default color
+
 log_tag() {
   case $1 in
-    0) echo "emerg" ;;
-    1) echo "alert" ;;
-    2) echo "crit" ;;
-    3) echo "err" ;;
-    4) echo "warning" ;;
-    5) echo "notice" ;;
-    6) echo "info" ;;
-    7) echo "debug" ;;
+    2) echo  "${BLUE}crit${RESET}" ;;
+    3) echo  "${RED}err${RESET}" ;;
+    6) echo  "${YELLOW}info${RESET}" ;;
+    7) echo  "${CYAN}debug${RESET}" ;;
+    8) echo  "${GREEN}success${RESET}" ;;  # Added success tag
     *) echo "$1" ;;
   esac
 }
@@ -221,12 +224,17 @@ log_info() {
 }
 log_err() {
   log_priority 3 || return 0
-  echoerr "$(log_prefix)" "$(log_tag 3)" "$@"
+  echoerr "$(log_prefix)" "$(log_tag 5)" "$@"
 }
 log_crit() {
   log_priority 2 || return 0
   echoerr "$(log_prefix)" "$(log_tag 2)" "$@"
 }
+log_success() {
+  log_priority 5 || return 0
+  echoerr "$(log_prefix)" "$(log_tag 8)" "$@"
+}
+
 uname_os() {
   os=$(uname -s | tr '[:upper:]' '[:lower:]')
   case "$os" in
@@ -447,13 +455,9 @@ NAME=${PROJECT_NAME}_${OS}_${ARCH}
 TARBALL=${NAME}.${FORMAT}
 TARBALL_URL=${GITHUB_DOWNLOAD}/${TAG}/${TARBALL}
 
-log_info "Starting the download of ${TARBALL_URL}"
-
-
+log_debug "Starting the download of ${TARBALL_URL}"
 
 execute
-
-
 
 
 
