@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/spf13/afero"
 	fs2 "io/fs"
 	"log"
 	"os"
@@ -11,7 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/templates"
+	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
 )
 
