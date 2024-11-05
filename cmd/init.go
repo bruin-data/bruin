@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/spf13/afero"
 	fs2 "io/fs"
 	"log"
 	"os"
@@ -9,9 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/templates"
-	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
 )
 
@@ -87,6 +87,12 @@ func Init() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			_, err = config.LoadOrCreate(afero.NewOsFs(), path2.Join(inputPath, ".bruin.yml"))
+			if err != nil {
+				errorPrinter.Printf("Could not write .bruin.yml file: %v\n", err)
+				return err
+			}
+
 			err = fs2.WalkDir(templates.Templates, templateName, func(path string, d fs2.DirEntry, err error) error {
 				if err != nil {
 					return err
@@ -121,12 +127,6 @@ func Init() *cli.Command {
 				err = os.WriteFile(filepath.Join(absolutePath, baseName), fileContents, 0o644) //nolint:gosec
 				if err != nil {
 					errorPrinter.Printf("Could not write the %s file: %v\n", filepath.Join(absolutePath, baseName), err)
-					return err
-				}
-
-				_, err = config.LoadOrCreate(afero.NewOsFs(), path2.Join(inputPath, ".bruin.yml"))
-				if err != nil {
-					errorPrinter.Printf("Could not write .bruin.yml file: %v\n", err)
 					return err
 				}
 
