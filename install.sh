@@ -67,15 +67,13 @@ execute() {
 
   current_shell=$(basename "$SHELL")
 
- 
   case "$current_shell" in
     bash|sh)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
       eval "$export_command"
       echo "$export_command" >> "$HOME/.${current_shell}rc"
       export PATH="$PATH:${BINDIR}"
-      log_info "You will need to restart your shell to use the installed binaries."
-
+      echo "${YELLOW}To use the installed binaries, please restart the shell:${RESET}"
       ;;
     zsh)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
@@ -83,15 +81,16 @@ execute() {
       echo "$export_command" >> "$HOME/.zshrc"
       # Export PATH in the current shell
       export PATH="$PATH:${BINDIR}"
-      log_info "You will need to restart your shell to use the installed binaries."
+      echo "${YELLOW}To use the installed binaries, please restart the shell:${RESET}"
       ;;
     fish)
       export_command="set -gx PATH \$PATH ${BINDIR}"
       fish -c "$export_command"
+
       echo "$export_command" >> "$HOME/.config/fish/config.fish"
       # Export PATH in the current shell (for fish, this is already done by the fish -c command)
 
-      log_info "You will need to restart your shell to use the installed binaries."
+      echo "${YELLOW}To use the installed binaries, please restart the shell:${RESET}"
       ;;
     *)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
@@ -198,22 +197,18 @@ log_priority() {
   [ "$1" -le "$_logp" ]
 }
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-CYAN='\033[0;36m'
+BLUE='\033[0;34m'    # Blue
+RED='\033[0;31m'     # Red
+YELLOW='\033[0;33m'  # Yellow
+GREEN='\033[0;32m'  # Green
+CYAN='\033[0;36m'    # Cyan
 RESET='\033[0m' # Reset to default color
+
 log_tag() {
   case $1 in
-    0) echo "${RED}emerg${RESET}" ;;
-    1) echo  "${MAGENTA}alert${RESET}" ;;
-    2) echo  "${RED}crit${RESET}" ;;
-    3) echo  "${YELLOW}err${RESET}" ;;
-    4) echo  "${YELLOW}warning${RESET}" ;;
-    5) echo  "${GREEN}notice${RESET}" ;;
-    6) echo  "${BLUE}info${RESET}" ;;
+    2) echo  "${BLUE}crit${RESET}" ;;
+    3) echo  "${RED}err${RESET}" ;;
+    6) echo  "${YELLOW}info${RESET}" ;;
     7) echo  "${CYAN}debug${RESET}" ;;
     8) echo  "${GREEN}success${RESET}" ;;  # Added success tag
     *) echo "$1" ;;
@@ -229,7 +224,7 @@ log_info() {
 }
 log_err() {
   log_priority 3 || return 0
-  echoerr "$(log_prefix)" "$(log_tag 3)" "$@"
+  echoerr "$(log_prefix)" "$(log_tag 5)" "$@"
 }
 log_crit() {
   log_priority 2 || return 0
@@ -462,12 +457,7 @@ TARBALL_URL=${GITHUB_DOWNLOAD}/${TAG}/${TARBALL}
 
 log_debug "Starting the download of ${TARBALL_URL}"
 
-
-
 execute
-
-
-
 
 
 
