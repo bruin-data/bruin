@@ -65,9 +65,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ github.ref_name }}
-      - run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.sha }}/install.sh | sh -s -- -d
+      - name: Use install script
+        run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.sha }}/install.sh | sh -s -- -d
       - name: Test Pipeline
-        run: bruin init duckdb test-pipeline && ce test-pipeline && bruin run .
+        run: bruin init duckdb test-pipeline && cd test-pipeline && bruin run .
 
   goreleaser-unix:
     runs-on: ubuntu-latest
@@ -81,6 +82,7 @@ jobs:
       - name: Run GoReleaser
         run: |
           docker run -e VERSION=0.0.0  -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 build --snapshot --clean --id bruin-darwin --id bruin-linux-amd64 --id bruin-linux-arm64  --single-target
-      - run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.sha }}/install.sh | sh -s -- -d
+      - name: Use install script
+        run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.sha }}/install.sh | sh -s -- -d
       - name: Test Pipeline
-        run: bruin init duckdb test-pipeline && ce test-pipeline && bruin run .
+        run: bruin init duckdb test-pipeline && cd test-pipeline && bruin run .
