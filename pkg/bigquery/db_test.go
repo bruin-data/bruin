@@ -554,7 +554,7 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 				if !strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/datasets/%s/tables/%s", projectID, schema, table)) {
 					w.WriteHeader(http.StatusInternalServerError)
 					_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
-					require.NoError(t, err)
+					assert.NoError(t, err)
 					return
 				}
 
@@ -564,10 +564,10 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 					w.WriteHeader(http.StatusOK)
 
 					response, err := json.Marshal(tt.tableResponse)
-					require.NoError(t, err)
+					assert.NoError(t, err)
 
 					_, err = w.Write(response)
-					require.NoError(t, err)
+					assert.NoError(t, err)
 					return
 
 				// this is the request that updates the table metadata with the new details
