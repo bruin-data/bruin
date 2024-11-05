@@ -33,7 +33,8 @@ parameters:
 **parameters:**
 - source_connection: The name of the Kafka connection defined in .bruin.yml.
 - source_table: The name of the data table in kafka you want to ingest.
-Step 2: Add a Connection to [.bruin.yml](https://bruin-data.github.io/bruin/connections/overview.html) that stores connections and secrets to be used in pipelines.
+- 
+**Step 2: Add a Connection to [.bruin.yml](https://bruin-data.github.io/bruin/connections/overview.html) that stores connections and secrets to be used in pipelines.**
 You need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema.
 
 ***File: .bruin.yml***
@@ -44,7 +45,7 @@ You need to add a configuration item to `connections` in the `.bruin.yml` file c
           bootstrap_servers: "localhost:9093"
           group_id: "test123"
 ```
-**Step 3: [Run](https://bruin-data.github.io/bruin/commands/run.html] Asset) to Ingest Data**
+**Step 3: [Run](https://bruin-data.github.io/bruin/commands/run.html) Asset to Ingest Data**
 ```
 bruin run ingestr.kafka.asset.yml
 ```

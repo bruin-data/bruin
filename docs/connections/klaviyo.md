@@ -45,7 +45,7 @@ You need to add a configuration item to `connections` in the `.bruin.yml` file c
         - name: "connection_name"
           api_key: "YOUR_Klaviyo_API_KEY"
 ```
-**Step 3: [Run](https://bruin-data.github.io/bruin/commands/run.html] Asset) to Ingest Data**
+**Step 3: [Run](https://bruin-data.github.io/bruin/commands/run.html) Asset to Ingest Data**
 ```
 bruin run ingestr.klaviyo.asset.yml
 ```
