@@ -75,6 +75,7 @@ execute() {
       echo "$export_command" >> "$HOME/.${current_shell}rc"
       export PATH="$PATH:${BINDIR}"
       log_info "You will need to restart your shell to use the installed binaries."
+
       ;;
     zsh)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
@@ -196,16 +197,25 @@ log_priority() {
   fi
   [ "$1" -le "$_logp" ]
 }
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
+RESET='\033[0m' # Reset to default color
 log_tag() {
   case $1 in
-    0) echo "emerg" ;;
-    1) echo "alert" ;;
-    2) echo "crit" ;;
-    3) echo "err" ;;
-    4) echo "warning" ;;
-    5) echo "notice" ;;
-    6) echo "info" ;;
-    7) echo "debug" ;;
+    0) echo -e "${RED}emerg${RESET}" ;;
+    1) echo -e "${MAGENTA}alert${RESET}" ;;
+    2) echo -e "${RED}crit${RESET}" ;;
+    3) echo -e "${YELLOW}err${RESET}" ;;
+    4) echo -e "${YELLOW}warning${RESET}" ;;
+    5) echo -e "${GREEN}notice${RESET}" ;;
+    6) echo -e "${BLUE}info${RESET}" ;;
+    7) echo -e "${CYAN}debug${RESET}" ;;
+    8) echo -e "${GREEN}success${RESET}" ;;  # Added success tag
     *) echo "$1" ;;
   esac
 }
@@ -225,6 +235,11 @@ log_crit() {
   log_priority 2 || return 0
   echoerr "$(log_prefix)" "$(log_tag 2)" "$@"
 }
+log_success() {
+  log_priority 5 || return 0
+  echoerr "$(log_prefix)" "$(log_tag 8)" "$@"
+}
+
 uname_os() {
   os=$(uname -s | tr '[:upper:]' '[:lower:]')
   case "$os" in
@@ -450,6 +465,7 @@ log_debug "Starting the download of ${TARBALL_URL}"
 
 
 execute
+
 
 
 
