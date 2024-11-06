@@ -23,7 +23,7 @@ duckdb-test: build
 	@echo "$(OK_COLOR)==> Testing with duck db...$(NO_COLOR)"
 	@./bin/bruin init duckdb test
 	@cd test && git init
-	@./bin/bruin run .
+	@./bin/bruin run test
 
 
 clean:
