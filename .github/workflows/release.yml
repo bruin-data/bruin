@@ -107,6 +107,7 @@ jobs:
 
   release-windows:
     runs-on: windows-latest
+    needs: release
     defaults:
       run:
         shell: msys2 {0}
@@ -142,6 +143,16 @@ jobs:
           overwrite: false
           make_latest: true
           prerelease: false
+
+  install-windows:
+    runs-on: windows-latest
+    name: Installer Script on Windows
+    needs: release-windows
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v3
       - name: Use install script
         shell: bash
         run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh -s -- -d
@@ -149,3 +160,15 @@ jobs:
         shell: bash
         run: /c/Users/runneradmin/.local/bin/bruin.exe init duckdb test-pipeline && cd test-pipeline && git init && /c/Users/runneradmin/.local/bin/bruin.exe run .
 
+  install-uni:
+    runs-on: ubuntu-latest
+    needs: [release-windows]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Use install script
+        run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh -s -- -d
+      - name: Test Pipeline
+        run: bruin init duckdb test-pipeline && cd test-pipeline && git init && bruin run .
