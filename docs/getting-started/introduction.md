@@ -62,5 +62,14 @@ you can see the available template names by running `bruin help init`
 
 # Troubleshooting
 
-- Permission denied' error while installing the Bruin CLI, In this case user doesn't have permission to write the `binary` in `~/.local/bin` directory 
+## 1. 'Permission Denied' Error While Installing Bruin CLI
 
+**Issue:**  
+When installing the Bruin CLI, you may encounter a `'Permission Denied'` error. This typically happens if the user doesn't have permission to write the binary to the `~/.local/bin` directory.
+
+**Solution:**  
+To resolve this, ensure that you have the necessary write permissions for the `~/.local/bin` directory. You can do this by running the following command with sudo:
+
+```shell
+curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sudo sh
+```
