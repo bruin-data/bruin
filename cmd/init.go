@@ -21,7 +21,7 @@ const (
 	DefaultFolderName = "bruin-pipeline"
 )
 
-var choices = templates.TemplatesName()
+var choices = templates.TemplateNames()
 
 type model struct {
 	cursor int
@@ -56,6 +56,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Return the concrete type instead of the interface
 	return m, nil // This line is fine as it is
 }
+
 func (m model) View() string {
 	s := strings.Builder{}
 	s.WriteString("Please select a template below\n\n")
