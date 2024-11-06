@@ -8,7 +8,7 @@ import (
 //go:embed */.bruin.yml
 var Templates embed.FS
 
-func TemplatesName() []string {
+func TemplateNames() []string {
 	dirs, err := Templates.ReadDir(".")
 	if err != nil {
 		return []string{}
