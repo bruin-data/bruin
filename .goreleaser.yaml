@@ -69,6 +69,7 @@ builds:
 
 release:
   draft: true
+  make_latest: false
 
 archives:
   - format: tar.gz
