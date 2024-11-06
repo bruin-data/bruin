@@ -58,7 +58,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 func (m model) View() string {
 	s := strings.Builder{}
-	s.WriteString("Please select the template?\n\n")
+	s.WriteString("Please select a template below\n\n")
 
 	for i, choice := range choices {
 		if m.cursor == i {
