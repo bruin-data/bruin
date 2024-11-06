@@ -141,6 +141,7 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: false
           make_latest: false
+          prerelease: true
       - name: Use install script
         shell: bash
         run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh -s -- -d
