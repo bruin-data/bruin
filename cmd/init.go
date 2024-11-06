@@ -21,7 +21,7 @@ const (
 	DefaultFolderName = "bruin-pipeline"
 )
 
-var choices = templates.TemplateNames()
+var choices = []string{}
 
 type model struct {
 	cursor int
@@ -86,6 +86,8 @@ func Init() *cli.Command {
 			templateList = append(templateList, entry.Name())
 		}
 	}
+
+	choices = templateList
 	p := tea.NewProgram(model{})
 	return &cli.Command{
 		Name:  "init",
