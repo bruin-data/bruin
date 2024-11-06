@@ -67,12 +67,18 @@ Using Bruin vscode extension
 - Add destination connection - postgres sql
 - Add source connection - Notion
 
+https://github.com/user-attachments/assets/7ef731e3-386a-420c-9355-01bb307436f7
+
 
 You can customize your pipeline by adding in pipeline.yml
 - You can change schedule to weekly or daily
 
 #### Validate and Run your pipeline
 - bruin CLI can run the whole pipeline or any task with the downstreams.
+
+
+
+https://github.com/user-attachments/assets/aa6b2c0f-e480-48a5-9975-286af1ab4474
 
 
 #### This is what Notion data looks like at the destination
