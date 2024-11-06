@@ -33,23 +33,19 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	if msg, ok := msg.(tea.KeyMsg); ok {
 		switch msg.String() {
 		case "ctrl+c", "q", "esc":
 			return m, tea.Quit
-
 		case "enter":
 			// Send the choice on the channel and exit.
 			m.choice = choices[m.cursor]
 			return m, tea.Quit
-
 		case "down", "j":
 			m.cursor++
 			if m.cursor >= len(choices) {
 				m.cursor = 0
 			}
-
 		case "up", "k":
 			m.cursor--
 			if m.cursor < 0 {
@@ -57,21 +53,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
-
-	return m, nil
+	// Return the concrete type instead of the interface
+	return m, nil // This line is fine as it is
 }
-
 func (m model) View() string {
 	s := strings.Builder{}
 	s.WriteString("Please select the template?\n\n")
 
-	for i := 0; i < len(choices); i++ {
+	for i, choice := range choices {
 		if m.cursor == i {
 			s.WriteString("(•) ")
 		} else {
 			s.WriteString("( ) ")
 		}
-		s.WriteString(choices[i])
+		s.WriteString(choice)
 		s.WriteString("\n")
 	}
 	s.WriteString("\n(press q to quit)\n")
