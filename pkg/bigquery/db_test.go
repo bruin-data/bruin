@@ -105,7 +105,6 @@ func TestDB_IsValid(t *testing.T) {
 
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				response, err := json.Marshal(tt.response)
-<<<<<<< HEAD
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError) // Handle error
 					return
@@ -117,13 +116,6 @@ func TestDB_IsValid(t *testing.T) {
 					http.Error(w, err.Error(), http.StatusInternalServerError) // Handle error
 					return
 				}
-=======
-				require.NoError(t, err)
-
-				w.WriteHeader(tt.statusCode)
-				_, err = w.Write(response)
-				require.NoError(t, err)
->>>>>>> 1d7b493 (fix lint)
 			}))
 			defer server.Close()
 
@@ -281,7 +273,6 @@ func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse,
 			w.WriteHeader(qrr.statusCode)
 
 			response, err := json.Marshal(qrr.response)
-<<<<<<< HEAD
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -290,18 +281,11 @@ func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse,
 			if err != nil {
 				t.Fatal(err)
 			}
-=======
-			require.NoError(t, err)
-
-			_, err = w.Write(response)
-			require.NoError(t, err)
->>>>>>> 1d7b493 (fix lint)
 			return
 		} else if r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries", projectID)) {
 			w.WriteHeader(jsr.statusCode)
 
 			response, err := json.Marshal(jsr.response)
-<<<<<<< HEAD
 			if err != nil {
 				t.Fatal(err)
 			} // Updated error handling
@@ -310,24 +294,14 @@ func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse,
 			if err != nil {
 				t.Fatal(err)
 			} // Updated error handling
-=======
-			require.NoError(t, err)
-
-			_, err = w.Write(response)
-			require.NoError(t, err)
->>>>>>> 1d7b493 (fix lint)
 			return
 		}
 
 		w.WriteHeader(http.StatusInternalServerError)
 		_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
-<<<<<<< HEAD
 		if err != nil {
 			t.Fatal(err)
 		} // Updated error handling
-=======
-		require.NoError(t, err)
->>>>>>> 1d7b493 (fix lint)
 	})
 }
 
@@ -603,14 +577,10 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 					// read the body
 					var table bigquery2.Table
 					err := json.NewDecoder(r.Body).Decode(&table)
-<<<<<<< HEAD
 					if err != nil {
 						http.Error(w, err.Error(), http.StatusInternalServerError) // Handle error
 						return
 					}
-=======
-					require.NoError(t, err)
->>>>>>> 1d7b493 (fix lint)
 
 					colsByName := make(map[string]*pipeline.Column, len(tt.asset.Columns))
 					for _, col := range tt.asset.Columns {
