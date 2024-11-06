@@ -34,7 +34,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -s -w -X main.version={{ .Env.VERSION }}
+      - -s -w -X main.version={{ .Env.VERSION }} -X main.commit={{ .Env.COMMIT_SHA }}
   - id: bruin-linux-arm64
     binary: bruin
     main: ./
@@ -49,7 +49,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -s -w -X main.version={{ .Env.VERSION }}"
+      - -s -w -X main.version={{ .Env.VERSION }} -X main.commit={{ .Env.COMMIT_SHA }}
   - id: bruin-windows-amd64
     binary: bruin
     main: ./
@@ -62,7 +62,7 @@ builds:
       - CXX=x86_64-w64-mingw32-g++
       - CGO_ENABLED=1
     ldflags:
-      - -s -w -X main.version={{ .Env.VERSION }}"
+      - -s -w -X main.version={{ .Env.VERSION }} -X main.commit={{ .Env.COMMIT_SHA }}
     flags:
       - -trimpath
       - -buildmode=exe
