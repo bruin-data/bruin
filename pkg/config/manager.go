@@ -690,17 +690,18 @@ func removeConnection[T interface{ GetName() string }](connections []T, name str
 	}
 	return connections
 }
-
 func (c *Connections) ValidateConnectionNames() error {
 	val := reflect.ValueOf(c).Elem() // Get the actual value that c points to
 	typeOfConnections := val.Type()
 
-	for i := 0; i < val.NumField(); i++ {
+	// Use range to iterate over the number of fields in the struct
+	for i := range make([]struct{}, val.NumField()) {
 		field := val.Field(i)
 
 		// Ensure the field is a slice, as each connection type is a slice
 		if field.Kind() == reflect.Slice {
-			for j := 0; j < field.Len(); j++ {
+			// Use range to iterate over the elements of the slice
+			for j := range make([]struct{}, field.Len()) {
 				conn := field.Index(j)
 
 				// Retrieve the Name field from the connection struct
