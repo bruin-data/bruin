@@ -21,11 +21,22 @@ Bruin can be installed with a variety of methods.
 If you are on macOS, you can use `brew` to install Bruin:
 
 ```shell
-brew tap bruin-data/tap
-brew install bruin
+brew install bruin-data/tap/bruin
 ```
 
-## Windows & Linux
+## Windows, Linux and MacOS
+
+If you are on macOS, linux or windows, you can use `curl` to install Bruin:
+
+```shell
+curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh
+```
+
+Or you can also use `wget` to install Bruin:
+
+```shell
+wget -qO- https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh
+```
 
 
 ### Golang
@@ -49,5 +60,7 @@ bruin init {folder name} [template name]
 you can see the available template names by running `bruin help init`
 
 
+# Troubleshooting
 
+- Permission denied' error while installing the Bruin CLI, In this case user doesn't have permission to write the `binary` in `~/.local/bin` directory 
 
