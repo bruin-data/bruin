@@ -157,7 +157,7 @@ environments:
           email: "zendeskemail"
           subdomain: "zendeskUrl"
 
-        - name: conn25-1
+        - name: conn25_1
           oauth_token: "zendeskToken"
           subdomain: "zendeskUrl"
       s3:
