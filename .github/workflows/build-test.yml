@@ -108,7 +108,7 @@ jobs:
 
       - name: Run GoReleaser
         run: |
-          docker run -e VERSION=0.0.0  -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 build --snapshot --clean --id bruin-darwin --id bruin-linux-amd64 --id bruin-linux-arm64  --single-target
+          docker run -e VERSION=0.0.0 -e COMMIT_SHA=${{ github.sha }} -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 build --snapshot --clean --id bruin-darwin --id bruin-linux-amd64 --id bruin-linux-arm64  --single-target
       - name: Use install script
         run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.sha }}/install.sh | sh -s -- -d
       - name: Test Pipeline
