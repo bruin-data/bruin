@@ -5,7 +5,6 @@ import (
 	fs2 "io/fs"
 	"log"
 	"os"
-	"os/exec"
 	path2 "path"
 	"path/filepath"
 	"strings"
@@ -135,14 +134,6 @@ func Init() *cli.Command {
 			})
 			if err != nil {
 				errorPrinter.Printf("Could not copy template %s: %s\n", templateName, err)
-				return cli.Exit("", 1)
-			}
-
-			cmd := exec.Command("git", "init")
-			cmd.Dir = inputPath
-			out, err := cmd.CombinedOutput()
-			if err != nil {
-				errorPrinter.Printf("Could not initialize git repository: %s\n", string(out))
 				return cli.Exit("", 1)
 			}
 
