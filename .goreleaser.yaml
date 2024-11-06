@@ -68,7 +68,6 @@ builds:
       - -buildmode=exe
 
 release:
-  draft: true
   make_latest: false
   prerelease: true
 
