@@ -101,7 +101,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
-
   release-windows:
     runs-on: windows-latest
     defaults:

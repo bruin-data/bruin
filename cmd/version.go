@@ -23,12 +23,11 @@ func VersionCmd(commit string) *cli.Command {
 		Action: func(c *cli.Context) error {
 			outputFormat := c.String("output")
 			version := c.App.Version
-
 			res, err := http.Get("https://github.com/bruin-data/bruin/releases/latest") //nolint
-			defer res.Body.Close()                                                      //nolint:all
 			if err != nil {
 				return errors.Wrap(err, "failed to check the latest version")
 			}
+			defer res.Body.Close()
 			latest := strings.TrimPrefix(res.Request.URL.String(), "https://github.com/bruin-data/bruin/releases/tag/")
 
 			if outputFormat == "json" {
