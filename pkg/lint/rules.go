@@ -379,7 +379,7 @@ func ValidateInvalidPythonModuleName(ctx context.Context, p *pipeline.Pipeline, 
 	var issues []*Issue
 
 	if asset.Type == "python" {
-		components := filepath.SplitList(asset.ExecutableFile.Path)
+		components := strings.Split(asset.ExecutableFile.Path, "/")
 		for i, component := range components {
 			if component == "assets" {
 				for _, subComponent := range components[i+1:] {
