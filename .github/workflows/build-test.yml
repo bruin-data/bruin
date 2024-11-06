@@ -72,6 +72,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-embed-python-
       - run: make test
+      - run: make duckdb-test
+        shell: bash
+
 
   lint:
     runs-on: ubuntu-latest
