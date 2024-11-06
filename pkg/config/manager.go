@@ -6,6 +6,8 @@ import (
 	"fmt"
 	fs2 "io/fs"
 	"path/filepath"
+	"reflect"
+	"strings"
 
 	"github.com/bruin-data/bruin/pkg/git"
 	path2 "github.com/bruin-data/bruin/pkg/path"
@@ -308,6 +310,14 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 
 	if config.DefaultEnvironmentName == "" {
 		config.DefaultEnvironmentName = "default"
+	}
+
+	for envName, env := range config.Environments {
+		if env.Connections != nil {
+			if err := env.Connections.ValidateConnectionNames(); err != nil {
+				return nil, fmt.Errorf("environment '%s': %w", envName, err)
+			}
+		}
 	}
 
 	err = config.SelectEnvironment(config.DefaultEnvironmentName)
@@ -679,4 +689,31 @@ func removeConnection[T interface{ GetName() string }](connections []T, name str
 		}
 	}
 	return connections
+}
+
+func (c *Connections) ValidateConnectionNames() error {
+	val := reflect.ValueOf(c).Elem() // Get the actual value that c points to
+	typeOfConnections := val.Type()
+
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
+
+		// Ensure the field is a slice, as each connection type is a slice
+		if field.Kind() == reflect.Slice {
+			for j := 0; j < field.Len(); j++ {
+				conn := field.Index(j)
+
+				// Retrieve the Name field from the connection struct
+				nameField := conn.FieldByName("Name")
+				if nameField.IsValid() && nameField.Kind() == reflect.String {
+					connName := nameField.String()
+					if strings.Contains(connName, "-") {
+						return fmt.Errorf("invalid connection name '%s' in %s: names should not contain hyphens", connName, typeOfConnections.Field(i).Name)
+					}
+				}
+			}
+		}
+	}
+
+	return nil
 }
