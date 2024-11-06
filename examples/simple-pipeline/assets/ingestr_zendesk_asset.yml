@@ -3,7 +3,7 @@ type: ingestr
 connection: postgres
 
 parameters:
-  source_connection: my-zendesk
+  source_connection: my_zendesk
   source_table: 'settings'
 
   destination: postgres

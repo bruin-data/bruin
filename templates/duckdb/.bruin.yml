@@ -3,5 +3,5 @@ environments:
   default:
     connections:
       duckdb:
-        - name: "duckdb-default"
+        - name: "duckdb_default"
           path: "duckdb.db"

@@ -3,7 +3,7 @@ type: ingestr
 connection: postgres
 
 parameters:
-  source_connection: my-airtable
+  source_connection: my_airtable
   source_table: 'Details'
 
   destination: postgres

@@ -3,7 +3,7 @@ type: ingestr
 connection: redshift-aws
 
 parameters:
-  source_connection: alberto-gcp
+  source_connection: alberto_gcp
   source_table: 'test_data_alberto.ingestr_destiny_2'
 
   destination: redshift

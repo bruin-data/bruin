@@ -3,7 +3,7 @@ type: ingestr
 connection: postgres
 
 parameters:
-  source_connection: my-kafka
+  source_connection: my_kafka
   source_table: 'kafka-bruin'
 
   destination: postgres

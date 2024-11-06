@@ -3,7 +3,7 @@ type: ingestr
 connection: postgres
 
 parameters:
-  source_connection: my-chess
+  source_connection: my_chess
   source_table: 'profiles'
 
   destination: postgres

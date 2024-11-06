@@ -2,7 +2,7 @@ name: pulic.postgres_to_duckdb
 type: ingestr
 
 parameters:
-  source_connection: postgres-default
+  source_connection: postgres_default
   source_table: 'public.hello_regex'
 
   destination: duckdb
