@@ -25,7 +25,7 @@ func VersionCmd(commit string) *cli.Command {
 			version := c.App.Version
 
 			res, err := http.Get("https://github.com/bruin-data/bruin/releases/latest") //nolint
-			defer res.Body.Close()                                                      //nolint
+			defer res.Body.Close()                                                      //nolint:all
 			if err != nil {
 				return errors.Wrap(err, "failed to check the latest version")
 			}
