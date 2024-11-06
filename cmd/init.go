@@ -62,9 +62,9 @@ func (m model) View() string {
 
 	for i, choice := range choices {
 		if m.cursor == i {
-			s.WriteString("(•) ")
+			s.WriteString(" [x] ")
 		} else {
-			s.WriteString("( ) ")
+			s.WriteString(" [ ] ")
 		}
 		s.WriteString(choice)
 		s.WriteString("\n")
