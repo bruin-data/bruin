@@ -258,7 +258,7 @@ func TestLoadFromFile(t *testing.T) {
 					Subdomain: "zendeskUrl",
 				},
 				{
-					Name:       "conn25-1",
+					Name:       "conn25_1",
 					OAuthToken: "zendeskToken",
 					Subdomain:  "zendeskUrl",
 				},
