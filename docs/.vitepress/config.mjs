@@ -16,7 +16,10 @@ export default defineConfig({
                 text: "Getting Started",
                 collapsed: false,
                 items: [
-                    {text: "Introduction", link: "/getting-started/introduction"},
+                    {text: "Introduction", link: "/getting-started/introduction", items: [
+                            {text: "Installation", link: "/getting-started/introduction/installation"},
+                            {text: "Quickstart", link: "/getting-started/introduction/quickstart"},
+                        ]},
                     {
                         text: "Concepts",
                         link: "/getting-started/concepts",

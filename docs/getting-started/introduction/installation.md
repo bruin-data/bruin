@@ -2,22 +2,10 @@
 outline: deep
 ---
 
-# What is Bruin?
-
-Bruin is a command-line tool that allows you to build end-to-end data pipelines that can:
-- ingest data using Python
-- transform data using Python and SQL
-- add quality checks to your pipelines
-
-You can use Bruin to build your data models inside your data warehouse.
-
-<br>
-
 # Installation
 Bruin can be installed with a variety of methods.
 
 ## MacOS
-
 If you are on macOS, you can use `brew` to install Bruin:
 
 ```shell
@@ -42,25 +30,14 @@ wget -qO- https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/ins
 > If you are on Windows, make sure to run the command in the Git Bash or WSL terminal.
 
 
-### Creating your first Bruin project
+## Troubleshooting
 
-To create a bruin project basic structure you can just run
+### 'Permission Denied' error during the installation
 
-```
-bruin init {folder name} [template name]
-```
-
-you can see the available template names by running `bruin help init`
-
-
-# Troubleshooting
-
-## 1. 'Permission Denied' Error While Installing Bruin CLI
-
-**Issue:**  
+**Issue**  
 When installing the Bruin CLI, you may encounter a `'Permission Denied'` error. This typically happens if the user doesn't have permission to write the binary to the `~/.local/bin` directory.
 
-**Solution:**  
+**Solution**  
 To resolve this, ensure that you have the necessary write permissions for the `~/.local/bin` directory. You can do this by running the following command with sudo:
 
 ```shell
