@@ -140,8 +140,8 @@ jobs:
           asset_name: bruin_Windows_x86_64.zip
           tag: ${{ github.ref }}
           overwrite: false
-          make_latest: false
-          prerelease: true
+          make_latest: true
+          prerelease: false
       - name: Use install script
         shell: bash
         run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh -s -- -d
