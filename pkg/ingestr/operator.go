@@ -53,13 +53,12 @@ func NewBasicOperator(conn *connection.Manager) (*BasicOperator, error) {
 
 	reader, err := dockerClient.ImagePull(ctx, DockerImage, types.ImagePullOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch docker image: %s", err.Error())
+		return nil, fmt.Errorf("failed to create output reader: %s", err.Error())
 	}
 	defer reader.Close()
 	_, err = io.Copy(io.Discard, reader)
-	// _, err = io.Copy(os.Stdout, reader)
 	if err != nil {
-		return nil, fmt.Errorf("error while copying output: %s", err.Error())
+		return nil, fmt.Errorf("error while fetching docker image: %s", err.Error())
 	}
 
 	return &BasicOperator{client: dockerClient, conn: conn}, nil
