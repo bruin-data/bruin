@@ -258,6 +258,12 @@ func Run(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
 			}
 
+			err = cm.CanRunPipeline(foundPipeline)
+			if err != nil {
+				errorPrinter.Printf(err.Error()) //nolint: govet
+				return cli.Exit("", 1)
+			}
+
 			rules, err := lint.GetRules(fs, &git.RepoFinder{}, true)
 			if err != nil {
 				errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
