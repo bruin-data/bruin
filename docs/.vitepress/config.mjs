@@ -118,6 +118,13 @@ export default defineConfig({
                 ],
             },
             {
+                text: "CICD Integration",
+                collapsed: false,
+                items: [
+                    {text: "Github Action", link: "/cicd/github-action"},
+                ],
+            },
+            {
                 text: "Bruin Cloud",
                 collapsed: false,
                 items: [
