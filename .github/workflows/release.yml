@@ -65,7 +65,7 @@ jobs:
           docker run --privileged   -v /var/run/docker.sock:/var/run/docker.sock -e GGOOS=linux -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e COMMIT_SHA=${{ github.sha }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.RELEASE_TOKEN }} -v $(pwd):/src -w /src ghcr.io/bruin-data/goreleaser-cross-pro:v1.22 release --clean --split --verbose
 
 
-  release:
+  release-unix:
     runs-on: ubuntu-latest
     needs: [prepare-linux,  prepare-darwin]
     steps:
@@ -107,7 +107,7 @@ jobs:
 
   release-windows:
     runs-on: windows-latest
-    needs: release
+    needs: release-unix
     defaults:
       run:
         shell: msys2 {0}
@@ -141,13 +141,29 @@ jobs:
           asset_name: bruin_Windows_x86_64.zip
           tag: ${{ github.ref }}
           overwrite: false
-          make_latest: true
+          make_latest: false
           prerelease: false
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [release-windows]
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Release the new binaries
+        uses: mini-bomba/create-github-release@v1.1.3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref }}
+          prerelease: false
+          clear_attachments: false
 
   install-windows:
     runs-on: windows-latest
     name: Installer Script on Windows
-    needs: release-windows
+    needs: release
     defaults:
       run:
         shell: msys2 {0}
@@ -160,9 +176,9 @@ jobs:
         shell: bash
         run: /c/Users/runneradmin/.local/bin/bruin.exe init duckdb test-pipeline && cd test-pipeline && git init && /c/Users/runneradmin/.local/bin/bruin.exe run .
 
-  install-uni:
+  install-unix:
     runs-on: ubuntu-latest
-    needs: [release-windows]
+    needs: [release]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
