@@ -16,6 +16,8 @@ func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer conn.Close()
+
 	err = conn.Ping()
 	if err != nil {
 		return nil, err
@@ -31,7 +33,7 @@ func (c *EphemeralConnection) QueryContext(ctx context.Context, query string, ar
 	}
 	defer conn.Close()
 
-	return conn.QueryContext(ctx, query, args...)
+	return conn.QueryContext(ctx, query, args...) //nolint
 }
 
 func (c *EphemeralConnection) ExecContext(ctx context.Context, sql string, arguments ...any) (sql.Result, error) {
