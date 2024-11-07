@@ -269,7 +269,7 @@ func (c *Config) CanRunPipeline(p *pipeline.Pipeline) error {
 			return errors2.Wrap(err, "Could not find connection name for asset "+task.Name)
 		}
 		if !c.SelectedEnvironment.Connections.Exists(connName) {
-			return errors.New("Connection " + connName + " does not exist in the selected environment and is needed for asset " + task.Name)
+			return errors2.Errorf("Connection '%s' does not exist in the selected environment and is needed for '%s'", connName, task.Name)
 		}
 	}
 
