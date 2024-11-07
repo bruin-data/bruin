@@ -3,6 +3,7 @@ package config
 import (
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -697,6 +698,145 @@ func TestDeleteConnection(t *testing.T) {
 				}
 
 				assert.False(t, env.Connections.Exists(tt.connName))
+			}
+		})
+	}
+}
+
+func TestCanRunPipeline(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		config         Config
+		pipeline       pipeline.Pipeline
+		expectedErr    bool
+		expectedCanRun bool
+	}{
+		{
+			name:   "no connections, no assets",
+			config: Config{},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{},
+			},
+			expectedCanRun: true,
+			expectedErr:    false,
+		},
+		{
+			name: "specific connection, not found",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "conn1",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Connection: "conn2",
+					},
+				},
+			},
+			expectedCanRun: false,
+			expectedErr:    false,
+		},
+		{
+			name: "specific connection, found",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "conn1",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Connection: "conn1",
+					},
+				},
+			},
+			expectedCanRun: true,
+			expectedErr:    false,
+		},
+		{
+			name: "2 assets 1 conn missing",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "conn1",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Connection: "conn1",
+					},
+					{
+						Connection: "conn2",
+					},
+				},
+			},
+			expectedCanRun: false,
+			expectedErr:    false,
+		},
+		{
+			name: "2 assets 2 conns",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "conn1",
+							},
+						},
+						Snowflake: []SnowflakeConnection{
+							{
+								Name: "conn2",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Connection: "conn1",
+					},
+					{
+						Connection: "conn2",
+					},
+				},
+			},
+			expectedCanRun: true,
+			expectedErr:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			canRun, err := tt.config.CanRunPipeline(tt.pipeline)
+			if tt.expectedErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.expectedCanRun, canRun)
 			}
 		})
 	}
