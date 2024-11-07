@@ -259,7 +259,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			err = cm.CanRunPipeline(foundPipeline)
 			if err != nil {
-				errorPrinter.Printf("Cannot run: %v\n", err)
+				errorPrinter.Printf(err.Error()) // nolint: govet
 				return cli.Exit("", 1)
 			}
 

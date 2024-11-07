@@ -766,6 +766,50 @@ func TestCanRunPipeline(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name: "no specific connection, not found",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "gcp-default",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Type: pipeline.AssetType("sf.sql"),
+					},
+				},
+			},
+			expectedErr: true,
+		},
+		{
+			name: "no specific connection, found",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "gcp-default",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Type: pipeline.AssetType("bq.sql"),
+					},
+				},
+			},
+			expectedErr: false,
+		},
+		{
 			name: "2 assets 1 conn missing",
 			config: Config{
 				SelectedEnvironment: &Environment{
