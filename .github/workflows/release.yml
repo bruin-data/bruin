@@ -143,16 +143,18 @@ jobs:
   release:
     runs-on: ubuntu-latest
     needs: [release-windows]
-    defaults:
-      run:
-        shell: msys2 {0}
     steps:
       - uses: actions/checkout@v3
+      - name: Extract tag from ref
+        id: extract_tag
+        run: |
+          ref_name="${GITHUB_REF##*/}"
+          echo "tag=${ref_name}" >> $GITHUB_ENV
       - name: Release the new binaries
         uses: mini-bomba/create-github-release@v1.1.3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref_name }}
+          tag: ${{ env.tag }}
           prerelease: false
           clear_attachments: false
 
