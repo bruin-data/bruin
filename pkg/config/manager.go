@@ -262,18 +262,18 @@ type Config struct {
 	Environments            map[string]Environment `yaml:"environments" json:"environments" mapstructure:"environments"`
 }
 
-func (c *Config) CanRunPipeline(p pipeline.Pipeline) (bool, error) {
+func (c *Config) CanRunPipeline(p pipeline.Pipeline) error {
 	for _, task := range p.Assets {
 		connName, err := p.GetConnectionNameForAsset(task)
 		if err != nil {
-			return false, errors2.Wrap(err, "Could not find connection name for asset "+task.Name)
+			return errors2.Wrap(err, "Could not find connection name for asset "+task.Name)
 		}
 		if !c.SelectedEnvironment.Connections.Exists(connName) {
-			return false, nil
+			return errors.New("Connection " + connName + " does not exist in the selected environment")
 		}
 	}
 
-	return true, nil
+	return nil
 }
 
 func (c *Config) GetEnvironmentNames() []string {

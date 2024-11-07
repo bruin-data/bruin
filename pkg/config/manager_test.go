@@ -719,8 +719,7 @@ func TestCanRunPipeline(t *testing.T) {
 			pipeline: pipeline.Pipeline{
 				Assets: []*pipeline.Asset{},
 			},
-			expectedCanRun: true,
-			expectedErr:    false,
+			expectedErr: false,
 		},
 		{
 			name: "specific connection, not found",
@@ -742,8 +741,7 @@ func TestCanRunPipeline(t *testing.T) {
 					},
 				},
 			},
-			expectedCanRun: false,
-			expectedErr:    false,
+			expectedErr: true,
 		},
 		{
 			name: "specific connection, found",
@@ -765,8 +763,7 @@ func TestCanRunPipeline(t *testing.T) {
 					},
 				},
 			},
-			expectedCanRun: true,
-			expectedErr:    false,
+			expectedErr: false,
 		},
 		{
 			name: "2 assets 1 conn missing",
@@ -791,8 +788,7 @@ func TestCanRunPipeline(t *testing.T) {
 					},
 				},
 			},
-			expectedCanRun: false,
-			expectedErr:    false,
+			expectedErr: true,
 		},
 		{
 			name: "2 assets 2 conns",
@@ -822,8 +818,7 @@ func TestCanRunPipeline(t *testing.T) {
 					},
 				},
 			},
-			expectedCanRun: true,
-			expectedErr:    false,
+			expectedErr: false,
 		},
 	}
 
@@ -831,12 +826,11 @@ func TestCanRunPipeline(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			canRun, err := tt.config.CanRunPipeline(tt.pipeline)
+			err := tt.config.CanRunPipeline(tt.pipeline)
 			if tt.expectedErr {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, tt.expectedCanRun, canRun)
 			}
 		})
 	}
