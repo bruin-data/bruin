@@ -407,7 +407,7 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 		for _, result := range results {
 			parts := strings.Split(result.Instance.GetHumanID(), ":")
 			if len(parts) < 3 {
-				continue // Skip if the format is unexpected
+				continue
 			}
 			columnName := parts[1]
 			checkName := parts[2]
