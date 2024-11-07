@@ -31,6 +31,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test-install-unix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Use install script
+        run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.sha }}/install.sh | sh -s -- -d
+      - name: Run bruin version
+        run: bruin version
+
+
+  test-install-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Use install script
+        shell: bash
+        run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.sha }}/install.sh | sh -s -- -d
+      - name: Run bruin version
+        shell: bash
+        run: /c/Users/runneradmin/.local/bin/bruin.exe version
+
+
   build:
     strategy:
       matrix:
@@ -52,6 +72,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-embed-python-
       - run: make test
+      - run: make duckdb-test
+        shell: bash
+
 
   lint:
     runs-on: ubuntu-latest
@@ -89,12 +112,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ github.ref_name }}
-      - name: Use install script
-        shell: bash
-        run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.sha }}/install.sh | sh -s -- -d
-      # - name: Test Pipeline
-      #   shell: bash
-      #   run: /c/Users/runneradmin/.local/bin/bruin.exe init duckdb test-pipeline && cd test-pipeline && /c/Users/runneradmin/.local/bin/bruin.exe run .
+          COMMIT_SHA: ${{ github.sha }}
 
   goreleaser-unix:
     runs-on: ubuntu-latest
@@ -107,8 +125,4 @@ jobs:
 
       - name: Run GoReleaser
         run: |
-          docker run -e VERSION=0.0.0  -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 build --snapshot --clean --id bruin-darwin --id bruin-linux-amd64 --id bruin-linux-arm64  --single-target
-      # - name: Use install script
-      #   run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.sha }}/install.sh | sh -s -- -d
-      # - name: Test Pipeline
-      #   run: bruin init duckdb test-pipeline && cd test-pipeline && bruin run .
+          docker run -e VERSION=0.0.0 -e COMMIT_SHA=${{ github.sha }} -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 build --snapshot --clean --id bruin-darwin --id bruin-linux-amd64 --id bruin-linux-arm64  --single-target

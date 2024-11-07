@@ -375,6 +375,7 @@ func ValidateDuplicateColumnNames(ctx context.Context, p *pipeline.Pipeline, ass
 	return issues, nil
 }
 
+
 func ValidateInvalidPythonModuleName(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	var issues []*Issue
 
@@ -395,6 +396,7 @@ func ValidateInvalidPythonModuleName(ctx context.Context, p *pipeline.Pipeline, 
 	}
 	return issues, nil
 }
+
 
 func ValidateAssetDirectoryExist(p *pipeline.Pipeline) ([]*Issue, error) {
 	var issues []*Issue

@@ -197,12 +197,19 @@ log_priority() {
   [ "$1" -le "$_logp" ]
 }
 
-BLUE='\033[0;34m'    # Blue
-RED='\033[0;31m'     # Red
-YELLOW='\033[0;33m'  # Yellow
-GREEN='\033[0;32m'  # Green
-CYAN='\033[0;36m'    # Cyan
-RESET='\033[0m' # Reset to default color
+# check if stdout is a terminal...
+if test -t 1; then
+    # see if it supports colors...
+    ncolors=$(tput colors)
+    if test -n "$ncolors" && test $ncolors -ge 8; then
+        RESET="$(tput sgr0)"
+        RED="$(tput setaf 1)"
+        GREEN="$(tput setaf 2)"
+        YELLOW="$(tput setaf 3)"
+        BLUE="$(tput setaf 4)"
+        CYAN="$(tput setaf 6)"
+    fi
+fi
 
 log_tag() {
   case $1 in
