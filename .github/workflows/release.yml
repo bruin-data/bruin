@@ -103,7 +103,7 @@ jobs:
 
   release-windows:
     runs-on: windows-latest
-    needs: release-unix
+    needs: [prepare-linux,  prepare-darwin]
     defaults:
       run:
         shell: msys2 {0}
@@ -165,7 +165,7 @@ jobs:
   install-unix:
     runs-on: ubuntu-latest
     name: Installer Script on Linux
-    needs: [release-windows]
+    needs: [release-unix]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
