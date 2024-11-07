@@ -111,7 +111,7 @@ func Init() *cli.Command {
 			if len(templateName) == 0 {
 				m, err := p.Run()
 				if err != nil {
-					fmt.Println("Oh no:", err)
+					fmt.Printf("Error running the select: %v\n", err)
 					os.Exit(1)
 				}
 
