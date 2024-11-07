@@ -157,7 +157,7 @@ jobs:
           echo "tag=${ref_name}" >> $GITHUB_ENV
       - name: Use install script
         shell: bash
-        run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh -s -- -d ${{ env.tag }}
+        run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh -s -- -d ${{ github.ref }}
       - name: Test Pipeline
         shell: bash
         run: /c/Users/runneradmin/.local/bin/bruin.exe init duckdb test-pipeline && cd test-pipeline && git init && /c/Users/runneradmin/.local/bin/bruin.exe run .
@@ -192,9 +192,11 @@ jobs:
           ref_name="${GITHUB_REF##*/}"
           echo "tag=${ref_name}" >> $GITHUB_ENV
       - name: Release promote to latest
-        uses: mini-bomba/create-github-release@v1.1.3
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ env.tag }}
+          tag_name: ${{ env.tag }}
           prerelease: false
+          make_latest: true
           clear_attachments: false
