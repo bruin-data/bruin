@@ -4,6 +4,6 @@ connection: postgres
 
 parameters:
   source_connection: my-stripe
-  source_table: 'customer'
+  source_table: 'event'
 
   destination: postgres
