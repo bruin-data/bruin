@@ -400,11 +400,12 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 
 	tree := treeprint.New()
 
-	branch := tree.AddBranch(fmt.Sprintf("Failed assets: '%d'", len(errorsInTaskResults)))
+	branch := tree.AddBranch(fmt.Sprintf("Failed assets: '%d'", len(data)))
 	for assetName, results := range data {
-		baseAsset := branch.Add(assetName)
+		baseAsset := branch.AddBranch(assetName)
 		columnBranches := make(map[string]treeprint.Tree)
 		for _, result := range results {
+			fmt.Println(result.Instance.GetAsset().Columns)
 			parts := strings.Split(result.Instance.GetHumanID(), ":")
 			if len(parts) < 3 {
 				continue
