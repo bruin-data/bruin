@@ -85,6 +85,7 @@ linters-settings:
       - databricks.Client
       - athena.Client
       - duckdb.DuckDBClient
+      - tea.Model
   goconst:
     min-len: 5
     min-occurrences: 5
