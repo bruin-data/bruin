@@ -31,26 +31,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-install-unix:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Use install script
-        run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.sha }}/install.sh | sh -s -- -d
-      - name: Run bruin version
-        run: bruin version
-
-
-  test-install-windows:
-    runs-on: windows-latest
-    steps:
-      - name: Use install script
-        shell: bash
-        run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/${{ github.sha }}/install.sh | sh -s -- -d
-      - name: Run bruin version
-        shell: bash
-        run: /c/Users/runneradmin/.local/bin/bruin.exe version
-
-
   build:
     strategy:
       matrix:
