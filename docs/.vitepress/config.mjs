@@ -16,7 +16,10 @@ export default defineConfig({
                 text: "Getting Started",
                 collapsed: false,
                 items: [
-                    {text: "Introduction", link: "/getting-started/introduction"},
+                    {text: "Introduction", link: "/getting-started/introduction", items: [
+                            {text: "Installation", link: "/getting-started/introduction/installation"},
+                            {text: "Quickstart", link: "/getting-started/introduction/quickstart"},
+                        ]},
                     {
                         text: "Concepts",
                         link: "/getting-started/concepts",
@@ -48,10 +51,13 @@ export default defineConfig({
                             {text: "Chess", link: "/connections/chess.md"},
                             {text: "Databricks", link: "/connections/databricks"},
                             {text: "DuckDB", link: "/connections/duckdb"},
+                            {text: "Facebook", link: "/connections/facebook-ads.md"},
                             {text: "Google Cloud Platform", link: "/connections/google_cloud_platform"},
                             {text: "Google Sheets", link: "/connections/google_sheets.md"},
                             {text: "Gorgias", link: "/connections/gorgias"},
                             {text: "Hubspot", link: "/connections/hubspot.md"},
+                            {text: "Kafka", link: "/connections/kafka.md"},
+                            {text: "Klaviyo", link: "/connections/klaviyo.md"},
                             {text: "Microsoft SQL Server", link: "/connections/mssql"},
                             {text: "MongoDB", link: "/connections/mongo"},
                             {text: "MySQL", link: "/connections/mysql"},

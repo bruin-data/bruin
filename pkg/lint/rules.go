@@ -375,29 +375,6 @@ func ValidateDuplicateColumnNames(ctx context.Context, p *pipeline.Pipeline, ass
 	return issues, nil
 }
 
-func ValidateInvalidPythonModuleName(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-	var issues []*Issue
-
-	if asset.Type == pipeline.AssetTypePython {
-		parentDirs := strings.Split(filepath.SplitList(filepath.Dir(asset.ExecutableFile.Path))[0], "/")
-		fmt.Println(parentDirs)
-		// Check if the last directory contains a hyphen and is not in the 'assets' directory
-		for i, component := range parentDirs {
-			if component == "assets" {
-				for _, subComponent := range parentDirs[i+1:] {
-					if strings.Contains(subComponent, "-") {
-						issues = append(issues, &Issue{
-							Task:        asset,
-							Description: fmt.Sprintf("Invalid Python module name '%s' for asset '%s'. Directory names cannot contain hyphens ('-') as they cannot be imported in Python.", asset.ExecutableFile.Path, asset.Name),
-						})
-					}
-				}
-			}
-		}
-	}
-	return issues, nil
-}
-
 func ValidateAssetDirectoryExist(p *pipeline.Pipeline) ([]*Issue, error) {
 	var issues []*Issue
 
