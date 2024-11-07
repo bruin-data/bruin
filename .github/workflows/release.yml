@@ -78,10 +78,6 @@ jobs:
         run: |
           # Workaround a bug in github actions:
           git config --global --add safe.directory "$GITHUB_WORKSPACE" 
-      - uses: actions/setup-go@v3
-        with:
-          go-version: 1.22
-          cache: true
       - shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
       - uses: actions/cache@v3
@@ -156,7 +152,7 @@ jobs:
         uses: mini-bomba/create-github-release@v1.1.3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref }}
+          tag: ${{ github.ref_name }}
           prerelease: false
           clear_attachments: false
 
