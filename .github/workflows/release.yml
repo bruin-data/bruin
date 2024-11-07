@@ -150,7 +150,7 @@ jobs:
         run: |
           ref_name="${GITHUB_REF##*/}"
           echo "tag=${ref_name}" >> $GITHUB_ENV
-      - name: Release the new binaries
+      - name: Release promote to latest
         uses: mini-bomba/create-github-release@v1.1.3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
