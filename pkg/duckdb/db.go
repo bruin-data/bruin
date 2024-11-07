@@ -5,7 +5,6 @@ import (
 	"database/sql"
 
 	"github.com/bruin-data/bruin/pkg/query"
-	"github.com/jmoiron/sqlx"
 	_ "github.com/marcboeker/go-duckdb"
 )
 
@@ -25,7 +24,7 @@ type connection interface {
 }
 
 func NewClient(c DuckDBConfig) (*Client, error) {
-	conn, err := sqlx.Open("duckdb", c.ToDBConnectionURI())
+	conn, err := NewEphemeralConnection(c)
 	if err != nil {
 		return nil, err
 	}
