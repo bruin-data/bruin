@@ -262,7 +262,7 @@ type Config struct {
 	Environments            map[string]Environment `yaml:"environments" json:"environments" mapstructure:"environments"`
 }
 
-func (c *Config) CanRunPipeline(p pipeline.Pipeline) error {
+func (c *Config) CanRunPipeline(p *pipeline.Pipeline) error {
 	for _, task := range p.Assets {
 		connName, err := p.GetConnectionNameForAsset(task)
 		if err != nil {
