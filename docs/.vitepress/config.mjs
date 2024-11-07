@@ -66,9 +66,10 @@ export default defineConfig({
                             {text: "Redshift", link: "/connections/redshift"},
                             {text: "SAP HANA", link: "/connections/sap_hana"},
                             {text: "S3", link: "/connections/s3"},
+                            {text: "Shopify", link:"/connections/shopify.md"},
                             {text: "Slack", link: "/connections/slack.md"},
                             {text: "Snowflake", link: "/connections/snowflake"},
-                            {text: "Zendesk", link: "/connections/Zendesk"},
+                            {text: "Zendesk", link: "/connections/zendesk"},
                         ]
                     },
                 ],
