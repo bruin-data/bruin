@@ -9,8 +9,10 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/git"
 	path2 "github.com/bruin-data/bruin/pkg/path"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/invopop/jsonschema"
+	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
 
@@ -258,6 +260,20 @@ type Config struct {
 	SelectedEnvironmentName string                 `yaml:"-" json:"selected_environment_name" mapstructure:"selected_environment_name"`
 	SelectedEnvironment     *Environment           `yaml:"-" json:"selected_environment" mapstructure:"selected_environment"`
 	Environments            map[string]Environment `yaml:"environments" json:"environments" mapstructure:"environments"`
+}
+
+func (c *Config) CanRunPipeline(p pipeline.Pipeline) (bool, error) {
+	for _, task := range p.Assets {
+		connName, err := p.GetConnectionNameForAsset(task)
+		if err != nil {
+			return false, errors2.Wrap(err, "Could not find connection name for asset "+task.Name)
+		}
+		if !c.SelectedEnvironment.Connections.Exists(connName) {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 func (c *Config) GetEnvironmentNames() []string {
