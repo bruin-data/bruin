@@ -391,7 +391,6 @@ func Run(isDebug *bool) *cli.Command {
 }
 
 func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) {
-	errorPrinter.Printf("\nFailed assets: %d\n", len(errorsInTaskResults))
 	data := make(map[string][]*scheduler.TaskExecutionResult)
 
 	for _, result := range errorsInTaskResults {
@@ -400,10 +399,11 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	}
 
 	tree := treeprint.New()
-	columnBranches := make(map[string]treeprint.Tree)
 
+	branch := tree.AddBranch(fmt.Sprintf("Failed assets: '%d'", len(errorsInTaskResults)))
 	for assetName, results := range data {
-		branch := tree.AddBranch(assetName)
+		baseAsset := branch.Add(assetName)
+		columnBranches := make(map[string]treeprint.Tree)
 		for _, result := range results {
 			parts := strings.Split(result.Instance.GetHumanID(), ":")
 			if len(parts) < 3 {
@@ -414,14 +414,14 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 
 			if columnName != "custom-check" {
 				if _, exists := columnBranches[columnName]; !exists {
-					colBranch := branch.AddBranch(fmt.Sprintf("Column: '%s'", columnName))
+					colBranch := baseAsset.AddBranch(fmt.Sprintf("Column: '%s'", columnName))
 					columnBranches[columnName] = colBranch
 				}
 				colBranch := columnBranches[columnName]
 				checkBranch := colBranch.AddBranch(fmt.Sprintf("Check: '%s'", checkName))
 				checkBranch.AddNode(fmt.Sprintf("'%s'", result.Error.Error()))
 			} else {
-				customBranch := branch.AddBranch(fmt.Sprintf("Custom Check: '%s'", checkName))
+				customBranch := baseAsset.AddBranch(fmt.Sprintf("Custom Check: '%s'", checkName))
 				customBranch.AddNode(fmt.Sprintf("'%s'", result.Error.Error()))
 			}
 		}
