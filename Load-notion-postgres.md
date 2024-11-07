@@ -1,4 +1,4 @@
-## Loading Notion Data to PostgreSQL Database Using Bruin
+## Loading Notion Data To PostgreSQL Database Using Bruin
 [Notion](https://www.notion.so) is an all-in-one workspace for note-taking, project management, and database management.
 For more information, read [here](https://github.com/bruin-data/ingestr/blob/main/docs/supported-sources/notion.md)
 
@@ -17,7 +17,6 @@ brew install bruin-data/tap/bruin
 To install bruin vscode extension, follow the instruction [here](https://github.com/bruin-data/bruin/blob/f799133136aba1b0eea673d731f236a4b5e78752/docs/vscode-extension/installation.md)
 
 <img width="685" alt="bruin_extension" src="https://github.com/user-attachments/assets/c74607e8-b822-4927-a100-bfe29446101b">
-
 
 
 ### Getting Started
