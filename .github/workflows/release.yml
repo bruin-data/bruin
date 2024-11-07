@@ -150,6 +150,11 @@ jobs:
         shell: msys2 {0}
     steps:
       - uses: actions/checkout@v3
+      - name: Extract tag from ref
+        id: extract_tag
+        run: |
+          ref_name="${GITHUB_REF##*/}"
+          echo "tag=${ref_name}" >> $GITHUB_ENV
       - name: Use install script
         shell: bash
         run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh -s -- -d ${{ env.tag }}
