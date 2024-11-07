@@ -11,6 +11,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/templates"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
 )
@@ -19,6 +20,60 @@ const (
 	DefaultTemplate   = "default"
 	DefaultFolderName = "bruin-pipeline"
 )
+
+var choices = []string{}
+
+type model struct {
+	cursor int
+	choice string
+}
+
+func (m model) Init() tea.Cmd {
+	return nil
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if msg, ok := msg.(tea.KeyMsg); ok {
+		switch msg.String() {
+		case "ctrl+c", "q", "esc":
+			return m, tea.Quit
+		case "enter":
+			// Send the choice on the channel and exit.
+			m.choice = choices[m.cursor]
+			return m, tea.Quit
+		case "down", "j":
+			m.cursor++
+			if m.cursor >= len(choices) {
+				m.cursor = 0
+			}
+		case "up", "k":
+			m.cursor--
+			if m.cursor < 0 {
+				m.cursor = len(choices) - 1
+			}
+		}
+	}
+	// Return the concrete type instead of the interface
+	return m, nil // This line is fine as it is
+}
+
+func (m model) View() string {
+	s := strings.Builder{}
+	s.WriteString("Please select a template below\n\n")
+
+	for i, choice := range choices {
+		if m.cursor == i {
+			s.WriteString(" [x] ")
+		} else {
+			s.WriteString(" [ ] ")
+		}
+		s.WriteString(choice)
+		s.WriteString("\n")
+	}
+	s.WriteString("\n(press q to quit)\n")
+
+	return s.String()
+}
 
 func Init() *cli.Command {
 	folders, err := templates.Templates.ReadDir(".")
@@ -32,6 +87,8 @@ func Init() *cli.Command {
 		}
 	}
 
+	choices = templateList
+	p := tea.NewProgram(model{})
 	return &cli.Command{
 		Name:  "init",
 		Usage: "init a Bruin pipeline",
@@ -51,8 +108,16 @@ func Init() *cli.Command {
 			}()
 
 			templateName := c.Args().Get(0)
-			if templateName == "" {
-				templateName = DefaultTemplate
+			if len(templateName) == 0 {
+				m, err := p.Run()
+				if err != nil {
+					fmt.Printf("Error running the select: %v\n", err)
+					os.Exit(1)
+				}
+
+				if m, ok := m.(model); ok && m.choice != "" {
+					templateName = m.choice
+				}
 			}
 
 			_, err = templates.Templates.ReadDir(templateName)
@@ -81,7 +146,7 @@ func Init() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			err := os.Mkdir(inputPath, 0o755)
+			err = os.Mkdir(inputPath, 0o755)
 			if err != nil {
 				errorPrinter.Printf("Failed to create the folder %s: %v\n", inputPath, err)
 				return cli.Exit("", 1)
