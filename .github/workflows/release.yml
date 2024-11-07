@@ -164,6 +164,7 @@ jobs:
 
   install-unix:
     runs-on: ubuntu-latest
+    name: Installer Script on Linux
     needs: [release-windows]
     steps:
       - name: Checkout
