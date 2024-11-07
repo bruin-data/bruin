@@ -826,7 +826,7 @@ func TestCanRunPipeline(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := tt.config.CanRunPipeline(tt.pipeline)
+			err := tt.config.CanRunPipeline(&tt.pipeline)
 			if tt.expectedErr {
 				require.Error(t, err)
 			} else {
