@@ -378,7 +378,7 @@ func ValidateDuplicateColumnNames(ctx context.Context, p *pipeline.Pipeline, ass
 func ValidateInvalidPythonModuleName(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	var issues []*Issue
 
-	if asset.Type == "python" {
+	if asset.Type == pipeline.AssetTypePython {
 		components := strings.Split(asset.ExecutableFile.Path, "/")
 		for i, component := range components {
 			if component == "assets" {
