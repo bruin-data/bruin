@@ -145,19 +145,11 @@ jobs:
     runs-on: windows-latest
     name: Installer Script on Windows
     needs: release-windows
-    defaults:
-      run:
-        shell: msys2 {0}
     steps:
       - uses: actions/checkout@v3
-      - name: Extract tag from ref
-        id: extract_tag
-        run: |
-          ref_name="${GITHUB_REF##*/}"
-          echo "tag=${ref_name}" >> $GITHUB_ENV
       - name: Use install script
         shell: bash
-        run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh -s -- -d ${{ github.ref }}
+        run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh -s -- -d ${GITHUB_REF##*/}
       - name: Test Pipeline
         shell: bash
         run: /c/Users/runneradmin/.local/bin/bruin.exe init duckdb test-pipeline && cd test-pipeline && git init && /c/Users/runneradmin/.local/bin/bruin.exe run .
