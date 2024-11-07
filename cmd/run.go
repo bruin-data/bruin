@@ -394,43 +394,38 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	errorPrinter.Printf("\nFailed assets: %d\n", len(errorsInTaskResults))
 	data := make(map[string][]*scheduler.TaskExecutionResult)
 
-	for _, t := range errorsInTaskResults {
-		if _, exists := data[t.Instance.GetAsset().Name]; !exists {
-			data[t.Instance.GetAsset().Name] = []*scheduler.TaskExecutionResult{}
-		}
-		data[t.Instance.GetAsset().Name] = append(data[t.Instance.GetAsset().Name], t)
+	for _, result := range errorsInTaskResults {
+		assetName := strings.Split(result.Instance.GetHumanID(), ":")[0]
+		data[assetName] = append(data[assetName], result)
 	}
+
 	tree := treeprint.New()
+	columnBranches := make(map[string]treeprint.Tree)
 
-	for k, v := range data {
-		branch := tree.AddBranch(k)
-		column := make(map[string][]*scheduler.TaskExecutionResult)
-		for _, col := range v {
-			for _, colNacolumn := range col.Instance.GetAsset().ColumnNames() {
-				if _, exists := column[colNacolumn]; !exists {
-					column[colNacolumn] = []*scheduler.TaskExecutionResult{}
+	for assetName, results := range data {
+		branch := tree.AddBranch(assetName)
+		for _, result := range results {
+			parts := strings.Split(result.Instance.GetHumanID(), ":")
+			if len(parts) < 3 {
+				continue // Skip if the format is unexpected
+			}
+			columnName := parts[1]
+			checkName := parts[2]
+
+			if columnName != "custom-check" {
+				if _, exists := columnBranches[columnName]; !exists {
+					colBranch := branch.AddBranch(fmt.Sprintf("Column: '%s'", columnName))
+					columnBranches[columnName] = colBranch
 				}
-				column[colNacolumn] = append(column[colNacolumn], col)
-
-				for _, check := range col.Instance.GetAsset().CustomChecks {
-					customBranch := tree.AddBranch(fmt.Sprintf("Custom Check: '%s'", check.Name))
-					customBranch.AddNode(fmt.Sprintf("'%s'", col.Error.Error()))
-				}
-
+				colBranch := columnBranches[columnName]
+				checkBranch := colBranch.AddBranch(fmt.Sprintf("Check: '%s'", checkName))
+				checkBranch.AddNode(fmt.Sprintf("'%s'", result.Error.Error()))
+			} else {
+				customBranch := branch.AddBranch(fmt.Sprintf("Custom Check: '%s'", checkName))
+				customBranch.AddNode(fmt.Sprintf("'%s'", result.Error.Error()))
 			}
 		}
-		for colName, colResults := range column {
-			colBranch := branch.AddBranch(fmt.Sprintf("Column: '%s'", colName))
-			for _, val := range colResults {
-
-				checkBranch := colBranch.AddBranch(fmt.Sprintf("Check: '%s'", val.Instance.GetHumanReadableDescription()))
-
-				checkBranch.AddNode(fmt.Sprintf("'%s'", val.Error.Error()))
-			}
-		}
-
 	}
-
 	errorPrinter.Println(tree.String())
 	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
 	if len(upstreamFailedTasks) > 0 {
