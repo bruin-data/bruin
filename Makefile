@@ -46,7 +46,7 @@ format: tools
 	gofumpt -w cmd pkg &
 
 	@echo "$(OK_COLOR)>> [golangci-lint] running$(NO_COLOR)" & \
-	golangci-lint run  & \
+	golangci-lint run --timeout 10m60s ./...  & \
 	wait
 
 tools:
