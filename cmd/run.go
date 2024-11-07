@@ -40,6 +40,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
+	"github.com/xlab/treeprint"
 )
 
 const LogsFolder = "logs"
@@ -384,12 +385,47 @@ func Run(isDebug *bool) *cli.Command {
 }
 
 func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) {
-	errorPrinter.Printf("\nFailed tasks: %d\n", len(errorsInTaskResults))
+	errorPrinter.Printf("\nFailed assets: %d\n", len(errorsInTaskResults))
+	data := make(map[string][]*scheduler.TaskExecutionResult)
+
 	for _, t := range errorsInTaskResults {
-		errorPrinter.Printf("  - %s\n", t.Instance.GetHumanReadableDescription())
-		errorPrinter.Printf("    └── %s\n\n", t.Error.Error())
+		if _, exists := data[t.Instance.GetAsset().Name]; !exists {
+			data[t.Instance.GetAsset().Name] = []*scheduler.TaskExecutionResult{}
+		}
+		data[t.Instance.GetAsset().Name] = append(data[t.Instance.GetAsset().Name], t)
+	}
+	tree := treeprint.New()
+
+	for k, v := range data {
+		branch := tree.AddBranch(k)
+		column := make(map[string][]*scheduler.TaskExecutionResult)
+		for _, col := range v {
+			for _, colNacolumn := range col.Instance.GetAsset().ColumnNames() {
+				if _, exists := column[colNacolumn]; !exists {
+					column[colNacolumn] = []*scheduler.TaskExecutionResult{}
+				}
+				column[colNacolumn] = append(column[colNacolumn], col)
+
+				for _, check := range col.Instance.GetAsset().CustomChecks {
+					customBranch := tree.AddBranch(fmt.Sprintf("Custom Check: '%s'", check.Name))
+					customBranch.AddNode(fmt.Sprintf("'%s'", col.Error.Error()))
+				}
+
+			}
+		}
+		for colName, colResults := range column {
+			colBranch := branch.AddBranch(fmt.Sprintf("Column: '%s'", colName))
+			for _, val := range colResults {
+
+				checkBranch := colBranch.AddBranch(fmt.Sprintf("Check: '%s'", val.Instance.GetHumanReadableDescription()))
+
+				checkBranch.AddNode(fmt.Sprintf("'%s'", val.Error.Error()))
+			}
+		}
+
 	}
 
+	errorPrinter.Println(tree.String())
 	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
 	if len(upstreamFailedTasks) > 0 {
 		errorPrinter.Printf("The following tasks are skipped due to their upstream failing:\n")
