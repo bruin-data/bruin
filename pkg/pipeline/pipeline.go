@@ -33,6 +33,7 @@ const (
 	AssetTypePostgresQuery        = AssetType("pg.sql")
 	AssetTypeRedshiftQuery        = AssetType("rs.sql")
 	AssetTypeAthenaQuery          = AssetType("athena.sql")
+	AssetTypeAthenaSQLSensor      = AssetType("athena.sensor.sql")
 	AssetTypeMsSQLQuery           = AssetType("ms.sql")
 	AssetTypeDatabricksQuery      = AssetType("databricks.sql")
 	AssetTypeSynapseQuery         = AssetType("synapse.sql")

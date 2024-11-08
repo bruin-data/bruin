@@ -4,65 +4,32 @@ outline: deep
 
 # What is Bruin?
 
-Bruin is a command-line tool that allows you to build end-to-end data pipelines that can:
-- ingest data using Python
+Bruin is a data framework that consists of a command-line application & VS Code extension. It allows you to
+- ingest data with pre-built connectors / Python
 - transform data using Python and SQL
 - add quality checks to your pipelines
 
-You can use Bruin to build your data models inside your data warehouse.
+You can use Bruin to build your data pipelines inside your data warehouse. It is a single-binary, which allows you to run it anywhere, e,g. your computer, GitHub Actions, or in an EC2 instance.
 
-<br>
+You can get started with Bruin [via installing it](./introduction/installation.md) with a single command.
 
-# Installation
-Bruin can be installed with a variety of methods.
+<script setup>
+import { withBase } from 'vitepress'
+import { useSidebar } from 'vitepress/theme'
 
-## MacOS
+const { sidebarGroups } = useSidebar()
 
-If you are on macOS, you can use `brew` to install Bruin:
+const platformsGroup = sidebarGroups.value.find(group => group.text === 'Data Platforms')
+</script>
 
-```shell
-brew install bruin-data/tap/bruin
-```
+<div v-if="platformsGroup && platformsGroup.items.length > 0">
+<h2>Supported Platforms</h2>
 
-## Windows, Linux and MacOS
+Bruin supports many data platforms out-of-the-box and as a first-class citizen. Feel free to get started with your favorite platform:
 
-If you are on macOS, linux or windows, you can use `curl` to install Bruin:
-
-```shell
-curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh
-```
-
-Or you can also use `wget` to install Bruin:
-
-```shell
-wget -qO- https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh
-```
-
-> [!IMPORTANT]
-> If you are on Windows, make sure to run the command in the Git Bash or WSL terminal.
-
-
-### Creating your first Bruin project
-
-To create a bruin project basic structure you can just run
-
-```
-bruin init {folder name} [template name]
-```
-
-you can see the available template names by running `bruin help init`
-
-
-# Troubleshooting
-
-## 1. 'Permission Denied' Error While Installing Bruin CLI
-
-**Issue:**  
-When installing the Bruin CLI, you may encounter a `'Permission Denied'` error. This typically happens if the user doesn't have permission to write the binary to the `~/.local/bin` directory.
-
-**Solution:**  
-To resolve this, ensure that you have the necessary write permissions for the `~/.local/bin` directory. You can do this by running the following command with sudo:
-
-```shell
-curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sudo sh
-```
+<ul>
+<li v-for="platform in platformsGroup.items" :key="platform">
+    <a :href="withBase(platform.link)">{{ platform.text }}</a>
+</li>
+</ul>
+</div>
