@@ -394,8 +394,7 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	data := make(map[string][]*scheduler.TaskExecutionResult)
 
 	for _, result := range errorsInTaskResults {
-		assetName := strings.Split(result.Instance.GetHumanID(), ":")[0]
-		data[assetName] = append(data[assetName], result)
+		data[result.Instance.GetAsset().Name] = append(data[result.Instance.GetAsset().Name], result)
 	}
 
 	tree := treeprint.New()
