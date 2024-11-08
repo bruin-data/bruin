@@ -16,18 +16,76 @@ export default defineConfig({
                 text: "Getting Started",
                 collapsed: false,
                 items: [
-                    {text: "Introduction", link: "/getting-started/introduction", items: [
+                    {
+                        text: "Introduction", link: "/getting-started/introduction", items: [
                             {text: "Installation", link: "/getting-started/introduction/installation"},
                             {text: "Quickstart", link: "/getting-started/introduction/quickstart"},
-                        ]},
-                    {
-                        text: "Concepts",
-                        link: "/getting-started/concepts",
-                        items: [
-                            {text: "Design Principles", link: "/getting-started/concepts/design-principles"},
-                            {text: "Glossary", link: "/getting-started/concepts/glossary"},
                         ]
-                    }
+                    },
+                    {text: "Concepts", link: "/getting-started/concepts"},
+                    {text: "Design Principles", link: "/getting-started/design-principles"},
+                    {text: "Glossary", link: "/getting-started/glossary"},
+                ],
+            },
+            {
+                text: "Assets",
+                collapsed: false,
+                items: [
+                    {text: "Definition Schema", link: "/assets/definition-schema"},
+                    {text: "Columns", link: "/assets/columns"},
+                    {text: "Materialization", link: "/assets/materialization"},
+                    {text: "Ingestr", link: "/assets/ingestr"},
+                    {text: "Python Assets", link: "/assets/python"},
+                    {
+                        text: "Templating", link: "/templating/templating", items: [
+                            {text: "Filters", link: "/templating/filters"},
+
+                        ]
+                    },
+                ],
+            },
+            {
+                text: "Data Platforms",
+                collapsed: false,
+                items: [
+                    {text: "AWS Athena", link: "/platforms/athena"},
+                    {text: "Databricks", link: "/platforms/databricks"},
+                    {text: "DuckDB", link: "/platforms/duckdb"},
+                    {text: "Google BigQuery", link: "/platforms/bigquery"},
+                    {text: "Microsoft SQL Server", link: "/platforms/mssql"},
+                    {text: "Postgres", link: "/platforms/postgres"},
+                    {text: "Redshift", link: "/platforms/redshift"},
+                    {text: "Snowflake", link: "/platforms/snowflake"},
+                    {text: "Synapse", link: "/platforms/synapse"},
+                ],
+            },
+            {
+                text: "Data Ingestion",
+                collapsed: false,
+                items: [
+                    {text: "Overview", link: "/ingestion/overview"},
+                    {
+                        text: "Sources", collapsed: true, items: [
+                            {text: "Adjust", link: "/ingestion/adjust.md"},
+                            {text: "Airtable", link: "/ingestion/airtable.md"},
+                            {text: "Chess", link: "/ingestion/chess.md"},
+                            {text: "Databricks", link: "/ingestion/databricks"},
+                            {text: "Facebook", link: "/ingestion/facebook-ads.md"},
+                            {text: "Google Sheets", link: "/ingestion/google_sheets.md"},
+                            {text: "Gorgias", link: "/ingestion/gorgias"},
+                            {text: "Hubspot", link: "/ingestion/hubspot.md"},
+                            {text: "Kafka", link: "/ingestion/kafka.md"},
+                            {text: "Klaviyo", link: "/ingestion/klaviyo.md"},
+                            {text: "MongoDB", link: "/ingestion/mongo"},
+                            {text: "MySQL", link: "/ingestion/mysql"},
+                            {text: "Notion", link: "/ingestion/notion"},
+                            {text: "Redshift", link: "/ingestion/redshift"},
+                            {text: "SAP HANA", link: "/ingestion/sap_hana"},
+                            {text: "S3", link: "/ingestion/s3"},
+                            {text: "Slack", link: "/ingestion/slack.md"},
+                            {text: "Zendesk", link: "/ingestion/Zendesk"},
+                        ]
+                    },
                 ],
             },
             {
@@ -35,73 +93,12 @@ export default defineConfig({
                 collapsed: false,
                 items: [
                     {text: "Init", link: "/commands/init"},
-                    {text: "Connections", link: "/commands/connections"},
+                    {text: "Connections", link: "/commands/ingestion"},
                     {text: "Run", link: "/commands/run"},
                 ],
             },
             {
-                text: "Connections",
-                collapsed: false,
-                items: [
-                    {
-                        text: "Overview", link: "/connections/overview", items: [
-                            {text: "Adjust", link: "/connections/adjust.md"},
-                            {text: "Airtable", link: "/connections/airtable.md"},
-                            {text: "AWS Athena", link: "/connections/athena"},
-                            {text: "Chess", link: "/connections/chess.md"},
-                            {text: "Databricks", link: "/connections/databricks"},
-                            {text: "DuckDB", link: "/connections/duckdb"},
-                            {text: "Facebook", link: "/connections/facebook-ads.md"},
-                            {text: "Google Cloud Platform", link: "/connections/google_cloud_platform"},
-                            {text: "Google Sheets", link: "/connections/google_sheets.md"},
-                            {text: "Gorgias", link: "/connections/gorgias"},
-                            {text: "Hubspot", link: "/connections/hubspot.md"},
-                            {text: "Kafka", link: "/connections/kafka.md"},
-                            {text: "Klaviyo", link: "/connections/klaviyo.md"},
-                            {text: "Microsoft SQL Server", link: "/connections/mssql"},
-                            {text: "MongoDB", link: "/connections/mongo"},
-                            {text: "MySQL", link: "/connections/mysql"},
-                            {text: "Notion", link: "/connections/notion"},
-                            {text: "Postgres", link: "/connections/postgres"},
-                            {text: "Redshift", link: "/connections/redshift"},
-                            {text: "SAP HANA", link: "/connections/sap_hana"},
-                            {text: "S3", link: "/connections/s3"},
-                            {text: "Slack", link: "/connections/slack.md"},
-                            {text: "Snowflake", link: "/connections/snowflake"},
-                            {text: "Zendesk", link: "/connections/Zendesk"},
-                        ]
-                    },
-                ],
-            },
-            {
-                text: "Assets",
-                collapsed: false,
-                items: [
-                    {text: "Definition Schema", link: "/assets/definition-schema", items:[
-                        {text: "Google BigQuery", link: "/assets/bigquery"},
-                        {text: "Snowflake", link: "/assets/snowflake"},
-                        {text: "Python", link: "/assets/python"},
-                        {text: "Ingestr", link: "/assets/ingestr"},
-                        {text: "Databricks", link: "/assets/databricks"},
-                        {text: "SQL Server", link: "/assets/mssql"},
-                        {text: "Postgres", link: "/assets/postgres"},
-                        {text: "Synapse", link: "/assets/synapse"},
-                        {text: "Redshift", link: "/assets/redshift"},
-                        {text: "AWS Athena", link: "/assets/athena"},
-                    ]},
-                    {text: "Materialization", link: "/assets/materialization"},
-                ],
-            },
-            {
-                text: "Templating",
-                collapsed: false,
-                items: [
-                    {text: "Overview", link: "/templating/templating"},
-                    {text: "Filters", link: "/templating/filters"},
-                ],
-            },
-            {
-                text: "Quality checks",
+                text: "Quality Checks",
                 collapsed: false,
                 items: [
                     {
@@ -118,10 +115,31 @@ export default defineConfig({
                 ],
             },
             {
-                text: "CICD Integration",
+                text: "Bruin VSCode Extension",
                 collapsed: false,
                 items: [
-                    {text: "Github Action", link: "/cicd/github-action"},
+                    {
+                        text: "Overview", link: "/vscode-extension/overview",
+                        items: [
+                            {text: "Installation", link: "/vscode-extension/installation"},
+                            {text: "Getting Started", link: "/vscode-extension/getting-started"},
+                            {text: "Configuration", link: "/vscode-extension/configuration"},
+                            {
+                                text: "Panels",
+                                items: [
+                                    {text: "Side Panel", link: "/vscode-extension/panels/side-panel"},
+                                    {text: "Lineage Panel", link: "/vscode-extension/panels/lineage-panel"}
+                                ]
+                            },
+                        ]
+                    },
+                ]
+            },
+            {
+                text: "CI/CD Integration",
+                collapsed: false,
+                items: [
+                    {text: "Github Actions", link: "/cicd/github-action"},
                 ],
             },
             {
@@ -132,26 +150,7 @@ export default defineConfig({
                     {text: "Notifications", link: "/cloud/notifications"},
                 ],
             },
-            {
-                text:"Bruin VSCode Extension",
-                collapsed: false,
-                items: [
-                    {text: "Overview", link: "/vscode-extension/overview",
-                    items: [
-                        {text: "Installation", link: "/vscode-extension/installation"},
-                        {text: "Getting Started", link: "/vscode-extension/getting-started"},
-                        {text: "Configuration", link: "/vscode-extension/configuration"},
-                        {
-                            text: "Panels",
-                            items: [
-                                { text: "Side Panel", link: "/vscode-extension/panels/side-panel" },
-                                { text: "Lineage Panel", link: "/vscode-extension/panels/lineage-panel" }
-                            ]
-                        },
-                    ]
-                },
-                ]
-            }
+
         ],
 
         socialLinks: [{icon: "github", link: "https://github.com/bruin-data/bruin"}],
