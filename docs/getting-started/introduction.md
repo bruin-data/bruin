@@ -12,3 +12,23 @@ Bruin is a data framework that consists of a command-line application & VS Code 
 You can use Bruin to build your data pipelines inside your data warehouse. It is a single-binary, which allows you to run it anywhere, e,g. your computer, GitHub Actions, or in an EC2 instance.
 
 You can get started with Bruin [via installing it](./introduction/installation.md) with a single command.
+
+## Supported Platforms
+
+Bruin supports many data platforms out-of-the-box and as a first-class citizen. Feel free to get started with your favorite platform:
+
+<script setup>
+import { withBase } from 'vitepress'
+import { useSidebar } from 'vitepress/theme'
+
+const { sidebarGroups } = useSidebar()
+
+const platformsGroup = sidebarGroups.value.find(group => group.text === 'Data Platforms')
+console.log(platformsGroup)
+</script>
+
+<ul>
+<li v-for="platform in platformsGroup.items" :key="platform">
+    <a :href="withBase(platform.link)">{{ platform.text }}</a>
+</li>
+</ul>

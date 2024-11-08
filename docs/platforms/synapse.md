@@ -1,6 +1,6 @@
 # Microsoft Azure Synapse
 
-Bruin supports Azure Synapse as a data warehouse, which means you can use it to build data pipelines on Synapse.
+Bruin supports Azure Synapse as a data platform, which means you can use it to build data pipelines on Synapse.
 
 ## Connection
 Synapse connection is configured the same way as Microsoft SQL Server connection, check [SQL Server connection](mssql.md#connection) for more details.
