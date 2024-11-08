@@ -1,6 +1,6 @@
 # AWS Redshift
 
-Bruin supports AWS Redshift as a data warehouse, which means you can use Bruin to build tables and views in your Redshift data warehouse.
+Bruin supports AWS Redshift as a data platform, which means you can use Bruin to build tables and views in your Redshift data warehouse.
 
 ## Connection
 In order to have set up a Redshift connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema

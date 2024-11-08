@@ -133,7 +133,7 @@ bruin run
 Bruin supports data quality checks natively, as part of the asset definition. It includes a handful of data quality checks, and it also supports custom checks.
 
 Let's add a few data quality checks to our table:
-```sql{11-29}
+```sql
 /* @bruin
 
 name: dataset.player_stats
@@ -144,25 +144,25 @@ materialization:
 depends:
    - dataset.players
 
-columns: // [!code focus]
-  - name: name // [!code focus]
-    type: string // [!code focus]
-    description: this column contains the player names // [!code focus]
-    checks: // [!code focus]
-      - name: not_null // [!code focus]
-      - name: unique // [!code focus]
+columns: // [!code ++]
+  - name: name // [!code ++]
+    type: string // [!code ++]
+    description: this column contains the player names // [!code ++]
+    checks: // [!code ++]
+      - name: not_null // [!code ++]
+      - name: unique // [!code ++]
 
-  - name: player_count // [!code focus]
-    type: int // [!code focus]
-    description: the number of players with the given name // [!code focus]
-    checks: // [!code focus]
-      - name: not_null // [!code focus]
-      - name: positive // [!code focus]
+  - name: player_count // [!code ++]
+    type: int // [!code ++]
+    description: the number of players with the given name // [!code ++]
+    checks: // [!code ++]
+      - name: not_null // [!code ++]
+      - name: positive // [!code ++]
 
-custom_checks: // [!code focus]  
-  - name: row count is greater than zero // [!code focus]  
-    description: this check ensures that the table is not empty // [!code focus]  
-    query: SELECT count(*) > 1 FROM dataset.player_count // [!code focus]  
+custom_checks: // [!code ++]  
+  - name: row count is greater than zero // [!code ++]  
+    description: this check ensures that the table is not empty // [!code ++]  
+    query: SELECT count(*) > 1 FROM dataset.player_count // [!code ++]  
    
 @bruin */
 

@@ -17,7 +17,7 @@ Using Ingestr, you can move data from:
     * Facebook Ads
     * Google Ads
 
-to your data warehouses:
+to your data platforms:
 * Google BigQuery 
 * Snowflake 
 * AWS Redshift 

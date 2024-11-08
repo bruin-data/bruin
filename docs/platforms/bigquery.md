@@ -1,6 +1,6 @@
 # Google BigQuery
 
-Google BigQuery is a fully-managed, serverless data warehouse that enables super-fast SQL queries using the processing power of Google's infrastructure.
+Google BigQuery is a fully-managed, serverless data platform that enables super-fast SQL queries using the processing power of Google's infrastructure.
 
 Bruin supports BigQuery as a data platform.
 

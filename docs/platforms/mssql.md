@@ -1,6 +1,6 @@
 # Microsoft SQL Server
 
-Bruin supports Microsoft SQL Server as a data warehouse.
+Bruin supports Microsoft SQL Server as a data platform.
 
 > [!NOTE]
 > We tend to use "MS SQL" interchangeably to refer to Microsoft SQL Server, apologies for any confusion.

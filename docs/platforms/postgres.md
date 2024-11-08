@@ -1,6 +1,6 @@
 # PostgreSQL
 
-Bruin supports PostgreSQL as a data warehouse.
+Bruin supports PostgreSQL as a data platform.
 
 ## Connection
 In order to have set up a Postgres connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema.
