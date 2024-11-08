@@ -592,6 +592,11 @@ func isPathReferencingAsset(p string) bool {
 		return false
 	}
 
+	if !strings.HasSuffix(p, "asset.yml") {
+		warningPrinter.Printf("Warning: The file '%s' does not end with 'asset.yml'. This is why it cannot be run as an asset. Please rename the file to include the correct suffix.\n", p)
+		return false
+	}
+
 	return true
 }
 
