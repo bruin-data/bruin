@@ -38,7 +38,7 @@ If you have trouble setting this up you can check [AWS documentation](https://re
 ## AWS Redshift Assets
 
 ### `rs.sql`
-Runs a materialized AWS Redshift asset or an SQL script. For detailed parameters, you can check [Definition Schema](definition-schema.md) page.
+Runs a materialized AWS Redshift asset or an SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 #### Example: Create a table for product reviews
 ```sql

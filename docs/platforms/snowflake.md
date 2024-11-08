@@ -32,7 +32,7 @@ Where account is the identifier that you can copy here:
 ## Snowflake Assets
 
 ### `sf.sql`
-Runs a materialized Snowflake asset or a Snowflake script. For detailed parameters, you can check [Definition Schema](definition-schema.md) page.
+Runs a materialized Snowflake asset or a Snowflake script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 
 #### Example: Create a table using table materialization
