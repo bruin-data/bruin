@@ -7,7 +7,7 @@ Synapse connection is configured the same way as Microsoft SQL Server connection
 
 ## Synapse Assets
 ### `synapse.sql`
-Runs a materialized Synapse asset or an SQL script. For detailed parameters, you can check [Definition Schema](definition-schema.md) page.
+Runs a materialized Synapse asset or an SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 #### Example: Create a view using view materialization
 ```sql

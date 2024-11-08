@@ -13,10 +13,6 @@ You can use Bruin to build your data pipelines inside your data warehouse. It is
 
 You can get started with Bruin [via installing it](./introduction/installation.md) with a single command.
 
-## Supported Platforms
-
-Bruin supports many data platforms out-of-the-box and as a first-class citizen. Feel free to get started with your favorite platform:
-
 <script setup>
 import { withBase } from 'vitepress'
 import { useSidebar } from 'vitepress/theme'
@@ -24,11 +20,16 @@ import { useSidebar } from 'vitepress/theme'
 const { sidebarGroups } = useSidebar()
 
 const platformsGroup = sidebarGroups.value.find(group => group.text === 'Data Platforms')
-console.log(platformsGroup)
 </script>
+
+<div v-if="platformsGroup && platformsGroup.items.length > 0">
+<h2>Supported Platforms</h2>
+
+Bruin supports many data platforms out-of-the-box and as a first-class citizen. Feel free to get started with your favorite platform:
 
 <ul>
 <li v-for="platform in platformsGroup.items" :key="platform">
     <a :href="withBase(platform.link)">{{ platform.text }}</a>
 </li>
 </ul>
+</div>

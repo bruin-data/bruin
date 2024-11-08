@@ -28,7 +28,7 @@ Google BigQuery requires a Google Cloud Platform connection, which can be added 
 ## BigQuery Assets
 
 ### `bq.sql`
-Runs a materialized BigQuery asset or a BigQuery script. For detailed parameters, you can check [Definition Schema](definition-schema.md) page.
+Runs a materialized BigQuery asset or a BigQuery script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 #### Example: Create a table using table materialization
 ```sql

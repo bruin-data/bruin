@@ -25,7 +25,7 @@ In order to have set up a Postgres connection, you need to add a configuration i
 ## PostgreSQL Assets
 
 ### `pg.sql`
-Runs a materialized Postgres asset or an sql script. For detailed parameters, you can check [Definition Schema](definition-schema.md) page.
+Runs a materialized Postgres asset or an sql script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 
 #### Example: Create a table using table materialization

@@ -29,7 +29,7 @@ The field `database` is optional, if not provided, it will default to `default`.
 ## Athena Assets
 
 ### `athena.sql`
-Runs a materialized Athena asset or an SQL script. For detailed parameters, you can check [Definition Schema](definition-schema.md) page.
+Runs a materialized Athena asset or an SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 ### Examples
 Create a view to aggregate website traffic data

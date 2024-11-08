@@ -24,7 +24,7 @@ In order to have set up a SQL Server connection on Bruin, you need to add a conf
 ## SQL Server Assets
 
 ### `ms.sql`
-Runs a materialized SQL Server asset or an SQL script. For detailed parameters, you can check [Definition Schema](definition-schema.md) page.
+Runs a materialized SQL Server asset or an SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 #### Examples
 Run an MS SQL script to generate sales report
