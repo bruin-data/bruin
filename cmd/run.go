@@ -405,14 +405,9 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 		baseAsset := branch.AddBranch(assetName)
 		columnBranches := make(map[string]treeprint.Tree)
 		for _, result := range results {
-			parts := strings.Split(result.Instance.GetHumanID(), ":")
-			if len(parts) < 3 {
-				continue
-			}
-			columnName := parts[1]
-			checkName := parts[2]
-
-			if columnName != "custom-check" {
+			if result.Instance.GetType() != scheduler.TaskInstanceTypeCustomCheck {
+				columnName := result.Instance.(*scheduler.ColumnCheckInstance).Column.Name
+				checkName := result.Instance.(*scheduler.ColumnCheckInstance).Check.Name
 				if _, exists := columnBranches[columnName]; !exists {
 					colBranch := baseAsset.AddMetaBranch("Column", columnName)
 					columnBranches[columnName] = colBranch
@@ -421,6 +416,7 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 				checkBranch := colBranch.AddMetaBranch("Check", checkName)
 				checkBranch.AddNode(fmt.Sprintf("'%s'", result.Error.Error()))
 			} else {
+				checkName := result.Instance.(*scheduler.CustomCheckInstance).Check.Name
 				customBranch := baseAsset.AddMetaBranch("Custom Check", checkName)
 				customBranch.AddNode(fmt.Sprintf("'%s'", result.Error.Error()))
 			}
