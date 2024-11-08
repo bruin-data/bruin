@@ -1,5 +1,5 @@
 # Ingestr Assets
-[Ingestr](https://github.com/bruin-data/ingestr) is a CLI tool that allows you to easily move data between platforms. Bruin supports `ingestr` natively as an asset type.
+[Ingestr](https://github.com/bruin-data/ingestr) is a Python package that allows you to easily move data between platforms. Bruin supports `ingestr` natively as an asset type.
 
 Using Ingestr, you can move data from:
 * your production databases like:
@@ -17,7 +17,7 @@ Using Ingestr, you can move data from:
     * Facebook Ads
     * Google Ads
 
-to your data warehouses:
+to your data platforms:
 * Google BigQuery 
 * Snowflake 
 * AWS Redshift 
@@ -29,7 +29,7 @@ to your data warehouses:
 
 
 
-## Asset Structure
+## Template
 ```yaml
 name: string
 type: ingestr

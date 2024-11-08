@@ -1,13 +1,16 @@
 # Design Principles
 
-Bruin is an opinionated data platform, which contains:
-- [various](https://github.com/bruin-data/ingestr) [open](https://github.com/bruin-data/bruin)-[source](https://github.com/bruin-data/bruin-vscode) components,
-- a managed data platform as a service, [Bruin Cloud](https://getbruin.com),
-- and a framework to build scalable data products, both in terms of data size as well as the _data team size_. 
+Bruin is an opinionated data framework, which contains:
+- various open-source components components,
+  - [Bruin CLI](https://github.com/bruin-data/bruin)
+  - [ingestr](https://github.com/bruin-data/ingestr)
+  - [Bruin VS Code extension](https://github.com/bruin-data/bruin-vscode)
+- a framework to build scalable data products, both in terms of data size as well as the _data team size_ 
+- and a managed data platform as a service, [Bruin Cloud](https://getbruin.com),
 
 Below is a living list of design principles that outlines the vision behind Bruin, both as an open-source product as well as a business.
 
-1. **Everything must be done via some form of a version-controllable text.** This means there should be no UI/database to configure anything in terms of how Bruin pipelines run, which enables proper reproducible builds for data pipelines.
+1. **Everything should be done via some form of a version-controllable text.** This means there should be no UI/database to configure anything in terms of how Bruin pipelines run, which enables proper reproducible builds for data pipelines.
 2. **Real-world data pipelines use multiple technologies.** While SQL is incredibly powerful, there are a lot of usecases that are not doable via just SQL. Bruin supports both Python and SQL natively, as well as pre-built images/binaries to support more complex usecases.
 3. **Real-world data pipelines depend on multiple sources and destinations.** A complete data platform needs to be able to fulfill the needs of various business functions, and enable creating a single source of truth, be it for marketing platforms, CRM systems, data warehouses, data lakes and many more. Data pipelines must be built to support the diverse set of sources and destinations.
 4. **Real-world data pipelines need the ability to mix-and-match technologies, sources, and destinations.** Consequently, it is not enough for a platform to support multiple source and destinations if they cannot be combined. A single pipeline must be able to mix and match technologies, sources and destinations as needed without any disruption.

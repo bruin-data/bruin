@@ -1,6 +1,10 @@
 # Duck DB
 
-Bruin supports using a local DuckDB database as a connection. This could come very handy when you want to test your queries locally before running them on a production database.
+DuckDB is an in-memory database designed to be fast and reliable.
+
+Bruin supports using a local DuckDB database.
+
+## Connection
 
 ```yaml
     connections:
@@ -11,7 +15,8 @@ Bruin supports using a local DuckDB database as a connection. This could come ve
 
 The field `path` is the only one you need and it can point to an existing database or the full path of the database that you want to create and where your queries would be materialized.
 
-It's important to note that other clients should not be connected to the database while Bruin is running since duck db does not allow concurrency between different processes.
+> [!WARNING]
+> DuckDB does not allow concurrency between different processes, which means other clients should not be connected to the database while Bruin is running.
 
 
 ## Assets
@@ -26,28 +31,30 @@ Create a view with orders per country
 ```sql
 /* @bruin
 name: orders_per_country
-type: duck.sql
+type: duckdb.sql
 materialization:
     type: view
 @bruin */
 
-select COUNT(*) as orders, country
-from events.orders
-where status = "paid"
-group by country
+SELECT COUNT(*) as orders, country
+FROM events.orders
+WHERE status = "paid"
+GROUP BY country
 ```
 
 Materialize new customers per region and append them to an existing table
 ```sql
 /* @bruin
 name: new_customers_per_region
-type: duck.sql
+type: duckdb.sql
 materialization:
     type: table
     strategy: append
 @bruin */
 
-select COUNT(*) as customers, region WHERE created_at >= {{ start_date }} AND created_at < {{ end_date }}
-from events.customers
+SELECT COUNT(*) as customers, region 
+    WHERE created_at >= {{ start_date }} 
+      AND created_at < {{ end_date }}
+FROM events.customers
 ```
 
