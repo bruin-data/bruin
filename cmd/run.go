@@ -103,6 +103,10 @@ func Run(isDebug *bool) *cli.Command {
 				Aliases: []string{"r"},
 				Usage:   "truncate the table before running",
 			},
+			&cli.BoolFlag{
+				Name:  "use-uv",
+				Usage: "use uv for managing Python dependencies",
+			},
 			&cli.StringFlag{
 				Name:    "tag",
 				Aliases: []string{"t"},
@@ -257,10 +261,12 @@ func Run(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
 			}
 
-			err = cm.CanRunPipeline(foundPipeline)
-			if err != nil {
-				errorPrinter.Printf(err.Error()) //nolint: govet
-				return cli.Exit("", 1)
+			if !runningForAnAsset {
+				err = cm.CanRunPipeline(foundPipeline)
+				if err != nil {
+					errorPrinter.Printf(err.Error()) //nolint: govet
+					return cli.Exit("", 1)
+				}
 			}
 
 			rules, err := lint.GetRules(fs, &git.RepoFinder{}, true)
@@ -348,7 +354,7 @@ func Run(isDebug *bool) *cli.Command {
 			infoPrinter.Printf("\nStarting the pipeline execution...\n")
 			infoPrinter.Println()
 
-			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, c.Bool("full-refresh"))
+			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, c.Bool("full-refresh"), c.Bool("use-uv"))
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -423,7 +429,17 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	}
 }
 
-func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connection.Manager, startDate, endDate time.Time, pipelineName string, runID string, fullRefresh bool) (map[pipeline.AssetType]executor.Config, error) {
+func setupExecutors(
+	s *scheduler.Scheduler,
+	config *config.Config,
+	conn *connection.Manager,
+	startDate,
+	endDate time.Time,
+	pipelineName string,
+	runID string,
+	fullRefresh bool,
+	useUvForPython bool,
+) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
 
 	// this is a heuristic we apply to find what might be the most common type of custom check in the pipeline
@@ -431,7 +447,11 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 	estimateCustomCheckType := s.FindMajorityOfTypes(pipeline.AssetTypeBigqueryQuery)
 
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
-		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh))
+		if useUvForPython {
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperatorWithUv(config, jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh))
+		} else {
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh))
+		}
 	}
 
 	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID)
