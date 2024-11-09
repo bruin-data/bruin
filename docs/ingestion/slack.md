@@ -44,7 +44,7 @@ parameters:
           api_key: "YOUR_SLACK_API_KEY"
           
 ```
-**Step 3: [Run](https://bruin-data.github.io/bruin/commands/run.html] Asset) to Ingest Data**
+**Step 3: [Run](https://bruin-data.github.io/bruin/commands/run.html) Asset to Ingest Data**
 ```
 bruin run ingestr.slack.asset.yml
 ```
