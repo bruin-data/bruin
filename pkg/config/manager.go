@@ -263,13 +263,20 @@ type Config struct {
 }
 
 func (c *Config) CanRunPipeline(p *pipeline.Pipeline) error {
-	for _, task := range p.Assets {
-		connName, err := p.GetConnectionNameForAsset(task)
+	for _, asset := range p.Assets {
+		connName, err := p.GetConnectionNameForAsset(asset)
 		if err != nil {
-			return errors2.Wrap(err, "Could not find connection name for asset "+task.Name)
+			return errors2.Wrap(err, "Could not find connection name for asset "+asset.Name)
 		}
+
+		if asset.Type == pipeline.AssetTypePython {
+			if asset.Connection == "" && asset.CheckCount() == 0 && len(asset.Secrets) == 0 {
+				continue
+			}
+		}
+
 		if !c.SelectedEnvironment.Connections.Exists(connName) {
-			return errors2.Errorf("Connection '%s' does not exist in the selected environment and is needed for '%s'", connName, task.Name)
+			return errors2.Errorf("Connection '%s' does not exist in the selected environment and is needed for '%s'", connName, asset.Name)
 		}
 	}
 

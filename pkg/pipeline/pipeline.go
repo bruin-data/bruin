@@ -675,6 +675,16 @@ func (a *Asset) GetColumnWithName(name string) *Column {
 	return nil
 }
 
+func (a *Asset) CheckCount() int {
+	checkCount := 0
+	for _, c := range a.Columns {
+		checkCount += len(c.Checks)
+	}
+
+	checkCount += len(a.CustomChecks)
+	return checkCount
+}
+
 func (a *Asset) EnrichFromEntityAttributes(entities []*glossary.Entity) error {
 	entityMap := make(map[string]*glossary.Entity, len(entities))
 	for _, e := range entities {
