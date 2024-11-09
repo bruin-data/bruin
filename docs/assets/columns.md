@@ -1,6 +1,6 @@
 # Columns
 
-Bruin supports column definitions inside assets to amke them a part of your data pipelines:
+Bruin supports column definitions inside assets to make them a part of your data pipelines:
 
 - you can document the existing columns in an asset and add further metadata, e.g. `primary_key`
 - you can define column-level quality checks
