@@ -139,7 +139,7 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					repo:            repo,
 					module:          "path.to.module",
 					requirementsTxt: "",
-					task:            task,
+					asset:           task,
 					envVariables: map[string]string{
 						"BRUIN_ASSET": "my-asset",
 					},
@@ -169,7 +169,7 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					repo:            repo,
 					module:          "path.to.module",
 					requirementsTxt: "",
-					task:            assetWithSecrets,
+					asset:           assetWithSecrets,
 					envVariables: map[string]string{
 						"key1_injected": "value1",
 						"key2":          "value2",
@@ -198,7 +198,7 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					repo:            repo,
 					module:          "path.to.module",
 					requirementsTxt: "/path/to/requirements.txt",
-					task:            task,
+					asset:           task,
 					envVariables: map[string]string{
 						"BRUIN_ASSET": "my-asset",
 					},

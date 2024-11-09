@@ -16,7 +16,7 @@ deps: tools
 
 build: deps
 	@echo "$(OK_COLOR)==> Building the application...$(NO_COLOR)"
-	@CGO_ENABLED=1 go build -v -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0))" -o "$(BUILD_DIR)/$(NAME)" "$(BUILD_SRC)"
+	@CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0))" -o "$(BUILD_DIR)/$(NAME)" "$(BUILD_SRC)"
 
 
 duckdb-test: build
