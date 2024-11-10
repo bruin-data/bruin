@@ -447,10 +447,11 @@ func setupExecutors(
 	estimateCustomCheckType := s.FindMajorityOfTypes(pipeline.AssetTypeBigqueryQuery)
 
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
+		jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh)
 		if useUvForPython {
-			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperatorWithUv(config, jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh))
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperatorWithUv(config, conn, jinjaVariables)
 		} else {
-			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh))
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinjaVariables)
 		}
 	}
 

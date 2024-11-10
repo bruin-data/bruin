@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -79,7 +80,7 @@ func NewLocalOperator(config *config.Config, envVariables map[string]string) *Lo
 	}
 }
 
-func NewLocalOperatorWithUv(config *config.Config, envVariables map[string]string) *LocalOperator {
+func NewLocalOperatorWithUv(config *config.Config, conn *connection.Manager, envVariables map[string]string) *LocalOperator {
 	cmdRunner := &commandRunner{}
 
 	return &LocalOperator{
@@ -90,6 +91,7 @@ func NewLocalOperatorWithUv(config *config.Config, envVariables map[string]strin
 			uvInstaller: &UvChecker{
 				cmd: commandRunner{},
 			},
+			conn: conn,
 		},
 		envVariables: envVariables,
 		config:       config,
@@ -137,9 +139,11 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		}
 	}
 
-	envVariables := o.envVariables
-	if envVariables == nil {
-		envVariables = make(map[string]string)
+	envVariables := make(map[string]string)
+	if o.envVariables != nil {
+		for k, v := range o.envVariables {
+			envVariables[k] = v
+		}
 	}
 	envVariables["BRUIN_ASSET"] = t.Name
 
