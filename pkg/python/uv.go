@@ -7,11 +7,17 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/executor"
+	"github.com/bruin-data/bruin/pkg/ingestr"
+	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/pkg/errors"
 )
 
 var AvailablePythonVersions = map[string]bool{
@@ -24,7 +30,8 @@ var AvailablePythonVersions = map[string]bool{
 }
 
 const (
-	UvVersion = "0.5.1"
+	UvVersion               = "0.5.1"
+	pythonVersionForIngestr = "3.11"
 )
 
 // UvChecker handles checking and installing the uv package manager.
@@ -107,9 +114,18 @@ type uvInstaller interface {
 	EnsureUvInstalled(ctx context.Context) error
 }
 
+type connectionFetcher interface {
+	GetConnection(name string) (interface{}, error)
+}
+
+type pipelineConnection interface {
+	GetIngestrURI() (string, error)
+}
+
 type uvPythonRunner struct {
 	cmd         cmd
 	uvInstaller uvInstaller
+	conn        connectionFetcher
 }
 
 func (u *uvPythonRunner) Run(ctx context.Context, execCtx *executionContext) error {
@@ -127,7 +143,14 @@ func (u *uvPythonRunner) Run(ctx context.Context, execCtx *executionContext) err
 		}
 	}
 
-	// uv run python --python <py-version> --with-requirements <requirements.txt> --module <module>
+	if execCtx.asset.Materialization.Type == "" {
+		return u.runWithNoMaterialization(ctx, execCtx, pythonVersion)
+	}
+
+	return u.runWithMaterialization(ctx, execCtx, pythonVersion)
+}
+
+func (u *uvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *executionContext, pythonVersion string) error {
 	flags := []string{"run", "--python", pythonVersion}
 	if execCtx.requirementsTxt != "" {
 		flags = append(flags, "--with-requirements", execCtx.requirementsTxt)
@@ -143,3 +166,180 @@ func (u *uvPythonRunner) Run(ctx context.Context, execCtx *executionContext) err
 
 	return u.cmd.Run(ctx, execCtx.repo, noDependencyCommand)
 }
+
+func (u *uvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *executionContext, pythonVersion string) error {
+	asset := execCtx.asset
+	mat := asset.Materialization
+
+	if mat.Type != "table" {
+		return errors.New("only table materialization is supported for Python assets")
+	}
+
+	arrowFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("asset_data_%d.arrow", time.Now().UnixNano()))
+	defer func(name string) {
+		_ = os.Remove(name)
+	}(arrowFilePath)
+
+	tempPyScript, err := os.CreateTemp("", "bruin-arrow-*.py")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer func(name string) {
+		_ = os.Remove(name)
+	}(tempPyScript.Name())
+	defer func(tempPyScript *os.File) {
+		_ = tempPyScript.Close()
+	}(tempPyScript)
+
+	arrowScript := strings.ReplaceAll(PythonArrowTemplate, "$REPO_ROOT", execCtx.repo.Path)
+	arrowScript = strings.ReplaceAll(arrowScript, "$MODULE_PATH", execCtx.module)
+	arrowScript = strings.ReplaceAll(arrowScript, "$ARROW_FILE_PATH", arrowFilePath)
+
+	if _, err := io.WriteString(tempPyScript, arrowScript); err != nil {
+		return fmt.Errorf("failed to write to temp file: %w", err)
+	}
+
+	flags := []string{"run", "--python", pythonVersion}
+	if execCtx.requirementsTxt != "" {
+		flags = append(flags, "--with-requirements", execCtx.requirementsTxt)
+	}
+
+	flags = append(flags, tempPyScript.Name())
+
+	err = u.cmd.Run(ctx, execCtx.repo, &command{
+		Name:    "uv",
+		Args:    flags,
+		EnvVars: execCtx.envVariables,
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to run asset code")
+	}
+
+	var output io.Writer = os.Stdout
+	if ctx.Value(executor.KeyPrinter) != nil {
+		output = ctx.Value(executor.KeyPrinter).(io.Writer)
+	}
+
+	_, _ = output.Write([]byte("Successfully collected the data from the asset, uploading to the destination...\n"))
+
+	// build ingestr flags
+	cmdArgs := []string{
+		"ingest",
+		"--source-uri",
+		"mmap://" + arrowFilePath,
+		"--source-table",
+		"asset_data",
+		"--dest-table",
+		execCtx.asset.Name,
+		"--yes",
+		"--progress",
+		"log",
+	}
+
+	destConnectionName, err := execCtx.pipeline.GetConnectionNameForAsset(asset)
+	if err != nil {
+		return err
+	}
+
+	destConnection, err := u.conn.GetConnection(destConnectionName)
+	if err != nil {
+		return fmt.Errorf("destination connection %s not found", destConnectionName)
+	}
+
+	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
+	if err != nil {
+		return errors.New("could not get the source uri")
+	}
+
+	if destURI == "" {
+		return errors.New("could not determine the destination, please set the `connection` value in the asset definition.")
+	}
+
+	cmdArgs = append(cmdArgs, "--dest-uri", destURI)
+
+	fullRefresh := ctx.Value(pipeline.RunConfigFullRefresh)
+	if fullRefresh != nil && fullRefresh.(bool) {
+		cmdArgs = append(cmdArgs, "--full-refresh")
+	}
+
+	// TODO: lock duckdb database
+
+	if mat.Strategy != "" {
+		cmdArgs = append(cmdArgs, "--incremental-strategy", string(mat.Strategy))
+	}
+
+	if mat.IncrementalKey != "" {
+		cmdArgs = append(cmdArgs, "--incremental-key", mat.IncrementalKey)
+	}
+
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) > 0 {
+		for _, pk := range primaryKeys {
+			cmdArgs = append(cmdArgs, "--primary-key", pk)
+		}
+	}
+
+	ingestrPackageName := "ingestr@" + ingestr.IngestrVersion
+	err = u.cmd.Run(ctx, execCtx.repo, &command{
+		Name: "uv",
+		Args: []string{"tool", "install", "--quiet", "--python", pythonVersionForIngestr, ingestrPackageName},
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to install ingestr")
+	}
+
+	runArgs := slices.Concat([]string{"tool", "run", "--python", pythonVersionForIngestr, ingestrPackageName}, cmdArgs)
+	_, _ = output.Write([]byte("Running command: uv " + strings.Join(runArgs, " ") + "\n"))
+	err = u.cmd.Run(ctx, execCtx.repo, &command{
+		Name: "uv",
+		Args: runArgs,
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to run load the data into the destination")
+	}
+
+	_, _ = output.Write([]byte("Successfully loaded the data from the asset into the destination.\n"))
+
+	return nil
+}
+
+const PythonArrowTemplate = `
+# /// script
+# dependencies = [
+#   "pyarrow==18.0.0"
+# ]
+# ///
+
+import sys
+import importlib.util
+from pathlib import Path
+
+def import_module_from_path(module_path: str, module_name: str):
+    project_root = str(Path(module_path))
+    sys.path.insert(0, project_root)
+
+    return importlib.import_module(module_name)
+
+module = import_module_from_path("$REPO_ROOT", "$MODULE_PATH")
+df = module.materialize()
+
+import pyarrow as pa
+import pyarrow.ipc as ipc
+
+if str(type(df)) == "<class 'pandas.core.frame.DataFrame'>":
+    table = pa.Table.from_pandas(df)
+elif str(type(df)) == "<class 'polars.dataframe.frame.DataFrame'>":
+    table = df.to_arrow()
+elif str(type(df)) == "<class 'generator'>":
+    table = pa.Table.from_pylist(list(df)) # TODO: Terrible implementation, but works for now
+elif str(type(df)) == "<class 'list'>":
+    table = pa.Table.from_pylist(df)
+else:
+    raise TypeError(f"Unsupported return type: {type(df)}")
+
+# Write to memory mapped file
+with pa.OSFile("$ARROW_FILE_PATH", 'wb') as f:
+	writer = ipc.new_file(f, table.schema)
+	writer.write_table(table)
+	writer.close()
+`

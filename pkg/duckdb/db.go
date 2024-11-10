@@ -3,6 +3,7 @@ package duck
 import (
 	"context"
 	"database/sql"
+	"github.com/jmoiron/sqlx"
 
 	"github.com/bruin-data/bruin/pkg/query"
 	_ "github.com/marcboeker/go-duckdb"
