@@ -27,7 +27,6 @@ linters:
     - mnd
     - wrapcheck
     - funlen
-    - gomnd
     - gochecknoglobals
     - lll
     - wsl
