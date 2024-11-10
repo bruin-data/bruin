@@ -17,7 +17,7 @@ func (c AwsConnection) GetName() string {
 	return c.Name
 }
 
-type GoogleCloudPlatformConnection struct {
+type GoogleCloudPlatformConnection struct { //nolint:recvcheck
 	Name               string `yaml:"name" json:"name" mapstructure:"name"`
 	ServiceAccountJSON string `yaml:"service_account_json" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
 	ServiceAccountFile string `yaml:"service_account_file" json:"service_account_file,omitempty" mapstructure:"service_account_file"`

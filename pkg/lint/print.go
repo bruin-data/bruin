@@ -95,7 +95,7 @@ func (l *Printer) printPipelineSummary(pipelineIssues *PipelineIssues) {
 	}
 }
 
-func (l Printer) relativePipelinePath(p *pipeline.Pipeline) string {
+func (l *Printer) relativePipelinePath(p *pipeline.Pipeline) string {
 	absolutePipelineRoot := filepath.Dir(p.DefinitionFile.Path)
 
 	absRootPath, err := filepath.Abs(l.RootCheckPath)
