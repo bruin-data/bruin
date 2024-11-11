@@ -87,7 +87,7 @@ func TestDB_Select(t *testing.T) {
 			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
 
 			tt.mockConnection(mock)
-			db := Client{connection: sqlxDB}
+			db := Client{connection: sqlxDB, config: Config{Path: "some/path.db"}}
 
 			got, err := db.Select(context.Background(), &tt.query)
 			if tt.wantErr {

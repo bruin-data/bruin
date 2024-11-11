@@ -50,8 +50,8 @@ func VersionCmd(commit string) *cli.Command {
 				return nil
 			}
 
-			fmt.Printf("Current version: %s (%s)\n", c.App.Version, commit)
-			fmt.Println("Latest version: " + latest)
+			fmt.Printf("Current: %s (%s)\n", c.App.Version, commit)
+			fmt.Println("Latest: " + latest)
 			return nil
 		},
 	}
