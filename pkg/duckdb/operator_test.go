@@ -30,8 +30,6 @@ func (m *mockMaterializer) Render(t *pipeline.Asset, query string) (string, erro
 }
 
 func TestBasicOperator_RunTask(t *testing.T) {
-	t.Parallel()
-
 	type args struct {
 		t *pipeline.Asset
 	}
@@ -183,8 +181,6 @@ func TestBasicOperator_RunTask(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			client := new(mockQuerierWithResult)
 			extractor := new(mockExtractor)
 			mat := new(mockMaterializer)
