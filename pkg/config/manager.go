@@ -512,6 +512,8 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		if err := mapstructure.Decode(creds, &conn); err != nil {
 			return fmt.Errorf("failed to decode credentials: %w", err)
 		}
+		conn.Name = name
+		env.Connections.Stripe = append(env.Connections.Stripe, conn)
 	case "generic":
 		var conn GenericConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -552,12 +554,15 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		if err := mapstructure.Decode(creds, &conn); err != nil {
 			return fmt.Errorf("failed to decode credentials: %w", err)
 		}
+		conn.Name = name
+		env.Connections.GoogleSheets = append(env.Connections.GoogleSheets, conn)
 	case "chess":
 		var conn ChessConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
 			return fmt.Errorf("failed to decode credentials: %w", err)
 		}
-
+		conn.Name = name
+		env.Connections.Chess = append(env.Connections.Chess, conn)
 	case "airtable":
 		var conn AirtableConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
