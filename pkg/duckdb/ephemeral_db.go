@@ -3,6 +3,7 @@ package duck
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -18,7 +19,12 @@ func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	defer func(conn *sqlx.DB) {
+		err := conn.Close()
+		if err != nil {
+			fmt.Println("FAILED TO CLOSE CONNECTION")
+		}
+	}(conn)
 
 	err = conn.Ping()
 	if err != nil {
@@ -36,7 +42,12 @@ func (c *EphemeralConnection) QueryContext(ctx context.Context, query string, ar
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	defer func(conn *sqlx.DB) {
+		err := conn.Close()
+		if err != nil {
+			fmt.Println("FAILED TO CLOSE CONNECTION")
+		}
+	}(conn)
 
 	return conn.QueryContext(ctx, query, args...) //nolint
 }
@@ -49,7 +60,12 @@ func (c *EphemeralConnection) ExecContext(ctx context.Context, sql string, argum
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	defer func(conn *sqlx.DB) {
+		err := conn.Close()
+		if err != nil {
+			fmt.Println("FAILED TO CLOSE CONNECTION")
+		}
+	}(conn)
 
 	return conn.ExecContext(ctx, sql, arguments...)
 }
