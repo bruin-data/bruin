@@ -5,11 +5,13 @@ import (
 	fs2 "io/fs"
 	"log"
 	"os"
+	"os/exec"
 	path2 "path"
 	"path/filepath"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/templates"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/afero"
@@ -200,6 +202,22 @@ func Init() *cli.Command {
 			if err != nil {
 				errorPrinter.Printf("Could not copy template %s: %s\n", templateName, err)
 				return cli.Exit("", 1)
+			}
+
+			successPrinter.Printf("\n\nA new '%s' pipeline created successfully in folder '%s'.\n", templateName, inputPath)
+			infoPrinter.Println("\nYou can run the following commands to get started:")
+			infoPrinter.Printf("\n    cd %s\n", inputPath)
+			infoPrinter.Printf("    bruin validate\n\n")
+
+			repoRoot, err := git.FindRepoFromPath(inputPath)
+			if err != nil || repoRoot == nil {
+				cmd := exec.Command("git", "init")
+				cmd.Dir = inputPath
+				out, err := cmd.CombinedOutput()
+				if err != nil {
+					errorPrinter.Printf("Could not initialize git repository: %s\n", string(out))
+					return cli.Exit("", 1)
+				}
 			}
 
 			return nil
