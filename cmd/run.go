@@ -404,27 +404,27 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	}
 
 	tree := treeprint.New()
-	failedBranch := tree.AddMetaBranch("Failed assets", len(data))
+	failedBranch := tree.AddBranch(fmt.Sprintf("[Failed assets] %d", len(data)))
 
 	for assetName, results := range data {
 		assetBranch := failedBranch.AddBranch(assetName)
-		
+
 		columnBranches := make(map[string]treeprint.Tree, len(results))
-		
+
 		for _, result := range results {
 			switch instance := result.Instance.(type) {
 			case *scheduler.ColumnCheckInstance:
 				colBranch, exists := columnBranches[instance.Column.Name]
 				if !exists {
-					colBranch = assetBranch.AddMetaBranch("Column", instance.Column.Name)
+					colBranch = assetBranch.AddBranch("[Column] " + instance.Column.Name)
 					columnBranches[instance.Column.Name] = colBranch
 				}
-				
-				checkBranch := colBranch.AddMetaBranch("Check", instance.Check.Name)
+
+				checkBranch := colBranch.AddBranch("[Check] " + instance.Check.Name)
 				checkBranch.AddNode(fmt.Sprintf("'%s'", result.Error))
-				
+
 			case *scheduler.CustomCheckInstance:
-				customBranch := assetBranch.AddMetaBranch("Custom Check", instance.Check.Name)
+				customBranch := assetBranch.AddBranch("[Custom Check] " + instance.Check.Name)
 				customBranch.AddNode(fmt.Sprintf("'%s'", result.Error))
 			}
 		}
