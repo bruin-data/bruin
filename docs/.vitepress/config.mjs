@@ -17,7 +17,7 @@ export default defineConfig({
                 collapsed: false,
                 items: [
                     {
-                        text: "Introduction", link: "/getting-started/introduction", items: [
+                        text: "Introduction", link: "/", items: [
                             {text: "Installation", link: "/getting-started/introduction/installation"},
                             {text: "Quickstart", link: "/getting-started/introduction/quickstart"},
                         ]
@@ -69,7 +69,6 @@ export default defineConfig({
                             {text: "Adjust", link: "/ingestion/adjust.md"},
                             {text: "Airtable", link: "/ingestion/airtable.md"},
                             {text: "Chess", link: "/ingestion/chess.md"},
-                            {text: "Databricks", link: "/ingestion/databricks"},
                             {text: "Facebook", link: "/ingestion/facebook-ads.md"},
                             {text: "Google Sheets", link: "/ingestion/google_sheets.md"},
                             {text: "Gorgias", link: "/ingestion/gorgias"},
@@ -79,7 +78,6 @@ export default defineConfig({
                             {text: "MongoDB", link: "/ingestion/mongo"},
                             {text: "MySQL", link: "/ingestion/mysql"},
                             {text: "Notion", link: "/ingestion/notion"},
-                            {text: "Redshift", link: "/ingestion/redshift"},
                             {text: "SAP HANA", link: "/ingestion/sap_hana"},
                             {text: "S3", link: "/ingestion/s3"},
                             {text: "Slack", link: "/ingestion/slack.md"},

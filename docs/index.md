@@ -1,55 +1,35 @@
 ---
-# https://vitepress.dev/reference/default-theme-home-page
-layout: home
-
-hero:
-  name: "Bruin"
-  text: "End-to-end data framework"
-  tagline: Built-in data ingestion, transformation, data quality, governance.
-  actions:
-    - theme: brand
-      text: Getting Started
-      link: /getting-started/introduction
-    - theme: alt
-      text: Design Principles
-      link: /getting-started/design-principles
-    - theme: alt
-      text: GitHub
-      link: https://github.com/bruin-data/bruin
-  image:
-    src: /BruinLogo-square.svg
-    alt: Bruin
-
-features:
-  - title: Data Ingestion
-    icon: 📥
-    details: Bruin allows you to ingest data from many sources into many destinations with a simple YAML file.
-  - title: Transformation
-    icon: 🔄
-    details: Bruin enables you to transform your data using SQL and Python without any custom code.    
-  - title: Data Quality
-    icon: ✅
-    details: Bruin contains built-in data quality checks that can be used to validate your data. You can also write custom checks.
-  - title: VS Code Extension
-    icon: 💻
-    details: On top of the CLI, we built a VS Code extension to allow you to easily work on your pipelines.
+outline: deep
 ---
 
+# What is Bruin?
 
-<style>
-@media (min-width: 640px) {
-  :root {
-    --vp-home-hero-image-filter: blur(56px);
-  }
-}
+Bruin is a data framework that consists of a command-line application & VS Code extension. It allows you to
+- ingest data with pre-built connectors / Python
+- transform data using Python and SQL
+- add quality checks to your pipelines
 
-@media (min-width: 960px) {
-  :root {
-    --vp-home-hero-image-filter: blur(68px);
-  }
-}
+You can use Bruin to build your data pipelines inside your data warehouse. It is a single-binary, which allows you to run it anywhere, e,g. your computer, GitHub Actions, or in an EC2 instance.
 
-:root {
-  --vp-c-brand-1: #d95f5f;
-}
-</style>
+You can get started with Bruin [via installing it](getting-started/introduction/installation.md) with a single command.
+
+<script setup>
+import { withBase } from 'vitepress'
+import { useSidebar } from 'vitepress/theme'
+
+const { sidebarGroups } = useSidebar()
+
+const platformsGroup = sidebarGroups.value.find(group => group.text === 'Data Platforms')
+</script>
+
+<div v-if="platformsGroup && platformsGroup.items.length > 0">
+<h2>Supported Platforms</h2>
+
+Bruin supports many data platforms out-of-the-box and as a first-class citizen. Feel free to get started with your favorite platform:
+
+<ul>
+<li v-for="platform in platformsGroup.items" :key="platform">
+    <a :href="withBase(platform.link)">{{ platform.text }}</a>
+</li>
+</ul>
+</div>
