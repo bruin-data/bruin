@@ -26,12 +26,12 @@ func (m *Mutex) TryLock(key interface{}) bool {
 		m.m.Lock()
 		fmt.Println("locking", key)
 		if _, ok := m.locks[key]; ok { // if locked
-			fmt.Println("is already locked:" + key.(string))
+			fmt.Println("is already locked:", key)
 			m.m.Unlock()
 			time.Sleep(m.backoff(i))
 		} else { // if unlock, lockit
 			m.locks[key] = struct{}{}
-			fmt.Println("managed to:" + key.(string))
+			fmt.Println("managed to:", key)
 			m.m.Unlock()
 			return true
 		}
