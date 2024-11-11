@@ -3,7 +3,6 @@ package duck
 import (
 	"context"
 	"database/sql"
-	"github.com/jmoiron/sqlx"
 
 	"github.com/bruin-data/bruin/pkg/query"
 	_ "github.com/marcboeker/go-duckdb"
@@ -48,6 +47,10 @@ func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) 
 
 func (c *Client) GetIngestrURI() (string, error) {
 	return c.config.GetIngestrURI(), nil
+}
+
+func (c *Client) GetDBConnectionURI() (string, error) {
+	return c.config.ToDBConnectionURI(), nil
 }
 
 // Select runs a query and returns the results.

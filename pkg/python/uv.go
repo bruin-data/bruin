@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/ingestr"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -246,7 +247,12 @@ func (u *uvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		return fmt.Errorf("destination connection %s not found", destConnectionName)
 	}
 
-	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
+	destConnectionInst, ok := destConnection.(pipelineConnection)
+	if !ok {
+		return errors.New("destination connection does not implement pipelineConnection, please create an issue in Bruin repo: https://github.com/bruin-data/bruin")
+	}
+
+	destURI, err := destConnectionInst.GetIngestrURI()
 	if err != nil {
 		return errors.New("could not get the source uri")
 	}
@@ -262,7 +268,12 @@ func (u *uvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		cmdArgs = append(cmdArgs, "--full-refresh")
 	}
 
-	// TODO: lock duckdb database
+	if strings.HasPrefix(destURI, "duckdb://") {
+		if dbURIGetter, ok := destConnectionInst.(interface{ GetDBConnectionURI() string }); ok {
+			duck.LockDatabase(dbURIGetter.GetDBConnectionURI())
+			defer duck.UnlockDatabase(dbURIGetter.GetDBConnectionURI())
+		}
+	}
 
 	if mat.Strategy != "" {
 		cmdArgs = append(cmdArgs, "--incremental-strategy", string(mat.Strategy))
@@ -289,7 +300,11 @@ func (u *uvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}
 
 	runArgs := slices.Concat([]string{"tool", "run", "--python", pythonVersionForIngestr, ingestrPackageName}, cmdArgs)
-	_, _ = output.Write([]byte("Running command: uv " + strings.Join(runArgs, " ") + "\n"))
+
+	if debug := ctx.Value(executor.KeyIsDebug); debug != nil && debug.(bool) {
+		_, _ = output.Write([]byte("Running command: uv " + strings.Join(runArgs, " ") + "\n"))
+	}
+
 	err = u.cmd.Run(ctx, execCtx.repo, &command{
 		Name: "uv",
 		Args: runArgs,

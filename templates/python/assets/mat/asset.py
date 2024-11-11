@@ -12,6 +12,8 @@ columns:
     - name: col1
       type: int
       primary_key: true
+      checks:
+        - name: unique
 
 
 @bruin """
