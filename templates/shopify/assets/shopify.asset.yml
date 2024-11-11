@@ -1,8 +1,0 @@
-name: raw.notion
-type: ingestr
-
-parameters:
-  source_connection: my-shopify-connection
-  source-uri: 'shopify://my-store.myshopify.com?api_key=shpkey_12345'
-  source_table: orders
-  destination: snowflake
