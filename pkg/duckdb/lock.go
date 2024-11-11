@@ -1,7 +1,6 @@
 package duck
 
 import (
-	"fmt"
 	"math/rand/v2"
 	"sync"
 	"time"
@@ -29,7 +28,6 @@ func (m *Mutex) TryLock(key interface{}) bool {
 			time.Sleep(m.backoff(i))
 		} else { // if unlock, lockit
 			m.locks[key] = struct{}{}
-			fmt.Println("locked:", key)
 			m.m.Unlock()
 			return true
 		}
@@ -43,7 +41,6 @@ func (m *Mutex) TryLock(key interface{}) bool {
 func (m *Mutex) Unlock(key interface{}) {
 	m.m.Lock()
 	delete(m.locks, key)
-	fmt.Println("UNlocked:", key)
 	m.m.Unlock()
 }
 
@@ -51,13 +48,13 @@ func (m *Mutex) backoff(retries int) time.Duration {
 	if retries == 0 {
 		return time.Duration(m.baseDelay) * time.Nanosecond
 	}
-	backoff, max := m.baseDelay, m.maxDelay
-	for backoff < max && retries > 0 {
+	backoff, maxDelay := m.baseDelay, m.maxDelay
+	for backoff < maxDelay && retries > 0 {
 		backoff *= m.factor
 		retries--
 	}
-	if backoff > max {
-		backoff = max
+	if backoff > maxDelay {
+		backoff = maxDelay
 	}
 	backoff *= 1 + m.jitter*(rand.Float64()*2-1) //nolint:gosec
 	if backoff < 0 {
