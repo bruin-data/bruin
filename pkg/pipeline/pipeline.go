@@ -33,7 +33,7 @@ const (
 	AssetTypePostgresQuery        = AssetType("pg.sql")
 	AssetTypeRedshiftQuery        = AssetType("rs.sql")
 	AssetTypeAthenaQuery          = AssetType("athena.sql")
-	AssetTypeAthenaSQLSensor      = AssetType("athena.sensor.sql")
+	AssetTypeAthenaSQLSensor      = AssetType("athena.sensor.query")
 	AssetTypeMsSQLQuery           = AssetType("ms.sql")
 	AssetTypeDatabricksQuery      = AssetType("databricks.sql")
 	AssetTypeSynapseQuery         = AssetType("synapse.sql")
@@ -78,7 +78,7 @@ type Notifications struct {
 	Discord []DiscordNotification `yaml:"discord" json:"discord" mapstructure:"discord"`
 }
 
-type DefaultTrueBool struct {
+type DefaultTrueBool struct { //nolint:recvcheck
 	Value *bool
 }
 
@@ -228,7 +228,7 @@ func (m Materialization) MarshalJSON() ([]byte, error) {
 	})
 }
 
-type ColumnCheckValue struct {
+type ColumnCheckValue struct { //nolint:recvcheck
 	IntArray    *[]int    `json:"int_array"`
 	Int         *int      `json:"int"`
 	Float       *float64  `json:"float"`
@@ -675,6 +675,16 @@ func (a *Asset) GetColumnWithName(name string) *Column {
 	return nil
 }
 
+func (a *Asset) CheckCount() int {
+	checkCount := 0
+	for _, c := range a.Columns {
+		checkCount += len(c.Checks)
+	}
+
+	checkCount += len(a.CustomChecks)
+	return checkCount
+}
+
 func (a *Asset) EnrichFromEntityAttributes(entities []*glossary.Entity) error {
 	entityMap := make(map[string]*glossary.Entity, len(entities))
 	for _, e := range entities {
@@ -778,7 +788,7 @@ func uniqueAssets(assets []*Asset) []*Asset {
 	return unique
 }
 
-type EmptyStringMap map[string]string
+type EmptyStringMap map[string]string //nolint:recvcheck
 
 func (m EmptyStringMap) MarshalJSON() ([]byte, error) { //nolint: stylecheck
 	if m == nil {
@@ -806,7 +816,7 @@ func (b *EmptyStringMap) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type EmptyStringArray []string
+type EmptyStringArray []string //nolint:recvcheck
 
 func (a EmptyStringArray) MarshalJSON() ([]byte, error) {
 	if a == nil {

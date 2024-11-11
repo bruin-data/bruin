@@ -98,6 +98,10 @@ func (l *commandRunner) Run(ctx context.Context, repo *git.Repo, command *comman
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 	}
 
+	return l.RunAnyCommand(ctx, cmd)
+}
+
+func (l *commandRunner) RunAnyCommand(ctx context.Context, cmd *exec.Cmd) error {
 	var output io.Writer = os.Stdout
 	if ctx.Value(executor.KeyPrinter) != nil {
 		output = ctx.Value(executor.KeyPrinter).(io.Writer)

@@ -12,7 +12,7 @@ hero:
       link: /getting-started/introduction
     - theme: alt
       text: Design Principles
-      link: /getting-started/concepts/design-principles
+      link: /getting-started/design-principles
     - theme: alt
       text: GitHub
       link: https://github.com/bruin-data/bruin

@@ -83,7 +83,7 @@ export default defineConfig({
                             {text: "SAP HANA", link: "/ingestion/sap_hana"},
                             {text: "S3", link: "/ingestion/s3"},
                             {text: "Slack", link: "/ingestion/slack.md"},
-                            {text: "Zendesk", link: "/ingestion/Zendesk"},
+                            {text: "Zendesk", link: "/ingestion/zendesk.md"},
                         ]
                     },
                 ],
@@ -93,7 +93,7 @@ export default defineConfig({
                 collapsed: false,
                 items: [
                     {text: "Init", link: "/commands/init"},
-                    {text: "Connections", link: "/commands/ingestion"},
+                    {text: "Connections", link: "/commands/connections.md"},
                     {text: "Run", link: "/commands/run"},
                 ],
             },
