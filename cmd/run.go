@@ -424,10 +424,10 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 			case *scheduler.CustomCheckInstance:
 				customBranch := assetBranch.AddBranch("[Custom Check] " + instance.Check.Name)
 				customBranch.AddNode(fmt.Sprintf("'%s'", result.Error))
-			}
 
-		default:
-			assetBranch.AddNode(fmt.Sprintf("'%s'", result.Error))
+			default:
+				assetBranch.AddNode(fmt.Sprintf("'%s'", result.Error))
+			}
 		}
 	}
 	errorPrinter.Println(fmt.Sprintf("Failed assets %d", len(data)))
