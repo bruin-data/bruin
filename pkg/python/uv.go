@@ -306,7 +306,6 @@ func (u *uvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		if *boolVal {
 			_, _ = output.Write([]byte("Running command: uv " + strings.Join(runArgs, " ") + "\n"))
 		}
-
 	}
 
 	err = u.cmd.Run(ctx, execCtx.repo, &command{
