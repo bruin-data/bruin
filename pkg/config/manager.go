@@ -591,6 +591,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Slack = append(env.Connections.Slack, conn)
+	case "duckdb":
+		var conn DuckDBConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.DuckDB = append(env.Connections.DuckDB, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
