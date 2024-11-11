@@ -12,6 +12,8 @@ type EphemeralConnection struct {
 }
 
 func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
+	LockDatabase(c.ToDBConnectionURI())
+	defer UnlockDatabase(c.ToDBConnectionURI())
 	conn, err := sqlx.Open("duckdb", c.ToDBConnectionURI())
 	if err != nil {
 		return nil, err
