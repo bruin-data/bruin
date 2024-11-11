@@ -33,6 +33,8 @@ func NewClient(c DuckDBConfig) (*Client, error) {
 }
 
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
+	LockDatabase(c.config.ToDBConnectionURI())
+	defer UnlockDatabase(c.config.ToDBConnectionURI())
 	_, err := c.connection.ExecContext(ctx, query.String())
 	if err != nil {
 		return err
@@ -47,6 +49,9 @@ func (c *Client) GetIngestrURI() (string, error) {
 
 // Select runs a query and returns the results.
 func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
+	LockDatabase(c.config.ToDBConnectionURI())
+	defer UnlockDatabase(c.config.ToDBConnectionURI())
+
 	rows, err := c.connection.QueryContext(ctx, query.String())
 	if err != nil {
 		return nil, err
