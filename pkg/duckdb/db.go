@@ -49,6 +49,10 @@ func (c *Client) GetIngestrURI() (string, error) {
 	return c.config.GetIngestrURI(), nil
 }
 
+func (c *Client) GetDBConnectionURI() (string, error) {
+	return c.config.ToDBConnectionURI(), nil
+}
+
 // Select runs a query and returns the results.
 func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
 	LockDatabase(c.config.ToDBConnectionURI())

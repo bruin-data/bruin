@@ -1,1 +1,1 @@
-cowsay==6.1
+pyfiglet
