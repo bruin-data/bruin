@@ -5,4 +5,5 @@ parameters:
   source_connection: my-shopify-connection
   source-uri: 'shopify://bruin-test.myshopify.com?api_key=54c21accb542b4abef0db63dc7737f11'
   source_table: orders
+  destination_connection: gcp
   destination: bigquery
