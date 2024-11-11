@@ -1,9 +1,7 @@
 package main
 
 import (
-	"fmt"
 	"os"
-	"runtime/debug"
 	"time"
 
 	"github.com/bruin-data/bruin/cmd"
@@ -20,22 +18,13 @@ func main() {
 	isDebug := false
 	color.NoColor = false
 
-	cli.VersionPrinter = func(cCtx *cli.Context) {
-		hash := commit
-		if hash == "" {
-			hash = func() string {
-				if info, ok := debug.ReadBuildInfo(); ok {
-					for _, setting := range info.Settings {
-						if setting.Key == "vcs.revision" {
-							return setting.Value
-						}
-					}
-				}
-				return ""
-			}()
-		}
+	versionCommand := cmd.VersionCmd(commit)
 
-		fmt.Printf("bruin CLI %s (%s)\n", cCtx.App.Version, hash)
+	cli.VersionPrinter = func(cCtx *cli.Context) {
+		err := versionCommand.Action(cCtx)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	app := &cli.App{
@@ -63,7 +52,7 @@ func main() {
 			cmd.Environments(&isDebug),
 			cmd.Connections(),
 			cmd.Fetch(),
-			cmd.VersionCmd(commit),
+			versionCommand,
 		},
 	}
 
