@@ -35,6 +35,11 @@ jobs:
     strategy:
       matrix:
         platform: [ ubuntu-latest, windows-latest ]
+        include:
+          - platform: windows-latest
+            cache: false
+          - platform: ubuntu-latest
+            cache: true
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -43,6 +48,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
+          cache: ${{ matrix.cache }}
       - run: make test
       - run: make duckdb-test
         shell: bash
