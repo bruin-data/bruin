@@ -404,10 +404,8 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	}
 
 	tree := treeprint.New()
-	failedBranch := tree.AddBranch(fmt.Sprintf("[Failed assets] %d", len(data)))
-
 	for assetName, results := range data {
-		assetBranch := failedBranch.AddBranch(assetName)
+		assetBranch := tree.AddBranch(assetName)
 
 		columnBranches := make(map[string]treeprint.Tree, len(results))
 
@@ -429,7 +427,7 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 			}
 		}
 	}
-
+	errorPrinter.Println(fmt.Sprintf("Failed assets %d", len(data)))
 	errorPrinter.Println(tree.String())
 	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
 	if len(upstreamFailedTasks) > 0 {
