@@ -13,7 +13,7 @@
    5. **Check Bruin CLI Installation**:
       - When you click the **Bruin Launch** button, the extension checks if Bruin CLI is installed.
       - If the CLI is **not installed**, a message will appear in the **Settings** tab with a button to install it.
-      - It is also possible to install the CLI manually. For instructions, please refer to the [Installation Guide](../getting-started/introduction.md) section.
+      - It is also possible to install the CLI manually. For instructions, please refer to the [Installation Guide](../index) section.
 
       ![Install Bruin CLI](../public/vscode-extension/install-cli.png)
 
