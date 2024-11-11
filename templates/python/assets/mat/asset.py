@@ -22,10 +22,11 @@ import pandas as pd
 
 
 def materialize():
+    items = 100000
     df = pd.DataFrame({
-        'col1': range(10),
-        'col2': [f'value_new_{i}' for i in range(10)],
-        'col3': [i * 6.0 for i in range(10)]
+        'col1': range(items),
+        'col2': [f'value_new_{i}' for i in range(items)],
+        'col3': [i * 6.0 for i in range(items)]
     })
 
     return df
