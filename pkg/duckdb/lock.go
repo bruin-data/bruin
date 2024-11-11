@@ -24,14 +24,12 @@ type Mutex struct {
 func (m *Mutex) TryLock(key interface{}) bool {
 	for i := range m.maxRetry {
 		m.m.Lock()
-		fmt.Println("locking", key)
 		if _, ok := m.locks[key]; ok { // if locked
-			fmt.Println("is already locked:", key)
 			m.m.Unlock()
 			time.Sleep(m.backoff(i))
 		} else { // if unlock, lockit
 			m.locks[key] = struct{}{}
-			fmt.Println("managed to:", key)
+			fmt.Println("locked:", key)
 			m.m.Unlock()
 			return true
 		}
@@ -44,8 +42,8 @@ func (m *Mutex) TryLock(key interface{}) bool {
 // please call Unlock only after having acquired the lock.
 func (m *Mutex) Unlock(key interface{}) {
 	m.m.Lock()
-	fmt.Println("unlocking", key)
 	delete(m.locks, key)
+	fmt.Println("UNlocked:", key)
 	m.m.Unlock()
 }
 
@@ -99,10 +97,8 @@ var databaseLocks = NewMapMutex()
 func LockDatabase(path string) {
 	for !databaseLocks.TryLock(path) {
 	}
-	fmt.Println("locked database:", path)
 }
 
 func UnlockDatabase(path string) {
 	databaseLocks.Unlock(path)
-	fmt.Println("unlocked database:", path)
 }
