@@ -268,13 +268,6 @@ func (u *uvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		cmdArgs = append(cmdArgs, "--full-refresh")
 	}
 
-	if strings.HasPrefix(destURI, "duckdb://") {
-		if dbURIGetter, ok := destConnectionInst.(interface{ GetDBConnectionURI() string }); ok {
-			duck.LockDatabase(dbURIGetter.GetDBConnectionURI())
-			defer duck.UnlockDatabase(dbURIGetter.GetDBConnectionURI())
-		}
-	}
-
 	if mat.Strategy != "" {
 		cmdArgs = append(cmdArgs, "--incremental-strategy", string(mat.Strategy))
 	}
@@ -290,6 +283,13 @@ func (u *uvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		}
 	}
 
+	if strings.HasPrefix(destURI, "duckdb://") {
+		if dbURIGetter, ok := destConnectionInst.(interface{ GetDBConnectionURI() string }); ok {
+			duck.LockDatabase(dbURIGetter.GetDBConnectionURI())
+			defer duck.UnlockDatabase(dbURIGetter.GetDBConnectionURI())
+		}
+	}
+
 	ingestrPackageName := "ingestr@" + ingestr.IngestrVersion
 	err = u.cmd.Run(ctx, execCtx.repo, &command{
 		Name: "uv",
@@ -301,8 +301,12 @@ func (u *uvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	runArgs := slices.Concat([]string{"tool", "run", "--python", pythonVersionForIngestr, ingestrPackageName}, cmdArgs)
 
-	if debug := ctx.Value(executor.KeyIsDebug); debug != nil && debug.(bool) {
-		_, _ = output.Write([]byte("Running command: uv " + strings.Join(runArgs, " ") + "\n"))
+	if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
+		boolVal := debug.(*bool)
+		if *boolVal {
+			_, _ = output.Write([]byte("Running command: uv " + strings.Join(runArgs, " ") + "\n"))
+		}
+
 	}
 
 	err = u.cmd.Run(ctx, execCtx.repo, &command{
