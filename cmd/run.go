@@ -391,36 +391,39 @@ func Run(isDebug *bool) *cli.Command {
 }
 
 func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) {
-	data := make(map[string][]*scheduler.TaskExecutionResult)
-
+	data := make(map[string][]*scheduler.TaskExecutionResult, len(errorsInTaskResults))
 	for _, result := range errorsInTaskResults {
-		data[result.Instance.GetAsset().Name] = append(data[result.Instance.GetAsset().Name], result)
+		assetName := result.Instance.GetAsset().Name
+		data[assetName] = append(data[assetName], result)
 	}
 
 	tree := treeprint.New()
+	failedBranch := tree.AddMetaBranch("Failed assets", len(data))
 
-	branch := tree.AddMetaBranch("Failed assets", len(data))
 	for assetName, results := range data {
-		baseAsset := branch.AddBranch(assetName)
-		columnBranches := make(map[string]treeprint.Tree)
+		assetBranch := failedBranch.AddBranch(assetName)
+		
+		columnBranches := make(map[string]treeprint.Tree, len(results))
+		
 		for _, result := range results {
-			if result.Instance.GetType() != scheduler.TaskInstanceTypeCustomCheck {
-				columnName := result.Instance.(*scheduler.ColumnCheckInstance).Column.Name
-				checkName := result.Instance.(*scheduler.ColumnCheckInstance).Check.Name
-				if _, exists := columnBranches[columnName]; !exists {
-					colBranch := baseAsset.AddMetaBranch("Column", columnName)
-					columnBranches[columnName] = colBranch
+			switch instance := result.Instance.(type) {
+			case *scheduler.ColumnCheckInstance:
+				colBranch, exists := columnBranches[instance.Column.Name]
+				if !exists {
+					colBranch = assetBranch.AddMetaBranch("Column", instance.Column.Name)
+					columnBranches[instance.Column.Name] = colBranch
 				}
-				colBranch := columnBranches[columnName]
-				checkBranch := colBranch.AddMetaBranch("Check", checkName)
-				checkBranch.AddNode(fmt.Sprintf("'%s'", result.Error.Error()))
-			} else {
-				checkName := result.Instance.(*scheduler.CustomCheckInstance).Check.Name
-				customBranch := baseAsset.AddMetaBranch("Custom Check", checkName)
-				customBranch.AddNode(fmt.Sprintf("'%s'", result.Error.Error()))
+				
+				checkBranch := colBranch.AddMetaBranch("Check", instance.Check.Name)
+				checkBranch.AddNode(fmt.Sprintf("'%s'", result.Error))
+				
+			case *scheduler.CustomCheckInstance:
+				customBranch := assetBranch.AddMetaBranch("Custom Check", instance.Check.Name)
+				customBranch.AddNode(fmt.Sprintf("'%s'", result.Error))
 			}
 		}
 	}
+
 	errorPrinter.Println(tree.String())
 	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
 	if len(upstreamFailedTasks) > 0 {
