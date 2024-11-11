@@ -24,6 +24,8 @@ type connection interface {
 }
 
 func NewClient(c DuckDBConfig) (*Client, error) {
+	LockDatabase(c.ToDBConnectionURI())
+	defer UnlockDatabase(c.ToDBConnectionURI())
 	conn, err := NewEphemeralConnection(c)
 	if err != nil {
 		return nil, err
@@ -56,10 +58,6 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 	if err != nil {
 		return nil, err
 	}
-	if rows.Err() != nil {
-		return nil, rows.Err()
-	}
-
 	if rows.Err() != nil {
 		return nil, rows.Err()
 	}
