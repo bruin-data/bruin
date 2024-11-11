@@ -50,7 +50,6 @@ func (c *EphemeralConnection) QueryContext(ctx context.Context, query string, ar
 }
 
 func (c *EphemeralConnection) ExecContext(ctx context.Context, sql string, arguments ...any) (sql.Result, error) {
-
 	conn, err := sqlx.Open("duckdb", c.config.ToDBConnectionURI())
 	if err != nil {
 		return nil, err
