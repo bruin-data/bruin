@@ -174,6 +174,9 @@ func Run(isDebug *bool) *cli.Command {
 					return cli.Exit("", 1)
 				}
 				if task == nil {
+					if strings.HasSuffix(inputPath, ".yml") {
+						warningPrinter.Printf("Warning: The file '%s' seems to be an 'ingestr' asset but does not end with '.asset.yml'. Please rename the file to include the correct suffix.\n", inputPath)
+					}
 					errorPrinter.Printf("The given file path doesn't seem to be a Bruin task definition: '%s'\n", inputPath)
 					return cli.Exit("", 1)
 				}
