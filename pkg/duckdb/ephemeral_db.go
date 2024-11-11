@@ -35,9 +35,6 @@ func NewEphemeralConnection(c DuckDBConfig) (*EphemeralConnection, error) {
 }
 
 func (c *EphemeralConnection) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	LockDatabase(c.config.ToDBConnectionURI())
-	defer UnlockDatabase(c.config.ToDBConnectionURI())
-
 	conn, err := sqlx.Open("duckdb", c.config.ToDBConnectionURI())
 	if err != nil {
 		return nil, err
@@ -53,8 +50,6 @@ func (c *EphemeralConnection) QueryContext(ctx context.Context, query string, ar
 }
 
 func (c *EphemeralConnection) ExecContext(ctx context.Context, sql string, arguments ...any) (sql.Result, error) {
-	LockDatabase(c.config.ToDBConnectionURI())
-	defer UnlockDatabase(c.config.ToDBConnectionURI())
 
 	conn, err := sqlx.Open("duckdb", c.config.ToDBConnectionURI())
 	if err != nil {
