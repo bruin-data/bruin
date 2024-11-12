@@ -1,9 +1,9 @@
-# Bruin - Shopify to DuckDB
+# Bruin - Shopify to Snowflake
 
-This pipeline is a simple example of a Bruin pipeline that copies data from Shopify to DuckDB. It demonstrates how to use the `bruin` CLI to build and run a pipeline.
+This pipeline is a simple example of a Bruin pipeline that copies data from Shopify to Snowflake. It demonstrates how to use the `bruin` CLI to build and run a pipeline.
 
 The pipeline includes two sample assets already:
-- `raw.shopify`: A simple ingestr asset that copies a table from Shopify to DuckDB
+- `raw.shopify`: A simple ingestr asset that copies a table from Shopify to Snowflake
 
 ## Setup
 The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://bruin-data.github.io/bruin/connections/overview.html).
@@ -15,9 +15,16 @@ default_environment: default
 environments:
     default:
         connections:
-            duckdb:
-                - name: "duckdb-default"
-                  path: "/Users/yuvraj/Workspace/bruin/database.duckdb"
+            snowflake:
+              - name: "connection_name"
+                username: "sfuser"
+                password: "XXXXXXXXXX"
+                account: "AAAAAAA-AA00000"
+                database: "dev"
+                schema: "schema_name" # optional
+                warehouse: "warehouse_name" # optional
+                role: "data_analyst" # optional
+                region: "eu-west1" # optional
 
             shopify:
                 - name: "my-shopify-connection"
@@ -34,7 +41,7 @@ bruin run assets/shopify.asset.yml
 ```
 
 ```shell
-❯ bruin run ./templates/shopify-duckdb/                                                       (bruin) 
+❯ bruin run ./templates/shopify-snowflake/                                                       (bruin) 
 Analyzed the pipeline 'bruin-init' with 1 assets.
 
 Pipeline: bruin-init (.)
@@ -43,6 +50,7 @@ Pipeline: bruin-init (.)
 ✓ Successfully validated 1 assets across 1 pipeline, all good.
 
 Starting the pipeline execution...
+
 
 Executed 1 tasks in 9.656s
 ```
@@ -54,7 +62,7 @@ bruin run assets/hello.py
 ```
 
 ```shell
-❯ bruin run ./templates/shopify-duckdb/                                                       (bruin) 
+❯ bruin run ./templates/shopify-snowflake/                                                       (bruin) 
 Analyzed the pipeline 'bruin-init' with 1 assets.
 
 Pipeline: bruin-init (.)
@@ -63,7 +71,6 @@ Pipeline: bruin-init (.)
 ✓ Successfully validated 1 assets across 1 pipeline, all good.
 
 Starting the pipeline execution...
-
 
 Executed 1 tasks in 9.656s
 ```

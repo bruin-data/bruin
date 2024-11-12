@@ -1,9 +1,9 @@
-# Bruin - Shopify to DuckDB
+# Bruin - Shopify to Redshift
 
-This pipeline is a simple example of a Bruin pipeline that copies data from Shopify to DuckDB. It demonstrates how to use the `bruin` CLI to build and run a pipeline.
+This pipeline is a simple example of a Bruin pipeline that copies data from Shopify to Redshift. It demonstrates how to use the `bruin` CLI to build and run a pipeline.
 
 The pipeline includes two sample assets already:
-- `raw.shopify`: A simple ingestr asset that copies a table from Shopify to DuckDB
+- `raw.shopify`: A simple ingestr asset that takes copies a table from Shopify to Redshift
 
 ## Setup
 The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://bruin-data.github.io/bruin/connections/overview.html).
@@ -15,9 +15,14 @@ default_environment: default
 environments:
     default:
         connections:
-            duckdb:
-                - name: "duckdb-default"
-                  path: "/Users/yuvraj/Workspace/bruin/database.duckdb"
+            redshift:
+              - name: "connection_name"
+                username: "awsuser"
+                password: "XXXXXXXXXX"
+                host: "redshift-cluster-1.xxxxxxxxx.eu-north-1.redshift.amazonaws.com"
+                port: 5439
+                database: "dev"
+                ssl_mode: "allow"
 
             shopify:
                 - name: "my-shopify-connection"
@@ -34,7 +39,7 @@ bruin run assets/shopify.asset.yml
 ```
 
 ```shell
-❯ bruin run ./templates/shopify-duckdb/                                                       (bruin) 
+❯ bruin run ./templates/shopify-redshift                                                       (bruin) 
 Analyzed the pipeline 'bruin-init' with 1 assets.
 
 Pipeline: bruin-init (.)
@@ -43,6 +48,7 @@ Pipeline: bruin-init (.)
 ✓ Successfully validated 1 assets across 1 pipeline, all good.
 
 Starting the pipeline execution...
+
 
 Executed 1 tasks in 9.656s
 ```
@@ -54,7 +60,7 @@ bruin run assets/hello.py
 ```
 
 ```shell
-❯ bruin run ./templates/shopify-duckdb/                                                       (bruin) 
+❯ bruin run ./templates/shopify-redshift/                                                       (bruin) 
 Analyzed the pipeline 'bruin-init' with 1 assets.
 
 Pipeline: bruin-init (.)

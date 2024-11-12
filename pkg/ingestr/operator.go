@@ -45,7 +45,7 @@ type pipelineConnection interface {
 
 func NewBasicOperator(conn *connection.Manager) (*BasicOperator, error) {
 	ctx := context.TODO()
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation(), client.WithTimeout(10000000*time.Second))
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client: %s", err.Error())
 	}
