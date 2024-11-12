@@ -1,0 +1,8 @@
+name: shopify_raw.inventory_items
+type: ingestr
+
+parameters:
+  source_connection: shopify-default
+  source_table: inventory_items
+  destination: bigquery
+  destination_table: inventory_items
