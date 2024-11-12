@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	IngestrVersion = "v0.9.2"
+	IngestrVersion = "v0.9.0"
 	DockerImage    = "ghcr.io/bruin-data/ingestr:" + IngestrVersion
 	DuckDBDest     = "/tmp/dest.db"
 	DuckDBSource   = "/tmp/source.db"
@@ -45,7 +45,7 @@ type pipelineConnection interface {
 
 func NewBasicOperator(conn *connection.Manager) (*BasicOperator, error) {
 	ctx := context.TODO()
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation(), client.WithTimeout(10*time.Minute))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client: %s", err.Error())
 	}
