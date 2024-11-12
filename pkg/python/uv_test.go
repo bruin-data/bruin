@@ -123,9 +123,9 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 			t.Parallel()
 
 			f := tt.fields()
-			l := &uvPythonRunner{
-				cmd:         f.cmd,
-				uvInstaller: f.uvInstaller,
+			l := &UvPythonRunner{
+				Cmd:         f.cmd,
+				UvInstaller: f.uvInstaller,
 			}
 			tt.wantErr(t, l.Run(context.Background(), tt.execCtx))
 		})

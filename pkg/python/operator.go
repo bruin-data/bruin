@@ -54,7 +54,7 @@ type secretFinder interface {
 }
 
 func NewLocalOperator(config *config.Config, envVariables map[string]string) *LocalOperator {
-	cmdRunner := &commandRunner{}
+	cmdRunner := &CommandRunner{}
 	fs := afero.NewOsFs()
 
 	pathToPython, err := findPathToExecutable([]string{"python3", "python"})
@@ -81,15 +81,15 @@ func NewLocalOperator(config *config.Config, envVariables map[string]string) *Lo
 }
 
 func NewLocalOperatorWithUv(config *config.Config, conn *connection.Manager, envVariables map[string]string) *LocalOperator {
-	cmdRunner := &commandRunner{}
+	cmdRunner := &CommandRunner{}
 
 	return &LocalOperator{
 		repoFinder: &git.RepoFinder{},
 		module:     &ModulePathFinder{},
-		runner: &uvPythonRunner{
-			cmd: cmdRunner,
-			uvInstaller: &UvChecker{
-				cmd: commandRunner{},
+		runner: &UvPythonRunner{
+			Cmd: cmdRunner,
+			UvInstaller: &UvChecker{
+				cmd: CommandRunner{},
 			},
 			conn: conn,
 		},

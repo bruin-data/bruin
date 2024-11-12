@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/git"
 	"io"
 	"os"
 	"os/exec"
@@ -16,7 +17,6 @@ import (
 
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
-	"github.com/bruin-data/bruin/pkg/ingestr"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
 )
@@ -33,12 +33,13 @@ var AvailablePythonVersions = map[string]bool{
 const (
 	UvVersion               = "0.5.1"
 	pythonVersionForIngestr = "3.11"
+	ingestrVersion          = "v0.9.2"
 )
 
 // UvChecker handles checking and installing the uv package manager.
 type UvChecker struct {
 	mut sync.Mutex
-	cmd commandRunner
+	cmd CommandRunner
 }
 
 // EnsureUvInstalled checks if uv is installed and installs it if not present.
@@ -123,14 +124,14 @@ type pipelineConnection interface {
 	GetIngestrURI() (string, error)
 }
 
-type uvPythonRunner struct {
-	cmd         cmd
-	uvInstaller uvInstaller
+type UvPythonRunner struct {
+	Cmd         cmd
+	UvInstaller uvInstaller
 	conn        connectionFetcher
 }
 
-func (u *uvPythonRunner) Run(ctx context.Context, execCtx *executionContext) error {
-	err := u.uvInstaller.EnsureUvInstalled(ctx)
+func (u *UvPythonRunner) Run(ctx context.Context, execCtx *executionContext) error {
+	err := u.UvInstaller.EnsureUvInstalled(ctx)
 	if err != nil {
 		return err
 	}
@@ -151,7 +152,27 @@ func (u *uvPythonRunner) Run(ctx context.Context, execCtx *executionContext) err
 	return u.runWithMaterialization(ctx, execCtx, pythonVersion)
 }
 
-func (u *uvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *executionContext, pythonVersion string) error {
+func (u *UvPythonRunner) RunIngestr(ctx context.Context, args []string, repo *git.Repo) error {
+	err := u.UvInstaller.EnsureUvInstalled(ctx)
+	if err != nil {
+		return err
+	}
+
+	flags := []string{"--python", pythonVersionForIngestr, "ingestr"}
+	flags = append(flags, args...)
+
+	noDependencyCommand := &command{
+		Name:    "uvx",
+		Args:    flags,
+		EnvVars: map[string]string{},
+	}
+
+	fmt.Println(strings.Join(flags, " "))
+
+	return u.Cmd.Run(ctx, repo, noDependencyCommand)
+}
+
+func (u *UvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *executionContext, pythonVersion string) error {
 	flags := []string{"run", "--python", pythonVersion}
 	if execCtx.requirementsTxt != "" {
 		flags = append(flags, "--with-requirements", execCtx.requirementsTxt)
@@ -165,10 +186,10 @@ func (u *uvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *
 		EnvVars: execCtx.envVariables,
 	}
 
-	return u.cmd.Run(ctx, execCtx.repo, noDependencyCommand)
+	return u.Cmd.Run(ctx, execCtx.repo, noDependencyCommand)
 }
 
-func (u *uvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *executionContext, pythonVersion string) error {
+func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *executionContext, pythonVersion string) error {
 	asset := execCtx.asset
 	mat := asset.Materialization
 
@@ -207,7 +228,7 @@ func (u *uvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	flags = append(flags, tempPyScript.Name())
 
-	err = u.cmd.Run(ctx, execCtx.repo, &command{
+	err = u.Cmd.Run(ctx, execCtx.repo, &command{
 		Name:    "uv",
 		Args:    flags,
 		EnvVars: execCtx.envVariables,
@@ -290,8 +311,8 @@ func (u *uvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		}
 	}
 
-	ingestrPackageName := "ingestr@" + ingestr.IngestrVersion
-	err = u.cmd.Run(ctx, execCtx.repo, &command{
+	ingestrPackageName := "ingestr@" + ingestrVersion
+	err = u.Cmd.Run(ctx, execCtx.repo, &command{
 		Name: "uv",
 		Args: []string{"tool", "install", "--quiet", "--python", pythonVersionForIngestr, ingestrPackageName},
 	})
@@ -308,7 +329,7 @@ func (u *uvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		}
 	}
 
-	err = u.cmd.Run(ctx, execCtx.repo, &command{
+	err = u.Cmd.Run(ctx, execCtx.repo, &command{
 		Name: "uv",
 		Args: runArgs,
 	})
