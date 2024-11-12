@@ -3,7 +3,7 @@ type: ingestr
 
 parameters:
   source_connection: gsheet-default
-  source_table: customers
+  source_table: 1p40qR9t6DM5a1IskTkqEX9eZYZmBeILzUX_AdMkg__A.Sheet1
   destination: snowflake
   incremental_strategy: replace
   destination_connection: snowflake-default
