@@ -85,4 +85,4 @@ columns:
 
 @bruin */
 
-SELECT * from shopify_raw.price_rules;
+SELECT * from `shopify_raw.price_rules`;

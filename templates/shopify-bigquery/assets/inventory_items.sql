@@ -64,4 +64,4 @@ columns:
     description: "Product variant details"
 @bruin */
 
-SELECT * from shopify_raw.inventory_items;
+SELECT * from `shopify_raw.inventory_items`;

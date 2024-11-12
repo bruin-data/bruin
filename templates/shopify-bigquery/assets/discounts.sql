@@ -34,4 +34,4 @@ columns:
 
 @bruin */
 
-SELECT * from shopify_raw.discounts;
+SELECT * from `shopify_raw.discounts`;

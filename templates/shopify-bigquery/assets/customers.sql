@@ -113,4 +113,4 @@ columns:
 
 @bruin */
 
-SELECT * from shopify_raw.customers;
+SELECT * from `shopify_raw.customers`;

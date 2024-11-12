@@ -57,4 +57,4 @@ columns:
 
 @bruin */
 
-SELECT * from shopify_raw.events;
+SELECT * from `shopify_raw.price_rules`;
