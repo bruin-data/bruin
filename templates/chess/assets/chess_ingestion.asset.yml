@@ -1,0 +1,6 @@
+name: raw.chess_ingestion
+type: ingestr
+parameters:
+  source_connection: chess_connection
+  source_table: profiles
+  destination: duckdb
