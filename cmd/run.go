@@ -371,6 +371,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, c.Bool("full-refresh"))
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
+			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
 
 			ex.Start(runCtx, s.WorkQueue, s.Results)
 
@@ -477,10 +478,11 @@ func setupExecutors(
 	estimateCustomCheckType := s.FindMajorityOfTypes(pipeline.AssetTypeBigqueryQuery)
 
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
+		jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh)
 		if useUvForPython {
-			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperatorWithUv(config, jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh))
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperatorWithUv(config, conn, jinjaVariables)
 		} else {
-			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh))
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinjaVariables)
 		}
 	}
 
