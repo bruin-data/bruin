@@ -5,5 +5,6 @@ parameters:
   source_connection: shopify-default
   source_table: orders
   destination: snowflake
+  incremental_strategy: replace
   destination_connection: snowflake-default
   destination_table: orders

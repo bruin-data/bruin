@@ -4,6 +4,7 @@ type: ingestr
 parameters:
   source_connection: shopify-default
   source_table: customers
+  incremental_strategy: replace
   destination: redshift
   destination_connection: redshift-default
   destination_table: customers

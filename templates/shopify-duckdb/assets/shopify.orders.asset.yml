@@ -4,6 +4,7 @@ type: ingestr
 parameters:
   source_connection: shopify-default
   source_table: orders
+  incremental_strategy: replace
   destination: duckdb
   destination_connection: duckdb-default
   destination_table: orders

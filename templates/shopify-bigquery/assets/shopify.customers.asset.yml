@@ -5,5 +5,6 @@ parameters:
   source_connection: shopify-default
   source_table: customers
   destination: bigquery
+  incremental_strategy: replace
   destination_connection: gcp-default
   destination_table: customers
