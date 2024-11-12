@@ -2,9 +2,9 @@ package ingestr
 
 import (
 	"context"
-	"github.com/bruin-data/bruin/pkg/git"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/stretchr/testify/mock"

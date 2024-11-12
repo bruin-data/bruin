@@ -3,12 +3,12 @@ package ingestr
 import (
 	"context"
 	"fmt"
-	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/connection"
+	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/python"
