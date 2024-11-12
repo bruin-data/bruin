@@ -262,14 +262,6 @@ func Run(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
 			}
 
-			if !runningForAnAsset {
-				err = cm.CanRunPipeline(foundPipeline)
-				if err != nil {
-					errorPrinter.Printf(err.Error()) //nolint: govet
-					return cli.Exit("", 1)
-				}
-			}
-
 			rules, err := lint.GetRules(fs, &git.RepoFinder{}, true)
 			if err != nil {
 				errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
@@ -316,6 +308,13 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("You cannot use the '--tag' flag when running a single asset.\n")
 					return cli.Exit("", 1)
 				}
+			}
+
+			assetsToBeRan := s.GetTaskInstancesByStatus(scheduler.Pending)
+			err = cm.CanRunTaskInstances(foundPipeline, assetsToBeRan)
+			if err != nil {
+				errorPrinter.Printf(err.Error()) //nolint: govet
+				return cli.Exit("", 1)
 			}
 
 			tag := c.String("tag")

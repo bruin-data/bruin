@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/scheduler"
 	fs2 "io/fs"
 	"path/filepath"
 
@@ -262,8 +263,9 @@ type Config struct {
 	Environments            map[string]Environment `yaml:"environments" json:"environments" mapstructure:"environments"`
 }
 
-func (c *Config) CanRunPipeline(p *pipeline.Pipeline) error {
-	for _, asset := range p.Assets {
+func (c *Config) CanRunTaskInstances(p *pipeline.Pipeline, tasks []scheduler.TaskInstance) error {
+	for _, task := range tasks {
+		asset := task.GetAsset()
 		connName, err := p.GetConnectionNameForAsset(asset)
 		if err != nil {
 			return errors2.Wrap(err, "Could not find connection name for asset "+asset.Name)

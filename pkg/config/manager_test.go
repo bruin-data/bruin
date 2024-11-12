@@ -2,6 +2,8 @@ package config
 
 import (
 	"runtime"
+
+	"github.com/bruin-data/bruin/pkg/scheduler"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -880,7 +882,13 @@ func TestCanRunPipeline(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := tt.config.CanRunPipeline(&tt.pipeline)
+			tasks := make([]scheduler.TaskInstance, 0)
+
+			for _, asset := range tt.pipeline.Assets {
+				tasks = append(tasks, &scheduler.AssetInstance{Asset: asset})
+			}
+
+			err := tt.config.CanRunTaskInstances(&tt.pipeline, tasks)
 			if tt.expectedErr {
 				require.Error(t, err)
 			} else {
