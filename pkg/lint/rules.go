@@ -675,10 +675,10 @@ func EnsureBigQueryTableSensorHasTableParameterForASingleAsset(ctx context.Conte
 	}
 	tableItems := strings.Split(table, ".")
 
-	if len(tableItems) != 3 {
+	if len(tableItems) != 2 && len(tableItems) != 3 {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: "BigQuery table sensor `table` parameter must be in the format `project.dataset.table`",
+			Description: "BigQuery table sensor `table` parameter must be either in the format `dataset.table` or `project.dataset.table`",
 		})
 	}
 
