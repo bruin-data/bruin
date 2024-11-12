@@ -3,12 +3,12 @@ package ingestr
 import (
 	"context"
 	"fmt"
+	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/connection"
-	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/python"
@@ -24,10 +24,14 @@ type repoFinder interface {
 	Repo(path string) (*git.Repo, error)
 }
 
+type ingestrRunner interface {
+	RunIngestr(ctx context.Context, args []string, repo *git.Repo) error
+}
+
 type BasicOperator struct {
-	conn     connectionFetcher
-	uvRunner *python.UvPythonRunner
-	finder   repoFinder
+	conn   connectionFetcher
+	runner ingestrRunner
+	finder repoFinder
 }
 
 type pipelineConnection interface {
@@ -40,7 +44,7 @@ func NewBasicOperator(conn *connection.Manager) (*BasicOperator, error) {
 		Cmd:         &python.CommandRunner{},
 	}
 
-	return &BasicOperator{conn: conn, uvRunner: uvRunner, finder: &git.RepoFinder{}}, nil
+	return &BasicOperator{conn: conn, runner: uvRunner, finder: &git.RepoFinder{}}, nil
 }
 
 func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
@@ -150,16 +154,21 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		cmdArgs = append(cmdArgs, "--full-refresh")
 	}
 
-	if strings.HasPrefix(destURI, "duckdb://") {
-		duck.LockDatabase(destURI)
-		defer duck.UnlockDatabase(destURI)
-	}
-
 	path := ti.GetAsset().ExecutableFile.Path
 	repo, err := o.finder.Repo(path)
 	if err != nil {
 		return errors.Wrap(err, "failed to find repo to run Ingestr")
 	}
 
-	return o.uvRunner.RunIngestr(ctx, cmdArgs, repo)
+	if strings.HasPrefix(destURI, "duckdb://") {
+		duck.LockDatabase(destURI)
+		defer duck.UnlockDatabase(destURI)
+	}
+
+	if strings.HasPrefix(sourceURI, "duckdb://") {
+		duck.LockDatabase(sourceURI)
+		defer duck.UnlockDatabase(sourceURI)
+	}
+
+	return o.runner.RunIngestr(ctx, cmdArgs, repo)
 }
