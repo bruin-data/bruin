@@ -6,6 +6,4 @@ parameters:
   source_table: products
   destination: bigquery
   loader_file_format: jsonl
-  incremental_strategy: replace
-  destination_connection: gcp-default
   destination_table: products
