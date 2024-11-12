@@ -40,6 +40,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
+	"github.com/xlab/treeprint"
 )
 
 const LogsFolder = "logs"
@@ -397,12 +398,41 @@ func Run(isDebug *bool) *cli.Command {
 }
 
 func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) {
-	errorPrinter.Printf("\nFailed tasks: %d\n", len(errorsInTaskResults))
-	for _, t := range errorsInTaskResults {
-		errorPrinter.Printf("  - %s\n", t.Instance.GetHumanReadableDescription())
-		errorPrinter.Printf("    └── %s\n\n", t.Error.Error())
+	data := make(map[string][]*scheduler.TaskExecutionResult, len(errorsInTaskResults))
+	for _, result := range errorsInTaskResults {
+		assetName := result.Instance.GetAsset().Name
+		data[assetName] = append(data[assetName], result)
 	}
 
+	tree := treeprint.New()
+	for assetName, results := range data {
+		assetBranch := tree.AddBranch(assetName)
+
+		columnBranches := make(map[string]treeprint.Tree, len(results))
+
+		for _, result := range results {
+			switch instance := result.Instance.(type) {
+			case *scheduler.ColumnCheckInstance:
+				colBranch, exists := columnBranches[instance.Column.Name]
+				if !exists {
+					colBranch = assetBranch.AddBranch("[Column] " + instance.Column.Name)
+					columnBranches[instance.Column.Name] = colBranch
+				}
+
+				checkBranch := colBranch.AddBranch("[Check] " + instance.Check.Name)
+				checkBranch.AddNode(fmt.Sprintf("'%s'", result.Error))
+
+			case *scheduler.CustomCheckInstance:
+				customBranch := assetBranch.AddBranch("[Custom Check] " + instance.Check.Name)
+				customBranch.AddNode(fmt.Sprintf("'%s'", result.Error))
+
+			default:
+				assetBranch.AddNode(fmt.Sprintf("'%s'", result.Error))
+			}
+		}
+	}
+	errorPrinter.Println(fmt.Sprintf("Failed assets %d", len(data)))
+	errorPrinter.Println(tree.String())
 	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
 	if len(upstreamFailedTasks) > 0 {
 		errorPrinter.Printf("The following tasks are skipped due to their upstream failing:\n")
