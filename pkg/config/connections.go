@@ -364,7 +364,7 @@ func (c GoogleSheetsConnection) GetName() string {
 
 type ChessConnection struct {
 	Name    string   `yaml:"name" json:"name" mapstructure:"name"`
-	Players []string `yaml:"players" json:"players" mapstructure:"players"`
+	Players []string `yaml:"players" json:"players" mapstructure:"players" jsonschema:"default=MagnusCarlsen,default=HikaruNakamura,default=ArjunErigaisi"`
 }
 
 func (c ChessConnection) GetName() string {
