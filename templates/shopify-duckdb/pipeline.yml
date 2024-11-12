@@ -3,5 +3,5 @@ schedule: daily
 start_date: "2023-03-20"
 
 default_connections:
-    google_cloud_platform: gcp-default
     shopify: shopify-default
+    duckdb: duckdb-default

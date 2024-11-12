@@ -1,8 +1,0 @@
-name: raw.shopify
-type: ingestr
-
-parameters:
-  source_connection: my-shopify-connection
-  source_table: orders
-  destination_connection: gcp
-  destination: bigquery

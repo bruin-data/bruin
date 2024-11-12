@@ -1,0 +1,9 @@
+name: shopify_raw.products
+type: ingestr
+
+parameters:
+  source_connection: shopify-default
+  source_table: products
+  destination: duckdb
+  destination_connection: duckdb-default
+  destination_table: products

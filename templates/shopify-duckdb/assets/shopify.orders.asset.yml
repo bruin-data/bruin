@@ -1,0 +1,9 @@
+name: shopify_raw.orders
+type: ingestr
+
+parameters:
+  source_connection: shopify-default
+  source_table: orders
+  destination: duckdb
+  destination_connection: duckdb-default
+  destination_table: orders

@@ -1,0 +1,9 @@
+name: shopify_raw.customers
+type: ingestr
+
+parameters:
+  source_connection: shopify-default
+  source_table: customers
+  destination: bigquery
+  destination_connection: gcp-default
+  destination_table: customers
