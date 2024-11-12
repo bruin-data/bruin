@@ -1,0 +1,9 @@
+name: public.deps
+type: ingestr
+connection: postgres-default
+
+parameters:
+  source_connection: neon
+  source_table: 'public.department'
+
+  destination: postgres

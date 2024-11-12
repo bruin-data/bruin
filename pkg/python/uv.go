@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/git"
 	"io"
 	"os"
 	"os/exec"
@@ -17,6 +16,7 @@ import (
 
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
 )
@@ -158,16 +158,24 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args []string, repo *gi
 		return err
 	}
 
-	flags := []string{"--python", pythonVersionForIngestr, "ingestr"}
+	ingestrPackageName := "ingestr@" + ingestrVersion
+	err = u.Cmd.Run(ctx, repo, &command{
+		Name: "uv",
+		Args: []string{"tool", "install", "--quiet", "--python", pythonVersionForIngestr, ingestrPackageName},
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to install ingestr")
+
+	}
+
+	flags := []string{"tool", "run", "--python", pythonVersionForIngestr, ingestrPackageName}
 	flags = append(flags, args...)
 
 	noDependencyCommand := &command{
-		Name:    "uvx",
+		Name:    "uv",
 		Args:    flags,
 		EnvVars: map[string]string{},
 	}
-
-	fmt.Println(strings.Join(flags, " "))
 
 	return u.Cmd.Run(ctx, repo, noDependencyCommand)
 }
