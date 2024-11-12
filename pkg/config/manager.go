@@ -687,6 +687,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Slack = removeConnection(env.Connections.Slack, connectionName)
 	case "zendesk":
 		env.Connections.Zendesk = removeConnection(env.Connections.Zendesk, connectionName)
+	case "duckdb":
+		env.Connections.DuckDB = removeConnection(env.Connections.DuckDB, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
