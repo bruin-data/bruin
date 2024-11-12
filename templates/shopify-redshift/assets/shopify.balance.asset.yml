@@ -1,0 +1,10 @@
+name: shopify_raw.balance
+type: ingestr
+
+parameters:
+  source_connection: shopify-default
+  source_table: balance
+  destination: redshift
+  incremental_strategy: replace
+  destination_connection: redshift-default
+  destination_table: balance

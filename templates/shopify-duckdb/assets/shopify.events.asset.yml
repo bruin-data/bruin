@@ -1,0 +1,10 @@
+name: shopify_raw.events
+type: ingestr
+
+parameters:
+  source_connection: shopify-default
+  source_table: events
+  destination: duckdb
+  incremental_strategy: replace
+  destination_connection: duckdb-default
+  destination_table: events

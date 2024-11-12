@@ -1,0 +1,10 @@
+name: shopify_raw.balance
+type: ingestr
+
+parameters:
+  source_connection: shopify-default
+  source_table: balance
+  destination: snowflake
+  incremental_strategy: replace
+  destination_connection: snowflake-default
+  destination_table: balance

@@ -1,0 +1,10 @@
+name: shopify_raw.price_rules
+type: ingestr
+
+parameters:
+  source_connection: shopify-default
+  source_table: price_rules
+  destination: duckdb
+  incremental_strategy: replace
+  destination_connection: duckdb-default
+  destination_table: price_rules
