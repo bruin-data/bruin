@@ -1,0 +1,10 @@
+name: gsheet_raw.customers
+type: ingestr
+
+parameters:
+  source_connection: gsheet-default
+  source_table: customers
+  destination: bigquery
+  incremental_strategy: replace
+  destination_connection: gcp-default
+  destination_table: customers

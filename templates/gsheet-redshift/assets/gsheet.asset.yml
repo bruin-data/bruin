@@ -1,0 +1,10 @@
+name: gsheet_raw.customers
+type: ingestr
+
+parameters:
+  source_connection: gsheet-default
+  source_table: customers
+  destination: redshift
+  incremental_strategy: replace
+  destination_connection: redshift-default
+  destination_table: customers
