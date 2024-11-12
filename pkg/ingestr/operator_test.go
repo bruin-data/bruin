@@ -4,11 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -26,8 +24,26 @@ type simpleConnectionFetcher struct {
 	connections map[string]*mockConnection
 }
 
+var repo = &git.Repo{
+	Path: "/the/repo",
+}
+
+type mockFinder struct{}
+
+func (m *mockFinder) Repo(path string) (*git.Repo, error) {
+	return repo, nil
+}
+
 func (s simpleConnectionFetcher) GetConnection(name string) (interface{}, error) {
 	return s.connections[name], nil
+}
+
+type mockRunner struct {
+	mock.Mock
+}
+
+func (m *mockRunner) RunIngestr(ctx context.Context, args []string, repo *git.Repo) error {
+	return m.Called(ctx, args, repo).Error(0)
 }
 
 func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
@@ -48,12 +64,13 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 		},
 	}
 
+	finder := new(mockFinder)
+
 	tests := []struct {
 		name        string
 		asset       *pipeline.Asset
 		fullRefresh bool
 		want        []string
-		wantMounts  []mount.Mount
 	}{
 		{
 			name: "create+replace, basic scenario",
@@ -79,14 +96,7 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 					"destination":       "bigquery",
 				},
 			},
-			want: []string{"ingest", "--source-uri", "duckdb:////tmp/source.db", "--source-table", "source-table", "--dest-uri", "bigquery://uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log"},
-			wantMounts: []mount.Mount{
-				{
-					Type:   mount.TypeBind,
-					Source: "/some/path",
-					Target: "/tmp/source.db",
-				},
-			},
+			want: []string{"ingest", "--source-uri", "duckdb:////some/path", "--source-table", "source-table", "--dest-uri", "bigquery://uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log"},
 		},
 		{
 			name: "duck db dest, basic scenario",
@@ -99,14 +109,7 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 					"destination":       "duckdb",
 				},
 			},
-			want: []string{"ingest", "--source-uri", "snowflake://uri-here", "--source-table", "source-table", "--dest-uri", "duckdb:////tmp/dest.db", "--dest-table", "asset-name", "--yes", "--progress", "log"},
-			wantMounts: []mount.Mount{
-				{
-					Type:   mount.TypeBind,
-					Source: "/some/path",
-					Target: "/tmp/dest.db",
-				},
-			},
+			want: []string{"ingest", "--source-uri", "snowflake://uri-here", "--source-table", "source-table", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
 		},
 		{
 			name: "basic scenario with Google Sheets override",
@@ -249,21 +252,15 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			baseConfig := container.Config{
-				Image:        DockerImage,
-				AttachStdout: false,
-				AttachStderr: true,
-				Tty:          true,
-				Env:          []string{},
-			}
-			baseHostConfig := container.HostConfig{
-				NetworkMode: "host",
-			}
-
 			t.Parallel()
 
+			runner := new(mockRunner)
+			runner.On("RunIngestr", mock.Anything, tt.want, repo).Return(nil)
+
 			o := &BasicOperator{
-				conn: &fetcher,
+				conn:   &fetcher,
+				finder: finder,
+				runner: runner,
 			}
 
 			ti := scheduler.AssetInstance{
@@ -273,13 +270,8 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 
 			ctx := context.WithValue(context.Background(), pipeline.RunConfigFullRefresh, tt.fullRefresh)
 
-			got, gotHost, err := o.ConvertTaskInstanceToContainerConfig(ctx, &ti)
-			baseConfig.Cmd = tt.want
-			baseHostConfig.Mounts = tt.wantMounts
-
+			err := o.Run(ctx, &ti)
 			require.NoError(t, err)
-			assert.Equal(t, baseConfig, *got)
-			assert.Equal(t, baseHostConfig, *gotHost)
 		})
 	}
 }

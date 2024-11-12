@@ -1,42 +1,37 @@
 package ingestr
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"io"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/connection"
-	"github.com/bruin-data/bruin/pkg/executor"
+	duck "github.com/bruin-data/bruin/pkg/duckdb"
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/scheduler"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
-)
-
-const (
-	IngestrVersion = "v0.9.2"
-	DockerImage    = "ghcr.io/bruin-data/ingestr:" + IngestrVersion
-	DuckDBDest     = "/tmp/dest.db"
-	DuckDBSource   = "/tmp/source.db"
-	DuckDBPrefix   = "duckdb:///"
-	GsheetsSource  = "/tmp/gsheets_source.db"
-	GsheetsPrefix  = "gsheets://?credentials_path="
 )
 
 type connectionFetcher interface {
 	GetConnection(name string) (interface{}, error)
 }
 
+type repoFinder interface {
+	Repo(path string) (*git.Repo, error)
+}
+
+type ingestrRunner interface {
+	RunIngestr(ctx context.Context, args []string, repo *git.Repo) error
+}
+
 type BasicOperator struct {
-	client *client.Client
 	conn   connectionFetcher
+	runner ingestrRunner
+	finder repoFinder
 }
 
 type pipelineConnection interface {
@@ -44,132 +39,29 @@ type pipelineConnection interface {
 }
 
 func NewBasicOperator(conn *connection.Manager) (*BasicOperator, error) {
-	ctx := context.TODO()
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation(), client.WithTimeout(10*time.Second))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create docker client: %s", err.Error())
-	}
-	defer dockerClient.Close()
-
-	reader, err := dockerClient.ImagePull(ctx, DockerImage, types.ImagePullOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create output reader: %s", err.Error())
-	}
-	defer reader.Close()
-	_, err = io.Copy(io.Discard, reader)
-	if err != nil {
-		return nil, fmt.Errorf("error while fetching docker image: %s", err.Error())
+	uvRunner := &python.UvPythonRunner{
+		UvInstaller: &python.UvChecker{},
+		Cmd:         &python.CommandRunner{},
 	}
 
-	return &BasicOperator{client: dockerClient, conn: conn}, nil
+	return &BasicOperator{conn: conn, runner: uvRunner, finder: &git.RepoFinder{}}, nil
 }
 
 func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
-	config, hostConfig, err := o.ConvertTaskInstanceToContainerConfig(ctx, ti)
-	if err != nil {
-		return err
-	}
-
-	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
-	_, _ = writer.Write([]byte("Triggering ingestr...\n"))
-
-	resp, err := o.client.ContainerCreate(ctx, config, hostConfig, nil, nil, "")
-	if err != nil {
-		return fmt.Errorf("failed to create docker container: %s", err.Error())
-	}
-
-	err = o.client.ContainerStart(ctx, resp.ID, container.StartOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to start docker container: %s", err.Error())
-	}
-
-	go func() {
-		reader, err := o.client.ContainerLogs(ctx, resp.ID, container.LogsOptions{
-			ShowStdout: true,
-			ShowStderr: true,
-			Follow:     true,
-			Timestamps: false,
-		})
-		if err != nil {
-			panic(err)
-		}
-		defer reader.Close()
-
-		scanner := bufio.NewScanner(reader)
-
-		if ctx.Value(executor.KeyPrinter) == nil {
-			return
-		}
-
-		for scanner.Scan() {
-			message := scanner.Text()
-			if !strings.HasSuffix(message, "\n") {
-				message += "\n"
-			}
-			_, _ = writer.Write([]byte(message))
-		}
-	}()
-
-	statusCh, errCh := o.client.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
-
-	select {
-	case <-ctx.Done():
-		_, _ = writer.Write([]byte("Stopping the ingestr container\n"))
-		_ = o.client.ContainerStop(ctx, resp.ID, container.StopOptions{})
-		return ctx.Err()
-	case err := <-errCh:
-		if err != nil {
-			return fmt.Errorf("failed after waiting for docker container to start: %s", err.Error())
-		}
-	case res := <-statusCh:
-		if res.Error != nil {
-			return fmt.Errorf("failed after waiting for docker container to finish: %s", res.Error.Message)
-		}
-
-		if res.StatusCode != 0 {
-			return fmt.Errorf("ingestr container failed with status code %d, please check the logs above for errors", res.StatusCode)
-		}
-
-		_, _ = writer.Write([]byte(fmt.Sprintf("ingestr container completed with response code: %d\n", res.StatusCode)))
-	}
-
-	return nil
-}
-
-func (o *BasicOperator) ConvertTaskInstanceToContainerConfig(ctx context.Context, ti scheduler.TaskInstance) (*container.Config, *container.HostConfig, error) {
-	mounts := []mount.Mount{}
 	// Source connection
 	sourceConnectionName, ok := ti.GetAsset().Parameters["source_connection"]
 	if !ok {
-		return nil, nil, errors.New("source connection not configured")
+		return errors.New("source connection not configured")
 	}
 
 	sourceConnection, err := o.conn.GetConnection(sourceConnectionName)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "source connection %s not found", sourceConnectionName)
+		return errors.Wrapf(err, "source connection %s not found", sourceConnectionName)
 	}
 
 	sourceURI, err := sourceConnection.(pipelineConnection).GetIngestrURI()
 	if err != nil {
-		return nil, nil, errors.New("could not get the source uri")
-	}
-	if strings.HasPrefix(sourceURI, DuckDBPrefix) {
-		sourcePath := strings.TrimPrefix(sourceURI, DuckDBPrefix)
-		mounts = append(mounts, mount.Mount{
-			Type:   mount.TypeBind,
-			Source: sourcePath,
-			Target: DuckDBSource,
-		})
-		sourceURI = DuckDBPrefix + DuckDBSource
-	}
-	if strings.HasPrefix(sourceURI, GsheetsPrefix) {
-		sourcePath := strings.TrimPrefix(sourceURI, GsheetsPrefix)
-		mounts = append(mounts, mount.Mount{
-			Type:   mount.TypeBind,
-			Source: sourcePath,
-			Target: GsheetsSource,
-		})
-		sourceURI = GsheetsPrefix + GsheetsSource
+		return errors.New("could not get the source uri")
 	}
 
 	// some connection types can be shared among sources, therefore inferring source URI from the connection type is not
@@ -180,31 +72,22 @@ func (o *BasicOperator) ConvertTaskInstanceToContainerConfig(ctx context.Context
 
 	sourceTable, ok := ti.GetAsset().Parameters["source_table"]
 	if !ok {
-		return nil, nil, errors.New("source table not configured")
+		return errors.New("source table not configured")
 	}
 
 	destConnectionName, err := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	destConnection, err := o.conn.GetConnection(destConnectionName)
 	if err != nil {
-		return nil, nil, fmt.Errorf("destination connection %s not found", destConnectionName)
+		return fmt.Errorf("destination connection %s not found", destConnectionName)
 	}
 
 	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
 	if err != nil {
-		return nil, nil, errors.New("could not get the source uri")
-	}
-	if strings.HasPrefix(destURI, DuckDBPrefix) {
-		destPath := strings.TrimPrefix(destURI, DuckDBPrefix)
-		mounts = append(mounts, mount.Mount{
-			Type:   mount.TypeBind,
-			Source: destPath,
-			Target: DuckDBDest,
-		})
-		destURI = DuckDBPrefix + DuckDBDest
+		return errors.New("could not get the source uri")
 	}
 
 	destTable := ti.GetAsset().Name
@@ -255,7 +138,7 @@ func (o *BasicOperator) ConvertTaskInstanceToContainerConfig(ctx context.Context
 	if ok {
 		boolInject, err := strconv.ParseBool(injectIntervals)
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "failed to parse inject_intervals")
+			return errors.Wrap(err, "failed to parse inject_intervals")
 		}
 
 		if boolInject {
@@ -271,21 +154,21 @@ func (o *BasicOperator) ConvertTaskInstanceToContainerConfig(ctx context.Context
 		cmdArgs = append(cmdArgs, "--full-refresh")
 	}
 
-	if len(mounts) == 0 {
-		mounts = nil
+	path := ti.GetAsset().ExecutableFile.Path
+	repo, err := o.finder.Repo(path)
+	if err != nil {
+		return errors.Wrap(err, "failed to find repo to run Ingestr")
 	}
 
-	return &container.Config{
-			Image:        DockerImage,
-			Cmd:          cmdArgs,
-			AttachStdout: false,
-			AttachStderr: true,
-			Tty:          true,
-			Env:          []string{},
-		},
-		&container.HostConfig{
-			NetworkMode: "host",
-			Mounts:      mounts,
-		},
-		nil
+	if strings.HasPrefix(destURI, "duckdb://") {
+		duck.LockDatabase(destURI)
+		defer duck.UnlockDatabase(destURI)
+	}
+
+	if strings.HasPrefix(sourceURI, "duckdb://") {
+		duck.LockDatabase(sourceURI)
+		defer duck.UnlockDatabase(sourceURI)
+	}
+
+	return o.runner.RunIngestr(ctx, cmdArgs, repo)
 }

@@ -82,7 +82,7 @@ func (l *localPythonRunner) Run(ctx context.Context, execCtx *executionContext) 
 	})
 }
 
-type commandRunner struct{}
+type CommandRunner struct{}
 
 type command struct {
 	Name    string
@@ -90,7 +90,7 @@ type command struct {
 	EnvVars map[string]string
 }
 
-func (l *commandRunner) Run(ctx context.Context, repo *git.Repo, command *command) error {
+func (l *CommandRunner) Run(ctx context.Context, repo *git.Repo, command *command) error {
 	cmd := exec.Command(command.Name, command.Args...) //nolint:gosec
 	cmd.Dir = repo.Path
 	cmd.Env = make([]string, len(command.EnvVars))
@@ -101,7 +101,7 @@ func (l *commandRunner) Run(ctx context.Context, repo *git.Repo, command *comman
 	return l.RunAnyCommand(ctx, cmd)
 }
 
-func (l *commandRunner) RunAnyCommand(ctx context.Context, cmd *exec.Cmd) error {
+func (l *CommandRunner) RunAnyCommand(ctx context.Context, cmd *exec.Cmd) error {
 	var output io.Writer = os.Stdout
 	if ctx.Value(executor.KeyPrinter) != nil {
 		output = ctx.Value(executor.KeyPrinter).(io.Writer)
