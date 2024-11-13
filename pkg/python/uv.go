@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/user"
-	"github.com/spf13/afero"
 	"io"
 	"os"
 	"os/exec"
@@ -20,7 +18,9 @@ import (
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 )
 
 var AvailablePythonVersions = map[string]bool{
@@ -63,7 +63,7 @@ func (u *UvChecker) EnsureUvInstalled(ctx context.Context) error {
 	}
 	uvBinaryPath := filepath.Join(bruinHomeDirAbsPath, binaryName)
 	if _, err := os.Stat(uvBinaryPath); errors.Is(err, os.ErrNotExist) {
-		err = u.installUvCommand(ctx)
+		err = u.installUvCommand(ctx, bruinHomeDirAbsPath)
 		if err != nil {
 			return err
 		}
@@ -84,7 +84,7 @@ func (u *UvChecker) EnsureUvInstalled(ctx context.Context) error {
 	}
 
 	if uvVersion.Version != UvVersion {
-		err = u.installUvCommand(ctx)
+		err = u.installUvCommand(ctx, bruinHomeDirAbsPath)
 		if err != nil {
 			return err
 		}
@@ -94,7 +94,7 @@ func (u *UvChecker) EnsureUvInstalled(ctx context.Context) error {
 	return nil
 }
 
-func (u *UvChecker) installUvCommand(ctx context.Context) error {
+func (u *UvChecker) installUvCommand(ctx context.Context, dest string) error {
 	var output io.Writer = os.Stdout
 	if ctx.Value(executor.KeyPrinter) != nil {
 		output = ctx.Value(executor.KeyPrinter).(io.Writer)
@@ -107,14 +107,14 @@ func (u *UvChecker) installUvCommand(ctx context.Context) error {
 
 	var commandInstance *exec.Cmd
 	if runtime.GOOS == "windows" {
-		commandInstance = exec.Command(Shell, ShellSubcommandFlag, fmt.Sprintf("winget install --accept-package-agreements --accept-source-agreements --silent --id=astral-sh.uv --version %s -e", UvVersion)) //nolint:gosec
+		commandInstance = exec.Command(Shell, ShellSubcommandFlag, fmt.Sprintf("winget install --accept-package-agreements --accept-source-agreements --silent --id=astral-sh.uv --version %s --location %s -e", UvVersion, dest)) //nolint:gosec
 	} else {
-		commandInstance = exec.Command(Shell, ShellSubcommandFlag, fmt.Sprintf(" set -o pipefail; curl -LsSf https://astral.sh/uv/%s/install.sh | sh", UvVersion)) //nolint:gosec
+		commandInstance = exec.Command(Shell, ShellSubcommandFlag, fmt.Sprintf(" set -o pipefail; UV_INSTALL_DIR=\"%s\" curl -LsSf https://astral.sh/uv/%s/install.sh | sh", dest, UvVersion)) //nolint:gosec
 	}
 
 	err := u.cmd.RunAnyCommand(ctx, commandInstance)
 	if err != nil {
-		return fmt.Errorf("failed to install uv: %w\nPlease install uv v%s yourself: https://docs.astral.sh/uv/getting-started/installation/", err, UvVersion)
+		return fmt.Errorf("failed to install uv: %w\n", err)
 	}
 
 	_, _ = output.Write([]byte("\n"))
