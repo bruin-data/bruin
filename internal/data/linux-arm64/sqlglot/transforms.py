@@ -3,10 +3,132 @@ from __future__ import annotations
 import typing as t
 
 from sqlglot import expressions as exp
+from sqlglot.errors import UnsupportedError
 from sqlglot.helper import find_new_name, name_sequence
 
+
 if t.TYPE_CHECKING:
+    from sqlglot._typing import E
     from sqlglot.generator import Generator
+
+
+def preprocess(
+    transforms: t.List[t.Callable[[exp.Expression], exp.Expression]],
+) -> t.Callable[[Generator, exp.Expression], str]:
+    """
+    Creates a new transform by chaining a sequence of transformations and converts the resulting
+    expression to SQL, using either the "_sql" method corresponding to the resulting expression,
+    or the appropriate `Generator.TRANSFORMS` function (when applicable -- see below).
+
+    Args:
+        transforms: sequence of transform functions. These will be called in order.
+
+    Returns:
+        Function that can be used as a generator transform.
+    """
+
+    def _to_sql(self, expression: exp.Expression) -> str:
+        expression_type = type(expression)
+
+        try:
+            expression = transforms[0](expression)
+            for transform in transforms[1:]:
+                expression = transform(expression)
+        except UnsupportedError as unsupported_error:
+            self.unsupported(str(unsupported_error))
+
+        _sql_handler = getattr(self, expression.key + "_sql", None)
+        if _sql_handler:
+            return _sql_handler(expression)
+
+        transforms_handler = self.TRANSFORMS.get(type(expression))
+        if transforms_handler:
+            if expression_type is type(expression):
+                if isinstance(expression, exp.Func):
+                    return self.function_fallback_sql(expression)
+
+                # Ensures we don't enter an infinite loop. This can happen when the original expression
+                # has the same type as the final expression and there's no _sql method available for it,
+                # because then it'd re-enter _to_sql.
+                raise ValueError(
+                    f"Expression type {expression.__class__.__name__} requires a _sql method in order to be transformed."
+                )
+
+            return transforms_handler(self, expression)
+
+        raise ValueError(f"Unsupported expression type {expression.__class__.__name__}.")
+
+    return _to_sql
+
+
+def unnest_generate_date_array_using_recursive_cte(expression: exp.Expression) -> exp.Expression:
+    if isinstance(expression, exp.Select):
+        count = 0
+        recursive_ctes = []
+
+        for unnest in expression.find_all(exp.Unnest):
+            if (
+                not isinstance(unnest.parent, (exp.From, exp.Join))
+                or len(unnest.expressions) != 1
+                or not isinstance(unnest.expressions[0], exp.GenerateDateArray)
+            ):
+                continue
+
+            generate_date_array = unnest.expressions[0]
+            start = generate_date_array.args.get("start")
+            end = generate_date_array.args.get("end")
+            step = generate_date_array.args.get("step")
+
+            if not start or not end or not isinstance(step, exp.Interval):
+                continue
+
+            alias = unnest.args.get("alias")
+            column_name = alias.columns[0] if isinstance(alias, exp.TableAlias) else "date_value"
+
+            start = exp.cast(start, "date")
+            date_add = exp.func(
+                "date_add", column_name, exp.Literal.number(step.name), step.args.get("unit")
+            )
+            cast_date_add = exp.cast(date_add, "date")
+
+            cte_name = "_generated_dates" + (f"_{count}" if count else "")
+
+            base_query = exp.select(start.as_(column_name))
+            recursive_query = (
+                exp.select(cast_date_add)
+                .from_(cte_name)
+                .where(cast_date_add <= exp.cast(end, "date"))
+            )
+            cte_query = base_query.union(recursive_query, distinct=False)
+
+            generate_dates_query = exp.select(column_name).from_(cte_name)
+            unnest.replace(generate_dates_query.subquery(cte_name))
+
+            recursive_ctes.append(
+                exp.alias_(exp.CTE(this=cte_query), cte_name, table=[column_name])
+            )
+            count += 1
+
+        if recursive_ctes:
+            with_expression = expression.args.get("with") or exp.With()
+            with_expression.set("recursive", True)
+            with_expression.set("expressions", [*recursive_ctes, *with_expression.expressions])
+            expression.set("with", with_expression)
+
+    return expression
+
+
+def unnest_generate_series(expression: exp.Expression) -> exp.Expression:
+    """Unnests GENERATE_SERIES or SEQUENCE table references."""
+    this = expression.this
+    if isinstance(expression, exp.Table) and isinstance(this, exp.GenerateSeries):
+        unnest = exp.Unnest(expressions=[this])
+        if expression.alias:
+            return exp.alias_(unnest, alias="_u", table=[expression.alias], copy=False)
+
+        return unnest
+
+    return expression
 
 
 def unalias_group(expression: exp.Expression) -> exp.Expression:
@@ -180,25 +302,93 @@ def unqualify_unnest(expression: exp.Expression) -> exp.Expression:
     return expression
 
 
-def unnest_to_explode(expression: exp.Expression) -> exp.Expression:
+def unnest_to_explode(
+    expression: exp.Expression,
+    unnest_using_arrays_zip: bool = True,
+) -> exp.Expression:
     """Convert cross join unnest into lateral view explode."""
+
+    def _unnest_zip_exprs(
+        u: exp.Unnest, unnest_exprs: t.List[exp.Expression], has_multi_expr: bool
+    ) -> t.List[exp.Expression]:
+        if has_multi_expr:
+            if not unnest_using_arrays_zip:
+                raise UnsupportedError("Cannot transpile UNNEST with multiple input arrays")
+
+            # Use INLINE(ARRAYS_ZIP(...)) for multiple expressions
+            zip_exprs: t.List[exp.Expression] = [
+                exp.Anonymous(this="ARRAYS_ZIP", expressions=unnest_exprs)
+            ]
+            u.set("expressions", zip_exprs)
+            return zip_exprs
+        return unnest_exprs
+
+    def _udtf_type(u: exp.Unnest, has_multi_expr: bool) -> t.Type[exp.Func]:
+        if u.args.get("offset"):
+            return exp.Posexplode
+        return exp.Inline if has_multi_expr else exp.Explode
+
     if isinstance(expression, exp.Select):
-        for join in expression.args.get("joins") or []:
-            unnest = join.this
+        from_ = expression.args.get("from")
+
+        if from_ and isinstance(from_.this, exp.Unnest):
+            unnest = from_.this
+            alias = unnest.args.get("alias")
+            exprs = unnest.expressions
+            has_multi_expr = len(exprs) > 1
+            this, *expressions = _unnest_zip_exprs(unnest, exprs, has_multi_expr)
+
+            unnest.replace(
+                exp.Table(
+                    this=_udtf_type(unnest, has_multi_expr)(
+                        this=this,
+                        expressions=expressions,
+                    ),
+                    alias=exp.TableAlias(this=alias.this, columns=alias.columns) if alias else None,
+                )
+            )
+
+        joins = expression.args.get("joins") or []
+        for join in list(joins):
+            join_expr = join.this
+
+            is_lateral = isinstance(join_expr, exp.Lateral)
+
+            unnest = join_expr.this if is_lateral else join_expr
 
             if isinstance(unnest, exp.Unnest):
-                alias = unnest.args.get("alias")
-                udtf = exp.Posexplode if unnest.args.get("offset") else exp.Explode
+                if is_lateral:
+                    alias = join_expr.args.get("alias")
+                else:
+                    alias = unnest.args.get("alias")
+                exprs = unnest.expressions
+                # The number of unnest.expressions will be changed by _unnest_zip_exprs, we need to record it here
+                has_multi_expr = len(exprs) > 1
+                exprs = _unnest_zip_exprs(unnest, exprs, has_multi_expr)
 
-                expression.args["joins"].remove(join)
+                joins.remove(join)
 
-                for e, column in zip(unnest.expressions, alias.columns if alias else []):
+                alias_cols = alias.columns if alias else []
+
+                # # Handle UNNEST to LATERAL VIEW EXPLODE: Exception is raised when there are 0 or > 2 aliases
+                # Spark LATERAL VIEW EXPLODE requires single alias for array/struct and two for Map type column unlike unnest in trino/presto which can take an arbitrary amount.
+                # Refs: https://spark.apache.org/docs/latest/sql-ref-syntax-qry-select-lateral-view.html
+
+                if not has_multi_expr and len(alias_cols) not in (1, 2):
+                    raise UnsupportedError(
+                        "CROSS JOIN UNNEST to LATERAL VIEW EXPLODE transformation requires explicit column aliases"
+                    )
+
+                for e, column in zip(exprs, alias_cols):
                     expression.append(
                         "laterals",
                         exp.Lateral(
-                            this=udtf(this=e),
+                            this=_udtf_type(unnest, has_multi_expr)(this=e),
                             view=True,
-                            alias=exp.TableAlias(this=alias.this, columns=[column]),  # type: ignore
+                            alias=exp.TableAlias(
+                                this=alias.this,  # type: ignore
+                                columns=alias_cols,
+                            ),
                         ),
                     )
 
@@ -393,7 +583,7 @@ def add_recursive_cte_column_names(expression: exp.Expression) -> exp.Expression
         for cte in expression.expressions:
             if not cte.args["alias"].columns:
                 query = cte.this
-                if isinstance(query, exp.Union):
+                if isinstance(query, exp.SetOperation):
                     query = query.this
 
                 cte.args["alias"].set(
@@ -450,16 +640,28 @@ def eliminate_full_outer_join(expression: exp.Expression) -> exp.Expression:
             expression_copy = expression.copy()
             expression.set("limit", None)
             index, full_outer_join = full_outer_joins[0]
-            full_outer_join.set("side", "left")
-            expression_copy.args["joins"][index].set("side", "right")
-            expression_copy.args.pop("with", None)  # remove CTEs from RIGHT side
 
-            return exp.union(expression, expression_copy, copy=False)
+            tables = (expression.args["from"].alias_or_name, full_outer_join.alias_or_name)
+            join_conditions = full_outer_join.args.get("on") or exp.and_(
+                *[
+                    exp.column(col, tables[0]).eq(exp.column(col, tables[1]))
+                    for col in full_outer_join.args.get("using")
+                ]
+            )
+
+            full_outer_join.set("side", "left")
+            anti_join_clause = exp.select("1").from_(expression.args["from"]).where(join_conditions)
+            expression_copy.args["joins"][index].set("side", "right")
+            expression_copy = expression_copy.where(exp.Exists(this=anti_join_clause).not_())
+            expression_copy.args.pop("with", None)  # remove CTEs from RIGHT side
+            expression.args.pop("order", None)  # remove order by from LEFT side
+
+            return exp.union(expression, expression_copy, copy=False, distinct=False)
 
     return expression
 
 
-def move_ctes_to_top_level(expression: exp.Expression) -> exp.Expression:
+def move_ctes_to_top_level(expression: E) -> E:
     """
     Some dialects (e.g. Hive, T-SQL, Spark prior to version 3) only allow CTEs to be
     defined at the top-level, so for example queries like:
@@ -505,7 +707,10 @@ def ensure_bools(expression: exp.Expression) -> exp.Expression:
     def _ensure_bool(node: exp.Expression) -> None:
         if (
             node.is_number
-            or node.is_type(exp.DataType.Type.UNKNOWN, *exp.DataType.NUMERIC_TYPES)
+            or (
+                not isinstance(node, exp.SubqueryPredicate)
+                and node.is_type(exp.DataType.Type.UNKNOWN, *exp.DataType.NUMERIC_TYPES)
+            )
             or (isinstance(node, exp.Column) and not node.type)
         ):
             node.replace(node.neq(0))
@@ -620,47 +825,130 @@ def struct_kv_to_alias(expression: exp.Expression) -> exp.Expression:
     return expression
 
 
-def preprocess(
-    transforms: t.List[t.Callable[[exp.Expression], exp.Expression]],
-) -> t.Callable[[Generator, exp.Expression], str]:
+def eliminate_join_marks(expression: exp.Expression) -> exp.Expression:
     """
-    Creates a new transform by chaining a sequence of transformations and converts the resulting
-    expression to SQL, using either the "_sql" method corresponding to the resulting expression,
-    or the appropriate `Generator.TRANSFORMS` function (when applicable -- see below).
+    Remove join marks from an AST. This rule assumes that all marked columns are qualified.
+    If this does not hold for a query, consider running `sqlglot.optimizer.qualify` first.
+
+    For example,
+        SELECT * FROM a, b WHERE a.id = b.id(+)    -- ... is converted to
+        SELECT * FROM a LEFT JOIN b ON a.id = b.id -- this
 
     Args:
-        transforms: sequence of transform functions. These will be called in order.
+        expression: The AST to remove join marks from.
 
     Returns:
-        Function that can be used as a generator transform.
+       The AST with join marks removed.
     """
+    from sqlglot.optimizer.scope import traverse_scope
 
-    def _to_sql(self, expression: exp.Expression) -> str:
-        expression_type = type(expression)
+    for scope in traverse_scope(expression):
+        query = scope.expression
 
-        expression = transforms[0](expression)
-        for transform in transforms[1:]:
-            expression = transform(expression)
+        where = query.args.get("where")
+        joins = query.args.get("joins")
 
-        _sql_handler = getattr(self, expression.key + "_sql", None)
-        if _sql_handler:
-            return _sql_handler(expression)
+        if not where or not joins:
+            continue
 
-        transforms_handler = self.TRANSFORMS.get(type(expression))
-        if transforms_handler:
-            if expression_type is type(expression):
-                if isinstance(expression, exp.Func):
-                    return self.function_fallback_sql(expression)
+        query_from = query.args["from"]
 
-                # Ensures we don't enter an infinite loop. This can happen when the original expression
-                # has the same type as the final expression and there's no _sql method available for it,
-                # because then it'd re-enter _to_sql.
-                raise ValueError(
-                    f"Expression type {expression.__class__.__name__} requires a _sql method in order to be transformed."
-                )
+        # These keep track of the joins to be replaced
+        new_joins: t.Dict[str, exp.Join] = {}
+        old_joins = {join.alias_or_name: join for join in joins}
 
-            return transforms_handler(self, expression)
+        for column in scope.columns:
+            if not column.args.get("join_mark"):
+                continue
 
-        raise ValueError(f"Unsupported expression type {expression.__class__.__name__}.")
+            predicate = column.find_ancestor(exp.Predicate, exp.Select)
+            assert isinstance(
+                predicate, exp.Binary
+            ), "Columns can only be marked with (+) when involved in a binary operation"
 
-    return _to_sql
+            predicate_parent = predicate.parent
+            join_predicate = predicate.pop()
+
+            left_columns = [
+                c for c in join_predicate.left.find_all(exp.Column) if c.args.get("join_mark")
+            ]
+            right_columns = [
+                c for c in join_predicate.right.find_all(exp.Column) if c.args.get("join_mark")
+            ]
+
+            assert not (
+                left_columns and right_columns
+            ), "The (+) marker cannot appear in both sides of a binary predicate"
+
+            marked_column_tables = set()
+            for col in left_columns or right_columns:
+                table = col.table
+                assert table, f"Column {col} needs to be qualified with a table"
+
+                col.set("join_mark", False)
+                marked_column_tables.add(table)
+
+            assert (
+                len(marked_column_tables) == 1
+            ), "Columns of only a single table can be marked with (+) in a given binary predicate"
+
+            join_this = old_joins.get(col.table, query_from).this
+            new_join = exp.Join(this=join_this, on=join_predicate, kind="LEFT")
+
+            # Upsert new_join into new_joins dictionary
+            new_join_alias_or_name = new_join.alias_or_name
+            existing_join = new_joins.get(new_join_alias_or_name)
+            if existing_join:
+                existing_join.set("on", exp.and_(existing_join.args.get("on"), new_join.args["on"]))
+            else:
+                new_joins[new_join_alias_or_name] = new_join
+
+            # If the parent of the target predicate is a binary node, then it now has only one child
+            if isinstance(predicate_parent, exp.Binary):
+                if predicate_parent.left is None:
+                    predicate_parent.replace(predicate_parent.right)
+                else:
+                    predicate_parent.replace(predicate_parent.left)
+
+        if query_from.alias_or_name in new_joins:
+            only_old_joins = old_joins.keys() - new_joins.keys()
+            assert (
+                len(only_old_joins) >= 1
+            ), "Cannot determine which table to use in the new FROM clause"
+
+            new_from_name = list(only_old_joins)[0]
+            query.set("from", exp.From(this=old_joins[new_from_name].this))
+
+        query.set("joins", list(new_joins.values()))
+
+        if not where.this:
+            where.pop()
+
+    return expression
+
+
+def any_to_exists(expression: exp.Expression) -> exp.Expression:
+    """
+    Transform ANY operator to Spark's EXISTS
+
+    For example,
+        - Postgres: SELECT * FROM tbl WHERE 5 > ANY(tbl.col)
+        - Spark: SELECT * FROM tbl WHERE EXISTS(tbl.col, x -> x < 5)
+
+    Both ANY and EXISTS accept queries but currently only array expressions are supported for this
+    transformation
+    """
+    if isinstance(expression, exp.Select):
+        for any in expression.find_all(exp.Any):
+            this = any.this
+            if isinstance(this, exp.Query):
+                continue
+
+            binop = any.parent
+            if isinstance(binop, exp.Binary):
+                lambda_arg = exp.to_identifier("x")
+                any.replace(lambda_arg)
+                lambda_expr = exp.Lambda(this=binop.copy(), expressions=[lambda_arg])
+                binop.replace(exp.Exists(this=this.unnest(), expression=lambda_expr))
+
+    return expression

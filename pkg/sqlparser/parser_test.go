@@ -290,6 +290,64 @@ func TestSqlParser_Lineage(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "cte",
+			sql: `with t1 as (
+        select *
+        from table1
+        join table2
+            using(a)
+    ),
+    t2 as (
+        select *
+        from table2
+        left join table1
+            using(a)
+    )
+    select t1.*, t2.b as b2, t2.c as c2
+    from t1
+    join t2
+        using(a)`,
+			schema: Schema{
+				"table1": {"a": "str", "b": "int64"},
+				"table2": {"a": "str", "c": "str"},
+			},
+			want: &Lineage{
+				Columns: []ColumnLineage{
+					{
+						Name: "a",
+						Upstream: []UpstreamColumn{
+							{Column: "a", Table: "table1"},
+							{Column: "a", Table: "table2"},
+						},
+					},
+					{
+						Name: "b",
+						Upstream: []UpstreamColumn{
+							{Column: "b", Table: "table1"},
+						},
+					},
+					{
+						Name: "b2",
+						Upstream: []UpstreamColumn{
+							{Column: "b", Table: "table1"},
+						},
+					},
+					{
+						Name: "c",
+						Upstream: []UpstreamColumn{
+							{Column: "c", Table: "table2"},
+						},
+					},
+					{
+						Name: "c2",
+						Upstream: []UpstreamColumn{
+							{Column: "c", Table: "table2"},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	t.Run("blocking group", func(t *testing.T) {
