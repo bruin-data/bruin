@@ -6,4 +6,3 @@ parameters:
   source_table: products
   destination: bigquery
   loader_file_format: jsonl
-  destination_table: products

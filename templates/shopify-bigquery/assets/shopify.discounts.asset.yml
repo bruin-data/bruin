@@ -6,4 +6,3 @@ parameters:
   source_table: discounts
   destination: bigquery
   loader_file_format: jsonl
-  destination_table: discounts
