@@ -45,28 +45,6 @@ Pipeline: bruin-init (.)
 
 Starting the pipeline execution...
 
-[2024-11-11 21:07:43] Starting: raw.shopify
-[2024-11-11 21:07:43] [raw.shopify] Triggering ingestr...
-[2024-11-11 21:07:46] [raw.shopify] /usr/local/lib/python3.11/site-packages/dlt/common/configuration/specs/base_configuration.py:234: UserWarning: You indicated connection_url to be dlt.secrets.value but type hint is not a secret
-[2024-11-11 21:07:46] [raw.shopify]   warnings.warn(
-[2024-11-11 21:07:46] [raw.shopify] 
-[2024-11-11 21:07:46] [raw.shopify] Initiated the pipeline with the following:
-[2024-11-11 21:07:46] [raw.shopify]   Source: shopify / orders
-[2024-11-11 21:07:46] [raw.shopify]   Destination: bigquery / raw.shopify
-[2024-11-11 21:07:46] [raw.shopify]   Incremental Strategy: Platform-specific
-[2024-11-11 21:07:46] [raw.shopify]   Incremental Key: None
-[2024-11-11 21:07:46] [raw.shopify]   Primary Key: None
-[2024-11-11 21:07:46] [raw.shopify] 
-[2024-11-11 21:07:46] [raw.shopify] 
-[2024-11-11 21:07:46] [raw.shopify] Starting the ingestion...
-[2024-11-11 21:07:51] [raw.shopify] ------------------------------- Extract shopify --------------------------------
-[2024-11-11 21:07:51] [raw.shopify] Resources: 1/1 (100.0%) | Time: 0.78s | Rate: 1.29/s
-[2024-11-11 21:07:51] [raw.shopify] shopify: 0  | Time: 0.03s | Rate: 0.00/s
-[2024-11-11 21:07:51] [raw.shopify] 
-[2024-11-11 21:07:51] [raw.shopify] Successfully finished loading data from 'shopify' to 'bigquery'  
-[2024-11-11 21:07:51] [raw.shopify] 
-[2024-11-11 21:07:53] [raw.shopify] ingestr container completed with response code: 0
-[2024-11-11 21:07:53] Finished: raw.shopify (9.656s)
 
 
 Executed 1 tasks in 9.656s
@@ -88,29 +66,6 @@ Pipeline: bruin-init (.)
 ✓ Successfully validated 1 assets across 1 pipeline, all good.
 
 Starting the pipeline execution...
-
-[2024-11-11 21:07:43] Starting: raw.shopify
-[2024-11-11 21:07:43] [raw.shopify] Triggering ingestr...
-[2024-11-11 21:07:46] [raw.shopify] /usr/local/lib/python3.11/site-packages/dlt/common/configuration/specs/base_configuration.py:234: UserWarning: You indicated connection_url to be dlt.secrets.value but type hint is not a secret
-[2024-11-11 21:07:46] [raw.shopify]   warnings.warn(
-[2024-11-11 21:07:46] [raw.shopify] 
-[2024-11-11 21:07:46] [raw.shopify] Initiated the pipeline with the following:
-[2024-11-11 21:07:46] [raw.shopify]   Source: shopify / orders
-[2024-11-11 21:07:46] [raw.shopify]   Destination: bigquery / raw.shopify
-[2024-11-11 21:07:46] [raw.shopify]   Incremental Strategy: Platform-specific
-[2024-11-11 21:07:46] [raw.shopify]   Incremental Key: None
-[2024-11-11 21:07:46] [raw.shopify]   Primary Key: None
-[2024-11-11 21:07:46] [raw.shopify] 
-[2024-11-11 21:07:46] [raw.shopify] 
-[2024-11-11 21:07:46] [raw.shopify] Starting the ingestion...
-[2024-11-11 21:07:51] [raw.shopify] ------------------------------- Extract shopify --------------------------------
-[2024-11-11 21:07:51] [raw.shopify] Resources: 1/1 (100.0%) | Time: 0.78s | Rate: 1.29/s
-[2024-11-11 21:07:51] [raw.shopify] shopify: 0  | Time: 0.03s | Rate: 0.00/s
-[2024-11-11 21:07:51] [raw.shopify] 
-[2024-11-11 21:07:51] [raw.shopify] Successfully finished loading data from 'shopify' to 'bigquery'  
-[2024-11-11 21:07:51] [raw.shopify] 
-[2024-11-11 21:07:53] [raw.shopify] ingestr container completed with response code: 0
-[2024-11-11 21:07:53] Finished: raw.shopify (9.656s)
 
 
 Executed 1 tasks in 9.656s
