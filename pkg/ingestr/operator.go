@@ -165,7 +165,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		defer duck.UnlockDatabase(destURI)
 	}
 
-	if strings.HasPrefix(sourceURI, "duckdb://") {
+	if strings.HasPrefix(sourceURI, "duckdb://") && sourceURI != destURI {
 		duck.LockDatabase(sourceURI)
 		defer duck.UnlockDatabase(sourceURI)
 	}

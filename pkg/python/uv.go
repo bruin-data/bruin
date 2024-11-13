@@ -33,7 +33,7 @@ var AvailablePythonVersions = map[string]bool{
 const (
 	UvVersion               = "0.5.1"
 	pythonVersionForIngestr = "3.11"
-	ingestrVersion          = "v0.9.2"
+	ingestrVersion          = "v0.9.3"
 )
 
 // UvChecker handles checking and installing the uv package manager.
