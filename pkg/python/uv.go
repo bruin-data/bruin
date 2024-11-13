@@ -161,7 +161,7 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args []string, repo *gi
 	ingestrPackageName := "ingestr@" + ingestrVersion
 	err = u.Cmd.Run(ctx, repo, &command{
 		Name: "uv",
-		Args: []string{"tool", "install", "--quiet", "--python", pythonVersionForIngestr, ingestrPackageName},
+		Args: []string{"tool", "install", "--force", "--quiet", "--python", pythonVersionForIngestr, ingestrPackageName},
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to install ingestr")
