@@ -145,15 +145,6 @@ export default defineConfig({
                 collapsed: false,
                 items: [
                     {text: "Shopify", link: "/connection/shopify"},
-                    {text: "DuckDB", link: "/connection/duckDB"},
-                    {text: "BigQuery", link: "/connection/bigquery"},
-                ],
-            },
-            {
-                text: "Cookbook",
-                collapsed: false,
-                items: [
-                    {text: "Shopify Pipelines", link: "/cookbook/shopify-pipelines"},
                 ],
             },
             {
