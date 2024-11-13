@@ -17,7 +17,7 @@ environments:
         connections:
             duckdb:
                 - name: "duckdb-default"
-                  path: "/Users/yuvraj/Workspace/bruin/database.duckdb"
+                  path: "<path to database>"
 
             shopify:
                 - name: "my-shopify-connection"
