@@ -23,7 +23,7 @@ The Bruin VSCode extension complements the Bruin CLI by offering a more visual a
 A **Bruin section** refers to a block of code within SQL or Python files that is specifically designated for Bruin-related functionality. These sections are typically enclosed within specific delimiters, allowing the extension to identify and manage them effectively. Users can fold or expand these sections to improve code readability and organization.
 
 #### Example of a Bruin Section in SQL
-```sql
+```bruinsql
 /* @bruin
   This is a Bruin section in SQL.
   It can contain Bruin-specific commands or configurations.
@@ -31,7 +31,7 @@ A **Bruin section** refers to a block of code within SQL or Python files that is
 SELECT * FROM users;
 ```
 ### Example of a Bruin Section in Python
-```python
+```bruin-python
 """
 @bruin
 This is a Bruin section in Python.

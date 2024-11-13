@@ -10,8 +10,8 @@ Bruin supports AWS Athena as a query engine, which means you can use Bruin to bu
 In order to have set up an Athena connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema:
 
 ```yaml
-    connections:
-      athena:
+connections:
+    athena:
         - name: "connection_name"
           region: "us-west-2"
           database: "some_database" 
@@ -33,7 +33,7 @@ Runs a materialized Athena asset or an SQL script. For detailed parameters, you 
 
 ### Examples
 Create a view to aggregate website traffic data
-```sql
+```bruinsql
 /* @bruin
 name: website_traffic.view
 type: athena.sql
@@ -51,7 +51,7 @@ group by date;
 ```
 
 Create a table to analyze daily sales performance:
-```sql
+```bruinsql
 /* @bruin
 name: daily_sales_analysis.view
 type: athena.sql
@@ -69,7 +69,7 @@ group by order_date;
 ```
 
 Bruin Athena assets support partitioning by one column only
-```sql
+```bruinsql
 /* @bruin
 name: daily_sales_analysis.view
 type: athena.sql

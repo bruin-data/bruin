@@ -2,6 +2,9 @@
 
 Bruin supports Azure Synapse as a data platform, which means you can use it to build data pipelines on Synapse.
 
+> [!WARNING]
+> I'll be honest with you: Synapse is the least used platform in the list, so there might be rough edges. If you run into any issues, please let us know by opening an issue on [GitHub](https://github.com/bruin-data/bruin/issues).
+
 ## Connection
 Synapse connection is configured the same way as Microsoft SQL Server connection, check [SQL Server connection](mssql.md#connection) for more details.
 
@@ -10,7 +13,7 @@ Synapse connection is configured the same way as Microsoft SQL Server connection
 Runs a materialized Synapse asset or an SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 #### Example: Create a view using view materialization
-```sql
+```bruinsql
 /* @bruin
 name: customer_data.view
 type: synapse.sql
@@ -24,7 +27,7 @@ where active = 1
 ```
 
 #### Example: Run a Synapse SQL script
-```sql
+```bruinsql
 /* @bruin
 name: orders_summary
 type: synapse.sql

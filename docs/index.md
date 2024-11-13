@@ -4,14 +4,32 @@ outline: deep
 
 # What is Bruin?
 
-Bruin is a data framework that consists of a command-line application & VS Code extension. It allows you to
-- ingest data with pre-built connectors / Python
-- transform data using Python and SQL
-- add quality checks to your pipelines
+End-to-end data framework: data ingestion + transformations + quality. 
 
-You can use Bruin to build your data pipelines inside your data warehouse. It is a single-binary, which allows you to run it anywhere, e,g. your computer, GitHub Actions, or in an EC2 instance.
+If dbt, Airbyte, and Great Expectations had a lovechild, it would be Bruin.
+
+<img alt="Bruin - Demo" src="/demo.gif" />
+
+Bruin is packed with features:
+- 📥 ingest data with [ingestr](https://github.com/bruin-data/ingestr) / Python
+- ✨ run SQL & Python transformations on [many platforms](#supported-platforms)
+- 📐 table/view [materializations](assets/materialization.md), incremental tables
+- 🐍 run Python in isolated environments using [uv](https://github.com/astral-sh/uv)
+- 💅 built-in data quality checks
+- 🚀 Jinja templating to avoid repetition
+- ✅ validate pipelines end-to-end via dry-run
+- 👷 run on your local machine, an EC2 instance, or [GitHub Actions](cicd/github-action.md)
+- 🔒 secrets injection via environment variables
+- [VS Code extension](vscode-extension/overview.md) for a better developer experience
+- ⚡ written in Golang
+- 📦 [easy to install](getting-started/introduction/installation.md) and use
+
+I know, that's a lot. Let's dive into the details.
 
 You can get started with Bruin [via installing it](getting-started/introduction/installation.md) with a single command.
+
+
+## Supported Platforms
 
 <script setup>
 import { withBase } from 'vitepress'
@@ -23,7 +41,6 @@ const platformsGroup = sidebarGroups.value.find(group => group.text === 'Data Pl
 </script>
 
 <div v-if="platformsGroup && platformsGroup.items.length > 0">
-<h2>Supported Platforms</h2>
 
 Bruin supports many data platforms out-of-the-box and as a first-class citizen. Feel free to get started with your favorite platform:
 

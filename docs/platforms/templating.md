@@ -4,7 +4,7 @@ Bruin supports [Jinja](https://jinja.palletsprojects.com/en/3.1.x/) as its templ
 
 The following is an example SQL asset that uses Jinja templating for different `start_date` and `end_date` parameters:
 
-```sql
+```bruinsql
 SELECT * FROM my_table WHERE dt BETWEEN '{{ start_date }}' AND '{{ end_date }}'
 ```
 
@@ -12,7 +12,7 @@ Since `start_date` and `end_date` parameters are automatically passed to your as
 
 You can do more complex stuff such as looping over a list of values, or using conditional logic. Here's an example of a SQL asset that loops over a list of user IDs:
 
-```sql
+```bruinsql
 {% set days = [1, 3, 7, 15, 30, 90] %}
 
 SELECT
@@ -28,7 +28,7 @@ GROUP BY 1,2
 
 This will render into the following SQL query:
 
-```sql
+```bruinsql
 SELECT
     conversion_date,
     cohort_id,

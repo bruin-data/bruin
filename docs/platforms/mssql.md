@@ -28,7 +28,7 @@ Runs a materialized SQL Server asset or an SQL script. For detailed parameters, 
 
 #### Examples
 Run an MS SQL script to generate sales report
-```sql
+```bruinsql
 /* @bruin
 name: sales_report
 type: ms.sql

@@ -1,7 +1,7 @@
 # Design Principles
 
 Bruin is an opinionated data framework, which contains:
-- various open-source components components,
+- various open-source components,
   - [Bruin CLI](https://github.com/bruin-data/bruin)
   - [ingestr](https://github.com/bruin-data/ingestr)
   - [Bruin VS Code extension](https://github.com/bruin-data/bruin-vscode)
@@ -9,6 +9,8 @@ Bruin is an opinionated data framework, which contains:
 - and a managed data platform as a service, [Bruin Cloud](https://getbruin.com),
 
 Below is a living list of design principles that outlines the vision behind Bruin, both as an open-source product as well as a business.
+
+---
 
 1. **Everything should be done via some form of a version-controllable text.** This means there should be no UI/database to configure anything in terms of how Bruin pipelines run, which enables proper reproducible builds for data pipelines.
 2. **Real-world data pipelines use multiple technologies.** While SQL is incredibly powerful, there are a lot of usecases that are not doable via just SQL. Bruin supports both Python and SQL natively, as well as pre-built images/binaries to support more complex usecases.

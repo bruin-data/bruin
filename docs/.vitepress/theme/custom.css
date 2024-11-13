@@ -16,3 +16,19 @@
   --vp-c-brand-2: #e18080;
   --vp-c-brand-3: #d95f5f;
 }
+
+html.dark .vp-code-dark {
+  display: block !important;
+}
+
+html.dark .vp-code-light {
+  display: none !important;
+}
+
+html:not(.dark) .vp-code-light {
+  display: block !important;
+}
+
+html:not(.dark) .vp-code-dark {
+  display: none !important;
+}

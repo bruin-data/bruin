@@ -12,14 +12,14 @@ To access Bruin features, add a Bruin section in your code. You can do this manu
 
 - **Using Snippets**: Quickly create Bruin sections with these snippets:
   - **For SQL Files**: Type `!fullsqlasset` and select the snippet to insert a Bruin section. Or, create it manually like this:
-    ```sql
+    ```bruinsql
     /* @bruin
       Your Bruin-specific SQL commands or configurations go here.
     @bruin */
     ```
 
   - **For Python Files**: Type `!fullpythonasset` and select the snippet to insert a Bruin section. Alternatively, create it manually like this:
-    ```python
+    ```bruin-python
     """@bruin
     Your Bruin-specific Python logic or configurations go here.
     @bruin"""

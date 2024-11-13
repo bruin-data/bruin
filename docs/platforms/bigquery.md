@@ -31,7 +31,7 @@ Google BigQuery requires a Google Cloud Platform connection, which can be added 
 Runs a materialized BigQuery asset or a BigQuery script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 #### Example: Create a table using table materialization
-```sql
+```bruinsql
 /* @bruin
 name: events.install
 type: bq.sql
@@ -45,7 +45,7 @@ where event_name = "install"
 ```
 
 #### Example: Run a BigQuery script
-```sql
+```bruinsql
 /* @bruin
 name: events.install
 type: bq.sql

@@ -35,7 +35,7 @@ Each virtual environment is cached in `~/.bruin/virtualenvs` folder
 
 ### Examples
 #### Print hello world
-```python
+```bruin-python
 """ @bruin
 name: hello_world
 type: python
@@ -45,7 +45,7 @@ print("Hello World!")
 ```
 
 #### Ingest data to BigQuery via an API
-```python
+```bruin-python
 """ @bruin
 name: raw_data.currency_rates
 type: python
@@ -72,7 +72,6 @@ START_DATE = os.environ["BRUIN_START_DATE"]
 END_DATE = os.environ["BRUIN_END_DATE"]
 
 bq_client = get_bq_client("bigquery_conn")
-
 df = currency_rates.get_rates(start=START_DATE, end=END_DATE)
 
 df.to_gbq("raw_data.currency_rates", if_exists="replace", credentials=bq_client._credentials)

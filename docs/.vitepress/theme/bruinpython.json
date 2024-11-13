@@ -1,0 +1,38 @@
+{
+    "name": "bruin-python",
+    "scopeName": "source.bruinpython",
+    "fileTypes": ["py"],
+    "patterns": [
+        {
+            "include": "#bruin-python"
+        }
+    ],
+    "repository": {
+        "bruin-python": {
+            "patterns": [
+                {
+                    "begin": "(\"\"\"\\s*@bruin)\\s*$",
+                    "end": "(@bruin\\s*\"\"\")\\s*$",
+                    "beginCaptures": {
+                        "1": {
+                            "name": "comment.block.documentation.python"
+                        }
+                    },
+                    "endCaptures": {
+                        "1": {
+                            "name": "comment.block.documentation.python"
+                        }
+                    },
+                    "patterns": [
+                        {
+                            "include": "source.yaml"
+                        }
+                    ]
+                },
+                {
+                    "include": "source.python"
+                }
+            ]
+        }
+    }
+}

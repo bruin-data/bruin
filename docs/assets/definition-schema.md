@@ -4,7 +4,7 @@ This enables the metadata to be right next to the code, reducing the friction wh
 The definition includes all the details around an asset from its name to the quality checks that will be executed.
 
 Here's an example asset definition:
-```sql
+```bruinsql
 /* @bruin
 
 name: dashboard.hello_bq

@@ -69,7 +69,7 @@ bruin run assets/players.asset.yml
 
 Let's create a new SQL asset with a file `assets/player_stats.sql`:
 
-```sql
+```bruinsql
 /* @bruin
 
 name: dataset.player_stats
@@ -108,7 +108,7 @@ Similar to SQL, Bruin supports running Python natively as well.
 
 You can create a Python asset with a file `assets/my_python_asset.py`:
 
-```python
+```bruin-python
 """@bruin
 name: my_python_asset
 @bruin"""
@@ -133,7 +133,7 @@ bruin run
 Bruin supports data quality checks natively, as part of the asset definition. It includes a handful of data quality checks, and it also supports custom checks.
 
 Let's add a few data quality checks to our table:
-```sql
+```bruinsql
 /* @bruin
 
 name: dataset.player_stats
@@ -144,6 +144,7 @@ materialization:
 depends:
    - dataset.players
 
+# you can define column metadata and quality checks
 columns: // [!code ++]
   - name: name // [!code ++]
     type: string // [!code ++]
@@ -151,7 +152,6 @@ columns: // [!code ++]
     checks: // [!code ++]
       - name: not_null // [!code ++]
       - name: unique // [!code ++]
-
   - name: player_count // [!code ++]
     type: int // [!code ++]
     description: the number of players with the given name // [!code ++]
@@ -159,6 +159,7 @@ columns: // [!code ++]
       - name: not_null // [!code ++]
       - name: positive // [!code ++]
 
+# you can also define custom checks 
 custom_checks: // [!code ++]  
   - name: row count is greater than zero // [!code ++]  
     description: this check ensures that the table is not empty // [!code ++]  

@@ -41,7 +41,7 @@ If you have trouble setting this up you can check [AWS documentation](https://re
 Runs a materialized AWS Redshift asset or an SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 #### Example: Create a table for product reviews
-```sql
+```bruinsql
 /* @bruin
 name: product_reviews.table
 type: rs.sql
@@ -60,7 +60,7 @@ create table product_reviews (
 ```
 
 #### Example: Run an AWS Redshift script to clean up old data
-```sql
+```bruinsql
 /* @bruin
 name: clean_old_data
 type: rs.sql

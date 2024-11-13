@@ -36,7 +36,7 @@ Runs a materialized Snowflake asset or a Snowflake script. For detailed paramete
 
 
 #### Example: Create a table using table materialization
-```sql
+```bruinsql
 /* @bruin
 name: events.install
 type: sf.sql
@@ -50,7 +50,7 @@ where event_name = "install"
 ```
 
 #### Example: Run a Snowflake script
-```sql
+```bruinsql
 /* @bruin
 name: events.install
 type: sf.sql

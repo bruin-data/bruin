@@ -28,7 +28,7 @@ For detailed parameters, you can check [Definition Schema](../assets/definition-
 ### Examples
 
 Create a view with orders per country
-```sql
+```bruinsql
 /* @bruin
 name: orders_per_country
 type: duckdb.sql
@@ -43,7 +43,7 @@ GROUP BY country
 ```
 
 Materialize new customers per region and append them to an existing table
-```sql
+```bruinsql
 /* @bruin
 name: new_customers_per_region
 type: duckdb.sql
