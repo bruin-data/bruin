@@ -1,10 +1,32 @@
 name: gsheet_raw.customers
 type: ingestr
 
+description: |
+  This asset manages the ingestion of Google Sheet data into BigQuery. It captures comprehensive customer information 
+  including customer IDs, email addresses, and creation timestamps. The asset includes data quality checks to ensure 
+  critical fields like customer ID and email are properly populated.
+
+columns:
+  - name: id
+    type: integer
+    description: "Customer unique identifier"
+    primary_key: true
+    checks:
+      - name: not_null
+      - name: positive
+  - name: email
+    type: varchar
+    description: "Customer email address"
+    checks:
+      - name: not_null
+  - name: created_at
+    type: timestamp
+    description: "Timestamp when customer was created"
+    checks:
+      - name: not_null
+
 parameters:
   source_connection: gsheet-default
   source_table: 1p40qR9t6DM5a1IskTkqEX9eZYZmBeILzUX_AdMkg__A.Sheet1
   destination: bigquery
-  incremental_strategy: replace
-  destination_connection: gcp-default
   destination_table: customers
