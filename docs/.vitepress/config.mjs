@@ -82,6 +82,7 @@ export default defineConfig({
                             {text: "S3", link: "/ingestion/s3"},
                             {text: "Slack", link: "/ingestion/slack.md"},
                             {text: "Zendesk", link: "/ingestion/zendesk.md"},
+                            {text: "Shopify", link: "/ingestion/shopify"},
                         ]
                     },
                 ],
