@@ -1,4 +1,4 @@
-name: pulic.postgres_to_duckdb
+name: public.postgres_to_duckdb
 type: ingestr
 
 parameters:

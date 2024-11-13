@@ -44,8 +44,8 @@ type UvChecker struct {
 	cmd CommandRunner
 }
 
-// EnsureUvInstalled checks if uv is installed and installs it if not present.
-func (u *UvChecker) EnsureUvInstalled(ctx context.Context) error {
+// EnsureUvInstalled checks if uv is installed and installs it if not present, then returns the full path of the binary.
+func (u *UvChecker) EnsureUvInstalled(ctx context.Context) (string, error) {
 	u.mut.Lock()
 	defer u.mut.Unlock()
 
@@ -53,7 +53,7 @@ func (u *UvChecker) EnsureUvInstalled(ctx context.Context) error {
 	m := user.NewConfigManager(afero.NewOsFs())
 	bruinHomeDirAbsPath, err := m.EnsureAndGetBruinHomeDir()
 	if err != nil {
-		return errors.Wrap(err, "failed to get bruin home directory")
+		return "", errors.Wrap(err, "failed to get bruin home directory")
 	}
 	var binaryName string
 	if runtime.GOOS == "windows" {
@@ -65,33 +65,33 @@ func (u *UvChecker) EnsureUvInstalled(ctx context.Context) error {
 	if _, err := os.Stat(uvBinaryPath); errors.Is(err, os.ErrNotExist) {
 		err = u.installUvCommand(ctx, bruinHomeDirAbsPath)
 		if err != nil {
-			return err
+			return "", err
 		}
-		return nil
+		return "", nil
 	}
 
-	cmd := exec.Command("~/.bruin/uv", "version", "--output-format", "json")
+	cmd := exec.Command(uvBinaryPath, "version", "--output-format", "json")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to check uv version: %w\nOutput: %s\n\nPlease install uv v%s yourself: https://docs.astral.sh/uv/getting-started/installation/", err, output, UvVersion)
+		return "", fmt.Errorf("failed to check uv version: %w\nOutput: %s\n\nPlease install uv v%s yourself: https://docs.astral.sh/uv/getting-started/installation/", err, output, UvVersion)
 	}
 
 	var uvVersion struct {
 		Version string `json:"version"`
 	}
 	if err := json.Unmarshal(output, &uvVersion); err != nil {
-		return fmt.Errorf("failed to parse uv version: %w", err)
+		return "", fmt.Errorf("failed to parse uv version: %w", err)
 	}
 
 	if uvVersion.Version != UvVersion {
 		err = u.installUvCommand(ctx, bruinHomeDirAbsPath)
 		if err != nil {
-			return err
+			return "", err
 		}
-		return nil
+		return uvBinaryPath, nil
 	}
 
-	return nil
+	return uvBinaryPath, nil
 }
 
 func (u *UvChecker) installUvCommand(ctx context.Context, dest string) error {
@@ -126,7 +126,7 @@ func (u *UvChecker) installUvCommand(ctx context.Context, dest string) error {
 }
 
 type uvInstaller interface {
-	EnsureUvInstalled(ctx context.Context) error
+	EnsureUvInstalled(ctx context.Context) (string, error)
 }
 
 type connectionFetcher interface {
@@ -138,16 +138,19 @@ type pipelineConnection interface {
 }
 
 type UvPythonRunner struct {
-	Cmd         cmd
-	UvInstaller uvInstaller
-	conn        connectionFetcher
+	Cmd            cmd
+	UvInstaller    uvInstaller
+	conn           connectionFetcher
+	binaryFullPath string
 }
 
 func (u *UvPythonRunner) Run(ctx context.Context, execCtx *executionContext) error {
-	err := u.UvInstaller.EnsureUvInstalled(ctx)
+	binaryFullPath, err := u.UvInstaller.EnsureUvInstalled(ctx)
 	if err != nil {
 		return err
 	}
+
+	u.binaryFullPath = binaryFullPath
 
 	pythonVersion := "3.11"
 	if execCtx.asset.Image != "" {
@@ -166,14 +169,15 @@ func (u *UvPythonRunner) Run(ctx context.Context, execCtx *executionContext) err
 }
 
 func (u *UvPythonRunner) RunIngestr(ctx context.Context, args []string, repo *git.Repo) error {
-	err := u.UvInstaller.EnsureUvInstalled(ctx)
+	binaryFullPath, err := u.UvInstaller.EnsureUvInstalled(ctx)
 	if err != nil {
 		return err
 	}
+	u.binaryFullPath = binaryFullPath
 
 	ingestrPackageName := "ingestr@" + ingestrVersion
 	err = u.Cmd.Run(ctx, repo, &command{
-		Name: "~/.bruin/uv",
+		Name: u.binaryFullPath,
 		Args: []string{"tool", "install", "--force", "--quiet", "--python", pythonVersionForIngestr, ingestrPackageName},
 	})
 	if err != nil {
@@ -184,7 +188,7 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args []string, repo *gi
 	flags = append(flags, args...)
 
 	noDependencyCommand := &command{
-		Name:    "~/.bruin/uv",
+		Name:    u.binaryFullPath,
 		Args:    flags,
 		EnvVars: map[string]string{},
 	}
@@ -201,7 +205,7 @@ func (u *UvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *
 	flags = append(flags, "--module", execCtx.module)
 
 	noDependencyCommand := &command{
-		Name:    "~/.bruin/uv",
+		Name:    u.binaryFullPath,
 		Args:    flags,
 		EnvVars: execCtx.envVariables,
 	}
@@ -249,7 +253,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	flags = append(flags, tempPyScript.Name())
 
 	err = u.Cmd.Run(ctx, execCtx.repo, &command{
-		Name:    "~/.bruin/uv",
+		Name:    u.binaryFullPath,
 		Args:    flags,
 		EnvVars: execCtx.envVariables,
 	})
@@ -333,7 +337,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	ingestrPackageName := "ingestr@" + ingestrVersion
 	err = u.Cmd.Run(ctx, execCtx.repo, &command{
-		Name: "~/.bruin/uv",
+		Name: u.binaryFullPath,
 		Args: []string{"tool", "install", "--quiet", "--python", pythonVersionForIngestr, ingestrPackageName},
 	})
 	if err != nil {
@@ -350,7 +354,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}
 
 	err = u.Cmd.Run(ctx, execCtx.repo, &command{
-		Name: "~/.bruin/uv",
+		Name: u.binaryFullPath,
 		Args: runArgs,
 	})
 	if err != nil {
