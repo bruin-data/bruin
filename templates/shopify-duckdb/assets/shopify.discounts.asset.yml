@@ -1,6 +1,25 @@
 name: shopify_raw.discounts
 type: ingestr
 
+description: |
+  This asset manages the ingestion of Shopify discount data into Duckdb. It captures comprehensive discount information 
+  including discount IDs, discount rules, conditions, and associated metadata. The asset includes data quality checks 
+  to ensure critical fields like discount ID are properly populated and valid.
+  
+columns:
+  - name: id
+    type: integer
+    description: "Product unique identifier"
+    primary_key: true
+    checks:
+        - name: not_null
+  - name: discount
+    type: json
+    description: "Discount information"
+  - name: metafields_first250
+    type: json
+    description: "First 250 metafields"
+    
 parameters:
   source_connection: shopify-default
   source_table: discounts
