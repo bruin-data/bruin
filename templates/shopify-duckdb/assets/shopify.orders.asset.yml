@@ -1,12 +1,8 @@
 name: shopify_raw.orders
 type: ingestr
 
-description: |
-  This asset manages the ingestion of Shopify inventory item data into Duckdb. It captures comprehensive inventory tracking 
-  information including SKUs, shipping requirements, measurement details, and variant relationships. The asset tracks both 
-  basic inventory attributes and advanced features like duplicate SKU detection and inventory tracking settings. Data quality 
-  checks ensure critical fields like inventory item ID are properly populated. This table serves as the source of truth for 
-  product inventory management, supporting both tracked and untracked inventory items with their associated variant details.
+description: This asset manages the ingestion of Shopify inventory item data into BigQuery. It captures comprehensive inventory tracking information including SKUs, shipping requirements, measurement details, and variant relationships. The asset tracks both basic inventory attributes and advanced features like duplicate SKU detection and inventory tracking settings. Data quality checks ensure critical fields like inventory item ID are properly populated. This table serves as the source of truth for product inventory management, supporting both tracke
+
   
 columns:
   - name: id
