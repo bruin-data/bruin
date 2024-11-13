@@ -1,7 +1,7 @@
 name: shopify_raw.price_rules
 type: ingestr
 
-description: "This asset manages the ingestion of Shopify price rule data into BigQuery. It captures comprehensive discount rule configurations including rule IDs, value types, allocation methods, and targeting criteria. The asset tracks eligibility conditions such as customer selection, target types, and usage limits (once per customer). It includes temporal data for rule validity periods (starts_at, ends_at) and maintains lists of entitled products, variants, collections, and countries. Data quality checks ensure critical fields like price rule
+description: "This asset manages the ingestion of Shopify price rule data into BigQuery. It captures comprehensive discount rule configurations including rule IDs, value types, allocation methods, and targeting criteria. The asset tracks eligibility conditions such as customer selection, target types, and usage limits (once per customer). It includes temporal data for rule validity periods (starts_at, ends_at) and maintains lists of entitled products, variants, collections, and countries. Data quality checks ensure critical fields like price rule"
 
   
 columns:
