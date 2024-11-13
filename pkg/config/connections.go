@@ -80,8 +80,8 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 
 type AthenaConnection struct {
 	Name             string `yaml:"name" json:"name" mapstructure:"name"`
-	AccessKey        string `yaml:"access_key" json:"access_key" mapstructure:"access_key"`
-	SecretKey        string `yaml:"secret_key" json:"secret_key" mapstructure:"secret_key"`
+	AccessKey        string `yaml:"access_key_id" json:"access_key_id" mapstructure:"access_key_id"`
+	SecretKey        string `yaml:"secret_access_key" json:"secret_access_key" mapstructure:"secret_access_key"`
 	QueryResultsPath string `yaml:"query_results_path" json:"query_results_path" mapstructure:"query_results_path"`
 	Region           string `yaml:"region" json:"region" mapstructure:"region"`
 	Database         string `yaml:"database" json:"database,omitempty" mapstructure:"database"`
