@@ -41,7 +41,7 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 			fields: func() *fields {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
-					Name: "uv",
+					Name: "~/.bruin/uv",
 					Args: []string{"run", "--python", "3.11", "--module", module},
 				}).Return(assert.AnError)
 
@@ -68,7 +68,7 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 			fields: func() *fields {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
-					Name: "uv",
+					Name: "~/.bruin/uv",
 					Args: []string{"run", "--python", "3.11", "--with-requirements", "/path/to/requirements.txt", "--module", module},
 				}).Return(assert.AnError)
 
@@ -95,7 +95,7 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 			fields: func() *fields {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
-					Name: "uv",
+					Name: "~/.bruin/uv",
 					Args: []string{"run", "--python", "3.13", "--with-requirements", "/path/to/requirements.txt", "--module", module},
 				}).Return(assert.AnError)
 
