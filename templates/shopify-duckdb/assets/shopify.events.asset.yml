@@ -1,0 +1,8 @@
+name: shopify_raw.events
+type: ingestr
+
+parameters:
+  source_connection: shopify-default
+  source_table: events
+  destination: duckdb
+
