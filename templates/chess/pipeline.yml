@@ -1,5 +1,1 @@
-name: chess_duckdb_pipeline
-
-default_connections:
-  duckdb: "duckdb_default"
-  chess: "chess_connection"
+name: chess_duckdb
