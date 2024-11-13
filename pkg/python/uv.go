@@ -31,7 +31,7 @@ var AvailablePythonVersions = map[string]bool{
 }
 
 const (
-	UvVersion               = "0.5.1"
+	UvVersion               = "0.5.0"
 	pythonVersionForIngestr = "3.11"
 	ingestrVersion          = "v0.9.3"
 )
