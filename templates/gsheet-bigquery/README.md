@@ -17,7 +17,7 @@ environments:
         connections:
             google_cloud_platform:
                 - name: "gcp-default"
-                  service_account_file: "/Users/yuvraj/Workspace/bruin/service-account.json"
+                  service_account_file: "<Path to your Google Cloud service account JSON file>"
                   project_id: "bruin-common-health-check"
             google_sheets:
                 - name: "gsheet-default"

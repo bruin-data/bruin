@@ -17,7 +17,7 @@ environments:
         connections:
             duckdb:
                 - name: "duckdb-default"
-                  path: "/Users/yuvraj/Workspace/bruin/database.duckdb"
+                  path: "<Path to your DuckDB database file>"
             google_sheets:
                 - name: "gsheet-default"
                   credentials_path: "<Path to your Google Sheets credentials JSON file>"
