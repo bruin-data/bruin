@@ -52,6 +52,18 @@ func (c *ConfigManager) RecreateHomeDir() error {
 	return nil
 }
 
+func (c *ConfigManager) EnsureAndGetBruinHomeDir() (string, error) {
+	err := c.EnsureHomeDirExists()
+	if err != nil {
+		return "", err
+	}
+	absPath, err := filepath.Abs(c.bruinHomeDir)
+	if err != nil {
+		return "", err
+	}
+	return absPath, nil
+}
+
 func (c *ConfigManager) EnsureHomeDirExists() error {
 	err := c.ensureHomeDirSet()
 	if err != nil {

@@ -14,9 +14,9 @@ type mockUvInstaller struct {
 	mock.Mock
 }
 
-func (m *mockUvInstaller) EnsureUvInstalled(ctx context.Context) error {
+func (m *mockUvInstaller) EnsureUvInstalled(ctx context.Context) (string, error) {
 	called := m.Called(ctx)
-	return called.Error(0)
+	return called.String(0), called.Error(1)
 }
 
 func Test_uvPythonRunner_Run(t *testing.T) {
@@ -41,12 +41,12 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 			fields: func() *fields {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
-					Name: "uv",
+					Name: "~/.bruin/uv",
 					Args: []string{"run", "--python", "3.11", "--module", module},
 				}).Return(assert.AnError)
 
 				inst := new(mockUvInstaller)
-				inst.On("EnsureUvInstalled", mock.Anything).Return(nil)
+				inst.On("EnsureUvInstalled", mock.Anything).Return("~/.bruin/uv", nil)
 
 				return &fields{
 					cmd:         cmd,
@@ -68,12 +68,12 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 			fields: func() *fields {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
-					Name: "uv",
+					Name: "~/.bruin/uv",
 					Args: []string{"run", "--python", "3.11", "--with-requirements", "/path/to/requirements.txt", "--module", module},
 				}).Return(assert.AnError)
 
 				inst := new(mockUvInstaller)
-				inst.On("EnsureUvInstalled", mock.Anything).Return(nil)
+				inst.On("EnsureUvInstalled", mock.Anything).Return("~/.bruin/uv", nil)
 
 				return &fields{
 					cmd:         cmd,
@@ -95,12 +95,12 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 			fields: func() *fields {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &command{
-					Name: "uv",
+					Name: "~/.bruin/uv",
 					Args: []string{"run", "--python", "3.13", "--with-requirements", "/path/to/requirements.txt", "--module", module},
 				}).Return(assert.AnError)
 
 				inst := new(mockUvInstaller)
-				inst.On("EnsureUvInstalled", mock.Anything).Return(nil)
+				inst.On("EnsureUvInstalled", mock.Anything).Return("~/.bruin/uv", nil)
 
 				return &fields{
 					cmd:         cmd,
