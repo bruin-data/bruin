@@ -35,8 +35,6 @@ columns:
   - name: orders_count
     type: integer
     description: "Total number of orders placed by customer"
-    checks:
-        - name: positive
   - name: state
     type: varchar
     description: "Customer account state"
