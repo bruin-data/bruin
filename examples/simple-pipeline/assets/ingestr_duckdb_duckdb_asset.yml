@@ -1,0 +1,8 @@
+name: main.self_duck
+type: ingestr
+
+parameters:
+  source_connection: duckdb-default
+  source_table: 'main.example'
+
+  destination: duckdb
