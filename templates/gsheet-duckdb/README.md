@@ -1,6 +1,6 @@
 # Bruin - Shopify to DuckDB
 
-This pipeline is a simple example of a Bruin pipeline that copies data from Shopify to DuckDB. It demonstrates how to use the `bruin` CLI to build and run a pipeline.
+This pipeline is a simple example of a Bruin pipeline that copies data from GSheet to DuckDB. It demonstrates how to use the `bruin` CLI to build and run a pipeline.
 
 The pipeline includes two sample assets already:
 - `raw.shopify`: A simple ingestr asset that copies a table from Shopify to DuckDB
@@ -18,11 +18,9 @@ environments:
             duckdb:
                 - name: "duckdb-default"
                   path: "/Users/yuvraj/Workspace/bruin/database.duckdb"
-
-            shopify:
-                - name: "my-shopify-connection"
-                  api_key: "********"
-                  url: "******.myshopify.com"
+            google_sheets:
+                - name: "gsheet-default"
+                  credentials_path: "<Path to your Google Sheets credentials JSON file>"
 ```
 
 ## Running the pipeline
@@ -30,11 +28,11 @@ environments:
 bruin CLI can run the whole pipeline or any task with the downstreams:
 
 ```shell
-bruin run assets/shopify.asset.yml
+bruin run assets/gsheet.asset.yml
 ```
 
 ```shell
-❯ bruin run ./templates/shopify-duckdb/                                                       (bruin) 
+❯ bruin run ./templates/gsheet-duckdb/                                                       (bruin) 
 Analyzed the pipeline 'bruin-init' with 1 assets.
 
 Pipeline: bruin-init (.)
@@ -54,7 +52,7 @@ bruin run assets/hello.py
 ```
 
 ```shell
-❯ bruin run ./templates/shopify-duckdb/                                                       (bruin) 
+❯ bruin run ./templates/gsheet-duckdb/                                                       (bruin) 
 Analyzed the pipeline 'bruin-init' with 1 assets.
 
 Pipeline: bruin-init (.)
