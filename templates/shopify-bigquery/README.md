@@ -17,7 +17,7 @@ environments:
         connections:
             google_cloud_platform:
                 - name: "gcp"
-                  service_account_file: "/Users/yuvraj/Workspace/bruin/service-account.json"
+                  service_account_file: "<path to service account file>"
                   project_id: "bruin-common-health-check"
 
             shopify:
