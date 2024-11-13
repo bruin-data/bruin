@@ -10,7 +10,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	color2 "github.com/fatih/color"
-	"github.com/go-viper/mapstructure/v2"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
@@ -193,14 +192,8 @@ func PatchAsset() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			var jsonBody map[string]interface{}
-			err = json.Unmarshal([]byte(c.String("body")), &jsonBody)
+			err = json.Unmarshal([]byte(c.String("body")), &asset)
 			if err != nil {
-				printErrorJSON(errors2.Wrap(err, "failed to parse the given body JSON"))
-				return cli.Exit("", 1)
-			}
-
-			if err = mapstructure.Decode(jsonBody, &asset); err != nil {
 				printErrorJSON(errors2.Wrap(err, "failed to patch the asset with the given json body"))
 				return cli.Exit("", 1)
 			}
