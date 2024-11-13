@@ -14,9 +14,9 @@ type mockUvInstaller struct {
 	mock.Mock
 }
 
-func (m *mockUvInstaller) EnsureUvInstalled(ctx context.Context) error {
+func (m *mockUvInstaller) EnsureUvInstalled(ctx context.Context) (string, error) {
 	called := m.Called(ctx)
-	return called.Error(0)
+	return called.String(0), called.Error(1)
 }
 
 func Test_uvPythonRunner_Run(t *testing.T) {
@@ -46,7 +46,7 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 				}).Return(assert.AnError)
 
 				inst := new(mockUvInstaller)
-				inst.On("EnsureUvInstalled", mock.Anything).Return(nil)
+				inst.On("EnsureUvInstalled", mock.Anything).Return("~/.bruin/uv", nil)
 
 				return &fields{
 					cmd:         cmd,
@@ -73,7 +73,7 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 				}).Return(assert.AnError)
 
 				inst := new(mockUvInstaller)
-				inst.On("EnsureUvInstalled", mock.Anything).Return(nil)
+				inst.On("EnsureUvInstalled", mock.Anything).Return("~/.bruin/uv", nil)
 
 				return &fields{
 					cmd:         cmd,
@@ -100,7 +100,7 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 				}).Return(assert.AnError)
 
 				inst := new(mockUvInstaller)
-				inst.On("EnsureUvInstalled", mock.Anything).Return(nil)
+				inst.On("EnsureUvInstalled", mock.Anything).Return("~/.bruin/uv", nil)
 
 				return &fields{
 					cmd:         cmd,
