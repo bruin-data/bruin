@@ -68,3 +68,34 @@ Executed 1 tasks in 9.656s
 You can optionally pass a `--downstream` flag to run the task with all of its downstreams.
 
 That's it, good luck!
+
+
+NOTE: Please find assets example for balance and transactions table in the [Shopify Cookbook](https://bruin-data.github.io/docs/cookbook/shopify-pipelines.html)
+
+- Balance Table
+```yaml
+name: shopify_raw.balance
+type: ingestr
+
+description: This asset manages the ingestion of Shopify customer data into BigQuery. It captures comprehensive customer information including personal details, contact information, order history, marketing preferences, and address data. The asset includes data quality checks to ensure critical fields like customer ID and email are properly populated.
+
+parameters:
+  source_connection: shopify-default
+  source_table: balance
+  destination: duckdb
+
+```
+
+- Transactions Table
+```yaml
+name: shopify_raw.transactions
+type: ingestr
+
+description: This asset manages the ingestion of Shopify transaction data into BigQuery. It captures detailed payment transaction information including transaction ID, order ID, amount, currency, payment method, status, and processed date. This data is essential for financial reporting, reconciliation, and analyzing payment patterns across the Shopify store.
+
+parameters:
+  source_connection: shopify-default
+  source_table: transactions
+  destination: duckdb
+
+```
