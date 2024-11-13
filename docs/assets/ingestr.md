@@ -47,11 +47,6 @@ parameters:
   loader_file_format: jsonl | csv | parquet
 ```
 
-
-> [!INFO]
-> Ingestr assets require Docker to be installed in your machine. If you are using [Bruin Cloud](https://getbruin.com), you don't need to worry about this.
-
-
 ##  Examples
 The examples below show how to use the `ingestr` asset type in your pipeline. Feel free to change them as you wish according to your needs.
 

@@ -15,7 +15,6 @@ Bruin requires a few components to be installed:
 - [Visual Studio Code](https://code.visualstudio.com/download): optional, but highly recommended
 
 In addition, there are some optional components:
-- [Docker](https://docs.docker.com/engine/install/): optional, required if you'd like to ingest data
 - [DuckDB](https://duckdb.org/docs/installation/): optional, useful for the tutorials in this documentation
 
 
