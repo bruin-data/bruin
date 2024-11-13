@@ -1,8 +1,280 @@
 name: shopify_raw.orders
 type: ingestr
 
+description: This asset manages the ingestion of Shopify inventory item data into BigQuery. It captures comprehensive inventory tracking information including SKUs, shipping requirements, measurement details, and variant relationships. The asset tracks both basic inventory attributes and advanced features like duplicate SKU detection and inventory tracking settings. Data quality checks ensure critical fields like inventory item ID are properly populated. This table serves as the source of truth for product inventory management, supporting both tracke
+
+columns:
+  - name: id
+    type: integer
+    description: "Order unique identifier"
+    primary_key: true
+    checks:
+      - name: not_null
+  - name: app_id
+    type: integer
+    description: "ID of the app that created the order"
+  - name: billing_address
+    type: json
+    description: "Billing address details"
+  - name: browser_ip
+    type: string
+    description: "IP address of the browser used to create the order"
+  - name: buyer_accepts_marketing
+    type: boolean
+    description: "Whether the buyer accepts marketing"
+  - name: cancel_reason
+    type: string
+    description: "Reason for order cancellation"
+  - name: cancelled_at
+    type: timestamp
+    description: "When the order was cancelled"
+  - name: cart_token
+    type: string
+    description: "Token for the cart associated with the order"
+  - name: checkout_token
+    type: string
+    description: "Token for the checkout associated with the order"
+  - name: client_details
+    type: json
+    description: "Details about the client who placed the order"
+  - name: closed_at
+    type: timestamp
+    description: "When the order was closed"
+  - name: company
+    type: json
+    description: "Company information associated with the order"
+  - name: confirmation_number
+    type: string
+    description: "Order confirmation number"
+  - name: confirmed
+    type: boolean
+    description: "Whether the order has been confirmed"
+  - name: created_at
+    type: timestamp
+    description: "When the order was created"
+    checks:
+      - name: not_null
+  - name: currency
+    type: string
+    description: "Currency code for the order"
+    checks:
+      - name: not_null
+  - name: current_total_additional_fees_set
+    type: json
+    description: "Current total additional fees in shop and presentment currencies"
+  - name: current_total_discounts
+    type: numeric
+    description: "Current total discounts applied to the order"
+  - name: current_total_discounts_set
+    type: json
+    description: "Current total discounts in shop and presentment currencies"
+  - name: current_total_duties_set
+    type: json
+    description: "Current total duties in shop and presentment currencies"
+  - name: current_total_price
+    type: numeric
+    description: "Current total price of the order"
+  - name: current_total_price_set
+    type: json
+    description: "Current total price in shop and presentment currencies"
+  - name: current_subtotal_price
+    type: numeric
+    description: "Current subtotal price of the order"
+  - name: current_subtotal_price_set
+    type: json
+    description: "Current subtotal price in shop and presentment currencies"
+  - name: current_total_tax
+    type: numeric
+    description: "Current total tax amount"
+  - name: current_total_tax_set
+    type: json
+    description: "Current total tax in shop and presentment currencies"
+  - name: customer
+    type: json
+    description: "Customer information associated with the order"
+  - name: customer_locale
+    type: string
+    description: "Language code of the customer"
+  - name: discount_applications
+    type: json
+    description: "List of discount applications on the order"
+  - name: discount_codes
+    type: json
+    description: "List of discount codes applied to the order"
+  - name: email
+    type: string
+    description: "Customer's email address"
+  - name: estimated_taxes
+    type: boolean
+    description: "Whether taxes are estimated"
+  - name: financial_status
+    type: string
+    description: "Financial status of the order"
+  - name: fulfillments
+    type: json
+    description: "List of fulfillments associated with the order"
+  - name: fulfillment_status
+    type: string
+    description: "Status of order fulfillment"
+  - name: gateway
+    type: string
+    description: "Payment gateway used"
+  - name: landing_site
+    type: string
+    description: "URL for the landing site"
+  - name: line_items
+    type: json
+    description: "List of line items in the order"
+  - name: location_id
+    type: integer
+    description: "ID of the location associated with the order"
+  - name: merchant_of_record_app_id
+    type: integer
+    description: "ID of the merchant of record app"
+  - name: name
+    type: string
+    description: "Name of the order"
+  - name: note
+    type: string
+    description: "Additional notes on the order"
+  - name: note_attributes
+    type: json
+    description: "Extra information added to the order"
+  - name: number
+    type: integer
+    description: "Order number"
+  - name: order_number
+    type: integer
+    description: "Sequential order number"
+  - name: original_total_additional_fees_set
+    type: json
+    description: "Original total additional fees in shop and presentment currencies"
+  - name: original_total_duties_set
+    type: json
+    description: "Original total duties in shop and presentment currencies"
+  - name: payment_terms
+    type: json
+    description: "Payment terms information"
+  - name: payment_gateway_names
+    type: json
+    description: "List of payment gateway names"
+  - name: phone
+    type: string
+    description: "Phone number associated with the order"
+  - name: po_number
+    type: string
+    description: "Purchase order number"
+  - name: presentment_currency
+    type: string
+    description: "Currency used for presentment"
+  - name: processed_at
+    type: timestamp
+    description: "When the order was processed"
+  - name: referring_site
+    type: string
+    description: "Website that referred the customer"
+  - name: refunds
+    type: json
+    description: "List of refunds issued for the order"
+  - name: shipping_address
+    type: json
+    description: "Shipping address information"
+  - name: shipping_lines
+    type: json
+    description: "List of shipping methods used"
+  - name: source_name
+    type: string
+    description: "Source of the order"
+  - name: source_identifier
+    type: string
+    description: "Identifier for the order source"
+  - name: source_url
+    type: string
+    description: "URL of the order source"
+  - name: subtotal_price
+    type: numeric
+    description: "Subtotal price of the order"
+  - name: subtotal_price_set
+    type: json
+    description: "Subtotal price in shop and presentment currencies"
+  - name: tags
+    type: string
+    description: "Tags associated with the order"
+  - name: tax_lines
+    type: json
+    description: "List of tax lines applied to the order"
+  - name: taxes_included
+    type: boolean
+    description: "Whether taxes are included in the prices"
+  - name: test
+    type: boolean
+    description: "Whether this is a test order"
+  - name: token
+    type: string
+    description: "Unique token for the order"
+  - name: total_discounts
+    type: numeric
+    description: "Total amount of discounts applied"
+  - name: total_discounts_set
+    type: json
+    description: "Total discounts in shop and presentment currencies"
+  - name: total_line_items_price
+    type: numeric
+    description: "Total price of line items"
+  - name: total_line_items_price_set
+    type: json
+    description: "Total line items price in shop and presentment currencies"
+  - name: total_outstanding
+    type: numeric
+    description: "Total amount still outstanding"
+  - name: total_price
+    type: numeric
+    description: "Total price of the order"
+  - name: total_price_set
+    type: json
+    description: "Total price in shop and presentment currencies"
+  - name: total_shipping_price_set
+    type: json
+    description: "Total shipping price in shop and presentment currencies"
+  - name: total_tax
+    type: numeric
+    description: "Total tax amount"
+  - name: total_tax_set
+    type: json
+    description: "Total tax in shop and presentment currencies"
+  - name: total_tip_received
+    type: numeric
+    description: "Total tip amount received"
+  - name: total_weight
+    type: numeric
+    description: "Total weight of the order"
+  - name: updated_at
+    type: timestamp
+    description: "When the order was last updated"
+  - name: user_id
+    type: integer
+    description: "ID of the user associated with the order"
+  - name: order_status_url
+    type: string
+    description: "URL for checking order status"
+  - name: admin_graphql_api_id
+    type: string
+    description: "GraphQL API ID for the order"
+  - name: checkout_id
+    type: integer
+    description: "ID of the checkout associated with the order"
+  - name: contact_email
+    type: string
+    description: "Contact email for the order"
+  - name: reference
+    type: string
+    description: "Reference identifier for the order"
+  - name: tax_exempt
+    type: boolean
+    description: "Whether the order is tax exempt"
+
 parameters:
   source_connection: shopify-default
   source_table: orders
   destination: bigquery
-  destination_table: orders
+  loader_file_format: jsonl

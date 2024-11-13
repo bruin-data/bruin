@@ -1,8 +1,0 @@
-name: shopify_raw.balance
-type: ingestr
-
-parameters:
-  source_connection: shopify-default
-  source_table: balance
-  destination: bigquery
-  destination_table: balance
