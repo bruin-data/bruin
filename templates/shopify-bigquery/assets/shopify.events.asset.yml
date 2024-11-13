@@ -1,12 +1,7 @@
 name: shopify_raw.events
 type: ingestr
 
-description: |
-  This asset manages the ingestion of Shopify event data into BigQuery. It captures comprehensive event logging information 
-  including event IDs, subject references, timestamps, event types, and associated actions. The asset tracks various event 
-  details such as the event creator, subject relationships, and detailed event messages. Data quality checks ensure critical 
-  fields like event ID and creation timestamp are properly populated. This table serves as an audit trail for tracking 
-  changes and actions within the Shopify platform.
+description: This asset manages the ingestion of Shopify event data into BigQuery. It captures comprehensive event logging information including event IDs, subject references, timestamps, event types, and associated actions. The asset tracks various event details such as the event creator, subject relationships, and detailed event messages. Data quality checks ensure critical fields like event ID and creation timestamp are properly populated. This table serves as an audit trail for tracking changes and actions within the Shopify platform.
 
 columns:
   - name: id

@@ -1,11 +1,7 @@
 name: shopify_raw.products
 type: ingestr
 
-description: |
-  This asset manages the ingestion of Shopify product data into BigQuery. It captures comprehensive product information 
-  including product IDs, titles, descriptions, pricing, inventory levels, variants, and metadata. The asset includes 
-  data quality checks to ensure critical fields like product ID, title, and inventory tracking are properly populated. 
-  The data model supports both simple and complex product structures, including variant management and price range tracking.
+description: This asset manages the ingestion of Shopify product data into BigQuery. It captures comprehensive product information including product IDs, titles, descriptions, pricing, inventory levels, variants, and metadata. The asset includes data quality checks to ensure critical fields like
 
 columns:
   - name: id
