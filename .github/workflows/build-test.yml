@@ -49,12 +49,13 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: ${{ matrix.cache }}
+      - run: make test
       - name: Install winget
         if: matrix.platform == 'windows-latest'
         uses: Cyberboss/install-winget@v1
       - run: make duckdb-test
         shell: bash
-      - run: make test
+
 
   lint:
     runs-on: ubuntu-latest
