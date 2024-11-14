@@ -109,7 +109,7 @@ func (u *UvChecker) installUvCommand(ctx context.Context, dest string) error {
 	if runtime.GOOS == "windows" {
 		commandInstance = exec.Command(Shell, ShellSubcommandFlag, fmt.Sprintf("winget install --accept-package-agreements --accept-source-agreements --silent --id=astral-sh.uv --version %s --location %s -e", UvVersion, dest)) //nolint:gosec
 	} else {
-		commandInstance = exec.Command(Shell, ShellSubcommandFlag, fmt.Sprintf(" set -o pipefail; curl -LsSf https://astral.sh/uv/%s/install.sh | UV_INSTALL_DIR=\"%s\" NO_MODIFY_PATH=1 sh", UvVersion, dest)) //nolint:gosec
+		commandInstance = exec.Command(fmt.Sprintf(" set -o pipefail; curl -LsSf https://astral.sh/uv/%s/install.sh | UV_INSTALL_DIR=\"%s\" NO_MODIFY_PATH=1 sh", UvVersion, dest)) //nolint:gosec
 	}
 
 	err := u.cmd.RunAnyCommand(ctx, commandInstance)
