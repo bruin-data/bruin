@@ -266,19 +266,15 @@ type Config struct {
 func (c *Config) CanRunTaskInstances(p *pipeline.Pipeline, tasks []scheduler.TaskInstance) error {
 	for _, task := range tasks {
 		asset := task.GetAsset()
-		connName, err := p.GetConnectionNameForAsset(asset)
+		connNames, err := p.GetAllConnectionNamesForAsset(asset)
 		if err != nil {
 			return errors2.Wrap(err, "Could not find connection name for asset "+asset.Name)
 		}
 
-		if asset.Type == pipeline.AssetTypePython {
-			if asset.Connection == "" && asset.CheckCount() == 0 && len(asset.Secrets) == 0 {
-				continue
+		for _, connName := range connNames {
+			if !c.SelectedEnvironment.Connections.Exists(connName) {
+				return errors2.Errorf("Connection '%s' does not exist in the selected environment and is needed for '%s'", connName, asset.Name)
 			}
-		}
-
-		if !c.SelectedEnvironment.Connections.Exists(connName) {
-			return errors2.Errorf("Connection '%s' does not exist in the selected environment and is needed for '%s'", connName, asset.Name)
 		}
 	}
 

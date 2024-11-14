@@ -885,6 +885,45 @@ type Pipeline struct {
 	tasksByName map[string]*Asset
 }
 
+func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error) {
+	assetType := asset.Type
+	if assetType == AssetTypePython { //nolint
+		secretKeys := make([]string, 0)
+		for _, secret := range asset.Secrets {
+			secretKeys = append(secretKeys, secret.SecretKey)
+		}
+		return secretKeys, nil
+	} else if assetType == AssetTypeIngestr {
+		ingestrDestination, ok := asset.Parameters["destination_connection"]
+		// if destination connection not specified, we infer from destination type
+		if !ok {
+			assetType = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
+			mapping, ok := AssetTypeConnectionMapping[assetType]
+			if !ok {
+				return []string{}, errors.Errorf("No connection mapping found for asset type:'%s' (%s)", assetType, asset.Name)
+			}
+			conn, ok := p.DefaultConnections[mapping]
+			if ok {
+				ingestrDestination = conn
+			}
+		}
+
+		ingestrSource, ok := asset.Parameters["source_connection"]
+		if !ok {
+			return []string{}, errors.Errorf("No source connection in asset")
+		}
+
+		return []string{ingestrDestination, ingestrSource}, nil
+	} else {
+		conn, err := p.GetConnectionNameForAsset(asset)
+		if err != nil {
+			return []string{}, err
+		}
+
+		return []string{conn}, nil
+	}
+}
+
 func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 	if asset.Connection != "" {
 		return asset.Connection, nil
