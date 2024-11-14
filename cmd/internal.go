@@ -229,7 +229,7 @@ func PatchAsset() *cli.Command {
 	}
 }
 
-func ParseLineage(pipeline *pipeline.Pipeline, asset *pipeline.Asset) error {
+func ParseLineage(pipe *pipeline.Pipeline, asset *pipeline.Asset) error {
 	parser, err := sqlparser.NewSQLParser()
 	if err != nil {
 		return err
@@ -242,17 +242,26 @@ func ParseLineage(pipeline *pipeline.Pipeline, asset *pipeline.Asset) error {
 	columnMetadata := make(sqlparser.Schema)
 
 	for _, upstream := range asset.Upstreams {
-		if upstreamAsset := pipeline.GetAssetByName(upstream.Value); upstreamAsset != nil {
+		if upstreamAsset := pipe.GetAssetByName(upstream.Value); upstreamAsset != nil {
 			columnMetadata[upstreamAsset.Name] = makeColumnMap(upstreamAsset.Columns)
 		}
 	}
 
-	_, err = parser.ColumnLineage(asset.ExecutableFile.Content, "", columnMetadata)
+	lineage, err := parser.ColumnLineage(asset.ExecutableFile.Content, "", columnMetadata)
 	if err != nil {
 		return err
 	}
 
-	return err
+	for _, column := range lineage.Columns {
+		for _, cols := range asset.Columns {
+			if cols.Name == column.Name {
+				for _, upstream := range column.Upstream {
+					cols = *pipe.GetAssetByName(upstream.Table).GetColumnWithName(upstream.Column)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func makeColumnMap(columns []pipeline.Column) map[string]string {
