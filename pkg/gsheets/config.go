@@ -26,5 +26,4 @@ func (c *Config) GetIngestrURI() string {
 		return ""
 	}
 	return fmt.Sprintf("gsheets://?credentials_base64=%s", base64.StdEncoding.EncodeToString(creds))
-
 }
