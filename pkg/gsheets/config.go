@@ -1,12 +1,30 @@
 package gsheets
 
-import "fmt"
+import (
+	"encoding/base64"
+	"fmt"
+	"os"
+)
 
 type Config struct {
-	CredentialsBase64 string
+	CredentialsFilePath string
+	CredentialsJSON     string
 }
 
 func (c *Config) GetIngestrURI() string {
-	fmt.Println("CredentialsBase64", c.CredentialsBase64)
-	return "gsheets://?credentials_base64=" + c.CredentialsBase64
+	var creds []byte
+	switch {
+	case c.CredentialsJSON != "":
+		creds = []byte(c.CredentialsJSON)
+	case c.CredentialsFilePath != "":
+		var err error
+		creds, err = os.ReadFile(c.CredentialsFilePath)
+		if err != nil {
+			return ""
+		}
+	default:
+		return ""
+	}
+	return fmt.Sprintf("gsheets://?credentials_base64=%s", base64.StdEncoding.EncodeToString(creds))
+
 }
