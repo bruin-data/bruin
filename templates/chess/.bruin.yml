@@ -4,7 +4,7 @@ environments:
     connections:
       duckdb:
         - name: "duckdb-default"
-          path: "/tmp/duckdb.db"
+          path: "duckdb.db"
       chess:
         - name: "chess-default"
           players:
