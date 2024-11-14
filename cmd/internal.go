@@ -115,7 +115,7 @@ func (r *ParseCommand) ParsePipeline(assetPath string) error {
 
 	foundPipeline.WipeContentOfAssets()
 
-	js, err := json.Marshal(foundPipeline)
+	js, err := json.MarshalIndent(foundPipeline, "", "  ")
 	if err != nil {
 		printErrorJSON(err)
 		return cli.Exit("", 1)
