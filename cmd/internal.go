@@ -168,31 +168,7 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 		Repo:     repoRoot,
 	}
 	if lineage {
-		parser, err := sqlparser.NewSQLParser()
-		if err != nil {
-			printErrorJSON(err)
-			return cli.Exit("", 1)
-		}
 
-		if err := parser.Start(); err != nil {
-			printErrorJSON(err)
-			return cli.Exit("", 1)
-		}
-
-		columnMetadata := make(sqlparser.Schema)
-
-		columnMetadata[asset.Name] = makeColumnMap(asset.Columns)
-		for _, upstream := range asset.Upstreams {
-			if upstreamAsset := foundPipeline.GetAssetByName(upstream.Value); upstreamAsset != nil {
-				columnMetadata[upstreamAsset.Name] = makeColumnMap(upstreamAsset.Columns)
-			}
-		}
-
-		result.Lineage, err = parser.ColumnLineage(asset.ExecutableFile.Content, "", columnMetadata)
-		if err != nil {
-			printErrorJSON(err)
-			return cli.Exit("", 1)
-		}
 	}
 
 	js, err := json.MarshalIndent(result, "", "  ")
@@ -251,6 +227,32 @@ func PatchAsset() *cli.Command {
 			return nil
 		},
 	}
+}
+
+func ParseLineage(pipeline *pipeline.Pipeline, asset *pipeline.Asset) error {
+	parser, err := sqlparser.NewSQLParser()
+	if err != nil {
+		return err
+	}
+
+	if err := parser.Start(); err != nil {
+		return err
+	}
+
+	columnMetadata := make(sqlparser.Schema)
+
+	for _, upstream := range asset.Upstreams {
+		if upstreamAsset := pipeline.GetAssetByName(upstream.Value); upstreamAsset != nil {
+			columnMetadata[upstreamAsset.Name] = makeColumnMap(upstreamAsset.Columns)
+		}
+	}
+
+	_, err = parser.ColumnLineage(asset.ExecutableFile.Content, "", columnMetadata)
+	if err != nil {
+		return err
+	}
+
+	return err
 }
 
 func makeColumnMap(columns []pipeline.Column) map[string]string {

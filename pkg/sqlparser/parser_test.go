@@ -214,6 +214,16 @@ func TestSqlParser_Lineage(t *testing.T) {
 			},
 		},
 		{
+			name: "yuvraj test",
+			sql: `
+				SELECT * from example2
+			`,
+			schema: Schema{
+				"example2": {"id": "str", "manager_id": "str"},
+			},
+			want: &Lineage{},
+		},
+		{
 			name: "self join",
 			sql: `
 				SELECT e1.id, e2.manager_id
