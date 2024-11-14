@@ -341,12 +341,12 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 
 	// Make duckdb paths absolute
 	for _, env := range config.Environments {
-		for _, conn := range env.Connections.DuckDB {
+		for i, conn := range env.Connections.DuckDB {
 			if filepath.IsAbs(conn.Path) {
 				continue
 			}
-
-			conn.Path = filepath.Join(configLocation, conn.Path)
+			fmt.Printf("Fixing %s to %s", conn.Path, filepath.Join(configLocation, conn.Path))
+			env.Connections.DuckDB[i].Path = filepath.Join(configLocation, conn.Path)
 		}
 	}
 
