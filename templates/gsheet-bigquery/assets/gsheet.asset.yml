@@ -3,21 +3,24 @@ type: ingestr
 
 description: This asset manages the ingestion of Google Sheet data into BigQuery. It captures comprehensive customer information including customer IDs, email addresses, and creation timestamps. The asset includes data quality checks to ensure critical fields like customer ID and email are properly populated.
 columns:
-  - name: id
-    type: integer
-    description: "Customer unique identifier"
-    primary_key: true
-    checks:
-      - name: not_null
-      - name: positive
-  - name: email
+  - name: name
     type: varchar
-    description: "Customer email address"
+    description: "Contact person's full name"
     checks:
       - name: not_null
-  - name: created_at
-    type: timestamp
-    description: "Timestamp when customer was created"
+  - name: networking_through
+    type: varchar
+    description: "Source or connection through which contact was made"
+    checks:
+      - name: not_null
+  - name: position
+    type: varchar
+    description: "Contact's job position or title"
+    checks:
+      - name: not_null
+  - name: contact_date
+    type: varchar
+    description: "Date when contact was established"
     checks:
       - name: not_null
 
