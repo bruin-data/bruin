@@ -141,7 +141,7 @@ environments:
           api_key: "hubspotkey"
       google_sheets:
           - name: conn22
-            credentials_base64: "/path/to/service_account.json"
+            credentials_base64: "Y3JlZGVudGlhbA"
       chess:
         - name: conn24
           players:
