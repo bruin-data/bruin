@@ -3,7 +3,7 @@
 This pipeline is a simple example of a Bruin pipeline that copies data from GSheet to DuckDB. It demonstrates how to use the `bruin` CLI to build and run a pipeline.
 
 The pipeline includes two sample assets already:
-- `gsheet_raw.customers`: A simple ingestr asset that copies a table from Shopify to DuckDB
+- `gsheet_raw.customers`: A simple ingestr asset that copies a table from GSheet to DuckDB
 
 ## Setup
 The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://bruin-data.github.io/bruin/connections/overview.html).
