@@ -591,7 +591,6 @@ func TestConfig_AddConnection(t *testing.T) {
 				require.NoError(t, err)
 				env, exists := conf.Environments[tt.envName]
 				assert.True(t, exists)
-
 				switch tt.connType {
 				case "google_cloud_platform":
 					assert.Len(t, env.Connections.GoogleCloudPlatform, 1)
