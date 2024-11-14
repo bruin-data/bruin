@@ -310,8 +310,8 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			}
 
-			assetsToBeRan := s.GetTaskInstancesByStatus(scheduler.Pending)
-			err = cm.CanRunTaskInstances(foundPipeline, assetsToBeRan)
+			assetsToBeRun := s.GetTaskInstancesByStatus(scheduler.Pending)
+			err = cm.CanRunTaskInstances(foundPipeline, assetsToBeRun)
 			if err != nil {
 				errorPrinter.Printf(err.Error()) //nolint: govet
 				return cli.Exit("", 1)
