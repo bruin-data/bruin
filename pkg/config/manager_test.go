@@ -13,10 +13,12 @@ import (
 func TestLoadFromFile(t *testing.T) {
 	t.Parallel()
 
-	var duckPath string
+	var duckPath, configFile string
 	if runtime.GOOS == "windows" {
+		configFile = "simple_win.yml"
 		duckPath = "C:\\path\\to\\duck.db"
 	} else {
+		configFile = "simple.yml"
 		duckPath = "/path/to/duck.db"
 	}
 
@@ -294,7 +296,7 @@ func TestLoadFromFile(t *testing.T) {
 		{
 			name: "read simple connection",
 			args: args{
-				path: "testdata/simple.yml",
+				path: "testdata/" + configFile,
 			},
 			want: &Config{
 				DefaultEnvironmentName:  "dev",

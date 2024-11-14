@@ -1,0 +1,183 @@
+default_environment: dev
+environments:
+  dev:
+    connections:
+      google_cloud_platform:
+        - name: conn1
+          service_account_json: "{\"key1\": \"value1\"}"
+          service_account_file: "/path/to/service_account.json"
+          project_id: "my-project"
+
+      snowflake:
+        - name: conn2
+          username: "user"
+          password: "pass"
+          account: "account"
+          database: "db"
+          warehouse: "wh"
+          schema: "schema"
+          role: "role"
+          region: "region"
+
+      postgres:
+        - name: conn3
+          username: "pguser"
+          password: "pgpass"
+          host: "somehost"
+          port: 5432
+          database: "pgdb"
+          schema: "non_public_schema"
+          pool_max_conns: 5
+          ssl_mode: "require"
+
+      redshift:
+        - name: conn4
+          username: "rsuser"
+          password: "rspass"
+          host: "someredshift"
+          port: 5433
+          database: "rsdb"
+          pool_max_conns: 4
+          ssl_mode: "disable"
+
+      mssql:
+        - name: conn5
+          username: "msuser"
+          password: "mspass"
+          host: "somemssql"
+          port: 1433
+          database: "mssqldb"
+
+      databricks:
+        - name: conn55
+          host: "hostbricks"
+          path: "sql"
+          token: "aaaaaaaa"
+          port: 443
+
+      synapse:
+        - name: conn6
+          username: "syuser"
+          password: "sypass"
+          host: "somemsynapse"
+          port: 1434
+          database: "sydb"
+
+      mongo:
+        - name: conn7
+          username: "mongouser"
+          password: "mongopass"
+          host: "mongohost"
+          port: 27017
+          database: "mongodb"
+
+      mysql:
+        - name: conn8
+          username: "mysqluser"
+          password: "mysqlpass"
+          host: "mysqlhost"
+          port: 3306
+          database: "mysqldb"
+
+      notion:
+        - name: conn9
+          api_key: "XXXXYYYYZZZZ"
+
+      hana:
+        - name: conn10
+          username: "hanauser"
+          password: "hanapass"
+          host: "hanahost"
+          port: 39013
+          database: "hanadb"
+
+      shopify:
+        - name: conn11
+          api_key: "shopifykey"
+          url: "shopifyurl"
+
+      gorgias:
+        - name: conn12
+          api_key: "gorgiaskey"
+          domain: "gorgiasurl"
+          email: "gorgiasemail"
+
+      aws:
+        - name: conn13
+          access_key: "awskey"
+          secret_key: "awssecret"
+      athena:
+        - name: conn14
+          access_key_id: "athena_key"
+          secret_access_key: "athena_secret"
+          query_results_path: "s3://bucket/prefix"
+          region: "us-west-2"
+          database: "athena_db"
+      klaviyo:
+        - name: conn15
+          api_key: "klaviyokey"
+      adjust:
+        - name: conn16
+          api_key: "adjustokey"
+      facebookads:
+        - name: conn17
+          access_token: "Facebookkey"
+          account_id: "Id123"
+      stripe:
+        - name: conn18
+          api_key: "stripekey"
+      appsflyer:
+        - name: conn19
+          api_key: "appsflyerkey"
+      kafka:
+        - name: conn20
+          bootstrap_servers: "localhost:9093"
+          group_id: "kafka123"
+      duckdb:
+        - name: conn20
+          path: "C:\\path\\to\\duck.db"
+      hubspot:
+        - name: conn21
+          api_key: "hubspotkey"
+      google_sheets:
+        - name: conn22
+          credentials_path: "/path/to/service_account.json"
+      chess:
+        - name: conn24
+          players:
+            - "Max"
+            - "Peter"
+      airtable:
+        - name: conn23
+          base_id: "123"
+          access_token: "accessKey"
+      zendesk:
+        - name: conn25
+          api_token: "zendeskKey"
+          email: "zendeskemail"
+          subdomain: "zendeskUrl"
+
+        - name: conn25-1
+          oauth_token: "zendeskToken"
+          subdomain: "zendeskUrl"
+      s3:
+        - name: conn25
+          bucket_name:  "my-bucket"
+          path_to_file:  "/folder1/file.csv"
+          access_key_id: "123Key"
+          secret_access_key: "secretKey123"
+      slack:
+        - name: conn26
+          api_key: "slackkey"
+      generic:
+        - name: key1
+          value: value1
+        - name: key2
+          value: value2
+
+  prod:
+    connections:
+      google_cloud_platform:
+        - name: conn1
+          service_account_file: "/path/to/service_account.json"
+          project_id: "my-project"
