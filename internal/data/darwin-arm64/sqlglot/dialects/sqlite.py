@@ -15,8 +15,10 @@ from sqlglot.dialects.dialect import (
     no_tablesample_sql,
     no_trycast_sql,
     rename_func,
+    str_position_sql,
 )
 from sqlglot.tokens import TokenType
+from sqlglot.generator import unsupported_args
 
 
 def _date_add_sql(self: SQLite.Generator, expression: exp.DateAdd) -> str:
@@ -75,6 +77,26 @@ def _transform_create(expression: exp.Expression) -> exp.Expression:
     return expression
 
 
+def _generated_to_auto_increment(expression: exp.Expression) -> exp.Expression:
+    if not isinstance(expression, exp.ColumnDef):
+        return expression
+
+    generated = expression.find(exp.GeneratedAsIdentityColumnConstraint)
+
+    if generated:
+        t.cast(exp.ColumnConstraint, generated.parent).pop()
+
+        not_null = expression.find(exp.NotNullColumnConstraint)
+        if not_null:
+            t.cast(exp.ColumnConstraint, not_null.parent).pop()
+
+        expression.append(
+            "constraints", exp.ColumnConstraint(kind=exp.AutoIncrementColumnConstraint())
+        )
+
+    return expression
+
+
 class SQLite(Dialect):
     # https://sqlite.org/forum/forumpost/5e575586ac5c711b?raw
     NORMALIZATION_STRATEGY = NormalizationStrategy.CASE_INSENSITIVE
@@ -86,13 +108,26 @@ class SQLite(Dialect):
         IDENTIFIERS = ['"', ("[", "]"), "`"]
         HEX_STRINGS = [("x'", "'"), ("X'", "'"), ("0x", ""), ("0X", "")]
 
+        KEYWORDS = tokens.Tokenizer.KEYWORDS.copy()
+        KEYWORDS.pop("/*+")
+
     class Parser(parser.Parser):
         FUNCTIONS = {
             **parser.Parser.FUNCTIONS,
             "EDITDIST3": exp.Levenshtein.from_arg_list,
             "STRFTIME": _build_strftime,
+            "DATETIME": lambda args: exp.Anonymous(this="DATETIME", expressions=args),
+            "TIME": lambda args: exp.Anonymous(this="TIME", expressions=args),
         }
         STRING_ALIASES = True
+
+        def _parse_unique(self) -> exp.UniqueColumnConstraint:
+            # Do not consume more tokens if UNIQUE is used as a standalone constraint, e.g:
+            # CREATE TABLE foo (bar TEXT UNIQUE REFERENCES baz ...)
+            if self._curr.text.upper() in self.CONSTRAINT_PARSERS:
+                return self.expression(exp.UniqueColumnConstraint)
+
+            return super()._parse_unique()
 
     class Generator(generator.Generator):
         JOIN_HINTS = False
@@ -103,6 +138,8 @@ class SQLite(Dialect):
         SUPPORTS_CREATE_TABLE_LIKE = False
         SUPPORTS_TABLE_ALIAS_COLUMNS = False
         SUPPORTS_TO_NUMBER = False
+        EXCEPT_INTERSECT_SUPPORT_ALL_CLAUSE = False
+        SUPPORTS_MEDIAN = False
 
         SUPPORTED_JSON_PATH_PARTS = {
             exp.JSONPathKey,
@@ -141,13 +178,16 @@ class SQLite(Dialect):
             exp.CurrentDate: lambda *_: "CURRENT_DATE",
             exp.CurrentTime: lambda *_: "CURRENT_TIME",
             exp.CurrentTimestamp: lambda *_: "CURRENT_TIMESTAMP",
+            exp.ColumnDef: transforms.preprocess([_generated_to_auto_increment]),
             exp.DateAdd: _date_add_sql,
             exp.DateStrToDate: lambda self, e: self.sql(e, "this"),
             exp.If: rename_func("IIF"),
             exp.ILike: no_ilike_sql,
             exp.JSONExtract: _json_extract_sql,
             exp.JSONExtractScalar: arrow_json_extract_sql,
-            exp.Levenshtein: rename_func("EDITDIST3"),
+            exp.Levenshtein: unsupported_args("ins_cost", "del_cost", "sub_cost", "max_dist")(
+                rename_func("EDITDIST3")
+            ),
             exp.LogicalOr: rename_func("MAX"),
             exp.LogicalAnd: rename_func("MIN"),
             exp.Pivot: no_pivot_sql,
@@ -158,6 +198,9 @@ class SQLite(Dialect):
                     transforms.eliminate_qualify,
                     transforms.eliminate_semi_and_anti_joins,
                 ]
+            ),
+            exp.StrPosition: lambda self, e: str_position_sql(
+                self, e, str_position_func_name="INSTR"
             ),
             exp.TableSample: no_tablesample_sql,
             exp.TimeStrToTime: lambda self, e: self.sql(e, "this"),
@@ -197,7 +240,7 @@ class SQLite(Dialect):
                     exp.select(exp.alias_("value", column_alias)).from_(expression).subquery()
                 )
             else:
-                sql = super().generateseries_sql(expression)
+                sql = self.function_fallback_sql(expression)
 
             return sql
 
@@ -224,7 +267,7 @@ class SQLite(Dialect):
             elif unit == "NANOSECOND":
                 sql = f"{sql} * 8640000000000.0"
             else:
-                self.unsupported("DATEDIFF unsupported for '{unit}'.")
+                self.unsupported(f"DATEDIFF unsupported for '{unit}'.")
 
             return f"CAST({sql} AS INTEGER)"
 
