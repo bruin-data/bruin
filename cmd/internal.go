@@ -259,13 +259,13 @@ func ParseLineage(pipe *pipeline.Pipeline, asset *pipeline.Asset) error {
 	for _, lineageCol := range lineage.Columns {
 		for _, upstream := range lineageCol.Upstream {
 			upstreamAsset := pipe.GetAssetByName(upstream.Table)
-			if upstreamAsset == nil {
-				return fmt.Errorf("upstream asset not found: %s", upstream.Table)
-			}
 
+			if upstreamAsset == nil {
+				continue
+			}
 			upstreamCol := upstreamAsset.GetColumnWithName(upstream.Column)
 			if upstreamCol == nil {
-				return fmt.Errorf("column %s not found in asset %s", upstream.Column, upstream.Table)
+				continue
 			}
 
 			newCol := *upstreamCol
