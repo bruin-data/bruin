@@ -146,9 +146,11 @@ jobs:
       - name: Use install script
         shell: bash
         run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh -s -- -d ${GITHUB_REF##*/}
+      - name: Install winget
+        uses: Cyberboss/install-winget@v1
       - name: Test Pipeline
         shell: bash
-        run: /c/Users/runneradmin/.local/bin/bruin.exe init duckdb test-pipeline && cd test-pipeline && git init && /c/Users/runneradmin/.local/bin/bruin.exe run .
+        run: /c/Users/runneradmin/.local/bin/bruin.exe init chess test-pipeline && cd test-pipeline && git init && /c/Users/runneradmin/.local/bin/bruin.exe run .
 
   install-unix:
     runs-on: ubuntu-latest
@@ -167,7 +169,7 @@ jobs:
       - name: Use install script
         run: curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh -s -- -d ${{ env.tag }}
       - name: Test Pipeline
-        run: bruin init duckdb test-pipeline && cd test-pipeline && git init && bruin run .
+        run: bruin init chess test-pipeline && cd test-pipeline && git init && bruin run .
 
   release:
     runs-on: ubuntu-latest

@@ -333,6 +333,23 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 		config.DefaultEnvironmentName = "default"
 	}
 
+	absoluteConfigPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get absolute path: %w", err)
+	}
+	configLocation := filepath.Dir(absoluteConfigPath)
+
+	// Make duckdb paths absolute
+	for _, env := range config.Environments {
+		for i, conn := range env.Connections.DuckDB {
+			if filepath.IsAbs(conn.Path) {
+				continue
+			}
+			fmt.Printf("Fixing %s to %s", conn.Path, filepath.Join(configLocation, conn.Path))
+			env.Connections.DuckDB[i].Path = filepath.Join(configLocation, conn.Path)
+		}
+	}
+
 	err = config.SelectEnvironment(config.DefaultEnvironmentName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select default environment: %w", err)

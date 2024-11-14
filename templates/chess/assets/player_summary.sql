@@ -9,6 +9,13 @@ depends:
    - chess_playground.games
    - chess_playground.profiles
 
+columns:
+  - name: total_games
+    type: integer
+    description: "the games"
+    checks:
+      - name: positive
+
 @bruin */
 
 WITH game_results AS (
