@@ -115,7 +115,7 @@ func (r *ParseCommand) ParsePipeline(assetPath string) error {
 
 	foundPipeline.WipeContentOfAssets()
 
-	js, err := json.MarshalIndent(foundPipeline, "", "  ")
+	js, err := json.Marshal(foundPipeline)
 	if err != nil {
 		printErrorJSON(err)
 		return cli.Exit("", 1)
@@ -172,7 +172,7 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 		Repo:     repoRoot,
 	}
 
-	js, err := json.MarshalIndent(result, "", "  ")
+	js, err := json.Marshal(result)
 	if err != nil {
 		printErrorJSON(err)
 		return cli.Exit("", 1)
