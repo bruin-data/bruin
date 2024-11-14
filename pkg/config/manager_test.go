@@ -1,6 +1,7 @@
 package config
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -11,6 +12,13 @@ import (
 
 func TestLoadFromFile(t *testing.T) {
 	t.Parallel()
+
+	var duckPath string
+	if runtime.GOOS == "windows" {
+		duckPath = "C:\\path\\to\\duck.db"
+	} else {
+		duckPath = "/path/to/duck.db"
+	}
 
 	devEnv := Environment{
 		Connections: &Connections{
@@ -208,7 +216,7 @@ func TestLoadFromFile(t *testing.T) {
 			DuckDB: []DuckDBConnection{
 				{
 					Name: "conn20",
-					Path: "/path/to/duck.db",
+					Path: duckPath,
 				},
 			},
 			Hubspot: []HubspotConnection{
