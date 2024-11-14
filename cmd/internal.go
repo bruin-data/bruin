@@ -157,34 +157,7 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 
 	foundPipeline.Assets = nil
 
-	parser, err := sqlparser.NewSQLParser()
-	if err != nil {
-		printErrorJSON(err)
-		return cli.Exit("", 1)
-	}
-
-	if err := parser.Start(); err != nil {
-		printErrorJSON(err)
-		return cli.Exit("", 1)
-	}
-	columnMetadata := make(map[string]map[string]string)
-	columnMetadata[asset.Name] = make(map[string]string, len(asset.Columns))
-
-	for _, col := range asset.Columns {
-		columnMetadata[asset.Name][col.Name] = col.Type
-	}
-
-	fmt.Println(columnMetadata)
-
-	lineageResult, err := parser.ColumnLineage(asset.ExecutableFile.Content, "", columnMetadata)
-	if err != nil {
-		printErrorJSON(errors2.Wrap(err, "failed to analyze column lineage"))
-		return cli.Exit("", 1)
-	}
-
-	fmt.Println(lineageResult)
-
-	js, err := json.MarshalIndent(struct {
+	result := struct {
 		Asset    *pipeline.Asset    `json:"asset"`
 		Lineage  *sqlparser.Lineage `json:"lineage"`
 		Pipeline *pipeline.Pipeline `json:"pipeline"`
@@ -192,9 +165,39 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 	}{
 		Asset:    asset,
 		Pipeline: foundPipeline,
-		Lineage:  lineageResult,
 		Repo:     repoRoot,
-	}, "", "  ")
+	}
+	if lineage {
+		parser, err := sqlparser.NewSQLParser()
+		if err != nil {
+			printErrorJSON(err)
+			return cli.Exit("", 1)
+		}
+
+		if err := parser.Start(); err != nil {
+			printErrorJSON(err)
+			return cli.Exit("", 1)
+		}
+		columnMetadata := make(map[string]map[string]string)
+		columnMetadata[asset.Name] = make(map[string]string, len(asset.Columns))
+
+		for _, col := range asset.Columns {
+			columnMetadata[asset.Name][col.Name] = col.Type
+		}
+
+		lineageResult, err := parser.ColumnLineage(asset.ExecutableFile.Content, "", columnMetadata)
+		if err != nil {
+			printErrorJSON(errors2.Wrap(err, "failed to analyze column lineage"))
+			return cli.Exit("", 1)
+		}
+		result.Lineage = lineageResult
+	}
+
+	js, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		printErrorJSON(err)
+		return cli.Exit("", 1)
+	}
 
 	fmt.Println(string(js))
 
