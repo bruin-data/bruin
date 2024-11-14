@@ -9,6 +9,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	color2 "github.com/fatih/color"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -33,13 +34,22 @@ func ParseAsset() *cli.Command {
 		Name:      "parse-asset",
 		Usage:     "parse a single Bruin asset",
 		ArgsUsage: "[path to the asset definition]",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:        "column-lineage",
+				Aliases:     []string{"c"},
+				Usage:       "return the column lineage for the given asset",
+				Required:    false,
+				DefaultText: "false",
+			},
+		},
 		Action: func(c *cli.Context) error {
 			r := ParseCommand{
 				builder:      DefaultPipelineBuilder,
 				errorPrinter: errorPrinter,
 			}
 
-			return r.Run(c.Args().Get(0))
+			return r.Run(c.Args().Get(0), c.Bool("column-lineage"))
 		},
 	}
 }
@@ -116,7 +126,7 @@ func (r *ParseCommand) ParsePipeline(assetPath string) error {
 	return err
 }
 
-func (r *ParseCommand) Run(assetPath string) error {
+func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 	defer RecoverFromPanic()
 
 	if assetPath == "" {
@@ -147,15 +157,44 @@ func (r *ParseCommand) Run(assetPath string) error {
 
 	foundPipeline.Assets = nil
 
-	js, err := json.Marshal(struct {
+	parser, err := sqlparser.NewSQLParser()
+	if err != nil {
+		printErrorJSON(err)
+		return cli.Exit("", 1)
+	}
+
+	if err := parser.Start(); err != nil {
+		printErrorJSON(err)
+		return cli.Exit("", 1)
+	}
+	columnMetadata := make(map[string]map[string]string)
+	columnMetadata[asset.Name] = make(map[string]string, len(asset.Columns))
+
+	for _, col := range asset.Columns {
+		columnMetadata[asset.Name][col.Name] = col.Type
+	}
+
+	fmt.Println(columnMetadata)
+
+	lineageResult, err := parser.ColumnLineage(asset.ExecutableFile.Content, "", columnMetadata)
+	if err != nil {
+		printErrorJSON(errors2.Wrap(err, "failed to analyze column lineage"))
+		return cli.Exit("", 1)
+	}
+
+	fmt.Println(lineageResult)
+
+	js, err := json.MarshalIndent(struct {
 		Asset    *pipeline.Asset    `json:"asset"`
+		Lineage  *sqlparser.Lineage `json:"lineage"`
 		Pipeline *pipeline.Pipeline `json:"pipeline"`
 		Repo     *git.Repo          `json:"repo"`
 	}{
 		Asset:    asset,
 		Pipeline: foundPipeline,
+		Lineage:  lineageResult,
 		Repo:     repoRoot,
-	})
+	}, "", "  ")
 
 	fmt.Println(string(js))
 
