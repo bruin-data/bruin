@@ -2,11 +2,10 @@ package config
 
 import (
 	"runtime"
-
-	"github.com/bruin-data/bruin/pkg/scheduler"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
