@@ -178,19 +178,21 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 			printErrorJSON(err)
 			return cli.Exit("", 1)
 		}
-		columnMetadata := make(map[string]map[string]string)
-		columnMetadata[asset.Name] = make(map[string]string, len(asset.Columns))
 
-		for _, col := range asset.Columns {
-			columnMetadata[asset.Name][col.Name] = col.Type
+		columnMetadata := make(sqlparser.Schema)
+
+		columnMetadata[asset.Name] = makeColumnMap(asset.Columns)
+		for _, upstream := range asset.Upstreams {
+			if upstreamAsset := foundPipeline.GetAssetByName(upstream.Value); upstreamAsset != nil {
+				columnMetadata[upstreamAsset.Name] = makeColumnMap(upstreamAsset.Columns)
+			}
 		}
 
-		lineageResult, err := parser.ColumnLineage(asset.ExecutableFile.Content, "", columnMetadata)
+		result.Lineage, err = parser.ColumnLineage(asset.ExecutableFile.Content, "", columnMetadata)
 		if err != nil {
-			printErrorJSON(errors2.Wrap(err, "failed to analyze column lineage"))
+			printErrorJSON(err)
 			return cli.Exit("", 1)
 		}
-		result.Lineage = lineageResult
 	}
 
 	js, err := json.MarshalIndent(result, "", "  ")
@@ -249,4 +251,12 @@ func PatchAsset() *cli.Command {
 			return nil
 		},
 	}
+}
+
+func makeColumnMap(columns []pipeline.Column) map[string]string {
+	columnMap := make(map[string]string, len(columns))
+	for _, col := range columns {
+		columnMap[col.Name] = col.Type
+	}
+	return columnMap
 }
