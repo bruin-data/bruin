@@ -273,8 +273,6 @@ func ParseLineage(pipe *pipeline.Pipeline, asset *pipeline.Asset) error {
 
 			if col := asset.GetColumnWithName(lineageCol.Name); col == nil {
 				asset.Columns = append(asset.Columns, newCol)
-			} else {
-				*col = newCol
 			}
 		}
 	}
