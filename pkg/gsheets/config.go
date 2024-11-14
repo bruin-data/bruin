@@ -1,9 +1,12 @@
 package gsheets
 
+import "fmt"
+
 type Config struct {
-	CredentialsPath string
+	CredentialsBase64 string
 }
 
 func (c *Config) GetIngestrURI() string {
-	return "gsheets://?credentials_path=" + c.CredentialsPath
+	fmt.Println("CredentialsBase64", c.CredentialsBase64)
+	return "gsheets://?credentials_base64=" + c.CredentialsBase64
 }

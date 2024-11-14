@@ -1300,7 +1300,7 @@ func (m *Manager) AddGoogleSheetsConnectionFromConfig(connection *config.GoogleS
 	m.mutex.Unlock()
 
 	client, err := gsheets.NewClient(gsheets.Config{
-		CredentialsPath: connection.CredentialsPath,
+		CredentialsBase64: connection.CredentialsBase64,
 	})
 	if err != nil {
 		return err
