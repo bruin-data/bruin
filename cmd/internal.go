@@ -155,20 +155,21 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 
 	asset := foundPipeline.GetAssetByPath(assetPath)
 
-	foundPipeline.Assets = nil
+	if lineage {
+		if err := ParseLineage(foundPipeline, asset); err != nil {
+			printErrorJSON(err)
+			return cli.Exit("", 1)
+		}
+	}
 
 	result := struct {
 		Asset    *pipeline.Asset    `json:"asset"`
-		Lineage  *sqlparser.Lineage `json:"lineage"`
 		Pipeline *pipeline.Pipeline `json:"pipeline"`
 		Repo     *git.Repo          `json:"repo"`
 	}{
 		Asset:    asset,
 		Pipeline: foundPipeline,
 		Repo:     repoRoot,
-	}
-	if lineage {
-
 	}
 
 	js, err := json.MarshalIndent(result, "", "  ")
@@ -229,41 +230,59 @@ func PatchAsset() *cli.Command {
 	}
 }
 
+// ParseLineage analyzes the column lineage for a given asset within a pipeline.
+// It traces column relationships between the asset and its upstream dependencies.
 func ParseLineage(pipe *pipeline.Pipeline, asset *pipeline.Asset) error {
 	parser, err := sqlparser.NewSQLParser()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create SQL parser: %w", err)
 	}
 
 	if err := parser.Start(); err != nil {
-		return err
+		return fmt.Errorf("failed to start SQL parser: %w", err)
 	}
 
 	columnMetadata := make(sqlparser.Schema)
-
 	for _, upstream := range asset.Upstreams {
-		if upstreamAsset := pipe.GetAssetByName(upstream.Value); upstreamAsset != nil {
-			columnMetadata[upstreamAsset.Name] = makeColumnMap(upstreamAsset.Columns)
+		upstreamAsset := pipe.GetAssetByName(upstream.Value)
+		if upstreamAsset == nil {
+			return fmt.Errorf("upstream asset not found: %s", upstream.Value)
 		}
+		columnMetadata[upstreamAsset.Name] = makeColumnMap(upstreamAsset.Columns)
 	}
 
 	lineage, err := parser.ColumnLineage(asset.ExecutableFile.Content, "", columnMetadata)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to parse column lineage: %w", err)
 	}
 
-	for _, column := range lineage.Columns {
-		for _, cols := range asset.Columns {
-			if cols.Name == column.Name {
-				for _, upstream := range column.Upstream {
-					cols = *pipe.GetAssetByName(upstream.Table).GetColumnWithName(upstream.Column)
-				}
+	for _, lineageCol := range lineage.Columns {
+		for _, upstream := range lineageCol.Upstream {
+			upstreamAsset := pipe.GetAssetByName(upstream.Table)
+			if upstreamAsset == nil {
+				return fmt.Errorf("upstream asset not found: %s", upstream.Table)
+			}
+
+			upstreamCol := upstreamAsset.GetColumnWithName(upstream.Column)
+			if upstreamCol == nil {
+				return fmt.Errorf("column %s not found in asset %s", upstream.Column, upstream.Table)
+			}
+
+			newCol := *upstreamCol
+			newCol.Name = lineageCol.Name
+
+			if col := asset.GetColumnWithName(lineageCol.Name); col == nil {
+				asset.Columns = append(asset.Columns, newCol)
+			} else {
+				*col = newCol
 			}
 		}
 	}
+
 	return nil
 }
 
+// makeColumnMap creates a map of column names to their types from a slice of columns.
 func makeColumnMap(columns []pipeline.Column) map[string]string {
 	columnMap := make(map[string]string, len(columns))
 	for _, col := range columns {
