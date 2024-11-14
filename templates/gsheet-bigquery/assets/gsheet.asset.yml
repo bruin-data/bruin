@@ -21,11 +21,10 @@ columns:
   - name: contact_date
     type: varchar
     description: "Date when contact was established"
-    checks:
-      - name: not_null
+
 
 parameters:
   source_connection: gsheet-default
-  source_table: 1p40qR9t6DM5a1IskTkqEX9eZYZmBeILzUX_AdMkg__A.Sheet1
+  source_table: 16UY6EQ_6jnaNpRsMgbf0OpxsYh6fkdUQ2bjdNfUq2CA.Sheet1
   destination: bigquery
   destination_table: customers

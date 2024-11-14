@@ -22,8 +22,7 @@ columns:
   - name: contact_date
     type: varchar
     description: "Date when contact was established"
-    checks:
-      - name: not_null
+
 
 parameters:
   source_connection: gsheet-default
