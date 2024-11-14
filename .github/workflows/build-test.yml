@@ -49,10 +49,9 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: ${{ matrix.cache }}
-      - run: make test
       - run: make duckdb-test
         shell: bash
-
+      - run: make test
 
   lint:
     runs-on: ubuntu-latest
