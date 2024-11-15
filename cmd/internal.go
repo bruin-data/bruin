@@ -130,6 +130,9 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool) error {
 			}
 		}
 	}
+
+	foundPipeline.WipeContentOfAssets()
+
 	js, err := json.MarshalIndent(foundPipeline, "", " ")
 	if err != nil {
 		printErrorJSON(err)

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -182,7 +181,7 @@ func TestParseLineageRecursively(t *testing.T) {
 	tests := []struct {
 		name     string
 		pipeline *pipeline.Pipeline
-		asset    *pipeline.Asset
+		after    *pipeline.Pipeline
 		want     error
 	}{
 		{
@@ -190,56 +189,72 @@ func TestParseLineageRecursively(t *testing.T) {
 			pipeline: &pipeline.Pipeline{
 				Assets: []*pipeline.Asset{
 					{
-						Name:    "table1",
-						Columns: []pipeline.Column{{Name: "id", Type: "int64"}},
-					},
-					{
-						Name:    "table2",
-						Columns: []pipeline.Column{{Name: "id", Type: "int64"}},
-						ExecutableFile: pipeline.ExecutableFile{
-							Content: "SELECT * FROM table1",
-						},
-						Upstreams: []pipeline.Upstream{{Value: "table1"}},
-					},
-					{
-						Name: "table3",
+						Name: "table1",
 						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM table2",
 						},
 						Upstreams: []pipeline.Upstream{{Value: "table2"}},
 					},
-				},
-			},
-			asset: &pipeline.Asset{
-				Name: "table3",
-				ExecutableFile: pipeline.ExecutableFile{
-					Content: "SELECT * FROM table2",
-				},
-				Upstreams: []pipeline.Upstream{{Value: "table2"}},
-			},
-			want: nil,
-		},
-		{
-			name: "upstream asset not found",
-			pipeline: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+					{
+						Name: "table2",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT * FROM table3",
+						},
+						Upstreams: []pipeline.Upstream{{Value: "table3"}},
+					},
 					{
 						Name: "table3",
-						ExecutableFile: pipeline.ExecutableFile{
-							Content: "SELECT * FROM table2",
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64"},
+							{Name: "name", Type: "str"},
+							{Name: "age", Type: "int64"},
 						},
-						Upstreams: []pipeline.Upstream{{Value: "non_existent_table"}},
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT id,name,age FROM table3",
+						},
 					},
 				},
 			},
-			asset: &pipeline.Asset{
-				Name: "table3",
-				ExecutableFile: pipeline.ExecutableFile{
-					Content: "SELECT * FROM table3",
+			after: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "table1",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT * FROM table2",
+						},
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64"},
+							{Name: "name", Type: "str"},
+							{Name: "age", Type: "int64"},
+						},
+						Upstreams: []pipeline.Upstream{{Value: "table2"}},
+					},
+					{
+						Name: "table2",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT * FROM table3",
+						},
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64"},
+							{Name: "name", Type: "str"},
+							{Name: "age", Type: "int64"},
+						},
+						Upstreams: []pipeline.Upstream{{Value: "table3"}},
+					},
+					{
+						Name: "table3",
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64"},
+							{Name: "name", Type: "str"},
+							{Name: "age", Type: "int64"},
+						},
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT id,name,age FROM table3",
+						},
+					},
 				},
-				Upstreams: []pipeline.Upstream{{Value: "non_existent_table"}},
 			},
-			want: fmt.Errorf("upstream asset not found: non_existent_table"),
+			want: nil,
 		},
 	}
 
@@ -247,14 +262,23 @@ func TestParseLineageRecursively(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := parseLineageRecursively(tt.pipeline, tt.asset)
-			if tt.want == nil {
-				if err != nil {
-					t.Errorf("parseLineageRecursively() error = %v, want nil", err)
+			for _, asset := range tt.pipeline.Assets {
+				err := parseLineageRecursive(tt.pipeline, asset)
+				if tt.want == nil {
+					if err != nil {
+						t.Errorf("parseLineageRecursive() error = %v, want nil", err)
+					}
+				} else {
+					if err == nil || err.Error() != tt.want.Error() {
+						t.Errorf("parseLineageRecursive() error = %v, want %v", err, tt.want)
+					}
 				}
-			} else {
-				if err == nil || err.Error() != tt.want.Error() {
-					t.Errorf("parseLineageRecursively() error = %v, want %v", err, tt.want)
+
+				for _, asset := range tt.after.Assets {
+					assetFound := tt.pipeline.GetAssetByName(asset.Name)
+					if assetFound == nil {
+						t.Errorf("Asset %s not found in pipeline", asset.Name)
+					}
 				}
 			}
 		})
