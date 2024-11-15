@@ -757,6 +757,14 @@ func (a *Asset) EnrichFromEntityAttributes(entities []*glossary.Entity) error {
 	return nil
 }
 
+func (a *Asset) PropagateColumns(foundPipeline *Pipeline) error {
+	if err := parseLineageRecursive(foundPipeline, a); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (a *Asset) Persist(fs afero.Fs) error {
 	if a == nil {
 		return errors.New("failed to build an asset, therefore cannot persist it")
@@ -916,6 +924,15 @@ type Pipeline struct {
 
 	TasksByType map[AssetType][]*Asset `json:"-"`
 	tasksByName map[string]*Asset
+}
+
+func (p *Pipeline) PropagateColumns() error {
+	for _, asset := range p.Assets {
+		if err := parseLineageRecursive(p, asset); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error) {
