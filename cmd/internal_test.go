@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -170,6 +171,91 @@ func TestInternalParse_Run(t *testing.T) {
 
 			if tt.afterAssets != nil {
 				assertColumns(t, tt.afterAssets.Columns, tt.wantColumns, tt.wantCount)
+			}
+		})
+	}
+}
+
+func TestParseLineageRecursively(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		pipeline *pipeline.Pipeline
+		asset    *pipeline.Asset
+		want     error
+	}{
+		{
+			name: "successful recursive lineage parsing",
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name:    "table1",
+						Columns: []pipeline.Column{{Name: "id", Type: "int64"}},
+					},
+					{
+						Name:    "table2",
+						Columns: []pipeline.Column{{Name: "id", Type: "int64"}},
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT * FROM table1",
+						},
+						Upstreams: []pipeline.Upstream{{Value: "table1"}},
+					},
+					{
+						Name: "table3",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT * FROM table2",
+						},
+						Upstreams: []pipeline.Upstream{{Value: "table2"}},
+					},
+				},
+			},
+			asset: &pipeline.Asset{
+				Name: "table3",
+				ExecutableFile: pipeline.ExecutableFile{
+					Content: "SELECT * FROM table2",
+				},
+				Upstreams: []pipeline.Upstream{{Value: "table2"}},
+			},
+			want: nil,
+		},
+		{
+			name: "upstream asset not found",
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "table3",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT * FROM table2",
+						},
+						Upstreams: []pipeline.Upstream{{Value: "non_existent_table"}},
+					},
+				},
+			},
+			asset: &pipeline.Asset{
+				Name: "table3",
+				ExecutableFile: pipeline.ExecutableFile{
+					Content: "SELECT * FROM table3",
+				},
+				Upstreams: []pipeline.Upstream{{Value: "non_existent_table"}},
+			},
+			want: fmt.Errorf("upstream asset not found: non_existent_table"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := parseLineageRecursively(tt.pipeline, tt.asset)
+			if tt.want == nil {
+				if err != nil {
+					t.Errorf("parseLineageRecursively() error = %v, want nil", err)
+				}
+			} else {
+				if err == nil || err.Error() != tt.want.Error() {
+					t.Errorf("parseLineageRecursively() error = %v, want %v", err, tt.want)
+				}
 			}
 		})
 	}
