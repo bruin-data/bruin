@@ -92,3 +92,45 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 
 	return result, nil
 }
+
+func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query) (*query.QueryResult, error) {
+	LockDatabase(c.config.ToDBConnectionURI())
+	defer UnlockDatabase(c.config.ToDBConnectionURI())
+
+	rows, err := c.connection.QueryContext(ctx, queryObject.String())
+	if err != nil {
+		return nil, err
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	defer rows.Close()
+
+	result := &query.QueryResult{
+		Columns: []string{},
+		Rows:    [][]interface{}{},
+	}
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		columns := make([]interface{}, len(cols))
+		columnPointers := make([]interface{}, len(cols))
+		for i := range columns {
+			columnPointers[i] = &columns[i]
+		}
+
+		// Scan the result into the column pointers...
+		if err := rows.Scan(columnPointers...); err != nil {
+			return nil, err
+		}
+
+		result.Rows = append(result.Rows, columns)
+	}
+
+	return result, nil
+}

@@ -31,6 +31,16 @@ func (m *mockQuerierWithResult) RunQueryWithoutResult(ctx context.Context, query
 	return args.Error(0)
 }
 
+func (m *mockQuerierWithResult) SelectWithSchema(ctx context.Context, queryObject *query.Query) (*query.QueryResult, error) {
+	args := m.Called(ctx, queryObject)
+	get := args.Get(0)
+	if get == nil {
+		return nil, args.Error(1)
+	}
+
+	return get.(*query.QueryResult), args.Error(1)
+}
+
 type mockConnectionFetcher struct {
 	mock.Mock
 }
