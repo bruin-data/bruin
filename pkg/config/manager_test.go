@@ -993,6 +993,56 @@ func TestCanRunTaskInstances(t *testing.T) {
 			},
 			expectedErr: false,
 		},
+		{
+			name: "defaults",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "gcp-default",
+							},
+						},
+						Snowflake: []SnowflakeConnection{
+							{
+								Name: "snowflake-default",
+							},
+							{
+								Name: "conn3",
+							},
+						},
+						Generic: []GenericConnection{
+							{
+								Name: "some_key",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Type: pipeline.AssetTypeBigqueryQuery,
+					},
+					{
+						Type: pipeline.AssetTypeIngestr,
+						Parameters: map[string]string{
+							"source_connection": "conn3",
+							"destination":       "snowflake",
+						},
+					},
+					{
+						Type: pipeline.AssetTypePython,
+						Secrets: []pipeline.SecretMapping{
+							{
+								SecretKey: "some_key",
+							},
+						},
+					},
+				},
+			},
+			expectedErr: false,
+		},
 	}
 
 	for _, tt := range tests {
