@@ -106,6 +106,35 @@ func TestInternalParse_Run(t *testing.T) {
 			want:        nil,
 		},
 		{
+			name: "simple select all query wihtout upstream",
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name:    "employees",
+						Columns: createEmployeeColumns(),
+					},
+				},
+			},
+			beforeAssets: &pipeline.Asset{
+				Name: "example",
+				ExecutableFile: pipeline.ExecutableFile{
+					Content: "select * from employees",
+				},
+				Upstreams: []pipeline.Upstream{},
+			},
+			afterAssets: &pipeline.Asset{
+				Name: "example",
+				ExecutableFile: pipeline.ExecutableFile{
+					Content: "select * from employees",
+				},
+				Columns:   []pipeline.Column{},
+				Upstreams: []pipeline.Upstream{},
+			},
+			wantCount:   0,
+			wantColumns: []pipeline.Column{},
+			want:        nil,
+		},
+		{
 			name:     "complex join query",
 			pipeline: createComplexJoinPipeline(),
 			beforeAssets: &pipeline.Asset{
