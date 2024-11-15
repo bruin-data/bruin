@@ -1,8 +1,7 @@
 name: gsheet_raw.customers
 type: ingestr
 
-description: This asset manages the ingestion of Google Sheet data into DuckDB. It captures comprehensive customer information including customer IDs, email addresses, and creation timestamps. The asset includes data quality checks to ensure critical fields like customer ID and email are properly populated.
-
+description: This asset manages the ingestion of Google Sheet data into DuckDB. It captures customer contact information including names, networking sources, job positions, and contact dates. The asset includes data quality checks to ensure critical fields like name, networking source, and position are properly populated.
 columns:
   - name: name
     type: varchar
