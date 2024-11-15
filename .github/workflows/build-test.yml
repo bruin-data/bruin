@@ -53,7 +53,7 @@ jobs:
       - name: Install winget
         if: matrix.platform == 'windows-latest'
         uses: Cyberboss/install-winget@v1
-      - run: make duckdb-test
+      - run: make integration-test
         shell: bash
 
 

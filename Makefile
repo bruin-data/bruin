@@ -19,11 +19,12 @@ build: deps
 	@CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0))" -o "$(BUILD_DIR)/$(NAME)" "$(BUILD_SRC)"
 
 
-duckdb-test: build
+integration-test: build
+	@rm -rf integration-tests
 	@echo "$(OK_COLOR)==> Testing with duck db...$(NO_COLOR)"
-	@./bin/bruin init chess test
-	@cd test && git init
-	@./bin/bruin run test
+	@./bin/bruin init integration-tests integration-tests
+	@cd integration-tests && git init
+	@./bin/bruin run integration-tests
 
 
 clean:

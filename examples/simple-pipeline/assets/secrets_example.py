@@ -2,7 +2,7 @@
 name: secrets_example
 secrets:
     - key: KEY1
-      injected_as: INJECTED1
+      inject_as: INJECTED1
     - key: KEY2_AS_IS
     - key: snowflake
 @bruin """

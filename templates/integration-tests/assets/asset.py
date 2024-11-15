@@ -7,10 +7,11 @@ depends:
 
 secrets:
     - key: KEY1
-      injected_as: INJECTED1
+      inject_as: INJECTED1
 
 @bruin """
 
 import os
 if os.getenv('INJECTED1') != "value1":
     raise Exception("KEY1 is not injected correctly")
+
