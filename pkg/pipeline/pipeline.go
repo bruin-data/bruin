@@ -758,11 +758,7 @@ func (a *Asset) EnrichFromEntityAttributes(entities []*glossary.Entity) error {
 }
 
 func (a *Asset) PropagateColumns(foundPipeline *Pipeline) error {
-	if err := parseLineageRecursive(foundPipeline, a); err != nil {
-		return err
-	}
-
-	return nil
+	return parseLineageRecursive(foundPipeline, a)
 }
 
 func (a *Asset) Persist(fs afero.Fs) error {
