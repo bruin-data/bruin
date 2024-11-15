@@ -44,6 +44,39 @@ const (
 	RunConfigEndDate     = RunConfig("end-date")
 )
 
+var defaultMapping = map[string]string{
+	"aws":                   "aws-default",
+	"athena":                "athena-default",
+	"gcp":                   "gcp-default",
+	"google_cloud_platform": "gcp-default",
+	"snowflake":             "snowflake-default",
+	"postgres":              "postgres-default",
+	"redshift":              "redshift-default",
+	"mssql":                 "mssql-default",
+	"databricks":            "databricks-default",
+	"synapse":               "synapse-default",
+	"mongo":                 "mongo-default",
+	"mysql":                 "mysql-default",
+	"notion":                "notion-default",
+	"hana":                  "hana-default",
+	"shopify":               "shopify-default",
+	"gorgias":               "gorgias-default",
+	"facebookads":           "facebookads-default",
+	"klaviyo":               "klaviyo-default",
+	"adjust":                "adjust-default",
+	"stripe":                "stripe-default",
+	"appsflyer":             "appsflyer-default",
+	"kafka":                 "kafka-default",
+	"duckdb":                "duckdb-default",
+	"hubspot":               "hubspot-default",
+	"google_sheets":         "google-sheets-default",
+	"chess":                 "chess-default",
+	"airtable":              "airtable-default",
+	"zendesk":               "zendesk-default",
+	"s3":                    "s3-default",
+	"slack":                 "slack-default",
+}
+
 var SupportedFileSuffixes = []string{".yml", ".yaml", ".sql", ".py"}
 
 type (
@@ -906,6 +939,11 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 			if ok {
 				ingestrDestination = conn
 			}
+
+			ingestrDestination, ok = defaultMapping[mapping]
+			if !ok {
+				return []string{}, errors.Errorf("No default connection for type: '%s'", assetType)
+			}
 		}
 
 		ingestrSource, ok := asset.Parameters["source_connection"]
@@ -946,70 +984,13 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return conn, nil
 	}
 
-	switch mapping {
-	case "aws":
-		return "aws-default", nil
-	case "athena":
-		return "athena-default", nil
-	case "gcp":
-		return "gcp-default", nil
-	case "google_cloud_platform":
-		return "gcp-default", nil
-	case "snowflake":
-		return "snowflake-default", nil
-	case "postgres":
-		return "postgres-default", nil
-	case "redshift":
-		return "redshift-default", nil
-	case "mssql":
-		return "mssql-default", nil
-	case "databricks":
-		return "databricks-default", nil
-	case "synapse":
-		return "synapse-default", nil
-	case "mongo":
-		return "mongo-default", nil
-	case "mysql":
-		return "mysql-default", nil
-	case "notion":
-		return "notion-default", nil
-	case "hana":
-		return "hana-default", nil
-	case "shopify":
-		return "shopify-default", nil
-	case "gorgias":
-		return "gorgias-default", nil
-	case "facebookads":
-		return "facebookads-default", nil
-	case "klaviyo":
-		return "klaviyo-default", nil
-	case "adjust":
-		return "adjust-default", nil
-	case "stripe":
-		return "stripe-default", nil
-	case "appsflyer":
-		return "appsflyer-default", nil
-	case "kafka":
-		return "kafka-default", nil
-	case "duckdb":
-		return "duckdb-default", nil
-	case "hubspot":
-		return "hubspot-default", nil
-	case "google_sheets":
-		return "google-sheets-default", nil
-	case "chess":
-		return "chess-default", nil
-	case "airtable":
-		return "airtable-default", nil
-	case "zendesk":
-		return "zendesk-default", nil
-	case "s3":
-		return "s3-default", nil
-	case "slack":
-		return "slack-default", nil
-	default:
+	defaultConn, ok := defaultMapping[mapping]
+
+	if !ok {
 		return "", errors.Errorf("no default connection found for type '%s'", assetType)
 	}
+
+	return defaultConn, nil
 }
 
 // WipeContentOfAssets removes the content of the executable files of all assets in the pipeline.
