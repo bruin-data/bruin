@@ -89,7 +89,6 @@ func (p *LineageExtractor) parseLineage(pipe *Pipeline, asset *Asset) error {
 			if col := asset.GetColumnWithName(lineageCol.Name); col == nil {
 				asset.Columns = append(asset.Columns, newCol)
 			}
-
 		}
 	}
 
