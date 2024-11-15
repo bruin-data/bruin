@@ -27,9 +27,6 @@ environments:
 
 bruin CLI can run the whole pipeline or any task with the downstreams:
 
-```shell
-bruin run assets/gsheet.asset.yml
-```
 
 ```shell
 ❯ bruin run ./templates/gsheet-duckdb/                                                       (bruin) 
@@ -47,9 +44,6 @@ Executed 1 tasks in 9.656s
 
 You can also run a single task:
 
-```shell
-bruin run assets/hello.py                            
-```
 
 ```shell
 ❯ bruin run ./templates/gsheet-duckdb/                                                       (bruin) 

@@ -1,9 +1,9 @@
-# Bruin - GSheet to DuckDB
+# Bruin - GSheet to BigQuery
 
 This pipeline is a simple example of a Bruin pipeline that copies data from GSheet to BigQuery. It demonstrates how to use the `bruin` CLI to build and run a pipeline.
 
 The pipeline includes two sample assets already:
-- `gsheet_raw.customers`: A simple ingestr asset that copies a table from GSheet to DuckDB
+- `gsheet_raw.customers`: A simple ingestr asset that copies a table from GSheet to BigQuery
 
 ## Setup
 The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://bruin-data.github.io/bruin/connections/overview.html).
@@ -29,11 +29,7 @@ environments:
 bruin CLI can run the whole pipeline or any task with the downstreams:
 
 ```shell
-bruin run assets/gsheet.asset.yml
-```
-
-```shell
-❯ bruin run ./templates/gsheet-duckdb/                                                       (bruin) 
+❯ bruin run ./templates/gsheet-bigquery/                                                       (bruin) 
 Analyzed the pipeline 'bruin-init' with 1 assets.
 
 Pipeline: bruin-init (.)
@@ -47,13 +43,8 @@ Executed 1 tasks in 9.656s
 ```
 
 You can also run a single task:
-
 ```shell
-bruin run assets/hello.py                            
-```
-
-```shell
-❯ bruin run ./templates/gsheet-duckdb/                                                       (bruin) 
+❯ bruin run ./templates/gsheet-bigquery/                                                     (bruin) 
 Analyzed the pipeline 'bruin-init' with 1 assets.
 
 Pipeline: bruin-init (.)
