@@ -1286,9 +1286,15 @@ func (b *Builder) CreateAssetFromFile(path string) (*Asset, error) {
 	isSeparateDefinitionFile := false
 	creator := b.commentTaskCreator
 
-	if fileHasSuffix(b.config.TasksFileSuffixes, path) {
-		creator = b.yamlTaskCreator
-		isSeparateDefinitionFile = true
+	if fileHasSuffix([]string{"yml", "yaml"}, path) {
+		if fileHasSuffix(b.config.TasksFileSuffixes, path) {
+			creator = b.yamlTaskCreator
+			isSeparateDefinitionFile = true
+		} else {
+			// ends in yaml or yml but not asset.yml, task.yml etc
+			return nil, errors.New("You are trying to run a yaml file that doesn't end on: " + strings.Join(b.config.TasksFileSuffixes, ", "))
+		}
+
 	}
 
 	task, err := creator(path)
