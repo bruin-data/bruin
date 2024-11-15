@@ -9,6 +9,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	color2 "github.com/fatih/color"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -33,13 +34,22 @@ func ParseAsset() *cli.Command {
 		Name:      "parse-asset",
 		Usage:     "parse a single Bruin asset",
 		ArgsUsage: "[path to the asset definition]",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:        "column-lineage",
+				Aliases:     []string{"c"},
+				Usage:       "return the column lineage for the given asset",
+				Required:    false,
+				DefaultText: "false",
+			},
+		},
 		Action: func(c *cli.Context) error {
 			r := ParseCommand{
 				builder:      DefaultPipelineBuilder,
 				errorPrinter: errorPrinter,
 			}
 
-			return r.Run(c.Args().Get(0))
+			return r.Run(c.Args().Get(0), c.Bool("column-lineage"))
 		},
 	}
 }
@@ -116,7 +126,7 @@ func (r *ParseCommand) ParsePipeline(assetPath string) error {
 	return err
 }
 
-func (r *ParseCommand) Run(assetPath string) error {
+func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 	defer RecoverFromPanic()
 
 	if assetPath == "" {
@@ -145,7 +155,12 @@ func (r *ParseCommand) Run(assetPath string) error {
 
 	asset := foundPipeline.GetAssetByPath(assetPath)
 
-	foundPipeline.Assets = nil
+	if lineage {
+		if err := ParseLineage(foundPipeline, asset); err != nil {
+			printErrorJSON(err)
+			return cli.Exit("", 1)
+		}
+	}
 
 	js, err := json.Marshal(struct {
 		Asset    *pipeline.Asset    `json:"asset"`
@@ -156,6 +171,10 @@ func (r *ParseCommand) Run(assetPath string) error {
 		Pipeline: foundPipeline,
 		Repo:     repoRoot,
 	})
+	if err != nil {
+		printErrorJSON(err)
+		return cli.Exit("", 1)
+	}
 
 	fmt.Println(string(js))
 
@@ -207,4 +226,63 @@ func PatchAsset() *cli.Command {
 			return nil
 		},
 	}
+}
+
+// ParseLineage analyzes the column lineage for a given asset within a pipeline.
+// It traces column relationships between the asset and its upstream dependencies.
+func ParseLineage(pipe *pipeline.Pipeline, asset *pipeline.Asset) error {
+	parser, err := sqlparser.NewSQLParser()
+	if err != nil {
+		return fmt.Errorf("failed to create SQL parser: %w", err)
+	}
+
+	if err := parser.Start(); err != nil {
+		return fmt.Errorf("failed to start SQL parser: %w", err)
+	}
+
+	columnMetadata := make(sqlparser.Schema)
+	for _, upstream := range asset.Upstreams {
+		upstreamAsset := pipe.GetAssetByName(upstream.Value)
+		if upstreamAsset == nil {
+			return fmt.Errorf("upstream asset not found: %s", upstream.Value)
+		}
+		columnMetadata[upstreamAsset.Name] = makeColumnMap(upstreamAsset.Columns)
+	}
+
+	lineage, err := parser.ColumnLineage(asset.ExecutableFile.Content, "", columnMetadata)
+	if err != nil {
+		return fmt.Errorf("failed to parse column lineage: %w", err)
+	}
+
+	for _, lineageCol := range lineage.Columns {
+		for _, upstream := range lineageCol.Upstream {
+			upstreamAsset := pipe.GetAssetByName(upstream.Table)
+
+			if upstreamAsset == nil {
+				continue
+			}
+			upstreamCol := upstreamAsset.GetColumnWithName(upstream.Column)
+			if upstreamCol == nil {
+				continue
+			}
+
+			newCol := *upstreamCol
+			newCol.Name = lineageCol.Name
+
+			if col := asset.GetColumnWithName(lineageCol.Name); col == nil {
+				asset.Columns = append(asset.Columns, newCol)
+			}
+		}
+	}
+
+	return nil
+}
+
+// makeColumnMap creates a map of column names to their types from a slice of columns.
+func makeColumnMap(columns []pipeline.Column) map[string]string {
+	columnMap := make(map[string]string, len(columns))
+	for _, col := range columns {
+		columnMap[col.Name] = col.Type
+	}
+	return columnMap
 }
