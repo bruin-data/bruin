@@ -5,11 +5,19 @@
 Bruin supports Google Sheets as a source, and you can use it to ingest data from Google Sheets into your data warehouse.
 
 In order to have set up a Google Sheets connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema.
-For more information on how to get these credentials check the Google Sheets section in [Ingestr documentation](https://bruin-data.github.io/ingestr/supported-sources/gsheets.html).
+
 
 ```yaml
     connections:
       google_sheets:
         - name: "connection_name"
-          credentials_path: "/path/to/service/account.json"
+          # you can either specify a path to the service account file
+          service_account_file: "path/to/file.json"
+          
+          # or you can specify the service account json directly
+          service_account_json: |
+            {
+              "type": "service_account",
+              ...
+            }
 ```
