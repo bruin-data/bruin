@@ -229,8 +229,8 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			GoogleSheets: []GoogleSheetsConnection{
 				{
-					Name:            "conn22",
-					CredentialsPath: "/path/to/service_account.json",
+					Name:               "conn22",
+					ServiceAccountFile: "/path/to/service_account.json",
 				},
 			},
 			Chess: []ChessConnection{

@@ -1298,18 +1298,34 @@ func (m *Manager) AddGoogleSheetsConnectionFromConfig(connection *config.GoogleS
 		m.GoogleSheets = make(map[string]*gsheets.Client)
 	}
 	m.mutex.Unlock()
+	if len(connection.ServiceAccountFile) == 0 && len(connection.ServiceAccountJSON) == 0 {
+		return errors.New("credentials are required: provide either service_account_file or service_account_json")
+	}
+
+	// Validate ServiceAccountFile if provided.
+	if len(connection.ServiceAccountFile) > 0 {
+		if err := validateServiceAccountFile(connection.ServiceAccountFile); err != nil {
+			return err
+		}
+	}
+
+	// Validate ServiceAccountJSON if provided.
+	if len(connection.ServiceAccountJSON) > 0 {
+		if err := validateServiceAccountJSON(connection.ServiceAccountJSON); err != nil {
+			return err
+		}
+	}
 
 	client, err := gsheets.NewClient(gsheets.Config{
-		CredentialsPath: connection.CredentialsPath,
+		CredentialsFilePath: connection.ServiceAccountFile,
+		CredentialsJSON:     connection.ServiceAccountJSON,
 	})
 	if err != nil {
 		return err
 	}
-
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.GoogleSheets[connection.Name] = client
-
 	return nil
 }
 
