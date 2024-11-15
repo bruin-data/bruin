@@ -230,6 +230,7 @@ func TestLoadFromFile(t *testing.T) {
 			GoogleSheets: []GoogleSheetsConnection{
 				{
 					Name:               "conn22",
+					ServiceAccountJSON: "{\"key1\": \"value1\"}",
 					ServiceAccountFile: "/path/to/service_account.json",
 				},
 			},
