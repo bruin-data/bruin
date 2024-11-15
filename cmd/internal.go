@@ -122,11 +122,9 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool) error {
 		return cli.Exit("", 1)
 	}
 
-	foundPipeline.WipeContentOfAssets()
-
 	if lineage {
 		for _, asset := range foundPipeline.Assets {
-			if err := parseLineageRecursively(foundPipeline, asset); err != nil {
+			if err := parseLineageRecursive(foundPipeline, asset); err != nil {
 				printErrorJSON(err)
 				return cli.Exit("", 1)
 			}
@@ -173,7 +171,7 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 	asset := foundPipeline.GetAssetByPath(assetPath)
 
 	if lineage {
-		if err := ParseLineage(foundPipeline, asset); err != nil {
+		if err := parseLineageRecursive(foundPipeline, asset); err != nil {
 			printErrorJSON(err)
 			return cli.Exit("", 1)
 		}
@@ -263,14 +261,15 @@ func ParseLineage(pipe *pipeline.Pipeline, asset *pipeline.Asset) error {
 		if upstreamAsset == nil {
 			return fmt.Errorf("upstream asset not found: %s", upstream.Value)
 		}
-		columnMetadata[upstreamAsset.Name] = makeColumnMap(upstreamAsset.Columns)
+		if len(upstreamAsset.Columns) > 0 {
+			columnMetadata[upstreamAsset.Name] = makeColumnMap(upstreamAsset.Columns)
+		}
 	}
 
 	lineage, err := parser.ColumnLineage(asset.ExecutableFile.Content, "", columnMetadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse column lineage: %w", err)
 	}
-
 	for _, lineageCol := range lineage.Columns {
 		for _, upstream := range lineageCol.Upstream {
 			upstreamAsset := pipe.GetAssetByName(upstream.Table)
@@ -278,16 +277,20 @@ func ParseLineage(pipe *pipeline.Pipeline, asset *pipeline.Asset) error {
 			if upstreamAsset == nil {
 				continue
 			}
-			upstreamCol := upstreamAsset.GetColumnWithName(upstream.Column)
-			if upstreamCol == nil {
-				continue
-			}
 
-			newCol := *upstreamCol
-			newCol.Name = lineageCol.Name
+			if upstream.Column != "*" {
+				upstreamCol := upstreamAsset.GetColumnWithName(upstream.Column)
+				if upstreamCol == nil {
+					continue
+				}
 
-			if col := asset.GetColumnWithName(lineageCol.Name); col == nil {
-				asset.Columns = append(asset.Columns, newCol)
+				if lineageCol.Name != "*" {
+					newCol := *upstreamCol
+					newCol.Name = lineageCol.Name
+					if col := asset.GetColumnWithName(lineageCol.Name); col == nil {
+						asset.Columns = append(asset.Columns, newCol)
+					}
+				}
 			}
 		}
 	}
@@ -305,17 +308,27 @@ func makeColumnMap(columns []pipeline.Column) map[string]string {
 }
 
 // parseLineageRecursively processes the lineage of an asset and its upstream dependencies recursively.
-func parseLineageRecursively(pipeline *pipeline.Pipeline, asset *pipeline.Asset) error {
-	for _, upstream := range asset.GetUpstream() {
-		upstreamAsset := pipeline.GetAssetByName(upstream.Name)
-		if upstreamAsset == nil {
-			return fmt.Errorf("upstream asset not found: %s", upstream.Name)
+func parseLineageRecursive(pipeline *pipeline.Pipeline, asset *pipeline.Asset) error {
+	if err := ParseLineage(pipeline, asset); err != nil {
+		return err
+	}
+
+	if len(asset.Columns) == 0 {
+		for _, upstream := range asset.Upstreams {
+			upstreamAsset := pipeline.GetAssetByName(upstream.Value)
+			if upstreamAsset == nil {
+				continue
+			}
+
+			if err := parseLineageRecursive(pipeline, upstreamAsset); err != nil {
+				return err
+			}
 		}
 
-		if err := parseLineageRecursively(pipeline, upstreamAsset); err != nil {
+		if err := ParseLineage(pipeline, asset); err != nil {
 			return err
 		}
 	}
 
-	return ParseLineage(pipeline, asset)
+	return nil
 }
