@@ -41,11 +41,11 @@ environments:
     default:
         connections:
             duckdb:
-                - name: "duckdb_default"
+                - name: "duckdb-default"
                   path: "/path/to/your/database.db"
 
             chess:
-                - name: "chess_connection"
+                - name: "chess-default"
                   players:
                       - "MagnusCarlsen"
                       - "Hikaru"
