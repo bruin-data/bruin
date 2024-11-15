@@ -256,6 +256,190 @@ func TestParseLineageRecursively(t *testing.T) {
 			},
 			want: nil,
 		},
+		{
+			name: "successful recursive lineage parsing",
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "table1",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT name FROM table2",
+						},
+						Upstreams: []pipeline.Upstream{{Value: "table2"}},
+					},
+					{
+						Name: "table2",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT id, age FROM table3",
+						},
+						Upstreams: []pipeline.Upstream{{Value: "table3"}},
+					},
+					{
+						Name: "table3",
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64"},
+							{Name: "name", Type: "str"},
+							{Name: "age", Type: "int64"},
+						},
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT id,name,age FROM table3",
+						},
+					},
+				},
+			},
+			after: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "table1",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT name FROM table2",
+						},
+						Columns: []pipeline.Column{
+							{Name: "name", Type: "str"},
+						},
+						Upstreams: []pipeline.Upstream{{Value: "table2"}},
+					},
+					{
+						Name: "table2",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT id, age FROM table3",
+						},
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64"},
+							{Name: "age", Type: "int64"},
+						},
+						Upstreams: []pipeline.Upstream{{Value: "table3"}},
+					},
+					{
+						Name: "table3",
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64"},
+							{Name: "name", Type: "str"},
+							{Name: "age", Type: "int64"},
+						},
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT id,name,age FROM table3",
+						},
+					},
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "successful recursive lineage parsing with joins",
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "analytics",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: `
+select 
+    a.name, 
+    b.country 
+from people a 
+join country b on a.id = b.id;`,
+						},
+						Upstreams: []pipeline.Upstream{{Value: "country"}, {Value: "people"}},
+					},
+					{
+						Name: "country",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "select id, country from users;",
+						},
+						Upstreams: []pipeline.Upstream{{Value: "users"}},
+					},
+					{
+						Name: "people",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: `
+select 
+    id, 
+    name, 
+    last_name,
+    now() as current_timestamp 
+from users;`,
+						},
+						Upstreams: []pipeline.Upstream{{Value: "users"}},
+					},
+					{
+						Name: "users",
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64"},
+							{Name: "name", Type: "str"},
+							{Name: "last_name", Type: "str"},
+							{Name: "country", Type: "str"},
+							{Name: "created_at", Type: "timestamp"},
+						},
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "select *  from user_data;",
+						},
+					},
+				},
+			},
+			after: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "analytics",
+						Columns: []pipeline.Column{
+							{Name: "name", Type: "str"},
+							{Name: "country", Type: "str"},
+						},
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: `
+select 
+    a.name, 
+    b.country 
+from people a 
+join country b on a.id = b.id;`,
+						},
+						Upstreams: []pipeline.Upstream{{Value: "country"}, {Value: "people"}},
+					},
+					{
+						Name: "country",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "select id, country from users;",
+						},
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64"},
+							{Name: "country", Type: "str"},
+						},
+						Upstreams: []pipeline.Upstream{{Value: "users"}},
+					},
+					{
+						Name: "people",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: `
+select 
+    id, 
+    name, 
+    last_name,
+    now() as current_timestamp 
+from users;`,
+						},
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64"},
+							{Name: "name", Type: "str"},
+							{Name: "last_name", Type: "str"},
+						},
+						Upstreams: []pipeline.Upstream{{Value: "users"}},
+					},
+					{
+						Name: "users",
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64"},
+							{Name: "name", Type: "str"},
+							{Name: "last_name", Type: "str"},
+							{Name: "country", Type: "str"},
+							{Name: "created_at", Type: "timestamp"},
+						},
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "select *  from user_data;",
+						},
+					},
+				},
+			},
+			want: nil,
+		},
 	}
 
 	for _, tt := range tests {
