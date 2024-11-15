@@ -28,11 +28,12 @@ func main() {
 	}
 
 	app := &cli.App{
-		Name:     "bruin",
-		Version:  version,
-		Usage:    "The CLI used for managing Bruin-powered data pipelines",
-		Compiled: time.Now(),
-		Action:   versionCommand.Action,
+		Name:           "bruin",
+		Version:        version,
+		Usage:          "The CLI used for managing Bruin-powered data pipelines",
+		Compiled:       time.Now(),
+		Action:         versionCommand.Action,
+		DefaultCommand: "help",
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:        "debug",
@@ -54,6 +55,13 @@ func main() {
 			cmd.Connections(),
 			cmd.Fetch(),
 			versionCommand,
+			&cli.Command{
+				Name: "help",
+				Action: func(c *cli.Context) error {
+					cli.ShowAppHelp(c)
+					return nil
+				},
+			},
 		},
 	}
 
