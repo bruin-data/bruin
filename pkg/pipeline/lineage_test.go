@@ -168,7 +168,7 @@ func TestInternalParse_Run(t *testing.T) {
 func runSingleParseTest(t *testing.T, p *Pipeline, before, after *Asset, wantCols []Column, wantCount int, want error) {
 	t.Helper()
 
-	err := parseLineage(p, before)
+	err := (&LineageExtractor{}).ColumnLineage(p, before)
 	if !errors.Is(err, want) {
 		t.Errorf("ParseLineage() error = %v, want %v", err, want)
 	}
@@ -216,7 +216,7 @@ func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error) {
 	t.Helper()
 
 	for _, asset := range p.Assets {
-		err := parseLineageRecursive(p, asset)
+		err := (&LineageExtractor{}).ColumnLineage(p, asset)
 		assertLineageError(t, err, want)
 		assertAssetExists(t, after, asset)
 	}
