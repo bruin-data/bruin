@@ -1,22 +1,20 @@
-package cmd
+package pipeline
 
 import (
 	"errors"
 	"testing"
-
-	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
-func createEmployeeColumns() []pipeline.Column {
-	return []pipeline.Column{
+func createEmployeeColumns() []Column {
+	return []Column{
 		{Name: "id", Type: "str", PrimaryKey: true},
 		{Name: "name", Type: "str"},
 		{Name: "age", Type: "int64"},
 	}
 }
 
-func createJoinColumns() []pipeline.Column {
-	return []pipeline.Column{
+func createJoinColumns() []Column {
+	return []Column{
 		{Name: "a", Type: "str"},
 		{Name: "b", Type: "int64"},
 		{Name: "c", Type: "str"},
@@ -44,19 +42,19 @@ const complexJoinQuery = `
 		using(a)
 `
 
-func createComplexJoinPipeline() *pipeline.Pipeline {
-	return &pipeline.Pipeline{
-		Assets: []*pipeline.Asset{
+func createComplexJoinPipeline() *Pipeline {
+	return &Pipeline{
+		Assets: []*Asset{
 			{
 				Name: "table1",
-				Columns: []pipeline.Column{
+				Columns: []Column{
 					{Name: "a", Type: "str"},
 					{Name: "b", Type: "int64"},
 				},
 			},
 			{
 				Name: "table2",
-				Columns: []pipeline.Column{
+				Columns: []Column{
 					{Name: "a", Type: "str"},
 					{Name: "c", Type: "str"},
 				},
@@ -69,37 +67,37 @@ func TestInternalParse_Run(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name         string
-		pipeline     *pipeline.Pipeline
-		beforeAssets *pipeline.Asset
-		afterAssets  *pipeline.Asset
+		pipeline     *Pipeline
+		beforeAssets *Asset
+		afterAssets  *Asset
 		wantCount    int
-		wantColumns  []pipeline.Column
+		wantColumns  []Column
 		want         error
 	}{
 		{
 			name: "simple select all query",
-			pipeline: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			pipeline: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name:    "employees",
 						Columns: createEmployeeColumns(),
 					},
 				},
 			},
-			beforeAssets: &pipeline.Asset{
+			beforeAssets: &Asset{
 				Name: "example",
-				ExecutableFile: pipeline.ExecutableFile{
+				ExecutableFile: ExecutableFile{
 					Content: "select * from employees",
 				},
-				Upstreams: []pipeline.Upstream{{Value: "employees"}},
+				Upstreams: []Upstream{{Value: "employees"}},
 			},
-			afterAssets: &pipeline.Asset{
+			afterAssets: &Asset{
 				Name: "example",
-				ExecutableFile: pipeline.ExecutableFile{
+				ExecutableFile: ExecutableFile{
 					Content: "select * from employees",
 				},
 				Columns:   createEmployeeColumns(),
-				Upstreams: []pipeline.Upstream{{Value: "employees"}},
+				Upstreams: []Upstream{{Value: "employees"}},
 			},
 			wantCount:   3,
 			wantColumns: createEmployeeColumns(),
@@ -107,51 +105,51 @@ func TestInternalParse_Run(t *testing.T) {
 		},
 		{
 			name: "simple select all query wihtout upstream",
-			pipeline: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			pipeline: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name:    "employees",
 						Columns: createEmployeeColumns(),
 					},
 				},
 			},
-			beforeAssets: &pipeline.Asset{
+			beforeAssets: &Asset{
 				Name: "example",
-				ExecutableFile: pipeline.ExecutableFile{
+				ExecutableFile: ExecutableFile{
 					Content: "select * from employees",
 				},
-				Upstreams: []pipeline.Upstream{},
+				Upstreams: []Upstream{},
 			},
-			afterAssets: &pipeline.Asset{
+			afterAssets: &Asset{
 				Name: "example",
-				ExecutableFile: pipeline.ExecutableFile{
+				ExecutableFile: ExecutableFile{
 					Content: "select * from employees",
 				},
-				Columns:   []pipeline.Column{},
-				Upstreams: []pipeline.Upstream{},
+				Columns:   []Column{},
+				Upstreams: []Upstream{},
 			},
 			wantCount:   0,
-			wantColumns: []pipeline.Column{},
+			wantColumns: []Column{},
 			want:        nil,
 		},
 		{
 			name:     "complex join query",
 			pipeline: createComplexJoinPipeline(),
-			beforeAssets: &pipeline.Asset{
+			beforeAssets: &Asset{
 				Name: "example",
-				ExecutableFile: pipeline.ExecutableFile{
+				ExecutableFile: ExecutableFile{
 					Content: complexJoinQuery,
 				},
-				Columns:   []pipeline.Column{},
-				Upstreams: []pipeline.Upstream{{Value: "table1"}, {Value: "table2"}},
+				Columns:   []Column{},
+				Upstreams: []Upstream{{Value: "table1"}, {Value: "table2"}},
 			},
-			afterAssets: &pipeline.Asset{
+			afterAssets: &Asset{
 				Name: "example",
-				ExecutableFile: pipeline.ExecutableFile{
+				ExecutableFile: ExecutableFile{
 					Content: complexJoinQuery,
 				},
 				Columns:   createJoinColumns(),
-				Upstreams: []pipeline.Upstream{{Value: "table1"}, {Value: "table2"}},
+				Upstreams: []Upstream{{Value: "table1"}, {Value: "table2"}},
 			},
 			wantCount:   5,
 			wantColumns: createJoinColumns(),
@@ -167,10 +165,10 @@ func TestInternalParse_Run(t *testing.T) {
 	}
 }
 
-func runSingleParseTest(t *testing.T, p *pipeline.Pipeline, before, after *pipeline.Asset, wantCols []pipeline.Column, wantCount int, want error) {
+func runSingleParseTest(t *testing.T, p *Pipeline, before, after *Asset, wantCols []Column, wantCount int, want error) {
 	t.Helper()
 
-	err := ParseLineage(p, before)
+	err := parseLineage(p, before)
 	if !errors.Is(err, want) {
 		t.Errorf("ParseLineage() error = %v, want %v", err, want)
 	}
@@ -199,8 +197,8 @@ func TestParseLineageRecursively(t *testing.T) {
 
 func runLineageTests(t *testing.T, tests []struct {
 	name     string
-	pipeline *pipeline.Pipeline
-	after    *pipeline.Pipeline
+	pipeline *Pipeline
+	after    *Pipeline
 	want     error
 },
 ) {
@@ -214,7 +212,7 @@ func runLineageTests(t *testing.T, tests []struct {
 	}
 }
 
-func runSingleLineageTest(t *testing.T, p, after *pipeline.Pipeline, want error) {
+func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error) {
 	t.Helper()
 
 	for _, asset := range p.Assets {
@@ -239,7 +237,7 @@ func assertLineageError(t *testing.T, got, want error) {
 	}
 }
 
-func assertAssetExists(t *testing.T, p *pipeline.Pipeline, _ *pipeline.Asset) {
+func assertAssetExists(t *testing.T, p *Pipeline, _ *Asset) {
 	t.Helper()
 
 	for _, expectedAsset := range p.Assets {
@@ -253,75 +251,75 @@ func assertAssetExists(t *testing.T, p *pipeline.Pipeline, _ *pipeline.Asset) {
 func testBasicRecursiveParsing(t *testing.T) {
 	tests := []struct {
 		name     string
-		pipeline *pipeline.Pipeline
-		after    *pipeline.Pipeline
+		pipeline *Pipeline
+		after    *Pipeline
 		want     error
 	}{
 		{
 			name: "successful recursive lineage parsing",
-			pipeline: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			pipeline: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name: "table1",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: "SELECT * FROM table2",
 						},
-						Upstreams: []pipeline.Upstream{{Value: "table2"}},
+						Upstreams: []Upstream{{Value: "table2"}},
 					},
 					{
 						Name: "table2",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: "SELECT * FROM table3",
 						},
-						Upstreams: []pipeline.Upstream{{Value: "table3"}},
+						Upstreams: []Upstream{{Value: "table3"}},
 					},
 					{
 						Name: "table3",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "id", Type: "int64"},
 							{Name: "name", Type: "str"},
 							{Name: "age", Type: "int64"},
 						},
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: "SELECT id,name,age FROM table3",
 						},
 					},
 				},
 			},
-			after: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			after: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name: "table1",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: "SELECT * FROM table2",
 						},
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "id", Type: "int64"},
 							{Name: "name", Type: "str"},
 							{Name: "age", Type: "int64"},
 						},
-						Upstreams: []pipeline.Upstream{{Value: "table2"}},
+						Upstreams: []Upstream{{Value: "table2"}},
 					},
 					{
 						Name: "table2",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: "SELECT * FROM table3",
 						},
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "id", Type: "int64"},
 							{Name: "name", Type: "str"},
 							{Name: "age", Type: "int64"},
 						},
-						Upstreams: []pipeline.Upstream{{Value: "table3"}},
+						Upstreams: []Upstream{{Value: "table3"}},
 					},
 					{
 						Name: "table3",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "id", Type: "int64"},
 							{Name: "name", Type: "str"},
 							{Name: "age", Type: "int64"},
 						},
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: "SELECT id,name,age FROM table3",
 						},
 					},
@@ -331,66 +329,66 @@ func testBasicRecursiveParsing(t *testing.T) {
 		},
 		{
 			name: "successful recursive lineage parsing",
-			pipeline: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			pipeline: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name: "table1",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: "SELECT name FROM table2",
 						},
-						Upstreams: []pipeline.Upstream{{Value: "table2"}},
+						Upstreams: []Upstream{{Value: "table2"}},
 					},
 					{
 						Name: "table2",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: "SELECT id, age FROM table3",
 						},
-						Upstreams: []pipeline.Upstream{{Value: "table3"}},
+						Upstreams: []Upstream{{Value: "table3"}},
 					},
 					{
 						Name: "table3",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "id", Type: "int64"},
 							{Name: "name", Type: "str"},
 							{Name: "age", Type: "int64"},
 						},
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: "SELECT id,name,age FROM table3",
 						},
 					},
 				},
 			},
-			after: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			after: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name: "table1",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: "SELECT name FROM table2",
 						},
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "name", Type: "str"},
 						},
-						Upstreams: []pipeline.Upstream{{Value: "table2"}},
+						Upstreams: []Upstream{{Value: "table2"}},
 					},
 					{
 						Name: "table2",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: "SELECT id, age FROM table3",
 						},
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "id", Type: "int64"},
 							{Name: "age", Type: "int64"},
 						},
-						Upstreams: []pipeline.Upstream{{Value: "table3"}},
+						Upstreams: []Upstream{{Value: "table3"}},
 					},
 					{
 						Name: "table3",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "id", Type: "int64"},
 							{Name: "name", Type: "str"},
 							{Name: "age", Type: "int64"},
 						},
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: "SELECT id,name,age FROM table3",
 						},
 					},
@@ -405,17 +403,17 @@ func testBasicRecursiveParsing(t *testing.T) {
 func testJoinsAndComplexQueries(t *testing.T) {
 	tests := []struct {
 		name     string
-		pipeline *pipeline.Pipeline
-		after    *pipeline.Pipeline
+		pipeline *Pipeline
+		after    *Pipeline
 		want     error
 	}{
 		{
 			name: "successful recursive lineage parsing with joins",
-			pipeline: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			pipeline: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name: "analytics",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: `
 select 
     a.name, 
@@ -423,18 +421,18 @@ select
 from people a 
 join country b on a.id = b.id;`,
 						},
-						Upstreams: []pipeline.Upstream{{Value: "country"}, {Value: "people"}},
+						Upstreams: []Upstream{{Value: "country"}, {Value: "people"}},
 					},
 					{
 						Name: "country",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: "select id, country from users;",
 						},
-						Upstreams: []pipeline.Upstream{{Value: "users"}},
+						Upstreams: []Upstream{{Value: "users"}},
 					},
 					{
 						Name: "people",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: `
 select 
     id, 
@@ -443,32 +441,32 @@ select
     now() as current_timestamp 
 from users;`,
 						},
-						Upstreams: []pipeline.Upstream{{Value: "users"}},
+						Upstreams: []Upstream{{Value: "users"}},
 					},
 					{
 						Name: "users",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "id", Type: "int64"},
 							{Name: "name", Type: "str"},
 							{Name: "last_name", Type: "str"},
 							{Name: "country", Type: "str"},
 							{Name: "created_at", Type: "timestamp"},
 						},
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: "select *  from user_data;",
 						},
 					},
 				},
 			},
-			after: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			after: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name: "analytics",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "name", Type: "str"},
 							{Name: "country", Type: "str"},
 						},
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: `
 select 
     a.name, 
@@ -476,22 +474,22 @@ select
 from people a 
 join country b on a.id = b.id;`,
 						},
-						Upstreams: []pipeline.Upstream{{Value: "country"}, {Value: "people"}},
+						Upstreams: []Upstream{{Value: "country"}, {Value: "people"}},
 					},
 					{
 						Name: "country",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: "select id, country from users;",
 						},
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "id", Type: "int64"},
 							{Name: "country", Type: "str"},
 						},
-						Upstreams: []pipeline.Upstream{{Value: "users"}},
+						Upstreams: []Upstream{{Value: "users"}},
 					},
 					{
 						Name: "people",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: `
 select 
     id, 
@@ -500,23 +498,23 @@ select
     now() as current_timestamp 
 from users;`,
 						},
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "id", Type: "int64"},
 							{Name: "name", Type: "str"},
 							{Name: "last_name", Type: "str"},
 						},
-						Upstreams: []pipeline.Upstream{{Value: "users"}},
+						Upstreams: []Upstream{{Value: "users"}},
 					},
 					{
 						Name: "users",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "id", Type: "int64"},
 							{Name: "name", Type: "str"},
 							{Name: "last_name", Type: "str"},
 							{Name: "country", Type: "str"},
 							{Name: "created_at", Type: "timestamp"},
 						},
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: "select *  from user_data;",
 						},
 					},
@@ -526,11 +524,11 @@ from users;`,
 		},
 		{
 			name: "complex subqueries with aliases and functions",
-			pipeline: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			pipeline: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name: "user_segments",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: `
 SELECT 
     user_id,
@@ -544,11 +542,11 @@ SELECT
 FROM users
 WHERE CAST(signup_date AS DATE) >= '2023-01-01'`,
 						},
-						Upstreams: []pipeline.Upstream{{Value: "users"}},
+						Upstreams: []Upstream{{Value: "users"}},
 					},
 					{
 						Name: "users",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "user_id", Type: "int64"},
 							{Name: "age", Type: "int64"},
 							{Name: "signup_date", Type: "timestamp"},
@@ -557,17 +555,17 @@ WHERE CAST(signup_date AS DATE) >= '2023-01-01'`,
 					},
 				},
 			},
-			after: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			after: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name: "user_segments",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "user_id", Type: "int64"},
 							{Name: "age_group", Type: "str"},
 							{Name: "signup_day", Type: "date"},
 							{Name: "amount_cents", Type: "int64"},
 						},
-						Upstreams: []pipeline.Upstream{{Value: "users"}},
+						Upstreams: []Upstream{{Value: "users"}},
 					},
 				},
 			},
@@ -575,11 +573,11 @@ WHERE CAST(signup_date AS DATE) >= '2023-01-01'`,
 		},
 		{
 			name: "recursive CTEs with window functions",
-			pipeline: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			pipeline: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name: "employee_hierarchy",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: `
 WITH RECURSIVE emp_tree AS (
     SELECT 
@@ -606,11 +604,11 @@ SELECT
     ROW_NUMBER() OVER (PARTITION BY level ORDER BY name) as rank
 FROM emp_tree`,
 						},
-						Upstreams: []pipeline.Upstream{{Value: "employees"}},
+						Upstreams: []Upstream{{Value: "employees"}},
 					},
 					{
 						Name: "employees",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "id", Type: "int64"},
 							{Name: "name", Type: "str"},
 							{Name: "manager_id", Type: "int64"},
@@ -618,16 +616,16 @@ FROM emp_tree`,
 					},
 				},
 			},
-			after: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			after: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name: "employee_hierarchy",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "name", Type: "str"},
 							{Name: "level", Type: "int64"},
 							{Name: "rank", Type: "int64"},
 						},
-						Upstreams: []pipeline.Upstream{{Value: "employees"}},
+						Upstreams: []Upstream{{Value: "employees"}},
 					},
 				},
 			},
@@ -635,11 +633,11 @@ FROM emp_tree`,
 		},
 		{
 			name: "union with different column names",
-			pipeline: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			pipeline: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name: "combined_data",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: `
 SELECT 
     user_id as id,
@@ -653,34 +651,34 @@ SELECT
     phone_number
 FROM vendors`,
 						},
-						Upstreams: []pipeline.Upstream{{Value: "customers"}, {Value: "vendors"}},
+						Upstreams: []Upstream{{Value: "customers"}, {Value: "vendors"}},
 					},
 					{
 						Name: "customers",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "user_id", Type: "int64"},
 							{Name: "email", Type: "str"},
 						},
 					},
 					{
 						Name: "vendors",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "vendor_id", Type: "int64"},
 							{Name: "phone_number", Type: "str"},
 						},
 					},
 				},
 			},
-			after: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			after: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name: "combined_data",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "id", Type: "int64"},
 							{Name: "type", Type: "str"},
 							{Name: "contact", Type: "str"},
 						},
-						Upstreams: []pipeline.Upstream{{Value: "customers"}, {Value: "vendors"}},
+						Upstreams: []Upstream{{Value: "customers"}, {Value: "vendors"}},
 					},
 				},
 			},
@@ -688,11 +686,11 @@ FROM vendors`,
 		},
 		{
 			name: "nested subqueries with multiple CTEs",
-			pipeline: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			pipeline: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name: "sales_report",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: `
 WITH monthly_sales AS (
     SELECT 
@@ -729,11 +727,11 @@ JOIN monthly_sales ms ON ms.product_id = tp.product_id
 JOIN product_ranks pr ON pr.product_id = tp.product_id AND pr.month = ms.month
 ORDER BY ms.month, pr.rank`,
 						},
-						Upstreams: []pipeline.Upstream{{Value: "orders"}, {Value: "products"}},
+						Upstreams: []Upstream{{Value: "orders"}, {Value: "products"}},
 					},
 					{
 						Name: "orders",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "order_date", Type: "timestamp"},
 							{Name: "product_id", Type: "int64"},
 							{Name: "quantity", Type: "int64"},
@@ -742,7 +740,7 @@ ORDER BY ms.month, pr.rank`,
 					},
 					{
 						Name: "products",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "id", Type: "int64"},
 							{Name: "name", Type: "str"},
 							{Name: "category", Type: "str"},
@@ -750,11 +748,11 @@ ORDER BY ms.month, pr.rank`,
 					},
 				},
 			},
-			after: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			after: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name: "sales_report",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "name", Type: "str"},
 							{Name: "category", Type: "str"},
 							{Name: "month", Type: "timestamp"},
@@ -762,7 +760,7 @@ ORDER BY ms.month, pr.rank`,
 							{Name: "total_amount", Type: "float64"},
 							{Name: "rank", Type: "int64"},
 						},
-						Upstreams: []pipeline.Upstream{{Value: "orders"}, {Value: "products"}},
+						Upstreams: []Upstream{{Value: "orders"}, {Value: "products"}},
 					},
 				},
 			},
@@ -775,17 +773,17 @@ ORDER BY ms.month, pr.rank`,
 func testAdvancedSQLFeatures(t *testing.T) {
 	tests := []struct {
 		name     string
-		pipeline *pipeline.Pipeline
-		after    *pipeline.Pipeline
+		pipeline *Pipeline
+		after    *Pipeline
 		want     error
 	}{
 		{
 			name: "lateral joins with array operations",
-			pipeline: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			pipeline: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name: "user_preferences",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: `
 WITH user_tags AS (
     SELECT 
@@ -813,7 +811,7 @@ SELECT
 FROM exploded_tags
 GROUP BY user_id, name`,
 						},
-						Upstreams: []pipeline.Upstream{
+						Upstreams: []Upstream{
 							{Value: "users"},
 							{Value: "user_activity"},
 							{Value: "preferences"},
@@ -821,21 +819,21 @@ GROUP BY user_id, name`,
 					},
 					{
 						Name: "users",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "id", Type: "int64"},
 							{Name: "name", Type: "str"},
 						},
 					},
 					{
 						Name: "user_activity",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "user_id", Type: "int64"},
 							{Name: "tag", Type: "str"},
 						},
 					},
 					{
 						Name: "preferences",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "user_id", Type: "int64"},
 							{Name: "tag", Type: "str"},
 							{Name: "preference_value", Type: "float64"},
@@ -843,16 +841,16 @@ GROUP BY user_id, name`,
 					},
 				},
 			},
-			after: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			after: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name: "user_preferences",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "user_id", Type: "int64"},
 							{Name: "name", Type: "str"},
 							{Name: "preferences", Type: "array"},
 						},
-						Upstreams: []pipeline.Upstream{
+						Upstreams: []Upstream{
 							{Value: "users"},
 							{Value: "user_activity"},
 							{Value: "preferences"},
@@ -864,11 +862,11 @@ GROUP BY user_id, name`,
 		},
 		{
 			name: "window functions with complex partitioning",
-			pipeline: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			pipeline: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name: "customer_metrics",
-						ExecutableFile: pipeline.ExecutableFile{
+						ExecutableFile: ExecutableFile{
 							Content: `
 SELECT 
     customer_id,
@@ -880,11 +878,11 @@ SELECT
 FROM orders
 GROUP BY customer_id`,
 						},
-						Upstreams: []pipeline.Upstream{{Value: "orders"}},
+						Upstreams: []Upstream{{Value: "orders"}},
 					},
 					{
 						Name: "orders",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "customer_id", Type: "int64"},
 							{Name: "transaction_date", Type: "timestamp"},
 							{Name: "amount", Type: "float64"},
@@ -892,15 +890,15 @@ GROUP BY customer_id`,
 					},
 				},
 			},
-			after: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
+			after: &Pipeline{
+				Assets: []*Asset{
 					{
 						Name: "customer_metrics",
-						Columns: []pipeline.Column{
+						Columns: []Column{
 							{Name: "customer_id", Type: "int64"},
 							{Name: "total_spent", Type: "float64"},
 						},
-						Upstreams: []pipeline.Upstream{{Value: "orders"}},
+						Upstreams: []Upstream{{Value: "orders"}},
 					},
 				},
 			},
@@ -910,14 +908,14 @@ GROUP BY customer_id`,
 	runLineageTests(t, tests)
 }
 
-func assertColumns(t *testing.T, got, want []pipeline.Column, wantCount int) {
+func assertColumns(t *testing.T, got, want []Column, wantCount int) {
 	t.Helper()
 
 	if len(got) != wantCount {
 		t.Errorf("Column count mismatch: got %d, want %d", len(got), wantCount)
 	}
 
-	columnMap := make(map[string]pipeline.Column)
+	columnMap := make(map[string]Column)
 	for _, col := range want {
 		columnMap[col.Name] = col
 	}

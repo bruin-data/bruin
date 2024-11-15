@@ -3,13 +3,12 @@ package pipeline
 import (
 	"fmt"
 
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
-// ParseLineage analyzes the column lineage for a given asset within a pipeline.
+// ParseLineage analyzes the column lineage for a given asset within a
 // It traces column relationships between the asset and its upstream dependencies.
-func parseLineage(pipe *pipeline.Pipeline, asset *pipeline.Asset) error {
+func parseLineage(pipe *Pipeline, asset *Asset) error {
 	parser, err := sqlparser.NewSQLParser()
 	if err != nil {
 		return fmt.Errorf("failed to create SQL parser: %w", err)
@@ -63,7 +62,7 @@ func parseLineage(pipe *pipeline.Pipeline, asset *pipeline.Asset) error {
 }
 
 // makeColumnMap creates a map of column names to their types from a slice of columns.
-func makeColumnMap(columns []pipeline.Column) map[string]string {
+func makeColumnMap(columns []Column) map[string]string {
 	columnMap := make(map[string]string, len(columns))
 	for _, col := range columns {
 		columnMap[col.Name] = col.Type
@@ -72,24 +71,24 @@ func makeColumnMap(columns []pipeline.Column) map[string]string {
 }
 
 // parseLineageRecursively processes the lineage of an asset and its upstream dependencies recursively.
-func parseLineageRecursive(pipeline *pipeline.Pipeline, asset *pipeline.Asset) error {
-	if err := ParseLineage(pipeline, asset); err != nil {
+func parseLineageRecursive(pipe *Pipeline, asset *Asset) error {
+	if err := parseLineage(pipe, asset); err != nil {
 		return err
 	}
 
 	if len(asset.Columns) == 0 {
 		for _, upstream := range asset.Upstreams {
-			upstreamAsset := pipeline.GetAssetByName(upstream.Value)
+			upstreamAsset := pipe.GetAssetByName(upstream.Value)
 			if upstreamAsset == nil {
 				continue
 			}
 
-			if err := parseLineageRecursive(pipeline, upstreamAsset); err != nil {
+			if err := parseLineageRecursive(pipe, upstreamAsset); err != nil {
 				return err
 			}
 		}
 
-		if err := ParseLineage(pipeline, asset); err != nil {
+		if err := parseLineage(pipe, asset); err != nil {
 			return err
 		}
 	}
