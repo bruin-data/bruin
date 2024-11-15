@@ -59,13 +59,22 @@ func ParsePipeline() *cli.Command {
 		Name:      "parse-pipeline",
 		Usage:     "parse a full Bruin pipeline",
 		ArgsUsage: "[path to the any asset or anywhere in the pipeline]",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:        "column-lineage",
+				Aliases:     []string{"c"},
+				Usage:       "return the column lineage for the given asset",
+				Required:    false,
+				DefaultText: "false",
+			},
+		},
 		Action: func(c *cli.Context) error {
 			r := ParseCommand{
 				builder:      DefaultPipelineBuilder,
 				errorPrinter: errorPrinter,
 			}
 
-			return r.ParsePipeline(c.Args().Get(0))
+			return r.ParsePipeline(c.Args().Get(0), c.Bool("column-lineage"))
 		},
 	}
 }
@@ -92,7 +101,7 @@ type ParseCommand struct {
 	errorPrinter *color2.Color
 }
 
-func (r *ParseCommand) ParsePipeline(assetPath string) error {
+func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool) error {
 	defer RecoverFromPanic()
 
 	if assetPath == "" {
@@ -115,7 +124,15 @@ func (r *ParseCommand) ParsePipeline(assetPath string) error {
 
 	foundPipeline.WipeContentOfAssets()
 
-	js, err := json.Marshal(foundPipeline)
+	if lineage {
+		for _, asset := range foundPipeline.Assets {
+			if err := parseLineageRecursively(foundPipeline, asset); err != nil {
+				printErrorJSON(err)
+				return cli.Exit("", 1)
+			}
+		}
+	}
+	js, err := json.MarshalIndent(foundPipeline, "", " ")
 	if err != nil {
 		printErrorJSON(err)
 		return cli.Exit("", 1)
@@ -285,4 +302,20 @@ func makeColumnMap(columns []pipeline.Column) map[string]string {
 		columnMap[col.Name] = col.Type
 	}
 	return columnMap
+}
+
+// parseLineageRecursively processes the lineage of an asset and its upstream dependencies recursively.
+func parseLineageRecursively(pipeline *pipeline.Pipeline, asset *pipeline.Asset) error {
+	for _, upstream := range asset.GetUpstream() {
+		upstreamAsset := pipeline.GetAssetByName(upstream.Name)
+		if upstreamAsset == nil {
+			return fmt.Errorf("upstream asset not found: %s", upstream.Name)
+		}
+
+		if err := parseLineageRecursively(pipeline, upstreamAsset); err != nil {
+			return err
+		}
+	}
+
+	return ParseLineage(pipeline, asset)
 }
