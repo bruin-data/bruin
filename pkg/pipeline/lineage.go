@@ -73,26 +73,23 @@ func (p *LineageExtractor) parseLineage(pipe *Pipeline, asset *Asset) error {
 				continue
 			}
 
-			if upstream.Column != "*" {
-				upstreamCol := upstreamAsset.GetColumnWithName(upstream.Column)
-				if upstreamCol == nil {
-					continue
-				}
-
-				if lineageCol.Name != "*" {
-					newCol := *upstreamCol
-					newCol.Name = lineageCol.Name
-					newCol.Upstreams = append(newCol.Upstreams, UpstreamColumn{
-						Asset:      upstreamAsset.Name,
-						Column:     upstreamCol.Name,
-						Table:      upstreamAsset.Name,
-						AssetFound: true,
-					})
-					if col := asset.GetColumnWithName(lineageCol.Name); col == nil {
-						asset.Columns = append(asset.Columns, newCol)
-					}
-				}
+			upstreamCol := upstreamAsset.GetColumnWithName(upstream.Column)
+			if upstreamCol == nil {
+				continue
 			}
+
+			newCol := *upstreamCol
+			newCol.Name = lineageCol.Name
+			newCol.Upstreams = append(newCol.Upstreams, UpstreamColumn{
+				Asset:      upstreamAsset.Name,
+				Column:     upstreamCol.Name,
+				Table:      upstreamAsset.Name,
+				AssetFound: true,
+			})
+			if col := asset.GetColumnWithName(lineageCol.Name); col == nil {
+				asset.Columns = append(asset.Columns, newCol)
+			}
+
 		}
 	}
 
