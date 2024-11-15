@@ -343,7 +343,6 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 			if filepath.IsAbs(conn.Path) {
 				continue
 			}
-			fmt.Printf("Fixing %s to %s", conn.Path, filepath.Join(configLocation, conn.Path))
 			env.Connections.DuckDB[i].Path = filepath.Join(configLocation, conn.Path)
 		}
 	}
