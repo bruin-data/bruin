@@ -1,6 +1,7 @@
 package config
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -11,6 +12,15 @@ import (
 
 func TestLoadFromFile(t *testing.T) {
 	t.Parallel()
+
+	var duckPath, configFile string
+	if runtime.GOOS == "windows" {
+		configFile = "simple_win.yml"
+		duckPath = "C:\\path\\to\\duck.db"
+	} else {
+		configFile = "simple.yml"
+		duckPath = "/path/to/duck.db"
+	}
 
 	devEnv := Environment{
 		Connections: &Connections{
@@ -208,7 +218,7 @@ func TestLoadFromFile(t *testing.T) {
 			DuckDB: []DuckDBConnection{
 				{
 					Name: "conn20",
-					Path: "/path/to/duck.db",
+					Path: duckPath,
 				},
 			},
 			Hubspot: []HubspotConnection{
@@ -219,8 +229,8 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			GoogleSheets: []GoogleSheetsConnection{
 				{
-					Name:              "conn22",
-					CredentialsBase64: "Y3JlZGVudGlhbA",
+					Name:               "conn22",
+					ServiceAccountJSON: "Y3JlZGVudGlhbA",
 				},
 			},
 			Chess: []ChessConnection{
@@ -286,7 +296,7 @@ func TestLoadFromFile(t *testing.T) {
 		{
 			name: "read simple connection",
 			args: args{
-				path: "testdata/simple.yml",
+				path: "testdata/" + configFile,
 			},
 			want: &Config{
 				DefaultEnvironmentName:  "dev",
