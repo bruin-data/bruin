@@ -10,3 +10,6 @@ environments:
           players:
             - "MagnusCarlsen"
             - "Hikaru"
+      generic:
+        - name: KEY1
+          value: value1
