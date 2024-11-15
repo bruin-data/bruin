@@ -1294,7 +1294,6 @@ func (b *Builder) CreateAssetFromFile(path string) (*Asset, error) {
 			// ends in yaml or yml but not asset.yml, task.yml etc
 			return nil, errors.New("You are trying to run a yaml file that doesn't end on: " + strings.Join(b.config.TasksFileSuffixes, ", "))
 		}
-
 	}
 
 	task, err := creator(path)
