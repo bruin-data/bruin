@@ -6,8 +6,11 @@ The pipeline includes two sample assets already:
 - `gsheet_raw.customers`: A simple ingestr asset that copies a table from GSheet to DuckDB
 
 ## Setup
-The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://bruin-data.github.io/bruin/connections/overview.html).
 
+Example Sheet: https://docs.google.com/spreadsheets/d/1p40qR9t6DM5a1IskTkqEX9eZYZmBeILzUX_AdMkg__A/edit?usp=sharing
+
+## Setup
+The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://bruin-data.github.io/bruin/ingestion/google_sheets.html).
 Here's a sample `.bruin.yml` file:
 
 ```yaml
