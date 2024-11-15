@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -589,7 +590,6 @@ func TestConfig_AddConnection(t *testing.T) {
 				require.NoError(t, err)
 				env, exists := conf.Environments[tt.envName]
 				assert.True(t, exists)
-
 				switch tt.connType {
 				case "google_cloud_platform":
 					assert.Len(t, env.Connections.GoogleCloudPlatform, 1)
@@ -713,7 +713,7 @@ func TestDeleteConnection(t *testing.T) {
 	}
 }
 
-func TestCanRunPipeline(t *testing.T) {
+func TestCanRunTaskInstances(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -747,6 +747,7 @@ func TestCanRunPipeline(t *testing.T) {
 			pipeline: pipeline.Pipeline{
 				Assets: []*pipeline.Asset{
 					{
+						Type:       pipeline.AssetTypeBigqueryQuery,
 						Connection: "conn2",
 					},
 				},
@@ -769,6 +770,7 @@ func TestCanRunPipeline(t *testing.T) {
 			pipeline: pipeline.Pipeline{
 				Assets: []*pipeline.Asset{
 					{
+						Type:       pipeline.AssetTypeBigqueryQuery,
 						Connection: "conn1",
 					},
 				},
@@ -813,14 +815,14 @@ func TestCanRunPipeline(t *testing.T) {
 			pipeline: pipeline.Pipeline{
 				Assets: []*pipeline.Asset{
 					{
-						Type: pipeline.AssetType("bq.sql"),
+						Type: pipeline.AssetTypeBigqueryQuery,
 					},
 				},
 			},
 			expectedErr: false,
 		},
 		{
-			name: "2 assets 1 conn missing",
+			name: "2 assets 2 conn missing",
 			config: Config{
 				SelectedEnvironment: &Environment{
 					Connections: &Connections{
@@ -835,10 +837,13 @@ func TestCanRunPipeline(t *testing.T) {
 			pipeline: pipeline.Pipeline{
 				Assets: []*pipeline.Asset{
 					{
+						Type:       pipeline.AssetTypeBigqueryQuery,
 						Connection: "conn1",
 					},
 					{
+						Type:       pipeline.AssetTypeIngestr,
 						Connection: "conn2",
+						Parameters: map[string]string{"source_connection": "conn3"},
 					},
 				},
 			},
@@ -858,6 +863,158 @@ func TestCanRunPipeline(t *testing.T) {
 							{
 								Name: "conn2",
 							},
+							{
+								Name: "conn3",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				DefaultConnections: map[string]string{
+					"snowflake": "conn2",
+				},
+				Assets: []*pipeline.Asset{
+					{
+						Type:       pipeline.AssetTypeBigqueryQuery,
+						Connection: "conn1",
+					},
+					{
+						Type: pipeline.AssetTypeIngestr,
+						Parameters: map[string]string{
+							"source_connection": "conn3",
+							"destination":       "snowflake",
+						},
+					},
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "3 assets 1 python secret missing",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "conn1",
+							},
+						},
+						Snowflake: []SnowflakeConnection{
+							{
+								Name: "conn2",
+							},
+							{
+								Name: "conn3",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				DefaultConnections: map[string]string{
+					"snowflake": "conn2",
+				},
+				Assets: []*pipeline.Asset{
+					{
+						Type:       pipeline.AssetTypeBigqueryQuery,
+						Connection: "conn1",
+					},
+					{
+						Type: pipeline.AssetTypeIngestr,
+						Parameters: map[string]string{
+							"source_connection": "conn3",
+							"destination":       "snowflake",
+						},
+					},
+					{
+						Type: pipeline.AssetTypePython,
+						Secrets: []pipeline.SecretMapping{
+							{
+								SecretKey: "some_key",
+							},
+						},
+					},
+				},
+			},
+			expectedErr: true,
+		},
+		{
+			name: "3 assets 1 python secret",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "conn1",
+							},
+						},
+						Snowflake: []SnowflakeConnection{
+							{
+								Name: "conn2",
+							},
+							{
+								Name: "conn3",
+							},
+						},
+						Generic: []GenericConnection{
+							{
+								Name: "some_key",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				DefaultConnections: map[string]string{
+					"snowflake": "conn2",
+				},
+				Assets: []*pipeline.Asset{
+					{
+						Type:       pipeline.AssetTypeBigqueryQuery,
+						Connection: "conn1",
+					},
+					{
+						Type: pipeline.AssetTypeIngestr,
+						Parameters: map[string]string{
+							"source_connection": "conn3",
+							"destination":       "snowflake",
+						},
+					},
+					{
+						Type: pipeline.AssetTypePython,
+						Secrets: []pipeline.SecretMapping{
+							{
+								SecretKey: "some_key",
+							},
+						},
+					},
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "defaults",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "gcp-default",
+							},
+						},
+						Snowflake: []SnowflakeConnection{
+							{
+								Name: "snowflake-default",
+							},
+							{
+								Name: "conn3",
+							},
+						},
+						Generic: []GenericConnection{
+							{
+								Name: "some_key",
+							},
 						},
 					},
 				},
@@ -865,10 +1022,22 @@ func TestCanRunPipeline(t *testing.T) {
 			pipeline: pipeline.Pipeline{
 				Assets: []*pipeline.Asset{
 					{
-						Connection: "conn1",
+						Type: pipeline.AssetTypeBigqueryQuery,
 					},
 					{
-						Connection: "conn2",
+						Type: pipeline.AssetTypeIngestr,
+						Parameters: map[string]string{
+							"source_connection": "conn3",
+							"destination":       "snowflake",
+						},
+					},
+					{
+						Type: pipeline.AssetTypePython,
+						Secrets: []pipeline.SecretMapping{
+							{
+								SecretKey: "some_key",
+							},
+						},
 					},
 				},
 			},
@@ -880,7 +1049,13 @@ func TestCanRunPipeline(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := tt.config.CanRunPipeline(&tt.pipeline)
+			tasks := make([]scheduler.TaskInstance, 0)
+
+			for _, asset := range tt.pipeline.Assets {
+				tasks = append(tasks, &scheduler.AssetInstance{Asset: asset})
+			}
+
+			err := tt.config.CanRunTaskInstances(&tt.pipeline, tasks)
 			if tt.expectedErr {
 				require.Error(t, err)
 			} else {

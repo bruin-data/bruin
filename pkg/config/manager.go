@@ -10,6 +10,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	path2 "github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/invopop/jsonschema"
 	errors2 "github.com/pkg/errors"
@@ -262,21 +263,18 @@ type Config struct {
 	Environments            map[string]Environment `yaml:"environments" json:"environments" mapstructure:"environments"`
 }
 
-func (c *Config) CanRunPipeline(p *pipeline.Pipeline) error {
-	for _, asset := range p.Assets {
-		connName, err := p.GetConnectionNameForAsset(asset)
+func (c *Config) CanRunTaskInstances(p *pipeline.Pipeline, tasks []scheduler.TaskInstance) error {
+	for _, task := range tasks {
+		asset := task.GetAsset()
+		connNames, err := p.GetAllConnectionNamesForAsset(asset)
 		if err != nil {
 			return errors2.Wrap(err, "Could not find connection name for asset "+asset.Name)
 		}
 
-		if asset.Type == pipeline.AssetTypePython {
-			if asset.Connection == "" && asset.CheckCount() == 0 && len(asset.Secrets) == 0 {
-				continue
+		for _, connName := range connNames {
+			if !c.SelectedEnvironment.Connections.Exists(connName) {
+				return errors2.Errorf("Connection '%s' does not exist in the selected environment and is needed for '%s'", connName, asset.Name)
 			}
-		}
-
-		if !c.SelectedEnvironment.Connections.Exists(connName) {
-			return errors2.Errorf("Connection '%s' does not exist in the selected environment and is needed for '%s'", connName, asset.Name)
 		}
 	}
 
