@@ -162,7 +162,7 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 		}
 	}
 
-	result := struct {
+	js, err := json.Marshal(struct {
 		Asset    *pipeline.Asset    `json:"asset"`
 		Pipeline *pipeline.Pipeline `json:"pipeline"`
 		Repo     *git.Repo          `json:"repo"`
@@ -170,9 +170,7 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 		Asset:    asset,
 		Pipeline: foundPipeline,
 		Repo:     repoRoot,
-	}
-
-	js, err := json.Marshal(result)
+	})
 	if err != nil {
 		printErrorJSON(err)
 		return cli.Exit("", 1)
