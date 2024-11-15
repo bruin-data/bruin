@@ -927,31 +927,34 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 		}
 		return secretKeys, nil
 	} else if assetType == AssetTypeIngestr {
-		ingestrDestination, ok := asset.Parameters["destination_connection"]
-		// if destination connection not specified, we infer from destination type
-		if !ok {
-			assetType = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
-			mapping, ok := AssetTypeConnectionMapping[assetType]
-			if !ok {
-				return []string{}, errors.Errorf("No connection mapping found for asset type:'%s' (%s)", assetType, asset.Name)
-			}
-			conn, ok := p.DefaultConnections[mapping]
-			if ok {
-				ingestrDestination = conn
-			}
-
-			ingestrDestination, ok = defaultMapping[mapping]
-			if !ok {
-				return []string{}, errors.Errorf("No default connection for type: '%s'", assetType)
-			}
-		}
-
 		ingestrSource, ok := asset.Parameters["source_connection"]
 		if !ok {
 			return []string{}, errors.Errorf("No source connection in asset")
 		}
 
-		return []string{ingestrDestination, ingestrSource}, nil
+		ingestrDestination, ok := asset.Parameters["destination_connection"]
+		if ok {
+			return []string{ingestrDestination, ingestrSource}, nil
+		}
+
+		// if destination connection not specified, we infer from destination type
+		assetType = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
+		mapping, ok := AssetTypeConnectionMapping[assetType]
+		if !ok {
+			return []string{}, errors.Errorf("No connection mapping found for asset type:'%s' (%s)", assetType, asset.Name)
+		}
+		conn, ok := p.DefaultConnections[mapping]
+		if ok {
+			ingestrDestination = conn
+			return []string{ingestrDestination, ingestrSource}, nil
+		}
+
+		ingestrDestination, ok = defaultMapping[mapping]
+		if ok {
+			return []string{ingestrDestination, ingestrSource}, nil
+		}
+
+		return []string{}, errors.Errorf("No default connection for type: '%s'", assetType)
 	} else {
 		conn, err := p.GetConnectionNameForAsset(asset)
 		if err != nil {
