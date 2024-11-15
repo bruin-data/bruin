@@ -2,7 +2,6 @@ package gsheets
 
 import (
 	"encoding/base64"
-	"fmt"
 	"os"
 )
 
@@ -25,5 +24,6 @@ func (c *Config) GetIngestrURI() string {
 	default:
 		return ""
 	}
-	return fmt.Sprintf("gsheets://?credentials_base64=%s", base64.StdEncoding.EncodeToString(creds))
+
+	return "gsheets://?credentials_base64=" + base64.StdEncoding.EncodeToString(creds)
 }
