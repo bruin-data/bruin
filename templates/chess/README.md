@@ -17,11 +17,11 @@ environments:
     default:
         connections:
             duckdb:
-                - name: "duckdb_default"
+                - name: "duckdb-default"
                   path: "/path/to/your/database.db"
 
             chess:
-                - name: "chess_connection"
+                - name: "chess-connection"
                   players:
                       - "MagnusCarlsen"
                       - "Hikaru"
@@ -35,19 +35,7 @@ You can simply switch the environment using the `--environment` flag, e.g.:
 bruin CLI can run the whole pipeline or any task with the downstreams:
 
 ```shell
-bruin run .
-```
-
-```shell
-Starting the pipeline execution...
-
-[2023-03-16T18:25:14Z] [worker-0] Running: dashboard.bruin-test
-[2023-03-16T18:25:16Z] [worker-0] Completed: dashboard.bruin-test (1.681s)
-[2023-03-16T18:25:16Z] [worker-4] Running: hello
-[2023-03-16T18:25:16Z] [worker-4] [hello] >> Hello, world!
-[2023-03-16T18:25:16Z] [worker-4] Completed: hello (116ms)
-
-Executed 2 tasks in 1.798s
+bruin run ./chess/pipeline.yml
 ```
 
 You can also run a single task:

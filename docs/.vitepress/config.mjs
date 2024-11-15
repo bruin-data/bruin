@@ -55,13 +55,15 @@ export default defineConfig({
           { text: "Materialization", link: "/assets/materialization" },
           { text: "Ingestr", link: "/assets/ingestr" },
           { text: "Python Assets", link: "/assets/python" },
+          { text: "Templates", link: "/assets/templates" },
           {
-            text: "Templating",
+            text: " Jinja Templating",
             link: "/assets/templating/templating",
             items: [{ text: "Filters", link: "/assets/templating/filters" }],
           },
         ],
       },
+
       {
         text: "Data Platforms",
         collapsed: false,
