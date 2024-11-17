@@ -2,6 +2,7 @@ package athena
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -84,6 +85,60 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 	}
 
 	return result, err
+}
+
+func (db *DB) SelectWithSchema(ctx context.Context, queryObject *query.Query) (*query.QueryResult, error) {
+	// Initialize the database connection
+	err := db.initializeDB()
+	if err != nil {
+		return nil, err
+	}
+
+	// Prepare and execute the query
+	queryString := queryObject.String()
+	rows, err := db.conn.QueryContext(ctx, queryString)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	defer rows.Close()
+
+	// Initialize the QueryResult struct
+	result := &query.QueryResult{
+		Columns: []string{},
+		Rows:    [][]interface{}{},
+	}
+
+	// Retrieve column names (schema)
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve column names: %w", err)
+	}
+	result.Columns = columns
+
+	// Fetch rows and add them to the result
+	for rows.Next() {
+		// Create a slice for column values
+		columnValues := make([]interface{}, len(columns))
+		columnPointers := make([]interface{}, len(columns))
+		for i := range columnValues {
+			columnPointers[i] = &columnValues[i]
+		}
+
+		// Scan the row into column pointers
+		if err := rows.Scan(columnPointers...); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		// Append the row to the result
+		result.Rows = append(result.Rows, columnValues)
+	}
+
+	// Check for any row errors
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error occurred while reading rows: %w", err)
+	}
+
+	return result, nil
 }
 
 func (db *DB) initializeDB() error {
