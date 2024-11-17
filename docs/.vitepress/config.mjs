@@ -44,6 +44,7 @@ export default defineConfig({
           { text: "Concepts", link: "/getting-started/concepts" },
           { text: "Design Principles", link: "/getting-started/design-principles" },
           { text: "Glossary", link: "/getting-started/glossary" },
+          { text: "Templates", link: "/getting-started/templates" },
         ],
       },
       {
@@ -55,7 +56,6 @@ export default defineConfig({
           { text: "Materialization", link: "/assets/materialization" },
           { text: "Ingestr", link: "/assets/ingestr" },
           { text: "Python Assets", link: "/assets/python" },
-          { text: "Templates", link: "/assets/templates" },
           {
             text: " Jinja Templating",
             link: "/assets/templating/templating",

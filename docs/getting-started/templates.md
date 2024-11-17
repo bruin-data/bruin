@@ -1,24 +1,49 @@
-# Templates Overview
+# Templates 
 
-We simplify the creation of pipeline projects through the use of **templates**. Templates provide a starting point with predefined structures, configurations, and connections to help you quickly set up and standardize your pipelines.
+We simplify the creation of pipelines through the use of **templates**. Templates provide a starting point with predefined structures, configurations, and connections to help you quickly set up and standardize your pipelines.
+
+---
+## What are templates?
+
+Templates in Bruin are blueprints for initializing new pipelines. They:
+- define the structure and essential files for a pipeline.
+- contain boilerplate code and configurations tailored to specific use cases.
+- allow users to quickly set up pipelines without starting from scratch.
+
+By using templates,teams can focus on their pipeline logic rather than worrying about setup and configuration.
 
 ---
 
-## What Are Templates?
+## How to use templates ?
 
-Templates in Bruin are blueprints for initializing new pipeline projects. They:
-- Define the structure and essential files for a pipeline.
-- Contain boilerplate code and configurations tailored to specific use cases.
-- Allow users to quickly set up pipelines without starting from scratch.
+Using templates in Bruin is straightforward with the `bruin init` command. It offers both
+an interactive wizard and direct command-line options.
 
-By using templates, developers can focus on their pipeline logic rather than worrying about setup and configuration.
+### Running the wizard
 
----
+To initialize a project using the wizard, simply run:
+```bash
+bruin init 
+```
+As shown below, this will launch a terminal-based wizard:
+```plaintext
+bin/bruin init
+[ ] default
+[ ] duckdb
+[ ] firebase
+[ ] gorgias
+[x] notion
+[ ] python
+[ ] redshift
+[ ] shopify-bigquery
+[ ] shopify-duckdb
 
-## How to Use Templates
-
-Using templates in Bruin is straightforward with the `bruin init` command:
-
+(press q to quit)
+```
+You can navigate through the available templates using the up and down arrow keys. Once you've selected your desired template, press Enter to confirm. 
+The wizard will automatically create the folder and set up the project for you.
+### Manual Template Selection
+If you'd prefer to specify your choices directly, you can use:
 ```bash
 bruin init [template-name] [folder-name]
 ```
