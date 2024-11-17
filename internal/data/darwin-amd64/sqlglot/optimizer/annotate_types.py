@@ -10,10 +10,10 @@ from sqlglot.helper import (
     is_iso_date,
     is_iso_datetime,
     seq_get,
-    subclasses,
 )
 from sqlglot.optimizer.scope import Scope, traverse_scope
 from sqlglot.schema import Schema, ensure_schema
+from sqlglot.dialects.dialect import Dialect
 
 if t.TYPE_CHECKING:
     from sqlglot._typing import B, E
@@ -24,12 +24,15 @@ if t.TYPE_CHECKING:
         BinaryCoercionFunc,
     ]
 
+    from sqlglot.dialects.dialect import DialectType, AnnotatorsType
+
 
 def annotate_types(
     expression: E,
     schema: t.Optional[t.Dict | Schema] = None,
-    annotators: t.Optional[t.Dict[t.Type[E], t.Callable[[TypeAnnotator, E], E]]] = None,
+    annotators: t.Optional[AnnotatorsType] = None,
     coerces_to: t.Optional[t.Dict[exp.DataType.Type, t.Set[exp.DataType.Type]]] = None,
+    dialect: t.Optional[DialectType] = None,
 ) -> E:
     """
     Infers the types of an expression, annotating its AST accordingly.
@@ -54,11 +57,7 @@ def annotate_types(
 
     schema = ensure_schema(schema)
 
-    return TypeAnnotator(schema, annotators, coerces_to).annotate(expression)
-
-
-def _annotate_with_type_lambda(data_type: exp.DataType.Type) -> t.Callable[[TypeAnnotator, E], E]:
-    return lambda self, e: self._annotate_with_type(e, data_type)
+    return TypeAnnotator(schema, annotators, coerces_to, dialect=dialect).annotate(expression)
 
 
 def _coerce_date_literal(l: exp.Expression, unit: t.Optional[exp.Expression]) -> exp.DataType.Type:
@@ -129,168 +128,17 @@ class _TypeAnnotator(type):
                 klass.COERCES_TO[data_type] = coerces_to.copy()
                 coerces_to |= {data_type}
 
+        # NULL can be coerced to any type, so e.g. NULL + 1 will have type INT
+        klass.COERCES_TO[exp.DataType.Type.NULL] = {
+            *text_precedence,
+            *numeric_precedence,
+            *timelike_precedence,
+        }
+
         return klass
 
 
 class TypeAnnotator(metaclass=_TypeAnnotator):
-    TYPE_TO_EXPRESSIONS: t.Dict[exp.DataType.Type, t.Set[t.Type[exp.Expression]]] = {
-        exp.DataType.Type.BIGINT: {
-            exp.ApproxDistinct,
-            exp.ArraySize,
-            exp.Count,
-            exp.Length,
-        },
-        exp.DataType.Type.BOOLEAN: {
-            exp.Between,
-            exp.Boolean,
-            exp.In,
-            exp.RegexpLike,
-        },
-        exp.DataType.Type.DATE: {
-            exp.CurrentDate,
-            exp.Date,
-            exp.DateFromParts,
-            exp.DateStrToDate,
-            exp.DiToDate,
-            exp.StrToDate,
-            exp.TimeStrToDate,
-            exp.TsOrDsToDate,
-        },
-        exp.DataType.Type.DATETIME: {
-            exp.CurrentDatetime,
-            exp.DatetimeAdd,
-            exp.DatetimeSub,
-        },
-        exp.DataType.Type.DOUBLE: {
-            exp.ApproxQuantile,
-            exp.Avg,
-            exp.Div,
-            exp.Exp,
-            exp.Ln,
-            exp.Log,
-            exp.Pow,
-            exp.Quantile,
-            exp.Round,
-            exp.SafeDivide,
-            exp.Sqrt,
-            exp.Stddev,
-            exp.StddevPop,
-            exp.StddevSamp,
-            exp.Variance,
-            exp.VariancePop,
-        },
-        exp.DataType.Type.INT: {
-            exp.Ceil,
-            exp.DatetimeDiff,
-            exp.DateDiff,
-            exp.Extract,
-            exp.TimestampDiff,
-            exp.TimeDiff,
-            exp.DateToDi,
-            exp.Floor,
-            exp.Levenshtein,
-            exp.Sign,
-            exp.StrPosition,
-            exp.TsOrDiToDi,
-        },
-        exp.DataType.Type.JSON: {
-            exp.ParseJSON,
-        },
-        exp.DataType.Type.TIMESTAMP: {
-            exp.CurrentTime,
-            exp.CurrentTimestamp,
-            exp.StrToTime,
-            exp.TimeAdd,
-            exp.TimeStrToTime,
-            exp.TimeSub,
-            exp.TimestampAdd,
-            exp.TimestampSub,
-            exp.UnixToTime,
-        },
-        exp.DataType.Type.TINYINT: {
-            exp.Day,
-            exp.Month,
-            exp.Week,
-            exp.Year,
-            exp.Quarter,
-        },
-        exp.DataType.Type.VARCHAR: {
-            exp.ArrayConcat,
-            exp.Concat,
-            exp.ConcatWs,
-            exp.DateToDateStr,
-            exp.GroupConcat,
-            exp.Initcap,
-            exp.Lower,
-            exp.Substring,
-            exp.TimeToStr,
-            exp.TimeToTimeStr,
-            exp.Trim,
-            exp.TsOrDsToDateStr,
-            exp.UnixToStr,
-            exp.UnixToTimeStr,
-            exp.Upper,
-        },
-    }
-
-    ANNOTATORS: t.Dict = {
-        **{
-            expr_type: lambda self, e: self._annotate_unary(e)
-            for expr_type in subclasses(exp.__name__, (exp.Unary, exp.Alias))
-        },
-        **{
-            expr_type: lambda self, e: self._annotate_binary(e)
-            for expr_type in subclasses(exp.__name__, exp.Binary)
-        },
-        **{
-            expr_type: _annotate_with_type_lambda(data_type)
-            for data_type, expressions in TYPE_TO_EXPRESSIONS.items()
-            for expr_type in expressions
-        },
-        exp.Abs: lambda self, e: self._annotate_by_args(e, "this"),
-        exp.Anonymous: lambda self, e: self._annotate_with_type(e, exp.DataType.Type.UNKNOWN),
-        exp.Array: lambda self, e: self._annotate_by_args(e, "expressions", array=True),
-        exp.ArrayAgg: lambda self, e: self._annotate_by_args(e, "this", array=True),
-        exp.ArrayConcat: lambda self, e: self._annotate_by_args(e, "this", "expressions"),
-        exp.Bracket: lambda self, e: self._annotate_bracket(e),
-        exp.Cast: lambda self, e: self._annotate_with_type(e, e.args["to"]),
-        exp.Case: lambda self, e: self._annotate_by_args(e, "default", "ifs"),
-        exp.Coalesce: lambda self, e: self._annotate_by_args(e, "this", "expressions"),
-        exp.DataType: lambda self, e: self._annotate_with_type(e, e.copy()),
-        exp.DateAdd: lambda self, e: self._annotate_timeunit(e),
-        exp.DateSub: lambda self, e: self._annotate_timeunit(e),
-        exp.DateTrunc: lambda self, e: self._annotate_timeunit(e),
-        exp.Distinct: lambda self, e: self._annotate_by_args(e, "expressions"),
-        exp.Div: lambda self, e: self._annotate_div(e),
-        exp.Dot: lambda self, e: self._annotate_dot(e),
-        exp.Explode: lambda self, e: self._annotate_explode(e),
-        exp.Filter: lambda self, e: self._annotate_by_args(e, "this"),
-        exp.GenerateDateArray: lambda self, e: self._annotate_with_type(
-            e, exp.DataType.build("ARRAY<DATE>")
-        ),
-        exp.If: lambda self, e: self._annotate_by_args(e, "true", "false"),
-        exp.Interval: lambda self, e: self._annotate_with_type(e, exp.DataType.Type.INTERVAL),
-        exp.Least: lambda self, e: self._annotate_by_args(e, "expressions"),
-        exp.Literal: lambda self, e: self._annotate_literal(e),
-        exp.Map: lambda self, e: self._annotate_map(e),
-        exp.Max: lambda self, e: self._annotate_by_args(e, "this", "expressions"),
-        exp.Min: lambda self, e: self._annotate_by_args(e, "this", "expressions"),
-        exp.Null: lambda self, e: self._annotate_with_type(e, exp.DataType.Type.NULL),
-        exp.Nullif: lambda self, e: self._annotate_by_args(e, "this", "expression"),
-        exp.PropertyEQ: lambda self, e: self._annotate_by_args(e, "expression"),
-        exp.Slice: lambda self, e: self._annotate_with_type(e, exp.DataType.Type.UNKNOWN),
-        exp.Struct: lambda self, e: self._annotate_struct(e),
-        exp.Sum: lambda self, e: self._annotate_by_args(e, "this", "expressions", promote=True),
-        exp.Timestamp: lambda self, e: self._annotate_with_type(
-            e,
-            exp.DataType.Type.TIMESTAMPTZ if e.args.get("with_tz") else exp.DataType.Type.TIMESTAMP,
-        ),
-        exp.ToMap: lambda self, e: self._annotate_to_map(e),
-        exp.TryCast: lambda self, e: self._annotate_with_type(e, e.args["to"]),
-        exp.Unnest: lambda self, e: self._annotate_unnest(e),
-        exp.VarMap: lambda self, e: self._annotate_map(e),
-    }
-
     NESTED_TYPES = {
         exp.DataType.Type.ARRAY,
     }
@@ -331,17 +179,23 @@ class TypeAnnotator(metaclass=_TypeAnnotator):
     def __init__(
         self,
         schema: Schema,
-        annotators: t.Optional[t.Dict[t.Type[E], t.Callable[[TypeAnnotator, E], E]]] = None,
+        annotators: t.Optional[AnnotatorsType] = None,
         coerces_to: t.Optional[t.Dict[exp.DataType.Type, t.Set[exp.DataType.Type]]] = None,
         binary_coercions: t.Optional[BinaryCoercions] = None,
+        dialect: t.Optional[DialectType] = None,
     ) -> None:
         self.schema = schema
-        self.annotators = annotators or self.ANNOTATORS
+        self.annotators = annotators or Dialect.get_or_raise(dialect).ANNOTATORS
         self.coerces_to = coerces_to or self.COERCES_TO
         self.binary_coercions = binary_coercions or self.BINARY_COERCIONS
 
         # Caches the ids of annotated sub-Expressions, to ensure we only visit them once
         self._visited: t.Set[int] = set()
+
+        # Maps an exp.SetOperation's id (e.g. UNION) to its projection types. This is computed if the
+        # exp.SetOperation is the expression of a scope source, as selecting from it multiple times
+        # would reprocess the entire subtree to coerce the types of its operands' projections
+        self._setop_column_types: t.Dict[int, t.Dict[str, exp.DataType.Type]] = {}
 
     def _set_type(
         self, expression: exp.Expression, target_type: t.Optional[exp.DataType | exp.DataType.Type]
@@ -359,31 +213,67 @@ class TypeAnnotator(metaclass=_TypeAnnotator):
         for name, source in scope.sources.items():
             if not isinstance(source, Scope):
                 continue
-            if isinstance(source.expression, exp.UDTF):
+
+            expression = source.expression
+            if isinstance(expression, exp.UDTF):
                 values = []
 
-                if isinstance(source.expression, exp.Lateral):
-                    if isinstance(source.expression.this, exp.Explode):
-                        values = [source.expression.this.this]
-                elif isinstance(source.expression, exp.Unnest):
-                    values = [source.expression]
+                if isinstance(expression, exp.Lateral):
+                    if isinstance(expression.this, exp.Explode):
+                        values = [expression.this.this]
+                elif isinstance(expression, exp.Unnest):
+                    values = [expression]
                 else:
-                    values = source.expression.expressions[0].expressions
+                    values = expression.expressions[0].expressions
 
                 if not values:
                     continue
 
                 selects[name] = {
-                    alias: column
-                    for alias, column in zip(
-                        source.expression.alias_column_names,
-                        values,
-                    )
+                    alias: column.type
+                    for alias, column in zip(expression.alias_column_names, values)
                 }
+            elif isinstance(expression, exp.SetOperation) and len(expression.left.selects) == len(
+                expression.right.selects
+            ):
+                selects[name] = col_types = self._setop_column_types.setdefault(id(expression), {})
+
+                if not col_types:
+                    # Process a chain / sub-tree of set operations
+                    for set_op in expression.walk(
+                        prune=lambda n: not isinstance(n, (exp.SetOperation, exp.Subquery))
+                    ):
+                        if not isinstance(set_op, exp.SetOperation):
+                            continue
+
+                        if set_op.args.get("by_name"):
+                            r_type_by_select = {
+                                s.alias_or_name: s.type for s in set_op.right.selects
+                            }
+                            setop_cols = {
+                                s.alias_or_name: self._maybe_coerce(
+                                    t.cast(exp.DataType, s.type),
+                                    r_type_by_select.get(s.alias_or_name)
+                                    or exp.DataType.Type.UNKNOWN,
+                                )
+                                for s in set_op.left.selects
+                            }
+                        else:
+                            setop_cols = {
+                                ls.alias_or_name: self._maybe_coerce(
+                                    t.cast(exp.DataType, ls.type), t.cast(exp.DataType, rs.type)
+                                )
+                                for ls, rs in zip(set_op.left.selects, set_op.right.selects)
+                            }
+
+                        # Coerce intermediate results with the previously registered types, if they exist
+                        for col_name, col_type in setop_cols.items():
+                            col_types[col_name] = self._maybe_coerce(
+                                col_type, col_types.get(col_name, exp.DataType.Type.NULL)
+                            )
+
             else:
-                selects[name] = {
-                    select.alias_or_name: select for select in source.expression.selects
-                }
+                selects[name] = {s.alias_or_name: s.type for s in expression.selects}
 
         # First annotate the current scope's column references
         for col in scope.columns:
@@ -395,7 +285,7 @@ class TypeAnnotator(metaclass=_TypeAnnotator):
                 self._set_type(col, self.schema.get_column_type(source, col))
             elif source:
                 if col.table in selects and col.name in selects[col.table]:
-                    self._set_type(col, selects[col.table][col.name].type)
+                    self._set_type(col, selects[col.table][col.name])
                 elif isinstance(source.expression, exp.Unnest):
                     self._set_type(col, source.expression.type)
 
@@ -422,17 +312,18 @@ class TypeAnnotator(metaclass=_TypeAnnotator):
 
     def _maybe_coerce(
         self, type1: exp.DataType | exp.DataType.Type, type2: exp.DataType | exp.DataType.Type
-    ) -> exp.DataType | exp.DataType.Type:
+    ) -> exp.DataType.Type:
         type1_value = type1.this if isinstance(type1, exp.DataType) else type1
         type2_value = type2.this if isinstance(type2, exp.DataType) else type2
 
-        # We propagate the NULL / UNKNOWN types upwards if found
-        if exp.DataType.Type.NULL in (type1_value, type2_value):
-            return exp.DataType.Type.NULL
+        # We propagate the UNKNOWN type upwards if found
         if exp.DataType.Type.UNKNOWN in (type1_value, type2_value):
             return exp.DataType.Type.UNKNOWN
 
-        return type2_value if type2_value in self.coerces_to.get(type1_value, {}) else type1_value
+        return t.cast(
+            exp.DataType.Type,
+            type2_value if type2_value in self.coerces_to.get(type1_value, {}) else type1_value,
+        )
 
     def _annotate_binary(self, expression: B) -> B:
         self._annotate_args(expression)
@@ -440,17 +331,7 @@ class TypeAnnotator(metaclass=_TypeAnnotator):
         left, right = expression.left, expression.right
         left_type, right_type = left.type.this, right.type.this  # type: ignore
 
-        if isinstance(expression, exp.Connector):
-            if left_type == exp.DataType.Type.NULL and right_type == exp.DataType.Type.NULL:
-                self._set_type(expression, exp.DataType.Type.NULL)
-            elif exp.DataType.Type.NULL in (left_type, right_type):
-                self._set_type(
-                    expression,
-                    exp.DataType.build("NULLABLE", expressions=exp.DataType.build("BOOLEAN")),
-                )
-            else:
-                self._set_type(expression, exp.DataType.Type.BOOLEAN)
-        elif isinstance(expression, exp.Predicate):
+        if isinstance(expression, (exp.Connector, exp.Predicate)):
             self._set_type(expression, exp.DataType.Type.BOOLEAN)
         elif (left_type, right_type) in self.binary_coercions:
             self._set_type(expression, self.binary_coercions[(left_type, right_type)](left, right))
@@ -462,7 +343,7 @@ class TypeAnnotator(metaclass=_TypeAnnotator):
     def _annotate_unary(self, expression: E) -> E:
         self._annotate_args(expression)
 
-        if isinstance(expression, exp.Condition) and not isinstance(expression, exp.Paren):
+        if isinstance(expression, exp.Not):
             self._set_type(expression, exp.DataType.Type.BOOLEAN)
         else:
             self._set_type(expression, expression.this.type)
@@ -479,7 +360,9 @@ class TypeAnnotator(metaclass=_TypeAnnotator):
 
         return expression
 
-    def _annotate_with_type(self, expression: E, target_type: exp.DataType.Type) -> E:
+    def _annotate_with_type(
+        self, expression: E, target_type: exp.DataType | exp.DataType.Type
+    ) -> E:
         self._set_type(expression, target_type)
         return self._annotate_args(expression)
 
@@ -507,7 +390,7 @@ class TypeAnnotator(metaclass=_TypeAnnotator):
                 last_datatype = expr_type
                 break
 
-            if not expr_type.is_type(exp.DataType.Type.NULL, exp.DataType.Type.UNKNOWN):
+            if not expr_type.is_type(exp.DataType.Type.UNKNOWN):
                 last_datatype = self._maybe_coerce(last_datatype or expr_type, expr_type)
 
         self._set_type(expression, last_datatype or exp.DataType.Type.UNKNOWN)
@@ -675,4 +558,15 @@ class TypeAnnotator(metaclass=_TypeAnnotator):
                     break
 
         self._set_type(expression, map_type)
+        return expression
+
+    def _annotate_extract(self, expression: exp.Extract) -> exp.Extract:
+        self._annotate_args(expression)
+        part = expression.name
+        if part == "TIME":
+            self._set_type(expression, exp.DataType.Type.TIME)
+        elif part == "DATE":
+            self._set_type(expression, exp.DataType.Type.DATE)
+        else:
+            self._set_type(expression, exp.DataType.Type.INT)
         return expression

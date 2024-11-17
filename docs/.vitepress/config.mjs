@@ -45,6 +45,8 @@ export default defineConfig({
           { text: "Design Principles", link: "/getting-started/design-principles" },
           { text: "Glossary", link: "/getting-started/glossary" },
           { text: "Templates", link: "/getting-started/templates" },
+          {text: "Tutorials", link: "/getting-started/tutorials"},
+
         ],
       },
       {
@@ -126,13 +128,7 @@ export default defineConfig({
             text: "Overview",
             link: "/quality/overview",
             items: [
-              { text: "Not null", link: "/quality/not_null" },
-              { text: "Unique", link: "/quality/unique" },
-              { text: "Positive", link: "/quality/positive" },
-              { text: "Non Negative", link: "/quality/non_negative" },
-              { text: "Negative", link: "/quality/negative" },
-              { text: "Accepted values", link: "/quality/accepted_values" },
-              { text: "Pattern", link: "/quality/pattern" },
+              { text: "Available Checks", link: "/quality/available_checks" },
             ],
           },
         ],

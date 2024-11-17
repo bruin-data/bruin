@@ -1,0 +1,12 @@
+default_environment: default
+environments:
+  default:
+    connections:
+      duckdb:
+        - name: "duckdb-default"
+          path: "duckdb.db"
+      chess:
+        - name: "chess-default"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"

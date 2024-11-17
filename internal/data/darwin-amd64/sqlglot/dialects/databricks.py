@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from sqlglot import exp, transforms
+import typing as t
+
+from sqlglot import exp, transforms, jsonpath
 from sqlglot.dialects.dialect import (
     date_delta_sql,
     build_date_delta,
@@ -10,27 +12,40 @@ from sqlglot.dialects.spark import Spark
 from sqlglot.tokens import TokenType
 
 
-def _timestamp_diff(
-    self: Databricks.Generator, expression: exp.DatetimeDiff | exp.TimestampDiff
+def _build_json_extract(args: t.List) -> exp.JSONExtract:
+    # Transform GET_JSON_OBJECT(expr, '$.<path>') -> expr:<path>
+    this = args[0]
+    path = args[1].name.lstrip("$.")
+    return exp.JSONExtract(this=this, expression=path)
+
+
+def _jsonextract_sql(
+    self: Databricks.Generator, expression: exp.JSONExtract | exp.JSONExtractScalar
 ) -> str:
-    return self.func("TIMESTAMPDIFF", expression.unit, expression.expression, expression.this)
+    this = self.sql(expression, "this")
+    expr = self.sql(expression, "expression")
+    return f"{this}:{expr}"
 
 
 class Databricks(Spark):
     SAFE_DIVISION = False
     COPY_PARAMS_ARE_CSV = False
 
+    class JSONPathTokenizer(jsonpath.JSONPathTokenizer):
+        IDENTIFIERS = ["`", '"']
+
     class Parser(Spark.Parser):
         LOG_DEFAULTS_TO_LN = True
         STRICT_CAST = True
-        COLON_IS_JSON_EXTRACT = True
+        COLON_IS_VARIANT_EXTRACT = True
 
         FUNCTIONS = {
             **Spark.Parser.FUNCTIONS,
             "DATEADD": build_date_delta(exp.DateAdd),
             "DATE_ADD": build_date_delta(exp.DateAdd),
             "DATEDIFF": build_date_delta(exp.DateDiff),
-            "TIMESTAMPDIFF": build_date_delta(exp.TimestampDiff),
+            "DATE_DIFF": build_date_delta(exp.DateDiff),
+            "GET_JSON_OBJECT": _build_json_extract,
         }
 
         FACTOR = {
@@ -42,6 +57,8 @@ class Databricks(Spark):
         TABLESAMPLE_SEED_KEYWORD = "REPEATABLE"
         COPY_PARAMS_ARE_WRAPPED = False
         COPY_PARAMS_EQ_REQUIRED = True
+        JSON_PATH_SINGLE_QUOTE_ESCAPE = False
+        QUOTE_JSON_PATH = False
 
         TRANSFORMS = {
             **Spark.Generator.TRANSFORMS,
@@ -56,15 +73,17 @@ class Databricks(Spark):
                 exp.Mul(this=e.expression, expression=exp.Literal.number(-1)),
                 e.this,
             ),
-            exp.DatetimeDiff: _timestamp_diff,
-            exp.TimestampDiff: _timestamp_diff,
             exp.DatetimeTrunc: timestamptrunc_sql(),
             exp.Select: transforms.preprocess(
                 [
                     transforms.eliminate_distinct_on,
                     transforms.unnest_to_explode,
+                    transforms.any_to_exists,
                 ]
             ),
+            exp.JSONExtract: _jsonextract_sql,
+            exp.JSONExtractScalar: _jsonextract_sql,
+            exp.JSONPathRoot: lambda *_: "",
             exp.ToChar: lambda self, e: self.function_fallback_sql(e),
         }
 
@@ -88,3 +107,7 @@ class Databricks(Spark):
         ) -> str:
             expression.set("this", True)  # trigger ALWAYS in super class
             return super().generatedasidentitycolumnconstraint_sql(expression)
+
+        def jsonpath_sql(self, expression: exp.JSONPath) -> str:
+            expression.set("escape", None)
+            return super().jsonpath_sql(expression)

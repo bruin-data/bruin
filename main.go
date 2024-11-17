@@ -32,7 +32,6 @@ func main() {
 		Version:  version,
 		Usage:    "The CLI used for managing Bruin-powered data pipelines",
 		Compiled: time.Now(),
-		Action:   versionCommand.Action,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:        "debug",

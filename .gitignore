@@ -125,7 +125,7 @@ Temporary Items
 bin
 __pycache__/
 .bruin.yml
-!templates/duckdb/.bruin.yml
+!templates/*/.bruin.yml
 dist/
 *.pyc
 

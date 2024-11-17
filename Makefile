@@ -21,7 +21,7 @@ build: deps
 
 duckdb-test: build
 	@echo "$(OK_COLOR)==> Testing with duck db...$(NO_COLOR)"
-	@./bin/bruin init duckdb test
+	@./bin/bruin init chess test
 	@cd test && git init
 	@./bin/bruin run test
 
