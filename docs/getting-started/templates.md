@@ -42,7 +42,7 @@ bin/bruin init
 ```
 You can navigate through the available templates using the up and down arrow keys. Once you've selected your desired template, press Enter to confirm. 
 The wizard will automatically create the folder and set up the project for you.
-### Manual Template Selection
+### Manual template selection
 If you'd prefer to specify your choices directly, you can use:
 ```bash
 bruin init [template-name] [folder-name]
@@ -57,7 +57,7 @@ Arguments:
     - `bruin-pipeline` for the default template.  
     - The template name for custom templates.
 
-### Available Templates
+### Available templates
 
 To see a list of available templates, run:
 
@@ -68,11 +68,11 @@ The output will display a list of available templates.
 
 ---
 
-## Example Template: Notion-to-BigQuery Pipeline
+## Example template: Notion-to-BigQuery pipeline
 
 The **Notion-to-BigQuery Pipeline** template is an example of a Bruin pipeline designed to copy data from Notion to BigQuery. This template demonstrates how to structure a simple pipeline with Bruin and provides prebuilt configurations for both Notion and BigQuery assets.
 
-### Template Overview
+### Template overview
 
 This template includes:
 
@@ -83,7 +83,7 @@ This template includes:
 - **Project Structure**:
   A structured layout with folders and files to organize pipeline assets, configurations, and documentation.
 
-### Folder Structure
+### Folder structure
 
 ```plaintext
 notion/
@@ -94,17 +94,17 @@ notion/
 └── README.md                     # Documentation for the pipeline
 ```
 
-### How to Use This Template
+### How to use This template?
 
-1. **Initialize the Project**:  
+1. **Initialize the project**:  
    Use the template to create a new pipeline project:
    ```bash
    bruin init notion 
-2. **Configure Connections**:
+2. **Configure connections**:
 
 
 Update the `.bruin.yml` file with your Notion API key and Google Cloud credentials.
-3. **Run the Pipeline**:
+3. **Run the pipeline**:
 
 Use the `bruin` CLI to execute the pipeline, moving data from Notion to BigQuery based on the preconfigured assets.
 
