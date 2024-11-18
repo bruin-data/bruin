@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -216,7 +217,13 @@ func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error) {
 	t.Helper()
 
 	for _, asset := range p.Assets {
-		err := (&LineageExtractor{}).ColumnLineage(p, asset)
+		extractor := &LineageExtractor{}
+
+		if asset.ExecutableFile.Content != "" {
+			asset.ExecutableFile.Content = strings.ReplaceAll(asset.ExecutableFile.Content, "\r\n", "\n")
+		}
+
+		err := extractor.ColumnLineage(p, asset)
 		assertLineageError(t, err, want)
 		assertAssetExists(t, after, asset)
 	}
