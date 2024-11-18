@@ -784,51 +784,58 @@ func (m *Manager) GetSlackConnectionWithoutDefault(name string) (*slack.Client, 
 }
 
 func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatformConnection) error {
+	// Ensure thread-safety with mutex locking
 	m.mutex.Lock()
 	if m.BigQuery == nil {
 		m.BigQuery = make(map[string]*bigquery.Client)
 	}
 	m.mutex.Unlock()
 
-	// Check if either ServiceAccountFile or ServiceAccountJSON is provided, prioritizing ServiceAccountFile.
+	// Check if either ServiceAccountFile or ServiceAccountJSON is provided, prioritizing ServiceAccountFile
 	if len(connection.ServiceAccountFile) == 0 && len(connection.ServiceAccountJSON) == 0 {
 		return errors.New("credentials are required: provide either service_account_file or service_account_json")
 	}
 
-	// Validate ServiceAccountFile if provided.
+	// Resolve and validate ServiceAccountFile if provided
 	if len(connection.ServiceAccountFile) > 0 {
-		if err := validateServiceAccountFile(connection.ServiceAccountFile); err != nil {
+		absPath, err := resolveFilePath(connection.ServiceAccountFile)
+		if err != nil {
+			return errors.Errorf("failed to resolve service account file path: %v", err)
+		}
+		connection.ServiceAccountFile = absPath // Update the connection with the resolved absolute path
+
+		// Validate the resolved ServiceAccountFile
+		if err := validateServiceAccountFile(absPath); err != nil {
 			return err
 		}
 	}
 
-	// Validate ServiceAccountJSON if provided.
+	// Validate ServiceAccountJSON if provided
 	if len(connection.ServiceAccountJSON) > 0 {
 		if err := validateServiceAccountJSON(connection.ServiceAccountJSON); err != nil {
 			return err
 		}
 	}
 
-	// Set up the BigQuery client using the preferred credentials.
+	// Set up the BigQuery client using the preferred credentials
 	db, err := bigquery.NewDB(&bigquery.Config{
 		ProjectID:           connection.ProjectID,
-		CredentialsFilePath: connection.ServiceAccountFile,
+		CredentialsFilePath: connection.ServiceAccountFile, // Now always absolute
 		CredentialsJSON:     connection.ServiceAccountJSON,
 		Credentials:         connection.GetCredentials(),
 		Location:            connection.Location,
 	})
 	if err != nil {
-		return err
+		return errors.Errorf("failed to create BigQuery client: %v", err)
 	}
 
-	// Lock and store the new BigQuery client.
+	// Lock and store the new BigQuery client
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.BigQuery[connection.Name] = db
 
 	return nil
 }
-
 func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnection) error {
 	m.mutex.Lock()
 	if m.Snowflake == nil {
