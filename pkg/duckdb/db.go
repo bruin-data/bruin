@@ -107,16 +107,20 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 
 	defer rows.Close()
 
+	// Initialize QueryResult
 	result := &query.QueryResult{
 		Columns: []string{},
 		Rows:    [][]interface{}{},
 	}
 
+	// Fetch column names and populate Columns slice
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, err
 	}
+	result.Columns = cols // Add column names to the result
 
+	// Fetch rows and populate Rows slice
 	for rows.Next() {
 		columns := make([]interface{}, len(cols))
 		columnPointers := make([]interface{}, len(cols))
