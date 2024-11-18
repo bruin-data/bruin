@@ -93,7 +93,9 @@ type CommandInstance struct {
 func (l *CommandRunner) Run(ctx context.Context, repo *git.Repo, command *CommandInstance) error {
 	cmd := exec.Command(command.Name, command.Args...) //nolint:gosec
 	cmd.Dir = repo.Path
-	cmd.Env = make([]string, len(command.EnvVars))
+
+	// pass the path-related env vars by default
+	cmd.Env = []string{"USERPROFILE=" + os.Getenv("USERPROFILE"), "HOMEPATH=" + os.Getenv("HOMEPATH"), "HOME=" + os.Getenv("HOME")}
 	for k, v := range command.EnvVars {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 	}
