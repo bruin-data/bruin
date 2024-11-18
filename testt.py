@@ -42,6 +42,7 @@ def _resolve_platform_dirs() -> PlatformDirsProto:
         # https://platformdirs.readthedocs.io/
         return PlatformDirs(**platformdir_kwargs)
 
-
+print("----------------------------------------")
 res = _resolve_platform_dirs()
 print(res.user_config_path)
+print("----------------------------------------")

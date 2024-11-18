@@ -2,22 +2,45 @@ package main
 
 import (
 	"context"
+	"fmt"
+
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/python"
+	"os"
+	"strings"
+
 )
 
 func main() {
+	fmt.Println("running...")
+
 	cmdRunner := &python.CommandRunner{}
-	repo, err := git.FindRepoFromPath("/Users/burak/Code/personal/bruin/internal/bruin-cli")
-	if err != nil {
-		panic(err)
+	repo := &git.Repo{
+		Path: "C:\\Users\\burak\\code\\bruin",
 	}
 
-	err = cmdRunner.Run(context.Background(), repo, &python.CommandInstance{
-		Name: "/Users/burak/.local/bin/uv",
-		Args: []string{"run", "--no-project", "--python", "3.11", "--with", "platformdirs", "/Users/burak/Code/personal/bruin/internal/bruin-cli/testt.py"},
+	
+	env := os.Environ()
+	kv := map[string]string{}
+	for _, v := range env {
+		fmt.Println("handling:", v)
+		fields := strings.Split(v, "=")
+		if len(fields)!= 2 {
+			fmt.Println("skipped:", v, fields)
+			continue
+		}
+		kv[fields[0]] = fields[1]
+	}
+
+	err := cmdRunner.Run(context.Background(), repo, &python.CommandInstance{
+		Name: "C:\\Users\\burak\\.local\\bin\\uv.exe",
+		Args: []string{"run", "--no-project", "--python", "3.11", "--with", "platformdirs", `C:\Users\burak\code\bruin\testt.py`},
+		EnvVars: kv,
 	})
 	if err != nil {
-		panic(err)
+		fmt.Println("ilki faileddd")
+		fmt.Println(err)
 	}
+
+
 }
