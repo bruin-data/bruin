@@ -1,9 +1,12 @@
 # Filters
 
-Bruin supports Jinja filters to modify any given variable before they are converted to SQL. Filters are separated from the variable by a pipe symbol (`|`) and may have optional arguments in parentheses. Multiple filters can be chained. The output of one filter is applied to the next.
+Bruin supports Jinja filters to modify any given variable before they are converted to string. Filters are separated from the variable by a pipe symbol (`|`) and may have optional arguments in parentheses. Multiple filters can be chained. The output of one filter is applied to the next.
 
 ```sql
-SELECT * FROM my_table WHERE dt BETWEEN '{{ start_date |  date_format('%Y-%m-%d') }}' AND '{{ end_date | date_format('%Y-%m-%d') }}'
+SELECT * 
+FROM my_table 
+WHERE dt BETWEEN '{{ start_date |  date_format('%Y-%m-%d') }}' 
+             AND '{{ end_date | date_format('%Y-%m-%d') }}'
 ```
 
 ## Default Filters

@@ -50,6 +50,21 @@ export default defineConfig({
         ],
       },
       {
+        text: "Data Platforms",
+        collapsed: false,
+        items: [
+          { text: "AWS Athena", link: "/platforms/athena" },
+          { text: "Databricks", link: "/platforms/databricks" },
+          { text: "DuckDB", link: "/platforms/duckdb" },
+          { text: "Google BigQuery", link: "/platforms/bigquery" },
+          { text: "Microsoft SQL Server", link: "/platforms/mssql" },
+          { text: "Postgres", link: "/platforms/postgres" },
+          { text: "Redshift", link: "/platforms/redshift" },
+          { text: "Snowflake", link: "/platforms/snowflake" },
+          { text: "Synapse", link: "/platforms/synapse" },
+        ],
+      },
+      {
         text: "Assets",
         collapsed: false,
         items: [
@@ -63,22 +78,6 @@ export default defineConfig({
             link: "/assets/templating/templating",
             items: [{ text: "Filters", link: "/assets/templating/filters" }],
           },
-        ],
-      },
-
-      {
-        text: "Data Platforms",
-        collapsed: false,
-        items: [
-          { text: "AWS Athena", link: "/platforms/athena" },
-          { text: "Databricks", link: "/platforms/databricks" },
-          { text: "DuckDB", link: "/platforms/duckdb" },
-          { text: "Google BigQuery", link: "/platforms/bigquery" },
-          { text: "Microsoft SQL Server", link: "/platforms/mssql" },
-          { text: "Postgres", link: "/platforms/postgres" },
-          { text: "Redshift", link: "/platforms/redshift" },
-          { text: "Snowflake", link: "/platforms/snowflake" },
-          { text: "Synapse", link: "/platforms/synapse" },
         ],
       },
       {
