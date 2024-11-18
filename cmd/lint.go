@@ -175,7 +175,7 @@ func Lint(isDebug *bool) *cli.Command {
 				err = printer.PrintJSON(result)
 				if err != nil {
 					printError(err, c.String("output"), "An error occurred")
-					os.Exit(1)
+					return cli.Exit("", 1)
 				}
 
 				return nil
