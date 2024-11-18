@@ -46,10 +46,10 @@ func Test_localPythonRunner_Run(t *testing.T) {
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
-			name: "if no dependencies are found the basic command should be executed, and error should be propagated",
+			name: "if no dependencies are found the basic CommandInstance should be executed, and error should be propagated",
 			fields: func() *fields {
 				cmd := new(mockCmd)
-				cmd.On("Run", mock.Anything, repo, &command{
+				cmd.On("Run", mock.Anything, repo, &CommandInstance{
 					Name: Shell,
 					Args: []string{ShellSubcommandFlag, "/test/python -u -m " + module},
 				}).Return(assert.AnError)
@@ -66,10 +66,10 @@ func Test_localPythonRunner_Run(t *testing.T) {
 			wantErr: assert.Error,
 		},
 		{
-			name: "if no dependencies are found the basic command should be executed",
+			name: "if no dependencies are found the basic CommandInstance should be executed",
 			fields: func() *fields {
 				cmd := new(mockCmd)
-				cmd.On("Run", mock.Anything, repo, &command{
+				cmd.On("Run", mock.Anything, repo, &CommandInstance{
 					Name: Shell,
 					Args: []string{ShellSubcommandFlag, "/test/python -u -m path.to.module"},
 				}).Return(nil)
@@ -108,7 +108,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 					Return("", nil)
 
 				cmd := new(mockCmd)
-				cmd.On("Run", mock.Anything, repo, &command{
+				cmd.On("Run", mock.Anything, repo, &CommandInstance{
 					Name: Shell,
 					Args: []string{ShellSubcommandFlag, "/test/python -u -m path.to.module"},
 				}).Return(nil)
@@ -134,7 +134,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 				}
 
 				cmd := new(mockCmd)
-				cmd.On("Run", mock.Anything, repo, &command{
+				cmd.On("Run", mock.Anything, repo, &CommandInstance{
 					Name: Shell,
 					Args: []string{ShellSubcommandFlag, expectedCommand},
 				}).Return(assert.AnError)
@@ -160,7 +160,7 @@ func Test_localPythonRunner_Run(t *testing.T) {
 				}
 
 				cmd := new(mockCmd)
-				cmd.On("Run", mock.Anything, repo, &command{
+				cmd.On("Run", mock.Anything, repo, &CommandInstance{
 					Name: Shell,
 					Args: []string{ShellSubcommandFlag, expectedCommand},
 				}).Return(nil)

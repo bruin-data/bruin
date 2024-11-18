@@ -176,7 +176,7 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args []string, repo *gi
 	u.binaryFullPath = binaryFullPath
 
 	ingestrPackageName := "ingestr@" + ingestrVersion
-	err = u.Cmd.Run(ctx, repo, &command{
+	err = u.Cmd.Run(ctx, repo, &CommandInstance{
 		Name: u.binaryFullPath,
 		Args: []string{"tool", "install", "--force", "--quiet", "--python", pythonVersionForIngestr, ingestrPackageName},
 	})
@@ -187,7 +187,7 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args []string, repo *gi
 	flags := []string{"tool", "run", "--python", pythonVersionForIngestr, ingestrPackageName}
 	flags = append(flags, args...)
 
-	noDependencyCommand := &command{
+	noDependencyCommand := &CommandInstance{
 		Name:    u.binaryFullPath,
 		Args:    flags,
 		EnvVars: map[string]string{},
@@ -204,7 +204,7 @@ func (u *UvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *
 
 	flags = append(flags, "--module", execCtx.module)
 
-	noDependencyCommand := &command{
+	noDependencyCommand := &CommandInstance{
 		Name:    u.binaryFullPath,
 		Args:    flags,
 		EnvVars: execCtx.envVariables,
@@ -252,7 +252,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	flags = append(flags, tempPyScript.Name())
 
-	err = u.Cmd.Run(ctx, execCtx.repo, &command{
+	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
 		Name:    u.binaryFullPath,
 		Args:    flags,
 		EnvVars: execCtx.envVariables,
@@ -336,7 +336,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}
 
 	ingestrPackageName := "ingestr@" + ingestrVersion
-	err = u.Cmd.Run(ctx, execCtx.repo, &command{
+	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
 		Name: u.binaryFullPath,
 		Args: []string{"tool", "install", "--quiet", "--python", pythonVersionForIngestr, ingestrPackageName},
 	})
@@ -349,11 +349,11 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
 		boolVal := debug.(*bool)
 		if *boolVal {
-			_, _ = output.Write([]byte("Running command: uv " + strings.Join(runArgs, " ") + "\n"))
+			_, _ = output.Write([]byte("Running CommandInstance: uv " + strings.Join(runArgs, " ") + "\n"))
 		}
 	}
 
-	err = u.Cmd.Run(ctx, execCtx.repo, &command{
+	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
 		Name: u.binaryFullPath,
 		Args: runArgs,
 	})

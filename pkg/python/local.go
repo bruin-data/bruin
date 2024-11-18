@@ -19,7 +19,7 @@ import (
 const WINDOWS = "windows"
 
 type cmd interface {
-	Run(ctx context.Context, repo *git.Repo, command *command) error
+	Run(ctx context.Context, repo *git.Repo, command *CommandInstance) error
 }
 
 type requirementsInstaller interface {
@@ -47,7 +47,7 @@ func log(ctx context.Context, message string) {
 
 func (l *localPythonRunner) Run(ctx context.Context, execCtx *executionContext) error {
 	pythonCommandForScript := fmt.Sprintf("%s -u -m %s", l.pathToPython, execCtx.module)
-	noDependencyCommand := &command{
+	noDependencyCommand := &CommandInstance{
 		Name:    Shell,
 		Args:    []string{ShellSubcommandFlag, pythonCommandForScript},
 		EnvVars: execCtx.envVariables,
@@ -75,7 +75,7 @@ func (l *localPythonRunner) Run(ctx context.Context, execCtx *executionContext) 
 		fullCommand = ". " + fullCommand
 	}
 
-	return l.cmd.Run(ctx, execCtx.repo, &command{
+	return l.cmd.Run(ctx, execCtx.repo, &CommandInstance{
 		Name:    Shell,
 		Args:    []string{ShellSubcommandFlag, fullCommand},
 		EnvVars: execCtx.envVariables,
@@ -84,13 +84,13 @@ func (l *localPythonRunner) Run(ctx context.Context, execCtx *executionContext) 
 
 type CommandRunner struct{}
 
-type command struct {
+type CommandInstance struct {
 	Name    string
 	Args    []string
 	EnvVars map[string]string
 }
 
-func (l *CommandRunner) Run(ctx context.Context, repo *git.Repo, command *command) error {
+func (l *CommandRunner) Run(ctx context.Context, repo *git.Repo, command *CommandInstance) error {
 	cmd := exec.Command(command.Name, command.Args...) //nolint:gosec
 	cmd.Dir = repo.Path
 	cmd.Env = make([]string, len(command.EnvVars))
@@ -123,7 +123,7 @@ func (l *CommandRunner) RunAnyCommand(ctx context.Context, cmd *exec.Cmd) error 
 
 	err = cmd.Start()
 	if err != nil {
-		return errors.Wrap(err, "failed to start command")
+		return errors.Wrap(err, "failed to start CommandInstance")
 	}
 
 	res := cmd.Wait()
