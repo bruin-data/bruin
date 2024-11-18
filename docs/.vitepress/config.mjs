@@ -44,7 +44,9 @@ export default defineConfig({
           { text: "Concepts", link: "/getting-started/concepts" },
           { text: "Design Principles", link: "/getting-started/design-principles" },
           { text: "Glossary", link: "/getting-started/glossary" },
+          { text: "Templates", link: "/getting-started/templates" },
           {text: "Tutorials", link: "/getting-started/tutorials"},
+
         ],
       },
       {
@@ -57,12 +59,13 @@ export default defineConfig({
           { text: "Ingestr", link: "/assets/ingestr" },
           { text: "Python Assets", link: "/assets/python" },
           {
-            text: "Templating",
+            text: " Jinja Templating",
             link: "/assets/templating/templating",
             items: [{ text: "Filters", link: "/assets/templating/filters" }],
           },
         ],
       },
+
       {
         text: "Data Platforms",
         collapsed: false,
