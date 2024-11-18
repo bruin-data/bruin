@@ -21,6 +21,7 @@ type Client interface {
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 	GetResultsLocation() string
 	Test(ctx context.Context) error
+	SelectWithSchema(ctx context.Context, queryObject *query.Query) (*query.QueryResult, error)
 }
 
 type queryExtractor interface {
