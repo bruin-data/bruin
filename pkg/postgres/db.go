@@ -85,7 +85,7 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	// Extract column names
 	columns := make([]string, len(fieldDescriptions))
 	for i, field := range fieldDescriptions {
-		columns[i] = string(field.Name)
+		columns[i] = field.Name
 	}
 
 	// Collect rows
