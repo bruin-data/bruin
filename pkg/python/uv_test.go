@@ -37,10 +37,10 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
-			name: "if no dependencies are found the basic command should be executed, and error should be propagated",
+			name: "if no dependencies are found the basic CommandInstance should be executed, and error should be propagated",
 			fields: func() *fields {
 				cmd := new(mockCmd)
-				cmd.On("Run", mock.Anything, repo, &command{
+				cmd.On("Run", mock.Anything, repo, &CommandInstance{
 					Name: "~/.bruin/uv",
 					Args: []string{"run", "--python", "3.11", "--module", module},
 				}).Return(assert.AnError)
@@ -67,7 +67,7 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 			name: "requirements should be installed",
 			fields: func() *fields {
 				cmd := new(mockCmd)
-				cmd.On("Run", mock.Anything, repo, &command{
+				cmd.On("Run", mock.Anything, repo, &CommandInstance{
 					Name: "~/.bruin/uv",
 					Args: []string{"run", "--python", "3.11", "--with-requirements", "/path/to/requirements.txt", "--module", module},
 				}).Return(assert.AnError)
@@ -94,7 +94,7 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 			name: "different python versions are supported",
 			fields: func() *fields {
 				cmd := new(mockCmd)
-				cmd.On("Run", mock.Anything, repo, &command{
+				cmd.On("Run", mock.Anything, repo, &CommandInstance{
 					Name: "~/.bruin/uv",
 					Args: []string{"run", "--python", "3.13", "--with-requirements", "/path/to/requirements.txt", "--module", module},
 				}).Return(assert.AnError)
