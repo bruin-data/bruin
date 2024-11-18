@@ -310,13 +310,6 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			}
 
-			assetsToBeRun := s.GetTaskInstancesByStatus(scheduler.Pending)
-			err = cm.CanRunTaskInstances(foundPipeline, assetsToBeRun)
-			if err != nil {
-				errorPrinter.Printf(err.Error()) //nolint: govet
-				return cli.Exit("", 1)
-			}
-
 			tag := c.String("tag")
 			if tag != "" {
 				assetsByTag := foundPipeline.GetAssetsByTag(tag)

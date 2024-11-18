@@ -102,6 +102,7 @@ func TestDB_Select(t *testing.T) {
 		})
 	}
 }
+
 func TestDB_SelectWithSchema(t *testing.T) {
 	t.Parallel()
 
