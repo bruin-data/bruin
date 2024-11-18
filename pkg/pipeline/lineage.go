@@ -6,6 +6,12 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
+var assetTypeDialectMap = map[AssetType]string{
+	"bq.sql":     "bigquery",
+	"sf.sql":     "snowflake",
+	"duckdb.sql": "duckdb",
+}
+
 type Parser interface {
 	ColumnLineage(foundPipeline *Pipeline, asset *Asset) error
 }
@@ -61,10 +67,11 @@ func (p *LineageExtractor) parseLineage(pipe *Pipeline, asset *Asset) error {
 		}
 	}
 
-	lineage, err := parser.ColumnLineage(asset.ExecutableFile.Content, "", columnMetadata)
+	lineage, err := parser.ColumnLineage(asset.ExecutableFile.Content, assetTypeDialectMap[asset.Type], columnMetadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse column lineage: %w", err)
 	}
+
 	for _, lineageCol := range lineage.Columns {
 		for _, upstream := range lineageCol.Upstream {
 			upstreamAsset := pipe.GetAssetByName(upstream.Table)
@@ -73,24 +80,33 @@ func (p *LineageExtractor) parseLineage(pipe *Pipeline, asset *Asset) error {
 				continue
 			}
 
+			// fmt.Println("====><", upstream.Column, upstreamAsset.Name, asset.Name)
 			upstreamCol := upstreamAsset.GetColumnWithName(upstream.Column)
+			// fmt.Println("====>", upstreamCol, upstreamAsset.Name, asset.Name)
 			if upstreamCol == nil {
 				continue
 			}
 
 			newCol := *upstreamCol
+
 			newCol.Name = lineageCol.Name
-			if len(newCol.Upstreams) == 0 {
-				newCol.Upstreams = append(newCol.Upstreams, UpstreamColumn{
-					Asset:      upstreamAsset.Name,
-					Column:     upstreamCol.Name,
-					Table:      upstreamAsset.Name,
-					AssetFound: true,
-				})
+
+			if newCol.Upstreams == (UpstreamColumn{}) {
+				newCol.Upstreams = UpstreamColumn{
+					Asset:  upstreamAsset.Name,
+					Column: upstreamCol.Name,
+					Table:  upstreamAsset.Name,
+				}
 			}
 
-			if col := asset.GetColumnWithName(lineageCol.Name); col == nil {
+			col := asset.GetColumnWithName(newCol.Name)
+			if col == nil {
+				newCol.PrimaryKey = false
 				asset.Columns = append(asset.Columns, newCol)
+			} else {
+				col.Checks = []ColumnCheck{}
+				col.Description = newCol.Description
+				col.Upstreams = UpstreamColumn{}
 			}
 		}
 	}
