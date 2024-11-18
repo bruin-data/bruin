@@ -166,8 +166,8 @@ func Lint(isDebug *bool) *cli.Command {
 			}
 
 			printer := lint.Printer{RootCheckPath: rootPath}
-			if result == nil {
-				printError(errr, c.String("output"), "An error occurred")
+			if errr != nil || result == nil {
+				printError(err, c.String("output"), "An error occurred")
 				return cli.Exit("", 1)
 			}
 
