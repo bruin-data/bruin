@@ -17,6 +17,7 @@ type materializer interface {
 type Client interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
+	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
 }
 
 type queryExtractor interface {
