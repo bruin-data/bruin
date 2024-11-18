@@ -38,17 +38,17 @@ Add or modify the `.bruin.yml` file as follows:
 ```yaml
 default_environment: default
 environments:
-    default:
-        connections:
-            duckdb:
-                - name: "duckdb-default"
-                  path: "/path/to/your/database.db"
+  default:
+    connections:
+      duckdb:
+        - name: "duckdb-default"
+          path: "duckdb.db"
+      chess:
+        - name: "chess-default"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
 
-            chess:
-                - name: "chess-default"
-                  players:
-                      - "MagnusCarlsen"
-                      - "Hikaru"
 ```
 ## Step 3: Take a look at your assets
 Since we initialized our project with the `chess template`, the necessary assets are already included in the assets folder,
@@ -85,7 +85,7 @@ Now that the data is in DuckDB, you can query it to verify the results. Open a t
 
 
 ```bash
-bruin fetch query --connection duckdb_default  --query "SELECT * FROM chess_playground.player_summary LIMIT 10;"
+bruin fetch query --connection duckdb-default  --query "SELECT * FROM chess_playground.player_summary LIMIT 10;"
 ```
 
 Congratulations!
