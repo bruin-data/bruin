@@ -368,7 +368,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
-			runCtx = context.WithValue(runCtx, python.CtxUsePowershellForUv, c.Bool("exp-use-powershell-for-uv"))
+			runCtx = context.WithValue(runCtx, python.CtxUsePowershellForUv, c.Bool("exp-use-powershell-for-uv")) //nolint:staticcheck
 
 			ex.Start(runCtx, s.WorkQueue, s.Results)
 

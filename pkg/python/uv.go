@@ -109,7 +109,6 @@ func (u *UvChecker) installUvCommand(ctx context.Context, dest string) error {
 
 	var commandInstance *exec.Cmd
 	if runtime.GOOS == "windows" {
-
 		// this conditional part is to test the powershell stuff safely.
 		// once we confirm this on different systems we should remove winget altogether.
 		usePowershell := false
@@ -118,8 +117,8 @@ func (u *UvChecker) installUvCommand(ctx context.Context, dest string) error {
 		}
 
 		if usePowershell {
-			commandInstance = exec.Command("powershell", "-ExecutionPolicy", "ByPass", "-c", fmt.Sprintf("irm https://astral.sh/uv/%s/install.ps1 | iex", UvVersion))
-			commandInstance.Env = []string{fmt.Sprintf("UV_INSTALL_DIR=%s", dest), "NO_MODIFY_PATH=1"}
+			commandInstance = exec.Command("powershell", "-ExecutionPolicy", "ByPass", "-c", fmt.Sprintf("irm https://astral.sh/uv/%s/install.ps1 | iex", UvVersion)) //nolint:gosec
+			commandInstance.Env = []string{"UV_INSTALL_DIR=" + dest, "NO_MODIFY_PATH=1"}
 		} else {
 			commandInstance = exec.Command(Shell, ShellSubcommandFlag, fmt.Sprintf("winget install --accept-package-agreements --accept-source-agreements --silent --id=astral-sh.uv --version %s --location %s -e", UvVersion, dest)) //nolint:gosec
 		}
