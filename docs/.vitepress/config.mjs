@@ -118,6 +118,12 @@ export default defineConfig({
           { text: "Init", link: "/commands/init" },
           { text: "Connections", link: "/commands/connections.md" },
           { text: "Run", link: "/commands/run" },
+          { text: "Fetch", link: "/commands/fetch" },
+          { text: "Clean", link: "/commands/clean" },
+          { text: "Format", link: "/commands/format" },
+          { text: "Environments", link: "/commands/environments" },
+          { text: "Render", link: "/commands/render" },
+          { text: "Lineage", link: "/commands/lineage" },
         ],
       },
       {
