@@ -6,14 +6,18 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
-var assetTypeDialectMap = map[AssetType]string{
-	"bq.sql":     "bigquery",
-	"sf.sql":     "snowflake",
-	"duckdb.sql": "duckdb",
-}
+// Define constants for known SQL dialects
+const (
+	BigQueryDialect  = "bigquery"
+	SnowflakeDialect = "snowflake"
+	DuckDBDialect    = "duckdb"
+)
 
-type Parser interface {
-	ColumnLineage(foundPipeline *Pipeline, asset *Asset) error
+// Make the map immutable and use constants
+var assetTypeDialectMap = map[AssetType]string{
+	"bq.sql":     BigQueryDialect,
+	"sf.sql":     SnowflakeDialect,
+	"duckdb.sql": DuckDBDialect,
 }
 
 type LineageExtractor struct {
@@ -38,11 +42,13 @@ func validateDialect(assetType AssetType) (string, error) {
 	return dialect, nil
 }
 
+// TableSchema extracts the table schema from the assets and stores it in the columnMetadata map
 func (p *LineageExtractor) TableSchema() error {
 	for _, foundAsset := range p.Pipeline.Assets {
 		if len(foundAsset.Columns) > 0 {
 			p.columnMetadata[foundAsset.Name] = makeColumnMap(foundAsset.Columns)
 		}
+
 	}
 	return nil
 }
@@ -71,6 +77,9 @@ func (p *LineageExtractor) ColumnLineage(asset *Asset) error {
 // ParseLineage analyzes the column lineage for a given asset within a
 // It traces column relationships between the asset and its upstream dependencies.
 func (p *LineageExtractor) parseLineage(pipe *Pipeline, asset *Asset) error {
+	if asset == nil || pipe == nil {
+		return fmt.Errorf("invalid arguments: asset and pipeline cannot be nil")
+	}
 
 	dialect, err := validateDialect(asset.Type)
 	if err != nil {
@@ -86,11 +95,6 @@ func (p *LineageExtractor) parseLineage(pipe *Pipeline, asset *Asset) error {
 		return fmt.Errorf("failed to start SQL parser: %w", err)
 	}
 
-	if err := p.TableSchema(); err != nil {
-		return fmt.Errorf("failed to get table schema: %w", err)
-	}
-
-	// Validate and collect upstream metadata
 	for _, upstream := range asset.Upstreams {
 		upstreamAsset := pipe.GetAssetByName(upstream.Value)
 		if upstreamAsset == nil {
@@ -108,6 +112,14 @@ func (p *LineageExtractor) parseLineage(pipe *Pipeline, asset *Asset) error {
 
 // processLineageColumns handles the processing of lineage columns and updates the asset
 func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparser.Lineage) error {
+	if lineage == nil {
+		return nil // or return an error if this should never happen
+	}
+
+	if asset == nil {
+		return fmt.Errorf("asset cannot be nil")
+	}
+
 	for _, lineageCol := range lineage.Columns {
 		for _, upstream := range lineageCol.Upstream {
 			upstreamAsset := p.Pipeline.GetAssetByName(upstream.Table)
@@ -116,7 +128,10 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 			}
 			upstreamCol := upstreamAsset.GetColumnWithName(upstream.Column)
 			if upstreamCol == nil {
-				continue
+				upstreamCol = &Column{
+					Name: upstream.Column,
+					Type: "function",
+				}
 			}
 
 			if err := p.addColumnToAsset(asset, lineageCol.Name, upstreamAsset, upstreamCol); err != nil {
@@ -129,6 +144,10 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 
 // addColumnToAsset adds a new column to the asset based on upstream information
 func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstreamAsset *Asset, upstreamCol *Column) error {
+	if asset == nil || upstreamAsset == nil || upstreamCol == nil || colName == "" {
+		return fmt.Errorf("invalid arguments: all parameters must be non-nil and colName must not be empty")
+	}
+
 	newCol := *upstreamCol
 	newCol.Name = colName
 	newCol.Upstreams = UpstreamColumn{
@@ -146,9 +165,15 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 
 // makeColumnMap creates a map of column names to their types from a slice of columns.
 func makeColumnMap(columns []Column) map[string]string {
+	if len(columns) == 0 {
+		return make(map[string]string)
+	}
+
 	columnMap := make(map[string]string, len(columns))
 	for _, col := range columns {
-		columnMap[col.Name] = col.Type
+		if col.Name != "" {
+			columnMap[col.Name] = col.Type
+		}
 	}
 	return columnMap
 }

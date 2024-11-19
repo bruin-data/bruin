@@ -124,6 +124,9 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool) error {
 	if lineage {
 		lineage := pipeline.NewLineageExtractor(foundPipeline)
 		for _, asset := range foundPipeline.Assets {
+			if err := lineage.TableSchema(); err != nil {
+				return fmt.Errorf("failed to get table schema: %w", err)
+			}
 			if err := lineage.ColumnLineage(asset); err != nil {
 				printErrorJSON(err)
 				return cli.Exit("", 1)
@@ -176,6 +179,10 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 
 	if lineage {
 		lineage := pipeline.NewLineageExtractor(foundPipeline)
+		if err := lineage.TableSchema(); err != nil {
+			return fmt.Errorf("failed to get table schema: %w", err)
+		}
+
 		if err := lineage.ColumnLineage(asset); err != nil {
 			printErrorJSON(err)
 			return cli.Exit("", 1)
