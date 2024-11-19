@@ -2,13 +2,13 @@
 Facebook Ads is the advertising platform that helps users to create targeted ads on Facebook, Instagram and Messenger.
 ingestr supports Facebook-Ads as a source for [ingestr assets](https://bruin-data.github.io/bruin/assets/ingestr.html), allowing you to ingest data from Facebook-Ads into your data warehouse.
 
-In order to have set up Facebook-Ads connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema. For more information on how to get these credentials, read [here](https://bruin-data.github.io/ingestr/supported-sources/facebook-ads.html)
+In order to have set up Facebook-Ads connection, you need to add a configuration item in the `.bruin.yml` and `asset` file. You will also need `access token` and `accound id`. For more information on how to get these credentials, read [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/facebook_ads#setup-guide)
 
 Follow the steps below to correctly set up Facebook Ads as a data source and run ingestion.
 
 **Step 1: Add a Connection to .bruin.yml**
 
-To connect to Facebook Ads, you need to add a configuration item to the connections section of the [.bruin.yml file](https://bruin-data.github.io/bruin/connections/overview.html). This configuration must comply with the following schema:
+To connect to Facebook Ads, you need to add a configuration item to the connections section of the `.bruin.yml file`. This configuration must comply with the following schema:
 
 ```yaml
 connections:
@@ -17,6 +17,7 @@ connections:
       access_token: "YOUR_FACEBOOK_ACCESS_TOKEN"
       account_id: "YOUR_ACCOUNT_ID"
 ```
+
 
 **Step 2: Create an Asset File for Data Ingestion**
 
@@ -49,4 +50,4 @@ parameters:
 ```
 bruin run --file facebook_ads.yml
 ```
-It will ingest facebook ads data to postgres. 
+It will ingest facebook ads data to postgres.
