@@ -26,12 +26,11 @@ integration-test: build
 	@cd integration-tests && git init
 	@TELEMETRY_OPTOUT=1 ./bin/bruin run --use-uv integration-tests
 	@TELEMETRY_OPTOUT=1 ./bin/bruin validate integration-tests
-    @TELEMETRY_OPTOUT=1 ./bin/bruin internal parse-pipeline integration-tests | diff integration-tests/parsed_pipeline.json -
-    @TELEMETRY_OPTOUT=1 ./bin/bruin internal parse-asset integration-tests/assets/asset.py  | diff integration-tests/parsed_asset_py.json -
-    @TELEMETRY_OPTOUT=1 ./bin/bruin internal parse-asset integration-tests/assets/chess_games.asset.yml  | diff integration-tests/parsed_chess_games.json -
-    @TELEMETRY_OPTOUT=1 ./bin/bruin internal parse-asset integration-tests/assets/chess_profiles.asset.yml  | diff integration-tests/parsed_chess_profiles.json -
-    @TELEMETRY_OPTOUT=1 ./bin/bruin internal parse-asset integration-tests/assets/asset.py  | diff integration-tests/parsed_summary.json -
-
+	@TELEMETRY_OPTOUT=1 ./bin/bruin internal parse-pipeline integration-tests | diff integration-tests/parsed_pipeline.json -
+	@TELEMETRY_OPTOUT=1 ./bin/bruin internal parse-asset integration-tests/assets/asset.py | diff integration-tests/parsed_asset_py.json
+	@TELEMETRY_OPTOUT=1 ./bin/bruin internal parse-asset integration-tests/assets/chess_games.asset.yml | diff integration-tests/parsed_chess_games.json
+	@TELEMETRY_OPTOUT=1 ./bin/bruin internal parse-asset integration-tests/assets/chess_profiles.asset.yml | diff integration-tests/parsed_chess_profiles.json
+	@TELEMETRY_OPTOUT=1 ./bin/bruin internal parse-asset integration-tests/assets/asset.py | diff integration-tests/parsed_summary.json -
 
 clean:
 	@rm -rf ./bin
