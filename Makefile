@@ -6,6 +6,9 @@ NO_COLOR=\033[0m
 OK_COLOR=\033[32;01m
 ERROR_COLOR=\033[31;01m
 WARN_COLOR=\033[33;01m
+TELEMETRY_OPTOUT=1
+CURRENT_DIR=$(pwd)
+FILES := $(wildcard *.yml *.txt *.py)
 
 .PHONY: all clean test build tools format pre-commit tools-update
 all: clean deps test build
@@ -22,15 +25,19 @@ build: deps
 integration-test: build
 	@rm -rf integration-tests
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
-	@TELEMETRY_OPTOUT=1 ./bin/bruin init integration-tests integration-tests
+	@./bin/bruin init integration-tests integration-tests
 	@cd integration-tests && git init
-	@TELEMETRY_OPTOUT=1 ./bin/bruin run --use-uv integration-tests
-	@TELEMETRY_OPTOUT=1 ./bin/bruin validate integration-tests
-	@TELEMETRY_OPTOUT=1 ./bin/bruin internal parse-pipeline integration-tests | diff integration-tests/parsed_pipeline.json -
-	@TELEMETRY_OPTOUT=1 ./bin/bruin internal parse-asset integration-tests/assets/asset.py | diff integration-tests/parsed_asset_py.json -
-	@TELEMETRY_OPTOUT=1 ./bin/bruin internal parse-asset integration-tests/assets/chess_games.asset.yml | diff integration-tests/parsed_chess_games.json -
-	@TELEMETRY_OPTOUT=1 ./bin/bruin internal parse-asset integration-tests/assets/chess_profiles.asset.yml | diff integration-tests/parsed_chess_profiles.json -
-	@TELEMETRY_OPTOUT=1 ./bin/bruin internal parse-asset integration-tests/assets/player_summary.sql | diff integration-tests/parsed_summary.json -
+	@./bin/bruin run --use-uv integration-tests
+	@./bin/bruin validate integration-tests
+	@./bin/bruin internal parse-pipeline integration-tests | sed "s|$(PWD)|__BASEDIR__|g" | diff integration-tests/parsed/pipeline.yml.json -
+	@for input_file in integration-tests/assets/$(FILES); do\
+		if [ -f "$$input_file" ]; then \
+			EXPECTED_DIR=integration-tests/parsed; \
+			base_name=$$(basename $$input_file); \
+			expected_file=$(EXPECTED_DIR)/$$base_name; \
+			./bin/bruin internal parse-asset $$input_file | sed "s|$(PWD)|__BASEDIR__|g" | diff integration-tests/parsed/`basename $$input_file`.json -;\
+		fi;\
+	done
 
 clean:
 	@rm -rf ./bin
