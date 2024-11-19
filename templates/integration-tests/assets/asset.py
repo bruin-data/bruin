@@ -12,6 +12,12 @@ secrets:
 @bruin """
 
 import os
+import duckdb
+
 if os.getenv('INJECTED1') != "value1":
     raise Exception("KEY1 is not injected correctly")
 
+con = duckdb.connect(database = "duckdb.db", read_only = False)
+
+result = con.sql("SELECT * FROM tbl")
+print(result)
