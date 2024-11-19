@@ -25,6 +25,7 @@ integration-test: build
 	@TELEMETRY_OPTOUT=1 ./bin/bruin init integration-tests integration-tests
 	@cd integration-tests && git init
 	@TELEMETRY_OPTOUT=1 ./bin/bruin run integration-tests
+    @TELEMETRY_OPTOUT=1 ./bin/bruin internal parse-pipeline | diff integration-tests/parsed_pipeline.json -
 
 
 clean:
