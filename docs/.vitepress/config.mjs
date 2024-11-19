@@ -123,6 +123,7 @@ export default defineConfig({
           { text: "Lineage", link: "/commands/lineage" },
           { text: "Render", link: "/commands/render" },
           { text: "Run", link: "/commands/run" },
+          { text: "Validate", link: "/commands/validate" },
         ],
 
       },
