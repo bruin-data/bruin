@@ -43,7 +43,7 @@ parameters:
 **parameters:**
 - source_connection: The name of the airtable connection defined in .bruin.yml.
 
-- source_table: The name of the data table in airtable you want to ingest. For example, "Details" is the table of airtable you want to ingest.
+- source_table: The name of the data table in airtable that you want to ingest. For example, "Details" is the table of airtable that you want to ingest.
 
 **Step 3: [Run](https://bruin-data.github.io/bruin/commands/run.html) Asset to Ingest Data**
 ```
