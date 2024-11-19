@@ -141,3 +141,4 @@ glossary.yaml
 .pixi
 
 integration-tests
+!templates/integration-tests
