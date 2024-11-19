@@ -49,3 +49,6 @@ parameters:
 bruin run assets/airtable_ingestion.yml
 ```
 As a result of this command, Bruin will ingest data from the given Airtable table into your Postgres database.
+
+
+<img width="1159" alt="airtable" src="https://github.com/user-attachments/assets/416f8a07-be28-43a2-a227-9d6077276f1d">
