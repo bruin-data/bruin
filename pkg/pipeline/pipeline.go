@@ -411,10 +411,9 @@ type EntityAttribute struct {
 }
 
 type UpstreamColumn struct {
-	Asset      string `json:"asset" yaml:"asset,omitempty" mapstructure:"asset"`
-	Column     string `json:"column" yaml:"column,omitempty" mapstructure:"column"`
-	Table      string `json:"table" yaml:"table,omitempty" mapstructure:"table"`
-	AssetFound bool   `json:"asset_found" yaml:"asset_found,omitempty" mapstructure:"asset_found"`
+	Asset  string `json:"asset" yaml:"asset,omitempty" mapstructure:"asset"`
+	Column string `json:"column" yaml:"column,omitempty" mapstructure:"column"`
+	Table  string `json:"table" yaml:"table,omitempty" mapstructure:"table"`
 }
 
 type Column struct {
@@ -426,7 +425,7 @@ type Column struct {
 	UpdateOnMerge   bool             `json:"update_on_merge" yaml:"update_on_merge,omitempty" mapstructure:"update_on_merge"`
 	Extends         string           `json:"-" yaml:"extends,omitempty" mapstructure:"extends"`
 	Checks          []ColumnCheck    `json:"checks" yaml:"checks,omitempty" mapstructure:"checks"`
-	Upstreams       []UpstreamColumn `json:"upstreams,omitempty" yaml:"-" mapstructure:"-"`
+	Upstreams       UpstreamColumn   `json:"upstreams,omitempty" yaml:"-" mapstructure:"-"`
 }
 
 func (c *Column) HasCheck(check string) bool {
@@ -765,10 +764,6 @@ func (a *Asset) EnrichFromEntityAttributes(entities []*glossary.Entity) error {
 	return nil
 }
 
-func (a *Asset) PropagateColumns(foundPipeline *Pipeline) error {
-	return (&LineageExtractor{}).ColumnLineage(foundPipeline, a)
-}
-
 func (a *Asset) Persist(fs afero.Fs) error {
 	if a == nil {
 		return errors.New("failed to build an asset, therefore cannot persist it")
@@ -928,15 +923,6 @@ type Pipeline struct {
 
 	TasksByType map[AssetType][]*Asset `json:"-"`
 	tasksByName map[string]*Asset
-}
-
-func (p *Pipeline) PropagateColumns() error {
-	for _, asset := range p.Assets {
-		if err := (&LineageExtractor{}).ColumnLineage(p, asset); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error) {

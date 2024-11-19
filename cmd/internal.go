@@ -122,10 +122,14 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool) error {
 	}
 
 	if lineage {
-		if err := foundPipeline.PropagateColumns(); err != nil {
-			printErrorJSON(err)
-			return cli.Exit("", 1)
+		lineage := pipeline.NewLineageExtractor(foundPipeline)
+		for _, asset := range foundPipeline.Assets {
+			if err := lineage.ColumnLineage(asset); err != nil {
+				printErrorJSON(err)
+				return cli.Exit("", 1)
+			}
 		}
+
 	}
 
 	foundPipeline.WipeContentOfAssets()
@@ -171,7 +175,8 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 	asset := foundPipeline.GetAssetByPath(assetPath)
 
 	if lineage {
-		if err := asset.PropagateColumns(foundPipeline); err != nil {
+		lineage := pipeline.NewLineageExtractor(foundPipeline)
+		if err := lineage.ColumnLineage(asset); err != nil {
 			printErrorJSON(err)
 			return cli.Exit("", 1)
 		}
