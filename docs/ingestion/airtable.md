@@ -3,12 +3,45 @@
 
 Bruin supports Airtable as a source for [Ingestr assets](https://bruin-data.github.io/bruin/assets/ingestr.html), and you can use it to ingest data from Airtable into your data warehouse.
 
-In order to have set up Airtable connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema. For more information on how to get these credentials check the Airtable section in [Ingestr documentation](https://bruin-data.github.io/ingestr/getting-started/quickstart.html)
+In order to have set up Airtable connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema. For more information on how to get these credentials check here (https://dlthub.com/docs/dlt-ecosystem/verified-sources/airtable#setup-guide)
 
-```yaml
+Follow the steps below to correctly set up Airtable as a data source and run ingestion.
+
+```yml
     connections:
       airtable:
         - name: "connection_name"
           base_id: "id123",
           access_token: "key123",
 ```
+**Step 2: Create an Asset File for Data Ingestion**
+
+To ingest data from Airtable Ads, you need to create an [asset configuration file](https://bruin-data.github.io/bruin/assets/ingestr.html#template). This file defines the data flow from the source to the destination. Create a YAML file (e.g., airtable_ingestion.yml) and add the following content:
+
+```yml
+name: public.airtable
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: connection_name
+  source_table: 'Details'
+
+  destination: postgres
+```
+**name**: The name of the asset.
+
+**type**: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
+
+**connection:** This is the destination connection, which defines where the data should be stored. For example: "postgres" indicates that the ingested data will be stored in a PostgreSQL database.
+
+**parameters:**
+**source_connection:** The name of the airtable connection defined in .bruin.yml.
+
+**source_table**: The name of the data table in airtable you want to ingest. For example, "Details" is the table of airtable you want to ingest.
+
+**Step 3: [Run](https://bruin-data.github.io/bruin/commands/run.html) Asset to Ingest Data**
+```
+bruin run --file airtable_ingestion.yml
+```
+It will ingest airtable data to postgres. 
