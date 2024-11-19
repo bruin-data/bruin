@@ -22,9 +22,9 @@ build: deps
 integration-test: build
 	@rm -rf integration-tests
 	@echo "$(OK_COLOR)==> Testing with duck db...$(NO_COLOR)"
-	@./bin/bruin init integration-tests integration-tests
+	@TELEMETRY_OPTOUT=1 ./bin/bruin init integration-tests integration-tests
 	@cd integration-tests && git init
-	@./bin/bruin run integration-tests
+	@TELEMETRY_OPTOUT=1 ./bin/bruin run integration-tests
 
 
 clean:
