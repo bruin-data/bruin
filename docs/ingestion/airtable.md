@@ -21,7 +21,7 @@ Follow the steps below to correctly set up Airtable as a data source and run ing
 
 **Step 2: Create an Asset File for Data Ingestion**
 
-To ingest data from Airtable Ads, you need to create an [asset configuration file](https://bruin-data.github.io/bruin/assets/ingestr.html#template). This file defines the data flow from the source to the destination. Create a YAML file (e.g., airtable_ingestion.yml) and add the following content:
+To ingest data from Airtable Ads, you need to create an [asset configuration file](https://bruin-data.github.io/bruin/assets/ingestr.html#template). This file defines the data flow from the source to the destination. Create a YML file (e.g., airtable_ingestion.yml) and add the following content:
 
 ```yml
 name: public.airtable
