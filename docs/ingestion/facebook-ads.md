@@ -21,7 +21,7 @@ connections:
 
 **Step 2: Create an Asset File for Data Ingestion**
 
-To ingest data from Facebook Ads, you need to create an [asset configuration file](https://bruin-data.github.io/bruin/assets/ingestr.html#template). This file defines the data flow from the source to the destination. Create a YAML file (e.g., facebook_ads_ingestion.yml) and add the following content:
+To ingest data from Facebook Ads, you need to create an [asset configuration](https://bruin-data.github.io/bruin/assets/ingestr.html#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., facebook_ads_ingestion.yml) and add the following content:
 
 ```yaml
 name: public.facebookads
