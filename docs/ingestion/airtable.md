@@ -8,7 +8,7 @@ You will need the `base_id` and `access_token`. For details on how to obtain the
 
 Follow the steps below to correctly set up Airtable as a data source and run ingestion.
 
-**Step 1: Add a connection to .bruin.yml**
+**Step 1: Add a connection to .bruin.yml file**
 
 To connect to Airtable, you need to add a configuration item to the connections section of the .bruin.yml file. This configuration must comply with the following schema:
 
