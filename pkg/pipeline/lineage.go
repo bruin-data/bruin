@@ -112,15 +112,7 @@ func (p *LineageExtractor) parseLineage(asset *Asset) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse column lineage: %w", err)
 	}
-	// fmt.Println("======")
-	// gs, _ := json.MarshalIndent(lineage, "", "  ")
-	// fmt.Println(string(gs))
-	// ts, _ := json.MarshalIndent(p.columnMetadata, "", "  ")
-	// fmt.Println(string(ts))
-	// fmt.Println(asset.ExecutableFile.Content)
-	// fmt.Println(asset.Name)
-	// fmt.Println(dialect)
-	// fmt.Println("======")
+
 	return p.processLineageColumns(asset, lineage)
 }
 
@@ -166,10 +158,9 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 			upstreamCol := upstreamAsset.GetColumnWithName(upstream.Column)
 			if upstreamCol == nil {
 				upstreamCol = &Column{
-					Name:        upstream.Column,
-					Type:        upstream.Column,
-					Checks:      []ColumnCheck{},
-					Description: "function",
+					Name:   upstream.Column,
+					Type:   upstream.Column,
+					Checks: []ColumnCheck{},
 					Upstreams: []*UpstreamColumn{
 						{
 							Asset:  upstreamAsset.Name,
@@ -220,7 +211,8 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 	newCol.Name = colName
 	newCol.PrimaryKey = false
 	newCol.Type = upstreamCol.Type
-	newCol.Description = upstreamCol.Description
+	// TODO(Yuvraj): Description create issue when we have more then one upstream column dependency, like sum(column1, column2)
+	// newCol.Description = upstreamCol.Description
 	newCol.UpdateOnMerge = upstreamCol.UpdateOnMerge
 	newCol.Checks = []ColumnCheck{}
 
