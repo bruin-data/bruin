@@ -25,7 +25,7 @@ build: deps
 integration-test: build
 	@rm -rf integration-tests
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
-	@./bin/bruin init integration-tests integration-tests
+	@go run main.go init integration-tests integration-tests
 	@cd integration-tests && git init
 	@go run internal/integration/integration-test.go
 clean:

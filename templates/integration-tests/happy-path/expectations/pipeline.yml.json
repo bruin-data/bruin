@@ -5,7 +5,7 @@
   "start_date": "",
   "definition_file": {
     "name": "pipeline.yml",
-    "path": "__BASEDIR__/happy-path/pipeline.yml"
+    "path": "__PIPELINEDIR__pipeline.yml"
   },
   "default_parameters": {},
   "default_connections": {},
@@ -30,12 +30,12 @@
       "owner": "",
       "executable_file": {
         "name": "asset.py",
-        "path": "__BASEDIR__/happy-path/assets/asset.py",
+        "path": "__ASSETSDIR__asset.py",
         "content": ""
       },
       "definition_file": {
         "name": "asset.py",
-        "path": "__BASEDIR__/happy-path/assets/asset.py",
+        "path": "__ASSETSDIR__asset.py",
         "type": "comment"
       },
       "parameters": {},
@@ -66,12 +66,12 @@
       "owner": "",
       "executable_file": {
         "name": "chess_games.asset.yml",
-        "path": "__BASEDIR__/happy-path/assets/chess_games.asset.yml",
+        "path": "__ASSETSDIR__chess_games.asset.yml",
         "content": ""
       },
       "definition_file": {
         "name": "chess_games.asset.yml",
-        "path": "__BASEDIR__/happy-path/assets/chess_games.asset.yml",
+        "path": "__ASSETSDIR__chess_games.asset.yml",
         "type": "yaml"
       },
       "parameters": {
@@ -101,12 +101,12 @@
       "owner": "",
       "executable_file": {
         "name": "chess_profiles.asset.yml",
-        "path": "__BASEDIR__/happy-path/assets/chess_profiles.asset.yml",
+        "path": "__ASSETSDIR__chess_profiles.asset.yml",
         "content": ""
       },
       "definition_file": {
         "name": "chess_profiles.asset.yml",
-        "path": "__BASEDIR__/happy-path/assets/chess_profiles.asset.yml",
+        "path": "__ASSETSDIR__chess_profiles.asset.yml",
         "type": "yaml"
       },
       "parameters": {
@@ -151,12 +151,12 @@
       "owner": "",
       "executable_file": {
         "name": "player_summary.sql",
-        "path": "__BASEDIR__/happy-path/assets/player_summary.sql",
+        "path": "__ASSETSDIR__player_summary.sql",
         "content": ""
       },
       "definition_file": {
         "name": "player_summary.sql",
-        "path": "__BASEDIR__/happy-path/assets/player_summary.sql",
+        "path": "__ASSETSDIR__player_summary.sql",
         "type": "comment"
       },
       "parameters": {},

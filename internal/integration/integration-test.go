@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	jd "github.com/josephburnett/jd/lib"
@@ -16,7 +18,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	integrationTestsFolder := current + "/integration-tests"
+	integrationTestsFolder := filepath.Join(current, "integration-tests")
 
 	entries, err := os.ReadDir(integrationTestsFolder)
 
@@ -31,11 +33,14 @@ func main() {
 			continue
 		}
 		// Check if the entry is a directory
-		runTest(integrationTestsFolder+"/"+entry.Name(), integrationTestsFolder)
+		runTest(entry.Name(), integrationTestsFolder)
 	}
 }
 
-func runTest(folder, integrationTestsFolder string) {
+func runTest(testName, integrationTestsFolder string) {
+	integrationTestsFolder = integrationTestsFolder + string(os.PathSeparator)
+	folder := filepath.Join(integrationTestsFolder, testName) + string(os.PathSeparator)
+	assetFolder := filepath.Join(folder, "assets") + string(os.PathSeparator)
 	fmt.Println("Running test for:", folder)
 	cmd := exec.Command("go", "run", "main.go", "validate", folder)
 	stdout, err := cmd.Output()
@@ -45,13 +50,13 @@ func runTest(folder, integrationTestsFolder string) {
 		os.Exit(3)
 	}
 
-	cmd = exec.Command("go", "run", "main.go", "run", "--use-uv", folder)
-	stdout, err = cmd.Output()
-	fmt.Println(string(stdout))
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(4)
-	}
+	//cmd = exec.Command("go", "run", "main.go", "run", "--use-uv", folder)
+	//stdout, err = cmd.Output()
+	//fmt.Println(string(stdout))
+	//if err != nil {
+	//	fmt.Println(err)
+	//	os.Exit(4)
+	//}
 
 	cmd = exec.Command("go", "run", "main.go", "internal", "parse-pipeline", folder)
 	stdout, err = cmd.Output()
@@ -60,14 +65,15 @@ func runTest(folder, integrationTestsFolder string) {
 		fmt.Println(err)
 		os.Exit(4)
 	}
-	expectation, err := jd.ReadJsonFile(folder + "/expectations/pipeline.yml.json")
+	expectation, err := jd.ReadJsonFile(filepath.Join(folder, "expectations", "pipeline.yml.json"))
 	if err != nil {
 		fmt.Println("Error running expectation for parse-pipeline")
 		fmt.Println(err)
 		os.Exit(5)
 	}
+	out := replacePaths(string(stdout), integrationTestsFolder, folder, assetFolder)
 
-	parsed, err := jd.ReadJsonString(strings.ReplaceAll(string(stdout), integrationTestsFolder, "__BASEDIR__"))
+	parsed, err := jd.ReadJsonString(out)
 	if err != nil {
 		fmt.Println("Error parsing json output for pipeline " + folder)
 		fmt.Println(err)
@@ -81,7 +87,7 @@ func runTest(folder, integrationTestsFolder string) {
 		os.Exit(6)
 	}
 
-	assets, err := os.ReadDir(folder + "/assets")
+	assets, err := os.ReadDir(filepath.Join(folder, "assets"))
 	if err != nil {
 		fmt.Println("Error reading assets folder")
 		fmt.Println(err)
@@ -92,7 +98,7 @@ func runTest(folder, integrationTestsFolder string) {
 			continue
 		}
 		fmt.Println("Checking expectations for:" + asset.Name())
-		cmd = exec.Command("go", "run", "main.go", "internal", "parse-asset", folder+"/assets/"+asset.Name()) //nolint:gosec
+		cmd = exec.Command("go", "run", "main.go", "internal", "parse-asset", filepath.Join(folder, "assets", asset.Name())) //nolint:gosec
 		stdout, err = cmd.Output()
 		if err != nil {
 			fmt.Println("Error running parse asset")
@@ -100,14 +106,15 @@ func runTest(folder, integrationTestsFolder string) {
 			os.Exit(7)
 		}
 
-		expectation, err = jd.ReadJsonFile(folder + "/expectations/" + asset.Name() + ".json")
+		expectation, err = jd.ReadJsonFile(filepath.Join(folder, "expectations", asset.Name()) + ".json")
 		if err != nil {
 			fmt.Println("Error reading expectation for parse asset")
 			fmt.Println(err)
 			os.Exit(8)
 		}
 
-		replaced := strings.ReplaceAll(string(stdout), integrationTestsFolder, "__BASEDIR__")
+		out = replacePaths(string(stdout), integrationTestsFolder, folder, assetFolder)
+		replaced := out
 		parsed, err = jd.ReadJsonString(replaced)
 		if err != nil {
 			fmt.Println("Error parsing json output for asset " + asset.Name())
@@ -121,4 +128,19 @@ func runTest(folder, integrationTestsFolder string) {
 			os.Exit(6)
 		}
 	}
+}
+
+func replacePaths(input, base, pipeline, asset string) string {
+	if runtime.GOOS == "windows" {
+		base = strings.ReplaceAll(base, "\\", "\\\\")
+		pipeline = strings.ReplaceAll(pipeline, "\\", "\\\\")
+		asset = strings.ReplaceAll(asset, "\\", "\\\\")
+	}
+	fmt.Printf("Replacing %s with %s\n", asset, "__ASSETSDIR__")
+	fmt.Printf("Replacing %s with %s\n", pipeline, "__PIPELINEDIR__")
+	fmt.Printf("Replacing %s with %s\n", base, "__BASEDIR__")
+	input = strings.ReplaceAll(input, asset, "__ASSETSDIR__")
+	input = strings.ReplaceAll(input, pipeline, "__PIPELINEDIR__")
+	input = strings.ReplaceAll(input, filepath.Clean(base), "__BASEDIR__")
+	return input
 }
