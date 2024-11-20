@@ -27,18 +27,7 @@ integration-test: build
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
 	@./bin/bruin init integration-tests integration-tests
 	@cd integration-tests && git init
-	@./bin/bruin run --use-uv integration-tests
-	@./bin/bruin validate integration-tests
-	@./bin/bruin internal parse-pipeline integration-tests | sed "s|$(PWD)|__BASEDIR__|g" | diff integration-tests/parsed/pipeline.yml.json -
-	@for input_file in integration-tests/assets/$(FILES); do\
-		if [ -f "$$input_file" ]; then \
-			EXPECTED_DIR=integration-tests/parsed; \
-			base_name=$$(basename $$input_file); \
-			expected_file=$(EXPECTED_DIR)/$$base_name; \
-			./bin/bruin internal parse-asset $$input_file | sed "s|$(PWD)|__BASEDIR__|g" | diff integration-tests/parsed/`basename $$input_file`.json -;\
-		fi;\
-	done
-
+	@go run internal/integration/integration-test.go
 clean:
 	@rm -rf ./bin
 
