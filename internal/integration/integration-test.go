@@ -37,7 +37,9 @@ func main() {
 func runTest(testName, integrationTestsFolder string) {
 	integrationTestsFolder = integrationTestsFolder + string(os.PathSeparator)
 	folder := filepath.Join(integrationTestsFolder, testName) + string(os.PathSeparator)
+
 	fmt.Println("Running test for:", folder)
+
 	cmd := exec.Command("go", "run", "main.go", "validate", folder)
 	stdout, err := cmd.Output()
 	fmt.Println(string(stdout))
@@ -77,15 +79,17 @@ func runTest(testName, integrationTestsFolder string) {
 
 	diff := expectation.Diff(parsed)
 	if len(diff) != 0 {
+		var path jd.JsonNode
 		for _, d := range diff {
-			path := d.Path[len(d.Path)-1]
+			path = d.Path[len(d.Path)-1]
 			if path.Json() == "\"path\"" {
 				continue
 			}
+			fmt.Println("Parsed pipeline not matching, last path:")
+			fmt.Println(path.Json())
+			fmt.Println(diff.Render())
+			os.Exit(6)
 		}
-		fmt.Println("Parsed pipeline not matching")
-		fmt.Println(diff.Render())
-		os.Exit(6)
 	}
 
 	assets, err := os.ReadDir(filepath.Join(folder, "assets"))
@@ -127,11 +131,11 @@ func runTest(testName, integrationTestsFolder string) {
 				if path.Json() == "\"path\"" {
 					continue
 				}
+				fmt.Printf("Asset %s not matching\n", asset.Name())
+				fmt.Println(diff.Render())
+				os.Exit(6)
 			}
 
-			fmt.Printf("Asset %s not matching\n", asset.Name())
-			fmt.Println(diff.Render())
-			os.Exit(6)
 		}
 	}
 }
