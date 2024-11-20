@@ -291,7 +291,7 @@ func testBasicRecursiveParsing(t *testing.T) {
 					{
 						Name: "source_table",
 						Columns: []Column{
-							{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key", UpdateOnMerge: false, Checks: []ColumnCheck{
+							{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key", UpdateOnMerge: true, Checks: []ColumnCheck{
 								{Name: "not_null"},
 							}},
 							{Name: "name", Type: "str", Description: "User name", UpdateOnMerge: true, Checks: []ColumnCheck{
@@ -317,7 +317,7 @@ func testBasicRecursiveParsing(t *testing.T) {
 							Content: "SELECT id, UPPER(name) as upper_name, age * 2 as doubled_age FROM source_table",
 						},
 						Columns: []Column{
-							{Name: "id", Type: "int64", PrimaryKey: false, Upstreams: []*UpstreamColumn{{Asset: "source_table", Column: "id", Table: "source_table"}}, UpdateOnMerge: false, Description: "Primary key", Checks: []ColumnCheck{}},
+							{Name: "id", Type: "int64", PrimaryKey: false, Upstreams: []*UpstreamColumn{{Asset: "source_table", Column: "id", Table: "source_table"}}, UpdateOnMerge: true, Description: "Primary key", Checks: []ColumnCheck{}},
 							{Name: "upper_name", Type: "str", Upstreams: []*UpstreamColumn{{Asset: "source_table", Column: "name", Table: "source_table"}}, UpdateOnMerge: true, Description: "User name", Checks: []ColumnCheck{}},
 							{Name: "doubled_age", Type: "int64", Upstreams: []*UpstreamColumn{{Asset: "source_table", Column: "age", Table: "source_table"}}, UpdateOnMerge: true, Description: "User age", Checks: []ColumnCheck{}},
 						},
@@ -326,16 +326,9 @@ func testBasicRecursiveParsing(t *testing.T) {
 					{
 						Name: "source_table",
 						Columns: []Column{
-							{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key", UpdateOnMerge: false, Checks: []ColumnCheck{
-								{Name: "not_null"},
-							}},
-							{Name: "name", Type: "str", Description: "User name", UpdateOnMerge: true, Checks: []ColumnCheck{
-								{Name: "not_null"},
-							}},
-							{Name: "age", Type: "int64", Description: "User age", UpdateOnMerge: true, Checks: []ColumnCheck{
-								{Name: "not_null"},
-								{Name: "positive"},
-							}},
+							{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key", UpdateOnMerge: true},
+							{Name: "name", Type: "str", Description: "User name", UpdateOnMerge: true},
+							{Name: "age", Type: "int64", Description: "User age", UpdateOnMerge: true},
 						},
 						ExecutableFile: ExecutableFile{
 							Content: "SELECT * FROM data_table",

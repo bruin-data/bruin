@@ -94,7 +94,6 @@ func Lint(isDebug *bool) *cli.Command {
 
 			err = switchEnvironment(c, cm, os.Stdin)
 			if err != nil {
-
 				return err
 			}
 
