@@ -15,8 +15,8 @@ To connect to Airtable, you need to add a configuration item to the connections 
     connections:
       airtable:
         - name: "connection_name"
-          base_id: "id123",
-          access_token: "key123",
+          base_id: "id123"
+          access_token: "key123"
 ```
 
 - `base_id`: A unique identifier for an Airtable base.
@@ -50,5 +50,5 @@ bruin run assets/airtable_ingestion.yml
 ```
 As a result of this command, Bruin will ingest data from the given Airtable table into your Postgres database.
 
+<img width="1108" alt="airtable" src="https://github.com/user-attachments/assets/56db541a-7c3a-41c5-82fe-8db03b2f4b21">
 
-<img width="1159" alt="airtable" src="https://github.com/user-attachments/assets/416f8a07-be28-43a2-a227-9d6077276f1d">
