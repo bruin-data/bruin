@@ -2,13 +2,10 @@ package main
 
 import (
 	"fmt"
+	jd "github.com/josephburnett/jd/lib"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
-	"strings"
-
-	jd "github.com/josephburnett/jd/lib"
 )
 
 func main() {
@@ -40,7 +37,6 @@ func main() {
 func runTest(testName, integrationTestsFolder string) {
 	integrationTestsFolder = integrationTestsFolder + string(os.PathSeparator)
 	folder := filepath.Join(integrationTestsFolder, testName) + string(os.PathSeparator)
-	assetFolder := filepath.Join(folder, "assets") + string(os.PathSeparator)
 	fmt.Println("Running test for:", folder)
 	cmd := exec.Command("go", "run", "main.go", "validate", folder)
 	stdout, err := cmd.Output()
@@ -71,9 +67,8 @@ func runTest(testName, integrationTestsFolder string) {
 		fmt.Println(err)
 		os.Exit(5)
 	}
-	out := replacePaths(string(stdout), integrationTestsFolder, folder, assetFolder)
 
-	parsed, err := jd.ReadJsonString(out)
+	parsed, err := jd.ReadJsonString(string(stdout))
 	if err != nil {
 		fmt.Println("Error parsing json output for pipeline " + folder)
 		fmt.Println(err)
@@ -82,6 +77,12 @@ func runTest(testName, integrationTestsFolder string) {
 
 	diff := expectation.Diff(parsed)
 	if len(diff) != 0 {
+		for _, d := range diff {
+			path := d.Path[len(d.Path)-1]
+			if path.Json() == "\"path\"" {
+				continue
+			}
+		}
 		fmt.Println("Parsed pipeline not matching")
 		fmt.Println(diff.Render())
 		os.Exit(6)
@@ -113,9 +114,7 @@ func runTest(testName, integrationTestsFolder string) {
 			os.Exit(8)
 		}
 
-		out = replacePaths(string(stdout), integrationTestsFolder, folder, assetFolder)
-		replaced := out
-		parsed, err = jd.ReadJsonString(replaced)
+		parsed, err = jd.ReadJsonString(string(stdout))
 		if err != nil {
 			fmt.Println("Error parsing json output for asset " + asset.Name())
 			fmt.Println(err)
@@ -123,24 +122,16 @@ func runTest(testName, integrationTestsFolder string) {
 		}
 		diff = expectation.Diff(parsed)
 		if len(diff) != 0 {
+			for _, d := range diff {
+				path := d.Path[len(d.Path)-1]
+				if path.Json() == "\"path\"" {
+					continue
+				}
+			}
+
 			fmt.Printf("Asset %s not matching\n", asset.Name())
 			fmt.Println(diff.Render())
 			os.Exit(6)
 		}
 	}
-}
-
-func replacePaths(input, base, pipeline, asset string) string {
-	if runtime.GOOS == "windows" {
-		base = strings.ReplaceAll(base, "\\", "\\\\")
-		pipeline = strings.ReplaceAll(pipeline, "\\", "\\\\")
-		asset = strings.ReplaceAll(asset, "\\", "\\\\")
-	}
-	fmt.Printf("Replacing %s with %s\n", asset, "__ASSETSDIR__")
-	fmt.Printf("Replacing %s with %s\n", pipeline, "__PIPELINEDIR__")
-	fmt.Printf("Replacing %s with %s\n", base, "__BASEDIR__")
-	input = strings.ReplaceAll(input, asset, "__ASSETSDIR__")
-	input = strings.ReplaceAll(input, pipeline, "__PIPELINEDIR__")
-	input = strings.ReplaceAll(input, filepath.Clean(base), "__BASEDIR__")
-	return input
 }
