@@ -21,7 +21,7 @@ To connect to HubSpot, you need to add a configuration item to the connections s
 
 ### Step 2: Create an asset file for data ingestion
 
-To ingest data from HubSpot, you need to create an [asset configuration](https://bruin-data.github.io/bruin/assets/ingestr.html#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., hubspot_ingestion.yml) inside the assets folder and add the following content:
+To ingest data from HubSpot, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., hubspot_ingestion.yml) inside the assets folder and add the following content:
 
 ```yaml
 name: public.hubspot
