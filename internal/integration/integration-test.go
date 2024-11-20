@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	jd "github.com/josephburnett/jd/lib"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	jd "github.com/josephburnett/jd/lib"
 )
 
 func main() {
@@ -35,8 +36,7 @@ func main() {
 }
 
 func runTest(testName, integrationTestsFolder string) {
-	integrationTestsFolder = integrationTestsFolder + string(os.PathSeparator)
-	folder := filepath.Join(integrationTestsFolder, testName) + string(os.PathSeparator)
+	folder := filepath.Join(integrationTestsFolder, testName)
 
 	fmt.Println("Running test for:", folder)
 
@@ -48,13 +48,13 @@ func runTest(testName, integrationTestsFolder string) {
 		os.Exit(3)
 	}
 
-	//cmd = exec.Command("go", "run", "main.go", "run", "--use-uv", folder)
-	//stdout, err = cmd.Output()
-	//fmt.Println(string(stdout))
-	//if err != nil {
-	//	fmt.Println(err)
-	//	os.Exit(4)
-	//}
+	cmd = exec.Command("go", "run", "main.go", "run", "--use-uv", folder)
+	stdout, err = cmd.Output()
+	fmt.Println(string(stdout))
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(4)
+	}
 
 	cmd = exec.Command("go", "run", "main.go", "internal", "parse-pipeline", folder)
 	stdout, err = cmd.Output()
@@ -132,10 +132,10 @@ func runTest(testName, integrationTestsFolder string) {
 					continue
 				}
 				fmt.Printf("Asset %s not matching\n", asset.Name())
+				fmt.Println(path.Json())
 				fmt.Println(diff.Render())
 				os.Exit(6)
 			}
-
 		}
 	}
 }
