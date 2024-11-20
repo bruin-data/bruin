@@ -112,7 +112,15 @@ func (p *LineageExtractor) parseLineage(asset *Asset) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse column lineage: %w", err)
 	}
-
+	// fmt.Println("======")
+	// gs, _ := json.MarshalIndent(lineage, "", "  ")
+	// fmt.Println(string(gs))
+	// ts, _ := json.MarshalIndent(p.columnMetadata, "", "  ")
+	// fmt.Println(string(ts))
+	// fmt.Println(asset.ExecutableFile.Content)
+	// fmt.Println(asset.Name)
+	// fmt.Println(dialect)
+	// fmt.Println("======")
 	return p.processLineageColumns(asset, lineage)
 }
 
@@ -159,13 +167,13 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 			if upstreamCol == nil {
 				upstreamCol = &Column{
 					Name:        upstream.Column,
-					Type:        "function",
+					Type:        upstream.Column,
 					Checks:      []ColumnCheck{},
 					Description: "function",
 					Upstreams: []*UpstreamColumn{
 						{
 							Asset:  upstreamAsset.Name,
-							Column: "function",
+							Column: upstream.Column,
 							Table:  upstreamAsset.Name,
 						},
 					},
@@ -199,15 +207,12 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 			Table:  upstreamAsset.Name,
 		}
 
-		for _, existing := range col.Upstreams {
-			if existing.Asset == newUpstream.Asset &&
-				existing.Column == newUpstream.Column &&
-				existing.Table == newUpstream.Table {
+		for i, existing := range asset.Columns {
+			if existing.Name == colName {
+				asset.Columns[i].Upstreams = append(asset.Columns[i].Upstreams, newUpstream)
 				return nil
 			}
 		}
-
-		col.Upstreams = append(col.Upstreams, newUpstream)
 		return nil
 	}
 
