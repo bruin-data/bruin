@@ -37,7 +37,7 @@ func main() {
 
 func runTest(folder, integrationTestsFolder string) {
 	fmt.Println("Running test for:", folder)
-	cmd := exec.Command("bin/bruin", "validate", folder)
+	cmd := exec.Command("./bin/bruin", "validate", folder)
 	stdout, err := cmd.Output()
 	fmt.Println(string(stdout))
 	if err != nil {
@@ -45,7 +45,7 @@ func runTest(folder, integrationTestsFolder string) {
 		os.Exit(3)
 	}
 
-	cmd = exec.Command("bin/bruin", "run", "--use-uv", folder)
+	cmd = exec.Command("./bin/bruin", "run", "--use-uv", folder)
 	stdout, err = cmd.Output()
 	fmt.Println(string(stdout))
 	if err != nil {
@@ -53,7 +53,7 @@ func runTest(folder, integrationTestsFolder string) {
 		os.Exit(4)
 	}
 
-	cmd = exec.Command("bin/bruin", "internal", "parse-pipeline", folder)
+	cmd = exec.Command("./bin/bruin", "internal", "parse-pipeline", folder)
 	stdout, err = cmd.Output()
 	if err != nil {
 		fmt.Println("Error running parse-pipeline")
@@ -92,7 +92,7 @@ func runTest(folder, integrationTestsFolder string) {
 			continue
 		}
 		fmt.Println("Checking expectations for:" + asset.Name())
-		cmd = exec.Command("bin/bruin", "internal", "parse-asset", folder+"/assets/"+asset.Name()) //nolint:gosec
+		cmd = exec.Command("./bin/bruin", "internal", "parse-asset", folder+"/assets/"+asset.Name()) //nolint:gosec
 		stdout, err = cmd.Output()
 		if err != nil {
 			fmt.Println("Error running parse asset")
