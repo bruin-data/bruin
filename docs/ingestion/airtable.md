@@ -4,7 +4,7 @@
 Bruin supports Airtable as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Airtable into your data warehouse.
 
 In order to set up Airtable connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. 
-You will need the `base_id` and `access_token`. For details on how to obtain these credentials, read [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/airtable#setup-guide).
+You will need the `base_id` and `access_token`. For details on how to obtain these credentials, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/airtable#setup-guide).
 
 Follow the steps below to correctly set up Airtable as a data source and run ingestion.
 

@@ -3,7 +3,7 @@
 
 Bruin supports HubSpot as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from HubSpot into your data warehouse.
 
-In order to set up HubSpot connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You will need the `api_key`. For details on how to obtain these credentials, read [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/hubspot#setup-guide).
+In order to set up HubSpot connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You will need the `api_key`. For details on how to obtain these credentials, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/hubspot#setup-guide).
 
 Follow the steps below to correctly set up HubSpot as a data source and run ingestion.
 ### Step 1: Add a connection to .bruin.yml file
