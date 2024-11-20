@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	jd "github.com/josephburnett/jd/lib"
 	"os"
 	"os/exec"
 	"strings"
+
+	jd "github.com/josephburnett/jd/lib"
 )
 
 func main() {
@@ -68,7 +69,7 @@ func runTest(folder, integrationTestsFolder string) {
 
 	parsed, err := jd.ReadJsonString(strings.ReplaceAll(string(stdout), integrationTestsFolder, "__BASEDIR__"))
 	if err != nil {
-		fmt.Println("Error parsing json output for pipeline " + folder)git`c`
+		fmt.Println("Error parsing json output for pipeline " + folder)
 		fmt.Println(err)
 		os.Exit(5)
 	}
