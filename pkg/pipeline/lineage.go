@@ -1,19 +1,20 @@
 package pipeline
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
-// Define constants for known SQL dialects
+// Define constants for known SQL dialects.
 const (
 	BigQueryDialect  = "bigquery"
 	SnowflakeDialect = "snowflake"
 	DuckDBDialect    = "duckdb"
 )
 
-// Make the map immutable and use constants
+// Make the map immutable and use constants.
 var assetTypeDialectMap = map[AssetType]string{
 	"bq.sql":     BigQueryDialect,
 	"sf.sql":     SnowflakeDialect,
@@ -25,7 +26,7 @@ type LineageExtractor struct {
 	columnMetadata sqlparser.Schema
 }
 
-// NewLineageExtractor creates a new LineageExtractor instance
+// NewLineageExtractor creates a new LineageExtractor instance.
 func NewLineageExtractor(pipeline *Pipeline) *LineageExtractor {
 	return &LineageExtractor{
 		Pipeline:       pipeline,
@@ -33,7 +34,7 @@ func NewLineageExtractor(pipeline *Pipeline) *LineageExtractor {
 	}
 }
 
-// validateDialect checks if the asset type has a valid SQL dialect
+// validateDialect checks if the asset type has a valid SQL dialect.
 func validateDialect(assetType AssetType) (string, error) {
 	dialect, ok := assetTypeDialectMap[assetType]
 	if !ok {
@@ -42,7 +43,7 @@ func validateDialect(assetType AssetType) (string, error) {
 	return dialect, nil
 }
 
-// TableSchema extracts the table schema from the assets and stores it in the columnMetadata map
+// TableSchema extracts the table schema from the assets and stores it in the columnMetadata map.
 func (p *LineageExtractor) TableSchema() error {
 	for _, foundAsset := range p.Pipeline.Assets {
 		if len(foundAsset.Columns) > 0 {
@@ -82,9 +83,8 @@ func (p *LineageExtractor) ColumnLineage(asset *Asset) error {
 // ParseLineage analyzes the column lineage for a given asset within a
 // It traces column relationships between the asset and its upstream dependencies.
 func (p *LineageExtractor) parseLineage(asset *Asset) error {
-
 	if asset == nil {
-		return fmt.Errorf("invalid arguments: asset and pipeline cannot be nil")
+		return errors.New("invalid arguments: asset and pipeline cannot be nil")
 	}
 
 	dialect, err := validateDialect(asset.Type)
@@ -114,7 +114,6 @@ func (p *LineageExtractor) parseLineage(asset *Asset) error {
 	}
 
 	return p.processLineageColumns(asset, lineage)
-
 }
 
 func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparser.Lineage) error {
@@ -123,7 +122,7 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 	}
 
 	if asset == nil {
-		return fmt.Errorf("asset cannot be nil")
+		return errors.New("asset cannot be nil")
 	}
 
 	for _, lineageCol := range lineage.Columns {
@@ -181,10 +180,10 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 	return nil
 }
 
-// addColumnToAsset adds a new column to the asset based on upstream information
+// addColumnToAsset adds a new column to the asset based on upstream information.
 func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstreamAsset *Asset, upstreamCol *Column) error {
 	if asset == nil || upstreamAsset == nil || upstreamCol == nil || colName == "" {
-		return fmt.Errorf("invalid arguments: all parameters must be non-nil and colName must not be empty")
+		return errors.New("invalid arguments: all parameters must be non-nil and colName must not be empty")
 	}
 
 	if colName == "*" {
@@ -194,7 +193,6 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 	col := asset.GetColumnWithName(colName)
 
 	if col != nil {
-
 		newUpstream := &UpstreamColumn{
 			Asset:  upstreamAsset.Name,
 			Column: upstreamCol.Name,
@@ -223,7 +221,7 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 
 	newCol.EntityAttribute = upstreamCol.EntityAttribute
 	newCol.Upstreams = []*UpstreamColumn{
-		&UpstreamColumn{
+		{
 			Asset:  upstreamAsset.Name,
 			Column: upstreamCol.Name,
 			Table:  upstreamAsset.Name,

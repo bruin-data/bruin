@@ -132,7 +132,6 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool) error {
 				return cli.Exit("", 1)
 			}
 		}
-
 	}
 
 	foundPipeline.WipeContentOfAssets()
