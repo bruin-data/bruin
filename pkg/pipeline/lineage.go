@@ -150,27 +150,43 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 			if upstream.Column == "*" {
 				continue
 			}
-
-			upstreamAsset := p.Pipeline.GetAssetByName(upstream.Table)
-			if upstreamAsset == nil {
+			if upstream.Table == asset.Name {
 				continue
 			}
+			upstreamAsset := p.Pipeline.GetAssetByName(upstream.Table)
+			if upstreamAsset == nil {
+				if err := p.addColumnToAsset(asset, lineageCol.Name, nil, &Column{
+					Name:   upstream.Table,
+					Type:   upstream.Table,
+					Checks: []ColumnCheck{},
+					Upstreams: []*UpstreamColumn{
+						{
+							Asset:  upstream.Table,
+							Column: upstream.Column,
+							Table:  upstream.Table,
+						},
+					},
+				}); err != nil {
+					return err
+				}
+				continue
+			}
+
 			upstreamCol := upstreamAsset.GetColumnWithName(upstream.Column)
 			if upstreamCol == nil {
 				upstreamCol = &Column{
 					Name:   upstream.Column,
-					Type:   upstream.Column,
+					Type:   upstream.Table,
 					Checks: []ColumnCheck{},
 					Upstreams: []*UpstreamColumn{
 						{
 							Asset:  upstreamAsset.Name,
-							Column: upstream.Column,
+							Column: upstream.Table,
 							Table:  upstreamAsset.Name,
 						},
 					},
 				}
 			}
-
 			if err := p.addColumnToAsset(asset, lineageCol.Name, upstreamAsset, upstreamCol); err != nil {
 				return err
 			}
@@ -181,11 +197,26 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 
 // addColumnToAsset adds a new column to the asset based on upstream information.
 func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstreamAsset *Asset, upstreamCol *Column) error {
-	if asset == nil || upstreamAsset == nil || upstreamCol == nil || colName == "" {
+	if asset == nil || upstreamCol == nil || colName == "" {
 		return errors.New("invalid arguments: all parameters must be non-nil and colName must not be empty")
 	}
 
 	if colName == "*" {
+		return nil
+	}
+
+	newCol := Column{
+		Name:       colName,
+		PrimaryKey: false,
+		Type:       upstreamCol.Type,
+		Checks:     []ColumnCheck{},
+		// Description:     upstreamCol.Description,
+		EntityAttribute: upstreamCol.EntityAttribute,
+		Upstreams:       []*UpstreamColumn{},
+		UpdateOnMerge:   upstreamCol.UpdateOnMerge,
+	}
+
+	if upstreamAsset == nil {
 		return nil
 	}
 
@@ -207,24 +238,11 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 		return nil
 	}
 
-	newCol := Column{}
-	newCol.Name = colName
-	newCol.PrimaryKey = false
-	newCol.Type = upstreamCol.Type
-	// TODO(Yuvraj): Description create issue when we have more then one upstream column dependency, like sum(column1, column2)
-	// newCol.Description = upstreamCol.Description
-	newCol.UpdateOnMerge = upstreamCol.UpdateOnMerge
-	newCol.Checks = []ColumnCheck{}
-
-	newCol.EntityAttribute = upstreamCol.EntityAttribute
-	newCol.Upstreams = []*UpstreamColumn{
-		{
-			Asset:  upstreamAsset.Name,
-			Column: upstreamCol.Name,
-			Table:  upstreamAsset.Name,
-		},
-	}
-
+	newCol.Upstreams = append(newCol.Upstreams, &UpstreamColumn{
+		Asset:  upstreamAsset.Name,
+		Column: upstreamCol.Name,
+		Table:  upstreamAsset.Name,
+	})
 	asset.Columns = append(asset.Columns, newCol)
 	return nil
 }
