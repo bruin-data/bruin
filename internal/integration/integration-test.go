@@ -67,6 +67,12 @@ func runTest(folder, integrationTestsFolder string) {
 	}
 
 	parsed, err := jd.ReadJsonString(strings.ReplaceAll(string(stdout), integrationTestsFolder, "__BASEDIR__"))
+	if err != nil {
+		fmt.Println("Error parsing json output for pipeline " + folder)git`c`
+		fmt.Println(err)
+		os.Exit(5)
+	}
+
 	diff := expectation.Diff(parsed)
 	if len(diff) != 0 {
 		fmt.Println("Parsed pipeline not matching")
@@ -75,13 +81,17 @@ func runTest(folder, integrationTestsFolder string) {
 	}
 
 	assets, err := os.ReadDir(folder + "/assets")
-
+	if err != nil {
+		fmt.Println("Error reading assets folder")
+		fmt.Println(err)
+		os.Exit(5)
+	}
 	for _, asset := range assets {
 		if asset.IsDir() {
 			continue
 		}
 		fmt.Println("Checking expectations for:" + asset.Name())
-		cmd = exec.Command("bin/bruin", "internal", "parse-asset", folder+"/assets/"+asset.Name())
+		cmd = exec.Command("bin/bruin", "internal", "parse-asset", folder+"/assets/"+asset.Name()) //nolint:gosec
 		stdout, err = cmd.Output()
 		if err != nil {
 			fmt.Println("Error running parse asset")
@@ -98,6 +108,11 @@ func runTest(folder, integrationTestsFolder string) {
 
 		replaced := strings.ReplaceAll(string(stdout), integrationTestsFolder, "__BASEDIR__")
 		parsed, err = jd.ReadJsonString(replaced)
+		if err != nil {
+			fmt.Println("Error parsing json output for asset " + asset.Name())
+			fmt.Println(err)
+			os.Exit(8)
+		}
 		diff = expectation.Diff(parsed)
 		if len(diff) != 0 {
 			fmt.Printf("Asset %s not matching\n", asset.Name())
@@ -105,5 +120,4 @@ func runTest(folder, integrationTestsFolder string) {
 			os.Exit(6)
 		}
 	}
-
 }
