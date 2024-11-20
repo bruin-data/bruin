@@ -45,3 +45,7 @@ parameters:
 bruin run assets/facebook_ads_ingestion.yml
 ```
 As a result of this command, Bruin will ingest data from the given Facebook Ads table into your Postgres database.
+
+
+<img width="962" alt="facebooksads" src="https://github.com/user-attachments/assets/7476fb59-8885-4c76-95d4-f150cac2d423">
+
