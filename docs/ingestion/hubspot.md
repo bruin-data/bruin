@@ -46,6 +46,7 @@ bruin run assets/hubspot_ingestion.yml
 ```
 As a result of this command, Bruin will ingest data from the given HubSpot table into your Postgres database.
 
+<img width="1124" alt="hubspot" src="https://github.com/user-attachments/assets/c88f2781-1e78-4d5b-8cb1-60b7993ea674">
 
 
 
