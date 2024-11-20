@@ -154,19 +154,15 @@ func Lint(isDebug *bool) *cli.Command {
 			var result *lint.PipelineAnalysisResult
 			var errr error
 			if asset == "" {
-
 				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
 				logger.Debugf("running %d rules for pipeline validation", len(rules))
 				infoPrinter.Printf("Validating pipelines in '%s' for '%s' environment...\n", rootPath, cm.SelectedEnvironmentName)
 				result, errr = linter.Lint(rootPath, pipelineDefinitionFile)
-
 			} else {
-
 				rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
 				logger.Debugf("running %d rules for asset-only validation", len(rules))
 				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
 				result, errr = linter.LintAsset(rootPath, pipelineDefinitionFile, asset)
-
 			}
 
 			printer := lint.Printer{RootCheckPath: rootPath}
