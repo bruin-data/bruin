@@ -417,15 +417,15 @@ type UpstreamColumn struct {
 }
 
 type Column struct {
-	EntityAttribute *EntityAttribute `json:"entity_attribute" yaml:"-" mapstructure:"-"`
-	Name            string           `json:"name" yaml:"name,omitempty" mapstructure:"name"`
-	Type            string           `json:"type" yaml:"type,omitempty" mapstructure:"type"`
-	Description     string           `json:"description" yaml:"description,omitempty" mapstructure:"description"`
-	PrimaryKey      bool             `json:"primary_key" yaml:"primary_key,omitempty" mapstructure:"primary_key"`
-	UpdateOnMerge   bool             `json:"update_on_merge" yaml:"update_on_merge,omitempty" mapstructure:"update_on_merge"`
-	Extends         string           `json:"-" yaml:"extends,omitempty" mapstructure:"extends"`
-	Checks          []ColumnCheck    `json:"checks" yaml:"checks,omitempty" mapstructure:"checks"`
-	Upstreams       UpstreamColumn   `json:"upstreams,omitempty" yaml:"-" mapstructure:"-"`
+	EntityAttribute *EntityAttribute  `json:"entity_attribute" yaml:"-" mapstructure:"-"`
+	Name            string            `json:"name" yaml:"name,omitempty" mapstructure:"name"`
+	Type            string            `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	Description     string            `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	PrimaryKey      bool              `json:"primary_key" yaml:"primary_key,omitempty" mapstructure:"primary_key"`
+	UpdateOnMerge   bool              `json:"update_on_merge" yaml:"update_on_merge,omitempty" mapstructure:"update_on_merge"`
+	Extends         string            `json:"-" yaml:"extends,omitempty" mapstructure:"extends"`
+	Checks          []ColumnCheck     `json:"checks" yaml:"checks,omitempty" mapstructure:"checks"`
+	Upstreams       []*UpstreamColumn `json:"upstreams,omitempty" yaml:"-" mapstructure:"-"`
 }
 
 func (c *Column) HasCheck(check string) bool {
@@ -709,6 +709,16 @@ func (a *Asset) GetColumnWithName(name string) *Column {
 	for _, c := range a.Columns {
 		if c.Name == name {
 			return &c
+		}
+	}
+
+	return nil
+}
+
+func (a *Asset) SetColumnUpstream(upstream *UpstreamColumn, colName string) error {
+	for _, c := range a.Columns {
+		if c.Name == colName {
+			c.Upstreams = append(c.Upstreams, upstream)
 		}
 	}
 

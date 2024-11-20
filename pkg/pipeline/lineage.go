@@ -48,26 +48,31 @@ func (p *LineageExtractor) TableSchema() error {
 		if len(foundAsset.Columns) > 0 {
 			p.columnMetadata[foundAsset.Name] = makeColumnMap(foundAsset.Columns)
 		}
-
 	}
 	return nil
 }
 
 // ParseLineageRecursive processes the lineage of an asset and its upstream dependencies recursively.
 func (p *LineageExtractor) ColumnLineage(asset *Asset) error {
+	if asset == nil {
+		return nil
+	}
+
+	if len(asset.Columns) > 0 {
+		return nil
+	}
 
 	for _, upstream := range asset.Upstreams {
 		upstreamAsset := p.Pipeline.GetAssetByName(upstream.Value)
 		if upstreamAsset == nil {
 			continue
 		}
-
 		if err := p.ColumnLineage(upstreamAsset); err != nil {
 			return err
 		}
 	}
 
-	if err := p.parseLineage(p.Pipeline, asset); err != nil {
+	if err := p.parseLineage(asset); err != nil {
 		return err
 	}
 
@@ -76,8 +81,9 @@ func (p *LineageExtractor) ColumnLineage(asset *Asset) error {
 
 // ParseLineage analyzes the column lineage for a given asset within a
 // It traces column relationships between the asset and its upstream dependencies.
-func (p *LineageExtractor) parseLineage(pipe *Pipeline, asset *Asset) error {
-	if asset == nil || pipe == nil {
+func (p *LineageExtractor) parseLineage(asset *Asset) error {
+
+	if asset == nil {
 		return fmt.Errorf("invalid arguments: asset and pipeline cannot be nil")
 	}
 
@@ -96,7 +102,7 @@ func (p *LineageExtractor) parseLineage(pipe *Pipeline, asset *Asset) error {
 	}
 
 	for _, upstream := range asset.Upstreams {
-		upstreamAsset := pipe.GetAssetByName(upstream.Value)
+		upstreamAsset := p.Pipeline.GetAssetByName(upstream.Value)
 		if upstreamAsset == nil {
 			return fmt.Errorf("upstream asset not found: %s", upstream.Value)
 		}
@@ -108,12 +114,12 @@ func (p *LineageExtractor) parseLineage(pipe *Pipeline, asset *Asset) error {
 	}
 
 	return p.processLineageColumns(asset, lineage)
+
 }
 
-// processLineageColumns handles the processing of lineage columns and updates the asset
 func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparser.Lineage) error {
 	if lineage == nil {
-		return nil // or return an error if this should never happen
+		return nil
 	}
 
 	if asset == nil {
@@ -121,7 +127,31 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 	}
 
 	for _, lineageCol := range lineage.Columns {
+		if lineageCol.Name == "*" {
+			for _, upstream := range lineageCol.Upstream {
+				upstreamAsset := p.Pipeline.GetAssetByName(upstream.Table)
+				if upstreamAsset == nil {
+					continue
+				}
+
+				// If upstream column is *, copy all columns from upstream asset
+				if upstream.Column == "*" {
+					for _, upstreamCol := range upstreamAsset.Columns {
+						if err := p.addColumnToAsset(asset, upstreamCol.Name, upstreamAsset, &upstreamCol); err != nil {
+							return err
+						}
+					}
+					continue
+				}
+			}
+			continue
+		}
+
 		for _, upstream := range lineageCol.Upstream {
+			if upstream.Column == "*" {
+				continue
+			}
+
 			upstreamAsset := p.Pipeline.GetAssetByName(upstream.Table)
 			if upstreamAsset == nil {
 				continue
@@ -129,8 +159,17 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 			upstreamCol := upstreamAsset.GetColumnWithName(upstream.Column)
 			if upstreamCol == nil {
 				upstreamCol = &Column{
-					Name: upstream.Column,
-					Type: "function",
+					Name:        upstream.Column,
+					Type:        "function",
+					Checks:      []ColumnCheck{},
+					Description: "function",
+					Upstreams: []*UpstreamColumn{
+						{
+							Asset:  upstreamAsset.Name,
+							Column: "function",
+							Table:  upstreamAsset.Name,
+						},
+					},
 				}
 			}
 
@@ -148,18 +187,50 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 		return fmt.Errorf("invalid arguments: all parameters must be non-nil and colName must not be empty")
 	}
 
-	newCol := *upstreamCol
-	newCol.Name = colName
-	newCol.Upstreams = UpstreamColumn{
-		Asset:  upstreamAsset.Name,
-		Column: upstreamCol.Name,
-		Table:  upstreamAsset.Name,
+	if colName == "*" {
+		return nil
 	}
 
-	if col := asset.GetColumnWithName(newCol.Name); col == nil {
-		newCol.PrimaryKey = false
-		asset.Columns = append(asset.Columns, newCol)
+	col := asset.GetColumnWithName(colName)
+
+	if col != nil {
+
+		newUpstream := &UpstreamColumn{
+			Asset:  upstreamAsset.Name,
+			Column: upstreamCol.Name,
+			Table:  upstreamAsset.Name,
+		}
+
+		for _, existing := range col.Upstreams {
+			if existing.Asset == newUpstream.Asset &&
+				existing.Column == newUpstream.Column &&
+				existing.Table == newUpstream.Table {
+				return nil
+			}
+		}
+
+		col.Upstreams = append(col.Upstreams, newUpstream)
+		return nil
 	}
+
+	newCol := Column{}
+	newCol.Name = colName
+	newCol.PrimaryKey = false
+	newCol.Type = upstreamCol.Type
+	newCol.Description = upstreamCol.Description
+	newCol.UpdateOnMerge = upstreamCol.UpdateOnMerge
+	newCol.Checks = []ColumnCheck{}
+
+	newCol.EntityAttribute = upstreamCol.EntityAttribute
+	newCol.Upstreams = []*UpstreamColumn{
+		&UpstreamColumn{
+			Asset:  upstreamAsset.Name,
+			Column: upstreamCol.Name,
+			Table:  upstreamAsset.Name,
+		},
+	}
+
+	asset.Columns = append(asset.Columns, newCol)
 	return nil
 }
 
