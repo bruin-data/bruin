@@ -1,0 +1,969 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/bruin-data/bruin/pkg/config/connections",
+  "$ref": "#/$defs/Connections",
+  "$defs": {
+    "AdjustConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
+    "AirtableConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "base_id": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "base_id",
+        "access_token"
+      ]
+    },
+    "AppsflyerConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
+    "AthenaConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_key_id": {
+          "type": "string"
+        },
+        "secret_access_key": {
+          "type": "string"
+        },
+        "query_results_path": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_key_id",
+        "secret_access_key",
+        "query_results_path",
+        "region"
+      ]
+    },
+    "AwsConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_key": {
+          "type": "string"
+        },
+        "secret_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_key",
+        "secret_key"
+      ]
+    },
+    "ChessConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "players": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "default": [
+            "MagnusCarlsen",
+            "HikaruNakamura",
+            "ArjunErigaisi"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "players"
+      ]
+    },
+    "Connections": {
+      "properties": {
+        "aws": {
+          "items": {
+            "$ref": "#/$defs/AwsConnection"
+          },
+          "type": "array"
+        },
+        "athena": {
+          "items": {
+            "$ref": "#/$defs/AthenaConnection"
+          },
+          "type": "array"
+        },
+        "google_cloud_platform": {
+          "items": {
+            "$ref": "#/$defs/GoogleCloudPlatformConnection"
+          },
+          "type": "array"
+        },
+        "snowflake": {
+          "items": {
+            "$ref": "#/$defs/SnowflakeConnection"
+          },
+          "type": "array"
+        },
+        "postgres": {
+          "items": {
+            "$ref": "#/$defs/PostgresConnection"
+          },
+          "type": "array"
+        },
+        "redshift": {
+          "items": {
+            "$ref": "#/$defs/RedshiftConnection"
+          },
+          "type": "array"
+        },
+        "mssql": {
+          "items": {
+            "$ref": "#/$defs/MsSQLConnection"
+          },
+          "type": "array"
+        },
+        "databricks": {
+          "items": {
+            "$ref": "#/$defs/DatabricksConnection"
+          },
+          "type": "array"
+        },
+        "synapse": {
+          "items": {
+            "$ref": "#/$defs/SynapseConnection"
+          },
+          "type": "array"
+        },
+        "mongo": {
+          "items": {
+            "$ref": "#/$defs/MongoConnection"
+          },
+          "type": "array"
+        },
+        "mysql": {
+          "items": {
+            "$ref": "#/$defs/MySQLConnection"
+          },
+          "type": "array"
+        },
+        "notion": {
+          "items": {
+            "$ref": "#/$defs/NotionConnection"
+          },
+          "type": "array"
+        },
+        "hana": {
+          "items": {
+            "$ref": "#/$defs/HANAConnection"
+          },
+          "type": "array"
+        },
+        "shopify": {
+          "items": {
+            "$ref": "#/$defs/ShopifyConnection"
+          },
+          "type": "array"
+        },
+        "gorgias": {
+          "items": {
+            "$ref": "#/$defs/GorgiasConnection"
+          },
+          "type": "array"
+        },
+        "klaviyo": {
+          "items": {
+            "$ref": "#/$defs/KlaviyoConnection"
+          },
+          "type": "array"
+        },
+        "adjust": {
+          "items": {
+            "$ref": "#/$defs/AdjustConnection"
+          },
+          "type": "array"
+        },
+        "generic": {
+          "items": {
+            "$ref": "#/$defs/GenericConnection"
+          },
+          "type": "array"
+        },
+        "facebookads": {
+          "items": {
+            "$ref": "#/$defs/FacebookAdsConnection"
+          },
+          "type": "array"
+        },
+        "stripe": {
+          "items": {
+            "$ref": "#/$defs/StripeConnection"
+          },
+          "type": "array"
+        },
+        "appsflyer": {
+          "items": {
+            "$ref": "#/$defs/AppsflyerConnection"
+          },
+          "type": "array"
+        },
+        "kafka": {
+          "items": {
+            "$ref": "#/$defs/KafkaConnection"
+          },
+          "type": "array"
+        },
+        "duckdb": {
+          "items": {
+            "$ref": "#/$defs/DuckDBConnection"
+          },
+          "type": "array"
+        },
+        "hubspot": {
+          "items": {
+            "$ref": "#/$defs/HubspotConnection"
+          },
+          "type": "array"
+        },
+        "google_sheets": {
+          "items": {
+            "$ref": "#/$defs/GoogleSheetsConnection"
+          },
+          "type": "array"
+        },
+        "chess": {
+          "items": {
+            "$ref": "#/$defs/ChessConnection"
+          },
+          "type": "array"
+        },
+        "airtable": {
+          "items": {
+            "$ref": "#/$defs/AirtableConnection"
+          },
+          "type": "array"
+        },
+        "zendesk": {
+          "items": {
+            "$ref": "#/$defs/ZendeskConnection"
+          },
+          "type": "array"
+        },
+        "s3": {
+          "items": {
+            "$ref": "#/$defs/S3Connection"
+          },
+          "type": "array"
+        },
+        "slack": {
+          "items": {
+            "$ref": "#/$defs/SlackConnection"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "DatabricksConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "default": 443
+        },
+        "catalog": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "token",
+        "path",
+        "host",
+        "port",
+        "catalog",
+        "schema"
+      ]
+    },
+    "DuckDBConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "path"
+      ]
+    },
+    "FacebookAdsConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "account_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token",
+        "account_id"
+      ]
+    },
+    "GenericConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "value"
+      ]
+    },
+    "GoogleCloudPlatformConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "service_account_json": {
+          "type": "string"
+        },
+        "service_account_file": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "project_id"
+      ]
+    },
+    "GoogleSheetsConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "credentials_path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "credentials_path"
+      ]
+    },
+    "GorgiasConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "domain",
+        "api_key",
+        "email"
+      ]
+    },
+    "HANAConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "database": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "database"
+      ]
+    },
+    "HubspotConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
+    "KafkaConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "bootstrap_servers": {
+          "type": "string"
+        },
+        "group_id": {
+          "type": "string"
+        },
+        "security_protocol": {
+          "type": "string"
+        },
+        "sasl_mechanisms": {
+          "type": "string"
+        },
+        "sasl_username": {
+          "type": "string"
+        },
+        "sasl_password": {
+          "type": "string"
+        },
+        "batch_size": {
+          "type": "string"
+        },
+        "batch_timeout": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "bootstrap_servers",
+        "group_id"
+      ]
+    },
+    "KlaviyoConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
+    "MongoConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "default": 27017
+        },
+        "database": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "database"
+      ]
+    },
+    "MsSQLConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "default": 1433
+        },
+        "database": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "database"
+      ]
+    },
+    "MySQLConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "default": 3306
+        },
+        "database": {
+          "type": "string"
+        },
+        "driver": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "database"
+      ]
+    },
+    "NotionConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
+    "PostgresConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "default": 5432
+        },
+        "database": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "pool_max_conns": {
+          "type": "integer"
+        },
+        "ssl_mode": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "database",
+        "schema",
+        "pool_max_conns",
+        "ssl_mode"
+      ]
+    },
+    "RedshiftConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "default": 5439
+        },
+        "database": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "pool_max_conns": {
+          "type": "integer"
+        },
+        "ssl_mode": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "database",
+        "schema",
+        "pool_max_conns",
+        "ssl_mode"
+      ]
+    },
+    "S3Connection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "bucket_name": {
+          "type": "string"
+        },
+        "path_to_file": {
+          "type": "string"
+        },
+        "access_key_id": {
+          "type": "string"
+        },
+        "secret_access_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "bucket_name",
+        "path_to_file",
+        "access_key_id",
+        "secret_access_key"
+      ]
+    },
+    "ShopifyConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "url",
+        "api_key"
+      ]
+    },
+    "SlackConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
+    "SnowflakeConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "account": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "warehouse": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "account",
+        "username",
+        "password",
+        "region",
+        "role",
+        "database",
+        "schema",
+        "warehouse"
+      ]
+    },
+    "StripeConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
+    "SynapseConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "default": 1433
+        },
+        "database": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "database"
+      ]
+    },
+    "ZendeskConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_token": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "oauth_token": {
+          "type": "string"
+        },
+        "subdomain": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_token",
+        "email",
+        "oauth_token",
+        "subdomain"
+      ]
+    }
+  }
+}

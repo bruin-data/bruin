@@ -42,6 +42,14 @@ func main() {
 		"internal parse-asset happy-path/assets/player_summary.sql",
 		"happy-path/expectations/player_summary.sql.json",
 	)
+	expectJSONOutput(
+		"internal connections",
+		"expected_connections_schema.json",
+	)
+	expectJSONOutput(
+		"connections list -o json",
+		"expected_connections.json",
+	)
 }
 
 func expectJSONOutput(command string, jsonFilePath string) {
