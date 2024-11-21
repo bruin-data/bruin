@@ -35,11 +35,6 @@ jobs:
     strategy:
       matrix:
         platform: [ ubuntu-latest, windows-latest ]
-        include:
-          - platform: windows-latest
-            cache: false
-          - platform: ubuntu-latest
-            cache: true
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
