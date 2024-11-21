@@ -73,3 +73,15 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 
 	return result, err
 }
+
+func (db *DB) Test(ctx context.Context) error {
+	q := query.Query{
+		Query: "SELECT 1",
+	}
+	err := db.RunQueryWithoutResult(ctx, &q)
+	if err != nil {
+		return errors.Wrap(err, "failed to run test query on Athena connection")
+	}
+
+	return nil
+}
