@@ -9,9 +9,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/pkg/errors"
-
 	jd "github.com/josephburnett/jd/lib"
+	"github.com/pkg/errors"
 )
 
 var currentFolder string

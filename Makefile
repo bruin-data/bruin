@@ -41,7 +41,7 @@ format: tools
 	go vet ./... &
 
 	@echo "$(OK_COLOR)>> [gci] running$(NO_COLOR)" & \
-	gci write cmd pkg main.go &
+	gci write cmd pkg integration-tests/integration-test.go main.go &
 
 	@echo "$(OK_COLOR)>> [gofumpt] running$(NO_COLOR)" & \
 	gofumpt -w cmd pkg &
