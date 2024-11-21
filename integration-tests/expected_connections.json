@@ -1,0 +1,56 @@
+{
+  "default_environment_name": "default",
+  "selected_environment_name": "default",
+  "selected_environment": {
+    "connections": {
+      "generic": [
+        {
+          "name": "KEY1",
+          "value": "value1"
+        }
+      ],
+      "duckdb": [
+        {
+          "name": "duckdb-default",
+          "path": "duckdb.db"
+        }
+      ],
+      "chess": [
+        {
+          "name": "chess-default",
+          "players": [
+            "MagnusCarlsen",
+            "Hikaru"
+          ]
+        }
+      ]
+    }
+  },
+  "environments": {
+    "default": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-default",
+            "path": "duckdb.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-default",
+            "players": [
+              "MagnusCarlsen",
+              "Hikaru"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
