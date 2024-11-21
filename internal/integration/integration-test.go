@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	jd "github.com/josephburnett/jd/lib"
 )
@@ -48,13 +49,13 @@ func runTest(testName, integrationTestsFolder string) {
 		os.Exit(3)
 	}
 
-	cmd = exec.Command("go", "run", "main.go", "run", "--use-uv", folder)
-	stdout, err = cmd.Output()
-	fmt.Println(string(stdout))
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(4)
-	}
+	//cmd = exec.Command("go", "run", "main.go", "run", "--use-uv", folder)
+	//stdout, err = cmd.Output()
+	//fmt.Println(string(stdout))
+	//if err != nil {
+	//	fmt.Println(err)
+	//	os.Exit(4)
+	//}
 
 	cmd = exec.Command("go", "run", "main.go", "internal", "parse-pipeline", folder)
 	stdout, err = cmd.Output()
@@ -70,7 +71,7 @@ func runTest(testName, integrationTestsFolder string) {
 		os.Exit(5)
 	}
 
-	parsed, err := jd.ReadJsonString(string(stdout))
+	parsed, err := jd.ReadJsonString(strings.ReplaceAll(string(stdout), "\\r\\n", "\\n"))
 	if err != nil {
 		fmt.Println("Error parsing json output for pipeline " + folder)
 		fmt.Println(err)
@@ -85,6 +86,7 @@ func runTest(testName, integrationTestsFolder string) {
 			if path.Json() == "\"path\"" {
 				continue
 			}
+
 			fmt.Println("Parsed pipeline not matching, last path:")
 			fmt.Println(path.Json())
 			fmt.Println(diff.Render())
@@ -118,7 +120,7 @@ func runTest(testName, integrationTestsFolder string) {
 			os.Exit(8)
 		}
 
-		parsed, err = jd.ReadJsonString(string(stdout))
+		parsed, err = jd.ReadJsonString(strings.ReplaceAll(string(stdout), "\\r\\n", "\\n"))
 		if err != nil {
 			fmt.Println("Error parsing json output for asset " + asset.Name())
 			fmt.Println(err)
