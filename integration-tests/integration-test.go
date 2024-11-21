@@ -9,6 +9,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/pkg/errors"
+
 	jd "github.com/josephburnett/jd/lib"
 )
 
@@ -24,27 +26,26 @@ func main() {
 
 	expectExitCode("validate happy-path", 0)
 	expectExitCode("run --use-uv happy-path", 0)
-	expectJsonOutput("internal parse-pipeline happy-path", "happy-path/expectations/pipeline.yml.json")
-	expectJsonOutput(
+	expectJSONOutput("internal parse-pipeline happy-path", "happy-path/expectations/pipeline.yml.json")
+	expectJSONOutput(
 		"internal parse-asset happy-path/assets/asset.py",
 		"happy-path/expectations/asset.py.json",
 	)
-	expectJsonOutput(
+	expectJSONOutput(
 		"internal parse-asset happy-path/assets/chess_games.asset.yml",
 		"happy-path/expectations/chess_games.asset.yml.json",
 	)
-	expectJsonOutput(
+	expectJSONOutput(
 		"internal parse-asset happy-path/assets/chess_profiles.asset.yml",
 		"happy-path/expectations/chess_profiles.asset.yml.json",
 	)
-	expectJsonOutput(
+	expectJSONOutput(
 		"internal parse-asset happy-path/assets/player_summary.sql",
 		"happy-path/expectations/player_summary.sql.json",
 	)
-
 }
 
-func expectJsonOutput(command string, jsonFilePath string) {
+func expectJSONOutput(command string, jsonFilePath string) {
 	output, err := runCommand(command)
 	if err != nil {
 		fmt.Println("Failed:", err)
@@ -88,7 +89,8 @@ func expectExitCode(command string, code int) {
 	output, err := runCommand(command)
 	if err != nil {
 		// Try to get the exit code
-		if exitError, ok := err.(*exec.ExitError); ok {
+		if errors.As(err, exec.ExitError{}) {
+			exitError := err.(*exec.ExitError) //nolint: errorlint
 			// Get the status code
 			if status, ok := exitError.Sys().(syscall.WaitStatus); ok {
 				if status.ExitStatus() != code {
