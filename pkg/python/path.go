@@ -1,6 +1,7 @@
 package python
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,7 +24,7 @@ type ModulePathFinder struct {
 func (m *ModulePathFinder) FindModulePath(repo *git.Repo, executable *pipeline.ExecutableFile) (string, error) {
 	// Normalize paths by replacing OS-specific separators with a slash
 	if !strings.HasPrefix(filepath.Clean(strings.ToLower(executable.Path)), strings.ToLower(repo.Path)) {
-		return "", errors.New("executable is not in the repository")
+		return "", errors.New(fmt.Sprintf("executable (%s) is not in the repository (%s)", executable.Path, repo.Path))
 	}
 
 	relativePath, err := filepath.Rel(repo.Path, filepath.Clean(executable.Path))

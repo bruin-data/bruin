@@ -139,3 +139,6 @@ glossary.yaml
 
 # pixi dev env 
 .pixi
+
+integration-tests
+!templates/integration-tests
