@@ -103,11 +103,11 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 }
 
 // Test runs a simple query (SELECT 1) to validate the connection.
-func (d *Client) Ping(ctx context.Context) error {
+func (c *Client) Ping(ctx context.Context) error {
 	q := query.Query{
 		Query: "SELECT 1",
 	}
-	err := d.RunQueryWithoutResult(ctx, &q)
+	err := c.RunQueryWithoutResult(ctx, &q)
 	if err != nil {
 		return errors.Wrap(err, "failed to run test query on Postgres connection")
 	}
