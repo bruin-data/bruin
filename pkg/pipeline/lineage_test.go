@@ -12,6 +12,7 @@ func TestParseLineageRecursively(t *testing.T) {
 		"basic recursive parsing":   testBasicRecursiveParsing,
 		"joins and complex queries": testJoinsAndComplexQueries,
 		"advanced SQL features":     testAdvancedSQLFeatures,
+		"dialect specific features": testDialectSpecificFeatures,
 	}
 
 	for name, tc := range testCases {
@@ -291,16 +292,9 @@ func testBasicRecursiveParsing(t *testing.T) {
 					{
 						Name: "source_table",
 						Columns: []Column{
-							{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key", UpdateOnMerge: true, Checks: []ColumnCheck{
-								{Name: "not_null"},
-							}},
-							{Name: "name", Type: "str", Description: "User name", UpdateOnMerge: true, Checks: []ColumnCheck{
-								{Name: "not_null"},
-							}},
-							{Name: "age", Type: "int64", Description: "User age", UpdateOnMerge: true, Checks: []ColumnCheck{
-								{Name: "not_null"},
-								{Name: "positive"},
-							}},
+							{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key", UpdateOnMerge: true},
+							{Name: "name", Type: "str", Description: "User name", UpdateOnMerge: true},
+							{Name: "age", Type: "int64", Description: "User age", UpdateOnMerge: true},
 						},
 						ExecutableFile: ExecutableFile{
 							Content: "SELECT * FROM data_table",
@@ -818,6 +812,359 @@ func testAdvancedSQLFeatures(t *testing.T) {
 							{Name: "order_date", Type: "timestamp", Description: "Order timestamp"},
 							{Name: "customer_id", Type: "int64", Description: "Customer identifier"},
 							{Name: "amount", Type: "float64", Description: "Sale amount"},
+						},
+					},
+				},
+			},
+			want: nil,
+		},
+	}
+	runLineageTests(t, tests)
+}
+
+func testDialectSpecificFeatures(t *testing.T) {
+	tests := []struct {
+		name     string
+		pipeline *Pipeline
+		after    *Pipeline
+		want     error
+	}{
+		// {
+		// 	name: "snowflake specific syntax",
+		// 	pipeline: &Pipeline{
+		// 		Assets: []*Asset{
+		// 			{
+		// 				Name: "transformed_data",
+		// 				Type: "sf.sql",
+		// 				ExecutableFile: ExecutableFile{
+		// 					Content: `
+		// 						SELECT
+		// 							$1:id::INTEGER as id,
+		// 							$1:user.name::STRING as user_name,
+		// 							ARRAY_SIZE($1:items) as item_count,
+		// 							PARSE_JSON($1:metadata)::VARIANT as metadata,
+		// 							current_timestamp() as processed_at
+		// 						FROM data
+		// 						QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY item_count DESC) = 1
+		// 					`,
+		// 				},
+		// 				Upstreams: []Upstream{{Value: "data"}},
+		// 			},
+		// 			{
+		// 				Name: "data",
+		// 				Columns: []Column{
+		// 					{Name: "id", Type: "INTEGER", PrimaryKey: true, Description: "Unique identifier"},
+		// 					{Name: "user.name", Type: "STRING", Description: "User's full name"},
+		// 					{Name: "items", Type: "ARRAY", Description: "Array of items"},
+		// 					{Name: "metadata", Type: "VARIANT", Description: "JSON metadata"},
+		// 				},
+		// 				ExecutableFile: ExecutableFile{
+		// 					Content: "SELECT * FROM data_user_stats",
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// 	after: &Pipeline{
+		// 		Assets: []*Asset{
+		// 			{
+		// 				Name: "transformed_data",
+		// 				Type: "sf.sql",
+		// 				Columns: []Column{
+		// 					{
+		// 						Name:        "id",
+		// 						Type:        "INTEGER",
+		// 						Description: "Unique identifier",
+		// 						Upstreams: []*UpstreamColumn{
+		// 							{Asset: "@mystage/data.json", Column: "id", Table: "@mystage/data.json"},
+		// 						},
+		// 						UpdateOnMerge: false,
+		// 					},
+		// 					{
+		// 						Name:        "user_name",
+		// 						Type:        "STRING",
+		// 						Description: "User's full name",
+		// 						Upstreams: []*UpstreamColumn{
+		// 							{Asset: "@mystage/data.json", Column: "user.name", Table: "@mystage/data.json"},
+		// 						},
+		// 						UpdateOnMerge: false,
+		// 					},
+		// 					{
+		// 						Name:        "item_count",
+		// 						Type:        "INTEGER",
+		// 						Description: "Number of items in array",
+		// 						Upstreams: []*UpstreamColumn{
+		// 							{Asset: "@mystage/data.json", Column: "items", Table: "@mystage/data.json"},
+		// 						},
+		// 						UpdateOnMerge: false,
+		// 					},
+		// 					{
+		// 						Name:        "metadata",
+		// 						Type:        "VARIANT",
+		// 						Description: "JSON metadata",
+		// 						Upstreams: []*UpstreamColumn{
+		// 							{Asset: "@mystage/data.json", Column: "metadata", Table: "@mystage/data.json"},
+		// 						},
+		// 						UpdateOnMerge: false,
+		// 					},
+		// 					{
+		// 						Name:          "processed_at",
+		// 						Type:          "TIMESTAMP_NTZ",
+		// 						Description:   "Processing timestamp",
+		// 						UpdateOnMerge: false,
+		// 						Upstreams:     nil,
+		// 					},
+		// 				},
+		// 				Upstreams: []Upstream{{Value: "@mystage/data.json"}},
+		// 			},
+		// 			{
+		// 				Name: "@mystage/data.json",
+		// 				Columns: []Column{
+		// 					{Name: "id", Type: "INTEGER", PrimaryKey: true, Description: "Unique identifier"},
+		// 					{Name: "user.name", Type: "STRING", Description: "User's full name"},
+		// 					{Name: "items", Type: "ARRAY", Description: "Array of items"},
+		// 					{Name: "metadata", Type: "VARIANT", Description: "JSON metadata"},
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// 	want: nil,
+		// },
+
+		{
+			name: "redshift specific syntax",
+			pipeline: &Pipeline{
+				Assets: []*Asset{
+					{
+						Name: "sales_report",
+						Type: "rs.sql",
+						ExecutableFile: ExecutableFile{
+							Content: `
+                        SELECT 
+                            DATE_TRUNC('month', sale_date) as sale_month,
+                            LISTAGG(DISTINCT category, ', ') WITHIN GROUP (ORDER BY category) as categories,
+                            SUM(amount) as total_sales,
+                            AVG(amount) as avg_sale,
+                            COUNT(DISTINCT customer_id) as unique_customers
+                        FROM raw_sales
+                        WHERE sale_date BETWEEN GETDATE() - INTERVAL '1 year' AND GETDATE()
+                        GROUP BY 1
+                    `,
+						},
+						Upstreams: []Upstream{{Value: "raw_sales"}},
+					},
+					{
+						Name: "raw_sales",
+						Type: "rs.sql",
+						Columns: []Column{
+							{Name: "sale_date", Type: "timestamp", PrimaryKey: true, Description: "Sale timestamp"},
+							{Name: "category", Type: "varchar(max)", Description: "Product category"},
+							{Name: "amount", Type: "decimal(18,2)", Description: "Sale amount"},
+							{Name: "customer_id", Type: "bigint", Description: "Customer identifier"},
+						},
+						ExecutableFile: ExecutableFile{
+							Content: "SELECT * FROM data_sales",
+						},
+					},
+				},
+			},
+			after: &Pipeline{
+				Assets: []*Asset{
+					{
+						Name: "sales_report",
+						Type: "rs.sql",
+						Columns: []Column{
+							{
+								Name:        "sale_month",
+								Type:        "timestamp",
+								Description: "Truncated sale month",
+								Upstreams: []*UpstreamColumn{
+									{Asset: "raw_sales", Column: "sale_date", Table: "raw_sales"},
+								},
+								UpdateOnMerge: false,
+							},
+							{
+								Name:        "categories",
+								Type:        "varchar(max)",
+								Description: "Aggregated categories",
+								Upstreams: []*UpstreamColumn{
+									{Asset: "raw_sales", Column: "category", Table: "raw_sales"},
+								},
+								UpdateOnMerge: false,
+							},
+							{
+								Name:        "total_sales",
+								Type:        "decimal(18,2)",
+								Description: "Sum of sales",
+								Upstreams: []*UpstreamColumn{
+									{Asset: "raw_sales", Column: "amount", Table: "raw_sales"},
+								},
+								UpdateOnMerge: false,
+								Checks:        []ColumnCheck{{Name: "positive"}},
+							},
+							{
+								Name:        "avg_sale",
+								Type:        "decimal(18,2)",
+								Description: "Average sale amount",
+								Upstreams: []*UpstreamColumn{
+									{Asset: "raw_sales", Column: "amount", Table: "raw_sales"},
+								},
+								UpdateOnMerge: false,
+							},
+							{
+								Name:        "unique_customers",
+								Type:        "bigint",
+								Description: "Count of unique customers",
+								Upstreams: []*UpstreamColumn{
+									{Asset: "raw_sales", Column: "customer_id", Table: "raw_sales"},
+								},
+								UpdateOnMerge: false,
+								Checks:        []ColumnCheck{{Name: "positive"}},
+							},
+						},
+						Upstreams: []Upstream{{Value: "raw_sales"}},
+					},
+					{
+						Name: "raw_sales",
+						Type: "rs.sql",
+						Columns: []Column{
+							{Name: "sale_date", Type: "timestamp", PrimaryKey: true, Description: "Sale timestamp"},
+							{Name: "category", Type: "varchar(max)", Description: "Product category"},
+							{Name: "amount", Type: "decimal(18,2)", Description: "Sale amount"},
+							{Name: "customer_id", Type: "bigint", Description: "Customer identifier"},
+						},
+					},
+				},
+			},
+			want: nil,
+		},
+
+		{
+			name: "postgres specific syntax",
+			pipeline: &Pipeline{
+				Assets: []*Asset{
+					{
+						Name: "user_stats",
+						Type: "pg.sql",
+						ExecutableFile: ExecutableFile{
+							Content: `
+								 WITH RECURSIVE user_hierarchy AS (
+        SELECT id, manager_id, name, hire_date, 1 as level
+        FROM users
+        WHERE manager_id IS NULL
+        UNION ALL
+        SELECT u.id, u.manager_id, u.name, u.hire_date, uh.level + 1
+        FROM users u
+        JOIN user_hierarchy uh ON u.manager_id = uh.id
+    )
+    SELECT 
+        name,
+        level,
+        array_agg(DISTINCT department) as departments,
+        jsonb_object_agg(
+            department,
+            jsonb_build_object(
+                'count', COUNT(*),
+                'avg_tenure', AVG(EXTRACT(YEAR FROM age(current_date, user_hierarchy.hire_date)))
+            )
+        ) as dept_stats
+    FROM user_hierarchy
+    LEFT JOIN user_departments ud ON ud.user_id = user_hierarchy.id
+    GROUP BY name, level;
+							`,
+						},
+						Upstreams: []Upstream{
+							{Value: "users"},
+							{Value: "user_departments"},
+						},
+					},
+					{
+						Name: "users",
+						Type: "pg.sql",
+						Columns: []Column{
+							{Name: "id", Type: "integer", PrimaryKey: true, Description: "User ID"},
+							{Name: "manager_id", Type: "integer", Description: "Manager's user ID"},
+							{Name: "name", Type: "text", Description: "User's name"},
+							{Name: "hire_date", Type: "date", Description: "Hire date"},
+						},
+						ExecutableFile: ExecutableFile{
+							Content: "SELECT * FROM data_users",
+						},
+					},
+					{
+						Name: "user_departments",
+						Type: "pg.sql",
+						Columns: []Column{
+							{Name: "user_id", Type: "integer", Description: "User ID"},
+							{Name: "department", Type: "text", Description: "Department name"},
+						},
+						ExecutableFile: ExecutableFile{
+							Content: "SELECT * FROM data_user_departments",
+						},
+					},
+				},
+			},
+			after: &Pipeline{
+				Assets: []*Asset{
+					{
+						Name: "user_stats",
+						Type: "pg.sql",
+						Columns: []Column{
+							{
+								Name:        "name",
+								Type:        "text",
+								Description: "User's name",
+								Upstreams: []*UpstreamColumn{
+									{Asset: "users", Column: "name", Table: "users"},
+								},
+								UpdateOnMerge: false,
+							},
+							{
+								Name:        "departments",
+								Type:        "text",
+								Description: "Array of departments",
+								Upstreams: []*UpstreamColumn{
+									{Asset: "user_departments", Column: "department", Table: "user_departments"},
+								},
+								UpdateOnMerge: false,
+							},
+							{
+								Name:        "dept_stats",
+								Type:        "text",
+								Description: "Department statistics",
+								Upstreams: []*UpstreamColumn{
+									{Asset: "user_departments", Column: "department", Table: "user_departments"},
+									{Asset: "users", Column: "hire_date", Table: "users"},
+								},
+								UpdateOnMerge: false,
+							},
+						},
+						Upstreams: []Upstream{
+							{Value: "users"},
+							{Value: "user_departments"},
+						},
+					},
+					{
+						Name: "users",
+						Type: "pg.sql",
+						Columns: []Column{
+							{Name: "id", Type: "integer", PrimaryKey: true, Description: "User ID"},
+							{Name: "manager_id", Type: "integer", Description: "Manager's user ID"},
+							{Name: "name", Type: "text", Description: "User's name"},
+							{Name: "hire_date", Type: "date", Description: "Hire date"},
+						},
+						ExecutableFile: ExecutableFile{
+							Content: "SELECT * FROM data_users",
+						},
+					},
+					{
+						Name: "user_departments",
+						Type: "pg.sql",
+						Columns: []Column{
+							{Name: "user_id", Type: "integer", Description: "User ID"},
+							{Name: "department", Type: "text", Description: "Department name"},
+						},
+						ExecutableFile: ExecutableFile{
+							Content: "SELECT * FROM data_user_departments",
 						},
 					},
 				},

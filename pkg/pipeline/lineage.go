@@ -96,11 +96,6 @@ func (p *LineageExtractor) parseLineage(asset *Asset) error {
 }
 
 func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparser.Lineage) error {
-	// fmt.Println("================")
-	// gs, _ := json.MarshalIndent(lineage, "", "  ")
-	// fmt.Println(string(gs))
-	// fmt.Println(asset.Name)
-	// fmt.Println("================")
 	if lineage == nil {
 		return nil
 	}

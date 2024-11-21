@@ -25,6 +25,7 @@ func (m *mockQuerierWithResult) Select(ctx context.Context, q *query.Query) ([][
 
 	return get.([][]interface{}), args.Error(1)
 }
+
 func (m *mockQuerierWithResult) SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error) {
 	args := m.Called(ctx, q)
 	get := args.Get(0)

@@ -6,16 +6,28 @@ import (
 
 // Define constants for known SQL dialects.
 const (
-	BigQueryDialect  = "bigquery"
-	SnowflakeDialect = "snowflake"
-	DuckDBDialect    = "duckdb"
+	BigQueryDialect   = "bigquery"
+	SnowflakeDialect  = "snowflake"
+	DuckDBDialect     = "duckdb"
+	RedshiftDialect   = "redshift"
+	PostgresDialect   = "postgres"
+	MssqlDialect      = "mssql"
+	DatabricksDialect = "databricks"
+	AthenaDialect     = "athena"
+	SynapseDialect    = "synapse"
 )
 
 // Make the map immutable and use constants.
 var assetTypeDialectMap = map[string]string{
-	"bq.sql":     BigQueryDialect,
-	"sf.sql":     SnowflakeDialect,
-	"duckdb.sql": DuckDBDialect,
+	"bq.sql":         BigQueryDialect,
+	"sf.sql":         SnowflakeDialect,
+	"duckdb.sql":     DuckDBDialect,
+	"rs.sql":         RedshiftDialect,
+	"pg.sql":         PostgresDialect,
+	"mysql.sql":      MssqlDialect,
+	"databricks.sql": DatabricksDialect,
+	"athena.sql":     AthenaDialect,
+	"synapse.sql":    SynapseDialect,
 }
 
 // GetDialectByAssetType checks if the asset type has a valid SQL dialect.
