@@ -6,6 +6,9 @@ NO_COLOR=\033[0m
 OK_COLOR=\033[32;01m
 ERROR_COLOR=\033[31;01m
 WARN_COLOR=\033[33;01m
+TELEMETRY_OPTOUT=1
+CURRENT_DIR=$(pwd)
+FILES := $(wildcard *.yml *.txt *.py)
 
 .PHONY: all clean test build tools format pre-commit tools-update
 all: clean deps test build
@@ -19,13 +22,12 @@ build: deps
 	@CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0))" -o "$(BUILD_DIR)/$(NAME)" "$(BUILD_SRC)"
 
 
-duckdb-test: build
-	@echo "$(OK_COLOR)==> Testing with duck db...$(NO_COLOR)"
-	@./bin/bruin init chess test
-	@cd test && git init
-	@./bin/bruin run test
-
-
+integration-test: build
+	@rm -rf integration-tests
+	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
+	@go run main.go init integration-tests integration-tests
+	@cd integration-tests && git init
+	@go run internal/integration/integration-test.go
 clean:
 	@rm -rf ./bin
 
