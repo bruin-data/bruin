@@ -80,7 +80,7 @@ func (db *DB) Ping(ctx context.Context) error {
 	}
 	err := db.RunQueryWithoutResult(ctx, &q)
 	if err != nil {
-		return errors.Wrap(err, "failed to run test query on Athena connection")
+		return errors.Wrap(err, "failed to run test query on Databricks connection")
 	}
 
 	return nil

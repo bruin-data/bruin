@@ -266,7 +266,7 @@ func (d *Client) Ping(ctx context.Context) error {
 	// Use the existing RunQueryWithoutResult method
 	err := d.RunQueryWithoutResult(ctx, &q)
 	if err != nil {
-		return errors.Wrap(err, "failed to run test query on Snowflake connection")
+		return errors.Wrap(err, "failed to run test query on Bigquery connection")
 	}
 
 	return nil // Return nil if the query runs successfully
