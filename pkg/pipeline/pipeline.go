@@ -715,16 +715,6 @@ func (a *Asset) GetColumnWithName(name string) *Column {
 	return nil
 }
 
-func (a *Asset) SetColumnUpstream(upstream *UpstreamColumn, colName string) error {
-	for _, c := range a.Columns {
-		if c.Name == colName {
-			c.Upstreams = append(c.Upstreams, upstream)
-		}
-	}
-
-	return nil
-}
-
 func (a *Asset) CheckCount() int {
 	checkCount := 0
 	for _, c := range a.Columns {
