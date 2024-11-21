@@ -49,13 +49,13 @@ func runTest(testName, integrationTestsFolder string) {
 		os.Exit(3)
 	}
 
-	//cmd = exec.Command("go", "run", "main.go", "run", "--use-uv", folder)
-	//stdout, err = cmd.Output()
-	//fmt.Println(string(stdout))
-	//if err != nil {
-	//	fmt.Println(err)
-	//	os.Exit(4)
-	//}
+	cmd = exec.Command("go", "run", "main.go", "run", "--use-uv", folder)
+	stdout, err = cmd.Output()
+	fmt.Println(string(stdout))
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(4)
+	}
 
 	cmd = exec.Command("go", "run", "main.go", "internal", "parse-pipeline", folder)
 	stdout, err = cmd.Output()
