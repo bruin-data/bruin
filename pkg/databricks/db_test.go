@@ -103,7 +103,7 @@ func TestDB_Select(t *testing.T) {
 	}
 }
 
-func TestDB_Test(t *testing.T) {
+func TestDB_Ping(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -143,7 +143,7 @@ func TestDB_Test(t *testing.T) {
 			tt.mockConnection(mock)
 			db := DB{conn: sqlxDB}
 
-			err = db.Test(context.Background())
+			err = db.Ping(context.Background())
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.errorMessage)

@@ -74,7 +74,7 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 	return result, err
 }
 
-func (db *DB) Test(ctx context.Context) error {
+func (db *DB) Ping(ctx context.Context) error {
 	q := query.Query{
 		Query: "SELECT 1",
 	}

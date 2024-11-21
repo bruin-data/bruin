@@ -167,7 +167,7 @@ func (db *DB) initializeDB() error {
 	return nil
 }
 
-func (db *DB) Test(ctx context.Context) error {
+func (db *DB) Ping(ctx context.Context) error {
 	q := query.Query{
 		Query: "SELECT 1",
 	}
