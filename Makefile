@@ -23,11 +23,10 @@ build: deps
 
 
 integration-test: build
-	@rm -rf integration-tests
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
-	@go run main.go init integration-tests integration-tests
 	@cd integration-tests && git init
-	@go run internal/integration/integration-test.go
+	@go run integration-tests/integration-test.go
+	@rm -rf integration-tests/.git
 clean:
 	@rm -rf ./bin
 

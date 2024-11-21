@@ -11,13 +11,13 @@ import (
 )
 
 func main() {
-	current, err := os.Getwd()
+	currentFolder, err := os.Getwd()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	integrationTestsFolder := filepath.Join(current, "integration-tests")
+	integrationTestsFolder := filepath.Join(currentFolder, "integration-tests")
 
 	entries, err := os.ReadDir(integrationTestsFolder)
 

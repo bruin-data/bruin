@@ -84,7 +84,7 @@ func Init() *cli.Command {
 	}
 	templateList := make([]string, 0)
 	for _, entry := range folders {
-		if entry.IsDir() && entry.Name() != "integration-tests" {
+		if entry.IsDir() {
 			templateList = append(templateList, entry.Name())
 		}
 	}
