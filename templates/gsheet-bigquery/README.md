@@ -1,4 +1,4 @@
-# Bruin - GSheet to BigQuery
+# Bruin - GSheet to BigQuery Template
 
 This pipeline is a simple example of a Bruin pipeline that copies data from GSheet to BigQuery. It demonstrates how to use the `bruin` CLI to build and run a pipeline.
 

@@ -1,4 +1,4 @@
-# Bruin - Sample Pipeline
+# Bruin - Python Template
 
 This pipeline is a simple example of a Bruin pipeline. It demonstrates how to use the `bruin` CLI to build and run a pipeline.
 
