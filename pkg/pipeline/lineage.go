@@ -3,23 +3,11 @@ package pipeline
 import (
 	"errors"
 	"fmt"
+	"strings"
 
+	"github.com/bruin-data/bruin/pkg/dialect"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
-
-// Define constants for known SQL dialects.
-const (
-	BigQueryDialect  = "bigquery"
-	SnowflakeDialect = "snowflake"
-	DuckDBDialect    = "duckdb"
-)
-
-// Make the map immutable and use constants.
-var assetTypeDialectMap = map[AssetType]string{
-	"bq.sql":     BigQueryDialect,
-	"sf.sql":     SnowflakeDialect,
-	"duckdb.sql": DuckDBDialect,
-}
 
 type LineageExtractor struct {
 	Pipeline       *Pipeline
@@ -32,15 +20,6 @@ func NewLineageExtractor(pipeline *Pipeline) *LineageExtractor {
 		Pipeline:       pipeline,
 		columnMetadata: make(sqlparser.Schema),
 	}
-}
-
-// validateDialect checks if the asset type has a valid SQL dialect.
-func validateDialect(assetType AssetType) (string, error) {
-	dialect, ok := assetTypeDialectMap[assetType]
-	if !ok {
-		return "", fmt.Errorf("unsupported asset type: %s", assetType)
-	}
-	return dialect, nil
 }
 
 // TableSchema extracts the table schema from the assets and stores it in the columnMetadata map.
@@ -87,7 +66,7 @@ func (p *LineageExtractor) parseLineage(asset *Asset) error {
 		return errors.New("invalid arguments: asset and pipeline cannot be nil")
 	}
 
-	dialect, err := validateDialect(asset.Type)
+	dialect, err := dialect.GetDialectByAssetType(string(asset.Type))
 	if err != nil {
 		return err
 	}
@@ -117,6 +96,11 @@ func (p *LineageExtractor) parseLineage(asset *Asset) error {
 }
 
 func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparser.Lineage) error {
+	// fmt.Println("================")
+	// gs, _ := json.MarshalIndent(lineage, "", "  ")
+	// fmt.Println(string(gs))
+	// fmt.Println(asset.Name)
+	// fmt.Println("================")
 	if lineage == nil {
 		return nil
 	}
@@ -156,14 +140,14 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 			upstreamAsset := p.Pipeline.GetAssetByName(upstream.Table)
 			if upstreamAsset == nil {
 				if err := p.addColumnToAsset(asset, lineageCol.Name, nil, &Column{
-					Name:   upstream.Table,
-					Type:   upstream.Table,
+					Name:   upstream.Column,
+					Type:   strings.ToLower(upstream.Table),
 					Checks: []ColumnCheck{},
 					Upstreams: []*UpstreamColumn{
 						{
-							Asset:  upstream.Table,
+							Asset:  strings.ToLower(upstream.Table),
 							Column: upstream.Column,
-							Table:  upstream.Table,
+							Table:  strings.ToLower(upstream.Table),
 						},
 					},
 				}); err != nil {
@@ -217,32 +201,35 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 	}
 
 	if upstreamAsset == nil {
-		return nil
+		newCol = *upstreamCol
 	}
 
 	col := asset.GetColumnWithName(colName)
 
 	if col != nil {
-		newUpstream := &UpstreamColumn{
-			Asset:  upstreamAsset.Name,
-			Column: upstreamCol.Name,
-			Table:  upstreamAsset.Name,
-		}
-
-		for i, existing := range asset.Columns {
-			if existing.Name == colName {
-				asset.Columns[i].Upstreams = append(asset.Columns[i].Upstreams, newUpstream)
-				return nil
+		if upstreamAsset != nil {
+			newUpstream := &UpstreamColumn{
+				Asset:  upstreamAsset.Name,
+				Column: upstreamCol.Name,
+				Table:  upstreamAsset.Name,
+			}
+			for i, existing := range asset.Columns {
+				if existing.Name == colName {
+					asset.Columns[i].Upstreams = append(asset.Columns[i].Upstreams, newUpstream)
+					return nil
+				}
 			}
 		}
 		return nil
 	}
 
-	newCol.Upstreams = append(newCol.Upstreams, &UpstreamColumn{
-		Asset:  upstreamAsset.Name,
-		Column: upstreamCol.Name,
-		Table:  upstreamAsset.Name,
-	})
+	if upstreamAsset != nil {
+		newCol.Upstreams = append(newCol.Upstreams, &UpstreamColumn{
+			Asset:  upstreamAsset.Name,
+			Column: upstreamCol.Name,
+			Table:  upstreamAsset.Name,
+		})
+	}
 	asset.Columns = append(asset.Columns, newCol)
 	return nil
 }

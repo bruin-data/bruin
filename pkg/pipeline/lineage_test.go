@@ -803,6 +803,12 @@ func testAdvancedSQLFeatures(t *testing.T) {
 								Description: "Sale amount",
 								Upstreams:   []*UpstreamColumn{{Asset: "raw_sales", Column: "amount", Table: "raw_sales"}},
 							},
+							{
+								Name:        "report_generated_at",
+								Type:        "now",
+								Description: "Timestamp when report was generated",
+								Upstreams:   []*UpstreamColumn{{Asset: "now", Column: "report_generated_at", Table: "now"}},
+							},
 						},
 						Upstreams: []Upstream{{Value: "raw_sales"}},
 					},
