@@ -12,6 +12,18 @@ Follow the steps below to correctly set up Klaviyo as a data source and run inge
 To connect to Klaviyo, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
 
 ```yaml
+    connections:
+      klaviyo:
+        - name: "my_klaviyo"
+          api_key: "YOUR_KLAVIYO_API_KEY"
+```
+- `api_key`: The API key used for authentication with the Klaviyo API.
+
+### Step 2: Create an asset file for data ingestion
+
+To ingest data from Klaviyo, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., klaviyo_ingestion.yml) inside the assets folder and add the following content:
+
+```yaml
 name: public.klaviyo
 type: ingestr
 connection: postgres
@@ -28,16 +40,7 @@ parameters:
 - `source_connection`: The name of the Klaviyo connection defined in .bruin.yml.
 - `source_table`: The name of the data table in klaviyo you want to ingest. For example, `events` would ingest data related to events. You can find the available source tables in Klaviyo [here](https://bruin-data.github.io/ingestr/supported-sources/klaviyo.html#available-tables).
 
-### Step 2: Create an asset file for data ingestion
 
-To ingest data from Klaviyo, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., klaviyo_ingestion.yml) inside the assets folder and add the following content:
-
-```yaml
-    connections:
-      klaviyo:
-        - name: "my_klaviyo"
-          api_key: "YOUR_KLAVIYO_API_KEY"
-```
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```
 bruin run ingestr.klaviyo.asset.yml
