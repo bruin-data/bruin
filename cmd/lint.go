@@ -167,16 +167,17 @@ func Lint(isDebug *bool) *cli.Command {
 
 			printer := lint.Printer{RootCheckPath: rootPath}
 
-			if errr != nil {
-				printError(errr, c.String("output"), "An error occurred")
-				return cli.Exit(errr.Error(), 1)
+			if errr != nil || result == nil {
+				printError(err, c.String("output"), "An error occurred")
+				return cli.Exit("", 1)
+
 			}
 
 			if strings.ToLower(strings.TrimSpace(c.String("output"))) == "json" {
 				err = printer.PrintJSON(result)
 				if err != nil {
 					printError(err, c.String("output"), "An error occurred")
-					return cli.Exit(err.Error(), 1)
+					return cli.Exit("", 1)
 				}
 				return nil
 			}
