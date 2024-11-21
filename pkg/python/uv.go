@@ -94,6 +94,8 @@ func (u *UvChecker) EnsureUvInstalled(ctx context.Context) (string, error) {
 	return uvBinaryPath, nil
 }
 
+const CtxUsePowershellForUv = "use_powershell_for_uv"
+
 func (u *UvChecker) installUvCommand(ctx context.Context, dest string) error {
 	var output io.Writer = os.Stdout
 	if ctx.Value(executor.KeyPrinter) != nil {
@@ -107,7 +109,19 @@ func (u *UvChecker) installUvCommand(ctx context.Context, dest string) error {
 
 	var commandInstance *exec.Cmd
 	if runtime.GOOS == "windows" {
-		commandInstance = exec.Command(Shell, ShellSubcommandFlag, fmt.Sprintf("winget install --accept-package-agreements --accept-source-agreements --silent --id=astral-sh.uv --version %s --location %s -e", UvVersion, dest)) //nolint:gosec
+		// this conditional part is to test the powershell stuff safely.
+		// once we confirm this on different systems we should remove winget altogether.
+		usePowershell := false
+		if ctx.Value(CtxUsePowershellForUv) != nil {
+			usePowershell = ctx.Value(CtxUsePowershellForUv).(bool)
+		}
+
+		if usePowershell {
+			commandInstance = exec.Command("powershell", "-ExecutionPolicy", "ByPass", "-c", fmt.Sprintf("irm https://astral.sh/uv/%s/install.ps1 | iex", UvVersion)) //nolint:gosec
+			commandInstance.Env = []string{"UV_INSTALL_DIR=" + dest, "NO_MODIFY_PATH=1"}
+		} else {
+			commandInstance = exec.Command(Shell, ShellSubcommandFlag, fmt.Sprintf("winget install --accept-package-agreements --accept-source-agreements --silent --id=astral-sh.uv --version %s --location %s -e", UvVersion, dest)) //nolint:gosec
+		}
 	} else {
 		commandInstance = exec.Command(Shell, ShellSubcommandFlag, fmt.Sprintf("set -e; curl -LsSf https://astral.sh/uv/%s/install.sh | UV_INSTALL_DIR=\"%s\" NO_MODIFY_PATH=1 sh", UvVersion, dest)) //nolint:gosec
 	}
@@ -176,7 +190,7 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args []string, repo *gi
 	u.binaryFullPath = binaryFullPath
 
 	ingestrPackageName := "ingestr@" + ingestrVersion
-	err = u.Cmd.Run(ctx, repo, &command{
+	err = u.Cmd.Run(ctx, repo, &CommandInstance{
 		Name: u.binaryFullPath,
 		Args: []string{"tool", "install", "--force", "--quiet", "--python", pythonVersionForIngestr, ingestrPackageName},
 	})
@@ -187,7 +201,7 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args []string, repo *gi
 	flags := []string{"tool", "run", "--python", pythonVersionForIngestr, ingestrPackageName}
 	flags = append(flags, args...)
 
-	noDependencyCommand := &command{
+	noDependencyCommand := &CommandInstance{
 		Name:    u.binaryFullPath,
 		Args:    flags,
 		EnvVars: map[string]string{},
@@ -204,7 +218,7 @@ func (u *UvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *
 
 	flags = append(flags, "--module", execCtx.module)
 
-	noDependencyCommand := &command{
+	noDependencyCommand := &CommandInstance{
 		Name:    u.binaryFullPath,
 		Args:    flags,
 		EnvVars: execCtx.envVariables,
@@ -252,7 +266,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	flags = append(flags, tempPyScript.Name())
 
-	err = u.Cmd.Run(ctx, execCtx.repo, &command{
+	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
 		Name:    u.binaryFullPath,
 		Args:    flags,
 		EnvVars: execCtx.envVariables,
@@ -336,7 +350,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}
 
 	ingestrPackageName := "ingestr@" + ingestrVersion
-	err = u.Cmd.Run(ctx, execCtx.repo, &command{
+	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
 		Name: u.binaryFullPath,
 		Args: []string{"tool", "install", "--quiet", "--python", pythonVersionForIngestr, ingestrPackageName},
 	})
@@ -349,11 +363,11 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
 		boolVal := debug.(*bool)
 		if *boolVal {
-			_, _ = output.Write([]byte("Running command: uv " + strings.Join(runArgs, " ") + "\n"))
+			_, _ = output.Write([]byte("Running CommandInstance: uv " + strings.Join(runArgs, " ") + "\n"))
 		}
 	}
 
-	err = u.Cmd.Run(ctx, execCtx.repo, &command{
+	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
 		Name: u.binaryFullPath,
 		Args: runArgs,
 	})

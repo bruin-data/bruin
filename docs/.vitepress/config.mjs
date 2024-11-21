@@ -50,6 +50,21 @@ export default defineConfig({
         ],
       },
       {
+        text: "Data Platforms",
+        collapsed: false,
+        items: [
+          { text: "AWS Athena", link: "/platforms/athena" },
+          { text: "Databricks", link: "/platforms/databricks" },
+          { text: "DuckDB", link: "/platforms/duckdb" },
+          { text: "Google BigQuery", link: "/platforms/bigquery" },
+          { text: "Microsoft SQL Server", link: "/platforms/mssql" },
+          { text: "Postgres", link: "/platforms/postgres" },
+          { text: "Redshift", link: "/platforms/redshift" },
+          { text: "Snowflake", link: "/platforms/snowflake" },
+          { text: "Synapse", link: "/platforms/synapse" },
+        ],
+      },
+      {
         text: "Assets",
         collapsed: false,
         items: [
@@ -63,22 +78,6 @@ export default defineConfig({
             link: "/assets/templating/templating",
             items: [{ text: "Filters", link: "/assets/templating/filters" }],
           },
-        ],
-      },
-
-      {
-        text: "Data Platforms",
-        collapsed: false,
-        items: [
-          { text: "AWS Athena", link: "/platforms/athena" },
-          { text: "Databricks", link: "/platforms/databricks" },
-          { text: "DuckDB", link: "/platforms/duckdb" },
-          { text: "Google BigQuery", link: "/platforms/bigquery" },
-          { text: "Microsoft SQL Server", link: "/platforms/mssql" },
-          { text: "Postgres", link: "/platforms/postgres" },
-          { text: "Redshift", link: "/platforms/redshift" },
-          { text: "Snowflake", link: "/platforms/snowflake" },
-          { text: "Synapse", link: "/platforms/synapse" },
         ],
       },
       {
@@ -115,16 +114,18 @@ export default defineConfig({
         text: "Commands",
         collapsed: false,
         items: [
-          { text: "Init", link: "/commands/init" },
-          { text: "Connections", link: "/commands/connections.md" },
-          { text: "Run", link: "/commands/run" },
-          { text: "Fetch", link: "/commands/fetch" },
           { text: "Clean", link: "/commands/clean" },
-          { text: "Format", link: "/commands/format" },
+          { text: "Connections", link: "/commands/connections.md" },
           { text: "Environments", link: "/commands/environments" },
-          { text: "Render", link: "/commands/render" },
+          { text: "Fetch", link: "/commands/fetch" },
+          { text: "Format", link: "/commands/format" },
+          { text: "Init", link: "/commands/init" },
           { text: "Lineage", link: "/commands/lineage" },
+          { text: "Render", link: "/commands/render" },
+          { text: "Run", link: "/commands/run" },
+          { text: "Validate", link: "/commands/validate" },
         ],
+
       },
       {
         text: "Quality Checks",

@@ -63,7 +63,7 @@ func (i *installReqsToHomeDir) EnsureVirtualEnvExists(ctx context.Context, repo 
 		}
 	}
 
-	err = i.cmd.Run(ctx, repo, &command{
+	err = i.cmd.Run(ctx, repo, &CommandInstance{
 		Name: i.pathToPython,
 		Args: []string{"-m", "venv", venvPath},
 	})
@@ -77,7 +77,7 @@ func (i *installReqsToHomeDir) EnsureVirtualEnvExists(ctx context.Context, repo 
 		fullCommand = ". " + fullCommand
 	}
 
-	err = i.cmd.Run(ctx, repo, &command{
+	err = i.cmd.Run(ctx, repo, &CommandInstance{
 		Name: Shell,
 		Args: []string{ShellSubcommandFlag, fullCommand},
 	})

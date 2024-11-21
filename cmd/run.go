@@ -118,6 +118,10 @@ func Run(isDebug *bool) *cli.Command {
 				DefaultText: "'main', 'checks', 'push-metadata'",
 				Usage:       "limit the types of tasks to run. By default it will run main and checks, while push-metadata is optional if defined in the pipeline definition",
 			},
+			&cli.BoolFlag{
+				Name:  "exp-use-powershell-for-uv",
+				Usage: "use powershell to manage and install uv on windows, on non-windows systems this has no effect.",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			defer func() {
@@ -364,6 +368,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
+			runCtx = context.WithValue(runCtx, python.CtxUsePowershellForUv, c.Bool("exp-use-powershell-for-uv")) //nolint:staticcheck
 
 			ex.Start(runCtx, s.WorkQueue, s.Results)
 

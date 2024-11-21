@@ -29,7 +29,7 @@ type mockCmd struct {
 	mock.Mock
 }
 
-func (m *mockCmd) Run(ctx context.Context, repo *git.Repo, cmd *command) error {
+func (m *mockCmd) Run(ctx context.Context, repo *git.Repo, cmd *CommandInstance) error {
 	return m.Called(ctx, repo, cmd).Error(0)
 }
 
@@ -170,7 +170,7 @@ func Test_installReqsToHomeDir_EnsureVirtualEnvExists(t *testing.T) {
 				createRequirementsFile(fs, validReqsContent)
 
 				fakeCmd := new(mockCmd)
-				fakeCmd.On("Run", mock.Anything, repo, &command{
+				fakeCmd.On("Run", mock.Anything, repo, &CommandInstance{
 					Name: "/test/python",
 					Args: []string{"-m", "venv", "/path/to/venv"},
 				}).Return(nil)
@@ -180,7 +180,7 @@ func Test_installReqsToHomeDir_EnsureVirtualEnvExists(t *testing.T) {
 					expectedCommand = ". " + expectedCommand
 				}
 
-				fakeCmd.On("Run", mock.Anything, repo, &command{
+				fakeCmd.On("Run", mock.Anything, repo, &CommandInstance{
 					Name: Shell,
 					Args: []string{ShellSubcommandFlag, expectedCommand},
 				}).Return(nil)
@@ -210,7 +210,7 @@ func Test_installReqsToHomeDir_EnsureVirtualEnvExists(t *testing.T) {
 				createRequirementsFile(fs, validReqsContent)
 
 				fakeCmd := new(mockCmd)
-				fakeCmd.On("Run", mock.Anything, repo, &command{
+				fakeCmd.On("Run", mock.Anything, repo, &CommandInstance{
 					Name: "/test/python",
 					Args: []string{"-m", "venv", "/path/to/venv"},
 				}).Return(assert.AnError)

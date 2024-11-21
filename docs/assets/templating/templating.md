@@ -42,3 +42,28 @@ FROM user_cohorts
 GROUP BY 1,2
 ```
 You can read more about [Jinja here](https://jinja.palletsprojects.com/en/3.1.x/).
+
+## Available variables
+
+Bruin injects various variables by default:
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `start_date` | The start date in YYYY-MM-DD format | "2023-12-01" |
+| `start_datetime` | The start date and time in YYYY-MM-DDThh:mm:ss format | "2023-12-01T15:30:00" |
+| `start_timestamp` | The start timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | "2023-12-01T15:30:00.000000Z07:00" |
+| `end_date` | The end date in YYYY-MM-DD format | "2023-12-02" |
+| `end_datetime` | The end date and time in YYYY-MM-DDThh:mm:ss format | "2023-12-02T15:30:00" |
+| `end_timestamp` | The end timestamp in [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339) format | "2023-12-02T15:30:00.000000Z07:00" |
+| `pipeline` | The name of the currently executing pipeline | `my_pipeline` |
+| `run_id` | The unique identifier for the current [pipeline run](../../getting-started/concepts.md#pipeline-run) | `run_1234567890` |
+
+You can use these variables in your SQL queries by referencing them with the `{{ }}` syntax:
+```sql
+SELECT * FROM my_table 
+WHERE dt BETWEEN '{{ start_date }}' AND '{{ end_date }}'
+```
+
+> [!NOTE]
+> Date-related variables are passed in as strings, and they will be driven by the flags given to the `bruin run` command, read more on that [here](../../commands/run.md).
+
+You can modify these variables with the use of [filters](./filters.md).

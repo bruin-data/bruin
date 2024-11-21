@@ -38,17 +38,17 @@ Add or modify the `.bruin.yml` file as follows:
 ```yaml
 default_environment: default
 environments:
-    default:
-        connections:
-            duckdb:
-                - name: "duckdb-default"
-                  path: "/path/to/your/database.db"
+  default:
+    connections:
+      duckdb:
+        - name: "duckdb-default"
+          path: "duckdb.db"
+      chess:
+        - name: "chess-default"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
 
-            chess:
-                - name: "chess-default"
-                  players:
-                      - "MagnusCarlsen"
-                      - "Hikaru"
 ```
 ## Step 3: Take a look at your assets
 Since we initialized our project with the `chess template`, the necessary assets are already included in the assets folder,
@@ -85,9 +85,16 @@ Now that the data is in DuckDB, you can query it to verify the results. Open a t
 
 
 ```bash
-bruin fetch query --connection duckdb_default  --query "SELECT * FROM chess_playground.player_summary LIMIT 10;"
+bruin fetch query --connection duckdb-default  --query "SELECT * FROM chess_playground.player_summary LIMIT 10;"
 ```
+After executing the query, you will see the following results displayed in your terminal in a clear and organized table format:
+```plaintext
+| USERNAME      | AID                                            | TOTAL_GAMES | WHITE_WINS | BLACK_WINS | WHITE_GAMES | BLACK_GAMES | WHITE_WIN_RATE | BLACK_WIN_RATE |
+|---------------|------------------------------------------------|-------------|------------|------------|-------------|-------------|----------------|----------------|
+| hikaru        | https://api.chess.com/pub/player/hikaru        | 59573       | 24243      | 22731      | 30029       | 29544       | 80.73          | 76.94          |
+| magnuscarlsen | https://api.chess.com/pub/player/magnuscarlsen | 6298        | 2267       | 2027       | 3169        | 3129        | 71.54          | 64.78          |
 
+```
 Congratulations!
 
 You've successfully created and run your first Bruin pipeline! Your chess data is now ingested into DuckDB, ready for you to query and explore. This is just the beginning—feel free to extend this pipeline, add more data sources, or incorporate data transformations to suit your needs.
