@@ -125,7 +125,7 @@ func (db *DB) IsValid(ctx context.Context, query *query.Query) (bool, error) {
 }
 
 // Test runs a simple query (SELECT 1) to validate the connection.
-func (db *DB) Test(ctx context.Context) error {
+func (db *DB) Ping(ctx context.Context) error {
 	// Define the test query
 	q := query.Query{
 		Query: "SELECT 1",

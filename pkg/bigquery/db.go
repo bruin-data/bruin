@@ -22,7 +22,7 @@ var scopes = []string{
 
 type Querier interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
-	Test(ctx context.Context) error
+	Ping(ctx context.Context) error
 }
 type Selector interface {
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
@@ -257,7 +257,7 @@ func formatError(err error) error {
 }
 
 // Test runs a simple query (SELECT 1) to validate the connection.
-func (d *Client) Test(ctx context.Context) error {
+func (d *Client) Ping(ctx context.Context) error {
 	// Define the test query
 	q := query.Query{
 		Query: "SELECT 1",

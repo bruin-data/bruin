@@ -102,3 +102,56 @@ func TestDB_Select(t *testing.T) {
 		})
 	}
 }
+
+func TestDB_Ping(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		mockConnection func(mock sqlmock.Sqlmock)
+		wantErr        bool
+		errorMessage   string
+	}{
+		{
+			name: "valid connection test",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(`SELECT 1`).
+					WillReturnRows(sqlmock.NewRows([]string{"1"}).AddRow(1))
+			},
+			wantErr: false,
+		},
+		{
+			name: "failed connection test",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(`SELECT 1`).
+					WillReturnError(errors.New("connection error"))
+			},
+			wantErr:      true,
+			errorMessage: "failed to run test query on Athena connection: connection error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+			defer mockDB.Close()
+			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+
+			tt.mockConnection(mock)
+			db := DB{conn: sqlxDB}
+
+			err = db.Ping(context.Background())
+			if tt.wantErr {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.errorMessage)
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
