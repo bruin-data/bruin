@@ -127,7 +127,7 @@ func TestDB_Ping(t *testing.T) {
 					WillReturnError(errors.New("connection error"))
 			},
 			wantErr:      true,
-			errorMessage: "failed to run test query on Athena connection: connection error",
+			errorMessage: "failed to run test query on Databricks connection: connection error",
 		},
 	}
 
