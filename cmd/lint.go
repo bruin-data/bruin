@@ -170,7 +170,6 @@ func Lint(isDebug *bool) *cli.Command {
 			if errr != nil || result == nil {
 				printError(err, c.String("output"), "An error occurred")
 				return cli.Exit("", 1)
-
 			}
 
 			if strings.ToLower(strings.TrimSpace(c.String("output"))) == "json" {
