@@ -23,11 +23,10 @@ build: deps
 
 
 integration-test: build
-	@rm -rf integration-tests
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
-	@go run main.go init integration-tests integration-tests
 	@cd integration-tests && git init
-	@go run internal/integration/integration-test.go
+	@go run integration-tests/integration-test.go
+	@rm -rf integration-tests/.git
 clean:
 	@rm -rf ./bin
 
@@ -42,7 +41,7 @@ format: tools
 	go vet ./... &
 
 	@echo "$(OK_COLOR)>> [gci] running$(NO_COLOR)" & \
-	gci write cmd pkg main.go &
+	gci write cmd pkg integration-tests/integration-test.go main.go &
 
 	@echo "$(OK_COLOR)>> [gofumpt] running$(NO_COLOR)" & \
 	gofumpt -w cmd pkg &
