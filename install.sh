@@ -71,34 +71,34 @@ execute() {
     bash|sh)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
       eval "$export_command"
-      echo "$export_command" >> "$HOME/.${current_shell}rc"
-      export PATH="$PATH:${BINDIR}"
+      if ! grep -q "export PATH=\"\$PATH:${BINDIR}\"" "$HOME/.${current_shell}rc"; then
+        echo "$export_command" >> "$HOME/.${current_shell}rc"
+      fi
       echo "${YELLOW}To use the installed binaries, please restart the shell${RESET}"
       ;;
     zsh)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
       eval "$export_command"
-      echo "$export_command" >> "$HOME/.zshrc"
-      # Export PATH in the current shell
-      export PATH="$PATH:${BINDIR}"
+      if ! grep -q "export PATH=\"\$PATH:${BINDIR}\"" "$HOME/.zshrc"; then
+        echo "$export_command" >> "$HOME/.zshrc"
+      fi
       echo "${YELLOW}To use the installed binaries, please restart the shell${RESET}"
       ;;
     fish)
       export_command="set -gx PATH \$PATH ${BINDIR}"
       fish -c "$export_command"
-
-      echo "$export_command" >> "$HOME/.config/fish/config.fish"
-      # Export PATH in the current shell (for fish, this is already done by the fish -c command)
-
+      
+      if ! grep -q "set -gx PATH \$PATH ${BINDIR}" "$HOME/.config/fish/config.fish" 2>/dev/null; then
+        echo "$export_command" >> "$HOME/.config/fish/config.fish"
+      fi
       echo "${YELLOW}To use the installed binaries, please restart the shell${RESET}"
       ;;
     *)
       export_command="export PATH=\"\$PATH:${BINDIR}\""
       eval "$export_command"
       log_info "# Unable to automatically add to your shell's configuration file."
-      log_info "# Please manually add the appropriate line to your shell's configuration file to make it permanent."
-      # Export PATH in the current shell
-      export PATH="$PATH:${BINDIR}"
+      log_info "# Please manually add the following line to your shell's configuration file to make it permanent:"
+      log_info "#   $export_command"
       ;;
   esac
   
