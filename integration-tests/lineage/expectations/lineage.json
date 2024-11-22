@@ -1,16 +1,14 @@
 {
     "legacy_id": "",
-    "name": "bruin-duckdb",
-    "schedule": "daily",
-    "start_date": "2024-01-01",
+    "name": "integration_test",
+    "schedule": "",
+    "start_date": "",
     "definition_file": {
       "name": "pipeline.yml",
       "path": "__PIPELINEDIR__pipeline.yml"
     },
     "default_parameters": {},
-    "default_connections": {
-      "duckdb": "duckdb-default"
-    },
+    "default_connections": {},
     "assets": [
       {
         "id": "aff64e4fd520bd185cb01adab98d2d20060f621c62d5cad5204712cfa2294ef7",
