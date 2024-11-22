@@ -69,7 +69,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
         find_leaf_nodes(ll, leaves)
 
         for ds in leaves:
-            if isinstance(ds.expression.this, exp.Literal):
+            if isinstance(ds.expression.this, exp.Literal) or isinstance(ds.expression.this, exp.Anonymous):
                 continue
 
             cl.append(
@@ -84,9 +84,6 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
         result.append({"name": col, "upstream": cl})
 
     result.sort(key=lambda x: x["name"])
-
-    
-
 
     return {
         "columns": result,

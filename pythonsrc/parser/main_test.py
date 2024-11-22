@@ -190,7 +190,8 @@ test_cases = [
                     WHEN regions.name = 'South' THEN 'S'
                     ELSE 'Other'
                 END as region_abbr,
-                'fixed' as fixed
+                'fixed' as fixed,
+                now() as updated_at
             FROM sales
             JOIN regions ON sales.region_id = regions.id
         """,
@@ -206,6 +207,7 @@ test_cases = [
                 "upstream": [{"column": "name", "table": "regions"}],
             },
             {"name": "sale_size", "upstream": [{"column": "amount", "table": "sales"}]},
+            {"name": "updated_at", "upstream": []},
         ]
     },
 ]
