@@ -293,21 +293,21 @@ func TestSqlParser_Lineage(t *testing.T) {
 		{
 			name: "cte",
 			sql: `with t1 as (
-        select *
-        from table1
-        join table2
-            using(a)
-    ),
-    t2 as (
-        select *
-        from table2
-        left join table1
-            using(a)
-    )
-    select t1.*, t2.b as b2, t2.c as c2
-    from t1
-    join t2
-        using(a)`,
+				select *
+				from table1
+				join table2
+					using(a)
+			),
+			t2 as (
+				select *
+				from table2
+				left join table1
+					using(a)
+			)
+			select t1.*, t2.b as b2, t2.c as c2, now() as updated_at
+			from t1
+			join t2
+				using(a)`,
 			schema: Schema{
 				"table1": {"a": "str", "b": "int64"},
 				"table2": {"a": "str", "c": "str"},
@@ -344,6 +344,10 @@ func TestSqlParser_Lineage(t *testing.T) {
 						Upstream: []UpstreamColumn{
 							{Column: "c", Table: "table2"},
 						},
+					},
+					{
+						Name:     "updated_at",
+						Upstream: []UpstreamColumn{},
 					},
 				},
 			},
