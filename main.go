@@ -46,6 +46,13 @@ func main() {
 		Version:  version,
 		Usage:    "The CLI used for managing Bruin-powered data pipelines",
 		Compiled: time.Now(),
+		Before: func(context *cli.Context) error {
+			Telemetry.SendEvent("command", analytics.Properties{
+				"command": context.Command.Name,
+				"args":    context.Args().Slice(),
+			})
+			return nil
+		},
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:        "debug",
@@ -69,6 +76,5 @@ func main() {
 			versionCommand,
 		},
 	}
-	Telemetry.SendEvent("cli_started", analytics.Properties{"args": os.Args})
 	_ = app.Run(os.Args)
 }
