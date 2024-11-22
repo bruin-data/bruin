@@ -10,27 +10,19 @@ import (
 
 const url = "https://getbruinbumlky.dataplane.rudderstack.com"
 
-type Telemetry struct {
-	telemetryKey string
-	optOut       bool
-	appVersion   string
-}
+var (
+	TelemetryKey = ""
+	OptOut       = false
+	AppVersion   = ""
+)
 
-func NewTelemetry(telemetryKey, version string, optOut bool) *Telemetry {
-	return &Telemetry{
-		telemetryKey: telemetryKey,
-		optOut:       optOut,
-		appVersion:   version,
-	}
-}
-
-func (t *Telemetry) SendEvent(event string, properties analytics.Properties) {
-	if t.optOut {
+func SendEvent(event string, properties analytics.Properties) {
+	if OptOut || TelemetryKey == "" {
 		return
 	}
 	id, _ := machineid.ID()
 
-	client := analytics.New(t.telemetryKey, url)
+	client := analytics.New(TelemetryKey, url)
 	// Enqueues a track event that will be sent asynchronously.
 	_ = client.Enqueue(analytics.Track{
 		AnonymousId:       id,
@@ -39,7 +31,7 @@ func (t *Telemetry) SendEvent(event string, properties analytics.Properties) {
 		Context: &analytics.Context{
 			App: analytics.AppInfo{
 				Name:    "Bruin CLI",
-				Version: t.appVersion,
+				Version: AppVersion,
 			},
 			OS: analytics.OSInfo{
 				Name: runtime.GOOS + " " + runtime.GOARCH,

@@ -12,26 +12,23 @@ import (
 )
 
 var (
-	version      = "dev"
-	commit       = ""
-	telemetryKey = ""
+	version = "dev"
+	commit  = ""
 )
-
-var Telemetry *telemetry.Telemetry
 
 func main() {
 	start := time.Now()
 	isDebug := false
 	color.NoColor = false
-	if telemetryKey == "" {
-		telemetryKey = os.Getenv("TELEMETRY_KEY")
-	}
+
 	var optOut bool
 	if os.Getenv("TELEMETRY_OPTOUT") != "" {
 		optOut = true
 	}
 
-	Telemetry = telemetry.NewTelemetry(telemetryKey, version, optOut)
+	telemetry.TelemetryKey = os.Getenv("TELEMETRY_KEY")
+	telemetry.OptOut = optOut
+	telemetry.AppVersion = version
 
 	versionCommand := cmd.VersionCmd(commit)
 
@@ -48,24 +45,28 @@ func main() {
 		Usage:    "The CLI used for managing Bruin-powered data pipelines",
 		Compiled: time.Now(),
 		Before: func(context *cli.Context) error {
-			Telemetry.SendEvent("command", analytics.Properties{
+			telemetry.SendEvent("command", analytics.Properties{
 				"command_start": context.Command.Name,
 				"args":          context.Args().Slice(),
 			})
 			return nil
 		},
 		After: func(context *cli.Context) error {
-			Telemetry.SendEvent("command", analytics.Properties{
+			telemetry.SendEvent("command", analytics.Properties{
 				"command_finish": context.Command.Name,
 				"duration":       time.Since(start).Seconds(),
 			})
 			return nil
 		},
 		ExitErrHandler: func(context *cli.Context, err error) {
-			Telemetry.SendEvent("command", analytics.Properties{
+			errMsg := "Unknown error"
+			if err != nil {
+				errMsg = err.Error()
+			}
+			telemetry.SendEvent("command", analytics.Properties{
 				"command_error": context.Command.Name,
 				"args":          context.Args().Slice(),
-				"error":         err.Error(),
+				"error":         errMsg,
 				"duration":      time.Since(start).Seconds(),
 			})
 			cli.HandleExitCoder(err)
