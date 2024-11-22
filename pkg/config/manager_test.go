@@ -234,17 +234,17 @@ func TestLoadFromFile(t *testing.T) {
 					CredentialsPath: "/path/to/service_account.json",
 				},
 			},
+			Chess: []ChessConnection{
+				{
+					Name:    "conn24",
+					Players: []string{"Max", "Peter"},
+				},
+			},
 			Airtable: []AirtableConnection{
 				{
 					Name:        "conn23",
 					BaseID:      "123",
 					AccessToken: "accessKey",
-				},
-			},
-			Chess: []ChessConnection{
-				{
-					Name:    "conn24",
-					Players: []string{"Max", "Peter"},
 				},
 			},
 			S3: []S3Connection{
@@ -264,13 +264,13 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			Zendesk: []ZendeskConnection{
 				{
-					Name:      "conn27",
+					Name:      "conn25",
 					APIToken:  "zendeskKey",
 					Email:     "zendeskemail",
 					Subdomain: "zendeskUrl",
 				},
 				{
-					Name:       "conn27-1",
+					Name:       "conn25-1",
 					OAuthToken: "zendeskToken",
 					Subdomain:  "zendeskUrl",
 				},
