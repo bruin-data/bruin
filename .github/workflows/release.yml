@@ -55,7 +55,7 @@ jobs:
       - name: Run GoReleaser
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          docker run --privileged   -v /var/run/docker.sock:/var/run/docker.sock -e GGOOS=darwin -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e COMMIT_SHA=${{ github.sha }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.RELEASE_TOKEN }} -v $(pwd):/src -w /src ghcr.io/bruin-data/goreleaser-cross-pro:v1.22 release --clean --split --verbose
+          docker run --privileged   -v /var/run/docker.sock:/var/run/docker.sock -e GGOOS=darwin -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e COMMIT_SHA=${{ github.sha }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.RELEASE_TOKEN }} -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} -v $(pwd):/src -w /src ghcr.io/bruin-data/goreleaser-cross-pro:v1.22 release --clean --split --verbose
   
         
   prepare-linux:
@@ -84,7 +84,7 @@ jobs:
       - name: Run GoReleaser
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          docker run --privileged   -v /var/run/docker.sock:/var/run/docker.sock -e GGOOS=linux -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e COMMIT_SHA=${{ github.sha }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.RELEASE_TOKEN }} -v $(pwd):/src -w /src ghcr.io/bruin-data/goreleaser-cross-pro:v1.22 release --clean --split --verbose
+          docker run --privileged   -v /var/run/docker.sock:/var/run/docker.sock -e GGOOS=linux -e GORELEASER_KEY=${{ secrets.GORELEASER_KEY }} -e COMMIT_SHA=${{ github.sha }} -e VERSION=${{ github.ref_name }} -e GITHUB_TOKEN=${{ secrets.RELEASE_TOKEN }} -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} -v $(pwd):/src -w /src ghcr.io/bruin-data/goreleaser-cross-pro:v1.22 release --clean --split --verbose
 
 
   release-unix:
@@ -118,6 +118,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+          TELEMETRY_KEY: ${{ secrets.TELEMETRY_KEY }}
 
   release-windows:
     runs-on: windows-latest
@@ -146,6 +147,7 @@ jobs:
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
           VERSION: ${{ github.ref_name }}
           COMMIT_SHA: ${{ github.sha }}
+          TELEMETRY_KEY: ${{ secrets.TELEMETRY_KEY }}
           GGOOS: windows
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2

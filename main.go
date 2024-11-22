@@ -5,18 +5,32 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/cmd"
+	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/fatih/color"
+	"github.com/rudderlabs/analytics-go/v4"
 	"github.com/urfave/cli/v2"
 )
 
 var (
-	version = "dev"
-	commit  = ""
+	version      = "dev"
+	commit       = ""
+	telemetryKey = ""
 )
+
+var Telemetry *telemetry.Telemetry
 
 func main() {
 	isDebug := false
 	color.NoColor = false
+	if telemetryKey == "" {
+		telemetryKey = os.Getenv("TELEMETRY_KEY")
+	}
+	var optOut bool
+	if os.Getenv("TELEMETRY_OPTOUT") != "" {
+		optOut = true
+	}
+
+	Telemetry = telemetry.NewTelemetry(telemetryKey, version, optOut)
 
 	versionCommand := cmd.VersionCmd(commit)
 
@@ -32,6 +46,27 @@ func main() {
 		Version:  version,
 		Usage:    "The CLI used for managing Bruin-powered data pipelines",
 		Compiled: time.Now(),
+		Before: func(context *cli.Context) error {
+			Telemetry.SendEvent("command", analytics.Properties{
+				"command_start": context.Command.Name,
+				"args":          context.Args().Slice(),
+			})
+			return nil
+		},
+		After: func(context *cli.Context) error {
+			Telemetry.SendEvent("command", analytics.Properties{
+				"command_finish": context.Command.Name,
+			})
+			return nil
+		},
+		ExitErrHandler: func(context *cli.Context, err error) {
+			Telemetry.SendEvent("command", analytics.Properties{
+				"command_error": context.Command.Name,
+				"args":          context.Args().Slice(),
+				"error":         err.Error(),
+			})
+			cli.HandleExitCoder(err)
+		},
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:        "debug",

@@ -10,6 +10,7 @@ require (
 	github.com/alecthomas/chroma/v2 v2.13.0
 	github.com/charmbracelet/bubbletea v1.1.2
 	github.com/databricks/databricks-sql-go v1.6.0
+	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/fatih/color v1.16.0
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/go-viper/mapstructure/v2 v2.1.0
@@ -27,6 +28,7 @@ require (
 	github.com/pashagolub/pgxmock/v3 v3.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/rudderlabs/analytics-go/v4 v4.2.1
 	github.com/samber/lo v1.46.0
 	github.com/snowflakedb/gosnowflake v1.8.0
 	github.com/sourcegraph/conc v0.3.0
@@ -147,8 +149,12 @@ require (
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/rs/zerolog v1.28.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/segmentio/backo-go v1.1.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
+	github.com/tidwall/gjson v1.14.4 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/uber-go/tally v3.3.17+incompatible // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/xrash/smetrics v0.0.0-20240312152122-5f08fbb34913 // indirect
