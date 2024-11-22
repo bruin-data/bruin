@@ -36,8 +36,10 @@ import (
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/synapse"
+	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
+	"github.com/rudderlabs/analytics-go/v4"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
 	"github.com/xlab/treeprint"
@@ -313,6 +315,8 @@ func Run(isDebug *bool) *cli.Command {
 					return cli.Exit("", 1)
 				}
 			}
+
+			sendTelemetry(s)
 
 			tag := c.String("tag")
 			if tag != "" {
@@ -728,4 +732,16 @@ var re = regexp.MustCompile(ansi)
 
 func Clean(str string) string {
 	return re.ReplaceAllString(str, "")
+}
+
+func sendTelemetry(s *scheduler.Scheduler) {
+	assetStats := make(map[string]int)
+	for _, asset := range s.GetTaskInstancesByStatus(scheduler.Pending) {
+		_, ok := assetStats[string(asset.GetAsset().Type)]
+		if !ok {
+			assetStats[string(asset.GetAsset().Type)] = 0
+		}
+		assetStats[string(asset.GetAsset().Type)]++
+	}
+	telemetry.SendEvent("running", analytics.Properties{"assets": assetStats})
 }
