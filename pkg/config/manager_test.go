@@ -234,17 +234,17 @@ func TestLoadFromFile(t *testing.T) {
 					CredentialsPath: "/path/to/service_account.json",
 				},
 			},
-			Chess: []ChessConnection{
-				{
-					Name:    "conn24",
-					Players: []string{"Max", "Peter"},
-				},
-			},
 			Airtable: []AirtableConnection{
 				{
 					Name:        "conn23",
 					BaseID:      "123",
 					AccessToken: "accessKey",
+				},
+			},
+			Chess: []ChessConnection{
+				{
+					Name:    "conn24",
+					Players: []string{"Max", "Peter"},
 				},
 			},
 			S3: []S3Connection{
