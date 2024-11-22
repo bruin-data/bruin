@@ -69,11 +69,6 @@ This is the column of the table that will be used for incremental updates of the
 - **Type:** `String[]`
 - **Default:** `[]`
 
-## `tags`
-A list of tags that can be used to categorize the asset. This is useful for searching and filtering assets when running.
-- **Type:** `String[]`
-- **Default:** `[]`
-
 ## Strategies
 Bruin supports various materialization strategies that take your code and convert it to another structure behind the scenes to materialize the execution results of your assets.
 

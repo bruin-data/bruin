@@ -39,7 +39,11 @@ export default defineConfig({
                             {text: "Quickstart", link: "/getting-started/introduction/quickstart"},
                         ],
                     },
-                    {text: "Features", link: "/getting-started/features", items: [{text: "Glossary", link: "/getting-started/glossary"}]},
+                    {
+                        text: "Features",
+                        link: "/getting-started/features",
+                        items: [{text: "Glossary", link: "/getting-started/glossary"}]
+                    },
                     {text: "Concepts", link: "/getting-started/concepts"},
                     {text: "Design Principles", link: "/getting-started/design-principles"},
                     {text: "Templates", link: "/getting-started/templates"},
@@ -76,14 +80,15 @@ export default defineConfig({
                 collapsed: false,
                 items: [
                     {text: "Definition Schema", link: "/assets/definition-schema"},
-                    {text: "Columns", link: "/assets/columns"},
-                    {text: "Materialization", link: "/assets/materialization"},
-                    {text: "Asset Types", items:[
+                    {
+                        text: "Asset Types", items: [
                             {text: "SQL", link: "/assets/sql"},
                             {text: "Ingestr", link: "/assets/ingestr"},
                             {text: "Python Assets", link: "/assets/python"},
-                        ]},
-
+                        ]
+                    },
+                    {text: "Columns", link: "/assets/columns"},
+                    {text: "Materialization", link: "/assets/materialization"},
                     {
                         text: " Jinja Templating",
                         link: "/assets/templating/templating",
