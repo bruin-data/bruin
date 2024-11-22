@@ -128,7 +128,7 @@ Bruin supports data quality checks by default, and it has a handful of [built-in
 
 ## Jinja templating
 
-Bruin supports [Jinja templates](../assets/templating) out of the box to reduce repetition. You can simply write any templating logic for your SQL assets and let Bruin take care of it.
+Bruin supports [Jinja templates](../assets/templating/templating.md) out of the box to reduce repetition. You can simply write any templating logic for your SQL assets and let Bruin take care of it.
 
 ```sql
 {% set days = [1, 3, 7, 15, 30, 90, 120] %}
