@@ -151,15 +151,6 @@ environments:
         - name: conn23
           base_id: "123"
           access_token: "accessKey"
-      zendesk:
-        - name: conn25
-          api_token: "zendeskKey"
-          email: "zendeskemail"
-          sub_domain: "zendeskUrl"
-
-        - name: conn25-1
-          oauth_token: "zendeskToken"
-          sub_domain: "zendeskUrl"
       s3:
         - name: conn25
           bucket_name:  "my-bucket"
@@ -174,6 +165,15 @@ environments:
           value: value1
         - name: key2
           value: value2
+      zendesk:
+        - name: conn27
+          api_token: "zendeskKey"
+          email: "zendeskemail"
+          sub_domain: "zendeskUrl"
+
+        - name: conn27-1
+          oauth_token: "zendeskToken"
+          sub_domain: "zendeskUrl"
 
   prod:
     connections:
