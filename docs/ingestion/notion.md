@@ -14,19 +14,30 @@ To connect to Notion, you need to add a configuration item to the connections se
 ```yaml
     connections:
       notion:
-        - name: "connection_name"
-          api_key: "XXXXXXXX"
+        - name: "my-notion"
+          api_key: ""
 ```
 ### Step 2: Create an asset file for data ingestion
 
 To ingest data from Notion, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., notion_ingestion.yml) inside the assets folder and add the following content:
 
+```yaml
+name: public.notion
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my_notion
+  source_table: 'd8ee2d159ac34cfc85827ba5a0a8ae71'
+
+  destination: postgress
+```
 
 - `name`: The name of the asset.
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the Notion connection defined in .bruin.yml.
-- `source_table`: The name of the data table in Notion that you want to ingest. For example, `details` is the table of notion that you want to ingest.
+- `source_table`: The name of the data table in Notion that you want to ingest. Use the `database ID` as the source_table. For example, if the Notion URL is: https://www.notion.so/d8ee2d159ac34cfc85827ba5a0a8ae71?v=c714dec3742440cc91a8c38914f83b6b, the database ID is the string immediately following notion.so/ and preceding any question marks. In this example, the `database ID` is `d8ee2d159ac34cfc85827ba5a0a8ae71`.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```     

@@ -1,0 +1,9 @@
+name: public.notion
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my_notion
+  source_table: '1361b9b5fabe807ca41ce24e1c5c7f5b'
+
+  destination: postgres
