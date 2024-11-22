@@ -15,7 +15,7 @@ To connect to Notion, you need to add a configuration item to the connections se
     connections:
       notion:
         - name: "my-notion"
-          api_key: ""
+          api_key: "YOUR_NOTION_API_KEY"
 ```
 ### Step 2: Create an asset file for data ingestion
 
