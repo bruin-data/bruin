@@ -155,11 +155,11 @@ environments:
         - name: conn25
           api_token: "zendeskKey"
           email: "zendeskemail"
-          subdomain: "zendeskUrl"
+          sub_domain: "zendeskUrl"
 
         - name: conn25-1
           oauth_token: "zendeskToken"
-          subdomain: "zendeskUrl"
+          sub_domain: "zendeskUrl"
       s3:
         - name: conn25
           bucket_name:  "my-bucket"
