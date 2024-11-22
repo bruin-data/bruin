@@ -5,18 +5,32 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/cmd"
+	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/fatih/color"
+	"github.com/rudderlabs/analytics-go/v4"
 	"github.com/urfave/cli/v2"
 )
 
 var (
-	version = "dev"
-	commit  = ""
+	version      = "dev"
+	commit       = ""
+	telemetryKey = ""
 )
+
+var Telemetry *telemetry.Telemetry
 
 func main() {
 	isDebug := false
 	color.NoColor = false
+	if telemetryKey == "" {
+		telemetryKey = os.Getenv("TELEMETRY_KEY")
+	}
+	var optOut bool
+	if os.Getenv("TELEMETRY_OPTOUT") != "" {
+		optOut = true
+	}
+
+	Telemetry = telemetry.NewTelemetry(telemetryKey, version, optOut)
 
 	versionCommand := cmd.VersionCmd(commit)
 
@@ -55,6 +69,6 @@ func main() {
 			versionCommand,
 		},
 	}
-
+	Telemetry.SendEvent("cli_started", analytics.Properties{"args": os.Args})
 	_ = app.Run(os.Args)
 }

@@ -89,6 +89,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ github.ref_name }}
           COMMIT_SHA: ${{ github.sha }}
+          TELEMETRY_KEY: ${{ secrets.TELEMETRY_KEY }}
 
   goreleaser-unix:
     runs-on: ubuntu-latest
