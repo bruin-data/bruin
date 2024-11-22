@@ -50,6 +50,16 @@ func main() {
 		"connections list -o json",
 		"expected_connections.json",
 	)
+
+	expectJSONOutput(
+		"internal parse-pipeline -c lineage",
+		"lineage/expectations/lineage.json",
+	)
+
+	expectJSONOutput(
+		"internal parse-asset -c lineage/assets/example.sql",
+		"lineage/expectations/lineage-asset.json",
+	)
 }
 
 func expectJSONOutput(command string, jsonFilePath string) {
