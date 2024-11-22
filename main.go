@@ -48,8 +48,14 @@ func main() {
 		Compiled: time.Now(),
 		Before: func(context *cli.Context) error {
 			Telemetry.SendEvent("command", analytics.Properties{
-				"command": context.Command.Name,
-				"args":    context.Args().Slice(),
+				"command_start": context.Command.Name,
+				"args":          context.Args().Slice(),
+			})
+			return nil
+		},
+		After: func(context *cli.Context) error {
+			Telemetry.SendEvent("command", analytics.Properties{
+				"command_finish": context.Command.Name,
 			})
 			return nil
 		},
