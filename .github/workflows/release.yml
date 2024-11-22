@@ -9,8 +9,29 @@ permissions:
   contents: write
 
 jobs:
+  integration-tests:
+    strategy:
+      matrix:
+        platform: [ ubuntu-24.04, ubuntu-22.04, macos-latest, macos-14, windows-2022 ]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Golang with cache
+        uses: magnetikonline/action-golang-cache@v5
+        with:
+          go-version-file: go.mod
+      - run: make test
+      - name: Install winget
+        if: matrix.platform == 'windows-2022'
+        uses: Cyberboss/install-winget@v1
+      - run: make integration-test
+        shell: bash
+
   prepare-darwin:
     runs-on: ubuntu-latest
+    needs: integration-tests
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -39,6 +60,7 @@ jobs:
         
   prepare-linux:
     runs-on: ubuntu-latest
+    needs: integration-tests
     steps:
       - name: Checkout
         uses: actions/checkout@v3
