@@ -59,6 +59,13 @@ func main() {
 			})
 			return nil
 		},
+		ExitErrHandler: func(context *cli.Context, err error) {
+			Telemetry.SendEvent("command", analytics.Properties{
+				"command_error": context.Command.Name,
+				"args":          context.Args().Slice(),
+			})
+			cli.HandleExitCoder(err)
+		},
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:        "debug",
@@ -82,5 +89,6 @@ func main() {
 			versionCommand,
 		},
 	}
+
 	_ = app.Run(os.Args)
 }
