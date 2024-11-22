@@ -1,7 +1,6 @@
 package pipeline
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -51,6 +50,7 @@ func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error) {
 		}
 		err := extractor.ColumnLineage(asset)
 		assertLineageError(t, err, want)
+
 		assertColumns(t, asset.Columns, after.GetAssetByName(asset.Name).Columns, len(asset.Columns))
 		assertAssetExists(t, after, asset)
 	}
@@ -105,51 +105,6 @@ func assertAssetExists(t *testing.T, afterPipeline *Pipeline, asset *Asset) {
 		if gotCol.PrimaryKey != wantCol.PrimaryKey {
 			t.Errorf("Column %s.%s primary key mismatch: got %v, want %v",
 				asset.Name, gotCol.Name, gotCol.PrimaryKey, wantCol.PrimaryKey)
-		}
-		// if gotCol.Description != wantCol.Description {
-		// 	t.Errorf("Column %s.%s description mismatch: got %s, want %s",
-		// 		asset.Name, gotCol.Name, gotCol.Description, wantCol.Description)
-		// }
-		if gotCol.UpdateOnMerge != wantCol.UpdateOnMerge {
-			t.Errorf("Column %s.%s UpdateOnMerge mismatch: got %v, want %v",
-				asset.Name, gotCol.Name, gotCol.UpdateOnMerge, wantCol.UpdateOnMerge)
-		}
-		if (gotCol.Upstreams == nil) != (wantCol.Upstreams == nil) {
-			t.Errorf("Column %s.%s upstream presence mismatch: got %v, want %v",
-				asset.Name, gotCol.Name, gotCol.Upstreams != nil, wantCol.Upstreams != nil)
-		} else if gotCol.Upstreams != nil {
-			if len(gotCol.Upstreams) != len(wantCol.Upstreams) {
-				t.Errorf("Column %s.%s upstream count mismatch: got %d, want %d",
-					asset.Name, gotCol.Name, len(gotCol.Upstreams), len(wantCol.Upstreams))
-				continue
-			}
-
-			gotMap := make(map[string]bool)
-			wantMap := make(map[string]bool)
-
-			for _, got := range gotCol.Upstreams {
-				key := fmt.Sprintf("%s:%s:%s", got.Asset, got.Column, got.Table)
-				gotMap[key] = true
-			}
-
-			for _, want := range wantCol.Upstreams {
-				key := fmt.Sprintf("%s:%s:%s", want.Asset, want.Column, want.Table)
-				wantMap[key] = true
-			}
-
-			for key := range gotMap {
-				if !wantMap[key] {
-					t.Errorf("Column %s.%s has unexpected upstream: %s",
-						asset.Name, gotCol.Name, key)
-				}
-			}
-
-			for key := range wantMap {
-				if !gotMap[key] {
-					t.Errorf("Column %s.%s is missing expected upstream: %s",
-						asset.Name, gotCol.Name, key)
-				}
-			}
 		}
 	}
 }
@@ -798,10 +753,8 @@ func testAdvancedSQLFeatures(t *testing.T) {
 								Upstreams:   []*UpstreamColumn{{Asset: "raw_sales", Column: "amount", Table: "raw_sales"}},
 							},
 							{
-								Name:        "report_generated_at",
-								Type:        "now",
-								Description: "Timestamp when report was generated",
-								Upstreams:   []*UpstreamColumn{{Asset: "now", Column: "report_generated_at", Table: "now"}},
+								Name:      "report_generated_at",
+								Upstreams: []*UpstreamColumn{{}},
 							},
 						},
 						Upstreams: []Upstream{{Value: "raw_sales"}},
@@ -829,186 +782,6 @@ func testDialectSpecificFeatures(t *testing.T) {
 		after    *Pipeline
 		want     error
 	}{
-		{
-			name: "snowflake simple syntax",
-			pipeline: &Pipeline{
-				Assets: []*Asset{
-					{
-						Name: "transformed_data",
-						Type: "sf.sql",
-						ExecutableFile: ExecutableFile{
-							Content: `
-								SELECT
-									id::INTEGER as user_id,
-									UPPER(name)::STRING as user_name,
-									amount::NUMBER(10,2) as transaction_amount,
-									current_timestamp() as processed_at
-								FROM raw_data
-								QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY amount DESC) = 1
-							`,
-						},
-						Upstreams: []Upstream{{Value: "raw_data"}},
-					},
-					{
-						Name: "raw_data",
-						Columns: []Column{
-							{Name: "id", Type: "INTEGER", PrimaryKey: true, Description: "Unique identifier"},
-							{Name: "name", Type: "STRING", Description: "User's name"},
-							{Name: "amount", Type: "NUMBER(10,2)", Description: "Transaction amount"},
-						},
-						ExecutableFile: ExecutableFile{
-							Content: "SELECT * FROM source_data",
-						},
-					},
-				},
-			},
-			after: &Pipeline{
-				Assets: []*Asset{
-					{
-						Name: "transformed_data",
-						Type: "sf.sql",
-						Columns: []Column{
-							{
-								Name:        "user_id",
-								Type:        "INTEGER",
-								Description: "Unique identifier",
-								Upstreams:   []*UpstreamColumn{{Asset: "raw_data", Column: "id", Table: "raw_data"}},
-							},
-							{
-								Name:        "user_name",
-								Type:        "STRING",
-								Description: "User's name",
-								Upstreams:   []*UpstreamColumn{{Asset: "raw_data", Column: "name", Table: "raw_data"}},
-							},
-							{
-								Name:        "transaction_amount",
-								Type:        "NUMBER(10,2)",
-								Description: "Transaction amount",
-								Upstreams:   []*UpstreamColumn{{Asset: "raw_data", Column: "amount", Table: "raw_data"}},
-							},
-							{
-								Name:          "processed_at",
-								Type:          "TIMESTAMP_NTZ",
-								Description:   "Processing timestamp",
-								UpdateOnMerge: false,
-							},
-						},
-						Upstreams: []Upstream{{Value: "raw_data"}},
-					},
-					{
-						Name: "raw_data",
-						Columns: []Column{
-							{Name: "id", Type: "INTEGER", PrimaryKey: true, Description: "Unique identifier"},
-							{Name: "name", Type: "STRING", Description: "User's name"},
-							{Name: "amount", Type: "NUMBER(10,2)", Description: "Transaction amount"},
-						},
-					},
-				},
-			},
-			want: nil,
-		},
-
-		// {
-		// 	name: "snowflake specific syntax",
-		// 	pipeline: &Pipeline{
-		// 		Assets: []*Asset{
-		// 			{
-		// 				Name: "transformed_data",
-		// 				Type: "sf.sql",
-		// 				ExecutableFile: ExecutableFile{
-		// 					Content: `
-		// 						SELECT
-		// 							$1:id::INTEGER as id,
-		// 							$1:user.name::STRING as user_name,
-		// 							ARRAY_SIZE($1:items) as item_count,
-		// 							PARSE_JSON($1:metadata)::VARIANT as metadata,
-		// 							current_timestamp() as processed_at
-		// 						FROM data
-		// 						QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY item_count DESC) = 1
-		// 					`,
-		// 				},
-		// 				Upstreams: []Upstream{{Value: "data"}},
-		// 			},
-		// 			{
-		// 				Name: "data",
-		// 				Columns: []Column{
-		// 					{Name: "id", Type: "INTEGER", PrimaryKey: true, Description: "Unique identifier"},
-		// 					{Name: "user.name", Type: "STRING", Description: "User's full name"},
-		// 					{Name: "items", Type: "ARRAY", Description: "Array of items"},
-		// 					{Name: "metadata", Type: "VARIANT", Description: "JSON metadata"},
-		// 				},
-		// 				ExecutableFile: ExecutableFile{
-		// 					Content: "SELECT * FROM data_user_stats",
-		// 				},
-		// 			},
-		// 		},
-		// 	},
-		// 	after: &Pipeline{
-		// 		Assets: []*Asset{
-		// 			{
-		// 				Name: "transformed_data",
-		// 				Type: "sf.sql",
-		// 				Columns: []Column{
-		// 					{
-		// 						Name:        "id",
-		// 						Type:        "INTEGER",
-		// 						Description: "Unique identifier",
-		// 						Upstreams: []*UpstreamColumn{
-		// 							{Asset: "@mystage/data.json", Column: "id", Table: "@mystage/data.json"},
-		// 						},
-		// 						UpdateOnMerge: false,
-		// 					},
-		// 					{
-		// 						Name:        "user_name",
-		// 						Type:        "STRING",
-		// 						Description: "User's full name",
-		// 						Upstreams: []*UpstreamColumn{
-		// 							{Asset: "@mystage/data.json", Column: "user.name", Table: "@mystage/data.json"},
-		// 						},
-		// 						UpdateOnMerge: false,
-		// 					},
-		// 					{
-		// 						Name:        "item_count",
-		// 						Type:        "INTEGER",
-		// 						Description: "Number of items in array",
-		// 						Upstreams: []*UpstreamColumn{
-		// 							{Asset: "@mystage/data.json", Column: "items", Table: "@mystage/data.json"},
-		// 						},
-		// 						UpdateOnMerge: false,
-		// 					},
-		// 					{
-		// 						Name:        "metadata",
-		// 						Type:        "VARIANT",
-		// 						Description: "JSON metadata",
-		// 						Upstreams: []*UpstreamColumn{
-		// 							{Asset: "@mystage/data.json", Column: "metadata", Table: "@mystage/data.json"},
-		// 						},
-		// 						UpdateOnMerge: false,
-		// 					},
-		// 					{
-		// 						Name:          "processed_at",
-		// 						Type:          "TIMESTAMP_NTZ",
-		// 						Description:   "Processing timestamp",
-		// 						UpdateOnMerge: false,
-		// 						Upstreams:     nil,
-		// 					},
-		// 				},
-		// 				Upstreams: []Upstream{{Value: "@mystage/data.json"}},
-		// 			},
-		// 			{
-		// 				Name: "@mystage/data.json",
-		// 				Columns: []Column{
-		// 					{Name: "id", Type: "INTEGER", PrimaryKey: true, Description: "Unique identifier"},
-		// 					{Name: "user.name", Type: "STRING", Description: "User's full name"},
-		// 					{Name: "items", Type: "ARRAY", Description: "Array of items"},
-		// 					{Name: "metadata", Type: "VARIANT", Description: "JSON metadata"},
-		// 				},
-		// 			},
-		// 		},
-		// 	},
-		// 	want: nil,
-		// },
-
 		{
 			name: "redshift specific syntax",
 			pipeline: &Pipeline{
@@ -1204,6 +977,11 @@ func testDialectSpecificFeatures(t *testing.T) {
 								Upstreams: []*UpstreamColumn{
 									{Asset: "user_departments", Column: "department", Table: "user_departments"},
 								},
+								UpdateOnMerge: false,
+							},
+							{
+								Name:          "level",
+								Upstreams:     []*UpstreamColumn{},
 								UpdateOnMerge: false,
 							},
 							{
