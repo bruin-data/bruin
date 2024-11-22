@@ -12,4 +12,4 @@ Set Framerate 60
 # Simulate typing the commands
 Type "bruin run chess/pipeline.yml"
 Enter
-Sleep 10s
+Sleep 46s
