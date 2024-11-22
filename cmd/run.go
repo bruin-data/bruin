@@ -316,15 +316,7 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			}
 
-			assetStats := make(map[string]int)
-			for _, asset := range s.GetTaskInstancesByStatus(scheduler.Pending) {
-				_, ok := assetStats[string(asset.GetAsset().Type)]
-				if !ok {
-					assetStats[string(asset.GetAsset().Type)] = 0
-				}
-				assetStats[string(asset.GetAsset().Type)]++
-			}
-			telemetry.SendEvent("running", analytics.Properties{"assets": assetStats})
+			sendTelemetry(s)
 
 			tag := c.String("tag")
 			if tag != "" {
@@ -740,4 +732,16 @@ var re = regexp.MustCompile(ansi)
 
 func Clean(str string) string {
 	return re.ReplaceAllString(str, "")
+}
+
+func sendTelemetry(s *scheduler.Scheduler) {
+	assetStats := make(map[string]int)
+	for _, asset := range s.GetTaskInstancesByStatus(scheduler.Pending) {
+		_, ok := assetStats[string(asset.GetAsset().Type)]
+		if !ok {
+			assetStats[string(asset.GetAsset().Type)] = 0
+		}
+		assetStats[string(asset.GetAsset().Type)]++
+	}
+	telemetry.SendEvent("running", analytics.Properties{"assets": assetStats})
 }
