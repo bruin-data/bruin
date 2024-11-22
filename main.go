@@ -63,6 +63,7 @@ func main() {
 			Telemetry.SendEvent("command", analytics.Properties{
 				"command_error": context.Command.Name,
 				"args":          context.Args().Slice(),
+				"error":         err.Error(),
 			})
 			cli.HandleExitCoder(err)
 		},
