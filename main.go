@@ -20,6 +20,7 @@ var (
 var Telemetry *telemetry.Telemetry
 
 func main() {
+	start := time.Now()
 	isDebug := false
 	color.NoColor = false
 	if telemetryKey == "" {
@@ -56,6 +57,7 @@ func main() {
 		After: func(context *cli.Context) error {
 			Telemetry.SendEvent("command", analytics.Properties{
 				"command_finish": context.Command.Name,
+				"duration":       time.Since(start).Seconds(),
 			})
 			return nil
 		},
@@ -64,6 +66,7 @@ func main() {
 				"command_error": context.Command.Name,
 				"args":          context.Args().Slice(),
 				"error":         err.Error(),
+				"duration":      time.Since(start).Seconds(),
 			})
 			cli.HandleExitCoder(err)
 		},
