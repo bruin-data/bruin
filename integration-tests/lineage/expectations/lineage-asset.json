@@ -1,0 +1,518 @@
+{
+  "asset": {
+    "id": "50d858e0985ecc7f60418aaf0cc5ab587f42c2570a884095a9e8ccacd0f6545c",
+    "uri": "",
+    "name": "example",
+    "type": "duckdb.sql",
+    "description": "",
+    "connection": "",
+    "tags": [],
+    "materialization": {
+      "type": "table",
+      "strategy": "",
+      "partition_by": "",
+      "cluster_by": null,
+      "incremental_key": ""
+    },
+    "upstreams": [
+      {
+        "type": "asset",
+        "value": "country"
+      },
+      {
+        "type": "asset",
+        "value": "people"
+      }
+    ],
+    "image": "",
+    "instance": "",
+    "owner": "",
+    "executable_file": {
+      "name": "example.sql",
+      "path": "__ASSETSDIR__asset.sql",
+      "content": "select \n    a.name, \n    a.last_name,\n    a.created_at as updated_at,\n    b.country \nfrom people a \njoin country b on a.id = b.id;"
+    },
+    "definition_file": {
+      "name": "example.sql",
+      "path": "__ASSETSDIR__asset.sql",
+      "type": "comment"
+    },
+    "parameters": {},
+    "secrets": [],
+    "columns": [
+      {
+        "entity_attribute": null,
+        "name": "country",
+        "type": "varchar",
+        "description": "",
+        "primary_key": false,
+        "update_on_merge": false,
+        "checks": [],
+        "upstreams": [
+          {
+            "asset": "country",
+            "column": "country",
+            "table": "country"
+          }
+        ]
+      },
+      {
+        "entity_attribute": null,
+        "name": "last_name",
+        "type": "varchar",
+        "description": "",
+        "primary_key": false,
+        "update_on_merge": false,
+        "checks": [],
+        "upstreams": [
+          {
+            "asset": "people",
+            "column": "last_name",
+            "table": "people"
+          }
+        ]
+      },
+      {
+        "entity_attribute": null,
+        "name": "name",
+        "type": "varchar",
+        "description": "",
+        "primary_key": false,
+        "update_on_merge": false,
+        "checks": [],
+        "upstreams": [
+          {
+            "asset": "people",
+            "column": "name",
+            "table": "people"
+          }
+        ]
+      },
+      {
+        "entity_attribute": null,
+        "name": "updated_at",
+        "type": "timestamp",
+        "description": "",
+        "primary_key": false,
+        "update_on_merge": false,
+        "checks": [],
+        "upstreams": [
+          {
+            "asset": "people",
+            "column": "created_at",
+            "table": "people"
+          }
+        ]
+      }
+    ],
+    "custom_checks": [],
+    "metadata": {},
+    "snowflake": null,
+    "athena": null
+  },
+  "pipeline": {
+    "legacy_id": "",
+    "name": "bruin-duckdb",
+    "schedule": "daily",
+    "start_date": "2024-01-01",
+    "definition_file": {
+      "name": "pipeline.yml",
+      "path": "__PIPELINEDIR__pipeline.yml"
+    },
+    "default_parameters": {},
+    "default_connections": {
+      "duckdb": "duckdb-default"
+    },
+    "assets": [
+      {
+        "id": "aff64e4fd520bd185cb01adab98d2d20060f621c62d5cad5204712cfa2294ef7",
+        "uri": "",
+        "name": "country",
+        "type": "duckdb.sql",
+        "description": "",
+        "connection": "",
+        "tags": [],
+        "materialization": {
+          "type": "table",
+          "strategy": "",
+          "partition_by": "",
+          "cluster_by": null,
+          "incremental_key": ""
+        },
+        "upstreams": [
+          {
+            "type": "asset",
+            "value": "users"
+          }
+        ],
+        "image": "",
+        "instance": "",
+        "owner": "",
+        "executable_file": {
+          "name": "country.sql",
+          "path": "__ASSETSDIR__country.sql",
+          "content": "select id, country from users;"
+        },
+        "definition_file": {
+          "name": "country.sql",
+          "path": "__ASSETSDIR__country.sql",
+          "type": "comment"
+        },
+        "parameters": {},
+        "secrets": [],
+        "columns": [
+          {
+            "entity_attribute": null,
+            "name": "country",
+            "type": "varchar",
+            "description": "",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [],
+            "upstreams": [
+              {
+                "asset": "users",
+                "column": "country",
+                "table": "users"
+              }
+            ]
+          },
+          {
+            "entity_attribute": null,
+            "name": "id",
+            "type": "integer",
+            "description": "",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [],
+            "upstreams": [
+              {
+                "asset": "users",
+                "column": "id",
+                "table": "users"
+              }
+            ]
+          }
+        ],
+        "custom_checks": [],
+        "metadata": {},
+        "snowflake": null,
+        "athena": null
+      },
+      {
+        "id": "50d858e0985ecc7f60418aaf0cc5ab587f42c2570a884095a9e8ccacd0f6545c",
+        "uri": "",
+        "name": "example",
+        "type": "duckdb.sql",
+        "description": "",
+        "connection": "",
+        "tags": [],
+        "materialization": {
+          "type": "table",
+          "strategy": "",
+          "partition_by": "",
+          "cluster_by": null,
+          "incremental_key": ""
+        },
+        "upstreams": [
+          {
+            "type": "asset",
+            "value": "country"
+          },
+          {
+            "type": "asset",
+            "value": "people"
+          }
+        ],
+        "image": "",
+        "instance": "",
+        "owner": "",
+        "executable_file": {
+          "name": "example.sql",
+          "path": "__ASSETSDIR__example.sql",
+          "content": "select \n    a.name, \n    a.last_name,\n    a.created_at as updated_at,\n    b.country \nfrom people a \njoin country b on a.id = b.id;"
+        },
+        "definition_file": {
+          "name": "example.sql",
+          "path": "__ASSETSDIR__example.sql",
+          "type": "comment"
+        },
+        "parameters": {},
+        "secrets": [],
+        "columns": [
+          {
+            "entity_attribute": null,
+            "name": "country",
+            "type": "varchar",
+            "description": "",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [],
+            "upstreams": [
+              {
+                "asset": "country",
+                "column": "country",
+                "table": "country"
+              }
+            ]
+          },
+          {
+            "entity_attribute": null,
+            "name": "last_name",
+            "type": "varchar",
+            "description": "",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [],
+            "upstreams": [
+              {
+                "asset": "people",
+                "column": "last_name",
+                "table": "people"
+              }
+            ]
+          },
+          {
+            "entity_attribute": null,
+            "name": "name",
+            "type": "varchar",
+            "description": "",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [],
+            "upstreams": [
+              {
+                "asset": "people",
+                "column": "name",
+                "table": "people"
+              }
+            ]
+          },
+          {
+            "entity_attribute": null,
+            "name": "updated_at",
+            "type": "timestamp",
+            "description": "",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [],
+            "upstreams": [
+              {
+                "asset": "people",
+                "column": "created_at",
+                "table": "people"
+              }
+            ]
+          }
+        ],
+        "custom_checks": [],
+        "metadata": {},
+        "snowflake": null,
+        "athena": null
+      },
+      {
+        "id": "c9022680f888674e2b2274758755bfa07dea729b68d71cde5c521ed70ef261bf",
+        "uri": "",
+        "name": "people",
+        "type": "duckdb.sql",
+        "description": "",
+        "connection": "",
+        "tags": [],
+        "materialization": {
+          "type": "table",
+          "strategy": "",
+          "partition_by": "",
+          "cluster_by": null,
+          "incremental_key": ""
+        },
+        "upstreams": [
+          {
+            "type": "asset",
+            "value": "users"
+          }
+        ],
+        "image": "",
+        "instance": "",
+        "owner": "",
+        "executable_file": {
+          "name": "people.sql",
+          "path": "__ASSETSDIR__people.sql",
+          "content": "select \n    id, \n    name, \n    last_name,\n    created_at\nfrom users;"
+        },
+        "definition_file": {
+          "name": "people.sql",
+          "path": "__ASSETSDIR__people.sql",
+          "type": "comment"
+        },
+        "parameters": {},
+        "secrets": [],
+        "columns": [
+          {
+            "entity_attribute": null,
+            "name": "created_at",
+            "type": "timestamp",
+            "description": "",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [],
+            "upstreams": [
+              {
+                "asset": "users",
+                "column": "created_at",
+                "table": "users"
+              }
+            ]
+          },
+          {
+            "entity_attribute": null,
+            "name": "id",
+            "type": "integer",
+            "description": "",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [],
+            "upstreams": [
+              {
+                "asset": "users",
+                "column": "id",
+                "table": "users"
+              }
+            ]
+          },
+          {
+            "entity_attribute": null,
+            "name": "last_name",
+            "type": "varchar",
+            "description": "",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [],
+            "upstreams": [
+              {
+                "asset": "users",
+                "column": "last_name",
+                "table": "users"
+              }
+            ]
+          },
+          {
+            "entity_attribute": null,
+            "name": "name",
+            "type": "varchar",
+            "description": "",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [],
+            "upstreams": [
+              {
+                "asset": "users",
+                "column": "name",
+                "table": "users"
+              }
+            ]
+          }
+        ],
+        "custom_checks": [],
+        "metadata": {},
+        "snowflake": null,
+        "athena": null
+      },
+      {
+        "id": "7dfb4cf67742cb0660305e56ef816c53fcec892cae7f6ee39b75f34e659d672c",
+        "uri": "",
+        "name": "users",
+        "type": "duckdb.sql",
+        "description": "",
+        "connection": "",
+        "tags": [],
+        "materialization": {
+          "type": "table",
+          "strategy": "",
+          "partition_by": "",
+          "cluster_by": null,
+          "incremental_key": ""
+        },
+        "upstreams": [],
+        "image": "",
+        "instance": "",
+        "owner": "",
+        "executable_file": {
+          "name": "users.sql",
+          "path": "__ASSETSDIR__users.sql",
+          "content": "select *  from user_data;"
+        },
+        "definition_file": {
+          "name": "users.sql",
+          "path": "__ASSETSDIR__users.sql",
+          "type": "comment"
+        },
+        "parameters": {},
+        "secrets": [],
+        "columns": [
+          {
+            "entity_attribute": null,
+            "name": "id",
+            "type": "integer",
+            "description": "Just a number",
+            "primary_key": true,
+            "update_on_merge": false,
+            "checks": []
+          },
+          {
+            "entity_attribute": null,
+            "name": "name",
+            "type": "varchar",
+            "description": "Just a name",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": []
+          },
+          {
+            "entity_attribute": null,
+            "name": "last_name",
+            "type": "varchar",
+            "description": "Just a last name",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": []
+          },
+          {
+            "entity_attribute": null,
+            "name": "country",
+            "type": "varchar",
+            "description": "Just a country",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": []
+          },
+          {
+            "entity_attribute": null,
+            "name": "created_at",
+            "type": "timestamp",
+            "description": "Just a timestamp",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": []
+          }
+        ],
+        "custom_checks": [],
+        "metadata": {},
+        "snowflake": null,
+        "athena": null
+      }
+    ],
+    "notifications": {
+      "slack": [],
+      "ms_teams": [],
+      "discord": []
+    },
+    "catchup": false,
+    "metadata_push": {
+      "bigquery": false
+    },
+    "retries": 0
+  },
+  "repo": {
+    "path": "__BASEDIR__"
+  }
+}

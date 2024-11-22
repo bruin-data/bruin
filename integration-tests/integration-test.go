@@ -23,6 +23,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	expectJSONOutput(
+		"internal parse-pipeline -c lineage",
+		"lineage/expectations/lineage.json",
+	)
+
+	expectJSONOutput(
+		"internal parse-asset -c lineage/assets/example.sql",
+		"lineage/expectations/lineage-asset.json",
+	)
+
 	expectExitCode("validate happy-path", 0)
 	expectExitCode("run --use-uv happy-path", 0)
 	expectJSONOutput("internal parse-pipeline happy-path", "happy-path/expectations/pipeline.yml.json")
@@ -50,6 +60,7 @@ func main() {
 		"connections list -o json",
 		"expected_connections.json",
 	)
+
 }
 
 func expectJSONOutput(command string, jsonFilePath string) {
