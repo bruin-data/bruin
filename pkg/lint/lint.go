@@ -99,11 +99,11 @@ func (l *Linter) Lint(rootPath, pipelineDefinitionFileName string) (*PipelineAna
 	assetStats := make(map[string]int)
 	for _, pipeline := range pipelines {
 		for _, asset := range pipeline.Assets {
-			_, ok := assetStats[asset.Name]
+			_, ok := assetStats[string(asset.Type)]
 			if !ok {
-				assetStats[asset.Name] = 0
+				assetStats[string(asset.Type)] = 0
 			}
-			assetStats[asset.Name]++
+			assetStats[string(asset.Type)]++
 		}
 	}
 	telemetry.SendEvent("validating", analytics.Properties{"assets": assetStats})
