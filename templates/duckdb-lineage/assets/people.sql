@@ -12,5 +12,5 @@ select
     id, 
     name, 
     last_name,
-    now() as updated_at
+    created_at
 from users;

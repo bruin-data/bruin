@@ -1,8 +1,11 @@
 # Bruin - Sample Pipeline
 
-This pipeline is a simple example of a Bruin pipeline for DuckDB, 
-featuring `raw_sales.sql` and `sales_summary.sql` — a SQL assets that creates a table with sample data and enforces schema constraints 
-like `not_null`, `unique`, and `primary_key`.
+This pipeline is a simple example of a Bruin pipeline for DuckDB, demonstrating a data transformation workflow with multiple interconnected SQL assets. The pipeline features table materializations with dependencies between assets and schema definitions including `primary_key` constraints.
+
+The example includes:
+- `users.sql`: A base table with defined schema constraints and column descriptions
+- `people.sql` and `country.sql`: Intermediate tables that depend on the users table
+- `example.sql`: A final joined view combining people and country data
 
 ## Setup
 The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://bruin-data.github.io/bruin/connections/gorgias.html).
