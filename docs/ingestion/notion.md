@@ -43,5 +43,7 @@ parameters:
 ```     
 bruin run assets/notion_ingestion.yml
 ```
-
 As a result of this command, Bruin will ingest data from the given Notion table into your Postgres database.
+
+<img width="1178" alt="notion" src="https://github.com/user-attachments/assets/347b9714-e6c2-4e82-ad4a-2cbea37953ab">
+
