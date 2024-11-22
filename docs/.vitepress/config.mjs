@@ -46,6 +46,7 @@ export default defineConfig({
           { text: "Glossary", link: "/getting-started/glossary" },
           { text: "Templates", link: "/getting-started/templates" },
           {text: "Tutorials", link: "/getting-started/tutorials"},
+          {text: "Telemetry", link: "/getting-started/telemetry"},
 
         ],
       },
