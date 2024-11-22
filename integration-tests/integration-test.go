@@ -60,7 +60,6 @@ func main() {
 		"internal parse-asset -c lineage/assets/example.sql",
 		"lineage/expectations/lineage-asset.json",
 	)
-
 }
 
 func expectJSONOutput(command string, jsonFilePath string) {
