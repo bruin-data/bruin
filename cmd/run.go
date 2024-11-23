@@ -124,6 +124,10 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "exp-use-powershell-for-uv",
 				Usage: "use powershell to manage and install uv on windows, on non-windows systems this has no effect.",
 			},
+			&cli.StringFlag{
+				Name:  "exclude",
+				Usage: "exclude the assets with the given tag",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			defer func() {
@@ -319,6 +323,13 @@ func Run(isDebug *bool) *cli.Command {
 			sendTelemetry(s)
 
 			tag := c.String("tag")
+			excludeTag := c.String("exclude")
+
+			// Conflict check
+			if tag != "" && excludeTag != "" {
+				errorPrinter.Printf("You cannot use both '--tag' and '--exclude' flags simultaneously.\n")
+				return cli.Exit("", 1)
+			}
 			if tag != "" {
 				assetsByTag := foundPipeline.GetAssetsByTag(tag)
 				if len(assetsByTag) == 0 {
@@ -331,6 +342,20 @@ func Run(isDebug *bool) *cli.Command {
 				s.MarkByTag(tag, scheduler.Pending, runDownstreamTasks)
 
 				infoPrinter.Printf("Running only the assets with tag '%s', found %d assets.\n", tag, len(assetsByTag))
+			}
+
+			// Handle exclude (excludeTag)
+			if excludeTag != "" {
+				excludedAssets := foundPipeline.GetAssetsByTag(excludeTag)
+				if len(excludedAssets) == 0 {
+					infoPrinter.Printf("No assets found with the tag '%s' to exclude.\n", excludeTag)
+				} else {
+					logger.Debugf("excluding assets with tag '%s', found %d assets", excludeTag, len(excludedAssets))
+					for _, asset := range excludedAssets {
+						s.MarkAsset(asset, scheduler.Succeeded, false) // Mark as succeeded to skip execution
+					}
+					infoPrinter.Printf("Excluded %d assets with tag '%s'.\n", len(excludedAssets), excludeTag)
+				}
 			}
 
 			if !runMain {
