@@ -47,17 +47,10 @@ func (p *LineageExtractor) ColumnLineage(asset *Asset) error {
 		if upstreamAsset == nil {
 			continue
 		}
-		if err := p.ColumnLineage(upstreamAsset); err != nil {
-			fmt.Printf("Error processing upstream asset %s: %v\n", upstreamAsset.Name, err)
-			// Ignore error
-		}
+		_ = p.ColumnLineage(upstreamAsset)
 	}
 
-	if err := p.parseLineage(asset); err != nil {
-		fmt.Printf("Error parsing lineage for asset %s: %v\n", asset.Name, err)
-		// Ignore error
-		return nil
-	}
+	_ = p.parseLineage(asset)
 
 	return nil
 }
