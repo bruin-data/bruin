@@ -3,9 +3,7 @@
 
 Bruin supports Shopify as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Shopify into your data warehouse.
 
-
 In order to set up Shopify connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need `api_key`. For details on how to obtain these credentials, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/shopify#setup-guide).
-
 
 Follow the steps below to correctly set up shopify as a data source and run ingestion:
 
@@ -16,7 +14,7 @@ To ingest data from Shopify, you need to create an [asset configuration](/assets
    connections:
     shopify:
         - name: my-shopify
-          url: hello.myshopify.com
+          url: test.myshopify.com
           api_key: abckey
 ```
 - `api_key`: the API key used for authentication with Shopify
@@ -44,4 +42,6 @@ parameters:
 ```     
 bruin run assets/shopify_ingestion.yml
 ```
-As a result of this command, Bruin will ingest data from the given Shopify table into your Postgres database. `
+As a result of this command, Bruin will ingest data from the given Shopify table into your Postgres database.
+
+<img width="1217" alt="shopify" src="https://github.com/user-attachments/assets/0fe4b3e9-e9b8-4967-b892-4dc539683155">
