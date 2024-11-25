@@ -40,7 +40,7 @@ bruin connections add --env someother --type generic --name MY_SECRET --credenti
 
 This will add the connection to the `.bruin.yml` file and the connection will be available in the given environment.
 
-The parameter after `--credentials` is the value of the connection in JSON format, as you would write it in the `.bruin.yml` file. For further reference, you can check the [Connections section](../connections/overview.md) of the documentation.
+The parameter after `--credentials` is the value of the connection in JSON format, as you would write it in the `.bruin.yml` file. For further reference, you can check the [Connections section](../getting-started/concepts.md#connection) of the documentation.
 
 
 > [!INFO]

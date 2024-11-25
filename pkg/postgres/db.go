@@ -69,3 +69,48 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 
 	return collectedRows, nil
 }
+
+func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+	rows, err := c.connection.Query(ctx, queryObj.String())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to execute query")
+	}
+	defer rows.Close()
+	// Retrieve column metadata using FieldDescriptions
+	fieldDescriptions := rows.FieldDescriptions()
+	if fieldDescriptions == nil {
+		return nil, errors.New("field descriptions are not available")
+	}
+
+	// Extract column names
+	columns := make([]string, len(fieldDescriptions))
+	for i, field := range fieldDescriptions {
+		columns[i] = field.Name
+	}
+
+	// Collect rows
+	collectedRows, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) ([]interface{}, error) {
+		return row.Values()
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to collect row values")
+	}
+	result := &query.QueryResult{
+		Columns: columns,
+		Rows:    collectedRows,
+	}
+	return result, nil
+}
+
+// Test runs a simple query (SELECT 1) to validate the connection.
+func (c *Client) Ping(ctx context.Context) error {
+	q := query.Query{
+		Query: "SELECT 1",
+	}
+	err := c.RunQueryWithoutResult(ctx, &q)
+	if err != nil {
+		return errors.Wrap(err, "failed to run test query on Postgres connection")
+	}
+
+	return nil
+}

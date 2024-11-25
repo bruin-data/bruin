@@ -27,9 +27,11 @@ def qualify(
     infer_schema: t.Optional[bool] = None,
     isolate_tables: bool = False,
     qualify_columns: bool = True,
+    allow_partial_qualification: bool = False,
     validate_qualify_columns: bool = True,
     quote_identifiers: bool = True,
     identify: bool = True,
+    infer_csv_schemas: bool = False,
 ) -> exp.Expression:
     """
     Rewrite sqlglot AST to have normalized and qualified tables and columns.
@@ -55,18 +57,27 @@ def qualify(
         infer_schema: Whether to infer the schema if missing.
         isolate_tables: Whether to isolate table selects.
         qualify_columns: Whether to qualify columns.
+        allow_partial_qualification: Whether to allow partial qualification.
         validate_qualify_columns: Whether to validate columns.
         quote_identifiers: Whether to run the quote_identifiers step.
             This step is necessary to ensure correctness for case sensitive queries.
             But this flag is provided in case this step is performed at a later time.
         identify: If True, quote all identifiers, else only necessary ones.
+        infer_csv_schemas: Whether to scan READ_CSV calls in order to infer the CSVs' schemas.
 
     Returns:
         The qualified expression.
     """
     schema = ensure_schema(schema, dialect=dialect)
     expression = normalize_identifiers(expression, dialect=dialect)
-    expression = qualify_tables(expression, db=db, catalog=catalog, schema=schema, dialect=dialect)
+    expression = qualify_tables(
+        expression,
+        db=db,
+        catalog=catalog,
+        schema=schema,
+        dialect=dialect,
+        infer_csv_schemas=infer_csv_schemas,
+    )
 
     if isolate_tables:
         expression = isolate_table_selects(expression, schema=schema)
@@ -81,6 +92,7 @@ def qualify(
             expand_alias_refs=expand_alias_refs,
             expand_stars=expand_stars,
             infer_schema=infer_schema,
+            allow_partial_qualification=allow_partial_qualification,
         )
 
     if quote_identifiers:

@@ -8,6 +8,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
 )
@@ -50,7 +51,7 @@ func (r *EnvironmentListCommand) Run(isDebug *bool, output string) error {
 
 	repoRoot, err := git.FindRepoFromPath(path2.Clean("."))
 	if err != nil {
-		errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
+		printError(errors.Wrap(err, "Failed to find the git repository root"), output, "")
 		return cli.Exit("", 1)
 	}
 	logger.Debugf("found repo root '%s'", repoRoot.Path)
@@ -58,7 +59,7 @@ func (r *EnvironmentListCommand) Run(isDebug *bool, output string) error {
 	configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
 	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
 	if err != nil {
-		errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
+		printError(err, output, "Failed to load the config file at "+configFilePath)
 		return cli.Exit("", 1)
 	}
 

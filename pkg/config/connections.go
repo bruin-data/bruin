@@ -17,7 +17,7 @@ func (c AwsConnection) GetName() string {
 	return c.Name
 }
 
-type GoogleCloudPlatformConnection struct {
+type GoogleCloudPlatformConnection struct { //nolint:recvcheck
 	Name               string `yaml:"name" json:"name" mapstructure:"name"`
 	ServiceAccountJSON string `yaml:"service_account_json" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
 	ServiceAccountFile string `yaml:"service_account_file" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
@@ -80,8 +80,8 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 
 type AthenaConnection struct {
 	Name             string `yaml:"name" json:"name" mapstructure:"name"`
-	AccessKey        string `yaml:"access_key" json:"access_key" mapstructure:"access_key"`
-	SecretKey        string `yaml:"secret_key" json:"secret_key" mapstructure:"secret_key"`
+	AccessKey        string `yaml:"access_key_id" json:"access_key_id" mapstructure:"access_key_id"`
+	SecretKey        string `yaml:"secret_access_key" json:"secret_access_key" mapstructure:"secret_access_key"`
 	QueryResultsPath string `yaml:"query_results_path" json:"query_results_path" mapstructure:"query_results_path"`
 	Region           string `yaml:"region" json:"region" mapstructure:"region"`
 	Database         string `yaml:"database" json:"database,omitempty" mapstructure:"database"`
@@ -364,7 +364,7 @@ func (c GoogleSheetsConnection) GetName() string {
 
 type ChessConnection struct {
 	Name    string   `yaml:"name" json:"name" mapstructure:"name"`
-	Players []string `yaml:"players" json:"players" mapstructure:"players"`
+	Players []string `yaml:"players" json:"players" mapstructure:"players" jsonschema:"default=MagnusCarlsen,default=HikaruNakamura,default=ArjunErigaisi"`
 }
 
 func (c ChessConnection) GetName() string {

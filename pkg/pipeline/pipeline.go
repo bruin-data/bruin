@@ -33,6 +33,7 @@ const (
 	AssetTypePostgresQuery        = AssetType("pg.sql")
 	AssetTypeRedshiftQuery        = AssetType("rs.sql")
 	AssetTypeAthenaQuery          = AssetType("athena.sql")
+	AssetTypeAthenaSQLSensor      = AssetType("athena.sensor.query")
 	AssetTypeMsSQLQuery           = AssetType("ms.sql")
 	AssetTypeDatabricksQuery      = AssetType("databricks.sql")
 	AssetTypeSynapseQuery         = AssetType("synapse.sql")
@@ -42,6 +43,39 @@ const (
 	RunConfigStartDate   = RunConfig("start-date")
 	RunConfigEndDate     = RunConfig("end-date")
 )
+
+var defaultMapping = map[string]string{
+	"aws":                   "aws-default",
+	"athena":                "athena-default",
+	"gcp":                   "gcp-default",
+	"google_cloud_platform": "gcp-default",
+	"snowflake":             "snowflake-default",
+	"postgres":              "postgres-default",
+	"redshift":              "redshift-default",
+	"mssql":                 "mssql-default",
+	"databricks":            "databricks-default",
+	"synapse":               "synapse-default",
+	"mongo":                 "mongo-default",
+	"mysql":                 "mysql-default",
+	"notion":                "notion-default",
+	"hana":                  "hana-default",
+	"shopify":               "shopify-default",
+	"gorgias":               "gorgias-default",
+	"facebookads":           "facebookads-default",
+	"klaviyo":               "klaviyo-default",
+	"adjust":                "adjust-default",
+	"stripe":                "stripe-default",
+	"appsflyer":             "appsflyer-default",
+	"kafka":                 "kafka-default",
+	"duckdb":                "duckdb-default",
+	"hubspot":               "hubspot-default",
+	"google_sheets":         "google-sheets-default",
+	"chess":                 "chess-default",
+	"airtable":              "airtable-default",
+	"zendesk":               "zendesk-default",
+	"s3":                    "s3-default",
+	"slack":                 "slack-default",
+}
 
 var SupportedFileSuffixes = []string{".yml", ".yaml", ".sql", ".py"}
 
@@ -77,7 +111,7 @@ type Notifications struct {
 	Discord []DiscordNotification `yaml:"discord" json:"discord" mapstructure:"discord"`
 }
 
-type DefaultTrueBool struct {
+type DefaultTrueBool struct { //nolint:recvcheck
 	Value *bool
 }
 
@@ -227,7 +261,7 @@ func (m Materialization) MarshalJSON() ([]byte, error) {
 	})
 }
 
-type ColumnCheckValue struct {
+type ColumnCheckValue struct { //nolint:recvcheck
 	IntArray    *[]int    `json:"int_array"`
 	Int         *int      `json:"int"`
 	Float       *float64  `json:"float"`
@@ -376,15 +410,22 @@ type EntityAttribute struct {
 	Attribute string `json:"attribute"`
 }
 
+type UpstreamColumn struct {
+	Asset  string `json:"asset" yaml:"asset,omitempty" mapstructure:"asset"`
+	Column string `json:"column" yaml:"column,omitempty" mapstructure:"column"`
+	Table  string `json:"table" yaml:"table,omitempty" mapstructure:"table"`
+}
+
 type Column struct {
-	EntityAttribute *EntityAttribute `json:"entity_attribute" yaml:"-" mapstructure:"-"`
-	Name            string           `json:"name" yaml:"name,omitempty" mapstructure:"name"`
-	Type            string           `json:"type" yaml:"type,omitempty" mapstructure:"type"`
-	Description     string           `json:"description" yaml:"description,omitempty" mapstructure:"description"`
-	PrimaryKey      bool             `json:"primary_key" yaml:"primary_key,omitempty" mapstructure:"primary_key"`
-	UpdateOnMerge   bool             `json:"update_on_merge" yaml:"update_on_merge,omitempty" mapstructure:"update_on_merge"`
-	Extends         string           `json:"-" yaml:"extends,omitempty" mapstructure:"extends"`
-	Checks          []ColumnCheck    `json:"checks" yaml:"checks,omitempty" mapstructure:"checks"`
+	EntityAttribute *EntityAttribute  `json:"entity_attribute" yaml:"-" mapstructure:"-"`
+	Name            string            `json:"name" yaml:"name,omitempty" mapstructure:"name"`
+	Type            string            `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	Description     string            `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	PrimaryKey      bool              `json:"primary_key" yaml:"primary_key,omitempty" mapstructure:"primary_key"`
+	UpdateOnMerge   bool              `json:"update_on_merge" yaml:"update_on_merge,omitempty" mapstructure:"update_on_merge"`
+	Extends         string            `json:"-" yaml:"extends,omitempty" mapstructure:"extends"`
+	Checks          []ColumnCheck     `json:"checks" yaml:"checks,omitempty" mapstructure:"checks"`
+	Upstreams       []*UpstreamColumn `json:"upstreams,omitempty" yaml:"-" mapstructure:"-"`
 }
 
 func (c *Column) HasCheck(check string) bool {
@@ -674,6 +715,16 @@ func (a *Asset) GetColumnWithName(name string) *Column {
 	return nil
 }
 
+func (a *Asset) CheckCount() int {
+	checkCount := 0
+	for _, c := range a.Columns {
+		checkCount += len(c.Checks)
+	}
+
+	checkCount += len(a.CustomChecks)
+	return checkCount
+}
+
 func (a *Asset) EnrichFromEntityAttributes(entities []*glossary.Entity) error {
 	entityMap := make(map[string]*glossary.Entity, len(entities))
 	for _, e := range entities {
@@ -777,7 +828,7 @@ func uniqueAssets(assets []*Asset) []*Asset {
 	return unique
 }
 
-type EmptyStringMap map[string]string
+type EmptyStringMap map[string]string //nolint:recvcheck
 
 func (m EmptyStringMap) MarshalJSON() ([]byte, error) { //nolint: stylecheck
 	if m == nil {
@@ -805,7 +856,7 @@ func (b *EmptyStringMap) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type EmptyStringArray []string
+type EmptyStringArray []string //nolint:recvcheck
 
 func (a EmptyStringArray) MarshalJSON() ([]byte, error) {
 	if a == nil {
@@ -874,6 +925,53 @@ type Pipeline struct {
 	tasksByName map[string]*Asset
 }
 
+func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error) {
+	assetType := asset.Type
+	if assetType == AssetTypePython { //nolint
+		secretKeys := make([]string, 0)
+		for _, secret := range asset.Secrets {
+			secretKeys = append(secretKeys, secret.SecretKey)
+		}
+		return secretKeys, nil
+	} else if assetType == AssetTypeIngestr {
+		ingestrSource, ok := asset.Parameters["source_connection"]
+		if !ok {
+			return []string{}, errors.Errorf("No source connection in asset")
+		}
+
+		ingestrDestination, ok := asset.Parameters["destination_connection"]
+		if ok {
+			return []string{ingestrDestination, ingestrSource}, nil
+		}
+
+		// if destination connection not specified, we infer from destination type
+		assetType = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
+		mapping, ok := AssetTypeConnectionMapping[assetType]
+		if !ok {
+			return []string{}, errors.Errorf("No connection mapping found for asset type:'%s' (%s)", assetType, asset.Name)
+		}
+		conn, ok := p.DefaultConnections[mapping]
+		if ok {
+			ingestrDestination = conn
+			return []string{ingestrDestination, ingestrSource}, nil
+		}
+
+		ingestrDestination, ok = defaultMapping[mapping]
+		if ok {
+			return []string{ingestrDestination, ingestrSource}, nil
+		}
+
+		return []string{}, errors.Errorf("No default connection for type: '%s'", assetType)
+	} else {
+		conn, err := p.GetConnectionNameForAsset(asset)
+		if err != nil {
+			return []string{}, err
+		}
+
+		return []string{conn}, nil
+	}
+}
+
 func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 	if asset.Connection != "" {
 		return asset.Connection, nil
@@ -896,70 +994,13 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 		return conn, nil
 	}
 
-	switch mapping {
-	case "aws":
-		return "aws-default", nil
-	case "athena":
-		return "athena-default", nil
-	case "gcp":
-		return "gcp-default", nil
-	case "google_cloud_platform":
-		return "gcp-default", nil
-	case "snowflake":
-		return "snowflake-default", nil
-	case "postgres":
-		return "postgres-default", nil
-	case "redshift":
-		return "redshift-default", nil
-	case "mssql":
-		return "mssql-default", nil
-	case "databricks":
-		return "databricks-default", nil
-	case "synapse":
-		return "synapse-default", nil
-	case "mongo":
-		return "mongo-default", nil
-	case "mysql":
-		return "mysql-default", nil
-	case "notion":
-		return "notion-default", nil
-	case "hana":
-		return "hana-default", nil
-	case "shopify":
-		return "shopify-default", nil
-	case "gorgias":
-		return "gorgias-default", nil
-	case "facebookads":
-		return "facebookads-default", nil
-	case "klaviyo":
-		return "klaviyo-default", nil
-	case "adjust":
-		return "adjust-default", nil
-	case "stripe":
-		return "stripe-default", nil
-	case "appsflyer":
-		return "appsflyer-default", nil
-	case "kafka":
-		return "kafka-default", nil
-	case "duckdb":
-		return "duckdb-default", nil
-	case "hubspot":
-		return "hubspot-default", nil
-	case "google_sheets":
-		return "google-sheets-default", nil
-	case "chess":
-		return "chess-default", nil
-	case "airtable":
-		return "airtable-default", nil
-	case "zendesk":
-		return "zendesk-default", nil
-	case "s3":
-		return "s3-default", nil
-	case "slack":
-		return "slack-default", nil
-	default:
+	defaultConn, ok := defaultMapping[mapping]
+
+	if !ok {
 		return "", errors.Errorf("no default connection found for type '%s'", assetType)
 	}
+
+	return defaultConn, nil
 }
 
 // WipeContentOfAssets removes the content of the executable files of all assets in the pipeline.
@@ -1255,6 +1296,9 @@ func (b *Builder) CreateAssetFromFile(path string) (*Asset, error) {
 	if fileHasSuffix(b.config.TasksFileSuffixes, path) {
 		creator = b.yamlTaskCreator
 		isSeparateDefinitionFile = true
+	} else if fileHasSuffix([]string{".yml", ".yaml"}, path) {
+		// ends in yaml or yml but not asset.yml, task.yml etc
+		return nil, errors.New("You are trying to run a yaml file that doesn't end on: " + strings.Join(b.config.TasksFileSuffixes, ", "))
 	}
 
 	task, err := creator(path)

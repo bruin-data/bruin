@@ -1,0 +1,38 @@
+{
+    "name": "bruin-sql",
+    "scopeName": "sql.comment.block",
+    "injectionSelector": "L:source.sql",
+    "patterns": [
+        {
+            "include": "#bruin-sql"
+        }
+    ],
+    "repository": {
+        "bruin-sql": {
+            "patterns": [
+                {
+                    "begin": "(\\/\\*\\s*@bruin)\\s*$",
+                    "end": "(@bruin\\s*\\*\\/)\\s*$",
+                    "beginCaptures": {
+                        "1": {
+                            "name": "comment"
+                        }
+                    },
+                    "endCaptures": {
+                        "1": {
+                            "name": "comment"
+                        }
+                    },
+                    "patterns": [
+                        {
+                            "include": "source.yaml"
+                        }
+                    ]
+                },
+                {
+                    "include": "source.sql"
+                }
+            ]
+        }
+    }
+}

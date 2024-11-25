@@ -1,18 +1,8 @@
 name: Bump Version
 
 on:
-  push:
-    branches: [ main ]
-    paths-ignore:
-      - 'docs/**'
-      - 'examples/**'
-      - 'resources/**'
-      - 'templates/**'
-      - 'install.sh'
-      - 'README.md'
-      - 'Makefile'
-      - 'package.json'
-      - 'package-lock.json'
+  workflow_dispatch:
+    
 jobs:
   bump_version:
     name: Bump Version

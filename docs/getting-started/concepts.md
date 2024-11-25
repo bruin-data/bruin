@@ -16,7 +16,7 @@ You will primarily be interacting with assets when using Bruin.
 
 Here's an example SQL asset:
 
-```sql
+```bruin-sql
 /* @bruin
 
 name: dashboard.hello_bq
@@ -103,13 +103,22 @@ Bruin currently supports the following connection types:
 - Google Cloud Platform
 - Snowflake
 - Postgres
-- Aws Redshift
+- AWS Redshift
 - Generic
 
 Platform specific connections have specific schemas, and "generic" connections are built as key-value pairs to inject secrets into your assets from outside. 
 
 Connections are defined in the `.bruin.yml` file locally. A connection has a name and the credentials.
 
+When you run a pipeline, Bruin will find this file in the repo root, parse the connections there, build client objects internally to interact with these external platforms and then run your assets.
+
+> [!INFO]
+> The first time you run `bruin validate` or `bruin run`, Bruin will create an empty `.bruin.yml` file and add it to `.gitignore` automatically.
+
+
 ## Default Connections
 Default connections are top-level defaults that reduces repetition by stating what connections to use on types of assets.
 For instance, a pipeline might have SQL queries that run on Google BigQuery or Snowflake, and based on the type of an asset Bruin picks the appropriate connection.
+
+## Sensors
+Sensors are a special type of assets that are used to wait on certain external signals. Sensors are useful to wait on external signals such as a table being created in an external database, or a file being uploaded to S3. A common usecase for sensors is when there are datasets/files/tables that are created by a separate process and you need to wait for them to be created before running your assets.

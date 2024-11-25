@@ -2,6 +2,7 @@ package snowflake
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"strings"
 
@@ -124,7 +125,7 @@ func (db *DB) IsValid(ctx context.Context, query *query.Query) (bool, error) {
 }
 
 // Test runs a simple query (SELECT 1) to validate the connection.
-func (db *DB) Test(ctx context.Context) error {
+func (db *DB) Ping(ctx context.Context) error {
 	// Define the test query
 	q := query.Query{
 		Query: "SELECT 1",
@@ -137,4 +138,55 @@ func (db *DB) Test(ctx context.Context) error {
 	}
 
 	return nil // Return nil if the query runs successfully
+}
+
+func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+	// Prepare Snowflake context for the query execution
+	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create snowflake context")
+	}
+
+	// Convert query object to string and execute it
+	queryString := queryObj.String()
+	rows, err := db.conn.QueryContext(ctx, queryString)
+	if err != nil {
+		errorMessage := err.Error()
+		err = errors.New(strings.ReplaceAll(errorMessage, "\n", "  -  "))
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Initialize the result struct
+	result := &query.QueryResult{
+		Columns: []string{},
+		Rows:    [][]interface{}{},
+	}
+
+	// Fetch column names
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to retrieve column names")
+	}
+	result.Columns = cols
+
+	// Fetch rows and scan into result set
+	for rows.Next() {
+		row := make([]interface{}, len(cols))
+		columnPointers := make([]interface{}, len(cols))
+		for i := range row {
+			columnPointers[i] = &row[i]
+		}
+
+		if err := rows.Scan(columnPointers...); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		result.Rows = append(result.Rows, row)
+	}
+
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("error occurred during row iteration: %w", rows.Err())
+	}
+
+	return result, nil
 }

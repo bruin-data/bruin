@@ -1,0 +1,7 @@
+name: bruin-init
+schedule: daily
+start_date: "2023-03-20"
+
+default_connections:
+    gsheet: gsheet-default
+    duckdb: duckdb-default

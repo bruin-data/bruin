@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -24,7 +25,7 @@ type executionContext struct {
 
 	envVariables map[string]string
 	pipeline     *pipeline.Pipeline
-	task         *pipeline.Asset
+	asset        *pipeline.Asset
 }
 
 type modulePathFinder interface {
@@ -53,7 +54,7 @@ type secretFinder interface {
 }
 
 func NewLocalOperator(config *config.Config, envVariables map[string]string) *LocalOperator {
-	cmdRunner := &commandRunner{}
+	cmdRunner := &CommandRunner{}
 	fs := afero.NewOsFs()
 
 	pathToPython, err := findPathToExecutable([]string{"python3", "python"})
@@ -79,10 +80,28 @@ func NewLocalOperator(config *config.Config, envVariables map[string]string) *Lo
 	}
 }
 
+func NewLocalOperatorWithUv(config *config.Config, conn *connection.Manager, envVariables map[string]string) *LocalOperator {
+	cmdRunner := &CommandRunner{}
+
+	return &LocalOperator{
+		repoFinder: &git.RepoFinder{},
+		module:     &ModulePathFinder{},
+		runner: &UvPythonRunner{
+			Cmd: cmdRunner,
+			UvInstaller: &UvChecker{
+				cmd: CommandRunner{},
+			},
+			conn: conn,
+		},
+		envVariables: envVariables,
+		config:       config,
+	}
+}
+
 func (o *LocalOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	_, ok := ti.(*scheduler.AssetInstance)
 	if !ok {
-		return errors.New("python assets can only be run as a main task")
+		return errors.New("python assets can only be run as a main asset")
 	}
 
 	return o.RunTask(ctx, ti.GetPipeline(), ti.GetAsset())
@@ -99,7 +118,7 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		logger = ctx.Value(executor.ContextLogger).(*zap.SugaredLogger)
 	}
 
-	logger.Debugf("running Python task %s in repo %s", t.Name, repo.Path)
+	logger.Debugf("running Python asset %s in repo %s", t.Name, repo.Path)
 
 	module, err := o.module.FindModulePath(repo, &t.ExecutableFile)
 	if err != nil {
@@ -120,9 +139,11 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		}
 	}
 
-	envVariables := o.envVariables
-	if envVariables == nil {
-		envVariables = make(map[string]string)
+	envVariables := make(map[string]string)
+	if o.envVariables != nil {
+		for k, v := range o.envVariables {
+			envVariables[k] = v
+		}
 	}
 	envVariables["BRUIN_ASSET"] = t.Name
 
@@ -144,7 +165,7 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		module:          module,
 		requirementsTxt: requirementsTxt,
 		pipeline:        p,
-		task:            t,
+		asset:           t,
 		envVariables:    envVariables,
 	})
 	if err != nil {

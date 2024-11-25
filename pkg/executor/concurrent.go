@@ -20,9 +20,8 @@ var (
 		color.FgMagenta,
 		color.FgCyan,
 		color.FgWhite,
-		color.FgHiMagenta,
-		color.FgHiBlue,
-		color.FgHiCyan,
+		color.FgGreen + color.Faint,
+		color.FgYellow,
 	}
 	faint = color.New(color.Faint).SprintFunc()
 )
@@ -31,6 +30,7 @@ type contextKey int
 
 const (
 	KeyPrinter contextKey = iota
+	KeyIsDebug contextKey = iota
 	ContextLogger
 
 	timeFormat = "2006-01-02 15:04:05"

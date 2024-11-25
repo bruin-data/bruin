@@ -2,7 +2,6 @@ package sqlparser
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"io"
 	"os"
@@ -17,7 +16,99 @@ import (
 	"github.com/kluctl/go-embed-python/embed_util"
 	"github.com/kluctl/go-embed-python/python"
 	"github.com/pkg/errors"
+	"github.com/sourcegraph/conc"
 )
+
+type SQLParserPool struct {
+	parsers     []*SQLParser
+	workerCount int
+	mut         sync.Mutex
+	counter     int
+}
+
+func NewSQLParserPool(workerCount int) (*SQLParserPool, error) {
+	sp := &SQLParserPool{
+		parsers:     make([]*SQLParser, workerCount),
+		workerCount: workerCount,
+	}
+
+	var mut sync.Mutex
+	var wg conc.WaitGroup
+	for i := range workerCount {
+		wg.Go(func() {
+			p, err := NewSQLParser()
+			if err != nil {
+				panic(err)
+			}
+			mut.Lock()
+			defer mut.Unlock()
+			sp.parsers[i] = p
+		})
+	}
+
+	panics := wg.WaitAndRecover()
+	if panics != nil {
+		return nil, panics.AsError()
+	}
+
+	return sp, nil
+}
+
+func (sp *SQLParserPool) Start() error {
+	var wg conc.WaitGroup
+	for _, parser := range sp.parsers {
+		wg.Go(func() {
+			err := parser.Start()
+			if err != nil {
+				panic(err)
+			}
+		})
+	}
+
+	panics := wg.WaitAndRecover()
+	if panics != nil {
+		return panics.AsError()
+	}
+
+	return nil
+}
+
+func (sp *SQLParserPool) Close() error {
+	var wg conc.WaitGroup
+	for _, parser := range sp.parsers {
+		wg.Go(func() {
+			err := parser.Close()
+			if err != nil {
+				panic(err)
+			}
+		})
+	}
+
+	panics := wg.WaitAndRecover()
+	if panics != nil {
+		return panics.AsError()
+	}
+
+	return nil
+}
+
+func (sp *SQLParserPool) ColumnLineage(sql, dialect string, schema Schema) (*Lineage, error) {
+	sp.mut.Lock()
+	runner := sp.parsers[sp.counter%sp.workerCount]
+	sp.counter++
+	sp.mut.Unlock()
+
+	return runner.ColumnLineage(sql, dialect, schema)
+}
+
+func (sp *SQLParserPool) UsedTables(sql, dialect string) ([]string, error) {
+	sp.mut.Lock()
+	runner := sp.parsers[sp.counter%sp.workerCount]
+	sp.counter++
+	sp.mut.Unlock()
+
+	return runner.UsedTables(sql, dialect)
+}
 
 type SQLParser struct {
 	ep          *python.EmbeddedPython
@@ -201,19 +292,8 @@ func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
 
 	reader := bufio.NewReader(s.stdout)
 
-	line := bytes.NewBuffer(nil)
-	for {
-		l, p, err := reader.ReadLine()
-		if err != nil {
-			return "", err
-		}
-		line.Write(l)
-		if !p {
-			break
-		}
-	}
-
-	return line.String(), nil
+	resp, err := reader.ReadString(byte('\n'))
+	return resp, err
 }
 
 func (s *SQLParser) Close() error {

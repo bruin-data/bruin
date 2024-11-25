@@ -24,7 +24,7 @@ func Connections() *cli.Command {
 			ListConnections(),
 			AddConnection(),
 			DeleteConnection(),
-			TestConnection(),
+			PingConnection(),
 		},
 	}
 }
@@ -280,7 +280,7 @@ func printErrorForOutput(output string, err error) {
 	}
 }
 
-func TestConnection() *cli.Command {
+func PingConnection() *cli.Command {
 	return &cli.Command{
 		Name:  "test",
 		Usage: "Test the validity of a connection in an environment",
@@ -344,9 +344,9 @@ func TestConnection() *cli.Command {
 				return cli.Exit("", 1)
 			}
 			if tester, ok := conn.(interface {
-				Test(ctx context.Context) error
+				Ping(ctx context.Context) error
 			}); ok {
-				testErr := tester.Test(context.Background())
+				testErr := tester.Ping(context.Background())
 				if testErr != nil {
 					printErrorForOutput(output, errors2.Wrap(testErr, fmt.Sprintf("failed to run test query on %s connection", connType)))
 					return cli.Exit("", 1)

@@ -19,7 +19,10 @@ def extract_tables(parsed):
 
 def extract_columns(parsed):
     cols = []
-    for expression in parsed.find(exp.Select).expressions:
+    found = parsed.find(exp.Select)
+    if found is None:
+        return cols
+    for expression in found.expressions:
         if isinstance(expression, exp.CTE):
             continue
 
@@ -56,30 +59,43 @@ def get_tables(query: str, dialect: str):
 
 def get_column_lineage(query: str, schema: dict, dialect: str):
     parsed = parse_one(query, dialect=dialect)
-    optimized = optimize(parsed, schema, dialect=dialect)
+    if not isinstance(parsed, exp.Query):
+        return {"columns": []}
+    try:
+        optimized = optimize(parsed, schema, dialect=dialect)
+    except:
+        return {"columns": []}
 
     result = []
 
     cols = extract_columns(optimized)
     for col in cols:
-        ll = lineage.lineage(col, optimized, schema, dialect=dialect)
+        try:
+            ll = lineage.lineage(col, optimized, schema, dialect=dialect)
+        except:
+            continue
 
         cl = []
         leaves: list[Node] = []
         find_leaf_nodes(ll, leaves)
 
         for ds in leaves:
-            if isinstance(ds.expression.this, exp.Literal):
+            if isinstance(ds.expression.this, exp.Literal) or isinstance(ds.expression.this, exp.Anonymous):
                 continue
 
             cl.append(
                 {"column": ds.name.split(".")[-1], "table": ds.expression.this.name}
             )
 
+        
+        # Deduplicate based on column-table combination
+        cl = [dict(t) for t in {tuple(d.items()) for d in cl}]
         cl.sort(key=lambda x: x["table"])
+
         result.append({"name": col, "upstream": cl})
 
     result.sort(key=lambda x: x["name"])
+
     return {
         "columns": result,
     }

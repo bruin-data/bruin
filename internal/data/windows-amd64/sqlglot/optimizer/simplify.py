@@ -6,7 +6,6 @@ import functools
 import itertools
 import typing as t
 from collections import deque, defaultdict
-from decimal import Decimal
 from functools import reduce
 
 import sqlglot
@@ -207,6 +206,11 @@ COMPLEMENT_COMPARISONS = {
     exp.NEQ: exp.EQ,
 }
 
+COMPLEMENT_SUBQUERY_PREDICATES = {
+    exp.All: exp.Any,
+    exp.Any: exp.All,
+}
+
 
 def simplify_not(expression):
     """
@@ -219,9 +223,12 @@ def simplify_not(expression):
         if is_null(this):
             return exp.null()
         if this.__class__ in COMPLEMENT_COMPARISONS:
-            return COMPLEMENT_COMPARISONS[this.__class__](
-                this=this.this, expression=this.expression
-            )
+            right = this.expression
+            complement_subquery_predicate = COMPLEMENT_SUBQUERY_PREDICATES.get(right.__class__)
+            if complement_subquery_predicate:
+                right = complement_subquery_predicate(this=right.this)
+
+            return COMPLEMENT_COMPARISONS[this.__class__](this=this.this, expression=right)
         if isinstance(this, exp.Paren):
             condition = this.unnest()
             if isinstance(condition, exp.And):
@@ -268,12 +275,10 @@ def flatten(expression):
 
 def simplify_connectors(expression, root=True):
     def _simplify_connectors(expression, left, right):
-        if left == right:
-            if isinstance(expression, exp.Xor):
-                return exp.false()
-            return left
         if isinstance(expression, exp.And):
             if is_false(left) or is_false(right):
+                return exp.false()
+            if is_zero(left) or is_zero(right):
                 return exp.false()
             if is_null(left) or is_null(right):
                 return exp.null()
@@ -287,12 +292,10 @@ def simplify_connectors(expression, root=True):
         elif isinstance(expression, exp.Or):
             if always_true(left) or always_true(right):
                 return exp.true()
-            if is_false(left) and is_false(right):
-                return exp.false()
             if (
                 (is_null(left) and is_null(right))
-                or (is_null(left) and is_false(right))
-                or (is_false(left) and is_null(right))
+                or (is_null(left) and always_false(right))
+                or (always_false(left) and is_null(right))
             ):
                 return exp.null()
             if is_false(left):
@@ -300,6 +303,9 @@ def simplify_connectors(expression, root=True):
             if is_false(right):
                 return left
             return _simplify_comparison(expression, left, right, or_=True)
+        elif isinstance(expression, exp.Xor):
+            if left == right:
+                return exp.false()
 
     if isinstance(expression, exp.Connector):
         return _flat_simplify(expression, _simplify_connectors, root)
@@ -347,8 +353,8 @@ def _simplify_comparison(expression, left, right, or_=False):
                 return expression
 
             if l.is_number and r.is_number:
-                l = float(l.name)
-                r = float(r.name)
+                l = l.to_py()
+                r = r.to_py()
             elif l.is_string and r.is_string:
                 l = l.name
                 r = r.name
@@ -626,13 +632,8 @@ def simplify_literals(expression, root=True):
     if isinstance(expression, exp.Binary) and not isinstance(expression, exp.Connector):
         return _flat_simplify(expression, _simplify_binary, root)
 
-    if isinstance(expression, exp.Neg):
-        this = expression.this
-        if this.is_number:
-            value = this.name
-            if value[0] == "-":
-                return exp.Literal.number(value[1:])
-            return exp.Literal.number(f"-{value}")
+    if isinstance(expression, exp.Neg) and isinstance(expression.this, exp.Neg):
+        return expression.this.this
 
     if type(expression) in INVERSE_DATE_OPS:
         return _simplify_binary(expression, expression.this, expression.interval()) or expression
@@ -650,7 +651,7 @@ def _simplify_integer_cast(expr: exp.Expression) -> exp.Expression:
         this = expr.this
 
     if isinstance(expr, exp.Cast) and this.is_int:
-        num = int(this.name)
+        num = this.to_py()
 
         # Remove the (up)cast from small (byte-sized) integers in predicates which is side-effect free. Downcasts on any
         # integer type might cause overflow, thus the cast cannot be eliminated and the behavior is
@@ -690,8 +691,8 @@ def _simplify_binary(expression, a, b):
         return exp.null()
 
     if a.is_number and b.is_number:
-        num_a = int(a.name) if a.is_int else Decimal(a.name)
-        num_b = int(b.name) if b.is_int else Decimal(b.name)
+        num_a = a.to_py()
+        num_b = b.to_py()
 
         if isinstance(expression, exp.Add):
             return exp.Literal.number(num_a + num_b)
@@ -1034,7 +1035,7 @@ def simplify_datetrunc(expression: exp.Expression, dialect: Dialect) -> exp.Expr
 
         return (
             DATETRUNC_BINARY_COMPARISONS[comparison](
-                trunc_arg, date, unit, dialect, extract_type(trunc_arg, r)
+                trunc_arg, date, unit, dialect, extract_type(r)
             )
             or expression
         )
@@ -1060,7 +1061,7 @@ def simplify_datetrunc(expression: exp.Expression, dialect: Dialect) -> exp.Expr
                 return expression
 
             ranges = merge_ranges(ranges)
-            target_type = extract_type(l, *rs)
+            target_type = extract_type(*rs)
 
             return exp.or_(
                 *[_datetrunc_eq_expression(l, drange, target_type) for drange in ranges], copy=False
@@ -1077,7 +1078,11 @@ def sort_comparison(expression: exp.Expression) -> exp.Expression:
         l_const = _is_constant(l)
         r_const = _is_constant(r)
 
-        if (l_column and not r_column) or (r_const and not l_const):
+        if (
+            (l_column and not r_column)
+            or (r_const and not l_const)
+            or isinstance(r, exp.SubqueryPredicate)
+        ):
             return expression
         if (r_column and not l_column) or (l_const and not r_const) or (gen(l) > gen(r)):
             return INVERSE_COMPARISONS.get(expression.__class__, expression.__class__)(
@@ -1114,13 +1119,17 @@ def remove_where_true(expression):
 
 
 def always_true(expression):
-    return (isinstance(expression, exp.Boolean) and expression.this) or isinstance(
-        expression, exp.Literal
+    return (isinstance(expression, exp.Boolean) and expression.this) or (
+        isinstance(expression, exp.Literal) and not is_zero(expression)
     )
 
 
 def always_false(expression):
-    return is_false(expression) or is_null(expression)
+    return is_false(expression) or is_null(expression) or is_zero(expression)
+
+
+def is_zero(expression):
+    return isinstance(expression, exp.Literal) and expression.to_py() == 0
 
 
 def is_complement(a, b):
@@ -1206,7 +1215,7 @@ def _is_date_literal(expression: exp.Expression) -> bool:
 
 def extract_interval(expression):
     try:
-        n = int(expression.name)
+        n = int(expression.this.to_py())
         unit = expression.text("unit").lower()
         return interval(unit, n)
     except (UnsupportedUnit, ModuleNotFoundError, ValueError):

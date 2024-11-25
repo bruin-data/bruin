@@ -36,10 +36,13 @@ import (
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/synapse"
+	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
+	"github.com/rudderlabs/analytics-go/v4"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
+	"github.com/xlab/treeprint"
 )
 
 const LogsFolder = "logs"
@@ -103,6 +106,10 @@ func Run(isDebug *bool) *cli.Command {
 				Aliases: []string{"r"},
 				Usage:   "truncate the table before running",
 			},
+			&cli.BoolFlag{
+				Name:  "use-uv",
+				Usage: "use uv for managing Python dependencies",
+			},
 			&cli.StringFlag{
 				Name:    "tag",
 				Aliases: []string{"t"},
@@ -112,6 +119,10 @@ func Run(isDebug *bool) *cli.Command {
 				Name:        "only",
 				DefaultText: "'main', 'checks', 'push-metadata'",
 				Usage:       "limit the types of tasks to run. By default it will run main and checks, while push-metadata is optional if defined in the pipeline definition",
+			},
+			&cli.BoolFlag{
+				Name:  "exp-use-powershell-for-uv",
+				Usage: "use powershell to manage and install uv on windows, on non-windows systems this has no effect.",
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -305,6 +316,8 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			}
 
+			sendTelemetry(s)
+
 			tag := c.String("tag")
 			if tag != "" {
 				assetsByTag := foundPipeline.GetAssetsByTag(tag)
@@ -342,7 +355,7 @@ func Run(isDebug *bool) *cli.Command {
 			infoPrinter.Printf("\nStarting the pipeline execution...\n")
 			infoPrinter.Println()
 
-			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, c.Bool("full-refresh"))
+			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, c.Bool("full-refresh"), c.Bool("use-uv"))
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -358,6 +371,8 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, c.Bool("full-refresh"))
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
+			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
+			runCtx = context.WithValue(runCtx, python.CtxUsePowershellForUv, c.Bool("exp-use-powershell-for-uv")) //nolint:staticcheck
 
 			ex.Start(runCtx, s.WorkQueue, s.Results)
 
@@ -384,12 +399,41 @@ func Run(isDebug *bool) *cli.Command {
 }
 
 func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) {
-	errorPrinter.Printf("\nFailed tasks: %d\n", len(errorsInTaskResults))
-	for _, t := range errorsInTaskResults {
-		errorPrinter.Printf("  - %s\n", t.Instance.GetHumanReadableDescription())
-		errorPrinter.Printf("    └── %s\n\n", t.Error.Error())
+	data := make(map[string][]*scheduler.TaskExecutionResult, len(errorsInTaskResults))
+	for _, result := range errorsInTaskResults {
+		assetName := result.Instance.GetAsset().Name
+		data[assetName] = append(data[assetName], result)
 	}
 
+	tree := treeprint.New()
+	for assetName, results := range data {
+		assetBranch := tree.AddBranch(assetName)
+
+		columnBranches := make(map[string]treeprint.Tree, len(results))
+
+		for _, result := range results {
+			switch instance := result.Instance.(type) {
+			case *scheduler.ColumnCheckInstance:
+				colBranch, exists := columnBranches[instance.Column.Name]
+				if !exists {
+					colBranch = assetBranch.AddBranch("[Column] " + instance.Column.Name)
+					columnBranches[instance.Column.Name] = colBranch
+				}
+
+				checkBranch := colBranch.AddBranch("[Check] " + instance.Check.Name)
+				checkBranch.AddNode(fmt.Sprintf("'%s'", result.Error))
+
+			case *scheduler.CustomCheckInstance:
+				customBranch := assetBranch.AddBranch("[Custom Check] " + instance.Check.Name)
+				customBranch.AddNode(fmt.Sprintf("'%s'", result.Error))
+
+			default:
+				assetBranch.AddNode(fmt.Sprintf("'%s'", result.Error))
+			}
+		}
+	}
+	errorPrinter.Println(fmt.Sprintf("Failed assets %d", len(data)))
+	errorPrinter.Println(tree.String())
 	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
 	if len(upstreamFailedTasks) > 0 {
 		errorPrinter.Printf("The following tasks are skipped due to their upstream failing:\n")
@@ -417,7 +461,17 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	}
 }
 
-func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connection.Manager, startDate, endDate time.Time, pipelineName string, runID string, fullRefresh bool) (map[pipeline.AssetType]executor.Config, error) {
+func setupExecutors(
+	s *scheduler.Scheduler,
+	config *config.Config,
+	conn *connection.Manager,
+	startDate,
+	endDate time.Time,
+	pipelineName string,
+	runID string,
+	fullRefresh bool,
+	useUvForPython bool,
+) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
 
 	// this is a heuristic we apply to find what might be the most common type of custom check in the pipeline
@@ -425,7 +479,12 @@ func setupExecutors(s *scheduler.Scheduler, config *config.Config, conn *connect
 	estimateCustomCheckType := s.FindMajorityOfTypes(pipeline.AssetTypeBigqueryQuery)
 
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
-		mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh))
+		jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh)
+		if useUvForPython {
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperatorWithUv(config, conn, jinjaVariables)
+		} else {
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinjaVariables)
+		}
 	}
 
 	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID)
@@ -673,4 +732,16 @@ var re = regexp.MustCompile(ansi)
 
 func Clean(str string) string {
 	return re.ReplaceAllString(str, "")
+}
+
+func sendTelemetry(s *scheduler.Scheduler) {
+	assetStats := make(map[string]int)
+	for _, asset := range s.GetTaskInstancesByStatus(scheduler.Pending) {
+		_, ok := assetStats[string(asset.GetAsset().Type)]
+		if !ok {
+			assetStats[string(asset.GetAsset().Type)] = 0
+		}
+		assetStats[string(asset.GetAsset().Type)]++
+	}
+	telemetry.SendEvent("running", analytics.Properties{"assets": assetStats})
 }

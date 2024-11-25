@@ -1,0 +1,30 @@
+name: gsheet_raw.customers
+type: ingestr
+
+description: This asset manages the ingestion of Google Sheet data into BigQuery. It captures customer contact information including names, networking sources, job positions, and contact dates. The asset includes data quality checks to ensure critical fields like name, networking source, and position are properly populated.
+columns:
+  - name: name
+    type: varchar
+    description: "Contact person's full name"
+    checks:
+      - name: not_null
+  - name: networking_through
+    type: varchar
+    description: "Source or connection through which contact was made"
+    checks:
+      - name: not_null
+  - name: position
+    type: varchar
+    description: "Contact's job position or title"
+    checks:
+      - name: not_null
+  - name: contact_date
+    type: varchar
+    description: "Date when contact was established"
+
+
+parameters:
+  source_connection: gsheet-default
+  source_table: 16UY6EQ_6jnaNpRsMgbf0OpxsYh6fkdUQ2bjdNfUq2CA.Sheet1
+  destination: bigquery
+  destination_table: customers

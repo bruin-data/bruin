@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -69,9 +70,13 @@ func marshal[K ErrorResponse | ErrorResponses](m K) ([]byte, error) {
 }
 
 func printErrorJSON(err error) {
-	js, err := marshal[ErrorResponse](ErrorResponse{
-		Error: err.Error(),
-	})
+	errResponse := ErrorResponse{
+		Error: errors.New("something went wrong").Error(),
+	}
+	if err != nil {
+		errResponse.Error = err.Error()
+	}
+	js, err := marshal[ErrorResponse](errResponse)
 	if err != nil {
 		fmt.Println(err)
 		return

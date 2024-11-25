@@ -1680,10 +1680,10 @@ func TestEnsureBigQueryTableSensorHasTableParameter(t *testing.T) {
 				},
 			},
 			wantErr: assert.NoError,
-			want:    []string{"BigQuery table sensor `table` parameter must be in the format `project.dataset.table`"},
+			want:    []string{"BigQuery table sensor `table` parameter must be either in the format `dataset.table` or `project.dataset.table`"},
 		},
 		{
-			name: "table param exists but missing",
+			name: "table param exists with dataset.table, valid",
 			p: &pipeline.Pipeline{
 				Assets: []*pipeline.Asset{
 					{
@@ -1696,7 +1696,6 @@ func TestEnsureBigQueryTableSensorHasTableParameter(t *testing.T) {
 				},
 			},
 			wantErr: assert.NoError,
-			want:    []string{"BigQuery table sensor `table` parameter must be in the format `project.dataset.table`"},
 		},
 		{
 			name: "no issues",

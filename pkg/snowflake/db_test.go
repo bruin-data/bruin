@@ -9,6 +9,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -181,7 +182,7 @@ func TestDB_Select(t *testing.T) {
 	}
 }
 
-func TestDB_Test(t *testing.T) {
+func TestDB_Ping(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -221,7 +222,7 @@ func TestDB_Test(t *testing.T) {
 			tt.mockConnection(mock)
 			db := DB{conn: sqlxDB}
 
-			err = db.Test(context.Background())
+			err = db.Ping(context.Background())
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.errorMessage)
@@ -229,6 +230,97 @@ func TestDB_Test(t *testing.T) {
 				require.NoError(t, err)
 			}
 
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestDB_SelectWithSchema(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		mockConnection func(mock sqlmock.Sqlmock)
+		query          query.Query
+		want           *query.QueryResult
+		wantErr        bool
+		errorMessage   string
+	}{
+		{
+			name: "simple successful query with schema",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				// Mocking the query response with schema and data rows
+				mock.ExpectQuery(`SELECT first_name, last_name, age FROM users`).
+					WillReturnRows(sqlmock.NewRows([]string{"first_name", "last_name", "age"}).
+						AddRow("jane", "doe", 30).
+						AddRow("joe", "doe", 28))
+			},
+			query: query.Query{
+				Query: "SELECT first_name, last_name, age FROM users",
+			},
+			want: &query.QueryResult{
+				Columns: []string{"first_name", "last_name", "age"},
+				Rows: [][]interface{}{
+					{"jane", "doe", int64(30)},
+					{"joe", "doe", int64(28)},
+				},
+			},
+		},
+		{
+			name: "invalid query returns error",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				// Mocking a syntax error in the SQL query
+				mock.ExpectQuery(`some broken query`).
+					WillReturnError(errors.New("SQL compilation error: syntax error at position 1"))
+			},
+			query: query.Query{
+				Query: "some broken query",
+			},
+			wantErr:      true,
+			errorMessage: "SQL compilation error: syntax error at position 1",
+		},
+		{
+			name: "generic error propagation",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				// Simulating a generic connection error
+				mock.ExpectQuery(`SELECT first_name FROM users`).
+					WillReturnError(errors.New("connection issue"))
+			},
+			query: query.Query{
+				Query: "SELECT first_name FROM users",
+			},
+			wantErr:      true,
+			errorMessage: "connection issue",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Setting up sqlmock
+			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+			defer mockDB.Close()
+			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+
+			// Apply the mock connection setup
+			tt.mockConnection(mock)
+			db := DB{conn: sqlxDB}
+
+			// Execute SelectWithSchema
+			got, err := db.SelectWithSchema(context.Background(), &tt.query)
+
+			// Validate the error expectations
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMessage)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+			}
+
+			// Ensure all expectations were met
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}

@@ -125,7 +125,7 @@ Temporary Items
 bin
 __pycache__/
 .bruin.yml
-!templates/duckdb/.bruin.yml
+!templates/*/.bruin.yml
 dist/
 *.pyc
 
@@ -139,3 +139,7 @@ glossary.yaml
 
 # pixi dev env 
 .pixi
+
+integration-tests/duckdb.db
+integration-tests/logs
+!integration-tests/.bruin.yml

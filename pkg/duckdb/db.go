@@ -5,7 +5,6 @@ import (
 	"database/sql"
 
 	"github.com/bruin-data/bruin/pkg/query"
-	"github.com/jmoiron/sqlx"
 	_ "github.com/marcboeker/go-duckdb"
 )
 
@@ -25,7 +24,9 @@ type connection interface {
 }
 
 func NewClient(c DuckDBConfig) (*Client, error) {
-	conn, err := sqlx.Open("duckdb", c.ToDBConnectionURI())
+	LockDatabase(c.ToDBConnectionURI())
+	defer UnlockDatabase(c.ToDBConnectionURI())
+	conn, err := NewEphemeralConnection(c)
 	if err != nil {
 		return nil, err
 	}
@@ -34,6 +35,8 @@ func NewClient(c DuckDBConfig) (*Client, error) {
 }
 
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
+	LockDatabase(c.config.ToDBConnectionURI())
+	defer UnlockDatabase(c.config.ToDBConnectionURI())
 	_, err := c.connection.ExecContext(ctx, query.String())
 	if err != nil {
 		return err
@@ -46,16 +49,19 @@ func (c *Client) GetIngestrURI() (string, error) {
 	return c.config.GetIngestrURI(), nil
 }
 
+func (c *Client) GetDBConnectionURI() (string, error) {
+	return c.config.ToDBConnectionURI(), nil
+}
+
 // Select runs a query and returns the results.
 func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
+	LockDatabase(c.config.ToDBConnectionURI())
+	defer UnlockDatabase(c.config.ToDBConnectionURI())
+
 	rows, err := c.connection.QueryContext(ctx, query.String())
 	if err != nil {
 		return nil, err
 	}
-	if rows.Err() != nil {
-		return nil, rows.Err()
-	}
-
 	if rows.Err() != nil {
 		return nil, rows.Err()
 	}
@@ -82,6 +88,52 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 		}
 
 		result = append(result, columns)
+	}
+
+	return result, nil
+}
+
+func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query) (*query.QueryResult, error) {
+	LockDatabase(c.config.ToDBConnectionURI())
+	defer UnlockDatabase(c.config.ToDBConnectionURI())
+
+	rows, err := c.connection.QueryContext(ctx, queryObject.String())
+	if err != nil {
+		return nil, err
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	defer rows.Close()
+
+	// Initialize QueryResult
+	result := &query.QueryResult{
+		Columns: []string{},
+		Rows:    [][]interface{}{},
+	}
+
+	// Fetch column names and populate Columns slice
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+	result.Columns = cols // Add column names to the result
+
+	// Fetch rows and populate Rows slice
+	for rows.Next() {
+		columns := make([]interface{}, len(cols))
+		columnPointers := make([]interface{}, len(cols))
+		for i := range columns {
+			columnPointers[i] = &columns[i]
+		}
+
+		// Scan the result into the column pointers...
+		if err := rows.Scan(columnPointers...); err != nil {
+			return nil, err
+		}
+
+		result.Rows = append(result.Rows, columns)
 	}
 
 	return result, nil

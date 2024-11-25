@@ -1,16 +1,13 @@
 package main
 
 import (
-	"fmt"
-	"net/http"
 	"os"
-	"runtime/debug"
-	"strings"
 	"time"
 
 	"github.com/bruin-data/bruin/cmd"
+	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/fatih/color"
-	"github.com/pkg/errors"
+	"github.com/rudderlabs/analytics-go/v4"
 	"github.com/urfave/cli/v2"
 )
 
@@ -20,25 +17,26 @@ var (
 )
 
 func main() {
+	start := time.Now()
 	isDebug := false
 	color.NoColor = false
 
-	cli.VersionPrinter = func(cCtx *cli.Context) {
-		hash := commit
-		if hash == "" {
-			hash = func() string {
-				if info, ok := debug.ReadBuildInfo(); ok {
-					for _, setting := range info.Settings {
-						if setting.Key == "vcs.revision" {
-							return setting.Value
-						}
-					}
-				}
-				return ""
-			}()
-		}
+	var optOut bool
+	if os.Getenv("TELEMETRY_OPTOUT") != "" {
+		optOut = true
+	}
 
-		fmt.Printf("bruin CLI %s (%s)\n", cCtx.App.Version, hash)
+	telemetry.TelemetryKey = os.Getenv("TELEMETRY_KEY")
+	telemetry.OptOut = optOut
+	telemetry.AppVersion = version
+
+	versionCommand := cmd.VersionCmd(commit)
+
+	cli.VersionPrinter = func(cCtx *cli.Context) {
+		err := versionCommand.Action(cCtx)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	app := &cli.App{
@@ -46,6 +44,33 @@ func main() {
 		Version:  version,
 		Usage:    "The CLI used for managing Bruin-powered data pipelines",
 		Compiled: time.Now(),
+		Before: func(context *cli.Context) error {
+			telemetry.SendEvent("command", analytics.Properties{
+				"command_start": context.Command.Name,
+				"args":          context.Args().Slice(),
+			})
+			return nil
+		},
+		After: func(context *cli.Context) error {
+			telemetry.SendEvent("command", analytics.Properties{
+				"command_finish": context.Command.Name,
+				"duration":       time.Since(start).Seconds(),
+			})
+			return nil
+		},
+		ExitErrHandler: func(context *cli.Context, err error) {
+			errMsg := "Unknown error"
+			if err != nil {
+				errMsg = err.Error()
+			}
+			telemetry.SendEvent("command", analytics.Properties{
+				"command_error": context.Command.Name,
+				"args":          context.Args().Slice(),
+				"error":         errMsg,
+				"duration":      time.Since(start).Seconds(),
+			})
+			cli.HandleExitCoder(err)
+		},
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:        "debug",
@@ -61,25 +86,13 @@ func main() {
 			cmd.Lineage(),
 			cmd.CleanCmd(),
 			cmd.Format(&isDebug),
+			cmd.Docs(),
 			cmd.Init(),
 			cmd.Internal(),
 			cmd.Environments(&isDebug),
 			cmd.Connections(),
 			cmd.Fetch(),
-			&cli.Command{
-				Name: "version",
-				Action: func(c *cli.Context) error {
-					fmt.Printf("Current version: %s (%s)\n", c.App.Version, commit)
-					res, err := http.Get("https://github.com/bruin-data/bruin/releases/latest") //nolint
-					defer res.Body.Close()                                                      //nolint
-					if err != nil {
-						return errors.Wrap(err, "failed to check the latest version")
-					}
-
-					fmt.Println("Latest version: " + strings.TrimPrefix(res.Request.URL.String(), "https://github.com/bruin-data/bruin/releases/tag/"))
-					return nil
-				},
-			},
+			versionCommand,
 		},
 	}
 

@@ -6,6 +6,9 @@ NO_COLOR=\033[0m
 OK_COLOR=\033[32;01m
 ERROR_COLOR=\033[31;01m
 WARN_COLOR=\033[33;01m
+TELEMETRY_OPTOUT=1
+CURRENT_DIR=$(pwd)
+FILES := $(wildcard *.yml *.txt *.py)
 
 .PHONY: all clean test build tools format pre-commit tools-update
 all: clean deps test build
@@ -16,8 +19,14 @@ deps: tools
 
 build: deps
 	@echo "$(OK_COLOR)==> Building the application...$(NO_COLOR)"
-	@CGO_ENABLED=1 go build -v -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0))" -o "$(BUILD_DIR)/$(NAME)" "$(BUILD_SRC)"
+	@CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0))" -o "$(BUILD_DIR)/$(NAME)" "$(BUILD_SRC)"
 
+
+integration-test: build
+	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
+	@cd integration-tests && git init
+	@go run integration-tests/integration-test.go
+	@rm -rf integration-tests/.git
 clean:
 	@rm -rf ./bin
 
@@ -32,13 +41,13 @@ format: tools
 	go vet ./... &
 
 	@echo "$(OK_COLOR)>> [gci] running$(NO_COLOR)" & \
-	gci write cmd pkg main.go &
+	gci write cmd pkg integration-tests/integration-test.go main.go &
 
 	@echo "$(OK_COLOR)>> [gofumpt] running$(NO_COLOR)" & \
 	gofumpt -w cmd pkg &
 
 	@echo "$(OK_COLOR)>> [golangci-lint] running$(NO_COLOR)" & \
-	golangci-lint run  & \
+	golangci-lint run --timeout 10m60s ./...  & \
 	wait
 
 tools:

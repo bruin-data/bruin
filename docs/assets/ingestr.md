@@ -1,5 +1,5 @@
 # Ingestr Assets
-[Ingestr](https://github.com/bruin-data/ingestr) is a Python package that allows you to easily move data between platforms. Bruin supports `ingestr` natively as an asset type.
+[Ingestr](https://github.com/bruin-data/ingestr) is a CLI tool that allows you to easily move data between platforms. Bruin supports `ingestr` natively as an asset type.
 
 Using Ingestr, you can move data from:
 * your production databases like:
@@ -29,7 +29,7 @@ to your data warehouses:
 
 
 
-## Template
+## Asset Structure
 ```yaml
 name: string
 type: ingestr
@@ -46,11 +46,6 @@ parameters:
   sql_backend: pyarrow | sqlalchemy
   loader_file_format: jsonl | csv | parquet
 ```
-
-
-> [!INFO]
-> Ingestr assets require Docker to be installed in your machine. If you are using [Bruin Cloud](https://getbruin.com), you don't need to worry about this.
-
 
 ##  Examples
 The examples below show how to use the `ingestr` asset type in your pipeline. Feel free to change them as you wish according to your needs.

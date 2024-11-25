@@ -9,8 +9,11 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/git"
 	path2 "github.com/bruin-data/bruin/pkg/path"
+	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/invopop/jsonschema"
+	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
 
@@ -260,6 +263,24 @@ type Config struct {
 	Environments            map[string]Environment `yaml:"environments" json:"environments" mapstructure:"environments"`
 }
 
+func (c *Config) CanRunTaskInstances(p *pipeline.Pipeline, tasks []scheduler.TaskInstance) error {
+	for _, task := range tasks {
+		asset := task.GetAsset()
+		connNames, err := p.GetAllConnectionNamesForAsset(asset)
+		if err != nil {
+			return errors2.Wrap(err, "Could not find connection name for asset "+asset.Name)
+		}
+
+		for _, connName := range connNames {
+			if !c.SelectedEnvironment.Connections.Exists(connName) {
+				return errors2.Errorf("Connection '%s' does not exist in the selected environment and is needed for '%s'", connName, asset.Name)
+			}
+		}
+	}
+
+	return nil
+}
+
 func (c *Config) GetEnvironmentNames() []string {
 	envs := make([]string, len(c.Environments))
 	i := 0
@@ -308,6 +329,22 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 
 	if config.DefaultEnvironmentName == "" {
 		config.DefaultEnvironmentName = "default"
+	}
+
+	absoluteConfigPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get absolute path: %w", err)
+	}
+	configLocation := filepath.Dir(absoluteConfigPath)
+
+	// Make duckdb paths absolute
+	for _, env := range config.Environments {
+		for i, conn := range env.Connections.DuckDB {
+			if filepath.IsAbs(conn.Path) {
+				continue
+			}
+			env.Connections.DuckDB[i].Path = filepath.Join(configLocation, conn.Path)
+		}
 	}
 
 	err = config.SelectEnvironment(config.DefaultEnvironmentName)
@@ -489,6 +526,8 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		if err := mapstructure.Decode(creds, &conn); err != nil {
 			return fmt.Errorf("failed to decode credentials: %w", err)
 		}
+		conn.Name = name
+		env.Connections.Stripe = append(env.Connections.Stripe, conn)
 	case "generic":
 		var conn GenericConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -529,12 +568,15 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		if err := mapstructure.Decode(creds, &conn); err != nil {
 			return fmt.Errorf("failed to decode credentials: %w", err)
 		}
+		conn.Name = name
+		env.Connections.GoogleSheets = append(env.Connections.GoogleSheets, conn)
 	case "chess":
 		var conn ChessConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
 			return fmt.Errorf("failed to decode credentials: %w", err)
 		}
-
+		conn.Name = name
+		env.Connections.Chess = append(env.Connections.Chess, conn)
 	case "airtable":
 		var conn AirtableConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -563,6 +605,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Slack = append(env.Connections.Slack, conn)
+	case "duckdb":
+		var conn DuckDBConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.DuckDB = append(env.Connections.DuckDB, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -652,6 +701,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Slack = removeConnection(env.Connections.Slack, connectionName)
 	case "zendesk":
 		env.Connections.Zendesk = removeConnection(env.Connections.Zendesk, connectionName)
+	case "duckdb":
+		env.Connections.DuckDB = removeConnection(env.Connections.DuckDB, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}

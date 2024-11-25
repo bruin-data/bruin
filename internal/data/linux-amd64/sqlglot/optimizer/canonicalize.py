@@ -40,9 +40,11 @@ def replace_date_funcs(node: exp.Expression) -> exp.Expression:
         isinstance(node, (exp.Date, exp.TsOrDsToDate))
         and not node.expressions
         and not node.args.get("zone")
+        and node.this.is_string
+        and is_iso_date(node.this.name)
     ):
         return exp.cast(node.this, to=exp.DataType.Type.DATE)
-    if isinstance(node, exp.Timestamp) and not node.expression:
+    if isinstance(node, exp.Timestamp) and not node.args.get("zone"):
         if not node.type:
             from sqlglot.optimizer.annotate_types import annotate_types
 
@@ -88,6 +90,12 @@ def remove_redundant_casts(expression: exp.Expression) -> exp.Expression:
         isinstance(expression, exp.Cast)
         and expression.this.type
         and expression.to.this == expression.this.type.this
+    ):
+        return expression.this
+    if (
+        isinstance(expression, (exp.Date, exp.TsOrDsToDate))
+        and expression.this.type
+        and expression.this.type.this == exp.DataType.Type.DATE
     ):
         return expression.this
     return expression

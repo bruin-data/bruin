@@ -57,6 +57,10 @@ def ensure_list(value: t.Collection[T]) -> t.List[T]: ...
 
 
 @t.overload
+def ensure_list(value: None) -> t.List: ...
+
+
+@t.overload
 def ensure_list(value: T) -> t.List[T]: ...
 
 
@@ -179,8 +183,9 @@ def apply_index_offset(
 
     if not expression.type:
         annotate_types(expression)
+
     if t.cast(exp.DataType, expression.type).this in exp.DataType.INTEGER_TYPES:
-        logger.warning("Applying array index offset (%s)", offset)
+        logger.info("Applying array index offset (%s)", offset)
         expression = simplify(expression + offset)
         return [expression]
 

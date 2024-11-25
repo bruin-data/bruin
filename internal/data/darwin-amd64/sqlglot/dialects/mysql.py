@@ -24,6 +24,8 @@ from sqlglot.dialects.dialect import (
     rename_func,
     strposition_to_locate_sql,
     unit_to_var,
+    trim_sql,
+    timestrtotime_sql,
 )
 from sqlglot.helper import seq_get
 from sqlglot.tokens import TokenType
@@ -93,21 +95,6 @@ def _str_to_date_sql(
     self: MySQL.Generator, expression: exp.StrToDate | exp.StrToTime | exp.TsOrDsToDate
 ) -> str:
     return self.func("STR_TO_DATE", expression.this, self.format_time(expression))
-
-
-def _trim_sql(self: MySQL.Generator, expression: exp.Trim) -> str:
-    target = self.sql(expression, "this")
-    trim_type = self.sql(expression, "position")
-    remove_chars = self.sql(expression, "expression")
-
-    # Use TRIM/LTRIM/RTRIM syntax if the expression isn't mysql-specific
-    if not remove_chars:
-        return self.trim_sql(expression)
-
-    trim_type = f"{trim_type} " if trim_type else ""
-    remove_chars = f"{remove_chars} " if remove_chars else ""
-    from_part = "FROM " if trim_type or remove_chars else ""
-    return f"TRIM({trim_type}{remove_chars}{from_part}{target})"
 
 
 def _unix_to_time_sql(self: MySQL.Generator, expression: exp.UnixToTime) -> str:
@@ -186,7 +173,7 @@ class MySQL(Dialect):
         "%k": "%-H",
         "%l": "%-I",
         "%T": "%H:%M:%S",
-        "%W": "%a",
+        "%W": "%A",
     }
 
     class Tokenizer(tokens.Tokenizer):
@@ -200,8 +187,12 @@ class MySQL(Dialect):
         KEYWORDS = {
             **tokens.Tokenizer.KEYWORDS,
             "CHARSET": TokenType.CHARACTER_SET,
+            # The DESCRIBE and EXPLAIN statements are synonyms.
+            # https://dev.mysql.com/doc/refman/8.4/en/explain.html
+            "EXPLAIN": TokenType.DESCRIBE,
             "FORCE": TokenType.FORCE,
             "IGNORE": TokenType.IGNORE,
+            "KEY": TokenType.KEY,
             "LOCK TABLES": TokenType.COMMAND,
             "LONGBLOB": TokenType.LONGBLOB,
             "LONGTEXT": TokenType.LONGTEXT,
@@ -301,6 +292,9 @@ class MySQL(Dialect):
 
         FUNCTIONS = {
             **parser.Parser.FUNCTIONS,
+            "CONVERT_TZ": lambda args: exp.ConvertTimezone(
+                source_tz=seq_get(args, 1), target_tz=seq_get(args, 2), timestamp=seq_get(args, 0)
+            ),
             "DATE": lambda args: exp.TsOrDsToDate(this=seq_get(args, 0)),
             "DATE_ADD": build_date_delta_with_interval(exp.DateAdd),
             "DATE_FORMAT": build_formatted_time(exp.TimeToStr, "mysql"),
@@ -309,7 +303,6 @@ class MySQL(Dialect):
             "DAYOFMONTH": lambda args: exp.DayOfMonth(this=exp.TsOrDsToDate(this=seq_get(args, 0))),
             "DAYOFWEEK": lambda args: exp.DayOfWeek(this=exp.TsOrDsToDate(this=seq_get(args, 0))),
             "DAYOFYEAR": lambda args: exp.DayOfYear(this=exp.TsOrDsToDate(this=seq_get(args, 0))),
-            "INSTR": lambda args: exp.StrPosition(substr=seq_get(args, 1), this=seq_get(args, 0)),
             "FROM_UNIXTIME": build_formatted_time(exp.UnixToTime, "mysql"),
             "ISNULL": isnull_to_is_null,
             "LOCATE": locate_to_strposition,
@@ -338,12 +331,17 @@ class MySQL(Dialect):
 
         FUNCTION_PARSERS = {
             **parser.Parser.FUNCTION_PARSERS,
-            "CHAR": lambda self: self._parse_chr(),
+            "CHAR": lambda self: self.expression(
+                exp.Chr,
+                expressions=self._parse_csv(self._parse_assignment),
+                charset=self._match(TokenType.USING) and self._parse_var(),
+            ),
             "GROUP_CONCAT": lambda self: self._parse_group_concat(),
             # https://dev.mysql.com/doc/refman/5.7/en/miscellaneous-functions.html#function_values
             "VALUES": lambda self: self.expression(
                 exp.Anonymous, this="VALUES", expressions=[self._parse_id_var()]
             ),
+            "JSON_VALUE": lambda self: self._parse_json_value(),
         }
 
         STATEMENT_PARSERS = {
@@ -456,6 +454,17 @@ class MySQL(Dialect):
         ENUM_TYPE_TOKENS = {
             *parser.Parser.ENUM_TYPE_TOKENS,
             TokenType.SET,
+        }
+
+        # SELECT [ ALL | DISTINCT | DISTINCTROW ] [ <OPERATION_MODIFIERS> ]
+        OPERATION_MODIFIERS = {
+            "HIGH_PRIORITY",
+            "STRAIGHT_JOIN",
+            "SQL_SMALL_RESULT",
+            "SQL_BIG_RESULT",
+            "SQL_BUFFER_RESULT",
+            "SQL_NO_CACHE",
+            "SQL_CALC_FOUND_ROWS",
         }
 
         LOG_DEFAULTS_TO_LN = True
@@ -628,18 +637,6 @@ class MySQL(Dialect):
                 parse_interval=parse_interval, fallback_to_identifier=fallback_to_identifier
             )
 
-        def _parse_chr(self) -> t.Optional[exp.Expression]:
-            expressions = self._parse_csv(self._parse_assignment)
-            kwargs: t.Dict[str, t.Any] = {"this": seq_get(expressions, 0)}
-
-            if len(expressions) > 1:
-                kwargs["expressions"] = expressions[1:]
-
-            if self._match(TokenType.USING):
-                kwargs["charset"] = self._parse_var()
-
-            return self.expression(exp.Chr, **kwargs)
-
         def _parse_group_concat(self) -> t.Optional[exp.Expression]:
             def concat_exprs(
                 node: t.Optional[exp.Expression], exprs: t.List[exp.Expression]
@@ -673,6 +670,21 @@ class MySQL(Dialect):
 
             return self.expression(exp.GroupConcat, this=this, separator=separator)
 
+        def _parse_json_value(self) -> exp.JSONValue:
+            this = self._parse_bitwise()
+            self._match(TokenType.COMMA)
+            path = self._parse_bitwise()
+
+            returning = self._match(TokenType.RETURNING) and self._parse_type()
+
+            return self.expression(
+                exp.JSONValue,
+                this=this,
+                path=self.dialect.to_json_path(path),
+                returning=returning,
+                on_condition=self._parse_on_condition(),
+            )
+
     class Generator(generator.Generator):
         INTERVAL_ALLOWS_PLURAL_FORM = False
         LOCKING_READS_SUPPORTED = True
@@ -688,6 +700,11 @@ class MySQL(Dialect):
         JSON_PATH_BRACKETED_KEY_SUPPORTED = False
         JSON_KEY_VALUE_PAIR_SEP = ","
         SUPPORTS_TO_NUMBER = False
+        PARSE_JSON_NAME: t.Optional[str] = None
+        PAD_FILL_PATTERN_IS_REQUIRED = True
+        WRAP_DERIVED_VALUES = False
+        VARCHAR_REQUIRES_SIZE = True
+        SUPPORTS_MEDIAN = False
 
         TRANSFORMS = {
             **generator.Generator.TRANSFORMS,
@@ -713,7 +730,6 @@ class MySQL(Dialect):
             exp.Month: _remove_ts_or_ds_to_date(),
             exp.NullSafeEQ: lambda self, e: self.binary(e, "<=>"),
             exp.NullSafeNEQ: lambda self, e: f"NOT {self.binary(e, '<=>')}",
-            exp.ParseJSON: lambda self, e: self.sql(e, "this"),
             exp.Pivot: no_pivot_sql,
             exp.Select: transforms.preprocess(
                 [
@@ -721,6 +737,7 @@ class MySQL(Dialect):
                     transforms.eliminate_semi_and_anti_joins,
                     transforms.eliminate_qualify,
                     transforms.eliminate_full_outer_join,
+                    transforms.unnest_generate_date_array_using_recursive_cte,
                 ]
             ),
             exp.StrPosition: strposition_to_locate_sql,
@@ -735,13 +752,15 @@ class MySQL(Dialect):
             ),
             exp.TimestampSub: date_add_interval_sql("DATE", "SUB"),
             exp.TimeStrToUnix: rename_func("UNIX_TIMESTAMP"),
-            exp.TimeStrToTime: lambda self, e: self.sql(
-                exp.cast(e.this, exp.DataType.Type.DATETIME, copy=True)
+            exp.TimeStrToTime: lambda self, e: timestrtotime_sql(
+                self,
+                e,
+                include_precision=not e.args.get("zone"),
             ),
             exp.TimeToStr: _remove_ts_or_ds_to_date(
                 lambda self, e: self.func("DATE_FORMAT", e.this, self.format_time(e))
             ),
-            exp.Trim: _trim_sql,
+            exp.Trim: trim_sql,
             exp.TryCast: no_trycast_sql,
             exp.TsOrDsAdd: date_add_sql("ADD"),
             exp.TsOrDsDiff: lambda self, e: self.func("DATEDIFF", e.this, e.expression),
@@ -1092,29 +1111,6 @@ class MySQL(Dialect):
             "xor",
             "year_month",
             "zerofill",
-            "cume_dist",
-            "dense_rank",
-            "empty",
-            "except",
-            "first_value",
-            "grouping",
-            "groups",
-            "intersect",
-            "json_table",
-            "lag",
-            "last_value",
-            "lateral",
-            "lead",
-            "nth_value",
-            "ntile",
-            "of",
-            "over",
-            "percent_rank",
-            "rank",
-            "recursive",
-            "row_number",
-            "system",
-            "window",
         }
 
         def array_sql(self, expression: exp.Array) -> str:
@@ -1136,10 +1132,19 @@ class MySQL(Dialect):
             return super().extract_sql(expression)
 
         def datatype_sql(self, expression: exp.DataType) -> str:
+            if (
+                self.VARCHAR_REQUIRES_SIZE
+                and expression.is_type(exp.DataType.Type.VARCHAR)
+                and not expression.expressions
+            ):
+                # `VARCHAR` must always have a size - if it doesn't, we always generate `TEXT`
+                return "TEXT"
+
             # https://dev.mysql.com/doc/refman/8.0/en/numeric-type-syntax.html
             result = super().datatype_sql(expression)
             if expression.this in self.UNSIGNED_TYPE_MAPPING:
                 result = f"{result} UNSIGNED"
+
             return result
 
         def jsonarraycontains_sql(self, expression: exp.JSONArrayContains) -> str:
@@ -1233,3 +1238,14 @@ class MySQL(Dialect):
             dateadd = build_date_delta_with_interval(exp.DateAdd)([start_ts, interval])
 
             return self.sql(dateadd)
+
+        def converttimezone_sql(self, expression: exp.ConvertTimezone) -> str:
+            from_tz = expression.args.get("source_tz")
+            to_tz = expression.args.get("target_tz")
+            dt = expression.args.get("timestamp")
+
+            return self.func("CONVERT_TZ", dt, from_tz, to_tz)
+
+        def attimezone_sql(self, expression: exp.AtTimeZone) -> str:
+            self.unsupported("AT TIME ZONE is not supported by MySQL")
+            return self.sql(expression.this)

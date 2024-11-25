@@ -1,8 +1,11 @@
 package config
 
 import (
+	"runtime"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -10,6 +13,15 @@ import (
 
 func TestLoadFromFile(t *testing.T) {
 	t.Parallel()
+
+	var duckPath, configFile string
+	if runtime.GOOS == "windows" {
+		configFile = "simple_win.yml"
+		duckPath = "C:\\path\\to\\duck.db"
+	} else {
+		configFile = "simple.yml"
+		duckPath = "/path/to/duck.db"
+	}
 
 	devEnv := Environment{
 		Connections: &Connections{
@@ -207,7 +219,7 @@ func TestLoadFromFile(t *testing.T) {
 			DuckDB: []DuckDBConnection{
 				{
 					Name: "conn20",
-					Path: "/path/to/duck.db",
+					Path: duckPath,
 				},
 			},
 			Hubspot: []HubspotConnection{
@@ -285,7 +297,7 @@ func TestLoadFromFile(t *testing.T) {
 		{
 			name: "read simple connection",
 			args: args{
-				path: "testdata/simple.yml",
+				path: "testdata/" + configFile,
 			},
 			want: &Config{
 				DefaultEnvironmentName:  "dev",
@@ -578,7 +590,6 @@ func TestConfig_AddConnection(t *testing.T) {
 				require.NoError(t, err)
 				env, exists := conf.Environments[tt.envName]
 				assert.True(t, exists)
-
 				switch tt.connType {
 				case "google_cloud_platform":
 					assert.Len(t, env.Connections.GoogleCloudPlatform, 1)
@@ -697,6 +708,358 @@ func TestDeleteConnection(t *testing.T) {
 				}
 
 				assert.False(t, env.Connections.Exists(tt.connName))
+			}
+		})
+	}
+}
+
+func TestCanRunTaskInstances(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		config         Config
+		pipeline       pipeline.Pipeline
+		expectedErr    bool
+		expectedCanRun bool
+	}{
+		{
+			name:   "no connections, no assets",
+			config: Config{},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "specific connection, not found",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "conn1",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Type:       pipeline.AssetTypeBigqueryQuery,
+						Connection: "conn2",
+					},
+				},
+			},
+			expectedErr: true,
+		},
+		{
+			name: "specific connection, found",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "conn1",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Type:       pipeline.AssetTypeBigqueryQuery,
+						Connection: "conn1",
+					},
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "no specific connection, not found",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "gcp-default",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Type: pipeline.AssetType("sf.sql"),
+					},
+				},
+			},
+			expectedErr: true,
+		},
+		{
+			name: "no specific connection, found",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "gcp-default",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Type: pipeline.AssetTypeBigqueryQuery,
+					},
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "2 assets 2 conn missing",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "conn1",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Type:       pipeline.AssetTypeBigqueryQuery,
+						Connection: "conn1",
+					},
+					{
+						Type:       pipeline.AssetTypeIngestr,
+						Connection: "conn2",
+						Parameters: map[string]string{"source_connection": "conn3"},
+					},
+				},
+			},
+			expectedErr: true,
+		},
+		{
+			name: "2 assets 2 conns",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "conn1",
+							},
+						},
+						Snowflake: []SnowflakeConnection{
+							{
+								Name: "conn2",
+							},
+							{
+								Name: "conn3",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				DefaultConnections: map[string]string{
+					"snowflake": "conn2",
+				},
+				Assets: []*pipeline.Asset{
+					{
+						Type:       pipeline.AssetTypeBigqueryQuery,
+						Connection: "conn1",
+					},
+					{
+						Type: pipeline.AssetTypeIngestr,
+						Parameters: map[string]string{
+							"source_connection": "conn3",
+							"destination":       "snowflake",
+						},
+					},
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "3 assets 1 python secret missing",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "conn1",
+							},
+						},
+						Snowflake: []SnowflakeConnection{
+							{
+								Name: "conn2",
+							},
+							{
+								Name: "conn3",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				DefaultConnections: map[string]string{
+					"snowflake": "conn2",
+				},
+				Assets: []*pipeline.Asset{
+					{
+						Type:       pipeline.AssetTypeBigqueryQuery,
+						Connection: "conn1",
+					},
+					{
+						Type: pipeline.AssetTypeIngestr,
+						Parameters: map[string]string{
+							"source_connection": "conn3",
+							"destination":       "snowflake",
+						},
+					},
+					{
+						Type: pipeline.AssetTypePython,
+						Secrets: []pipeline.SecretMapping{
+							{
+								SecretKey: "some_key",
+							},
+						},
+					},
+				},
+			},
+			expectedErr: true,
+		},
+		{
+			name: "3 assets 1 python secret",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "conn1",
+							},
+						},
+						Snowflake: []SnowflakeConnection{
+							{
+								Name: "conn2",
+							},
+							{
+								Name: "conn3",
+							},
+						},
+						Generic: []GenericConnection{
+							{
+								Name: "some_key",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				DefaultConnections: map[string]string{
+					"snowflake": "conn2",
+				},
+				Assets: []*pipeline.Asset{
+					{
+						Type:       pipeline.AssetTypeBigqueryQuery,
+						Connection: "conn1",
+					},
+					{
+						Type: pipeline.AssetTypeIngestr,
+						Parameters: map[string]string{
+							"source_connection": "conn3",
+							"destination":       "snowflake",
+						},
+					},
+					{
+						Type: pipeline.AssetTypePython,
+						Secrets: []pipeline.SecretMapping{
+							{
+								SecretKey: "some_key",
+							},
+						},
+					},
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "defaults",
+			config: Config{
+				SelectedEnvironment: &Environment{
+					Connections: &Connections{
+						GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+							{
+								Name: "gcp-default",
+							},
+						},
+						Snowflake: []SnowflakeConnection{
+							{
+								Name: "snowflake-default",
+							},
+							{
+								Name: "conn3",
+							},
+						},
+						Generic: []GenericConnection{
+							{
+								Name: "some_key",
+							},
+						},
+					},
+				},
+			},
+			pipeline: pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Type: pipeline.AssetTypeBigqueryQuery,
+					},
+					{
+						Type: pipeline.AssetTypeIngestr,
+						Parameters: map[string]string{
+							"source_connection": "conn3",
+							"destination":       "snowflake",
+						},
+					},
+					{
+						Type: pipeline.AssetTypePython,
+						Secrets: []pipeline.SecretMapping{
+							{
+								SecretKey: "some_key",
+							},
+						},
+					},
+				},
+			},
+			expectedErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tasks := make([]scheduler.TaskInstance, 0)
+
+			for _, asset := range tt.pipeline.Assets {
+				tasks = append(tasks, &scheduler.AssetInstance{Asset: asset})
+			}
+
+			err := tt.config.CanRunTaskInstances(&tt.pipeline, tasks)
+			if tt.expectedErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
 		})
 	}
