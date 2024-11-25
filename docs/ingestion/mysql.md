@@ -20,11 +20,12 @@ Follow the steps below to correctly set up MySQL as a data source and run ingest
           port: 3306
           database: "mysql"
 ```
-- `username`: the username to connect to the database
-- `password`: the password for the user
-- `host`: the host address of the database server
-- `port`: the port number the database server is listening on, the default is 3306
-- `dbname`: the name of the database to connect to
+- `name`: The name to identify this MySQL connection
+- `username`: The MySQL username with access to the database
+- `password`: The password for the specified username
+- `host`: The host address of the MySQL server (e.g., localhost or an IP address)
+- `port`: The port number the database server is listening on (default: 3306)
+- `database`:  The name of the database to connect to
 
 ### Step 2: Create an asset file for data ingestion
 
