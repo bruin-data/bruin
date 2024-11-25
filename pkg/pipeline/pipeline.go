@@ -1133,6 +1133,18 @@ func (p *Pipeline) GetAssetsByTag(tag string) []*Asset {
 	return assets
 }
 
+func (p *Pipeline) GetAssetsByTagFromSubset(tag string, subset []*Asset) []*Asset {
+	assets := make([]*Asset, 0)
+	for _, asset := range subset {
+		for _, t := range asset.Tags {
+			if t == tag {
+				assets = append(assets, asset)
+			}
+		}
+	}
+	return assets
+}
+
 type TaskCreator func(path string) (*Asset, error)
 
 type BuilderConfig struct {

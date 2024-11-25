@@ -324,14 +324,9 @@ func Run(isDebug *bool) *cli.Command {
 
 			tag := c.String("tag")
 			excludeTag := c.String("exclude")
-
-			// Conflict check
-			if tag != "" && excludeTag != "" {
-				errorPrinter.Printf("You cannot use both '--tag' and '--exclude' flags simultaneously.\n")
-				return cli.Exit("", 1)
-			}
+			var assetsByTag []*pipeline.Asset
 			if tag != "" {
-				assetsByTag := foundPipeline.GetAssetsByTag(tag)
+				assetsByTag = foundPipeline.GetAssetsByTag(tag)
 				if len(assetsByTag) == 0 {
 					errorPrinter.Printf("No assets found with the tag '%s'\n", tag)
 					return cli.Exit("", 1)
@@ -342,20 +337,14 @@ func Run(isDebug *bool) *cli.Command {
 				s.MarkByTag(tag, scheduler.Pending, runDownstreamTasks)
 
 				infoPrinter.Printf("Running only the assets with tag '%s', found %d assets.\n", tag, len(assetsByTag))
+			} else {
+				// Set to an empty slice if no tag is provided
+				assetsByTag = []*pipeline.Asset{}
 			}
 
 			// Handle exclude (excludeTag)
 			if excludeTag != "" {
-				excludedAssets := foundPipeline.GetAssetsByTag(excludeTag)
-				if len(excludedAssets) == 0 {
-					infoPrinter.Printf("No assets found with the tag '%s' to exclude.\n", excludeTag)
-				} else {
-					logger.Debugf("excluding assets with tag '%s', found %d assets", excludeTag, len(excludedAssets))
-					for _, asset := range excludedAssets {
-						s.MarkAsset(asset, scheduler.Succeeded, false) // Mark as succeeded to skip execution
-					}
-					infoPrinter.Printf("Excluded %d assets with tag '%s'.\n", len(excludedAssets), excludeTag)
-				}
+				ExcludeAssetsByTag(excludeTag, foundPipeline, s, assetsByTag)
 			}
 
 			if !runMain {
@@ -769,4 +758,30 @@ func sendTelemetry(s *scheduler.Scheduler) {
 		assetStats[string(asset.GetAsset().Type)]++
 	}
 	telemetry.SendEvent("running", analytics.Properties{"assets": assetStats})
+}
+
+func ExcludeAssetsByTag(excludeTag string, p *pipeline.Pipeline, s *scheduler.Scheduler, assetsByTag []*pipeline.Asset) int {
+	var excludedAssets []*pipeline.Asset
+	if len(assetsByTag) != 0 {
+		excludedAssets = p.GetAssetsByTagFromSubset(excludeTag, assetsByTag)
+	} else {
+		excludedAssets = p.GetAssetsByTag(excludeTag)
+	}
+	// Deduplicate excluded assets
+	uniqueAssets := make(map[string]*pipeline.Asset)
+	for _, asset := range excludedAssets {
+		uniqueAssets[asset.Name] = asset
+	}
+
+	if len(uniqueAssets) == 0 {
+		_, _ = errorPrinter.Printf("No assets found with the tag '%s' to exclude.\n", excludeTag)
+		return 0
+	}
+
+	for _, asset := range uniqueAssets {
+		s.MarkAsset(asset, scheduler.Succeeded, false) // Mark as succeeded to skip execution
+	}
+
+	_, _ = infoPrinter.Printf("Excluded %d assets with tag '%s'.\n", len(uniqueAssets), excludeTag)
+	return len(uniqueAssets)
 }
