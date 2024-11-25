@@ -14,8 +14,8 @@ To connect to Stripe, you need to add a configuration item to the connections se
 ```yaml
 connections:
     stripe:
-        - name: my-stripe
-         api_key: rk_yui&8v8F4_SPgjeh7hsdf
+        - name: 'my-stripe'
+          api_key: 'test_123'
 ```
 - `api_key`: the API key used for authentication with the Stripe API
 
@@ -47,3 +47,7 @@ parameters:
 bruin run assets/stripe_ingestion.yml
 ```
 As a result of this command, Bruin will ingest data from the given Stripe table into your Postgres database.
+
+
+
+<img width="1088" alt="stripe" src="https://github.com/user-attachments/assets/7133763d-91cb-4882-bb82-02617024b5dc">
