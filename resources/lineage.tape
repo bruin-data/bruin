@@ -1,5 +1,5 @@
 # Output location for the GIF
-Output chessPipeline.gif
+Output ../docs/public/lineage2.gif
 
 # Set up terminal dimensions and appearance
 Set FontSize 20
@@ -10,6 +10,6 @@ Set TypingSpeed 0.1
 Set Framerate 60
 
 # Simulate typing the commands
-Type "bruin run chess/pipeline.yml"
+Type "bruin lineage chess/assets/player_summary.sql "
 Enter
-Sleep 46s
+Sleep 10s

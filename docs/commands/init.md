@@ -26,3 +26,16 @@ bruin init --help
 ```
 
 The output displays the list of available templates.
+
+
+## Example
+
+### Initializing the Shopify-Bigquery template
+
+``` bash
+bruin init shopify-bigquery
+```
+#### Output:
+
+
+<img alt="Bruin - clean" src="/init.gif" style="margin: 10px;" />
