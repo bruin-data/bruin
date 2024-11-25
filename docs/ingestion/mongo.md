@@ -53,3 +53,7 @@ parameters:
 bruin run assets/mongo_ingestion.yml
 ```
 As a result of this command, Bruin will ingest data from the given MongoDB table into your Postgres database.
+
+<img width="1017" alt="image" src="https://github.com/user-attachments/assets/2bad9131-baa1-4f20-8e3d-eed4329e7f90">
+
+
