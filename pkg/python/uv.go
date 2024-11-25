@@ -111,15 +111,15 @@ func (u *UvChecker) installUvCommand(ctx context.Context, dest string) error {
 	if runtime.GOOS == "windows" {
 		// this conditional part is to test the powershell stuff safely.
 		// once we confirm this on different systems we should remove winget altogether.
-		usePowershell := false
+		useWinget := false
 		if ctx.Value(CtxUseWingetForUv) != nil {
-			usePowershell = ctx.Value(CtxUseWingetForUv).(bool)
+			useWinget = ctx.Value(CtxUseWingetForUv).(bool)
 		}
 
-		if usePowershell {
-			commandInstance = exec.Command("powershell", "-ExecutionPolicy", "ByPass", "-c", fmt.Sprintf("$env:NO_MODIFY_PATH=1 ; $env:UV_INSTALL_DIR='~/.bruin' ; irm https://astral.sh/uv/%s/install.ps1 | iex", UvVersion)) //nolint:gosec
-		} else {
+		if useWinget {
 			commandInstance = exec.Command(Shell, ShellSubcommandFlag, fmt.Sprintf("winget install --accept-package-agreements --accept-source-agreements --silent --id=astral-sh.uv --version %s --location %s -e", UvVersion, dest)) //nolint:gosec
+		} else {
+			commandInstance = exec.Command("powershell", "-ExecutionPolicy", "ByPass", "-c", fmt.Sprintf("$env:NO_MODIFY_PATH=1 ; $env:UV_INSTALL_DIR='~/.bruin' ; irm https://astral.sh/uv/%s/install.ps1 | iex", UvVersion)) //nolint:gosec
 		}
 	} else {
 		commandInstance = exec.Command(Shell, ShellSubcommandFlag, fmt.Sprintf("set -e; curl -LsSf https://astral.sh/uv/%s/install.sh | UV_INSTALL_DIR=\"%s\" NO_MODIFY_PATH=1 sh", UvVersion, dest)) //nolint:gosec
