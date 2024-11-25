@@ -48,12 +48,15 @@ func (p *LineageExtractor) ColumnLineage(asset *Asset) error {
 			continue
 		}
 		if err := p.ColumnLineage(upstreamAsset); err != nil {
-			return err
+			fmt.Printf("Error processing upstream asset %s: %v\n", upstreamAsset.Name, err)
+			// Ignore error
 		}
 	}
 
 	if err := p.parseLineage(asset); err != nil {
-		return err
+		fmt.Printf("Error parsing lineage for asset %s: %v\n", asset.Name, err)
+		// Ignore error
+		return nil
 	}
 
 	return nil
@@ -78,13 +81,6 @@ func (p *LineageExtractor) parseLineage(asset *Asset) error {
 
 	if err := parser.Start(); err != nil {
 		return fmt.Errorf("failed to start SQL parser: %w", err)
-	}
-
-	for _, upstream := range asset.Upstreams {
-		upstreamAsset := p.Pipeline.GetAssetByName(upstream.Value)
-		if upstreamAsset == nil {
-			return fmt.Errorf("upstream asset not found: %s", upstream.Value)
-		}
 	}
 
 	lineage, err := parser.ColumnLineage(asset.ExecutableFile.Content, dialect, p.columnMetadata)
