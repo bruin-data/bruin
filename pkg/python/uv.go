@@ -94,7 +94,7 @@ func (u *UvChecker) EnsureUvInstalled(ctx context.Context) (string, error) {
 	return uvBinaryPath, nil
 }
 
-const CtxUsePowershellForUv = "use_powershell_for_uv"
+const CtxUseWingetForUv = "use_winget_for_uv"
 
 func (u *UvChecker) installUvCommand(ctx context.Context, dest string) error {
 	var output io.Writer = os.Stdout
@@ -112,8 +112,8 @@ func (u *UvChecker) installUvCommand(ctx context.Context, dest string) error {
 		// this conditional part is to test the powershell stuff safely.
 		// once we confirm this on different systems we should remove winget altogether.
 		usePowershell := false
-		if ctx.Value(CtxUsePowershellForUv) != nil {
-			usePowershell = ctx.Value(CtxUsePowershellForUv).(bool)
+		if ctx.Value(CtxUseWingetForUv) != nil {
+			usePowershell = ctx.Value(CtxUseWingetForUv).(bool)
 		}
 
 		if usePowershell {
