@@ -7,3 +7,4 @@ parameters:
   source_table: 'kollywood.Horror'
 
   destination: postgres
+  
