@@ -29,7 +29,7 @@ Runs a materialized Postgres asset or an sql script. For detailed parameters, yo
 
 
 #### Example: Create a table using table materialization
-```bruinsql
+```bruin-sql
 /* @bruin
 name: events.install
 type: pg.sql
@@ -43,7 +43,7 @@ where event_name = "install"
 ```
 
 #### Example: Run a Postgres script
-```bruinsql
+```bruin-sql
 /* @bruin
 name: events.install
 type: pg.sql
