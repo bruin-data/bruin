@@ -17,6 +17,8 @@ To connect to Notion, you need to add a configuration item to the connections se
         - name: "my-notion"
           api_key: "YOUR_NOTION_API_KEY"
 ```
+
+- `api_key`: the API key used for authentication with Notion
 ### Step 2: Create an asset file for data ingestion
 
 To ingest data from Notion, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., notion_ingestion.yml) inside the assets folder and add the following content:

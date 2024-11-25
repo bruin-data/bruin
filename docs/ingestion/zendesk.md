@@ -3,7 +3,7 @@
 
 Bruin supports Zendesk as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Zendesk into your data warehouse.
 
-In order to set up Zendesk connection, you need to add a configuration item to `connections` in the `.bruin.yml` file and in `asset` file. Depending on the data you are ingesting (source_table), you will need to use either `API Token authentication` or `OAuth Token authentication`. Choose the appropriate method based on your source table. [Ingestr documentation](https://bruin-data.github.io/ingestr/supported-sources/zendesk.html)
+In order to set up Zendesk connection, you need to add a configuration item to `connections` in the `.bruin.yml` file and in `asset` file. Depending on the data you are ingesting (source_table), you will need to use either `API Token authentication` or `OAuth Token authentication`. Choose the appropriate method based on your source table. For more details, please refer to the [Ingestr documentation](https://bruin-data.github.io/ingestr/supported-sources/zendesk.html)
 
 Follow the steps below to correctly set up zendesk as a data source and run ingestion.
 ### Step 1: Add a connection to .bruin.yml file
