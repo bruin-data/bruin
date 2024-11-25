@@ -39,7 +39,7 @@ parameters:
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: "postgres" indicates that the ingested data will be stored in a PostgreSQL database.
 - `source_connection`: The name of the Stripe connection defined in .bruin.yml.
-- `source_table`: The name of the data table in Stripe you want to ingest. For example, "events" would ingest data related to events. You can find the available source tables in Stripe [here](https://bruin-data.github.io/ingestr/supported-sources/stripe.html#available-tables)
+- `source_table`: The name of the data table in Stripe you want to ingest. For example, "events" would ingest data related to events. You can find the available source tables in Stripe [here](https://bruin-data.github.io/ingestr/supported-sources/stripe.html#tables)
 
 
 ### Step 3: [Run](/commands/run) asset to ingest data
