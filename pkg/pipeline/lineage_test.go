@@ -2,6 +2,8 @@ package pipeline
 
 import (
 	"testing"
+
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
 func TestParseLineageRecursively(t *testing.T) {
@@ -42,7 +44,16 @@ func runLineageTests(t *testing.T, tests []struct {
 
 func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error) {
 	t.Helper()
-	extractor := NewLineageExtractor(p)
+
+	sqlParser, err := sqlparser.NewSQLParser()
+	if err != nil {
+		t.Errorf("error initializing SQL parser: %v", err)
+	}
+	err = sqlParser.Start()
+	if err != nil {
+		t.Errorf("error starting SQL parser: %v", err)
+	}
+	extractor := NewLineageExtractor(p, sqlParser)
 
 	for _, asset := range p.Assets {
 		if err := extractor.TableSchema(); err != nil {
