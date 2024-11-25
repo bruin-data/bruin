@@ -24,7 +24,7 @@ func main() {
 	}
 
 	expectExitCode("validate happy-path", 0)
-	expectExitCode("run --use-uv happy-path", 0)
+	expectExitCode("run --exp-use-powershell-for-uv --use-uv happy-path", 0)
 	expectJSONOutput("internal parse-pipeline happy-path", "happy-path/expectations/pipeline.yml.json")
 	expectJSONOutput(
 		"internal parse-asset happy-path/assets/asset.py",
