@@ -20,7 +20,7 @@ Follow the steps below to correctly set up MySQL as a data source and run ingest
           port: 3306
           database: "mysql"
 ```
-- `user`: the username to connect to the database
+- `username`: the username to connect to the database
 - `password`: the password for the user
 - `host`: the host address of the database server
 - `port`: the port number the database server is listening on, the default is 3306
@@ -53,3 +53,5 @@ parameters:
 bruin run assets/mysql_ingestion.yml
 ```
 As a result of this command, Bruin will ingest data from the given MySQL table into your Postgres database.
+
+<img width="1081" alt="mysql" src="https://github.com/user-attachments/assets/efd0666c-3c9b-40b3-bfa9-bf9ed05620d7">
