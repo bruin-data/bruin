@@ -21,7 +21,8 @@ jobs:
       - name: Setup Go ${{ matrix.go-version }}
         uses: actions/setup-go@v5
         with:
-          go-version: 1.22
+          go-version-file: 'go.mod'
+          cache-dependency-path: "go.sum"
       - run: make test
       - name: Install winget
         if: matrix.platform == 'windows-2022'
@@ -45,6 +46,7 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
+          cache-dependency-path: "go.sum"
       - shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
       - name: cache darwin
@@ -74,6 +76,7 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
+          cache-dependency-path: "go.sum"
       - shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
       - name: cache linux
@@ -136,6 +139,7 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
+          cache-dependency-path: "go.sum"
       - name: Release
         uses: goreleaser/goreleaser-action@v6
         with:
