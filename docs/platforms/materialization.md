@@ -5,7 +5,7 @@ Materialization is the idea taking a simple `SELECT` query, and applying the nec
 Bruin supports various materialization strategies catered to different use cases.
 
 Here's a sample asset with materialization:
-```bruinsql
+```bruin-sql
 /* @bruin
 
 name: dashboard.hello_bq
@@ -32,7 +32,7 @@ This materialization strategy is useful when you want to create a table if it do
 `create+replace` strategy does not do any incremental logic, which means it's a full refresh every time the asset is run. This can be expensive for large tables.
 
 Here's an example of an asset with `create+replace` materialization:
-```bruinsql
+```bruin-sql
 /* @bruin
 
 name: dashboard.hello_bq
@@ -62,7 +62,7 @@ Bruin implements `delete+insert` strategy in the following way:
 - run an `INSERT` query to insert the new rows from the temp table
 
 Here's an example of an asset with `delete+insert` materialization:
-```bruinsql
+```bruin-sql
 /* @bruin
 
 name: dashboard.hello_bq
@@ -85,7 +85,7 @@ select 2 as UserId, 'Bob' as Name
 
 Bruin will simply run the query, and insert the results into the destination table.
 
-```bruinsql
+```bruin-sql
 /* @bruin
 
 name: dashboard.hello_bq
@@ -113,7 +113,7 @@ Merge strategy requires columns to be defined and marked with `primary_key` or `
 > An important difference between `merge` and `delete+insert` is that `merge` will update the existing rows, while `delete+insert` will delete the existing rows and insert the new rows. This means if your source has deleted rows, `merge` will not delete them from the destination, whereas `delete+insert` will if their `incremental_key` matches.
 
 Here's a sample asset with `merge` materialization:
-```bruinsql
+```bruin-sql
 /* @bruin
 
 name: dashboard.hello_bq

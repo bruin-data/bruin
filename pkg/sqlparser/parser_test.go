@@ -6,13 +6,39 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSqlParser_Lineage(t *testing.T) {
+type lineager interface {
+	ColumnLineage(sql, dialect string, schema Schema) (*Lineage, error)
+}
+
+func TestSqlParser_ColumnLineage(t *testing.T) {
+	t.Parallel()
+
 	s, err := NewSQLParser()
 	require.NoError(t, err)
 
 	err = s.Start()
 	require.NoError(t, err)
 
+	t.Run("run generic tests", func(t *testing.T) {
+		GetLineageForRunner(t, s)
+	})
+}
+
+func TestSqlParserPool_ColumnLineage(t *testing.T) {
+	t.Parallel()
+
+	s, err := NewSQLParserPool(4)
+	require.NoError(t, err)
+
+	err = s.Start()
+	require.NoError(t, err)
+
+	t.Run("run generic tests", func(t *testing.T) {
+		GetLineageForRunner(t, s)
+	})
+}
+
+func GetLineageForRunner(t *testing.T, s lineager) {
 	tests := []struct {
 		name    string
 		sql     string
@@ -293,21 +319,21 @@ func TestSqlParser_Lineage(t *testing.T) {
 		{
 			name: "cte",
 			sql: `with t1 as (
-        select *
-        from table1
-        join table2
-            using(a)
-    ),
-    t2 as (
-        select *
-        from table2
-        left join table1
-            using(a)
-    )
-    select t1.*, t2.b as b2, t2.c as c2
-    from t1
-    join t2
-        using(a)`,
+				select *
+				from table1
+				join table2
+					using(a)
+			),
+			t2 as (
+				select *
+				from table2
+				left join table1
+					using(a)
+			)
+			select t1.*, t2.b as b2, t2.c as c2, now() as updated_at
+			from t1
+			join t2
+				using(a)`,
 			schema: Schema{
 				"table1": {"a": "str", "b": "int64"},
 				"table2": {"a": "str", "c": "str"},
@@ -345,6 +371,10 @@ func TestSqlParser_Lineage(t *testing.T) {
 							{Column: "c", Table: "table2"},
 						},
 					},
+					{
+						Name:     "updated_at",
+						Upstream: []UpstreamColumn{},
+					},
 				},
 			},
 		},
@@ -366,10 +396,6 @@ func TestSqlParser_Lineage(t *testing.T) {
 			})
 		}
 	})
-
-	// wg.Wait()
-	s.Close()
-	require.NoError(t, err)
 }
 
 func TestSqlParser_GetTables(t *testing.T) {

@@ -79,6 +79,7 @@ Now that your pipeline is set up, you're ready to run it and ingest the data int
 ```bash
 bruin run ./chess/pipeline.yml
 ```
+<img alt="Chess - Pipeline" src="/chesspipeline.gif" />
 
 ## Step 6: Query Your Data in DuckDB
 Now that the data is in DuckDB, you can query it to verify the results. Open a terminal and run the following commands to inspect your data:

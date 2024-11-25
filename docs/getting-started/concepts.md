@@ -16,7 +16,7 @@ You will primarily be interacting with assets when using Bruin.
 
 Here's an example SQL asset:
 
-```bruinsql
+```bruin-sql
 /* @bruin
 
 name: dashboard.hello_bq

@@ -213,3 +213,112 @@ func TestClient_SelectWithSchema(t *testing.T) {
 		})
 	}
 }
+
+func TestClient_RunQueryWithoutResult(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		query     string
+		setupMock func(mock pgxmock.PgxPoolIface)
+		wantErr   string
+	}{
+		{
+			name:  "test successful execution",
+			query: "DELETE FROM table WHERE id = 1",
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectExec("DELETE FROM table WHERE id = 1").WillReturnResult(pgxmock.NewResult("DELETE", 1))
+			},
+			wantErr: "",
+		},
+		{
+			name:  "test execution error",
+			query: "DELETE FROM table WHERE id = 1",
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectExec("DELETE FROM table WHERE id = 1").WillReturnError(errors.New("execution error"))
+			},
+			wantErr: "execution error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			mock, err := pgxmock.NewPool()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer mock.Close()
+
+			tt.setupMock(mock)
+
+			client := Client{connection: mock}
+
+			err = client.RunQueryWithoutResult(context.TODO(), &query.Query{
+				Query: tt.query,
+			})
+
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				assert.Equal(t, tt.wantErr, err.Error())
+			}
+
+			// Verify all expectations are met
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestClient_Ping(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		setupMock func(mock pgxmock.PgxPoolIface)
+		wantErr   string
+	}{
+		{
+			name: "test successful ping",
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectExec("SELECT 1").WillReturnResult(pgxmock.NewResult("SELECT", 1))
+			},
+			wantErr: "",
+		},
+		{
+			name: "test ping with execution error",
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectExec("SELECT 1").WillReturnError(errors.New("ping error"))
+			},
+			wantErr: "failed to run test query on Postgres connection: ping error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			mock, err := pgxmock.NewPool()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer mock.Close()
+
+			tt.setupMock(mock)
+
+			client := Client{connection: mock}
+
+			err = client.Ping(context.TODO())
+
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				assert.Equal(t, tt.wantErr, err.Error())
+			}
+
+			// Verify all expectations are met
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}

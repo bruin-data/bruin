@@ -46,6 +46,7 @@ export default defineConfig({
                     },
                     {text: "Concepts", link: "/getting-started/concepts"},
                     {text: "Design Principles", link: "/getting-started/design-principles"},
+
                     {
                         text: "Templates",
                         link: "/getting-started/templates",

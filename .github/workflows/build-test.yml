@@ -35,25 +35,20 @@ jobs:
     strategy:
       matrix:
         platform: [ ubuntu-latest, windows-latest ]
-        include:
-          - platform: windows-latest
-            cache: false
-          - platform: ubuntu-latest
-            cache: true
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v5
+      - name: Setup Golang with cache
+        uses: magnetikonline/action-golang-cache@v5
         with:
-          go-version-file: 'go.mod'
-          cache: ${{ matrix.cache }}
+          go-version-file: go.mod
       - run: make test
       - name: Install winget
         if: matrix.platform == 'windows-latest'
         uses: Cyberboss/install-winget@v1
-      - run: make duckdb-test
+      - run: make integration-test
         shell: bash
 
 
@@ -94,6 +89,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ github.ref_name }}
           COMMIT_SHA: ${{ github.sha }}
+          TELEMETRY_KEY: ${{ secrets.TELEMETRY_KEY }}
 
   goreleaser-unix:
     runs-on: ubuntu-latest
@@ -106,4 +102,4 @@ jobs:
 
       - name: Run GoReleaser
         run: |
-          docker run -e VERSION=0.0.0 -e COMMIT_SHA=${{ github.sha }} -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 build --snapshot --clean --id bruin-darwin --id bruin-linux-amd64 --id bruin-linux-arm64  --single-target
+          docker run -e VERSION=0.0.0 -e COMMIT_SHA=${{ github.sha }}  -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 build --snapshot --clean --id bruin-darwin --id bruin-linux-amd64 --id bruin-linux-arm64  --single-target

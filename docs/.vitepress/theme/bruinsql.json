@@ -1,5 +1,5 @@
 {
-    "name": "bruinsql",
+    "name": "bruin-sql",
     "scopeName": "sql.comment.block",
     "injectionSelector": "L:source.sql",
     "patterns": [

@@ -1,51 +1,47 @@
-# slack
+# Slack
 [slack](https://slack.com/) is a messaging platform for teams and organizations where they can collaborate, share ideas and information.
 
-ingestr supports slack as a source for [ingestr assets](https://bruin-data.github.io/bruin/assets/ingestr.html), allowing you to ingest data from slack into your data warehouse.
+Bruin supports Slack as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Slack into your data warehouse.
 
-In order to have set up slack connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema. For more information on how to get these credentials check the slack section in [Ingestr documentation](https://bruin-data.github.io/ingestr/getting-started/quickstart.html)
+In order to set up Slack connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need the `api_key`. For details on how to obtain these credentials, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/slack#setup-guide).
 
 Follow the steps below to correctly set up slack as a data source and run ingestion:
 
-**Step 1: Create an Asset File for Data Ingestion**
+### Step 1: Add a connection to .bruin.yml file
 
-To ingest data from slack, you need to create an [asset configuration file](https://bruin-data.github.io/bruin/assets/ingestr.html#template). This file defines the data flow from the source to the destination.
-(For e.g., ingestr.slack.asset.yml) and add the following content:
+To connect to Slack, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
 
-***File: ingestr.slack.asset.yml***
+```yaml
+    connections:
+      slack:
+        - name: "my-slack"
+          api_key: "YOUR_SLACK_API_KEY"
+          
+```
+
+### Step 2: Create an asset file for data ingestion
+
+To ingest data from Slack, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., slack_ingestion.yml) inside the assets folder and add the following content:
+
 ```yaml
 name: public.slack
 type: ingestr
 connection: postgres
 
 parameters:
-  source_connection: slack
+  source_connection: my-slack
   source_table: 'users'
   destination: postgres
 ```
 
 - name: The name of the asset.
-
 - type: Specifies the type of the asset. It will be always ingestr type for slack.
-
 - connection: This is the destination connection.
-
-**parameters:**
 - source_connection: The name of the slack connection defined in .bruin.yml.
 - source_table: The name of the data table in slack you want to ingest.
-  Step 2: Add a Connection to [.bruin.yml](https://bruin-data.github.io/bruin/connections/overview.html) that stores connections and secrets to be used in pipelines.
-  You need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema.
 
-***File: .bruin.yml***
-```yaml
-    connections:
-      slack:
-        - name: "connection_name"
-          api_key: "YOUR_SLACK_API_KEY"
-          
+### Step 3: [Run](/commands/run) asset to ingest data
 ```
-**Step 3: [Run](https://bruin-data.github.io/bruin/commands/run.html) Asset to Ingest Data**
+bruin run assets/slack_ingestion.yml
 ```
-bruin run ingestr.slack.asset.yml
-```
-It will ingest slack data to postgres.
+As a result of this command, Bruin will ingest data from the given Slack table into your Postgres database.
