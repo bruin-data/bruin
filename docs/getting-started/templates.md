@@ -23,20 +23,9 @@ To initialize a project using the wizard, simply run:
 bruin init 
 ```
 As shown below, this will launch a terminal-based wizard:
-```plaintext
-bin/bruin init
-[ ] default
-[ ] duckdb
-[ ] firebase
-[ ] gorgias
-[x] notion
-[ ] python
-[ ] redshift
-[ ] shopify-bigquery
-[ ] shopify-duckdb
 
-(press q to quit)
-```
+<img alt="Bruin - init" src="/init-wizard.gif" style="margin: 10px;" />
+
 You can navigate through the available templates using the up and down arrow keys. Once you've selected your desired template, press Enter to confirm. 
 The wizard will automatically create the folder and set up the project for you.
 ### Manual template selection
