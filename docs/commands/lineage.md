@@ -10,7 +10,6 @@ This is useful for understanding your pipeline’s structure, tracking relations
 ```bash
  bruin lineage [flags] <path to the asset definition>
 ```
-
 ### Flags
 
 - `--full`  
@@ -21,5 +20,16 @@ This is useful for understanding your pipeline’s structure, tracking relations
     - `plain` (default): Outputs a human-readable text summary.
     - `json`: Outputs the lineage as structured JSON.
 
+  
+## Example
 
+### Understanding the dependencies of Chess template 
+
+``` bash
+bruin lineage chess/assets/player_summary.sql 
+```
+#### Output:
+
+
+<img alt="Bruin - clean" src="/lineage2.gif" style="margin: 10px;" />
 

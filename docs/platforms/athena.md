@@ -33,7 +33,7 @@ Runs a materialized Athena asset or an SQL script. For detailed parameters, you 
 
 ### Examples
 Create a view to aggregate website traffic data
-```bruinsql
+```bruin-sql
 /* @bruin
 name: website_traffic.view
 type: athena.sql
@@ -51,7 +51,7 @@ group by date;
 ```
 
 Create a table to analyze daily sales performance:
-```bruinsql
+```bruin-sql
 /* @bruin
 name: daily_sales_analysis.view
 type: athena.sql
@@ -69,7 +69,7 @@ group by order_date;
 ```
 
 Bruin Athena assets support partitioning by one column only
-```bruinsql
+```bruin-sql
 /* @bruin
 name: daily_sales_analysis.view
 type: athena.sql

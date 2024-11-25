@@ -6,13 +6,39 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSqlParser_Lineage(t *testing.T) {
+type lineager interface {
+	ColumnLineage(sql, dialect string, schema Schema) (*Lineage, error)
+}
+
+func TestSqlParser_ColumnLineage(t *testing.T) {
+	t.Parallel()
+
 	s, err := NewSQLParser()
 	require.NoError(t, err)
 
 	err = s.Start()
 	require.NoError(t, err)
 
+	t.Run("run generic tests", func(t *testing.T) {
+		GetLineageForRunner(t, s)
+	})
+}
+
+func TestSqlParserPool_ColumnLineage(t *testing.T) {
+	t.Parallel()
+
+	s, err := NewSQLParserPool(4)
+	require.NoError(t, err)
+
+	err = s.Start()
+	require.NoError(t, err)
+
+	t.Run("run generic tests", func(t *testing.T) {
+		GetLineageForRunner(t, s)
+	})
+}
+
+func GetLineageForRunner(t *testing.T, s lineager) {
 	tests := []struct {
 		name    string
 		sql     string
@@ -370,10 +396,6 @@ func TestSqlParser_Lineage(t *testing.T) {
 			})
 		}
 	})
-
-	// wg.Wait()
-	s.Close()
-	require.NoError(t, err)
 }
 
 func TestSqlParser_GetTables(t *testing.T) {

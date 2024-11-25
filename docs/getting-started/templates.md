@@ -2,7 +2,6 @@
 
 We simplify the creation of pipelines through the use of **templates**. Templates provide a starting point with predefined structures, configurations, and connections to help you quickly set up and standardize your pipelines.
 
----
 ## What are templates?
 
 Templates in Bruin are blueprints for initializing new pipelines. They:
@@ -10,14 +9,12 @@ Templates in Bruin are blueprints for initializing new pipelines. They:
 - contain boilerplate code and configurations tailored to specific use cases.
 - allow users to quickly set up pipelines without starting from scratch.
 
-By using templates,teams can focus on their pipeline logic rather than worrying about setup and configuration.
+By using templates, teams can focus on their pipeline logic rather than worrying about setup and configuration.
 
----
 
 ## How to use templates ?
 
-Using templates in Bruin is straightforward with the `bruin init` command. It offers both
-an interactive wizard and direct command-line options.
+Using templates in Bruin is straightforward with the `bruin init` command. It offers both an interactive wizard and direct command-line options.
 
 ### Running the wizard
 
@@ -26,20 +23,9 @@ To initialize a project using the wizard, simply run:
 bruin init 
 ```
 As shown below, this will launch a terminal-based wizard:
-```plaintext
-bin/bruin init
-[ ] default
-[ ] duckdb
-[ ] firebase
-[ ] gorgias
-[x] notion
-[ ] python
-[ ] redshift
-[ ] shopify-bigquery
-[ ] shopify-duckdb
 
-(press q to quit)
-```
+<img alt="Bruin - init" src="/init-wizard.gif" style="margin: 10px;" />
+
 You can navigate through the available templates using the up and down arrow keys. Once you've selected your desired template, press Enter to confirm. 
 The wizard will automatically create the folder and set up the project for you.
 ### Manual template selection
@@ -88,26 +74,27 @@ This template includes:
 ```plaintext
 notion/
 ├── assets/
-│   ├── example.sql               # Example SQL script for BigQuery table creation
-│   ├── notion.asset.yml          # Configuration for the Notion asset
+│     ├── example.sql             # Example SQL asset for BigQuery table creation
+│     └── notion.asset.yml        # Configuration for the Notion asset
 ├── pipeline.yml                  # Main pipeline configuration
 └── README.md                     # Documentation for the pipeline
 ```
 
-### How to use This template?
+### How to use this template?
 
-1. **Initialize the project**:  
+**1. Initialize the project**:  
    Use the template to create a new pipeline project:
-   ```bash
-   bruin init notion 
-2. **Configure connections**:
-
+```bash
+bruin init notion
+``` 
+**2. Configure connections**:
 
 Update the `.bruin.yml` file with your Notion API key and Google Cloud credentials.
-3. **Run the pipeline**:
+
+**3. Run the pipeline**:
 
 Use the `bruin` CLI to execute the pipeline, moving data from Notion to BigQuery based on the preconfigured assets.
 
 ---
 
-This example template provides a starting point for building similar data ingestion pipelines with Notion and BigQuery. Modify the assets or add custom scripts to expand its functionality as needed.
+This example template provides a starting point for building similar data pipelines with Notion and BigQuery. Modify the assets or add custom scripts to expand its functionality as needed.
