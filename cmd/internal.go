@@ -103,13 +103,14 @@ type ParseCommand struct {
 }
 
 func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool) error {
-	defer RecoverFromPanic()
+	// defer RecoverFromPanic()
 	var lineageWg conc.WaitGroup
 	var sqlParser *sqlparser.SQLParser
 
 	if lineage {
 		lineageWg.Go(func() {
-			sqlParser, err := sqlparser.NewSQLParser()
+			var err error
+			sqlParser, err = sqlparser.NewSQLParser()
 			if err != nil {
 				printErrorJSON(err)
 				panic(err)
@@ -177,6 +178,26 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool) error {
 func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 	defer RecoverFromPanic()
 
+	var lineageWg conc.WaitGroup
+	var sqlParser *sqlparser.SQLParser
+
+	if lineage {
+		lineageWg.Go(func() {
+			var err error
+			sqlParser, err = sqlparser.NewSQLParser()
+			if err != nil {
+				printErrorJSON(err)
+				panic(err)
+			}
+
+			err = sqlParser.Start()
+			if err != nil {
+				printErrorJSON(err)
+				panic(err)
+			}
+		})
+	}
+
 	if assetPath == "" {
 		errorPrinter.Printf("Please give an asset path to parse: bruin render <path to the asset file>)\n")
 		return cli.Exit("", 1)
@@ -204,17 +225,17 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 	asset := foundPipeline.GetAssetByPath(assetPath)
 
 	if lineage {
-		sqlParser, err := sqlparser.NewSQLParser()
-		if err != nil {
-			printErrorJSON(err)
+		panics := lineageWg.WaitAndRecover()
+		if panics != nil {
 			return cli.Exit("", 1)
 		}
-		lineage := pipeline.NewLineageExtractor(foundPipeline, sqlParser)
-		if err := lineage.TableSchema(); err != nil {
+
+		lineageExtractor := pipeline.NewLineageExtractor(foundPipeline, sqlParser)
+		if err := lineageExtractor.TableSchema(); err != nil {
 			return fmt.Errorf("failed to get table schema: %w", err)
 		}
 
-		if err := lineage.ColumnLineage(asset); err != nil {
+		if err := lineageExtractor.ColumnLineage(asset); err != nil {
 			printErrorJSON(err)
 			return cli.Exit("", 1)
 		}
