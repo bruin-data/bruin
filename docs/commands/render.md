@@ -8,7 +8,7 @@ It supports multiple databases and output formats, making it a flexible tool for
 ```bash
 bruin render [path to asset definition] [flags]
 ```
-
+<img alt="Bruin - clean" src="/render.gif" style="margin: 10px;" />
 ### Arguments
 
 **path-to-asset-definition* (required):
