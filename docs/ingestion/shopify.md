@@ -3,7 +3,7 @@
 
 Bruin supports Shopify as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Shopify into your data warehouse.
 
-In order to set up Shopify connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need the `url` of your Shopify store` and the `api_key`. For details on how to obtain these credentials, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/shopify#setup-guide).
+In order to set up Shopify connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need the `url` of your Shopify store and the `api_key`. For details on how to obtain these credentials, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/shopify#setup-guide).
 
 Follow the steps below to correctly set up shopify as a data source and run ingestion:
 
