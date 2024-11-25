@@ -5,11 +5,10 @@ Bruin supports MongoDB as a source for [Ingestr assets](/assets/ingestr), and yo
 
 In order to set up MongoDB connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file.
 
-### Step 1: Add a connection to .bruin.yml file
-To connect to MongoDB, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
-
 Follow the steps below to correctly set up MongoDB as a data source and run ingestion.
 
+### Step 1: Add a connection to .bruin.yml file
+To connect to MongoDB, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
 ```yaml
     connections:
       mongo:

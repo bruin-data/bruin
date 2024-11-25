@@ -5,11 +5,10 @@ Bruin supports MySQL as a source for [Ingestr assets](/assets/ingestr), and you 
 
 In order to set up MySQL connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file.
 
-### Step 1: Add a connection to .bruin.yml file
-
-To connect to MySQL, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
-
 Follow the steps below to correctly set up MySQL as a data source and run ingestion.
+
+### Step 1: Add a connection to .bruin.yml file
+To connect to MySQL, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
 
 ```yaml
      mysql:
@@ -28,7 +27,6 @@ Follow the steps below to correctly set up MySQL as a data source and run ingest
 - `database`:  The name of the database to connect to
 
 ### Step 2: Create an asset file for data ingestion
-
 To ingest data from MySQL, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., mysql_ingestion.yml) inside the assets folder and add the following content:
 
 ```yaml
