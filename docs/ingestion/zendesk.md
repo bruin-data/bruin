@@ -46,7 +46,7 @@ parameters:
   source_connection: my_zendesk
   source_table: 'brands'
 
-  destination: postgress
+  destination: postgres
 ```
 
 - `name`: The name of the asset.
