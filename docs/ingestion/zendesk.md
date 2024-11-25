@@ -60,3 +60,5 @@ parameters:
 bruin run assets/zendesk_ingestion.yml
 ```
 As a result of this command, Bruin will ingest data from the given zendesk table into your Postgres database.
+
+<img width="1082" alt="zendesk" src="https://github.com/user-attachments/assets/b4cb54eb-dc05-4b6e-a113-e07316be9bff">
