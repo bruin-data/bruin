@@ -179,7 +179,6 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 			if err := p.addColumnToAsset(asset, lineageCol.Name, upstreamAsset, upstreamCol); err != nil {
 				return err
 			}
-			continue
 		}
 	}
 	return nil
