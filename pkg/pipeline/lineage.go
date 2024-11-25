@@ -9,16 +9,22 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
+type sqlParser interface {
+	ColumnLineage(sql, dialect string, schema sqlparser.Schema) (*sqlparser.Lineage, error)
+}
+
 type LineageExtractor struct {
 	Pipeline       *Pipeline
+	sqlParser      sqlParser
 	columnMetadata sqlparser.Schema
 }
 
 // NewLineageExtractor creates a new LineageExtractor instance.
-func NewLineageExtractor(pipeline *Pipeline) *LineageExtractor {
+func NewLineageExtractor(pipeline *Pipeline, parser sqlParser) *LineageExtractor {
 	return &LineageExtractor{
 		Pipeline:       pipeline,
 		columnMetadata: make(sqlparser.Schema),
+		sqlParser:      parser,
 	}
 }
 
@@ -64,19 +70,17 @@ func (p *LineageExtractor) parseLineage(asset *Asset) error {
 
 	dialect, err := dialect.GetDialectByAssetType(string(asset.Type))
 	if err != nil {
-		return err
+		return nil //nolint:nilerr
 	}
 
-	parser, err := sqlparser.NewSQLParser()
-	if err != nil {
-		return fmt.Errorf("failed to create SQL parser: %w", err)
+	for _, upstream := range asset.Upstreams {
+		upstreamAsset := p.Pipeline.GetAssetByName(upstream.Value)
+		if upstreamAsset == nil {
+			return fmt.Errorf("upstream asset not found: %s", upstream.Value)
+		}
 	}
 
-	if err := parser.Start(); err != nil {
-		return fmt.Errorf("failed to start SQL parser: %w", err)
-	}
-
-	lineage, err := parser.ColumnLineage(asset.ExecutableFile.Content, dialect, p.columnMetadata)
+	lineage, err := p.sqlParser.ColumnLineage(asset.ExecutableFile.Content, dialect, p.columnMetadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse column lineage: %w", err)
 	}
