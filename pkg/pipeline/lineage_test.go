@@ -7,7 +7,6 @@ import (
 )
 
 func TestParseLineageRecursively(t *testing.T) {
-	t.Parallel()
 
 	testCases := map[string]func(*testing.T){
 		"basic recursive parsing":   testBasicRecursiveParsing,
@@ -18,7 +17,7 @@ func TestParseLineageRecursively(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+
 			tc(t)
 		})
 	}
@@ -35,7 +34,6 @@ func runLineageTests(t *testing.T, tests []struct {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 
 			runSingleLineageTest(t, tt.pipeline, tt.after, tt.want)
 		})
@@ -43,8 +41,8 @@ func runLineageTests(t *testing.T, tests []struct {
 }
 
 func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error) {
-	t.Helper()
-	sqlParser, err := sqlparser.NewSQLParserPool(4)
+
+	sqlParser, err := sqlparser.NewSQLParser(1)
 	if err != nil {
 		t.Errorf("error initializing SQL parser: %v", err)
 	}
