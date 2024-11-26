@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"io"
 	"runtime"
 	"time"
 
@@ -21,7 +22,14 @@ var (
 	OptOut       = false
 	AppVersion   = ""
 	RunID        = ""
+	client       analytics.Client
 )
+
+func Init() io.Closer {
+	client = analytics.New(TelemetryKey, url)
+
+	return client
+}
 
 func SendEvent(event string, properties analytics.Properties) {
 	if RunID == "" {
@@ -33,7 +41,10 @@ func SendEvent(event string, properties analytics.Properties) {
 	id, _ := machineid.ID()
 	properties["run_id"] = RunID
 
-	client := analytics.New(TelemetryKey, url)
+	if client == nil {
+		panic("Telemetry client not initialized")
+	}
+
 	// Enqueues a track event that will be sent asynchronously.
 	_ = client.Enqueue(analytics.Track{
 		AnonymousId:       id,
