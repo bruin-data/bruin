@@ -1,0 +1,3 @@
+{"columns":[{"name":"username"},{"name":"total_games"},{"name":"white_wins"},{"name":"black_wins"},{"name":"white_games"},{"name":"black_games"},
+  {"name":"white_win_rate"},{"name":"black_win_rate"}],"rows":[["hikaru",59792,24338,22822,30142,29650,80.74,76.97],
+  ["magnuscarlsen",6338,2282,2041,3189,3149,71.56,64.81]]}

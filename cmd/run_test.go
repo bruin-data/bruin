@@ -39,6 +39,7 @@ func BenchmarkClean(b *testing.B) {
 
 func TestExcludeAssetsByTag(t *testing.T) {
 	// Mock pipeline setup
+	t.Parallel()
 	mockPipeline := &pipeline.Pipeline{
 		Assets: []*pipeline.Asset{
 			{Name: "asset1", Tags: []string{"tag1", "tag2"}},
@@ -107,12 +108,12 @@ func TestExcludeAssetsByTag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// Run the function
 			excludedCount := ExcludeAssetsByTag(tt.excludeTag, mockPipeline, mockScheduler, tt.assetsByTag)
 
 			// Assert the count of excluded assets
 			assert.Equal(t, tt.expectedExcluded, excludedCount)
 		})
-
 	}
 }
