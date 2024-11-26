@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io"
 	"os"
 	"time"
 
@@ -28,8 +27,7 @@ func main() {
 	telemetry.TelemetryKey = os.Getenv("TELEMETRY_KEY")
 	telemetry.OptOut = optOut
 	telemetry.AppVersion = version
-	var client io.Closer
-	client = telemetry.Init()
+	client := telemetry.Init()
 	defer client.Close()
 
 	versionCommand := cmd.VersionCmd(commit)

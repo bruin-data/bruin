@@ -17,6 +17,8 @@ const (
 	startTimeKey = "telemetry_start"
 )
 
+type contextKey string
+
 var (
 	TelemetryKey = ""
 	OptOut       = false
@@ -78,7 +80,7 @@ func SendEventWithAssetStats(event string, stats map[string]int, context *cli.Co
 
 func BeforeCommand(c *cli.Context) error {
 	start := time.Now()
-	c.Context = context.WithValue(c.Context, startTimeKey, start)
+	c.Context = context.WithValue(c.Context, contextKey(startTimeKey), start)
 	SendEvent("command_start", analytics.Properties{
 		"command": c.Command.Name,
 	})
@@ -86,7 +88,7 @@ func BeforeCommand(c *cli.Context) error {
 }
 
 func AfterCommand(context *cli.Context) error {
-	start := context.Context.Value(startTimeKey)
+	start := context.Context.Value(contextKey(startTimeKey))
 	SendEvent("command_end", analytics.Properties{
 		"command":     context.Command.Name,
 		"duration_ms": time.Since(start.(time.Time)).Milliseconds(),
@@ -98,7 +100,7 @@ func ErrorCommand(context *cli.Context, err error) {
 	if err == nil {
 		return
 	}
-	start := context.Context.Value(startTimeKey)
+	start := context.Context.Value(contextKey(startTimeKey))
 
 	SendEvent("command_error", analytics.Properties{
 		"command":     context.Command.Name,
