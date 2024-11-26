@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/denisbrodbeck/machineid"
@@ -25,6 +26,7 @@ var (
 	AppVersion   = ""
 	RunID        = ""
 	client       analytics.Client
+	lock         sync.Mutex
 )
 
 func Init() io.Closer {
@@ -34,6 +36,8 @@ func Init() io.Closer {
 }
 
 func SendEvent(event string, properties analytics.Properties) {
+	lock.Lock()
+	defer lock.Unlock()
 	if RunID == "" {
 		RunID = uuid.New().String()
 	}
