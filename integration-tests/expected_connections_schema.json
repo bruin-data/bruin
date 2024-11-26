@@ -951,7 +951,7 @@
         "oauth_token": {
           "type": "string"
         },
-        "subdomain": {
+        "sub_domain": {
           "type": "string"
         }
       },
@@ -962,7 +962,7 @@
         "api_token",
         "email",
         "oauth_token",
-        "subdomain"
+        "sub_domain"
       ]
     }
   }

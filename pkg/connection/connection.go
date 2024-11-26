@@ -222,7 +222,6 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 
 	connZendesk, err := m.GetZendeskConnectionWithoutDefault(name)
 	if err == nil {
-		fmt.Println("err", err)
 		return connZendesk, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Zendesk)...)
