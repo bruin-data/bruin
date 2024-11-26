@@ -7,7 +7,6 @@ import (
 	"github.com/bruin-data/bruin/cmd"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/fatih/color"
-	"github.com/rudderlabs/analytics-go/v4"
 	"github.com/urfave/cli/v2"
 )
 
@@ -17,7 +16,6 @@ var (
 )
 
 func main() {
-	start := time.Now()
 	isDebug := false
 	color.NoColor = false
 
@@ -40,30 +38,11 @@ func main() {
 	}
 
 	app := &cli.App{
-		Name:     "bruin",
-		Version:  version,
-		Usage:    "The CLI used for managing Bruin-powered data pipelines",
-		Compiled: time.Now(),
-		Before: func(context *cli.Context) error {
-			telemetry.SendEvent("command_start", analytics.Properties{
-				"command": context.Command.Name,
-			})
-			return nil
-		},
-		After: func(context *cli.Context) error {
-			telemetry.SendEvent("command_end", analytics.Properties{
-				"command":     context.Command.Name,
-				"duration_ms": time.Since(start).Milliseconds(),
-			})
-			return nil
-		},
-		ExitErrHandler: func(context *cli.Context, err error) {
-			telemetry.SendEvent("command_error", analytics.Properties{
-				"command":     context.Command.Name,
-				"duration_ms": time.Since(start).Milliseconds(),
-			})
-			cli.HandleExitCoder(err)
-		},
+		Name:           "bruin",
+		Version:        version,
+		Usage:          "The CLI used for managing Bruin-powered data pipelines",
+		Compiled:       time.Now(),
+		ExitErrHandler: telemetry.ErrorCommand,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:        "debug",

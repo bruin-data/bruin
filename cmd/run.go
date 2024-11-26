@@ -394,6 +394,8 @@ func Run(isDebug *bool) *cli.Command {
 
 			return nil
 		},
+		Before: telemetry.BeforeCommand,
+		After:  telemetry.AfterCommand,
 	}
 }
 

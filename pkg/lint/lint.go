@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/urfave/cli/v2"
 	"os"
 	"sort"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/pkg/errors"
+	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
 )
 

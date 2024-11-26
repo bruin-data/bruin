@@ -1,27 +1,37 @@
 package telemetry
 
 import (
-	"github.com/urfave/cli/v2"
+	"context"
 	"runtime"
 	"time"
 
 	"github.com/denisbrodbeck/machineid"
+	"github.com/google/uuid"
 	"github.com/rudderlabs/analytics-go/v4"
+	"github.com/urfave/cli/v2"
 )
 
-const url = "https://getbruinbumlky.dataplane.rudderstack.com"
+const (
+	url          = "https://getbruinbumlky.dataplane.rudderstack.com"
+	startTimeKey = "telemetry_start"
+)
 
 var (
 	TelemetryKey = ""
 	OptOut       = false
 	AppVersion   = ""
+	RunID        = ""
 )
 
 func SendEvent(event string, properties analytics.Properties) {
+	if RunID == "" {
+		RunID = uuid.New().String()
+	}
 	if OptOut || TelemetryKey == "" {
 		return
 	}
 	id, _ := machineid.ID()
+	properties["run_id"] = RunID
 
 	client := analytics.New(TelemetryKey, url)
 	// Enqueues a track event that will be sent asynchronously.
@@ -53,4 +63,34 @@ func SendEventWithAssetStats(event string, stats map[string]int, context *cli.Co
 	}
 
 	SendEvent(event, properties)
+}
+
+func BeforeCommand(c *cli.Context) error {
+	start := time.Now()
+	c.Context = context.WithValue(c.Context, startTimeKey, start)
+	SendEvent("command_start", analytics.Properties{
+		"command": c.Command.Name,
+	})
+	return nil
+}
+
+func AfterCommand(context *cli.Context) error {
+	start := context.Context.Value(startTimeKey)
+	SendEvent("command_end", analytics.Properties{
+		"command":     context.Command.Name,
+		"duration_ms": time.Since(start.(time.Time)).Milliseconds(),
+	})
+	return nil
+}
+
+func ErrorCommand(context *cli.Context, err error) {
+	if err == nil {
+		return
+	}
+	start := context.Context.Value(startTimeKey)
+
+	SendEvent("command_error", analytics.Properties{
+		"command":     context.Command.Name,
+		"duration_ms": time.Since(start.(time.Time)).Milliseconds(),
+	})
 }

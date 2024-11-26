@@ -16,6 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -188,6 +189,8 @@ func Lint(isDebug *bool) *cli.Command {
 			}
 			return nil
 		},
+		Before: telemetry.BeforeCommand,
+		After:  telemetry.AfterCommand,
 	}
 }
 
