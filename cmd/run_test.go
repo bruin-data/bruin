@@ -110,7 +110,6 @@ func TestExcludeAssetsByTag(t *testing.T) {
 	var mu sync.Mutex
 
 	for _, tt := range tests {
-		tt := tt // Capture the loop variable
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
