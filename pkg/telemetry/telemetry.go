@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"github.com/urfave/cli/v2"
 	"runtime"
 	"time"
 
@@ -39,4 +40,17 @@ func SendEvent(event string, properties analytics.Properties) {
 		},
 		Properties: properties,
 	})
+}
+
+func SendEventWithAssetStats(event string, stats map[string]int, context *cli.Context) {
+	properties := analytics.Properties{
+		"assets":        stats,
+		"downstream":    context.Bool("downstream"),
+		"push_metadata": context.Bool("push-metadata"),
+		"full_refresh":  context.Bool("full-refresh"),
+		"use_uv":        context.Bool("use-uv"),
+		"force":         context.Bool("force"),
+	}
+
+	SendEvent(event, properties)
 }

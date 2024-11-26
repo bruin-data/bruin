@@ -45,29 +45,22 @@ func main() {
 		Usage:    "The CLI used for managing Bruin-powered data pipelines",
 		Compiled: time.Now(),
 		Before: func(context *cli.Context) error {
-			telemetry.SendEvent("command", analytics.Properties{
-				"command_start": context.Command.Name,
-				"args":          context.Args().Slice(),
+			telemetry.SendEvent("command_start", analytics.Properties{
+				"command": context.Command.Name,
 			})
 			return nil
 		},
 		After: func(context *cli.Context) error {
-			telemetry.SendEvent("command", analytics.Properties{
-				"command_finish": context.Command.Name,
-				"duration":       time.Since(start).Seconds(),
+			telemetry.SendEvent("command_end", analytics.Properties{
+				"command":     context.Command.Name,
+				"duration_ms": time.Since(start).Milliseconds(),
 			})
 			return nil
 		},
 		ExitErrHandler: func(context *cli.Context, err error) {
-			errMsg := "Unknown error"
-			if err != nil {
-				errMsg = err.Error()
-			}
-			telemetry.SendEvent("command", analytics.Properties{
-				"command_error": context.Command.Name,
-				"args":          context.Args().Slice(),
-				"error":         errMsg,
-				"duration":      time.Since(start).Seconds(),
+			telemetry.SendEvent("command_error", analytics.Properties{
+				"command":     context.Command.Name,
+				"duration_ms": time.Since(start).Milliseconds(),
 			})
 			cli.HandleExitCoder(err)
 		},

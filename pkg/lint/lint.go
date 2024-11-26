@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/urfave/cli/v2"
 	"os"
 	"sort"
 	"strings"
@@ -11,7 +12,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/pkg/errors"
-	"github.com/rudderlabs/analytics-go/v4"
 	"go.uber.org/zap"
 )
 
@@ -93,7 +93,7 @@ func NewLinter(findPipelines pipelineFinder, builder pipelineBuilder, rules []Ru
 	}
 }
 
-func (l *Linter) Lint(rootPath, pipelineDefinitionFileName string) (*PipelineAnalysisResult, error) {
+func (l *Linter) Lint(rootPath, pipelineDefinitionFileName string, c *cli.Context) (*PipelineAnalysisResult, error) {
 	pipelines, err := l.extractPipelinesFromPath(rootPath, pipelineDefinitionFileName)
 
 	assetStats := make(map[string]int)
@@ -106,7 +106,7 @@ func (l *Linter) Lint(rootPath, pipelineDefinitionFileName string) (*PipelineAna
 			assetStats[string(asset.Type)]++
 		}
 	}
-	telemetry.SendEvent("validating", analytics.Properties{"assets": assetStats})
+	telemetry.SendEventWithAssetStats("validate_assets", assetStats, c)
 
 	if err != nil {
 		return nil, err
@@ -115,7 +115,7 @@ func (l *Linter) Lint(rootPath, pipelineDefinitionFileName string) (*PipelineAna
 	return l.LintPipelines(pipelines)
 }
 
-func (l *Linter) LintAsset(rootPath, pipelineDefinitionFileName, assetNameOrPath string) (*PipelineAnalysisResult, error) {
+func (l *Linter) LintAsset(rootPath, pipelineDefinitionFileName, assetNameOrPath string, c *cli.Context) (*PipelineAnalysisResult, error) {
 	pipelines, err := l.extractPipelinesFromPath(rootPath, pipelineDefinitionFileName)
 	if err != nil {
 		return nil, err
@@ -154,7 +154,7 @@ func (l *Linter) LintAsset(rootPath, pipelineDefinitionFileName, assetNameOrPath
 		return nil, errors.Errorf("failed to find an asset with the path or name '%s' under the path '%s'", assetNameOrPath, rootPath)
 	}
 
-	telemetry.SendEvent("validating", analytics.Properties{"assets": map[string]int{string(asset.Type): 1}})
+	telemetry.SendEventWithAssetStats("validate_assets", map[string]int{string(asset.Type): 1}, c)
 
 	pipelineResult := &PipelineIssues{
 		Pipeline: assetPipeline,
