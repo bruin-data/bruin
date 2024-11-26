@@ -745,5 +745,5 @@ func sendTelemetry(s *scheduler.Scheduler, c *cli.Context) {
 		assetStats[string(asset.GetAsset().Type)]++
 	}
 
-	telemetry.SendEventWithAssetStats("running", assetStats, c)
+	telemetry.SendEventWithAssetStats("run_assets", assetStats, c)
 }
