@@ -44,11 +44,13 @@ func runLineageTests(t *testing.T, tests []struct {
 
 func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error) {
 	t.Helper()
-
-	sqlParser, err := sqlparser.NewSQLParser()
+	sqlParser, err := sqlparser.NewSQLParserPool(4)
 	if err != nil {
 		t.Errorf("error initializing SQL parser: %v", err)
 	}
+
+	defer sqlParser.Close()
+
 	err = sqlParser.Start()
 	if err != nil {
 		t.Errorf("error starting SQL parser: %v", err)

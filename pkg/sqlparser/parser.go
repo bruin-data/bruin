@@ -47,6 +47,11 @@ func NewSQLParserPool(workerCount int) (*SQLParserPool, error) {
 		})
 	}
 
+	err = p.Start()
+	if err != nil {
+		panic(err)
+	}
+
 	panics := wg.WaitAndRecover()
 	if panics != nil {
 		return nil, panics.AsError()
@@ -56,21 +61,6 @@ func NewSQLParserPool(workerCount int) (*SQLParserPool, error) {
 }
 
 func (sp *SQLParserPool) Start() error {
-	var wg conc.WaitGroup
-	for _, parser := range sp.parsers {
-		wg.Go(func() {
-			err := parser.Start()
-			if err != nil {
-				panic(err)
-			}
-		})
-	}
-
-	panics := wg.WaitAndRecover()
-	if panics != nil {
-		return panics.AsError()
-	}
-
 	return nil
 }
 
@@ -151,6 +141,7 @@ func NewSQLParser() (*SQLParser, error) {
 }
 
 func (s *SQLParser) Start() error {
+
 	s.startMutex.Lock()
 	defer s.startMutex.Unlock()
 	err := backoff.Retry(func() error {
