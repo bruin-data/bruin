@@ -324,24 +324,11 @@ func Run(isDebug *bool) *cli.Command {
 
 			tag := c.String("tag")
 			excludeTag := c.String("exclude")
-			var assetsByTag []*pipeline.Asset
-			if tag != "" {
-				assetsByTag = foundPipeline.GetAssetsByTag(tag)
-				if len(assetsByTag) == 0 {
-					errorPrinter.Printf("No assets found with the tag '%s'\n", tag)
-					return cli.Exit("", 1)
-				}
-
-				logger.Debugf("marking assets with tag '%s' to run", tag)
-				s.MarkAll(scheduler.Succeeded)
-				s.MarkByTag(tag, scheduler.Pending, runDownstreamTasks)
-
-				infoPrinter.Printf("Running only the assets with tag '%s', found %d assets.\n", tag, len(assetsByTag))
-			} else {
-				// Set to an empty slice if no tag is provided
-				assetsByTag = []*pipeline.Asset{}
+			assetsByTag, err := handleIncludeTag(tag, foundPipeline, s, runDownstreamTasks)
+			if err != nil {
+				errorPrinter.Printf("Error including assets by tag: %v\n", err)
+				return cli.Exit("Failed to include assets by tag", 1)
 			}
-
 			// Handle exclude (excludeTag)
 			if excludeTag != "" {
 				ExcludeAssetsByTag(excludeTag, foundPipeline, s, assetsByTag)
@@ -784,4 +771,30 @@ func ExcludeAssetsByTag(excludeTag string, p *pipeline.Pipeline, s *scheduler.Sc
 
 	_, _ = infoPrinter.Printf("Excluded %d assets with tag '%s'.\n", len(uniqueAssets), excludeTag)
 	return len(uniqueAssets)
+}
+
+func handleIncludeTag(tag string, p *pipeline.Pipeline, s *scheduler.Scheduler, runDownstreamTasks bool) ([]*pipeline.Asset, error) {
+	var assetsByTag []*pipeline.Asset
+
+	if tag != "" {
+		assetsByTag = p.GetAssetsByTag(tag)
+
+		if len(assetsByTag) == 0 {
+			errorPrinter.Printf("No assets found with the tag '%s'\n", tag)
+			return nil, fmt.Errorf("no assets found with tag '%s'", tag)
+		}
+
+		// Use infoPrinter or another custom printer for debug information
+		infoPrinter.Printf("Marking assets with tag '%s' to run.\n", tag)
+
+		// Mark assets with the given tag
+		s.MarkAll(scheduler.Succeeded)
+		s.MarkByTag(tag, scheduler.Pending, runDownstreamTasks)
+
+		infoPrinter.Printf("Running only the assets with tag '%s', found %d assets.\n", tag, len(assetsByTag))
+	} else {
+		assetsByTag = []*pipeline.Asset{}
+	}
+
+	return assetsByTag, nil
 }
