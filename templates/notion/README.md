@@ -1,4 +1,4 @@
-# Bruin - Sample Pipeline
+# Bruin - Notion to Bigquery Template
 
 This pipeline is a simple example of a Bruin pipeline that copies data from Notion to BigQuery. It demonstrates how to use the `bruin` CLI to build and run a pipeline.
 

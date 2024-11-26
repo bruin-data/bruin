@@ -1,4 +1,4 @@
-# Bruin - Firebase to GCP Pipeline
+# Bruin - Firebase to GCP Template
 
 This pipeline is a simple example of a Bruin pipeline for Firebase. 
 

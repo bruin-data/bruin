@@ -1,4 +1,4 @@
-# Bruin - Sample Pipeline
+# Bruin - DuckDB Template
 
 This pipeline is a simple example of a Bruin pipeline for DuckDB, 
 featuring `example.sql`—a SQL asset that creates a table with sample data and enforces schema constraints 
