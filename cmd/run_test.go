@@ -1,11 +1,12 @@
 package cmd
 
 import (
+	"sync"
+	"testing"
+
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/stretchr/testify/assert"
-	"sync"
-	"testing"
 )
 
 func TestClean(t *testing.T) {
