@@ -120,6 +120,7 @@ export default defineConfig({
                             {text: "SAP HANA", link: "/ingestion/sap_hana"},
                             {text: "S3", link: "/ingestion/s3"},
                             {text: "Shopify", link: "/ingestion/shopify"},
+                            {text: "Stripe", link: "/ingestion/stripe.md"},
                             {text: "Slack", link: "/ingestion/slack.md"},
                             {text: "Zendesk", link: "/ingestion/zendesk.md"},
                         ],

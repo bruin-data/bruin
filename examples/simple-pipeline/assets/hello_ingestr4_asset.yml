@@ -1,9 +1,10 @@
-name: public.test_merge_4
+name: public.mongo
 type: ingestr
-connection: neon
+connection: postgres
 
 parameters:
   source_connection: localMongo
-  source_table: 'test-alberto.test'
+  source_table: 'kollywood.Horror'
 
   destination: postgres
+  
