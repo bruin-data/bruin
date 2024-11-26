@@ -31,7 +31,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  test:
     strategy:
       matrix:
         platform: [ ubuntu-latest, windows-latest ]
@@ -47,6 +47,23 @@ jobs:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
       - run: make test
+
+
+  end2end:
+    strategy:
+      matrix:
+        platform: [ ubuntu-latest, windows-latest ]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+# TODO: Replace with actions/setup-go once issue is resolved https://github.com/actions/setup-go/pull/515
+      - name: Setup Go 
+        uses: antontroshin/setup-go@windows-go-mod-cache
+        with:
+          go-version-file: 'go.mod'
+          cache-dependency-path: "go.sum"
       - name: Install winget
         if: matrix.platform == 'windows-latest'
         uses: Cyberboss/install-winget@v1
