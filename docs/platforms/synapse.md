@@ -13,7 +13,7 @@ Synapse connection is configured the same way as Microsoft SQL Server connection
 Runs a materialized Synapse asset or an SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 #### Example: Create a view using view materialization
-```bruinsql
+```bruin-sql
 /* @bruin
 name: customer_data.view
 type: synapse.sql
@@ -27,7 +27,7 @@ where active = 1
 ```
 
 #### Example: Run a Synapse SQL script
-```bruinsql
+```bruin-sql
 /* @bruin
 name: orders_summary
 type: synapse.sql

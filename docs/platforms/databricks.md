@@ -26,7 +26,7 @@ In order to work with Databricks you can add as a configuration item to `connect
 Runs a materialized Databricks asset or a Databricks SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 #### Example: Create a table using table materialization
-```bruinsql
+```bruin-sql
 /* @bruin
 name: events.install
 type: databricks.sql
@@ -40,7 +40,7 @@ where event_name = "install"
 ```
 
 #### Example: Run a script
-```bruinsql
+```bruin-sql
 /* @bruin
 name: events.install
 type: databricks.sql

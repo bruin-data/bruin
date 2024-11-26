@@ -18,7 +18,6 @@ bruin clean [path-to-project-root]
 bruin clean 
 ```
 #### Output:
-``` plaintext
-Found 107 log files, cleaning them up...
-Successfully removed 107 log files.
-```
+
+
+<img alt="Bruin - clean" src="/clean.gif" style="margin: 10px;" />
