@@ -24,7 +24,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool) ([]Rule, err
 		},
 	}
 
-	parser, err := sqlparser.NewSQLParser()
+	parser, err := sqlparser.NewSQLParser(1)
 	if err != nil {
 		return make([]Rule, 0), errors.Wrap(err, "failed to instantiate sql parser")
 	}

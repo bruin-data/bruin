@@ -3,6 +3,7 @@ package sqlparser
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/bruin-data/bruin/internal/data"
 	"github.com/bruin-data/bruin/pythonsrc"
-	backoff "github.com/cenkalti/backoff/v4"
 	"github.com/kluctl/go-embed-python/embed_util"
 	"github.com/kluctl/go-embed-python/python"
 	"github.com/pkg/errors"
@@ -35,21 +35,16 @@ func NewSQLParserPool(workerCount int) (*SQLParserPool, error) {
 
 	var mut sync.Mutex
 	var wg conc.WaitGroup
-	p, err := NewSQLParser()
-	if err != nil {
-		panic(err)
-	}
 	for i := range workerCount {
 		wg.Go(func() {
+			p, err := NewSQLParser(i)
+			if err != nil {
+				panic(err)
+			}
 			mut.Lock()
 			defer mut.Unlock()
 			sp.parsers[i] = p
 		})
-	}
-
-	err = p.Start()
-	if err != nil {
-		panic(err)
 	}
 
 	panics := wg.WaitAndRecover()
@@ -61,6 +56,21 @@ func NewSQLParserPool(workerCount int) (*SQLParserPool, error) {
 }
 
 func (sp *SQLParserPool) Start() error {
+	var wg conc.WaitGroup
+	for _, parser := range sp.parsers {
+		wg.Go(func() {
+			err := parser.Start()
+			if err != nil {
+				panic(err)
+			}
+		})
+	}
+
+	panics := wg.WaitAndRecover()
+	if panics != nil {
+		return panics.AsError()
+	}
+
 	return nil
 }
 
@@ -115,8 +125,8 @@ type SQLParser struct {
 	startMutex sync.Mutex
 }
 
-func NewSQLParser() (*SQLParser, error) {
-	tmpDir := filepath.Join(os.TempDir(), "bruin-cli-embedded")
+func NewSQLParser(i int) (*SQLParser, error) {
+	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("bruin-cli-embedded-%d", i))
 
 	ep, err := python.NewEmbeddedPythonWithTmpDir(tmpDir+"-python", true)
 	if err != nil {
@@ -141,43 +151,43 @@ func NewSQLParser() (*SQLParser, error) {
 }
 
 func (s *SQLParser) Start() error {
-
 	s.startMutex.Lock()
 	defer s.startMutex.Unlock()
-	err := backoff.Retry(func() error {
-		if s.started {
-			return nil
-		}
-		var err error
-		args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
-		s.cmd, err = s.ep.PythonCmd(args...)
-		if err != nil {
-			return err
-		}
-		s.cmd.Stderr = os.Stderr
+	if s.started {
+		return nil
+	}
 
-		s.stdout, err = s.cmd.StdoutPipe()
-		if err != nil {
-			return err
-		}
-
-		s.stdin, err = s.cmd.StdinPipe()
-		if err != nil {
-			return err
-		}
-
-		err = s.cmd.Start()
-		if err != nil {
-			return err
-		}
-
-		_, err = s.sendCommand(&parserCommand{
-			Command: "init",
-		})
-		return err
-	}, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 5))
+	args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
+	cmd, err := s.ep.PythonCmd(args...)
 	if err != nil {
-		return errors.Wrap(err, "failed to start sql parser after retries")
+		return err
+	}
+	cmd.Stderr = os.Stderr
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		return err
+	}
+
+	s.stdin = stdin
+	s.stdout = stdout
+	s.cmd = cmd
+
+	_, err = s.sendCommand(&parserCommand{
+		Command: "init",
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to send init command")
 	}
 
 	s.started = true
