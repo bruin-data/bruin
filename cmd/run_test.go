@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -105,9 +106,18 @@ func TestExcludeAssetsByTag(t *testing.T) {
 			expectedExcluded: 1,
 		},
 	}
+	// Mutex to protect shared resources
+	var mu sync.Mutex
 
 	for _, tt := range tests {
+		tt := tt // Capture the loop variable
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Lock the mutex to protect shared resources
+			mu.Lock()
+			defer mu.Unlock()
+
 			// Run the function
 			excludedCount := ExcludeAssetsByTag(tt.excludeTag, mockPipeline, mockScheduler, tt.assetsByTag)
 
