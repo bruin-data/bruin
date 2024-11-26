@@ -3,7 +3,7 @@
 In this guide, you'll learn how to create a simple pipeline that ingests chess data and stores it in DuckDB using Bruin.
 
 ## Prerequisites
-Before you start, make sure you have the Bruin CLI installed. [Get instructions](./introduction/installation.md).
+Before you start, make sure you have the Bruin CLI installed. [Get instructions](../introduction/installation.md).
 
 
 
@@ -59,7 +59,7 @@ pre-configured for chess data ingestion. Open this file to take a look at your a
 - **`player_summary.sql`**: A SQL asset that creates a summary table of player statistics, aggregating game results, wins, and win rates for each player based on the ingested data.
 > [!INFO]
 > **What is an Asset?**  
-> An asset in Bruin is a configuration that details specific data processing tasks, such as ingestion, transformation. Learn more about [Bruin assets](../assets/definition-schema.md).
+> An asset in Bruin is a configuration that details specific data processing tasks, such as ingestion, transformation. Learn more about [Bruin assets](../../assets/definition-schema.md).
 
 ## Step 4: Check Your `pipeline.yml` file
 Just like in Step 3, the pipeline.yml file also comes pre-configured for our task, and it follows this structure:
@@ -72,7 +72,7 @@ default_connections:
 ```
 > [!INFO]
 > **What is a Pipeline?**  
->A pipeline is a group of assets that are executed together in the right order.  Learn more about [Bruin Pipelines](concepts.md#pipeline).
+>A pipeline is a group of assets that are executed together in the right order.  Learn more about [Bruin Pipelines](../concepts.md#pipeline).
 ## Step 5: Run Your Pipeline and Ingest the Data
 Now that your pipeline is set up, you're ready to run it and ingest the data into DuckDB. Use the following command to execute the pipeline:
 

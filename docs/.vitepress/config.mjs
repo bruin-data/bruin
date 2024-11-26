@@ -45,7 +45,15 @@ export default defineConfig({
           { text: "Design Principles", link: "/getting-started/design-principles" },
           { text: "Glossary", link: "/getting-started/glossary" },
           { text: "Templates", link: "/getting-started/templates" },
-          {text: "Tutorials", link: "/getting-started/tutorials"},
+          {
+            text: "Tutorials",
+            collapsed: false,
+            items: [
+              {text: "Your First Project", link: "/getting-started/tutorials/first-tutorial"},
+              { text: "Load Notion to PostgreSQL", link: "/getting-started/tutorials/load-notion-postgres" },
+            ],
+
+          },
           {text: "Telemetry", link: "/getting-started/telemetry"},
 
         ],
