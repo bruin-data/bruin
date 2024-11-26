@@ -136,7 +136,9 @@ jobs:
           msystem: UCRT64
           update: true
           install: git mingw-w64-ucrt-x86_64-gcc
-      - uses: actions/setup-go@v4
+# TODO: Replace with actions/setup-go once issue is resolved https://github.com/actions/setup-go/pull/515
+      - name: Setup Go 
+        uses: antontroshin/setup-go@windows-go-mod-cache
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
