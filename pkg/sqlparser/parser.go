@@ -35,12 +35,12 @@ func NewSQLParserPool(workerCount int) (*SQLParserPool, error) {
 
 	var mut sync.Mutex
 	var wg conc.WaitGroup
+	p, err := NewSQLParser()
+	if err != nil {
+		panic(err)
+	}
 	for i := range workerCount {
 		wg.Go(func() {
-			p, err := NewSQLParser()
-			if err != nil {
-				panic(err)
-			}
 			mut.Lock()
 			defer mut.Unlock()
 			sp.parsers[i] = p
