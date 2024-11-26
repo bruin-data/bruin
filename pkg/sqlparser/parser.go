@@ -151,46 +151,43 @@ func NewSQLParser() (*SQLParser, error) {
 }
 
 func (s *SQLParser) Start() error {
-	s.startMutex.Lock()
-	defer s.startMutex.Unlock()
-	if s.started {
-		return nil
-	}
-
-	args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
-	cmd, err := s.ep.PythonCmd(args...)
-	if err != nil {
-		return err
-	}
-	cmd.Stderr = os.Stderr
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return err
-	}
-
-	err = cmd.Start()
-	if err != nil {
-		return err
-	}
-
-	s.stdin = stdin
-	s.stdout = stdout
-	s.cmd = cmd
-
+	var err error
 	err = backoff.Retry(func() error {
+		s.startMutex.Lock()
+		defer s.startMutex.Unlock()
+		if s.started {
+			return nil
+		}
+
+		args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
+		s.cmd, err = s.ep.PythonCmd(args...)
+		if err != nil {
+			return err
+		}
+		s.cmd.Stderr = os.Stderr
+
+		s.stdout, err = s.cmd.StdoutPipe()
+		if err != nil {
+			return err
+		}
+
+		s.stdin, err = s.cmd.StdinPipe()
+		if err != nil {
+			return err
+		}
+
+		err = s.cmd.Start()
+		if err != nil {
+			return err
+		}
+
 		_, err = s.sendCommand(&parserCommand{
 			Command: "init",
 		})
 		return err
 	}, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 5))
 	if err != nil {
-		return errors.Wrap(err, "failed to send init command after retries")
+		return errors.Wrap(err, "failed to start sql parser after retries")
 	}
 
 	s.started = true
