@@ -151,14 +151,13 @@ func NewSQLParser() (*SQLParser, error) {
 }
 
 func (s *SQLParser) Start() error {
-	var err error
-	err = backoff.Retry(func() error {
-		s.startMutex.Lock()
-		defer s.startMutex.Unlock()
+	s.startMutex.Lock()
+	defer s.startMutex.Unlock()
+	err := backoff.Retry(func() error {
 		if s.started {
 			return nil
 		}
-
+		var err error
 		args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
 		s.cmd, err = s.ep.PythonCmd(args...)
 		if err != nil {
