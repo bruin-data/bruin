@@ -144,7 +144,7 @@ environments:
           service_account_json: "{\"key1\": \"value1\"}"
 
         - name: conn22-1
-          service_account_file: "/path/to/service_account.json",
+          service_account_file: "/path/to/service_account.json"
       chess:
         - name: conn24
           players:
