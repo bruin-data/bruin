@@ -354,8 +354,9 @@ func (c HubspotConnection) GetName() string {
 }
 
 type GoogleSheetsConnection struct {
-	Name            string `yaml:"name" json:"name" mapstructure:"name"`
-	CredentialsPath string `yaml:"credentials_path" json:"credentials_path" mapstructure:"credentials_path"`
+	Name               string `yaml:"name" json:"name" mapstructure:"name"`
+	ServiceAccountJSON string `yaml:"service_account_json" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
+	ServiceAccountFile string `yaml:"service_account_file" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
 }
 
 func (c GoogleSheetsConnection) GetName() string {
