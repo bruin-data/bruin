@@ -1,9 +1,29 @@
 package gsheets
 
+import (
+	"encoding/base64"
+	"os"
+)
+
 type Config struct {
-	CredentialsPath string
+	ServiceAccountFile string
+	ServiceAccountJSON string
 }
 
 func (c *Config) GetIngestrURI() string {
-	return "gsheets://?credentials_path=" + c.CredentialsPath
+	var creds []byte
+	switch {
+	case c.ServiceAccountJSON != "":
+		creds = []byte(c.ServiceAccountJSON)
+	case c.ServiceAccountFile != "":
+		var err error
+		creds, err = os.ReadFile(c.ServiceAccountFile)
+		if err != nil {
+			return ""
+		}
+	default:
+		return ""
+	}
+
+	return "gsheets://?credentials_base64=" + base64.StdEncoding.EncodeToString(creds)
 }
