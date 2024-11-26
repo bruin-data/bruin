@@ -3,7 +3,7 @@
 
 Bruin supports Google Sheets as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Google Sheets into your data warehouse.
 
-To set up a Google Sheets connection, you need to add a configuration item in the `.bruin.yml` file and the asset file. You will need either the `service_account_file` or the `service_account_json`. For more information, please follow the [guide](https://dlthub.com/docs/dlt-ecosystem/verified-sources/google_sheets#google-service-account-credentials). Once you complete the guide, you should have a `service account JSON` file.
+To set up a Google Sheets connection, you need to add a configuration item in the `.bruin.yml` file and the `asset` file. You will need either the `service_account_file` or the `service_account_json`. For more information, please follow the [guide](https://dlthub.com/docs/dlt-ecosystem/verified-sources/google_sheets#google-service-account-credentials). Once you complete the guide, you should have a `service account JSON` file.
 
 Follow the steps below to correctly set up Google Sheets as a data source and run ingestion.
 
