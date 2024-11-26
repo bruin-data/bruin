@@ -119,6 +119,7 @@ export default defineConfig({
                             {text: "Notion", link: "/ingestion/notion"},
                             {text: "SAP HANA", link: "/ingestion/sap_hana"},
                             {text: "S3", link: "/ingestion/s3"},
+                            {text: "Stripe", link: "/ingestion/stripe.md"},
                             {text: "Slack", link: "/ingestion/slack.md"},
                             {text: "Zendesk", link: "/ingestion/zendesk.md"},
                             {text: "Shopify", link: "/ingestion/shopify"},
