@@ -26,6 +26,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
 
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || (github.ref == 'refs/heads/main' && github.sha || github.ref) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
