@@ -13,6 +13,7 @@ import (
 
 	"github.com/bruin-data/bruin/internal/data"
 	"github.com/bruin-data/bruin/pythonsrc"
+	backoff "github.com/cenkalti/backoff/v4"
 	"github.com/kluctl/go-embed-python/embed_util"
 	"github.com/kluctl/go-embed-python/python"
 	"github.com/pkg/errors"
@@ -182,11 +183,14 @@ func (s *SQLParser) Start() error {
 	s.stdout = stdout
 	s.cmd = cmd
 
-	_, err = s.sendCommand(&parserCommand{
-		Command: "init",
-	})
+	err = backoff.Retry(func() error {
+		_, err = s.sendCommand(&parserCommand{
+			Command: "init",
+		})
+		return err
+	}, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 5))
 	if err != nil {
-		return errors.Wrap(err, "failed to send init command")
+		return errors.Wrap(err, "failed to send init command after retries")
 	}
 
 	s.started = true
