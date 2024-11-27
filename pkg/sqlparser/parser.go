@@ -3,6 +3,7 @@ package sqlparser
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -16,6 +17,7 @@ import (
 	"github.com/kluctl/go-embed-python/embed_util"
 	"github.com/kluctl/go-embed-python/python"
 	"github.com/pkg/errors"
+	"golang.org/x/exp/rand"
 )
 
 type SQLParser struct {
@@ -33,7 +35,7 @@ type SQLParser struct {
 }
 
 func NewSQLParser() (*SQLParser, error) {
-	tmpDir := filepath.Join(os.TempDir(), "bruin-cli-embedded")
+	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("bruin-cli-embedded-%d", rand.Int()))
 
 	ep, err := python.NewEmbeddedPythonWithTmpDir(tmpDir+"-python", true)
 	if err != nil {
