@@ -110,7 +110,7 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool) error {
 	if lineage {
 		lineageWg.Go(func() {
 			var err error
-			sqlParser, err = sqlparser.NewSQLParser(1)
+			sqlParser, err = sqlparser.NewSQLParser()
 			if err != nil {
 				printErrorJSON(err)
 				panic(err)
@@ -184,7 +184,7 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 	if lineage {
 		lineageWg.Go(func() {
 			var err error
-			sqlParser, err = sqlparser.NewSQLParser(1)
+			sqlParser, err = sqlparser.NewSQLParser()
 			if err != nil {
 				printErrorJSON(err)
 				panic(err)

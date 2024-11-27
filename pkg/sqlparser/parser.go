@@ -3,7 +3,6 @@ package sqlparser
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -34,8 +33,8 @@ type SQLParser struct {
 	startMutex sync.Mutex
 }
 
-func NewSQLParser(i int) (*SQLParser, error) {
-	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("bruin-cli-embedded-%d", i))
+func NewSQLParser() (*SQLParser, error) {
+	tmpDir := filepath.Join(os.TempDir(), "bruin-cli-embedded")
 
 	ep, err := python.NewEmbeddedPythonWithTmpDir(tmpDir+"-python", true)
 	if err != nil {

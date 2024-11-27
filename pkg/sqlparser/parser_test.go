@@ -371,7 +371,7 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 }
 
 func TestSqlParser_GetTables(t *testing.T) {
-	s, err := NewSQLParser(1)
+	s, err := NewSQLParser()
 	require.NoError(t, err)
 
 	err = s.Start()

@@ -40,7 +40,7 @@ func runLineageTests(t *testing.T, tests []struct {
 }
 
 func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error) {
-	sqlParser, err := sqlparser.NewSQLParser(1)
+	sqlParser, err := sqlparser.NewSQLParser()
 	if err != nil {
 		t.Errorf("error initializing SQL parser: %v", err)
 	}
