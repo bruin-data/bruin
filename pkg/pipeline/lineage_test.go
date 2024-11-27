@@ -21,25 +21,6 @@ func setup() error {
 	return nil
 }
 
-func TestParseLineageRecursively(t *testing.T) {
-	t.Parallel()
-	if err := setup(); err != nil {
-		panic("error")
-	}
-	testCases := map[string]func(*testing.T){
-		"basic recursive parsing":   testBasicRecursiveParsing,
-		"joins and complex queries": testJoinsAndComplexQueries,
-		"advanced SQL features":     testAdvancedSQLFeatures,
-		"dialect specific features": testDialectSpecificFeatures,
-	}
-
-	for name, tc := range testCases {
-		_ = t.Run(name, func(t *testing.T) {
-			tc(t)
-		})
-	}
-}
-
 func runLineageTests(t *testing.T, tests []struct {
 	name     string
 	pipeline *Pipeline
@@ -154,7 +135,7 @@ func assertColumns(t *testing.T, got, want []Column, wantCount int) {
 	}
 }
 
-func testBasicRecursiveParsing(t *testing.T) {
+func TestBasicRecursiveParsing(t *testing.T) {
 	tests := []struct {
 		name     string
 		pipeline *Pipeline
@@ -459,10 +440,11 @@ func testBasicRecursiveParsing(t *testing.T) {
 			want: nil,
 		},
 	}
+	_ = setup()
 	runLineageTests(t, tests)
 }
 
-func testJoinsAndComplexQueries(t *testing.T) {
+func TestJoinsAndComplexQueries(t *testing.T) {
 	tests := []struct {
 		name     string
 		pipeline *Pipeline
@@ -683,10 +665,11 @@ func testJoinsAndComplexQueries(t *testing.T) {
 			want: nil,
 		},
 	}
+	_ = setup()
 	runLineageTests(t, tests)
 }
 
-func testAdvancedSQLFeatures(t *testing.T) {
+func TestAdvancedSQLFeatures(t *testing.T) {
 	tests := []struct {
 		name     string
 		pipeline *Pipeline
@@ -789,10 +772,11 @@ func testAdvancedSQLFeatures(t *testing.T) {
 			want: nil,
 		},
 	}
+	_ = setup()
 	runLineageTests(t, tests)
 }
 
-func testDialectSpecificFeatures(t *testing.T) {
+func TestDialectSpecificFeatures(t *testing.T) {
 	tests := []struct {
 		name     string
 		pipeline *Pipeline
@@ -1046,5 +1030,6 @@ func testDialectSpecificFeatures(t *testing.T) {
 			want: nil,
 		},
 	}
+	_ = setup()
 	runLineageTests(t, tests)
 }
