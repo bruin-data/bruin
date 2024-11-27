@@ -10,6 +10,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
+	"github.com/bruin-data/bruin/pkg/telemetry"
 	color2 "github.com/fatih/color"
 	errors2 "github.com/pkg/errors"
 	"github.com/sourcegraph/conc"
@@ -27,6 +28,8 @@ func Internal() *cli.Command {
 			PatchAsset(),
 			ConnectionSchemas(),
 		},
+		Before: telemetry.BeforeCommand,
+		After:  telemetry.AfterCommand,
 	}
 }
 
@@ -52,6 +55,8 @@ func ParseAsset() *cli.Command {
 
 			return r.Run(c.Args().Get(0), c.Bool("column-lineage"))
 		},
+		Before: telemetry.BeforeCommand,
+		After:  telemetry.AfterCommand,
 	}
 }
 
@@ -77,6 +82,8 @@ func ParsePipeline() *cli.Command {
 
 			return r.ParsePipeline(c.Args().Get(0), c.Bool("column-lineage"))
 		},
+		Before: telemetry.BeforeCommand,
+		After:  telemetry.AfterCommand,
 	}
 }
 
@@ -94,6 +101,8 @@ func ConnectionSchemas() *cli.Command {
 			fmt.Println(jsonStringSchema)
 			return nil
 		},
+		Before: telemetry.BeforeCommand,
+		After:  telemetry.AfterCommand,
 	}
 }
 
@@ -304,5 +313,7 @@ func PatchAsset() *cli.Command {
 
 			return nil
 		},
+		Before: telemetry.BeforeCommand,
+		After:  telemetry.AfterCommand,
 	}
 }

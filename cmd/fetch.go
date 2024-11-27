@@ -11,6 +11,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -24,6 +25,8 @@ func Fetch() *cli.Command {
 		Subcommands: []*cli.Command{
 			queryCommand(),
 		},
+		Before: telemetry.BeforeCommand,
+		After:  telemetry.AfterCommand,
 	}
 }
 

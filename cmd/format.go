@@ -8,6 +8,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/telemetry"
 	errors2 "github.com/pkg/errors"
 	"github.com/sourcegraph/conc/pool"
 	"github.com/spf13/afero"
@@ -124,6 +125,8 @@ func Format(isDebug *bool) *cli.Command {
 
 			return cli.Exit("", 1)
 		},
+		Before: telemetry.BeforeCommand,
+		After:  telemetry.AfterCommand,
 	}
 }
 
