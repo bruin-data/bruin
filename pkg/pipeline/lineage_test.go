@@ -6,9 +6,23 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
+var sqlParserInstance = &sqlparser.SQLParser{}
+
+func setup() {
+	var err error
+	sqlParserInstance, err = sqlparser.NewSQLParser()
+	if err != nil {
+		panic(err)
+	}
+	err = sqlParserInstance.Start()
+	if err != nil {
+		panic(err)
+	}
+}
+
 func TestParseLineageRecursively(t *testing.T) {
 	t.Parallel()
-
+	setup()
 	testCases := map[string]func(*testing.T){
 		"basic recursive parsing":   testBasicRecursiveParsing,
 		"joins and complex queries": testJoinsAndComplexQueries,
@@ -17,7 +31,8 @@ func TestParseLineageRecursively(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
-		_ = t.Run(name, func(t *testing.T) {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			tc(t)
 		})
 	}
@@ -42,15 +57,7 @@ func runLineageTests(t *testing.T, tests []struct {
 func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error) {
 	t.Helper()
 
-	sqlParser, err := sqlparser.NewSQLParser()
-	if err != nil {
-		t.Errorf("error initializing SQL parser: %v", err)
-	}
-	err = sqlParser.Start()
-	if err != nil {
-		t.Errorf("error starting SQL parser: %v", err)
-	}
-	extractor := NewLineageExtractor(p, sqlParser)
+	extractor := NewLineageExtractor(p, sqlParserInstance)
 
 	for _, asset := range p.Assets {
 		if err := extractor.TableSchema(); err != nil {
