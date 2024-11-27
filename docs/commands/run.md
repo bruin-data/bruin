@@ -13,7 +13,7 @@ This command is used to execute a Bruin pipeline or a specific asset within a pi
 ```bash
 bruin run [FLAGS] [optional path to the pipeline/asset]
 ```
-
+<img alt="Bruin - init" src="/chesspipeline.gif" style="margin: 10px;" />
 ## Flags
 
 | Flag | Type | Default | Description |

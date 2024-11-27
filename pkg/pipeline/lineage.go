@@ -9,16 +9,22 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
+type sqlParser interface {
+	ColumnLineage(sql, dialect string, schema sqlparser.Schema) (*sqlparser.Lineage, error)
+}
+
 type LineageExtractor struct {
 	Pipeline       *Pipeline
+	sqlParser      sqlParser
 	columnMetadata sqlparser.Schema
 }
 
 // NewLineageExtractor creates a new LineageExtractor instance.
-func NewLineageExtractor(pipeline *Pipeline) *LineageExtractor {
+func NewLineageExtractor(pipeline *Pipeline, parser sqlParser) *LineageExtractor {
 	return &LineageExtractor{
 		Pipeline:       pipeline,
 		columnMetadata: make(sqlparser.Schema),
+		sqlParser:      parser,
 	}
 }
 
@@ -47,14 +53,10 @@ func (p *LineageExtractor) ColumnLineage(asset *Asset) error {
 		if upstreamAsset == nil {
 			continue
 		}
-		if err := p.ColumnLineage(upstreamAsset); err != nil {
-			return err
-		}
+		_ = p.ColumnLineage(upstreamAsset)
 	}
 
-	if err := p.parseLineage(asset); err != nil {
-		return err
-	}
+	_ = p.parseLineage(asset)
 
 	return nil
 }
@@ -68,16 +70,7 @@ func (p *LineageExtractor) parseLineage(asset *Asset) error {
 
 	dialect, err := dialect.GetDialectByAssetType(string(asset.Type))
 	if err != nil {
-		return err
-	}
-
-	parser, err := sqlparser.NewSQLParser()
-	if err != nil {
-		return fmt.Errorf("failed to create SQL parser: %w", err)
-	}
-
-	if err := parser.Start(); err != nil {
-		return fmt.Errorf("failed to start SQL parser: %w", err)
+		return nil //nolint:nilerr
 	}
 
 	for _, upstream := range asset.Upstreams {
@@ -87,7 +80,7 @@ func (p *LineageExtractor) parseLineage(asset *Asset) error {
 		}
 	}
 
-	lineage, err := parser.ColumnLineage(asset.ExecutableFile.Content, dialect, p.columnMetadata)
+	lineage, err := p.sqlParser.ColumnLineage(asset.ExecutableFile.Content, dialect, p.columnMetadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse column lineage: %w", err)
 	}
@@ -120,6 +113,17 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 					}
 					continue
 				}
+			}
+			continue
+		}
+
+		if len(lineageCol.Upstream) == 0 {
+			if err := p.addColumnToAsset(asset, lineageCol.Name, nil, &Column{
+				Name:      lineageCol.Name,
+				Checks:    []ColumnCheck{},
+				Upstreams: []*UpstreamColumn{},
+			}); err != nil {
+				return err
 			}
 			continue
 		}

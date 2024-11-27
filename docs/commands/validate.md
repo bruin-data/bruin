@@ -8,6 +8,7 @@ It ensures that the configurations meet specific requirements and are properly c
 ```bash
 bruin validate [path to pipelines] [flags]
 ```
+<img alt="Bruin - validate" src="/validate.gif" style="margin: 10px;" />
 **Arguments:**
 
 **[path to pipelines]:** Path to the pipeline directory or a specific asset.
@@ -31,14 +32,7 @@ Defaults to the current directory (".") if not provided.
 bruin validate
 ```
 
-**2. Validate pipelines in a specified directory:**
-
-```bash
-bruin validate
-```
-
-
-**3. Validate with JSON output:**
+**2. Validate with JSON output:**
 
 ```bash
 bruin validate --output json
@@ -46,7 +40,7 @@ bruin validate --output json
 ```
 
 
-**4. Validate a specific asset:**
+**3. Validate a specific asset:**
 
 ```bash
 bruin validate path/to/specific-asset

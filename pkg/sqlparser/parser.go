@@ -2,7 +2,6 @@ package sqlparser
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"io"
 	"os"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/bruin-data/bruin/internal/data"
 	"github.com/bruin-data/bruin/pythonsrc"
+	"github.com/cenkalti/backoff"
 	"github.com/kluctl/go-embed-python/embed_util"
 	"github.com/kluctl/go-embed-python/python"
 	"github.com/pkg/errors"
@@ -64,38 +64,37 @@ func (s *SQLParser) Start() error {
 	if s.started {
 		return nil
 	}
+	err := backoff.Retry(func() error {
+		var err error
+		args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
+		s.cmd, err = s.ep.PythonCmd(args...)
+		if err != nil {
+			return err
+		}
+		s.cmd.Stderr = os.Stderr
 
-	args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
-	cmd, err := s.ep.PythonCmd(args...)
-	if err != nil {
+		s.stdout, err = s.cmd.StdoutPipe()
+		if err != nil {
+			return err
+		}
+
+		s.stdin, err = s.cmd.StdinPipe()
+		if err != nil {
+			return err
+		}
+
+		err = s.cmd.Start()
+		if err != nil {
+			return err
+		}
+
+		_, err = s.sendCommand(&parserCommand{
+			Command: "init",
+		})
 		return err
-	}
-	cmd.Stderr = os.Stderr
-
-	stdout, err := cmd.StdoutPipe()
+	}, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 5))
 	if err != nil {
-		return err
-	}
-
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return err
-	}
-
-	err = cmd.Start()
-	if err != nil {
-		return err
-	}
-
-	s.stdin = stdin
-	s.stdout = stdout
-	s.cmd = cmd
-
-	_, err = s.sendCommand(&parserCommand{
-		Command: "init",
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to send init command")
+		return errors.Wrap(err, "failed to start sql parser after retries")
 	}
 
 	s.started = true
@@ -201,19 +200,8 @@ func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
 
 	reader := bufio.NewReader(s.stdout)
 
-	line := bytes.NewBuffer(nil)
-	for {
-		l, p, err := reader.ReadLine()
-		if err != nil {
-			return "", err
-		}
-		line.Write(l)
-		if !p {
-			break
-		}
-	}
-
-	return line.String(), nil
+	resp, err := reader.ReadString(byte('\n'))
+	return resp, err
 }
 
 func (s *SQLParser) Close() error {

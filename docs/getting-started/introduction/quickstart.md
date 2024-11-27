@@ -69,7 +69,7 @@ bruin run assets/players.asset.yml
 
 Let's create a new SQL asset with a file `assets/player_stats.sql`:
 
-```bruinsql
+```bruin-sql
 /* @bruin
 
 name: dataset.player_stats
@@ -133,7 +133,7 @@ bruin run
 Bruin supports data quality checks natively, as part of the asset definition. It includes a handful of data quality checks, and it also supports custom checks.
 
 Let's add a few data quality checks to our table:
-```bruinsql
+```bruin-sql
 /* @bruin
 
 name: dataset.player_stats
