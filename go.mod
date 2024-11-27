@@ -8,7 +8,7 @@ require (
 	cloud.google.com/go/bigquery v1.60.0
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/alecthomas/chroma/v2 v2.13.0
-	github.com/cenkalti/backoff/v4 v4.3.0
+	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/charmbracelet/bubbletea v1.1.2
 	github.com/databricks/databricks-sql-go v1.6.0
 	github.com/denisbrodbeck/machineid v1.0.1

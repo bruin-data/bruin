@@ -13,7 +13,7 @@ type lineager interface {
 func TestSqlParser_ColumnLineage(t *testing.T) {
 	t.Parallel()
 
-	s, err := NewSQLParser(1)
+	s, err := NewSQLParserPool(4)
 	require.NoError(t, err)
 
 	err = s.Start()
