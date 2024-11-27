@@ -10,10 +10,10 @@ and connecting Notion with PostgreSQL. By the end, you’ll have a working examp
 ### Prerequisites
 #### Bruin CLI
 
-To install Bruin CLI depending upon your machine, follow the installation instructions [here](https://github.com/bruin-data/bruin/blob/f799133136aba1b0eea673d731f236a4b5e78752/docs/getting-started/introduction/installation.md)
+To install Bruin CLI depending upon your machine, follow the installation instructions [here](../introduction/installation.md)
 
 #### Bruin VSCode Extension
-To install bruin vscode extension, follow the instruction [here](https://github.com/bruin-data/bruin/blob/f799133136aba1b0eea673d731f236a4b5e78752/docs/vscode-extension/installation.md)
+To install bruin vscode extension, follow the instruction [here](../../vscode-extension/installation.md)
 
 <img width="685" alt="bruin_extension" src="https://github.com/user-attachments/assets/c74607e8-b822-4927-a100-bfe29446101b">
 
@@ -37,7 +37,7 @@ If you don't define folder name and template name. It will create `default` temp
 
 #### Adding a new asset
 
-Adding a new [asset](https://bruin-data.github.io/bruin/assets/ingestr.html) is as simple as creating a new file inside the assets folder. Let's create a new [ingestr asset](https://bruin-data.github.io/bruin/assets/ingestr.html) file `asset.ingetsr.notion.yml` inside assets folder and add :
+Adding a new [asset](../../assets/definition-schema.md) is as simple as creating a new file inside the assets folder. Let's create a new [ingestr asset](../../assets/ingestr.md) file `asset.ingetsr.notion.yml` inside assets folder and add :
 
  ```
 name: public.notion
