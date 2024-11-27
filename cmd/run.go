@@ -285,7 +285,7 @@ func Run(isDebug *bool) *cli.Command {
 			runMain := true
 			runChecks := true
 			runPushMetadata := c.Bool("push-metadata") || foundPipeline.MetadataPush.HasAnyEnabled()
-			if !runPushMetadata {
+			if runPushMetadata {
 				foundPipeline.MetadataPush.Global = true
 			}
 
