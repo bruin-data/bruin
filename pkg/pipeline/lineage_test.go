@@ -17,7 +17,6 @@ func TestParseLineageRecursively(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			tc(t)
@@ -147,7 +146,6 @@ func assertColumns(t *testing.T, got, want []Column, wantCount int) {
 }
 
 func testBasicRecursiveParsing(t *testing.T) {
-
 	tests := []struct {
 		name     string
 		pipeline *Pipeline
@@ -457,7 +455,6 @@ func testBasicRecursiveParsing(t *testing.T) {
 }
 
 func testJoinsAndComplexQueries(t *testing.T) {
-
 	tests := []struct {
 		name     string
 		pipeline *Pipeline
@@ -682,7 +679,6 @@ func testJoinsAndComplexQueries(t *testing.T) {
 }
 
 func testAdvancedSQLFeatures(t *testing.T) {
-
 	tests := []struct {
 		name     string
 		pipeline *Pipeline
@@ -790,7 +786,6 @@ func testAdvancedSQLFeatures(t *testing.T) {
 }
 
 func testDialectSpecificFeatures(t *testing.T) {
-
 	tests := []struct {
 		name     string
 		pipeline *Pipeline
