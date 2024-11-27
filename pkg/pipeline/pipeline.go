@@ -900,7 +900,7 @@ func PipelineFromPath(filePath string, fs afero.Fs) (*Pipeline, error) {
 }
 
 type MetadataPush struct {
-	Global   bool
+	Global   bool `json:"-"`
 	BigQuery bool `json:"bigquery" yaml:"bigquery" mapstructure:"bigquery"`
 }
 
