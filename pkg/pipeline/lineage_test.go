@@ -17,8 +17,7 @@ func TestParseLineageRecursively(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
-		t.Parallel()
-		t.Run(name, func(t *testing.T) {
+		_ = t.Run(name, func(t *testing.T) {
 			tc(t)
 		})
 	}
