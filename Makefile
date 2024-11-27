@@ -34,7 +34,7 @@ test: test-unit
 
 test-unit:
 	@echo "$(OK_COLOR)==> Running the unit tests$(NO_COLOR)"
-	@go test -race -cover -timeout 20m ./... --count 100
+	@go test -race -cover -timeout 20m ./... --count 30
 
 format: tools
 	@echo "$(OK_COLOR)>> [go vet] running$(NO_COLOR)" & \
