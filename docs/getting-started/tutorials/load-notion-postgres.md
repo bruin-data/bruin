@@ -1,17 +1,16 @@
 ## Loading Notion Data To PostgreSQL Database Using Bruin
-[Notion](https://www.notion.so) is an all-in-one workspace for note-taking, project management, and database management.
-For more information, read [here](https://github.com/bruin-data/ingestr/blob/main/docs/supported-sources/notion.md)
+Welcome! 👋 This tutorial is a simple, step-by-step guide to help you load data from Notion into a PostgreSQL database using Bruin.
+Notion is an incredibly versatile tool for organizing projects, taking notes, and managing databases.
+However, when you want to leverage this data for analytics, reporting, or integration with other systems, you often need to move it into a structured database like PostgreSQL.
+That’s where Bruin comes in. Bruin makes it easy to automate and manage data pipelines, letting you move data from Notion (and other sources) to destinations like PostgreSQL with minimal effort.
+
+If you’re just starting out, don’t worry—this guide is designed for beginners. You’ll learn the basics of setting up a Bruin project, creating a pipeline,
+and connecting Notion with PostgreSQL. By the end, you’ll have a working example that you can extend or customize for your own needs.
 
 ### Prerequisites
 #### Bruin CLI
 
 To install Bruin CLI depending upon your machine, follow the installation instructions [here](https://github.com/bruin-data/bruin/blob/f799133136aba1b0eea673d731f236a4b5e78752/docs/getting-started/introduction/installation.md)
-
-If you are on macOS, you can use brew to install Bruin:
-
-```
-brew install bruin-data/tap/bruin
-```
 
 #### Bruin VSCode Extension
 To install bruin vscode extension, follow the instruction [here](https://github.com/bruin-data/bruin/blob/f799133136aba1b0eea673d731f236a4b5e78752/docs/vscode-extension/installation.md)
@@ -20,7 +19,6 @@ To install bruin vscode extension, follow the instruction [here](https://github.
 
 
 ### Getting Started
-#### Create your first Bruin project
 
 To create a bruin project basic structure you can just run
 
@@ -89,7 +87,15 @@ You can customize your pipeline by adding in pipeline.yml
 
 
 
-#### This is what Notion data looks like at the destination: 
+#### This is what Notion data looks like at the destination:
 <br>
 <img width="968" alt="notion_dest" src="https://github.com/user-attachments/assets/bdf4f4af-30b9-44a9-bd32-ba004ad501d5">
 
+
+🎉 Congratulations!
+
+You've successfully created and run your first Bruin pipeline! Your Notion data is now ingested into PostgreSQL, ready for you to query and explore. This is just the beginning—feel free to extend this pipeline, add more data sources, or incorporate data transformations to suit your needs.
+
+For more advanced features and customization, check out the Bruin documentation.
+
+Happy data engineering! 🚀
