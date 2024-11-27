@@ -13,7 +13,6 @@ import (
 
 	"github.com/bruin-data/bruin/internal/data"
 	"github.com/bruin-data/bruin/pythonsrc"
-
 	"github.com/kluctl/go-embed-python/embed_util"
 	"github.com/kluctl/go-embed-python/python"
 	"github.com/pkg/errors"
@@ -61,7 +60,6 @@ func NewSQLParser() (*SQLParser, error) {
 func (s *SQLParser) Start() error {
 	s.startMutex.Lock()
 	defer s.startMutex.Unlock()
-
 
 	if s.started {
 		return nil
