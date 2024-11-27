@@ -1,4 +1,4 @@
-# Bruin - Sample Pipeline
+# Bruin - Gorgias to Bigquery Template
 
 This pipeline is a simple example of a Bruin pipeline that copies data from Gorgias to BigQuery. It copies data from the following resources:
 - `customers`

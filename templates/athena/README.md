@@ -1,4 +1,4 @@
-# Bruin - Athena Pipeline
+# Bruin - Athena Template
 
 This pipeline template is designed for data processing workflows using Amazon Athena. It demonstrates how to use Bruin to define and execute SQL queries in Athena with a predefined schedule and set of assets.
 
