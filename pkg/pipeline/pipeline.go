@@ -38,6 +38,7 @@ const (
 	AssetTypeDatabricksQuery      = AssetType("databricks.sql")
 	AssetTypeSynapseQuery         = AssetType("synapse.sql")
 	AssetTypeIngestr              = AssetType("ingestr")
+	AssetTypeTableau              = AssetType("tableau")
 
 	RunConfigFullRefresh = RunConfig("full-refresh")
 	RunConfigStartDate   = RunConfig("start-date")

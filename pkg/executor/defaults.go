@@ -114,4 +114,7 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 	pipeline.AssetTypeIngestr: {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
+	pipeline.AssetTypeTableau: {
+		scheduler.TaskInstanceTypeMain: NoOpOperator{},
+	},
 }
