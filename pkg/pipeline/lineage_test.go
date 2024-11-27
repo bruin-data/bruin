@@ -6,6 +6,25 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
+func TestParseLineageRecursively(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]func(*testing.T){
+		"basic recursive parsing":   testBasicRecursiveParsing,
+		"joins and complex queries": testJoinsAndComplexQueries,
+		"advanced SQL features":     testAdvancedSQLFeatures,
+		"dialect specific features": testDialectSpecificFeatures,
+	}
+
+	for name, tc := range testCases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			tc(t)
+		})
+	}
+}
+
 func runLineageTests(t *testing.T, tests []struct {
 	name     string
 	pipeline *Pipeline
@@ -127,8 +146,8 @@ func assertColumns(t *testing.T, got, want []Column, wantCount int) {
 	}
 }
 
-func TestBasicRecursiveParsing(t *testing.T) {
-	t.Parallel()
+func testBasicRecursiveParsing(t *testing.T) {
+
 	tests := []struct {
 		name     string
 		pipeline *Pipeline
@@ -437,8 +456,8 @@ func TestBasicRecursiveParsing(t *testing.T) {
 	runLineageTests(t, tests)
 }
 
-func TestJoinsAndComplexQueries(t *testing.T) {
-	t.Parallel()
+func testJoinsAndComplexQueries(t *testing.T) {
+
 	tests := []struct {
 		name     string
 		pipeline *Pipeline
@@ -662,8 +681,8 @@ func TestJoinsAndComplexQueries(t *testing.T) {
 	runLineageTests(t, tests)
 }
 
-func TestAdvancedSQLFeatures(t *testing.T) {
-	t.Parallel()
+func testAdvancedSQLFeatures(t *testing.T) {
+
 	tests := []struct {
 		name     string
 		pipeline *Pipeline
@@ -770,8 +789,8 @@ func TestAdvancedSQLFeatures(t *testing.T) {
 	runLineageTests(t, tests)
 }
 
-func TestDialectSpecificFeatures(t *testing.T) {
-	t.Parallel()
+func testDialectSpecificFeatures(t *testing.T) {
+
 	tests := []struct {
 		name     string
 		pipeline *Pipeline
