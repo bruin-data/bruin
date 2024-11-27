@@ -56,7 +56,9 @@ func (p *LineageExtractor) ColumnLineage(asset *Asset) error {
 		_ = p.ColumnLineage(upstreamAsset)
 	}
 
-	_ = p.parseLineage(asset)
+	if asset.Type != AssetTypeEmpty && asset.Type != AssetTypePython && asset.Type != AssetTypeIngestr && strings.HasSuffix(string(asset.Type), ".sql") {
+		_ = p.parseLineage(asset)
+	}
 
 	return nil
 }
