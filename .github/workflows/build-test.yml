@@ -16,7 +16,6 @@ on:
   pull_request:
     branches: [ main ]
     paths-ignore:
-      - 'docs/**'
       - 'examples/**'
       - 'resources/**'
       - 'templates/**'
@@ -126,3 +125,29 @@ jobs:
       - name: Run GoReleaser
         run: |
           docker run -e VERSION=0.0.0 -e COMMIT_SHA=${{ github.sha }}  -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 build --snapshot --clean --id bruin-darwin --id bruin-linux-amd64 --id bruin-linux-arm64  --single-target
+  
+
+  docs-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build documentation
+        run: npm run docs:build
+
+      - name: Verify documentation output
+        run: |
+          if [ ! -d "./docs/.vitepress/dist" ]; then
+            echo "Docs build failed: Output directory not found!"
+            exit 1
+          fi
