@@ -16,6 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -157,12 +158,12 @@ func Lint(isDebug *bool) *cli.Command {
 				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
 				logger.Debugf("running %d rules for pipeline validation", len(rules))
 				infoPrinter.Printf("Validating pipelines in '%s' for '%s' environment...\n", rootPath, cm.SelectedEnvironmentName)
-				result, errr = linter.Lint(rootPath, pipelineDefinitionFile)
+				result, errr = linter.Lint(rootPath, pipelineDefinitionFile, c)
 			} else {
 				rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
 				logger.Debugf("running %d rules for asset-only validation", len(rules))
 				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
-				result, errr = linter.LintAsset(rootPath, pipelineDefinitionFile, asset)
+				result, errr = linter.LintAsset(rootPath, pipelineDefinitionFile, asset, c)
 			}
 
 			printer := lint.Printer{RootCheckPath: rootPath}
@@ -188,6 +189,8 @@ func Lint(isDebug *bool) *cli.Command {
 			}
 			return nil
 		},
+		Before: telemetry.BeforeCommand,
+		After:  telemetry.AfterCommand,
 	}
 }
 

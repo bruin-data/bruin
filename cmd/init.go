@@ -12,6 +12,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/bruin-data/bruin/templates"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/afero"
@@ -222,5 +223,7 @@ func Init() *cli.Command {
 
 			return nil
 		},
+		Before: telemetry.BeforeCommand,
+		After:  telemetry.AfterCommand,
 	}
 }
