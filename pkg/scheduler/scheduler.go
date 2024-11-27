@@ -404,19 +404,17 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline) *Scheduler {
 			instances = append(instances, testInstance)
 		}
 
-		if p.MetadataPush.HasAnyEnabled() {
-			instances = append(instances, &MetadataPushInstance{
-				AssetInstance: &AssetInstance{
-					ID:         uuid.New().String(),
-					HumanID:    task.Name + ":metadata-push",
-					Pipeline:   p,
-					Asset:      task,
-					status:     Pending,
-					upstream:   make([]TaskInstance, 0),
-					downstream: make([]TaskInstance, 0),
-				},
-			})
-		}
+		instances = append(instances, &MetadataPushInstance{
+			AssetInstance: &AssetInstance{
+				ID:         uuid.New().String(),
+				HumanID:    task.Name + ":metadata-push",
+				Pipeline:   p,
+				Asset:      task,
+				status:     Pending,
+				upstream:   make([]TaskInstance, 0),
+				downstream: make([]TaskInstance, 0),
+			},
+		})
 	}
 
 	s := &Scheduler{
