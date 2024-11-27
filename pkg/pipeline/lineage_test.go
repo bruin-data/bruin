@@ -8,21 +8,24 @@ import (
 
 var sqlParserInstance = &sqlparser.SQLParser{}
 
-func setup() {
+func setup() error {
 	var err error
 	sqlParserInstance, err = sqlparser.NewSQLParser()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	err = sqlParserInstance.Start()
 	if err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 func TestParseLineageRecursively(t *testing.T) {
 	t.Parallel()
-	setup()
+	if err := setup(); err != nil {
+		panic("error")
+	}
 	testCases := map[string]func(*testing.T){
 		"basic recursive parsing":   testBasicRecursiveParsing,
 		"joins and complex queries": testJoinsAndComplexQueries,
