@@ -128,6 +128,7 @@ func assertColumns(t *testing.T, got, want []Column, wantCount int) {
 }
 
 func TestBasicRecursiveParsing(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		pipeline *Pipeline
@@ -437,6 +438,7 @@ func TestBasicRecursiveParsing(t *testing.T) {
 }
 
 func TestJoinsAndComplexQueries(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		pipeline *Pipeline
@@ -657,11 +659,11 @@ func TestJoinsAndComplexQueries(t *testing.T) {
 			want: nil,
 		},
 	}
-	_ = setup()
 	runLineageTests(t, tests)
 }
 
 func TestAdvancedSQLFeatures(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		pipeline *Pipeline
@@ -764,11 +766,12 @@ func TestAdvancedSQLFeatures(t *testing.T) {
 			want: nil,
 		},
 	}
-	_ = setup()
+
 	runLineageTests(t, tests)
 }
 
 func TestDialectSpecificFeatures(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		pipeline *Pipeline
@@ -1022,6 +1025,6 @@ func TestDialectSpecificFeatures(t *testing.T) {
 			want: nil,
 		},
 	}
-	_ = setup()
+
 	runLineageTests(t, tests)
 }
