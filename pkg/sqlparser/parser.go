@@ -2,6 +2,7 @@ package sqlparser
 
 import (
 	"bufio"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,7 +19,6 @@ import (
 	"github.com/kluctl/go-embed-python/embed_util"
 	"github.com/kluctl/go-embed-python/python"
 	"github.com/pkg/errors"
-	"golang.org/x/exp/rand"
 )
 
 type SQLParser struct {
@@ -36,7 +36,14 @@ type SQLParser struct {
 }
 
 func NewSQLParser() (*SQLParser, error) {
-	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("bruin-cli-embedded-%d", rand.Int()))
+	b := make([]byte, 4)
+	_, err := rand.Read(b)
+	if err != nil {
+		return nil, err
+	}
+	randomInt := int(b[0])
+
+	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("bruin-cli-embedded-%d", randomInt))
 
 	ep, err := python.NewEmbeddedPythonWithTmpDir(tmpDir+"-python", true)
 	if err != nil {
@@ -63,11 +70,9 @@ func NewSQLParser() (*SQLParser, error) {
 func (s *SQLParser) Start() error {
 	s.startMutex.Lock()
 	defer s.startMutex.Unlock()
-
 	if s.started {
 		return nil
 	}
-
 	err := backoff.Retry(func() error {
 		var err error
 		args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
@@ -98,8 +103,9 @@ func (s *SQLParser) Start() error {
 		return err
 	}, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 5))
 	if err != nil {
-		return errors.Wrap(err, "failed to run init command")
+		return errors.Wrap(err, "failed to start sql parser after retries")
 	}
+
 	s.started = true
 	return nil
 }

@@ -32,25 +32,28 @@ func runLineageTests(t *testing.T, tests []struct {
 },
 ) {
 	t.Helper()
-	sqlParserInstance, err := sqlparser.NewSQLParser()
-	if err != nil {
-		panic(err)
-	}
-	err = sqlParserInstance.Start()
-	if err != nil {
-		panic(err)
-	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			runSingleLineageTest(t, tt.pipeline, tt.after, tt.want, sqlParserInstance)
+			t.Parallel()
+
+			runSingleLineageTest(t, tt.pipeline, tt.after, tt.want)
 		})
 	}
 }
 
-func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error, parser *sqlparser.SQLParser) {
+func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error) {
 	t.Helper()
 
-	extractor := NewLineageExtractor(p, parser)
+	sqlParser, err := sqlparser.NewSQLParser()
+	if err != nil {
+		t.Errorf("error initializing SQL parser: %v", err)
+	}
+	err = sqlParser.Start()
+	if err != nil {
+		t.Errorf("error starting SQL parser: %v", err)
+	}
+	extractor := NewLineageExtractor(p, sqlParser)
 
 	for _, asset := range p.Assets {
 		if err := extractor.TableSchema(); err != nil {
@@ -450,7 +453,6 @@ func testBasicRecursiveParsing(t *testing.T) {
 			want: nil,
 		},
 	}
-
 	runLineageTests(t, tests)
 }
 
@@ -781,7 +783,6 @@ func testAdvancedSQLFeatures(t *testing.T) {
 			want: nil,
 		},
 	}
-
 	runLineageTests(t, tests)
 }
 
@@ -1039,6 +1040,5 @@ func testDialectSpecificFeatures(t *testing.T) {
 			want: nil,
 		},
 	}
-
 	runLineageTests(t, tests)
 }
