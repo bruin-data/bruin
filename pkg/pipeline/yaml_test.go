@@ -63,8 +63,9 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Secrets:    []pipeline.SecretMapping{},
 				Upstreams: []pipeline.Upstream{
 					{
-						Type:  "asset",
-						Value: "gcs-to-bq",
+						Type:    "asset",
+						Value:   "gcs-to-bq",
+						Columns: make([]pipeline.DependsColumn, 0),
 					},
 				},
 				Materialization: pipeline.Materialization{
@@ -136,8 +137,9 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Secrets:    []pipeline.SecretMapping{},
 				Upstreams: []pipeline.Upstream{
 					{
-						Type:  "asset",
-						Value: "gcs-to-bq",
+						Type:    "asset",
+						Value:   "gcs-to-bq",
+						Columns: make([]pipeline.DependsColumn, 0),
 					},
 				},
 				Columns:      make([]pipeline.Column, 0),
@@ -167,8 +169,9 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Secrets:    []pipeline.SecretMapping{},
 				Upstreams: []pipeline.Upstream{
 					{
-						Type:  "asset",
-						Value: "gcs-to-bq",
+						Type:    "asset",
+						Value:   "gcs-to-bq",
+						Columns: make([]pipeline.DependsColumn, 0),
 					},
 				},
 				Columns:      make([]pipeline.Column, 0),
@@ -198,8 +201,9 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Secrets:    []pipeline.SecretMapping{},
 				Upstreams: []pipeline.Upstream{
 					{
-						Type:  "asset",
-						Value: "gcs-to-bq",
+						Type:    "asset",
+						Value:   "gcs-to-bq",
+						Columns: make([]pipeline.DependsColumn, 0),
 					},
 				},
 				Columns:      make([]pipeline.Column, 0),
@@ -212,7 +216,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				filePath: filepath.Join("testdata", "yaml", "random-structure", "task.yml"),
 			},
 			wantErr: true,
-			err:     errors.New("`depends` field must be an array of strings or mappings with `value` and `type` keys"),
+			err:     errors.New("Malformed `depends` items"),
 		},
 	}
 	for _, tt := range tests {
@@ -260,16 +264,34 @@ func TestUpstreams(t *testing.T) {
 		},
 		Upstreams: []pipeline.Upstream{
 			{
-				Type:  "asset",
-				Value: "some_asset",
+				Type:    "asset",
+				Value:   "some_asset",
+				Columns: make([]pipeline.DependsColumn, 0),
 			},
 			{
-				Type:  "uri",
-				Value: "bigquery://project.database/schema",
+				Type:    "uri",
+				Value:   "bigquery://project.database/schema",
+				Columns: make([]pipeline.DependsColumn, 0),
 			},
 			{
-				Type:  "asset",
-				Value: "some_other_asset",
+				Type:    "asset",
+				Value:   "some_other_asset",
+				Columns: make([]pipeline.DependsColumn, 0),
+			},
+			{
+				Type:    "asset",
+				Value:   "other_asset",
+				Columns: []pipeline.DependsColumn{{Name: "col1", Usage: ""}, {Name: "col2", Usage: ""}},
+			},
+			{
+				Type:    "asset",
+				Value:   "other_asset2",
+				Columns: []pipeline.DependsColumn{{Name: "col3", Usage: ""}, {Name: "col4", Usage: "CLAUSE"}},
+			},
+			{
+				Type:    "asset",
+				Value:   "yet_another_asset",
+				Columns: []pipeline.DependsColumn{{Name: "col5", Usage: ""}, {Name: "col6", Usage: "CLAUSE"}},
 			},
 		},
 	}
