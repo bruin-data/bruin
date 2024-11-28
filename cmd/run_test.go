@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
@@ -122,6 +123,78 @@ func TestExcludeAssetsByTag(t *testing.T) {
 
 			// Assert the count of excluded assets
 			assert.Equal(t, tt.expectedExcluded, excludedCount)
+		})
+	}
+}
+
+func TestHandleIncludeTag(t *testing.T) {
+	t.Parallel()
+	// Mock pipeline setup
+	asset1 := &pipeline.Asset{Name: "asset1", Tags: []string{"tag1", "tag2"}}
+	asset2 := &pipeline.Asset{Name: "asset2", Tags: []string{"tag1"}}
+	asset3 := &pipeline.Asset{Name: "asset3", Tags: []string{"tag2"}}
+	asset4 := &pipeline.Asset{Name: "asset4", Tags: []string{"tag3"}}
+	asset5 := &pipeline.Asset{Name: "asset5", Tags: []string{}}
+	asset6 := &pipeline.Asset{Name: "asset6", Tags: []string{"tag1"}}
+	mockPipeline := &pipeline.Pipeline{
+		Assets: []*pipeline.Asset{
+			asset1,
+			asset2,
+			asset3,
+			asset4,
+			asset5,
+			asset6,
+		},
+	}
+	// Mock scheduler setup
+	mockScheduler := scheduler.NewScheduler(nil, mockPipeline)
+
+	tests := []struct {
+		name               string
+		Tag                string
+		expectedIncluded   int
+		runDownStreamTasks bool
+	}{
+		{
+			name:               "valid IncludeTag,empty downstream",
+			Tag:                "tag2",
+			expectedIncluded:   2,
+			runDownStreamTasks: true,
+		},
+
+		{
+			name:               "non existent tag",
+			Tag:                "null-tag",
+			expectedIncluded:   0,
+			runDownStreamTasks: true,
+		},
+
+		{
+			name:               "Empty includeTag",
+			Tag:                "",
+			expectedIncluded:   0,
+			runDownStreamTasks: true,
+		},
+	}
+	// Mutex to protect shared resources
+	var mu sync.Mutex
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Lock the mutex to protect shared resources
+			mu.Lock()
+			defer mu.Unlock()
+
+			// Run the function
+			assets, err := handleIncludeTag(tt.Tag, mockPipeline, mockScheduler, tt.runDownStreamTasks)
+			if err != nil {
+				assert.EqualError(t, err, fmt.Sprintf("no assets found with tag '%s'", tt.Tag))
+			} else {
+				includedCount := len(assets)
+				assert.Equal(t, tt.expectedIncluded, includedCount)
+			}
 		})
 	}
 }
