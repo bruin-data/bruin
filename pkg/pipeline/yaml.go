@@ -61,7 +61,7 @@ func (a *depends) UnmarshalYAML(value *yaml.Node) error {
 
 func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 	if value.Kind == yaml.ScalarNode {
-		*u = upstream{Value: value.Value, Type: "asset", Columns: *new(columns)}
+		*u = upstream{Value: value.Value, Type: "asset", Columns: columns(nil)}
 		return nil
 	}
 
@@ -74,7 +74,7 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 	uri, foundURI := us["uri"]
 	asset, foundAsset := us["asset"]
 	cols, foundColumns := us["columns"]
-	colsStruct := *new(columns)
+	colsStruct := columns(nil)
 
 	if foundColumns {
 		colsSlice, ok := cols.([]any)
@@ -103,7 +103,6 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 
 			colsStruct = append(colsStruct, upstreamColumn{Name: nameString, Usage: colMap["usage"].(string)})
 		}
-
 	}
 
 	if foundURI && !foundAsset {
@@ -368,10 +367,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 	for index, dep := range definition.Depends {
 		cols := make([]DependsColumn, 0)
 		for _, col := range dep.Columns {
-			cols = append(cols, DependsColumn{
-				Name:  col.Name,
-				Usage: col.Usage,
-			})
+			cols = append(cols, DependsColumn(col))
 		}
 
 		upstreams[index] = Upstream{
