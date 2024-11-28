@@ -1,11 +1,5 @@
 # Loading Notion Data To PostgreSQL Database Using Bruin
-Welcome! 👋 This tutorial is a simple, step-by-step guide to help you load data from Notion into a PostgreSQL database using Bruin.
-Notion is an incredibly versatile tool for organizing projects, taking notes, and managing databases.
-However, when you want to leverage this data for analytics, reporting, or integration with other systems, you often need to move it into a structured database like PostgreSQL.
-That’s where Bruin comes in. Bruin makes it easy to automate and manage data pipelines, letting you move data from Notion (and other sources) to destinations like PostgreSQL with minimal effort.
-
-If you’re just starting out, don’t worry—this guide is designed for beginners. You’ll learn the basics of setting up a Bruin project, creating a pipeline,
-and connecting Notion with PostgreSQL. By the end, you’ll have a working example that you can extend or customize for your own needs.
+Welcome! 👋 This tutorial is a simple, step-by-step guide to help you load data from Notion into a PostgreSQL database using Bruin. Notion is an incredibly versatile tool for organizing projects, taking notes, and managing databases. However, when you want to leverage this data for analytics, reporting, or integration with other systems, you often need to move it into a structured database like PostgreSQL. That’s where Bruin comes in. Bruin makes it easy to automate and manage data pipelines, letting you move data from Notion (and other sources) to destinations like PostgreSQL with minimal effort. If you’re just starting out, don’t worry—this guide is designed for beginners. You’ll learn the basics of setting up a Bruin project, creating a pipeline, and connecting Notion with PostgreSQL. By the end, you’ll have a working example that you can extend or customize for your own needs.
 
 ### Prerequisites
 #### Bruin CLI
@@ -94,8 +88,6 @@ You can customize your pipeline by adding in pipeline.yml
 
 🎉 Congratulations!
 
-You've successfully created and run your first Bruin pipeline! Your Notion data is now ingested into PostgreSQL, ready for you to query and explore. This is just the beginning—feel free to extend this pipeline, add more data sources, or incorporate data transformations to suit your needs.
-
-For more advanced features and customization, check out the Bruin documentation.
+You've successfully created and run your first Bruin pipeline! Your Notion data is now ingested into PostgreSQL, ready for you to query and explore. This is just the beginning—feel free to extend this pipeline, add more data sources, or incorporate data transformations to suit your needs. For more advanced features and customization, check out the Bruin documentation.
 
 Happy data engineering! 🚀
