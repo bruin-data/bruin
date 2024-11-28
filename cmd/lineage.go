@@ -6,6 +6,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
 )
@@ -35,6 +36,8 @@ func Lineage() *cli.Command {
 
 			return r.Run(c.Args().Get(0), c.Bool("full"), c.String("output"))
 		},
+		Before: telemetry.BeforeCommand,
+		After:  telemetry.AfterCommand,
 	}
 }
 

@@ -2,7 +2,9 @@ package sqlparser
 
 import (
 	"bufio"
+	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -13,103 +15,10 @@ import (
 
 	"github.com/bruin-data/bruin/internal/data"
 	"github.com/bruin-data/bruin/pythonsrc"
-	backoff "github.com/cenkalti/backoff/v4"
 	"github.com/kluctl/go-embed-python/embed_util"
 	"github.com/kluctl/go-embed-python/python"
 	"github.com/pkg/errors"
-	"github.com/sourcegraph/conc"
 )
-
-type SQLParserPool struct {
-	parsers     []*SQLParser
-	workerCount int
-	mut         sync.Mutex
-	counter     int
-}
-
-func NewSQLParserPool(workerCount int) (*SQLParserPool, error) {
-	sp := &SQLParserPool{
-		parsers:     make([]*SQLParser, workerCount),
-		workerCount: workerCount,
-	}
-
-	var mut sync.Mutex
-	var wg conc.WaitGroup
-	for i := range workerCount {
-		wg.Go(func() {
-			p, err := NewSQLParser()
-			if err != nil {
-				panic(err)
-			}
-			mut.Lock()
-			defer mut.Unlock()
-			sp.parsers[i] = p
-		})
-	}
-
-	panics := wg.WaitAndRecover()
-	if panics != nil {
-		return nil, panics.AsError()
-	}
-
-	return sp, nil
-}
-
-func (sp *SQLParserPool) Start() error {
-	var wg conc.WaitGroup
-	for _, parser := range sp.parsers {
-		wg.Go(func() {
-			err := parser.Start()
-			if err != nil {
-				panic(err)
-			}
-		})
-	}
-
-	panics := wg.WaitAndRecover()
-	if panics != nil {
-		return panics.AsError()
-	}
-
-	return nil
-}
-
-func (sp *SQLParserPool) Close() error {
-	var wg conc.WaitGroup
-	for _, parser := range sp.parsers {
-		wg.Go(func() {
-			err := parser.Close()
-			if err != nil {
-				panic(err)
-			}
-		})
-	}
-
-	panics := wg.WaitAndRecover()
-	if panics != nil {
-		return panics.AsError()
-	}
-
-	return nil
-}
-
-func (sp *SQLParserPool) ColumnLineage(sql, dialect string, schema Schema) (*Lineage, error) {
-	sp.mut.Lock()
-	runner := sp.parsers[sp.counter%sp.workerCount]
-	sp.counter++
-	sp.mut.Unlock()
-
-	return runner.ColumnLineage(sql, dialect, schema)
-}
-
-func (sp *SQLParserPool) UsedTables(sql, dialect string) ([]string, error) {
-	sp.mut.Lock()
-	runner := sp.parsers[sp.counter%sp.workerCount]
-	sp.counter++
-	sp.mut.Unlock()
-
-	return runner.UsedTables(sql, dialect)
-}
 
 type SQLParser struct {
 	ep          *python.EmbeddedPython
@@ -126,7 +35,14 @@ type SQLParser struct {
 }
 
 func NewSQLParser() (*SQLParser, error) {
-	tmpDir := filepath.Join(os.TempDir(), "bruin-cli-embedded")
+	b := make([]byte, 4)
+	_, err := rand.Read(b)
+	if err != nil {
+		return nil, err
+	}
+	randomInt := int(b[0])
+
+	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("bruin-cli-embedded-%d", randomInt))
 
 	ep, err := python.NewEmbeddedPythonWithTmpDir(tmpDir+"-python", true)
 	if err != nil {
@@ -153,38 +69,37 @@ func NewSQLParser() (*SQLParser, error) {
 func (s *SQLParser) Start() error {
 	s.startMutex.Lock()
 	defer s.startMutex.Unlock()
-	err := backoff.Retry(func() error {
-		if s.started {
-			return nil
-		}
-		var err error
-		args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
-		s.cmd, err = s.ep.PythonCmd(args...)
-		if err != nil {
-			return err
-		}
-		s.cmd.Stderr = os.Stderr
+	if s.started {
+		return nil
+	}
 
-		s.stdout, err = s.cmd.StdoutPipe()
-		if err != nil {
-			return err
-		}
-
-		s.stdin, err = s.cmd.StdinPipe()
-		if err != nil {
-			return err
-		}
-
-		err = s.cmd.Start()
-		if err != nil {
-			return err
-		}
-
-		_, err = s.sendCommand(&parserCommand{
-			Command: "init",
-		})
+	var err error
+	args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
+	s.cmd, err = s.ep.PythonCmd(args...)
+	if err != nil {
 		return err
-	}, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 5))
+	}
+	s.cmd.Stderr = os.Stderr
+
+	s.stdout, err = s.cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+
+	s.stdin, err = s.cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+
+	err = s.cmd.Start()
+	if err != nil {
+		return err
+	}
+
+	_, err = s.sendCommand(&parserCommand{
+		Command: "init",
+	})
+
 	if err != nil {
 		return errors.Wrap(err, "failed to start sql parser after retries")
 	}

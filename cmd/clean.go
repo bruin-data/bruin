@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -30,6 +31,8 @@ func CleanCmd() *cli.Command {
 
 			return r.Run(inputPath)
 		},
+		Before: telemetry.BeforeCommand,
+		After:  telemetry.AfterCommand,
 	}
 }
 
