@@ -216,7 +216,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				filePath: filepath.Join("testdata", "yaml", "random-structure", "task.yml"),
 			},
 			wantErr: true,
-			err:     errors.New("Malformed `depends` field"),
+			err:     errors.New("Malformed `depends` items"),
 		},
 	}
 	for _, tt := range tests {
