@@ -1,6 +1,22 @@
 # Getting Started with Your First Bruin Pipeline: Chess Data to DuckDB
 
-In this guide, you'll learn how to create a simple pipeline that ingests chess data and stores it in DuckDB using Bruin.
+Welcome! 👋 This guide is your starting point for building data pipelines with Bruin—beginning with an easy, 
+hands-on project. You'll learn how to set up a pipeline that fetches chess data from a simple, 
+no-credentials-needed API and stores it in DuckDB, a powerful and efficient database.
+
+The chess API provides a hassle-free way to work with real-world data, 
+making it the perfect starting project for experimenting with Bruin. 
+Think of this as your playground for exploring Bruin’s capabilities.
+
+**By the end of this tutorial, you’ll:**
+- Understand the basics of Bruin CLI 
+- Build a pipeline that ingests data from the chess API
+- Store and query data in DuckDB, ready for analysis or integration
+
+Whether you're new to Bruin, pipelines, or even data engineering in general,
+this guide is designed to help you take your first steps confidently.
+You’ll finish with a working pipeline that you can use as a foundation for more advanced projects. 
+Let's dive in and start building! 🚀
 
 ## Prerequisites
 Before you start, make sure you have the Bruin CLI installed. [Get instructions](../introduction/installation.md).
@@ -96,7 +112,7 @@ After executing the query, you will see the following results displayed in your 
 | magnuscarlsen | https://api.chess.com/pub/player/magnuscarlsen | 6298        | 2267       | 2027       | 3169        | 3129        | 71.54          | 64.78          |
 
 ```
-Congratulations!
+🎉Congratulations!
 
 You've successfully created and run your first Bruin pipeline! Your chess data is now ingested into DuckDB, ready for you to query and explore. This is just the beginning—feel free to extend this pipeline, add more data sources, or incorporate data transformations to suit your needs.
 

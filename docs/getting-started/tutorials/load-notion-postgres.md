@@ -1,4 +1,4 @@
-## Loading Notion Data To PostgreSQL Database Using Bruin
+# Loading Notion Data To PostgreSQL Database Using Bruin
 Welcome! 👋 This tutorial is a simple, step-by-step guide to help you load data from Notion into a PostgreSQL database using Bruin.
 Notion is an incredibly versatile tool for organizing projects, taking notes, and managing databases.
 However, when you want to leverage this data for analytics, reporting, or integration with other systems, you often need to move it into a structured database like PostgreSQL.
@@ -12,15 +12,15 @@ and connecting Notion with PostgreSQL. By the end, you’ll have a working examp
 
 To install Bruin CLI depending upon your machine, follow the installation instructions [here](../introduction/installation.md)
 
-#### Bruin VSCode Extension
-To install bruin vscode extension, follow the instruction [here](../../vscode-extension/installation.md)
+#### Bruin VS Code Extension
+To install Bruin VS Code extension, follow the instruction [here](../../vscode-extension/overview.md)
 
-<img width="685" alt="bruin_extension" src="https://github.com/user-attachments/assets/c74607e8-b822-4927-a100-bfe29446101b">
+<img width="685" alt="bruin_extension" src="./tutorial-media/bruin-extension.png">
 
 
 ### Getting Started
 
-To create a bruin project basic structure you can just run
+To create a bruin project basic structure you can just run:
 
 
    ```
@@ -67,8 +67,8 @@ Using Bruin vscode extension
 - Add destination connection - PostgresSQL
 - Add source connection - Notion
 
-<video width="685" height="auto" controls poster="https://github.com/user-attachments/assets/7f9bac4d-a8d4-4bbf-b114-948ca561f50b">
-  <source src="https://github.com/user-attachments/assets/7ef731e3-386a-420c-9355-01bb307436f7" type="video/mp4">
+<video width="685" height="auto" controls poster="./tutorial-media/vscode-poster.png">
+  <source src="./tutorial-media/vscode-video.mp4">
   Your browser does not support the video tag.
 </video>
 
@@ -80,17 +80,17 @@ You can customize your pipeline by adding in pipeline.yml
 - bruin CLI can run the whole pipeline or any task with the downstreams.
   `Make sure, asset file is open`
 
-<video width="685" height="auto" controls poster="https://github.com/user-attachments/assets/6fe545f3-8112-4ce2-ac96-3abf6dc1021e">
-  <source src="https://github.com/user-attachments/assets/aa6b2c0f-e480-48a5-9975-286af1ab4474" type="video/mp4">
+<video width="685" height="auto" controls poster="./tutorial-media/run-pipeline-poster.png">
+  <source src="./tutorial-media/run-pipeline-video.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
-
+<br>
 
 
 #### This is what Notion data looks like at the destination:
 <br>
-<img width="968" alt="notion_dest" src="https://github.com/user-attachments/assets/bdf4f4af-30b9-44a9-bd32-ba004ad501d5">
 
+<img alt="notion-dest" src="./tutorial-media/notion-table.png" />
 
 🎉 Congratulations!
 
