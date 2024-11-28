@@ -1,7 +1,10 @@
 # `clean`  Command
 
-The `clean` command is used to remove temporary artifacts from your project. 
-It helps maintain a clean development environment by deleting unnecessary `.log` files.
+The `clean` command is used to remove temporary artifacts related to Bruin.
+
+It currently:
+- cleans the cached virtualenv directories inside `~/.bruin` directory
+- removes the `logs` directory from the project root
 
 ## Usage
 
@@ -18,7 +21,6 @@ bruin clean [path-to-project-root]
 bruin clean 
 ```
 #### Output:
-``` plaintext
-Found 107 log files, cleaning them up...
-Successfully removed 107 log files.
-```
+
+
+<img alt="Bruin - clean" src="/clean.gif" style="margin: 10px;" />

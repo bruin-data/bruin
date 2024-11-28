@@ -431,19 +431,18 @@
       ]
     },
     "GoogleSheetsConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
+      "properties":{
+        "name":{"type":"string"},
+        "service_account_json":{
+          "type":"string"
         },
-        "credentials_path": {
-          "type": "string"
+        "service_account_file":{
+          "type":"string"
         }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "credentials_path"
+      },"additionalProperties":false,
+      "type":"object",
+      "required":[
+        "name"
       ]
     },
     "GorgiasConnection": {
@@ -951,7 +950,7 @@
         "oauth_token": {
           "type": "string"
         },
-        "subdomain": {
+        "sub_domain": {
           "type": "string"
         }
       },
@@ -962,7 +961,7 @@
         "api_token",
         "email",
         "oauth_token",
-        "subdomain"
+        "sub_domain"
       ]
     }
   }

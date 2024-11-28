@@ -39,7 +39,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
-	"github.com/rudderlabs/analytics-go/v4"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
 	"github.com/xlab/treeprint"
@@ -121,7 +120,7 @@ func Run(isDebug *bool) *cli.Command {
 				Usage:       "limit the types of tasks to run. By default it will run main and checks, while push-metadata is optional if defined in the pipeline definition",
 			},
 			&cli.BoolFlag{
-				Name:  "exp-use-powershell-for-uv",
+				Name:  "exp-use-winget-for-uv",
 				Usage: "use powershell to manage and install uv on windows, on non-windows systems this has no effect.",
 			},
 			&cli.StringFlag{
@@ -290,6 +289,9 @@ func Run(isDebug *bool) *cli.Command {
 			runMain := true
 			runChecks := true
 			runPushMetadata := c.Bool("push-metadata") || foundPipeline.MetadataPush.HasAnyEnabled()
+			if runPushMetadata {
+				foundPipeline.MetadataPush.Global = true
+			}
 
 			onlyFlags := c.StringSlice("only")
 			if len(onlyFlags) > 0 {
@@ -320,7 +322,7 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			}
 
-			sendTelemetry(s)
+			sendTelemetry(s, c)
 
 			tag := c.String("tag")
 			excludeTag := c.String("exclude")
@@ -373,7 +375,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
-			runCtx = context.WithValue(runCtx, python.CtxUsePowershellForUv, c.Bool("exp-use-powershell-for-uv")) //nolint:staticcheck
+			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, c.Bool("exp-use-winget-for-uv")) //nolint:staticcheck
 
 			ex.Start(runCtx, s.WorkQueue, s.Results)
 
@@ -396,6 +398,8 @@ func Run(isDebug *bool) *cli.Command {
 
 			return nil
 		},
+		Before: telemetry.BeforeCommand,
+		After:  telemetry.AfterCommand,
 	}
 }
 
@@ -735,7 +739,7 @@ func Clean(str string) string {
 	return re.ReplaceAllString(str, "")
 }
 
-func sendTelemetry(s *scheduler.Scheduler) {
+func sendTelemetry(s *scheduler.Scheduler, c *cli.Context) {
 	assetStats := make(map[string]int)
 	for _, asset := range s.GetTaskInstancesByStatus(scheduler.Pending) {
 		_, ok := assetStats[string(asset.GetAsset().Type)]
@@ -744,7 +748,8 @@ func sendTelemetry(s *scheduler.Scheduler) {
 		}
 		assetStats[string(asset.GetAsset().Type)]++
 	}
-	telemetry.SendEvent("running", analytics.Properties{"assets": assetStats})
+
+	telemetry.SendEventWithAssetStats("run_assets", assetStats, c)
 }
 
 func ExcludeAssetsByTag(excludeTag string, p *pipeline.Pipeline, s *scheduler.Scheduler, assetsByTag []*pipeline.Asset) int {

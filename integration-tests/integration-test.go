@@ -33,6 +33,7 @@ func main() {
 		"chess-extended/expectations/player_summary.json",
 	)
 
+	expectExitCode("run happy-path", 0)
 	expectJSONOutput("internal parse-pipeline happy-path", "happy-path/expectations/pipeline.yml.json")
 	expectJSONOutput(
 		"internal parse-asset happy-path/assets/asset.py",

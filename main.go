@@ -7,7 +7,6 @@ import (
 	"github.com/bruin-data/bruin/cmd"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/fatih/color"
-	"github.com/rudderlabs/analytics-go/v4"
 	"github.com/urfave/cli/v2"
 )
 
@@ -17,7 +16,6 @@ var (
 )
 
 func main() {
-	start := time.Now()
 	isDebug := false
 	color.NoColor = false
 
@@ -29,6 +27,8 @@ func main() {
 	telemetry.TelemetryKey = os.Getenv("TELEMETRY_KEY")
 	telemetry.OptOut = optOut
 	telemetry.AppVersion = version
+	client := telemetry.Init()
+	defer client.Close()
 
 	versionCommand := cmd.VersionCmd(commit)
 
@@ -40,37 +40,11 @@ func main() {
 	}
 
 	app := &cli.App{
-		Name:     "bruin",
-		Version:  version,
-		Usage:    "The CLI used for managing Bruin-powered data pipelines",
-		Compiled: time.Now(),
-		Before: func(context *cli.Context) error {
-			telemetry.SendEvent("command", analytics.Properties{
-				"command_start": context.Command.Name,
-				"args":          context.Args().Slice(),
-			})
-			return nil
-		},
-		After: func(context *cli.Context) error {
-			telemetry.SendEvent("command", analytics.Properties{
-				"command_finish": context.Command.Name,
-				"duration":       time.Since(start).Seconds(),
-			})
-			return nil
-		},
-		ExitErrHandler: func(context *cli.Context, err error) {
-			errMsg := "Unknown error"
-			if err != nil {
-				errMsg = err.Error()
-			}
-			telemetry.SendEvent("command", analytics.Properties{
-				"command_error": context.Command.Name,
-				"args":          context.Args().Slice(),
-				"error":         errMsg,
-				"duration":      time.Since(start).Seconds(),
-			})
-			cli.HandleExitCoder(err)
-		},
+		Name:           "bruin",
+		Version:        version,
+		Usage:          "The CLI used for managing Bruin-powered data pipelines",
+		Compiled:       time.Now(),
+		ExitErrHandler: telemetry.ErrorCommand,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:        "debug",
@@ -86,6 +60,7 @@ func main() {
 			cmd.Lineage(),
 			cmd.CleanCmd(),
 			cmd.Format(&isDebug),
+			cmd.Docs(),
 			cmd.Init(),
 			cmd.Internal(),
 			cmd.Environments(&isDebug),

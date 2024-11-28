@@ -141,7 +141,10 @@ environments:
           api_key: "hubspotkey"
       google_sheets:
           - name: conn22
-            credentials_path: "/path/to/service_account.json"
+            service_account_json: "{\"key1\": \"value1\"}"
+
+          - name: conn22-1
+            service_account_file: "/path/to/service_account.json"
       chess:
         - name: conn24
           players:
@@ -155,11 +158,11 @@ environments:
         - name: conn25
           api_token: "zendeskKey"
           email: "zendeskemail"
-          subdomain: "zendeskUrl"
+          sub_domain: "zendeskUrl"
 
         - name: conn25-1
           oauth_token: "zendeskToken"
-          subdomain: "zendeskUrl"
+          sub_domain: "zendeskUrl"
       s3:
         - name: conn25
           bucket_name:  "my-bucket"

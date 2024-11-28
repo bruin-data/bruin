@@ -10,6 +10,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/jedib0t/go-pretty/v6/table"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -26,6 +27,8 @@ func Connections() *cli.Command {
 			DeleteConnection(),
 			PingConnection(),
 		},
+		Before: telemetry.BeforeCommand,
+		After:  telemetry.AfterCommand,
 	}
 }
 

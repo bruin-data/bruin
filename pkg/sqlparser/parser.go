@@ -2,8 +2,9 @@ package sqlparser
 
 import (
 	"bufio"
-	"bytes"
+	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -34,7 +35,14 @@ type SQLParser struct {
 }
 
 func NewSQLParser() (*SQLParser, error) {
-	tmpDir := filepath.Join(os.TempDir(), "bruin-cli-embedded")
+	b := make([]byte, 4)
+	_, err := rand.Read(b)
+	if err != nil {
+		return nil, err
+	}
+	randomInt := int(b[0])
+
+	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("bruin-cli-embedded-%d", randomInt))
 
 	ep, err := python.NewEmbeddedPythonWithTmpDir(tmpDir+"-python", true)
 	if err != nil {
@@ -65,37 +73,35 @@ func (s *SQLParser) Start() error {
 		return nil
 	}
 
+	var err error
 	args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
-	cmd, err := s.ep.PythonCmd(args...)
+	s.cmd, err = s.ep.PythonCmd(args...)
 	if err != nil {
 		return err
 	}
-	cmd.Stderr = os.Stderr
+	s.cmd.Stderr = os.Stderr
 
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-
-	stdin, err := cmd.StdinPipe()
+	s.stdout, err = s.cmd.StdoutPipe()
 	if err != nil {
 		return err
 	}
 
-	err = cmd.Start()
+	s.stdin, err = s.cmd.StdinPipe()
 	if err != nil {
 		return err
 	}
 
-	s.stdin = stdin
-	s.stdout = stdout
-	s.cmd = cmd
+	err = s.cmd.Start()
+	if err != nil {
+		return err
+	}
 
 	_, err = s.sendCommand(&parserCommand{
 		Command: "init",
 	})
+
 	if err != nil {
-		return errors.Wrap(err, "failed to send init command")
+		return errors.Wrap(err, "failed to start sql parser after retries")
 	}
 
 	s.started = true
@@ -201,19 +207,8 @@ func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
 
 	reader := bufio.NewReader(s.stdout)
 
-	line := bytes.NewBuffer(nil)
-	for {
-		l, p, err := reader.ReadLine()
-		if err != nil {
-			return "", err
-		}
-		line.Write(l)
-		if !p {
-			break
-		}
-	}
-
-	return line.String(), nil
+	resp, err := reader.ReadString(byte('\n'))
+	return resp, err
 }
 
 func (s *SQLParser) Close() error {

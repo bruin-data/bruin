@@ -38,6 +38,7 @@ const (
 	AssetTypeDatabricksQuery      = AssetType("databricks.sql")
 	AssetTypeSynapseQuery         = AssetType("synapse.sql")
 	AssetTypeIngestr              = AssetType("ingestr")
+	AssetTypeTableau              = AssetType("tableau")
 
 	RunConfigFullRefresh = RunConfig("full-refresh")
 	RunConfigStartDate   = RunConfig("start-date")
@@ -495,10 +496,16 @@ type CustomCheck struct {
 	Query       string          `json:"query" yaml:"query" mapstructure:"query"`
 }
 
+type DependsColumn struct {
+	Name  string
+	Usage string
+}
+
 type Upstream struct {
-	Type     string         `json:"type" yaml:"type" mapstructure:"type"`
-	Value    string         `json:"value" yaml:"value" mapstructure:"value"`
-	Metadata EmptyStringMap `json:"metadata,omitempty" yaml:"metadata,omitempty" mapstructure:"metadata"`
+	Type     string          `json:"type" yaml:"type" mapstructure:"type"`
+	Value    string          `json:"value" yaml:"value" mapstructure:"value"`
+	Metadata EmptyStringMap  `json:"metadata,omitempty" yaml:"metadata,omitempty" mapstructure:"metadata"`
+	Columns  []DependsColumn `json:"columns,omitempty" yaml:"columns,omitempty" mapstructure:"columns"`
 }
 
 func (u Upstream) MarshalYAML() (interface{}, error) {
@@ -900,11 +907,12 @@ func PipelineFromPath(filePath string, fs afero.Fs) (*Pipeline, error) {
 }
 
 type MetadataPush struct {
+	Global   bool `json:"-"`
 	BigQuery bool `json:"bigquery" yaml:"bigquery" mapstructure:"bigquery"`
 }
 
 func (mp *MetadataPush) HasAnyEnabled() bool {
-	return mp.BigQuery
+	return mp.BigQuery || mp.Global
 }
 
 type Pipeline struct {
