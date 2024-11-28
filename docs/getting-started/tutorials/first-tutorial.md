@@ -7,10 +7,7 @@ Welcome! 👋 This guide is your starting point for building data pipelines with
 - Build a pipeline that ingests data from the chess API
 - Store and query data in DuckDB, ready for analysis or integration
 
-Whether you're new to Bruin, pipelines, or even data engineering in general,
-this guide is designed to help you take your first steps confidently.
-You’ll finish with a working pipeline that you can use as a foundation for more advanced projects. 
-Let's dive in and start building! 🚀
+Whether you're new to Bruin, pipelines, or even data engineering in general, this guide is designed to help you take your first steps confidently. You’ll finish with a working pipeline that you can use as a foundation for more advanced projects. Let's dive in and start building! 🚀
 
 ## Prerequisites
 Before you start, make sure you have the Bruin CLI installed. [Get instructions](../introduction/installation.md).
