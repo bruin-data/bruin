@@ -110,7 +110,7 @@ func expectJSONOutput(command string, jsonFilePath string) {
 	fmt.Println("Passed")
 }
 
-// nolint:unparam // Keeping `code` for future use to handle different exit codes
+//nolint:unparam // Keeping `code` for future use to handle different exit codes
 func expectExitCode(command string, code int) {
 	output, err := runCommand(command)
 	if err != nil {
