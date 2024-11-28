@@ -40,29 +40,6 @@ type upstreamColumn struct {
 	Usage string
 }
 
-func (u *upstreamColumn) UnmarshalYAML(value *yaml.Node) error {
-	if value.Kind == yaml.ScalarNode {
-		*u = upstreamColumn{Name: value.Value, Usage: ""}
-		return nil
-	}
-
-	var uc map[string]string
-	err := value.Decode(&uc)
-	if err != nil {
-		return &ParseError{Msg: "Malformed `depends.column` field"}
-	}
-
-	name, foundName := uc["name"]
-	usage, _ := uc["usage"]
-	if !foundName {
-		return &ParseError{Msg: "Malformed `depends.column` field"}
-	}
-
-	*u = upstreamColumn{Name: name, Usage: usage}
-
-	return nil
-}
-
 type depends []upstream
 
 type upstream struct {
@@ -75,7 +52,7 @@ func (a *depends) UnmarshalYAML(value *yaml.Node) error {
 	var multi []upstream
 	err := value.Decode(&multi)
 	if err != nil {
-		return &ParseError{Msg: "`depends` field must be an array of strings or mappings with `value` and `type` keys"}
+		return &ParseError{Msg: "Malformed `depends` items"}
 	}
 	*a = multi
 
@@ -88,7 +65,7 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 		return nil
 	}
 
-	var us map[string]string
+	var us map[string]any
 	err := value.Decode(&us)
 	if err != nil {
 		return &ParseError{Msg: "Malformed `depends` field"}
@@ -96,18 +73,58 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 
 	uri, foundURI := us["uri"]
 	asset, foundAsset := us["asset"]
+	cols, foundColumns := us["columns"]
+	colsStruct := *new(columns)
+
+	if foundColumns {
+		colsSlice, ok := cols.([]any)
+		if !ok {
+			return &ParseError{Msg: "`columns` is malformed"}
+		}
+
+		for _, col := range colsSlice {
+			colString, ok := col.(string)
+			if ok {
+				colsStruct = append(colsStruct, upstreamColumn{Name: colString, Usage: ""})
+				continue
+			}
+			colMap, ok := col.(map[string]any)
+			if !ok {
+				return &ParseError{Msg: "'columns' is malformed"}
+			}
+			name, ok := colMap["name"]
+			if !ok {
+				return &ParseError{Msg: "Missing 'name' in column"}
+			}
+			nameString, ok := name.(string)
+			if !ok {
+				return &ParseError{Msg: "Malformed 'name' in column"}
+			}
+
+			colsStruct = append(colsStruct, upstreamColumn{Name: nameString, Usage: colMap["usage"].(string)})
+		}
+
+	}
 
 	if foundURI && !foundAsset {
-		*u = upstream{Value: uri, Type: "uri", Columns: *new(columns)}
+		uriString, ok := uri.(string)
+		if !ok {
+			return &ParseError{Msg: "`uri` field must be a string"}
+		}
+		*u = upstream{Value: uriString, Type: "uri", Columns: colsStruct}
 		return nil
 	}
 
 	if foundAsset && !foundURI {
-		*u = upstream{Value: asset, Type: "asset", Columns: *new(columns)}
+		assetString, ok := asset.(string)
+		if !ok {
+			return &ParseError{Msg: "`uri` field must be a string"}
+		}
+		*u = upstream{Value: assetString, Type: "asset", Columns: colsStruct}
 		return nil
 	}
 
-	return &ParseError{Msg: "Malformed `depends` field"}
+	return &ParseError{Msg: "Malformed \"depends\" field"}
 }
 
 type clusterBy []string
@@ -349,7 +366,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 	upstreams := make([]Upstream, len(definition.Depends))
 
 	for index, dep := range definition.Depends {
-		cols := make([]DependsColumn, len(dep.Columns))
+		cols := make([]DependsColumn, 0)
 		for _, col := range dep.Columns {
 			cols = append(cols, DependsColumn{
 				Name:  col.Name,
