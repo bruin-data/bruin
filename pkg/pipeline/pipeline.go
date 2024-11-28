@@ -497,8 +497,8 @@ type CustomCheck struct {
 }
 
 type DependsColumn struct {
-	Name  string
-	Usage string
+	Name  string `json:"name" yaml:"name" mapstructure:"name"`
+	Usage string `json:"usage" yaml:"usage" mapstructure:"usage"`
 }
 
 type Upstream struct {
