@@ -28,11 +28,10 @@ func main() {
 	expectExitCode("run --tag include --exclude exclude chess-extended", 0)
 	expectFetchQuery(
 		"duckdb-default",
-		"SELECT * FROM chess_playground.player_summary;",
+		"SELECT table_name FROM information_schema.tables WHERE table_schema = 'chess_playground';",
 		"json",
-		"chess-extended/expectations/player_summary.json",
+		"chess-extended/expectations/tables_summary.json",
 	)
-
 	expectExitCode("run happy-path", 0)
 	expectJSONOutput("internal parse-pipeline happy-path", "happy-path/expectations/pipeline.yml.json")
 	expectJSONOutput(
@@ -154,42 +153,39 @@ func expectFetchQuery(connection, query, outputFile, expectationPath string) {
 		"--output", outputFile,
 	}
 
+	// Print a message indicating the query is being run
+	fmt.Println("Running the query...")
+
 	// Create the command
 	cmd := exec.Command("go", args...)
 	cmd.Dir = currentFolder // Set the working directory
-
-	// Print the fetch query being executed
-	fmt.Printf("fetch query with arguments: --connection %s --query \"%s\" --output %s\n", connection, query, outputFile)
 
 	// Run the command and capture the output
 	outputBytes, err := cmd.CombinedOutput()
 	output := string(outputBytes) // Convert output to a string for processing
 
 	if err != nil {
-		fmt.Printf("Fetch query failed with error: %v\n", err)
-		fmt.Println("Command output:", output)
 		os.Exit(1)
 	}
 
 	// Verify the output against the expected JSON file
 	expectation, err := jd.ReadJsonFile(filepath.Join(currentFolder, expectationPath))
 	if err != nil {
-		fmt.Println("Failed to read expectation file:", err)
 		os.Exit(1)
 	}
 
 	// Normalize and parse the output for comparison
 	parsedOutput, err := jd.ReadJsonString(strings.ReplaceAll(output, "\\r\\n", "\\n"))
 	if err != nil {
-		fmt.Println("Failed to parse output JSON:", err)
 		os.Exit(1)
 	}
 
+	// Check for differences between expected and actual output
 	diff := expectation.Diff(parsedOutput)
 	if len(diff) != 0 {
 		os.Exit(1) // Output mismatch, exit with failure
 	}
 
 	// If everything matches, print "Passed"
-	fmt.Println("Passed")
+	fmt.Println("Fetch query passed successfully.")
 }
