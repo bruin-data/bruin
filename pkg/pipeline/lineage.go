@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/dialect"
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
@@ -17,6 +18,7 @@ type LineageExtractor struct {
 	Pipeline       *Pipeline
 	sqlParser      sqlParser
 	columnMetadata sqlparser.Schema
+	renderer       *jinja.Renderer
 }
 
 // NewLineageExtractor creates a new LineageExtractor instance.
@@ -25,6 +27,7 @@ func NewLineageExtractor(pipeline *Pipeline, parser sqlParser) *LineageExtractor
 		Pipeline:       pipeline,
 		columnMetadata: make(sqlparser.Schema),
 		sqlParser:      parser,
+		renderer:       jinja.NewRendererWithYesterday(pipeline.Name, "lineage-parser"),
 	}
 }
 
@@ -80,7 +83,11 @@ func (p *LineageExtractor) parseLineage(asset *Asset) error {
 		}
 	}
 
-	lineage, err := p.sqlParser.ColumnLineage(asset.ExecutableFile.Content, dialect, p.columnMetadata)
+	query, err := p.renderer.Render(asset.ExecutableFile.Content)
+	if err != nil {
+		return fmt.Errorf("failed to render the query: %w", err)
+	}
+	lineage, err := p.sqlParser.ColumnLineage(query, dialect, p.columnMetadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse column lineage: %w", err)
 	}
