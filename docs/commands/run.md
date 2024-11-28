@@ -16,20 +16,20 @@ bruin run [FLAGS] [optional path to the pipeline/asset]
 <img alt="Bruin - init" src="/chesspipeline.gif" style="margin: 10px;" />
 ## Flags
 
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `--downstream` | bool | `false` | Run all downstream tasks as well. |
-| `--start-date` | str | Beginning of yesterday | The start date of the range the pipeline will run for. Format: YYYY-MM-DD, YYYY-MM-DD HH:MM:SS, or YYYY-MM-DD HH:MM:SS.ffffff |
-| `--end-date` | str | End of yesterday | The end date of the range the pipeline will run for. Format: YYYY-MM-DD, YYYY-MM-DD HH:MM:SS, or YYYY-MM-DD HH:MM:SS.ffffff |
-| `--environment` | str | - | The environment to use. |
-| `--force` | bool | `false` | Do not ask for confirmation in a production environment. |
-| `--full-refresh` | bool | `false` | Truncate the table before running. |
-| `--no-log-file` | bool | `false` | Do not create a log file for this run. |
-| `--only` | []str | `main`, `checks` | Limit the types of tasks to run. Options: `main`, `checks`, `push-metadata`. |
-| `--push-metadata` | bool | `false` | Push metadata to the destination database if supported (currently BigQuery). |
-| `--tag` | str | - | Pick assets with the given tag. |
-| `--workers` | int | `16` | Number of workers to run tasks in parallel. |
-
+| Flag              | Type | Default | Description                                                                                                                   |
+|-------------------|------|---------|-------------------------------------------------------------------------------------------------------------------------------|
+| `--downstream`    | bool | `false` | Run all downstream tasks as well.                                                                                             |
+| `--start-date`    | str | Beginning of yesterday | The start date of the range the pipeline will run for. Format: YYYY-MM-DD, YYYY-MM-DD HH:MM:SS, or YYYY-MM-DD HH:MM:SS.ffffff |
+| `--end-date`      | str | End of yesterday | The end date of the range the pipeline will run for. Format: YYYY-MM-DD, YYYY-MM-DD HH:MM:SS, or YYYY-MM-DD HH:MM:SS.ffffff   |
+| `--environment`   | str | - | The environment to use.                                                                                                       |
+| `--force`         | bool | `false` | Do not ask for confirmation in a production environment.                                                                      |
+| `--full-refresh`  | bool | `false` | Truncate the table before running.                                                                                            |
+| `--no-log-file`   | bool | `false` | Do not create a log file for this run.                                                                                        |
+| `--only`          | []str | `main`, `checks` | Limit the types of tasks to run. Options: `main`, `checks`, `push-metadata`.                                                  |
+| `--push-metadata` | bool | `false` | Push metadata to the destination database if supported (currently BigQuery).                                                  |
+| `--tag`           | str | - | Pick assets with the given tag.                                                                                               |
+| `--workers`       | int | `16` | Number of workers to run tasks in parallel.                                                                                   |
+| `--exclude`       | str | - | Exclude assets with the given tag from pipeline execution.                                                                    |
 ## Examples
 
 Run the pipeline from the current directory:
