@@ -63,8 +63,9 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Secrets:    []pipeline.SecretMapping{},
 				Upstreams: []pipeline.Upstream{
 					{
-						Type:  "asset",
-						Value: "gcs-to-bq",
+						Type:    "asset",
+						Value:   "gcs-to-bq",
+						Columns: make([]pipeline.DependsColumn, 0),
 					},
 				},
 				Materialization: pipeline.Materialization{
@@ -136,8 +137,9 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Secrets:    []pipeline.SecretMapping{},
 				Upstreams: []pipeline.Upstream{
 					{
-						Type:  "asset",
-						Value: "gcs-to-bq",
+						Type:    "asset",
+						Value:   "gcs-to-bq",
+						Columns: make([]pipeline.DependsColumn, 0),
 					},
 				},
 				Columns:      make([]pipeline.Column, 0),
@@ -167,8 +169,9 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Secrets:    []pipeline.SecretMapping{},
 				Upstreams: []pipeline.Upstream{
 					{
-						Type:  "asset",
-						Value: "gcs-to-bq",
+						Type:    "asset",
+						Value:   "gcs-to-bq",
+						Columns: make([]pipeline.DependsColumn, 0),
 					},
 				},
 				Columns:      make([]pipeline.Column, 0),
@@ -198,8 +201,9 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				Secrets:    []pipeline.SecretMapping{},
 				Upstreams: []pipeline.Upstream{
 					{
-						Type:  "asset",
-						Value: "gcs-to-bq",
+						Type:    "asset",
+						Value:   "gcs-to-bq",
+						Columns: make([]pipeline.DependsColumn, 0),
 					},
 				},
 				Columns:      make([]pipeline.Column, 0),
@@ -260,16 +264,19 @@ func TestUpstreams(t *testing.T) {
 		},
 		Upstreams: []pipeline.Upstream{
 			{
-				Type:  "asset",
-				Value: "some_asset",
+				Type:    "asset",
+				Value:   "some_asset",
+				Columns: make([]pipeline.DependsColumn, 0),
 			},
 			{
-				Type:  "uri",
-				Value: "bigquery://project.database/schema",
+				Type:    "uri",
+				Value:   "bigquery://project.database/schema",
+				Columns: make([]pipeline.DependsColumn, 0),
 			},
 			{
-				Type:  "asset",
-				Value: "some_other_asset",
+				Type:    "asset",
+				Value:   "some_other_asset",
+				Columns: make([]pipeline.DependsColumn, 0),
 			},
 		},
 	}

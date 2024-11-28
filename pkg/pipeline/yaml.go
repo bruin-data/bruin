@@ -33,11 +33,42 @@ func mustBeStringArray(fieldName string, value *yaml.Node) ([]string, error) {
 	return multi, nil
 }
 
+type columns []upstreamColumn
+
+type upstreamColumn struct {
+	Name  string
+	Usage string
+}
+
+func (u *upstreamColumn) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		*u = upstreamColumn{Name: value.Value, Usage: ""}
+		return nil
+	}
+
+	var uc map[string]string
+	err := value.Decode(&uc)
+	if err != nil {
+		return &ParseError{Msg: "Malformed `depends.column` field"}
+	}
+
+	name, foundName := uc["name"]
+	usage, _ := uc["usage"]
+	if !foundName {
+		return &ParseError{Msg: "Malformed `depends.column` field"}
+	}
+
+	*u = upstreamColumn{Name: name, Usage: usage}
+
+	return nil
+}
+
 type depends []upstream
 
 type upstream struct {
-	Value string `yaml:"value"`
-	Type  string `yaml:"type"`
+	Value   string  `yaml:"value"`
+	Type    string  `yaml:"type"`
+	Columns columns `yaml:"columns"`
 }
 
 func (a *depends) UnmarshalYAML(value *yaml.Node) error {
@@ -53,7 +84,7 @@ func (a *depends) UnmarshalYAML(value *yaml.Node) error {
 
 func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 	if value.Kind == yaml.ScalarNode {
-		*u = upstream{Value: value.Value, Type: "asset"}
+		*u = upstream{Value: value.Value, Type: "asset", Columns: *new(columns)}
 		return nil
 	}
 
@@ -67,12 +98,12 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 	asset, foundAsset := us["asset"]
 
 	if foundURI && !foundAsset {
-		*u = upstream{Value: uri, Type: "uri"}
+		*u = upstream{Value: uri, Type: "uri", Columns: *new(columns)}
 		return nil
 	}
 
 	if foundAsset && !foundURI {
-		*u = upstream{Value: asset, Type: "asset"}
+		*u = upstream{Value: asset, Type: "asset", Columns: *new(columns)}
 		return nil
 	}
 
@@ -318,9 +349,18 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 	upstreams := make([]Upstream, len(definition.Depends))
 
 	for index, dep := range definition.Depends {
+		cols := make([]DependsColumn, len(dep.Columns))
+		for _, col := range dep.Columns {
+			cols = append(cols, DependsColumn{
+				Name:  col.Name,
+				Usage: col.Usage,
+			})
+		}
+
 		upstreams[index] = Upstream{
-			Value: dep.Value,
-			Type:  dep.Type,
+			Value:   dep.Value,
+			Type:    dep.Type,
+			Columns: cols,
 		}
 	}
 
