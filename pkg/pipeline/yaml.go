@@ -100,8 +100,12 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 			if !ok {
 				return &ParseError{Msg: "Malformed 'name' in column"}
 			}
+			usage, ok := colMap["usage"]
+			if !ok {
+				usage = ""
+			}
 
-			colsStruct = append(colsStruct, upstreamColumn{Name: nameString, Usage: colMap["usage"].(string)})
+			colsStruct = append(colsStruct, upstreamColumn{Name: nameString, Usage: usage.(string)})
 		}
 	}
 

@@ -278,6 +278,21 @@ func TestUpstreams(t *testing.T) {
 				Value:   "some_other_asset",
 				Columns: make([]pipeline.DependsColumn, 0),
 			},
+			{
+				Type:    "asset",
+				Value:   "other_asset",
+				Columns: []pipeline.DependsColumn{{Name: "col1", Usage: ""}, {Name: "col2", Usage: ""}},
+			},
+			{
+				Type:    "asset",
+				Value:   "other_asset2",
+				Columns: []pipeline.DependsColumn{{Name: "col3", Usage: ""}, {Name: "col4", Usage: "CLAUSE"}},
+			},
+			{
+				Type:    "asset",
+				Value:   "yet_another_asset",
+				Columns: []pipeline.DependsColumn{{Name: "col5", Usage: ""}, {Name: "col6", Usage: "CLAUSE"}},
+			},
 		},
 	}
 
