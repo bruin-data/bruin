@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"io"
 	"log"
 	"os"
@@ -267,7 +268,12 @@ func Run(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
 			}
 
-			rules, err := lint.GetRules(fs, &git.RepoFinder{}, true)
+			parser, err := sqlparser.NewSQLParser()
+			if err != nil {
+				printError(err, c.String("output"), "Could not initialize sql parser")
+			}
+
+			rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, parser)
 			if err != nil {
 				errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
 				return cli.Exit("", 1)
