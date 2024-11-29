@@ -5,7 +5,6 @@ from sqlglot.lineage import Node
 
 def extract_query(parsed):
 	cols = []
-
 	expressions_to_find = [
 		exp.EQ,
 		exp.LT,
@@ -19,8 +18,10 @@ def extract_query(parsed):
 	for expr in expressions_to_find:
 		found = parsed.find(expr)
 		if found is not None:
-			cols.append(found.this.args["this"])
-
+			cols.append({
+				"col": found.this.args["this"],
+				"table": found.this.args["table"]
+			})
 	return cols
 
 def extract_tables(parsed):
@@ -93,9 +94,10 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
     conditional_cols = extract_query(optimized.find(exp.Where))
     
     
-    for col in conditional_cols:
-        col_name = str(col).split(".")[1] if len(str(col).split(".")) == 2 else str(col).split(".")[0]
-        conditions.append({"name": col_name, "upstream": [], "type": str(col.type)})
+	for col in conditional_cols:
+		col_name = str(col["col"]).split(".")[1] if len(str(col["col"]).split(".")) == 2 else str(col["col"]).split(".")[0]
+		cl = [{"column": col_name, "table": col["table"].this}]
+		conditional.append({"name": col_name, "upstream": cl, "type": str(col["col"].type)})
 
 
     cols = extract_columns(optimized)
@@ -140,3 +142,6 @@ def find_leaf_nodes(node: Node, leaf_nodes):
     else:
         for child in node.downstream:
             find_leaf_nodes(child, leaf_nodes)
+
+
+
