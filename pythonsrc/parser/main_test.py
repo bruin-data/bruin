@@ -24,13 +24,14 @@ test_cases = [
         "expected": [
             {
                 "name": "a",
+				"type": "TEXT",
                 "upstream": [
                     {"column": "a", "table": "table1"},
                     {"column": "a", "table": "table2"},
                 ],
             },
-            {"name": "b", "upstream": [{"column": "b", "table": "table1"}]},
-            {"name": "c", "upstream": [{"column": "c", "table": "table2"}]},
+            {"name": "b",'type': 'BIGINT', "upstream": [{"column": "b", "table": "table1"}]},
+            {"name": "c", 'type': 'BIGINT',"upstream": [{"column": "c", "table": "table2"}]},
         ],
     },
     {
@@ -54,12 +55,14 @@ test_cases = [
         "expected": [
             {
                 "name": "item_id",
+				'type': 'TEXT',
                 "upstream": [
                     {"column": "item_id", "table": "items"},
                 ],
             },
             {
                 "name": "price_category",
+				'type': 'VARCHAR',
                 "upstream": [
                     {"column": "price", "table": "items"},
                     {"column": "somecol", "table": "orders"},
@@ -79,8 +82,8 @@ test_cases = [
             "table2": {"id": "str", "col2": "int64"},
         },
         "expected": [
-            {"name": "col1", "upstream": [{"column": "col1", "table": "table1"}]},
-            {"name": "col2", "upstream": [{"column": "col2", "table": "table2"}]},
+            {"name": "col1", 'type': 'BIGINT',"upstream": [{"column": "col1", "table": "table1"}]},
+            {"name": "col2",'type': 'BIGINT', "upstream": [{"column": "col2", "table": "table2"}]},
         ],
     },
     {
@@ -96,10 +99,12 @@ test_cases = [
         "expected": [
             {
                 "name": "cid",
+				'type': 'TEXT',
                 "upstream": [{"column": "customer_id", "table": "orders"}],
             },
             {
                 "name": "order_count",
+				'type': 'BIGINT',
                 "upstream": [{"column": "order_id", "table": "orders"}],
             },
         ],
@@ -118,12 +123,14 @@ test_cases = [
         },
         "expected": [
             {
-                "name": "avg_salary",
-                "upstream": [{"column": "salary", "table": "salaries"}],
+                "name": "emp_id",
+                'type': 'TEXT',
+                "upstream": [{"column": "emp_id", "table": "employees"}],
             },
             {
-                "name": "emp_id",
-                "upstream": [{"column": "emp_id", "table": "employees"}],
+                "name": "avg_salary",
+                'type': 'DOUBLE',
+                "upstream": [{"column": "salary", "table": "salaries"}],
             },
         ],
     },
@@ -141,6 +148,7 @@ test_cases = [
         "expected": [
             {
                 "name": "id",
+				'type': 'TEXT',
                 "upstream": [
                     {"column": "id", "table": "customers"},
                     {"column": "id", "table": "employees"},
@@ -148,6 +156,7 @@ test_cases = [
             },
             {
                 "name": "name",
+				'type': 'TEXT',
                 "upstream": [
                     {"column": "name", "table": "customers"},
                     {"column": "name", "table": "employees"},
@@ -166,9 +175,10 @@ test_cases = [
             "employees": {"id": "str", "manager_id": "str"},
         },
         "expected": [
-            {"name": "id", "upstream": [{"column": "id", "table": "employees"}]},
+            {"name": "id",'type': 'TEXT',"upstream": [{"column": "id", "table": "employees"}]},
             {
                 "name": "manager_id",
+'type': 'TEXT',
                 "upstream": [
                     {"column": "manager_id", "table": "employees"},
                 ],
@@ -200,14 +210,15 @@ test_cases = [
             "regions": {"id": "str", "name": "str"},
         },
         "expected": [
-            {"name": "fixed", "upstream": []},
-            {"name": "id", "upstream": [{"column": "id", "table": "sales"}]},
+            {"name": "id", 'type': 'TEXT', "upstream": [{"column": "id", "table": "sales"}]},
+            {"name": "sale_size", 'type': 'VARCHAR', "upstream": [{"column": "amount", "table": "sales"}]},
             {
                 "name": "region_abbr",
+                'type': 'VARCHAR',
                 "upstream": [{"column": "name", "table": "regions"}],
             },
-            {"name": "sale_size", "upstream": [{"column": "amount", "table": "sales"}]},
-            {"name": "updated_at", "upstream": []},
+            {"name": "fixed", 'type': 'VARCHAR', "upstream": []},
+            {"name": "updated_at", "upstream": [], "type": "UNKNOWN"},
         ]
     },
 ]
