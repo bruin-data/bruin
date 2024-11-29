@@ -227,7 +227,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			t.Parallel()
 
 			builderConfig := pipeline.BuilderConfig{
-				PipelineFileName:    "pipeline.yml",
+				PipelineFileName:    []string{"pipeline.yml"},
 				TasksDirectoryNames: []string{tt.fields.tasksDirectoryName},
 				TasksFileSuffixes:   []string{"task.yml", "task.yaml"},
 			}
@@ -474,7 +474,7 @@ func TestPipeline_GetAssetByPath(t *testing.T) {
 
 	fs := afero.NewCacheOnReadFs(afero.NewOsFs(), afero.NewMemMapFs(), 0)
 	config := pipeline.BuilderConfig{
-		PipelineFileName:    "pipeline.yml",
+		PipelineFileName:    []string{"pipeline.yml"},
 		TasksDirectoryNames: []string{"tasks", "assets"},
 		TasksFileSuffixes:   []string{"task.yml", "task.yaml"},
 	}
