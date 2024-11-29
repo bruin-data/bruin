@@ -304,8 +304,8 @@ func (r *RenderCommand) printErrorOrJsonf(msg string, args ...interface{}) {
 }
 
 func getPipelineDefinitionFullPath(pipelinePath string) (string, error) {
-	for _, pipelineDefinitionFile := range pipelineDefinitionFile {
-		fullPath := filepath.Join(pipelinePath, pipelineDefinitionFile)
+	for _, pipelineDefinition := range pipelineDefinitionFile {
+		fullPath := filepath.Join(pipelinePath, pipelineDefinition)
 		if _, err := os.Stat(fullPath); err == nil {
 			// File exists, return the full path
 			return fullPath, nil
