@@ -7,19 +7,18 @@ def extract_query(parsed):
 	cols = []
 
 	expressions_to_find = [
-		exp.Where,
 		exp.EQ,
 		exp.LT,
+		exp.GT,
 		exp.GTE,
 		exp.LTE,
-		exp.LogicalAnd,
-		exp.LogicalOr
+		exp.NEQ,
+		exp.Not
 	]
 
 	for expr in expressions_to_find:
 		found = parsed.find(expr)
 		if found is not None:
-
 			cols.append(found.this.args["this"])
 
 	return cols
