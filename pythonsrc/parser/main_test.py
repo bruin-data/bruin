@@ -15,7 +15,7 @@ test_cases = [
                     from table2
                 ) t2
             ) t3
-                using(a)
+            using(a)
         """,
         "schema": {
             "table1": {"a": "str", "b": "int64"},
@@ -24,14 +24,14 @@ test_cases = [
         "expected": [
             {
                 "name": "a",
-				"type": "TEXT",
+                "type": "TEXT",
                 "upstream": [
                     {"column": "a", "table": "table1"},
                     {"column": "a", "table": "table2"},
                 ],
             },
-            {"name": "b",'type': 'BIGINT', "upstream": [{"column": "b", "table": "table1"}]},
-            {"name": "c", 'type': 'BIGINT',"upstream": [{"column": "c", "table": "table2"}]},
+            {"name": "b", 'type': 'BIGINT', "upstream": [{"column": "b", "table": "table1"}]},
+            {"name": "c", 'type': 'BIGINT', "upstream": [{"column": "c", "table": "table2"}]},
         ],
     },
     {
@@ -45,7 +45,7 @@ test_cases = [
                     ELSE 'low'
                 END as price_category
             FROM items
-                JOIN orders as t2 on items.item_id = t2.item_id
+            JOIN orders as t2 on items.item_id = t2.item_id
             WHERE in_stock = true
         """,
         "schema": {
@@ -55,14 +55,14 @@ test_cases = [
         "expected": [
             {
                 "name": "item_id",
-				'type': 'TEXT',
+                'type': 'TEXT',
                 "upstream": [
                     {"column": "item_id", "table": "items"},
                 ],
             },
             {
                 "name": "price_category",
-				'type': 'VARCHAR',
+                'type': 'VARCHAR',
                 "upstream": [
                     {"column": "price", "table": "items"},
                     {"column": "somecol", "table": "orders"},
@@ -82,8 +82,8 @@ test_cases = [
             "table2": {"id": "str", "col2": "int64"},
         },
         "expected": [
-            {"name": "col1", 'type': 'BIGINT',"upstream": [{"column": "col1", "table": "table1"}]},
-            {"name": "col2",'type': 'BIGINT', "upstream": [{"column": "col2", "table": "table2"}]},
+            {"name": "col1", 'type': 'BIGINT', "upstream": [{"column": "col1", "table": "table1"}]},
+            {"name": "col2", 'type': 'BIGINT', "upstream": [{"column": "col2", "table": "table2"}]},
         ],
     },
     {
@@ -99,12 +99,12 @@ test_cases = [
         "expected": [
             {
                 "name": "cid",
-				'type': 'TEXT',
+                'type': 'TEXT',
                 "upstream": [{"column": "customer_id", "table": "orders"}],
             },
             {
                 "name": "order_count",
-				'type': 'BIGINT',
+                'type': 'BIGINT',
                 "upstream": [{"column": "order_id", "table": "orders"}],
             },
         ],
@@ -123,14 +123,14 @@ test_cases = [
         },
         "expected": [
             {
-                "name": "emp_id",
-                'type': 'TEXT',
-                "upstream": [{"column": "emp_id", "table": "employees"}],
-            },
-            {
                 "name": "avg_salary",
                 'type': 'DOUBLE',
                 "upstream": [{"column": "salary", "table": "salaries"}],
+            },
+            {
+                "name": "emp_id",
+                'type': 'TEXT',
+                "upstream": [{"column": "emp_id", "table": "employees"}],
             },
         ],
     },
@@ -148,7 +148,7 @@ test_cases = [
         "expected": [
             {
                 "name": "id",
-				'type': 'TEXT',
+                'type': 'TEXT',
                 "upstream": [
                     {"column": "id", "table": "customers"},
                     {"column": "id", "table": "employees"},
@@ -156,7 +156,7 @@ test_cases = [
             },
             {
                 "name": "name",
-				'type': 'TEXT',
+                'type': 'TEXT',
                 "upstream": [
                     {"column": "name", "table": "customers"},
                     {"column": "name", "table": "employees"},
@@ -175,10 +175,10 @@ test_cases = [
             "employees": {"id": "str", "manager_id": "str"},
         },
         "expected": [
-            {"name": "id",'type': 'TEXT',"upstream": [{"column": "id", "table": "employees"}]},
+            {"name": "id", 'type': 'TEXT', "upstream": [{"column": "id", "table": "employees"}]},
             {
                 "name": "manager_id",
-'type': 'TEXT',
+                'type': 'TEXT',
                 "upstream": [
                     {"column": "manager_id", "table": "employees"},
                 ],
@@ -210,16 +210,86 @@ test_cases = [
             "regions": {"id": "str", "name": "str"},
         },
         "expected": [
+            {"name": "fixed", 'type': 'VARCHAR', "upstream": []},
             {"name": "id", 'type': 'TEXT', "upstream": [{"column": "id", "table": "sales"}]},
-            {"name": "sale_size", 'type': 'VARCHAR', "upstream": [{"column": "amount", "table": "sales"}]},
             {
                 "name": "region_abbr",
                 'type': 'VARCHAR',
                 "upstream": [{"column": "name", "table": "regions"}],
             },
-            {"name": "fixed", 'type': 'VARCHAR', "upstream": []},
+            {"name": "sale_size", 'type': 'VARCHAR', "upstream": [{"column": "amount", "table": "sales"}]},
             {"name": "updated_at", "upstream": [], "type": "UNKNOWN"},
         ]
+    },
+    {
+        "name": "aggregate functions with multiple columns",
+        "query": """
+            SELECT
+                customer_id,
+                SUM(order_amount) as total_amount,
+                AVG(order_amount) as average_amount,
+                COUNT(order_id) as order_count
+            FROM orders
+            GROUP BY customer_id
+        """,
+        "schema": {
+            "orders": {"customer_id": "str", "order_id": "str", "order_amount": "int64"},
+        },
+        "expected": [
+            {
+                "name": "average_amount",
+                'type': 'DOUBLE',
+                "upstream": [{"column": "order_amount", "table": "orders"}],
+            },
+            {
+                "name": "customer_id",
+                'type': 'TEXT',
+                "upstream": [{"column": "customer_id", "table": "orders"}],
+            },
+            {
+                "name": "order_count",
+                'type': 'BIGINT',
+                "upstream": [{"column": "order_id", "table": "orders"}],
+            },
+            {
+                "name": "total_amount",
+                'type': 'BIGINT',
+                "upstream": [{"column": "order_amount", "table": "orders"}],
+            },
+        ],
+    },
+    {
+        "name": "string functions and current timestamp",
+        "query": """
+            SELECT
+                CONCAT(first_name, ' ', last_name) as full_name,
+                NOW() as current_time,
+                LENGTH(first_name) as first_name_length
+            FROM users
+        """,
+        "schema": {
+            "users": {"first_name": "str", "last_name": "str"},
+        },
+        "expected": [
+            {
+                "name": "current_time",
+                'type': 'UNKNOWN',
+                "upstream": [],
+            },
+            {
+                "name": "first_name_length",
+                'type': 'BIGINT',
+                "upstream": [{"column": "first_name", "table": "users"}],
+            },
+            {
+                "name": "full_name",
+                'type': 'TEXT',
+                "upstream": [
+                    {"column": "first_name", "table": "users"},
+                    {"column": "last_name", "table": "users"},
+                ],
+            },
+        ],
     },
 ]
 
