@@ -90,8 +90,6 @@ func (p *LineageExtractor) parseLineage(asset *Asset) error {
 
 	lineage, err := p.sqlParser.ColumnLineage(query, dialect, p.columnMetadata)
 	if err != nil {
-
-		fmt.Printf("%v", err)
 		return fmt.Errorf("failed to parse column lineage: %w", err)
 	}
 
