@@ -168,7 +168,7 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 			if upstreamCol == nil {
 				upstreamCol = &Column{
 					Name:   upstream.Column,
-					Type:   upstream.Table,
+					Type:   lineageCol.Type,
 					Checks: []ColumnCheck{},
 					Upstreams: []*UpstreamColumn{
 						{
