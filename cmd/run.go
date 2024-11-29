@@ -653,8 +653,15 @@ func setupExecutors(
 }
 
 func isPathReferencingAsset(p string) bool {
-  
-	return !strings.HasSuffix(p, pipelineDefinitionFile) && !isDir(p)
+	// Check if the path matches any of the pipeline definition file names
+	for _, pipelineDefinition := range pipelineDefinitionFile {
+		if strings.HasSuffix(p, pipelineDefinition) {
+			return false
+		}
+	}
+
+	// Return true only if it's not a directory
+	return !isDir(p)
 }
 
 func isDir(path string) bool {
