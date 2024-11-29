@@ -3,6 +3,47 @@ from sqlglot.optimizer.scope import find_all_in_scope, build_scope
 from sqlglot.optimizer import optimize, qualify
 from sqlglot.lineage import Node
 
+def extract_query(parsed):
+	cols = []
+
+	expressions_to_find = [
+		exp.Where,
+		exp.EQ,
+		exp.LT,
+		exp.GTE,
+		exp.LTE,
+		exp.LogicalAnd,
+		exp.LogicalOr
+	]
+
+	for expr in expressions_to_find:
+		found = parsed.find(expr)
+		if found is not None:
+
+			cols.append(found.this.args["this"])
+
+	return cols
+
+def extract_query(parsed):
+	cols = []
+
+	expressions_to_find = [
+		exp.Where,
+		exp.EQ,
+		exp.LT,
+		exp.GTE,
+		exp.LTE,
+		exp.LogicalAnd,
+		exp.LogicalOr
+	]
+
+	for expr in expressions_to_find:
+		found = parsed.find(expr)
+		if found is not None:
+			cols.append(found.this.args["this"])
+
+	return cols
+
 
 def extract_tables(parsed):
     root = build_scope(parsed)
@@ -69,8 +110,18 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
         return {"columns": []}
 
     result = []
+    conditions = []
+
+    conditional_cols = extract_query(optimized.find(exp.Where))
+    
+    
+    for col in conditional_cols:
+        col_name = str(col).split(".")[1] if len(str(col).split(".")) == 2 else str(col).split(".")[0]
+        conditions.append({"name": col_name, "upstream": [], "type": str(col.type)})
+
 
     cols = extract_columns(optimized)
+    
     for col in cols:
         try:
             ll = lineage.lineage(col["name"], optimized, schema, dialect=dialect)
@@ -97,9 +148,11 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
         result.append({"name": col["name"], "upstream": cl,  "type": col["type"]})
 
     result.sort(key=lambda x: x["name"])
+    conditions.sort(key=lambda x: x["name"])
 
     return {
         "columns": result,
+        "condition": conditions
     }
 
 
