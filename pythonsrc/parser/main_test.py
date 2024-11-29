@@ -5,6 +5,7 @@ from main import get_column_lineage
 test_cases = [
     {
         "name": "nested subqueries",
+        "dilect": "bigquery",
         "query": """
             select *
             from table1
@@ -36,6 +37,7 @@ test_cases = [
     },
     {
         "name": "case-when",
+        "dilect": "bigquery",
         "query": """
             SELECT
                 items.item_id as item_id,
@@ -72,6 +74,7 @@ test_cases = [
     },
     {
         "name": "simple join",
+        "dilect": "bigquery",
         "query": """
             SELECT t1.col1, t2.col2
             FROM table1 t1
@@ -88,6 +91,7 @@ test_cases = [
     },
     {
         "name": "aggregate function",
+        "dilect": "bigquery",
         "query": """
             SELECT customer_id as cid, COUNT(order_id) as order_count
             FROM orders
@@ -111,6 +115,7 @@ test_cases = [
     },
     {
         "name": "subquery in select",
+        "dilect": "bigquery",
         "query": """
             SELECT
                 emp_id,
@@ -136,6 +141,7 @@ test_cases = [
     },
     {
         "name": "union all",
+        "dilect": "bigquery",
         "query": """
             SELECT id, name FROM customers
             UNION ALL
@@ -166,6 +172,7 @@ test_cases = [
     },
     {
         "name": "self join",
+        "dilect": "bigquery",
         "query": """
             SELECT e1.id, e2.manager_id
             FROM employees e1
@@ -187,6 +194,7 @@ test_cases = [
     },
     {
         "name": "complex case-when",
+        "dilect": "bigquery",
         "query": """
             SELECT
                 sales.id,
@@ -223,6 +231,7 @@ test_cases = [
     },
     {
         "name": "aggregate functions with multiple columns",
+        "dilect": "bigquery",
         "query": """
             SELECT
                 customer_id,
@@ -260,6 +269,7 @@ test_cases = [
     },
     {
         "name": "upper function",
+        "dilect": "bigquery",
         "query": """
             SELECT UPPER(name) as upper_name
             FROM users
@@ -277,6 +287,7 @@ test_cases = [
     },
     {
         "name": "lower function",
+        "dilect": "bigquery",
         "query": """
             SELECT LOWER(email) as lower_email
             FROM users
@@ -294,6 +305,7 @@ test_cases = [
     },
     {
         "name": "length function",
+        "dilect": "bigquery",
         "query": """
             SELECT LENGTH(description) as description_length
             FROM products
@@ -311,6 +323,7 @@ test_cases = [
     },
      {
         "name": "trim function",
+        "dilect": "bigquery",
         "query": """
             SELECT TRIM(whitespace_column) as trimmed_column
             FROM data
@@ -328,6 +341,7 @@ test_cases = [
     },
     {
         "name": "round function",
+        "dilect": "bigquery",
         "query": """
             SELECT ROUND(price, 2) as rounded_price
             FROM products
@@ -345,6 +359,7 @@ test_cases = [
     },
     {
         "name": "coalesce function",
+        "dilect": "bigquery",
         "query": """
             SELECT COALESCE(middle_name, 'N/A') as middle_name
             FROM users
@@ -362,6 +377,7 @@ test_cases = [
     },
     {
         "name": "cast function",
+        "dilect": "bigquery",
         "query": """
             SELECT CAST(order_id AS INT) as order_id_int
             FROM orders
@@ -379,6 +395,7 @@ test_cases = [
     },
      {
         "name": "date function",
+        "dilect": "bigquery",
         "query": """
             SELECT DATE(order_date) as order_date_only
             FROM orders
@@ -396,6 +413,7 @@ test_cases = [
     },
     {
         "name": "extract function",
+        "dilect": "bigquery",
         "query": """
             SELECT EXTRACT(YEAR FROM order_date) as order_year
             FROM orders
@@ -406,13 +424,14 @@ test_cases = [
         "expected": [
             {
                 "name": "order_year",
-                'type': 'INTEGER',
+                'type': 'INT',
                 "upstream": [{"column": "order_date", "table": "orders"}],
             },
         ],
     },
     {
         "name": "substring function",
+        "dilect": "bigquery",
         "query": """
             SELECT SUBSTRING(name FROM 1 FOR 3) as name_prefix
             FROM users
@@ -430,6 +449,7 @@ test_cases = [
     },
     {
         "name": "floor function",
+        "dilect": "bigquery",
         "query": """
             SELECT FLOOR(price) as floored_price
             FROM products
@@ -447,6 +467,7 @@ test_cases = [
     },
     {
         "name": "ceil function",
+        "dilect": "bigquery",
         "query": """
             SELECT CEIL(price) as ceiled_price
             FROM products
@@ -462,14 +483,91 @@ test_cases = [
             },
         ],
     },
+    {
+        "name": "mysql date_format function",
+        "dilect": "mysql",
+        "query": """
+            SELECT DATE_FORMAT(order_date, '%Y-%m-%d') as formatted_date
+            FROM orders
+        """,
+        "schema": {
+            "orders": {"order_date": "datetime"},
+        },
+        "expected": [
+            {
+                "name": "formatted_date",
+                'type': 'VARCHAR',
+                "upstream": [{"column": "order_date", "table": "orders"}],
+            },
+        ],
+    },
+    {
+        "name": "snowflake to_timestamp function",
+        "dilect": "snowflake",
+        "query": """
+            SELECT TO_TIMESTAMP(order_date) as timestamp_date
+            FROM orders
+        """,
+        "schema": {
+            "orders": {"order_date": "str"},
+        },
+        "expected": [
+            {
+                "name": "TIMESTAMP_DATE",
+                'type': 'UNKNOWN',
+                "upstream": [{"column": "ORDER_DATE", "table": "ORDERS"}],
+            },
+        ],
+    },
+    {
+        "name": "duckdb current_timestamp function",
+        "dilect": "duckdb",
+        "query": """
+            SELECT order_id,CURRENT_TIMESTAMP as current_time
+            FROM orders
+        """,
+        "schema": {
+            "orders": {"order_id": "str"},
+        },
+        "expected": [
+            {
+                "name": "current_time",
+                'type': 'TIMESTAMP',
+                "upstream": [{'column': 'current_time', 'table': ''}],
+            },
+			{
+				"name": "order_id",
+				'type': 'TEXT',
+				"upstream": [{'column': 'order_id', 'table': 'orders'}],
+			}
+        ],
+    },
+    {
+        "name": "redshift date_trunc function",
+        "dilect": "redshift",
+        "query": """
+            SELECT DATE_TRUNC('month', order_date) as month_start
+            FROM orders
+        """,
+        "schema": {
+            "orders": {"order_date": "datetime"},
+        },
+        "expected": [
+            {
+                "name": "month_start",
+                'type': 'UNKNOWN',
+                "upstream": [{"column": "order_date", "table": "orders"}],
+            },
+        ],
+    },
 ]
 
 
 @pytest.mark.parametrize(
-    "query,schema,expected",
-    [(tc["query"], tc["schema"], tc["expected"]) for tc in test_cases],
+    "query,schema,expected,dilect",
+    [(tc["query"], tc["schema"], tc["expected"], tc["dilect"]) for tc in test_cases],
     ids=[tc["name"] for tc in test_cases],
 )
-def test_get_column_lineage(query, schema, expected):
-    result = get_column_lineage(query, schema, "bigquery")
+def test_get_column_lineage(query, schema, expected, dilect):
+    result = get_column_lineage(query, schema, dilect)
     assert result['columns'] == expected
