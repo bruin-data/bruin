@@ -127,6 +127,7 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 		if len(lineageCol.Upstream) == 0 {
 			if err := p.addColumnToAsset(asset, lineageCol.Name, nil, &Column{
 				Name:      lineageCol.Name,
+				Type:      lineageCol.Type,
 				Checks:    []ColumnCheck{},
 				Upstreams: []*UpstreamColumn{},
 			}); err != nil {
@@ -146,7 +147,7 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 			if upstreamAsset == nil {
 				if err := p.addColumnToAsset(asset, lineageCol.Name, nil, &Column{
 					Name:   upstream.Column,
-					Type:   strings.ToLower(upstream.Table),
+					Type:   lineageCol.Type,
 					Checks: []ColumnCheck{},
 					Upstreams: []*UpstreamColumn{
 						{
