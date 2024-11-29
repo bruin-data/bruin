@@ -2,11 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"io"
 	"os"
 	path2 "path"
 	"strings"
+
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
