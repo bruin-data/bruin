@@ -8,9 +8,7 @@ import (
 	"github.com/spf13/afero"
 )
 
-const (
-	pipelineDefinitionFile = "pipeline.yml"
-)
+var pipelineDefinitionFile = []string{"pipeline.yml", "pipeline.yaml"}
 
 var (
 	fs = afero.NewCacheOnReadFs(afero.NewOsFs(), afero.NewMemMapFs(), 0)

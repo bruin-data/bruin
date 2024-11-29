@@ -104,7 +104,11 @@ func Render() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			pipelineDefinitionFullPath := filepath.Join(pipelinePath, pipelineDefinitionFile)
+			pipelineDefinitionFullPath, err := getPipelineDefinitionFullPath(pipelinePath)
+			if err != nil {
+				fmt.Printf("Error: %s\n", err)
+			}
+
 			pl, err := pipeline.PipelineFromPath(pipelineDefinitionFullPath, fs)
 			if err != nil {
 				printError(err, c.String("output"), "Failed to read the pipeline definition file:")
@@ -297,4 +301,16 @@ func (r *RenderCommand) printErrorOrJSON(msg string) {
 
 func (r *RenderCommand) printErrorOrJsonf(msg string, args ...interface{}) {
 	r.printErrorOrJSON(fmt.Sprintf(msg, args...))
+}
+
+func getPipelineDefinitionFullPath(pipelinePath string) (string, error) {
+	for _, pipelineDefinitionFile := range pipelineDefinitionFile {
+		fullPath := filepath.Join(pipelinePath, pipelineDefinitionFile)
+		if _, err := os.Stat(fullPath); err == nil {
+			// File exists, return the full path
+			return fullPath, nil
+		}
+	}
+
+	return "", fmt.Errorf("no pipeline definition file found in '%s'. Supported files: %v", pipelinePath, pipelineDefinitionFile)
 }

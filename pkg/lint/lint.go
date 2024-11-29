@@ -16,7 +16,7 @@ import (
 )
 
 type (
-	pipelineFinder    func(root, pipelineDefinitionFile string) ([]string, error)
+	pipelineFinder    func(root string, pipelineDefinitionFiles []string) ([]string, error)
 	PipelineValidator func(pipeline *pipeline.Pipeline) ([]*Issue, error)
 	AssetValidator    func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error)
 )
@@ -93,7 +93,7 @@ func NewLinter(findPipelines pipelineFinder, builder pipelineBuilder, rules []Ru
 	}
 }
 
-func (l *Linter) Lint(rootPath, pipelineDefinitionFileName string, c *cli.Context) (*PipelineAnalysisResult, error) {
+func (l *Linter) Lint(rootPath string, pipelineDefinitionFileName []string, c *cli.Context) (*PipelineAnalysisResult, error) {
 	pipelines, err := l.extractPipelinesFromPath(rootPath, pipelineDefinitionFileName)
 
 	assetStats := make(map[string]int)
@@ -115,8 +115,8 @@ func (l *Linter) Lint(rootPath, pipelineDefinitionFileName string, c *cli.Contex
 	return l.LintPipelines(pipelines)
 }
 
-func (l *Linter) LintAsset(rootPath, pipelineDefinitionFileName, assetNameOrPath string, c *cli.Context) (*PipelineAnalysisResult, error) {
-	pipelines, err := l.extractPipelinesFromPath(rootPath, pipelineDefinitionFileName)
+func (l *Linter) LintAsset(rootPath string, pipelineDefinitionFileNames []string, assetNameOrPath string, c *cli.Context) (*PipelineAnalysisResult, error) {
+	pipelines, err := l.extractPipelinesFromPath(rootPath, pipelineDefinitionFileNames)
 	if err != nil {
 		return nil, err
 	}
@@ -180,8 +180,8 @@ func (l *Linter) LintAsset(rootPath, pipelineDefinitionFileName, assetNameOrPath
 	}, nil
 }
 
-func (l *Linter) extractPipelinesFromPath(rootPath string, pipelineDefinitionFileName string) ([]*pipeline.Pipeline, error) {
-	pipelinePaths, err := l.findPipelines(rootPath, pipelineDefinitionFileName)
+func (l *Linter) extractPipelinesFromPath(rootPath string, pipelineDefinitionFileNames []string) ([]*pipeline.Pipeline, error) {
+	pipelinePaths, err := l.findPipelines(rootPath, pipelineDefinitionFileNames)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, errors.New("the given pipeline path does not exist, please make sure you gave the right path")
