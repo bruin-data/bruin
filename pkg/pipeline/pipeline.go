@@ -575,6 +575,8 @@ type Asset struct {
 
 	upstream   []*Asset
 	downstream []*Asset
+
+	CondtionalColumns []Column `json:"conditions_columns" yaml:"conditions_columns,omitempty" mapstructure:"conditions_columns"`
 }
 
 func (a *Asset) AddUpstream(asset *Asset) {
