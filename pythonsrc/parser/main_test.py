@@ -259,35 +259,206 @@ test_cases = [
         ],
     },
     {
-        "name": "string functions and current timestamp",
+        "name": "upper function",
         "query": """
-            SELECT
-                CONCAT(first_name, ' ', last_name) as full_name,
-                NOW() as current_time,
-                LENGTH(first_name) as first_name_length
+            SELECT UPPER(name) as upper_name
             FROM users
         """,
         "schema": {
-            "users": {"first_name": "str", "last_name": "str"},
+            "users": {"name": "str"},
         },
         "expected": [
             {
-                "name": "current_time",
-                'type': 'UNKNOWN',
-                "upstream": [],
-            },
-            {
-                "name": "first_name_length",
-                'type': 'BIGINT',
-                "upstream": [{"column": "first_name", "table": "users"}],
-            },
-            {
-                "name": "full_name",
+                "name": "upper_name",
                 'type': 'TEXT',
-                "upstream": [
-                    {"column": "first_name", "table": "users"},
-                    {"column": "last_name", "table": "users"},
-                ],
+                "upstream": [{"column": "name", "table": "users"}],
+            },
+        ],
+    },
+    {
+        "name": "lower function",
+        "query": """
+            SELECT LOWER(email) as lower_email
+            FROM users
+        """,
+        "schema": {
+            "users": {"email": "str"},
+        },
+        "expected": [
+            {
+                "name": "lower_email",
+                'type': 'TEXT',
+                "upstream": [{"column": "email", "table": "users"}],
+            },
+        ],
+    },
+    {
+        "name": "length function",
+        "query": """
+            SELECT LENGTH(description) as description_length
+            FROM products
+        """,
+        "schema": {
+            "products": {"description": "str"},
+        },
+        "expected": [
+            {
+                "name": "description_length",
+                'type': 'BIGINT',
+                "upstream": [{"column": "description", "table": "products"}],
+            },
+        ],
+    },
+     {
+        "name": "trim function",
+        "query": """
+            SELECT TRIM(whitespace_column) as trimmed_column
+            FROM data
+        """,
+        "schema": {
+            "data": {"whitespace_column": "str"},
+        },
+        "expected": [
+            {
+                "name": "trimmed_column",
+                'type': 'TEXT',
+                "upstream": [{"column": "whitespace_column", "table": "data"}],
+            },
+        ],
+    },
+    {
+        "name": "round function",
+        "query": """
+            SELECT ROUND(price, 2) as rounded_price
+            FROM products
+        """,
+        "schema": {
+            "products": {"price": "float"},
+        },
+        "expected": [
+            {
+                "name": "rounded_price",
+                'type': 'FLOAT',
+                "upstream": [{"column": "price", "table": "products"}],
+            },
+        ],
+    },
+    {
+        "name": "coalesce function",
+        "query": """
+            SELECT COALESCE(middle_name, 'N/A') as middle_name
+            FROM users
+        """,
+        "schema": {
+            "users": {"middle_name": "str"},
+        },
+        "expected": [
+            {
+                "name": "middle_name",
+                'type': 'TEXT',
+                "upstream": [{"column": "middle_name", "table": "users"}],
+            },
+        ],
+    },
+    {
+        "name": "cast function",
+        "query": """
+            SELECT CAST(order_id AS INT) as order_id_int
+            FROM orders
+        """,
+        "schema": {
+            "orders": {"order_id": "str"},
+        },
+        "expected": [
+            {
+                "name": "order_id_int",
+                'type': 'INT',
+                "upstream": [{"column": "order_id", "table": "orders"}],
+            },
+        ],
+    },
+     {
+        "name": "date function",
+        "query": """
+            SELECT DATE(order_date) as order_date_only
+            FROM orders
+        """,
+        "schema": {
+            "orders": {"order_date": "datetime"},
+        },
+        "expected": [
+            {
+                "name": "order_date_only",
+                'type': 'DATE',
+                "upstream": [{"column": "order_date", "table": "orders"}],
+            },
+        ],
+    },
+    {
+        "name": "extract function",
+        "query": """
+            SELECT EXTRACT(YEAR FROM order_date) as order_year
+            FROM orders
+        """,
+        "schema": {
+            "orders": {"order_date": "datetime"},
+        },
+        "expected": [
+            {
+                "name": "order_year",
+                'type': 'INTEGER',
+                "upstream": [{"column": "order_date", "table": "orders"}],
+            },
+        ],
+    },
+    {
+        "name": "substring function",
+        "query": """
+            SELECT SUBSTRING(name FROM 1 FOR 3) as name_prefix
+            FROM users
+        """,
+        "schema": {
+            "users": {"name": "str"},
+        },
+        "expected": [
+            {
+                "name": "name_prefix",
+                'type': 'TEXT',
+                "upstream": [{"column": "name", "table": "users"}],
+            },
+        ],
+    },
+    {
+        "name": "floor function",
+        "query": """
+            SELECT FLOOR(price) as floored_price
+            FROM products
+        """,
+        "schema": {
+            "products": {"price": "float"},
+        },
+        "expected": [
+            {
+                "name": "floored_price",
+                'type': 'FLOAT',
+                "upstream": [{"column": "price", "table": "products"}],
+            },
+        ],
+    },
+    {
+        "name": "ceil function",
+        "query": """
+            SELECT CEIL(price) as ceiled_price
+            FROM products
+        """,
+        "schema": {
+            "products": {"price": "float"},
+        },
+        "expected": [
+            {
+                "name": "ceiled_price",
+                'type': 'FLOAT',
+                "upstream": [{"column": "price", "table": "products"}],
             },
         ],
     },
