@@ -82,11 +82,13 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
 	for col in conditional_cols:
 		col_name = str(str(col).split(".")[1]) if len(str(col).split(".")) == 2 else str(str(col).split(".")[0])
 		cl = [{"column": col_name, "table": str(str(col).split(".")[0])}]
-		conditional.append({"name": col_name, "upstream": cl, "type": str(col.type)})
+	    if not any(c["name"] == col_name for c in conditional):
+	        conditional.append({"name": col_name, "upstream": cl, "type": str(col.type)})
 
     cols = extract_columns(optimized)
     
     for col in cols:
+        conditional = [c for c in conditional if c["name"] != col["name"]]
         try:
             ll = lineage.lineage(col["name"], optimized, schema, dialect=dialect)
         except:
