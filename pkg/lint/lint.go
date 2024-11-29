@@ -16,7 +16,7 @@ import (
 )
 
 type (
-	pipelineFinder    func(root string, pipelineDefinitionFiles []string) ([]string, error)
+	pipelineFinder    func(root string, pipelineDefinitionFile []string) ([]string, error)
 	PipelineValidator func(pipeline *pipeline.Pipeline) ([]*Issue, error)
 	AssetValidator    func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error)
 )

@@ -12,7 +12,7 @@ import (
 
 var SkipDirs = []string{".git", ".github", ".vscode", "node_modules", "dist", "build", "target", "vendor", ".venv", ".env", "env", "venv", "dbt_packages"}
 
-func GetPipelinePaths(root string, pipelineDefinitionFiles []string) ([]string, error) {
+func GetPipelinePaths(root string, pipelineDefinitionFile []string) ([]string, error) {
 	var pipelinePaths []string
 
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -29,8 +29,8 @@ func GetPipelinePaths(root string, pipelineDefinitionFiles []string) ([]string, 
 		}
 
 		// Check if the file matches any of the pipeline definition file names
-		for _, pipelineDefinitionFile := range pipelineDefinitionFiles {
-			if strings.HasSuffix(path, pipelineDefinitionFile) {
+		for _, pipelineDefinition := range pipelineDefinitionFile {
+			if strings.HasSuffix(path, pipelineDefinition) {
 				abs, err := filepath.Abs(path)
 				if err != nil {
 					return errors.Wrapf(err, "failed to get absolute path for %s", path)
@@ -51,7 +51,7 @@ func GetPipelinePaths(root string, pipelineDefinitionFiles []string) ([]string, 
 	return pipelinePaths, nil
 }
 
-func GetPipelineRootFromTask(taskPath string, pipelineDefinitionFiles []string) (string, error) {
+func GetPipelineRootFromTask(taskPath string, pipelineDefinitionFile []string) (string, error) {
 	absoluteTaskPath, err := filepath.Abs(taskPath)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to convert task path to absolute path")
@@ -60,8 +60,8 @@ func GetPipelineRootFromTask(taskPath string, pipelineDefinitionFiles []string) 
 	currentFolder := absoluteTaskPath
 	rootPath := filepath.VolumeName(currentFolder) + string(os.PathSeparator)
 	for currentFolder != rootPath && currentFolder != "/" {
-		for _, pipelineDefinitionFile := range pipelineDefinitionFiles {
-			tryPath := filepath.Join(currentFolder, pipelineDefinitionFile)
+		for _, pipelineDefinition := range pipelineDefinitionFile {
+			tryPath := filepath.Join(currentFolder, pipelineDefinition)
 			if _, err := os.Stat(tryPath); err == nil {
 				return currentFolder, nil
 			}
