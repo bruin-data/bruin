@@ -96,8 +96,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
     
 	for col in conditional_cols:
 		col_name = str(col["col"]).split(".")[1] if len(str(col["col"]).split(".")) == 2 else str(col["col"]).split(".")[0]
-		cl = [{"column": col_name, "table": col["table"].this}]
-		conditional.append({"name": col_name, "upstream": cl, "type": str(col["col"].type)})
+		conditional.append({"name": col_name, "upstream": [{"column": col_name, "table": col["table"].this}], "type": str(col["col"].type)})
 
 
     cols = extract_columns(optimized)
