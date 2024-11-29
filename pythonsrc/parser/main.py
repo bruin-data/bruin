@@ -94,7 +94,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
         cl = [dict(t) for t in {tuple(d.items()) for d in cl}]
         cl.sort(key=lambda x: x["table"])
 
-        result.append({"name": col, "upstream": cl, , "type": col["type"]})
+        result.append({"name": col, "upstream": cl,  "type": col["type"]})
 
     result.sort(key=lambda x: x["name"])
 
