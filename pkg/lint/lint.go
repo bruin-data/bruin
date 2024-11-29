@@ -115,8 +115,8 @@ func (l *Linter) Lint(rootPath string, pipelineDefinitionFileName []string, c *c
 	return l.LintPipelines(pipelines)
 }
 
-func (l *Linter) LintAsset(rootPath string, pipelineDefinitionFileNames []string, assetNameOrPath string, c *cli.Context) (*PipelineAnalysisResult, error) {
-	pipelines, err := l.extractPipelinesFromPath(rootPath, pipelineDefinitionFileNames)
+func (l *Linter) LintAsset(rootPath string, pipelineDefinitionFileName []string, assetNameOrPath string, c *cli.Context) (*PipelineAnalysisResult, error) {
+	pipelines, err := l.extractPipelinesFromPath(rootPath, pipelineDefinitionFileName)
 	if err != nil {
 		return nil, err
 	}
@@ -180,8 +180,8 @@ func (l *Linter) LintAsset(rootPath string, pipelineDefinitionFileNames []string
 	}, nil
 }
 
-func (l *Linter) extractPipelinesFromPath(rootPath string, pipelineDefinitionFileNames []string) ([]*pipeline.Pipeline, error) {
-	pipelinePaths, err := l.findPipelines(rootPath, pipelineDefinitionFileNames)
+func (l *Linter) extractPipelinesFromPath(rootPath string, pipelineDefinitionFileName []string) ([]*pipeline.Pipeline, error) {
+	pipelinePaths, err := l.findPipelines(rootPath, pipelineDefinitionFileName)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, errors.New("the given pipeline path does not exist, please make sure you gave the right path")
