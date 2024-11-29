@@ -5,23 +5,8 @@ from sqlglot.lineage import Node
 
 def extract_query(parsed):
 	cols = []
-	expressions_to_find = [
-		exp.EQ,
-		exp.LT,
-		exp.GT,
-		exp.GTE,
-		exp.LTE,
-		exp.NEQ,
-		exp.Not
-	]
-
-	for expr in expressions_to_find:
-		found = parsed.find(expr)
-		if found is not None:
-			cols.append({
-				"col": found.this.args["this"],
-				"table": found.this.args["table"]
-			})
+	for expr in find_all_in_scope(parsed, exp.Column):
+		cols.append(expr)
 	return cols
 
 def extract_tables(parsed):
@@ -95,9 +80,9 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
     
     
 	for col in conditional_cols:
-		col_name = str(col["col"]).split(".")[1] if len(str(col["col"]).split(".")) == 2 else str(col["col"]).split(".")[0]
-		conditional.append({"name": col_name, "upstream": [{"column": col_name, "table": col["table"].this}], "type": str(col["col"].type)})
-
+		col_name = str(str(col).split(".")[1]) if len(str(col).split(".")) == 2 else str(str(col).split(".")[0])
+		cl = [{"column": col_name, "table": str(str(col).split(".")[0])}]
+		conditional.append({"name": col_name, "upstream": cl, "type": str(col.type)})
 
     cols = extract_columns(optimized)
     
