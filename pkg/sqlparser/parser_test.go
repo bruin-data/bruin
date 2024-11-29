@@ -347,19 +347,20 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Type: "BIGINT",
 					},
 					{
-						Name: "b2",
-						Upstream: []UpstreamColumn{
-							{Column: "b", Table: "table1"},
-						},
-						Type: "BIGINT",
-					},
-					{
 						Name: "c",
 						Upstream: []UpstreamColumn{
 							{Column: "c", Table: "table2"},
 						},
 						Type: "TEXT",
 					},
+					{
+						Name: "b2",
+						Upstream: []UpstreamColumn{
+							{Column: "b", Table: "table1"},
+						},
+						Type: "BIGINT",
+					},
+
 					{
 						Name: "c2",
 						Upstream: []UpstreamColumn{
