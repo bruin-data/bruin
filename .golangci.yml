@@ -68,7 +68,7 @@ linters-settings:
       - name: unexported-return
         disabled: true
   maintidx:
-    under: 10
+    under: 5
 
   ireturn:
     allow:
