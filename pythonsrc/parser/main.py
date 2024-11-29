@@ -24,27 +24,6 @@ def extract_query(parsed):
 
 	return cols
 
-def extract_query(parsed):
-	cols = []
-
-	expressions_to_find = [
-		exp.Where,
-		exp.EQ,
-		exp.LT,
-		exp.GTE,
-		exp.LTE,
-		exp.LogicalAnd,
-		exp.LogicalOr
-	]
-
-	for expr in expressions_to_find:
-		found = parsed.find(expr)
-		if found is not None:
-			cols.append(found.this.args["this"])
-
-	return cols
-
-
 def extract_tables(parsed):
     root = build_scope(parsed)
     if root is None:
