@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"io"
 	"log"
 	"os"
@@ -36,6 +35,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/synapse"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/fatih/color"
@@ -653,20 +653,8 @@ func setupExecutors(
 }
 
 func isPathReferencingAsset(p string) bool {
-	// Check if the path matches any of the pipeline definition file names
-	for _, pipelineDefinitionFile := range pipelineDefinitionFile {
-		if strings.HasSuffix(p, pipelineDefinitionFile) {
-			return false
-		}
-	}
-
-	// Check if the path is a directory
-	if isDir(p) {
-		return false
-	}
-
-	// If the path is not a pipeline definition file and not a directory, it's referencing an asset
-	return true
+  
+	return !strings.HasSuffix(p, pipelineDefinitionFile) && !isDir(p)
 }
 
 func isDir(path string) bool {
