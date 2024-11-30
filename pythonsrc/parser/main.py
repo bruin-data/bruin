@@ -3,11 +3,26 @@ from sqlglot.optimizer.scope import find_all_in_scope, build_scope
 from sqlglot.optimizer import optimize, qualify
 from sqlglot.lineage import Node
 
-def extract_query(parsed):
-	cols = []
-	for expr in find_all_in_scope(parsed, exp.Column):
-		cols.append(expr)
-	return cols
+def extract_all_columns(parsed):
+	# Extract columns from the parsed expression
+	cols = [{
+		"name": str(expr),
+		"type": str(expr.type),
+	} for expr in find_all_in_scope(parsed, exp.Column)]
+
+	# Remove duplicates while preserving order
+	unique_cols = list({col['name']: col for col in cols}.values())
+	conditions = []
+	for col in unique_cols:
+		# Split the column name into table and column parts
+		table_name, column_name = col["name"].split(".") if "." in col["name"] else (None, col["name"])
+		conditions.append({
+			"name": column_name,
+			"upstream": [{"column": column_name, "table": table_name}],
+			"type": col["type"]
+		})
+	conditions.sort(key=lambda x: x["name"])
+	return conditions
 
 def extract_tables(parsed):
     root = build_scope(parsed)
@@ -74,21 +89,10 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
         return {"columns": []}
 
     result = []
-    conditions = []
-
-    conditional_cols = extract_query(optimized.find(exp.Where))
-    
-    
-	for col in conditional_cols:
-		col_name = str(str(col).split(".")[1]) if len(str(col).split(".")) == 2 else str(str(col).split(".")[0])
-		cl = [{"column": col_name, "table": str(str(col).split(".")[0])}]
-	    if not any(c["name"] == col_name for c in conditional):
-	        conditional.append({"name": col_name, "upstream": cl, "type": str(col.type)})
 
     cols = extract_columns(optimized)
     
     for col in cols:
-        conditional = [c for c in conditional if c["name"] != col["name"]]
         try:
             ll = lineage.lineage(col["name"], optimized, schema, dialect=dialect)
         except:
@@ -118,7 +122,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
 
     return {
         "columns": result,
-        "condition": conditions
+        "lineage": extract_all_columns(optimized)
     }
 
 
