@@ -178,12 +178,12 @@ export default defineConfig({
                     {text: "Clean", link: "/commands/clean"},
                     {text: "Connections", link: "/commands/connections.md"},
                     {text: "Environments", link: "/commands/environments"},
-                    {text: "Fetch", link: "/commands/fetch"},
                     {text: "Format", link: "/commands/format"},
                     {text: "Init", link: "/commands/init"},
                     {text: "Lineage", link: "/commands/lineage"},
                     {text: "Render", link: "/commands/render"},
                     {text: "Run", link: "/commands/run"},
+                    {text: "Query", link: "/commands/query"},
                     {text: "Validate", link: "/commands/validate"},
                 ],
 
