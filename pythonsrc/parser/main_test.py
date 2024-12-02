@@ -36,11 +36,7 @@ test_cases_non_selected_columns = [
             select * from orders where id > 10
         """,
         "schema": SCHEMA,
-        "expected": [
-            {"name": "customer_id", "table": "orders"},
-            {"name": "id", "table": "customers"},
-            {"name": "id", "table": "orders"},
-        ],
+        "expected": [{"name": "id", "table": "orders"}],
     },
     {
         "name": "Join orders and customers with id filter",
@@ -50,7 +46,6 @@ test_cases_non_selected_columns = [
         """,
         "schema": SCHEMA,
         "expected": [
-            {"name": "country", "table": "customers"},
             {"name": "customer_id", "table": "orders"},
             {"name": "id", "table": "customers"},
             {"name": "id", "table": "orders"},
@@ -68,7 +63,6 @@ test_cases_non_selected_columns = [
             {"name": "customer_id", "table": "orders"},
             {"name": "id", "table": "customers"},
             {"name": "id", "table": "orders"},
-            {"name": "shipping_country", "table": "orders"},
         ],
     },
     {
@@ -79,7 +73,11 @@ test_cases_non_selected_columns = [
         """,
         "schema": SCHEMA,
         "expected": [
-            {"name": "col1", "table": "table1"},
+            {"name": "country", "table": "customers"},
+            {"name": "customer_id", "table": "orders"},
+            {"name": "id", "table": "customers"},
+            {"name": "id", "table": "orders"},
+            {"name": "shipping_country", "table": "orders"},
         ],
     },
     {
@@ -96,10 +94,7 @@ test_cases_non_selected_columns = [
         "schema": {
             "table1": {"col3": "int", "col1": "int", "col2": "int"},
         },
-        "expected": [
-            {"name": "item_id", "table": "items"},
-            {"name": "price_category", "table": "items"},
-        ],
+        "expected": [{"name": "col1", "table": "table1"}],
     },
 ]
 
@@ -143,7 +138,15 @@ test_cases = [
                 "upstream": [{"column": "c", "table": "table2"}],
             },
         ],
-        "expected_non_selected": [{'name': 'a', 'table': 'table1'}, {'name': 'a', 'table': 'table2'}],
+        "expected_non_selected": [
+            {
+                "name": "a",
+                "upstream": [
+                    {"column": "a", "table": "table1"},
+                    {"column": "a", "table": "table2"},
+                ],
+            }
+        ],
     },
     {
         "name": "case-when",
@@ -181,9 +184,19 @@ test_cases = [
                 ],
             },
         ],
-        "expected_non_selected": [{'name': 'in_stock', 'table': 'items'},
- {'name': 'item_id', 'table': 'items'},
- {'name': 'item_id', 'table': 't2'}],
+        "expected_non_selected": [
+            {
+                "name": "in_stock",
+                "upstream": [{"column": "in_stock", "table": "items"}],
+            },
+            {
+                "name": "item_id",
+                "upstream": [
+                    {"column": "item_id", "table": "items"},
+                    {"column": "item_id", "table": "t2"},
+                ],
+            },
+        ],
     },
     {
         "name": "simple join",
@@ -209,7 +222,15 @@ test_cases = [
                 "upstream": [{"column": "col2", "table": "table2"}],
             },
         ],
-        "expected_non_selected": [{'name': 'id', 'table': 't1'}, {'name': 'id', 'table': 't2'}],
+        "expected_non_selected": [
+            {
+                "name": "id",
+                "upstream": [
+                    {"column": "id", "table": "t1"},
+                    {"column": "id", "table": "t2"},
+                ],
+            }
+        ],
     },
     {
         "name": "aggregate function",
@@ -234,7 +255,12 @@ test_cases = [
                 "upstream": [{"column": "order_id", "table": "orders"}],
             },
         ],
-        "expected_non_selected": [{'name': 'customer_id', 'table': 'orders'}],
+        "expected_non_selected": [
+            {
+                "name": "customer_id",
+                "upstream": [{"column": "customer_id", "table": "orders"}],
+            }
+        ],
     },
     {
         "name": "subquery in select",
@@ -261,9 +287,16 @@ test_cases = [
                 "upstream": [{"column": "emp_id", "table": "employees"}],
             },
         ],
-        "expected_non_selected": [{'name': '_u_1', 'table': '_u_0'},
- {'name': 'emp_id', 'table': 'employees'},
- {'name': 'emp_id', 'table': 'salaries'}],
+        "expected_non_selected": [
+            {"name": "_u_1", "upstream": [{"column": "_u_1", "table": "_u_0"}]},
+            {
+                "name": "emp_id",
+                "upstream": [
+                    {"column": "emp_id", "table": "employees"},
+                    {"column": "emp_id", "table": "salaries"},
+                ],
+            },
+        ],
     },
     {
         "name": "union all",
@@ -322,7 +355,13 @@ test_cases = [
                 ],
             },
         ],
-        "expected_non_selected": [{'name': 'id', 'table': 'e2'}, {'name': 'manager_id', 'table': 'e1'}],
+        "expected_non_selected": [
+            {"name": "id", "upstream": [{"column": "id", "table": "e2"}]},
+            {
+                "name": "manager_id",
+                "upstream": [{"column": "manager_id", "table": "e1"}],
+            },
+        ],
     },
     {
         "name": "complex case-when",
@@ -368,7 +407,13 @@ test_cases = [
             },
             {"name": "updated_at", "upstream": [], "type": "UNKNOWN"},
         ],
-        "expected_non_selected": [{'name': 'id', 'table': 'regions'}, {'name': 'region_id', 'table': 'sales'}],
+        "expected_non_selected": [
+            {"name": "id", "upstream": [{"column": "id", "table": "regions"}]},
+            {
+                "name": "region_id",
+                "upstream": [{"column": "region_id", "table": "sales"}],
+            },
+        ],
     },
     {
         "name": "aggregate functions with multiple columns",
@@ -411,7 +456,12 @@ test_cases = [
                 "upstream": [{"column": "order_amount", "table": "orders"}],
             },
         ],
-        "expected_non_selected": [{'name': 'customer_id', 'table': 'orders'}],
+        "expected_non_selected": [
+            {
+                "name": "customer_id",
+                "upstream": [{"column": "customer_id", "table": "orders"}],
+            }
+        ],
     },
     {
         "name": "upper function",

@@ -117,6 +117,7 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 				}
 			}
 		}
+
 		upstreams = append(upstreams, upstream)
 	}
 	asset.Upstreams = upstreams

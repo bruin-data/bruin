@@ -149,7 +149,6 @@ func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage,
 	if err != nil {
 		return nil, err
 	}
-
 	return &lineage, nil
 }
 
