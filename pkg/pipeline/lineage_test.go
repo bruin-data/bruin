@@ -766,6 +766,7 @@ func testAdvancedSQLFeatures(t *testing.T) {
 							{
 								Name:      "report_generated_at",
 								Upstreams: []*UpstreamColumn{{}},
+								Type:      "UNKNOWN",
 							},
 						},
 						Upstreams: []Upstream{{Value: "raw_sales"}},
@@ -994,6 +995,7 @@ func testDialectSpecificFeatures(t *testing.T) {
 								Name:          "level",
 								Upstreams:     []*UpstreamColumn{},
 								UpdateOnMerge: false,
+								Type:          "INT",
 							},
 							{
 								Name:        "dept_stats",

@@ -87,10 +87,12 @@ func (p *LineageExtractor) parseLineage(asset *Asset) error {
 	if err != nil {
 		return fmt.Errorf("failed to render the query: %w", err)
 	}
+
 	lineage, err := p.sqlParser.ColumnLineage(query, dialect, p.columnMetadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse column lineage: %w", err)
 	}
+
 	return p.processLineageColumns(asset, lineage)
 }
 
@@ -127,6 +129,7 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 		if len(lineageCol.Upstream) == 0 {
 			if err := p.addColumnToAsset(asset, lineageCol.Name, nil, &Column{
 				Name:      lineageCol.Name,
+				Type:      lineageCol.Type,
 				Checks:    []ColumnCheck{},
 				Upstreams: []*UpstreamColumn{},
 			}); err != nil {
@@ -146,7 +149,7 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 			if upstreamAsset == nil {
 				if err := p.addColumnToAsset(asset, lineageCol.Name, nil, &Column{
 					Name:   upstream.Column,
-					Type:   strings.ToLower(upstream.Table),
+					Type:   lineageCol.Type,
 					Checks: []ColumnCheck{},
 					Upstreams: []*UpstreamColumn{
 						{
@@ -165,7 +168,7 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 			if upstreamCol == nil {
 				upstreamCol = &Column{
 					Name:   upstream.Column,
-					Type:   upstream.Table,
+					Type:   lineageCol.Type,
 					Checks: []ColumnCheck{},
 					Upstreams: []*UpstreamColumn{
 						{

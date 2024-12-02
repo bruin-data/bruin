@@ -130,6 +130,10 @@ func (b *DefaultTrueBool) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (b DefaultTrueBool) IsZero() bool {
+	return b.Value == nil || *b.Value == true
+}
+
 func (b DefaultTrueBool) MarshalJSON() ([]byte, error) {
 	if b.Value == nil {
 		return []byte("true"), nil
@@ -158,7 +162,7 @@ func (b *DefaultTrueBool) Bool() bool {
 }
 
 func (b DefaultTrueBool) MarshalYAML() (interface{}, error) {
-	if b.Value == nil {
+	if b.Value == nil || *b.Value {
 		return nil, nil
 	}
 

@@ -1,7 +1,9 @@
 package pipeline_test
 
 import (
+	"bytes"
 	"encoding/json"
+	"gopkg.in/yaml.v3"
 	"log"
 	"os"
 	"path/filepath"
@@ -890,5 +892,56 @@ func BenchmarkClearSpacesAtLineEndings(b *testing.B) {
 `
 	for i := 0; i < b.N; i++ {
 		pipeline.ClearSpacesAtLineEndings(content)
+	}
+}
+
+func TestDefaultTrueBool_MarshalYAML(t *testing.T) {
+	t.Parallel()
+
+	type testStruct struct {
+		Field1 string                   `yaml:"field1"`
+		Bool   pipeline.DefaultTrueBool `yaml:"bool,omitempty"`
+	}
+
+	trueVal := true
+	falseVal := false
+
+	tests := []struct {
+		name  string
+		input testStruct
+		want  string
+	}{
+		{
+			name: "true values should be omitted",
+			input: testStruct{
+				Field1: "field1",
+				Bool:   pipeline.DefaultTrueBool{Value: &trueVal},
+			},
+			want: "field1: field1\n",
+		},
+		{
+			name: "false values should be marshalled",
+			input: testStruct{
+				Field1: "field1",
+				Bool:   pipeline.DefaultTrueBool{Value: &falseVal},
+			},
+			want: "field1: field1\nbool: false\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			buf := bytes.NewBuffer(nil)
+			enc := yaml.NewEncoder(buf)
+			enc.SetIndent(2)
+
+			err := enc.Encode(tt.input)
+			require.NoError(t, err)
+
+			yamlConfig := buf.Bytes()
+			assert.Equal(t, tt.want, string(yamlConfig))
+		})
 	}
 }

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"io"
 	"os"
 	path2 "path"
@@ -17,6 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
