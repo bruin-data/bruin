@@ -1,5 +1,4 @@
 from dataclasses import dataclass, asdict
-
 from sqlglot import parse_one, exp, lineage
 from sqlglot.lineage import Node
 from sqlglot.optimizer import optimize
@@ -137,7 +136,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
 
 	return {
 		"columns": result,
-		"non_selected_columns": extract_non_selected_columns(parse),
+		"non_selected_columns": extract_non_selected_columns(optimized),
 	}
 
 
