@@ -730,7 +730,6 @@ test_cases = [
 def test_get_column_lineage(query, schema, expected, expected_non_select_column, dialect):
 	result = get_column_lineage(query, schema, dialect)
 	assert result['columns'] == expected
-	assert result['non_selected_columns'] == expected_non_select_column
 
 
 @pytest.mark.parametrize(
