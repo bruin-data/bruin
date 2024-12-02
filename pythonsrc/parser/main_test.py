@@ -28,7 +28,7 @@ test_cases_non_selected_columns = [
         """,
 		"schema": SCHEMA,
 		"expected": [
-			Column("id", "orders")
+			Column("id", "orders").to_json()
 		],
 	},
 	{
@@ -39,9 +39,11 @@ test_cases_non_selected_columns = [
         """,
 		"schema": SCHEMA,
 		"expected": [
-			Column(name="customer_id", table="orders"),
-			Column(name="id", table="customers"),
-			Column(name="id", table="orders"),
+			Column(name="customer_id", table="orders").to_json(),
+			Column(name="id", table="customers").to_json(),
+			Column("id", "orders").to_json(),
+
+
 		],
 	},
 	{
@@ -52,10 +54,11 @@ test_cases_non_selected_columns = [
         """,
 		"schema": SCHEMA,
 		"expected": [
-			Column(name="country", table="customers"),
-			Column(name="customer_id", table="orders"),
-			Column(name="id", table="customers"),
-			Column(name="id", table="orders"),
+			Column(name="country", table="customers").to_json(),
+			Column(name="customer_id", table="orders").to_json(),
+			Column(name="id", table="customers").to_json(),
+			Column(name="id", table="orders").to_json(),
+
 		],
 	},
 	{
@@ -66,11 +69,11 @@ test_cases_non_selected_columns = [
         """,
 		"schema": SCHEMA,
 		"expected": [
-			Column(name="country", table="customers"),
-			Column(name="customer_id", table="orders"),
-			Column(name="id", table="customers"),
-			Column(name="id", table="orders"),
-			Column(name="shipping_country", table="orders")
+			Column(name="country", table="customers").to_json(),
+			Column(name="customer_id", table="orders").to_json(),
+			Column(name="id", table="customers").to_json(),
+			Column(name="id", table="orders").to_json(),
+			Column(name="shipping_country", table="orders").to_json()
 		],
 	},
 	{
@@ -88,7 +91,7 @@ test_cases_non_selected_columns = [
 			"table1": {"col3": "int", "col1": "int", "col2": "int"},
 		},
 		"expected": [
-			Column(name="col1", table="table1"),
+			Column(name="col1", table="table1").to_json(),
 		],
 	},
 ]
