@@ -1,11 +1,103 @@
 import unittest
 import pytest
-from main import get_column_lineage
+from main import get_column_lineage, Column, extract_non_selected_columns
+from sqlglot import parse_one, exp, lineage
+from sqlglot.optimizer.scope import find_all_in_scope, build_scope
+from sqlglot.optimizer import optimize
+
+
+SCHEMA = {
+    "orders": {"id": "bigint", "order_number": "string", "customer_id": "bigint", "shipping_country": "string"},
+    "customers": {"id": "bigint", "name": "string", "age": "bigint", "country": "string"},
+}
+
+test_cases_non_selected_columns = [
+    {
+        "name": "nested subqueries",
+        "dialect": "bigquery",
+        "query": """
+            select * from orders
+        """,
+        "schema": SCHEMA,
+        "expected": [],
+    },
+    {
+        "name": "nested subqueries 2s",
+        "dialect": "bigquery",
+        "query": """
+            select * from orders where id > 10
+        """,
+        "schema": SCHEMA,
+        "expected": [
+            Column("id", "orders")
+        ],
+    },
+    {
+        "name": "nested subqueries ss",
+        "dialect": "bigquery",
+        "query": """
+            select * from orders join customers on customers.id = orders.customer_id where orders.id > 10;
+        """,
+        "schema": SCHEMA,
+        "expected": [
+            Column(name="customer_id", table="orders"),
+            Column(name="id", table="customers"),
+            Column(name="id", table="orders"),
+        ],
+    },
+    {
+        "name": "nested subqueries",
+        "dialect": "bigquery",
+        "query": """
+            select * from orders join customers on customers.id = orders.customer_id where orders.id > 10 and customers.country = "UK";
+        """,
+        "schema": SCHEMA,
+        "expected": [
+            Column(name="country", table="customers"),
+            Column(name="customer_id", table="orders"),
+            Column(name="id", table="customers"),
+            Column(name="id", table="orders"),
+        ],
+    },
+    {
+        "name": "nested subqueries",
+        "dialect": "bigquery",
+        "query": """
+            select * from orders join customers on customers.id = orders.customer_id where orders.id > 10 and customers.country = "UK" and concat(customers.country, orders.shipping_country)="UKUK";
+        """,
+        "schema": SCHEMA,
+        "expected": [
+            Column(name="country", table="customers"),
+            Column(name="customer_id", table="orders"),
+            Column(name="id", table="customers"),
+            Column(name="id", table="orders"),
+            Column(name="shipping_country", table="orders")
+        ],
+    },
+    {
+        "name": "cte",
+        "dialect": "bigquery",
+        "query": """
+            with t1 as (
+                select col1, count(*) as cnt1 from table1 group by col1
+            ), t2 as (
+                select avg(col3) as col3_avg from table1 group by col1
+            )
+            select col1, cnt1, col3_avg from t1 cross join t2
+        """,
+        "schema": {
+            "table1": {"col3": "int", "col1": "int", "col2": "int"},
+        },
+        "expected": [
+            Column(name="col1", table="table1"),
+        ],
+    },
+]
 
 test_cases = [
     {
         "name": "nested subqueries",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             select *
             from table1
@@ -37,7 +129,7 @@ test_cases = [
     },
     {
         "name": "case-when",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT
                 items.item_id as item_id,
@@ -74,7 +166,7 @@ test_cases = [
     },
     {
         "name": "simple join",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT t1.col1, t2.col2
             FROM table1 t1
@@ -91,7 +183,7 @@ test_cases = [
     },
     {
         "name": "aggregate function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT customer_id as cid, COUNT(order_id) as order_count
             FROM orders
@@ -115,7 +207,7 @@ test_cases = [
     },
     {
         "name": "subquery in select",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT
                 emp_id,
@@ -141,7 +233,7 @@ test_cases = [
     },
     {
         "name": "union all",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT id, name FROM customers
             UNION ALL
@@ -172,7 +264,7 @@ test_cases = [
     },
     {
         "name": "self join",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT e1.id, e2.manager_id
             FROM employees e1
@@ -194,7 +286,7 @@ test_cases = [
     },
     {
         "name": "complex case-when",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT
                 sales.id,
@@ -231,7 +323,7 @@ test_cases = [
     },
     {
         "name": "aggregate functions with multiple columns",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT
                 customer_id,
@@ -269,7 +361,7 @@ test_cases = [
     },
     {
         "name": "upper function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT UPPER(name) as upper_name
             FROM users
@@ -287,7 +379,7 @@ test_cases = [
     },
     {
         "name": "lower function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT LOWER(email) as lower_email
             FROM users
@@ -305,7 +397,7 @@ test_cases = [
     },
     {
         "name": "length function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT LENGTH(description) as description_length
             FROM products
@@ -323,7 +415,7 @@ test_cases = [
     },
      {
         "name": "trim function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT TRIM(whitespace_column) as trimmed_column
             FROM data
@@ -341,7 +433,7 @@ test_cases = [
     },
     {
         "name": "round function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT ROUND(price, 2) as rounded_price
             FROM products
@@ -359,7 +451,7 @@ test_cases = [
     },
     {
         "name": "coalesce function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT COALESCE(middle_name, 'N/A') as middle_name
             FROM users
@@ -377,7 +469,7 @@ test_cases = [
     },
     {
         "name": "cast function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT CAST(order_id AS INT) as order_id_int
             FROM orders
@@ -395,7 +487,7 @@ test_cases = [
     },
      {
         "name": "date function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT DATE(order_date) as order_date_only
             FROM orders
@@ -413,7 +505,7 @@ test_cases = [
     },
     {
         "name": "extract function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT EXTRACT(YEAR FROM order_date) as order_year
             FROM orders
@@ -431,7 +523,7 @@ test_cases = [
     },
     {
         "name": "substring function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT SUBSTRING(name FROM 1 FOR 3) as name_prefix
             FROM users
@@ -449,7 +541,7 @@ test_cases = [
     },
     {
         "name": "floor function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT FLOOR(price) as floored_price
             FROM products
@@ -467,7 +559,7 @@ test_cases = [
     },
     {
         "name": "ceil function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT CEIL(price) as ceiled_price
             FROM products
@@ -485,7 +577,7 @@ test_cases = [
     },
     {
         "name": "mysql date_format function",
-        "dilect": "mysql",
+        "dialect": "mysql",
         "query": """
             SELECT DATE_FORMAT(order_date, '%Y-%m-%d') as formatted_date
             FROM orders
@@ -503,7 +595,7 @@ test_cases = [
     },
     {
         "name": "snowflake to_timestamp function",
-        "dilect": "snowflake",
+        "dialect": "snowflake",
         "query": """
             SELECT TO_TIMESTAMP(order_date) as timestamp_date
             FROM orders
@@ -521,7 +613,7 @@ test_cases = [
     },
     {
         "name": "duckdb current_timestamp function",
-        "dilect": "duckdb",
+        "dialect": "duckdb",
         "query": """
             SELECT order_id,CURRENT_TIMESTAMP as current_time
             FROM orders
@@ -544,7 +636,7 @@ test_cases = [
     },
     {
         "name": "redshift date_trunc function",
-        "dilect": "redshift",
+        "dialect": "redshift",
         "query": """
             SELECT DATE_TRUNC('month', order_date) as month_start
             FROM orders
@@ -564,10 +656,25 @@ test_cases = [
 
 
 @pytest.mark.parametrize(
-    "query,schema,expected,dilect",
-    [(tc["query"], tc["schema"], tc["expected"], tc["dilect"]) for tc in test_cases],
+    "query,schema,expected,dialect",
+    [(tc["query"], tc["schema"], tc["expected"], tc["dialect"]) for tc in test_cases],
     ids=[tc["name"] for tc in test_cases],
 )
-def test_get_column_lineage(query, schema, expected, dilect):
-    result = get_column_lineage(query, schema, dilect)
+def test_get_column_lineage(query, schema, expected, dialect):
+    result = get_column_lineage(query, schema, dialect)
     assert result['columns'] == expected
+
+
+@pytest.mark.parametrize(
+    "query,schema,expected,dialect",
+    [(tc["query"], tc["schema"], tc["expected"], tc["dialect"]) for tc in test_cases],
+    ids=[tc["name"] for tc in test_cases],
+)
+def test_extract_non_Select_column(query, schema, expected, dialect):
+    parsed = parse_one(query, dialect=dialect)
+
+    optimized = optimize(parsed, schema, dialect=dialect)
+
+    result = extract_non_selected_columns(optimized)
+    assert result == expected
+

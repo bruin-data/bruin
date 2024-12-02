@@ -2,6 +2,28 @@ from sqlglot import parse_one, exp, lineage
 from sqlglot.optimizer.scope import find_all_in_scope, build_scope
 from sqlglot.optimizer import optimize, qualify
 from sqlglot.lineage import Node
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class Column:
+   name: str
+   table: str
+
+def extract_non_selected_columns(parsed: exp.Select) -> list[Column]:
+    where = parsed.find_all(exp.Where)
+    join = parsed.find_all(exp.Join)
+    group = parsed.find_all(exp.Group)
+
+    cols = []
+    for scopes in [where, join, group]:
+        for scope in scopes:
+            if scope is None:
+                continue
+            cols += [Column(expr.name, expr.table) for expr in find_all_in_scope(scope, exp.Column)]
+
+    result = list(set(cols))
+    result.sort(key=lambda x: x.name + x.table)
+    return result
 
 
 def extract_tables(parsed):
