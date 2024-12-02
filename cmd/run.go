@@ -268,7 +268,7 @@ func Run(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
 			}
 
-			parser, err := sqlparser.NewSQLParser()
+			parser, err := sqlparser.NewSQLParser(false)
 			if err != nil {
 				printError(err, c.String("output"), "Could not initialize sql parser")
 			}

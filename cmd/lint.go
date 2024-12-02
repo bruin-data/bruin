@@ -109,7 +109,7 @@ func Lint(isDebug *bool) *cli.Command {
 
 			logger.Debugf("built the connection manager instance")
 
-			parser, err := sqlparser.NewSQLParser()
+			parser, err := sqlparser.NewSQLParser(false)
 			if err != nil {
 				printError(err, c.String("output"), "Could not initialize sql parser")
 			}
