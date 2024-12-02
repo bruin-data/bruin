@@ -115,6 +115,11 @@ func Run(isDebug *bool) *cli.Command {
 				Aliases: []string{"t"},
 				Usage:   "pick the assets with the given tag",
 			},
+			&cli.StringFlag{
+				Name:    "exclude-tag",
+				Aliases: []string{"x"},
+				Usage:   "Exclude the assets with the given tag",
+			},
 			&cli.StringSliceFlag{
 				Name:        "only",
 				DefaultText: "'main', 'checks', 'push-metadata'",
@@ -323,23 +328,20 @@ func Run(isDebug *bool) *cli.Command {
 					return cli.Exit("", 1)
 				}
 			}
-
 			sendTelemetry(s, c)
 
-			tag := c.String("tag")
-			if tag != "" {
-				assetsByTag := foundPipeline.GetAssetsByTag(tag)
-				if len(assetsByTag) == 0 {
-					errorPrinter.Printf("No assets found with the tag '%s'\n", tag)
-					return cli.Exit("", 1)
-				}
-
-				logger.Debugf("marking assets with tag '%s' to run", tag)
-				s.MarkAll(scheduler.Succeeded)
-				s.MarkByTag(tag, scheduler.Pending, runDownstreamTasks)
-
-				infoPrinter.Printf("Running only the assets with tag '%s', found %d assets.\n", tag, len(assetsByTag))
+			filter := &Filter{
+				IncludeTag:        c.String("tag"),
+				ExcludeTag:        c.String("exclude-tag"),
+				OnlyTaskTypes:     c.StringSlice("only"),
+				IncludeDownstream: c.Bool("downstream"),
 			}
+
+			// Apply the filter to mark assets based on include/exclude tags
+			filter.ShouldRunAsset(foundPipeline, s)
+
+			infoPrinter.Printf("Assets marked for execution: %d pending out of %d total.\n",
+				s.InstanceCountByStatus(scheduler.Pending), len(foundPipeline.Assets))
 
 			if !runMain {
 				logger.Debug("disabling main instances if any")
@@ -747,4 +749,28 @@ func sendTelemetry(s *scheduler.Scheduler, c *cli.Context) {
 	}
 
 	telemetry.SendEventWithAssetStats("run_assets", assetStats, c)
+}
+
+type Filter struct {
+	IncludeTag        string   // Tag to include assets (from `--tag`)
+	ExcludeTag        string   // Tag to exclude assets (from `--exclude`)
+	OnlyTaskTypes     []string // Task types to include (from `--only`)
+	IncludeDownstream bool     // Whether to include downstream tasks (from `--downstream`)
+}
+
+func (f *Filter) ShouldRunAsset(pipeline *pipeline.Pipeline, s *scheduler.Scheduler) {
+
+	pipeline.GetAssetsByTag(f.IncludeTag)
+	// Exclude assets if they match the exclude tag
+	if f.ExcludeTag != "" {
+		s.MarkByTag(f.ExcludeTag, scheduler.Succeeded, f.IncludeDownstream)
+		infoPrinter.Printf("Excluded assets with tag '%s'.\n", f.ExcludeTag)
+	}
+
+	// Include only if they match the include tag (if specified)
+	if f.IncludeTag != "" {
+		s.MarkAll(scheduler.Succeeded)
+		s.MarkByTag(f.IncludeTag, scheduler.Pending, f.IncludeDownstream)
+		infoPrinter.Printf("Included assets with tag '%s' for execution.\n", f.IncludeTag)
+	}
 }
