@@ -131,7 +131,7 @@ func (b *DefaultTrueBool) UnmarshalJSON(data []byte) error {
 }
 
 func (b DefaultTrueBool) IsZero() bool {
-	return b.Value == nil || *b.Value == true
+	return b.Value == nil || *b.Value
 }
 
 func (b DefaultTrueBool) MarshalJSON() ([]byte, error) {
@@ -575,8 +575,6 @@ type Asset struct {
 
 	upstream   []*Asset
 	downstream []*Asset
-
-	CondtionalColumns []Column `json:"conditions_columns" yaml:"conditions_columns,omitempty" mapstructure:"conditions_columns"`
 }
 
 func (a *Asset) AddUpstream(asset *Asset) {
