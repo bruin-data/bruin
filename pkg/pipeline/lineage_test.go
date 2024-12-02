@@ -32,19 +32,6 @@ func runLineageTests(t *testing.T, tests []struct {
 },
 ) {
 	t.Helper()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			runSingleLineageTest(t, tt.pipeline, tt.after, tt.want)
-		})
-	}
-}
-
-func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error) {
-	t.Helper()
-
 	sqlParser, err := sqlparser.NewSQLParser()
 	if err != nil {
 		t.Errorf("error initializing SQL parser: %v", err)
@@ -53,6 +40,17 @@ func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error) {
 	if err != nil {
 		t.Errorf("error starting SQL parser: %v", err)
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			runSingleLineageTest(t, tt.pipeline, tt.after, tt.want, sqlParser)
+		})
+	}
+}
+
+func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error, sqlParser *sqlparser.SQLParser) {
+	t.Helper()
 	extractor := NewLineageExtractor(p, sqlParser)
 
 	for _, asset := range p.Assets {

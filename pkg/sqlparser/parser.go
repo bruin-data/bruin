@@ -13,7 +13,6 @@ import (
 
 	"github.com/bruin-data/bruin/internal/data"
 	"github.com/bruin-data/bruin/pythonsrc"
-	"github.com/cenkalti/backoff"
 	"github.com/kluctl/go-embed-python/embed_util"
 	"github.com/kluctl/go-embed-python/python"
 	"github.com/pkg/errors"
@@ -64,39 +63,33 @@ func (s *SQLParser) Start() error {
 	if s.started {
 		return nil
 	}
+	var err error
+	args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
+	s.cmd, err = s.ep.PythonCmd(args...)
+	if err != nil {
+		return err
+	}
+	s.cmd.Stderr = os.Stderr
 
-	operation := func() error {
-		var err error
-		args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
-		s.cmd, err = s.ep.PythonCmd(args...)
-		if err != nil {
-			return err
-		}
-		s.cmd.Stderr = os.Stderr
-
-		s.stdout, err = s.cmd.StdoutPipe()
-		if err != nil {
-			return err
-		}
-
-		s.stdin, err = s.cmd.StdinPipe()
-		if err != nil {
-			return err
-		}
-
-		err = s.cmd.Start()
-		if err != nil {
-			return err
-		}
-
-		_, err = s.sendCommand(&parserCommand{
-			Command: "init",
-		})
-
+	s.stdout, err = s.cmd.StdoutPipe()
+	if err != nil {
 		return err
 	}
 
-	if err := backoff.Retry(operation, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 5)); err != nil {
+	s.stdin, err = s.cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+
+	err = s.cmd.Start()
+	if err != nil {
+		return err
+	}
+
+	_, err = s.sendCommand(&parserCommand{
+		Command: "init",
+	})
+	if err != nil {
 		return errors.Wrap(err, "failed to start sql parser after retries")
 	}
 	s.started = true
