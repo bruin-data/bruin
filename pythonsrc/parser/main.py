@@ -1,9 +1,9 @@
-from sqlglot import parse_one, exp, lineage
-from sqlglot.optimizer.scope import find_all_in_scope, build_scope
-from sqlglot.optimizer import optimize, qualify
-from sqlglot.lineage import Node
 from dataclasses import dataclass, asdict
-import json
+
+from sqlglot import parse_one, exp, lineage
+from sqlglot.lineage import Node
+from sqlglot.optimizer import optimize
+from sqlglot.optimizer.scope import find_all_in_scope, build_scope
 
 
 @dataclass(frozen=True)
@@ -25,7 +25,10 @@ def extract_non_selected_columns(parsed: exp.Select) -> list[Column]:
 		for scope in scopes:
 			if scope is None:
 				continue
-			cols += [Column(expr.name, expr.table).to_json() for expr in find_all_in_scope(scope, exp.Column)]
+			cols += [
+				Column(expr.name, expr.table).to_json()
+				for expr in find_all_in_scope(scope, exp.Column)
+			]
 
 	result = [dict(t) for t in {tuple(d.items()) for d in cols}]
 	result.sort(key=lambda x: x["name"] + x["table"])
@@ -54,10 +57,12 @@ def extract_columns(parsed):
 	for expression in found.expressions:
 		if isinstance(expression, exp.CTE):
 			continue
-		cols.append({
-			"name": expression.alias_or_name,
-			"type": str(expression.type),
-		})
+		cols.append(
+			{
+				"name": expression.alias_or_name,
+				"type": str(expression.type),
+			}
+		)
 
 	return cols
 
@@ -113,7 +118,9 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
 		find_leaf_nodes(ll, leaves)
 
 		for ds in leaves:
-			if isinstance(ds.expression.this, exp.Literal) or isinstance(ds.expression.this, exp.Anonymous):
+			if isinstance(ds.expression.this, exp.Literal) or isinstance(
+				ds.expression.this, exp.Anonymous
+			):
 				continue
 
 			cl.append(
@@ -130,7 +137,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
 
 	return {
 		"columns": result,
-		"non_selected_columns": extract_non_selected_columns(parse)
+		"non_selected_columns": extract_non_selected_columns(parse),
 	}
 
 
