@@ -123,10 +123,10 @@ type ColumnLineage struct {
 	Name     string           `json:"name"`
 	Upstream []UpstreamColumn `json:"upstream"`
 	Type     string           `json:"type"`
+	Usage    string           `json:"usage"`
 }
 type Lineage struct {
 	Columns []ColumnLineage `json:"columns"`
-	Lineage []ColumnLineage `json:"lineage"`
 }
 
 func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage, error) {

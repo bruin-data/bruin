@@ -5,7 +5,7 @@ from main import get_column_lineage
 test_cases = [
     {
         "name": "nested subqueries",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             select *
             from table1
@@ -31,13 +31,47 @@ test_cases = [
                     {"column": "a", "table": "table2"},
                 ],
             },
-            {"name": "b", 'type': 'BIGINT', "upstream": [{"column": "b", "table": "table1"}]},
-            {"name": "c", 'type': 'BIGINT', "upstream": [{"column": "c", "table": "table2"}]},
+            {
+                "name": "b",
+                "type": "BIGINT",
+                "upstream": [{"column": "b", "table": "table1"}],
+            },
+            {
+                "name": "c",
+                "type": "BIGINT",
+                "upstream": [{"column": "c", "table": "table2"}],
+            },
+        ],
+        "expectedAllColumns": [
+            {
+                "name": "a",
+                "type": "TEXT",
+                "upstream": [
+                    {"column": "a", "table": "table1"},
+                ],
+            },
+            {
+                "name": "a",
+                "type": "TEXT",
+                "upstream": [
+                    {"column": "a", "table": "table2"},
+                ],
+            },
+            {
+                "name": "b",
+                "type": "BIGINT",
+                "upstream": [{"column": "b", "table": "table1"}],
+            },
+            {
+                "name": "c",
+                "type": "BIGINT",
+                "upstream": [{"column": "c", "table": "table2"}],
+            },
         ],
     },
     {
         "name": "case-when",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT
                 items.item_id as item_id,
@@ -71,10 +105,37 @@ test_cases = [
                 ],
             },
         ],
+        "expectedAllColumns": [
+            {
+                "name": "in_stock",
+                "type": "BOOLEAN",
+                "upstream": [{"column": "in_stock", "table": "items"}],
+            },
+            {
+                "name": "item_id",
+                "type": "TEXT",
+                "upstream": [{"column": "item_id", "table": "items"}],
+            },
+            {
+                "name": "item_id",
+                "type": "TEXT",
+                "upstream": [{"column": "item_id", "table": "t2"}],
+            },
+            {
+                "name": "price",
+                "type": "BIGINT",
+                "upstream": [{"column": "price", "table": "items"}],
+            },
+            {
+                "name": "somecol",
+                "type": "BIGINT",
+                "upstream": [{"column": "somecol", "table": "t2"}],
+            },
+        ],
     },
     {
         "name": "simple join",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT t1.col1, t2.col2
             FROM table1 t1
@@ -85,13 +146,43 @@ test_cases = [
             "table2": {"id": "str", "col2": "int64"},
         },
         "expected": [
-            {"name": "col1", 'type': 'BIGINT', "upstream": [{"column": "col1", "table": "table1"}]},
-            {"name": "col2", 'type': 'BIGINT', "upstream": [{"column": "col2", "table": "table2"}]},
+            {
+                "name": "col1",
+                'type': 'BIGINT',
+                "upstream": [{"column": "col1", "table": "table1"}],
+            },
+            {
+                "name": "col2",
+                'type': 'BIGINT',
+                "upstream": [{"column": "col2", "table": "table2"}],
+            },
+        ],
+        "expectedAllColumns": [
+            {
+                "name": "col1",
+                "type": "BIGINT",
+                "upstream": [{"column": "col1", "table": "t1"}],
+            },
+            {
+                "name": "col2",
+                "type": "BIGINT",
+                "upstream": [{"column": "col2", "table": "t2"}],
+            },
+            {
+                "name": "id",
+                "type": "TEXT",
+                "upstream": [{"column": "id", "table": "t1"}],
+            },
+            {
+                "name": "id",
+                "type": "TEXT",
+                "upstream": [{"column": "id", "table": "t2"}],
+            },
         ],
     },
     {
         "name": "aggregate function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT customer_id as cid, COUNT(order_id) as order_count
             FROM orders
@@ -112,10 +203,22 @@ test_cases = [
                 "upstream": [{"column": "order_id", "table": "orders"}],
             },
         ],
+        "expectedAllColumns": [
+            {
+                "name": "customer_id",
+                "type": "TEXT",
+                "upstream": [{"column": "customer_id", "table": "orders"}],
+            },
+            {
+                "name": "order_id",
+                "type": "BIGINT",
+                "upstream": [{"column": "order_id", "table": "orders"}],
+            },
+        ],
     },
     {
         "name": "subquery in select",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT
                 emp_id,
@@ -138,10 +241,27 @@ test_cases = [
                 "upstream": [{"column": "emp_id", "table": "employees"}],
             },
         ],
+        "expectedAllColumns": [
+            {
+                "name": "_col_0",
+                "type": "DOUBLE",
+                "upstream": [{"column": "_col_0", "table": "_u_0"}],
+            },
+            {
+                "name": "_u_1",
+                "type": "TEXT",
+                "upstream": [{"column": "_u_1", "table": "_u_0"}],
+            },
+            {
+                "name": "emp_id",
+                "type": "TEXT",
+                "upstream": [{"column": "emp_id", "table": "employees"}],
+            },
+        ],
     },
     {
         "name": "union all",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT id, name FROM customers
             UNION ALL
@@ -169,10 +289,13 @@ test_cases = [
                 ],
             },
         ],
+        "expectedAllColumns": [
+
+        ],
     },
     {
         "name": "self join",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT e1.id, e2.manager_id
             FROM employees e1
@@ -182,7 +305,11 @@ test_cases = [
             "employees": {"id": "str", "manager_id": "str"},
         },
         "expected": [
-            {"name": "id", 'type': 'TEXT', "upstream": [{"column": "id", "table": "employees"}]},
+            {
+                "name": "id",
+                'type': 'TEXT',
+                "upstream": [{"column": "id", "table": "employees"}],
+            },
             {
                 "name": "manager_id",
                 'type': 'TEXT',
@@ -191,10 +318,32 @@ test_cases = [
                 ],
             },
         ],
+        "expectedAllColumns": [
+            {
+                "name": "id",
+                "type": "TEXT",
+                "upstream": [{"column": "id", "table": "e1"}],
+            },
+            {
+                "name": "id",
+                "type": "TEXT",
+                "upstream": [{"column": "id", "table": "e2"}],
+            },
+            {
+                "name": "manager_id",
+                "type": "TEXT",
+                "upstream": [{"column": "manager_id", "table": "e2"}],
+            },
+            {
+                "name": "manager_id",
+                "type": "TEXT",
+                "upstream": [{"column": "manager_id", "table": "e1"}],
+            },
+        ],
     },
     {
         "name": "complex case-when",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT
                 sales.id,
@@ -218,20 +367,63 @@ test_cases = [
             "regions": {"id": "str", "name": "str"},
         },
         "expected": [
-            {"name": "fixed", 'type': 'VARCHAR', "upstream": []},
-            {"name": "id", 'type': 'TEXT', "upstream": [{"column": "id", "table": "sales"}]},
+            {
+                "name": "fixed",
+                'type': 'VARCHAR',
+                "upstream": [],
+            },
+            {
+                "name": "id",
+                'type': 'TEXT',
+                "upstream": [{"column": "id", "table": "sales"}],
+            },
             {
                 "name": "region_abbr",
                 'type': 'VARCHAR',
                 "upstream": [{"column": "name", "table": "regions"}],
             },
-            {"name": "sale_size", 'type': 'VARCHAR', "upstream": [{"column": "amount", "table": "sales"}]},
-            {"name": "updated_at", "upstream": [], "type": "UNKNOWN"},
-        ]
+            {
+                "name": "sale_size",
+                'type': 'VARCHAR',
+                "upstream": [{"column": "amount", "table": "sales"}],
+            },
+            {
+                "name": "updated_at",
+                "type": "UNKNOWN",
+                "upstream": [],
+            },
+        ],
+        "expectedAllColumns": [
+            {
+                "name": "amount",
+                "type": "BIGINT",
+                "upstream": [{"column": "amount", "table": "sales"}],
+            },
+            {
+                "name": "id",
+                "type": "TEXT",
+                "upstream": [{"column": "id", "table": "sales"}],
+            },
+            {
+                "name": "id",
+                "type": "TEXT",
+                "upstream": [{"column": "id", "table": "regions"}],
+            },
+            {
+                "name": "name",
+                "type": "TEXT",
+                "upstream": [{"column": "name", "table": "regions"}],
+            },
+            {
+                "name": "region_id",
+                "type": "TEXT",
+                "upstream": [{"column": "region_id", "table": "sales"}],
+            },
+        ],
     },
     {
         "name": "aggregate functions with multiple columns",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT
                 customer_id,
@@ -266,10 +458,27 @@ test_cases = [
                 "upstream": [{"column": "order_amount", "table": "orders"}],
             },
         ],
+        "expectedAllColumns": [
+            {
+                "name": "customer_id",
+                "type": "TEXT",
+                "upstream": [{"column": "customer_id", "table": "orders"}],
+            },
+            {
+                "name": "order_amount",
+                "type": "BIGINT",
+                "upstream": [{"column": "order_amount", "table": "orders"}],
+            },
+            {
+                "name": "order_id",
+                "type": "TEXT",
+                "upstream": [{"column": "order_id", "table": "orders"}],
+            },
+        ],
     },
     {
         "name": "upper function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT UPPER(name) as upper_name
             FROM users
@@ -284,10 +493,17 @@ test_cases = [
                 "upstream": [{"column": "name", "table": "users"}],
             },
         ],
+        "expectedAllColumns": [
+            {
+                "name": "name",
+                "type": "TEXT",
+                "upstream": [{"column": "name", "table": "users"}],
+            },
+        ],
     },
     {
         "name": "lower function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT LOWER(email) as lower_email
             FROM users
@@ -302,10 +518,17 @@ test_cases = [
                 "upstream": [{"column": "email", "table": "users"}],
             },
         ],
+        "expectedAllColumns": [
+            {
+                "name": "email",
+                "type": "TEXT",
+                "upstream": [{"column": "email", "table": "users"}],
+            },
+        ],
     },
     {
         "name": "length function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT LENGTH(description) as description_length
             FROM products
@@ -320,10 +543,13 @@ test_cases = [
                 "upstream": [{"column": "description", "table": "products"}],
             },
         ],
+        "expectedAllColumns": [{'name': 'description',
+  'type': 'TEXT',
+  'upstream': [{'column': 'description', 'table': 'products'}]}],
     },
-     {
+    {
         "name": "trim function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT TRIM(whitespace_column) as trimmed_column
             FROM data
@@ -338,10 +564,17 @@ test_cases = [
                 "upstream": [{"column": "whitespace_column", "table": "data"}],
             },
         ],
+        "expectedAllColumns": [
+            {
+                "name": "whitespace_column",
+                "type": "TEXT",
+                "upstream": [{"column": "whitespace_column", "table": "data"}],
+            },
+        ],
     },
     {
         "name": "round function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT ROUND(price, 2) as rounded_price
             FROM products
@@ -356,10 +589,13 @@ test_cases = [
                 "upstream": [{"column": "price", "table": "products"}],
             },
         ],
+        "expectedAllColumns": [{'name': 'price',
+  'type': 'FLOAT',
+  'upstream': [{'column': 'price', 'table': 'products'}]}],
     },
     {
         "name": "coalesce function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT COALESCE(middle_name, 'N/A') as middle_name
             FROM users
@@ -374,10 +610,13 @@ test_cases = [
                 "upstream": [{"column": "middle_name", "table": "users"}],
             },
         ],
+        "expectedAllColumns": [{'name': 'middle_name',
+  'type': 'TEXT',
+  'upstream': [{'column': 'middle_name', 'table': 'users'}]}],
     },
     {
         "name": "cast function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT CAST(order_id AS INT) as order_id_int
             FROM orders
@@ -392,10 +631,13 @@ test_cases = [
                 "upstream": [{"column": "order_id", "table": "orders"}],
             },
         ],
+        "expectedAllColumns": [{'name': 'order_id',
+  'type': 'TEXT',
+  'upstream': [{'column': 'order_id', 'table': 'orders'}]}],
     },
-     {
+    {
         "name": "date function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT DATE(order_date) as order_date_only
             FROM orders
@@ -410,10 +652,13 @@ test_cases = [
                 "upstream": [{"column": "order_date", "table": "orders"}],
             },
         ],
+        "expectedAllColumns": [{'name': 'order_date',
+  'type': 'TIMESTAMP',
+  'upstream': [{'column': 'order_date', 'table': 'orders'}]}],
     },
     {
         "name": "extract function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT EXTRACT(YEAR FROM order_date) as order_year
             FROM orders
@@ -428,10 +673,13 @@ test_cases = [
                 "upstream": [{"column": "order_date", "table": "orders"}],
             },
         ],
+        "expectedAllColumns": [{'name': 'order_date',
+  'type': 'TIMESTAMP',
+  'upstream': [{'column': 'order_date', 'table': 'orders'}]}],
     },
     {
         "name": "substring function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT SUBSTRING(name FROM 1 FOR 3) as name_prefix
             FROM users
@@ -446,10 +694,13 @@ test_cases = [
                 "upstream": [{"column": "name", "table": "users"}],
             },
         ],
+        "expectedAllColumns": [{'name': 'name',
+  'type': 'TEXT',
+  'upstream': [{'column': 'name', 'table': 'users'}]}],
     },
     {
         "name": "floor function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT FLOOR(price) as floored_price
             FROM products
@@ -464,10 +715,13 @@ test_cases = [
                 "upstream": [{"column": "price", "table": "products"}],
             },
         ],
+        "expectedAllColumns": [{'name': 'price',
+  'type': 'FLOAT',
+  'upstream': [{'column': 'price', 'table': 'products'}]}],
     },
     {
         "name": "ceil function",
-        "dilect": "bigquery",
+        "dialect": "bigquery",
         "query": """
             SELECT CEIL(price) as ceiled_price
             FROM products
@@ -482,10 +736,13 @@ test_cases = [
                 "upstream": [{"column": "price", "table": "products"}],
             },
         ],
+        "expectedAllColumns": [{'name': 'price',
+  'type': 'FLOAT',
+  'upstream': [{'column': 'price', 'table': 'products'}]}],
     },
     {
         "name": "mysql date_format function",
-        "dilect": "mysql",
+        "dialect": "mysql",
         "query": """
             SELECT DATE_FORMAT(order_date, '%Y-%m-%d') as formatted_date
             FROM orders
@@ -500,10 +757,13 @@ test_cases = [
                 "upstream": [{"column": "order_date", "table": "orders"}],
             },
         ],
+        "expectedAllColumns": [{'name': 'order_date',
+  'type': 'DATETIME',
+  'upstream': [{'column': 'order_date', 'table': 'orders'}]}],
     },
     {
         "name": "snowflake to_timestamp function",
-        "dilect": "snowflake",
+        "dialect": "snowflake",
         "query": """
             SELECT TO_TIMESTAMP(order_date) as timestamp_date
             FROM orders
@@ -518,10 +778,13 @@ test_cases = [
                 "upstream": [{"column": "ORDER_DATE", "table": "ORDERS"}],
             },
         ],
+        "expectedAllColumns": [{'name': 'ORDER_DATE',
+  'type': 'TEXT',
+  'upstream': [{'column': 'ORDER_DATE', 'table': 'ORDERS'}]}],
     },
     {
         "name": "duckdb current_timestamp function",
-        "dilect": "duckdb",
+        "dialect": "duckdb",
         "query": """
             SELECT order_id,CURRENT_TIMESTAMP as current_time
             FROM orders
@@ -535,16 +798,19 @@ test_cases = [
                 'type': 'TIMESTAMP',
                 "upstream": [{'column': 'current_time', 'table': ''}],
             },
-			{
-				"name": "order_id",
-				'type': 'TEXT',
-				"upstream": [{'column': 'order_id', 'table': 'orders'}],
-			}
+            {
+                "name": "order_id",
+                'type': 'TEXT',
+                "upstream": [{'column': 'order_id', 'table': 'orders'}],
+            },
         ],
+        "expectedAllColumns": [{'name': 'order_id',
+  'type': 'TEXT',
+  'upstream': [{'column': 'order_id', 'table': 'orders'}]}],
     },
     {
         "name": "redshift date_trunc function",
-        "dilect": "redshift",
+        "dialect": "redshift",
         "query": """
             SELECT DATE_TRUNC('month', order_date) as month_start
             FROM orders
@@ -559,15 +825,23 @@ test_cases = [
                 "upstream": [{"column": "order_date", "table": "orders"}],
             },
         ],
+        "expectedAllColumns": [
+            {
+                "name": "order_date",
+                'type': 'DATETIME',
+                "upstream": [{"column": "order_date", "table": "orders"}],
+            },
+        ],
     },
 ]
 
 
 @pytest.mark.parametrize(
-    "query,schema,expected,dilect",
-    [(tc["query"], tc["schema"], tc["expected"], tc["dilect"]) for tc in test_cases],
+    "query,schema,expected,expectedAllColumns, dialect",
+    [(tc["query"], tc["schema"], tc["expected"], tc["expectedAllColumns"],tc["dialect"]) for tc in test_cases],
     ids=[tc["name"] for tc in test_cases],
 )
-def test_get_column_lineage(query, schema, expected, dilect):
-    result = get_column_lineage(query, schema, dilect)
+def test_get_column_lineage(query, schema, expected,expectedAllColumns, dialect):
+    result = get_column_lineage(query, schema, dialect)
     assert result['columns'] == expected
+    assert result['lineage'] == expectedAllColumns
