@@ -105,6 +105,22 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 		return errors.New("asset cannot be nil")
 	}
 
+	upstreams := []Upstream{}
+	for _, up := range asset.Upstreams {
+		upstream := up
+		for _, lineageCol := range lineage.Columns {
+			for _, lineageUpstream := range lineageCol.Upstream {
+				if lineageUpstream.Table == up.Value {
+					upstream.Columns = append(upstream.Columns, DependsColumn{
+						Name: lineageCol.Name,
+					})
+				}
+			}
+		}
+		upstreams = append(upstreams, upstream)
+	}
+	asset.Upstreams = upstreams
+
 	for _, lineageCol := range lineage.Columns {
 		if lineageCol.Name == "*" {
 			for _, upstream := range lineageCol.Upstream {
