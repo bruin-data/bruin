@@ -62,6 +62,7 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Type: "BIGINT",
 					},
 				},
+				NonSelectedColumns: []ColumnLineage{},
 			},
 		},
 		{
@@ -100,6 +101,7 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Type: "VARCHAR",
 					},
 				},
+				NonSelectedColumns: []ColumnLineage{},
 			},
 		},
 		{
@@ -130,6 +132,7 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Type: "BIGINT",
 					},
 				},
+				NonSelectedColumns: []ColumnLineage{},
 			},
 		},
 		{
@@ -159,6 +162,7 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Type: "BIGINT",
 					},
 				},
+				NonSelectedColumns: []ColumnLineage{},
 			},
 		},
 		{
@@ -190,6 +194,7 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Type: "DOUBLE",
 					},
 				},
+				NonSelectedColumns: []ColumnLineage{},
 			},
 		},
 		{
@@ -222,6 +227,7 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Type: "TEXT",
 					},
 				},
+				NonSelectedColumns: []ColumnLineage{},
 			},
 		},
 		{
@@ -251,6 +257,7 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Type: "TEXT",
 					},
 				},
+				NonSelectedColumns: []ColumnLineage{},
 			},
 		},
 		{
@@ -305,6 +312,7 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Type:     "VARCHAR",
 					},
 				},
+				NonSelectedColumns: []ColumnLineage{},
 			},
 		},
 		{
@@ -374,6 +382,7 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Type:     "UNKNOWN",
 					},
 				},
+				NonSelectedColumns: []ColumnLineage{},
 			},
 		},
 	}
