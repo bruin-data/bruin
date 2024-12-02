@@ -124,9 +124,6 @@ test_cases = [
 			},
 			{"name": "b", 'type': 'BIGINT', "upstream": [{"column": "b", "table": "table1"}]},
 			{"name": "c", 'type': 'BIGINT', "upstream": [{"column": "c", "table": "table2"}]},
-		],
-		"expected_non_select_column": [
-
 		]
 	},
 	{
@@ -164,11 +161,6 @@ test_cases = [
 					{"column": "somecol", "table": "orders"},
 				],
 			},
-		],
-		"expected_non_select_column": [
-			 Column(name='in_stock', table=''),
-			 Column(name='item_id', table='items'),
-			 Column(name='item_id', table='t2')
 		]
 	},
 	{
@@ -186,8 +178,7 @@ test_cases = [
 		"expected": [
 			{"name": "col1", 'type': 'BIGINT', "upstream": [{"column": "col1", "table": "table1"}]},
 			{"name": "col2", 'type': 'BIGINT', "upstream": [{"column": "col2", "table": "table2"}]},
-		],
-		"expected_non_select_column": [Column(name='id', table='t1'), Column(name='id', table='t2')]
+		]
 	},
 	{
 		"name": "aggregate function",
@@ -211,8 +202,7 @@ test_cases = [
 				'type': 'BIGINT',
 				"upstream": [{"column": "order_id", "table": "orders"}],
 			},
-		],
-		"expected_non_select_column": [Column(name='customer_id', table='')]
+		]
 	},
 	{
 		"name": "subquery in select",
@@ -238,10 +228,6 @@ test_cases = [
 				'type': 'TEXT',
 				"upstream": [{"column": "emp_id", "table": "employees"}],
 			},
-		],
-		"expected_non_select_column": [
-			Column(name='emp_id', table='employees'),
- 			Column(name='emp_id', table='salaries')
 		]
 	},
 	{
@@ -273,9 +259,6 @@ test_cases = [
 					{"column": "name", "table": "employees"},
 				],
 			},
-		],
-		"expected_non_select_column": [
-
 		]
 	},
 	{
@@ -298,8 +281,7 @@ test_cases = [
 					{"column": "manager_id", "table": "employees"},
 				],
 			},
-		],
-		"expected_non_select_column": [Column(name='id', table='e2'), Column(name='manager_id', table='e1')]
+		]
 	},
 	{
 		"name": "complex case-when",
@@ -336,8 +318,7 @@ test_cases = [
 			},
 			{"name": "sale_size", 'type': 'VARCHAR', "upstream": [{"column": "amount", "table": "sales"}]},
 			{"name": "updated_at", "upstream": [], "type": "UNKNOWN"},
-		],
-		"expected_non_select_column": [Column(name='id', table='regions'), Column(name='region_id', table='sales')]
+		]
 	},
 	{
 		"name": "aggregate functions with multiple columns",
@@ -375,8 +356,7 @@ test_cases = [
 				'type': 'BIGINT',
 				"upstream": [{"column": "order_amount", "table": "orders"}],
 			},
-		],
-		"expected_non_select_column": [Column(name='customer_id', table='')]
+		]
 	},
 	{
 		"name": "upper function",
@@ -395,9 +375,6 @@ test_cases = [
 				"upstream": [{"column": "name", "table": "users"}],
 			},
 		],
-		"expected_non_select_column": [
-
-		]
 	},
 	{
 		"name": "lower function",
@@ -416,9 +393,6 @@ test_cases = [
 				"upstream": [{"column": "email", "table": "users"}],
 			},
 		],
-		"expected_non_select_column": [
-
-		]
 	},
 	{
 		"name": "length function",
@@ -437,9 +411,6 @@ test_cases = [
 				"upstream": [{"column": "description", "table": "products"}],
 			},
 		],
-		"expected_non_select_column": [
-
-		]
 	},
 	{
 		"name": "trim function",
@@ -458,9 +429,6 @@ test_cases = [
 				"upstream": [{"column": "whitespace_column", "table": "data"}],
 			},
 		],
-		"expected_non_select_column": [
-
-		]
 	},
 	{
 		"name": "round function",
@@ -479,9 +447,6 @@ test_cases = [
 				"upstream": [{"column": "price", "table": "products"}],
 			},
 		],
-		"expected_non_select_column": [
-
-		]
 	},
 	{
 		"name": "coalesce function",
@@ -500,9 +465,6 @@ test_cases = [
 				"upstream": [{"column": "middle_name", "table": "users"}],
 			},
 		],
-		"expected_non_select_column": [
-
-		]
 	},
 	{
 		"name": "cast function",
@@ -521,9 +483,6 @@ test_cases = [
 				"upstream": [{"column": "order_id", "table": "orders"}],
 			},
 		],
-		"expected_non_select_column": [
-
-		]
 	},
 	{
 		"name": "date function",
@@ -542,9 +501,6 @@ test_cases = [
 				"upstream": [{"column": "order_date", "table": "orders"}],
 			},
 		],
-		"expected_non_select_column": [
-
-		]
 	},
 	{
 		"name": "extract function",
@@ -563,9 +519,6 @@ test_cases = [
 				"upstream": [{"column": "order_date", "table": "orders"}],
 			},
 		],
-		"expected_non_select_column": [
-
-		]
 	},
 	{
 		"name": "substring function",
@@ -584,9 +537,6 @@ test_cases = [
 				"upstream": [{"column": "name", "table": "users"}],
 			},
 		],
-		"expected_non_select_column": [
-
-		]
 	},
 	{
 		"name": "floor function",
@@ -605,9 +555,6 @@ test_cases = [
 				"upstream": [{"column": "price", "table": "products"}],
 			},
 		],
-		"expected_non_select_column": [
-
-		]
 	},
 	{
 		"name": "ceil function",
@@ -626,9 +573,6 @@ test_cases = [
 				"upstream": [{"column": "price", "table": "products"}],
 			},
 		],
-		"expected_non_select_column": [
-
-		]
 	},
 	{
 		"name": "mysql date_format function",
@@ -647,9 +591,6 @@ test_cases = [
 				"upstream": [{"column": "order_date", "table": "orders"}],
 			},
 		],
-		"expected_non_select_column": [
-
-		]
 	},
 	{
 		"name": "snowflake to_timestamp function",
@@ -668,9 +609,6 @@ test_cases = [
 				"upstream": [{"column": "ORDER_DATE", "table": "ORDERS"}],
 			},
 		],
-		"expected_non_select_column": [
-
-		]
 	},
 	{
 		"name": "duckdb current_timestamp function",
@@ -694,9 +632,6 @@ test_cases = [
 				"upstream": [{'column': 'order_id', 'table': 'orders'}],
 			}
 		],
-		"expected_non_select_column": [
-
-		]
 	},
 	{
 		"name": "redshift date_trunc function",
@@ -715,19 +650,16 @@ test_cases = [
 				"upstream": [{"column": "order_date", "table": "orders"}],
 			},
 		],
-		"expected_non_select_column": [
-
-		]
 	},
 ]
 
 
 @pytest.mark.parametrize(
-	"query,schema,expected,expected_non_select_column, dialect",
-	[(tc["query"], tc["schema"], tc["expected"], tc["expected_non_select_column"], tc["dialect"]) for tc in test_cases],
+	"query,schema,expected, dialect",
+	[(tc["query"], tc["schema"], tc["expected"], tc["dialect"]) for tc in test_cases],
 	ids=[tc["name"] for tc in test_cases],
 )
-def test_get_column_lineage(query, schema, expected, expected_non_select_column, dialect):
+def test_get_column_lineage(query, schema, expected, dialect):
 	result = get_column_lineage(query, schema, dialect)
 	assert result['columns'] == expected
 
