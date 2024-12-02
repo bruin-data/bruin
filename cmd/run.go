@@ -338,7 +338,10 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			// Apply the filter to mark assets based on include/exclude tags
-			filter.ShouldRunAsset(foundPipeline, s)
+			if err := filter.ShouldRunAsset(foundPipeline, s); err != nil {
+				errorPrinter.Printf("Failed to filter assets: %v\n", err)
+				return cli.Exit("", 1)
+			}
 
 			infoPrinter.Printf("Assets marked for execution: %d pending out of %d total.\n",
 				s.InstanceCountByStatus(scheduler.Pending), len(foundPipeline.Assets))
@@ -758,19 +761,29 @@ type Filter struct {
 	IncludeDownstream bool     // Whether to include downstream tasks (from `--downstream`)
 }
 
-func (f *Filter) ShouldRunAsset(pipeline *pipeline.Pipeline, s *scheduler.Scheduler) {
-
-	pipeline.GetAssetsByTag(f.IncludeTag)
-	// Exclude assets if they match the exclude tag
+func (f *Filter) ShouldRunAsset(pipeline *pipeline.Pipeline, s *scheduler.Scheduler) error {
+	// Handle exclude tag: Mark excluded assets as skipped
 	if f.ExcludeTag != "" {
+		excludedAssets := pipeline.GetAssetsByTag(f.ExcludeTag)
+		if len(excludedAssets) == 0 {
+			errorPrinter.Printf("No assets found with exclude tag '%s'.\n", f.ExcludeTag)
+			return fmt.Errorf("no assets found with exclude tag '%s'", f.ExcludeTag)
+		}
 		s.MarkByTag(f.ExcludeTag, scheduler.Succeeded, f.IncludeDownstream)
-		infoPrinter.Printf("Excluded assets with tag '%s'.\n", f.ExcludeTag)
+		infoPrinter.Printf("Excluded %d assets with tag '%s'.\n", len(excludedAssets), f.ExcludeTag)
 	}
 
-	// Include only if they match the include tag (if specified)
+	// Handle include tag: Mark included assets as pending
 	if f.IncludeTag != "" {
-		s.MarkAll(scheduler.Succeeded)
+		includedAssets := pipeline.GetAssetsByTag(f.IncludeTag)
+		if len(includedAssets) == 0 {
+			errorPrinter.Printf("No assets found with include tag '%s'.\n", f.IncludeTag)
+			return fmt.Errorf("no assets found with include tag '%s'", f.IncludeTag)
+		}
+		s.MarkAll(scheduler.Succeeded) // Skip everything first
 		s.MarkByTag(f.IncludeTag, scheduler.Pending, f.IncludeDownstream)
-		infoPrinter.Printf("Included assets with tag '%s' for execution.\n", f.IncludeTag)
+		infoPrinter.Printf("Included %d assets with tag '%s' for execution.\n", len(includedAssets), f.IncludeTag)
 	}
+
+	return nil
 }
