@@ -108,22 +108,11 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 	upstreams := []Upstream{}
 	for _, up := range asset.Upstreams {
 		upstream := up
-		for _, lineageCol := range lineage.Columns {
-			for _, lineageUpstream := range lineageCol.Upstream {
-				if lineageUpstream.Table == up.Value {
-					upstream.Columns = append(upstream.Columns, DependsColumn{
-						Name:  lineageCol.Name,
-						Usage: "OUTPUT",
-					})
-				}
-			}
-		}
 		for _, lineageCol := range lineage.Lineage {
 			for _, lineageUpstream := range lineageCol.Upstream {
 				if lineageUpstream.Table == up.Value {
 					upstream.Columns = append(upstream.Columns, DependsColumn{
-						Name:  lineageCol.Name,
-						Usage: "QUERY",
+						Name: lineageCol.Name,
 					})
 				}
 			}

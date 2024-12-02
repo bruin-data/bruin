@@ -20,7 +20,6 @@ def extract_columns(parsed):
 	select_columns = []
 	found = parsed.find(exp.Select)
 	if found is not None:
-		# Extract select columns
 		for expression in found.expressions:
 			if not isinstance(expression, exp.CTE):  # Skip CTEs
 				select_columns.append({
@@ -28,7 +27,7 @@ def extract_columns(parsed):
 					"type": str(expression.type),
 				})
 
-	# Extract all columns from the parsed expression
+
 	cols = [{
 		"name": str(expr),
 		"type": str(expr.type),
@@ -41,13 +40,11 @@ def extract_columns(parsed):
 	for col in unique_cols:
 		# Split the column name into table and column parts
 		table_name, column_name = col["name"].split(".") if "." in col["name"] else (None, col["name"])
-		is_select = any(c["name"] == column_name.strip('"') and c["type"] == col["type"] for c in select_columns)  # Check if already selected
-		if not is_select:
-			cols.append({
-				"name": column_name.strip('"'),
-				"upstream": [{"column": column_name.strip('"'), "table": table_name.strip('"')}],
-				"type": col["type"]
-			})
+		cols.append({  
+			"name": column_name.strip('"'),
+			"upstream": [{"column": column_name.strip('"'), "table": table_name.strip('"')}],
+			"type": col["type"]
+		})
 
 	cols.sort(key=lambda x: x["name"])
 	select_columns.sort(key=lambda x: x["name"])
