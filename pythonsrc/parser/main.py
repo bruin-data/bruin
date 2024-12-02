@@ -3,27 +3,6 @@ from sqlglot.optimizer.scope import find_all_in_scope, build_scope
 from sqlglot.optimizer import optimize, qualify
 from sqlglot.lineage import Node
 
-def extract_all_columns(parsed):
-	# Extract columns from the parsed expression
-	cols = [{
-		"name": str(expr),
-		"type": str(expr.type),
-	} for expr in find_all_in_scope(parsed, exp.Column)]
-
-	# Remove duplicates while preserving order
-	unique_cols = list({col['name']: col for col in cols}.values())
-	conditions = []
-	for col in unique_cols:
-		# Split the column name into table and column parts
-		table_name, column_name = col["name"].split(".") if "." in col["name"] else (None, col["name"])
-		conditions.append({
-			"name": column_name,
-			"upstream": [{"column": column_name, "table": table_name}],
-			"type": col["type"]
-		})
-	conditions.sort(key=lambda x: x["name"])
-	return conditions
-
 def extract_tables(parsed):
     root = build_scope(parsed)
     if root is None:
@@ -38,19 +17,44 @@ def extract_tables(parsed):
     return tables
 
 def extract_columns(parsed):
-    cols = []
-    found = parsed.find(exp.Select)
-    if found is None:
-        return cols
-    for expression in found.expressions:
-        if isinstance(expression, exp.CTE):
-            continue
-        cols.append({
-			"name": expression.alias_or_name,
-			"type": str(expression.type),
-		})
+	select_columns = []
+	found = parsed.find(exp.Select)
+	if found is not None:
+		# Extract select columns
+		for expression in found.expressions:
+			if not isinstance(expression, exp.CTE):  # Skip CTEs
+				select_columns.append({
+					"name": expression.alias_or_name,
+					"type": str(expression.type),
+				})
 
-    return cols
+	# Extract all columns from the parsed expression
+	cols = [{
+		"name": str(expr),
+		"type": str(expr.type),
+	} for expr in find_all_in_scope(parsed, exp.Column)]
+
+	# Remove duplicates while preserving order
+	unique_cols = {col['name']: col for col in cols}.values()
+	cols = []
+
+	for col in unique_cols:
+		# Split the column name into table and column parts
+		table_name, column_name = col["name"].split(".") if "." in col["name"] else (None, col["name"])
+		is_select = any(c["name"] == column_name.strip('"') and c["type"] == col["type"] for c in select_columns)  # Check if already selected
+		if not is_select:
+			cols.append({
+				"name": column_name.strip('"'),
+				"upstream": [{"column": column_name.strip('"'), "table": table_name.strip('"')}],
+				"type": col["type"]
+			})
+
+	cols.sort(key=lambda x: x["name"])
+	select_columns.sort(key=lambda x: x["name"])
+	return {
+		"select_columns": select_columns,
+		"cols": cols,
+	}
 
 def get_table_name(table: exp.Table):
     db_name = ""
@@ -92,7 +96,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
 
     cols = extract_columns(optimized)
     
-    for col in cols:
+    for col in cols["select_columns"]:
         try:
             ll = lineage.lineage(col["name"], optimized, schema, dialect=dialect)
         except:
@@ -122,7 +126,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
 
     return {
         "columns": result,
-        "lineage": extract_all_columns(optimized)
+        "lineage": cols["cols"]
     }
 
 
