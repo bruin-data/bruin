@@ -13,7 +13,7 @@ SCHEMA = {
 
 test_cases_non_selected_columns = [
     {
-        "name": "nested subqueries",
+        "name": "Select all from orders",
         "dialect": "bigquery",
         "query": """
             select * from orders
@@ -22,7 +22,7 @@ test_cases_non_selected_columns = [
         "expected": [],
     },
     {
-        "name": "nested subqueries 2s",
+        "name": "Select orders with id greater than 10",
         "dialect": "bigquery",
         "query": """
             select * from orders where id > 10
@@ -33,7 +33,7 @@ test_cases_non_selected_columns = [
         ],
     },
     {
-        "name": "nested subqueries ss",
+        "name": "Join orders and customers with id filter",
         "dialect": "bigquery",
         "query": """
             select * from orders join customers on customers.id = orders.customer_id where orders.id > 10;
@@ -46,7 +46,7 @@ test_cases_non_selected_columns = [
         ],
     },
     {
-        "name": "nested subqueries",
+        "name": "Join orders and customers with country filter",
         "dialect": "bigquery",
         "query": """
             select * from orders join customers on customers.id = orders.customer_id where orders.id > 10 and customers.country = "UK";
@@ -60,7 +60,7 @@ test_cases_non_selected_columns = [
         ],
     },
     {
-        "name": "nested subqueries",
+        "name": "Join with additional condition on shipping country",
         "dialect": "bigquery",
         "query": """
             select * from orders join customers on customers.id = orders.customer_id where orders.id > 10 and customers.country = "UK" and concat(customers.country, orders.shipping_country)="UKUK";
@@ -75,7 +75,7 @@ test_cases_non_selected_columns = [
         ],
     },
     {
-        "name": "cte",
+        "name": "CTE with cross join",
         "dialect": "bigquery",
         "query": """
             with t1 as (
@@ -667,10 +667,10 @@ def test_get_column_lineage(query, schema, expected, dialect):
 
 @pytest.mark.parametrize(
     "query,schema,expected,dialect",
-    [(tc["query"], tc["schema"], tc["expected"], tc["dialect"]) for tc in test_cases],
-    ids=[tc["name"] for tc in test_cases],
+    [(tc["query"], tc["schema"], tc["expected"], tc["dialect"]) for tc in test_cases_non_selected_columns],
+    ids=[tc["name"] for tc in test_cases_non_selected_columns], 
 )
-def test_extract_non_Select_column(query, schema, expected, dialect):
+def test_extract_non_select_column(query, schema, expected, dialect):
     parsed = parse_one(query, dialect=dialect)
 
     optimized = optimize(parsed, schema, dialect=dialect)
