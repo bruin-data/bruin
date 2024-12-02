@@ -45,18 +45,21 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 							{Column: "a", Table: "table1"},
 							{Column: "a", Table: "table2"},
 						},
+						Type: "TEXT",
 					},
 					{
 						Name: "b",
 						Upstream: []UpstreamColumn{
 							{Column: "b", Table: "table1"},
 						},
+						Type: "BIGINT",
 					},
 					{
 						Name: "c",
 						Upstream: []UpstreamColumn{
 							{Column: "c", Table: "table2"},
 						},
+						Type: "BIGINT",
 					},
 				},
 			},
@@ -86,6 +89,7 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Upstream: []UpstreamColumn{
 							{Column: "item_id", Table: "items"},
 						},
+						Type: "TEXT",
 					},
 					{
 						Name: "price_category",
@@ -93,6 +97,7 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 							{Column: "price", Table: "items"},
 							{Column: "somecol", Table: "orders"},
 						},
+						Type: "VARCHAR",
 					},
 				},
 			},
@@ -115,12 +120,14 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Upstream: []UpstreamColumn{
 							{Column: "col1", Table: "table1"},
 						},
+						Type: "BIGINT",
 					},
 					{
 						Name: "col2",
 						Upstream: []UpstreamColumn{
 							{Column: "col2", Table: "table2"},
 						},
+						Type: "BIGINT",
 					},
 				},
 			},
@@ -142,12 +149,14 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Upstream: []UpstreamColumn{
 							{Column: "customer_id", Table: "orders"},
 						},
+						Type: "TEXT",
 					},
 					{
 						Name: "order_count",
 						Upstream: []UpstreamColumn{
 							{Column: "order_id", Table: "orders"},
 						},
+						Type: "BIGINT",
 					},
 				},
 			},
@@ -167,16 +176,18 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 			want: &Lineage{
 				Columns: []ColumnLineage{
 					{
-						Name: "avg_salary",
-						Upstream: []UpstreamColumn{
-							{Column: "salary", Table: "salaries"},
-						},
-					},
-					{
 						Name: "emp_id",
 						Upstream: []UpstreamColumn{
 							{Column: "emp_id", Table: "employees"},
 						},
+						Type: "TEXT",
+					},
+					{
+						Name: "avg_salary",
+						Upstream: []UpstreamColumn{
+							{Column: "salary", Table: "salaries"},
+						},
+						Type: "DOUBLE",
 					},
 				},
 			},
@@ -200,6 +211,7 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 							{Column: "id", Table: "customers"},
 							{Column: "id", Table: "employees"},
 						},
+						Type: "TEXT",
 					},
 					{
 						Name: "name",
@@ -207,6 +219,7 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 							{Column: "name", Table: "customers"},
 							{Column: "name", Table: "employees"},
 						},
+						Type: "TEXT",
 					},
 				},
 			},
@@ -228,12 +241,14 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Upstream: []UpstreamColumn{
 							{Column: "id", Table: "employees"},
 						},
+						Type: "TEXT",
 					},
 					{
 						Name: "manager_id",
 						Upstream: []UpstreamColumn{
 							{Column: "manager_id", Table: "employees"},
 						},
+						Type: "TEXT",
 					},
 				},
 			},
@@ -264,26 +279,30 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 			want: &Lineage{
 				Columns: []ColumnLineage{
 					{
-						Name:     "fixed",
-						Upstream: []UpstreamColumn{},
-					},
-					{
 						Name: "id",
 						Upstream: []UpstreamColumn{
 							{Column: "id", Table: "sales"},
 						},
-					},
-					{
-						Name: "region_abbr",
-						Upstream: []UpstreamColumn{
-							{Column: "name", Table: "regions"},
-						},
+						Type: "TEXT",
 					},
 					{
 						Name: "sale_size",
 						Upstream: []UpstreamColumn{
 							{Column: "amount", Table: "sales"},
 						},
+						Type: "VARCHAR",
+					},
+					{
+						Name: "region_abbr",
+						Upstream: []UpstreamColumn{
+							{Column: "name", Table: "regions"},
+						},
+						Type: "VARCHAR",
+					},
+					{
+						Name:     "fixed",
+						Upstream: []UpstreamColumn{},
+						Type:     "VARCHAR",
 					},
 				},
 			},
@@ -318,34 +337,41 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 							{Column: "a", Table: "table1"},
 							{Column: "a", Table: "table2"},
 						},
+						Type: "TEXT",
 					},
 					{
 						Name: "b",
 						Upstream: []UpstreamColumn{
 							{Column: "b", Table: "table1"},
 						},
-					},
-					{
-						Name: "b2",
-						Upstream: []UpstreamColumn{
-							{Column: "b", Table: "table1"},
-						},
+						Type: "BIGINT",
 					},
 					{
 						Name: "c",
 						Upstream: []UpstreamColumn{
 							{Column: "c", Table: "table2"},
 						},
+						Type: "TEXT",
 					},
+					{
+						Name: "b2",
+						Upstream: []UpstreamColumn{
+							{Column: "b", Table: "table1"},
+						},
+						Type: "BIGINT",
+					},
+
 					{
 						Name: "c2",
 						Upstream: []UpstreamColumn{
 							{Column: "c", Table: "table2"},
 						},
+						Type: "TEXT",
 					},
 					{
 						Name:     "updated_at",
 						Upstream: []UpstreamColumn{},
+						Type:     "UNKNOWN",
 					},
 				},
 			},

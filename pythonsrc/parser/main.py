@@ -25,8 +25,10 @@ def extract_columns(parsed):
     for expression in found.expressions:
         if isinstance(expression, exp.CTE):
             continue
-
-        cols.append(expression.alias_or_name)
+        cols.append({
+			"name": expression.alias_or_name,
+			"type": str(expression.type),
+		})
 
     return cols
 
@@ -71,7 +73,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
     cols = extract_columns(optimized)
     for col in cols:
         try:
-            ll = lineage.lineage(col, optimized, schema, dialect=dialect)
+            ll = lineage.lineage(col["name"], optimized, schema, dialect=dialect)
         except:
             continue
 
@@ -92,7 +94,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
         cl = [dict(t) for t in {tuple(d.items()) for d in cl}]
         cl.sort(key=lambda x: x["table"])
 
-        result.append({"name": col, "upstream": cl})
+        result.append({"name": col["name"], "upstream": cl,  "type": col["type"]})
 
     result.sort(key=lambda x: x["name"])
 
