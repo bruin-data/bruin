@@ -122,6 +122,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
 
     return {
         "columns": result,
+         "non_selected_columns": extract_non_selected_columns(parsed),
     }
 
 
