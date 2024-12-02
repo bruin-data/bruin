@@ -125,7 +125,7 @@ test_cases = [
 			{"name": "b", 'type': 'BIGINT', "upstream": [{"column": "b", "table": "table1"}]},
 			{"name": "c", 'type': 'BIGINT', "upstream": [{"column": "c", "table": "table2"}]},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 
 		]
 	},
@@ -165,7 +165,7 @@ test_cases = [
 				],
 			},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 			 Column(name='in_stock', table=''),
 			 Column(name='item_id', table='items'),
 			 Column(name='item_id', table='t2')
@@ -187,7 +187,7 @@ test_cases = [
 			{"name": "col1", 'type': 'BIGINT', "upstream": [{"column": "col1", "table": "table1"}]},
 			{"name": "col2", 'type': 'BIGINT', "upstream": [{"column": "col2", "table": "table2"}]},
 		],
-		"expectedNonSelectColumn": [Column(name='id', table='t1'), Column(name='id', table='t2')]
+		"expected_non_select_column": [Column(name='id', table='t1'), Column(name='id', table='t2')]
 	},
 	{
 		"name": "aggregate function",
@@ -212,7 +212,7 @@ test_cases = [
 				"upstream": [{"column": "order_id", "table": "orders"}],
 			},
 		],
-		"expectedNonSelectColumn": [Column(name='customer_id', table='')]
+		"expected_non_select_column": [Column(name='customer_id', table='')]
 	},
 	{
 		"name": "subquery in select",
@@ -239,7 +239,7 @@ test_cases = [
 				"upstream": [{"column": "emp_id", "table": "employees"}],
 			},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 			Column(name='emp_id', table='employees'),
  			Column(name='emp_id', table='salaries')
 		]
@@ -274,7 +274,7 @@ test_cases = [
 				],
 			},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 
 		]
 	},
@@ -299,7 +299,7 @@ test_cases = [
 				],
 			},
 		],
-		"expectedNonSelectColumn": [Column(name='id', table='e2'), Column(name='manager_id', table='e1')]
+		"expected_non_select_column": [Column(name='id', table='e2'), Column(name='manager_id', table='e1')]
 	},
 	{
 		"name": "complex case-when",
@@ -337,7 +337,7 @@ test_cases = [
 			{"name": "sale_size", 'type': 'VARCHAR', "upstream": [{"column": "amount", "table": "sales"}]},
 			{"name": "updated_at", "upstream": [], "type": "UNKNOWN"},
 		],
-		"expectedNonSelectColumn": [Column(name='id', table='regions'), Column(name='region_id', table='sales')]
+		"expected_non_select_column": [Column(name='id', table='regions'), Column(name='region_id', table='sales')]
 	},
 	{
 		"name": "aggregate functions with multiple columns",
@@ -376,7 +376,7 @@ test_cases = [
 				"upstream": [{"column": "order_amount", "table": "orders"}],
 			},
 		],
-		"expectedNonSelectColumn": [Column(name='customer_id', table='')]
+		"expected_non_select_column": [Column(name='customer_id', table='')]
 	},
 	{
 		"name": "upper function",
@@ -395,7 +395,7 @@ test_cases = [
 				"upstream": [{"column": "name", "table": "users"}],
 			},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 
 		]
 	},
@@ -416,7 +416,7 @@ test_cases = [
 				"upstream": [{"column": "email", "table": "users"}],
 			},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 
 		]
 	},
@@ -437,7 +437,7 @@ test_cases = [
 				"upstream": [{"column": "description", "table": "products"}],
 			},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 
 		]
 	},
@@ -458,7 +458,7 @@ test_cases = [
 				"upstream": [{"column": "whitespace_column", "table": "data"}],
 			},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 
 		]
 	},
@@ -479,7 +479,7 @@ test_cases = [
 				"upstream": [{"column": "price", "table": "products"}],
 			},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 
 		]
 	},
@@ -500,7 +500,7 @@ test_cases = [
 				"upstream": [{"column": "middle_name", "table": "users"}],
 			},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 
 		]
 	},
@@ -521,7 +521,7 @@ test_cases = [
 				"upstream": [{"column": "order_id", "table": "orders"}],
 			},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 
 		]
 	},
@@ -542,7 +542,7 @@ test_cases = [
 				"upstream": [{"column": "order_date", "table": "orders"}],
 			},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 
 		]
 	},
@@ -563,7 +563,7 @@ test_cases = [
 				"upstream": [{"column": "order_date", "table": "orders"}],
 			},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 
 		]
 	},
@@ -584,7 +584,7 @@ test_cases = [
 				"upstream": [{"column": "name", "table": "users"}],
 			},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 
 		]
 	},
@@ -605,7 +605,7 @@ test_cases = [
 				"upstream": [{"column": "price", "table": "products"}],
 			},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 
 		]
 	},
@@ -626,7 +626,7 @@ test_cases = [
 				"upstream": [{"column": "price", "table": "products"}],
 			},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 
 		]
 	},
@@ -647,7 +647,7 @@ test_cases = [
 				"upstream": [{"column": "order_date", "table": "orders"}],
 			},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 
 		]
 	},
@@ -668,7 +668,7 @@ test_cases = [
 				"upstream": [{"column": "ORDER_DATE", "table": "ORDERS"}],
 			},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 
 		]
 	},
@@ -694,7 +694,7 @@ test_cases = [
 				"upstream": [{'column': 'order_id', 'table': 'orders'}],
 			}
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 
 		]
 	},
@@ -715,7 +715,7 @@ test_cases = [
 				"upstream": [{"column": "order_date", "table": "orders"}],
 			},
 		],
-		"expectedNonSelectColumn": [
+		"expected_non_select_column": [
 
 		]
 	},
@@ -723,14 +723,14 @@ test_cases = [
 
 
 @pytest.mark.parametrize(
-	"query,schema,expected,expectedNonSelectColumn, dialect",
-	[(tc["query"], tc["schema"], tc["expected"], tc["expectedNonSelectColumn"], tc["dialect"]) for tc in test_cases],
+	"query,schema,expected,expected_non_select_column, dialect",
+	[(tc["query"], tc["schema"], tc["expected"], tc["expected_non_select_column"], tc["dialect"]) for tc in test_cases],
 	ids=[tc["name"] for tc in test_cases],
 )
-def test_get_column_lineage(query, schema, expected, expectedNonSelectColumn, dialect):
+def test_get_column_lineage(query, schema, expected, expected_non_select_column, dialect):
 	result = get_column_lineage(query, schema, dialect)
 	assert result['columns'] == expected
-	assert result['non_selected_columns'] == expectedNonSelectColumn
+	assert result['non_selected_columns'] == expected_non_select_column
 
 
 @pytest.mark.parametrize(
