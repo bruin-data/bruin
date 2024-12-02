@@ -2,7 +2,9 @@ package sqlparser
 
 import (
 	"bufio"
+	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -32,8 +34,17 @@ type SQLParser struct {
 	startMutex sync.Mutex
 }
 
-func NewSQLParser() (*SQLParser, error) {
-	tmpDir := filepath.Join(os.TempDir(), "bruin-cli-embedded")
+func NewSQLParser(randomize bool) (*SQLParser, error) {
+	randomInt := 0
+	if randomize {
+		b := make([]byte, 4)
+		_, err := rand.Read(b)
+		if err != nil {
+			return nil, err
+		}
+		randomInt = int(b[0])
+	}
+	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("bruin-cli-embedded_%d", randomInt))
 
 	ep, err := python.NewEmbeddedPythonWithTmpDir(tmpDir+"-python", true)
 	if err != nil {

@@ -11,7 +11,7 @@ var SQLParser *sqlparser.SQLParser
 func TestParseLineageRecursively(t *testing.T) {
 	t.Parallel()
 	var err error
-	sqlParser, err := sqlparser.NewSQLParser()
+	sqlParser, err := sqlparser.NewSQLParser(true)
 	if err != nil {
 		t.Errorf("error initializing SQL parser: %v", err)
 	}
