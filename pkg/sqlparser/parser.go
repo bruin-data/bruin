@@ -90,7 +90,7 @@ func (s *SQLParser) Start() error {
 		Command: "init",
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to start sql parser after retries")
+		return errors.Wrap(err, "failed to send init command")
 	}
 	s.started = true
 	return nil
