@@ -318,7 +318,7 @@ func Run(isDebug *bool) *cli.Command {
 			sendTelemetry(s, c)
 
 			// Apply the filter to mark assets based on include/exclude tags
-			if err := filter.ApplyFiltersAndMarkAssets(foundPipeline, s); err != nil {
+			if err := filter.ApplyFiltersAndMarkAssets(foundPipeline, s, task); err != nil {
 				errorPrinter.Printf("Failed to filter assets: %v\n", err)
 				return cli.Exit("", 1)
 			}
@@ -728,7 +728,7 @@ type Filter struct {
 	PushMetaData      bool
 }
 
-func (f *Filter) MarkAssets(pipeline *pipeline.Pipeline, s *scheduler.Scheduler, task *pipeline.Asset) error {
+func (f *Filter) ApplyFiltersAndMarkAssets(pipeline *pipeline.Pipeline, s *scheduler.Scheduler, task *pipeline.Asset) error {
 	// Initially mark all tasks as pending
 	s.MarkAll(scheduler.Pending)
 
