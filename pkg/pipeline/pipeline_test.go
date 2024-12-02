@@ -3,7 +3,6 @@ package pipeline_test
 import (
 	"bytes"
 	"encoding/json"
-	"gopkg.in/yaml.v3"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,6 +16,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
@@ -941,7 +941,7 @@ func TestDefaultTrueBool_MarshalYAML(t *testing.T) {
 			require.NoError(t, err)
 
 			yamlConfig := buf.Bytes()
-			assert.Equal(t, tt.want, string(yamlConfig))
+			assert.YAMLEq(t, tt.want, string(yamlConfig))
 		})
 	}
 }
