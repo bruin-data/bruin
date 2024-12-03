@@ -29,9 +29,9 @@ def extract_non_selected_columns(parsed: exp.Select) -> list[Column]:
                 Column(name=expr.name, table=expr.table)
                 for expr in find_all_in_scope(scope, exp.Column)
             ]
-
-    cols.sort(key=lambda x: x.name + x.table)
-    return cols
+    result = list(set(cols))
+    result.sort(key=lambda x: x.name + x.table)
+    return result
 
 
 def extract_tables(parsed):
@@ -136,13 +136,11 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
 
     non_selected_columns_dict = {}
     for column in extract_non_selected_columns(optimized):
-        name = column.name
-        if name not in non_selected_columns_dict:
-            non_selected_columns_dict[name] = {"name": name, "upstream": []}
-        non_selected_columns_dict[name]["upstream"].append(
-            {"column": name, "table": column.table}
+        if column.name not in non_selected_columns_dict:
+            non_selected_columns_dict[column.name] = {"name": column.name, "upstream": []}
+        non_selected_columns_dict[column.name]["upstream"].append(
+            {"column": column.name, "table": column.table}
         )
-
     non_selected_columns = list(non_selected_columns_dict.values())
 
     return {
