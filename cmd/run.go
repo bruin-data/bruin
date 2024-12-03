@@ -290,7 +290,6 @@ func Run(isDebug *bool) *cli.Command {
 
 			filter := &Filter{
 				IncludeTag:        c.String("tag"),
-				ExcludeTag:        c.String("exclude-tag"),
 				OnlyTaskTypes:     c.StringSlice("only"),
 				IncludeDownstream: runDownstreamTasks,
 				PushMetaData:      c.Bool("push-metadata"),
@@ -703,7 +702,6 @@ func sendTelemetry(s *scheduler.Scheduler, c *cli.Context) {
 
 type Filter struct {
 	IncludeTag        string   // Tag to include assets (from `--tag`)
-	ExcludeTag        string   // Tag to exclude assets (from `--exclude`)
 	OnlyTaskTypes     []string // Task types to include (from `--only`)
 	IncludeDownstream bool     // Whether to include downstream tasks (from `--downstream`)
 	PushMetaData      bool
