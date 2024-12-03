@@ -144,7 +144,22 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
 
     result.sort(key=lambda x: x["name"])
 
-    return {"columns": result}
+    non_selected_columns_dict = {}
+    for column in extract_non_selected_columns(optimized):
+        if column.name not in non_selected_columns_dict:
+            non_selected_columns_dict[column.name] = {
+                "name": column.name,
+                "upstream": [],
+            }
+        non_selected_columns_dict[column.name]["upstream"].append(
+            {"column": column.name, "table": column.table}
+        )
+    non_selected_columns = list(non_selected_columns_dict.values())
+
+    return {
+        "columns": result,
+        "non_selected_columns": non_selected_columns,
+    }
 
 
 def find_leaf_nodes(node: Node, leaf_nodes):
