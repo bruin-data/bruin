@@ -131,7 +131,7 @@ func (b *DefaultTrueBool) UnmarshalJSON(data []byte) error {
 }
 
 func (b DefaultTrueBool) IsZero() bool {
-	return b.Value == nil || *b.Value == true
+	return b.Value == nil || *b.Value
 }
 
 func (b DefaultTrueBool) MarshalJSON() ([]byte, error) {

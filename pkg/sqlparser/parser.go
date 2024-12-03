@@ -34,15 +34,17 @@ type SQLParser struct {
 	startMutex sync.Mutex
 }
 
-func NewSQLParser() (*SQLParser, error) {
-	b := make([]byte, 4)
-	_, err := rand.Read(b)
-	if err != nil {
-		return nil, err
+func NewSQLParser(randomize bool) (*SQLParser, error) {
+	randomInt := 0
+	if randomize {
+		b := make([]byte, 4)
+		_, err := rand.Read(b)
+		if err != nil {
+			return nil, err
+		}
+		randomInt = int(b[0])
 	}
-	randomInt := int(b[0])
-
-	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("bruin-cli-embedded-%d", randomInt))
+	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("bruin-cli-embedded_%d", randomInt))
 
 	ep, err := python.NewEmbeddedPythonWithTmpDir(tmpDir+"-python", true)
 	if err != nil {
@@ -72,7 +74,6 @@ func (s *SQLParser) Start() error {
 	if s.started {
 		return nil
 	}
-
 	var err error
 	args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
 	s.cmd, err = s.ep.PythonCmd(args...)
@@ -100,9 +101,8 @@ func (s *SQLParser) Start() error {
 		Command: "init",
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to start sql parser after retries")
+		return errors.Wrap(err, "failed to send init command")
 	}
-
 	s.started = true
 	return nil
 }
