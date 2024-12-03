@@ -126,6 +126,3 @@ jobs:
       - name: Run GoReleaser
         run: |
           docker run -e VERSION=0.0.0 -e COMMIT_SHA=${{ github.sha }}  -e TELEMETRY_KEY=${{ secrets.TELEMETRY_KEY }} -v $(pwd):/src -w /src goreleaser/goreleaser-cross:v1.22 build --snapshot --clean --id bruin-darwin --id bruin-linux-amd64 --id bruin-linux-arm64  --single-target
-  
-
-
