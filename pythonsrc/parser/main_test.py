@@ -2,7 +2,7 @@ import pytest
 from sqlglot import parse_one
 from sqlglot.optimizer import optimize
 
-from main import get_column_lineage, extract_non_selected_columns
+from main import get_column_lineage, extract_non_selected_columns, Column
 
 SCHEMA = {
     "orders": {
@@ -36,7 +36,7 @@ test_cases_non_selected_columns = [
             select * from orders where id > 10
         """,
         "schema": SCHEMA,
-        "expected": [{"name": "id", "table": "orders"}],
+        "expected": [Column("id", "orders")],
     },
     {
         "name": "Join orders and customers with id filter",
@@ -46,9 +46,9 @@ test_cases_non_selected_columns = [
         """,
         "schema": SCHEMA,
         "expected": [
-            {"name": "customer_id", "table": "orders"},
-            {"name": "id", "table": "customers"},
-            {"name": "id", "table": "orders"},
+            Column(name="customer_id", table="orders"),
+            Column(name="id", table="customers"),
+            Column(name="id", table="orders"),
         ],
     },
     {
@@ -59,10 +59,10 @@ test_cases_non_selected_columns = [
         """,
         "schema": SCHEMA,
         "expected": [
-            {"name": "country", "table": "customers"},
-            {"name": "customer_id", "table": "orders"},
-            {"name": "id", "table": "customers"},
-            {"name": "id", "table": "orders"},
+            Column(name="country", table="customers"),
+            Column(name="customer_id", table="orders"),
+            Column(name="id", table="customers"),
+            Column(name="id", table="orders"),
         ],
     },
     {
@@ -73,11 +73,11 @@ test_cases_non_selected_columns = [
         """,
         "schema": SCHEMA,
         "expected": [
-            {"name": "country", "table": "customers"},
-            {"name": "customer_id", "table": "orders"},
-            {"name": "id", "table": "customers"},
-            {"name": "id", "table": "orders"},
-            {"name": "shipping_country", "table": "orders"},
+            Column(name="country", table="customers"),
+            Column(name="customer_id", table="orders"),
+            Column(name="id", table="customers"),
+            Column(name="id", table="orders"),
+            Column(name="shipping_country", table="orders"),
         ],
     },
     {
@@ -94,7 +94,9 @@ test_cases_non_selected_columns = [
         "schema": {
             "table1": {"col3": "int", "col1": "int", "col2": "int"},
         },
-        "expected": [{"name": "col1", "table": "table1"}],
+        "expected": [
+            Column(name="col1", table="table1"),
+        ],
     },
 ]
 
