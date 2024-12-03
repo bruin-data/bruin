@@ -11,9 +11,6 @@ class Column:
     name: str
     table: str
 
-    def to_json(self) -> str:
-        return asdict(self)
-
 
 def extract_non_selected_columns(parsed: exp.Select) -> list[Column]:
     where = parsed.find_all(exp.Where)
