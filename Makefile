@@ -72,8 +72,9 @@ tools-update:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest;
 
 lint-python:
-	# @echo "$(OK_COLOR)==> Running Python linting with flake8...$(NO_COLOR)"
-	# @flake8 ./pythonsrc/ --exclude=bin
-
+	pip install ruff
 	@echo "$(OK_COLOR)==> Running Python formatting with black...$(NO_COLOR)"
-	@black ./pythonsrc/ --check
+	@ruff format ./pythonsrc
+
+	# @echo "$(OK_COLOR)==> Running Python linting with flake8...$(NO_COLOR)"
+	@ruff check --fix ./pythonsrc

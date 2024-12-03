@@ -18,6 +18,7 @@ logging.basicConfig(
     level=logging.DEBUG,
 )
 
+
 def main():
     logging.info("starting the loop")
     while True:
@@ -65,5 +66,5 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except KeyboardInterrupt as e:
+    except KeyboardInterrupt:
         pass

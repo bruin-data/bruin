@@ -321,7 +321,6 @@ test_cases = [
             },
         ],
         "expected_non_selected": [
-
             {
                 "name": "emp_id",
                 "upstream": [

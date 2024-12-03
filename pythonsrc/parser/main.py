@@ -1,45 +1,47 @@
 from sqlglot import parse_one, exp, lineage
 from sqlglot.optimizer.scope import find_all_in_scope, build_scope
-from sqlglot.optimizer import optimize, qualify
+from sqlglot.optimizer import optimize
 from sqlglot.lineage import Node
 from dataclasses import dataclass
 
+
 @dataclass(frozen=True)
 class Column:
-   name: str
-   table: str
+    name: str
+    table: str
+
 
 def extract_non_selected_columns(parsed: exp.Select) -> list[Column]:
-	where = parsed.find_all(exp.Where)
-	join = parsed.find_all(exp.Join)
-	group = parsed.find_all(exp.Group)
+    where = parsed.find_all(exp.Where)
+    join = parsed.find_all(exp.Join)
+    group = parsed.find_all(exp.Group)
 
-	cols = []
-	tables = extract_tables(parsed)
-	table_alias = {}
-	for table in tables:
-		if table.alias:
-			table_alias[table.alias] = table.name
+    cols = []
+    tables = extract_tables(parsed)
+    table_alias = {}
+    for table in tables:
+        if table.alias:
+            table_alias[table.alias] = table.name
 
-	table_names = {}
-	for table in tables:
-		table_names[table.name] = table
+    table_names = {}
+    for table in tables:
+        table_names[table.name] = table
 
-	for scopes in [where, join, group]:
-		for scope in scopes:
-			if scope is None:
-				continue
-			for expr in find_all_in_scope(scope, exp.Column):
-				table_name = expr.table
+    for scopes in [where, join, group]:
+        for scope in scopes:
+            if scope is None:
+                continue
+            for expr in find_all_in_scope(scope, exp.Column):
+                table_name = expr.table
 
-				if expr.table in table_alias:
-					table_name = table_alias[expr.table]
-				if table_name in table_names:
-					cols.append(Column(name=expr.name, table=table_name))
+                if expr.table in table_alias:
+                    table_name = table_alias[expr.table]
+                if table_name in table_names:
+                    cols.append(Column(name=expr.name, table=table_name))
 
-	result = list(set(cols))
-	result.sort(key=lambda x: x.name + x.table)
-	return result
+    result = list(set(cols))
+    result.sort(key=lambda x: x.name + x.table)
+    return result
 
 
 def extract_tables(parsed):
@@ -55,6 +57,7 @@ def extract_tables(parsed):
 
     return tables
 
+
 def extract_columns(parsed):
     cols = []
     found = parsed.find(exp.Select)
@@ -63,12 +66,15 @@ def extract_columns(parsed):
     for expression in found.expressions:
         if isinstance(expression, exp.CTE):
             continue
-        cols.append({
-			"name": expression.alias_or_name,
-			"type": str(expression.type),
-		})
+        cols.append(
+            {
+                "name": expression.alias_or_name,
+                "type": str(expression.type),
+            }
+        )
 
     return cols
+
 
 def get_table_name(table: exp.Table):
     db_name = ""
@@ -97,13 +103,14 @@ def get_tables(query: str, dialect: str):
         "tables": list(set([get_table_name(table) for table in tables])),
     }
 
+
 def get_column_lineage(query: str, schema: dict, dialect: str):
     parsed = parse_one(query, dialect=dialect)
     if not isinstance(parsed, exp.Query):
         return {"columns": []}
     try:
         optimized = optimize(parsed, schema, dialect=dialect)
-    except:
+    except Exception:
         return {"columns": []}
 
     result = []
@@ -112,7 +119,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
     for col in cols:
         try:
             ll = lineage.lineage(col["name"], optimized, schema, dialect=dialect)
-        except:
+        except Exception:
             continue
 
         cl = []
@@ -120,25 +127,24 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
         find_leaf_nodes(ll, leaves)
 
         for ds in leaves:
-            if isinstance(ds.expression.this, exp.Literal) or isinstance(ds.expression.this, exp.Anonymous):
+            if isinstance(ds.expression.this, exp.Literal) or isinstance(
+                ds.expression.this, exp.Anonymous
+            ):
                 continue
 
             cl.append(
                 {"column": ds.name.split(".")[-1], "table": ds.expression.this.name}
             )
 
-        
         # Deduplicate based on column-table combination
         cl = [dict(t) for t in {tuple(d.items()) for d in cl}]
         cl.sort(key=lambda x: x["table"])
 
-        result.append({"name": col["name"], "upstream": cl,  "type": col["type"]})
+        result.append({"name": col["name"], "upstream": cl, "type": col["type"]})
 
     result.sort(key=lambda x: x["name"])
 
-    return {
-        "columns": result
-    }
+    return {"columns": result}
 
 
 def find_leaf_nodes(node: Node, leaf_nodes):
