@@ -231,48 +231,55 @@ func TestGetLineageForRunner(t *testing.T) {
 				},
 			},
 		},
-		// {
-		// 	name: "subquery in select",
-		// 	sql: `
-		// 		SELECT
-		// 			emp_id,
-		// 			(SELECT AVG(salary) FROM salaries WHERE salaries.emp_id = employees.emp_id) as avg_salary
-		// 		FROM employees
-		// 	`,
-		// 	schema: Schema{
-		// 		"employees": {"emp_id": "str"},
-		// 		"salaries":  {"emp_id": "str", "salary": "int64"},
-		// 	},
-		// 	want: &Lineage{
-		// 		Columns: []ColumnLineage{
-		// 			{
-		// 				Name: "emp_id",
-		// 				Upstream: []UpstreamColumn{
-		// 					{Column: "emp_id", Table: "employees"},
-		// 				},
-		// 				Type: "TEXT",
-		// 			},
-		// 			{
-		// 				Name: "avg_salary",
-		// 				Upstream: []UpstreamColumn{
-		// 					{Column: "salary", Table: "salaries"},
-		// 				},
-		// 				Type: "DOUBLE",
-		// 			},
-		// 		},
-		// 		NonSelectedColumns: []ColumnLineage{
+		{
+			name: "subquery in select",
+			sql: `
+				SELECT
+					emp_id,
+					(SELECT AVG(salary) FROM salaries WHERE salaries.emp_id = employees.emp_id) as avg_salary
+				FROM employees
+			`,
+			schema: Schema{
+				"employees": {"emp_id": "str"},
+				"salaries":  {"emp_id": "str", "salary": "int64"},
+			},
+			want: &Lineage{
+				Columns: []ColumnLineage{
+					{
+						Name: "avg_salary",
+						Upstream: []UpstreamColumn{
+							{Column: "salary", Table: "salaries"},
+						},
+						Type: "DOUBLE",
+					},
+					{
+						Name: "emp_id",
+						Upstream: []UpstreamColumn{
+							{Column: "emp_id", Table: "employees"},
+						},
+						Type: "TEXT",
+					},
+				},
+				NonSelectedColumns: []ColumnLineage{
+					{
+						Name: "_u_1",
+						Upstream: []UpstreamColumn{
+							{Column: "_u_1", Table: "_u_0"},
+						},
+						Type: "",
+					},
 
-		// 			{
-		// 				Name: "emp_id",
-		// 				Upstream: []UpstreamColumn{
-		// 					{Column: "emp_id", Table: "employees"},
-		// 					{Column: "emp_id", Table: "salaries"},
-		// 				},
-		// 				Type: "",
-		// 			},
-		// 		},
-		// 	},
-		// },
+					{
+						Name: "emp_id",
+						Upstream: []UpstreamColumn{
+							{Column: "emp_id", Table: "employees"},
+							{Column: "emp_id", Table: "salaries"},
+						},
+						Type: "",
+					},
+				},
+			},
+		},
 		{
 			name: "union all",
 			sql: `
@@ -357,156 +364,153 @@ func TestGetLineageForRunner(t *testing.T) {
 				},
 			},
 		},
-		// {
-		// 	name: "complex case-when",
-		// 	sql: `
-		// 		SELECT
-		// 			sales.id,
-		// 			CASE
-		// 				WHEN sales.amount > 500 THEN 'large'
-		// 				WHEN sales.amount > 100 THEN 'medium'
-		// 				ELSE 'small'
-		// 			END as sale_size,
-		// 			CASE
-		// 				WHEN regions.name = 'North' THEN 'N'
-		// 				WHEN regions.name = 'South' THEN 'S'
-		// 				ELSE 'Other'
-		// 			END as region_abbr,
-		// 		    'fixed' as fixed
-		// 		FROM sales
-		// 		JOIN regions ON sales.region_id = regions.id
-		// 	`,
-		// 	schema: Schema{
-		// 		"sales":   {"id": "str", "amount": "int64", "region_id": "str"},
-		// 		"regions": {"id": "str", "name": "str"},
-		// 	},
-		// 	want: &Lineage{
-		// 		Columns: []ColumnLineage{
-		// 			{
-		// 				Name: "id",
-		// 				Upstream: []UpstreamColumn{
-		// 					{Column: "id", Table: "sales"},
-		// 				},
-		// 				Type: "TEXT",
-		// 			},
-		// 			{
-		// 				Name: "sale_size",
-		// 				Upstream: []UpstreamColumn{
-		// 					{Column: "amount", Table: "sales"},
-		// 				},
-		// 				Type: "VARCHAR",
-		// 			},
-		// 			{
-		// 				Name: "region_abbr",
-		// 				Upstream: []UpstreamColumn{
-		// 					{Column: "name", Table: "regions"},
-		// 				},
-		// 				Type: "VARCHAR",
-		// 			},
-		// 			{
-		// 				Name:     "fixed",
-		// 				Upstream: []UpstreamColumn{},
-		// 				Type:     "VARCHAR",
-		// 			},
-		// 		},
-		// 		NonSelectedColumns: []ColumnLineage{
-		// 			{
-		// 				Name: "id",
-		// 				Upstream: []UpstreamColumn{
-		// 					{Column: "id", Table: "regions"},
-		// 				},
-		// 				Type: "",
-		// 			},
-		// 			{
-		// 				Name: "region_id",
-		// 				Upstream: []UpstreamColumn{
-		// 					{Column: "region_id", Table: "sales"},
-		// 				},
-		// 				Type: "",
-		// 			},
-		// 		},
-		// 	},
-		// },
-		// {
-		// 	name: "cte",
-		// 	sql: `with t1 as (
-		// 		select *
-		// 		from table1
-		// 		join table2
-		// 			using(a)
-		// 	),
-		// 	t2 as (
-		// 		select *
-		// 		from table2
-		// 		left join table1
-		// 			using(a)
-		// 	)
-		// 	select t1.*, t2.b as b2, t2.c as c2, now() as updated_at
-		// 	from t1
-		// 	join t2
-		// 		using(a)`,
-		// 	schema: Schema{
-		// 		"table1": {"a": "str", "b": "int64"},
-		// 		"table2": {"a": "str", "c": "str"},
-		// 	},
-		// 	want: &Lineage{
-		// 		Columns: []ColumnLineage{
-		// 			{
-		// 				Name: "a",
-		// 				Upstream: []UpstreamColumn{
-		// 					{Column: "a", Table: "table1"},
-		// 					{Column: "a", Table: "table2"},
-		// 				},
-		// 				Type: "TEXT",
-		// 			},
-		// 			{
-		// 				Name: "b",
-		// 				Upstream: []UpstreamColumn{
-		// 					{Column: "b", Table: "table1"},
-		// 				},
-		// 				Type: "BIGINT",
-		// 			},
-		// 			{
-		// 				Name: "c",
-		// 				Upstream: []UpstreamColumn{
-		// 					{Column: "c", Table: "table2"},
-		// 				},
-		// 				Type: "TEXT",
-		// 			},
-		// 			{
-		// 				Name: "b2",
-		// 				Upstream: []UpstreamColumn{
-		// 					{Column: "b", Table: "table1"},
-		// 				},
-		// 				Type: "BIGINT",
-		// 			},
-
-		// 			{
-		// 				Name: "c2",
-		// 				Upstream: []UpstreamColumn{
-		// 					{Column: "c", Table: "table2"},
-		// 				},
-		// 				Type: "TEXT",
-		// 			},
-		// 			{
-		// 				Name:     "updated_at",
-		// 				Upstream: []UpstreamColumn{},
-		// 				Type:     "UNKNOWN",
-		// 			},
-		// 		},
-		// 		NonSelectedColumns: []ColumnLineage{
-		// 			{
-		// 				Name: "a",
-		// 				Upstream: []UpstreamColumn{
-		// 					{Column: "a", Table: "t2"},
-		// 					{Column: "a", Table: "table1"},
-		// 					{Column: "a", Table: "table2"},
-		// 				},
-		// 				Type: "",
-		// 			},
-		// 		},
-		// 	},
-		// },
+		{
+			name: "complex case-when",
+			sql: `
+		SELECT
+			sales.id,
+			CASE
+				WHEN sales.amount > 500 THEN 'large'
+				WHEN sales.amount > 100 THEN 'medium'
+				ELSE 'small'
+			END as sale_size,
+			CASE
+				WHEN regions.name = 'North' THEN 'N'
+				WHEN regions.name = 'South' THEN 'S'
+				ELSE 'Other'
+			END as region_abbr,
+		    'fixed' as fixed
+		FROM sales
+		JOIN regions ON sales.region_id = regions.id
+			`,
+			schema: Schema{
+				"sales":   {"id": "str", "amount": "int64", "region_id": "str"},
+				"regions": {"id": "str", "name": "str"},
+			},
+			want: &Lineage{
+				Columns: []ColumnLineage{
+					{
+						Name:     "fixed",
+						Upstream: []UpstreamColumn{},
+						Type:     "VARCHAR",
+					},
+					{
+						Name: "id",
+						Upstream: []UpstreamColumn{
+							{Column: "id", Table: "sales"},
+						},
+						Type: "TEXT",
+					},
+					{
+						Name: "region_abbr",
+						Upstream: []UpstreamColumn{
+							{Column: "name", Table: "regions"},
+						},
+						Type: "VARCHAR",
+					},
+					{
+						Name: "sale_size",
+						Upstream: []UpstreamColumn{
+							{Column: "amount", Table: "sales"},
+						},
+						Type: "VARCHAR",
+					},
+				},
+				NonSelectedColumns: []ColumnLineage{
+					{
+						Name: "id",
+						Upstream: []UpstreamColumn{
+							{Column: "id", Table: "regions"},
+						},
+					},
+					{
+						Name: "region_id",
+						Upstream: []UpstreamColumn{
+							{Column: "region_id", Table: "sales"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "cte",
+			sql: `with t1 as (
+				select *
+				from table1
+				join table2
+					using(a)
+			),
+			t2 as (
+				select *
+				from table2
+				left join table1
+					using(a)
+			)
+			select t1.*, t2.b as b2, t2.c as c2, now() as updated_at
+			from t1
+			join t2
+				using(a)`,
+			schema: Schema{
+				"table1": {"a": "str", "b": "int64"},
+				"table2": {"a": "str", "c": "str"},
+			},
+			want: &Lineage{
+				Columns: []ColumnLineage{
+					{
+						Name: "a",
+						Upstream: []UpstreamColumn{
+							{Column: "a", Table: "table1"},
+							{Column: "a", Table: "table2"},
+						},
+						Type: "TEXT",
+					},
+					{
+						Name: "b",
+						Upstream: []UpstreamColumn{
+							{Column: "b", Table: "table1"},
+						},
+						Type: "BIGINT",
+					},
+					{
+						Name: "b2",
+						Upstream: []UpstreamColumn{
+							{Column: "b", Table: "table1"},
+						},
+						Type: "BIGINT",
+					},
+					{
+						Name: "c",
+						Upstream: []UpstreamColumn{
+							{Column: "c", Table: "table2"},
+						},
+						Type: "TEXT",
+					},
+					{
+						Name: "c2",
+						Upstream: []UpstreamColumn{
+							{Column: "c", Table: "table2"},
+						},
+						Type: "TEXT",
+					},
+					{
+						Name:     "updated_at",
+						Upstream: []UpstreamColumn{},
+						Type:     "UNKNOWN",
+					},
+				},
+				NonSelectedColumns: []ColumnLineage{
+					{
+						Name: "a",
+						Upstream: []UpstreamColumn{
+							{Column: "a", Table: "t2"},
+							{Column: "a", Table: "table1"},
+							{Column: "a", Table: "table2"},
+						},
+						Type: "",
+					},
+				},
+			},
+		},
 	}
 
 	t.Run("blocking group", func(t *testing.T) {
