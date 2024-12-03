@@ -29,3 +29,7 @@ func (c *Config) ToDBConnectionURI() (string, error) {
 
 	return conf.Stringify(), nil
 }
+
+func (c *Config) GetIngestrURI() string {
+	return "athena://?bucket=" + c.OutputBucket + "&access_key_id=" + c.AccessID + "&secret_access_key=" + c.SecretAccessKey + "&region_name=" + c.Region
+}
