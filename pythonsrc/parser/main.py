@@ -1,5 +1,4 @@
 from dataclasses import dataclass, asdict
-
 from sqlglot import parse_one, exp, lineage
 from sqlglot.lineage import Node
 from sqlglot.optimizer import optimize
