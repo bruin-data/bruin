@@ -136,7 +136,7 @@ func TestGetLineageForRunner(t *testing.T) {
 							},
 							{
 								Column: "item_id",
-								Table:  "t2",
+								Table:  "orders",
 							},
 						},
 						Type: "",
@@ -178,11 +178,11 @@ func TestGetLineageForRunner(t *testing.T) {
 						Upstream: []UpstreamColumn{
 							{
 								Column: "id",
-								Table:  "t1",
+								Table:  "table1",
 							},
 							{
 								Column: "id",
-								Table:  "t2",
+								Table:  "table2",
 							},
 						},
 						Type: "",
@@ -262,14 +262,6 @@ func TestGetLineageForRunner(t *testing.T) {
 				},
 				NonSelectedColumns: []ColumnLineage{
 					{
-						Name: "_u_1",
-						Upstream: []UpstreamColumn{
-							{Column: "_u_1", Table: "_u_0"},
-						},
-						Type: "",
-					},
-
-					{
 						Name: "emp_id",
 						Upstream: []UpstreamColumn{
 							{Column: "emp_id", Table: "employees"},
@@ -346,7 +338,7 @@ func TestGetLineageForRunner(t *testing.T) {
 						Upstream: []UpstreamColumn{
 							{
 								Column: "id",
-								Table:  "e2",
+								Table:  "employees",
 							},
 						},
 						Type: "",
@@ -356,7 +348,7 @@ func TestGetLineageForRunner(t *testing.T) {
 						Upstream: []UpstreamColumn{
 							{
 								Column: "manager_id",
-								Table:  "e1",
+								Table:  "employees",
 							},
 						},
 						Type: "",
@@ -502,7 +494,6 @@ func TestGetLineageForRunner(t *testing.T) {
 					{
 						Name: "a",
 						Upstream: []UpstreamColumn{
-							{Column: "a", Table: "t2"},
 							{Column: "a", Table: "table1"},
 							{Column: "a", Table: "table2"},
 						},
