@@ -303,9 +303,6 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			infoPrinter.Printf("Assets marked for execution: %d pending out of %d total.\n",
-				s.InstanceCountByStatus(scheduler.Pending), len(foundPipeline.Assets))
-
 			if s.InstanceCountByStatus(scheduler.Pending) == 0 {
 				warningPrinter.Println("No tasks to run.")
 				return nil
