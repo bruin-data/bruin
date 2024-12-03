@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"runtime"
 	"sync"
@@ -104,10 +105,15 @@ func ErrorCommand(context *cli.Context, err error) {
 	if err == nil {
 		return
 	}
+	fmt.Println(err)
 	start := context.Context.Value(contextKey(startTimeKey))
+	startTime, err2 := start.(time.Time)
+	if !err2 {
+		return
+	}
 
 	SendEvent("command_error", analytics.Properties{
 		"command":     context.Command.Name,
-		"duration_ms": time.Since(start.(time.Time)).Milliseconds(),
+		"duration_ms": time.Since(startTime).Milliseconds(),
 	})
 }

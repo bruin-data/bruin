@@ -43,6 +43,22 @@ func main() {
 		"internal parse-asset happy-path/assets/player_summary.sql",
 		"happy-path/expectations/player_summary.sql.json",
 	)
+
+	expectOutputIncludes(
+		"internal parse-asset faulty-pipeline/assets/error.sql",
+		[]string{"error creating asset from file", "unmarshal errors"},
+	)
+
+	expectJSONOutput(
+		"validate -o json missing-upstream/assets/nonexistent.sql",
+		"missing-upstream/expectations/missing_upstream.json",
+	)
+
+	expectOutputIncludes(
+		"run malformed/assets/malformed.sql",
+		[]string{"Parser Error: syntax error at or near \"S_ELECT_\"", "Failed assets 1"},
+	)
+
 	expectJSONOutput(
 		"internal connections",
 		"expected_connections_schema.json",
@@ -61,6 +77,23 @@ func main() {
 		"internal parse-asset -c lineage/assets/example.sql",
 		"lineage/expectations/lineage-asset.json",
 	)
+}
+
+func expectOutputIncludes(command string, contains []string) {
+	output, err := runCommand(command)
+	if err != nil {
+		fmt.Println("Failed:", err)
+		os.Exit(1)
+	}
+
+	for _, c := range contains {
+		if !strings.Contains(output, c) {
+			fmt.Printf("Failed:, output of '%s does not contain '%s'", command, c)
+			os.Exit(1)
+		}
+	}
+
+	fmt.Println("Passed")
 }
 
 func expectJSONOutput(command string, jsonFilePath string) {
