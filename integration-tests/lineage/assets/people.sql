@@ -13,4 +13,4 @@ select
     name, 
     last_name,
     created_at
-from users;
+from users country = 'UK';;

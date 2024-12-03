@@ -17,11 +17,31 @@
     "upstreams": [
       {
         "type": "asset",
-        "value": "country"
+        "value": "country",
+        "columns": [
+          {
+            "name": "country",
+            "usage": ""
+          }
+        ]
       },
       {
         "type": "asset",
-        "value": "people"
+        "value": "people",
+        "columns": [
+          {
+            "name": "last_name",
+            "usage": ""
+          },
+          {
+            "name": "name",
+            "usage": ""
+          },
+          {
+            "name": "updated_at",
+            "usage": ""
+          }
+        ]
       }
     ],
     "image": "",
@@ -140,7 +160,17 @@
         "upstreams": [
           {
             "type": "asset",
-            "value": "users"
+            "value": "users",
+            "columns": [
+              {
+                "name": "id",
+                "usage": ""
+              },
+              {
+                "name": "country",
+                "usage": ""
+              }
+            ]
           }
         ],
         "image": "",
@@ -149,7 +179,7 @@
         "executable_file": {
           "name": "country.sql",
           "path": "__ASSETSDIR__country.sql",
-          "content": "select id, country from users;"
+          "content": "select id, country from users where id > 10000;"
         },
         "definition_file": {
           "name": "country.sql",
@@ -215,11 +245,31 @@
         "upstreams": [
           {
             "type": "asset",
-            "value": "country"
+            "value": "country",
+            "columns": [
+              {
+                "name": "country",
+                "usage": ""
+              }
+            ]
           },
           {
             "type": "asset",
-            "value": "people"
+            "value": "people",
+            "columns": [
+              {
+                "name": "last_name",
+                "usage": ""
+              },
+              {
+                "name": "name",
+                "usage": ""
+              },
+              {
+                "name": "updated_at",
+                "usage": ""
+              }
+            ]
           }
         ],
         "image": "",
@@ -326,7 +376,29 @@
         "upstreams": [
           {
             "type": "asset",
-            "value": "users"
+            "value": "users",
+            "columns": [
+              {
+                "name": "country",
+                "usage": ""
+              },
+              {
+                "name": "created_at",
+                "usage": ""
+              },
+              {
+                "name": "id",
+                "usage": ""
+              },
+              {
+                "name": "last_name",
+                "usage": ""
+              },
+              {
+                "name": "name",
+                "usage": ""
+              }
+            ]
           }
         ],
         "image": "",
@@ -335,7 +407,7 @@
         "executable_file": {
           "name": "people.sql",
           "path": "__ASSETSDIR__people.sql",
-          "content": "select \n    id, \n    name, \n    last_name,\n    created_at\nfrom users;"
+          "content": "select \n    id, \n    name, \n    last_name,\n    created_at\nfrom users where country = 'UK';"
         },
         "definition_file": {
           "name": "people.sql",

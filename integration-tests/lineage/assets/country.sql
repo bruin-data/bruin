@@ -8,4 +8,4 @@ depends:
   - users
 @bruin */
 
-select id, country from users;
+select id, country from users where id > 10000;
