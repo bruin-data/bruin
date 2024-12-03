@@ -152,6 +152,13 @@ export default defineConfig({
                             {text: "Zendesk", link: "/ingestion/zendesk.md"},
                         ],
                     },
+                    {
+                        text: "Destination",
+                        collapsed: true,
+                        items: [
+                            {text: "Athena", link: "/ingestion/athena.md"},
+                        ],
+                    },
                 ],
             },
             {

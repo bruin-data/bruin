@@ -29,8 +29,8 @@ func (db *DB) GetResultsLocation() string {
 	return db.config.OutputBucket
 }
 
-func (c *DB) GetIngestrURI() (string, error) {
-	return c.config.GetIngestrURI(), nil
+func (db *DB) GetIngestrURI() (string, error) {
+	return db.config.GetIngestrURI(), nil
 }
 
 func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
