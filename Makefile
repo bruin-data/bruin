@@ -36,7 +36,7 @@ test-unit:
 	@echo "$(OK_COLOR)==> Running the unit tests$(NO_COLOR)"
 	@go test -race -cover -timeout 10m ./... 
 
-format: tools
+format: tools lint-python
 	@echo "$(OK_COLOR)>> [go vet] running$(NO_COLOR)" & \
 	go vet ./... &
 
