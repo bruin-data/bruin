@@ -72,9 +72,10 @@ tools-update:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest;
 
 lint-python:
+	pip install sqlglot
 	pip install ruff
 	@echo "$(OK_COLOR)==> Running Python formatting with black...$(NO_COLOR)"
 	@ruff format ./pythonsrc
 
-	# @echo "$(OK_COLOR)==> Running Python linting with flake8...$(NO_COLOR)"
+	@echo "$(OK_COLOR)==> Running Python linting with flake8...$(NO_COLOR)"
 	@ruff check --fix ./pythonsrc
