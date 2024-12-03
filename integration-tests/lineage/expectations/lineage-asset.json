@@ -423,7 +423,7 @@
         "executable_file": {
           "name": "people.sql",
           "path": "__ASSETSDIR__people.sql",
-          "content": "select \n    id, \n    name, \n    last_name,\n    created_at\nfrom users where country = 'UK';;"
+          "content": "select \n    id, \n    name, \n    last_name,\n    created_at\nfrom users where country = 'UK';"
         },
         "definition_file": {
           "name": "people.sql",
