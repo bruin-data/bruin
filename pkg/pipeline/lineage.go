@@ -105,6 +105,27 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 		return errors.New("asset cannot be nil")
 	}
 
+	upstreams := []Upstream{}
+	for _, up := range asset.Upstreams {
+		upstream := up
+		lineage.NonSelectedColumns = append(lineage.NonSelectedColumns, lineage.Columns...)
+		dict := map[string]bool{}
+		for _, lineageCol := range lineage.NonSelectedColumns {
+			for _, lineageUpstream := range lineageCol.Upstream {
+				if _, ok := dict[fmt.Sprintf("%s-%s", lineageUpstream.Table, lineageCol.Name)]; !ok {
+					if lineageUpstream.Table == up.Value {
+						upstream.Columns = append(upstream.Columns, DependsColumn{
+							Name: lineageCol.Name,
+						})
+						dict[fmt.Sprintf("%s-%s", lineageUpstream.Table, lineageCol.Name)] = true
+					}
+				}
+			}
+		}
+		upstreams = append(upstreams, upstream)
+	}
+	asset.Upstreams = upstreams
+
 	for _, lineageCol := range lineage.Columns {
 		if lineageCol.Name == "*" {
 			for _, upstream := range lineageCol.Upstream {
