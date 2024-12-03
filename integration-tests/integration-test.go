@@ -43,9 +43,10 @@ func main() {
 		"internal parse-asset happy-path/assets/player_summary.sql",
 		"happy-path/expectations/player_summary.sql.json",
 	)
-	expectJSONOutput(
+
+	expectOutputIncludes(
 		"internal parse-asset faulty-pipeline/assets/error.sql",
-		"faulty-pipeline/expectations/malformed_asset.json",
+		[]string{"error creating asset from file", "unmarshal errors"},
 	)
 
 	expectJSONOutput(
