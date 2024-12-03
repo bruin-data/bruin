@@ -1,8 +1,9 @@
-from sqlglot import parse_one, exp, lineage
-from sqlglot.optimizer.scope import find_all_in_scope, build_scope
-from sqlglot.optimizer import optimize
-from sqlglot.lineage import Node
 from dataclasses import dataclass
+
+from sqlglot import parse_one, exp, lineage
+from sqlglot.lineage import Node
+from sqlglot.optimizer import optimize
+from sqlglot.optimizer.scope import find_all_in_scope, build_scope
 
 
 @dataclass(frozen=True)
