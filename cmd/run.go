@@ -302,21 +302,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			s := scheduler.NewScheduler(logger, foundPipeline)
-
-			// mark all the instances to be skipped, then conditionally mark the ones to run to be pending
-			s.MarkAll(scheduler.Pending)
-			if task != nil {
-				logger.Debug("marking single task to run: ", task.Name)
-				s.MarkAll(scheduler.Succeeded)
-				s.MarkAsset(task, scheduler.Pending, filter.IncludeDownstream)
-
-				if c.String("tag") != "" {
-					errorPrinter.Printf("You cannot use the '--tag' flag when running a single asset.\n")
-					return cli.Exit("", 1)
-				}
-			}
 			sendTelemetry(s, c)
-
 			// Apply the filter to mark assets based on include/exclude tags
 			if err := filter.ApplyFiltersAndMarkAssets(foundPipeline, s, task); err != nil {
 				errorPrinter.Printf("Failed to filter assets: %v\n", err)
