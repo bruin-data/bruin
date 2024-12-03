@@ -107,4 +107,4 @@ After executing the query, you will see the following results displayed in your 
 
 You've successfully created and run your first Bruin pipeline! Your chess data is now ingested into DuckDB, ready for you to query and explore. This is just the beginning—feel free to extend this pipeline, add more data sources, or incorporate data transformations to suit your needs. For more advanced features and customization, check out the Bruin documentation.
 
-Happy data engineering!
+Happy data engineering! 🚀
