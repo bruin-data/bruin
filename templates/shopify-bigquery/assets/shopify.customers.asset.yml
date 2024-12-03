@@ -1,5 +1,10 @@
 name: shopify_raw.customers
 type: ingestr
+parameters:
+  source_connection: shopify-default
+  source_table: customers
+  destination: bigquery
+  loader_file_format: jsonl
 
 description: This asset manages the ingestion of Shopify customer data into BigQuery. It captures comprehensive customer information including personal details, contact information, order history, marketing preferences, and address data. The asset includes data quality checks to ensure critical fields like customer ID and email are properly populated.
 
@@ -77,8 +82,3 @@ columns:
   - name: default_address
     type: json
     description: "Customer default address"
-parameters:
-  source_connection: shopify-default
-  source_table: customers
-  destination: bigquery
-  loader_file_format: jsonl

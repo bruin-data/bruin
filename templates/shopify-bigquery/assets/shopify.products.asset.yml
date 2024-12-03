@@ -1,5 +1,10 @@
 name: shopify_raw.products
 type: ingestr
+parameters:
+  source_connection: shopify-default
+  source_table: products
+  destination: bigquery
+  loader_file_format: jsonl
 
 description: This asset manages the ingestion of Shopify product data into BigQuery. It captures comprehensive product information including product IDs, titles, descriptions, pricing, inventory levels, variants, and metadata. The asset includes data quality checks to ensure critical fields like
 
@@ -113,9 +118,3 @@ columns:
   - name: variants_count
     type: json
     description: "Count of product variants"
-
-parameters:
-  source_connection: shopify-default
-  source_table: products
-  destination: bigquery
-  loader_file_format: jsonl
