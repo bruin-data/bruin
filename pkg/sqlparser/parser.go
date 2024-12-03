@@ -2,7 +2,9 @@ package sqlparser
 
 import (
 	"bufio"
+	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -13,7 +15,6 @@ import (
 
 	"github.com/bruin-data/bruin/internal/data"
 	"github.com/bruin-data/bruin/pythonsrc"
-	"github.com/cenkalti/backoff"
 	"github.com/kluctl/go-embed-python/embed_util"
 	"github.com/kluctl/go-embed-python/python"
 	"github.com/pkg/errors"
@@ -33,8 +34,17 @@ type SQLParser struct {
 	startMutex sync.Mutex
 }
 
-func NewSQLParser() (*SQLParser, error) {
-	tmpDir := filepath.Join(os.TempDir(), "bruin-cli-embedded")
+func NewSQLParser(randomize bool) (*SQLParser, error) {
+	randomInt := 0
+	if randomize {
+		b := make([]byte, 4)
+		_, err := rand.Read(b)
+		if err != nil {
+			return nil, err
+		}
+		randomInt = int(b[0])
+	}
+	tmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("bruin-cli-embedded_%d", randomInt))
 
 	ep, err := python.NewEmbeddedPythonWithTmpDir(tmpDir+"-python", true)
 	if err != nil {
@@ -64,39 +74,35 @@ func (s *SQLParser) Start() error {
 	if s.started {
 		return nil
 	}
-	err := backoff.Retry(func() error {
-		var err error
-		args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
-		s.cmd, err = s.ep.PythonCmd(args...)
-		if err != nil {
-			return err
-		}
-		s.cmd.Stderr = os.Stderr
-
-		s.stdout, err = s.cmd.StdoutPipe()
-		if err != nil {
-			return err
-		}
-
-		s.stdin, err = s.cmd.StdinPipe()
-		if err != nil {
-			return err
-		}
-
-		err = s.cmd.Start()
-		if err != nil {
-			return err
-		}
-
-		_, err = s.sendCommand(&parserCommand{
-			Command: "init",
-		})
-		return err
-	}, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 5))
+	var err error
+	args := []string{filepath.Join(s.rendererSrc.GetExtractedPath(), "main.py")}
+	s.cmd, err = s.ep.PythonCmd(args...)
 	if err != nil {
-		return errors.Wrap(err, "failed to start sql parser after retries")
+		return err
+	}
+	s.cmd.Stderr = os.Stderr
+
+	s.stdout, err = s.cmd.StdoutPipe()
+	if err != nil {
+		return err
 	}
 
+	s.stdin, err = s.cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+
+	err = s.cmd.Start()
+	if err != nil {
+		return err
+	}
+
+	_, err = s.sendCommand(&parserCommand{
+		Command: "init",
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to send init command")
+	}
 	s.started = true
 	return nil
 }
@@ -116,9 +122,11 @@ type UpstreamColumn struct {
 type ColumnLineage struct {
 	Name     string           `json:"name"`
 	Upstream []UpstreamColumn `json:"upstream"`
+	Type     string           `json:"type"`
 }
 type Lineage struct {
-	Columns []ColumnLineage `json:"columns"`
+	Columns            []ColumnLineage `json:"columns"`
+	NonSelectedColumns []ColumnLineage `json:"non_selected_columns"`
 }
 
 func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage, error) {

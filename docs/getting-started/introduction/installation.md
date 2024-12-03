@@ -42,7 +42,7 @@ wget -qO- https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/ins
 ```
 
 > [!IMPORTANT]
-> If you are on Windows, make sure to run the command in the Git Bash or WSL terminal.
+> If you are on Windows, make sure to run the command in the [Git Bash](https://git-scm.com/downloads/win) or [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) terminal.
 
 
 ## Bruin VSCode Extension

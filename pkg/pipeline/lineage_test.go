@@ -6,9 +6,20 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
+var SQLParser *sqlparser.SQLParser
+
 func TestParseLineageRecursively(t *testing.T) {
 	t.Parallel()
-
+	var err error
+	sqlParser, err := sqlparser.NewSQLParser(true)
+	if err != nil {
+		t.Errorf("error initializing SQL parser: %v", err)
+	}
+	err = sqlParser.Start()
+	if err != nil {
+		t.Errorf("error starting SQL parser: %v", err)
+	}
+	SQLParser = sqlParser
 	testCases := map[string]func(*testing.T){
 		"basic recursive parsing":   testBasicRecursiveParsing,
 		"joins and complex queries": testJoinsAndComplexQueries,
@@ -32,7 +43,6 @@ func runLineageTests(t *testing.T, tests []struct {
 },
 ) {
 	t.Helper()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -44,16 +54,7 @@ func runLineageTests(t *testing.T, tests []struct {
 
 func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error) {
 	t.Helper()
-
-	sqlParser, err := sqlparser.NewSQLParser()
-	if err != nil {
-		t.Errorf("error initializing SQL parser: %v", err)
-	}
-	err = sqlParser.Start()
-	if err != nil {
-		t.Errorf("error starting SQL parser: %v", err)
-	}
-	extractor := NewLineageExtractor(p, sqlParser)
+	extractor := NewLineageExtractor(p, SQLParser)
 
 	for _, asset := range p.Assets {
 		if err := extractor.TableSchema(); err != nil {
@@ -766,6 +767,7 @@ func testAdvancedSQLFeatures(t *testing.T) {
 							{
 								Name:      "report_generated_at",
 								Upstreams: []*UpstreamColumn{{}},
+								Type:      "UNKNOWN",
 							},
 						},
 						Upstreams: []Upstream{{Value: "raw_sales"}},
@@ -994,6 +996,7 @@ func testDialectSpecificFeatures(t *testing.T) {
 								Name:          "level",
 								Upstreams:     []*UpstreamColumn{},
 								UpdateOnMerge: false,
+								Type:          "INT",
 							},
 							{
 								Name:        "dept_stats",

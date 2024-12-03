@@ -1,6 +1,7 @@
 package pipeline_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"log"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
@@ -53,8 +55,9 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		Secrets:    []pipeline.SecretMapping{},
 		Upstreams: []pipeline.Upstream{
 			{
-				Type:  "asset",
-				Value: "gcs-to-bq",
+				Type:    "asset",
+				Value:   "gcs-to-bq",
+				Columns: make([]pipeline.DependsColumn, 0),
 			},
 		},
 		Columns:      make([]pipeline.Column, 0),
@@ -109,12 +112,12 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		Connection: "first-connection",
 		Secrets:    []pipeline.SecretMapping{},
 		Upstreams: []pipeline.Upstream{
-			{Type: "asset", Value: "task1"},
-			{Type: "asset", Value: "task2"},
-			{Type: "asset", Value: "task3"},
-			{Type: "asset", Value: "task4"},
-			{Type: "asset", Value: "task5"},
-			{Type: "asset", Value: "task3"},
+			{Type: "asset", Value: "task1", Columns: make([]pipeline.DependsColumn, 0)},
+			{Type: "asset", Value: "task2", Columns: make([]pipeline.DependsColumn, 0)},
+			{Type: "asset", Value: "task3", Columns: make([]pipeline.DependsColumn, 0)},
+			{Type: "asset", Value: "task4", Columns: make([]pipeline.DependsColumn, 0)},
+			{Type: "asset", Value: "task5", Columns: make([]pipeline.DependsColumn, 0)},
+			{Type: "asset", Value: "task3", Columns: make([]pipeline.DependsColumn, 0)},
 		},
 		Columns:      make([]pipeline.Column, 0),
 		CustomChecks: make([]pipeline.CustomCheck, 0),
@@ -144,12 +147,12 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 		Connection: "conn2",
 		Secrets:    []pipeline.SecretMapping{},
 		Upstreams: []pipeline.Upstream{
-			{Type: "asset", Value: "task1"},
-			{Type: "asset", Value: "task2"},
-			{Type: "asset", Value: "task3"},
-			{Type: "asset", Value: "task4"},
-			{Type: "asset", Value: "task5"},
-			{Type: "asset", Value: "task3"},
+			{Type: "asset", Value: "task1", Columns: make([]pipeline.DependsColumn, 0)},
+			{Type: "asset", Value: "task2", Columns: make([]pipeline.DependsColumn, 0)},
+			{Type: "asset", Value: "task3", Columns: make([]pipeline.DependsColumn, 0)},
+			{Type: "asset", Value: "task4", Columns: make([]pipeline.DependsColumn, 0)},
+			{Type: "asset", Value: "task5", Columns: make([]pipeline.DependsColumn, 0)},
+			{Type: "asset", Value: "task3", Columns: make([]pipeline.DependsColumn, 0)},
 		},
 		Columns:      make([]pipeline.Column, 0),
 		CustomChecks: make([]pipeline.CustomCheck, 0),
@@ -889,5 +892,56 @@ func BenchmarkClearSpacesAtLineEndings(b *testing.B) {
 `
 	for i := 0; i < b.N; i++ {
 		pipeline.ClearSpacesAtLineEndings(content)
+	}
+}
+
+func TestDefaultTrueBool_MarshalYAML(t *testing.T) {
+	t.Parallel()
+
+	type testStruct struct {
+		Field1 string                   `yaml:"field1"`
+		Bool   pipeline.DefaultTrueBool `yaml:"bool,omitempty"`
+	}
+
+	trueVal := true
+	falseVal := false
+
+	tests := []struct {
+		name  string
+		input testStruct
+		want  string
+	}{
+		{
+			name: "true values should be omitted",
+			input: testStruct{
+				Field1: "field1",
+				Bool:   pipeline.DefaultTrueBool{Value: &trueVal},
+			},
+			want: "field1: field1\n",
+		},
+		{
+			name: "false values should be marshalled",
+			input: testStruct{
+				Field1: "field1",
+				Bool:   pipeline.DefaultTrueBool{Value: &falseVal},
+			},
+			want: "field1: field1\nbool: false\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			buf := bytes.NewBuffer(nil)
+			enc := yaml.NewEncoder(buf)
+			enc.SetIndent(2)
+
+			err := enc.Encode(tt.input)
+			require.NoError(t, err)
+
+			yamlConfig := buf.Bytes()
+			assert.YAMLEq(t, tt.want, string(yamlConfig))
+		})
 	}
 }

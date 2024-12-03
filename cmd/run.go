@@ -35,6 +35,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/synapse"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/fatih/color"
@@ -267,7 +268,12 @@ func Run(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
 			}
 
-			rules, err := lint.GetRules(fs, &git.RepoFinder{}, true)
+			parser, err := sqlparser.NewSQLParser(false)
+			if err != nil {
+				printError(err, c.String("output"), "Could not initialize sql parser")
+			}
+
+			rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, parser)
 			if err != nil {
 				errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
 				return cli.Exit("", 1)
@@ -647,15 +653,7 @@ func setupExecutors(
 }
 
 func isPathReferencingAsset(p string) bool {
-	if strings.HasSuffix(p, pipelineDefinitionFile) {
-		return false
-	}
-
-	if isDir(p) {
-		return false
-	}
-
-	return true
+	return !strings.HasSuffix(p, pipelineDefinitionFile) && !isDir(p)
 }
 
 func isDir(path string) bool {

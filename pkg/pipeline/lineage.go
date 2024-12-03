@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/dialect"
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
@@ -17,6 +18,7 @@ type LineageExtractor struct {
 	Pipeline       *Pipeline
 	sqlParser      sqlParser
 	columnMetadata sqlparser.Schema
+	renderer       *jinja.Renderer
 }
 
 // NewLineageExtractor creates a new LineageExtractor instance.
@@ -25,6 +27,7 @@ func NewLineageExtractor(pipeline *Pipeline, parser sqlParser) *LineageExtractor
 		Pipeline:       pipeline,
 		columnMetadata: make(sqlparser.Schema),
 		sqlParser:      parser,
+		renderer:       jinja.NewRendererWithYesterday(pipeline.Name, "lineage-parser"),
 	}
 }
 
@@ -80,10 +83,16 @@ func (p *LineageExtractor) parseLineage(asset *Asset) error {
 		}
 	}
 
-	lineage, err := p.sqlParser.ColumnLineage(asset.ExecutableFile.Content, dialect, p.columnMetadata)
+	query, err := p.renderer.Render(asset.ExecutableFile.Content)
+	if err != nil {
+		return fmt.Errorf("failed to render the query: %w", err)
+	}
+
+	lineage, err := p.sqlParser.ColumnLineage(query, dialect, p.columnMetadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse column lineage: %w", err)
 	}
+
 	return p.processLineageColumns(asset, lineage)
 }
 
@@ -95,6 +104,27 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 	if asset == nil {
 		return errors.New("asset cannot be nil")
 	}
+
+	upstreams := []Upstream{}
+	for _, up := range asset.Upstreams {
+		upstream := up
+		lineage.NonSelectedColumns = append(lineage.NonSelectedColumns, lineage.Columns...)
+		dict := map[string]bool{}
+		for _, lineageCol := range lineage.NonSelectedColumns {
+			for _, lineageUpstream := range lineageCol.Upstream {
+				if _, ok := dict[fmt.Sprintf("%s-%s", lineageUpstream.Table, lineageCol.Name)]; !ok {
+					if lineageUpstream.Table == up.Value {
+						upstream.Columns = append(upstream.Columns, DependsColumn{
+							Name: lineageCol.Name,
+						})
+						dict[fmt.Sprintf("%s-%s", lineageUpstream.Table, lineageCol.Name)] = true
+					}
+				}
+			}
+		}
+		upstreams = append(upstreams, upstream)
+	}
+	asset.Upstreams = upstreams
 
 	for _, lineageCol := range lineage.Columns {
 		if lineageCol.Name == "*" {
@@ -120,6 +150,7 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 		if len(lineageCol.Upstream) == 0 {
 			if err := p.addColumnToAsset(asset, lineageCol.Name, nil, &Column{
 				Name:      lineageCol.Name,
+				Type:      lineageCol.Type,
 				Checks:    []ColumnCheck{},
 				Upstreams: []*UpstreamColumn{},
 			}); err != nil {
@@ -139,7 +170,7 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 			if upstreamAsset == nil {
 				if err := p.addColumnToAsset(asset, lineageCol.Name, nil, &Column{
 					Name:   upstream.Column,
-					Type:   strings.ToLower(upstream.Table),
+					Type:   lineageCol.Type,
 					Checks: []ColumnCheck{},
 					Upstreams: []*UpstreamColumn{
 						{
@@ -158,7 +189,7 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 			if upstreamCol == nil {
 				upstreamCol = &Column{
 					Name:   upstream.Column,
-					Type:   upstream.Table,
+					Type:   lineageCol.Type,
 					Checks: []ColumnCheck{},
 					Upstreams: []*UpstreamColumn{
 						{

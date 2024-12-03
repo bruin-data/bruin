@@ -66,7 +66,15 @@ export default defineConfig({
                         ],
                     },
 
-                    {text: "Tutorials", link: "/getting-started/tutorials"},
+                    {
+                           text: "Tutorials",
+                           collapsed: true,
+                           items: [
+                              {text: "Your First Project", link: "/getting-started/tutorials/first-tutorial"},
+                              { text: "Load Notion to PostgreSQL", link: "/getting-started/tutorials/load-notion-postgres" },
+                          ],
+
+                     },
                     {
                         text: "VS Code Extension",
                         link: "/vscode-extension/overview",
@@ -142,6 +150,13 @@ export default defineConfig({
                             {text: "Stripe", link: "/ingestion/stripe.md"},
                             {text: "Slack", link: "/ingestion/slack.md"},
                             {text: "Zendesk", link: "/ingestion/zendesk.md"},
+                        ],
+                    },
+                    {
+                        text: "Destination",
+                        collapsed: true,
+                        items: [
+                            {text: "Athena", link: "/ingestion/athena.md"},
                         ],
                     },
                 ],

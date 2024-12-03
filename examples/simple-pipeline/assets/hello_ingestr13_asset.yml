@@ -1,9 +1,9 @@
 name: public.chess
 type: ingestr
-connection: postgres
+connection: athena
 
 parameters:
   source_connection: my-chess
   source_table: 'profiles'
 
-  destination: postgres
+  destination: athena

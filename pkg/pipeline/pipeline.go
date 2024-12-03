@@ -38,6 +38,7 @@ const (
 	AssetTypeDatabricksQuery      = AssetType("databricks.sql")
 	AssetTypeSynapseQuery         = AssetType("synapse.sql")
 	AssetTypeIngestr              = AssetType("ingestr")
+	AssetTypeTableau              = AssetType("tableau")
 
 	RunConfigFullRefresh = RunConfig("full-refresh")
 	RunConfigStartDate   = RunConfig("start-date")
@@ -129,6 +130,10 @@ func (b *DefaultTrueBool) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (b DefaultTrueBool) IsZero() bool {
+	return b.Value == nil || *b.Value
+}
+
 func (b DefaultTrueBool) MarshalJSON() ([]byte, error) {
 	if b.Value == nil {
 		return []byte("true"), nil
@@ -157,7 +162,7 @@ func (b *DefaultTrueBool) Bool() bool {
 }
 
 func (b DefaultTrueBool) MarshalYAML() (interface{}, error) {
-	if b.Value == nil {
+	if b.Value == nil || *b.Value {
 		return nil, nil
 	}
 
@@ -495,10 +500,16 @@ type CustomCheck struct {
 	Query       string          `json:"query" yaml:"query" mapstructure:"query"`
 }
 
+type DependsColumn struct {
+	Name  string `json:"name" yaml:"name" mapstructure:"name"`
+	Usage string `json:"usage" yaml:"usage" mapstructure:"usage"`
+}
+
 type Upstream struct {
-	Type     string         `json:"type" yaml:"type" mapstructure:"type"`
-	Value    string         `json:"value" yaml:"value" mapstructure:"value"`
-	Metadata EmptyStringMap `json:"metadata,omitempty" yaml:"metadata,omitempty" mapstructure:"metadata"`
+	Type     string          `json:"type" yaml:"type" mapstructure:"type"`
+	Value    string          `json:"value" yaml:"value" mapstructure:"value"`
+	Metadata EmptyStringMap  `json:"metadata,omitempty" yaml:"metadata,omitempty" mapstructure:"metadata"`
+	Columns  []DependsColumn `json:"columns,omitempty" yaml:"columns,omitempty" mapstructure:"columns"`
 }
 
 func (u Upstream) MarshalYAML() (interface{}, error) {

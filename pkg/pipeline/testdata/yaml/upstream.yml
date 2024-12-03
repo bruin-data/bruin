@@ -4,3 +4,15 @@ depends:
    - asset: some_asset
    - uri: bigquery://project.database/schema
    - some_other_asset
+   - asset: other_asset
+     columns: [col1, col2]
+   - asset: other_asset2
+     columns:
+        - col3
+        - name: col4
+          usage: CLAUSE
+   - asset: yet_another_asset
+     columns:
+        - name: col5
+        - name: col6
+          usage: CLAUSE

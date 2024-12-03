@@ -16,6 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
@@ -108,7 +109,12 @@ func Lint(isDebug *bool) *cli.Command {
 
 			logger.Debugf("built the connection manager instance")
 
-			rules, err := lint.GetRules(fs, &git.RepoFinder{}, c.Bool("exclude-warnings"))
+			parser, err := sqlparser.NewSQLParser(false)
+			if err != nil {
+				printError(err, c.String("output"), "Could not initialize sql parser")
+			}
+
+			rules, err := lint.GetRules(fs, &git.RepoFinder{}, c.Bool("exclude-warnings"), parser)
 			if err != nil {
 				printError(err, c.String("output"), "An error occurred while building the validation rules")
 
