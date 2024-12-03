@@ -6,11 +6,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type lineager interface {
-	ColumnLineage(sql, dialect string, schema Schema) (*Lineage, error)
-}
+func TestGetLineageForRunner(t *testing.T) {
+	lineage, err := NewSQLParser(true)
+	require.NoError(t, err)
+	require.NoError(t, lineage.Start())
 
-func GetLineageForRunner(t *testing.T, s lineager) {
 	tests := []struct {
 		name    string
 		sql     string
@@ -62,6 +62,22 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Type: "BIGINT",
 					},
 				},
+				NonSelectedColumns: []ColumnLineage{
+					{
+						Name: "a",
+						Upstream: []UpstreamColumn{
+							{
+								Column: "a",
+								Table:  "table1",
+							},
+							{
+								Column: "a",
+								Table:  "table2",
+							},
+						},
+						Type: "",
+					},
+				},
 			},
 		},
 		{
@@ -100,6 +116,32 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Type: "VARCHAR",
 					},
 				},
+				NonSelectedColumns: []ColumnLineage{
+					{
+						Name: "in_stock",
+						Upstream: []UpstreamColumn{
+							{
+								Column: "in_stock",
+								Table:  "items",
+							},
+						},
+						Type: "",
+					},
+					{
+						Name: "item_id",
+						Upstream: []UpstreamColumn{
+							{
+								Column: "item_id",
+								Table:  "items",
+							},
+							{
+								Column: "item_id",
+								Table:  "t2",
+							},
+						},
+						Type: "",
+					},
+				},
 			},
 		},
 		{
@@ -128,6 +170,22 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 							{Column: "col2", Table: "table2"},
 						},
 						Type: "BIGINT",
+					},
+				},
+				NonSelectedColumns: []ColumnLineage{
+					{
+						Name: "id",
+						Upstream: []UpstreamColumn{
+							{
+								Column: "id",
+								Table:  "t1",
+							},
+							{
+								Column: "id",
+								Table:  "t2",
+							},
+						},
+						Type: "",
 					},
 				},
 			},
@@ -159,6 +217,18 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Type: "BIGINT",
 					},
 				},
+				NonSelectedColumns: []ColumnLineage{
+					{
+						Name: "customer_id",
+						Upstream: []UpstreamColumn{
+							{
+								Column: "customer_id",
+								Table:  "orders",
+							},
+						},
+						Type: "",
+					},
+				},
 			},
 		},
 		{
@@ -176,18 +246,36 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 			want: &Lineage{
 				Columns: []ColumnLineage{
 					{
+						Name: "avg_salary",
+						Upstream: []UpstreamColumn{
+							{Column: "salary", Table: "salaries"},
+						},
+						Type: "DOUBLE",
+					},
+					{
 						Name: "emp_id",
 						Upstream: []UpstreamColumn{
 							{Column: "emp_id", Table: "employees"},
 						},
 						Type: "TEXT",
 					},
+				},
+				NonSelectedColumns: []ColumnLineage{
 					{
-						Name: "avg_salary",
+						Name: "_u_1",
 						Upstream: []UpstreamColumn{
-							{Column: "salary", Table: "salaries"},
+							{Column: "_u_1", Table: "_u_0"},
 						},
-						Type: "DOUBLE",
+						Type: "",
+					},
+
+					{
+						Name: "emp_id",
+						Upstream: []UpstreamColumn{
+							{Column: "emp_id", Table: "employees"},
+							{Column: "emp_id", Table: "salaries"},
+						},
+						Type: "",
 					},
 				},
 			},
@@ -222,6 +310,7 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Type: "TEXT",
 					},
 				},
+				NonSelectedColumns: []ColumnLineage{},
 			},
 		},
 		{
@@ -251,26 +340,48 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Type: "TEXT",
 					},
 				},
+				NonSelectedColumns: []ColumnLineage{
+					{
+						Name: "id",
+						Upstream: []UpstreamColumn{
+							{
+								Column: "id",
+								Table:  "e2",
+							},
+						},
+						Type: "",
+					},
+					{
+						Name: "manager_id",
+						Upstream: []UpstreamColumn{
+							{
+								Column: "manager_id",
+								Table:  "e1",
+							},
+						},
+						Type: "",
+					},
+				},
 			},
 		},
 		{
 			name: "complex case-when",
 			sql: `
-				SELECT
-					sales.id,
-					CASE
-						WHEN sales.amount > 500 THEN 'large'
-						WHEN sales.amount > 100 THEN 'medium'
-						ELSE 'small'
-					END as sale_size,
-					CASE
-						WHEN regions.name = 'North' THEN 'N'
-						WHEN regions.name = 'South' THEN 'S'
-						ELSE 'Other'
-					END as region_abbr,
-				    'fixed' as fixed
-				FROM sales
-				JOIN regions ON sales.region_id = regions.id
+		SELECT
+			sales.id,
+			CASE
+				WHEN sales.amount > 500 THEN 'large'
+				WHEN sales.amount > 100 THEN 'medium'
+				ELSE 'small'
+			END as sale_size,
+			CASE
+				WHEN regions.name = 'North' THEN 'N'
+				WHEN regions.name = 'South' THEN 'S'
+				ELSE 'Other'
+			END as region_abbr,
+		    'fixed' as fixed
+		FROM sales
+		JOIN regions ON sales.region_id = regions.id
 			`,
 			schema: Schema{
 				"sales":   {"id": "str", "amount": "int64", "region_id": "str"},
@@ -279,18 +390,16 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 			want: &Lineage{
 				Columns: []ColumnLineage{
 					{
+						Name:     "fixed",
+						Upstream: []UpstreamColumn{},
+						Type:     "VARCHAR",
+					},
+					{
 						Name: "id",
 						Upstream: []UpstreamColumn{
 							{Column: "id", Table: "sales"},
 						},
 						Type: "TEXT",
-					},
-					{
-						Name: "sale_size",
-						Upstream: []UpstreamColumn{
-							{Column: "amount", Table: "sales"},
-						},
-						Type: "VARCHAR",
 					},
 					{
 						Name: "region_abbr",
@@ -300,9 +409,25 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Type: "VARCHAR",
 					},
 					{
-						Name:     "fixed",
-						Upstream: []UpstreamColumn{},
-						Type:     "VARCHAR",
+						Name: "sale_size",
+						Upstream: []UpstreamColumn{
+							{Column: "amount", Table: "sales"},
+						},
+						Type: "VARCHAR",
+					},
+				},
+				NonSelectedColumns: []ColumnLineage{
+					{
+						Name: "id",
+						Upstream: []UpstreamColumn{
+							{Column: "id", Table: "regions"},
+						},
+					},
+					{
+						Name: "region_id",
+						Upstream: []UpstreamColumn{
+							{Column: "region_id", Table: "sales"},
+						},
 					},
 				},
 			},
@@ -347,20 +472,19 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Type: "BIGINT",
 					},
 					{
-						Name: "c",
-						Upstream: []UpstreamColumn{
-							{Column: "c", Table: "table2"},
-						},
-						Type: "TEXT",
-					},
-					{
 						Name: "b2",
 						Upstream: []UpstreamColumn{
 							{Column: "b", Table: "table1"},
 						},
 						Type: "BIGINT",
 					},
-
+					{
+						Name: "c",
+						Upstream: []UpstreamColumn{
+							{Column: "c", Table: "table2"},
+						},
+						Type: "TEXT",
+					},
 					{
 						Name: "c2",
 						Upstream: []UpstreamColumn{
@@ -374,6 +498,17 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 						Type:     "UNKNOWN",
 					},
 				},
+				NonSelectedColumns: []ColumnLineage{
+					{
+						Name: "a",
+						Upstream: []UpstreamColumn{
+							{Column: "a", Table: "t2"},
+							{Column: "a", Table: "table1"},
+							{Column: "a", Table: "table2"},
+						},
+						Type: "",
+					},
+				},
 			},
 		},
 	}
@@ -383,7 +518,7 @@ func GetLineageForRunner(t *testing.T, s lineager) {
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				got, err := s.ColumnLineage(tt.sql, tt.dialect, tt.schema)
+				got, err := lineage.ColumnLineage(tt.sql, tt.dialect, tt.schema)
 				if tt.wantErr {
 					require.Error(t, err)
 				} else {
