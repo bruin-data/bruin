@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -40,12 +39,6 @@ func BenchmarkClean(b *testing.B) {
 	}
 }
 
-func printMarkedTasks(tasks []scheduler.TaskInstance) {
-	fmt.Println("Marked Tasks:")
-	for _, task := range tasks {
-		fmt.Printf(" d:Task Name: %s, Status: %s\n", task.GetAsset().Name, task.GetStatus())
-	}
-}
 func TestApplyFilters(t *testing.T) {
 	t.Parallel() // Enable parallel execution for the top-level test
 
