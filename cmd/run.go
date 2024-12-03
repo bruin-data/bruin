@@ -720,7 +720,7 @@ func (f *Filter) ApplyFiltersAndMarkAssets(pipeline *pipeline.Pipeline, s *sched
 		s.MarkAsset(task, scheduler.Pending, f.IncludeDownstream)
 		// Validate that --tag is not allowed with single task execution
 		if f.IncludeTag != "" {
-			return fmt.Errorf("you cannot use the '--tag' flag when running a single asset")
+			return errors.New("you cannot use the '--tag' flag when running a single asset")
 		}
 		return nil // Return early since we're only dealing with a single task
 	}

@@ -2,12 +2,13 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/pipeline"
-	"github.com/bruin-data/bruin/pkg/scheduler"
-	"go.uber.org/zap"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestClean(t *testing.T) {
@@ -270,10 +271,10 @@ func TestApplyFilters(t *testing.T) {
 
 			// Assert
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.EqualError(t, err, tt.expectedError)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				markedTasks := s.GetTaskInstancesByStatus(scheduler.Pending)
 				assert.Len(t, markedTasks, len(tt.expectedPending))
 
