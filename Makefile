@@ -36,7 +36,7 @@ test-unit:
 	@echo "$(OK_COLOR)==> Running the unit tests$(NO_COLOR)"
 	@go test -race -cover -timeout 10m ./... 
 
-format: tools
+format: tools lint-python
 	@echo "$(OK_COLOR)>> [go vet] running$(NO_COLOR)" & \
 	go vet ./... &
 
@@ -70,3 +70,12 @@ tools-update:
 	go install github.com/daixiang0/gci@latest; \
 	go install mvdan.cc/gofumpt@latest; \
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest;
+
+lint-python:
+	pip install sqlglot
+	pip install ruff
+	@echo "$(OK_COLOR)==> Running Python formatting with black...$(NO_COLOR)"
+	@ruff format ./pythonsrc
+
+	@echo "$(OK_COLOR)==> Running Python linting with flake8...$(NO_COLOR)"
+	@ruff check --fix ./pythonsrc
