@@ -179,7 +179,7 @@
         "executable_file": {
           "name": "country.sql",
           "path": "__ASSETSDIR__country.sql",
-          "content": "select id, country from users;"
+          "content": "select id, country from users where id > 10000;"
         },
         "definition_file": {
           "name": "country.sql",
@@ -407,7 +407,7 @@
         "executable_file": {
           "name": "people.sql",
           "path": "__ASSETSDIR__people.sql",
-          "content": "select \n    id, \n    name, \n    last_name,\n    created_at\nfrom users;"
+          "content": "select \n    id, \n    name, \n    last_name,\n    created_at\nfrom users where country = 'UK';"
         },
         "definition_file": {
           "name": "people.sql",

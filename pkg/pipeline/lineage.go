@@ -120,7 +120,6 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 						dict[fmt.Sprintf("%s-%s", lineageUpstream.Table, lineageCol.Name)] = true
 					}
 				}
-
 			}
 		}
 		upstreams = append(upstreams, upstream)
