@@ -115,11 +115,6 @@ func Run(isDebug *bool) *cli.Command {
 				Aliases: []string{"t"},
 				Usage:   "pick the assets with the given tag",
 			},
-			&cli.StringFlag{
-				Name:    "exclude-tag",
-				Aliases: []string{"x"},
-				Usage:   "Exclude the assets with the given tag",
-			},
 			&cli.StringSliceFlag{
 				Name:        "only",
 				DefaultText: "'main', 'checks', 'push-metadata'",
