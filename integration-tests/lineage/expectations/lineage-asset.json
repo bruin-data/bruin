@@ -20,6 +20,10 @@
         "value": "country",
         "columns": [
           {
+            "name": "id",
+            "usage": ""
+          },
+          {
             "name": "country",
             "usage": ""
           }
@@ -29,6 +33,10 @@
         "type": "asset",
         "value": "people",
         "columns": [
+          {
+            "name": "id",
+            "usage": ""
+          },
           {
             "name": "last_name",
             "usage": ""
@@ -248,6 +256,10 @@
             "value": "country",
             "columns": [
               {
+                "name": "id",
+                "usage": ""
+              },
+              {
                 "name": "country",
                 "usage": ""
               }
@@ -257,6 +269,10 @@
             "type": "asset",
             "value": "people",
             "columns": [
+              {
+                "name": "id",
+                "usage": ""
+              },
               {
                 "name": "last_name",
                 "usage": ""
@@ -407,7 +423,7 @@
         "executable_file": {
           "name": "people.sql",
           "path": "__ASSETSDIR__people.sql",
-          "content": "select \n    id, \n    name, \n    last_name,\n    created_at\nfrom users where country = 'UK';"
+          "content": "select \n    id, \n    name, \n    last_name,\n    created_at\nfrom users where country = 'UK';;"
         },
         "definition_file": {
           "name": "people.sql",

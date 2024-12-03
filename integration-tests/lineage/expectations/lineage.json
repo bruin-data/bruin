@@ -116,6 +116,10 @@
           "value": "country",
           "columns": [
             {
+              "name": "id",
+              "usage": ""
+            },
+            {
               "name": "country",
               "usage": ""
             }
@@ -125,6 +129,10 @@
           "type": "asset",
           "value": "people",
           "columns": [
+            {
+              "name": "id",
+              "usage": ""
+            },
             {
               "name": "last_name",
               "usage": ""
