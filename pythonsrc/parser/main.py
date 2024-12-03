@@ -1,4 +1,5 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
+
 from sqlglot import parse_one, exp, lineage
 from sqlglot.lineage import Node
 from sqlglot.optimizer import optimize
@@ -17,14 +18,28 @@ def extract_non_selected_columns(parsed: exp.Select) -> list[Column]:
     group = parsed.find_all(exp.Group)
 
     cols = []
+    tables = extract_tables(parsed)
+    table_alias = {}
+    for table in tables:
+        if table.alias:
+            table_alias[table.alias] = table.name
+
+    table_names = {}
+    for table in tables:
+        table_names[table.name] = table
+
     for scopes in [where, join, group]:
         for scope in scopes:
             if scope is None:
                 continue
-            cols += [
-                Column(name=expr.name, table=expr.table)
-                for expr in find_all_in_scope(scope, exp.Column)
-            ]
+            for expr in find_all_in_scope(scope, exp.Column):
+                table_name = expr.table
+
+                if expr.table in table_alias:
+                    table_name = table_alias[expr.table]
+                if table_name in table_names:
+                    cols.append(Column(name=expr.name, table=table_name))
+
     result = list(set(cols))
     result.sort(key=lambda x: x.name + x.table)
     return result
@@ -96,7 +111,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
         return {"columns": []}
     try:
         optimized = optimize(parsed, schema, dialect=dialect)
-    except:
+    except Exception:
         return {"columns": []}
 
     result = []
@@ -105,7 +120,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
     for col in cols:
         try:
             ll = lineage.lineage(col["name"], optimized, schema, dialect=dialect)
-        except:
+        except Exception:
             continue
 
         cl = []
@@ -133,7 +148,10 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
     non_selected_columns_dict = {}
     for column in extract_non_selected_columns(optimized):
         if column.name not in non_selected_columns_dict:
-            non_selected_columns_dict[column.name] = {"name": column.name, "upstream": []}
+            non_selected_columns_dict[column.name] = {
+                "name": column.name,
+                "upstream": [],
+            }
         non_selected_columns_dict[column.name]["upstream"].append(
             {"column": column.name, "table": column.table}
         )

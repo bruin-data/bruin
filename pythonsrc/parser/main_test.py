@@ -24,8 +24,8 @@ test_cases_non_selected_columns = [
         "name": "Select all from orders",
         "dialect": "bigquery",
         "query": """
-            select * from orders
-        """,
+	        select * from orders
+	    """,
         "schema": SCHEMA,
         "expected": [],
     },
@@ -33,8 +33,8 @@ test_cases_non_selected_columns = [
         "name": "Select orders with id greater than 10",
         "dialect": "bigquery",
         "query": """
-            select * from orders where id > 10
-        """,
+	        select * from orders where id > 10
+	    """,
         "schema": SCHEMA,
         "expected": [Column("id", "orders")],
     },
@@ -42,8 +42,8 @@ test_cases_non_selected_columns = [
         "name": "Join orders and customers with id filter",
         "dialect": "bigquery",
         "query": """
-            select * from orders join customers on customers.id = orders.customer_id where orders.id > 10;
-        """,
+	        select * from orders join customers on customers.id = orders.customer_id where orders.id > 10;
+	    """,
         "schema": SCHEMA,
         "expected": [
             Column(name="customer_id", table="orders"),
@@ -55,8 +55,8 @@ test_cases_non_selected_columns = [
         "name": "Join orders and customers with country filter",
         "dialect": "bigquery",
         "query": """
-            select * from orders join customers on customers.id = orders.customer_id where orders.id > 10 and customers.country = "UK";
-        """,
+	        select * from orders join customers on customers.id = orders.customer_id where orders.id > 10 and customers.country = "UK";
+	    """,
         "schema": SCHEMA,
         "expected": [
             Column(name="country", table="customers"),
@@ -69,8 +69,8 @@ test_cases_non_selected_columns = [
         "name": "Join with additional condition on shipping country",
         "dialect": "bigquery",
         "query": """
-            select * from orders join customers on customers.id = orders.customer_id where orders.id > 10 and customers.country = "UK" and concat(customers.country, orders.shipping_country)="UKUK";
-        """,
+	        select * from orders join customers on customers.id = orders.customer_id where orders.id > 10 and customers.country = "UK" and concat(customers.country, orders.shipping_country)="UKUK";
+	    """,
         "schema": SCHEMA,
         "expected": [
             Column(name="country", table="customers"),
@@ -84,18 +84,48 @@ test_cases_non_selected_columns = [
         "name": "CTE with cross join",
         "dialect": "bigquery",
         "query": """
-            with t1 as (
-                select col1, count(*) as cnt1 from table1 group by col1
-            ), t2 as (
-                select avg(col3) as col3_avg from table1 group by col1
-            )
-            select col1, cnt1, col3_avg from t1 cross join t2
-        """,
+	        with t1 as (
+	            select col1, count(*) as cnt1 from table1 group by col1
+	        ), t2 as (
+	            select avg(col3) as col3_avg from table1 group by col1
+	        )
+	        select col1, cnt1, col3_avg from t1 cross join t2
+	    """,
         "schema": {
             "table1": {"col3": "int", "col1": "int", "col2": "int"},
         },
         "expected": [
             Column(name="col1", table="table1"),
+        ],
+    },
+    {
+        "name": "CTE with cross ",
+        "dialect": "bigquery",
+        "query": """
+	   SELECT t1.col1, t2.col2 				FROM table1 t1 				JOIN table2 t2 ON t1.id = t2.id
+	""",
+        "schema": {
+            "table1": {"id": "str", "col1": "int64"},
+            "table2": {"id": "str", "col2": "int64"},
+        },
+        "expected": [
+            Column(name="id", table="table1"),
+            Column(name="id", table="table2"),
+        ],
+    },
+    {
+        "name": "CTE with cross test 2 ",
+        "dialect": "bigquery",
+        "query": """
+	   SELECT emp_id, (SELECT AVG(salary) FROM salaries WHERE salaries.emp_id = employees.emp_id) as avg_salary FROM employees
+	""",
+        "schema": {
+            "employees": {"emp_id": "str"},
+            "salaries": {"emp_id": "str", "salary": "int64"},
+        },
+        "expected": [
+            Column(name="emp_id", table="employees"),
+            Column(name="emp_id", table="salaries"),
         ],
     },
 ]
@@ -195,7 +225,7 @@ test_cases = [
                 "name": "item_id",
                 "upstream": [
                     {"column": "item_id", "table": "items"},
-                    {"column": "item_id", "table": "t2"},
+                    {"column": "item_id", "table": "orders"},
                 ],
             },
         ],
@@ -228,8 +258,8 @@ test_cases = [
             {
                 "name": "id",
                 "upstream": [
-                    {"column": "id", "table": "t1"},
-                    {"column": "id", "table": "t2"},
+                    {"column": "id", "table": "table1"},
+                    {"column": "id", "table": "table2"},
                 ],
             }
         ],
@@ -290,7 +320,6 @@ test_cases = [
             },
         ],
         "expected_non_selected": [
-            {"name": "_u_1", "upstream": [{"column": "_u_1", "table": "_u_0"}]},
             {
                 "name": "emp_id",
                 "upstream": [
@@ -358,10 +387,10 @@ test_cases = [
             },
         ],
         "expected_non_selected": [
-            {"name": "id", "upstream": [{"column": "id", "table": "e2"}]},
+            {"name": "id", "upstream": [{"column": "id", "table": "employees"}]},
             {
                 "name": "manager_id",
-                "upstream": [{"column": "manager_id", "table": "e1"}],
+                "upstream": [{"column": "manager_id", "table": "employees"}],
             },
         ],
     },
