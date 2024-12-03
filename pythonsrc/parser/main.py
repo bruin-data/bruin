@@ -9,21 +9,38 @@ class Column:
    name: str
    table: str
 
+
 def extract_non_selected_columns(parsed: exp.Select) -> list[Column]:
-    where = parsed.find_all(exp.Where)
-    join = parsed.find_all(exp.Join)
-    group = parsed.find_all(exp.Group)
+	where = parsed.find_all(exp.Where)
+	join = parsed.find_all(exp.Join)
+	group = parsed.find_all(exp.Group)
 
-    cols = []
-    for scopes in [where, join, group]:
-        for scope in scopes:
-            if scope is None:
-                continue
-            cols += [Column(expr.name, expr.table) for expr in find_all_in_scope(scope, exp.Column)]
+	cols = []
+	tables = extract_tables(parsed)
+	table_alias = {}
+	for table in tables:
+		if table.alias:
+			table_alias[table.alias] = table.name
 
-    result = list(set(cols))
-    result.sort(key=lambda x: x.name + x.table)
-    return result
+	table_names = {}
+	for table in tables:
+		table_names[table.name] = table
+
+	for scopes in [where, join, group]:
+		for scope in scopes:
+			if scope is None:
+				continue
+			for expr in find_all_in_scope(scope, exp.Column):
+				table_name = expr.table
+
+				if expr.table in table_alias:
+					table_name = table_alias[expr.table]
+				if table_name in table_names:
+					cols.append(Column(name=expr.name, table=table_name))
+
+	result = list(set(cols))
+	result.sort(key=lambda x: x.name + x.table)
+	return result
 
 
 def extract_tables(parsed):
@@ -120,8 +137,18 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
 
     result.sort(key=lambda x: x["name"])
 
+    non_selected_columns_dict = {}
+    for column in extract_non_selected_columns(optimized):
+        if column.name not in non_selected_columns_dict:
+            non_selected_columns_dict[column.name] = {"name": column.name, "upstream": []}
+        non_selected_columns_dict[column.name]["upstream"].append(
+            {"column": column.name, "table": column.table}
+        )
+    non_selected_columns = list(non_selected_columns_dict.values())
+
     return {
-        "columns": result
+        "columns": result,
+        "non_selected_columns": non_selected_columns,
     }
 
 

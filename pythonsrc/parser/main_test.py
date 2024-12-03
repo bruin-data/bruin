@@ -1,13 +1,22 @@
-import unittest
 import pytest
-from main import get_column_lineage, Column, extract_non_selected_columns
-from sqlglot import parse_one, exp, lineage
-from sqlglot.optimizer.scope import find_all_in_scope, build_scope
+from sqlglot import parse_one
 from sqlglot.optimizer import optimize
 
+from main import get_column_lineage, extract_non_selected_columns, Column
+
 SCHEMA = {
-	"orders": {"id": "bigint", "order_number": "string", "customer_id": "bigint", "shipping_country": "string"},
-	"customers": {"id": "bigint", "name": "string", "age": "bigint", "country": "string"},
+	"orders": {
+		"id": "bigint",
+		"order_number": "string",
+		"customer_id": "bigint",
+		"shipping_country": "string",
+	},
+	"customers": {
+		"id": "bigint",
+		"name": "string",
+		"age": "bigint",
+		"country": "string",
+	},
 }
 
 test_cases_non_selected_columns = [
@@ -15,8 +24,8 @@ test_cases_non_selected_columns = [
 		"name": "Select all from orders",
 		"dialect": "bigquery",
 		"query": """
-            select * from orders
-        """,
+	        select * from orders
+	    """,
 		"schema": SCHEMA,
 		"expected": [],
 	},
@@ -24,19 +33,17 @@ test_cases_non_selected_columns = [
 		"name": "Select orders with id greater than 10",
 		"dialect": "bigquery",
 		"query": """
-            select * from orders where id > 10
-        """,
+	        select * from orders where id > 10
+	    """,
 		"schema": SCHEMA,
-		"expected": [
-			Column("id", "orders")
-		],
+		"expected": [Column("id", "orders")],
 	},
 	{
 		"name": "Join orders and customers with id filter",
 		"dialect": "bigquery",
 		"query": """
-            select * from orders join customers on customers.id = orders.customer_id where orders.id > 10;
-        """,
+	        select * from orders join customers on customers.id = orders.customer_id where orders.id > 10;
+	    """,
 		"schema": SCHEMA,
 		"expected": [
 			Column(name="customer_id", table="orders"),
@@ -48,8 +55,8 @@ test_cases_non_selected_columns = [
 		"name": "Join orders and customers with country filter",
 		"dialect": "bigquery",
 		"query": """
-            select * from orders join customers on customers.id = orders.customer_id where orders.id > 10 and customers.country = "UK";
-        """,
+	        select * from orders join customers on customers.id = orders.customer_id where orders.id > 10 and customers.country = "UK";
+	    """,
 		"schema": SCHEMA,
 		"expected": [
 			Column(name="country", table="customers"),
@@ -62,33 +69,63 @@ test_cases_non_selected_columns = [
 		"name": "Join with additional condition on shipping country",
 		"dialect": "bigquery",
 		"query": """
-            select * from orders join customers on customers.id = orders.customer_id where orders.id > 10 and customers.country = "UK" and concat(customers.country, orders.shipping_country)="UKUK";
-        """,
+	        select * from orders join customers on customers.id = orders.customer_id where orders.id > 10 and customers.country = "UK" and concat(customers.country, orders.shipping_country)="UKUK";
+	    """,
 		"schema": SCHEMA,
 		"expected": [
 			Column(name="country", table="customers"),
 			Column(name="customer_id", table="orders"),
 			Column(name="id", table="customers"),
 			Column(name="id", table="orders"),
-			Column(name="shipping_country", table="orders")
+			Column(name="shipping_country", table="orders"),
 		],
 	},
 	{
 		"name": "CTE with cross join",
 		"dialect": "bigquery",
 		"query": """
-            with t1 as (
-                select col1, count(*) as cnt1 from table1 group by col1
-            ), t2 as (
-                select avg(col3) as col3_avg from table1 group by col1
-            )
-            select col1, cnt1, col3_avg from t1 cross join t2
-        """,
+	        with t1 as (
+	            select col1, count(*) as cnt1 from table1 group by col1
+	        ), t2 as (
+	            select avg(col3) as col3_avg from table1 group by col1
+	        )
+	        select col1, cnt1, col3_avg from t1 cross join t2
+	    """,
 		"schema": {
 			"table1": {"col3": "int", "col1": "int", "col2": "int"},
 		},
 		"expected": [
 			Column(name="col1", table="table1"),
+		],
+	},
+	{
+		"name": "CTE with cross ",
+		"dialect": "bigquery",
+		"query": """
+	   SELECT t1.col1, t2.col2 				FROM table1 t1 				JOIN table2 t2 ON t1.id = t2.id
+	""",
+		"schema": {
+			"table1": {"id": "str", "col1": "int64"},
+			"table2": {"id": "str", "col2": "int64"},
+		},
+		"expected": [
+			Column(name="id", table="table1"),
+			Column(name="id", table="table2"),
+		],
+	},
+	{
+		"name": "CTE with cross test 2 ",
+		"dialect": "bigquery",
+		"query": """
+	   SELECT emp_id, (SELECT AVG(salary) FROM salaries WHERE salaries.emp_id = employees.emp_id) as avg_salary FROM employees
+	""",
+		"schema": {
+			"employees": {"emp_id": "str"},
+			"salaries": {"emp_id": "str", "salary": "int64"},
+		},
+		"expected": [
+			Column(name="emp_id", table="employees"),
+			Column(name="emp_id", table="salaries"),
 		],
 	},
 ]
@@ -122,9 +159,26 @@ test_cases = [
 					{"column": "a", "table": "table2"},
 				],
 			},
-			{"name": "b", 'type': 'BIGINT', "upstream": [{"column": "b", "table": "table1"}]},
-			{"name": "c", 'type': 'BIGINT', "upstream": [{"column": "c", "table": "table2"}]},
-		]
+			{
+				"name": "b",
+				"type": "BIGINT",
+				"upstream": [{"column": "b", "table": "table1"}],
+			},
+			{
+				"name": "c",
+				"type": "BIGINT",
+				"upstream": [{"column": "c", "table": "table2"}],
+			},
+		],
+		"expected_non_selected": [
+			{
+				"name": "a",
+				"upstream": [
+					{"column": "a", "table": "table1"},
+					{"column": "a", "table": "table2"},
+				],
+			}
+		],
 	},
 	{
 		"name": "case-when",
@@ -148,20 +202,33 @@ test_cases = [
 		"expected": [
 			{
 				"name": "item_id",
-				'type': 'TEXT',
+				"type": "TEXT",
 				"upstream": [
 					{"column": "item_id", "table": "items"},
 				],
 			},
 			{
 				"name": "price_category",
-				'type': 'VARCHAR',
+				"type": "VARCHAR",
 				"upstream": [
 					{"column": "price", "table": "items"},
 					{"column": "somecol", "table": "orders"},
 				],
 			},
-		]
+		],
+		"expected_non_selected": [
+			{
+				"name": "in_stock",
+				"upstream": [{"column": "in_stock", "table": "items"}],
+			},
+			{
+				"name": "item_id",
+				"upstream": [
+					{"column": "item_id", "table": "items"},
+					{"column": "item_id", "table": "orders"},
+				],
+			},
+		],
 	},
 	{
 		"name": "simple join",
@@ -176,9 +243,26 @@ test_cases = [
 			"table2": {"id": "str", "col2": "int64"},
 		},
 		"expected": [
-			{"name": "col1", 'type': 'BIGINT', "upstream": [{"column": "col1", "table": "table1"}]},
-			{"name": "col2", 'type': 'BIGINT', "upstream": [{"column": "col2", "table": "table2"}]},
-		]
+			{
+				"name": "col1",
+				"type": "BIGINT",
+				"upstream": [{"column": "col1", "table": "table1"}],
+			},
+			{
+				"name": "col2",
+				"type": "BIGINT",
+				"upstream": [{"column": "col2", "table": "table2"}],
+			},
+		],
+		"expected_non_selected": [
+			{
+				"name": "id",
+				"upstream": [
+					{"column": "id", "table": "table1"},
+					{"column": "id", "table": "table2"},
+				],
+			}
+		],
 	},
 	{
 		"name": "aggregate function",
@@ -194,15 +278,21 @@ test_cases = [
 		"expected": [
 			{
 				"name": "cid",
-				'type': 'TEXT',
+				"type": "TEXT",
 				"upstream": [{"column": "customer_id", "table": "orders"}],
 			},
 			{
 				"name": "order_count",
-				'type': 'BIGINT',
+				"type": "BIGINT",
 				"upstream": [{"column": "order_id", "table": "orders"}],
 			},
-		]
+		],
+		"expected_non_selected": [
+			{
+				"name": "customer_id",
+				"upstream": [{"column": "customer_id", "table": "orders"}],
+			}
+		],
 	},
 	{
 		"name": "subquery in select",
@@ -220,15 +310,25 @@ test_cases = [
 		"expected": [
 			{
 				"name": "avg_salary",
-				'type': 'DOUBLE',
+				"type": "DOUBLE",
 				"upstream": [{"column": "salary", "table": "salaries"}],
 			},
 			{
 				"name": "emp_id",
-				'type': 'TEXT',
+				"type": "TEXT",
 				"upstream": [{"column": "emp_id", "table": "employees"}],
 			},
-		]
+		],
+		"expected_non_selected": [
+
+			{
+				"name": "emp_id",
+				"upstream": [
+					{"column": "emp_id", "table": "employees"},
+					{"column": "emp_id", "table": "salaries"},
+				],
+			},
+		],
 	},
 	{
 		"name": "union all",
@@ -245,7 +345,7 @@ test_cases = [
 		"expected": [
 			{
 				"name": "id",
-				'type': 'TEXT',
+				"type": "TEXT",
 				"upstream": [
 					{"column": "id", "table": "customers"},
 					{"column": "id", "table": "employees"},
@@ -253,13 +353,14 @@ test_cases = [
 			},
 			{
 				"name": "name",
-				'type': 'TEXT',
+				"type": "TEXT",
 				"upstream": [
 					{"column": "name", "table": "customers"},
 					{"column": "name", "table": "employees"},
 				],
 			},
-		]
+		],
+		"expected_non_selected": [],
 	},
 	{
 		"name": "self join",
@@ -273,15 +374,26 @@ test_cases = [
 			"employees": {"id": "str", "manager_id": "str"},
 		},
 		"expected": [
-			{"name": "id", 'type': 'TEXT', "upstream": [{"column": "id", "table": "employees"}]},
+			{
+				"name": "id",
+				"type": "TEXT",
+				"upstream": [{"column": "id", "table": "employees"}],
+			},
 			{
 				"name": "manager_id",
-				'type': 'TEXT',
+				"type": "TEXT",
 				"upstream": [
 					{"column": "manager_id", "table": "employees"},
 				],
 			},
-		]
+		],
+		"expected_non_selected": [
+			{"name": "id", "upstream": [{"column": "id", "table": "employees"}]},
+			{
+				"name": "manager_id",
+				"upstream": [{"column": "manager_id", "table": "employees"}],
+			},
+		],
 	},
 	{
 		"name": "complex case-when",
@@ -309,16 +421,31 @@ test_cases = [
 			"regions": {"id": "str", "name": "str"},
 		},
 		"expected": [
-			{"name": "fixed", 'type': 'VARCHAR', "upstream": []},
-			{"name": "id", 'type': 'TEXT', "upstream": [{"column": "id", "table": "sales"}]},
+			{"name": "fixed", "type": "VARCHAR", "upstream": []},
+			{
+				"name": "id",
+				"type": "TEXT",
+				"upstream": [{"column": "id", "table": "sales"}],
+			},
 			{
 				"name": "region_abbr",
-				'type': 'VARCHAR',
+				"type": "VARCHAR",
 				"upstream": [{"column": "name", "table": "regions"}],
 			},
-			{"name": "sale_size", 'type': 'VARCHAR', "upstream": [{"column": "amount", "table": "sales"}]},
+			{
+				"name": "sale_size",
+				"type": "VARCHAR",
+				"upstream": [{"column": "amount", "table": "sales"}],
+			},
 			{"name": "updated_at", "upstream": [], "type": "UNKNOWN"},
-		]
+		],
+		"expected_non_selected": [
+			{"name": "id", "upstream": [{"column": "id", "table": "regions"}]},
+			{
+				"name": "region_id",
+				"upstream": [{"column": "region_id", "table": "sales"}],
+			},
+		],
 	},
 	{
 		"name": "aggregate functions with multiple columns",
@@ -333,30 +460,40 @@ test_cases = [
             GROUP BY customer_id
         """,
 		"schema": {
-			"orders": {"customer_id": "str", "order_id": "str", "order_amount": "int64"},
+			"orders": {
+				"customer_id": "str",
+				"order_id": "str",
+				"order_amount": "int64",
+			},
 		},
 		"expected": [
 			{
 				"name": "average_amount",
-				'type': 'DOUBLE',
+				"type": "DOUBLE",
 				"upstream": [{"column": "order_amount", "table": "orders"}],
 			},
 			{
 				"name": "customer_id",
-				'type': 'TEXT',
+				"type": "TEXT",
 				"upstream": [{"column": "customer_id", "table": "orders"}],
 			},
 			{
 				"name": "order_count",
-				'type': 'BIGINT',
+				"type": "BIGINT",
 				"upstream": [{"column": "order_id", "table": "orders"}],
 			},
 			{
 				"name": "total_amount",
-				'type': 'BIGINT',
+				"type": "BIGINT",
 				"upstream": [{"column": "order_amount", "table": "orders"}],
 			},
-		]
+		],
+		"expected_non_selected": [
+			{
+				"name": "customer_id",
+				"upstream": [{"column": "customer_id", "table": "orders"}],
+			}
+		],
 	},
 	{
 		"name": "upper function",
@@ -371,10 +508,11 @@ test_cases = [
 		"expected": [
 			{
 				"name": "upper_name",
-				'type': 'TEXT',
+				"type": "TEXT",
 				"upstream": [{"column": "name", "table": "users"}],
 			},
 		],
+		"expected_non_selected": [],
 	},
 	{
 		"name": "lower function",
@@ -389,10 +527,11 @@ test_cases = [
 		"expected": [
 			{
 				"name": "lower_email",
-				'type': 'TEXT',
+				"type": "TEXT",
 				"upstream": [{"column": "email", "table": "users"}],
 			},
 		],
+		"expected_non_selected": [],
 	},
 	{
 		"name": "length function",
@@ -407,10 +546,11 @@ test_cases = [
 		"expected": [
 			{
 				"name": "description_length",
-				'type': 'BIGINT',
+				"type": "BIGINT",
 				"upstream": [{"column": "description", "table": "products"}],
 			},
 		],
+		"expected_non_selected": [],
 	},
 	{
 		"name": "trim function",
@@ -425,10 +565,11 @@ test_cases = [
 		"expected": [
 			{
 				"name": "trimmed_column",
-				'type': 'TEXT',
+				"type": "TEXT",
 				"upstream": [{"column": "whitespace_column", "table": "data"}],
 			},
 		],
+		"expected_non_selected": [],
 	},
 	{
 		"name": "round function",
@@ -443,10 +584,11 @@ test_cases = [
 		"expected": [
 			{
 				"name": "rounded_price",
-				'type': 'FLOAT',
+				"type": "FLOAT",
 				"upstream": [{"column": "price", "table": "products"}],
 			},
 		],
+		"expected_non_selected": [],
 	},
 	{
 		"name": "coalesce function",
@@ -461,10 +603,11 @@ test_cases = [
 		"expected": [
 			{
 				"name": "middle_name",
-				'type': 'TEXT',
+				"type": "TEXT",
 				"upstream": [{"column": "middle_name", "table": "users"}],
 			},
 		],
+		"expected_non_selected": [],
 	},
 	{
 		"name": "cast function",
@@ -479,10 +622,11 @@ test_cases = [
 		"expected": [
 			{
 				"name": "order_id_int",
-				'type': 'INT',
+				"type": "INT",
 				"upstream": [{"column": "order_id", "table": "orders"}],
 			},
 		],
+		"expected_non_selected": [],
 	},
 	{
 		"name": "date function",
@@ -497,10 +641,11 @@ test_cases = [
 		"expected": [
 			{
 				"name": "order_date_only",
-				'type': 'DATE',
+				"type": "DATE",
 				"upstream": [{"column": "order_date", "table": "orders"}],
 			},
 		],
+		"expected_non_selected": [],
 	},
 	{
 		"name": "extract function",
@@ -515,10 +660,11 @@ test_cases = [
 		"expected": [
 			{
 				"name": "order_year",
-				'type': 'INT',
+				"type": "INT",
 				"upstream": [{"column": "order_date", "table": "orders"}],
 			},
 		],
+		"expected_non_selected": [],
 	},
 	{
 		"name": "substring function",
@@ -533,10 +679,11 @@ test_cases = [
 		"expected": [
 			{
 				"name": "name_prefix",
-				'type': 'TEXT',
+				"type": "TEXT",
 				"upstream": [{"column": "name", "table": "users"}],
 			},
 		],
+		"expected_non_selected": [],
 	},
 	{
 		"name": "floor function",
@@ -551,10 +698,11 @@ test_cases = [
 		"expected": [
 			{
 				"name": "floored_price",
-				'type': 'FLOAT',
+				"type": "FLOAT",
 				"upstream": [{"column": "price", "table": "products"}],
 			},
 		],
+		"expected_non_selected": [],
 	},
 	{
 		"name": "ceil function",
@@ -569,10 +717,11 @@ test_cases = [
 		"expected": [
 			{
 				"name": "ceiled_price",
-				'type': 'FLOAT',
+				"type": "FLOAT",
 				"upstream": [{"column": "price", "table": "products"}],
 			},
 		],
+		"expected_non_selected": [],
 	},
 	{
 		"name": "mysql date_format function",
@@ -587,10 +736,11 @@ test_cases = [
 		"expected": [
 			{
 				"name": "formatted_date",
-				'type': 'VARCHAR',
+				"type": "VARCHAR",
 				"upstream": [{"column": "order_date", "table": "orders"}],
 			},
 		],
+		"expected_non_selected": [],
 	},
 	{
 		"name": "snowflake to_timestamp function",
@@ -605,10 +755,11 @@ test_cases = [
 		"expected": [
 			{
 				"name": "TIMESTAMP_DATE",
-				'type': 'UNKNOWN',
+				"type": "UNKNOWN",
 				"upstream": [{"column": "ORDER_DATE", "table": "ORDERS"}],
 			},
 		],
+		"expected_non_selected": [],
 	},
 	{
 		"name": "duckdb current_timestamp function",
@@ -623,15 +774,16 @@ test_cases = [
 		"expected": [
 			{
 				"name": "current_time",
-				'type': 'TIMESTAMP',
-				"upstream": [{'column': 'current_time', 'table': ''}],
+				"type": "TIMESTAMP",
+				"upstream": [{"column": "current_time", "table": ""}],
 			},
 			{
 				"name": "order_id",
-				'type': 'TEXT',
-				"upstream": [{'column': 'order_id', 'table': 'orders'}],
-			}
+				"type": "TEXT",
+				"upstream": [{"column": "order_id", "table": "orders"}],
+			},
 		],
+		"expected_non_selected": [],
 	},
 	{
 		"name": "redshift date_trunc function",
@@ -646,27 +798,41 @@ test_cases = [
 		"expected": [
 			{
 				"name": "month_start",
-				'type': 'UNKNOWN',
+				"type": "UNKNOWN",
 				"upstream": [{"column": "order_date", "table": "orders"}],
 			},
 		],
+		"expected_non_selected": [],
 	},
 ]
 
 
 @pytest.mark.parametrize(
-	"query,schema,expected, dialect",
-	[(tc["query"], tc["schema"], tc["expected"], tc["dialect"]) for tc in test_cases],
+	"query,schema,expected,expected_non_selected,dialect",
+	[
+		(
+			tc["query"],
+			tc["schema"],
+			tc["expected"],
+			tc["expected_non_selected"],
+			tc["dialect"],
+		)
+		for tc in test_cases
+	],
 	ids=[tc["name"] for tc in test_cases],
 )
-def test_get_column_lineage(query, schema, expected, dialect):
+def test_get_column_lineage(query, schema, expected, expected_non_selected, dialect):
 	result = get_column_lineage(query, schema, dialect)
-	assert result['columns'] == expected
+	assert result["columns"] == expected
+	assert result["non_selected_columns"] == expected_non_selected
 
 
 @pytest.mark.parametrize(
 	"query,schema,expected,dialect",
-	[(tc["query"], tc["schema"], tc["expected"], tc["dialect"]) for tc in test_cases_non_selected_columns],
+	[
+		(tc["query"], tc["schema"], tc["expected"], tc["dialect"])
+		for tc in test_cases_non_selected_columns
+	],
 	ids=[tc["name"] for tc in test_cases_non_selected_columns],
 )
 def test_extract_non_select_column(query, schema, expected, dialect):
