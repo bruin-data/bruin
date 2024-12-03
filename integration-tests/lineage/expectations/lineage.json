@@ -28,7 +28,21 @@
         "upstreams": [
           {
             "type": "asset",
-            "value": "users"
+            "value": "users",
+            "columns": [
+              {
+                "name": "id",
+                "usage": ""
+              },
+              {
+                "name": "country",
+                "usage": ""
+              },
+              {
+                "name": "id",
+                "usage": ""
+              }
+            ]
           }
         ],
         "image": "",
@@ -103,11 +117,31 @@
         "upstreams": [
           {
             "type": "asset",
-            "value": "country"
+            "value": "country",
+            "columns": [
+              {
+                "name": "country",
+                "usage": ""
+              }
+            ]
           },
           {
             "type": "asset",
-            "value": "people"
+            "value": "people",
+            "columns": [
+              {
+                "name": "last_name",
+                "usage": ""
+              },
+              {
+                "name": "name",
+                "usage": ""
+              },
+              {
+                "name": "updated_at",
+                "usage": ""
+              }
+            ]
           }
         ],
         "image": "",
@@ -214,7 +248,29 @@
         "upstreams": [
           {
             "type": "asset",
-            "value": "users"
+            "value": "users",
+            "columns": [
+              {
+                "name": "country",
+                "usage": ""
+              },
+              {
+                "name": "created_at",
+                "usage": ""
+              },
+              {
+                "name": "id",
+                "usage": ""
+              },
+              {
+                "name": "last_name",
+                "usage": ""
+              },
+              {
+                "name": "name",
+                "usage": ""
+              }
+            ]
           }
         ],
         "image": "",
