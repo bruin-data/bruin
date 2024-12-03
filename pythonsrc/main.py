@@ -11,10 +11,12 @@ home = str(Path.home())
 log_dir = f"{home}/.bruin/pylogs"
 os.makedirs(log_dir, exist_ok=True)
 
-logging.basicConfig(filename=f"{log_dir}/parser_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log",
-                    filemode='a',
-                    format='%(asctime)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
-                    level=logging.DEBUG)
+logging.basicConfig(
+    filename=f"{log_dir}/parser_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log",
+    filemode="a",
+    format="%(asctime)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s",
+    level=logging.DEBUG,
+)
 
 def main():
     logging.info("starting the loop")
