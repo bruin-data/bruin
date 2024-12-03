@@ -109,14 +109,18 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 	for _, up := range asset.Upstreams {
 		upstream := up
 		lineage.NonSelectedColumns = append(lineage.NonSelectedColumns, lineage.Columns...)
-
+		dict := map[string]bool{}
 		for _, lineageCol := range lineage.NonSelectedColumns {
 			for _, lineageUpstream := range lineageCol.Upstream {
-				if lineageUpstream.Table == up.Value {
-					upstream.Columns = append(upstream.Columns, DependsColumn{
-						Name: lineageCol.Name,
-					})
+				if _, ok := dict[fmt.Sprintf("%s-%s", lineageUpstream.Table, lineageCol.Name)]; !ok {
+					if lineageUpstream.Table == up.Value {
+						upstream.Columns = append(upstream.Columns, DependsColumn{
+							Name: lineageCol.Name,
+						})
+						dict[fmt.Sprintf("%s-%s", lineageUpstream.Table, lineageCol.Name)] = true
+					}
 				}
+
 			}
 		}
 		upstreams = append(upstreams, upstream)

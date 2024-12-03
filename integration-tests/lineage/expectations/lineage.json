@@ -37,10 +37,6 @@
               {
                 "name": "country",
                 "usage": ""
-              },
-              {
-                "name": "id",
-                "usage": ""
               }
             ]
           }
