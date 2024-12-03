@@ -1,5 +1,4 @@
 from dataclasses import dataclass, asdict
-from typing import Any
 
 from sqlglot import parse_one, exp, lineage
 from sqlglot.lineage import Node
@@ -16,7 +15,7 @@ class Column:
         return asdict(self)
 
 
-def extract_non_selected_columns(parsed: exp.Select) -> list[dict[Any, Any]]:
+def extract_non_selected_columns(parsed: exp.Select) -> list[Column]:
     where = parsed.find_all(exp.Where)
     join = parsed.find_all(exp.Join)
     group = parsed.find_all(exp.Group)
@@ -27,13 +26,12 @@ def extract_non_selected_columns(parsed: exp.Select) -> list[dict[Any, Any]]:
             if scope is None:
                 continue
             cols += [
-                Column(name=expr.name, table=expr.table).to_json()
+                Column(name=expr.name, table=expr.table)
                 for expr in find_all_in_scope(scope, exp.Column)
             ]
 
-    result = [dict(t) for t in {tuple(d.items()) for d in cols}]
-    result.sort(key=lambda x: x["name"] + x["table"])
-    return result
+    cols.sort(key=lambda x: x.name + x.table)
+    return cols
 
 
 def extract_tables(parsed):
@@ -138,11 +136,11 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
 
     non_selected_columns_dict = {}
     for column in extract_non_selected_columns(optimized):
-        name = column["name"]
+        name = column.name
         if name not in non_selected_columns_dict:
             non_selected_columns_dict[name] = {"name": name, "upstream": []}
         non_selected_columns_dict[name]["upstream"].append(
-            {"column": name, "table": column["table"]}
+            {"column": name, "table": column.table}
         )
 
     non_selected_columns = list(non_selected_columns_dict.values())
