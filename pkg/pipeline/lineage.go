@@ -108,9 +108,9 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 	upstreams := []Upstream{}
 	for _, up := range asset.Upstreams {
 		upstream := up
-		allLineageCols := append(lineage.NonSelectedColumns, lineage.Columns...)
+		lineage.NonSelectedColumns = append(lineage.NonSelectedColumns, lineage.Columns...)
 
-		for _, lineageCol := range allLineageCols {
+		for _, lineageCol := range lineage.NonSelectedColumns {
 			for _, lineageUpstream := range lineageCol.Upstream {
 				if lineageUpstream.Table == up.Value {
 					upstream.Columns = append(upstream.Columns, DependsColumn{
