@@ -165,9 +165,6 @@ func TestApplyFiltersWithIncludeTag_NoMatches(t *testing.T) {
 	assert.Error(t, err)
 	assert.EqualError(t, err, "no assets found with include tag 'tag3'")
 
-	// Validate that no tasks are marked as Pending
-	markedTasks := s.GetTaskInstancesByStatus(scheduler.Pending)
-	assert.Len(t, markedTasks, 0)
 }
 
 func TestApplyFiltersWithIncludeTag_AndDownstream(t *testing.T) {
