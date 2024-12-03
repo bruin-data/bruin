@@ -1,0 +1,3 @@
+{
+  "error": "error creating asset from file '/Users/alberto/Code/bruin/integration-tests/faulty-pipeline/assets/error.sql': yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `fdsdfds...` into pipeline.taskDefinition"
+}

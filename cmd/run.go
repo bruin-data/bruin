@@ -227,6 +227,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath)
 			if err != nil {
+				errorPrinter.Printf("Failed to build pipeline: %v\n", err)
 				errorPrinter.Println("failed to build pipeline, are you sure you have referred the right path?")
 				errorPrinter.Println("\nHint: You need to run this command with a path to either the pipeline directory or the asset file itself directly.")
 

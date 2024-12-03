@@ -1,0 +1,15 @@
+[
+  {
+    "pipeline": "integration_test_missing",
+    "issues": {
+      "nonexistent": [
+        {
+          "asset": "nonexistent",
+          "description": "Dependency 'non_existent' does not exist",
+          "context": [],
+          "severity": "critical"
+        }
+      ]
+    }
+  }
+]
