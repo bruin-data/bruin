@@ -731,7 +731,6 @@ func (f *Filter) ApplyFiltersAndMarkAssets(pipeline *pipeline.Pipeline, s *sched
 		}
 		return nil // Return early since we're only dealing with a single task
 	}
-
 	// Default task execution flags
 	runMain := true
 	runChecks := true
@@ -756,6 +755,15 @@ func (f *Filter) ApplyFiltersAndMarkAssets(pipeline *pipeline.Pipeline, s *sched
 		runPushMetadata = slices.Contains(f.OnlyTaskTypes, "push-metadata")
 	}
 
+	// Handle include tag: Mark included assets as pending
+	if f.IncludeTag != "" {
+		includedAssets := pipeline.GetAssetsByTag(f.IncludeTag)
+		if len(includedAssets) == 0 {
+			return fmt.Errorf("no assets found with include tag '%s'", f.IncludeTag)
+		}
+		s.MarkAll(scheduler.Succeeded) // Skip everything first
+		s.MarkByTag(f.IncludeTag, scheduler.Pending, f.IncludeDownstream)
+	}
 	// Mark tasks in the scheduler
 	if !runMain {
 		s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeMain, scheduler.Succeeded)
@@ -766,16 +774,6 @@ func (f *Filter) ApplyFiltersAndMarkAssets(pipeline *pipeline.Pipeline, s *sched
 	}
 	if !runPushMetadata {
 		s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeMetadataPush, scheduler.Succeeded)
-	}
-
-	// Handle include tag: Mark included assets as pending
-	if f.IncludeTag != "" {
-		includedAssets := pipeline.GetAssetsByTag(f.IncludeTag)
-		if len(includedAssets) == 0 {
-			return fmt.Errorf("no assets found with include tag '%s'", f.IncludeTag)
-		}
-		s.MarkAll(scheduler.Succeeded) // Skip everything first
-		s.MarkByTag(f.IncludeTag, scheduler.Pending, f.IncludeDownstream)
 	}
 
 	return nil

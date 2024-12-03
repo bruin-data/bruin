@@ -282,3 +282,146 @@ func TestApplyFiltersWithInvalidTaskType(t *testing.T) {
 	assert.EqualError(t, err, "invalid value for '--only' flag: 'bigquery-query', available values are 'main', 'checks', and 'push-metadata'")
 
 }
+
+func TestApplyFiltersWithOnlyMetadataPush(t *testing.T) {
+	pipeline := &pipeline.Pipeline{
+		Name: "TestPipeline",
+		Assets: []*pipeline.Asset{
+			{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+		},
+		MetadataPush: pipeline.MetadataPush{
+			Global:   true, // Enable metadata push
+			BigQuery: true,
+		},
+	}
+
+	logger := zap.NewNop().Sugar()
+	s := scheduler.NewScheduler(logger, pipeline)
+
+	filter := &Filter{
+		OnlyTaskTypes: []string{"push-metadata"},
+	}
+
+	// Act
+	err := filter.ApplyFiltersAndMarkAssets(pipeline, s, nil)
+
+	// Assert
+	assert.NoError(t, err)
+	markedTasks := s.GetTaskInstancesByStatus(scheduler.Pending)
+	printMarkedTasks(markedTasks)
+	assert.Len(t, markedTasks, 1)
+	assert.Equal(t, "Task1:metadata-push", markedTasks[0].GetHumanID())
+}
+
+func TestApplyFiltersWithEmptyPipeline(t *testing.T) {
+	pipeline := &pipeline.Pipeline{
+		Name:   "EmptyPipeline",
+		Assets: []*pipeline.Asset{},
+	}
+
+	logger := zap.NewNop().Sugar()
+	s := scheduler.NewScheduler(logger, pipeline)
+
+	filter := &Filter{}
+
+	// Act
+	err := filter.ApplyFiltersAndMarkAssets(pipeline, s, nil)
+
+	// Assert
+	assert.NoError(t, err)
+	markedTasks := s.GetTaskInstancesByStatus(scheduler.Pending)
+	assert.Len(t, markedTasks, 0)
+}
+
+func TestApplyFiltersWithEmptyFilter(t *testing.T) {
+	// Arrange: Create a pipeline with multiple assets
+	pipeline := &pipeline.Pipeline{
+		Name: "TestPipeline",
+		Assets: []*pipeline.Asset{
+			{Name: "Task1", Type: pipeline.AssetTypePython, Tags: []string{"tag1"}},
+			{Name: "Task2", Type: pipeline.AssetTypeBigqueryQuery, Tags: []string{"tag2"}},
+			{Name: "Task3", Type: pipeline.AssetTypePython, Tags: []string{}},
+			{Name: "Task4", Type: pipeline.AssetTypeBigqueryQuery, Tags: []string{"tag1", "tag3"}},
+		},
+		MetadataPush: pipeline.MetadataPush{
+			Global:   false, // Metadata push disabled
+			BigQuery: false,
+		},
+	}
+
+	// Set up the scheduler and logger
+	logger := zap.NewNop().Sugar()
+	s := scheduler.NewScheduler(logger, pipeline)
+
+	// Create an "empty" filter where no flags are specified
+	filter := &Filter{
+		IncludeTag:        "",    // No include tag
+		ExcludeTag:        "",    // No exclude tag
+		OnlyTaskTypes:     nil,   // No task types specified
+		IncludeDownstream: false, // Do not include downstream tasks
+		PushMetaData:      false, // No metadata push
+	}
+
+	// Act: Apply filters
+	err := filter.ApplyFiltersAndMarkAssets(pipeline, s, nil)
+
+	// Assert
+	assert.NoError(t, err)
+
+	// Validate that all tasks are marked as Pending
+	markedTasks := s.GetTaskInstancesByStatus(scheduler.Pending)
+	assert.Len(t, markedTasks, len(pipeline.Assets)) // All tasks should be included
+
+	// Ensure all task names are in the marked tasks
+	markedTaskNames := []string{}
+	for _, task := range markedTasks {
+		markedTaskNames = append(markedTaskNames, task.GetAsset().Name)
+	}
+
+	for _, asset := range pipeline.Assets {
+		assert.Contains(t, markedTaskNames, asset.Name)
+	}
+}
+
+func TestApplyFiltersWithIncludeTagAndOnlyChecks(t *testing.T) {
+	// Arrange: Create a pipeline with multiple assets, some sharing the same tag
+	pipeline := &pipeline.Pipeline{
+		Name: "ComplexPipeline",
+		Assets: []*pipeline.Asset{
+			{Name: "Task1", Type: pipeline.AssetTypePython, Tags: []string{"common-tag"}},        // main
+			{Name: "Task2", Type: pipeline.AssetTypeBigqueryQuery, Tags: []string{"common-tag"}}, // checks
+			{Name: "Task3", Type: pipeline.AssetTypePython, Tags: []string{"unique-tag"}},        // main
+			{Name: "Task4", Type: pipeline.AssetTypeBigqueryQuery, Tags: []string{"common-tag"}}, // checks
+		},
+		MetadataPush: pipeline.MetadataPush{
+			Global:   false, // Metadata push disabled
+			BigQuery: false,
+		},
+	}
+
+	// Set up the scheduler and logger
+	logger := zap.NewNop().Sugar()
+	s := scheduler.NewScheduler(logger, pipeline)
+
+	// Create a filter that specifies:
+	// - Include only tasks with "common-tag"
+	// - Restrict to task type "checks" (BigqueryQuery)
+	filter := &Filter{
+		IncludeTag:        "common-tag",
+		ExcludeTag:        "", // No exclusions
+		OnlyTaskTypes:     []string{"checks"},
+		IncludeDownstream: false, // No downstream tasks
+		PushMetaData:      false, // No metadata push
+	}
+
+	// Act: Apply filters
+	err := filter.ApplyFiltersAndMarkAssets(pipeline, s, nil)
+
+	// Assert
+	assert.NoError(t, err)
+
+	// Validate that only the "checks" tasks with "common-tag" are marked as Pending
+	markedTasks := s.GetTaskInstancesByStatus(scheduler.Pending)
+	assert.Len(t, markedTasks, 0)
+
+}
