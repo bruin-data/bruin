@@ -93,7 +93,7 @@ Now that the data is in DuckDB, you can query it to verify the results. Open a t
 
 
 ```bash
-bruin fetch query --connection duckdb-default  --query "SELECT * FROM chess_playground.player_summary LIMIT 10;"
+bruin query --c duckdb-default  --q "SELECT * FROM chess_playground.player_summary LIMIT 10;"
 ```
 After executing the query, you will see the following results displayed in your terminal in a clear and organized table format:
 ```plaintext
