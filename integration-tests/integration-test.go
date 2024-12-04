@@ -44,6 +44,8 @@ func main() {
 		"happy-path/expectations/player_summary.sql.json",
 	)
 
+	expectExitCode("validate -o json missing-upstream/assets/nonexistent.sql", 1)
+
 	expectOutputIncludes(
 		"internal parse-asset faulty-pipeline/assets/error.sql",
 		[]string{"error creating asset from file", "unmarshal errors"},
