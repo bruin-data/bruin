@@ -30,7 +30,7 @@ func VersionCmd(commit string) *cli.Command {
 			},
 			&cli.DurationFlag{
 				Name:  "timeout",
-				Usage: "timeout for fetching version info in seconds",
+				Usage: "timeout for fetching version info",
 				Value: 5 * time.Second,
 			},
 		},
