@@ -45,10 +45,11 @@ func main() {
 	)
 
 	expectExitCode("internal parse-asset faulty-pipeline/assets/error.sql", 1)
-	// expectOutputIncludes(
-	// 	"internal parse-asset faulty-pipeline/assets/error.sql",
-	// 	[]string{"error creating asset from file", "unmarshal errors"},
-	// )
+	expectOutputIncludes(
+		"internal parse-asset faulty-pipeline/assets/error.sql",
+		1,
+		[]string{"error creating asset from file", "unmarshal errors"},
+	)
 
 	expectJSONOutput(
 		"validate -o json missing-upstream/assets/nonexistent.sql",
@@ -56,10 +57,11 @@ func main() {
 	)
 
 	expectExitCode("run malformed/assets/malformed.sql", 1)
-	// expectOutputIncludes(
-	// 	"run malformed/assets/malformed.sql",
-	// 	[]string{"Parser Error: syntax error at or near \"S_ELECT_\"", "Failed assets 1"},
-	// )
+	expectOutputIncludes(
+		"run malformed/assets/malformed.sql",
+		1,
+		[]string{"Parser Error: syntax error at or near \"S_ELECT_\"", "Failed assets 1"},
+	)
 
 	expectJSONOutput(
 		"internal connections",
@@ -81,22 +83,24 @@ func main() {
 	)
 }
 
-// func expectOutputIncludes(command string, contains []string) {
-// 	output, err := runCommand(command)
-// 	if err != nil {
-// 		fmt.Println("Failed:", err)
-// 		os.Exit(1)
-// 	}
+func expectOutputIncludes(command string, code int, contains []string) {
+	output, exitCode, err := runCommandWithExitCode(command)
+	if err != nil {
+		if exitCode != code {
+			fmt.Println("Failed:", err)
+			os.Exit(1)
+		}
+	}
 
-// 	for _, c := range contains {
-// 		if !strings.Contains(output, c) {
-// 			fmt.Printf("Failed:, output of '%s does not contain '%s'", command, c)
-// 			os.Exit(1)
-// 		}
-// 	}
+	for _, c := range contains {
+		if !strings.Contains(output, c) {
+			fmt.Printf("Failed:, output of '%s does not contain '%s'", command, c)
+			os.Exit(1)
+		}
+	}
 
-// 	fmt.Println("Passed")
-// }
+	fmt.Println("Passed")
+}
 
 func expectJSONOutput(command string, jsonFilePath string) {
 	output, err := runCommand(command)
@@ -171,4 +175,20 @@ func runCommand(command string) (string, error) {
 	output, err := cmd.Output()
 
 	return string(output), err
+}
+
+func runCommandWithExitCode(command string) (string, int, error) {
+	output, err := runCommand(command)
+	if err != nil {
+		// Try to get the exit code
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
+			// Get the status code
+			if status, ok := exitError.Sys().(syscall.WaitStatus); ok {
+				return output, status.ExitStatus(), nil
+			}
+		}
+		return output, 1, err
+	}
+	return output, 0, nil
 }
