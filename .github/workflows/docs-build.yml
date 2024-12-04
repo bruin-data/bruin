@@ -1,0 +1,45 @@
+name: Docs Build
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'docs/**'
+
+jobs:
+  docs-build:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+
+      - name: Install dependencies
+        run: npm install
+
+
+      - name: Build documentation
+        run: npm run docs:build
+
+
+      - name: Verify documentation output
+        run: |
+          if [ ! -d "./docs/.vitepress/dist" ]; then
+            echo "Docs build failed: Output directory not found!"
+            exit 1
+          fi
