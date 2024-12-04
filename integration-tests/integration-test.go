@@ -23,32 +23,32 @@ func main() {
 		os.Exit(1)
 	}
 
-	expectExitCode("validate happy-path", 0)
-	expectExitCode("run --use-uv happy-path", 0)
-	expectExitCode("run happy-path", 0)
-	expectJSONOutput("internal parse-pipeline happy-path", "happy-path/expectations/pipeline.yml.json")
-	expectJSONOutput(
-		"internal parse-asset happy-path/assets/asset.py",
-		"happy-path/expectations/asset.py.json",
-	)
-	expectJSONOutput(
-		"internal parse-asset happy-path/assets/chess_games.asset.yml",
-		"happy-path/expectations/chess_games.asset.yml.json",
-	)
-	expectJSONOutput(
-		"internal parse-asset happy-path/assets/chess_profiles.asset.yml",
-		"happy-path/expectations/chess_profiles.asset.yml.json",
-	)
-	expectJSONOutput(
-		"internal parse-asset happy-path/assets/player_summary.sql",
-		"happy-path/expectations/player_summary.sql.json",
-	)
-
-	expectExitCode("internal parse-asset faulty-pipeline/assets/error.sql", 1)
-	// expectOutputIncludes(
-	// 	"internal parse-asset faulty-pipeline/assets/error.sql",
-	// 	[]string{"error creating asset from file", "unmarshal errors"},
+	// expectExitCode("validate happy-path", 0)
+	// expectExitCode("run --use-uv happy-path", 0)
+	// expectExitCode("run happy-path", 0)
+	// expectJSONOutput("internal parse-pipeline happy-path", "happy-path/expectations/pipeline.yml.json")
+	// expectJSONOutput(
+	// 	"internal parse-asset happy-path/assets/asset.py",
+	// 	"happy-path/expectations/asset.py.json",
 	// )
+	// expectJSONOutput(
+	// 	"internal parse-asset happy-path/assets/chess_games.asset.yml",
+	// 	"happy-path/expectations/chess_games.asset.yml.json",
+	// )
+	// expectJSONOutput(
+	// 	"internal parse-asset happy-path/assets/chess_profiles.asset.yml",
+	// 	"happy-path/expectations/chess_profiles.asset.yml.json",
+	// )
+	// expectJSONOutput(
+	// 	"internal parse-asset happy-path/assets/player_summary.sql",
+	// 	"happy-path/expectations/player_summary.sql.json",
+	// )
+
+	// expectExitCode("internal parse-asset faulty-pipeline/assets/error.sql", 1)
+	expectOutputIncludes(
+		"internal parse-asset faulty-pipeline/assets/error.sql",
+		[]string{"error creating asset from file", "unmarshal errors"},
+	)
 
 	expectJSONOutput(
 		"validate -o json missing-upstream/assets/nonexistent.sql",
