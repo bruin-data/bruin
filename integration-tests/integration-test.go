@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -17,10 +16,17 @@ import (
 var currentFolder string
 
 func main() {
-	var err error
-	currentFolder = filepath.Join(currentFolder, "integration-tests")
+	path, err := os.Getwd()
 	if err != nil {
 		fmt.Println(err)
+		os.Exit(1)
+	}
+	currentFolder = filepath.Join(path, "integration-tests")
+	cmd := exec.Command("bash", "-c", "cp bin/bruin integration-tests/bruin")
+	out, err := cmd.Output()
+	if err != nil {
+		fmt.Println(err)
+		fmt.Println(string(out))
 		os.Exit(1)
 	}
 
@@ -130,11 +136,12 @@ func expectJSONOutput(command string, jsonFilePath string) {
 			if path.Json() == "\"path\"" {
 				continue
 			}
-
+			fmt.Println("Mismatch at: ", d.Path)
 			fmt.Print("Expected json: ")
 			fmt.Println(d.NewValues)
 			fmt.Print("Not Matching found json: ")
 			fmt.Println(d.OldValues)
+
 			os.Exit(1)
 		}
 	}
@@ -146,6 +153,7 @@ func expectExitCode(command string, code int) {
 	if err != nil {
 		if exitCode != code {
 			fmt.Println(strconv.Itoa(code) + " Was expected but got:" + strconv.Itoa(exitCode))
+			fmt.Printf("Error: %v\n", err)
 			fmt.Println(output)
 			os.Exit(1)
 		}
@@ -159,13 +167,9 @@ func expectExitCode(command string, code int) {
 }
 
 func runCommand(command string) (string, error) {
-	fmt.Println("Running command:", command)
-	binary := "../bin/bruin"
-	if runtime.GOOS == "windows" {
-		binary += ".exe"
-	}
+	fmt.Println("Running command: bruin ", command)
 	args := strings.Split(command, " ")
-	cmd := exec.Command(binary, args...)
+	cmd := exec.Command("bruin", args...)
 	cmd.Dir = currentFolder
 	output, err := cmd.Output()
 
