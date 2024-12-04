@@ -21,20 +21,20 @@ func TestGetPipelinePaths(t *testing.T) {
 	tests := []struct {
 		name                   string
 		root                   string
-		pipelineDefinitionFile string
+		pipelineDefinitionFile []string
 		want                   []string
 		wantErr                bool
 	}{
 		{
 			name:                   "pipelines are found",
 			root:                   testPipelinePath,
-			pipelineDefinitionFile: "pipeline.yml",
+			pipelineDefinitionFile: []string{"pipeline.yml"},
 			want:                   []string{firstPipelineAbsolute, secondPipelineAbsolute},
 		},
 		{
 			name:                   "filepath errors are propagated",
 			root:                   "some-random-directory-name-that-does-not-exist",
-			pipelineDefinitionFile: "pipeline.yml",
+			pipelineDefinitionFile: []string{"pipeline.yml"},
 			wantErr:                true,
 		},
 	}
@@ -69,32 +69,32 @@ func TestGetPipelineRootFromTask(t *testing.T) {
 	tests := []struct {
 		name                   string
 		taskPath               string
-		pipelineDefinitionFile string
+		pipelineDefinitionFile []string
 		want                   string
 		wantErr                bool
 	}{
 		{
 			name:                   "pipeline is found from a deeply nested task",
 			taskPath:               filepath.Join("testdata", "walk", "task-to-pipeline", "first-pipeline", "tasks", "helloworld", "task.yml"),
-			pipelineDefinitionFile: "pipeline.yml",
+			pipelineDefinitionFile: []string{"pipeline.yml"},
 			want:                   firstPipelineAbsolute,
 		},
 		{
 			name:                   "pipeline is found from a shallow nested task",
 			taskPath:               filepath.Join("testdata", "walk", "task-to-pipeline", "second-pipeline", "tasks", "task1.yml"),
-			pipelineDefinitionFile: "pipeline.yml",
+			pipelineDefinitionFile: []string{"pipeline.yml"},
 			want:                   secondPipelineAbsolute,
 		},
 		{
 			name:                   "pipeline is found even if definition file name is different",
 			taskPath:               filepath.Join("testdata", "walk", "task-to-pipeline", "second-pipeline", "tasks", "test2", "task.yml"),
-			pipelineDefinitionFile: "task1.yml",
+			pipelineDefinitionFile: []string{"task1.yml"},
 			want:                   filepath.Join(secondPipelineAbsolute, "tasks"),
 		},
 		{
 			name:                   "an error is returned when the pipeline is not found",
 			taskPath:               "testdata",
-			pipelineDefinitionFile: "pipeline.yml",
+			pipelineDefinitionFile: []string{"pipeline.yml"},
 			wantErr:                true,
 		},
 	}

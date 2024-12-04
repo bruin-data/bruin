@@ -8,9 +8,7 @@ import (
 	"github.com/spf13/afero"
 )
 
-const (
-	pipelineDefinitionFile = "pipeline.yml"
-)
+var pipelineDefinitionFiles = []string{"pipeline.yml", "pipeline.yaml"}
 
 var (
 	fs = afero.NewCacheOnReadFs(afero.NewOsFs(), afero.NewMemMapFs(), 0)
@@ -24,7 +22,7 @@ var (
 	assetsDirectoryNames = []string{"tasks", "assets"}
 
 	builderConfig = pipeline.BuilderConfig{
-		PipelineFileName:    pipelineDefinitionFile,
+		PipelineFileName:    pipelineDefinitionFiles,
 		TasksDirectoryNames: assetsDirectoryNames,
 		TasksFileSuffixes:   []string{"task.yml", "task.yaml", "asset.yml", "asset.yaml"},
 	}
