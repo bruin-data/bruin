@@ -45,6 +45,7 @@ func main() {
 	)
 
 	expectExitCode("validate -o json missing-upstream/assets/nonexistent.sql", 1)
+	expectExitCode("internal parse-asset faulty-pipeline/assets/error.sql", 1)
 
 	expectOutputIncludes(
 		"internal parse-asset faulty-pipeline/assets/error.sql",
