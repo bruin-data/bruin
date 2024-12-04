@@ -106,7 +106,8 @@ func Render() *cli.Command {
 
 			pipelineDefinitionFullPath, err := getPipelineDefinitionFullPath(pipelinePath)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err)
+				printError(err, c.String("output"), "Failed to locate a valid pipeline definition file")
+				return cli.Exit("", 1)
 			}
 
 			pl, err := pipeline.PipelineFromPath(pipelineDefinitionFullPath, fs)
@@ -311,6 +312,5 @@ func getPipelineDefinitionFullPath(pipelinePath string) (string, error) {
 			return fullPath, nil
 		}
 	}
-
-	return "", fmt.Errorf("no pipeline definition file found in '%s'. Supported files: %v", pipelinePath, pipelineDefinitionFile)
+	return "", errors.Errorf("no pipeline definition file found in '%s'. Supported files: %v", pipelinePath, pipelineDefinitionFile)
 }
