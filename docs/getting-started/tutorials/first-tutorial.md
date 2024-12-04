@@ -93,7 +93,7 @@ Now that the data is in DuckDB, you can query it to verify the results. Open a t
 
 
 ```bash
-bruin fetch query --connection duckdb-default  --query "SELECT * FROM chess_playground.player_summary LIMIT 10;"
+bruin query --c duckdb-default  --q "SELECT * FROM chess_playground.player_summary LIMIT 10;"
 ```
 After executing the query, you will see the following results displayed in your terminal in a clear and organized table format:
 ```plaintext
@@ -107,4 +107,4 @@ After executing the query, you will see the following results displayed in your 
 
 You've successfully created and run your first Bruin pipeline! Your chess data is now ingested into DuckDB, ready for you to query and explore. This is just the beginning—feel free to extend this pipeline, add more data sources, or incorporate data transformations to suit your needs. For more advanced features and customization, check out the Bruin documentation.
 
-Happy data engineering!
+Happy data engineering! 🚀
