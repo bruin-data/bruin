@@ -113,7 +113,7 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 		for _, lineageCol := range lineage.NonSelectedColumns {
 			for _, lineageUpstream := range lineageCol.Upstream {
 				if _, ok := dict[fmt.Sprintf("%s-%s", lineageUpstream.Table, lineageCol.Name)]; !ok {
-					if lineageUpstream.Table == up.Value {
+					if strings.EqualFold(lineageUpstream.Table, up.Value) {
 						upstream.Columns = append(upstream.Columns, DependsColumn{
 							Name: lineageCol.Name,
 						})
