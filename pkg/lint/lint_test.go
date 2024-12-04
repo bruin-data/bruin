@@ -38,14 +38,14 @@ func TestLinter_Lint(t *testing.T) {
 	}
 
 	type fields struct {
-		pipelineFinder   func(rootPath string, pipelineDefinitionFileName string) ([]string, error)
+		pipelineFinder   func(rootPath string, pipelineDefinitionFileName []string) ([]string, error)
 		setupBuilderMock func(m *mockPipelineBuilder)
 		rules            []Rule
 	}
 
 	type args struct {
 		rootPath                   string
-		pipelineDefinitionFileName string
+		pipelineDefinitionFileName []string
 	}
 	tests := []struct {
 		name          string
@@ -57,69 +57,74 @@ func TestLinter_Lint(t *testing.T) {
 		{
 			name: "pipeline finder returned an error",
 			fields: fields{
-				pipelineFinder: func(root, fileName string) ([]string, error) {
+				pipelineFinder: func(root string, fileName []string) ([]string, error) {
 					require.Equal(t, "some-root-path", root)
-					require.Equal(t, "some-file-name", fileName)
+					require.Equal(t, []string{"some-file-name"}, fileName)
+
 					return nil, errors.New("cannot find pipelines")
 				},
 			},
 			args: args{
 				rootPath:                   "some-root-path",
-				pipelineDefinitionFileName: "some-file-name",
+				pipelineDefinitionFileName: []string{"some-file-name"},
 			},
 			wantErr: true,
 		},
 		{
 			name: "pipeline finder returned a file not found error",
 			fields: fields{
-				pipelineFinder: func(root, fileName string) ([]string, error) {
+				pipelineFinder: func(root string, fileName []string) ([]string, error) {
 					require.Equal(t, "some-root-path", root)
-					require.Equal(t, "some-file-name", fileName)
+					require.Equal(t, []string{"some-file-name"}, fileName)
+
 					return nil, os.ErrNotExist
 				},
 			},
 			args: args{
 				rootPath:                   "some-root-path",
-				pipelineDefinitionFileName: "some-file-name",
+				pipelineDefinitionFileName: []string{"some-file-name"},
 			},
 			wantErr: true,
 		},
 		{
 			name: "empty file list returned",
 			fields: fields{
-				pipelineFinder: func(root, fileName string) ([]string, error) {
+				pipelineFinder: func(root string, fileName []string) ([]string, error) {
 					require.Equal(t, "some-root-path", root)
-					require.Equal(t, "some-file-name", fileName)
+					require.Equal(t, []string{"some-file-name"}, fileName)
+
 					return []string{}, nil
 				},
 			},
 			args: args{
 				rootPath:                   "some-root-path",
-				pipelineDefinitionFileName: "some-file-name",
+				pipelineDefinitionFileName: []string{"some-file-name"},
 			},
 			wantErr: true,
 		},
 		{
 			name: "found nested pipelines",
 			fields: fields{
-				pipelineFinder: func(root, fileName string) ([]string, error) {
+				pipelineFinder: func(root string, fileName []string) ([]string, error) {
 					require.Equal(t, "some-root-path", root)
-					require.Equal(t, "some-file-name", fileName)
+					require.Equal(t, []string{"some-file-name"}, fileName)
+
 					return []string{"path/to/pipeline1", "path/to/pipeline1/some-other-pipeline/under-here", "path/to/pipeline2"}, nil
 				},
 			},
 			args: args{
 				rootPath:                   "some-root-path",
-				pipelineDefinitionFileName: "some-file-name",
+				pipelineDefinitionFileName: []string{"some-file-name"},
 			},
 			wantErr: true,
 		},
 		{
 			name: "rules are properly applied, first rule fails",
 			fields: fields{
-				pipelineFinder: func(root, fileName string) ([]string, error) {
+				pipelineFinder: func(root string, fileName []string) ([]string, error) {
 					require.Equal(t, "some-root-path", root)
-					require.Equal(t, "some-file-name", fileName)
+					require.Equal(t, []string{"some-file-name"}, fileName)
+
 					return []string{"path/to/pipeline1", "path/to/pipeline2", "path/to/pipeline2_some_other_name"}, nil
 				},
 				setupBuilderMock: func(m *mockPipelineBuilder) {
@@ -134,16 +139,17 @@ func TestLinter_Lint(t *testing.T) {
 			},
 			args: args{
 				rootPath:                   "some-root-path",
-				pipelineDefinitionFileName: "some-file-name",
+				pipelineDefinitionFileName: []string{"some-file-name"},
 			},
 			wantErr: true,
 		},
 		{
 			name: "rules are properly applied, second rule fails",
 			fields: fields{
-				pipelineFinder: func(root, fileName string) ([]string, error) {
+				pipelineFinder: func(root string, fileName []string) ([]string, error) {
 					require.Equal(t, "some-root-path", root)
-					require.Equal(t, "some-file-name", fileName)
+					require.Equal(t, []string{"some-file-name"}, fileName)
+
 					return []string{"path/to/pipeline1", "path/to/pipeline2"}, nil
 				},
 				setupBuilderMock: func(m *mockPipelineBuilder) {
@@ -156,16 +162,17 @@ func TestLinter_Lint(t *testing.T) {
 			},
 			args: args{
 				rootPath:                   "some-root-path",
-				pipelineDefinitionFileName: "some-file-name",
+				pipelineDefinitionFileName: []string{"some-file-name"},
 			},
 			wantErr: true,
 		},
 		{
 			name: "rules are properly applied, second rule fails",
 			fields: fields{
-				pipelineFinder: func(root, fileName string) ([]string, error) {
+				pipelineFinder: func(root string, fileName []string) ([]string, error) {
 					require.Equal(t, "some-root-path", root)
-					require.Equal(t, "some-file-name", fileName)
+					require.Equal(t, []string{"some-file-name"}, fileName)
+
 					return []string{"path/to/pipeline1", "path/to/pipeline2"}, nil
 				},
 				setupBuilderMock: func(m *mockPipelineBuilder) {
@@ -178,7 +185,7 @@ func TestLinter_Lint(t *testing.T) {
 			},
 			args: args{
 				rootPath:                   "some-root-path",
-				pipelineDefinitionFileName: "some-file-name",
+				pipelineDefinitionFileName: []string{"some-file-name"},
 			},
 			wantErr: false,
 		},
@@ -230,14 +237,14 @@ func TestLinter_LintAsset(t *testing.T) {
 	}
 
 	type fields struct {
-		pipelineFinder   func(rootPath string, pipelineDefinitionFileName string) ([]string, error)
+		pipelineFinder   func(rootPath string, pipelineDefinitionFileName []string) ([]string, error)
 		setupBuilderMock func(m *mockPipelineBuilder)
 		rules            []Rule
 	}
 
 	type args struct {
 		rootPath                   string
-		pipelineDefinitionFileName string
+		pipelineDefinitionFileName []string
 	}
 	tests := []struct {
 		name          string
@@ -250,15 +257,16 @@ func TestLinter_LintAsset(t *testing.T) {
 		{
 			name: "pipeline finder returned an error",
 			fields: fields{
-				pipelineFinder: func(root, fileName string) ([]string, error) {
+				pipelineFinder: func(root string, fileName []string) ([]string, error) {
 					require.Equal(t, "some-root-path", root)
-					require.Equal(t, "some-file-name", fileName)
+					require.Equal(t, []string{"some-file-name"}, fileName)
+
 					return nil, errors.New("cannot find pipelines")
 				},
 			},
 			args: args{
 				rootPath:                   "some-root-path",
-				pipelineDefinitionFileName: "some-file-name",
+				pipelineDefinitionFileName: []string{"some-file-name"},
 			},
 			wantErr:      true,
 			errorMessage: "error getting pipeline paths: cannot find pipelines",
@@ -266,15 +274,16 @@ func TestLinter_LintAsset(t *testing.T) {
 		{
 			name: "pipeline finder returned a file not found error",
 			fields: fields{
-				pipelineFinder: func(root, fileName string) ([]string, error) {
+				pipelineFinder: func(root string, fileName []string) ([]string, error) {
 					require.Equal(t, "some-root-path", root)
-					require.Equal(t, "some-file-name", fileName)
+					require.Equal(t, []string{"some-file-name"}, fileName)
+
 					return nil, os.ErrNotExist
 				},
 			},
 			args: args{
 				rootPath:                   "some-root-path",
-				pipelineDefinitionFileName: "some-file-name",
+				pipelineDefinitionFileName: []string{"some-file-name"},
 			},
 			wantErr:      true,
 			errorMessage: "the given pipeline path does not exist, please make sure you gave the right path",
@@ -282,15 +291,16 @@ func TestLinter_LintAsset(t *testing.T) {
 		{
 			name: "empty file list returned",
 			fields: fields{
-				pipelineFinder: func(root, fileName string) ([]string, error) {
+				pipelineFinder: func(root string, fileName []string) ([]string, error) {
 					require.Equal(t, "some-root-path", root)
-					require.Equal(t, "some-file-name", fileName)
+					require.Equal(t, []string{"some-file-name"}, fileName)
+
 					return []string{}, nil
 				},
 			},
 			args: args{
 				rootPath:                   "some-root-path",
-				pipelineDefinitionFileName: "some-file-name",
+				pipelineDefinitionFileName: []string{"some-file-name"},
 			},
 			wantErr:      true,
 			errorMessage: "no pipelines found in path 'some-root-path'",
@@ -298,15 +308,16 @@ func TestLinter_LintAsset(t *testing.T) {
 		{
 			name: "found nested pipelines",
 			fields: fields{
-				pipelineFinder: func(root, fileName string) ([]string, error) {
+				pipelineFinder: func(root string, fileName []string) ([]string, error) {
 					require.Equal(t, "some-root-path", root)
-					require.Equal(t, "some-file-name", fileName)
+					require.Equal(t, []string{"some-file-name"}, fileName)
+
 					return []string{"path/to/pipeline1", "path/to/pipeline1/some-other-pipeline/under-here", "path/to/pipeline2"}, nil
 				},
 			},
 			args: args{
 				rootPath:                   "some-root-path",
-				pipelineDefinitionFileName: "some-file-name",
+				pipelineDefinitionFileName: []string{"some-file-name"},
 			},
 			wantErr:      true,
 			errorMessage: "nested pipelines are not allowed: seems like 'path/to/pipeline1' is already a parent pipeline for 'path/to/pipeline1/some-other-pipeline/under-here'",
@@ -314,9 +325,10 @@ func TestLinter_LintAsset(t *testing.T) {
 		{
 			name: "there's no asset with the name or path",
 			fields: fields{
-				pipelineFinder: func(root, fileName string) ([]string, error) {
+				pipelineFinder: func(root string, fileName []string) ([]string, error) {
 					require.Equal(t, "some-root-path", root)
-					require.Equal(t, "some-file-name", fileName)
+					require.Equal(t, []string{"some-file-name"}, fileName)
+
 					return []string{"path/to/pipeline1", "path/to/pipeline2", "path/to/pipeline2_some_other_name"}, nil
 				},
 				setupBuilderMock: func(m *mockPipelineBuilder) {
@@ -331,7 +343,7 @@ func TestLinter_LintAsset(t *testing.T) {
 			},
 			args: args{
 				rootPath:                   "some-root-path",
-				pipelineDefinitionFileName: "some-file-name",
+				pipelineDefinitionFileName: []string{"some-file-name"},
 			},
 			wantErr:      true,
 			errorMessage: "failed to find an asset with the path or name 'my-asset' under the path 'some-root-path'",
@@ -339,9 +351,10 @@ func TestLinter_LintAsset(t *testing.T) {
 		{
 			name: "rules are properly applied, first rule fails",
 			fields: fields{
-				pipelineFinder: func(root, fileName string) ([]string, error) {
+				pipelineFinder: func(root string, fileName []string) ([]string, error) {
 					require.Equal(t, "some-root-path", root)
-					require.Equal(t, "some-file-name", fileName)
+					require.Equal(t, []string{"some-file-name"}, fileName)
+
 					return []string{"path/to/pipeline1"}, nil
 				},
 				setupBuilderMock: func(m *mockPipelineBuilder) {
@@ -356,7 +369,7 @@ func TestLinter_LintAsset(t *testing.T) {
 			},
 			args: args{
 				rootPath:                   "some-root-path",
-				pipelineDefinitionFileName: "some-file-name",
+				pipelineDefinitionFileName: []string{"some-file-name"},
 			},
 			wantErr:      true,
 			errorMessage: "first rule failed",
@@ -364,9 +377,10 @@ func TestLinter_LintAsset(t *testing.T) {
 		{
 			name: "rules are properly applied, second rule fails",
 			fields: fields{
-				pipelineFinder: func(root, fileName string) ([]string, error) {
+				pipelineFinder: func(root string, fileName []string) ([]string, error) {
 					require.Equal(t, "some-root-path", root)
-					require.Equal(t, "some-file-name", fileName)
+					require.Equal(t, []string{"some-file-name"}, fileName)
+
 					return []string{"path/to/pipeline1"}, nil
 				},
 				setupBuilderMock: func(m *mockPipelineBuilder) {
@@ -381,7 +395,7 @@ func TestLinter_LintAsset(t *testing.T) {
 			},
 			args: args{
 				rootPath:                   "some-root-path",
-				pipelineDefinitionFileName: "some-file-name",
+				pipelineDefinitionFileName: []string{"some-file-name"},
 			},
 			wantErr:      true,
 			errorMessage: "first rule failed",
@@ -389,9 +403,10 @@ func TestLinter_LintAsset(t *testing.T) {
 		{
 			name: "rules are properly applied, they all pass when asset name is used",
 			fields: fields{
-				pipelineFinder: func(root, fileName string) ([]string, error) {
+				pipelineFinder: func(root string, fileName []string) ([]string, error) {
 					require.Equal(t, "some-root-path", root)
-					require.Equal(t, "some-file-name", fileName)
+					require.Equal(t, []string{"some-file-name"}, fileName)
+
 					return []string{"path/to/pipeline1"}, nil
 				},
 				setupBuilderMock: func(m *mockPipelineBuilder) {
@@ -406,16 +421,17 @@ func TestLinter_LintAsset(t *testing.T) {
 			},
 			args: args{
 				rootPath:                   "some-root-path",
-				pipelineDefinitionFileName: "some-file-name",
+				pipelineDefinitionFileName: []string{"some-file-name"},
 			},
 			wantErr: false,
 		},
 		{
 			name: "rules are properly applied, they all pass when asset path is used",
 			fields: fields{
-				pipelineFinder: func(root, fileName string) ([]string, error) {
+				pipelineFinder: func(root string, fileName []string) ([]string, error) {
 					require.Equal(t, "some-root-path", root)
-					require.Equal(t, "some-file-name", fileName)
+					require.Equal(t, []string{"some-file-name"}, fileName)
+
 					return []string{"path/to/pipeline1"}, nil
 				},
 				setupBuilderMock: func(m *mockPipelineBuilder) {
@@ -435,7 +451,7 @@ func TestLinter_LintAsset(t *testing.T) {
 			},
 			args: args{
 				rootPath:                   "some-root-path",
-				pipelineDefinitionFileName: "some-file-name",
+				pipelineDefinitionFileName: []string{"some-file-name"},
 			},
 			wantErr: false,
 		},

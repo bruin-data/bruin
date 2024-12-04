@@ -12,8 +12,9 @@ import (
 
 var SkipDirs = []string{".git", ".github", ".vscode", "node_modules", "dist", "build", "target", "vendor", ".venv", ".env", "env", "venv", "dbt_packages"}
 
-func GetPipelinePaths(root, pipelineDefinitionFile string) ([]string, error) {
+func GetPipelinePaths(root string, pipelineDefinitionFile []string) ([]string, error) {
 	var pipelinePaths []string
+
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -27,19 +28,22 @@ func GetPipelinePaths(root, pipelineDefinitionFile string) ([]string, error) {
 			return nil
 		}
 
-		if !strings.HasSuffix(path, pipelineDefinitionFile) {
-			return nil
-		}
+		// Check if the file matches any of the pipeline definition file names
+		for _, pipelineDefinition := range pipelineDefinitionFile {
+			if strings.HasSuffix(path, pipelineDefinition) {
+				abs, err := filepath.Abs(path)
+				if err != nil {
+					return errors.Wrapf(err, "failed to get absolute path for %s", path)
+				}
 
-		abs, err := filepath.Abs(path)
-		if err != nil {
-			return errors.Wrapf(err, "failed to get absolute path for %s", path)
+				pipelinePaths = append(pipelinePaths, filepath.Dir(abs))
+				break // Stop checking other file names if one matches
+			}
 		}
-
-		pipelinePaths = append(pipelinePaths, filepath.Dir(abs))
 
 		return nil
 	})
+
 	if err != nil {
 		return nil, errors.Wrapf(err, "error walking directory")
 	}
@@ -47,23 +51,26 @@ func GetPipelinePaths(root, pipelineDefinitionFile string) ([]string, error) {
 	return pipelinePaths, nil
 }
 
-func GetPipelineRootFromTask(taskPath, pipelineDefinitionFile string) (string, error) {
+func GetPipelineRootFromTask(taskPath string, pipelineDefinitionFile []string) (string, error) {
 	absoluteTaskPath, err := filepath.Abs(taskPath)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to convert task path to absolute path")
 	}
 
 	currentFolder := absoluteTaskPath
-	for currentFolder != filepath.VolumeName(currentFolder)+string(os.PathSeparator) && currentFolder != "/" {
-		tryPath := filepath.Join(currentFolder, pipelineDefinitionFile)
-		if _, err := os.Stat(tryPath); err == nil {
-			return currentFolder, nil
+	rootPath := filepath.VolumeName(currentFolder) + string(os.PathSeparator)
+	for currentFolder != rootPath && currentFolder != "/" {
+		for _, pipelineDefinition := range pipelineDefinitionFile {
+			tryPath := filepath.Join(currentFolder, pipelineDefinition)
+			if _, err := os.Stat(tryPath); err == nil {
+				return currentFolder, nil
+			}
 		}
 
 		currentFolder = filepath.Dir(currentFolder)
 	}
 
-	return "", errors.New("cannot find a pipeline the given task belongs to, are you sure this task is in an actual pipeline?")
+	return "", errors.New("cannot find a pipeline the given task belongs to. Are you sure this task is in an actual pipeline?")
 }
 
 func GetAllFilesRecursive(root string, suffixes []string) ([]string, error) {

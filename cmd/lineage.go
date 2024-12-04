@@ -59,7 +59,7 @@ func (r *LineageCommand) Run(assetPath string, fullLineage bool, output string) 
 		return cli.Exit("", 1)
 	}
 
-	pipelinePath, err := path.GetPipelineRootFromTask(assetPath, pipelineDefinitionFile)
+	pipelinePath, err := path.GetPipelineRootFromTask(assetPath, pipelineDefinitionFiles)
 	if err != nil {
 		r.errorPrinter.Printf("Failed to find the pipeline this task belongs to: '%s'\n", assetPath)
 		return cli.Exit("", 1)

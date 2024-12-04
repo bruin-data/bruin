@@ -1148,7 +1148,7 @@ func (p *Pipeline) GetAssetsByTag(tag string) []*Asset {
 type TaskCreator func(path string) (*Asset, error)
 
 type BuilderConfig struct {
-	PipelineFileName    string
+	PipelineFileName    []string
 	TasksDirectoryName  string
 	TasksDirectoryNames []string
 	TasksFileSuffixes   []string
@@ -1189,14 +1189,36 @@ func NewBuilder(config BuilderConfig, yamlTaskCreator TaskCreator, commentTaskCr
 	}
 }
 
+func matchPipelineFileName(filePath string, validFileNames []string) bool {
+	for _, fileName := range validFileNames {
+		if strings.HasSuffix(filePath, fileName) {
+			return true
+		}
+	}
+	return false
+}
+
+func resolvePipelineFilePath(basePath string, validFileNames []string, fs afero.Fs) (string, error) {
+	for _, fileName := range validFileNames {
+		candidatePath := filepath.Join(basePath, fileName)
+		if exists, _ := afero.Exists(fs, candidatePath); exists {
+			return candidatePath, nil
+		}
+	}
+	return "", fmt.Errorf("no pipeline file found in '%s'. Supported files: %v", basePath, validFileNames)
+}
+
 func (b *Builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, error) {
 	pipelineFilePath := pathToPipeline
-	if !strings.HasSuffix(pipelineFilePath, b.config.PipelineFileName) {
-		pipelineFilePath = filepath.Join(pathToPipeline, b.config.PipelineFileName)
+	if !matchPipelineFileName(pipelineFilePath, b.config.PipelineFileName) {
+		resolvedPath, err := resolvePipelineFilePath(pathToPipeline, b.config.PipelineFileName, b.fs)
+		if err != nil {
+			return nil, err
+		}
+		pipelineFilePath = resolvedPath
 	} else {
-		pathToPipeline = filepath.Dir(pathToPipeline)
+		pathToPipeline = filepath.Dir(pipelineFilePath)
 	}
-
 	pipeline, err := PipelineFromPath(pipelineFilePath, b.fs)
 	if err != nil {
 		return nil, err
