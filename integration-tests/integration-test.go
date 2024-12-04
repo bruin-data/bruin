@@ -29,18 +29,22 @@ func main() {
 	expectJSONOutput("internal parse-pipeline happy-path", "happy-path/expectations/pipeline.yml.json")
 	expectJSONOutput(
 		"internal parse-asset happy-path/assets/asset.py",
+
 		"happy-path/expectations/asset.py.json",
 	)
 	expectJSONOutput(
 		"internal parse-asset happy-path/assets/chess_games.asset.yml",
+
 		"happy-path/expectations/chess_games.asset.yml.json",
 	)
 	expectJSONOutput(
 		"internal parse-asset happy-path/assets/chess_profiles.asset.yml",
+
 		"happy-path/expectations/chess_profiles.asset.yml.json",
 	)
 	expectJSONOutput(
 		"internal parse-asset happy-path/assets/player_summary.sql",
+
 		"happy-path/expectations/player_summary.sql.json",
 	)
 
@@ -52,6 +56,7 @@ func main() {
 
 	expectJSONOutput(
 		"validate -o json missing-upstream/assets/nonexistent.sql",
+
 		"missing-upstream/expectations/missing_upstream.json",
 	)
 
@@ -63,20 +68,24 @@ func main() {
 
 	expectJSONOutput(
 		"internal connections",
+
 		"expected_connections_schema.json",
 	)
 	expectJSONOutput(
 		"connections list -o json",
+
 		"expected_connections.json",
 	)
 
 	expectJSONOutput(
 		"internal parse-pipeline -c lineage",
+
 		"lineage/expectations/lineage.json",
 	)
 
 	expectJSONOutput(
 		"internal parse-asset -c lineage/assets/example.sql",
+
 		"lineage/expectations/lineage-asset.json",
 	)
 }
@@ -101,10 +110,13 @@ func expectOutputIncludes(command string, code int, contains []string) {
 }
 
 func expectJSONOutput(command string, jsonFilePath string) {
-	output, err := runCommand(command)
+	output, exitCode, err := runCommandWithExitCode(command)
 	if err != nil {
-		fmt.Println("Failed:", err)
-		os.Exit(1)
+		if exitCode != 0 {
+			fmt.Println(strconv.Itoa(0) + " Was expected but got:" + strconv.Itoa(exitCode))
+			fmt.Println(output)
+			os.Exit(1)
+		}
 	}
 
 	expectation, err := jd.ReadJsonFile(filepath.Join(currentFolder, jsonFilePath))
