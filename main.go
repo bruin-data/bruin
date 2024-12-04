@@ -67,7 +67,7 @@ func main() {
 			cmd.Internal(),
 			cmd.Environments(&isDebug),
 			cmd.Connections(),
-			cmd.Fetch(),
+			cmd.Query(),
 			versionCommand,
 		},
 	}

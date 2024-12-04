@@ -18,31 +18,22 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func Fetch() *cli.Command {
+func Query() *cli.Command {
 	return &cli.Command{
-		Name:  "fetch",
-		Usage: "Manage data fetching operations",
-		Subcommands: []*cli.Command{
-			queryCommand(),
-		},
+		Name:   "query",
+		Usage:  "Execute a query on a specified connection and retrieve results",
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
-	}
-}
-
-func queryCommand() *cli.Command {
-	return &cli.Command{
-		Name:  "query",
-		Usage: "Execute a query on a specified connection and retrieve results",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "connection",
-				Aliases:  []string{"n"},
+				Aliases:  []string{"c"},
 				Usage:    "the name of the connection to use",
 				Required: true,
 			},
 			&cli.StringFlag{
 				Name:     "query",
+				Aliases:  []string{"q"},
 				Usage:    "the SQL query to execute",
 				Required: true,
 			},
