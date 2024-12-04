@@ -72,5 +72,9 @@ func main() {
 		},
 	}
 
-	_ = app.Run(os.Args)
+	err := app.Run(os.Args)
+
+	if err != nil {
+		cli.HandleExitCoder(err)
+	}
 }
