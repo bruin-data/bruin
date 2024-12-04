@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -159,9 +160,12 @@ func expectExitCode(command string, code int) {
 
 func runCommand(command string) (string, error) {
 	fmt.Println("Running command:", command)
-	args := []string{"run", "../main.go"}
-	args = append(args, strings.Split(command, " ")...)
-	cmd := exec.Command("go", args...)
+	binary := "../bin/bruin"
+	if runtime.GOOS == "windows" {
+		binary += ".exe"
+	}
+	args := strings.Split(command, " ")
+	cmd := exec.Command(binary, args...)
 	cmd.Dir = currentFolder
 	output, err := cmd.Output()
 
