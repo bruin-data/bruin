@@ -98,7 +98,7 @@ func Render() *cli.Command {
 				}
 				return cli.Exit("", 1)
 			}
-			pipelinePath, err := path.GetPipelineRootFromTask(inputPath, pipelineDefinitionFile)
+			pipelinePath, err := path.GetPipelineRootFromTask(inputPath, pipelineDefinitionFiles)
 			if err != nil {
 				printError(err, c.String("output"), "Failed to get the pipeline path:")
 				return cli.Exit("", 1)
@@ -305,12 +305,12 @@ func (r *RenderCommand) printErrorOrJsonf(msg string, args ...interface{}) {
 }
 
 func getPipelineDefinitionFullPath(pipelinePath string) (string, error) {
-	for _, pipelineDefinition := range pipelineDefinitionFile {
-		fullPath := filepath.Join(pipelinePath, pipelineDefinition)
+	for _, pipelineDefinitionfile := range pipelineDefinitionFiles {
+		fullPath := filepath.Join(pipelinePath, pipelineDefinitionfile)
 		if _, err := os.Stat(fullPath); err == nil {
 			// File exists, return the full path
 			return fullPath, nil
 		}
 	}
-	return "", errors.Errorf("no pipeline definition file found in '%s'. Supported files: %v", pipelinePath, pipelineDefinitionFile)
+	return "", errors.Errorf("no pipeline definition file found in '%s'. Supported files: %v", pipelinePath, pipelineDefinitionFiles)
 }

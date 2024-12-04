@@ -189,7 +189,7 @@ func Run(isDebug *bool) *cli.Command {
 					return cli.Exit("", 1)
 				}
 
-				pipelinePath, err = path.GetPipelineRootFromTask(inputPath, pipelineDefinitionFile)
+				pipelinePath, err = path.GetPipelineRootFromTask(inputPath, pipelineDefinitionFiles)
 				if err != nil {
 					errorPrinter.Printf("Failed to find the pipeline this task belongs to: '%s'\n", inputPath)
 					return cli.Exit("", 1)
@@ -654,8 +654,8 @@ func setupExecutors(
 
 func isPathReferencingAsset(p string) bool {
 	// Check if the path matches any of the pipeline definition file names
-	for _, pipelineDefinition := range pipelineDefinitionFile {
-		if strings.HasSuffix(p, pipelineDefinition) {
+	for _, pipelineDefinitionfile := range pipelineDefinitionFiles {
+		if strings.HasSuffix(p, pipelineDefinitionfile) {
 			return false
 		}
 	}
