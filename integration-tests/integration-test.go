@@ -169,7 +169,7 @@ func expectExitCode(command string, code int) {
 func runCommand(command string) (string, error) {
 	fmt.Println("Running command: bruin ", command)
 	args := strings.Split(command, " ")
-	cmd := exec.Command("bruin", args...)
+	cmd := exec.Command("./bruin", args...)
 	cmd.Dir = currentFolder
 	output, err := cmd.Output()
 
