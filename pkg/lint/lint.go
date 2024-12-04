@@ -222,6 +222,16 @@ type PipelineAnalysisResult struct {
 	Pipelines []*PipelineIssues `json:"pipelines"`
 }
 
+func (p *PipelineAnalysisResult) HasIssues() bool {
+	for _, pipelineIssues := range p.Pipelines {
+		if len(pipelineIssues.Issues) > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (p *PipelineAnalysisResult) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p.Pipelines)
 }

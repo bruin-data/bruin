@@ -171,6 +171,10 @@ func Lint(isDebug *bool) *cli.Command {
 				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
 				result, errr = linter.LintAsset(rootPath, pipelineDefinitionFile, asset, c)
 			}
+			var returnErr error
+			if result.HasIssues() {
+				returnErr = errors.New("Validation failed")
+			}
 
 			printer := lint.Printer{RootCheckPath: rootPath}
 
@@ -185,7 +189,7 @@ func Lint(isDebug *bool) *cli.Command {
 					printError(err, c.String("output"), "An error occurred")
 					return cli.Exit("", 1)
 				}
-				return nil
+				return returnErr
 			}
 
 			err = reportLintErrors(result, err, printer, asset)
@@ -193,7 +197,7 @@ func Lint(isDebug *bool) *cli.Command {
 				printError(err, c.String("output"), "An error occurred")
 				return cli.Exit("", 1)
 			}
-			return nil
+			return returnErr
 		},
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
