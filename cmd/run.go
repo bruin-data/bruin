@@ -293,12 +293,13 @@ func Run(isDebug *bool) *cli.Command {
 				OnlyTaskTypes:     c.StringSlice("only"),
 				IncludeDownstream: runDownstreamTasks,
 				PushMetaData:      c.Bool("push-metadata"),
+				SingleTask:        task,
 			}
 
 			s := scheduler.NewScheduler(logger, foundPipeline)
 			sendTelemetry(s, c)
 			// Apply the filter to mark assets based on include/exclude tags
-			if err := filter.ApplyFiltersAndMarkAssets(foundPipeline, s, task); err != nil {
+			if err := filter.ApplyFiltersAndMarkAssets(foundPipeline, s); err != nil {
 				errorPrinter.Printf("Failed to filter assets: %v\n", err)
 				return cli.Exit("", 1)
 			}
@@ -702,24 +703,24 @@ type Filter struct {
 	OnlyTaskTypes     []string // Task types to include (from `--only`)
 	IncludeDownstream bool     // Whether to include downstream tasks (from `--downstream`)
 	PushMetaData      bool
+	SingleTask        *pipeline.Asset
 }
 
-func (f *Filter) ApplyFiltersAndMarkAssets(pipeline *pipeline.Pipeline, s *scheduler.Scheduler, task *pipeline.Asset) error {
+func (f *Filter) ApplyFiltersAndMarkAssets(pipeline *pipeline.Pipeline, s *scheduler.Scheduler) error {
 	// Initially mark all tasks as pending
 	s.MarkAll(scheduler.Pending)
 
 	// Handle single-task execution
-	if task != nil {
+	if f.SingleTask != nil {
 		// Skip all other tasks
 		s.MarkAll(scheduler.Succeeded)
 
 		// Mark the single task and optionally its downstream tasks
-		s.MarkAsset(task, scheduler.Pending, f.IncludeDownstream)
+		s.MarkAsset(f.SingleTask, scheduler.Pending, f.IncludeDownstream)
 		// Validate that --tag is not allowed with single task execution
 		if f.IncludeTag != "" {
 			return errors.New("you cannot use the '--tag' flag when running a single asset")
 		}
-		return nil // Return early since we're only dealing with a single task
 	}
 	// Default task execution flags
 	runMain := true

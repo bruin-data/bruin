@@ -12,7 +12,6 @@ import (
 
 func TestClean(t *testing.T) {
 	t.Parallel()
-
 	tests := []struct {
 		name string
 		s    string
@@ -39,9 +38,106 @@ func BenchmarkClean(b *testing.B) {
 	}
 }
 
+var (
+	task0 = &pipeline.Asset{
+		Name: "Task0",
+		Type: pipeline.AssetTypeBigqueryQuery,
+		Tags: []string{"tag1"},
+		Columns: []pipeline.Column{
+			{
+				Name:        "Column0",
+				Type:        "STRING",
+				Description: "A sample column",
+				PrimaryKey:  true,
+				Checks: []pipeline.ColumnCheck{
+					{Name: "Check0"},
+				},
+			},
+		},
+		CustomChecks: []pipeline.CustomCheck{
+			{Name: "CustomCheck0", Description: "some custom check"},
+		},
+	}
+
+	task1 = &pipeline.Asset{Name: "Task1",
+		Type: pipeline.AssetTypePython,
+		Tags: []string{"tag1"},
+	}
+
+	task2 = &pipeline.Asset{Name: "Task2",
+		Type: pipeline.AssetTypeBigqueryQuery,
+		Tags: []string{"tag2"},
+	}
+
+	task3 = &pipeline.Asset{Name: "Task3", Type: pipeline.AssetTypePython,
+		Tags:      []string{"tag4"},
+		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task9"}},
+	}
+
+	task4 = &pipeline.Asset{Name: "Task4",
+		Type:      pipeline.AssetTypeBigqueryQuery,
+		Tags:      []string{"tag1", "tag3"},
+		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task9"}},
+	}
+
+	task5 = &pipeline.Asset{
+		Name:      "Task5",
+		Type:      pipeline.AssetTypeBigqueryQuery,
+		Tags:      []string{"tag1"},
+		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task8"}}, // Task8 is upstream
+	}
+
+	task6 = &pipeline.Asset{
+		Name:      "Task6",
+		Type:      pipeline.AssetTypeBigqueryQuery,
+		Tags:      []string{},
+		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task8"}}, // Task8 is upstream
+	}
+
+	task7 = &pipeline.Asset{
+		Name:      "Task7",
+		Type:      pipeline.AssetTypePython,
+		Tags:      []string{},
+		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task8"}}, // Task8 is upstream
+	}
+
+	task8 = &pipeline.Asset{
+		Name:      "Task8",
+		Type:      pipeline.AssetTypeBigqueryQuery,
+		Tags:      []string{"tag1"},
+		Upstreams: []pipeline.Upstream{}, // No upstreams for Task8
+	}
+
+	task9 = &pipeline.Asset{
+		Name:      "Task9",
+		Type:      pipeline.AssetTypeBigqueryQuery,
+		Tags:      []string{"tag4"},
+		Upstreams: []pipeline.Upstream{}, // No upstreams for Task8
+	}
+
+	task10 = &pipeline.Asset{
+		Name: "Task10",
+		Type: pipeline.AssetTypeBigqueryQuery,
+		Tags: []string{"tag1"},
+		Columns: []pipeline.Column{
+			{
+				Name:        "Column10",
+				Type:        "STRING",
+				Description: "A sample column",
+				PrimaryKey:  true,
+				Checks: []pipeline.ColumnCheck{
+					{Name: "Check10"},
+				},
+			},
+		},
+		CustomChecks: []pipeline.CustomCheck{
+			{Name: "CustomCheck10", Description: "some custom check"},
+		},
+	}
+)
+
 func TestApplyFilters(t *testing.T) {
 	t.Parallel() // Enable parallel execution for the top-level test
-
 	tests := []struct {
 		name            string
 		pipeline        *pipeline.Pipeline
@@ -223,32 +319,348 @@ func TestApplyFilters(t *testing.T) {
 			expectError:     true,
 			expectedError:   "no assets found with include tag 'tag1'",
 		},
-
 		{
-			name: "Metadata Push Enabled",
+			name: " Run single Task in a full pipeline",
 			pipeline: &pipeline.Pipeline{
 				Name: "TestPipeline",
 				Assets: []*pipeline.Asset{
-					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+					task0,
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+					task6,
+					task7,
+					task8,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				SingleTask: task4,
+			},
+			expectedPending: []string{"Task4"},
+			expectError:     false,
+		},
+		{
+			name: "Single Task with a Tag",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task0,
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				SingleTask: task4,
+				IncludeTag: "tag1",
+			},
+			expectedPending: []string{},
+			expectError:     true,
+			expectedError:   "you cannot use the '--tag' flag when running a single asset",
+		},
+
+		{
+			name: "Run single Task with downstream",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task0,
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+					task6,
+					task7,
+					task8,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				SingleTask:        task8,
+				IncludeDownstream: true,
+			},
+			expectedPending: []string{"Task8", "Task7", "Task6", "Task5"},
+			expectError:     false,
+		},
+		{
+			name: "Run single Task with downstream and a tag",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task5,
+					task6,
+					task7,
+					task8,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				SingleTask:        task8,
+				IncludeDownstream: true,
+				IncludeTag:        "tag1",
+			},
+			expectedPending: []string{},
+			expectError:     true,
+			expectedError:   "you cannot use the '--tag' flag when running a single asset",
+		},
+		{
+			name: "Filter By Tag and Only at the same time",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task4,
+					task5,
+					task6,
+					task7,
+					task8,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: true},
+			},
+			filter: &Filter{
+				IncludeDownstream: false,
+				IncludeTag:        "tag1",
+				OnlyTaskTypes:     []string{"push-metadata"},
+				PushMetaData:      true,
+			},
+			expectedPending: []string{"Task8:metadata-push", "Task5:metadata-push", "Task4:metadata-push"},
+			expectError:     false,
+		},
+		{
+			name: "Filter By Tag and run its downstream",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task0,
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+					task6,
+					task7,
+					task8,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				IncludeDownstream: true,
+				IncludeTag:        "tag1",
+			},
+			expectedPending: []string{"Task0", "Task1", "Task4", "Task5", "Task6", "Task7", "Task8",
+				"Task0:Column0:Check0", "Task0:custom-check:customcheck0"}, //task 2 and 3 shouldnt run
+			expectError: false,
+		},
+		{
+			name: "Filter by Tag and Run Matching Downstream Tasks by Type",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task0,
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+					task6,
+					task7,
+					task8,
+					task9,
 				},
 				MetadataPush: pipeline.MetadataPush{Global: true, BigQuery: true},
 			},
-			filter:          &Filter{PushMetaData: true},
-			expectedPending: []string{"Task1", "Task1:metadata-push"}, // Metadata push instance should be included
+			filter: &Filter{
+				IncludeDownstream: true,
+				IncludeTag:        "tag4",
+				PushMetaData:      true,
+				OnlyTaskTypes:     []string{"push-metadata"},
+			},
+			expectedPending: []string{"Task3:metadata-push", "Task4:metadata-push", "Task9:metadata-push"},
 			expectError:     false,
 		},
 
 		{
-			name: "Metadata Push Enabled with only metadatapush",
+			name: "Run single asset with PushmetaData",
 			pipeline: &pipeline.Pipeline{
 				Name: "TestPipeline",
 				Assets: []*pipeline.Asset{
-					{Name: "Task1", Type: pipeline.AssetTypeBigqueryQuery},
+					task0,
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+					task6,
+					task7,
+					task8,
+					task9,
 				},
 				MetadataPush: pipeline.MetadataPush{Global: true, BigQuery: true},
 			},
-			filter:          &Filter{PushMetaData: true, OnlyTaskTypes: []string{"push-metadata"}},
-			expectedPending: []string{"Task1:metadata-push"}, // Metadata push instance should be included
+			filter: &Filter{
+				SingleTask:        task4,
+				IncludeDownstream: true,
+				PushMetaData:      true,
+			},
+			expectedPending: []string{"Task4", "Task4:metadata-push"},
+			expectError:     false,
+		},
+
+		{
+			name: " Run single asset with PushmetaData and Only flag",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task0,
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+					task6,
+					task7,
+					task8,
+					task9,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: true, BigQuery: true},
+			},
+			filter: &Filter{
+				SingleTask:        task4,
+				IncludeDownstream: true,
+				PushMetaData:      true,
+				OnlyTaskTypes:     []string{"push-metadata"},
+			},
+			expectedPending: []string{"Task4:metadata-push"},
+			expectError:     false,
+		},
+		{
+			name: " Run only Checks",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task0,
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+					task6,
+					task7,
+					task8,
+					task9,
+					task10,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: true, BigQuery: true},
+			},
+			filter: &Filter{
+				IncludeDownstream: true,
+				PushMetaData:      true,
+				OnlyTaskTypes:     []string{"checks"},
+			},
+			expectedPending: []string{"Task0:Column0:Check0", "Task0:custom-check:customcheck0", "Task10:Column10:Check10", "Task10:custom-check:customcheck10"},
+			expectError:     false,
+		},
+
+		{
+			name: " Run only Main",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task0,
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+					task6,
+					task7,
+					task8,
+					task9,
+					task10,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: true, BigQuery: true},
+			},
+			filter: &Filter{
+				IncludeDownstream: true,
+				PushMetaData:      true,
+				OnlyTaskTypes:     []string{"main"}, //checks and metadata should be excluded
+			},
+			expectedPending: []string{"Task0", "Task1", "Task2", "Task3", "Task4", "Task5", "Task6", "Task7", "Task8", "Task9", "Task10"},
+			expectError:     false,
+		},
+
+		{
+			name: " Run full pipeline",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task0,
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+					task6,
+					task7,
+					task8,
+					task9,
+					task10,
+				},
+			},
+			filter: &Filter{},
+			expectedPending: []string{"Task0", "Task1", "Task2", "Task3", "Task4", "Task5", "Task6", "Task7", "Task8", "Task9", "Task10",
+				"Task10:Column10:Check10", "Task10:custom-check:customcheck10", "Task0:Column0:Check0", "Task0:custom-check:customcheck0"},
+			expectError: false,
+		},
+		{
+			name: " Run single asset with only Checks",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+
+					task6,
+					task7,
+					task8,
+					task9,
+					task10,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: true, BigQuery: true},
+			},
+			filter: &Filter{
+				SingleTask:        task10,
+				IncludeDownstream: true,
+				PushMetaData:      true,
+				OnlyTaskTypes:     []string{"checks"},
+			},
+			expectedPending: []string{"Task10:Column10:Check10", "Task10:custom-check:customcheck10"},
+			expectError:     false,
+		},
+		{
+			name: "Only flag with multiple arguments",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task6,
+					task7,
+					task8,
+					task9,
+					task10,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: true, BigQuery: true},
+			},
+			filter: &Filter{
+				SingleTask:        task10,
+				IncludeDownstream: true,
+				PushMetaData:      true,
+				OnlyTaskTypes:     []string{"checks", "push-metadata"},
+			},
+			expectedPending: []string{"Task10:Column10:Check10", "Task10:custom-check:customcheck10", "Task10:metadata-push"},
 			expectError:     false,
 		},
 	}
@@ -260,7 +672,7 @@ func TestApplyFilters(t *testing.T) {
 			s := scheduler.NewScheduler(logger, tt.pipeline)
 
 			// Act
-			err := tt.filter.ApplyFiltersAndMarkAssets(tt.pipeline, s, nil)
+			err := tt.filter.ApplyFiltersAndMarkAssets(tt.pipeline, s)
 
 			// Assert
 			if tt.expectError {
@@ -275,6 +687,7 @@ func TestApplyFilters(t *testing.T) {
 				taskNames := []string{}
 				for _, task := range markedTasks {
 					taskNames = append(taskNames, task.GetHumanID()) // Use HumanID for accurate matching
+					print(task.GetHumanID())
 				}
 
 				// Check if each expected task is present in the marked tasks
