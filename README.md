@@ -43,6 +43,10 @@ brew install bruin-data/tap/bruin
 ## Docs
 You can see our documentation [here](https://bruin-data.github.io/bruin/).
 
+## Community
+
+Join our Slack community [here](https://join.slack.com/t/bruindatacommunity/shared_invite/zt-2dl2i8foy-bVsuMUauHeN9M2laVm3ZVg).
+
 ## Getting Started
 
 All you need is a simple `pipeline.yml` in your Git repo:
