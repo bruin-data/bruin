@@ -454,7 +454,7 @@ func TestApplyFilters(t *testing.T) {
 				IncludeTag:        "tag1",
 			},
 			expectedPending: []string{"Task0", "Task1", "Task4", "Task5", "Task6", "Task7", "Task8",
-				"Task0:Column0:Check0", "Task0:custom-check:customcheck0"}, //task 2 and 3 shouldnt run
+				"Task0:Column0:Check0", "Task0:custom-check:customcheck0"}, // task 2 and 3 shouldnt run
 			expectError: false,
 		},
 		{
@@ -589,7 +589,7 @@ func TestApplyFilters(t *testing.T) {
 			filter: &Filter{
 				IncludeDownstream: true,
 				PushMetaData:      true,
-				OnlyTaskTypes:     []string{"main"}, //checks and metadata should be excluded
+				OnlyTaskTypes:     []string{"main"}, // checks and metadata should be excluded
 			},
 			expectedPending: []string{"Task0", "Task1", "Task2", "Task3", "Task4", "Task5", "Task6", "Task7", "Task8", "Task9", "Task10"},
 			expectError:     false,
