@@ -7,21 +7,19 @@ Welcome! 👋 This tutorial is a simple, step-by-step guide to help you load dat
 To install Bruin CLI depending upon your machine, follow the installation instructions [here](../introduction/installation.md)
 
 #### Bruin VS Code Extension
-To install Bruin VS Code extension, follow the instruction [here](../../vscode-extension/overview.md)
+To install the Bruin VS Code extension, follow the instructions [here](../../vscode-extension/overview.md)
 
 <img width="685" alt="bruin_extension" src="./tutorial-media/bruin-extension.png">
 
 
 ### Getting Started
-
-To create a bruin project basic structure you can just run:
-
+To create the basic structure of a Bruin project, you can simply run:
 
    ```
    bruin init {folder name} [template name]
    ```
 
-If you don't define folder name and template name. It will create `default` template with folder name bruin-pipeline. This command will:
+If you don't define the folder name and template name, it will create `default` template with folder name `bruin-pipeline`. This command will:
 
     Create a project named bruin-pipeline 
     Generate a folder called bruin-pipeline containing the following:
@@ -31,9 +29,9 @@ If you don't define folder name and template name. It will create `default` temp
 
 #### Adding a new asset
 
-Adding a new [asset](../../assets/definition-schema.md) is as simple as creating a new file inside the assets folder. Let's create a new [ingestr asset](../../assets/ingestr.md) file `asset.ingetsr.notion.yml` inside assets folder and add :
+Adding a new [asset](../../assets/definition-schema.md) is as simple as creating a new file inside the assets folder. Let's create a new [ingestr asset](../../assets/ingestr.md) file `notion.asset.yml` inside the assets folder and add :
 
- ```
+ ```yaml
 name: public.notion
 type: ingestr
 connection: my-postgres
@@ -43,22 +41,18 @@ parameters:
   destination: postgres
  ```
 
-- name: The name of the asset.
-
-- type: Specifies the type of the asset. It will be always ingestr type for Notion.
-
-- connection: The name of the connection
-
-- source_connection: The name of the Notion connection defined in .bruin.yml.
-- source_table: The database id of Notion you want to ingest.
-- destination: The name of the destination, you want to store. Here, we are using postgres sql
-
+- `name`: The name of the asset.
+- `type`: Specifies the type of the asset. It will always be of the `ingestr` type for Notion.
+- `connection`: The name of the connection
+- `source_connection`: The name of the Notion connection defined in .bruin.yml.
+- `source_table`: The database id of Notion you want to ingest.
+- `destination`: The name of the destination, you want to store. Here, we are using PostgreSQL.
 
 #### Adding connection and credentials in .bruin.yml
 Make sure, you have [Notion credentials](https://dlthub.com/docs/dlt-ecosystem/verified-sources/notion#setup-guide) and Postgres credentials.
 
 Using Bruin vscode extension
-- Add destination connection - PostgresSQL
+- Add destination connection - PostgreSQL
 - Add source connection - Notion
 
 <video width="685" height="auto" controls poster="./tutorial-media/vscode-poster.png">
@@ -67,11 +61,10 @@ Using Bruin vscode extension
 </video>
 
 
-You can customize your pipeline by adding in pipeline.yml
-- You can change schedule to daily, weekly or monthly.
+You can customize your pipeline by making changes in the pipeline.yml file. You can set the schedule to daily, weekly, or monthly.
 
 #### Validate and Run your pipeline
-- bruin CLI can run the whole pipeline or any task with the downstreams.
+- Bruin CLI can run the whole pipeline or any task with the downstreams.
   `Make sure, asset file is open`
 
 <video width="685" height="auto" controls poster="./tutorial-media/run-pipeline-poster.png">
