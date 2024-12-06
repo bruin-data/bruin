@@ -23,12 +23,13 @@ func main() {
 		os.Exit(1)
 	}
 	currentFolder = filepath.Join(path, "integration-tests")
-	cmd := exec.Command("bash", "-c", "cp bin/bruin integration-tests/bruin")
-	out, err := cmd.Output()
-	if err != nil {
-		fmt.Println(err)
-		fmt.Println(string(out))
-		os.Exit(1)
+
+	if runtime.GOOS == "windows" {
+		out, err := exec.Command("mv", "bin/bruin", "bin/bruin.exe").Output()
+		if err != nil {
+			fmt.Printf("failed to rename binary for execution on windows: %s\n", out)
+			panic(err)
+		}
 	}
 
 	expectExitCode("validate happy-path", 0)
@@ -170,10 +171,12 @@ func expectExitCode(command string, code int) {
 func runCommand(command string) (string, error) {
 	fmt.Println("Running command: bruin ", command)
 	args := strings.Split(command, " ")
-	binary := "./bruin"
+	executable := "bruin"
 	if runtime.GOOS == "windows" {
-		binary = "bruin"
+		executable = "bruin.exe"
 	}
+	wd, _ := os.Getwd()
+	binary := filepath.Join(wd, "bin", executable)
 	cmd := exec.Command(binary, args...)
 
 	cmd.Dir = currentFolder
