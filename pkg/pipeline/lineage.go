@@ -15,34 +15,33 @@ type sqlParser interface {
 }
 
 type LineageExtractor struct {
-	Pipeline       *Pipeline
-	sqlParser      sqlParser
-	columnMetadata sqlparser.Schema
-	renderer       *jinja.Renderer
+	Pipeline  *Pipeline
+	sqlParser sqlParser
+	renderer  *jinja.Renderer
 }
 
 // NewLineageExtractor creates a new LineageExtractor instance.
 func NewLineageExtractor(pipeline *Pipeline, parser sqlParser) *LineageExtractor {
 	return &LineageExtractor{
-		Pipeline:       pipeline,
-		columnMetadata: make(sqlparser.Schema),
-		sqlParser:      parser,
-		renderer:       jinja.NewRendererWithYesterday(pipeline.Name, "lineage-parser"),
+		Pipeline:  pipeline,
+		sqlParser: parser,
+		renderer:  jinja.NewRendererWithYesterday(pipeline.Name, "lineage-parser"),
 	}
 }
 
 // TableSchema extracts the table schema from the assets and stores it in the columnMetadata map.
-func (p *LineageExtractor) TableSchema() error {
+func (p *LineageExtractor) TableSchema() sqlparser.Schema {
+	columnMetadata := make(sqlparser.Schema)
 	for _, foundAsset := range p.Pipeline.Assets {
 		if len(foundAsset.Columns) > 0 {
-			p.columnMetadata[foundAsset.Name] = makeColumnMap(foundAsset.Columns)
+			columnMetadata[foundAsset.Name] = makeColumnMap(foundAsset.Columns)
 		}
 	}
-	return nil
+	return columnMetadata
 }
 
 // ParseLineageRecursive processes the lineage of an asset and its upstream dependencies recursively.
-func (p *LineageExtractor) ColumnLineage(asset *Asset) error {
+func (p *LineageExtractor) ColumnLineage(asset *Asset, metadata sqlparser.Schema) error {
 	if asset == nil {
 		return nil
 	}
@@ -56,17 +55,17 @@ func (p *LineageExtractor) ColumnLineage(asset *Asset) error {
 		if upstreamAsset == nil {
 			continue
 		}
-		_ = p.ColumnLineage(upstreamAsset)
+		_ = p.ColumnLineage(upstreamAsset, metadata)
 	}
 
-	_ = p.parseLineage(asset)
+	_ = p.parseLineage(asset, metadata)
 
 	return nil
 }
 
 // ParseLineage analyzes the column lineage for a given asset within a
 // It traces column relationships between the asset and its upstream dependencies.
-func (p *LineageExtractor) parseLineage(asset *Asset) error {
+func (p *LineageExtractor) parseLineage(asset *Asset, metadata sqlparser.Schema) error {
 	if asset == nil {
 		return errors.New("invalid arguments: asset and pipeline cannot be nil")
 	}
@@ -88,7 +87,7 @@ func (p *LineageExtractor) parseLineage(asset *Asset) error {
 		return fmt.Errorf("failed to render the query: %w", err)
 	}
 
-	lineage, err := p.sqlParser.ColumnLineage(query, dialect, p.columnMetadata)
+	lineage, err := p.sqlParser.ColumnLineage(query, dialect, metadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse column lineage: %w", err)
 	}
