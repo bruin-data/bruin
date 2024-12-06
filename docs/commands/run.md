@@ -30,6 +30,33 @@ bruin run [FLAGS] [optional path to the pipeline/asset]
 | `--tag` | str | - | Pick assets with the given tag. |
 | `--workers` | int | `16` | Number of workers to run tasks in parallel. |
 
+### Focused Runs: Filtering by Tags and Task Types
+As detailed in the flag section above, the  `--tag`, `--downstream`, and `--only` flags provide powerful ways to filter and control which tasks in your pipeline are executed. These flags can also be combined to fine-tune pipeline runs, allowing you to execute specific subsets of tasks based on tags, include their downstream dependencies, and restrict execution to certain task types.
+
+Let’s explore how combining these flags enables highly targeted pipeline execution scenarios:
+
+### Combining Tags and Downstream
+
+Using `--tag` with `--downstream` filters the assets by tag and includes all downstream dependencies for those tagged assets. For example:
+```bash
+bruin run --tag important_tag --downstream
+```
+This will run all tasks of the assets tagged with `important_tag` and include all downstream tasks that depend on them.
+
+### Combining Tags and Task Types
+Using `--tag` with `--only` restricts the tasks to specific types for the assets filtered by the given tag. For example:
+```bash
+bruin run --tag quality_tag --only checks
+```
+This runs only the `checks` tasks for the assets tagged with `quality_tag` while excluding other task types.
+
+### Combining Tags, Downstream, and Task Types
+
+Adding `--only` to the mix  with `--tag` and `--downstream` allows you to specify the types of tasks to run for the tagged assets and their downstream dependencies. For example:
+```bash
+bruin run --tag critical_tag --downstream --only main
+```
+This command runs only the `main` tasks for the assets tagged with `critical_tag` and their downstream dependencies.
 ## Examples
 
 Run the pipeline from the current directory:
