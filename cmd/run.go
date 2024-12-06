@@ -115,6 +115,11 @@ func Run(isDebug *bool) *cli.Command {
 				Aliases: []string{"t"},
 				Usage:   "pick the assets with the given tag",
 			},
+			&cli.StringFlag{
+				Name:    "exclude-tag",
+				Aliases: []string{"x"},
+				Usage:   "exclude the assets with given tag",
+			},
 			&cli.StringSliceFlag{
 				Name:        "only",
 				DefaultText: "'main', 'checks', 'push-metadata'",
@@ -294,6 +299,7 @@ func Run(isDebug *bool) *cli.Command {
 				IncludeDownstream: runDownstreamTasks,
 				PushMetaData:      c.Bool("push-metadata"),
 				SingleTask:        task,
+				ExcludeTag:        c.String("exclude-tag"),
 			}
 
 			s := scheduler.NewScheduler(logger, foundPipeline)
@@ -712,6 +718,7 @@ type Filter struct {
 	IncludeDownstream bool     // Whether to include downstream tasks (from `--downstream`)
 	PushMetaData      bool
 	SingleTask        *pipeline.Asset
+	ExcludeTag        string
 }
 
 func (f *Filter) ApplyFiltersAndMarkAssets(pipeline *pipeline.Pipeline, s *scheduler.Scheduler) error {
@@ -728,6 +735,10 @@ func (f *Filter) ApplyFiltersAndMarkAssets(pipeline *pipeline.Pipeline, s *sched
 		// Validate that --tag is not allowed with single task execution
 		if f.IncludeTag != "" {
 			return errors.New("you cannot use the '--tag' flag when running a single asset")
+		}
+
+		if f.ExcludeTag != "" {
+			return errors.New("you cannot use the '--exclude-tag' flag when running a single asset")
 		}
 	}
 	// Default task execution flags
@@ -753,7 +764,6 @@ func (f *Filter) ApplyFiltersAndMarkAssets(pipeline *pipeline.Pipeline, s *sched
 		runChecks = slices.Contains(f.OnlyTaskTypes, "checks")
 		runPushMetadata = slices.Contains(f.OnlyTaskTypes, "push-metadata")
 	}
-
 	// Handle include tag: Mark included assets as pending
 	if f.IncludeTag != "" {
 		includedAssets := pipeline.GetAssetsByTag(f.IncludeTag)
@@ -762,6 +772,15 @@ func (f *Filter) ApplyFiltersAndMarkAssets(pipeline *pipeline.Pipeline, s *sched
 		}
 		s.MarkAll(scheduler.Succeeded) // Skip everything first
 		s.MarkByTag(f.IncludeTag, scheduler.Pending, f.IncludeDownstream)
+	}
+
+	// Handle  exclude tag: Mark excluded assets as pending
+	if f.ExcludeTag != "" {
+		excludedAssets := pipeline.GetAssetsByTag(f.ExcludeTag)
+		if len(excludedAssets) == 0 {
+			return fmt.Errorf("no assets found with exclude tag '%s'", f.ExcludeTag)
+		}
+		s.MarkByTag(f.ExcludeTag, scheduler.Succeeded, f.IncludeDownstream)
 	}
 	// Mark tasks in the scheduler
 	if !runMain {
