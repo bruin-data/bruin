@@ -43,7 +43,6 @@ func GetPipelinePaths(root string, pipelineDefinitionFile []string) ([]string, e
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, errors.Wrapf(err, "error walking directory")
 	}

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -16,11 +17,19 @@ import (
 var currentFolder string
 
 func main() {
-	var err error
-	currentFolder = filepath.Join(currentFolder, "integration-tests")
+	path, err := os.Getwd()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+	currentFolder = filepath.Join(path, "integration-tests")
+
+	if runtime.GOOS == "windows" {
+		out, err := exec.Command("mv", "bin/bruin", "bin/bruin.exe").Output()
+		if err != nil {
+			fmt.Printf("failed to rename binary for execution on windows: %s\n", out)
+			panic(err)
+		}
 	}
 
 	expectExitCode("validate happy-path", 0)
@@ -129,11 +138,12 @@ func expectJSONOutput(command string, jsonFilePath string) {
 			if path.Json() == "\"path\"" {
 				continue
 			}
-
+			fmt.Println("Mismatch at: ", d.Path)
 			fmt.Print("Expected json: ")
 			fmt.Println(d.NewValues)
 			fmt.Print("Not Matching found json: ")
 			fmt.Println(d.OldValues)
+
 			os.Exit(1)
 		}
 	}
@@ -145,6 +155,7 @@ func expectExitCode(command string, code int) {
 	if err != nil {
 		if exitCode != code {
 			fmt.Println(strconv.Itoa(code) + " Was expected but got:" + strconv.Itoa(exitCode))
+			fmt.Printf("Error: %v\n", err)
 			fmt.Println(output)
 			os.Exit(1)
 		}
@@ -158,10 +169,16 @@ func expectExitCode(command string, code int) {
 }
 
 func runCommand(command string) (string, error) {
-	fmt.Println("Running command:", command)
-	args := []string{"run", "../main.go"}
-	args = append(args, strings.Split(command, " ")...)
-	cmd := exec.Command("go", args...)
+	fmt.Println("Running command: bruin", command)
+	args := strings.Split(command, " ")
+	executable := "bruin"
+	if runtime.GOOS == "windows" {
+		executable = "bruin.exe"
+	}
+	wd, _ := os.Getwd()
+	binary := filepath.Join(wd, "bin", executable)
+	cmd := exec.Command(binary, args...)
+
 	cmd.Dir = currentFolder
 	output, err := cmd.Output()
 
