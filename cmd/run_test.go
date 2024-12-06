@@ -112,7 +112,7 @@ var (
 		Name:      "Task9",
 		Type:      pipeline.AssetTypeBigqueryQuery,
 		Tags:      []string{"tag4"},
-		Upstreams: []pipeline.Upstream{}, // No upstreams for Task8
+		Upstreams: []pipeline.Upstream{},
 	}
 
 	task10 = &pipeline.Asset{
@@ -133,6 +133,46 @@ var (
 		CustomChecks: []pipeline.CustomCheck{
 			{Name: "CustomCheck10", Description: "some custom check"},
 		},
+	}
+	task11 = &pipeline.Asset{
+		Name: "Task11",
+		Type: pipeline.AssetTypeBigqueryQuery,
+		Tags: []string{"tag1", "tag4"},
+		Columns: []pipeline.Column{
+			{
+				Name:        "Column11",
+				Type:        "STRING",
+				Description: "A sample column",
+				PrimaryKey:  true,
+				Checks: []pipeline.ColumnCheck{
+					{Name: "Check11"},
+				},
+			},
+		},
+		CustomChecks: []pipeline.CustomCheck{
+			{Name: "CustomCheck11", Description: "some custom check"},
+		},
+		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task9"}},
+	}
+	task12 = &pipeline.Asset{
+		Name: "Task12",
+		Type: pipeline.AssetTypeBigqueryQuery,
+		Tags: []string{},
+		Columns: []pipeline.Column{
+			{
+				Name:        "Column12",
+				Type:        "STRING",
+				Description: "A sample column",
+				PrimaryKey:  true,
+				Checks: []pipeline.ColumnCheck{
+					{Name: "Check12"},
+				},
+			},
+		},
+		CustomChecks: []pipeline.CustomCheck{
+			{Name: "CustomCheck12", Description: "some custom check"},
+		},
+		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task9"}},
 	}
 )
 
@@ -892,6 +932,36 @@ func TestApplyFilters(t *testing.T) {
 				PushMetaData:  true,
 			},
 			expectedPending: []string{"Task0:Column0:Check0", "Task0:custom-check:customcheck0", "Task0:metadata-push"},
+		},
+
+		{
+			name: "Exclude ,Include Tag with downstream and only flag",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task0,
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+					task6,
+					task7,
+					task8,
+					task9,
+					task10,
+					task11,
+					task12,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				ExcludeTag:        "tag1",
+				IncludeTag:        "tag4",
+				IncludeDownstream: true,
+				OnlyTaskTypes:     []string{"checks"},
+			},
+			expectedPending: []string{"Task12:Column12:Check12", "Task12:custom-check:customcheck12"},
 		},
 	}
 
