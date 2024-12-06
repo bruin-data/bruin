@@ -13,15 +13,13 @@ To install Bruin VS Code extension, follow the instruction [here](../../vscode-e
 
 
 ### Getting Started
-
-To create a bruin project basic structure you can just run:
-
+To create the basic structure of a Bruin project, you can simply run:
 
    ```
    bruin init {folder name} [template name]
    ```
 
-If you don't define folder name and template name. It will create `default` template with folder name bruin-pipeline. This command will:
+If you don't define folder name and template name. It will create `default` template with folder name `bruin-pipeline`. This command will:
 
     Create a project named bruin-pipeline 
     Generate a folder called bruin-pipeline containing the following:
@@ -31,9 +29,9 @@ If you don't define folder name and template name. It will create `default` temp
 
 #### Adding a new asset
 
-Adding a new [asset](../../assets/definition-schema.md) is as simple as creating a new file inside the assets folder. Let's create a new [ingestr asset](../../assets/ingestr.md) file `asset.ingetsr.notion.yml` inside assets folder and add :
+Adding a new [asset](../../assets/definition-schema.md) is as simple as creating a new file inside the assets folder. Let's create a new [ingestr asset](../../assets/ingestr.md) file `notion.asset.yml` inside assets folder and add :
 
- ```
+ ```yaml
 name: public.notion
 type: ingestr
 connection: my-postgres
@@ -43,16 +41,12 @@ parameters:
   destination: postgres
  ```
 
-- name: The name of the asset.
-
-- type: Specifies the type of the asset. It will be always ingestr type for Notion.
-
-- connection: The name of the connection
-
-- source_connection: The name of the Notion connection defined in .bruin.yml.
-- source_table: The database id of Notion you want to ingest.
-- destination: The name of the destination, you want to store. Here, we are using postgres sql
-
+- `name`: The name of the asset.
+- `type`: Specifies the type of the asset. It will be always `ingestr` type for Notion.
+- `connection`: The name of the connection
+- `source_connection`: The name of the Notion connection defined in .bruin.yml.
+- `source_table`: The database id of Notion you want to ingest.
+- `destination`: The name of the destination, you want to store. Here, we are using postgres sql
 
 #### Adding connection and credentials in .bruin.yml
 Make sure, you have [Notion credentials](https://dlthub.com/docs/dlt-ecosystem/verified-sources/notion#setup-guide) and Postgres credentials.
