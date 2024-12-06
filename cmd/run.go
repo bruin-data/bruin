@@ -297,7 +297,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			s := scheduler.NewScheduler(logger, foundPipeline)
-			sendTelemetry(s, c)
+
 			// Apply the filter to mark assets based on include/exclude tags
 			if err := filter.ApplyFiltersAndMarkAssets(foundPipeline, s); err != nil {
 				errorPrinter.Printf("Failed to filter assets: %v\n", err)
@@ -308,7 +308,7 @@ func Run(isDebug *bool) *cli.Command {
 				warningPrinter.Println("No tasks to run.")
 				return nil
 			}
-
+			sendTelemetry(s, c)
 			infoPrinter.Printf("\nStarting the pipeline execution...\n")
 			infoPrinter.Println()
 
