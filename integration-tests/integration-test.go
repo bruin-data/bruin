@@ -169,7 +169,7 @@ func expectExitCode(command string, code int) {
 }
 
 func runCommand(command string) (string, error) {
-	fmt.Println("Running command: bruin ", command)
+	fmt.Println("Running command: bruin", command)
 	args := strings.Split(command, " ")
 	executable := "bruin"
 	if runtime.GOOS == "windows" {
