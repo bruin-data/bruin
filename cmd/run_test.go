@@ -61,7 +61,7 @@ var (
 
 	task1 = &pipeline.Asset{Name: "Task1",
 		Type: pipeline.AssetTypePython,
-		Tags: []string{"tag1"},
+		Tags: []string{"tag1", "x"},
 	}
 
 	task2 = &pipeline.Asset{Name: "Task2",
@@ -97,14 +97,14 @@ var (
 	task7 = &pipeline.Asset{
 		Name:      "Task7",
 		Type:      pipeline.AssetTypePython,
-		Tags:      []string{},
+		Tags:      []string{""},
 		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task8"}}, // Task8 is upstream
 	}
 
 	task8 = &pipeline.Asset{
 		Name:      "Task8",
 		Type:      pipeline.AssetTypeBigqueryQuery,
-		Tags:      []string{"tag1"},
+		Tags:      []string{"tag1", "exclude"},
 		Upstreams: []pipeline.Upstream{}, // No upstreams for Task8
 	}
 
@@ -662,6 +662,236 @@ func TestApplyFilters(t *testing.T) {
 			},
 			expectedPending: []string{"Task10:Column10:Check10", "Task10:custom-check:customcheck10", "Task10:metadata-push"},
 			expectError:     false,
+		},
+
+		{
+			name: "Single Task with a exclude-tag",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task0,
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				SingleTask: task4,
+				ExcludeTag: "tag1",
+			},
+			expectedPending: []string{},
+			expectError:     true,
+			expectedError:   "you cannot use the '--exclude-tag' flag when running a single asset",
+		},
+
+		{
+			name: "Full pipeline with exclude-tag",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task0,
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				ExcludeTag: "tag1",
+			},
+			expectedPending: []string{"Task2", "Task3"},
+			expectError:     false,
+		},
+
+		{
+			name: "Full pipeline with exclude-tag",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task0,
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				ExcludeTag: "non-existent-tag",
+			},
+			expectedPending: []string{},
+			expectError:     true,
+			expectedError:   "no assets found with exclude tag 'non-existent-tag'",
+		},
+
+		{
+			name: "Exclude Tag and the downstreams",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+					task6,
+					task7,
+					task8,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				ExcludeTag:        "exclude",
+				IncludeDownstream: true,
+			},
+			expectedPending: []string{"Task1", "Task2", "Task3", "Task4"},
+		},
+		{
+			name: "Exclude Tag and the downstreams",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+					task6,
+					task7,
+					task8,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				ExcludeTag:        "exclude",
+				IncludeDownstream: true,
+			},
+			expectedPending: []string{"Task1", "Task2", "Task3", "Task4"},
+		},
+
+		{
+			name: "Exclude and Include Tag",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task4,
+					task5,
+					task6,
+					task7,
+					task8,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				ExcludeTag:        "tag3",
+				IncludeTag:        "tag1",
+				IncludeDownstream: false,
+			},
+			expectedPending: []string{"Task5", "Task8"},
+		},
+
+		{
+			name: "Exclude and Include Tag (exclude tag non existent)",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task4,
+					task5,
+					task6,
+					task7,
+					task8,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				ExcludeTag:        "non-existent-tag",
+				IncludeTag:        "tag1",
+				IncludeDownstream: false,
+			},
+			expectedPending: []string{},
+			expectError:     true,
+			expectedError:   "no assets found with exclude tag 'non-existent-tag'",
+		},
+
+		{
+			name: "Exclude ,Include Tag with downstream",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task2,
+					task4,
+					task5,
+					task6,
+					task7,
+					task8,
+					task9,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				ExcludeTag:        "tag3",
+				IncludeTag:        "tag1",
+				IncludeDownstream: true,
+			},
+			expectedPending: []string{"Task5", "Task6", "Task7", "Task8"},
+		},
+
+		{
+			name: "Exclude with only checks ",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task0,
+					task1,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				ExcludeTag:    "x",
+				OnlyTaskTypes: []string{"checks"},
+			},
+			expectedPending: []string{"Task0:Column0:Check0", "Task0:custom-check:customcheck0"},
+		},
+		{
+			name: "Exclude with only checks 2",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task0,
+					task1,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: true, BigQuery: false},
+			},
+			filter: &Filter{
+				ExcludeTag:    "x",
+				OnlyTaskTypes: []string{"checks"},
+				PushMetaData:  true,
+			},
+			expectedPending: []string{"Task0:Column0:Check0", "Task0:custom-check:customcheck0"},
+		},
+
+		{
+			name: "Exclude with only checks and metadapush",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task0,
+					task1,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: true, BigQuery: false},
+			},
+			filter: &Filter{
+				ExcludeTag:    "x",
+				OnlyTaskTypes: []string{"checks", "push-metadata"},
+				PushMetaData:  true,
+			},
+			expectedPending: []string{"Task0:Column0:Check0", "Task0:custom-check:customcheck0", "Task0:metadata-push"},
 		},
 	}
 
