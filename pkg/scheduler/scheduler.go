@@ -110,7 +110,7 @@ func (t *AssetInstance) GetStatus() TaskInstanceStatus {
 }
 
 func (t *AssetInstance) Completed() bool {
-	return t.status == Failed || t.status == Succeeded || t.status == UpstreamFailed
+	return t.status == Failed || t.status == Succeeded || t.status == UpstreamFailed || t.status == Skipped
 }
 
 func (t *AssetInstance) Blocking() bool {
@@ -234,9 +234,8 @@ type Scheduler struct {
 	taskInstances []TaskInstance
 	taskNameMap   map[string]InstancesByType
 
-	WorkQueue     chan TaskInstance
-	Results       chan *TaskExecutionResult
-	isSingleAsset bool // single asset without downstreams
+	WorkQueue chan TaskInstance
+	Results   chan *TaskExecutionResult
 }
 
 func (s *Scheduler) InstanceCount() int {
@@ -299,6 +298,7 @@ func (s *Scheduler) MarkByTag(tag string, status TaskInstanceStatus, downstream 
 }
 
 func (s *Scheduler) MarkTaskInstance(instance TaskInstance, status TaskInstanceStatus, downstream bool) {
+
 	instance.MarkAs(status)
 	if !downstream {
 		return
@@ -314,11 +314,29 @@ func (s *Scheduler) MarkTaskInstance(instance TaskInstance, status TaskInstanceS
 	}
 }
 
-func (s *Scheduler) markTaskInstanceFailedWithDownstream(instance TaskInstance) {
-	if !s.isSingleAsset {
-		s.MarkTaskInstance(instance, UpstreamFailed, true)
+func (s *Scheduler) MarkTaskInstanceSkipped(instance TaskInstance, status TaskInstanceStatus, downstream bool) {
+	if instance.GetStatus() == Skipped {
+		return
 	}
-	s.MarkTaskInstance(instance, Failed, false)
+	instance.MarkAs(status)
+	if !downstream {
+		return
+	}
+
+	downstreams := instance.GetDownstream()
+	if len(downstreams) == 0 {
+		return
+	}
+
+	for _, d := range downstreams {
+		s.MarkTaskInstanceSkipped(d, status, downstream)
+	}
+}
+
+func (s *Scheduler) markTaskInstanceFailedWithDownstream(instance TaskInstance) {
+
+	s.MarkTaskInstanceSkipped(instance, UpstreamFailed, true)
+	s.MarkTaskInstanceSkipped(instance, Failed, false)
 }
 
 func (s *Scheduler) GetTaskInstancesByStatus(status TaskInstanceStatus) []TaskInstance {
@@ -354,7 +372,7 @@ func (s *Scheduler) FindMajorityOfTypes(defaultIfNone pipeline.AssetType) pipeli
 	return s.pipeline.GetMajorityAssetTypesFromSQLAssets(defaultIfNone)
 }
 
-func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, SingleAsset bool) *Scheduler {
+func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline) *Scheduler {
 	instances := make([]TaskInstance, 0)
 	for _, task := range p.Assets {
 		parentID := uuid.New().String()
@@ -428,7 +446,6 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, SingleAsset b
 		taskScheduleLock: sync.Mutex{},
 		WorkQueue:        make(chan TaskInstance, 100),
 		Results:          make(chan *TaskExecutionResult),
-		isSingleAsset:    SingleAsset,
 	}
 	s.initialize()
 
@@ -552,8 +569,9 @@ func (s *Scheduler) Run(ctx context.Context) []*TaskExecutionResult {
 func (s *Scheduler) Tick(result *TaskExecutionResult) bool {
 	s.taskScheduleLock.Lock()
 	defer s.taskScheduleLock.Unlock()
-
-	s.MarkTaskInstance(result.Instance, Succeeded, false)
+	if result.Instance.GetStatus() != Skipped {
+		s.MarkTaskInstance(result.Instance, Succeeded, false)
+	}
 	if result.Error != nil {
 		s.markTaskInstanceFailedWithDownstream(result.Instance)
 	}
