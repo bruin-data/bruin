@@ -15,24 +15,22 @@ type sqlParser interface {
 }
 
 type LineageExtractor struct {
-	Pipeline  *Pipeline
 	sqlParser sqlParser
 	renderer  *jinja.Renderer
 }
 
 // NewLineageExtractor creates a new LineageExtractor instance.
-func NewLineageExtractor(pipeline *Pipeline, parser sqlParser) *LineageExtractor {
+func NewLineageExtractor(name string, parser sqlParser) *LineageExtractor {
 	return &LineageExtractor{
-		Pipeline:  pipeline,
 		sqlParser: parser,
-		renderer:  jinja.NewRendererWithYesterday(pipeline.Name, "lineage-parser"),
+		renderer:  jinja.NewRendererWithYesterday(name, "lineage-parser"),
 	}
 }
 
 // TableSchema extracts the table schema from the assets and stores it in the columnMetadata map.
-func (p *LineageExtractor) TableSchema() sqlparser.Schema {
+func (p *LineageExtractor) TableSchema(foundPipeline *Pipeline) sqlparser.Schema {
 	columnMetadata := make(sqlparser.Schema)
-	for _, foundAsset := range p.Pipeline.Assets {
+	for _, foundAsset := range foundPipeline.Assets {
 		if len(foundAsset.Columns) > 0 {
 			columnMetadata[foundAsset.Name] = makeColumnMap(foundAsset.Columns)
 		}
@@ -41,7 +39,7 @@ func (p *LineageExtractor) TableSchema() sqlparser.Schema {
 }
 
 // ParseLineageRecursive processes the lineage of an asset and its upstream dependencies recursively.
-func (p *LineageExtractor) ColumnLineage(asset *Asset, metadata sqlparser.Schema) error {
+func (p *LineageExtractor) ColumnLineage(foundPipeline *Pipeline, asset *Asset, metadata sqlparser.Schema) error {
 	if asset == nil {
 		return nil
 	}
@@ -51,21 +49,21 @@ func (p *LineageExtractor) ColumnLineage(asset *Asset, metadata sqlparser.Schema
 	}
 
 	for _, upstream := range asset.Upstreams {
-		upstreamAsset := p.Pipeline.GetAssetByName(upstream.Value)
+		upstreamAsset := foundPipeline.GetAssetByName(upstream.Value)
 		if upstreamAsset == nil {
 			continue
 		}
-		_ = p.ColumnLineage(upstreamAsset, metadata)
+		_ = p.ColumnLineage(foundPipeline, upstreamAsset, metadata)
 	}
 
-	_ = p.parseLineage(asset, metadata)
+	_ = p.parseLineage(foundPipeline, asset, metadata)
 
 	return nil
 }
 
 // ParseLineage analyzes the column lineage for a given asset within a
 // It traces column relationships between the asset and its upstream dependencies.
-func (p *LineageExtractor) parseLineage(asset *Asset, metadata sqlparser.Schema) error {
+func (p *LineageExtractor) parseLineage(foundPipeline *Pipeline, asset *Asset, metadata sqlparser.Schema) error {
 	if asset == nil {
 		return errors.New("invalid arguments: asset and pipeline cannot be nil")
 	}
@@ -76,7 +74,7 @@ func (p *LineageExtractor) parseLineage(asset *Asset, metadata sqlparser.Schema)
 	}
 
 	for _, upstream := range asset.Upstreams {
-		upstreamAsset := p.Pipeline.GetAssetByName(upstream.Value)
+		upstreamAsset := foundPipeline.GetAssetByName(upstream.Value)
 		if upstreamAsset == nil {
 			return fmt.Errorf("upstream asset not found: %s", upstream.Value)
 		}
@@ -92,10 +90,10 @@ func (p *LineageExtractor) parseLineage(asset *Asset, metadata sqlparser.Schema)
 		return fmt.Errorf("failed to parse column lineage: %w", err)
 	}
 
-	return p.processLineageColumns(asset, lineage)
+	return p.processLineageColumns(foundPipeline, asset, lineage)
 }
 
-func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparser.Lineage) error {
+func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset *Asset, lineage *sqlparser.Lineage) error {
 	if lineage == nil {
 		return nil
 	}
@@ -128,7 +126,7 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 	for _, lineageCol := range lineage.Columns {
 		if lineageCol.Name == "*" {
 			for _, upstream := range lineageCol.Upstream {
-				upstreamAsset := p.Pipeline.GetAssetByName(upstream.Table)
+				upstreamAsset := foundPipeline.GetAssetByName(upstream.Table)
 				if upstreamAsset == nil {
 					continue
 				}
@@ -165,7 +163,7 @@ func (p *LineageExtractor) processLineageColumns(asset *Asset, lineage *sqlparse
 			if upstream.Table == asset.Name {
 				continue
 			}
-			upstreamAsset := p.Pipeline.GetAssetByName(upstream.Table)
+			upstreamAsset := foundPipeline.GetAssetByName(upstream.Table)
 			if upstreamAsset == nil {
 				if err := p.addColumnToAsset(asset, lineageCol.Name, nil, &Column{
 					Name:   upstream.Column,
