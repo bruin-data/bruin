@@ -142,4 +142,5 @@ glossary.yaml
 
 integration-tests/duckdb.db
 integration-tests/logs
+integration-tests/bruin
 !integration-tests/.bruin.yml
