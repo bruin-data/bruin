@@ -22,13 +22,13 @@ def extract_non_selected_columns(parsed: exp.Select) -> list[Column]:
     table_alias = {}
     for table in tables:
         if table.alias:
-            table_alias[table.alias] = f"{table.db + '.' if table.db else ''}{table.name}"
+            table_alias[table.alias] = f"{getattr(table, 'db', '') + '.' if getattr(table, 'db', '') else ''}{table.name}"
 
     table_names = {}
     for table in tables:
-        table_key = f"{table.db}.{table.name}" if table.db else table.name
+        table_key = f"{getattr(table, 'db', '')}.{table.name}" if getattr(table, 'db', '') else table.name
         table_names[table_key] = table
-
+        
     for scopes in [where, join, group]:
         for scope in scopes:
             if scope is None:
@@ -135,7 +135,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
             cl.append(
                 {
                     "column": ds.name.split(".")[-1],
-                    "table": f"{ds.expression.db + '.' if ds.expression.db else ''}{ds.expression.this.name}",
+                     "table": f"{getattr(ds.expression, 'db', '') + '.' if getattr(ds.expression, 'db', '') else ''}{ds.expression.this.name}",
                 }
             )
 
