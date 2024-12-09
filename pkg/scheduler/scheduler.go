@@ -298,7 +298,6 @@ func (s *Scheduler) MarkByTag(tag string, status TaskInstanceStatus, downstream 
 }
 
 func (s *Scheduler) MarkTaskInstance(instance TaskInstance, status TaskInstanceStatus, downstream bool) {
-
 	instance.MarkAs(status)
 	if !downstream {
 		return
@@ -334,7 +333,6 @@ func (s *Scheduler) MarkTaskInstanceSkipped(instance TaskInstance, status TaskIn
 }
 
 func (s *Scheduler) markTaskInstanceFailedWithDownstream(instance TaskInstance) {
-
 	s.MarkTaskInstanceSkipped(instance, UpstreamFailed, true)
 	s.MarkTaskInstanceSkipped(instance, Failed, false)
 }
