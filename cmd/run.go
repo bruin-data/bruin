@@ -352,7 +352,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			if len(errorsInTaskResults) > 0 {
-				printErrorsInResults(errorsInTaskResults, s)
+				filter.printErrorsInResults(errorsInTaskResults, s)
 				return cli.Exit("", 1)
 			}
 
@@ -363,7 +363,7 @@ func Run(isDebug *bool) *cli.Command {
 	}
 }
 
-func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) {
+func (f *Filter) printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) {
 	data := make(map[string][]*scheduler.TaskExecutionResult, len(errorsInTaskResults))
 	for _, result := range errorsInTaskResults {
 		assetName := result.Instance.GetAsset().Name
@@ -400,7 +400,7 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	errorPrinter.Println(fmt.Sprintf("Failed assets %d", len(data)))
 	errorPrinter.Println(tree.String())
 	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
-	if len(upstreamFailedTasks) > 0 {
+	if len(upstreamFailedTasks) > 0 && (f.SingleTask == nil || f.IncludeDownstream) {
 		errorPrinter.Printf("The following tasks are skipped due to their upstream failing:\n")
 
 		skippedAssets := make(map[string]int, 0)
