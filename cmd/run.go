@@ -301,8 +301,9 @@ func Run(isDebug *bool) *cli.Command {
 				SingleTask:        task,
 				ExcludeTag:        c.String("exclude-tag"),
 			}
+			isSingleAsset := (runningForAnAsset && !filter.IncludeDownstream)
 
-			s := scheduler.NewScheduler(logger, foundPipeline)
+			s := scheduler.NewScheduler(logger, foundPipeline, isSingleAsset)
 
 			// Apply the filter to mark assets based on include/exclude tags
 			if err := filter.ApplyFiltersAndMarkAssets(foundPipeline, s); err != nil {

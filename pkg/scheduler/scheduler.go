@@ -234,8 +234,9 @@ type Scheduler struct {
 	taskInstances []TaskInstance
 	taskNameMap   map[string]InstancesByType
 
-	WorkQueue chan TaskInstance
-	Results   chan *TaskExecutionResult
+	WorkQueue     chan TaskInstance
+	Results       chan *TaskExecutionResult
+	isSingleAsset bool // single asset without downstreams
 }
 
 func (s *Scheduler) InstanceCount() int {
@@ -314,7 +315,9 @@ func (s *Scheduler) MarkTaskInstance(instance TaskInstance, status TaskInstanceS
 }
 
 func (s *Scheduler) markTaskInstanceFailedWithDownstream(instance TaskInstance) {
-	s.MarkTaskInstance(instance, UpstreamFailed, true)
+	if !s.isSingleAsset {
+		s.MarkTaskInstance(instance, UpstreamFailed, true)
+	}
 	s.MarkTaskInstance(instance, Failed, false)
 }
 
@@ -351,9 +354,8 @@ func (s *Scheduler) FindMajorityOfTypes(defaultIfNone pipeline.AssetType) pipeli
 	return s.pipeline.GetMajorityAssetTypesFromSQLAssets(defaultIfNone)
 }
 
-func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline) *Scheduler {
+func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, SingleAsset bool) *Scheduler {
 	instances := make([]TaskInstance, 0)
-
 	for _, task := range p.Assets {
 		parentID := uuid.New().String()
 		instance := &AssetInstance{
@@ -426,6 +428,7 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline) *Scheduler {
 		taskScheduleLock: sync.Mutex{},
 		WorkQueue:        make(chan TaskInstance, 100),
 		Results:          make(chan *TaskExecutionResult),
+		isSingleAsset:    SingleAsset,
 	}
 	s.initialize()
 
