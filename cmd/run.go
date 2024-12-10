@@ -728,7 +728,7 @@ func (f *Filter) ApplyFiltersAndMarkAssets(pipeline *pipeline.Pipeline, s *sched
 	// Handle single-task execution
 	if f.SingleTask != nil {
 		// Skip all other tasks
-		s.MarkAll(scheduler.Succeeded)
+		s.MarkAll(scheduler.Skipped)
 
 		// Mark the single task and optionally its downstream tasks
 		s.MarkAsset(f.SingleTask, scheduler.Pending, f.IncludeDownstream)
@@ -770,7 +770,7 @@ func (f *Filter) ApplyFiltersAndMarkAssets(pipeline *pipeline.Pipeline, s *sched
 		if len(includedAssets) == 0 {
 			return fmt.Errorf("no assets found with include tag '%s'", f.IncludeTag)
 		}
-		s.MarkAll(scheduler.Succeeded) // Skip everything first
+		s.MarkAll(scheduler.Skipped) // Skip everything first
 		s.MarkByTag(f.IncludeTag, scheduler.Pending, f.IncludeDownstream)
 	}
 
@@ -780,18 +780,18 @@ func (f *Filter) ApplyFiltersAndMarkAssets(pipeline *pipeline.Pipeline, s *sched
 		if len(excludedAssets) == 0 {
 			return fmt.Errorf("no assets found with exclude tag '%s'", f.ExcludeTag)
 		}
-		s.MarkByTag(f.ExcludeTag, scheduler.Succeeded, f.IncludeDownstream)
+		s.MarkByTag(f.ExcludeTag, scheduler.Skipped, f.IncludeDownstream)
 	}
 	// Mark tasks in the scheduler
 	if !runMain {
-		s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeMain, scheduler.Succeeded)
+		s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeMain, scheduler.Skipped)
 	}
 	if !runChecks {
-		s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeColumnCheck, scheduler.Succeeded)
-		s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeCustomCheck, scheduler.Succeeded)
+		s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeColumnCheck, scheduler.Skipped)
+		s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeCustomCheck, scheduler.Skipped)
 	}
 	if !runPushMetadata {
-		s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeMetadataPush, scheduler.Succeeded)
+		s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeMetadataPush, scheduler.Skipped)
 	}
 
 	return nil

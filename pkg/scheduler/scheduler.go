@@ -110,7 +110,7 @@ func (t *AssetInstance) GetStatus() TaskInstanceStatus {
 }
 
 func (t *AssetInstance) Completed() bool {
-	return t.status == Failed || t.status == Succeeded || t.status == UpstreamFailed
+	return t.status == Failed || t.status == Succeeded || t.status == UpstreamFailed || t.status == Skipped
 }
 
 func (t *AssetInstance) Blocking() bool {
@@ -313,9 +313,28 @@ func (s *Scheduler) MarkTaskInstance(instance TaskInstance, status TaskInstanceS
 	}
 }
 
+func (s *Scheduler) MarkTaskInstanceIfNotSkipped(instance TaskInstance, status TaskInstanceStatus, markDownstream bool) {
+	if instance.GetStatus() == Skipped {
+		return
+	}
+	instance.MarkAs(status)
+	if !markDownstream {
+		return
+	}
+
+	downstreams := instance.GetDownstream()
+	if len(downstreams) == 0 {
+		return
+	}
+
+	for _, d := range downstreams {
+		s.MarkTaskInstanceIfNotSkipped(d, status, markDownstream)
+	}
+}
+
 func (s *Scheduler) markTaskInstanceFailedWithDownstream(instance TaskInstance) {
-	s.MarkTaskInstance(instance, UpstreamFailed, true)
-	s.MarkTaskInstance(instance, Failed, false)
+	s.MarkTaskInstanceIfNotSkipped(instance, UpstreamFailed, true)
+	s.MarkTaskInstanceIfNotSkipped(instance, Failed, false)
 }
 
 func (s *Scheduler) GetTaskInstancesByStatus(status TaskInstanceStatus) []TaskInstance {
@@ -353,7 +372,6 @@ func (s *Scheduler) FindMajorityOfTypes(defaultIfNone pipeline.AssetType) pipeli
 
 func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline) *Scheduler {
 	instances := make([]TaskInstance, 0)
-
 	for _, task := range p.Assets {
 		parentID := uuid.New().String()
 		instance := &AssetInstance{
@@ -549,8 +567,9 @@ func (s *Scheduler) Run(ctx context.Context) []*TaskExecutionResult {
 func (s *Scheduler) Tick(result *TaskExecutionResult) bool {
 	s.taskScheduleLock.Lock()
 	defer s.taskScheduleLock.Unlock()
-
-	s.MarkTaskInstance(result.Instance, Succeeded, false)
+	if result.Instance.GetStatus() != Skipped {
+		s.MarkTaskInstance(result.Instance, Succeeded, false)
+	}
 	if result.Error != nil {
 		s.markTaskInstanceFailedWithDownstream(result.Instance)
 	}
