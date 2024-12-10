@@ -7,6 +7,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
@@ -159,7 +160,7 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool) error {
 
 		defer sqlParser.Close()
 
-		lineage := pipeline.NewLineageExtractor(foundPipeline.Name, sqlParser)
+		lineage := pipeline.NewLineageExtractor(jinja.NewRendererWithYesterday(foundPipeline.Name, "lineage-parser"), sqlParser)
 		for _, asset := range foundPipeline.Assets {
 			metadata := lineage.TableSchema(foundPipeline)
 
@@ -238,7 +239,7 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 			return cli.Exit("", 1)
 		}
 
-		lineageExtractor := pipeline.NewLineageExtractor(foundPipeline.Name, sqlParser)
+		lineageExtractor := pipeline.NewLineageExtractor(jinja.NewRendererWithYesterday(foundPipeline.Name, "lineage-parser"), sqlParser)
 		metadata := lineageExtractor.TableSchema(foundPipeline)
 
 		if err := lineageExtractor.ColumnLineage(foundPipeline, asset, metadata); err != nil {

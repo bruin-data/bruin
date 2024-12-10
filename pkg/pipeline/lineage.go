@@ -20,10 +20,10 @@ type LineageExtractor struct {
 }
 
 // NewLineageExtractor creates a new LineageExtractor instance.
-func NewLineageExtractor(name string, parser sqlParser) *LineageExtractor {
+func NewLineageExtractor(jinjarender *jinja.Renderer, parser sqlParser) *LineageExtractor {
 	return &LineageExtractor{
 		sqlParser: parser,
-		renderer:  jinja.NewRendererWithYesterday(name, "lineage-parser"),
+		renderer:  jinjarender,
 	}
 }
 
