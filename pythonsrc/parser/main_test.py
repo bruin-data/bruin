@@ -129,7 +129,7 @@ test_cases_non_selected_columns = [
         ],
     },
     {
-        "name": "dashboard._report",
+        "name": "dashboard.report",
         "dialect": "bigquery",
         "query": """
         SELECT
@@ -208,6 +208,94 @@ test_cases_non_selected_columns = [
             Column(name="col4", table="dataset1.table1"),
             Column(name="col5", table="dataset1.table1"),
             Column(name="col5", table="dataset7.table7"),
+        ],
+    },
+    {
+        "name": "project_report",
+        "dialect": "bigquery",
+        "query": """
+       SELECT
+           p1.col1,
+           p1.col2,
+           p1.col3,
+           p1.col4,
+           p1.col5,
+           p1.col6,
+           p1.col7 is not null as is_active,
+           1 as project_credits,
+           if(p2.col1 is not null, 1, 0) as credits_used,
+           p3.col1 as ProjectName,
+           p3.col2 as ProjectId,
+           p4.col1,
+           p4.col2,
+           p5.col1 as Department,
+           p5.col2 as DepartmentId,
+           p4.col3,
+           p4.col4,
+           p6.col1 as ProgramName,
+           p5.col3,
+           p5.col4
+       FROM `project1.dataset1.table1` as p1
+       INNER JOIN `project2.dataset2.table2` as p6
+           ON p1.col3 = p6.col1
+       INNER JOIN `project3.dataset3.table3` as p5
+           ON p6.col2 = p5.col2
+       LEFT JOIN `project4.dataset4.table4` as p7
+           ON p7.col1 = p1.col4
+       LEFT JOIN `project5.dataset5.table5` as p2
+           ON p1.col1 = p2.col2
+       LEFT JOIN `project6.dataset6.table6` as p3
+           ON p3.col2 = cast(p2.col3 as int64)
+       LEFT JOIN `project7.dataset7.table7` as p4
+           ON p4.col5 = safe_cast(p1.col5 as int64)
+   """,
+        "schema": {
+            "project1.dataset1.table1": {
+                "col1": "STRING",
+                "col2": "STRING",
+                "col3": "STRING",
+                "col4": "STRING",
+                "col5": "STRING",
+                "col6": "STRING",
+                "col7": "STRING",
+            },
+            "project2.dataset2.table2": {"col1": "STRING", "col2": "STRING"},
+            "project3.dataset3.table3": {
+                "col1": "STRING",
+                "col2": "STRING",
+                "col3": "STRING",
+                "col4": "STRING",
+            },
+            "project4.dataset4.table4": {"col1": "STRING"},
+            "project5.dataset5.table5": {
+                "col1": "STRING",
+                "col2": "STRING",
+                "col3": "STRING",
+            },
+            "project6.dataset6.table6": {"col1": "STRING", "col2": "STRING"},
+            "project7.dataset7.table7": {
+                "col1": "STRING",
+                "col2": "STRING",
+                "col3": "STRING",
+                "col4": "STRING",
+                "col5": "STRING",
+            },
+        },
+        "expected": [
+            [
+                Column(name="col1", table="project1.dataset1.table1"),
+                Column(name="col1", table="project2.dataset2.table2"),
+                Column(name="col1", table="project4.dataset4.table4"),
+                Column(name="col2", table="project2.dataset2.table2"),
+                Column(name="col2", table="project3.dataset3.table3"),
+                Column(name="col2", table="project5.dataset5.table5"),
+                Column(name="col2", table="project6.dataset6.table6"),
+                Column(name="col3", table="project1.dataset1.table1"),
+                Column(name="col3", table="project5.dataset5.table5"),
+                Column(name="col4", table="project1.dataset1.table1"),
+                Column(name="col5", table="project1.dataset1.table1"),
+                Column(name="col5", table="project7.dataset7.table7"),
+            ]
         ],
     },
 ]
@@ -886,7 +974,7 @@ test_cases = [
         "expected_non_selected": [],
     },
     {
-        "name": "dashboard._report",
+        "name": "dashboard.report",
         "dialect": "bigquery",
         "query": """
         SELECT
@@ -1084,6 +1172,213 @@ test_cases = [
                 "upstream": [
                     {"column": "col5", "table": "dataset1.table1"},
                     {"column": "col5", "table": "dataset7.table7"},
+                ],
+            },
+        ],
+    },
+    {
+        "name": "project_report",
+        "dialect": "bigquery",
+        "query": """
+       SELECT
+           p1.col1,
+           p1.col2,
+           p1.col3,
+           p1.col4,
+           p1.col5,
+           p1.col6,
+           p1.col7 is not null as is_active,
+           1 as project_credits,
+           if(p2.col1 is not null, 1, 0) as credits_used,
+           p3.col1 as ProjectName,
+           p3.col2 as ProjectId,
+           p4.col1,
+           p4.col2,
+           p5.col1 as Department,
+           p5.col2 as DepartmentId,
+           p4.col3,
+           p4.col4,
+           p6.col1 as ProgramName,
+           p5.col3,
+           p5.col4
+       FROM `project1.dataset1.table1` as p1
+       INNER JOIN `project2.dataset2.table2` as p6
+           ON p1.col3 = p6.col1
+       INNER JOIN `project3.dataset3.table3` as p5
+           ON p6.col2 = p5.col2
+       LEFT JOIN `project4.dataset4.table4` as p7
+           ON p7.col1 = p1.col4
+       LEFT JOIN `project5.dataset5.table5` as p2
+           ON p1.col1 = p2.col2
+       LEFT JOIN `project6.dataset6.table6` as p3
+           ON p3.col2 = cast(p2.col3 as int64)
+       LEFT JOIN `project7.dataset7.table7` as p4
+           ON p4.col5 = safe_cast(p1.col5 as int64)
+   """,
+        "schema": {
+            "project1.dataset1.table1": {
+                "col1": "STRING",
+                "col2": "STRING",
+                "col3": "STRING",
+                "col4": "STRING",
+                "col5": "STRING",
+                "col6": "STRING",
+                "col7": "STRING",
+            },
+            "project2.dataset2.table2": {"col1": "STRING", "col2": "STRING"},
+            "project3.dataset3.table3": {
+                "col1": "STRING",
+                "col2": "STRING",
+                "col3": "STRING",
+                "col4": "STRING",
+            },
+            "project4.dataset4.table4": {"col1": "STRING"},
+            "project5.dataset5.table5": {
+                "col1": "STRING",
+                "col2": "STRING",
+                "col3": "STRING",
+            },
+            "project6.dataset6.table6": {"col1": "STRING", "col2": "STRING"},
+            "project7.dataset7.table7": {
+                "col1": "STRING",
+                "col2": "STRING",
+                "col3": "STRING",
+                "col4": "STRING",
+                "col5": "STRING",
+            },
+        },
+        "expected": [
+            {
+                "name": "col1",
+                "type": "UNKNOWN",
+                "upstream": [{"column": "col1", "table": "project1.dataset1.table1"}],
+            },
+            {
+                "name": "col1",
+                "type": "UNKNOWN",
+                "upstream": [{"column": "col1", "table": "project1.dataset1.table1"}],
+            },
+            {
+                "name": "col2",
+                "type": "UNKNOWN",
+                "upstream": [{"column": "col2", "table": "project1.dataset1.table1"}],
+            },
+            {
+                "name": "col2",
+                "type": "UNKNOWN",
+                "upstream": [{"column": "col2", "table": "project1.dataset1.table1"}],
+            },
+            {
+                "name": "col3",
+                "type": "UNKNOWN",
+                "upstream": [{"column": "col3", "table": "project1.dataset1.table1"}],
+            },
+            {
+                "name": "col3",
+                "type": "UNKNOWN",
+                "upstream": [{"column": "col3", "table": "project1.dataset1.table1"}],
+            },
+            {
+                "name": "col3",
+                "type": "UNKNOWN",
+                "upstream": [{"column": "col3", "table": "project1.dataset1.table1"}],
+            },
+            {
+                "name": "col4",
+                "type": "UNKNOWN",
+                "upstream": [{"column": "col4", "table": "project1.dataset1.table1"}],
+            },
+            {
+                "name": "col4",
+                "type": "UNKNOWN",
+                "upstream": [{"column": "col4", "table": "project1.dataset1.table1"}],
+            },
+            {
+                "name": "col4",
+                "type": "UNKNOWN",
+                "upstream": [{"column": "col4", "table": "project1.dataset1.table1"}],
+            },
+            {
+                "name": "col5",
+                "type": "UNKNOWN",
+                "upstream": [{"column": "col5", "table": "project1.dataset1.table1"}],
+            },
+            {
+                "name": "col6",
+                "type": "UNKNOWN",
+                "upstream": [{"column": "col6", "table": "project1.dataset1.table1"}],
+            },
+            {
+                "name": "credits_used",
+                "type": "INT",
+                "upstream": [{"column": "col1", "table": "project5.dataset5.table5"}],
+            },
+            {
+                "name": "department",
+                "type": "UNKNOWN",
+                "upstream": [{"column": "col1", "table": "project3.dataset3.table3"}],
+            },
+            {
+                "name": "departmentid",
+                "type": "UNKNOWN",
+                "upstream": [{"column": "col2", "table": "project3.dataset3.table3"}],
+            },
+            {
+                "name": "is_active",
+                "type": "BOOLEAN",
+                "upstream": [{"column": "col7", "table": "project1.dataset1.table1"}],
+            },
+            {
+                "name": "programname",
+                "type": "UNKNOWN",
+                "upstream": [{"column": "col1", "table": "project2.dataset2.table2"}],
+            },
+            {"name": "project_credits", "type": "INT", "upstream": []},
+            {
+                "name": "projectid",
+                "type": "UNKNOWN",
+                "upstream": [{"column": "col2", "table": "project6.dataset6.table6"}],
+            },
+            {
+                "name": "projectname",
+                "type": "UNKNOWN",
+                "upstream": [{"column": "col1", "table": "project6.dataset6.table6"}],
+            },
+        ],
+        "expected_non_selected": [
+            {
+                "name": "col1",
+                "upstream": [
+                    {"column": "col1", "table": "project1.dataset1.table1"},
+                    {"column": "col1", "table": "project2.dataset2.table2"},
+                    {"column": "col1", "table": "project4.dataset4.table4"},
+                ],
+            },
+            {
+                "name": "col2",
+                "upstream": [
+                    {"column": "col2", "table": "project2.dataset2.table2"},
+                    {"column": "col2", "table": "project3.dataset3.table3"},
+                    {"column": "col2", "table": "project5.dataset5.table5"},
+                    {"column": "col2", "table": "project6.dataset6.table6"},
+                ],
+            },
+            {
+                "name": "col3",
+                "upstream": [
+                    {"column": "col3", "table": "project1.dataset1.table1"},
+                    {"column": "col3", "table": "project5.dataset5.table5"},
+                ],
+            },
+            {
+                "name": "col4",
+                "upstream": [{"column": "col4", "table": "project1.dataset1.table1"}],
+            },
+            {
+                "name": "col5",
+                "upstream": [
+                    {"column": "col5", "table": "project1.dataset1.table1"},
+                    {"column": "col5", "table": "project7.dataset7.table7"},
                 ],
             },
         ],
