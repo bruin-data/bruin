@@ -54,10 +54,11 @@ func runLineageTests(t *testing.T, tests []struct {
 
 func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error) {
 	t.Helper()
-	extractor := NewLineageExtractor(p, SQLParser)
-	metadata := extractor.TableSchema()
+
+	extractor := NewLineageExtractor(SQLParser)
+	metadata := extractor.TableSchema(p)
 	for _, asset := range p.Assets {
-		err := extractor.ColumnLineage(asset, metadata)
+		err := extractor.ColumnLineage(p, asset, metadata)
 		assertLineageError(t, err, want)
 
 		assertColumns(t, asset.Columns, after.GetAssetByName(asset.Name).Columns, len(asset.Columns))
