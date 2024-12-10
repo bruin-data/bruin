@@ -313,12 +313,12 @@ func (s *Scheduler) MarkTaskInstance(instance TaskInstance, status TaskInstanceS
 	}
 }
 
-func (s *Scheduler) MarkTaskInstanceSkipped(instance TaskInstance, status TaskInstanceStatus, downstream bool) {
+func (s *Scheduler) MarkTaskInstanceIfNotSkipped(instance TaskInstance, status TaskInstanceStatus, markDownstream bool) {
 	if instance.GetStatus() == Skipped {
 		return
 	}
 	instance.MarkAs(status)
-	if !downstream {
+	if !markDownstream {
 		return
 	}
 
@@ -328,13 +328,13 @@ func (s *Scheduler) MarkTaskInstanceSkipped(instance TaskInstance, status TaskIn
 	}
 
 	for _, d := range downstreams {
-		s.MarkTaskInstanceSkipped(d, status, downstream)
+		s.MarkTaskInstanceIfNotSkipped(d, status, markDownstream)
 	}
 }
 
 func (s *Scheduler) markTaskInstanceFailedWithDownstream(instance TaskInstance) {
-	s.MarkTaskInstanceSkipped(instance, UpstreamFailed, true)
-	s.MarkTaskInstanceSkipped(instance, Failed, false)
+	s.MarkTaskInstanceIfNotSkipped(instance, UpstreamFailed, true)
+	s.MarkTaskInstanceIfNotSkipped(instance, Failed, false)
 }
 
 func (s *Scheduler) GetTaskInstancesByStatus(status TaskInstanceStatus) []TaskInstance {
