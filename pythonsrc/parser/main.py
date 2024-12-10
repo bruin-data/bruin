@@ -138,7 +138,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
             cl.append(
                 {
                     "column": ds.name.split(".")[-1],
-                    "table": f"{getattr(ds.expression, 'db', '') + '.' if getattr(ds.expression, 'db', '') else ''}{ds.expression.this.name}",
+                    "table": f"{ds.expression.db + '.' if getattr(ds.expression, 'db', '') else ''}{ds.expression.this.name}",
                 }
             )
 
