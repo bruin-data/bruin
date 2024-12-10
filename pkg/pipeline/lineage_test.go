@@ -3,6 +3,7 @@ package pipeline
 import (
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
@@ -54,10 +55,11 @@ func runLineageTests(t *testing.T, tests []struct {
 
 func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error) {
 	t.Helper()
-	extractor := NewLineageExtractor(p, SQLParser)
-	metadata := extractor.TableSchema()
+
+	extractor := NewLineageExtractor(jinja.NewRendererWithYesterday(p.Name, "lineage-parser"), SQLParser)
+	metadata := extractor.TableSchema(p)
 	for _, asset := range p.Assets {
-		err := extractor.ColumnLineage(asset, metadata)
+		err := extractor.ColumnLineage(p, asset, metadata)
 		assertLineageError(t, err, want)
 
 		assertColumns(t, asset.Columns, after.GetAssetByName(asset.Name).Columns, len(asset.Columns))
