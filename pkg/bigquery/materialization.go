@@ -88,7 +88,7 @@ func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
 
 func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) {
 	mat := asset.Materialization
-
+	query = query + "\n"
 	if mat.IncrementalKey == "" {
 		return "", fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", mat.Strategy)
 	}
