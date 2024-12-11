@@ -27,7 +27,7 @@ WITH game_results AS (
             END AS winner_aid,
         g.white->>'@id' AS white_aid,
     g.black->>'@id' AS black_aid
-FROM playground.game g
+FROM chess_playground.games g
 )
 
 SELECT
