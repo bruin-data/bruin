@@ -177,9 +177,4 @@ def find_leaf_nodes(node: Node, leaf_nodes):
 
 
 def merge_parts(table: exp.Table) -> str:
-    names = []
-    parts = table.parts
-    for part in parts:
-        if isinstance(part, exp.Identifier):
-            names.append(part.name)
-    return ".".join(names)
+    return ".".join(part.name for part in table.parts if isinstance(part, exp.Identifier))
