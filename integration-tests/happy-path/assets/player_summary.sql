@@ -21,13 +21,13 @@ columns:
 WITH game_results AS (
     SELECT
         CASE
-            WHEN g.white__result = 'win' THEN g.white__aid
-            WHEN g.black__result = 'win' THEN g.black__aid
+            WHEN g.white->>'result' = 'win' THEN g.white->>'@id'
+            WHEN g.black->>'result' = 'win' THEN g.black->>'@id'
             ELSE NULL
             END AS winner_aid,
-        g.white__aid AS white_aid,
-        g.black__aid AS black_aid
-    FROM chess_playground.games g
+        g.white->>'@id' AS white_aid,
+    g.black->>'@id' AS black_aid
+FROM playground.game g
 )
 
 SELECT
