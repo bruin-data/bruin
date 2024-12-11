@@ -33,6 +33,12 @@ func main() {
 	}
 	expectJSONOutput("internal parse-pipeline happy-path", "happy-path/expectations/pipeline.yml.json")
 	expectExitCode("run --tag include --exclude-tag exclude chess-extended", 0)
+	expectExitCode("run --tag include --exclude-tag exclude chess-extended/expectations/chess_games.asset.yml", 1)
+	expectOutputIncludes(
+		"run --tag include --exclude-tag exclude --only checks chess-extended",
+		0,
+		[]string{"Executed 1 tasks", "total_games:positive"},
+	)
 	expectQueryResult(
 		"duckdb-default",
 		"SELECT table_name FROM information_schema.tables WHERE table_schema = 'chess_playground';",
