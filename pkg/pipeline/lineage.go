@@ -105,12 +105,22 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 		dict := map[string]bool{}
 		for _, lineageCol := range lineage.NonSelectedColumns {
 			for _, lineageUpstream := range lineageCol.Upstream {
-				if _, ok := dict[fmt.Sprintf("%s-%s", lineageUpstream.Table, lineageCol.Name)]; !ok {
+				key := fmt.Sprintf("%s-%s", strings.ToLower(lineageUpstream.Table), strings.ToLower(lineageCol.Name))
+				if _, ok := dict[key]; !ok {
 					if strings.EqualFold(lineageUpstream.Table, up.Value) {
-						upstream.Columns = append(upstream.Columns, DependsColumn{
-							Name: lineageCol.Name,
-						})
-						dict[fmt.Sprintf("%s-%s", lineageUpstream.Table, lineageCol.Name)] = true
+						exists := false
+						for _, col := range upstream.Columns {
+							if strings.EqualFold(col.Name, lineageCol.Name) {
+								exists = true
+								break
+							}
+						}
+						if !exists {
+							upstream.Columns = append(upstream.Columns, DependsColumn{
+								Name: lineageCol.Name,
+							})
+						}
+						dict[key] = true
 					}
 				}
 			}

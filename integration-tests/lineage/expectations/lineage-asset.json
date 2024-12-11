@@ -78,7 +78,6 @@
         "checks": [],
         "upstreams": [
           {
-            "asset": "country",
             "column": "country",
             "table": "country"
           }
@@ -94,7 +93,6 @@
         "checks": [],
         "upstreams": [
           {
-            "asset": "people",
             "column": "last_name",
             "table": "people"
           }
@@ -110,7 +108,6 @@
         "checks": [],
         "upstreams": [
           {
-            "asset": "people",
             "column": "name",
             "table": "people"
           }
@@ -126,7 +123,6 @@
         "checks": [],
         "upstreams": [
           {
-            "asset": "people",
             "column": "created_at",
             "table": "people"
           }
@@ -207,7 +203,6 @@
             "checks": [],
             "upstreams": [
               {
-                "asset": "users",
                 "column": "country",
                 "table": "users"
               }
@@ -223,7 +218,6 @@
             "checks": [],
             "upstreams": [
               {
-                "asset": "users",
                 "column": "id",
                 "table": "users"
               }
@@ -314,7 +308,6 @@
             "checks": [],
             "upstreams": [
               {
-                "asset": "country",
                 "column": "country",
                 "table": "country"
               }
@@ -330,7 +323,6 @@
             "checks": [],
             "upstreams": [
               {
-                "asset": "people",
                 "column": "last_name",
                 "table": "people"
               }
@@ -346,7 +338,6 @@
             "checks": [],
             "upstreams": [
               {
-                "asset": "people",
                 "column": "name",
                 "table": "people"
               }
@@ -362,7 +353,6 @@
             "checks": [],
             "upstreams": [
               {
-                "asset": "people",
                 "column": "created_at",
                 "table": "people"
               }
@@ -443,7 +433,6 @@
             "checks": [],
             "upstreams": [
               {
-                "asset": "users",
                 "column": "created_at",
                 "table": "users"
               }
@@ -459,7 +448,6 @@
             "checks": [],
             "upstreams": [
               {
-                "asset": "users",
                 "column": "id",
                 "table": "users"
               }
@@ -475,7 +463,6 @@
             "checks": [],
             "upstreams": [
               {
-                "asset": "users",
                 "column": "last_name",
                 "table": "users"
               }
@@ -491,7 +478,6 @@
             "checks": [],
             "upstreams": [
               {
-                "asset": "users",
                 "column": "name",
                 "table": "users"
               }

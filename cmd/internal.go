@@ -247,6 +247,8 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 		}
 	}
 
+	foundPipeline.WipeContentOfAssets()
+
 	js, err := json.Marshal(struct {
 		Asset    *pipeline.Asset    `json:"asset"`
 		Pipeline *pipeline.Pipeline `json:"pipeline"`
