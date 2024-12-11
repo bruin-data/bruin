@@ -282,20 +282,18 @@ test_cases_non_selected_columns = [
             },
         },
         "expected": [
-            [
-                Column(name="col1", table="project1.dataset1.table1"),
-                Column(name="col1", table="project2.dataset2.table2"),
-                Column(name="col1", table="project4.dataset4.table4"),
-                Column(name="col2", table="project2.dataset2.table2"),
-                Column(name="col2", table="project3.dataset3.table3"),
-                Column(name="col2", table="project5.dataset5.table5"),
-                Column(name="col2", table="project6.dataset6.table6"),
-                Column(name="col3", table="project1.dataset1.table1"),
-                Column(name="col3", table="project5.dataset5.table5"),
-                Column(name="col4", table="project1.dataset1.table1"),
-                Column(name="col5", table="project1.dataset1.table1"),
-                Column(name="col5", table="project7.dataset7.table7"),
-            ]
+            Column(name="col1", table="project1.dataset1.table1"),
+            Column(name="col1", table="project2.dataset2.table2"),
+            Column(name="col1", table="project4.dataset4.table4"),
+            Column(name="col2", table="project2.dataset2.table2"),
+            Column(name="col2", table="project3.dataset3.table3"),
+            Column(name="col2", table="project5.dataset5.table5"),
+            Column(name="col2", table="project6.dataset6.table6"),
+            Column(name="col3", table="project1.dataset1.table1"),
+            Column(name="col3", table="project5.dataset5.table5"),
+            Column(name="col4", table="project1.dataset1.table1"),
+            Column(name="col5", table="project1.dataset1.table1"),
+            Column(name="col5", table="project7.dataset7.table7"),
         ],
     },
 ]
@@ -944,7 +942,7 @@ test_cases = [
             {
                 "name": "current_time",
                 "type": "TIMESTAMP",
-                "upstream": [{"column": "current_time", "table": ""}],
+                "upstream": [],
             },
             {
                 "name": "order_id",

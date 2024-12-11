@@ -22,17 +22,11 @@ def extract_non_selected_columns(parsed: exp.Select) -> list[Column]:
     table_alias = {}
     for table in tables:
         if table.alias:
-            table_alias[table.alias] = (
-                f"{table.catalog + '.' if table.catalog != '' else ''}"
-                f"{table.db + '.' if table.db != '' else ''}{table.name}"
-            )
+            table_alias[table.alias] = merge_parts(table)
 
     table_names = {}
     for table in tables:
-        table_key = (
-            f"{table.catalog + '.' if table.catalog != '' else ''}"
-            f"{table.db + '.' if table.db != '' else ''}{table.name}"
-        )
+        table_key = merge_parts(table)
         table_names[table_key] = table
 
     for scopes in [where, join, group]:
@@ -139,12 +133,14 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
                 ds.expression.this, exp.Anonymous
             ):
                 continue
-            cl.append(
-                {
-                    "column": ds.name.split(".")[-1],
-                    "table": f"{ds.expression.catalog + '.' if getattr(ds.expression, 'catalog', '') else ''}{ds.expression.db + '.' if getattr(ds.expression, 'db', '') else ''}{ds.expression.this.name}",
-                }
-            )
+
+            if isinstance(ds.expression, exp.Table):
+                cl.append(
+                    {
+                        "column": ds.name.split(".")[-1],
+                        "table": merge_parts(ds.expression),
+                    }
+                )
 
         # Deduplicate based on column-table combination
         cl = [dict(t) for t in {tuple(d.items()) for d in cl}]
@@ -178,3 +174,12 @@ def find_leaf_nodes(node: Node, leaf_nodes):
     else:
         for child in node.downstream:
             find_leaf_nodes(child, leaf_nodes)
+
+
+def merge_parts(table: exp.Table) -> str:
+    names = []
+    parts = table.parts
+    for part in parts:
+        if isinstance(part, exp.Identifier):
+            names.append(part.name)
+    return ".".join(names)
