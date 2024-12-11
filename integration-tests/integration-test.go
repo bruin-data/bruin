@@ -228,7 +228,7 @@ func expectQueryResult(connection, query, outputFile, expectationPath string) {
 		os.Exit(1)
 	}
 	if _, err := os.Stat(outputFile); os.IsNotExist(err) {
-		err = os.WriteFile(outputFile, []byte(output), 0644)
+		err = os.WriteFile(outputFile, []byte(output), 0600)
 		if err != nil {
 			os.Exit(1)
 		}
