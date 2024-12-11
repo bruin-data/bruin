@@ -718,7 +718,7 @@ func (a *Asset) ColumnNamesWithPrimaryKey() []string {
 
 func (a *Asset) GetColumnWithName(name string) *Column {
 	for _, c := range a.Columns {
-		if c.Name == name {
+		if strings.EqualFold(c.Name, name) {
 			return &c
 		}
 	}

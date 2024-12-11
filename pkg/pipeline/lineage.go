@@ -44,10 +44,6 @@ func (p *LineageExtractor) ColumnLineage(foundPipeline *Pipeline, asset *Asset, 
 		return nil
 	}
 
-	if len(asset.Columns) > 0 {
-		return nil
-	}
-
 	for _, upstream := range asset.Upstreams {
 		upstreamAsset := foundPipeline.GetAssetByName(upstream.Value)
 		if upstreamAsset == nil {
