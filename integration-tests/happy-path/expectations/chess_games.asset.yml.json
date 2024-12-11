@@ -14,12 +14,12 @@
     "owner": "",
     "executable_file": {
       "name": "chess_games.asset.yml",
-      "path": "__ASSETSDIR__chess_games.asset.yml",
+      "path": "/integration-tests/happy-path/assets/chess_games.asset.yml",
       "content": "name: chess_playground.games\ntype: ingestr\nparameters:\n  source_connection: chess-default\n  source_table: games\n  destination: duckdb"
     },
     "definition_file": {
       "name": "chess_games.asset.yml",
-      "path": "__ASSETSDIR__chess_games.asset.yml",
+      "path": "/integration-tests/happy-path/assets/chess_games.asset.yml",
       "type": "yaml"
     },
     "parameters": {
@@ -41,7 +41,7 @@
     "start_date": "",
     "definition_file": {
       "name": "pipeline.yml",
-      "path": "__PIPELINEDIR__pipeline.yml"
+      "path": "/integration-tests/happy-path/pipeline.yml"
     },
     "default_parameters": {},
     "default_connections": {},
@@ -66,12 +66,12 @@
         "owner": "",
         "executable_file": {
           "name": "asset.py",
-          "path": "__ASSETSDIR__asset.py",
+          "path": "/integration-tests/happy-path/assets/asset.py",
           "content": "import os\nimport duckdb\n\nif os.getenv('INJECTED1') != \"value1\":\n    raise Exception(\"KEY1 is not injected correctly\")\n\ncon = duckdb.connect(database = \"duckdb.db\", read_only = False)\n\ncon.execute(\"SELECT * FROM chess_playground.player_summary\")\nresult = con.fetchall()\nif len(result) != 2:\n    raise Exception(\"Incorrect number of rows in player_summary\")"
         },
         "definition_file": {
           "name": "asset.py",
-          "path": "__ASSETSDIR__asset.py",
+          "path": "/integration-tests/happy-path/assets/asset.py",
           "type": "comment"
         },
         "parameters": {},
@@ -102,12 +102,12 @@
         "owner": "",
         "executable_file": {
           "name": "chess_games.asset.yml",
-          "path": "__ASSETSDIR__chess_games.asset.yml",
+          "path": "/integration-tests/happy-path/assets/chess_games.asset.yml",
           "content": "name: chess_playground.games\ntype: ingestr\nparameters:\n  source_connection: chess-default\n  source_table: games\n  destination: duckdb"
         },
         "definition_file": {
           "name": "chess_games.asset.yml",
-          "path": "__ASSETSDIR__chess_games.asset.yml",
+          "path": "/integration-tests/happy-path/assets/chess_games.asset.yml",
           "type": "yaml"
         },
         "parameters": {
@@ -137,12 +137,12 @@
         "owner": "",
         "executable_file": {
           "name": "chess_profiles.asset.yml",
-          "path": "__ASSETSDIR__chess_profiles.asset.yml",
+          "path": "/integration-tests/happy-path/assets/chess_profiles.asset.yml",
           "content": "name: chess_playground.profiles\ntype: ingestr\nparameters:\n  source_connection: chess-default\n  source_table: profiles\n  destination: duckdb"
         },
         "definition_file": {
           "name": "chess_profiles.asset.yml",
-          "path": "__ASSETSDIR__chess_profiles.asset.yml",
+          "path": "/integration-tests/happy-path/assets/chess_profiles.asset.yml",
           "type": "yaml"
         },
         "parameters": {
@@ -187,12 +187,12 @@
         "owner": "",
         "executable_file": {
           "name": "player_summary.sql",
-          "path": "__ASSETSDIR__player_summary.sql",
-          "content": "WITH game_results AS (\n    SELECT\n        CASE\n            WHEN g.white__result = 'win' THEN g.white__aid\n            WHEN g.black__result = 'win' THEN g.black__aid\n            ELSE NULL\n            END AS winner_aid,\n        g.white__aid AS white_aid,\n        g.black__aid AS black_aid\n    FROM chess_playground.games g\n)\n\nSELECT\n    p.username,\n    p.aid,\n    COUNT(*) AS total_games,\n    COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) AS white_wins,\n    COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) AS black_wins,\n    COUNT(CASE WHEN g.white_aid = p.aid THEN 1 END) AS white_games,\n    COUNT(CASE WHEN g.black_aid = p.aid THEN 1 END) AS black_games,\n    ROUND(COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) * 100.0 / NULLIF(COUNT(CASE WHEN g.white_aid = p.aid THEN 1 END), 0), 2) AS white_win_rate,\n    ROUND(COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) * 100.0 / NULLIF(COUNT(CASE WHEN g.black_aid = p.aid THEN 1 END), 0), 2) AS black_win_rate\nFROM chess_playground.profiles p\nLEFT JOIN game_results g\n       ON p.aid IN (g.white_aid, g.black_aid)\nGROUP BY p.username, p.aid\nORDER BY total_games DESC"
+          "path": "/integration-tests/happy-path/assets/player_summary.sql",
+          "content": "WITH game_results AS (\n    SELECT\n        CASE\n            WHEN g.white-\u003e\u003e'result' = 'win' THEN g.white-\u003e\u003e'@id'\n            WHEN g.black-\u003e\u003e'result' = 'win' THEN g.black-\u003e\u003e'@id'\n            ELSE NULL\n            END AS winner_aid,\n        g.white-\u003e\u003e'@id' AS white_aid,\n    g.black-\u003e\u003e'@id' AS black_aid\nFROM chess_playground.games g\n)\n\nSELECT\n    p.username,\n    p.aid,\n    COUNT(*) AS total_games,\n    COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) AS white_wins,\n    COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) AS black_wins,\n    COUNT(CASE WHEN g.white_aid = p.aid THEN 1 END) AS white_games,\n    COUNT(CASE WHEN g.black_aid = p.aid THEN 1 END) AS black_games,\n    ROUND(COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) * 100.0 / NULLIF(COUNT(CASE WHEN g.white_aid = p.aid THEN 1 END), 0), 2) AS white_win_rate,\n    ROUND(COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) * 100.0 / NULLIF(COUNT(CASE WHEN g.black_aid = p.aid THEN 1 END), 0), 2) AS black_win_rate\nFROM chess_playground.profiles p\nLEFT JOIN game_results g\n       ON p.aid IN (g.white_aid, g.black_aid)\nGROUP BY p.username, p.aid\nORDER BY total_games DESC"
         },
         "definition_file": {
           "name": "player_summary.sql",
-          "path": "__ASSETSDIR__player_summary.sql",
+          "path": "/integration-tests/happy-path/assets/player_summary.sql",
           "type": "comment"
         },
         "parameters": {},
@@ -233,6 +233,6 @@
     "retries": 0
   },
   "repo": {
-    "path": "__BASEDIR__"
+    "path": "/integration-tests"
   }
 }

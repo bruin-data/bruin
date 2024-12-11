@@ -59,22 +59,26 @@ var (
 		},
 	}
 
-	task1 = &pipeline.Asset{Name: "Task1",
+	task1 = &pipeline.Asset{
+		Name: "Task1",
 		Type: pipeline.AssetTypePython,
 		Tags: []string{"tag1", "x"},
 	}
 
-	task2 = &pipeline.Asset{Name: "Task2",
+	task2 = &pipeline.Asset{
+		Name: "Task2",
 		Type: pipeline.AssetTypeBigqueryQuery,
 		Tags: []string{"tag2"},
 	}
 
-	task3 = &pipeline.Asset{Name: "Task3", Type: pipeline.AssetTypePython,
+	task3 = &pipeline.Asset{
+		Name: "Task3", Type: pipeline.AssetTypePython,
 		Tags:      []string{"tag4"},
 		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task9"}},
 	}
 
-	task4 = &pipeline.Asset{Name: "Task4",
+	task4 = &pipeline.Asset{
+		Name:      "Task4",
 		Type:      pipeline.AssetTypeBigqueryQuery,
 		Tags:      []string{"tag1", "tag3"},
 		Upstreams: []pipeline.Upstream{{Type: "asset", Value: "Task9"}},
@@ -493,8 +497,10 @@ func TestApplyFilters(t *testing.T) {
 				IncludeDownstream: true,
 				IncludeTag:        "tag1",
 			},
-			expectedPending: []string{"Task0", "Task1", "Task4", "Task5", "Task6", "Task7", "Task8",
-				"Task0:Column0:Check0", "Task0:custom-check:customcheck0"}, // task 2 and 3 shouldnt run
+			expectedPending: []string{
+				"Task0", "Task1", "Task4", "Task5", "Task6", "Task7", "Task8",
+				"Task0:Column0:Check0", "Task0:custom-check:customcheck0",
+			}, // task 2 and 3 shouldnt run
 			expectError: false,
 		},
 		{
@@ -654,8 +660,10 @@ func TestApplyFilters(t *testing.T) {
 				},
 			},
 			filter: &Filter{},
-			expectedPending: []string{"Task0", "Task1", "Task2", "Task3", "Task4", "Task5", "Task6", "Task7", "Task8", "Task9", "Task10",
-				"Task10:Column10:Check10", "Task10:custom-check:customcheck10", "Task0:Column0:Check0", "Task0:custom-check:customcheck0"},
+			expectedPending: []string{
+				"Task0", "Task1", "Task2", "Task3", "Task4", "Task5", "Task6", "Task7", "Task8", "Task9", "Task10",
+				"Task10:Column10:Check10", "Task10:custom-check:customcheck10", "Task0:Column0:Check0", "Task0:custom-check:customcheck0",
+			},
 			expectError: false,
 		},
 		{
@@ -663,7 +671,6 @@ func TestApplyFilters(t *testing.T) {
 			pipeline: &pipeline.Pipeline{
 				Name: "TestPipeline",
 				Assets: []*pipeline.Asset{
-
 					task6,
 					task7,
 					task8,
