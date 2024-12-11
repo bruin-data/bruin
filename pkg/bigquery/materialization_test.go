@@ -176,7 +176,7 @@ func TestMaterializer_Render(t *testing.T) {
 				"COMMIT TRANSACTION;$",
 		},
 		{
-			name: "delete+insert builds a proper transaction",
+			name: "delete+insert comment out",
 			task: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
@@ -185,9 +185,9 @@ func TestMaterializer_Render(t *testing.T) {
 					IncrementalKey: "dt",
 				},
 			},
-			query: "SELECT 1 -- This is a comment",
+			query: "SELECT 1\n -- This is a comment",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1 -- This is a comment\n;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n -- This is a comment\n;\n" +
 				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
 				"COMMIT TRANSACTION;$",

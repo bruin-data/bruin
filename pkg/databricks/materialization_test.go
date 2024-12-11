@@ -129,6 +129,24 @@ func TestMaterializer_Render(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "delete+insert comment out ",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey: "dt",
+				},
+			},
+			query: "SELECT 1 --this is a comment ",
+			want: []string{
+				"CREATE TEMPORARY VIEW __bruin_tmp_.+ AS SELECT 1 --this is a comment\n",
+				"\nDELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\)",
+				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp_.+",
+				"DROP VIEW IF EXISTS __bruin_tmp_.+",
+			},
+		},
+		{
 			name: "delete+insert builds a proper transaction",
 			task: &pipeline.Asset{
 				Name: "my.asset",
