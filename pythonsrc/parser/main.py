@@ -22,11 +22,12 @@ def extract_non_selected_columns(parsed: exp.Select) -> list[Column]:
     table_alias = {}
     for table in tables:
         if table.alias:
-            table_alias[table.alias] = table.name
+            table_alias[table.alias] = merge_parts(table)
 
     table_names = {}
     for table in tables:
-        table_names[table.name] = table
+        table_key = merge_parts(table)
+        table_names[table_key] = table
 
     for scopes in [where, join, group]:
         for scope in scopes:
@@ -133,9 +134,13 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
             ):
                 continue
 
-            cl.append(
-                {"column": ds.name.split(".")[-1], "table": ds.expression.this.name}
-            )
+            if isinstance(ds.expression, exp.Table):
+                cl.append(
+                    {
+                        "column": ds.name.split(".")[-1],
+                        "table": merge_parts(ds.expression),
+                    }
+                )
 
         # Deduplicate based on column-table combination
         cl = [dict(t) for t in {tuple(d.items()) for d in cl}]
@@ -169,3 +174,7 @@ def find_leaf_nodes(node: Node, leaf_nodes):
     else:
         for child in node.downstream:
             find_leaf_nodes(child, leaf_nodes)
+
+
+def merge_parts(table: exp.Table) -> str:
+    return ".".join(part.name for part in table.parts if isinstance(part, exp.Identifier))
