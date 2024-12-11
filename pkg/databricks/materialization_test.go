@@ -140,8 +140,8 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1",
 			want: []string{
-				"CREATE TEMPORARY VIEW __bruin_tmp_.+ AS SELECT 1",
-				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\)",
+				"CREATE TEMPORARY VIEW __bruin_tmp_.+ AS SELECT 1\n",
+				"\nDELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\)",
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp_.+",
 				"DROP VIEW IF EXISTS __bruin_tmp_.+",
 			},
