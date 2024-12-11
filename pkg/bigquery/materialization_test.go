@@ -176,6 +176,23 @@ func TestMaterializer_Render(t *testing.T) {
 				"COMMIT TRANSACTION;$",
 		},
 		{
+			name: "delete+insert builds a proper transaction",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey: "dt",
+				},
+			},
+			query: "SELECT 1 -- This is a comment",
+			want: "^BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1 -- This is a comment\n;\n" +
+				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
+				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
+				"COMMIT TRANSACTION;$",
+		},
+		{
 			name: "merge with no columns defined fails",
 			task: &pipeline.Asset{
 				Name:    "my.asset",
