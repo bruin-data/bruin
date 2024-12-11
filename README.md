@@ -7,17 +7,19 @@ also run Python assets within the same pipeline.
 
 <img alt="Welcome to VHS" src="./resources/demo.gif" width="1200" />
 
-Bruin is built to make your life easier when it comes to data transformations:
-- ✨ run SQL transformations on BigQuery/Snowflake
-- 🐍 run Python in isolated environments in the same pipeline
+Bruin is packed with features:
+- 📥 ingest data with [ingestr](https://github.com/bruin-data/ingestr) / Python
+- ✨ run SQL & Python transformations on [many platforms](#supported-platforms)
+- 📐 table/view [materializations](assets/materialization.md), incremental tables
+- 🐍 run Python in isolated environments using [uv](https://github.com/astral-sh/uv)
 - 💅 built-in data quality checks
 - 🚀 Jinja templating to avoid repetition
-- ✅ validate data pipelines end-to-end to catch issues early on via dry-run on live
-- 📐 table/view materialization
-- ➕ incremental tables
-- ⚡ blazing fast pipeline execution: bruin is written in Golang and uses concurrency at every opportunity
+- ✅ validate pipelines end-to-end via dry-run
+- 👷 run on your local machine, an EC2 instance, or [GitHub Actions](cicd/github-action.md)
 - 🔒 secrets injection via environment variables
-- 📦 easy to install and use
+- [VS Code extension](vscode-extension/overview.md) for a better developer experience
+- ⚡ written in Golang
+- 📦 [easy to install](getting-started/introduction/installation.md) and use
 
 ## Installation
 

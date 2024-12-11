@@ -21,6 +21,23 @@ export default defineConfig({
     title: "Bruin CLI",
     description: "Open-source multi-language data pipelines",
     base: "/bruin/",
+    head: [
+        [
+            "script",
+            {
+                async: "",
+                src: "https://www.googletagmanager.com/gtag/js?id=G-VB8J5FETV5",
+            },
+        ],
+        [
+            "script",
+            {},
+            `window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-VB8J5FETV5');`,
+        ],
+    ],
     themeConfig: {
         outline: "deep",
         search: {
