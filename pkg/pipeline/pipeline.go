@@ -416,7 +416,6 @@ type EntityAttribute struct {
 }
 
 type UpstreamColumn struct {
-	Asset  string `json:"asset" yaml:"asset,omitempty" mapstructure:"asset"`
 	Column string `json:"column" yaml:"column,omitempty" mapstructure:"column"`
 	Table  string `json:"table" yaml:"table,omitempty" mapstructure:"table"`
 }

@@ -167,7 +167,6 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 					Checks: []ColumnCheck{},
 					Upstreams: []*UpstreamColumn{
 						{
-							Asset:  strings.ToLower(upstream.Table),
 							Column: upstream.Column,
 							Table:  strings.ToLower(upstream.Table),
 						},
@@ -186,8 +185,7 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 					Checks: []ColumnCheck{},
 					Upstreams: []*UpstreamColumn{
 						{
-							Asset:  upstreamAsset.Name,
-							Column: upstream.Table,
+							Column: upstream.Column,
 							Table:  upstreamAsset.Name,
 						},
 					},
@@ -231,13 +229,22 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 	if col != nil {
 		if upstreamAsset != nil {
 			newUpstream := &UpstreamColumn{
-				Asset:  upstreamAsset.Name,
 				Column: upstreamCol.Name,
 				Table:  upstreamAsset.Name,
 			}
 			for i, existing := range asset.Columns {
-				if existing.Name == colName {
-					asset.Columns[i].Upstreams = append(asset.Columns[i].Upstreams, newUpstream)
+				if strings.EqualFold(existing.Name, colName) {
+					exists := false
+					for _, existingUpstream := range asset.Columns[i].Upstreams {
+						if strings.EqualFold(existingUpstream.Column, newUpstream.Column) &&
+							strings.EqualFold(existingUpstream.Table, newUpstream.Table) {
+							exists = true
+							break
+						}
+					}
+					if !exists {
+						asset.Columns[i].Upstreams = append(asset.Columns[i].Upstreams, newUpstream)
+					}
 					return nil
 				}
 			}
@@ -247,7 +254,6 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 
 	if upstreamAsset != nil {
 		newCol.Upstreams = append(newCol.Upstreams, &UpstreamColumn{
-			Asset:  upstreamAsset.Name,
 			Column: upstreamCol.Name,
 			Table:  upstreamAsset.Name,
 		})
