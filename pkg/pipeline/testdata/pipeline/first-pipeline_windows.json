@@ -46,7 +46,8 @@
       "upstreams": [
         {
           "type": "asset",
-          "value": "gcs-to-bq"
+          "value": "gcs-to-bq",
+          "columns": []
         }
       ],
       "materialization": null,
