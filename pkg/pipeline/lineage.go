@@ -238,7 +238,7 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 
 	if col != nil {
 		if upstreamAsset != nil {
-			newUpstream := &UpstreamColumn{
+			newUpstream := UpstreamColumn{
 				Column: upstreamCol.Name,
 				Table:  upstreamAsset.Name,
 			}
@@ -253,7 +253,7 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 						}
 					}
 					if !exists {
-						asset.Columns[i].Upstreams = append(asset.Columns[i].Upstreams, newUpstream)
+						asset.Columns[i].Upstreams = append(asset.Columns[i].Upstreams, &newUpstream)
 					}
 					return nil
 				}
