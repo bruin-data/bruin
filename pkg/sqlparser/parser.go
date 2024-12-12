@@ -121,7 +121,7 @@ type UpstreamColumn struct {
 
 type ColumnLineage struct {
 	Name     string           `json:"name"`
-	Upstream []UpstreamColumn `json:"upstream"`
+	Upstream []UpstreamColumn `json:"upstream,omitempty"`
 	Type     string           `json:"type"`
 }
 type Lineage struct {
