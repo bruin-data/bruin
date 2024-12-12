@@ -11,7 +11,8 @@
     "upstreams": [
       {
         "type": "asset",
-        "value": "chess_playground.player_summary"
+        "value": "chess_playground.player_summary",
+        "columns": []
       }
     ],
     "image": "python:3.11",
@@ -64,7 +65,8 @@
         "upstreams": [
           {
             "type": "asset",
-            "value": "chess_playground.player_summary"
+            "value": "chess_playground.player_summary",
+            "columns": []
           }
         ],
         "image": "python:3.11",
@@ -181,11 +183,13 @@
         "upstreams": [
           {
             "type": "asset",
-            "value": "chess_playground.games"
+            "value": "chess_playground.games",
+            "columns": []
           },
           {
             "type": "asset",
-            "value": "chess_playground.profiles"
+            "value": "chess_playground.profiles",
+            "columns": []
           }
         ],
         "image": "",

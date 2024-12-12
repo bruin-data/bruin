@@ -194,23 +194,28 @@
       "upstreams": [
         {
           "type": "asset",
-          "value": "task1"
+          "value": "task1",
+          "columns": []
         },
         {
           "type": "asset",
-          "value": "task2"
+          "value": "task2",
+          "columns": []
         },
         {
           "type": "asset",
-          "value": "task3"
+          "value": "task3",
+          "columns": []
         },
         {
           "type": "asset",
-          "value": "task4"
+          "value": "task4",
+          "columns": []
         },
         {
           "type": "asset",
-          "value": "task5"
+          "value": "task5",
+          "columns": []
         }
       ]
     }
