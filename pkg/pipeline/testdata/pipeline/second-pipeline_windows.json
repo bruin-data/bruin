@@ -158,7 +158,8 @@
             }
           ],
           "primary_key": false,
-          "update_on_merge": false
+          "update_on_merge": false,
+          "upstreams": []
         },
         {
           "name": "col2",
@@ -180,7 +181,8 @@
             }
           ],
           "primary_key": false,
-          "update_on_merge": false
+          "update_on_merge": false,
+          "upstreams": []
         }
       ],
       "custom_checks": [
