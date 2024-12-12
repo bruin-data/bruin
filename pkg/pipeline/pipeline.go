@@ -416,7 +416,6 @@ type EntityAttribute struct {
 }
 
 type UpstreamColumn struct {
-	Asset  string `json:"asset" yaml:"asset,omitempty" mapstructure:"asset"`
 	Column string `json:"column" yaml:"column,omitempty" mapstructure:"column"`
 	Table  string `json:"table" yaml:"table,omitempty" mapstructure:"table"`
 }
@@ -718,7 +717,7 @@ func (a *Asset) ColumnNamesWithPrimaryKey() []string {
 
 func (a *Asset) GetColumnWithName(name string) *Column {
 	for _, c := range a.Columns {
-		if c.Name == name {
+		if strings.EqualFold(c.Name, name) {
 			return &c
 		}
 	}
