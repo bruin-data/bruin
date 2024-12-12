@@ -363,6 +363,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			UpdateOnMerge:   column.UpdateOnMerge,
 			EntityAttribute: entityDefinition,
 			Extends:         column.Extends,
+			Upstreams:       make([]*UpstreamColumn, 0),
 		}
 	}
 
