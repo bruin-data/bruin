@@ -56,8 +56,8 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
 	queries := []string{
-		fmt.Sprintf("CREATE TEMPORARY VIEW %s AS %s", tempTableName, query),
-		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
+		fmt.Sprintf("CREATE TEMPORARY VIEW %s AS %s\n", tempTableName, query),
+		fmt.Sprintf("\nDELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
 		"DROP VIEW IF EXISTS " + tempTableName,
 	}

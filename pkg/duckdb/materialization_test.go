@@ -113,7 +113,26 @@ COMMIT;`,
 			},
 			query: "SELECT 1",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n;\n" +
+				"DELETE FROM my.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
+				"INSERT INTO my.asset SELECT \\* FROM __bruin_tmp_.+;\n" +
+				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
+				"COMMIT;$",
+		},
+
+		{
+			name: "delete+insert semicolon comment out ",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey: "dt",
+				},
+			},
+			query: "SELECT 1 --this is a comment",
+			want: "^BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1 --this is a comment\n;\n" +
 				"DELETE FROM my.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
 				"INSERT INTO my.asset SELECT \\* FROM __bruin_tmp_.+;\n" +
 				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
