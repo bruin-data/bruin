@@ -104,19 +104,19 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 		lineage.NonSelectedColumns = append(lineage.NonSelectedColumns, lineage.Columns...)
 		dict := map[string]bool{}
 		for _, lineageCol := range lineage.NonSelectedColumns {
-			for _, lineageUpstream := range *lineageCol.Upstream {
+			for _, lineageUpstream := range lineageCol.Upstream {
 				key := fmt.Sprintf("%s-%s", strings.ToLower(lineageUpstream.Table), strings.ToLower(lineageCol.Name))
 				if _, ok := dict[key]; !ok {
 					if strings.EqualFold(lineageUpstream.Table, up.Value) {
 						exists := false
-						for _, col := range *upstream.Columns {
+						for _, col := range upstream.Columns {
 							if strings.EqualFold(col.Name, lineageCol.Name) {
 								exists = true
 								break
 							}
 						}
 						if !exists {
-							*upstream.Columns = append(*upstream.Columns, DependsColumn{
+							upstream.Columns = append(upstream.Columns, DependsColumn{
 								Name: lineageCol.Name,
 							})
 						}
@@ -131,7 +131,7 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 
 	for _, lineageCol := range lineage.Columns {
 		if lineageCol.Name == "*" {
-			for _, upstream := range *lineageCol.Upstream {
+			for _, upstream := range lineageCol.Upstream {
 				upstreamAsset := foundPipeline.GetAssetByName(upstream.Table)
 				if upstreamAsset == nil {
 					continue
@@ -150,7 +150,7 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 			continue
 		}
 
-		if len(*lineageCol.Upstream) == 0 {
+		if len(lineageCol.Upstream) == 0 {
 			if err := p.addColumnToAsset(asset, lineageCol.Name, nil, &Column{
 				Name:      lineageCol.Name,
 				Type:      lineageCol.Type,
@@ -162,7 +162,7 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 			continue
 		}
 
-		for _, upstream := range *lineageCol.Upstream {
+		for _, upstream := range lineageCol.Upstream {
 			if upstream.Column == "*" {
 				continue
 			}

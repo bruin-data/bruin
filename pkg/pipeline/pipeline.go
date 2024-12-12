@@ -429,7 +429,7 @@ type Column struct {
 	UpdateOnMerge   bool              `json:"update_on_merge" yaml:"update_on_merge,omitempty" mapstructure:"update_on_merge"`
 	Extends         string            `json:"-" yaml:"extends,omitempty" mapstructure:"extends"`
 	Checks          []ColumnCheck     `json:"checks" yaml:"checks,omitempty" mapstructure:"checks"`
-	Upstreams       []*UpstreamColumn `json:"upstreams,omitempty" yaml:"-" mapstructure:"-"`
+	Upstreams       []*UpstreamColumn `json:"upstreams" yaml:"-" mapstructure:"-"`
 }
 
 func (c *Column) HasCheck(check string) bool {
@@ -505,10 +505,10 @@ type DependsColumn struct {
 }
 
 type Upstream struct {
-	Type     string           `json:"type" yaml:"type" mapstructure:"type"`
-	Value    string           `json:"value" yaml:"value" mapstructure:"value"`
-	Metadata EmptyStringMap   `json:"metadata,omitempty" yaml:"metadata,omitempty" mapstructure:"metadata"`
-	Columns  *[]DependsColumn `json:"columns,omitempty" yaml:"columns,omitempty" mapstructure:"columns"`
+	Type     string          `json:"type" yaml:"type" mapstructure:"type"`
+	Value    string          `json:"value" yaml:"value" mapstructure:"value"`
+	Metadata EmptyStringMap  `json:"metadata,omitempty" yaml:"metadata,omitempty" mapstructure:"metadata"`
+	Columns  []DependsColumn `json:"columns" yaml:"columns" mapstructure:"columns"`
 }
 
 func (u Upstream) MarshalYAML() (interface{}, error) {
