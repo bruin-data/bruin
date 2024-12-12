@@ -56,7 +56,8 @@
             "value": null,
             "blocking": true
           }
-        ]
+        ],
+        "upstreams": []
       }
     ],
     "custom_checks": [],
@@ -245,7 +246,8 @@
                 "value": null,
                 "blocking": true
               }
-            ]
+            ],
+            "upstreams": []
           }
         ],
         "custom_checks": [],

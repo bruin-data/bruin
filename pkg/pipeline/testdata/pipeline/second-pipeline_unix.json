@@ -146,7 +146,8 @@
             }
           ],
           "primary_key": false,
-          "update_on_merge": false
+          "update_on_merge": false,
+          "upstreams": []
         },
         {
           "entity_attribute": null,
@@ -168,7 +169,8 @@
             }
           ],
           "primary_key": false,
-          "update_on_merge": false
+          "update_on_merge": false,
+          "upstreams": []
         }
       ],
       "custom_checks": [

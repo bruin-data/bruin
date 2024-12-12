@@ -81,6 +81,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 						Name:        "col1",
 						Description: "column one",
 						Type:        "string",
+						Upstreams:   make([]*pipeline.UpstreamColumn, 0),
 						Checks: []pipeline.ColumnCheck{
 							{
 								ID:   "1cde48c4bee4ad881c5d315dbfd136c708bfe4522ca7b74997017302b38ba763",
@@ -110,6 +111,7 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 						Name:        "col2",
 						Description: "column two",
 						Checks:      []pipeline.ColumnCheck{},
+						Upstreams:   make([]*pipeline.UpstreamColumn, 0),
 					},
 				},
 			},

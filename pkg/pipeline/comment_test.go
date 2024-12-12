@@ -208,7 +208,8 @@ func Test_createTaskFromFile(t *testing.T) {
 						},
 					},
 					{
-						Name: "col2", Checks: []pipeline.ColumnCheck{
+						Name: "col2",
+						Checks: []pipeline.ColumnCheck{
 							{
 								ID:       "7870f9ce39b0d29451a41e2d8240c02713ce80647db886fe5e5cc69227dd86d3",
 								Name:     "not_null",
@@ -266,8 +267,9 @@ func Test_createTaskFromFile(t *testing.T) {
 				},
 				Columns: []pipeline.Column{
 					{
-						Name: "col1",
-						Type: "string",
+						Name:      "col1",
+						Type:      "string",
+						Upstreams: make([]*pipeline.UpstreamColumn, 0),
 						Checks: []pipeline.ColumnCheck{
 							{
 								ID:   "08745666ad3e043ceb0321ed502e9a2d20248d62b2ee7dd1c600fc5c944af238",
@@ -284,8 +286,9 @@ func Test_createTaskFromFile(t *testing.T) {
 						},
 					},
 					{
-						Name: "col2",
-						Type: "string",
+						Name:      "col2",
+						Type:      "string",
+						Upstreams: make([]*pipeline.UpstreamColumn, 0),
 						Checks: []pipeline.ColumnCheck{
 							{
 								ID:   "7870f9ce39b0d29451a41e2d8240c02713ce80647db886fe5e5cc69227dd86d3",
