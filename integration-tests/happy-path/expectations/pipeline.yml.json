@@ -159,7 +159,7 @@
       },
       "definition_file": {
         "name": "player_summary.sql",
-        "path": "/Users/yuvraj/Workspace/bruin/integration-tests/happy-path/assets/player_summary.sql",
+        "path": "__ASSETSDIR__player_summary.sql",
         "type": "comment"
       },
       "parameters": {},
