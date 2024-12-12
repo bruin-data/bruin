@@ -5,7 +5,7 @@
   "start_date": "",
   "definition_file": {
     "name": "pipeline.yml",
-    "path": "/Users/yuvraj/Workspace/bruin/integration-tests/lineage/pipeline.yml"
+    "path": "__PIPELINEDIR__pipeline.yml"
   },
   "default_parameters": {},
   "default_connections": {},
@@ -46,12 +46,12 @@
       "owner": "",
       "executable_file": {
         "name": "country.sql",
-        "path": "/Users/yuvraj/Workspace/bruin/integration-tests/lineage/assets/country.sql",
+        "path": "__ASSETSDIR__country.sql",
         "content": ""
       },
       "definition_file": {
         "name": "country.sql",
-        "path": "/Users/yuvraj/Workspace/bruin/integration-tests/lineage/assets/country.sql",
+        "path": "__ASSETSDIR__country.sql",
         "type": "comment"
       },
       "parameters": {},
@@ -151,12 +151,12 @@
       "owner": "",
       "executable_file": {
         "name": "example.sql",
-        "path": "/Users/yuvraj/Workspace/bruin/integration-tests/lineage/assets/example.sql",
+        "path": "__ASSETSDIR__example.sql",
         "content": ""
       },
       "definition_file": {
         "name": "example.sql",
-        "path": "/Users/yuvraj/Workspace/bruin/integration-tests/lineage/assets/example.sql",
+        "path": "__ASSETSDIR__example.sql",
         "type": "comment"
       },
       "parameters": {},
@@ -276,12 +276,12 @@
       "owner": "",
       "executable_file": {
         "name": "people.sql",
-        "path": "/Users/yuvraj/Workspace/bruin/integration-tests/lineage/assets/people.sql",
+        "path": "__ASSETSDIR__people.sql",
         "content": ""
       },
       "definition_file": {
         "name": "people.sql",
-        "path": "/Users/yuvraj/Workspace/bruin/integration-tests/lineage/assets/people.sql",
+        "path": "__ASSETSDIR__people.sql",
         "type": "comment"
       },
       "parameters": {},
@@ -374,12 +374,12 @@
       "owner": "",
       "executable_file": {
         "name": "users.sql",
-        "path": "/Users/yuvraj/Workspace/bruin/integration-tests/lineage/assets/users.sql",
+        "path": "__ASSETSDIR__users.sql",
         "content": ""
       },
       "definition_file": {
         "name": "users.sql",
-        "path": "/Users/yuvraj/Workspace/bruin/integration-tests/lineage/assets/users.sql",
+        "path": "__ASSETSDIR__users.sql",
         "type": "comment"
       },
       "parameters": {},
