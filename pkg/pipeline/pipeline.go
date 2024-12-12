@@ -429,7 +429,7 @@ type Column struct {
 	UpdateOnMerge   bool              `json:"update_on_merge" yaml:"update_on_merge,omitempty" mapstructure:"update_on_merge"`
 	Extends         string            `json:"-" yaml:"extends,omitempty" mapstructure:"extends"`
 	Checks          []ColumnCheck     `json:"checks" yaml:"checks,omitempty" mapstructure:"checks"`
-	Upstreams       []*UpstreamColumn `json:"upstreams,omitempty" yaml:"-" mapstructure:"-"`
+	Upstreams       []*UpstreamColumn `json:"upstreams" yaml:"-" mapstructure:"-"`
 }
 
 func (c *Column) HasCheck(check string) bool {
