@@ -139,7 +139,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1",
 			want: "^BEGIN TRANSACTION;\n" +
-				"SELECT alias\\.\\* INTO __bruin_tmp_.+ AS alias;\n" +
+				"SELECT alias\\.\\* INTO __bruin_tmp_.+ FROM \\(SELECT 1\n\\) AS alias;\n" +
 				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp_.+;\n" +
 				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
