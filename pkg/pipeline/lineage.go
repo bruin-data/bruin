@@ -98,7 +98,7 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 		return errors.New("asset cannot be nil")
 	}
 
-	upstreams := []Upstream{}
+	upstreams := make([]Upstream, 0)
 	for _, up := range asset.Upstreams {
 		upstream := up
 		lineage.NonSelectedColumns = append(lineage.NonSelectedColumns, lineage.Columns...)

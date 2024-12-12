@@ -124,11 +124,16 @@
       ],
       "athena": null,
       "upstreams": [
-        {"type" : "asset", "value" : "task1"},
-        {"type" : "asset", "value" : "task2"},
-        {"type" : "asset", "value" : "task3"},
-        {"type" : "asset", "value" : "task4"},
-        {"type" : "asset", "value" : "task5"}
+        {"type" : "asset", "value" : "task1",
+        "columns": []},
+        {"type" : "asset", "value" : "task2",
+        "columns": []},
+        {"type" : "asset", "value" : "task3",
+        "columns": []},
+        {"type" : "asset", "value" : "task4",
+        "columns": []},
+        {"type" : "asset", "value" : "task5",
+        "columns": []}
       ],
       "materialization": null,
       "columns": [
