@@ -179,8 +179,7 @@
               "value": null,
               "blocking": true
             }
-          ],
-          "upstreams": null
+          ]
         }
       ],
       "custom_checks": [],

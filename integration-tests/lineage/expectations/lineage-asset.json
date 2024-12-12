@@ -528,8 +528,7 @@
             "description": "Just a number",
             "primary_key": true,
             "update_on_merge": false,
-            "checks": [],
-            "upstreams": null
+            "checks": []
           },
           {
             "entity_attribute": null,
@@ -538,8 +537,7 @@
             "description": "Just a name",
             "primary_key": false,
             "update_on_merge": false,
-            "checks": [],
-            "upstreams": null
+            "checks": []
           },
           {
             "entity_attribute": null,
@@ -548,8 +546,7 @@
             "description": "Just a last name",
             "primary_key": false,
             "update_on_merge": false,
-            "checks": [],
-            "upstreams": null
+            "checks": []
           },
           {
             "entity_attribute": null,
@@ -558,8 +555,7 @@
             "description": "Just a country",
             "primary_key": false,
             "update_on_merge": false,
-            "checks": [],
-            "upstreams": null
+            "checks": []
           },
           {
             "entity_attribute": null,
@@ -568,8 +564,7 @@
             "description": "Just a timestamp",
             "primary_key": false,
             "update_on_merge": false,
-            "checks": [],
-            "upstreams": null
+            "checks": []
           }
         ],
         "custom_checks": [],
