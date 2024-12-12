@@ -31,11 +31,23 @@ func main() {
 			panic(err)
 		}
 	}
-
+	expectJSONOutput("internal parse-pipeline happy-path", "happy-path/expectations/pipeline.yml.json")
+	expectExitCode("run --tag include --exclude-tag exclude chess-extended", 0)
+	expectExitCode("run --tag include --exclude-tag exclude chess-extended/expectations/chess_games.asset.yml", 1)
+	expectOutputIncludes(
+		"run --tag include --exclude-tag exclude --only checks chess-extended",
+		0,
+		[]string{"Executed 1 tasks", "total_games:positive"},
+	)
+	expectQueryResult(
+		"duckdb-default",
+		"SELECT table_name FROM information_schema.tables WHERE table_schema = 'chess_playground';",
+		"json",
+		"chess-extended/expectations/tables_summary.json",
+	)
 	expectExitCode("validate happy-path", 0)
 	expectExitCode("run --use-uv happy-path", 0)
 	// expectExitCode("run happy-path", 0)
-	expectJSONOutput("internal parse-pipeline happy-path", "happy-path/expectations/pipeline.yml.json")
 	expectJSONOutput(
 		"internal parse-asset happy-path/assets/asset.py",
 		"happy-path/expectations/asset.py.json",
@@ -199,4 +211,48 @@ func runCommandWithExitCode(command string) (string, int, error) {
 		return output, 1, err
 	}
 	return output, 0, nil
+}
+func expectQueryResult(connection, query, outputFile, expectationPath string) {
+	args := []string{"run", "../main.go", "query",
+		"--connection", connection,
+		"--query", query,
+		"--output", outputFile,
+	}
+
+	cmd := exec.Command("go", args...)
+	cmd.Dir = currentFolder
+	outputBytes, err := cmd.CombinedOutput()
+	output := string(outputBytes)
+	if err != nil {
+		fmt.Println("Command failed with error:", err)
+		os.Exit(1)
+	}
+	if _, err := os.Stat(outputFile); os.IsNotExist(err) {
+		err = os.WriteFile(outputFile, []byte(output), 0600)
+		if err != nil {
+			os.Exit(1)
+		}
+	}
+	expectationPathFull := filepath.Join(currentFolder, expectationPath)
+	expectation, err := jd.ReadJsonFile(expectationPathFull)
+	if err != nil {
+		fmt.Println("Failed to read expectation file:", err)
+		os.Exit(1)
+	}
+
+	parsedOutput, err := jd.ReadJsonString(strings.ReplaceAll(output, "\\r\\n", "\\n"))
+	if err != nil {
+		fmt.Println("Failed to parse JSON output:", err)
+		os.Exit(1)
+	}
+
+	diff := expectation.Diff(parsedOutput)
+	if len(diff) != 0 {
+		fmt.Println("Mismatch detected:")
+		for _, d := range diff {
+			fmt.Printf("Path: %v, Expected: %v, Actual: %v\n", d.Path, d.NewValues, d.OldValues)
+		}
+		os.Exit(1)
+	}
+	fmt.Println("Passed")
 }
