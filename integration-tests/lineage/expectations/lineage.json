@@ -5,7 +5,7 @@
   "start_date": "",
   "definition_file": {
     "name": "pipeline.yml",
-    "path": "__PIPELINEDIR__pipeline.yml"
+    "path": "/Users/yuvraj/Workspace/bruin/integration-tests/lineage/pipeline.yml"
   },
   "default_parameters": {},
   "default_connections": {},
@@ -46,12 +46,12 @@
       "owner": "",
       "executable_file": {
         "name": "country.sql",
-        "path": "__ASSETSDIR__country.sql",
+        "path": "/Users/yuvraj/Workspace/bruin/integration-tests/lineage/assets/country.sql",
         "content": ""
       },
       "definition_file": {
         "name": "country.sql",
-        "path": "__ASSETSDIR__country.sql",
+        "path": "/Users/yuvraj/Workspace/bruin/integration-tests/lineage/assets/country.sql",
         "type": "comment"
       },
       "parameters": {},
@@ -151,12 +151,12 @@
       "owner": "",
       "executable_file": {
         "name": "example.sql",
-        "path": "__ASSETSDIR__example.sql",
+        "path": "/Users/yuvraj/Workspace/bruin/integration-tests/lineage/assets/example.sql",
         "content": ""
       },
       "definition_file": {
         "name": "example.sql",
-        "path": "__ASSETSDIR__example.sql",
+        "path": "/Users/yuvraj/Workspace/bruin/integration-tests/lineage/assets/example.sql",
         "type": "comment"
       },
       "parameters": {},
@@ -276,12 +276,12 @@
       "owner": "",
       "executable_file": {
         "name": "people.sql",
-        "path": "__ASSETSDIR__people.sql",
+        "path": "/Users/yuvraj/Workspace/bruin/integration-tests/lineage/assets/people.sql",
         "content": ""
       },
       "definition_file": {
         "name": "people.sql",
-        "path": "__ASSETSDIR__people.sql",
+        "path": "/Users/yuvraj/Workspace/bruin/integration-tests/lineage/assets/people.sql",
         "type": "comment"
       },
       "parameters": {},
@@ -374,12 +374,12 @@
       "owner": "",
       "executable_file": {
         "name": "users.sql",
-        "path": "__ASSETSDIR__users.sql",
+        "path": "/Users/yuvraj/Workspace/bruin/integration-tests/lineage/assets/users.sql",
         "content": ""
       },
       "definition_file": {
         "name": "users.sql",
-        "path": "__ASSETSDIR__users.sql",
+        "path": "/Users/yuvraj/Workspace/bruin/integration-tests/lineage/assets/users.sql",
         "type": "comment"
       },
       "parameters": {},
@@ -392,7 +392,8 @@
           "description": "Just a number",
           "primary_key": true,
           "update_on_merge": false,
-          "checks": []
+          "checks": [],
+          "upstreams": null
         },
         {
           "entity_attribute": null,
@@ -401,7 +402,8 @@
           "description": "Just a name",
           "primary_key": false,
           "update_on_merge": false,
-          "checks": []
+          "checks": [],
+          "upstreams": null
         },
         {
           "entity_attribute": null,
@@ -410,7 +412,8 @@
           "description": "Just a last name",
           "primary_key": false,
           "update_on_merge": false,
-          "checks": []
+          "checks": [],
+          "upstreams": null
         },
         {
           "entity_attribute": null,
@@ -419,7 +422,8 @@
           "description": "Just a country",
           "primary_key": false,
           "update_on_merge": false,
-          "checks": []
+          "checks": [],
+          "upstreams": null
         },
         {
           "entity_attribute": null,
@@ -428,7 +432,8 @@
           "description": "Just a timestamp",
           "primary_key": false,
           "update_on_merge": false,
-          "checks": []
+          "checks": [],
+          "upstreams": null
         }
       ],
       "custom_checks": [],
