@@ -78,7 +78,7 @@ var defaultMapping = map[string]string{
 	"slack":                 "slack-default",
 }
 
-var SupportedFileSuffixes = []string{".yml", ".yaml", ".sql", ".py"}
+var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}
 
 type (
 	schedule           string
@@ -1329,9 +1329,6 @@ func (b *Builder) CreateAssetFromFile(path string) (*Asset, error) {
 	if fileHasSuffix(b.config.TasksFileSuffixes, path) {
 		creator = b.yamlTaskCreator
 		isSeparateDefinitionFile = true
-	} else if fileHasSuffix([]string{".yml", ".yaml"}, path) {
-		// ends in yaml or yml but not asset.yml, task.yml etc
-		return nil, errors.New("You are trying to run a yaml file that doesn't end on: " + strings.Join(b.config.TasksFileSuffixes, ", "))
 	}
 
 	task, err := creator(path)
