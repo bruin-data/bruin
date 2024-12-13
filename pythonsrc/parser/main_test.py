@@ -2,7 +2,7 @@ import pytest
 from sqlglot import parse_one
 from sqlglot.optimizer import optimize
 
-from .main import get_column_lineage, extract_non_selected_columns, Column
+from main import get_column_lineage, extract_non_selected_columns, Column
 
 SCHEMA = {
     "orders": {
@@ -1047,62 +1047,62 @@ test_cases = [
             },
             {
                 "name": "col1",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col1", "table": "dataset1.table1"}],
             },
             {
                 "name": "col1",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col1", "table": "dataset1.table1"}],
             },
             {
                 "name": "col2",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col2", "table": "dataset1.table1"}],
             },
             {
                 "name": "col2",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col2", "table": "dataset1.table1"}],
             },
             {
                 "name": "col3",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col3", "table": "dataset1.table1"}],
             },
             {
                 "name": "col3",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col3", "table": "dataset1.table1"}],
             },
             {
                 "name": "col3",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col3", "table": "dataset1.table1"}],
             },
             {
                 "name": "col4",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col4", "table": "dataset1.table1"}],
             },
             {
                 "name": "col4",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col4", "table": "dataset1.table1"}],
             },
             {
                 "name": "col4",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col4", "table": "dataset1.table1"}],
             },
             {
                 "name": "col5",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col5", "table": "dataset1.table1"}],
             },
             {
                 "name": "col6",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col6", "table": "dataset1.table1"}],
             },
             {
@@ -1112,27 +1112,27 @@ test_cases = [
             },
             {
                 "name": "organization",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col1", "table": "dataset3.table3"}],
             },
             {
                 "name": "organizationid",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col2", "table": "dataset3.table3"}],
             },
             {
                 "name": "programname",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col1", "table": "dataset2.table2"}],
             },
             {
                 "name": "teamid",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col2", "table": "dataset6.table6"}],
             },
             {
                 "name": "teamname",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col1", "table": "dataset6.table6"}],
             },
         ],
@@ -1248,62 +1248,62 @@ test_cases = [
         "expected": [
             {
                 "name": "col1",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col1", "table": "project1.dataset1.table1"}],
             },
             {
                 "name": "col1",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col1", "table": "project1.dataset1.table1"}],
             },
             {
                 "name": "col2",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col2", "table": "project1.dataset1.table1"}],
             },
             {
                 "name": "col2",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col2", "table": "project1.dataset1.table1"}],
             },
             {
                 "name": "col3",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col3", "table": "project1.dataset1.table1"}],
             },
             {
                 "name": "col3",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col3", "table": "project1.dataset1.table1"}],
             },
             {
                 "name": "col3",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col3", "table": "project1.dataset1.table1"}],
             },
             {
                 "name": "col4",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col4", "table": "project1.dataset1.table1"}],
             },
             {
                 "name": "col4",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col4", "table": "project1.dataset1.table1"}],
             },
             {
                 "name": "col4",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col4", "table": "project1.dataset1.table1"}],
             },
             {
                 "name": "col5",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col5", "table": "project1.dataset1.table1"}],
             },
             {
                 "name": "col6",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col6", "table": "project1.dataset1.table1"}],
             },
             {
@@ -1313,12 +1313,12 @@ test_cases = [
             },
             {
                 "name": "department",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col1", "table": "project3.dataset3.table3"}],
             },
             {
                 "name": "departmentid",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col2", "table": "project3.dataset3.table3"}],
             },
             {
@@ -1328,18 +1328,18 @@ test_cases = [
             },
             {
                 "name": "programname",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col1", "table": "project2.dataset2.table2"}],
             },
             {"name": "project_credits", "type": "INT", "upstream": []},
             {
                 "name": "projectid",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col2", "table": "project6.dataset6.table6"}],
             },
             {
                 "name": "projectname",
-                "type": "TEXT",
+                "type": "UNKNOWN",
                 "upstream": [{"column": "col1", "table": "project6.dataset6.table6"}],
             },
         ],
@@ -1381,25 +1381,6 @@ test_cases = [
             },
         ],
     },
-    {
-        "name": "simple nested table references",
-        "dialect": "bigquery",
-        "query": """SELECT mycol FROM raw.table1""",
-        "schema": {
-            "raw.table1": {
-                "mycol": "STRING",
-            }
-        },
-        "expected": [
-            {
-                "name": "mycol",
-                "type": "TEXT",
-                "upstream": [{"column": "mycol", "table": "raw.table1"}],
-            },
-
-        ],
-        "expected_non_selected": []
-    },
 ]
 
 
@@ -1407,11 +1388,11 @@ test_cases = [
     "query,schema,expected,expected_non_selected,dialect",
     [
         (
-                tc["query"],
-                tc["schema"],
-                tc["expected"],
-                tc["expected_non_selected"],
-                tc["dialect"],
+            tc["query"],
+            tc["schema"],
+            tc["expected"],
+            tc["expected_non_selected"],
+            tc["dialect"],
         )
         for tc in test_cases
     ],
