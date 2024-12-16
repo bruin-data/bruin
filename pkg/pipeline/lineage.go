@@ -40,7 +40,7 @@ func (p *LineageExtractor) TableSchema(foundPipeline *Pipeline) sqlparser.Schema
 	return columnMetadata
 }
 
-// TableSchemaForUpstreams extracts the table schema for a single asset and returns a sqlparser schema only for its upstreams
+// TableSchemaForUpstreams extracts the table schema for a single asset and returns a sqlparser schema only for its upstreams.
 func (p *LineageExtractor) TableSchemaForUpstreams(foundPipeline *Pipeline, asset *Asset) sqlparser.Schema {
 	columnMetadata := make(sqlparser.Schema)
 	for _, upstream := range asset.Upstreams {
