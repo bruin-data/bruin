@@ -158,10 +158,10 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool) error {
 		}
 
 		defer sqlParser.Close()
-
+		processedAssets := make(map[string]bool)
 		lineage := pipeline.NewLineageExtractor(sqlParser)
 		for _, asset := range foundPipeline.Assets {
-			if err := lineage.ColumnLineage(foundPipeline, asset); err != nil {
+			if err := lineage.ColumnLineage(foundPipeline, asset, processedAssets); err != nil {
 				printErrorJSON(err)
 				return cli.Exit("", 1)
 			}
@@ -236,8 +236,9 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 			return cli.Exit("", 1)
 		}
 
+		processedAssets := make(map[string]bool)
 		lineageExtractor := pipeline.NewLineageExtractor(sqlParser)
-		if err := lineageExtractor.ColumnLineage(foundPipeline, asset); err != nil {
+		if err := lineageExtractor.ColumnLineage(foundPipeline, asset, processedAssets); err != nil {
 			printErrorJSON(err)
 			return cli.Exit("", 1)
 		}

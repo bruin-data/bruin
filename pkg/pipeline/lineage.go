@@ -17,7 +17,6 @@ type sqlParser interface {
 type LineageExtractor struct {
 	sqlParser sqlParser
 	renderer  *jinja.Renderer
-	processed map[string]bool
 }
 
 // NewLineageExtractor creates a new LineageExtractor instance.
@@ -25,7 +24,6 @@ func NewLineageExtractor(parser sqlParser) *LineageExtractor {
 	return &LineageExtractor{
 		sqlParser: parser,
 		renderer:  jinja.NewRendererWithYesterday("lineage-parser", "lineage-parser"),
-		processed: make(map[string]bool),
 	}
 }
 
@@ -57,22 +55,23 @@ func (p *LineageExtractor) TableSchemaForUpstreams(foundPipeline *Pipeline, asse
 }
 
 // ColumnLineage processes the lineage of an asset and its upstream dependencies recursively.
-func (p *LineageExtractor) ColumnLineage(foundPipeline *Pipeline, asset *Asset) error {
+func (p *LineageExtractor) ColumnLineage(foundPipeline *Pipeline, asset *Asset, processedAssets map[string]bool) error {
 	if asset == nil {
 		return nil
 	}
-	if p.processed[asset.Name] {
+	if processedAssets[asset.Name] {
+		fmt.Println("Already processed:", asset.Name)
 		return nil
 	}
 
-	p.processed[asset.Name] = true
+	processedAssets[asset.Name] = true
 
 	for _, upstream := range asset.Upstreams {
 		upstreamAsset := foundPipeline.GetAssetByName(upstream.Value)
 		if upstreamAsset == nil {
 			continue
 		}
-		_ = p.ColumnLineage(foundPipeline, upstreamAsset)
+		_ = p.ColumnLineage(foundPipeline, upstreamAsset, processedAssets)
 	}
 
 	_ = p.parseLineage(foundPipeline, asset, p.TableSchemaForUpstreams(foundPipeline, asset))
