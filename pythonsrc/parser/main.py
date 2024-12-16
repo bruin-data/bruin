@@ -111,7 +111,9 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
     if not isinstance(parsed, exp.Query):
         return {"columns": []}
     try:
-        optimized = optimize(parsed, schema, dialect=dialect)
+        optimized = optimize(
+            parsed, schema_dict_to_schema_object(schema), dialect=dialect
+        )
     except Exception:
         return {"columns": []}
 

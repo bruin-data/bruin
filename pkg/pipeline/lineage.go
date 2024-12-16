@@ -57,8 +57,7 @@ func (p *LineageExtractor) ColumnLineage(foundPipeline *Pipeline, asset *Asset) 
 	if asset == nil {
 		return nil
 	}
-	key := fmt.Sprintf("%s-%s", foundPipeline.Name, asset.Name)
-	if p.processed[key] {
+	if p.processed[asset.Name] {
 		return nil
 	}
 
