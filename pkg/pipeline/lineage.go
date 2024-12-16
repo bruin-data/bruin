@@ -44,6 +44,10 @@ func (p *LineageExtractor) TableSchema(foundPipeline *Pipeline) sqlparser.Schema
 func (p *LineageExtractor) TableSchemaForUpstreams(foundPipeline *Pipeline, asset *Asset) sqlparser.Schema {
 	columnMetadata := make(sqlparser.Schema)
 	for _, upstream := range asset.Upstreams {
+		if upstream.Type != "asset" {
+			continue
+		}
+
 		upstreamAsset := foundPipeline.GetAssetByName(upstream.Value)
 		if len(upstreamAsset.Columns) > 0 {
 			columnMetadata[upstreamAsset.Name] = makeColumnMap(upstreamAsset.Columns)
