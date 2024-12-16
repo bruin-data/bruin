@@ -22,7 +22,6 @@ type LineageExtractor struct {
 
 // NewLineageExtractor creates a new LineageExtractor instance.
 func NewLineageExtractor(parser sqlParser) *LineageExtractor {
-
 	return &LineageExtractor{
 		sqlParser: parser,
 		renderer:  jinja.NewRendererWithYesterday("lineage-parser", "lineage-parser"),
