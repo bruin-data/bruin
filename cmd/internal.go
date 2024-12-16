@@ -152,6 +152,7 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool) error {
 	}
 
 	if lineage {
+
 		panics := lineageWg.WaitAndRecover()
 		if panics != nil {
 			return cli.Exit("", 1)
@@ -160,9 +161,8 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool) error {
 		defer sqlParser.Close()
 
 		lineage := pipeline.NewLineageExtractor(sqlParser)
+		metadata := lineage.TableSchema(foundPipeline)
 		for _, asset := range foundPipeline.Assets {
-			metadata := lineage.TableSchema(foundPipeline)
-
 			if err := lineage.ColumnLineage(foundPipeline, asset, metadata); err != nil {
 				printErrorJSON(err)
 				return cli.Exit("", 1)

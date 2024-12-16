@@ -84,12 +84,21 @@ func (p *LineageExtractor) parseLineage(foundPipeline *Pipeline, asset *Asset, m
 		}
 	}
 
+	filteredMetadata := make(sqlparser.Schema)
+	for _, upstream := range asset.Upstreams {
+		upstreamAsset := foundPipeline.GetAssetByName(upstream.Value)
+		if upstreamAsset == nil {
+			continue
+		}
+		filteredMetadata[upstreamAsset.Name] = metadata[upstreamAsset.Name]
+	}
+
 	query, err := p.renderer.Render(asset.ExecutableFile.Content)
 	if err != nil {
 		return fmt.Errorf("failed to render the query: %w", err)
 	}
 
-	lineage, err := p.sqlParser.ColumnLineage(query, dialect, metadata)
+	lineage, err := p.sqlParser.ColumnLineage(query, dialect, filteredMetadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse column lineage: %w", err)
 	}
