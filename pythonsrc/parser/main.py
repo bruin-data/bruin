@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-import sqlglot
 from sqlglot import parse_one, exp, lineage
 from sqlglot.lineage import Node
 from sqlglot.optimizer import optimize
@@ -112,8 +111,10 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
     if not isinstance(parsed, exp.Query):
         return {"columns": []}
     try:
-        optimized = optimize(parsed, schema, dialect=dialect)
-    except Exception as e:
+        optimized = optimize(
+            parsed, schema_dict_to_schema_object(schema), dialect=dialect
+        )
+    except Exception:
         return {"columns": []}
 
     result = []
@@ -182,19 +183,20 @@ def merge_parts(table: exp.Table) -> str:
         part.name for part in table.parts if isinstance(part, exp.Identifier)
     )
 
+
 def schema_dict_to_schema_object(schema_dict: dict) -> dict:
     result = {}
-    
+
     for table_path, value in schema_dict.items():
         current = result
-        parts = table_path.split('.')
-        
+        parts = table_path.split(".")
+
         # Handle all parts except the last one
         for part in parts[:-1]:
             if part not in current:
                 current[part] = {}
             current = current[part]
-        
+
         # Handle the last part
         current[parts[-1]] = value
 
