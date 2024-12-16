@@ -17,6 +17,7 @@ type sqlParser interface {
 type LineageExtractor struct {
 	sqlParser sqlParser
 	renderer  *jinja.Renderer
+	processed map[string]bool
 }
 
 // NewLineageExtractor creates a new LineageExtractor instance.
@@ -24,6 +25,7 @@ func NewLineageExtractor(parser sqlParser) *LineageExtractor {
 	return &LineageExtractor{
 		sqlParser: parser,
 		renderer:  jinja.NewRendererWithYesterday("lineage-parser", "lineage-parser"),
+		processed: make(map[string]bool),
 	}
 }
 
@@ -43,6 +45,11 @@ func (p *LineageExtractor) ColumnLineage(foundPipeline *Pipeline, asset *Asset, 
 	if asset == nil {
 		return nil
 	}
+	if p.processed[asset.Name] {
+		return nil
+	}
+
+	p.processed[asset.Name] = true
 
 	for _, upstream := range asset.Upstreams {
 		upstreamAsset := foundPipeline.GetAssetByName(upstream.Value)
