@@ -1,4 +1,4 @@
-# Fetch Command 
+# Query Command 
 
 The `query` command executes and retrieves the results of a query on a specified connection and 
 returns the results on the terminal in either table format or as a JSON object.

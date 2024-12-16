@@ -1,4 +1,4 @@
-# Bruin - Shopify to DuckDB
+# Bruin - Shopify to DuckDB Template
 
 This pipeline is a simple example of a Bruin pipeline that copies data from Shopify to DuckDB. It demonstrates how to use the `bruin` CLI to build and run a pipeline.
 
