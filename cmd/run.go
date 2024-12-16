@@ -301,6 +301,9 @@ func Run(isDebug *bool) *cli.Command {
 				SingleTask:        task,
 				ExcludeTag:        c.String("exclude-tag"),
 			}
+			if filter.PushMetaData {
+				foundPipeline.MetadataPush.Global = true
+			}
 
 			s := scheduler.NewScheduler(logger, foundPipeline)
 
