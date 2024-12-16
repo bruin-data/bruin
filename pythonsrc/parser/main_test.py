@@ -1396,9 +1396,8 @@ test_cases = [
                 "type": "TEXT",
                 "upstream": [{"column": "mycol", "table": "raw.table1"}],
             },
-
         ],
-        "expected_non_selected": []
+        "expected_non_selected": [],
     },
 ]
 
@@ -1407,11 +1406,11 @@ test_cases = [
     "query,schema,expected,expected_non_selected,dialect",
     [
         (
-                tc["query"],
-                tc["schema"],
-                tc["expected"],
-                tc["expected_non_selected"],
-                tc["dialect"],
+            tc["query"],
+            tc["schema"],
+            tc["expected"],
+            tc["expected_non_selected"],
+            tc["dialect"],
         )
         for tc in test_cases
     ],
