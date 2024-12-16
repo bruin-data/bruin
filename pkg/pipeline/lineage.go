@@ -40,8 +40,20 @@ func (p *LineageExtractor) TableSchema(foundPipeline *Pipeline) sqlparser.Schema
 	return columnMetadata
 }
 
-// ParseLineageRecursive processes the lineage of an asset and its upstream dependencies recursively.
-func (p *LineageExtractor) ColumnLineage(foundPipeline *Pipeline, asset *Asset, metadata sqlparser.Schema) error {
+// TableSchemaForUpstreams extracts the table schema for a single asset and returns a sqlparser schema only for its upstreams
+func (p *LineageExtractor) TableSchemaForUpstreams(foundPipeline *Pipeline, asset *Asset) sqlparser.Schema {
+	columnMetadata := make(sqlparser.Schema)
+	for _, upstream := range asset.Upstreams {
+		upstreamAsset := foundPipeline.GetAssetByName(upstream.Value)
+		if len(upstreamAsset.Columns) > 0 {
+			columnMetadata[upstreamAsset.Name] = makeColumnMap(upstreamAsset.Columns)
+		}
+	}
+	return columnMetadata
+}
+
+// ColumnLineage processes the lineage of an asset and its upstream dependencies recursively.
+func (p *LineageExtractor) ColumnLineage(foundPipeline *Pipeline, asset *Asset) error {
 	if asset == nil {
 		return nil
 	}
@@ -57,10 +69,10 @@ func (p *LineageExtractor) ColumnLineage(foundPipeline *Pipeline, asset *Asset, 
 		if upstreamAsset == nil {
 			continue
 		}
-		_ = p.ColumnLineage(foundPipeline, upstreamAsset, metadata)
+		_ = p.ColumnLineage(foundPipeline, upstreamAsset)
 	}
 
-	_ = p.parseLineage(foundPipeline, asset, metadata)
+	_ = p.parseLineage(foundPipeline, asset, p.TableSchemaForUpstreams(foundPipeline, asset))
 
 	return nil
 }
@@ -84,21 +96,12 @@ func (p *LineageExtractor) parseLineage(foundPipeline *Pipeline, asset *Asset, m
 		}
 	}
 
-	filteredMetadata := make(sqlparser.Schema)
-	for _, upstream := range asset.Upstreams {
-		upstreamAsset := foundPipeline.GetAssetByName(upstream.Value)
-		if upstreamAsset == nil {
-			continue
-		}
-		filteredMetadata[upstreamAsset.Name] = metadata[upstreamAsset.Name]
-	}
-
 	query, err := p.renderer.Render(asset.ExecutableFile.Content)
 	if err != nil {
 		return fmt.Errorf("failed to render the query: %w", err)
 	}
 
-	lineage, err := p.sqlParser.ColumnLineage(query, dialect, filteredMetadata)
+	lineage, err := p.sqlParser.ColumnLineage(query, dialect, metadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse column lineage: %w", err)
 	}
