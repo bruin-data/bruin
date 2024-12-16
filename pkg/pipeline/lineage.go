@@ -60,7 +60,6 @@ func (p *LineageExtractor) ColumnLineage(foundPipeline *Pipeline, asset *Asset, 
 		return nil
 	}
 	if processedAssets[asset.Name] {
-		fmt.Println("Already processed:", asset.Name)
 		return nil
 	}
 
