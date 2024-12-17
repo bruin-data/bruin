@@ -344,22 +344,37 @@ func EnsurePipelineStartDateIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
 	return issues, nil
 }
 
+// ValidateCustomCheckQueryExists checks for duplicate column checks within a single column.
+// It returns a slice of Issues, each representing a duplicate column check found.
+func ValidateCustomCheckQueryExists(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	var issues []*Issue
+	for _, check := range asset.CustomChecks {
+		if check.Query == "" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Custom check '%s' query cannot be empty", check.Name),
+			})
+		}
+	}
+	return issues, nil
+}
+
 // ValidateDuplicateColumnChecks checks for duplicate column checks within a single column.
 // It returns a slice of Issues, each representing a duplicate column check found.
 func ValidateDuplicateColumnChecks(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	var issues []*Issue
 
-	CheckNames := make(map[string]bool)
 	for _, column := range asset.Columns {
+		checkNames := make(map[string]bool)
 		for _, check := range column.Checks {
-			lowercaseName := fmt.Sprintf("%s-%s", strings.ToLower(column.Name), strings.ToLower(check.Name))
-			if CheckNames[lowercaseName] {
+			lowercaseName := strings.ToLower(check.Name)
+			if checkNames[lowercaseName] {
 				issues = append(issues, &Issue{
 					Task:        asset,
-					Description: fmt.Sprintf("Duplicate column check '%s' found ", check.Name),
+					Description: fmt.Sprintf("Duplicate column check '%s' found", check.Name),
 				})
 			} else {
-				CheckNames[lowercaseName] = true
+				checkNames[lowercaseName] = true
 			}
 		}
 	}
