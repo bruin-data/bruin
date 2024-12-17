@@ -169,6 +169,7 @@ export default defineConfig({
                             {text: "Zendesk", link: "/ingestion/zendesk.md"},
                         ],
                     },
+                    {text: "Destinations", link: "/ingestion/destinations.md"}
                 ],
             },
             {
