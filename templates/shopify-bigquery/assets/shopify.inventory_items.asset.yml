@@ -4,6 +4,7 @@ parameters:
   source_connection: shopify-default
   source_table: inventory_items
   destination: bigquery
+  loader_file_format: jsonl
 
 description: This asset manages the ingestion of Shopify inventory item data into BigQuery. It captures comprehensive inventory tracking information including SKUs, shipping requirements, measurement details, and variant relationships. The asset tracks both basic inventory attributes and advanced features like duplicate SKU detection and inventory tracking settings. Data quality checks ensure critical fields like inventory item ID are properly populated. This table serves as the source of truth for product inventory
 
