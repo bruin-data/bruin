@@ -344,6 +344,28 @@ func EnsurePipelineStartDateIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
 	return issues, nil
 }
 
+// ValidateDuplicateColumnChecks checks for duplicate column checks within a single column.
+// It returns a slice of Issues, each representing a duplicate column check found.
+func ValidateDuplicateColumnChecks(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	var issues []*Issue
+
+	CheckNames := make(map[string]bool)
+	for _, column := range asset.Columns {
+		for _, check := range column.Checks {
+			lowercaseName := fmt.Sprintf("%s-%s", strings.ToLower(column.Name), strings.ToLower(check.Name))
+			if CheckNames[lowercaseName] {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: fmt.Sprintf("Duplicate column check '%s' found ", check.Name),
+				})
+			} else {
+				CheckNames[lowercaseName] = true
+			}
+		}
+	}
+	return issues, nil
+}
+
 // ValidateDuplicateColumnNames checks for duplicate column names within a single asset.
 // It returns a slice of Issues, each representing a duplicate column name found.
 //

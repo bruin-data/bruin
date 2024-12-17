@@ -154,6 +154,14 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlPa
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "duplicate-column-checks",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			Validator:        CallFuncForEveryAsset(ValidateDuplicateColumnChecks),
+			AssetValidator:   ValidateDuplicateColumnChecks,
+			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "assets-directory-exist",
 			Fast:             true,
 			Severity:         ValidatorSeverityWarning,
