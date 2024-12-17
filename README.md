@@ -5,7 +5,7 @@
 Bruin is a command-line tool for validating and running data transformations on SQL, similar to dbt. On top, bruin can
 also run Python assets within the same pipeline.
 
-<img alt="Welcome to VHS" src="./resources/demo.gif" width="1200" />
+<img alt="Bruin CLI - Demo" src="./resources/demo.gif" width="1200" />
 
 Bruin is packed with features:
 - 📥 ingest data with [ingestr](https://github.com/bruin-data/ingestr) / Python
