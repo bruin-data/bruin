@@ -7,6 +7,13 @@ also run Python assets within the same pipeline.
 
 <img alt="Bruin CLI - Demo" src="./resources/demo.gif" width="1200" />
 
+<div align="center" style="margin-top: 24px;">
+  <a target="_blank" href="https://join.slack.com/t/bruindatacommunity/shared_invite/zt-2dl2i8foy-bVsuMUauHeN9M2laVm3ZVg" style="background:none">
+    <img src="https://img.shields.io/badge/slack-join-dlt.svg?color=d95f5f&logo=slack" style="width: 180px;"  />
+  </a>
+</div>
+
+
 Bruin is packed with features:
 - 📥 ingest data with [ingestr](https://github.com/bruin-data/ingestr) / Python
 - ✨ run SQL & Python transformations on [many platforms](#supported-platforms)
@@ -23,22 +30,7 @@ Bruin is packed with features:
 
 ## Installation
 
-### Linux/MacOS/Windows
-```shell
-curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh
-```
-
-> [!IMPORTANT]
-> If you are on Windows, make sure to run the command in the [Git Bash](https://git-scm.com/downloads/win) or [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) terminal.
-
-### macOS (Homebrew)
-Alternatively, if you are a macOS users, you can use Homebrew to install Bruin CLI:
-```shell
-brew install bruin-data/tap/bruin
-```
-
-## Docs
-You can see our documentation [here](https://bruin-data.github.io/bruin/).
+Head to our installation instructions [here](https://bruin-data.github.io/bruin/getting-started/introduction/installation.html).
 
 ## Community
 
