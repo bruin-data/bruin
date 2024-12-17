@@ -45,7 +45,7 @@ func main() {
 		[]string{"Executed 3 tasks", " Finished: chess_playground.games", "Finished: chess_playground.profiles", "Finished: chess_playground.game_outcome_summary"},
 	)
 	expectOutputIncludes(
-		"run --push-metadata --only push-metadata bigquery-metadata",
+		"run --push-metadata --only push-metadata shopify-bigquery",
 		0,
 		[]string{" Starting: shopify_raw.products:metadata-push", "Starting: shopify_raw.events:metadata-push", " Starting: shopify_raw.customers:metadata-push"},
 	)
