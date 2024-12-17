@@ -7,13 +7,6 @@ also run Python assets within the same pipeline.
 
 <img alt="Bruin CLI - Demo" src="./resources/demo.gif" width="1200" />
 
-<div align="center" style="margin-top: 24px;">
-  <a target="_blank" href="https://join.slack.com/t/bruindatacommunity/shared_invite/zt-2dl2i8foy-bVsuMUauHeN9M2laVm3ZVg" style="background:none">
-    <img src="https://img.shields.io/badge/slack-join-dlt.svg?color=d95f5f&logo=slack" style="width: 180px;"  />
-  </a>
-</div>
-
-
 Bruin is packed with features:
 - 📥 ingest data with [ingestr](https://github.com/bruin-data/ingestr) / Python
 - ✨ run SQL & Python transformations on [many platforms](#supported-platforms)
@@ -35,6 +28,14 @@ Head to our installation instructions [here](https://bruin-data.github.io/bruin/
 ## Community
 
 Join our Slack community [here](https://join.slack.com/t/bruindatacommunity/shared_invite/zt-2dl2i8foy-bVsuMUauHeN9M2laVm3ZVg).
+
+
+<div align="center" style="margin-top: 24px;">
+  <a target="_blank" href="https://join.slack.com/t/bruindatacommunity/shared_invite/zt-2dl2i8foy-bVsuMUauHeN9M2laVm3ZVg" style="background:none">
+    <img src="https://img.shields.io/badge/slack-join-dlt.svg?color=d95f5f&logo=slack" style="width: 180px;"  />
+  </a>
+</div>
+
 
 ## Getting Started
 
