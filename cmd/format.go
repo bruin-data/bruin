@@ -26,6 +26,11 @@ func Format(isDebug *bool) *cli.Command {
 				Aliases: []string{"o"},
 				Usage:   "the output type, possible values are: plain, json",
 			},
+			&cli.BoolFlag{
+				Name:  "fail-if-changed",
+				Usage: "exit with failure code if any file is modified",
+				Value: false,
+			},
 		},
 		Action: func(c *cli.Context) error {
 			logger := makeLogger(*isDebug)
@@ -36,9 +41,10 @@ func Format(isDebug *bool) *cli.Command {
 			}
 
 			output := c.String("output")
+			failIfChanged := c.Bool("fail-if-changed")
 
 			if isPathReferencingAsset(repoOrAsset) {
-				asset, err := formatAsset(repoOrAsset)
+				asset, changed, err := formatAsset(repoOrAsset, failIfChanged)
 				if err != nil {
 					if errors.Is(err, os.ErrNotExist) {
 						printErrorForOutput(output, fmt.Errorf("the given file path '%s' does not seem to exist, are you sure you used the right path?", repoOrAsset))
@@ -47,6 +53,13 @@ func Format(isDebug *bool) *cli.Command {
 					}
 
 					return cli.Exit("", 1)
+				}
+				if failIfChanged && changed {
+					printErrorForOutput(output, fmt.Errorf("asset '%s' has been modified", repoOrAsset))
+					return cli.Exit("", 1)
+				}
+				if failIfChanged && !changed {
+					return cli.Exit("", 0)
 				}
 
 				if output != "json" {
