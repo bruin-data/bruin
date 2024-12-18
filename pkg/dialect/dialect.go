@@ -24,7 +24,7 @@ var assetTypeDialectMap = map[string]string{
 	"duckdb.sql":     DuckDBDialect,
 	"rs.sql":         RedshiftDialect,
 	"pg.sql":         PostgresDialect,
-	"mysql.sql":      MssqlDialect,
+	"ms.sql":         MssqlDialect,
 	"databricks.sql": DatabricksDialect,
 	"athena.sql":     AthenaDialect,
 	"synapse.sql":    SynapseDialect,
