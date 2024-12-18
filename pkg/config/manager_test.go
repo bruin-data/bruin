@@ -357,7 +357,7 @@ func TestLoadOrCreate(t *testing.T) {
 			GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 				{
 					Name:               "conn1",
-					ServiceAccountFile: "some/path/to/service_account.json",
+					ServiceAccountFile: "/path/to/service_account.json",
 				},
 			},
 		},
@@ -409,7 +409,6 @@ func TestLoadOrCreate(t *testing.T) {
 			setup: func(t *testing.T, args args) {
 				err := existingConfig.PersistToFs(args.fs)
 				require.NoError(t, err)
-
 				err = afero.WriteFile(args.fs, "/some/path/to/.gitignore", []byte("file1"), 0o644)
 				require.NoError(t, err)
 			},
