@@ -332,6 +332,12 @@ func PingConnection() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			err = cm.SelectEnvironment(environment)
+			if err != nil {
+				printErrorForOutput(output, errors2.Wrap(err, "failed to select the environment"))
+				return cli.Exit("", 1)
+			}
+
 			manager, errs := connection.NewManagerFromConfig(cm)
 			if len(errs) > 0 {
 				// Handle each error in the errs slice
