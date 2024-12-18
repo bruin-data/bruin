@@ -130,11 +130,39 @@ func Format(isDebug *bool) *cli.Command {
 	}
 }
 
-func formatAsset(path string) (*pipeline.Asset, error) {
-	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(path)
-	if err != nil {
-		return nil, errors2.Wrap(err, "failed to build the asset")
+func formatAsset(path string, failIfChanged bool) (*pipeline.Asset, bool, error) {
+	var originalContent []byte
+	var err error
+
+	if failIfChanged {
+		// Read the original content only if failIfChanged is true
+		originalContent, err = afero.ReadFile(afero.NewOsFs(), path)
+		if err != nil {
+			return nil, false, errors2.Wrap(err, "failed to read original content")
+		}
 	}
 
-	return asset, asset.Persist(afero.NewOsFs())
+	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(path)
+	if err != nil {
+		return nil, false, errors2.Wrap(err, "failed to build the asset")
+	}
+
+	err = asset.Persist(afero.NewOsFs())
+	if err != nil {
+		return nil, false, errors2.Wrap(err, "failed to persist the asset")
+	}
+
+	if failIfChanged {
+		// Compare the new content with the original only if failIfChanged is true
+		newContent, err := afero.ReadFile(afero.NewOsFs(), path)
+		if err != nil {
+			return nil, false, errors2.Wrap(err, "failed to read new content")
+		}
+
+		changed := string(originalContent) != string(newContent)
+		return asset, changed, nil
+	}
+
+	// If failIfChanged is false, return without change detection
+	return asset, false, nil
 }
