@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/scheduler"
 )
 
 var version = "dev"
@@ -20,27 +20,17 @@ const (
 
 type State struct {
 	sync.RWMutex
-	Parameters map[string]string            `json:"parameters"`
-	Metadata   Metadata                     `json:"metadata"`
-	State      map[string][]*SchedulerState `json:"state"`
-	Version    string                       `json:"version"`
-	TimeStamp  time.Time                    `json:"timestamp"`
-	RunID      string                       `json:"run_id"`
+	Parameters map[string]string                     `json:"parameters"`
+	Metadata   Metadata                              `json:"metadata"`
+	State      map[string][]*scheduler.AssetInstance `json:"state"`
+	Version    string                                `json:"version"`
+	TimeStamp  time.Time                             `json:"timestamp"`
+	RunID      string                                `json:"run_id"`
 }
 
 type Metadata struct {
 	Version string `json:"version"`
 	OS      string `json:"os"`
-}
-
-type SchedulerState struct {
-	Upstream  []pipeline.Upstream `json:"upstream"`
-	Status    Status              `json:"status"`
-	Error     string              `json:"error"`
-	StartTime time.Time           `json:"start_time"`
-	EndTime   time.Time           `json:"end_time"`
-	Name      string              `json:"name"`
-	ID        string              `json:"id"`
 }
 
 type Status string
@@ -52,40 +42,20 @@ func NewState(runid string, parameters map[string]string) *State {
 			Version: version,
 			OS:      runtime.GOOS,
 		},
-		State:     map[string][]*SchedulerState{},
+		State:     map[string][]*scheduler.AssetInstance{},
 		Version:   "1.0.0",
 		TimeStamp: time.Time{},
 		RunID:     runid,
 	}
 }
 
-func (s *State) InitState(foundPipelines []pipeline.Pipeline) error {
-	states := make(map[string][]*SchedulerState)
-	for _, foundPipeline := range foundPipelines {
-		states[foundPipeline.Name] = make([]*SchedulerState, 0)
-		for _, asset := range foundPipeline.Assets {
-			states[foundPipeline.Name] = append(states[foundPipeline.Name], &SchedulerState{
-				Upstream:  asset.Upstreams,
-				Status:    StatusPending,
-				Error:     "",
-				StartTime: time.Time{},
-				EndTime:   time.Time{},
-				Name:      asset.Name,
-				ID:        asset.ID,
-			})
-		}
-	}
-	s.State = states
-	return nil
-}
-
-func (s *State) GetAssetState(name string, pipelineName string) *SchedulerState {
+func (s *State) GetAssetState(name string, pipelineName string) *scheduler.AssetInstance {
 	s.RLock()
 	defer s.RUnlock()
 	for foundPipelineName, states := range s.State {
 		if foundPipelineName == pipelineName {
 			for _, state := range states {
-				if state.Name == name {
+				if state.Asset.Name == name {
 					return state
 				}
 			}
@@ -94,7 +64,7 @@ func (s *State) GetAssetState(name string, pipelineName string) *SchedulerState 
 	return nil
 }
 
-func (s *State) GetPipelineState(name string) []*SchedulerState {
+func (s *State) GetPipelineState(name string) []*scheduler.AssetInstance {
 	s.RLock()
 	defer s.RUnlock()
 	for foundPipelineName, states := range s.State {
@@ -102,20 +72,18 @@ func (s *State) GetPipelineState(name string) []*SchedulerState {
 			return states
 		}
 	}
-	return []*SchedulerState{}
+	return []*scheduler.AssetInstance{}
 }
 
-func (s *State) SetAssetState(name, pipelineName string, status Status, err error) *SchedulerState {
+func (s *State) SetAssetState(name, pipelineName string, instance *scheduler.AssetInstance) error {
 	s.RLock()
 	defer s.RUnlock()
 	for foundPipelineName, states := range s.State {
 		if foundPipelineName == pipelineName {
-			for _, state := range states {
-				if state.Name == name {
-					state.Status = status
-					state.Error = err.Error()
-					state.EndTime = time.Now()
-					return state
+			for key, state := range states {
+				if state.Asset.Name == name {
+					s.State[pipelineName][key] = instance
+					return nil
 				}
 			}
 		}
