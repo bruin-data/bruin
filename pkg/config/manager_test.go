@@ -357,7 +357,7 @@ func TestLoadOrCreate(t *testing.T) {
 			GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 				{
 					Name:               "conn1",
-					ServiceAccountFile: "/path/to/service_account.json",
+					ServiceAccountFile: "some/path/to/service_account.json",
 				},
 			},
 		},
