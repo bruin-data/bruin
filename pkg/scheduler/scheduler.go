@@ -372,7 +372,7 @@ func (s *Scheduler) FindMajorityOfTypes(defaultIfNone pipeline.AssetType) pipeli
 	return s.pipeline.GetMajorityAssetTypesFromSQLAssets(defaultIfNone)
 }
 
-func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, state *state.State) *Scheduler {
+func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, stateManager *state.State) *Scheduler {
 	instances := make([]TaskInstance, 0)
 	for _, task := range p.Assets {
 		parentID := uuid.New().String()
@@ -443,7 +443,7 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, state *state.
 		logger:           logger,
 		pipeline:         p,
 		taskInstances:    instances,
-		state:            state,
+		state:            stateManager,
 		taskScheduleLock: sync.Mutex{},
 		WorkQueue:        make(chan TaskInstance, 100),
 		Results:          make(chan *TaskExecutionResult),
@@ -578,6 +578,18 @@ func (s *Scheduler) saveState(results []*TaskExecutionResult) {
 			Upstream: result.Instance.GetAsset().Upstreams,
 		})
 	}
+	upstreamFailedTasks := s.GetTaskInstancesByStatus(UpstreamFailed)
+	for _, task := range upstreamFailedTasks {
+		states = append(states, &state.AssetInstance{
+			ID:       task.GetAsset().ID,
+			HumanID:  task.GetHumanID(),
+			Name:     task.GetAsset().Name,
+			Pipeline: task.GetPipeline().Name,
+			Status:   task.GetStatus().String(),
+			Upstream: task.GetAsset().Upstreams,
+		})
+	}
+
 	s.state.SetState(states)
 	s.state.Save("logs/" + s.pipeline.Name)
 }

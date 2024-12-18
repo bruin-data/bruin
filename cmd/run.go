@@ -131,6 +131,10 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "exp-use-winget-for-uv",
 				Usage: "use powershell to manage and install uv on windows, on non-windows systems this has no effect.",
 			},
+			&cli.BoolFlag{
+				Name:  "continue",
+				Usage: "continue from the last state",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			defer func() {
@@ -303,9 +307,7 @@ func Run(isDebug *bool) *cli.Command {
 				SingleTask:        task,
 				ExcludeTag:        c.String("exclude-tag"),
 			}
-			if filter.PushMetaData {
-				foundPipeline.MetadataPush.Global = true
-			}
+
 			state := state.NewState(runID, map[string]string{
 				"startDate":   startDate.Format(time.RFC3339),
 				"endDate":     endDate.Format(time.RFC3339),
@@ -317,6 +319,17 @@ func Run(isDebug *bool) *cli.Command {
 				"excludeTag":  c.String("exclude-tag"),
 				"only":        strings.Join(c.StringSlice("only"), ","),
 			}, foundPipeline.Name)
+
+			if c.Bool("continue") {
+				if err := state.Load("logs/" + foundPipeline.Name); err != nil {
+					return nil
+				}
+			}
+
+			if filter.PushMetaData {
+				foundPipeline.MetadataPush.Global = true
+			}
+
 			s := scheduler.NewScheduler(logger, foundPipeline, state)
 
 			// Apply the filter to mark assets based on include/exclude tags
