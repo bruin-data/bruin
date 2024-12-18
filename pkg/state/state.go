@@ -1,10 +1,6 @@
 package state
 
 import (
-	"encoding/json"
-	"fmt"
-	"log/slog"
-	"os"
 	"runtime"
 	"sync"
 	"time"
@@ -24,12 +20,12 @@ const (
 
 type State struct {
 	sync.RWMutex
-	Parameters map[string]string `json:"parameters"`
-	Metadata   Metadata          `json:"metadata"`
-	State      []*SchedulerState `json:"state"`
-	Version    string            `json:"version"`
-	LastRun    time.Time         `json:"last_run"`
-	LastRunID  string            `json:"last_run_id"`
+	Parameters map[string]string            `json:"parameters"`
+	Metadata   Metadata                     `json:"metadata"`
+	State      map[string][]*SchedulerState `json:"state"`
+	Version    string                       `json:"version"`
+	LastRun    time.Time                    `json:"last_run"`
+	LastRunID  string                       `json:"last_run_id"`
 }
 
 type Metadata struct {
@@ -49,27 +45,26 @@ type SchedulerState struct {
 
 type Status string
 
-func createStateFile(runid string, stateFileDir string) (*os.File, error) {
-	if _, err := os.Stat(stateFileDir); os.IsNotExist(err) {
-		err := os.Mkdir(stateFileDir, 0o755)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create directory: %w", err)
-		}
+func NewState(runid string, parameters map[string]string) *State {
+	return &State{
+		Parameters: parameters,
+		Metadata: Metadata{
+			Version: version,
+			OS:      runtime.GOOS,
+		},
+		State:     map[string][]*SchedulerState{},
+		Version:   "1.0.0",
+		LastRun:   time.Time{},
+		LastRunID: runid,
 	}
-	timestamp := time.Now().Format(time.RFC3339)
-	filePath := fmt.Sprintf("%s/%s_%s.json", stateFileDir, timestamp, runid)
-	file, err := os.Create(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create file: %w", err)
-	}
-	return file, nil
 }
 
-func NewState(runid string, parameters map[string]string, stateFileDir string, foundPipelines []pipeline.Pipeline) *State {
-	states := []*SchedulerState{}
-	for _, pipeline := range foundPipelines {
-		for _, asset := range pipeline.Assets {
-			states = append(states, &SchedulerState{
+func (s *State) InitState(foundPipelines []pipeline.Pipeline) error {
+	states := make(map[string][]*SchedulerState)
+	for _, foundPipeline := range foundPipelines {
+		states[foundPipeline.Name] = make([]*SchedulerState, 0)
+		for _, asset := range foundPipeline.Assets {
+			states[foundPipeline.Name] = append(states[foundPipeline.Name], &SchedulerState{
 				Upstream:  asset.Upstreams,
 				Status:    StatusPending,
 				Error:     "",
@@ -80,58 +75,49 @@ func NewState(runid string, parameters map[string]string, stateFileDir string, f
 			})
 		}
 	}
-	return &State{
-		Parameters: parameters,
-		Metadata: Metadata{
-			Version: version,
-			OS:      runtime.GOOS,
-		},
-		State:     states,
-		Version:   "1.0.0",
-		LastRun:   time.Time{},
-		LastRunID: runid,
-	}
+	s.State = states
+	return nil
 }
 
-func (s *State) GetState(name string) *SchedulerState {
+func (s *State) GetState(name string, pipelineName string) *SchedulerState {
 	s.RLock()
 	defer s.RUnlock()
-	for _, state := range s.State {
-		if state.Name == name {
-			return state
+	for foundPipelineName, states := range s.State {
+		if foundPipelineName == pipelineName {
+			for _, state := range states {
+				if state.Name == name {
+					return state
+				}
+			}
 		}
 	}
 	return nil
 }
 
-func (s *State) SetState(name string, status Status, err error) *SchedulerState {
-	s.Lock()
-	defer s.Unlock()
-	for _, state := range s.State {
-		if state.Name == name {
-			state.Status = status
-			state.Error = err.Error()
-			return state
+func (s *State) SetState(name, pipelineName string, status Status, err error) *SchedulerState {
+	s.RLock()
+	defer s.RUnlock()
+	for foundPipelineName, states := range s.State {
+		if foundPipelineName == pipelineName {
+			for _, state := range states {
+				if state.Name == name {
+					state.Status = status
+					state.Error = err.Error()
+					state.EndTime = time.Now()
+					return state
+				}
+			}
 		}
 	}
 	return nil
 }
 
 func (s *State) SaveState(stateFileDir string) error {
-	s.RLock()
-	defer s.RUnlock()
-	file, err := createStateFile(s.LastRunID, stateFileDir)
-	if err != nil {
-		slog.Error("failed to create state file", "error", err)
-		return err
-	}
-	defer file.Close()
+	// TODO: Implement state saving
+	return nil
+}
 
-	encoder := json.NewEncoder(file)
-	if err := encoder.Encode(s); err != nil {
-		slog.Error("failed to encode state to JSON", "error", err)
-		return err
-	}
-
+func (s *State) CompareState() error {
+	// TODO: Implement state saving
 	return nil
 }
