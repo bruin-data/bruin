@@ -154,14 +154,6 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlPa
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
 		&SimpleRule{
-			Identifier:       "duplicate-column-checks",
-			Fast:             true,
-			Severity:         ValidatorSeverityCritical,
-			Validator:        CallFuncForEveryAsset(ValidateDuplicateColumnChecks),
-			AssetValidator:   ValidateDuplicateColumnChecks,
-			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
-		},
-		&SimpleRule{
 			Identifier:       "custom-check-query-exists",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
