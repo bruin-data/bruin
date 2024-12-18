@@ -78,6 +78,7 @@ func Format(isDebug *bool) *cli.Command {
 			logger.Debugf("found %d asset paths", len(assetPaths))
 
 			errorList := make([]error, 0)
+			changedList := make([]string, 0) // List to store paths of modified assets
 			processedAssetCount := 0
 
 			for _, assetPath := range assetPaths {
@@ -85,20 +86,22 @@ func Format(isDebug *bool) *cli.Command {
 					_, changed, err := formatAsset(assetPath, failIfChanged)
 					if err != nil {
 						logger.Debugf("failed to process path '%s': %v", assetPath, err)
-						errorList = append(errorList, errors2.Wrapf(err, "failed to format  '%s'", assetPath))
+						errorList = append(errorList, errors2.Wrapf(err, "failed to format '%s'", assetPath))
 						return
 					}
 
 					if failIfChanged && changed {
 						logger.Debugf("asset '%s' has been modified", assetPath)
-						errorList = append(errorList, fmt.Errorf("asset '%s' has been modified", assetPath))
+						changedList = append(changedList, assetPath) // Append to changedList
 					}
-
 					processedAssetCount++
 				})
 			}
 
 			assetFinderPool.Wait()
+			if len(changedList) == 0 && failIfChanged {
+				return nil
+			}
 			if len(errorList) == 0 {
 				if output == "json" {
 					return nil
