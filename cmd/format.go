@@ -102,6 +102,13 @@ func Format(isDebug *bool) *cli.Command {
 			if len(changedList) == 0 && failIfChanged {
 				return nil
 			}
+			if len(changedList) > 0 && failIfChanged {
+				infoPrinter.Printf("The following assets were modified:\n")
+				for _, path := range changedList {
+					infoPrinter.Println("  - " + path)
+				}
+				return cli.Exit("", 1)
+			}
 			if len(errorList) == 0 {
 				if output == "json" {
 					return nil
