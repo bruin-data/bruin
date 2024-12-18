@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -24,6 +25,7 @@ const (
 )
 
 type State struct {
+	sync.RWMutex
 	Parameters map[string]string `json:"parameters"`
 	Metadata   Metadata          `json:"metadata"`
 	State      []*SchedulerState `json:"state"`
@@ -91,6 +93,8 @@ func NewState(runid string, parameters map[string]string, stateFileDir string, f
 }
 
 func (s *State) GetState(name string) *SchedulerState {
+	s.RLock()
+	defer s.RUnlock()
 	for _, state := range s.State {
 		if state.Name == name {
 			return state
@@ -100,6 +104,8 @@ func (s *State) GetState(name string) *SchedulerState {
 }
 
 func (s *State) SetState(name string, status Status, error string) *SchedulerState {
+	s.Lock()
+	defer s.Unlock()
 	for _, state := range s.State {
 		if state.Name == name {
 			state.Status = status
@@ -111,6 +117,8 @@ func (s *State) SetState(name string, status Status, error string) *SchedulerSta
 }
 
 func (s *State) SaveState(stateFileDir string) error {
+	s.RLock()
+	defer s.RUnlock()
 	file, err := createStateFile(s.LastRunID, stateFileDir)
 	if err != nil {
 		slog.Error("failed to create state file", "error", err)
