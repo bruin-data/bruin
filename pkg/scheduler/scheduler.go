@@ -373,58 +373,73 @@ func (s *Scheduler) FindMajorityOfTypes(defaultIfNone pipeline.AssetType) pipeli
 }
 
 func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, stateManager *state.State) *Scheduler {
+	newRun := true
+	if len(stateManager.Get()) > 0 {
+		newRun = false
+	}
+
 	instances := make([]TaskInstance, 0)
 	for _, task := range p.Assets {
-		parentID := uuid.New().String()
-		instance := &AssetInstance{
-			ID:         parentID,
-			HumanID:    task.Name,
-			Pipeline:   p,
-			Asset:      task,
-			status:     Pending,
-			upstream:   make([]TaskInstance, 0),
-			downstream: make([]TaskInstance, 0),
+		shouldSkip := false
+		if !newRun && stateManager.GetAssetState(task.Name).Status == Succeeded.String() {
+			shouldSkip = true
 		}
-		instances = append(instances, instance)
+
+		parentID := uuid.New().String()
+		if !shouldSkip {
+			instance := &AssetInstance{
+				ID:         parentID,
+				HumanID:    task.Name,
+				Pipeline:   p,
+				Asset:      task,
+				status:     Pending,
+				upstream:   make([]TaskInstance, 0),
+				downstream: make([]TaskInstance, 0),
+			}
+			instances = append(instances, instance)
+		}
 
 		for _, col := range task.Columns {
 			for _, t := range col.Checks {
-				testInstance := &ColumnCheckInstance{
+				if !shouldSkip {
+					testInstance := &ColumnCheckInstance{
+						AssetInstance: &AssetInstance{
+							ID:         uuid.New().String(),
+							HumanID:    fmt.Sprintf("%s:%s:%s", task.Name, col.Name, t.Name),
+							Pipeline:   p,
+							Asset:      task,
+							status:     Pending,
+							upstream:   make([]TaskInstance, 0),
+							downstream: make([]TaskInstance, 0),
+						},
+						parentID: parentID,
+						Column:   &col,
+						Check:    &t,
+					}
+					instances = append(instances, testInstance)
+				}
+			}
+		}
+
+		for _, c := range task.CustomChecks {
+			humanIDName := strings.ReplaceAll(strings.ToLower(c.Name), " ", "_")
+			if !shouldSkip {
+				testInstance := &CustomCheckInstance{
 					AssetInstance: &AssetInstance{
 						ID:         uuid.New().String(),
-						HumanID:    fmt.Sprintf("%s:%s:%s", task.Name, col.Name, t.Name),
+						HumanID:    fmt.Sprintf("%s:custom-check:%s", task.Name, humanIDName),
 						Pipeline:   p,
 						Asset:      task,
 						status:     Pending,
 						upstream:   make([]TaskInstance, 0),
 						downstream: make([]TaskInstance, 0),
 					},
-					parentID: parentID,
-					Column:   &col,
-					Check:    &t,
+					Check: &c,
 				}
 				instances = append(instances, testInstance)
 			}
 		}
-
-		for _, c := range task.CustomChecks {
-			humanIDName := strings.ReplaceAll(strings.ToLower(c.Name), " ", "_")
-			testInstance := &CustomCheckInstance{
-				AssetInstance: &AssetInstance{
-					ID:         uuid.New().String(),
-					HumanID:    fmt.Sprintf("%s:custom-check:%s", task.Name, humanIDName),
-					Pipeline:   p,
-					Asset:      task,
-					status:     Pending,
-					upstream:   make([]TaskInstance, 0),
-					downstream: make([]TaskInstance, 0),
-				},
-				Check: &c,
-			}
-			instances = append(instances, testInstance)
-		}
-
-		if p.MetadataPush.HasAnyEnabled() {
+		if !shouldSkip && p.MetadataPush.HasAnyEnabled() {
 			instances = append(instances, &MetadataPushInstance{
 				AssetInstance: &AssetInstance{
 					ID:         uuid.New().String(),

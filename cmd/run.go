@@ -318,7 +318,7 @@ func Run(isDebug *bool) *cli.Command {
 				if err != nil {
 					return cli.Exit("", 1)
 				}
-				stateBFS, err := state.GetBFSToAsset()
+				stateBFS, err := state.GetBFSToAsset(foundPipeline.Assets[0].Name)
 				if err != nil {
 					return cli.Exit("", 1)
 				}
@@ -326,14 +326,14 @@ func Run(isDebug *bool) *cli.Command {
 					return cli.Exit("Please rerun the pipeline because the order of assets has changed", 1)
 				}
 
-				filter = &Filter{
-					IncludeTag:        state.GetParam("tag"),
-					OnlyTaskTypes:     strings.Split(state.GetParam("only"), ","),
-					IncludeDownstream: runDownstreamTasks,
-					PushMetaData:      state.GetParam("push-metadata") == "true",
-					SingleTask:        task,
-					ExcludeTag:        state.GetParam("exclude-tag"),
-				}
+				// filter = &Filter{
+				// 	IncludeTag:        state.GetParam("tag"),
+				// 	OnlyTaskTypes:     strings.Split(state.GetParam("only"), ","),
+				// 	IncludeDownstream: runDownstreamTasks,
+				// 	PushMetaData:      state.GetParam("push-metadata") == "true",
+				// 	SingleTask:        task,
+				// 	ExcludeTag:        state.GetParam("exclude-tag"),
+				// }
 			} else {
 				state.SetParam(map[string]string{
 					"startDate":   startDate.Format(time.RFC3339),

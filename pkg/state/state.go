@@ -67,6 +67,17 @@ func (s *State) Get() []*AssetInstance {
 	return s.State
 }
 
+func (s *State) GetAssetState(name string) *AssetInstance {
+	s.Lock()
+	defer s.Unlock()
+	for _, asset := range s.State {
+		if asset.Name == name {
+			return asset
+		}
+	}
+	return nil
+}
+
 func (s *State) Set(results []*AssetInstance) {
 	s.Lock()
 	defer s.Unlock()
@@ -108,7 +119,7 @@ func (s *State) Save(directory string) []*AssetInstance {
 	return s.State
 }
 
-func (s *State) GetBFSToAsset() (string, error) {
+func (s *State) GetBFSToAsset(name string) (string, error) {
 	result := ""
 	graph := gograph.New[string](gograph.Directed())
 	for _, asset := range s.State {
@@ -118,7 +129,7 @@ func (s *State) GetBFSToAsset() (string, error) {
 			}
 		}
 	}
-	bfs, err := traverse.NewBreadthFirstIterator[string](graph, s.State[0].Name)
+	bfs, err := traverse.NewBreadthFirstIterator[string](graph, name)
 	if err != nil {
 		return "", err
 	}
