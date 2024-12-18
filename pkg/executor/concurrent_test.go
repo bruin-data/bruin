@@ -6,6 +6,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/bruin-data/bruin/pkg/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -64,7 +65,7 @@ func TestConcurrent_Start(t *testing.T) {
 	}
 
 	logger := zap.NewNop().Sugar()
-	s := scheduler.NewScheduler(logger, p)
+	s := scheduler.NewScheduler(logger, p, state.NewState("test", map[string]string{}, "test"))
 	assert.Equal(t, 5, s.InstanceCount())
 
 	ops := map[pipeline.AssetType]Config{

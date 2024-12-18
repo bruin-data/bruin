@@ -9,6 +9,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/state"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -230,6 +231,7 @@ type Scheduler struct {
 	logger           *zap.SugaredLogger
 	taskScheduleLock sync.Mutex
 	pipeline         *pipeline.Pipeline
+	state            *state.State
 
 	taskInstances []TaskInstance
 	taskNameMap   map[string]InstancesByType
@@ -370,7 +372,7 @@ func (s *Scheduler) FindMajorityOfTypes(defaultIfNone pipeline.AssetType) pipeli
 	return s.pipeline.GetMajorityAssetTypesFromSQLAssets(defaultIfNone)
 }
 
-func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline) *Scheduler {
+func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, state *state.State) *Scheduler {
 	instances := make([]TaskInstance, 0)
 	for _, task := range p.Assets {
 		parentID := uuid.New().String()
@@ -441,6 +443,7 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline) *Scheduler {
 		logger:           logger,
 		pipeline:         p,
 		taskInstances:    instances,
+		state:            state,
 		taskScheduleLock: sync.Mutex{},
 		WorkQueue:        make(chan TaskInstance, 100),
 		Results:          make(chan *TaskExecutionResult),
@@ -548,6 +551,7 @@ func (s *Scheduler) Run(ctx context.Context) []*TaskExecutionResult {
 		select {
 		case <-ctx.Done():
 			close(s.WorkQueue)
+			s.saveState(results)
 			return results
 		case result := <-s.Results:
 			s.logger.Debug("received task result: ", result.Instance.GetAsset().Name)
@@ -555,10 +559,27 @@ func (s *Scheduler) Run(ctx context.Context) []*TaskExecutionResult {
 			finished := s.Tick(result)
 			if finished {
 				s.logger.Debug("pipeline has completed, finishing the scheduler loop")
+				s.saveState(results)
 				return results
 			}
 		}
 	}
+}
+
+func (s *Scheduler) saveState(results []*TaskExecutionResult) {
+	states := make([]*state.AssetInstance, 0)
+	for _, result := range results {
+		states = append(states, &state.AssetInstance{
+			ID:       result.Instance.GetAsset().ID,
+			HumanID:  result.Instance.GetHumanID(),
+			Name:     result.Instance.GetAsset().Name,
+			Pipeline: result.Instance.GetPipeline().Name,
+			Status:   result.Instance.GetStatus().String(),
+			Upstream: result.Instance.GetAsset().Upstreams,
+		})
+	}
+	s.state.SetState(states)
+	s.state.Save("logs/" + s.pipeline.Name)
 }
 
 // Tick marks an iteration of the scheduler loop. It is called when a result is received.

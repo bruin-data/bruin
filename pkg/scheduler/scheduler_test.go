@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/state"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -209,7 +210,7 @@ func TestScheduler_Run(t *testing.T) {
 		},
 	}
 
-	scheduler := NewScheduler(&zap.SugaredLogger{}, p)
+	scheduler := NewScheduler(&zap.SugaredLogger{}, p, state.NewState("test", map[string]string{}, "test"))
 
 	scheduler.Tick(&TaskExecutionResult{
 		Instance: &AssetInstance{
@@ -326,7 +327,7 @@ func TestScheduler_MarkTasksAndDownstream(t *testing.T) {
 		},
 	}
 
-	s := NewScheduler(zap.NewNop().Sugar(), p)
+	s := NewScheduler(zap.NewNop().Sugar(), p, state.NewState("test", map[string]string{}, "test"))
 	s.MarkAll(Succeeded)
 	s.MarkAsset(t12, Pending, true)
 
@@ -436,7 +437,7 @@ func TestScheduler_WillRunTaskOfType(t *testing.T) {
 		},
 	}
 
-	s := NewScheduler(zap.NewNop().Sugar(), p)
+	s := NewScheduler(zap.NewNop().Sugar(), p, state.NewState("test", map[string]string{}, "test"))
 	s.MarkAll(Succeeded)
 	s.MarkAsset(t12, Pending, true)
 	s.MarkAsset(t1000, Pending, true)
@@ -497,7 +498,7 @@ func TestScheduler_FindMajorityOfTypes(t *testing.T) {
 		},
 	}
 
-	s := NewScheduler(zap.NewNop().Sugar(), p)
+	s := NewScheduler(zap.NewNop().Sugar(), p, state.NewState("test", map[string]string{}, "test"))
 
 	// if they are in equal counts, the default should be preferred
 	assert.Equal(t, pipeline.AssetType("bq.sql"), s.FindMajorityOfTypes("bq.sql"))

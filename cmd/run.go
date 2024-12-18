@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -36,6 +37,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
+	"github.com/bruin-data/bruin/pkg/state"
 	"github.com/bruin-data/bruin/pkg/synapse"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/fatih/color"
@@ -304,8 +306,18 @@ func Run(isDebug *bool) *cli.Command {
 			if filter.PushMetaData {
 				foundPipeline.MetadataPush.Global = true
 			}
-
-			s := scheduler.NewScheduler(logger, foundPipeline)
+			state := state.NewState(runID, map[string]string{
+				"startDate":   startDate.Format(time.RFC3339),
+				"endDate":     endDate.Format(time.RFC3339),
+				"runID":       runID,
+				"pipeline":    foundPipeline.Name,
+				"fullRefresh": strconv.FormatBool(c.Bool("full-refresh")),
+				"useUv":       strconv.FormatBool(c.Bool("use-uv")),
+				"tag":         c.String("tag"),
+				"excludeTag":  c.String("exclude-tag"),
+				"only":        strings.Join(c.StringSlice("only"), ","),
+			}, foundPipeline.Name)
+			s := scheduler.NewScheduler(logger, foundPipeline, state)
 
 			// Apply the filter to mark assets based on include/exclude tags
 			if err := filter.ApplyFiltersAndMarkAssets(foundPipeline, s); err != nil {

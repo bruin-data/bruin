@@ -5,6 +5,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/bruin-data/bruin/pkg/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -976,7 +977,7 @@ func TestApplyFilters(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel() // Enable parallel execution for individual test cases
 			logger := zap.NewNop().Sugar()
-			s := scheduler.NewScheduler(logger, tt.pipeline)
+			s := scheduler.NewScheduler(logger, tt.pipeline, state.NewState("test", map[string]string{}, "test"))
 
 			// Act
 			err := tt.filter.ApplyFiltersAndMarkAssets(tt.pipeline, s)
