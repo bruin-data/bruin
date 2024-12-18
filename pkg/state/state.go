@@ -113,7 +113,9 @@ func (s *State) GetBFSToAsset() (string, error) {
 	graph := gograph.New[string](gograph.Directed())
 	for _, asset := range s.State {
 		for _, upstream := range asset.Upstream {
-			graph.AddEdge(gograph.NewVertex(asset.Name), gograph.NewVertex(upstream.Value))
+			if _, err := graph.AddEdge(gograph.NewVertex(asset.Name), gograph.NewVertex(upstream.Value)); err != nil {
+				return "", err
+			}
 		}
 	}
 	bfs, err := traverse.NewBreadthFirstIterator[string](graph, s.State[0].Name)

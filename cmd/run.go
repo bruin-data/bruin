@@ -310,7 +310,6 @@ func Run(isDebug *bool) *cli.Command {
 
 			state := state.NewState(runID, foundPipeline.Name)
 
-			foundPipeline.GetBFSToAsset(foundPipeline)
 			if c.Bool("continue") {
 				if err := state.Load("logs/" + foundPipeline.Name); err != nil {
 					return nil

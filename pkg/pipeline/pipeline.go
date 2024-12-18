@@ -990,7 +990,9 @@ func (p *Pipeline) GetBFSToAsset(asset *Pipeline) (string, error) {
 	graph := gograph.New[string](gograph.Directed())
 	for _, asset := range p.Assets {
 		for _, upstream := range asset.Upstreams {
-			graph.AddEdge(gograph.NewVertex(asset.Name), gograph.NewVertex(upstream.Value))
+			if _, err := graph.AddEdge(gograph.NewVertex(asset.Name), gograph.NewVertex(upstream.Value)); err != nil {
+				return "", err
+			}
 		}
 	}
 	bfs, err := traverse.NewBreadthFirstIterator[string](graph, p.Assets[0].Name)
