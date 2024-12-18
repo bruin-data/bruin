@@ -2,7 +2,7 @@ import pytest
 from sqlglot import parse_one
 from sqlglot.optimizer import optimize
 
-from main import get_column_lineage, extract_non_selected_columns, Column
+from .main import get_column_lineage, extract_non_selected_columns, Column
 
 SCHEMA = {
     "orders": {
