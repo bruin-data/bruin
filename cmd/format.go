@@ -82,21 +82,16 @@ func Format(isDebug *bool) *cli.Command {
 
 			for _, assetPath := range assetPaths {
 				assetFinderPool.Go(func() {
-					asset, err := DefaultPipelineBuilder.CreateAssetFromFile(assetPath)
+					_, changed, err := formatAsset(assetPath, failIfChanged)
 					if err != nil {
 						logger.Debugf("failed to process path '%s': %v", assetPath, err)
+						errorList = append(errorList, errors2.Wrapf(err, "failed to format  '%s'", assetPath))
 						return
 					}
 
-					if asset == nil {
-						logger.Debugf("no asset found in path '%s': %v", assetPath, err)
-						return
-					}
-
-					err = asset.Persist(afero.NewOsFs())
-					if err != nil {
-						logger.Debugf("failed to persist asset '%s': %v", assetPath, err)
-						errorList = append(errorList, errors2.Wrapf(err, "failed to persist asset '%s'", assetPath))
+					if failIfChanged && changed {
+						logger.Debugf("asset '%s' has been modified", assetPath)
+						errorList = append(errorList, fmt.Errorf("asset '%s' has been modified", assetPath))
 					}
 
 					processedAssetCount++
