@@ -79,7 +79,7 @@ func (s *State) InitState(foundPipelines []pipeline.Pipeline) error {
 	return nil
 }
 
-func (s *State) GetState(name string, pipelineName string) *SchedulerState {
+func (s *State) GetAssetState(name string, pipelineName string) *SchedulerState {
 	s.RLock()
 	defer s.RUnlock()
 	for foundPipelineName, states := range s.State {
@@ -94,7 +94,18 @@ func (s *State) GetState(name string, pipelineName string) *SchedulerState {
 	return nil
 }
 
-func (s *State) SetState(name, pipelineName string, status Status, err error) *SchedulerState {
+func (s *State) GetPipelineState(name string) []*SchedulerState {
+	s.RLock()
+	defer s.RUnlock()
+	for foundPipelineName, states := range s.State {
+		if foundPipelineName == name {
+			return states
+		}
+	}
+	return []*SchedulerState{}
+}
+
+func (s *State) SetAssetState(name, pipelineName string, status Status, err error) *SchedulerState {
 	s.RLock()
 	defer s.RUnlock()
 	for foundPipelineName, states := range s.State {
