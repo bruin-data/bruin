@@ -18,8 +18,7 @@ func TestLoadFromFile(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		configFile = "simple_win.yml"
 		duckPath = "C:\\path\\to\\duck.db"
-		servicefile = "C:\\path\\to\\service_account.json\""
-
+		servicefile = "D:\\path\\to\\service_account.json"
 	} else {
 		configFile = "simple.yml"
 		duckPath = "/path/to/duck.db"
@@ -356,13 +355,10 @@ func TestLoadOrCreate(t *testing.T) {
 
 	var servicefile string
 	if runtime.GOOS == "windows" {
-
 		servicefile = "C:\\path\\to\\service_account.json\""
-
 	} else {
 		servicefile = "/path/to/service_account.json"
 	}
-
 	configPath := "/some/path/to/config.yml"
 	defaultEnv := &Environment{
 		Connections: &Connections{
