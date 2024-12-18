@@ -590,7 +590,7 @@ func (s *Scheduler) saveState(results []*TaskExecutionResult) {
 		})
 	}
 
-	s.state.SetState(states)
+	s.state.Set(states)
 	s.state.Save("logs/" + s.pipeline.Name)
 }
 

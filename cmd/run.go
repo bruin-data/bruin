@@ -308,7 +308,7 @@ func Run(isDebug *bool) *cli.Command {
 				ExcludeTag:        c.String("exclude-tag"),
 			}
 
-			state := state.NewState(runID, map[string]string{
+			state := state.NewState(runID, foundPipeline.Name, map[string]string{
 				"startDate":   startDate.Format(time.RFC3339),
 				"endDate":     endDate.Format(time.RFC3339),
 				"runID":       runID,
@@ -318,12 +318,14 @@ func Run(isDebug *bool) *cli.Command {
 				"tag":         c.String("tag"),
 				"excludeTag":  c.String("exclude-tag"),
 				"only":        strings.Join(c.StringSlice("only"), ","),
-			}, foundPipeline.Name)
+			})
 
 			if c.Bool("continue") {
 				if err := state.Load("logs/" + foundPipeline.Name); err != nil {
 					return nil
 				}
+				// TODO: Compare the Pipeline with the state and skip the assets that have already been run
+
 			}
 
 			if filter.PushMetaData {
