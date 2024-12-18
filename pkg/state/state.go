@@ -12,16 +12,14 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
-var (
-	version = "dev"
-)
+var version = "dev"
 
 const (
 	StatusPending Status = "pending"
 	StatusRunning Status = "running"
 	StatusSuccess Status = "success"
 	StatusFailed  Status = "failed"
-	StatusSkip    Status = "skiped"
+	StatusSkipped Status = "skipped"
 )
 
 type State struct {
@@ -46,20 +44,23 @@ type SchedulerState struct {
 	StartTime time.Time           `json:"start_time"`
 	EndTime   time.Time           `json:"end_time"`
 	Name      string              `json:"name"`
-	Id        string              `json:"id"`
+	ID        string              `json:"id"`
 }
 
 type Status string
 
 func createStateFile(runid string, stateFileDir string) (*os.File, error) {
 	if _, err := os.Stat(stateFileDir); os.IsNotExist(err) {
-		os.Mkdir(stateFileDir, 0755)
+		err := os.Mkdir(stateFileDir, 0o755)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create directory: %w", err)
+		}
 	}
 	timestamp := time.Now().Format(time.RFC3339)
 	filePath := fmt.Sprintf("%s/%s_%s.json", stateFileDir, timestamp, runid)
 	file, err := os.Create(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create file: %v", err)
+		return nil, fmt.Errorf("failed to create file: %w", err)
 	}
 	return file, nil
 }
@@ -75,7 +76,7 @@ func NewState(runid string, parameters map[string]string, stateFileDir string, f
 				StartTime: time.Time{},
 				EndTime:   time.Time{},
 				Name:      asset.Name,
-				Id:        asset.ID,
+				ID:        asset.ID,
 			})
 		}
 	}
@@ -103,13 +104,13 @@ func (s *State) GetState(name string) *SchedulerState {
 	return nil
 }
 
-func (s *State) SetState(name string, status Status, error string) *SchedulerState {
+func (s *State) SetState(name string, status Status, err error) *SchedulerState {
 	s.Lock()
 	defer s.Unlock()
 	for _, state := range s.State {
 		if state.Name == name {
 			state.Status = status
-			state.Error = error
+			state.Error = err.Error()
 			return state
 		}
 	}
