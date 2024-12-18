@@ -24,8 +24,8 @@ type State struct {
 	Metadata   Metadata                     `json:"metadata"`
 	State      map[string][]*SchedulerState `json:"state"`
 	Version    string                       `json:"version"`
-	LastRun    time.Time                    `json:"last_run"`
-	LastRunID  string                       `json:"last_run_id"`
+	TimeStamp  time.Time                    `json:"timestamp"`
+	RunID      string                       `json:"run_id"`
 }
 
 type Metadata struct {
@@ -54,8 +54,8 @@ func NewState(runid string, parameters map[string]string) *State {
 		},
 		State:     map[string][]*SchedulerState{},
 		Version:   "1.0.0",
-		LastRun:   time.Time{},
-		LastRunID: runid,
+		TimeStamp: time.Time{},
+		RunID:     runid,
 	}
 }
 
