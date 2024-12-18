@@ -977,7 +977,7 @@ func TestApplyFilters(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel() // Enable parallel execution for individual test cases
 			logger := zap.NewNop().Sugar()
-			s := scheduler.NewScheduler(logger, tt.pipeline, state.NewState("test", "test", map[string]string{}))
+			s := scheduler.NewScheduler(logger, tt.pipeline, state.NewState("test", "test"))
 
 			// Act
 			err := tt.filter.ApplyFiltersAndMarkAssets(tt.pipeline, s)

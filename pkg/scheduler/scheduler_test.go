@@ -210,7 +210,7 @@ func TestScheduler_Run(t *testing.T) {
 		},
 	}
 
-	scheduler := NewScheduler(&zap.SugaredLogger{}, p, state.NewState("test", "test", map[string]string{}))
+	scheduler := NewScheduler(&zap.SugaredLogger{}, p, state.NewState("test", "test"))
 
 	scheduler.Tick(&TaskExecutionResult{
 		Instance: &AssetInstance{
@@ -327,7 +327,7 @@ func TestScheduler_MarkTasksAndDownstream(t *testing.T) {
 		},
 	}
 
-	s := NewScheduler(zap.NewNop().Sugar(), p, state.NewState("test", "test", map[string]string{}))
+	s := NewScheduler(zap.NewNop().Sugar(), p, state.NewState("test", "test"))
 	s.MarkAll(Succeeded)
 	s.MarkAsset(t12, Pending, true)
 
@@ -437,7 +437,7 @@ func TestScheduler_WillRunTaskOfType(t *testing.T) {
 		},
 	}
 
-	s := NewScheduler(zap.NewNop().Sugar(), p, state.NewState("test", "test", map[string]string{}))
+	s := NewScheduler(zap.NewNop().Sugar(), p, state.NewState("test", "test"))
 	s.MarkAll(Succeeded)
 	s.MarkAsset(t12, Pending, true)
 	s.MarkAsset(t1000, Pending, true)
@@ -498,7 +498,7 @@ func TestScheduler_FindMajorityOfTypes(t *testing.T) {
 		},
 	}
 
-	s := NewScheduler(zap.NewNop().Sugar(), p, state.NewState("test", "test", map[string]string{}))
+	s := NewScheduler(zap.NewNop().Sugar(), p, state.NewState("test", "test"))
 
 	// if they are in equal counts, the default should be preferred
 	assert.Equal(t, pipeline.AssetType("bq.sql"), s.FindMajorityOfTypes("bq.sql"))

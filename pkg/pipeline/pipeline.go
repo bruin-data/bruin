@@ -11,6 +11,8 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/path"
+	"github.com/hmdsefi/gograph"
+	"github.com/hmdsefi/gograph/traverse"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
@@ -981,6 +983,24 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 
 		return []string{conn}, nil
 	}
+}
+
+func (p *Pipeline) GetBFSToAsset(asset *Pipeline) (string, error) {
+	result := ""
+	graph := gograph.New[string](gograph.Directed())
+	for _, asset := range p.Assets {
+		for _, upstream := range asset.Upstreams {
+			graph.AddEdge(gograph.NewVertex(asset.Name), gograph.NewVertex(upstream.Value))
+		}
+	}
+	bfs, err := traverse.NewBreadthFirstIterator[string](graph, p.Assets[0].Name)
+	if err != nil {
+		return "", err
+	}
+	for bfs.HasNext() {
+		result += bfs.Next().Label() + "->"
+	}
+	return result, nil
 }
 
 func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {

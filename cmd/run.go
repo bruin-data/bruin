@@ -308,24 +308,45 @@ func Run(isDebug *bool) *cli.Command {
 				ExcludeTag:        c.String("exclude-tag"),
 			}
 
-			state := state.NewState(runID, foundPipeline.Name, map[string]string{
-				"startDate":   startDate.Format(time.RFC3339),
-				"endDate":     endDate.Format(time.RFC3339),
-				"runID":       runID,
-				"pipeline":    foundPipeline.Name,
-				"fullRefresh": strconv.FormatBool(c.Bool("full-refresh")),
-				"useUv":       strconv.FormatBool(c.Bool("use-uv")),
-				"tag":         c.String("tag"),
-				"excludeTag":  c.String("exclude-tag"),
-				"only":        strings.Join(c.StringSlice("only"), ","),
-			})
+			state := state.NewState(runID, foundPipeline.Name)
 
+			foundPipeline.GetBFSToAsset(foundPipeline)
 			if c.Bool("continue") {
 				if err := state.Load("logs/" + foundPipeline.Name); err != nil {
 					return nil
 				}
-				// TODO: Compare the Pipeline with the state and skip the assets that have already been run
+				pipelineBFS, err := foundPipeline.GetBFSToAsset(foundPipeline)
+				if err != nil {
+					return cli.Exit("", 1)
+				}
+				stateBFS, err := state.GetBFSToAsset()
+				if err != nil {
+					return cli.Exit("", 1)
+				}
+				if pipelineBFS != stateBFS {
+					return cli.Exit("Please rerun the pipeline because the order of assets has changed", 1)
+				}
 
+				filter = &Filter{
+					IncludeTag:        state.GetParam("tag"),
+					OnlyTaskTypes:     strings.Split(state.GetParam("only"), ","),
+					IncludeDownstream: runDownstreamTasks,
+					PushMetaData:      state.GetParam("push-metadata") == "true",
+					SingleTask:        task,
+					ExcludeTag:        state.GetParam("exclude-tag"),
+				}
+			} else {
+				state.SetParam(map[string]string{
+					"startDate":   startDate.Format(time.RFC3339),
+					"endDate":     endDate.Format(time.RFC3339),
+					"runID":       runID,
+					"pipeline":    foundPipeline.Name,
+					"fullRefresh": strconv.FormatBool(c.Bool("full-refresh")),
+					"useUv":       strconv.FormatBool(c.Bool("use-uv")),
+					"tag":         c.String("tag"),
+					"excludeTag":  c.String("exclude-tag"),
+					"only":        strings.Join(c.StringSlice("only"), ","),
+				})
 			}
 
 			if filter.PushMetaData {

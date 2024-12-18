@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/hmdsefi/gograph"
+	"github.com/hmdsefi/gograph/traverse"
 )
 
 var version = "dev"
@@ -39,9 +41,8 @@ type AssetInstance struct {
 	Upstream []pipeline.Upstream `json:"upstream"`
 }
 
-func NewState(runid, name string, parameters map[string]string) *State {
+func NewState(runid, name string) *State {
 	return &State{
-		Parameters: parameters,
 		Metadata: Metadata{
 			Version: version,
 			OS:      runtime.GOOS,
@@ -52,6 +53,12 @@ func NewState(runid, name string, parameters map[string]string) *State {
 		RunID:     runid,
 		Name:      name,
 	}
+}
+
+func (s *State) SetParam(parameters map[string]string) {
+	s.Lock()
+	defer s.Unlock()
+	s.Parameters = parameters
 }
 
 func (s *State) Get() []*AssetInstance {
@@ -99,4 +106,26 @@ func (s *State) Save(directory string) []*AssetInstance {
 		log.Fatalf("failed to write latest file: %v", err)
 	}
 	return s.State
+}
+
+func (s *State) GetBFSToAsset() (string, error) {
+	result := ""
+	graph := gograph.New[string](gograph.Directed())
+	for _, asset := range s.State {
+		for _, upstream := range asset.Upstream {
+			graph.AddEdge(gograph.NewVertex(asset.Name), gograph.NewVertex(upstream.Value))
+		}
+	}
+	bfs, err := traverse.NewBreadthFirstIterator[string](graph, s.State[0].Name)
+	if err != nil {
+		return "", err
+	}
+	for bfs.HasNext() {
+		result += bfs.Next().Label() + "->"
+	}
+	return result, nil
+}
+
+func (s *State) GetParam(key string) string {
+	return s.Parameters[key]
 }
