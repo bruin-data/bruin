@@ -344,6 +344,21 @@ func EnsurePipelineStartDateIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
 	return issues, nil
 }
 
+// ValidateCustomCheckQueryExists checks for duplicate column checks within a single column.
+// It returns a slice of Issues, each representing a duplicate column check found.
+func ValidateCustomCheckQueryExists(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	var issues []*Issue
+	for _, check := range asset.CustomChecks {
+		if check.Query == "" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: fmt.Sprintf("Custom check '%s' query cannot be empty", check.Name),
+			})
+		}
+	}
+	return issues, nil
+}
+
 // ValidateDuplicateColumnNames checks for duplicate column names within a single asset.
 // It returns a slice of Issues, each representing a duplicate column name found.
 //

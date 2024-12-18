@@ -154,6 +154,14 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlPa
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "custom-check-query-exists",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			Validator:        CallFuncForEveryAsset(ValidateCustomCheckQueryExists),
+			AssetValidator:   ValidateCustomCheckQueryExists,
+			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "assets-directory-exist",
 			Fast:             true,
 			Severity:         ValidatorSeverityWarning,

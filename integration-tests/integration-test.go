@@ -39,11 +39,15 @@ func main() {
 		0,
 		[]string{"Executed 1 tasks", "total_games:positive"},
 	)
-	expectQueryResult(
-		"duckdb-default",
-		"SELECT table_name FROM information_schema.tables WHERE table_schema = 'chess_playground';",
-		"json",
-		"chess-extended/expectations/tables_summary.json",
+	expectOutputIncludes(
+		"run --tag include --exclude-tag exclude --only main chess-extended",
+		0,
+		[]string{"Executed 3 tasks", " Finished: chess_playground.games", "Finished: chess_playground.profiles", "Finished: chess_playground.game_outcome_summary"},
+	)
+	expectOutputIncludes(
+		"run --push-metadata --only push-metadata bigquery-metadata",
+		0,
+		[]string{" Starting: shopify_raw.products:metadata-push", "Starting: shopify_raw.inventory_items:metadata-push"},
 	)
 	expectExitCode("validate happy-path", 0)
 	expectExitCode("run --use-uv happy-path", 0)
@@ -211,48 +215,4 @@ func runCommandWithExitCode(command string) (string, int, error) {
 		return output, 1, err
 	}
 	return output, 0, nil
-}
-func expectQueryResult(connection, query, outputFile, expectationPath string) {
-	args := []string{"run", "../main.go", "query",
-		"--connection", connection,
-		"--query", query,
-		"--output", outputFile,
-	}
-
-	cmd := exec.Command("go", args...)
-	cmd.Dir = currentFolder
-	outputBytes, err := cmd.CombinedOutput()
-	output := string(outputBytes)
-	if err != nil {
-		fmt.Println("Command failed with error:", err)
-		os.Exit(1)
-	}
-	if _, err := os.Stat(outputFile); os.IsNotExist(err) {
-		err = os.WriteFile(outputFile, []byte(output), 0600)
-		if err != nil {
-			os.Exit(1)
-		}
-	}
-	expectationPathFull := filepath.Join(currentFolder, expectationPath)
-	expectation, err := jd.ReadJsonFile(expectationPathFull)
-	if err != nil {
-		fmt.Println("Failed to read expectation file:", err)
-		os.Exit(1)
-	}
-
-	parsedOutput, err := jd.ReadJsonString(strings.ReplaceAll(output, "\\r\\n", "\\n"))
-	if err != nil {
-		fmt.Println("Failed to parse JSON output:", err)
-		os.Exit(1)
-	}
-
-	diff := expectation.Diff(parsedOutput)
-	if len(diff) != 0 {
-		fmt.Println("Mismatch detected:")
-		for _, d := range diff {
-			fmt.Printf("Path: %v, Expected: %v, Actual: %v\n", d.Path, d.NewValues, d.OldValues)
-		}
-		os.Exit(1)
-	}
-	fmt.Println("Passed")
 }
