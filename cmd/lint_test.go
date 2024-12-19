@@ -1,11 +1,29 @@
 package cmd
 
 import (
+	"context"
 	"testing"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/urfave/cli/v2"
 )
+
+func BenchmarkLint(b *testing.B) {
+	isDebug := false
+	app := cli.NewApp()
+	app.Commands = []*cli.Command{
+		Lint(&isDebug),
+	}
+
+	// Run the benchmark
+	for i := 0; i < b.N; i++ {
+		err := app.RunContext(context.Background(), []string{"lint", "./testdata/lineage"})
+		if err != nil {
+			b.Fatalf("Failed to run Lint command: %v", err)
+		}
+	}
+}
 
 func Test_unwrapAllErrors(t *testing.T) {
 	t.Parallel()
