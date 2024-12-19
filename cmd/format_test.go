@@ -32,7 +32,6 @@ func TestCheckLint(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc // Capture the loop variable for parallel tests
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel() // Enables parallel execution for subtests
 
