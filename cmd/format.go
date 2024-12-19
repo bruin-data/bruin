@@ -45,7 +45,7 @@ func Format(isDebug *bool) *cli.Command {
 
 			if isPathReferencingAsset(repoOrAsset) {
 				if check {
-					return handleFailIfChanged(repoOrAsset, output)
+					return checkChangesForSingleAsset(repoOrAsset, output)
 				}
 				asset, err := formatAsset(repoOrAsset)
 				if err != nil {
@@ -206,7 +206,7 @@ func hasFileChanged(path string) (bool, error) {
 	return string(originalContent) != string(newContent), nil
 }
 
-func handleFailIfChanged(repoOrAsset, output string) error {
+func checkChangesForSingleAsset(repoOrAsset, output string) error {
 	changed, err := hasFileChanged(repoOrAsset)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
