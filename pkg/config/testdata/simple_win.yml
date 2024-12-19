@@ -5,7 +5,7 @@ environments:
       google_cloud_platform:
         - name: conn1
           service_account_json: "{\"key1\": \"value1\"}"
-          service_account_file: "/path/to/service_account.json"
+          service_account_file: "D:\\path\\to\\service_account.json"
           project_id: "my-project"
 
       snowflake:
@@ -144,7 +144,7 @@ environments:
           service_account_json: "{\"key1\": \"value1\"}"
 
         - name: conn22-1
-          service_account_file: "/path/to/service_account.json"
+          service_account_file: "D:\\path\\to\\service_account.json"
       chess:
         - name: conn24
           players:
@@ -182,5 +182,5 @@ environments:
     connections:
       google_cloud_platform:
         - name: conn1
-          service_account_file: "/path/to/service_account.json"
+          service_account_file: "D:\\path\\to\\service_account.json"
           project_id: "my-project"
