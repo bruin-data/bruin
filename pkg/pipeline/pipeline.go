@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -1340,6 +1341,11 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 			}
 		}
 	}
+
+	// Sort assets alphabetically by name using slice sort
+	slices.SortFunc(pipeline.Assets, func(a, b *Asset) int {
+		return strings.Compare(a.Name, b.Name)
+	})
 
 	return pipeline, nil
 }
