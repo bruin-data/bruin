@@ -28,7 +28,7 @@ func Format(isDebug *bool) *cli.Command {
 			},
 			&cli.BoolFlag{
 				Name:  "fail-if-changed",
-				Usage: "exit with failure code if any file is modified",
+				Usage: "exit with failure code if any file needs to be formatted",
 				Value: false,
 			},
 		},
