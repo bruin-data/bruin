@@ -179,7 +179,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			"gcpConnectionId": "gcp-connection-id-here",
 		},
 		Retries: 3,
-		Assets:  []*pipeline.Asset{asset1, asset2, asset3, asset4},
+		Assets:  []*pipeline.Asset{asset2, asset3, asset4, asset1},
 	}
 	fs := afero.NewOsFs()
 	tests := []struct {
