@@ -1,6 +1,6 @@
 # Getting Started with Your First Bruin Pipeline: Chess Data to DuckDB
 
-Welcome! 👋 This guide is your starting point for building data pipelines with Bruin—beginning with an easy, hands-on project. You'll learn how to set up a pipeline that fetches chess data from a simple, no-credentials-needed API and stores it in DuckDB, a powerful and efficient database. The chess API provides a hassle-free way to work with real-world data, making it the perfect starting project for experimenting with Bruin. Think of this as your playground for exploring Bruin’s capabilities.
+Welcome! 👋 This guide is your starting point for building data pipelines with Bruin—beginning with an easy, hands-on project. You'll learn how to set up a pipeline that fetches chess data from a simple, no-credentials-needed API and stores it in DuckDB. The chess API provides a hassle-free way to work with real-world data, making it the perfect starting project for experimenting with Bruin. Think of this as your playground for exploring Bruin’s capabilities.
 
 **By the end of this tutorial, you’ll:**
 - Understand the basics of Bruin CLI 
@@ -12,12 +12,9 @@ Whether you're new to Bruin, pipelines, or even data engineering in general, thi
 ## Prerequisites
 Before you start, make sure you have the Bruin CLI installed. [Get instructions](../introduction/installation.md).
 
+## Step 1: Initialize Your Pipeline 
 
-
-## Step 1: Initialize Your Pipeline Project
-
-Run the `bruin init chess` command to set up your Bruin project using the `chess` template.
-This template brings in the necessary project structure and configuration files for a pipeline specific to chess data.
+Run the `bruin init chess` command to set up your Bruin project using the `chess` template. This template brings in the necessary project structure and configuration files for a pipeline specific to chess data.
 
 ```bash 
 bruin init chess
