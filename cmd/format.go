@@ -44,7 +44,24 @@ func Format(isDebug *bool) *cli.Command {
 			failIfChanged := c.Bool("fail-if-changed")
 
 			if isPathReferencingAsset(repoOrAsset) {
-				asset, changed, err := formatAsset(repoOrAsset, failIfChanged)
+				if failIfChanged {
+					changed, err := hasFileChanged(repoOrAsset)
+					if err != nil {
+						if errors.Is(err, os.ErrNotExist) {
+							printErrorForOutput(output, fmt.Errorf("the given file path '%s' does not seem to exist, are you sure you used the right path?", repoOrAsset))
+						} else {
+							printErrorForOutput(output, errors2.Wrap(err, "failed to check asset"))
+						}
+					}
+					if changed {
+						printErrorForOutput(output, fmt.Errorf("Failure:asset '%s' needs to be reformatted", repoOrAsset))
+						return cli.Exit("", 1)
+					} else {
+						infoPrinter.Printf("Success:Asset '%s' doesn't need reformatting", repoOrAsset)
+						return cli.Exit("", 0)
+					}
+				}
+				asset, err := formatAsset(repoOrAsset)
 				if err != nil {
 					if errors.Is(err, os.ErrNotExist) {
 						printErrorForOutput(output, fmt.Errorf("the given file path '%s' does not seem to exist, are you sure you used the right path?", repoOrAsset))
@@ -53,13 +70,6 @@ func Format(isDebug *bool) *cli.Command {
 					}
 
 					return cli.Exit("", 1)
-				}
-				if failIfChanged && changed {
-					printErrorForOutput(output, fmt.Errorf("asset '%s' has been modified", repoOrAsset))
-					return cli.Exit("", 1)
-				}
-				if failIfChanged && !changed {
-					return cli.Exit("", 0)
 				}
 
 				if output != "json" {
@@ -78,38 +88,57 @@ func Format(isDebug *bool) *cli.Command {
 			logger.Debugf("found %d asset paths", len(assetPaths))
 
 			errorList := make([]error, 0)
-			changedList := make([]string, 0) // List to store paths of modified assets
+			changedAssetpaths := make([]string, 0)
 			processedAssetCount := 0
 
 			for _, assetPath := range assetPaths {
 				assetFinderPool.Go(func() {
-					_, changed, err := formatAsset(assetPath, failIfChanged)
-					if err != nil {
-						logger.Debugf("failed to process path '%s': %v", assetPath, err)
-						errorList = append(errorList, errors2.Wrapf(err, "failed to format '%s'", assetPath))
-						return
-					}
+					if failIfChanged {
+						changed, err := hasFileChanged(assetPath)
+						if err != nil {
+							logger.Debugf("failed to process path '%s': %v", assetPath, err)
+							errorList = append(errorList, errors2.Wrapf(err, "failed to check '%s'", assetPath))
+							return
+						}
+						if changed {
+							changedAssetpaths = append(changedAssetpaths, assetPath)
+						}
 
-					if failIfChanged && changed {
-						logger.Debugf("asset '%s' has been modified", assetPath)
-						changedList = append(changedList, assetPath) // Append to changedList
+					} else {
+						asset, err := DefaultPipelineBuilder.CreateAssetFromFile(assetPath)
+						if err != nil {
+							logger.Debugf("failed to process path '%s': %v", assetPath, err)
+							return
+						}
+
+						if asset == nil {
+							logger.Debugf("no asset found in path '%s': %v", assetPath, err)
+							return
+						}
+
+						err = asset.Persist(afero.NewOsFs())
+						if err != nil {
+							logger.Debugf("failed to persist asset '%s': %v", assetPath, err)
+							errorList = append(errorList, errors2.Wrapf(err, "failed to persist asset '%s'", assetPath))
+						}
+
+						processedAssetCount++
 					}
-					processedAssetCount++
 				})
 			}
 
 			assetFinderPool.Wait()
-			if len(changedList) == 0 && failIfChanged {
-				return nil
-			}
-			if len(changedList) > 0 && failIfChanged {
-				infoPrinter.Printf("The following assets were modified:\n")
-				for _, path := range changedList {
-					infoPrinter.Println("  - " + path)
+			if failIfChanged && len(errorList) == 0 {
+				if len(changedAssetpaths) == 0 {
+					infoPrinter.Printf("Success: No Asset '%s' needs reformatting", repoOrAsset)
+					return cli.Exit("", 0)
+				}
+				errorPrinter.Println("Failure: Some Assets needs reformatting:")
+				for _, assetPath := range changedAssetpaths {
+					infoPrinter.Printf("'%s'\n", assetPath)
 				}
 				return cli.Exit("", 1)
-			}
-			if len(errorList) == 0 {
+			} else {
 				if output == "json" {
 					return nil
 				}
@@ -126,7 +155,6 @@ func Format(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("Successfully formatted %d %s.\n", processedAssetCount, assetStr)
 				return nil
 			}
-
 			if output == "json" {
 				jsMessage, err := json.Marshal(errorList)
 				if err != nil {
@@ -148,39 +176,45 @@ func Format(isDebug *bool) *cli.Command {
 	}
 }
 
-func formatAsset(path string, failIfChanged bool) (*pipeline.Asset, bool, error) {
-	var originalContent []byte
-	var err error
-
-	if failIfChanged {
-		// Read the original content only if failIfChanged is true
-		originalContent, err = afero.ReadFile(afero.NewOsFs(), path)
-		if err != nil {
-			return nil, false, errors2.Wrap(err, "failed to read original content")
-		}
-	}
-
+func formatAsset(path string) (*pipeline.Asset, error) {
 	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(path)
 	if err != nil {
-		return nil, false, errors2.Wrap(err, "failed to build the asset")
+		return nil, errors2.Wrap(err, "failed to build the asset")
 	}
 
-	err = asset.Persist(afero.NewOsFs())
+	return asset, asset.Persist(afero.NewOsFs())
+}
+
+func hasFileChanged(path string) (bool, error) {
+	fs := afero.NewOsFs()
+	// Read the original content from the file
+	originalContent, err := afero.ReadFile(fs, path)
 	if err != nil {
-		return nil, false, errors2.Wrap(err, "failed to persist the asset")
+		return false, errors2.Wrap(err, "failed to read original content")
+	}
+	// Create the asset
+	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(path)
+	if err != nil {
+		return false, errors2.Wrap(err, "failed to build the asset")
+	}
+	// Persist the asset (modifies the file)
+	err = asset.Persist(fs)
+	if err != nil {
+		return false, errors2.Wrap(err, "failed to persist the asset")
 	}
 
-	if failIfChanged {
-		// Compare the new content with the original only if failIfChanged is true
-		newContent, err := afero.ReadFile(afero.NewOsFs(), path)
-		if err != nil {
-			return nil, false, errors2.Wrap(err, "failed to read new content")
-		}
-
-		changed := string(originalContent) != string(newContent)
-		return asset, changed, nil
+	// Read the new content after persisting
+	newContent, err := afero.ReadFile(fs, path)
+	if err != nil {
+		return false, errors2.Wrap(err, "failed to read new content")
 	}
 
-	// If failIfChanged is false, return without change detection
-	return asset, false, nil
+	// Restore the original content to the file
+	err = afero.WriteFile(fs, path, originalContent, 0644)
+	if err != nil {
+		return false, errors2.Wrap(err, "failed to restore original content")
+	}
+
+	// Compare the original and new content
+	return string(originalContent) != string(newContent), nil
 }
