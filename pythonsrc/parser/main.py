@@ -1,3 +1,5 @@
+import json
+import logging
 from dataclasses import dataclass
 
 from sqlglot import parse_one, exp, lineage
@@ -111,11 +113,11 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
     if not isinstance(parsed, exp.Query):
         return {"columns": []}
     try:
-        optimized = optimize(
-            parsed, schema_dict_to_schema_object(schema), dialect=dialect
-        )
-    except Exception:
-        return {"columns": []}
+        nested_schema = schema_dict_to_schema_object(schema)
+        optimized = optimize(parsed, nested_schema, dialect=dialect)
+    except Exception as e:
+        logging.error(f"Error optimizing query: {e}, query and schema: { json.dumps({'query': query, 'schema': schema}) }")
+        return {"columns": [], "error": str(e)}
 
     result = []
 
