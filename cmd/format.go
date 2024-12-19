@@ -78,7 +78,7 @@ func Format(isDebug *bool) *cli.Command {
 			for _, assetPath := range assetPaths {
 				assetFinderPool.Go(func() {
 					if check {
-						changed, err := hasFileChanged(assetPath)
+						changed, err := shouldFileChange(assetPath)
 						if err != nil {
 							logger.Debugf("failed to process path '%s': %v", assetPath, err)
 							errorList = append(errorList, errors2.Wrapf(err, "failed to check '%s'", assetPath))
@@ -172,7 +172,7 @@ func formatAsset(path string) (*pipeline.Asset, error) {
 	return asset, asset.Persist(afero.NewOsFs())
 }
 
-func hasFileChanged(path string) (bool, error) {
+func shouldFileChange(path string) (bool, error) {
 	fs := afero.NewOsFs()
 	// Read the original content from the file
 	originalContent, err := afero.ReadFile(fs, path)
@@ -207,7 +207,7 @@ func hasFileChanged(path string) (bool, error) {
 }
 
 func checkChangesForSingleAsset(repoOrAsset, output string) error {
-	changed, err := hasFileChanged(repoOrAsset)
+	changed, err := shouldFileChange(repoOrAsset)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			printErrorForOutput(output, fmt.Errorf("the given file path '%s' does not seem to exist, are you sure you used the right path?", repoOrAsset))
