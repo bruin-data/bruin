@@ -12,7 +12,7 @@ log_dir = f"{home}/.bruin/pylogs"
 os.makedirs(log_dir, exist_ok=True)
 
 logging.basicConfig(
-    filename=f"{log_dir}/parser_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log",
+    filename=f"{log_dir}/parser_debug.log",
     filemode="a",
     format="%(asctime)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s",
     level=logging.DEBUG,
