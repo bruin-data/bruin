@@ -11,6 +11,10 @@ import (
 func TestCheckLint(t *testing.T) {
 	t.Parallel() // Enables parallel execution for the entire test
 
+	// Base directory for test assets
+	testDataDir, err := filepath.Abs("./testdata/unformatted-pipeline/assets")
+	require.NoError(t, err, "Failed to resolve test data directory")
+
 	tests := []struct {
 		name          string
 		assetFilePath string
@@ -19,31 +23,32 @@ func TestCheckLint(t *testing.T) {
 	}{
 		{
 			name:          "Valid Asset",
-			assetFilePath: "./testdata/unformatted-pipeline/assets/valid_asset.sql",
+			assetFilePath: filepath.Join(testDataDir, "valid_asset.sql"),
 			expectError:   false,
 			expectChange:  false,
 		},
 		{
 			name:          "Needs Reformatting",
-			assetFilePath: "./testdata/unformatted-pipeline/assets/needs_reformatting.sql",
+			assetFilePath: filepath.Join(testDataDir, "needs_reformatting.sql"),
 			expectError:   false,
 			expectChange:  true,
 		},
 	}
 
 	for _, tc := range tests {
+		tc := tc // Capture the loop variable for parallel tests
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel() // Enables parallel execution for subtests
 
-			// Setup: Ensure testdata directory and file exist
-			absPath, err := filepath.Abs(tc.assetFilePath)
-			require.NoError(t, err, "Failed to get absolute path")
+			// Debug: Log the resolved path
+			t.Logf("Testing file path: %s", tc.assetFilePath)
 
-			_, err = os.Stat(absPath)
+			// Ensure test file exists
+			_, err := os.Stat(tc.assetFilePath)
 			require.NoError(t, err, "Test file does not exist")
 
 			// Act: Run the check-lint functionality
-			changed, err := shouldFileChange(absPath)
+			changed, err := shouldFileChange(tc.assetFilePath)
 
 			// Assert: Check for expected results
 			if tc.expectError {
