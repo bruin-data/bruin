@@ -145,13 +145,16 @@ func (c MsSQLConnection) GetName() string {
 }
 
 type MySQLConnection struct {
-	Name     string `yaml:"name" json:"name" mapstructure:"name"`
-	Username string `yaml:"username" json:"username" mapstructure:"username"`
-	Password string `yaml:"password" json:"password" mapstructure:"password"`
-	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
-	Port     int    `yaml:"port"     json:"port" mapstructure:"port" jsonschema:"default=3306"`
-	Database string `yaml:"database" json:"database" mapstructure:"database"`
-	Driver   string `yaml:"driver" json:"driver,omitempty" mapstructure:"driver"`
+	Name        string `yaml:"name" json:"name" mapstructure:"name"`
+	Username    string `yaml:"username" json:"username" mapstructure:"username"`
+	Password    string `yaml:"password" json:"password" mapstructure:"password"`
+	Host        string `yaml:"host"     json:"host" mapstructure:"host"`
+	Port        int    `yaml:"port"     json:"port" mapstructure:"port" jsonschema:"default=3306"`
+	Database    string `yaml:"database" json:"database" mapstructure:"database"`
+	Driver      string `yaml:"driver" json:"driver,omitempty" mapstructure:"driver"`
+	SslCaPath   string `yaml:"ssl_ca_path" json:"ssl_ca_path,omitempty" mapstructure:"ssl_ca_path"`
+	SslCertPath string `yaml:"ssl_cert_path" json:"ssl_cert_path,omitempty" mapstructure:"ssl_cert_path"`
+	SslKeyPath  string `yaml:"ssl_key_path" json:"ssl_key_path,omitempty" mapstructure:"ssl_key_path"`
 }
 
 func (c MySQLConnection) GetName() string {

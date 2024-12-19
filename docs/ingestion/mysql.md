@@ -18,6 +18,9 @@ To connect to MySQL, you need to add a configuration item to the connections sec
           host: "localhost"
           port: 3306
           database: "mysql"
+          ssl_ca_path: "path/to/ca.pem"
+          ssl_cert_path: "path/to/cert.pem"
+          ssl_key_path: "path/to/key.pem"
 ```
 - `name`: The name to identify this MySQL connection
 - `username`: The MySQL username with access to the database
@@ -26,6 +29,9 @@ To connect to MySQL, you need to add a configuration item to the connections sec
 - `port`: The port number the database server is listening on (default: 3306)
 - `database`:  The name of the database to connect to
 - `driver`: (Optional) The name of the database driver to use
+- `ssl_ca_path`: (Optional) The path to the CA certificate file
+- `ssl_cert_path`: (Optional) The path to the client certificate file
+- `ssl_key_path`: (Optional) The path to the client key file
 
 ### Step 2: Create an asset file for data ingestion
 To ingest data from MySQL, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., mysql_ingestion.yml) inside the assets folder and add the following content:

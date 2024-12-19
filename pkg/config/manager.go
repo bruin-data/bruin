@@ -352,6 +352,20 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 			}
 			env.Connections.GoogleCloudPlatform[i].ServiceAccountFile = filepath.Join(configLocation, conn.ServiceAccountFile)
 		}
+		// Make MySQL SSL file paths absolute
+		for i, conn := range env.Connections.MySQL {
+			if conn.SslCaPath != "" && !filepath.IsAbs(conn.SslCaPath) {
+				env.Connections.MySQL[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
+			}
+
+			if conn.SslCertPath != "" && !filepath.IsAbs(conn.SslCertPath) {
+				env.Connections.MySQL[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
+			}
+
+			if conn.SslKeyPath != "" && !filepath.IsAbs(conn.SslKeyPath) {
+				env.Connections.MySQL[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
+			}
+		}
 	}
 
 	err = config.SelectEnvironment(config.DefaultEnvironmentName)
