@@ -27,8 +27,8 @@ func Format(isDebug *bool) *cli.Command {
 				Usage:   "the output type, possible values are: plain, json",
 			},
 			&cli.BoolFlag{
-				Name:  "fail-if-changed",
-				Usage: "exit with failure code if any file needs to be formatted",
+				Name:  "check",
+				Usage: "check if any file needs to be formatted",
 				Value: false,
 			},
 		},
@@ -41,10 +41,10 @@ func Format(isDebug *bool) *cli.Command {
 			}
 
 			output := c.String("output")
-			failIfChanged := c.Bool("fail-if-changed")
+			check := c.Bool("check")
 
 			if isPathReferencingAsset(repoOrAsset) {
-				if failIfChanged {
+				if check {
 					return handleFailIfChanged(repoOrAsset, output)
 				}
 				asset, err := formatAsset(repoOrAsset)
@@ -77,7 +77,7 @@ func Format(isDebug *bool) *cli.Command {
 
 			for _, assetPath := range assetPaths {
 				assetFinderPool.Go(func() {
-					if failIfChanged {
+					if check {
 						changed, err := hasFileChanged(assetPath)
 						if err != nil {
 							logger.Debugf("failed to process path '%s': %v", assetPath, err)
@@ -111,7 +111,7 @@ func Format(isDebug *bool) *cli.Command {
 			}
 
 			assetFinderPool.Wait()
-			if failIfChanged && len(errorList) == 0 {
+			if check && len(errorList) == 0 {
 				if len(changedAssetpaths) == 0 {
 					if output == "json" {
 						return nil
@@ -119,13 +119,13 @@ func Format(isDebug *bool) *cli.Command {
 					infoPrinter.Printf("success: no asset in '%s' needs reformatting", repoOrAsset)
 					return nil
 				}
-				errorPrinter.Println("failure: Some Assets needs reformatting:")
+				errorPrinter.Println("failure: some Assets needs reformatting:")
 				for _, assetPath := range changedAssetpaths {
 					infoPrinter.Printf("'%s'\n", assetPath)
 				}
 				return cli.Exit("", 1)
 			}
-			if !failIfChanged && len(errorList) == 0 {
+			if !check && len(errorList) == 0 {
 				if output == "json" {
 					return nil
 				}
