@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -16,10 +15,8 @@ func BenchmarkLint(b *testing.B) {
 		Lint(&isDebug),
 	}
 
-	// Run the benchmark
 	for i := 0; i < b.N; i++ {
-		err := app.RunContext(context.Background(), []string{"lint", "./testdata/lineage"})
-		if err != nil {
+		if err := app.Run([]string{"cmd.test", "validate", "./testdata/lineage"}); err != nil {
 			b.Fatalf("Failed to run Lint command: %v", err)
 		}
 	}
