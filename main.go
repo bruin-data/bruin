@@ -6,6 +6,7 @@ import (
 
 	"github.com/bruin-data/bruin/cmd"
 	"github.com/bruin-data/bruin/pkg/telemetry"
+	v "github.com/bruin-data/bruin/pkg/version"
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 )
@@ -24,13 +25,16 @@ func main() {
 		optOut = true
 	}
 
+	v.Version = version
+	v.Commit = commit
+
 	telemetry.TelemetryKey = os.Getenv("TELEMETRY_KEY")
 	telemetry.OptOut = optOut
-	telemetry.AppVersion = version
+	telemetry.AppVersion = v.Version
 	client := telemetry.Init()
 	defer client.Close()
 
-	versionCommand := cmd.VersionCmd(commit)
+	versionCommand := cmd.VersionCmd(v.Commit)
 
 	cli.VersionPrinter = func(cCtx *cli.Context) {
 		err := versionCommand.Action(cCtx)
