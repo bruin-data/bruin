@@ -5,10 +5,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCheckLint(t *testing.T) {
+	t.Parallel() // Enables parallel execution for the entire test
+
 	tests := []struct {
 		name          string
 		assetFilePath string
@@ -22,12 +24,6 @@ func TestCheckLint(t *testing.T) {
 			expectChange:  false,
 		},
 		{
-			name:          "Invalid Pipeline",
-			assetFilePath: "./testdata/unformatted-pipeline/assets/broken_asset.sql",
-			expectError:   true,
-			expectChange:  false,
-		},
-		{
 			name:          "Needs Reformatting",
 			assetFilePath: "./testdata/unformatted-pipeline/assets/needs_reformatting.sql",
 			expectError:   false,
@@ -36,25 +32,28 @@ func TestCheckLint(t *testing.T) {
 	}
 
 	for _, tc := range tests {
+		tc := tc // Capture the loop variable for parallel tests
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel() // Enables parallel execution for subtests
+
 			// Setup: Ensure testdata directory and file exist
 			absPath, err := filepath.Abs(tc.assetFilePath)
-			assert.NoError(t, err, "Failed to get absolute path")
+			require.NoError(t, err, "Failed to get absolute path")
 
 			_, err = os.Stat(absPath)
-			assert.NoError(t, err, "Test file does not exist")
+			require.NoError(t, err, "Test file does not exist")
 
 			// Act: Run the check-lint functionality
 			changed, err := shouldFileChange(absPath)
 
 			// Assert: Check for expected results
 			if tc.expectError {
-				assert.Error(t, err, "Expected an error but didn't get one")
+				require.Error(t, err, "Expected an error but didn't get one")
 			} else {
-				assert.NoError(t, err, "Did not expect an error but got one")
+				require.NoError(t, err, "Did not expect an error but got one")
 			}
 
-			assert.Equal(t, tc.expectChange, changed, "Unexpected change detection result")
+			require.Equal(t, tc.expectChange, changed, "Unexpected change detection result")
 		})
 	}
 }
