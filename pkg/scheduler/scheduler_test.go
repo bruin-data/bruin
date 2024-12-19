@@ -8,6 +8,46 @@ import (
 	"go.uber.org/zap"
 )
 
+func TestScheduler_GetStatusForTask(t *testing.T) {
+	t.Parallel()
+
+	result := GetStatusForTask([]TaskInstanceStatus{Pending, Pending, Pending, Pending, Pending})
+	assert.Equal(t, Pending.String(), result.String())
+
+	result = GetStatusForTask([]TaskInstanceStatus{Failed, Failed, Failed, Failed, Failed})
+	assert.Equal(t, Failed.String(), result.String())
+
+	result = GetStatusForTask([]TaskInstanceStatus{Succeeded, Succeeded, Succeeded, Succeeded, Succeeded})
+	assert.Equal(t, Succeeded.String(), result.String())
+
+	result = GetStatusForTask([]TaskInstanceStatus{Succeeded, Succeeded, Failed})
+	assert.Equal(t, Failed.String(), result.String())
+
+	result = GetStatusForTask([]TaskInstanceStatus{Failed, Succeeded, Succeeded})
+	assert.Equal(t, Failed.String(), result.String())
+
+	result = GetStatusForTask([]TaskInstanceStatus{UpstreamFailed, Succeeded, Succeeded})
+	assert.Equal(t, Failed.String(), result.String())
+
+	result = GetStatusForTask([]TaskInstanceStatus{UpstreamFailed, Failed})
+	assert.Equal(t, Failed.String(), result.String())
+
+	result = GetStatusForTask([]TaskInstanceStatus{Skipped, Skipped, Skipped})
+	assert.Equal(t, Skipped.String(), result.String())
+
+	result = GetStatusForTask([]TaskInstanceStatus{Skipped, Skipped, Failed})
+	assert.Equal(t, Failed.String(), result.String())
+
+	result = GetStatusForTask([]TaskInstanceStatus{Skipped, Skipped, Succeeded})
+	assert.Equal(t, Succeeded.String(), result.String())
+
+	result = GetStatusForTask([]TaskInstanceStatus{Succeeded, Skipped, Skipped})
+	assert.Equal(t, Succeeded.String(), result.String())
+
+	result = GetStatusForTask([]TaskInstanceStatus{Succeeded, Running, Skipped})
+	assert.Equal(t, Pending.String(), result.String())
+}
+
 func TestScheduler_getScheduleableTasks(t *testing.T) {
 	t.Parallel()
 
@@ -209,7 +249,7 @@ func TestScheduler_Run(t *testing.T) {
 		},
 	}
 
-	scheduler := NewScheduler(&zap.SugaredLogger{}, p)
+	scheduler := NewScheduler(&zap.SugaredLogger{}, p, "test")
 
 	scheduler.Tick(&TaskExecutionResult{
 		Instance: &AssetInstance{
@@ -326,7 +366,7 @@ func TestScheduler_MarkTasksAndDownstream(t *testing.T) {
 		},
 	}
 
-	s := NewScheduler(zap.NewNop().Sugar(), p)
+	s := NewScheduler(zap.NewNop().Sugar(), p, "test")
 	s.MarkAll(Succeeded)
 	s.MarkAsset(t12, Pending, true)
 
@@ -436,7 +476,7 @@ func TestScheduler_WillRunTaskOfType(t *testing.T) {
 		},
 	}
 
-	s := NewScheduler(zap.NewNop().Sugar(), p)
+	s := NewScheduler(zap.NewNop().Sugar(), p, "test")
 	s.MarkAll(Succeeded)
 	s.MarkAsset(t12, Pending, true)
 	s.MarkAsset(t1000, Pending, true)
@@ -497,7 +537,7 @@ func TestScheduler_FindMajorityOfTypes(t *testing.T) {
 		},
 	}
 
-	s := NewScheduler(zap.NewNop().Sugar(), p)
+	s := NewScheduler(zap.NewNop().Sugar(), p, "test")
 
 	// if they are in equal counts, the default should be preferred
 	assert.Equal(t, pipeline.AssetType("bq.sql"), s.FindMajorityOfTypes("bq.sql"))

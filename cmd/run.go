@@ -43,6 +43,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
 	"github.com/xlab/treeprint"
+	"go.uber.org/zap"
 )
 
 const LogsFolder = "logs"
@@ -305,7 +306,8 @@ func Run(isDebug *bool) *cli.Command {
 				foundPipeline.MetadataPush.Global = true
 			}
 
-			s := scheduler.NewScheduler(logger, foundPipeline)
+			statePath := filepath.Join(repoRoot.Path, "logs/runs", runID+".json")
+			s := scheduler.NewScheduler(logger, foundPipeline, runID)
 
 			// Apply the filter to mark assets based on include/exclude tags
 			if err := filter.ApplyFiltersAndMarkAssets(foundPipeline, s); err != nil {
@@ -345,6 +347,10 @@ func Run(isDebug *bool) *cli.Command {
 			start := time.Now()
 			results := s.Run(runCtx)
 			duration := time.Since(start)
+
+			if err := s.SavePipelineState(map[string]string{}, runID, statePath); err != nil {
+				logger.Error("failed to save pipeline state", zap.Error(err))
+			}
 
 			successPrinter.Printf("\n\nExecuted %d tasks in %s\n", len(results), duration.Truncate(time.Millisecond).String())
 			errorsInTaskResults := make([]*scheduler.TaskExecutionResult, 0)

@@ -1,0 +1,11 @@
+{
+    "python.testing.pytestArgs": [
+        "${workspaceFolder}/pythonsrc",
+        "--exitfirst",
+        "--verbose",
+        "--collect-only",
+        "-s"
+    ],
+    "python.testing.cwd":  "${workspaceFolder}/pythonsrc",
+    "python.testing.pytestEnabled": true,
+}
