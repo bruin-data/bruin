@@ -56,7 +56,6 @@ func Format(isDebug *bool) *cli.Command {
 					}
 					return cli.Exit("", 1)
 				}
-
 				if output != "json" {
 					infoPrinter.Printf("Successfully formatted asset '%s' %s\n", asset.Name, faint(fmt.Sprintf("(%s)", asset.DefinitionFile.Path)))
 				}
@@ -113,21 +112,12 @@ func Format(isDebug *bool) *cli.Command {
 
 			assetFinderPool.Wait()
 			if failIfChanged && len(errorList) == 0 {
-				if output == "json" {
-					successMessage := map[string]string{
-						"success": fmt.Sprintf("no asset in '%s' need reformatting", repoOrAsset),
-					}
-					jsonOutput, err := json.Marshal(successMessage)
-					if err != nil {
-						printErrorJSON(err)
-						return cli.Exit("", 1)
-					}
-					fmt.Println(string(jsonOutput))
-					return nil
-				}
 				if len(changedAssetpaths) == 0 {
+					if output == "json" {
+						return nil
+					}
 					infoPrinter.Printf("success: no asset in '%s' needs reformatting", repoOrAsset)
-					return cli.Exit("", 0)
+					return nil
 				}
 				errorPrinter.Println("failure: Some Assets needs reformatting:")
 				for _, assetPath := range changedAssetpaths {
@@ -231,15 +221,6 @@ func handleFailIfChanged(repoOrAsset, output string) error {
 		return cli.Exit("", 1)
 	}
 	if output == "json" {
-		successMessage := map[string]string{
-			"success": fmt.Sprintf("Asset '%s' doesn't need reformatting", repoOrAsset),
-		}
-		jsonOutput, err := json.Marshal(successMessage)
-		if err != nil {
-			printErrorJSON(err)
-			return cli.Exit("", 1)
-		}
-		fmt.Println(string(jsonOutput))
 		return nil
 	}
 	infoPrinter.Printf("success: Asset '%s' doesn't need reformatting", repoOrAsset)
