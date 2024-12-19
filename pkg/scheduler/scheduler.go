@@ -13,6 +13,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+	"honnef.co/go/tools/lintcmd/version"
 )
 
 type TaskInstanceStatus int
@@ -689,7 +690,7 @@ func (s *Scheduler) SavePipelineState(param map[string]string, runID, statePath 
 	pipelineState := &PipelineState{
 		Parameters: param,
 		Metadata: Metadata{
-			Version: "v1",
+			Version: version.Version,
 			OS:      runtime.GOOS,
 		},
 		State:             state,
