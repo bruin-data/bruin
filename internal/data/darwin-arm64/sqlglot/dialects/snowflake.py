@@ -25,13 +25,14 @@ from sqlglot.dialects.dialect import (
     no_safe_divide_sql,
     no_timestamp_sql,
     timestampdiff_sql,
+    no_make_interval_sql,
 )
 from sqlglot.generator import unsupported_args
 from sqlglot.helper import flatten, is_float, is_int, seq_get
 from sqlglot.tokens import TokenType
 
 if t.TYPE_CHECKING:
-    from sqlglot._typing import E
+    from sqlglot._typing import E, B
 
 
 # from https://docs.snowflake.com/en/sql-reference/functions/to_timestamp.html
@@ -40,9 +41,12 @@ def _build_datetime(
 ) -> t.Callable[[t.List], exp.Func]:
     def _builder(args: t.List) -> exp.Func:
         value = seq_get(args, 0)
-        int_value = value is not None and is_int(value.name)
+        scale_or_fmt = seq_get(args, 1)
 
-        if isinstance(value, exp.Literal):
+        int_value = value is not None and is_int(value.name)
+        int_scale_or_fmt = scale_or_fmt is not None and scale_or_fmt.is_int
+
+        if isinstance(value, exp.Literal) or (value and scale_or_fmt):
             # Converts calls like `TO_TIME('01:02:03')` into casts
             if len(args) == 1 and value.is_string and not int_value:
                 return (
@@ -54,11 +58,11 @@ def _build_datetime(
             # Handles `TO_TIMESTAMP(str, fmt)` and `TO_TIMESTAMP(num, scale)` as special
             # cases so we can transpile them, since they're relatively common
             if kind == exp.DataType.Type.TIMESTAMP:
-                if int_value and not safe:
+                if not safe and (int_value or int_scale_or_fmt):
                     # TRY_TO_TIMESTAMP('integer') is not parsed into exp.UnixToTime as
                     # it's not easily transpilable
-                    return exp.UnixToTime(this=value, scale=seq_get(args, 1))
-                if not is_float(value.this):
+                    return exp.UnixToTime(this=value, scale=scale_or_fmt)
+                if not int_scale_or_fmt and not is_float(value.name):
                     expr = build_formatted_time(exp.StrToTime, "snowflake")(args)
                     expr.set("safe", safe)
                     return expr
@@ -103,13 +107,26 @@ def _build_date_time_add(expr_type: t.Type[E]) -> t.Callable[[t.List], E]:
     return _builder
 
 
+def _build_bitwise(expr_type: t.Type[B], name: str) -> t.Callable[[t.List], B | exp.Anonymous]:
+    def _builder(args: t.List) -> B | exp.Anonymous:
+        if len(args) == 3:
+            return exp.Anonymous(this=name, expressions=args)
+
+        return binary_from_function(expr_type)(args)
+
+    return _builder
+
+
 # https://docs.snowflake.com/en/sql-reference/functions/div0
 def _build_if_from_div0(args: t.List) -> exp.If:
-    cond = exp.EQ(this=seq_get(args, 1), expression=exp.Literal.number(0)).and_(
-        exp.Is(this=seq_get(args, 0), expression=exp.null()).not_()
+    lhs = exp._wrap(seq_get(args, 0), exp.Binary)
+    rhs = exp._wrap(seq_get(args, 1), exp.Binary)
+
+    cond = exp.EQ(this=rhs, expression=exp.Literal.number(0)).and_(
+        exp.Is(this=lhs, expression=exp.null()).not_()
     )
     true = exp.Literal.number(0)
-    false = exp.Div(this=seq_get(args, 0), expression=seq_get(args, 1))
+    false = exp.Div(this=lhs, expression=rhs)
     return exp.If(this=cond, true=true, false=false)
 
 
@@ -194,43 +211,58 @@ def _flatten_structured_types_unless_iceberg(expression: exp.Expression) -> exp.
     return expression
 
 
-def _unnest_generate_date_array(expression: exp.Expression) -> exp.Expression:
+def _unnest_generate_date_array(unnest: exp.Unnest) -> None:
+    generate_date_array = unnest.expressions[0]
+    start = generate_date_array.args.get("start")
+    end = generate_date_array.args.get("end")
+    step = generate_date_array.args.get("step")
+
+    if not start or not end or not isinstance(step, exp.Interval) or step.name != "1":
+        return
+
+    unit = step.args.get("unit")
+
+    unnest_alias = unnest.args.get("alias")
+    if unnest_alias:
+        unnest_alias = unnest_alias.copy()
+        sequence_value_name = seq_get(unnest_alias.columns, 0) or "value"
+    else:
+        sequence_value_name = "value"
+
+    # We'll add the next sequence value to the starting date and project the result
+    date_add = _build_date_time_add(exp.DateAdd)(
+        [unit, exp.cast(sequence_value_name, "int"), exp.cast(start, "date")]
+    ).as_(sequence_value_name)
+
+    # We use DATEDIFF to compute the number of sequence values needed
+    number_sequence = Snowflake.Parser.FUNCTIONS["ARRAY_GENERATE_RANGE"](
+        [exp.Literal.number(0), _build_datediff([unit, start, end]) + 1]
+    )
+
+    unnest.set("expressions", [number_sequence])
+    unnest.replace(exp.select(date_add).from_(unnest.copy()).subquery(unnest_alias))
+
+
+def _transform_generate_date_array(expression: exp.Expression) -> exp.Expression:
     if isinstance(expression, exp.Select):
-        for unnest in expression.find_all(exp.Unnest):
-            if (
-                isinstance(unnest.parent, (exp.From, exp.Join))
-                and len(unnest.expressions) == 1
-                and isinstance(unnest.expressions[0], exp.GenerateDateArray)
-            ):
-                generate_date_array = unnest.expressions[0]
-                start = generate_date_array.args.get("start")
-                end = generate_date_array.args.get("end")
-                step = generate_date_array.args.get("step")
+        for generate_date_array in expression.find_all(exp.GenerateDateArray):
+            parent = generate_date_array.parent
 
-                if not start or not end or not isinstance(step, exp.Interval) or step.name != "1":
-                    continue
-
-                unit = step.args.get("unit")
-
-                unnest_alias = unnest.args.get("alias")
-                if unnest_alias:
-                    unnest_alias = unnest_alias.copy()
-                    sequence_value_name = seq_get(unnest_alias.columns, 0) or "value"
-                else:
-                    sequence_value_name = "value"
-
-                # We'll add the next sequence value to the starting date and project the result
-                date_add = _build_date_time_add(exp.DateAdd)(
-                    [unit, exp.cast(sequence_value_name, "int"), exp.cast(start, "date")]
-                ).as_(sequence_value_name)
-
-                # We use DATEDIFF to compute the number of sequence values needed
-                number_sequence = Snowflake.Parser.FUNCTIONS["ARRAY_GENERATE_RANGE"](
-                    [exp.Literal.number(0), _build_datediff([unit, start, end]) + 1]
+            # If GENERATE_DATE_ARRAY is used directly as an array (e.g passed into ARRAY_LENGTH), the transformed Snowflake
+            # query is the following (it'll be unnested properly on the next iteration due to copy):
+            # SELECT ref(GENERATE_DATE_ARRAY(...)) -> SELECT ref((SELECT ARRAY_AGG(*) FROM UNNEST(GENERATE_DATE_ARRAY(...))))
+            if not isinstance(parent, exp.Unnest):
+                unnest = exp.Unnest(expressions=[generate_date_array.copy()])
+                generate_date_array.replace(
+                    exp.select(exp.ArrayAgg(this=exp.Star())).from_(unnest).subquery()
                 )
 
-                unnest.set("expressions", [number_sequence])
-                unnest.replace(exp.select(date_add).from_(unnest.copy()).subquery(unnest_alias))
+            if (
+                isinstance(parent, exp.Unnest)
+                and isinstance(parent.parent, (exp.From, exp.Join))
+                and len(parent.expressions) == 1
+            ):
+                _unnest_generate_date_array(parent)
 
     return expression
 
@@ -369,9 +401,15 @@ class Snowflake(Dialect):
                 end=exp.Sub(this=seq_get(args, 1), expression=exp.Literal.number(1)),
                 step=seq_get(args, 2),
             ),
-            "BITXOR": binary_from_function(exp.BitwiseXor),
-            "BIT_XOR": binary_from_function(exp.BitwiseXor),
-            "BOOLXOR": binary_from_function(exp.Xor),
+            "BITXOR": _build_bitwise(exp.BitwiseXor, "BITXOR"),
+            "BIT_XOR": _build_bitwise(exp.BitwiseXor, "BITXOR"),
+            "BITOR": _build_bitwise(exp.BitwiseOr, "BITOR"),
+            "BIT_OR": _build_bitwise(exp.BitwiseOr, "BITOR"),
+            "BITSHIFTLEFT": _build_bitwise(exp.BitwiseLeftShift, "BITSHIFTLEFT"),
+            "BIT_SHIFTLEFT": _build_bitwise(exp.BitwiseLeftShift, "BIT_SHIFTLEFT"),
+            "BITSHIFTRIGHT": _build_bitwise(exp.BitwiseRightShift, "BITSHIFTRIGHT"),
+            "BIT_SHIFTRIGHT": _build_bitwise(exp.BitwiseRightShift, "BIT_SHIFTRIGHT"),
+            "BOOLXOR": _build_bitwise(exp.Xor, "BOOLXOR"),
             "DATE": _build_datetime("DATE", exp.DataType.Type.DATE),
             "DATE_TRUNC": _date_trunc_to_time,
             "DATEADD": _build_date_time_add(exp.DateAdd),
@@ -461,6 +499,7 @@ class Snowflake(Dialect):
         PROPERTY_PARSERS = {
             **parser.Parser.PROPERTY_PARSERS,
             "LOCATION": lambda self: self._parse_location_property(),
+            "TAG": lambda self: self._parse_tag(),
         }
 
         TYPE_CONVERTERS = {
@@ -542,6 +581,12 @@ class Snowflake(Dialect):
 
             return self.expression(exp.Not, this=this)
 
+        def _parse_tag(self) -> exp.Tags:
+            return self.expression(
+                exp.Tags,
+                expressions=self._parse_wrapped_csv(self._parse_property),
+            )
+
         def _parse_with_constraint(self) -> t.Optional[exp.Expression]:
             if self._prev.token_type != TokenType.WITH:
                 self._retreat(self._index - 1)
@@ -561,12 +606,15 @@ class Snowflake(Dialect):
                     this=policy.to_dot() if isinstance(policy, exp.Column) else policy,
                 )
             if self._match(TokenType.TAG):
-                return self.expression(
-                    exp.TagColumnConstraint,
-                    expressions=self._parse_wrapped_csv(self._parse_property),
-                )
+                return self._parse_tag()
 
             return None
+
+        def _parse_with_property(self) -> t.Optional[exp.Expression] | t.List[exp.Expression]:
+            if self._match(TokenType.TAG):
+                return self._parse_tag()
+
+            return super()._parse_with_property()
 
         def _parse_create(self) -> exp.Create | exp.Command:
             expression = super()._parse_create()
@@ -758,6 +806,14 @@ class Snowflake(Dialect):
 
             return this
 
+        def _parse_foreign_key(self) -> exp.ForeignKey:
+            # inlineFK, the REFERENCES columns are implied
+            if self._match(TokenType.REFERENCES, advance=False):
+                return self.expression(exp.ForeignKey)
+
+            # outoflineFK, explicitly names the columns
+            return super()._parse_foreign_key()
+
     class Tokenizer(tokens.Tokenizer):
         STRING_ESCAPES = ["\\", "'"]
         HEX_STRINGS = [("x'", "'"), ("X'", "'")]
@@ -836,7 +892,10 @@ class Snowflake(Dialect):
             exp.AtTimeZone: lambda self, e: self.func(
                 "CONVERT_TIMEZONE", e.args.get("zone"), e.this
             ),
+            exp.BitwiseOr: rename_func("BITOR"),
             exp.BitwiseXor: rename_func("BITXOR"),
+            exp.BitwiseLeftShift: rename_func("BITSHIFTLEFT"),
+            exp.BitwiseRightShift: rename_func("BITSHIFTRIGHT"),
             exp.Create: transforms.preprocess([_flatten_structured_types_unless_iceberg]),
             exp.DateAdd: date_delta_sql("DATEADD"),
             exp.DateDiff: date_delta_sql("DATEDIFF"),
@@ -866,6 +925,7 @@ class Snowflake(Dialect):
             exp.LogicalAnd: rename_func("BOOLAND_AGG"),
             exp.LogicalOr: rename_func("BOOLOR_AGG"),
             exp.Map: lambda self, e: var_map_sql(self, e, "OBJECT_CONSTRUCT"),
+            exp.MakeInterval: no_make_interval_sql,
             exp.Max: max_or_greatest,
             exp.Min: min_or_least,
             exp.ParseJSON: lambda self, e: self.func(
@@ -888,7 +948,7 @@ class Snowflake(Dialect):
                     transforms.eliminate_distinct_on,
                     transforms.explode_to_unnest(),
                     transforms.eliminate_semi_and_anti_joins,
-                    _unnest_generate_date_array,
+                    _transform_generate_date_array,
                 ]
             ),
             exp.SafeDivide: lambda self, e: no_safe_divide_sql(self, e, "IFF"),
@@ -908,9 +968,6 @@ class Snowflake(Dialect):
             ),
             exp.TimestampTrunc: timestamptrunc_sql(),
             exp.TimeStrToTime: timestrtotime_sql,
-            exp.TimeToStr: lambda self, e: self.func(
-                "TO_CHAR", exp.cast(e.this, exp.DataType.Type.TIMESTAMP), self.format_time(e)
-            ),
             exp.TimeToUnix: lambda self, e: f"EXTRACT(epoch_second FROM {self.sql(e, 'this')})",
             exp.ToArray: rename_func("TO_ARRAY"),
             exp.ToChar: lambda self, e: self.function_fallback_sql(e),
@@ -1040,7 +1097,11 @@ class Snowflake(Dialect):
             else:
                 unnest_alias = exp.TableAlias(this="_u", columns=columns)
 
-            explode = f"TABLE(FLATTEN(INPUT => {self.sql(expression.expressions[0])}))"
+            table_input = self.sql(expression.expressions[0])
+            if not table_input.startswith("INPUT =>"):
+                table_input = f"INPUT => {table_input}"
+
+            explode = f"TABLE(FLATTEN({table_input}))"
             alias = self.sql(unnest_alias)
             alias = f" AS {alias}" if alias else ""
             return f"{explode}{alias}"
@@ -1147,3 +1208,19 @@ class Snowflake(Dialect):
                 exp.ParseJSON(this=this) if this.is_string else this,
                 expression.expression,
             )
+
+        def timetostr_sql(self, expression: exp.TimeToStr) -> str:
+            this = expression.this
+            if not isinstance(this, exp.TsOrDsToTimestamp):
+                this = exp.cast(this, exp.DataType.Type.TIMESTAMP)
+
+            return self.func("TO_CHAR", this, self.format_time(expression))
+
+        def datesub_sql(self, expression: exp.DateSub) -> str:
+            value = expression.expression
+            if value:
+                value.replace(value * (-1))
+            else:
+                self.unsupported("DateSub cannot be transpiled if the subtracted count is unknown")
+
+            return date_delta_sql("DATEADD")(self, expression)

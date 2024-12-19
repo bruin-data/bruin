@@ -198,6 +198,7 @@ class Presto(Dialect):
     TYPED_DIVISION = True
     TABLESAMPLE_SIZE_IS_PERCENT = True
     LOG_BASE_FIRST: t.Optional[bool] = None
+    SUPPORTS_VALUES_DEFAULT = False
 
     TIME_MAPPING = MySQL.TIME_MAPPING
 
@@ -230,6 +231,10 @@ class Presto(Dialect):
 
         KEYWORDS = {
             **tokens.Tokenizer.KEYWORDS,
+            "DEALLOCATE PREPARE": TokenType.COMMAND,
+            "DESCRIBE INPUT": TokenType.COMMAND,
+            "DESCRIBE OUTPUT": TokenType.COMMAND,
+            "RESET SESSION": TokenType.COMMAND,
             "START": TokenType.BEGIN,
             "MATCH_RECOGNIZE": TokenType.MATCH_RECOGNIZE,
             "ROW": TokenType.STRUCT,
@@ -371,6 +376,7 @@ class Presto(Dialect):
             exp.Cast: transforms.preprocess([transforms.epoch_cast_to_ts]),
             exp.CurrentTime: lambda *_: "CURRENT_TIME",
             exp.CurrentTimestamp: lambda *_: "CURRENT_TIMESTAMP",
+            exp.CurrentUser: lambda *_: "CURRENT_USER",
             exp.DateAdd: _date_delta_sql("DATE_ADD"),
             exp.DateDiff: lambda self, e: self.func(
                 "DATE_DIFF", unit_to_str(e), e.expression, e.this

@@ -476,6 +476,20 @@ class Postgres(Dialect):
                 and self.dialect.to_json_path(self._parse_bitwise()),
             )
 
+        def _parse_generated_as_identity(
+            self,
+        ) -> (
+            exp.GeneratedAsIdentityColumnConstraint
+            | exp.ComputedColumnConstraint
+            | exp.GeneratedAsRowColumnConstraint
+        ):
+            this = super()._parse_generated_as_identity()
+
+            if self._match_text_seq("STORED"):
+                this = self.expression(exp.ComputedColumnConstraint, this=this.expression)
+
+            return this
+
     class Generator(generator.Generator):
         SINGLE_STRING_INTERVAL = True
         RENAME_TABLE_WITH_DB = False
@@ -673,6 +687,14 @@ class Postgres(Dialect):
                     values = self.expressions(expression, key="values", flat=True)
                     return f"{self.expressions(expression, flat=True)}[{values}]"
                 return "ARRAY"
+
+            if (
+                expression.is_type(exp.DataType.Type.DOUBLE, exp.DataType.Type.FLOAT)
+                and expression.expressions
+            ):
+                # Postgres doesn't support precision for REAL and DOUBLE PRECISION types
+                return f"FLOAT({self.expressions(expression, flat=True)})"
+
             return super().datatype_sql(expression)
 
         def cast_sql(self, expression: exp.Cast, safe_prefix: t.Optional[str] = None) -> str:
@@ -691,3 +713,6 @@ class Postgres(Dialect):
                 if isinstance(seq_get(exprs, 0), exp.Select)
                 else f"{self.normalize_func('ARRAY')}[{self.expressions(expression, flat=True)}]"
             )
+
+        def computedcolumnconstraint_sql(self, expression: exp.ComputedColumnConstraint) -> str:
+            return f"GENERATED ALWAYS AS ({self.sql(expression, 'this')}) STORED"

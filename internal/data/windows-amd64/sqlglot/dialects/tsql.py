@@ -111,7 +111,7 @@ def _build_formatted_time(
         assert len(args) == 2
 
         return exp_class(
-            this=exp.cast(args[1], exp.DataType.Type.DATETIME),
+            this=exp.cast(args[1], exp.DataType.Type.DATETIME2),
             format=exp.Literal.string(
                 format_time(
                     args[0].name.lower(),
@@ -178,7 +178,7 @@ def _build_hashbytes(args: t.List) -> exp.Expression:
     return exp.func("HASHBYTES", *args)
 
 
-DATEPART_ONLY_FORMATS = {"DW", "HOUR", "QUARTER"}
+DATEPART_ONLY_FORMATS = {"DW", "WK", "HOUR", "QUARTER"}
 
 
 def _format_sql(self: TSQL.Generator, expression: exp.NumberToStr | exp.TimeToStr) -> str:
@@ -232,7 +232,7 @@ def _build_date_delta(
         if start_date and start_date.is_number:
             # Numeric types are valid DATETIME values
             if start_date.is_int:
-                adds = DEFAULT_START_DATE + datetime.timedelta(days=int(start_date.this))
+                adds = DEFAULT_START_DATE + datetime.timedelta(days=start_date.to_py())
                 start_date = exp.Literal.string(adds.strftime("%F"))
             else:
                 # We currently don't handle float values, i.e. they're not converted to equivalent DATETIMEs.
@@ -398,8 +398,8 @@ class TSQL(Dialect):
         "s": "%-S",
         "millisecond": "%f",
         "ms": "%f",
-        "weekday": "%W",
-        "dw": "%W",
+        "weekday": "%w",
+        "dw": "%w",
         "month": "%m",
         "mm": "%M",
         "m": "%-M",
@@ -492,7 +492,7 @@ class TSQL(Dialect):
         KEYWORDS = {
             **tokens.Tokenizer.KEYWORDS,
             "CLUSTERED INDEX": TokenType.INDEX,
-            "DATETIME2": TokenType.DATETIME,
+            "DATETIME2": TokenType.DATETIME2,
             "DATETIMEOFFSET": TokenType.TIMESTAMPTZ,
             "DECLARE": TokenType.DECLARE,
             "EXEC": TokenType.COMMAND,
@@ -507,7 +507,7 @@ class TSQL(Dialect):
             "PROC": TokenType.PROCEDURE,
             "REAL": TokenType.FLOAT,
             "ROWVERSION": TokenType.ROWVERSION,
-            "SMALLDATETIME": TokenType.DATETIME,
+            "SMALLDATETIME": TokenType.SMALLDATETIME,
             "SMALLMONEY": TokenType.SMALLMONEY,
             "SQL_VARIANT": TokenType.VARIANT,
             "SYSTEM_USER": TokenType.CURRENT_USER,
@@ -595,6 +595,11 @@ class TSQL(Dialect):
                 this=this,
                 expression=self._parse_function() or self._parse_var(any_token=True),
             ),
+        }
+
+        NO_PAREN_FUNCTION_PARSERS = {
+            **parser.Parser.NO_PAREN_FUNCTION_PARSERS,
+            "NEXT": lambda self: self._parse_next_value_for(),
         }
 
         # The DCOLON (::) operator serves as a scope resolution (exp.ScopeResolution) operator in T-SQL
@@ -868,14 +873,15 @@ class TSQL(Dialect):
         TYPE_MAPPING = {
             **generator.Generator.TYPE_MAPPING,
             exp.DataType.Type.BOOLEAN: "BIT",
+            exp.DataType.Type.DATETIME2: "DATETIME2",
             exp.DataType.Type.DECIMAL: "NUMERIC",
-            exp.DataType.Type.DATETIME: "DATETIME2",
             exp.DataType.Type.DOUBLE: "FLOAT",
             exp.DataType.Type.INT: "INTEGER",
             exp.DataType.Type.ROWVERSION: "ROWVERSION",
             exp.DataType.Type.TEXT: "VARCHAR(MAX)",
             exp.DataType.Type.TIMESTAMP: "DATETIME2",
             exp.DataType.Type.TIMESTAMPTZ: "DATETIMEOFFSET",
+            exp.DataType.Type.SMALLDATETIME: "SMALLDATETIME",
             exp.DataType.Type.UTINYINT: "TINYINT",
             exp.DataType.Type.VARIANT: "SQL_VARIANT",
         }

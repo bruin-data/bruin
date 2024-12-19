@@ -26,6 +26,7 @@ from sqlglot.dialects.dialect import (
     timestrtotime_sql,
     ts_or_ds_add_cast,
     unit_to_var,
+    str_position_sql,
 )
 from sqlglot.helper import seq_get, split_num_words
 from sqlglot.tokens import TokenType
@@ -37,6 +38,11 @@ if t.TYPE_CHECKING:
     from sqlglot.optimizer.annotate_types import TypeAnnotator
 
 logger = logging.getLogger("sqlglot")
+
+
+JSON_EXTRACT_TYPE = t.Union[exp.JSONExtract, exp.JSONExtractScalar, exp.JSONExtractArray]
+
+DQUOTES_ESCAPING_JSON_FUNCTIONS = ("JSON_QUERY", "JSON_VALUE", "JSON_QUERY_ARRAY")
 
 
 def _derived_table_values_to_unnest(self: BigQuery.Generator, expression: exp.Values) -> str:
@@ -211,7 +217,7 @@ def _build_time(args: t.List) -> exp.Func:
 
 def _build_datetime(args: t.List) -> exp.Func:
     if len(args) == 1:
-        return exp.TsOrDsToTimestamp.from_arg_list(args)
+        return exp.TsOrDsToDatetime.from_arg_list(args)
     if len(args) == 2:
         return exp.Datetime.from_arg_list(args)
     return exp.TimestampFromParts.from_arg_list(args)
@@ -304,6 +310,42 @@ def _build_levenshtein(args: t.List) -> exp.Levenshtein:
     )
 
 
+def _build_format_time(expr_type: t.Type[exp.Expression]) -> t.Callable[[t.List], exp.TimeToStr]:
+    def _builder(args: t.List) -> exp.TimeToStr:
+        return exp.TimeToStr(this=expr_type(this=seq_get(args, 1)), format=seq_get(args, 0))
+
+    return _builder
+
+
+def _build_contains_substring(args: t.List) -> exp.Contains | exp.Anonymous:
+    if len(args) == 3:
+        return exp.Anonymous(this="CONTAINS_SUBSTR", expressions=args)
+
+    # Lowercase the operands in case of transpilation, as exp.Contains
+    # is case-sensitive on other dialects
+    this = exp.Lower(this=seq_get(args, 0))
+    expr = exp.Lower(this=seq_get(args, 1))
+
+    return exp.Contains(this=this, expression=expr)
+
+
+def _json_extract_sql(self: BigQuery.Generator, expression: JSON_EXTRACT_TYPE) -> str:
+    name = (expression._meta and expression.meta.get("name")) or expression.sql_name()
+    upper = name.upper()
+
+    dquote_escaping = upper in DQUOTES_ESCAPING_JSON_FUNCTIONS
+
+    if dquote_escaping:
+        self._quote_json_path_key_using_brackets = False
+
+    sql = rename_func(upper)(self, expression)
+
+    if dquote_escaping:
+        self._quote_json_path_key_using_brackets = True
+
+    return sql
+
+
 class BigQuery(Dialect):
     WEEK_OFFSET = -1
     UNNEST_COLUMN_ONLY = True
@@ -313,6 +355,7 @@ class BigQuery(Dialect):
     HEX_LOWERCASE = True
     FORCE_EARLY_ALIAS_REF_EXPANSION = True
     EXPAND_ALIAS_REFS_EARLY_ONLY_IN_GROUP_BY = True
+    PRESERVE_ORIGINAL_NAMES = True
 
     # https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#case_sensitivity
     NORMALIZATION_STRATEGY = NormalizationStrategy.CASE_INSENSITIVE
@@ -449,6 +492,7 @@ class BigQuery(Dialect):
 
         FUNCTIONS = {
             **parser.Parser.FUNCTIONS,
+            "CONTAINS_SUBSTR": _build_contains_substring,
             "DATE": _build_date,
             "DATE_ADD": build_date_delta_with_interval(exp.DateAdd),
             "DATE_SUB": build_date_delta_with_interval(exp.DateSub),
@@ -462,9 +506,7 @@ class BigQuery(Dialect):
             "DATETIME_SUB": build_date_delta_with_interval(exp.DatetimeSub),
             "DIV": binary_from_function(exp.IntDiv),
             "EDIT_DISTANCE": _build_levenshtein,
-            "FORMAT_DATE": lambda args: exp.TimeToStr(
-                this=exp.TsOrDsToDate(this=seq_get(args, 1)), format=seq_get(args, 0)
-            ),
+            "FORMAT_DATE": _build_format_time(exp.TsOrDsToDate),
             "GENERATE_ARRAY": exp.GenerateSeries.from_arg_list,
             "JSON_EXTRACT_SCALAR": _build_extract_json_with_default_path(exp.JSONExtractScalar),
             "JSON_EXTRACT_ARRAY": _build_extract_json_with_default_path(exp.JSONExtractArray),
@@ -492,6 +534,7 @@ class BigQuery(Dialect):
                 this=seq_get(args, 0),
                 expression=seq_get(args, 1) or exp.Literal.string(","),
             ),
+            "STRPOS": exp.StrPosition.from_arg_list,
             "TIME": _build_time,
             "TIME_ADD": build_date_delta_with_interval(exp.TimeAdd),
             "TIME_SUB": build_date_delta_with_interval(exp.TimeSub),
@@ -506,14 +549,15 @@ class BigQuery(Dialect):
             ),
             "TIMESTAMP_SECONDS": lambda args: exp.UnixToTime(this=seq_get(args, 0)),
             "TO_JSON_STRING": exp.JSONFormat.from_arg_list,
-            "FORMAT_DATETIME": lambda args: exp.TimeToStr(
-                this=exp.TsOrDsToTimestamp(this=seq_get(args, 1)), format=seq_get(args, 0)
-            ),
+            "FORMAT_DATETIME": _build_format_time(exp.TsOrDsToDatetime),
+            "FORMAT_TIMESTAMP": _build_format_time(exp.TsOrDsToTimestamp),
         }
 
         FUNCTION_PARSERS = {
             **parser.Parser.FUNCTION_PARSERS,
             "ARRAY": lambda self: self.expression(exp.Array, expressions=[self._parse_statement()]),
+            "MAKE_INTERVAL": lambda self: self._parse_make_interval(),
+            "FEATURES_AT_TIME": lambda self: self._parse_features_at_time(),
         }
         FUNCTION_PARSERS.pop("TRIM")
 
@@ -545,6 +589,8 @@ class BigQuery(Dialect):
 
         NULL_TOKENS = {TokenType.NULL, TokenType.UNKNOWN}
 
+        DASHED_TABLE_PART_FOLLOW_TOKENS = {TokenType.DOT, TokenType.L_PAREN, TokenType.R_PAREN}
+
         STATEMENT_PARSERS = {
             **parser.Parser.STATEMENT_PARSERS,
             TokenType.ELSE: lambda self: self._parse_as_command(self._prev),
@@ -571,11 +617,13 @@ class BigQuery(Dialect):
             if isinstance(this, exp.Identifier):
                 table_name = this.name
                 while self._match(TokenType.DASH, advance=False) and self._next:
-                    text = ""
-                    while self._is_connected() and self._curr.token_type != TokenType.DOT:
+                    start = self._curr
+                    while self._is_connected() and not self._match_set(
+                        self.DASHED_TABLE_PART_FOLLOW_TOKENS, advance=False
+                    ):
                         self._advance()
-                        text += self._prev.text
-                    table_name += text
+
+                    table_name += self._find_sql(start, self._prev)
 
                 this = exp.Identifier(this=table_name, quoted=this.args.get("quoted"))
             elif isinstance(this, exp.Literal):
@@ -744,6 +792,43 @@ class BigQuery(Dialect):
 
             return unnest
 
+        def _parse_make_interval(self) -> exp.MakeInterval:
+            expr = exp.MakeInterval()
+
+            for arg_key in expr.arg_types:
+                value = self._parse_lambda()
+
+                if not value:
+                    break
+
+                # Non-named arguments are filled sequentially, (optionally) followed by named arguments
+                # that can appear in any order e.g MAKE_INTERVAL(1, minute => 5, day => 2)
+                if isinstance(value, exp.Kwarg):
+                    arg_key = value.this.name
+
+                expr.set(arg_key, value)
+
+                self._match(TokenType.COMMA)
+
+            return expr
+
+        def _parse_features_at_time(self) -> exp.FeaturesAtTime:
+            expr = self.expression(
+                exp.FeaturesAtTime,
+                this=(self._match(TokenType.TABLE) and self._parse_table())
+                or self._parse_select(nested=True),
+            )
+
+            while self._match(TokenType.COMMA):
+                arg = self._parse_lambda()
+
+                # Get the LHS of the Kwarg and set the arg to that value, e.g
+                # "num_rows => 1" sets the expr's `num_rows` arg
+                if arg:
+                    expr.set(arg.this.name, arg)
+
+            return expr
+
     class Generator(generator.Generator):
         INTERVAL_ALLOWS_PLURAL_FORM = False
         JOIN_HINTS = False
@@ -809,6 +894,10 @@ class BigQuery(Dialect):
             exp.If: if_sql(false_value="NULL"),
             exp.ILike: no_ilike_sql,
             exp.IntDiv: rename_func("DIV"),
+            exp.Int64: rename_func("INT64"),
+            exp.JSONExtract: _json_extract_sql,
+            exp.JSONExtractArray: _json_extract_sql,
+            exp.JSONExtractScalar: _json_extract_sql,
             exp.JSONFormat: rename_func("TO_JSON_STRING"),
             exp.Levenshtein: _levenshtein_sql,
             exp.Max: max_or_greatest,
@@ -845,6 +934,7 @@ class BigQuery(Dialect):
                 "DETERMINISTIC" if e.name == "IMMUTABLE" else "NOT DETERMINISTIC"
             ),
             exp.String: rename_func("STRING"),
+            exp.StrPosition: str_position_sql,
             exp.StrToDate: _str_to_datetime_sql,
             exp.StrToTime: _str_to_datetime_sql,
             exp.TimeAdd: date_add_interval_sql("TIME", "ADD"),
@@ -859,7 +949,8 @@ class BigQuery(Dialect):
             exp.TsOrDsAdd: _ts_or_ds_add_sql,
             exp.TsOrDsDiff: _ts_or_ds_diff_sql,
             exp.TsOrDsToTime: rename_func("TIME"),
-            exp.TsOrDsToTimestamp: rename_func("DATETIME"),
+            exp.TsOrDsToDatetime: rename_func("DATETIME"),
+            exp.TsOrDsToTimestamp: rename_func("TIMESTAMP"),
             exp.Unhex: rename_func("FROM_HEX"),
             exp.UnixDate: rename_func("UNIX_DATE"),
             exp.UnixToTime: _unix_to_time_sql,
@@ -1048,16 +1139,20 @@ class BigQuery(Dialect):
             return super().table_parts(expression)
 
         def timetostr_sql(self, expression: exp.TimeToStr) -> str:
-            if isinstance(expression.this, exp.TsOrDsToTimestamp):
+            this = expression.this
+            if isinstance(this, exp.TsOrDsToDatetime):
                 func_name = "FORMAT_DATETIME"
+            elif isinstance(this, exp.TsOrDsToTimestamp):
+                func_name = "FORMAT_TIMESTAMP"
             else:
                 func_name = "FORMAT_DATE"
-            this = (
-                expression.this
-                if isinstance(expression.this, (exp.TsOrDsToTimestamp, exp.TsOrDsToDate))
+
+            time_expr = (
+                this
+                if isinstance(this, (exp.TsOrDsToDatetime, exp.TsOrDsToTimestamp, exp.TsOrDsToDate))
                 else expression
             )
-            return self.func(func_name, self.format_time(expression), this.this)
+            return self.func(func_name, self.format_time(expression), time_expr.this)
 
         def eq_sql(self, expression: exp.EQ) -> str:
             # Operands of = cannot be NULL in BigQuery
@@ -1119,3 +1214,13 @@ class BigQuery(Dialect):
             if expression.name == "TIMESTAMP":
                 expression.set("this", "SYSTEM_TIME")
             return super().version_sql(expression)
+
+        def contains_sql(self, expression: exp.Contains) -> str:
+            this = expression.this
+            expr = expression.expression
+
+            if isinstance(this, exp.Lower) and isinstance(expr, exp.Lower):
+                this = this.this
+                expr = expr.this
+
+            return self.func("CONTAINS_SUBSTR", this, expr)
