@@ -105,3 +105,17 @@ func WriteJSONToFile(data interface{}, filename string) error {
 	}
 	return nil
 }
+
+func ReadJSONToFile(filename string, v interface{}) error {
+	file, err := os.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(file, v)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

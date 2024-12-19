@@ -38,6 +38,27 @@ func (s TaskInstanceStatus) String() string {
 	return "unknown"
 }
 
+func StatusFromString(status string) TaskInstanceStatus {
+	switch strings.ToLower(status) {
+	case "pending":
+		return Pending
+	case "queued":
+		return Queued
+	case "running":
+		return Running
+	case "failed":
+		return Failed
+	case "upstream_failed":
+		return UpstreamFailed
+	case "succeeded":
+		return Succeeded
+	case "skipped":
+		return Skipped
+	default:
+		return -1
+	}
+}
+
 type TaskInstanceType int
 
 func (s TaskInstanceType) String() string {
@@ -703,6 +724,29 @@ func (s *Scheduler) SavePipelineState(param map[string]string, runID, statePath 
 		s.logger.Error("failed to write pipeline state to file", zap.Error(err))
 		return err
 	}
+	return nil
+}
+
+func (s *Scheduler) RestoreState(statePath string) error {
+	pipelineState := &PipelineState{}
+	if err := helpers.ReadJSONToFile(statePath, pipelineState); err != nil {
+		s.logger.Error("failed to read pipeline state from file", zap.Error(err))
+		return err
+	}
+
+	for _, task := range s.taskInstances {
+		for _, state := range pipelineState.State {
+			if state.Name == task.GetAsset().Name {
+				if state.Status == Failed.String() || state.Status == UpstreamFailed.String() {
+					task.MarkAs(Pending)
+				} else {
+					task.MarkAs(StatusFromString(state.Status))
+				}
+			}
+			break
+		}
+	}
+
 	return nil
 }
 
