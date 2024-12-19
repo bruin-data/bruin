@@ -112,6 +112,10 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "use-uv",
 				Usage: "use uv for managing Python dependencies",
 			},
+			&cli.BoolFlag{
+				Name:  "continue",
+				Usage: "Continue the pipeline from the last run",
+			},
 			&cli.StringFlag{
 				Name:    "tag",
 				Aliases: []string{"t"},
@@ -307,8 +311,51 @@ func Run(isDebug *bool) *cli.Command {
 				foundPipeline.MetadataPush.Global = true
 			}
 
-			statePath := filepath.Join(repoRoot.Path, "logs/runs", runID+".json")
+			statePath := filepath.Join(repoRoot.Path, "logs/runs")
 			s := scheduler.NewScheduler(logger, foundPipeline, runID)
+
+			params := map[string]string{
+				"startDate":   startDate.Format(time.RFC3339),
+				"endDate":     endDate.Format(time.RFC3339),
+				"runID":       runID,
+				"pipeline":    foundPipeline.Name,
+				"fullRefresh": strconv.FormatBool(c.Bool("full-refresh")),
+				"useUv":       strconv.FormatBool(c.Bool("use-uv")),
+				"tag":         c.String("tag"),
+				"excludeTag":  c.String("exclude-tag"),
+				"only":        strings.Join(c.StringSlice("only"), ","),
+			}
+
+			if c.Bool("continue") {
+				pipelineState, stateErr := s.RestoreState(statePath)
+				if stateErr != nil {
+					errorPrinter.Printf("Failed to restore state: %v\n", stateErr)
+					return cli.Exit("", 1)
+				}
+				params = pipelineState.Parameters
+				filter = &Filter{
+					IncludeTag:        pipelineState.Parameters["tag"],
+					OnlyTaskTypes:     strings.Split(pipelineState.Parameters["only"], ","),
+					IncludeDownstream: runDownstreamTasks,
+					PushMetaData:      pipelineState.Parameters["push-metadata"] == "true",
+					SingleTask:        task,
+					ExcludeTag:        pipelineState.Parameters["exclude-tag"],
+				}
+				startDate, stateErr = time.Parse(time.RFC3339, pipelineState.Parameters["startDate"])
+				if stateErr != nil {
+					errorPrinter.Printf("Failed to parse start date from state: %v\n", stateErr)
+					return cli.Exit("", 1)
+				}
+				endDate, stateErr = time.Parse(time.RFC3339, pipelineState.Parameters["endDate"])
+				if stateErr != nil {
+					errorPrinter.Printf("Failed to parse end date from state: %v\n", stateErr)
+					return cli.Exit("", 1)
+				}
+				if foundPipeline.GetCompatibilityHash() != pipelineState.CompatibilityHash {
+					errorPrinter.Printf("The pipeline has changed since the last run. Please rerun the pipeline.\n")
+					return cli.Exit("", 1)
+				}
+			}
 
 			// Apply the filter to mark assets based on include/exclude tags
 			if err := filter.ApplyFiltersAndMarkAssets(foundPipeline, s); err != nil {
@@ -349,17 +396,7 @@ func Run(isDebug *bool) *cli.Command {
 			results := s.Run(runCtx)
 			duration := time.Since(start)
 
-			if err := s.SavePipelineState(map[string]string{
-				"startDate":   startDate.Format(time.RFC3339),
-				"endDate":     endDate.Format(time.RFC3339),
-				"runID":       runID,
-				"pipeline":    foundPipeline.Name,
-				"fullRefresh": strconv.FormatBool(c.Bool("full-refresh")),
-				"useUv":       strconv.FormatBool(c.Bool("use-uv")),
-				"tag":         c.String("tag"),
-				"excludeTag":  c.String("exclude-tag"),
-				"only":        strings.Join(c.StringSlice("only"), ","),
-			}, runID, statePath); err != nil {
+			if err := s.SavePipelineState(params, runID, filepath.Join(statePath, runID+".json")); err != nil {
 				logger.Error("failed to save pipeline state", zap.Error(err))
 			}
 

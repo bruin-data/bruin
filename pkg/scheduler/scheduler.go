@@ -727,27 +727,33 @@ func (s *Scheduler) SavePipelineState(param map[string]string, runID, statePath 
 	return nil
 }
 
-func (s *Scheduler) RestoreState(statePath string) error {
-	pipelineState := &PipelineState{}
-	if err := helpers.ReadJSONToFile(statePath, pipelineState); err != nil {
-		s.logger.Error("failed to read pipeline state from file", zap.Error(err))
-		return err
+func (s *Scheduler) RestoreState(statePath string) (*PipelineState, error) {
+	latestRunID, err := helpers.GetLatestFileInDir(statePath)
+	if err != nil {
+		s.logger.Error("failed to get latest run id", zap.Error(err))
+		return nil, err
 	}
-
+	pipelineState := &PipelineState{}
+	if err := helpers.ReadJSONToFile(latestRunID, pipelineState); err != nil {
+		s.logger.Error("failed to read pipeline state from file", zap.Error(err))
+		return nil, err
+	}
 	for _, task := range s.taskInstances {
 		for _, state := range pipelineState.State {
 			if state.Name == task.GetAsset().Name {
 				if state.Status == Failed.String() || state.Status == UpstreamFailed.String() {
 					task.MarkAs(Pending)
+				} else if state.Status == Skipped.String() {
+					task.MarkAs(Pending)
 				} else {
 					task.MarkAs(StatusFromString(state.Status))
 				}
+				break
 			}
-			break
 		}
 	}
 
-	return nil
+	return pipelineState, nil
 }
 
 func GetStatusForTask(tasks []TaskInstanceStatus) TaskInstanceStatus {

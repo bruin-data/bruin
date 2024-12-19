@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
@@ -118,4 +119,40 @@ func ReadJSONToFile(filename string, v interface{}) error {
 	}
 
 	return nil
+}
+
+func GetAllFilesInDir(dir string) ([]string, error) {
+	files, err := filepath.Glob(filepath.Join(dir, "*"))
+	if err != nil {
+		return nil, err
+	}
+	return files, nil
+}
+
+func GetLatestFileInDir(dir string) (string, error) {
+
+	files, err := GetAllFilesInDir(dir)
+	if err != nil {
+		return "", err
+	}
+
+	var latestFile string
+	var latestModTime time.Time
+
+	for _, file := range files {
+		info, err := os.Stat(file)
+		if err != nil {
+			return "", err
+		}
+
+		if info.ModTime().After(latestModTime) {
+			latestModTime = info.ModTime()
+			latestFile = file
+		}
+	}
+
+	if latestFile == "" {
+		return "", errors.New("no files found in directory")
+	}
+	return latestFile, nil
 }
