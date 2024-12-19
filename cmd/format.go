@@ -47,19 +47,16 @@ func Format(isDebug *bool) *cli.Command {
 				if failIfChanged {
 					changed, err := hasFileChanged(repoOrAsset)
 					if err != nil {
-						if errors.Is(err, os.ErrNotExist) {
-							printErrorForOutput(output, fmt.Errorf("the given file path '%s' does not seem to exist, are you sure you used the right path?", repoOrAsset))
-						} else {
-							printErrorForOutput(output, errors2.Wrap(err, "failed to check asset"))
-						}
+						printErrorForOutput(output, errors2.Wrap(err, "failed to check asset"))
+						return cli.Exit("", 1)
 					}
 					if changed {
-						printErrorForOutput(output, fmt.Errorf("Failure:asset '%s' needs to be reformatted", repoOrAsset))
+						printErrorForOutput(output, fmt.Errorf("failure:asset '%s' needs to be reformatted", repoOrAsset))
 						return cli.Exit("", 1)
-					} else {
-						infoPrinter.Printf("Success:Asset '%s' doesn't need reformatting", repoOrAsset)
-						return cli.Exit("", 0)
 					}
+					infoPrinter.Printf("success:Asset '%s' doesn't need reformatting", repoOrAsset)
+					return cli.Exit("", 0)
+
 				}
 				asset, err := formatAsset(repoOrAsset)
 				if err != nil {
@@ -130,21 +127,22 @@ func Format(isDebug *bool) *cli.Command {
 			assetFinderPool.Wait()
 			if failIfChanged && len(errorList) == 0 {
 				if len(changedAssetpaths) == 0 {
-					infoPrinter.Printf("Success: No Asset '%s' needs reformatting", repoOrAsset)
+					infoPrinter.Printf("success: No Asset '%s' needs reformatting", repoOrAsset)
 					return cli.Exit("", 0)
 				}
-				errorPrinter.Println("Failure: Some Assets needs reformatting:")
+				errorPrinter.Println("failure: Some Assets needs reformatting:")
 				for _, assetPath := range changedAssetpaths {
 					infoPrinter.Printf("'%s'\n", assetPath)
 				}
 				return cli.Exit("", 1)
-			} else {
+			}
+			if !failIfChanged && len(errorList) == 0 {
 				if output == "json" {
 					return nil
 				}
 
 				if processedAssetCount == 0 {
-					infoPrinter.Println("No actual assets were found in the given path, nothing has changed.")
+					infoPrinter.Println("no actual assets were found in the given path, nothing has changed.")
 					return nil
 				}
 
