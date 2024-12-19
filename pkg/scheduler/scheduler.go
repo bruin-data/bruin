@@ -11,9 +11,9 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/version"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
-	"honnef.co/go/tools/lintcmd/version"
 )
 
 type TaskInstanceStatus int
