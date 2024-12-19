@@ -3,12 +3,15 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/version"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -84,6 +87,26 @@ type TaskInstance interface {
 	GetDownstream() []TaskInstance
 	AddUpstream(t TaskInstance)
 	AddDownstream(t TaskInstance)
+}
+
+type PipelineState struct {
+	Parameters        map[string]string     `json:"parameters"`
+	Metadata          Metadata              `json:"metadata"`
+	State             []*PipelineAssetState `json:"state"`
+	Version           string                `json:"version"`
+	TimeStamp         time.Time             `json:"timestamp"`
+	RunID             string                `json:"run_id"`
+	CompatibilityHash string                `json:"compatibility_hash"`
+}
+
+type PipelineAssetState struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
+
+type Metadata struct {
+	Version string `json:"version"`
+	OS      string `json:"os"`
 }
 
 type AssetInstance struct {
@@ -236,6 +259,8 @@ type Scheduler struct {
 
 	WorkQueue chan TaskInstance
 	Results   chan *TaskExecutionResult
+
+	runID string
 }
 
 func (s *Scheduler) InstanceCount() int {
@@ -370,7 +395,7 @@ func (s *Scheduler) FindMajorityOfTypes(defaultIfNone pipeline.AssetType) pipeli
 	return s.pipeline.GetMajorityAssetTypesFromSQLAssets(defaultIfNone)
 }
 
-func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline) *Scheduler {
+func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, runID string) *Scheduler {
 	instances := make([]TaskInstance, 0)
 	for _, task := range p.Assets {
 		parentID := uuid.New().String()
@@ -444,6 +469,7 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline) *Scheduler {
 		taskScheduleLock: sync.Mutex{},
 		WorkQueue:        make(chan TaskInstance, 100),
 		Results:          make(chan *TaskExecutionResult),
+		runID:            runID,
 	}
 	s.initialize()
 
@@ -644,4 +670,61 @@ func (s *Scheduler) hasPipelineFinished() bool {
 	}
 
 	return true
+}
+
+func (s *Scheduler) SavePipelineState(param map[string]string, runID, statePath string) error {
+	state := make([]*PipelineAssetState, 0)
+	dict := make(map[string][]TaskInstanceStatus)
+	for _, task := range s.taskInstances {
+		dict[task.GetAsset().Name] = append(dict[task.GetAsset().Name], task.GetStatus())
+	}
+
+	for key, status := range dict {
+		result := GetStatusForTask(status)
+		state = append(state, &PipelineAssetState{
+			Name:   key,
+			Status: result.String(),
+		})
+	}
+
+	pipelineState := &PipelineState{
+		Parameters: param,
+		Metadata: Metadata{
+			Version: version.Version,
+			OS:      runtime.GOOS,
+		},
+		State:             state,
+		Version:           "1.0.0",
+		TimeStamp:         time.Now(),
+		RunID:             runID,
+		CompatibilityHash: s.pipeline.GetCompatibilityHash(),
+	}
+	if err := helpers.WriteJSONToFile(pipelineState, statePath); err != nil {
+		s.logger.Error("failed to write pipeline state to file", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+func GetStatusForTask(tasks []TaskInstanceStatus) TaskInstanceStatus {
+	dict := make(map[TaskInstanceStatus]bool)
+	for _, status := range tasks {
+		if _, ok := dict[status]; !ok {
+			dict[status] = true
+			continue
+		}
+	}
+	if dict[Failed] || dict[UpstreamFailed] {
+		return Failed
+	}
+
+	if dict[Skipped] && len(dict) == 1 {
+		return Skipped
+	}
+
+	if dict[Succeeded] && !dict[Running] {
+		return Succeeded
+	}
+
+	return Pending
 }

@@ -2,6 +2,8 @@ package pipeline_test
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"log"
 	"os"
@@ -942,6 +944,88 @@ func TestDefaultTrueBool_MarshalYAML(t *testing.T) {
 
 			yamlConfig := buf.Bytes()
 			assert.YAMLEq(t, tt.want, string(yamlConfig))
+		})
+	}
+}
+
+func TestPipeline_GetCompatibilityHash(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		pipeline *pipeline.Pipeline
+		expected string
+	}{
+		{
+			name: "single asset with one upstream",
+			pipeline: &pipeline.Pipeline{
+				Name: "test-pipeline",
+				Assets: []*pipeline.Asset{
+					{
+						Name: "asset1",
+						Upstreams: []pipeline.Upstream{
+							{Type: "type1", Value: "upstream1"},
+						},
+					},
+				},
+			},
+			expected: func() string {
+				var builder strings.Builder
+				builder.WriteString("PipelineName:test-pipeline;Assets:{AssetName:asset1;Upstreams:[{Value:upstream1;Type:type1}]}")
+				hash := sha256.New()
+				hash.Write([]byte(builder.String()))
+				return hex.EncodeToString(hash.Sum(nil))
+			}(),
+		},
+		{
+			name: "multiple assets with multiple upstreams",
+			pipeline: &pipeline.Pipeline{
+				Name: "complex-pipeline",
+				Assets: []*pipeline.Asset{
+					{
+						Name: "asset1",
+						Upstreams: []pipeline.Upstream{
+							{Type: "type1", Value: "upstream1"},
+							{Type: "type2", Value: "upstream2"},
+						},
+					},
+					{
+						Name: "asset2",
+						Upstreams: []pipeline.Upstream{
+							{Type: "type3", Value: "upstream3"},
+						},
+					},
+				},
+			},
+			expected: func() string {
+				var builder strings.Builder
+				builder.WriteString("PipelineName:complex-pipeline;Assets:{AssetName:asset1;Upstreams:[{Value:upstream1;Type:type1},{Value:upstream2;Type:type2}]}{AssetName:asset2;Upstreams:[{Value:upstream3;Type:type3}]}")
+				hash := sha256.New()
+				hash.Write([]byte(builder.String()))
+				return hex.EncodeToString(hash.Sum(nil))
+			}(),
+		},
+		{
+			name: "no assets",
+			pipeline: &pipeline.Pipeline{
+				Name:   "empty-pipeline",
+				Assets: []*pipeline.Asset{},
+			},
+			expected: func() string {
+				var builder strings.Builder
+				builder.WriteString("PipelineName:empty-pipeline;Assets:")
+				hash := sha256.New()
+				hash.Write([]byte(builder.String()))
+				return hex.EncodeToString(hash.Sum(nil))
+			}(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			actualHash := tt.pipeline.GetCompatibilityHash()
+			assert.Equal(t, tt.expected, actualHash)
 		})
 	}
 }

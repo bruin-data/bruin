@@ -1,9 +1,12 @@
 package helpers
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -83,4 +86,22 @@ func CastResultToInteger(res [][]interface{}) (int64, error) {
 	}
 
 	return 0, errors.Errorf("unexpected result from query during, cannot cast result to integer: %v", res)
+}
+
+func WriteJSONToFile(data interface{}, filename string) error {
+	file, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(filepath.Dir(filename)); os.IsNotExist(err) {
+		err := os.MkdirAll(filepath.Dir(filename), 0o755)
+		if err != nil {
+			return err
+		}
+	}
+	err = os.WriteFile(filename, file, 0o600)
+	if err != nil {
+		return err
+	}
+	return nil
 }

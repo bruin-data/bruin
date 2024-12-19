@@ -2,6 +2,8 @@ package pipeline
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -934,6 +936,35 @@ type Pipeline struct {
 
 	TasksByType map[AssetType][]*Asset `json:"-"`
 	tasksByName map[string]*Asset
+}
+
+func (p *Pipeline) GetCompatibilityHash() string {
+	var builder strings.Builder
+	builder.WriteString("PipelineName:")
+	builder.WriteString(p.Name)
+	builder.WriteString(";Assets:")
+
+	for _, asset := range p.Assets {
+		builder.WriteString("{AssetName:")
+		builder.WriteString(asset.Name)
+		builder.WriteString(";Upstreams:[")
+
+		for i, upstream := range asset.Upstreams {
+			builder.WriteString("{Value:")
+			builder.WriteString(upstream.Value)
+			builder.WriteString(";Type:")
+			builder.WriteString(upstream.Type)
+			builder.WriteString("}")
+			if i < len(asset.Upstreams)-1 {
+				builder.WriteString(",")
+			}
+		}
+		builder.WriteString("]}")
+	}
+
+	hash := sha256.New()
+	hash.Write([]byte(builder.String()))
+	return hex.EncodeToString(hash.Sum(nil))
 }
 
 func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error) {
