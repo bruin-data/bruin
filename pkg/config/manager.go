@@ -345,6 +345,13 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 			}
 			env.Connections.DuckDB[i].Path = filepath.Join(configLocation, conn.Path)
 		}
+		// Make GoogleCloudPlatform service account file paths absolute
+		for i, conn := range env.Connections.GoogleCloudPlatform {
+			if filepath.IsAbs(conn.ServiceAccountFile) {
+				continue
+			}
+			env.Connections.GoogleCloudPlatform[i].ServiceAccountFile = filepath.Join(configLocation, conn.ServiceAccountFile)
+		}
 	}
 
 	err = config.SelectEnvironment(config.DefaultEnvironmentName)

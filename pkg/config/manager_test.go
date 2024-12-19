@@ -14,13 +14,15 @@ import (
 func TestLoadFromFile(t *testing.T) {
 	t.Parallel()
 
-	var duckPath, configFile string
+	var servicefile, duckPath, configFile string
 	if runtime.GOOS == "windows" {
 		configFile = "simple_win.yml"
 		duckPath = "C:\\path\\to\\duck.db"
+		servicefile = "D:\\path\\to\\service_account.json"
 	} else {
 		configFile = "simple.yml"
 		duckPath = "/path/to/duck.db"
+		servicefile = "/path/to/service_account.json"
 	}
 
 	devEnv := Environment{
@@ -29,7 +31,7 @@ func TestLoadFromFile(t *testing.T) {
 				{
 					Name:               "conn1",
 					ServiceAccountJSON: "{\"key1\": \"value1\"}",
-					ServiceAccountFile: "/path/to/service_account.json",
+					ServiceAccountFile: servicefile,
 					ProjectID:          "my-project",
 				},
 			},
@@ -235,7 +237,7 @@ func TestLoadFromFile(t *testing.T) {
 				},
 				{
 					Name:               "conn22-1",
-					ServiceAccountFile: "/path/to/service_account.json",
+					ServiceAccountFile: servicefile,
 				},
 			},
 			Chess: []ChessConnection{
@@ -314,7 +316,7 @@ func TestLoadFromFile(t *testing.T) {
 							GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 								{
 									Name:               "conn1",
-									ServiceAccountFile: "/path/to/service_account.json",
+									ServiceAccountFile: servicefile,
 									ProjectID:          "my-project",
 								},
 							},
@@ -351,13 +353,19 @@ func TestLoadFromFile(t *testing.T) {
 func TestLoadOrCreate(t *testing.T) {
 	t.Parallel()
 
+	var servicefile string
+	if runtime.GOOS == "windows" {
+		servicefile = "C:\\path\\to\\service_account.json\""
+	} else {
+		servicefile = "/path/to/service_account.json"
+	}
 	configPath := "/some/path/to/config.yml"
 	defaultEnv := &Environment{
 		Connections: &Connections{
 			GoogleCloudPlatform: []GoogleCloudPlatformConnection{
 				{
 					Name:               "conn1",
-					ServiceAccountFile: "/path/to/service_account.json",
+					ServiceAccountFile: servicefile,
 				},
 			},
 		},
@@ -409,7 +417,6 @@ func TestLoadOrCreate(t *testing.T) {
 			setup: func(t *testing.T, args args) {
 				err := existingConfig.PersistToFs(args.fs)
 				require.NoError(t, err)
-
 				err = afero.WriteFile(args.fs, "/some/path/to/.gitignore", []byte("file1"), 0o644)
 				require.NoError(t, err)
 			},

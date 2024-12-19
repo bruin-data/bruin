@@ -87,7 +87,7 @@ export default defineConfig({
                            text: "Tutorials",
                            collapsed: true,
                            items: [
-                              {text: "Your First Project", link: "/getting-started/tutorials/first-tutorial"},
+                              {text: "Your First Pipeline", link: "/getting-started/tutorials/first-tutorial"},
                               { text: "Load Notion to PostgreSQL", link: "/getting-started/tutorials/load-notion-postgres" },
                           ],
 
