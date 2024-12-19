@@ -431,17 +431,20 @@
       ]
     },
     "GoogleSheetsConnection": {
-      "properties":{
-        "name":{"type":"string"},
-        "service_account_json":{
-          "type":"string"
+      "properties": {
+        "name": {
+          "type": "string"
         },
-        "service_account_file":{
-          "type":"string"
+        "service_account_json": {
+          "type": "string"
+        },
+        "service_account_file": {
+          "type": "string"
         }
-      },"additionalProperties":false,
-      "type":"object",
-      "required":[
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
         "name"
       ]
     },
@@ -659,6 +662,15 @@
           "type": "string"
         },
         "driver": {
+          "type": "string"
+        },
+        "ssl_ca_path": {
+          "type": "string"
+        },
+        "ssl_cert_path": {
+          "type": "string"
+        },
+        "ssl_key_path": {
           "type": "string"
         }
       },
