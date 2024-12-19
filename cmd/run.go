@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -348,7 +349,17 @@ func Run(isDebug *bool) *cli.Command {
 			results := s.Run(runCtx)
 			duration := time.Since(start)
 
-			if err := s.SavePipelineState(map[string]string{}, runID, statePath); err != nil {
+			if err := s.SavePipelineState(map[string]string{
+				"startDate":   startDate.Format(time.RFC3339),
+				"endDate":     endDate.Format(time.RFC3339),
+				"runID":       runID,
+				"pipeline":    foundPipeline.Name,
+				"fullRefresh": strconv.FormatBool(c.Bool("full-refresh")),
+				"useUv":       strconv.FormatBool(c.Bool("use-uv")),
+				"tag":         c.String("tag"),
+				"excludeTag":  c.String("exclude-tag"),
+				"only":        strings.Join(c.StringSlice("only"), ","),
+			}, runID, statePath); err != nil {
 				logger.Error("failed to save pipeline state", zap.Error(err))
 			}
 
