@@ -1,2 +1,2 @@
-sqlglot==25.30.0
-sqlglotrs==0.2.13
+sqlglot==26.0.1
+sqlglotrs==0.3.0

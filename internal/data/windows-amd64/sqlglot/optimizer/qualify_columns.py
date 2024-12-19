@@ -66,6 +66,7 @@ def qualify_columns(
             _expand_alias_refs(
                 scope,
                 resolver,
+                dialect,
                 expand_only_groupby=dialect.EXPAND_ALIAS_REFS_EARLY_ONLY_IN_GROUP_BY,
             )
 
@@ -73,9 +74,9 @@ def qualify_columns(
         _qualify_columns(scope, resolver, allow_partial_qualification=allow_partial_qualification)
 
         if not schema.empty and expand_alias_refs:
-            _expand_alias_refs(scope, resolver)
+            _expand_alias_refs(scope, resolver, dialect)
 
-        if not isinstance(scope.expression, exp.UDTF):
+        if isinstance(scope.expression, exp.Select):
             if expand_stars:
                 _expand_stars(
                     scope,
@@ -220,18 +221,31 @@ def _expand_using(scope: Scope, resolver: Resolver) -> t.Dict[str, t.Any]:
             if not column.table and column.name in column_tables:
                 tables = column_tables[column.name]
                 coalesce_args = [exp.column(column.name, table=table) for table in tables]
-                replacement = exp.func("coalesce", *coalesce_args)
+                replacement: exp.Expression = exp.func("coalesce", *coalesce_args)
 
-                # Ensure selects keep their output name
                 if isinstance(column.parent, exp.Select):
+                    # Ensure the USING column keeps its name if it's projected
                     replacement = alias(replacement, alias=column.name, copy=False)
+                elif isinstance(column.parent, exp.Struct):
+                    # Ensure the USING column keeps its name if it's an anonymous STRUCT field
+                    replacement = exp.PropertyEQ(
+                        this=exp.to_identifier(column.name), expression=replacement
+                    )
 
                 scope.replace(column, replacement)
 
     return column_tables
 
 
-def _expand_alias_refs(scope: Scope, resolver: Resolver, expand_only_groupby: bool = False) -> None:
+def _expand_alias_refs(
+    scope: Scope, resolver: Resolver, dialect: Dialect, expand_only_groupby: bool = False
+) -> None:
+    """
+    Expand references to aliases.
+    Example:
+        SELECT y.foo AS bar, bar * 2 AS baz FROM y
+     => SELECT y.foo AS bar, y.foo * 2 AS baz FROM y
+    """
     expression = scope.expression
 
     if not isinstance(expression, exp.Select):
@@ -303,6 +317,12 @@ def _expand_alias_refs(scope: Scope, resolver: Resolver, expand_only_groupby: bo
     replace_columns(expression.args.get("group"), literal_index=True)
     replace_columns(expression.args.get("having"), resolve_table=True)
     replace_columns(expression.args.get("qualify"), resolve_table=True)
+
+    # Snowflake allows alias expansion in the JOIN ... ON clause (and almost everywhere else)
+    # https://docs.snowflake.com/en/sql-reference/sql/select#usage-notes
+    if dialect == "snowflake":
+        for join in expression.args.get("joins") or []:
+            replace_columns(join)
 
     scope.clear_cache()
 
@@ -524,7 +544,9 @@ def _expand_struct_stars(
         this = field.this.copy()
         root, *parts = [part.copy() for part in itertools.chain(dot_parts, [this])]
         new_column = exp.column(
-            t.cast(exp.Identifier, root), table=dot_column.args.get("table"), fields=parts
+            t.cast(exp.Identifier, root),
+            table=dot_column.args.get("table"),
+            fields=t.cast(t.List[exp.Identifier], parts),
         )
         new_selections.append(alias(new_column, this, copy=False))
 
@@ -876,9 +898,21 @@ class Resolver:
                     for (name, alias) in itertools.zip_longest(columns, column_aliases)
                 ]
 
+            pseudocolumns = self._get_source_pseudocolumns(name)
+            if pseudocolumns:
+                columns = list(columns)
+                columns.extend(c for c in pseudocolumns if c not in columns)
+
             self._get_source_columns_cache[cache_key] = columns
 
         return self._get_source_columns_cache[cache_key]
+
+    def _get_source_pseudocolumns(self, name: str) -> t.Sequence[str]:
+        if self.schema.dialect == "snowflake" and self.scope.expression.args.get("connect"):
+            # When there is a CONNECT BY clause, there is only one table being scanned
+            # See: https://docs.snowflake.com/en/sql-reference/constructs/connect-by
+            return ["LEVEL"]
+        return []
 
     def _get_all_source_columns(self) -> t.Dict[str, t.Sequence[str]]:
         if self._source_columns is None:
