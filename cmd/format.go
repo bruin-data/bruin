@@ -45,18 +45,7 @@ func Format(isDebug *bool) *cli.Command {
 
 			if isPathReferencingAsset(repoOrAsset) {
 				if failIfChanged {
-					changed, err := hasFileChanged(repoOrAsset)
-					if err != nil {
-						printErrorForOutput(output, errors2.Wrap(err, "failed to check asset"))
-						return cli.Exit("", 1)
-					}
-					if changed {
-						printErrorForOutput(output, fmt.Errorf("failure:asset '%s' needs to be reformatted", repoOrAsset))
-						return cli.Exit("", 1)
-					}
-					infoPrinter.Printf("success:Asset '%s' doesn't need reformatting", repoOrAsset)
-					return cli.Exit("", 0)
-
+					return handleFailIfChanged(repoOrAsset, output)
 				}
 				asset, err := formatAsset(repoOrAsset)
 				if err != nil {
@@ -65,7 +54,6 @@ func Format(isDebug *bool) *cli.Command {
 					} else {
 						printErrorForOutput(output, errors2.Wrap(err, "failed to format asset"))
 					}
-
 					return cli.Exit("", 1)
 				}
 
@@ -100,7 +88,6 @@ func Format(isDebug *bool) *cli.Command {
 						if changed {
 							changedAssetpaths = append(changedAssetpaths, assetPath)
 						}
-
 					} else {
 						asset, err := DefaultPipelineBuilder.CreateAssetFromFile(assetPath)
 						if err != nil {
@@ -215,4 +202,22 @@ func hasFileChanged(path string) (bool, error) {
 
 	// Compare the original and new content
 	return string(originalContent) != string(newContent), nil
+}
+
+func handleFailIfChanged(repoOrAsset, output string) error {
+	changed, err := hasFileChanged(repoOrAsset)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			printErrorForOutput(output, fmt.Errorf("the given file path '%s' does not seem to exist, are you sure you used the right path?", repoOrAsset))
+		} else {
+			printErrorForOutput(output, errors2.Wrap(err, "failed to format asset"))
+		}
+		return cli.Exit("", 1)
+	}
+	if changed {
+		printErrorForOutput(output, fmt.Errorf("failure: asset '%s' needs to be reformatted", repoOrAsset))
+		return cli.Exit("", 1)
+	}
+	infoPrinter.Printf("success: Asset '%s' doesn't need reformatting", repoOrAsset)
+	return cli.Exit("", 0)
 }
