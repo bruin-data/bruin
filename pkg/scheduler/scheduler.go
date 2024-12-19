@@ -99,8 +99,8 @@ type PipelineState struct {
 }
 
 type PipelineAssetState struct {
-	Name   string
-	Status string
+	Name   string `json:"name"`
+	Status string `json:"status"`
 }
 
 type Metadata struct {
