@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: sqlglot
-Version: 25.30.0
+Version: 26.0.1
 Summary: An easily customizable SQL parser and transpiler
 Home-page: https://github.com/tobymao/sqlglot
 Author: Toby Mao
@@ -31,11 +31,11 @@ Requires-Dist: types-pytz; extra == "dev"
 Requires-Dist: typing-extensions; extra == "dev"
 Requires-Dist: maturin<2.0,>=1.4; extra == "dev"
 Provides-Extra: rs
-Requires-Dist: sqlglotrs==0.2.13; extra == "rs"
+Requires-Dist: sqlglotrs==0.3.0; extra == "rs"
 
 ![SQLGlot logo](sqlglot.png)
 
-SQLGlot is a no-dependency SQL parser, transpiler, optimizer, and engine. It can be used to format SQL or translate between [23 different dialects](https://github.com/tobymao/sqlglot/blob/main/sqlglot/dialects/__init__.py) like [DuckDB](https://duckdb.org/), [Presto](https://prestodb.io/) / [Trino](https://trino.io/), [Spark](https://spark.apache.org/) / [Databricks](https://www.databricks.com/), [Snowflake](https://www.snowflake.com/en/), and [BigQuery](https://cloud.google.com/bigquery/). It aims to read a wide variety of SQL inputs and output syntactically and semantically correct SQL in the targeted dialects.
+SQLGlot is a no-dependency SQL parser, transpiler, optimizer, and engine. It can be used to format SQL or translate between [24 different dialects](https://github.com/tobymao/sqlglot/blob/main/sqlglot/dialects/__init__.py) like [DuckDB](https://duckdb.org/), [Presto](https://prestodb.io/) / [Trino](https://trino.io/), [Spark](https://spark.apache.org/) / [Databricks](https://www.databricks.com/), [Snowflake](https://www.snowflake.com/en/), and [BigQuery](https://cloud.google.com/bigquery/). It aims to read a wide variety of SQL inputs and output syntactically and semantically correct SQL in the targeted dialects.
 
 It is a very comprehensive generic SQL parser with a robust [test suite](https://github.com/tobymao/sqlglot/blob/main/tests/). It is also quite [performant](#benchmarks), while being written purely in Python.
 

@@ -165,6 +165,7 @@ class ClickHouse(Dialect):
     SAFE_DIVISION = True
     LOG_BASE_FIRST: t.Optional[bool] = None
     FORCE_EARLY_ALIAS_REF_EXPANSION = True
+    PRESERVE_ORIGINAL_NAMES = True
 
     # https://github.com/ClickHouse/ClickHouse/issues/33935#issue-1112165779
     NORMALIZATION_STRATEGY = NormalizationStrategy.CASE_SENSITIVE
@@ -275,6 +276,7 @@ class ClickHouse(Dialect):
             "EDITDISTANCE": exp.Levenshtein.from_arg_list,
             "LEVENSHTEINDISTANCE": exp.Levenshtein.from_arg_list,
         }
+        FUNCTIONS.pop("TRANSFORM")
 
         AGG_FUNCTIONS = {
             "count",
@@ -563,6 +565,8 @@ class ClickHouse(Dialect):
             Parse a placeholder expression like SELECT {abc: UInt32} or FROM {table: Identifier}
             https://clickhouse.com/docs/en/sql-reference/syntax#defining-and-using-query-parameters
             """
+            index = self._index
+
             this = self._parse_id_var()
             self._match(TokenType.COLON)
             kind = self._parse_types(check_func=False, allow_identifiers=False) or (
@@ -570,11 +574,31 @@ class ClickHouse(Dialect):
             )
 
             if not kind:
-                self.raise_error("Expecting a placeholder type or 'Identifier' for tables")
+                self._retreat(index)
+                return None
             elif not self._match(TokenType.R_BRACE):
                 self.raise_error("Expecting }")
 
             return self.expression(exp.Placeholder, this=this, kind=kind)
+
+        def _parse_bracket(
+            self, this: t.Optional[exp.Expression] = None
+        ) -> t.Optional[exp.Expression]:
+            l_brace = self._match(TokenType.L_BRACE, advance=False)
+            bracket = super()._parse_bracket(this)
+
+            if l_brace and isinstance(bracket, exp.Struct):
+                varmap = exp.VarMap(keys=exp.Array(), values=exp.Array())
+                for expression in bracket.expressions:
+                    if not isinstance(expression, exp.PropertyEQ):
+                        break
+
+                    varmap.args["keys"].append("expressions", exp.Literal.string(expression.name))
+                    varmap.args["values"].append("expressions", expression.expression)
+
+                return varmap
+
+            return bracket
 
         def _parse_in(self, this: t.Optional[exp.Expression], is_global: bool = False) -> exp.In:
             this = super()._parse_in(this)
@@ -882,6 +906,8 @@ class ClickHouse(Dialect):
             exp.DataType.Type.BIGINT: "Int64",
             exp.DataType.Type.DATE32: "Date32",
             exp.DataType.Type.DATETIME: "DateTime",
+            exp.DataType.Type.DATETIME2: "DateTime",
+            exp.DataType.Type.SMALLDATETIME: "DateTime",
             exp.DataType.Type.DATETIME64: "DateTime64",
             exp.DataType.Type.DECIMAL: "Decimal",
             exp.DataType.Type.DECIMAL32: "Decimal32",
