@@ -100,6 +100,7 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 
 		executionCtx := context.WithValue(ctx, KeyPrinter, printer)
 		executionCtx = context.WithValue(executionCtx, ContextLogger, w.logger)
+
 		err := w.executor.RunSingleTask(executionCtx, task)
 
 		duration := time.Since(start)

@@ -311,7 +311,7 @@ func Run(isDebug *bool) *cli.Command {
 			state := state.NewState(runID, foundPipeline.Name)
 
 			if c.Bool("continue") {
-				if err := state.Load("logs/" + foundPipeline.Name); err != nil {
+				if err := state.Load("logs/runs/" + foundPipeline.Name); err != nil {
 					return nil
 				}
 				pipelineBFS, err := foundPipeline.GetBFSToAsset(foundPipeline)
@@ -832,6 +832,7 @@ func (f *Filter) ApplyFiltersAndMarkAssets(pipeline *pipeline.Pipeline, s *sched
 		}
 		s.MarkByTag(f.ExcludeTag, scheduler.Skipped, f.IncludeDownstream)
 	}
+
 	// Mark tasks in the scheduler
 	if !runMain {
 		s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeMain, scheduler.Skipped)

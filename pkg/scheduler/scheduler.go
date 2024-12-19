@@ -373,20 +373,18 @@ func (s *Scheduler) FindMajorityOfTypes(defaultIfNone pipeline.AssetType) pipeli
 }
 
 func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, stateManager *state.State) *Scheduler {
-	newRun := true
-	if len(stateManager.Get()) > 0 {
-		newRun = false
-	}
 
 	instances := make([]TaskInstance, 0)
 	for _, task := range p.Assets {
-		shouldSkip := false
-		if !newRun && stateManager.GetAssetState(task.Name).Status == Succeeded.String() {
-			shouldSkip = true
+		st := stateManager.GetAssetState(task.Name)
+		canSkip := false
+		if st == nil {
+			canSkip = false
+		} else {
+			canSkip = st.Status == Succeeded.String()
 		}
-
 		parentID := uuid.New().String()
-		if !shouldSkip {
+		if !canSkip {
 			instance := &AssetInstance{
 				ID:         parentID,
 				HumanID:    task.Name,
@@ -401,7 +399,7 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, stateManager 
 
 		for _, col := range task.Columns {
 			for _, t := range col.Checks {
-				if !shouldSkip {
+				if !canSkip {
 					testInstance := &ColumnCheckInstance{
 						AssetInstance: &AssetInstance{
 							ID:         uuid.New().String(),
@@ -418,12 +416,13 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, stateManager 
 					}
 					instances = append(instances, testInstance)
 				}
+
 			}
 		}
 
 		for _, c := range task.CustomChecks {
 			humanIDName := strings.ReplaceAll(strings.ToLower(c.Name), " ", "_")
-			if !shouldSkip {
+			if !canSkip {
 				testInstance := &CustomCheckInstance{
 					AssetInstance: &AssetInstance{
 						ID:         uuid.New().String(),
@@ -438,8 +437,10 @@ func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, stateManager 
 				}
 				instances = append(instances, testInstance)
 			}
+
 		}
-		if !shouldSkip && p.MetadataPush.HasAnyEnabled() {
+
+		if p.MetadataPush.HasAnyEnabled() && !canSkip {
 			instances = append(instances, &MetadataPushInstance{
 				AssetInstance: &AssetInstance{
 					ID:         uuid.New().String(),
@@ -606,7 +607,7 @@ func (s *Scheduler) saveState(results []*TaskExecutionResult) {
 	}
 
 	s.state.Set(states)
-	s.state.Save("logs/" + s.pipeline.Name)
+	s.state.Save("logs/runs/" + s.pipeline.Name)
 }
 
 // Tick marks an iteration of the scheduler loop. It is called when a result is received.
@@ -633,6 +634,7 @@ func (s *Scheduler) Tick(result *TaskExecutionResult) bool {
 	}
 
 	for _, task := range tasks {
+
 		task.MarkAs(Queued)
 		s.WorkQueue <- task
 	}
