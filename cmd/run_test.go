@@ -1011,7 +1011,7 @@ func TestApplyFilters(t *testing.T) {
 }
 
 func TestParseDate(t *testing.T) {
-	t.Parallel() // Enable parallel execution for the top-level test
+	t.Parallel()
 	tests := []struct {
 		name          string
 		startDateStr  string
@@ -1052,7 +1052,7 @@ func TestParseDate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel() // Enable parallel execution for individual test cases
+			t.Parallel()
 			logger := zaptest.NewLogger(t).Sugar()
 			startDate, endDate, err := ParseDate(tt.startDateStr, tt.endDateStr, logger)
 
@@ -1068,7 +1068,7 @@ func TestParseDate(t *testing.T) {
 }
 
 func TestValidation(t *testing.T) {
-	t.Parallel() // Enable parallel execution for the top-level test
+	t.Parallel()
 	logger := zaptest.NewLogger(t).Sugar()
 
 	tests := []struct {
@@ -1134,8 +1134,8 @@ func TestValidation(t *testing.T) {
 	}
 }
 
-func TestCheckLint(t *testing.T) {
-	t.Parallel() // Enable parallel execution for the top-level test
+func TestCheckLintFunc(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name          string
 		foundPipeline *pipeline.Pipeline
@@ -1160,7 +1160,7 @@ func TestCheckLint(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel() // Enable parallel execution for individual test cases
+			t.Parallel()
 			logger := zaptest.NewLogger(t).Sugar()
 			parser, err := sqlparser.NewSQLParser(false)
 			if err != nil {
