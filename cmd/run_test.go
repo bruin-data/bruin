@@ -1,13 +1,18 @@
 package cmd
 
 import (
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 )
 
 func TestClean(t *testing.T) {
@@ -776,7 +781,6 @@ func TestApplyFilters(t *testing.T) {
 			expectError:     true,
 			expectedError:   "no assets found with exclude tag 'non-existent-tag'",
 		},
-
 		{
 			name: "Exclude Tag and the downstreams",
 			pipeline: &pipeline.Pipeline{
@@ -1001,6 +1005,291 @@ func TestApplyFilters(t *testing.T) {
 				for _, name := range tt.expectedPending {
 					assert.Contains(t, taskNames, name)
 				}
+			}
+		})
+	}
+}
+
+func TestParseDate(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name          string
+		startDateStr  string
+		endDateStr    string
+		expectError   bool
+		expectedStart time.Time
+		expectedEnd   time.Time
+	}{
+		{
+			name:          "Valid Dates",
+			startDateStr:  "2023-12-01",
+			endDateStr:    "2023-12-31",
+			expectError:   false,
+			expectedStart: time.Date(2023, 12, 1, 0, 0, 0, 0, time.UTC),
+			expectedEnd:   time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:         "Invalid Start Date",
+			startDateStr: "invalid-date",
+			endDateStr:   "2023-12-31",
+			expectError:  true,
+		},
+		{
+			name:         "Invalid End Date",
+			startDateStr: "2023-12-01",
+			endDateStr:   "invalid-date",
+			expectError:  true,
+		},
+		{
+			name:          "Valid Date with Time",
+			startDateStr:  "2023-12-01 15:04:05",
+			endDateStr:    "2023-12-31 23:59:59",
+			expectError:   false,
+			expectedStart: time.Date(2023, 12, 1, 15, 4, 5, 0, time.UTC),
+			expectedEnd:   time.Date(2023, 12, 31, 23, 59, 59, 0, time.UTC),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			logger := zaptest.NewLogger(t).Sugar()
+			startDate, endDate, err := ParseDate(tt.startDateStr, tt.endDateStr, logger)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedStart, startDate)
+				assert.Equal(t, tt.expectedEnd, endDate)
+			}
+		})
+	}
+}
+
+func TestValidation(t *testing.T) {
+	t.Parallel()
+	logger := zaptest.NewLogger(t).Sugar()
+
+	tests := []struct {
+		name          string
+		runConfig     *scheduler.RunConfig
+		inputPath     string
+		expectError   bool
+		expectedError string
+	}{
+		{
+			name:          "Empty Input Path",
+			runConfig:     &scheduler.RunConfig{},
+			inputPath:     "",
+			expectError:   true,
+			expectedError: "please give a task or pipeline path: bruin run <path to the task definition>)",
+		},
+		{
+			name: "Invalid Start Date",
+			runConfig: &scheduler.RunConfig{
+				StartDate: "invalid-date",
+				EndDate:   "2023-12-31",
+			},
+			inputPath:   "some/path",
+			expectError: true,
+		},
+		{
+			name: "Invalid End Date",
+			runConfig: &scheduler.RunConfig{
+				StartDate: "2023-12-01",
+				EndDate:   "invalid-date",
+			},
+			inputPath:   "some/path",
+			expectError: true,
+		},
+		{
+			name: "Valid Input",
+			runConfig: &scheduler.RunConfig{
+				StartDate: "2023-12-01",
+				EndDate:   "2023-12-31",
+			},
+			inputPath:   "some/path",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel() // Enable parallel execution for individual test cases
+			startDate, endDate, path, err := ValidateRunConfig(tt.runConfig, tt.inputPath, logger)
+
+			if tt.expectError {
+				require.Error(t, err)
+				if tt.expectedError != "" {
+					require.EqualError(t, err, tt.expectedError)
+				}
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, time.Date(2023, 12, 1, 0, 0, 0, 0, time.UTC), startDate)
+				assert.Equal(t, time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC), endDate)
+				assert.Equal(t, tt.inputPath, path)
+			}
+		})
+	}
+}
+
+func TestCheckLintFunc(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name          string
+		foundPipeline *pipeline.Pipeline
+		pipelinePath  string
+	}{
+		{
+			name: "Lint Rule Error",
+			foundPipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+			},
+			pipelinePath: "path/to/pipeline",
+		},
+		{
+			name: "Linting Error",
+
+			foundPipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+			},
+			pipelinePath: "path/to/pipeline",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			logger := zaptest.NewLogger(t).Sugar()
+			parser, err := sqlparser.NewSQLParser(false)
+			if err != nil {
+				require.Error(t, err, "Expected an error but got none")
+			}
+			err = CheckLint(parser, tt.foundPipeline, tt.pipelinePath, logger)
+
+			require.NoError(t, err, "Expected no error but got one")
+		})
+	}
+}
+
+func TestReadState(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		statePath         string
+		stateContent      string
+		expectedError     bool
+		filter            *Filter
+		expectedFilter    *Filter
+		runConfig         *scheduler.RunConfig
+		expectedRunConfig *scheduler.RunConfig
+	}{
+		{
+			name:      "Valid State",
+			statePath: "/logs/run",
+			stateContent: `{
+				"parameters": {
+					"tag": "test-tag",
+					"only": ["task-type"],
+					"pushMetadata": true,
+					"excludeTag": "exclude-tag"
+				}
+			}`,
+			expectedError: false,
+			filter:        &Filter{},
+			expectedFilter: &Filter{
+				IncludeTag:    "test-tag",
+				OnlyTaskTypes: []string{"task-type"},
+				PushMetaData:  true,
+				ExcludeTag:    "exclude-tag",
+			},
+			runConfig:         &scheduler.RunConfig{},
+			expectedRunConfig: &scheduler.RunConfig{},
+		},
+		{
+			name:              "Empty State",
+			statePath:         "/logs/run",
+			stateContent:      `{}`,
+			expectedError:     false,
+			filter:            &Filter{},
+			expectedFilter:    &Filter{},
+			runConfig:         &scheduler.RunConfig{},
+			expectedRunConfig: &scheduler.RunConfig{},
+		},
+		{
+			name:      "Pre-filled Filter Values",
+			statePath: "/logs/run",
+			stateContent: `{
+				"parameters": {
+					"tag": "new-tag",
+					"only": ["new-task-type"],
+					"pushMetadata": false,
+					"excludeTag": "new-exclude-tag"
+				}
+			}`,
+			expectedError: false,
+			filter: &Filter{
+				IncludeTag:    "old-tag",
+				OnlyTaskTypes: []string{"old-task-type"},
+				PushMetaData:  true,
+				ExcludeTag:    "old-exclude-tag",
+			},
+			expectedFilter: &Filter{
+				IncludeTag:    "new-tag",
+				OnlyTaskTypes: []string{"new-task-type"},
+				PushMetaData:  false,
+				ExcludeTag:    "new-exclude-tag",
+			},
+			runConfig:         &scheduler.RunConfig{},
+			expectedRunConfig: &scheduler.RunConfig{},
+		},
+		{
+			name:      "Partial Pre-filled Filter Values",
+			statePath: "/logs/run",
+			stateContent: `{
+				"parameters": {
+					"tag": "partial-tag"
+				}
+			}`,
+			expectedError: false,
+			filter: &Filter{
+				IncludeTag:    "existing-tag",
+				OnlyTaskTypes: []string{"existing-task-type"},
+				PushMetaData:  true,
+				ExcludeTag:    "existing-exclude-tag",
+			},
+			expectedFilter: &Filter{
+				IncludeTag:   "partial-tag",
+				PushMetaData: false,
+				ExcludeTag:   "",
+			},
+			runConfig:         &scheduler.RunConfig{},
+			expectedRunConfig: &scheduler.RunConfig{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			fs := afero.NewMemMapFs()
+			err := afero.WriteFile(fs, filepath.Join(tt.statePath, "2024_12_19_22_59_13.json"), []byte(tt.stateContent), 0o644)
+			require.NoError(t, err)
+
+			filter := tt.filter
+			runConfig := tt.runConfig
+
+			pipelineState, err := ReadState(fs, tt.statePath, filter)
+
+			if tt.expectedError {
+				require.Error(t, err)
+				assert.Nil(t, pipelineState)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, pipelineState)
+				assert.Equal(t, tt.expectedFilter, filter)
+				assert.Equal(t, tt.expectedRunConfig, runConfig)
 			}
 		})
 	}

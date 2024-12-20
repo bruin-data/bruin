@@ -970,10 +970,14 @@ func TestPipeline_GetCompatibilityHash(t *testing.T) {
 				},
 			},
 			expected: func() string {
-				var builder strings.Builder
-				builder.WriteString("PipelineName:test-pipeline;Assets:{AssetName:asset1;Upstreams:[{Value:upstream1;Type:type1}]}")
+				var parts []string
+				parts = append(parts, "test-pipeline")
+				parts = append(parts, ":asset1{")
+				parts = append(parts, ":upstream1:type1:")
+				parts = append(parts, "}")
+				parts = append(parts, ":")
 				hash := sha256.New()
-				hash.Write([]byte(builder.String()))
+				hash.Write([]byte(strings.Join(parts, "")))
 				return hex.EncodeToString(hash.Sum(nil))
 			}(),
 		},
@@ -998,10 +1002,18 @@ func TestPipeline_GetCompatibilityHash(t *testing.T) {
 				},
 			},
 			expected: func() string {
-				var builder strings.Builder
-				builder.WriteString("PipelineName:complex-pipeline;Assets:{AssetName:asset1;Upstreams:[{Value:upstream1;Type:type1},{Value:upstream2;Type:type2}]}{AssetName:asset2;Upstreams:[{Value:upstream3;Type:type3}]}")
+				var parts []string
+				parts = append(parts, "complex-pipeline")
+				parts = append(parts, ":asset1{")
+				parts = append(parts, ":upstream1:type1:")
+				parts = append(parts, ":upstream2:type2:")
+				parts = append(parts, "}")
+				parts = append(parts, ":asset2{")
+				parts = append(parts, ":upstream3:type3:")
+				parts = append(parts, "}")
+				parts = append(parts, ":")
 				hash := sha256.New()
-				hash.Write([]byte(builder.String()))
+				hash.Write([]byte(strings.Join(parts, "")))
 				return hex.EncodeToString(hash.Sum(nil))
 			}(),
 		},
@@ -1012,10 +1024,11 @@ func TestPipeline_GetCompatibilityHash(t *testing.T) {
 				Assets: []*pipeline.Asset{},
 			},
 			expected: func() string {
-				var builder strings.Builder
-				builder.WriteString("PipelineName:empty-pipeline;Assets:")
+				var parts []string
+				parts = append(parts, "empty-pipeline")
+				parts = append(parts, ":")
 				hash := sha256.New()
-				hash.Write([]byte(builder.String()))
+				hash.Write([]byte(strings.Join(parts, "")))
 				return hex.EncodeToString(hash.Sum(nil))
 			}(),
 		},

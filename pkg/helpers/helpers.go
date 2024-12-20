@@ -8,9 +8,11 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 )
 
 func GetIngestrDestinationType(asset *pipeline.Asset) (pipeline.AssetType, error) {
@@ -88,20 +90,75 @@ func CastResultToInteger(res [][]interface{}) (int64, error) {
 	return 0, errors.Errorf("unexpected result from query during, cannot cast result to integer: %v", res)
 }
 
-func WriteJSONToFile(data interface{}, filename string) error {
+func WriteJSONToFile(fs afero.Fs, data interface{}, filename string) error {
 	file, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return err
 	}
-	if _, err := os.Stat(filepath.Dir(filename)); os.IsNotExist(err) {
-		err := os.MkdirAll(filepath.Dir(filename), 0o755)
+	if _, err := fs.Stat(filepath.Dir(filename)); os.IsNotExist(err) {
+		err := fs.MkdirAll(filepath.Dir(filename), 0o755)
 		if err != nil {
 			return err
 		}
 	}
-	err = os.WriteFile(filename, file, 0o600)
+	err = afero.WriteFile(fs, filename, file, 0o600)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func ReadJSONToFile(fs afero.Fs, filename string, v interface{}) error {
+	file, err := fs.Open(filename)
+	if err != nil {
+		return err
+	}
+
+	decoder := json.NewDecoder(file)
+	err = decoder.Decode(v)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func GetAllFilesInDir(fs afero.Fs, dir string) ([]string, error) {
+	filesInfo, err := afero.ReadDir(fs, dir)
+	if err != nil {
+		return nil, err
+	}
+
+	files := make([]string, 0, len(filesInfo)) // Pre-allocate the slice
+	for _, fileInfo := range filesInfo {
+		files = append(files, filepath.Join(dir, fileInfo.Name()))
+	}
+	return files, nil
+}
+
+func GetLatestFileInDir(fs afero.Fs, dir string) (string, error) {
+	files, err := GetAllFilesInDir(fs, dir)
+	if err != nil {
+		return "", err
+	}
+
+	var latestFile string
+	var latestModTime time.Time
+
+	for _, file := range files {
+		info, err := fs.Stat(file)
+		if err != nil {
+			return "", err
+		}
+
+		if info.ModTime().After(latestModTime) {
+			latestModTime = info.ModTime()
+			latestFile = file
+		}
+	}
+
+	if latestFile == "" {
+		return "", errors.New("no files found in directory")
+	}
+	return latestFile, nil
 }

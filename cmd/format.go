@@ -200,7 +200,7 @@ func shouldFileChange(path string) (bool, error) {
 	normalizedNewContent := normalizeLineEndings(newContent)
 
 	// Restore the original content to the file
-	err = afero.WriteFile(fs, path, originalContent, 0644)
+	err = afero.WriteFile(fs, path, originalContent, 0o644)
 	if err != nil {
 		return false, errors2.Wrap(err, "failed to restore original content")
 	}

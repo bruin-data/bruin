@@ -1,10 +1,16 @@
 package scheduler
 
 import (
+	"path/filepath"
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/version"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
@@ -542,4 +548,89 @@ func TestScheduler_FindMajorityOfTypes(t *testing.T) {
 	// if they are in equal counts, the default should be preferred
 	assert.Equal(t, pipeline.AssetType("bq.sql"), s.FindMajorityOfTypes("bq.sql"))
 	assert.Equal(t, pipeline.AssetType("sf.sql"), s.FindMajorityOfTypes("sf.sql"))
+}
+
+func TestScheduler_RestoreState(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+
+	stateFilePath := "logs/runs"
+	stateContent := `{"someKey": "someValue"}`
+
+	foundPipeline := &pipeline.Pipeline{
+		Name: "test",
+		Assets: []*pipeline.Asset{
+			{
+				Name: "task1",
+				Type: "bq.sql",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task2"},
+				},
+			},
+			{
+				Name:      "task2",
+				Type:      "bq.sql",
+				Upstreams: []pipeline.Upstream{},
+			},
+		},
+	}
+	err := afero.WriteFile(fs, filepath.Join(stateFilePath, "2024_12_19_22_59_13.json"), []byte(stateContent), 0o644)
+	require.NoError(t, err, "failed to write mock state file")
+
+	s := NewScheduler(zap.NewNop().Sugar(), foundPipeline, "2024_12_19_22_59_13")
+
+	err = s.SavePipelineState(fs, &RunConfig{
+		Tag:          "test",
+		Only:         []string{"bq.sql"},
+		PushMetadata: true,
+		ExcludeTag:   "exclude",
+		StartDate:    time.Now().AddDate(0, 0, -1).Format("2006-01-02"),
+		EndDate:      time.Now().Format("2006-01-02"),
+	}, "2024_12_19_22_59_13", stateFilePath)
+	require.NoError(t, err, "SavePipelineState should not return an error")
+
+	pipelineState, err := ReadState(fs, stateFilePath)
+	require.NoError(t, err, "RestoreState should not return an error")
+
+	err = s.RestoreState(pipelineState)
+	require.Error(t, err, "unknown status: pending. Please report this issue at https://github.com/bruin-data/bruin/issues/new")
+
+	expectedState := &PipelineState{
+		Parameters: RunConfig{
+			Tag:          "test",
+			Only:         []string{"bq.sql"},
+			PushMetadata: true,
+			ExcludeTag:   "exclude",
+			StartDate:    time.Now().AddDate(0, 0, -1).Format("2006-01-02"),
+			EndDate:      time.Now().Format("2006-01-02"),
+		},
+		Metadata: Metadata{
+			Version: version.Version,
+			OS:      runtime.GOOS,
+		},
+		State: []*PipelineAssetState{
+			{
+				Name:   "task2",
+				Status: Pending.String(),
+			},
+			{
+				Name:   "task1",
+				Status: Pending.String(),
+			},
+		},
+		Version:           "1.0.0",
+		RunID:             "2024_12_19_22_59_13",
+		CompatibilityHash: foundPipeline.GetCompatibilityHash(),
+	}
+
+	assert.Equal(t, expectedState.Metadata, pipelineState.Metadata, "Metadata should match")
+	assert.Equal(t, expectedState.Metadata, pipelineState.Metadata, "Metadata should match")
+
+	assert.Equal(t, expectedState.Version, pipelineState.Version, "Version should match")
+	assert.Equal(t, expectedState.RunID, pipelineState.RunID, "RunID should match")
+	assert.Equal(t, expectedState.CompatibilityHash, pipelineState.CompatibilityHash, "CompatibilityHash should match")
+	assert.Equal(t, expectedState.CompatibilityHash, pipelineState.CompatibilityHash, "CompatibilityHash should match")
+	assert.Equal(t, expectedState.RunID, pipelineState.RunID, "RunID should match")
+	assert.Equal(t, expectedState.Version, pipelineState.Version, "Version should match")
 }
