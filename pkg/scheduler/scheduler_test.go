@@ -580,7 +580,7 @@ func TestScheduler_RestoreState(t *testing.T) {
 
 	s := NewScheduler(zap.NewNop().Sugar(), foundPipeline, "2024_12_19_22_59_13")
 
-	err = s.SavePipelineState(fs, RunConfig{
+	err = s.SavePipelineState(fs, &RunConfig{
 		Tag:          "test",
 		Only:         []string{"bq.sql"},
 		PushMetadata: true,

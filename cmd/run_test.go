@@ -1117,7 +1117,7 @@ func TestValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel() // Enable parallel execution for individual test cases
-			startDate, endDate, path, err := Validation(tt.runConfig, tt.inputPath, logger)
+			startDate, endDate, path, err := ValidateRunConfig(tt.runConfig, tt.inputPath, logger)
 
 			if tt.expectError {
 				require.Error(t, err)

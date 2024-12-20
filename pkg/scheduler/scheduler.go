@@ -712,7 +712,7 @@ func (s *Scheduler) hasPipelineFinished() bool {
 	return true
 }
 
-func (s *Scheduler) SavePipelineState(fs afero.Fs, param RunConfig, runID, statePath string) error {
+func (s *Scheduler) SavePipelineState(fs afero.Fs, param *RunConfig, runID, statePath string) error {
 	state := make([]*PipelineAssetState, 0)
 	dict := make(map[string][]TaskInstanceStatus)
 	for _, task := range s.taskInstances {
@@ -728,7 +728,7 @@ func (s *Scheduler) SavePipelineState(fs afero.Fs, param RunConfig, runID, state
 	}
 
 	pipelineState := &PipelineState{
-		Parameters: param,
+		Parameters: *param,
 		Metadata: Metadata{
 			Version: version.Version,
 			OS:      runtime.GOOS,

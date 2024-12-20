@@ -48,6 +48,13 @@ import (
 
 const LogsFolder = "logs"
 
+type PipelineInfo struct {
+	Pipeline           *pipeline.Pipeline
+	RunningForAnAsset  bool
+	RunDownstreamTasks bool
+	Config             *config.Config
+}
+
 var (
 	yesterday        = time.Now().AddDate(0, 0, -1)
 	defaultStartDate = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
@@ -166,14 +173,20 @@ func Run(isDebug *bool) *cli.Command {
 			var startDate, endDate time.Time
 
 			var err error
-			startDate, endDate, inputPath, err := Validation(runConfig, c.Args().Get(0), logger)
+			startDate, endDate, inputPath, err := ValidateRunConfig(runConfig, c.Args().Get(0), logger)
 			if err != nil {
 				return err
 			}
 
-			foundPipeline, runDownstreamTasks, runningForAnAsset, cm, err := GetPipeline(inputPath, runConfig, logger)
+			pipelineInfo, err := GetPipeline(inputPath, runConfig, logger)
 			if err != nil {
 				return err
+			}
+			foundPipeline := pipelineInfo.Pipeline
+
+			if runConfig.Downstream {
+				infoPrinter.Println("The downstream tasks will be executed as well.")
+				pipelineInfo.RunDownstreamTasks = true
 			}
 
 			repoRoot, err := git.FindRepoFromPath(inputPath)
@@ -183,7 +196,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			var task *pipeline.Asset
-			if runningForAnAsset {
+			if pipelineInfo.RunningForAnAsset {
 				task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath)
 				if err != nil {
 					errorPrinter.Printf("Failed to build asset: %v\n", err)
@@ -191,12 +204,12 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			}
 
-			err = switchEnvironment(c, cm, os.Stdin)
+			err = switchEnvironment(c, pipelineInfo.Config, os.Stdin)
 			if err != nil {
 				return err
 			}
 
-			connectionManager, errs := connection.NewManagerFromConfig(cm)
+			connectionManager, errs := connection.NewManagerFromConfig(pipelineInfo.Config)
 			if len(errs) > 0 {
 				printErrors(errs, c.String("output"), "Failed to register connections")
 				return cli.Exit("", 1)
@@ -206,7 +219,7 @@ func Run(isDebug *bool) *cli.Command {
 			runID := time.Now().Format("2006_01_02_15_04_05")
 			if !runConfig.NoLogFile {
 				logFileName := fmt.Sprintf("%s__%s", runID, foundPipeline.Name)
-				if runningForAnAsset {
+				if pipelineInfo.RunningForAnAsset {
 					logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, task.Name)
 				}
 
@@ -233,7 +246,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 			infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", foundPipeline.Name, len(foundPipeline.Assets))
 
-			if runningForAnAsset {
+			if pipelineInfo.RunningForAnAsset {
 				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
 			}
 
@@ -251,7 +264,7 @@ func Run(isDebug *bool) *cli.Command {
 			filter := &Filter{
 				IncludeTag:        runConfig.Tag,
 				OnlyTaskTypes:     runConfig.Only,
-				IncludeDownstream: runDownstreamTasks,
+				IncludeDownstream: pipelineInfo.RunDownstreamTasks,
 				PushMetaData:      runConfig.PushMetadata,
 				SingleTask:        task,
 				ExcludeTag:        runConfig.ExcludeTag,
@@ -303,7 +316,7 @@ func Run(isDebug *bool) *cli.Command {
 			infoPrinter.Printf("\nStarting the pipeline execution...\n")
 			infoPrinter.Println()
 
-			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UseUV)
+			mainExecutors, err := setupExecutors(s, pipelineInfo.Config, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UseUV)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -328,7 +341,7 @@ func Run(isDebug *bool) *cli.Command {
 			results := s.Run(runCtx)
 			duration := time.Since(start)
 
-			if err := s.SavePipelineState(afero.NewOsFs(), *runConfig, runID, statePath); err != nil {
+			if err := s.SavePipelineState(afero.NewOsFs(), runConfig, runID, statePath); err != nil {
 				logger.Error("failed to save pipeline state", zap.Error(err))
 			}
 
@@ -358,30 +371,25 @@ func ReadState(fs afero.Fs, statePath string, filter *Filter) (*scheduler.Pipeli
 		errorPrinter.Printf("Failed to restore state: %v\n", err)
 		return nil, err
 	}
-
 	filter.IncludeTag = pipelineState.Parameters.Tag
-
 	filter.OnlyTaskTypes = pipelineState.Parameters.Only
-
 	filter.PushMetaData = pipelineState.Parameters.PushMetadata
-
 	filter.ExcludeTag = pipelineState.Parameters.ExcludeTag
-
 	return pipelineState, nil
 }
 
-func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.SugaredLogger) (*pipeline.Pipeline, bool, bool, *config.Config, error) {
+func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.SugaredLogger) (*PipelineInfo, error) {
 	pipelinePath := inputPath
 	repoRoot, err := git.FindRepoFromPath(inputPath)
 	if err != nil {
 		errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
-		return nil, false, false, nil, err
+		return nil, err
 	}
 
 	runningForAnAsset := isPathReferencingAsset(inputPath)
 	if runningForAnAsset && runConfig.Tag != "" {
 		errorPrinter.Printf("You cannot use the '--tag' flag when running a single asset.\n")
-		return nil, false, false, nil, err
+		return nil, err
 	}
 
 	var task *pipeline.Asset
@@ -390,26 +398,28 @@ func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.S
 		task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath)
 		if err != nil {
 			errorPrinter.Printf("Failed to build asset: %v. Are you sure you used the correct path?\n", err.Error())
-
-			return nil, runDownstreamTasks, runningForAnAsset, nil, err
+			return &PipelineInfo{
+				RunningForAnAsset:  runningForAnAsset,
+				RunDownstreamTasks: runDownstreamTasks,
+			}, err
 		}
 		if task == nil {
 			errorPrinter.Printf("The given file path doesn't seem to be a Bruin task definition: '%s'\n", inputPath)
-			return nil, runDownstreamTasks, runningForAnAsset, nil, err
+			return &PipelineInfo{
+				RunningForAnAsset:  runningForAnAsset,
+				RunDownstreamTasks: runDownstreamTasks,
+			}, err
 		}
 
 		pipelinePath, err = path.GetPipelineRootFromTask(inputPath, pipelineDefinitionFiles)
 		if err != nil {
 			errorPrinter.Printf("Failed to find the pipeline this task belongs to: '%s'\n", inputPath)
-			return nil, runDownstreamTasks, runningForAnAsset, nil, err
-		}
-
-		if runConfig.Downstream {
-			infoPrinter.Println("The downstream tasks will be executed as well.")
-			runDownstreamTasks = true
+			return &PipelineInfo{
+				RunningForAnAsset:  runningForAnAsset,
+				RunDownstreamTasks: runDownstreamTasks,
+			}, err
 		}
 	}
-
 	if !runningForAnAsset && runConfig.Downstream {
 		infoPrinter.Println("Ignoring the '--downstream' flag since you are running the whole pipeline")
 	}
@@ -418,7 +428,11 @@ func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.S
 	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
 	if err != nil {
 		errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
-		return nil, runDownstreamTasks, runningForAnAsset, cm, err
+		return &PipelineInfo{
+			RunningForAnAsset:  runningForAnAsset,
+			RunDownstreamTasks: runDownstreamTasks,
+			Config:             cm,
+		}, err
 	}
 
 	logger.Debugf("loaded the config from path '%s'", configFilePath)
@@ -428,10 +442,20 @@ func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.S
 		errorPrinter.Println("failed to build pipeline, are you sure you have referred the right path?")
 		errorPrinter.Println("\nHint: You need to run this command with a path to either the pipeline directory or the asset file itself directly.")
 
-		return nil, runDownstreamTasks, runningForAnAsset, cm, err
+		return &PipelineInfo{
+			Pipeline:           foundPipeline,
+			RunningForAnAsset:  runningForAnAsset,
+			RunDownstreamTasks: runDownstreamTasks,
+			Config:             cm,
+		}, err
 	}
 
-	return foundPipeline, runDownstreamTasks, runningForAnAsset, cm, err
+	return &PipelineInfo{
+		Pipeline:           foundPipeline,
+		RunningForAnAsset:  runningForAnAsset,
+		RunDownstreamTasks: runDownstreamTasks,
+		Config:             cm,
+	}, nil
 }
 
 func ParseDate(startDateStr, endDateStr string, logger *zap.SugaredLogger) (time.Time, time.Time, error) {
@@ -458,7 +482,7 @@ func ParseDate(startDateStr, endDateStr string, logger *zap.SugaredLogger) (time
 	return startDate, endDate, nil
 }
 
-func Validation(runConfig *scheduler.RunConfig, inputPath string, logger *zap.SugaredLogger) (time.Time, time.Time, string, error) {
+func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger *zap.SugaredLogger) (time.Time, time.Time, string, error) {
 	if inputPath == "" {
 		return time.Now(), time.Now(), "", errors.New("please give a task or pipeline path: bruin run <path to the task definition>)")
 	}
