@@ -1874,6 +1874,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 		})
 	}
 
+	for _, conn := range cm.SelectedEnvironment.Connections.DynamoDB {
+		wg.Go(func() {
+			err := connectionManager.AddDynamoDBConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add dynamodb connection '%s'", conn.Name))
+			}
+		})
+	}
+
 	for _, conn := range cm.SelectedEnvironment.Connections.Zendesk {
 		wg.Go(func() {
 			err := connectionManager.AddZendeskConnectionFromConfig(&conn)
