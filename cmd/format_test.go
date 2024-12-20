@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,9 +11,12 @@ import (
 
 func TestCheckLint(t *testing.T) {
 	t.Parallel() // Enables parallel execution for the entire test
-
-	// Base directory for test assets
-	testDataDir := "testdata/unformatted-pipeline/assets"
+	var testDatadir string
+	if runtime.GOOS == "windows" {
+		testDatadir = "testdata\\unformatted-pipeline\\assets"
+	} else {
+		testDatadir = "testdata/unformatted-pipeline/assets"
+	}
 
 	tests := []struct {
 		name          string
@@ -22,13 +26,13 @@ func TestCheckLint(t *testing.T) {
 	}{
 		{
 			name:          "Valid Asset",
-			assetFilePath: filepath.Join(testDataDir, "valid_asset.sql"),
+			assetFilePath: filepath.Join(testDatadir, "valid_asset.sql"),
 			expectError:   false,
 			expectChange:  false,
 		},
 		{
 			name:          "Needs Reformatting",
-			assetFilePath: filepath.Join(testDataDir, "needs_reformatting.sql"),
+			assetFilePath: filepath.Join(testDatadir, "needs_reformatting.sql"),
 			expectError:   false,
 			expectChange:  true,
 		},
