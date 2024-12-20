@@ -13,6 +13,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/version"
 	"github.com/google/uuid"
+	"github.com/spf13/afero"
 	"go.uber.org/zap"
 )
 
@@ -693,7 +694,7 @@ func (s *Scheduler) hasPipelineFinished() bool {
 	return true
 }
 
-func (s *Scheduler) SavePipelineState(param map[string]string, runID, statePath string) error {
+func (s *Scheduler) SavePipelineState(fs afero.Fs, param map[string]string, runID, statePath string) error {
 	state := make([]*PipelineAssetState, 0)
 	dict := make(map[string][]TaskInstanceStatus)
 	for _, task := range s.taskInstances {
@@ -720,21 +721,21 @@ func (s *Scheduler) SavePipelineState(param map[string]string, runID, statePath 
 		RunID:             runID,
 		CompatibilityHash: s.pipeline.GetCompatibilityHash(),
 	}
-	if err := helpers.WriteJSONToFile(pipelineState, statePath); err != nil {
+	if err := helpers.WriteJSONToFile(fs, pipelineState, statePath); err != nil {
 		s.logger.Error("failed to write pipeline state to file", zap.Error(err))
 		return err
 	}
 	return nil
 }
 
-func (s *Scheduler) RestoreState(statePath string) (*PipelineState, error) {
-	latestRunID, err := helpers.GetLatestFileInDir(statePath)
+func (s *Scheduler) RestoreState(fs afero.Fs, statePath string) (*PipelineState, error) {
+	latestRunID, err := helpers.GetLatestFileInDir(fs, statePath)
 	if err != nil {
 		s.logger.Error("failed to get latest run id", zap.Error(err))
 		return nil, err
 	}
 	pipelineState := &PipelineState{}
-	if err := helpers.ReadJSONToFile(latestRunID, pipelineState); err != nil {
+	if err := helpers.ReadJSONToFile(fs, latestRunID, pipelineState); err != nil {
 		s.logger.Error("failed to read pipeline state from file", zap.Error(err))
 		return nil, err
 	}

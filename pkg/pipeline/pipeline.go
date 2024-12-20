@@ -939,31 +939,19 @@ type Pipeline struct {
 }
 
 func (p *Pipeline) GetCompatibilityHash() string {
-	var builder strings.Builder
-	builder.WriteString("PipelineName:")
-	builder.WriteString(p.Name)
-	builder.WriteString(";Assets:")
-
+	var parts []string
+	parts = append(parts, p.Name)
 	for _, asset := range p.Assets {
-		builder.WriteString("{AssetName:")
-		builder.WriteString(asset.Name)
-		builder.WriteString(";Upstreams:[")
-
-		for i, upstream := range asset.Upstreams {
-			builder.WriteString("{Value:")
-			builder.WriteString(upstream.Value)
-			builder.WriteString(";Type:")
-			builder.WriteString(upstream.Type)
-			builder.WriteString("}")
-			if i < len(asset.Upstreams)-1 {
-				builder.WriteString(",")
-			}
+		assetPart := fmt.Sprintf(":%s{", asset.Name)
+		for _, upstream := range asset.Upstreams {
+			assetPart += fmt.Sprintf(":%s:%s:", upstream.Value, upstream.Type)
 		}
-		builder.WriteString("]}")
+		assetPart += "}"
+		parts = append(parts, assetPart)
 	}
-
+	parts = append(parts, ":")
 	hash := sha256.New()
-	hash.Write([]byte(builder.String()))
+	hash.Write([]byte(strings.Join(parts, "")))
 	return hex.EncodeToString(hash.Sum(nil))
 }
 

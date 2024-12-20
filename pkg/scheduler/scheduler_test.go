@@ -1,9 +1,12 @@
 package scheduler
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/version"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -542,4 +545,55 @@ func TestScheduler_FindMajorityOfTypes(t *testing.T) {
 	// if they are in equal counts, the default should be preferred
 	assert.Equal(t, pipeline.AssetType("bq.sql"), s.FindMajorityOfTypes("bq.sql"))
 	assert.Equal(t, pipeline.AssetType("sf.sql"), s.FindMajorityOfTypes("sf.sql"))
+}
+
+func TestScheduler_RestoreState(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+
+	stateFilePath := "logs/runs"
+	stateContent := `{"someKey": "someValue"}`
+
+	foundPipeline := &pipeline.Pipeline{
+		Name: "test",
+		Assets: []*pipeline.Asset{
+			{
+				Name: "task1",
+				Type: "bq.sql",
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "task2"},
+				},
+			},
+			{
+				Name:      "task2",
+				Type:      "bq.sql",
+				Upstreams: []pipeline.Upstream{},
+			},
+		},
+	}
+	err := afero.WriteFile(fs, filepath.Join(stateFilePath, "2024_12_19_22_59_13.json"), []byte(stateContent), 0644)
+	assert.NoError(t, err, "failed to write mock state file")
+
+	s := NewScheduler(zap.NewNop().Sugar(), foundPipeline, "2024_12_19_22_59_13")
+
+	err = s.SavePipelineState(fs, map[string]string{"someKey": "someValue"}, "2024_12_19_22_59_13", stateFilePath)
+	assert.NoError(t, err, "SavePipelineState should not return an error")
+
+	pipelineState, err := s.RestoreState(fs, stateFilePath)
+	assert.NoError(t, err, "RestoreState should not return an error")
+
+	expectedState := &PipelineState{
+		Parameters: map[string]string{"someKey": "someValue"},
+		Metadata: Metadata{
+			Version: version.Version,
+			OS:      "darwin",
+		},
+		State:             []*PipelineAssetState{},
+		Version:           "1.0.0",
+		RunID:             "2024_12_19_22_59_13",
+		CompatibilityHash: foundPipeline.GetCompatibilityHash(),
+	}
+
+	assert.Equal(t, expectedState, pipelineState, "restored state does not match expected state")
 }
