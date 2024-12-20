@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/version"
@@ -579,7 +580,14 @@ func TestScheduler_RestoreState(t *testing.T) {
 
 	s := NewScheduler(zap.NewNop().Sugar(), foundPipeline, "2024_12_19_22_59_13")
 
-	err = s.SavePipelineState(fs, map[string]string{"someKey": "someValue"}, "2024_12_19_22_59_13", stateFilePath)
+	err = s.SavePipelineState(fs, RunConfig{
+		Tag:          "test",
+		Only:         []string{"bq.sql"},
+		PushMetadata: true,
+		ExcludeTag:   "exclude",
+		StartDate:    time.Now().AddDate(0, 0, -1),
+		EndDate:      time.Now(),
+	}, "2024_12_19_22_59_13", stateFilePath)
 	require.NoError(t, err, "SavePipelineState should not return an error")
 
 	pipelineState, err := ReadState(fs, stateFilePath)
@@ -589,7 +597,14 @@ func TestScheduler_RestoreState(t *testing.T) {
 	require.Error(t, err, "unknown status: pending. Please report this issue at https://github.com/bruin-data/bruin/issues/new")
 
 	expectedState := &PipelineState{
-		Parameters: map[string]string{"someKey": "someValue"},
+		Parameters: RunConfig{
+			Tag:          "test",
+			Only:         []string{"bq.sql"},
+			PushMetadata: true,
+			ExcludeTag:   "exclude",
+			StartDate:    time.Now().AddDate(0, 0, -1),
+			EndDate:      time.Now(),
+		},
 		Metadata: Metadata{
 			Version: version.Version,
 			OS:      runtime.GOOS,
@@ -609,9 +624,12 @@ func TestScheduler_RestoreState(t *testing.T) {
 		CompatibilityHash: foundPipeline.GetCompatibilityHash(),
 	}
 
-	assert.Equal(t, expectedState.Parameters, pipelineState.Parameters, "Parameters should match")
+	assert.Equal(t, expectedState.Metadata, pipelineState.Metadata, "Metadata should match")
 	assert.Equal(t, expectedState.Metadata, pipelineState.Metadata, "Metadata should match")
 
+	assert.Equal(t, expectedState.Version, pipelineState.Version, "Version should match")
+	assert.Equal(t, expectedState.RunID, pipelineState.RunID, "RunID should match")
+	assert.Equal(t, expectedState.CompatibilityHash, pipelineState.CompatibilityHash, "CompatibilityHash should match")
 	assert.Equal(t, expectedState.CompatibilityHash, pipelineState.CompatibilityHash, "CompatibilityHash should match")
 	assert.Equal(t, expectedState.RunID, pipelineState.RunID, "RunID should match")
 	assert.Equal(t, expectedState.Version, pipelineState.Version, "Version should match")

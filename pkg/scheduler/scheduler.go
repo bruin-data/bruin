@@ -114,13 +114,29 @@ type TaskInstance interface {
 }
 
 type PipelineState struct {
-	Parameters        map[string]string     `json:"parameters"`
+	Parameters        RunConfig             `json:"parameters"`
 	Metadata          Metadata              `json:"metadata"`
 	State             []*PipelineAssetState `json:"state"`
 	Version           string                `json:"version"`
 	TimeStamp         time.Time             `json:"timestamp"`
 	RunID             string                `json:"run_id"`
 	CompatibilityHash string                `json:"compatibility_hash"`
+}
+
+type RunConfig struct {
+	Downstream   bool      `json:"downstream"`
+	StartDate    time.Time `json:"startDate"`
+	EndDate      time.Time `json:"endDate"`
+	Workers      int       `json:"workers"`
+	Environment  string    `json:"environment"`
+	Force        bool      `json:"force"`
+	PushMetadata bool      `json:"pushMetadata"`
+	NoLogFile    bool      `json:"noLogFile"`
+	FullRefresh  bool      `json:"fullRefresh"`
+	UseUV        bool      `json:"useUV"`
+	Tag          string    `json:"tag"`
+	ExcludeTag   string    `json:"excludeTag"`
+	Only         []string  `json:"only"`
 }
 
 type PipelineAssetState struct {
@@ -696,7 +712,7 @@ func (s *Scheduler) hasPipelineFinished() bool {
 	return true
 }
 
-func (s *Scheduler) SavePipelineState(fs afero.Fs, param map[string]string, runID, statePath string) error {
+func (s *Scheduler) SavePipelineState(fs afero.Fs, param RunConfig, runID, statePath string) error {
 	state := make([]*PipelineAssetState, 0)
 	dict := make(map[string][]TaskInstanceStatus)
 	for _, task := range s.taskInstances {
