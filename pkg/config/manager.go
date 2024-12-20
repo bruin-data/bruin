@@ -49,6 +49,7 @@ type Connections struct {
 	S3                  []S3Connection                  `yaml:"s3,omitempty" json:"s3,omitempty" mapstructure:"s3"`
 	Slack               []SlackConnection               `yaml:"slack,omitempty" json:"slack,omitempty" mapstructure:"slack"`
 	Asana               []AsanaConnection               `yaml:"asana,omitempty" json:"asana,omitempty" mapstructure:"asana"`
+	DynamoDB            []DynamoDBConnection            `yaml:"dynamodb,omitempty" json:"dynamodb,omitempty" mapstructure:"dynamodb"`
 
 	byKey       map[string]any
 	typeNameMap map[string]string
@@ -239,6 +240,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.Asana {
 		c.byKey[conn.Name] = &(c.Asana[i])
 		c.typeNameMap[conn.Name] = "asana"
+	}
+
+	for i, conn := range c.DynamoDB {
+		c.byKey[conn.Name] = &(c.DynamoDB[i])
+		c.typeNameMap[conn.Name] = "dynamodb"
 	}
 }
 
@@ -648,6 +654,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Asana = append(env.Connections.Asana, conn)
+	case "dynamodb":
+		var conn DynamoDBConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.DynamoDB = append(env.Connections.DynamoDB, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -741,6 +754,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.DuckDB = removeConnection(env.Connections.DuckDB, connectionName)
 	case "asana":
 		env.Connections.Asana = removeConnection(env.Connections.Asana, connectionName)
+	case "dynamodb":
+		env.Connections.DynamoDB = removeConnection(env.Connections.DynamoDB, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
