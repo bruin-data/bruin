@@ -49,6 +49,7 @@ linters:
     - tagalign
     - gocyclo
     - exportloopref
+    - godox
   presets:
     - bugs
     - comment
