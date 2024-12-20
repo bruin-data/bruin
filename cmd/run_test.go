@@ -2,12 +2,15 @@ package cmd
 
 import (
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 )
 
 func TestClean(t *testing.T) {
@@ -1002,6 +1005,169 @@ func TestApplyFilters(t *testing.T) {
 					assert.Contains(t, taskNames, name)
 				}
 			}
+		})
+	}
+}
+
+func TestParseDate(t *testing.T) {
+	t.Parallel() // Enable parallel execution for the top-level test
+	tests := []struct {
+		name          string
+		startDateStr  string
+		endDateStr    string
+		expectError   bool
+		expectedStart time.Time
+		expectedEnd   time.Time
+	}{
+		{
+			name:          "Valid Dates",
+			startDateStr:  "2023-12-01",
+			endDateStr:    "2023-12-31",
+			expectError:   false,
+			expectedStart: time.Date(2023, 12, 1, 0, 0, 0, 0, time.UTC),
+			expectedEnd:   time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:         "Invalid Start Date",
+			startDateStr: "invalid-date",
+			endDateStr:   "2023-12-31",
+			expectError:  true,
+		},
+		{
+			name:         "Invalid End Date",
+			startDateStr: "2023-12-01",
+			endDateStr:   "invalid-date",
+			expectError:  true,
+		},
+		{
+			name:          "Valid Date with Time",
+			startDateStr:  "2023-12-01 15:04:05",
+			endDateStr:    "2023-12-31 23:59:59",
+			expectError:   false,
+			expectedStart: time.Date(2023, 12, 1, 15, 4, 5, 0, time.UTC),
+			expectedEnd:   time.Date(2023, 12, 31, 23, 59, 59, 0, time.UTC),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel() // Enable parallel execution for individual test cases
+			logger := zaptest.NewLogger(t).Sugar()
+			startDate, endDate, err := ParseDate(tt.startDateStr, tt.endDateStr, logger)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedStart, startDate)
+				assert.Equal(t, tt.expectedEnd, endDate)
+			}
+		})
+	}
+}
+
+func TestValidation(t *testing.T) {
+	t.Parallel() // Enable parallel execution for the top-level test
+	logger := zaptest.NewLogger(t).Sugar()
+
+	tests := []struct {
+		name          string
+		runConfig     *scheduler.RunConfig
+		inputPath     string
+		expectError   bool
+		expectedError string
+	}{
+		{
+			name:          "Empty Input Path",
+			runConfig:     &scheduler.RunConfig{},
+			inputPath:     "",
+			expectError:   true,
+			expectedError: "please give a task or pipeline path: bruin run <path to the task definition>)",
+		},
+		{
+			name: "Invalid Start Date",
+			runConfig: &scheduler.RunConfig{
+				StartDate: "invalid-date",
+				EndDate:   "2023-12-31",
+			},
+			inputPath:   "some/path",
+			expectError: true,
+		},
+		{
+			name: "Invalid End Date",
+			runConfig: &scheduler.RunConfig{
+				StartDate: "2023-12-01",
+				EndDate:   "invalid-date",
+			},
+			inputPath:   "some/path",
+			expectError: true,
+		},
+		{
+			name: "Valid Input",
+			runConfig: &scheduler.RunConfig{
+				StartDate: "2023-12-01",
+				EndDate:   "2023-12-31",
+			},
+			inputPath:   "some/path",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel() // Enable parallel execution for individual test cases
+			startDate, endDate, path, err := Validation(tt.runConfig, tt.inputPath, logger)
+
+			if tt.expectError {
+				require.Error(t, err)
+				if tt.expectedError != "" {
+					require.EqualError(t, err, tt.expectedError)
+				}
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, time.Date(2023, 12, 1, 0, 0, 0, 0, time.UTC), startDate)
+				assert.Equal(t, time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC), endDate)
+				assert.Equal(t, tt.inputPath, path)
+			}
+		})
+	}
+}
+
+func TestCheckLint(t *testing.T) {
+	t.Parallel() // Enable parallel execution for the top-level test
+	tests := []struct {
+		name          string
+		foundPipeline *pipeline.Pipeline
+		pipelinePath  string
+	}{
+		{
+			name: "Lint Rule Error",
+			foundPipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+			},
+			pipelinePath: "path/to/pipeline",
+		},
+		{
+			name: "Linting Error",
+
+			foundPipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+			},
+			pipelinePath: "path/to/pipeline",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel() // Enable parallel execution for individual test cases
+			logger := zaptest.NewLogger(t).Sugar()
+			parser, err := sqlparser.NewSQLParser(false)
+			if err != nil {
+				require.Error(t, err, "Expected an error but got none")
+			}
+			err = CheckLint(parser, tt.foundPipeline, tt.pipelinePath, logger)
+
+			require.NoError(t, err, "Expected no error but got one")
 		})
 	}
 }
