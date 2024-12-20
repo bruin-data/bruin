@@ -164,7 +164,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			var startDate, endDate time.Time
-			var inputPath string
+			var inputPath = c.Args().Get(0)
 			if !c.Bool("continue") {
 				var err error
 				startDate, endDate, inputPath, err = Validation(runConfig, c.Args().Get(0), logger)
