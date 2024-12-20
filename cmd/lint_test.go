@@ -13,18 +13,15 @@ func BenchmarkLint(b *testing.B) {
 	isDebug := false
 	app := cli.NewApp()
 
-	b.ReportAllocs()
-	b.ResetTimer()
-
 	for i := 0; i < b.N; i++ {
-		b.StartTimer()
+		b.ResetTimer()
+		start := time.Now()
 		if err := Lint(&isDebug).Run(cli.NewContext(app, nil, nil), "./testdata/lineage"); err != nil {
 			b.Fatalf("Failed to run Lint command: %v", err)
 		}
 		b.StopTimer()
-		elapsed := b.Elapsed()
-		if elapsed > 100*time.Millisecond {
-			b.Fatalf("Benchmark took too long: %v", elapsed)
+		if time.Since(start) > 100*time.Millisecond {
+			b.Fatalf("Benchmark took longer than 100ms")
 		}
 	}
 }
