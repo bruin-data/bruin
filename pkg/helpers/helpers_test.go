@@ -2,10 +2,12 @@ package helpers
 
 import (
 	"encoding/json"
-	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -62,7 +64,7 @@ func TestGetIngestrDestinationType(t *testing.T) {
 	}
 }
 
-func Test_WriteJSONToFile(t *testing.T) {
+func TestWriteJSONToFile(t *testing.T) {
 	t.Parallel()
 
 	type testData struct {
@@ -77,24 +79,80 @@ func Test_WriteJSONToFile(t *testing.T) {
 
 	filename := "test_output.json"
 
-	// Call the function with the actual filesystem
-	err := WriteJSONToFile(data, filename)
-	require.NoError(t, err)
+	fs := afero.NewMemMapFs()
 
-	// Verify the file exists in the actual filesystem
-	_, err = os.Stat(filename)
-	require.NoError(t, err)
+	err := WriteJSONToFile(fs, data, filename)
+	require.NoError(t, err, "WriteJSONToFileWithFs should not return an error")
 
-	// Read the file and verify its contents
-	fileContent, err := os.ReadFile(filename)
-	require.NoError(t, err)
+	_, err = fs.Stat(filename)
+	require.NoError(t, err, "File should exist after writing")
+
+	fileContent, err := afero.ReadFile(fs, filename)
+	require.NoError(t, err, "Should be able to read the file")
 
 	expectedContent, err := json.MarshalIndent(data, "", "  ")
-	require.NoError(t, err)
+	require.NoError(t, err, "Should be able to marshal expected data")
 
-	assert.Equal(t, string(expectedContent), string(fileContent))
+	assert.Equal(t, string(expectedContent), string(fileContent), "File content should match expected JSON")
+}
 
-	// Clean up the file after test
-	err = os.Remove(filename)
-	require.NoError(t, err)
+func TestReadJSONToFile(t *testing.T) {
+	t.Parallel()
+
+	type testData struct {
+		Name  string `json:"name"`
+		Value int    `json:"value"`
+	}
+
+	expectedData := testData{
+		Name:  "Test",
+		Value: 123,
+	}
+
+	filename := "test_input.json"
+
+	fs := afero.NewMemMapFs()
+
+	fileContent, err := json.MarshalIndent(expectedData, "", "  ")
+	require.NoError(t, err, "Should be able to marshal expected data")
+
+	err = afero.WriteFile(fs, filename, fileContent, 0o644)
+	require.NoError(t, err, "Should be able to write file to in-memory filesystem")
+
+	var actualData testData
+	err = ReadJSONToFile(fs, filename, &actualData)
+	require.NoError(t, err, "ReadJSONToFile should not return an error")
+
+	assert.Equal(t, expectedData, actualData, "Data read from file should match expected data")
+}
+
+func TestGetLatestFileInDir(t *testing.T) {
+	t.Parallel()
+
+	fs := afero.NewMemMapFs()
+	dir := "/testdir"
+
+	files := []struct {
+		name    string
+		modTime time.Time
+	}{
+		{"file1.txt", time.Now().Add(-3 * time.Hour)},
+		{"file2.txt", time.Now().Add(-2 * time.Hour)},
+		{"file3.txt", time.Now().Add(-1 * time.Hour)},
+	}
+
+	for _, file := range files {
+		f, err := fs.Create(filepath.Join(dir, file.name))
+		require.NoError(t, err, "Should be able to create file")
+		defer f.Close()
+
+		err = fs.Chtimes(filepath.Join(dir, file.name), file.modTime, file.modTime)
+		require.NoError(t, err, "Should be able to change file times") // Check the error
+	}
+
+	latestFile, err := GetLatestFileInDir(fs, dir)
+	require.NoError(t, err, "GetLatestFileInDir should not return an error")
+
+	expectedLatestFile := filepath.Join(dir, "file3.txt")
+	assert.Equal(t, expectedLatestFile, latestFile, "Latest file should be the one with the most recent modification time")
 }

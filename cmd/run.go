@@ -298,6 +298,7 @@ func Run(isDebug *bool) *cli.Command {
 			if err != nil {
 				return cli.Exit("", 1)
 			}
+			statePath := filepath.Join(repoRoot.Path, "logs/runs")
 
 			filter := &Filter{
 				IncludeTag:        c.String("tag"),
@@ -307,12 +308,6 @@ func Run(isDebug *bool) *cli.Command {
 				SingleTask:        task,
 				ExcludeTag:        c.String("exclude-tag"),
 			}
-			if filter.PushMetaData {
-				foundPipeline.MetadataPush.Global = true
-			}
-
-			statePath := filepath.Join(repoRoot.Path, "logs/runs")
-			s := scheduler.NewScheduler(logger, foundPipeline, runID)
 
 			params := map[string]string{
 				"startDate":   startDate.Format(time.RFC3339),
@@ -332,17 +327,14 @@ func Run(isDebug *bool) *cli.Command {
 			fullRefresh := c.Bool("full-refresh")
 			useUv := c.Bool("use-uv")
 
+			s := scheduler.NewScheduler(logger, foundPipeline, runID)
+
 			if c.Bool("continue") {
-				pipelineState, stateErr := s.RestoreState(statePath)
-				if stateErr != nil {
-					errorPrinter.Printf("Failed to restore state: %v\n", stateErr)
+				pipelineState, err := scheduler.ReadState(afero.NewOsFs(), statePath)
+				if err != nil {
+					errorPrinter.Printf("Failed to restore state: %v\n", err)
 					return cli.Exit("", 1)
 				}
-				if foundPipeline.GetCompatibilityHash() != pipelineState.CompatibilityHash {
-					errorPrinter.Printf("The pipeline has changed since the last run. Please rerun the pipeline.\n")
-					return cli.Exit("", 1)
-				}
-				params = pipelineState.Parameters
 				only := []string{}
 				if _, ok := pipelineState.Parameters["only"]; ok {
 					only = strings.Split(pipelineState.Parameters["only"], ",")
@@ -355,24 +347,36 @@ func Run(isDebug *bool) *cli.Command {
 					SingleTask:        task,
 					ExcludeTag:        pipelineState.Parameters["exclude-tag"],
 				}
-				startDate, stateErr = time.Parse(time.RFC3339, pipelineState.Parameters["startDate"])
-				if stateErr != nil {
-					errorPrinter.Printf("Failed to parse start date from state: %v\n", stateErr)
+				startDate, err = time.Parse(time.RFC3339, pipelineState.Parameters["startDate"])
+				if err != nil {
+					errorPrinter.Printf("Failed to parse start date from state: %v\n", err)
 					return cli.Exit("", 1)
 				}
-				endDate, stateErr = time.Parse(time.RFC3339, pipelineState.Parameters["endDate"])
-				if stateErr != nil {
-					errorPrinter.Printf("Failed to parse end date from state: %v\n", stateErr)
+				endDate, err = time.Parse(time.RFC3339, pipelineState.Parameters["endDate"])
+				if err != nil {
+					errorPrinter.Printf("Failed to parse end date from state: %v\n", err)
 					return cli.Exit("", 1)
 				}
 				fullRefresh = pipelineState.Parameters["fullRefresh"] == "true"
 				useUv = pipelineState.Parameters["useUv"] == "true"
+
+				err = s.RestoreState(pipelineState)
+				if err != nil {
+					errorPrinter.Printf("Failed to restore state: %v\n", err)
+					return cli.Exit("", 1)
+				}
 			}
 
-			// Apply the filter to mark assets based on include/exclude tags
-			if err := filter.ApplyFiltersAndMarkAssets(foundPipeline, s); err != nil {
-				errorPrinter.Printf("Failed to filter assets: %v\n", err)
-				return cli.Exit("", 1)
+			if filter.PushMetaData {
+				foundPipeline.MetadataPush.Global = true
+			}
+
+			if !c.Bool("continue") {
+				// Apply the filter to mark assets based on include/exclude tags
+				if err := filter.ApplyFiltersAndMarkAssets(foundPipeline, s); err != nil {
+					errorPrinter.Printf("Failed to filter assets: %v\n", err)
+					return cli.Exit("", 1)
+				}
 			}
 
 			if s.InstanceCountByStatus(scheduler.Pending) == 0 {
@@ -408,7 +412,7 @@ func Run(isDebug *bool) *cli.Command {
 			results := s.Run(runCtx)
 			duration := time.Since(start)
 
-			if err := s.SavePipelineState(params, runID, filepath.Join(statePath, runID+".json")); err != nil {
+			if err := s.SavePipelineState(afero.NewOsFs(), params, runID, statePath); err != nil {
 				logger.Error("failed to save pipeline state", zap.Error(err))
 			}
 

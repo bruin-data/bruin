@@ -8,6 +8,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/version"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
@@ -572,16 +573,19 @@ func TestScheduler_RestoreState(t *testing.T) {
 			},
 		},
 	}
-	err := afero.WriteFile(fs, filepath.Join(stateFilePath, "2024_12_19_22_59_13.json"), []byte(stateContent), 0644)
-	assert.NoError(t, err, "failed to write mock state file")
+	err := afero.WriteFile(fs, filepath.Join(stateFilePath, "2024_12_19_22_59_13.json"), []byte(stateContent), 0o644)
+	require.NoError(t, err, "failed to write mock state file")
 
 	s := NewScheduler(zap.NewNop().Sugar(), foundPipeline, "2024_12_19_22_59_13")
 
 	err = s.SavePipelineState(fs, map[string]string{"someKey": "someValue"}, "2024_12_19_22_59_13", stateFilePath)
-	assert.NoError(t, err, "SavePipelineState should not return an error")
+	require.NoError(t, err, "SavePipelineState should not return an error")
 
-	pipelineState, err := s.RestoreState(fs, stateFilePath)
-	assert.NoError(t, err, "RestoreState should not return an error")
+	pipelineState, err := ReadState(fs, stateFilePath)
+	require.NoError(t, err, "RestoreState should not return an error")
+
+	err = s.RestoreState(pipelineState)
+	require.NoError(t, err, "RestoreState should not return an error")
 
 	expectedState := &PipelineState{
 		Parameters: map[string]string{"someKey": "someValue"},
@@ -589,11 +593,25 @@ func TestScheduler_RestoreState(t *testing.T) {
 			Version: version.Version,
 			OS:      "darwin",
 		},
-		State:             []*PipelineAssetState{},
+		State: []*PipelineAssetState{
+			{
+				Name:   "task1",
+				Status: Pending.String(),
+			},
+			{
+				Name:   "task2",
+				Status: Pending.String(),
+			},
+		},
 		Version:           "1.0.0",
 		RunID:             "2024_12_19_22_59_13",
 		CompatibilityHash: foundPipeline.GetCompatibilityHash(),
 	}
 
-	assert.Equal(t, expectedState, pipelineState, "restored state does not match expected state")
+	assert.Equal(t, expectedState.Parameters, pipelineState.Parameters, "Parameters should match")
+	assert.Equal(t, expectedState.Metadata, pipelineState.Metadata, "Metadata should match")
+	assert.Equal(t, expectedState.State, pipelineState.State, "State should match")
+	assert.Equal(t, expectedState.CompatibilityHash, pipelineState.CompatibilityHash, "CompatibilityHash should match")
+	assert.Equal(t, expectedState.RunID, pipelineState.RunID, "RunID should match")
+	assert.Equal(t, expectedState.Version, pipelineState.Version, "Version should match")
 }

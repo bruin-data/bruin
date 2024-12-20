@@ -939,7 +939,7 @@ type Pipeline struct {
 }
 
 func (p *Pipeline) GetCompatibilityHash() string {
-	var parts []string
+	parts := make([]string, 0, len(p.Assets)+1)
 	parts = append(parts, p.Name)
 	for _, asset := range p.Assets {
 		assetPart := fmt.Sprintf(":%s{", asset.Name)

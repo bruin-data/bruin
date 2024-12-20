@@ -129,7 +129,7 @@ func GetAllFilesInDir(fs afero.Fs, dir string) ([]string, error) {
 		return nil, err
 	}
 
-	var files []string
+	files := make([]string, 0, len(filesInfo)) // Pre-allocate the slice
 	for _, fileInfo := range filesInfo {
 		files = append(files, filepath.Join(dir, fileInfo.Name()))
 	}

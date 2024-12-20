@@ -2,7 +2,9 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
@@ -721,39 +723,34 @@ func (s *Scheduler) SavePipelineState(fs afero.Fs, param map[string]string, runI
 		RunID:             runID,
 		CompatibilityHash: s.pipeline.GetCompatibilityHash(),
 	}
-	if err := helpers.WriteJSONToFile(fs, pipelineState, statePath); err != nil {
+	file := filepath.Join(statePath, runID+".json")
+	if err := helpers.WriteJSONToFile(fs, pipelineState, file); err != nil {
 		s.logger.Error("failed to write pipeline state to file", zap.Error(err))
 		return err
 	}
 	return nil
 }
 
-func (s *Scheduler) RestoreState(fs afero.Fs, statePath string) (*PipelineState, error) {
-	latestRunID, err := helpers.GetLatestFileInDir(fs, statePath)
-	if err != nil {
-		s.logger.Error("failed to get latest run id", zap.Error(err))
-		return nil, err
-	}
-	pipelineState := &PipelineState{}
-	if err := helpers.ReadJSONToFile(fs, latestRunID, pipelineState); err != nil {
-		s.logger.Error("failed to read pipeline state from file", zap.Error(err))
-		return nil, err
+func (s *Scheduler) RestoreState(state *PipelineState) error {
+	if s.pipeline.GetCompatibilityHash() != state.CompatibilityHash {
+		return errors.New("the pipeline has changed since the last run; please rerun the pipeline")
 	}
 	for _, task := range s.taskInstances {
-		for _, state := range pipelineState.State {
+		for _, state := range state.State {
 			if state.Name == task.GetAsset().Name {
-				if state.Status == Failed.String() || state.Status == UpstreamFailed.String() {
+				switch state.Status {
+				case Failed.String(), UpstreamFailed.String(), Running.String(), Queued.String():
 					task.MarkAs(Pending)
-				} else if state.Status == Skipped.String() || state.Status == Succeeded.String() {
+				case Skipped.String(), Succeeded.String():
 					task.MarkAs(Skipped)
-				} else {
-					task.MarkAs(StatusFromString(state.Status))
+				default:
+					return fmt.Errorf("unknown status, please create a new issue at https://github.com/bruin-data/bruin/issues/new?template=bug_report.md&title=Unknown+status+ %s", state.Status)
 				}
 			}
 		}
 	}
 
-	return pipelineState, nil
+	return nil
 }
 
 func GetStatusForTask(tasks []TaskInstanceStatus) TaskInstanceStatus {
@@ -777,4 +774,17 @@ func GetStatusForTask(tasks []TaskInstanceStatus) TaskInstanceStatus {
 	}
 
 	return Pending
+}
+
+func ReadState(fs afero.Fs, statePath string) (*PipelineState, error) {
+	latestRunID, err := helpers.GetLatestFileInDir(fs, statePath)
+	if err != nil {
+		return nil, err
+	}
+	pipelineState := &PipelineState{}
+	if err := helpers.ReadJSONToFile(fs, latestRunID, pipelineState); err != nil {
+		return nil, err
+	}
+
+	return pipelineState, nil
 }
