@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,6 +27,11 @@ func Format(isDebug *bool) *cli.Command {
 				Aliases: []string{"o"},
 				Usage:   "the output type, possible values are: plain, json",
 			},
+			&cli.BoolFlag{
+				Name:  "lint",
+				Usage: "check if any file needs to be formatted",
+				Value: false,
+			},
 		},
 		Action: func(c *cli.Context) error {
 			logger := makeLogger(*isDebug)
@@ -36,8 +42,12 @@ func Format(isDebug *bool) *cli.Command {
 			}
 
 			output := c.String("output")
+			checkLint := c.Bool("lint")
 
 			if isPathReferencingAsset(repoOrAsset) {
+				if checkLint {
+					return checkChangesForSingleAsset(repoOrAsset, output)
+				}
 				asset, err := formatAsset(repoOrAsset)
 				if err != nil {
 					if errors.Is(err, os.ErrNotExist) {
@@ -45,10 +55,8 @@ func Format(isDebug *bool) *cli.Command {
 					} else {
 						printErrorForOutput(output, errors2.Wrap(err, "failed to format asset"))
 					}
-
 					return cli.Exit("", 1)
 				}
-
 				if output != "json" {
 					infoPrinter.Printf("Successfully formatted asset '%s' %s\n", asset.Name, faint(fmt.Sprintf("(%s)", asset.DefinitionFile.Path)))
 				}
@@ -65,39 +73,66 @@ func Format(isDebug *bool) *cli.Command {
 			logger.Debugf("found %d asset paths", len(assetPaths))
 
 			errorList := make([]error, 0)
+			changedAssetpaths := make([]string, 0)
 			processedAssetCount := 0
 
 			for _, assetPath := range assetPaths {
 				assetFinderPool.Go(func() {
-					asset, err := DefaultPipelineBuilder.CreateAssetFromFile(assetPath)
-					if err != nil {
-						logger.Debugf("failed to process path '%s': %v", assetPath, err)
-						return
-					}
+					if checkLint {
+						changed, err := shouldFileChange(assetPath)
+						if err != nil {
+							logger.Debugf("failed to process path '%s': %v", assetPath, err)
+							errorList = append(errorList, errors2.Wrapf(err, "failed to check '%s'", assetPath))
+							return
+						}
+						if changed {
+							changedAssetpaths = append(changedAssetpaths, assetPath)
+						}
+					} else {
+						asset, err := DefaultPipelineBuilder.CreateAssetFromFile(assetPath)
+						if err != nil {
+							logger.Debugf("failed to process path '%s': %v", assetPath, err)
+							return
+						}
 
-					if asset == nil {
-						logger.Debugf("no asset found in path '%s': %v", assetPath, err)
-						return
-					}
+						if asset == nil {
+							logger.Debugf("no asset found in path '%s': %v", assetPath, err)
+							return
+						}
 
-					err = asset.Persist(afero.NewOsFs())
-					if err != nil {
-						logger.Debugf("failed to persist asset '%s': %v", assetPath, err)
-						errorList = append(errorList, errors2.Wrapf(err, "failed to persist asset '%s'", assetPath))
-					}
+						err = asset.Persist(afero.NewOsFs())
+						if err != nil {
+							logger.Debugf("failed to persist asset '%s': %v", assetPath, err)
+							errorList = append(errorList, errors2.Wrapf(err, "failed to persist asset '%s'", assetPath))
+						}
 
-					processedAssetCount++
+						processedAssetCount++
+					}
 				})
 			}
 
 			assetFinderPool.Wait()
-			if len(errorList) == 0 {
+			if checkLint && len(errorList) == 0 {
+				if len(changedAssetpaths) == 0 {
+					if output == "json" {
+						return nil
+					}
+					infoPrinter.Printf("success: no asset in '%s' needs reformatting", repoOrAsset)
+					return nil
+				}
+				errorPrinter.Println("failure: some Assets needs reformatting:")
+				for _, assetPath := range changedAssetpaths {
+					infoPrinter.Printf("'%s'\n", assetPath)
+				}
+				return cli.Exit("", 1)
+			}
+			if !checkLint && len(errorList) == 0 {
 				if output == "json" {
 					return nil
 				}
 
 				if processedAssetCount == 0 {
-					infoPrinter.Println("No actual assets were found in the given path, nothing has changed.")
+					infoPrinter.Println("no actual assets were found in the given path, nothing has changed.")
 					return nil
 				}
 
@@ -108,7 +143,6 @@ func Format(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("Successfully formatted %d %s.\n", processedAssetCount, assetStr)
 				return nil
 			}
-
 			if output == "json" {
 				jsMessage, err := json.Marshal(errorList)
 				if err != nil {
@@ -137,4 +171,66 @@ func formatAsset(path string) (*pipeline.Asset, error) {
 	}
 
 	return asset, asset.Persist(afero.NewOsFs())
+}
+
+func shouldFileChange(path string) (bool, error) {
+	fs := afero.NewOsFs()
+	// Read the original content from the file
+	originalContent, err := afero.ReadFile(fs, path)
+	if err != nil {
+		return false, errors2.Wrap(err, "failed to read original content")
+	}
+	normalizedOriginalContent := normalizeLineEndings(originalContent)
+	// Create the asset
+	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(path)
+	if err != nil {
+		return false, errors2.Wrap(err, "failed to build the asset")
+	}
+	// Persist the asset (modifies the file)
+	err = asset.Persist(fs)
+	if err != nil {
+		return false, errors2.Wrap(err, "failed to persist the asset")
+	}
+
+	// Read the new content after persisting
+	newContent, err := afero.ReadFile(fs, path)
+	if err != nil {
+		return false, errors2.Wrap(err, "failed to read new content")
+	}
+	normalizedNewContent := normalizeLineEndings(newContent)
+
+	// Restore the original content to the file
+	err = afero.WriteFile(fs, path, originalContent, 0644)
+	if err != nil {
+		return false, errors2.Wrap(err, "failed to restore original content")
+	}
+
+	// Compare the normalized original and new content
+	return string(normalizedOriginalContent) != string(normalizedNewContent), nil
+}
+
+func checkChangesForSingleAsset(repoOrAsset, output string) error {
+	changed, err := shouldFileChange(repoOrAsset)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			printErrorForOutput(output, fmt.Errorf("the given file path '%s' does not seem to exist, are you sure you used the right path?", repoOrAsset))
+		} else {
+			printErrorForOutput(output, errors2.Wrap(err, "failed to format asset"))
+		}
+		return cli.Exit("", 1)
+	}
+	if changed {
+		printErrorForOutput(output, fmt.Errorf("failure: asset '%s' needs to be reformatted", repoOrAsset))
+		return cli.Exit("", 1)
+	}
+	if output == "json" {
+		return nil
+	}
+	infoPrinter.Printf("success: Asset '%s' doesn't need reformatting", repoOrAsset)
+	return nil
+}
+
+func normalizeLineEndings(content []byte) []byte {
+	content = bytes.ReplaceAll(content, []byte("\r\n"), []byte("\n"))
+	return bytes.ReplaceAll(content, []byte("\r"), []byte("\n"))
 }
