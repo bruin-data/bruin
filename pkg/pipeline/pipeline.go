@@ -83,7 +83,7 @@ var defaultMapping = map[string]string{
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}
 
 type (
-	schedule           string
+	Schedule           string
 	TaskDefinitionType string
 )
 
@@ -923,7 +923,7 @@ func (mp *MetadataPush) HasAnyEnabled() bool {
 type Pipeline struct {
 	LegacyID           string         `json:"legacy_id" yaml:"id" mapstructure:"id"`
 	Name               string         `json:"name" yaml:"name" mapstructure:"name"`
-	Schedule           schedule       `json:"schedule" yaml:"schedule" mapstructure:"schedule"`
+	Schedule           Schedule       `json:"schedule" yaml:"schedule" mapstructure:"schedule"`
 	StartDate          string         `json:"start_date" yaml:"start_date" mapstructure:"start_date"`
 	DefinitionFile     DefinitionFile `json:"definition_file"`
 	DefaultParameters  EmptyStringMap `json:"default_parameters" yaml:"default_parameters" mapstructure:"default_parameters"`
