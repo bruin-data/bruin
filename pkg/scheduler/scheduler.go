@@ -743,12 +743,11 @@ func (s *Scheduler) RestoreState(statePath string) (*PipelineState, error) {
 			if state.Name == task.GetAsset().Name {
 				if state.Status == Failed.String() || state.Status == UpstreamFailed.String() {
 					task.MarkAs(Pending)
-				} else if state.Status == Skipped.String() {
-					task.MarkAs(Pending)
+				} else if state.Status == Skipped.String() || state.Status == Succeeded.String() {
+					task.MarkAs(Skipped)
 				} else {
 					task.MarkAs(StatusFromString(state.Status))
 				}
-				break
 			}
 		}
 	}

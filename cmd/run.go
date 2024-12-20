@@ -323,8 +323,14 @@ func Run(isDebug *bool) *cli.Command {
 				"useUv":       strconv.FormatBool(c.Bool("use-uv")),
 				"tag":         c.String("tag"),
 				"excludeTag":  c.String("exclude-tag"),
-				"only":        strings.Join(c.StringSlice("only"), ","),
 			}
+
+			if len(c.StringSlice("only")) > 0 {
+				params["only"] = strings.Join(c.StringSlice("only"), ",")
+			}
+
+			fullRefresh := c.Bool("full-refresh")
+			useUv := c.Bool("use-uv")
 
 			if c.Bool("continue") {
 				pipelineState, stateErr := s.RestoreState(statePath)
@@ -332,10 +338,18 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to restore state: %v\n", stateErr)
 					return cli.Exit("", 1)
 				}
+				if foundPipeline.GetCompatibilityHash() != pipelineState.CompatibilityHash {
+					errorPrinter.Printf("The pipeline has changed since the last run. Please rerun the pipeline.\n")
+					return cli.Exit("", 1)
+				}
 				params = pipelineState.Parameters
+				only := []string{}
+				if _, ok := pipelineState.Parameters["only"]; ok {
+					only = strings.Split(pipelineState.Parameters["only"], ",")
+				}
 				filter = &Filter{
 					IncludeTag:        pipelineState.Parameters["tag"],
-					OnlyTaskTypes:     strings.Split(pipelineState.Parameters["only"], ","),
+					OnlyTaskTypes:     only,
 					IncludeDownstream: runDownstreamTasks,
 					PushMetaData:      pipelineState.Parameters["push-metadata"] == "true",
 					SingleTask:        task,
@@ -351,10 +365,8 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to parse end date from state: %v\n", stateErr)
 					return cli.Exit("", 1)
 				}
-				if foundPipeline.GetCompatibilityHash() != pipelineState.CompatibilityHash {
-					errorPrinter.Printf("The pipeline has changed since the last run. Please rerun the pipeline.\n")
-					return cli.Exit("", 1)
-				}
+				fullRefresh = pipelineState.Parameters["fullRefresh"] == "true"
+				useUv = pipelineState.Parameters["useUv"] == "true"
 			}
 
 			// Apply the filter to mark assets based on include/exclude tags
@@ -371,7 +383,7 @@ func Run(isDebug *bool) *cli.Command {
 			infoPrinter.Printf("\nStarting the pipeline execution...\n")
 			infoPrinter.Println()
 
-			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, c.Bool("full-refresh"), c.Bool("use-uv"))
+			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, fullRefresh, useUv)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -384,7 +396,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			runCtx := context.Background()
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, c.Bool("full-refresh"))
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, fullRefresh)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
