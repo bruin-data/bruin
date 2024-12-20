@@ -176,6 +176,11 @@ environments:
         - name: "asana-workspace-1337"
           access_token: "access_token_pawn3d"
           workspace: "1337"
+      dynamodb:
+        - name: "dynamodb-432123"
+          access_key_id: "access-key-786"
+          secret_access_key: "shhh,secret"
+          region: "ap-south-1"
       generic:
         - name: key1
           value: value1
