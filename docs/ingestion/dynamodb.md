@@ -23,7 +23,7 @@ To connect to DynamoDB, you need to add a configuration item to the connections 
 ```
 
 * `access_key_id`: Identifes an IAM account.
-* `access_token`: Password for the IAM account.
+* `secret_access_key`: Password for the IAM account.
 * `region`: AWS region in which your DynamoDB table exists.
 
 For details on how to obtain these credentials, please refer [here](https://bruin-data.github.io/ingestr/supported-sources/dynamodb.html#setting-up-a-dynamodb-integration).
