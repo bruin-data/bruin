@@ -298,7 +298,7 @@ func Run(isDebug *bool) *cli.Command {
 			if err != nil {
 				return cli.Exit("", 1)
 			}
-			statePath := filepath.Join(repoRoot.Path, "logs/runs")
+			statePath := filepath.Join(repoRoot.Path, "logs/runs", foundPipeline.Name)
 
 			filter := &Filter{
 				IncludeTag:        c.String("tag"),
