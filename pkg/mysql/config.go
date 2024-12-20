@@ -6,12 +6,15 @@ import (
 )
 
 type Config struct {
-	Username string
-	Password string
-	Host     string
-	Port     int
-	Database string
-	Driver   string
+	Username    string
+	Password    string
+	Host        string
+	Port        int
+	Database    string
+	Driver      string
+	SslCaPath   string
+	SslCertPath string
+	SslKeyPath  string
 }
 
 func (c Config) GetIngestrURI() string {
@@ -29,6 +32,20 @@ func (c Config) GetIngestrURI() string {
 		User:   url.UserPassword(c.Username, c.Password),
 		Host:   host,
 		Path:   c.Database,
+	}
+
+	if c.SslCaPath != "" || c.SslCertPath != "" || c.SslKeyPath != "" {
+		q := u.Query()
+		if c.SslCaPath != "" {
+			q.Set("ssl_ca", c.SslCaPath)
+		}
+		if c.SslCertPath != "" {
+			q.Set("ssl_cert", c.SslCertPath)
+		}
+		if c.SslKeyPath != "" {
+			q.Set("ssl_key", c.SslKeyPath)
+		}
+		u.RawQuery = q.Encode()
 	}
 
 	return u.String()
