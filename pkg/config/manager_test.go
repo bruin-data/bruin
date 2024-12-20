@@ -275,6 +275,14 @@ func TestLoadFromFile(t *testing.T) {
 					WorkspaceID: "1337",
 				},
 			},
+			DynamoDB: []DynamoDBConnection{
+				{
+					Name:            "dynamodb-432123",
+					AccessKeyID:     "access-key-786",
+					SecretAccessKey: "shhh,secret",
+					Region:          "ap-south-1",
+				},
+			},
 			Zendesk: []ZendeskConnection{
 				{
 					Name:      "conn25",

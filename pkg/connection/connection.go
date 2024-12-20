@@ -15,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
+	"github.com/bruin-data/bruin/pkg/dynamodb"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/gsheets"
@@ -66,6 +67,7 @@ type Manager struct {
 	S3           map[string]*s3.Client
 	Slack        map[string]*slack.Client
 	Asana        map[string]*asana.Client
+	DynamoDB     map[string]*dynamodb.Client
 	Zendesk      map[string]*zendesk.Client
 	mutex        sync.Mutex
 }
@@ -229,6 +231,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connAsana, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Asana)...)
+
+	connDynamoDB, err := m.GetDynamoDBConnectionWithoutDefault(name)
+	if err == nil {
+		return connDynamoDB, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.DynamoDB)...)
 
 	connZendesk, err := m.GetZendeskConnectionWithoutDefault(name)
 	if err == nil {
@@ -807,6 +815,25 @@ func (m *Manager) GetAsanaConnectionWithoutDefault(name string) (*asana.Client, 
 	db, ok := m.Asana[name]
 	if !ok {
 		return nil, errors.Errorf("asana connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetDynamoDBConnection(name string) (*dynamodb.Client, error) {
+	db, err := m.GetDynamoDBConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetDynamoDBConnectionWithoutDefault("dynamodb-default")
+}
+
+func (m *Manager) GetDynamoDBConnectionWithoutDefault(name string) (*dynamodb.Client, error) {
+	if m.DynamoDB == nil {
+		return nil, errors.New("no dynamodb connections found")
+	}
+	db, ok := m.DynamoDB[name]
+	if !ok {
+		return nil, errors.Errorf("dynamodb connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -1519,6 +1546,25 @@ func (m *Manager) AddAsanaConnectionFromConfig(connection *config.AsanaConnectio
 	return nil
 }
 
+func (m *Manager) AddDynamoDBConnectionFromConfig(connection *config.DynamoDBConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.DynamoDB == nil {
+		m.DynamoDB = make(map[string]*dynamodb.Client)
+	}
+
+	client, err := dynamodb.NewClient(dynamodb.Config{
+		AccessKeyID:     connection.AccessKeyID,
+		SecretAccessKey: connection.SecretAccessKey,
+		Region:          connection.Region,
+	})
+	if err != nil {
+		return err
+	}
+	m.DynamoDB[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddZendeskConnectionFromConfig(connection *config.ZendeskConnection) error {
 	m.mutex.Lock()
 	if m.Zendesk == nil {
@@ -1824,6 +1870,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			err := connectionManager.AddAsanaConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add asana connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.DynamoDB {
+		wg.Go(func() {
+			err := connectionManager.AddDynamoDBConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add dynamodb connection '%s'", conn.Name))
 			}
 		})
 	}

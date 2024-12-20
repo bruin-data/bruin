@@ -337,6 +337,12 @@
             "$ref": "#/$defs/AsanaConnection"
           },
           "type": "array"
+        },
+        "dynamodb": {
+          "items": {
+            "$ref": "#/$defs/DynamoDBConnection"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -393,6 +399,30 @@
       "required": [
         "name",
         "path"
+      ]
+    },
+    "DynamoDBConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_key_id": {
+          "type": "string"
+        },
+        "secret_access_key": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_key_id",
+        "secret_access_key",
+        "region"
       ]
     },
     "FacebookAdsConnection": {
