@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -591,7 +592,7 @@ func TestScheduler_RestoreState(t *testing.T) {
 		Parameters: map[string]string{"someKey": "someValue"},
 		Metadata: Metadata{
 			Version: version.Version,
-			OS:      "darwin",
+			OS:      runtime.GOOS,
 		},
 		State: []*PipelineAssetState{
 			{
