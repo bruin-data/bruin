@@ -48,8 +48,6 @@ jobs:
           go-version-file: 'go.mod'
           cache-dependency-path: "go.sum"
       - run: make test
-      - name: Run benchmark
-        run: go test -bench 'Benchmark' ./cmd/... | tee output.txt
 
   end2end:
     strategy:
