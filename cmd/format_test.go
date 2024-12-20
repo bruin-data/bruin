@@ -10,6 +10,7 @@ import (
 )
 
 func TestCheckLint(t *testing.T) {
+	t.Parallel()
 	var testDatadir string
 	if runtime.GOOS == "windows" {
 		testDatadir = "testdata\\unformatted-pipeline\\assets"
@@ -39,6 +40,7 @@ func TestCheckLint(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			// Debug: Log the resolved path
 			t.Logf("Testing file path: %s", tc.assetFilePath)
 
