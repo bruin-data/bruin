@@ -13,7 +13,7 @@ func BenchmarkLint(b *testing.B) {
 	isDebug := false
 	app := cli.NewApp()
 
-	for i := 0; i < 20; i++ {
+	for range [10]int{} {
 		b.ResetTimer()
 		start := time.Now()
 		if err := Lint(&isDebug).Run(cli.NewContext(app, nil, nil), "./testdata/lineage"); err != nil {
