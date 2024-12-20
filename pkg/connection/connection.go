@@ -8,6 +8,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/adjust"
 	"github.com/bruin-data/bruin/pkg/airtable"
 	"github.com/bruin-data/bruin/pkg/appsflyer"
+	"github.com/bruin-data/bruin/pkg/asana"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/chess"
@@ -64,6 +65,7 @@ type Manager struct {
 	Chess        map[string]*chess.Client
 	S3           map[string]*s3.Client
 	Slack        map[string]*slack.Client
+	Asana        map[string]*asana.Client
 	Zendesk      map[string]*zendesk.Client
 	mutex        sync.Mutex
 }
@@ -71,6 +73,7 @@ type Manager struct {
 func (m *Manager) GetConnection(name string) (interface{}, error) {
 	availableConnectionNames := make([]string, 0)
 
+	// todo(turtledev): make this DRY
 	connBigQuery, err := m.GetBqConnectionWithoutDefault(name)
 	if err == nil {
 		return connBigQuery, nil
@@ -214,11 +217,18 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connS3, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.S3)...)
+
 	connSlack, err := m.GetSlackConnectionWithoutDefault(name)
 	if err == nil {
 		return connSlack, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Slack)...)
+
+	connAsana, err := m.GetAsanaConnectionWithoutDefault(name)
+	if err == nil {
+		return connAsana, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Asana)...)
 
 	connZendesk, err := m.GetZendeskConnectionWithoutDefault(name)
 	if err == nil {
@@ -778,6 +788,25 @@ func (m *Manager) GetSlackConnectionWithoutDefault(name string) (*slack.Client, 
 	db, ok := m.Slack[name]
 	if !ok {
 		return nil, errors.Errorf("slack connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetAsanaConnection(name string) (*asana.Client, error) {
+	db, err := m.GetAsanaConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetAsanaConnectionWithoutDefault("asana-default")
+}
+
+func (m *Manager) GetAsanaConnectionWithoutDefault(name string) (*asana.Client, error) {
+	if m.Asana == nil {
+		return nil, errors.New("no asana connections found")
+	}
+	db, ok := m.Asana[name]
+	if !ok {
+		return nil, errors.Errorf("asana connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -1472,6 +1501,24 @@ func (m *Manager) AddSlackConnectionFromConfig(connection *config.SlackConnectio
 	return nil
 }
 
+func (m *Manager) AddAsanaConnectionFromConfig(connection *config.AsanaConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.Asana == nil {
+		m.Asana = make(map[string]*asana.Client)
+	}
+
+	client, err := asana.NewClient(asana.Config{
+		WorkspaceID: connection.WorkspaceID,
+		AccessToken: connection.AccessToken,
+	})
+	if err != nil {
+		return err
+	}
+	m.Asana[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddZendeskConnectionFromConfig(connection *config.ZendeskConnection) error {
 	m.mutex.Lock()
 	if m.Zendesk == nil {
@@ -1502,6 +1549,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	var errList []error
 	var mu sync.Mutex
 
+	// todo(turtledev): refactor this series of range blocks
 	for _, conn := range cm.SelectedEnvironment.Connections.AthenaConnection {
 		wg.Go(func() {
 			err := connectionManager.AddAthenaConnectionFromConfig(&conn)
@@ -1767,6 +1815,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			err := connectionManager.AddSlackConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add slack connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Asana {
+		wg.Go(func() {
+			err := connectionManager.AddAsanaConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add asana connection '%s'", conn.Name))
 			}
 		})
 	}

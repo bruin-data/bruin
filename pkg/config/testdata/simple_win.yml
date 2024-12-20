@@ -154,6 +154,10 @@ environments:
         - name: conn23
           base_id: "123"
           access_token: "accessKey"
+      asana:
+        - name: "asana-workspace-1337"
+          workspace: "1337"
+          access_token: "access_token_pawn3d"
       zendesk:
         - name: conn25
           api_token: "zendeskKey"

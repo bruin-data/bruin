@@ -268,6 +268,13 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "slackkey",
 				},
 			},
+			Asana: []AsanaConnection{
+				{
+					Name:        "asana-workspace-1337",
+					AccessToken: "access_token_pawn3d",
+					WorkspaceID: "1337",
+				},
+			},
 			Zendesk: []ZendeskConnection{
 				{
 					Name:      "conn25",

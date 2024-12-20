@@ -78,6 +78,7 @@ var defaultMapping = map[string]string{
 	"zendesk":               "zendesk-default",
 	"s3":                    "s3-default",
 	"slack":                 "slack-default",
+	"asana":                 "asana-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}
