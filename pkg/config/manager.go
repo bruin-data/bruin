@@ -429,7 +429,7 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		return fmt.Errorf("environment '%s' does not exist", environmentName)
 	}
 
-	// todo(turtledev): refactor this. It's full of unneccessary repetition
+	// todo(turtledev): refactor this. It's full of unnecessary repetition
 	switch connType {
 	case "aws":
 		var conn AwsConnection
