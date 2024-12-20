@@ -28,7 +28,7 @@ func Format(isDebug *bool) *cli.Command {
 				Usage:   "the output type, possible values are: plain, json",
 			},
 			&cli.BoolFlag{
-				Name:  "check",
+				Name:  "lint",
 				Usage: "check if any file needs to be formatted",
 				Value: false,
 			},
@@ -42,10 +42,10 @@ func Format(isDebug *bool) *cli.Command {
 			}
 
 			output := c.String("output")
-			check := c.Bool("check")
+			check_lint := c.Bool("lint")
 
 			if isPathReferencingAsset(repoOrAsset) {
-				if check {
+				if check_lint {
 					return checkChangesForSingleAsset(repoOrAsset, output)
 				}
 				asset, err := formatAsset(repoOrAsset)
@@ -78,7 +78,7 @@ func Format(isDebug *bool) *cli.Command {
 
 			for _, assetPath := range assetPaths {
 				assetFinderPool.Go(func() {
-					if check {
+					if check_lint {
 						changed, err := shouldFileChange(assetPath)
 						if err != nil {
 							logger.Debugf("failed to process path '%s': %v", assetPath, err)
@@ -112,7 +112,7 @@ func Format(isDebug *bool) *cli.Command {
 			}
 
 			assetFinderPool.Wait()
-			if check && len(errorList) == 0 {
+			if check_lint && len(errorList) == 0 {
 				if len(changedAssetpaths) == 0 {
 					if output == "json" {
 						return nil
@@ -126,7 +126,7 @@ func Format(isDebug *bool) *cli.Command {
 				}
 				return cli.Exit("", 1)
 			}
-			if !check && len(errorList) == 0 {
+			if !check_lint && len(errorList) == 0 {
 				if output == "json" {
 					return nil
 				}
