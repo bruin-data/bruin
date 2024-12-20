@@ -585,8 +585,8 @@ func TestScheduler_RestoreState(t *testing.T) {
 		Only:         []string{"bq.sql"},
 		PushMetadata: true,
 		ExcludeTag:   "exclude",
-		StartDate:    time.Now().AddDate(0, 0, -1),
-		EndDate:      time.Now(),
+		StartDate:    time.Now().AddDate(0, 0, -1).Format("2006-01-02"),
+		EndDate:      time.Now().Format("2006-01-02"),
 	}, "2024_12_19_22_59_13", stateFilePath)
 	require.NoError(t, err, "SavePipelineState should not return an error")
 
@@ -602,8 +602,8 @@ func TestScheduler_RestoreState(t *testing.T) {
 			Only:         []string{"bq.sql"},
 			PushMetadata: true,
 			ExcludeTag:   "exclude",
-			StartDate:    time.Now().AddDate(0, 0, -1),
-			EndDate:      time.Now(),
+			StartDate:    time.Now().AddDate(0, 0, -1).Format("2006-01-02"),
+			EndDate:      time.Now().Format("2006-01-02"),
 		},
 		Metadata: Metadata{
 			Version: version.Version,
