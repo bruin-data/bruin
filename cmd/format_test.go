@@ -12,8 +12,7 @@ func TestCheckLint(t *testing.T) {
 	t.Parallel() // Enables parallel execution for the entire test
 
 	// Base directory for test assets
-	testDataDir, err := filepath.Abs("./testdata/unformatted-pipeline/assets")
-	require.NoError(t, err, "Failed to resolve test data directory")
+	testDataDir := "testdata/unformatted-pipeline/assets"
 
 	tests := []struct {
 		name          string
@@ -36,7 +35,6 @@ func TestCheckLint(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc // Capture the loop variable for parallel tests
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel() // Enables parallel execution for subtests
 
