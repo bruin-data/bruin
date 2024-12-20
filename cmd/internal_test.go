@@ -11,7 +11,7 @@ func BenchmarkInternalParsePipeline(b *testing.B) {
 		errorPrinter: errorPrinter,
 	}
 
-	for i := 0; i < b.N; i++ {
+	for i := 0; i < 20; i++ {
 		b.ResetTimer()
 		start := time.Now()
 		if err := r.ParsePipeline("./testdata/lineage", true); err != nil {
@@ -30,7 +30,7 @@ func BenchmarkInternalParseAsset(b *testing.B) {
 		errorPrinter: errorPrinter,
 	}
 
-	for i := 0; i < b.N; i++ {
+	for i := 0; i < 20; i++ {
 		b.ResetTimer()
 		start := time.Now()
 		if err := r.Run("./testdata/lineage/assets/hello_bq.sql", true); err != nil {
@@ -49,7 +49,7 @@ func BenchmarkInternalParsePipelineWithoutColumnLineage(b *testing.B) {
 		errorPrinter: errorPrinter,
 	}
 
-	for i := 0; i < b.N; i++ {
+	for i := 0; i < 20; i++ {
 		b.ResetTimer()
 		start := time.Now()
 		if err := r.ParsePipeline("./testdata/lineage", false); err != nil {
@@ -68,7 +68,7 @@ func BenchmarkInternalParseAssetWithoutColumnLineage(b *testing.B) {
 		errorPrinter: errorPrinter,
 	}
 
-	for i := 0; i < b.N; i++ {
+	for i := 0; i < 20; i++ {
 		b.ResetTimer()
 		start := time.Now()
 		if err := r.Run("./testdata/lineage/assets/hello_bq.sql", false); err != nil {
