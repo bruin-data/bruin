@@ -28,3 +28,5 @@ default_connections:
   s3: "my-s3"
   slack: "my-slack"
   zendesk : "my-zendesk"
+  asana: "my-asana"
+  dynamodb: "my-dynamodb"

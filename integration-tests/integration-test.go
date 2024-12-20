@@ -39,6 +39,7 @@ func main() {
 		0,
 		[]string{"Executed 1 tasks", "total_games:positive"},
 	)
+	expectExitCode("format --lint ./chess-extended/assets/chess_games.asset.yml", 0)
 	expectOutputIncludes(
 		"run --tag include --exclude-tag exclude --only main chess-extended",
 		0,

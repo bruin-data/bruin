@@ -268,6 +268,21 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "slackkey",
 				},
 			},
+			Asana: []AsanaConnection{
+				{
+					Name:        "asana-workspace-1337",
+					AccessToken: "access_token_pawn3d",
+					WorkspaceID: "1337",
+				},
+			},
+			DynamoDB: []DynamoDBConnection{
+				{
+					Name:            "dynamodb-432123",
+					AccessKeyID:     "access-key-786",
+					SecretAccessKey: "shhh,secret",
+					Region:          "ap-south-1",
+				},
+			},
 			Zendesk: []ZendeskConnection{
 				{
 					Name:      "conn25",

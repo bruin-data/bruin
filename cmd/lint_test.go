@@ -2,10 +2,29 @@ package cmd
 
 import (
 	"testing"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/urfave/cli/v2"
 )
+
+func BenchmarkLint(b *testing.B) {
+	isDebug := false
+	app := cli.NewApp()
+
+	for range [10]int{} {
+		b.ResetTimer()
+		start := time.Now()
+		if err := Lint(&isDebug).Run(cli.NewContext(app, nil, nil), "./testdata/lineage"); err != nil {
+			b.Fatalf("Failed to run Lint command: %v", err)
+		}
+		b.StopTimer()
+		if time.Since(start) > 200*time.Millisecond {
+			b.Fatalf("Benchmark took longer than 100ms")
+		}
+	}
+}
 
 func Test_unwrapAllErrors(t *testing.T) {
 	t.Parallel()

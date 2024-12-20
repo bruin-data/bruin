@@ -154,6 +154,15 @@ environments:
         - name: conn23
           base_id: "123"
           access_token: "accessKey"
+      asana:
+        - name: "asana-workspace-1337"
+          workspace: "1337"
+          access_token: "access_token_pawn3d"
+      dynamodb:
+        - name: "dynamodb-432123"
+          access_key_id: "access-key-786"
+          secret_access_key: "shhh,secret"
+          region: "ap-south-1"
       zendesk:
         - name: conn25
           api_token: "zendeskKey"

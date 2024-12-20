@@ -423,3 +423,24 @@ type SlackConnection struct {
 func (c SlackConnection) GetName() string {
 	return c.Name
 }
+
+type AsanaConnection struct {
+	Name        string `yaml:"name" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
+	WorkspaceID string `yaml:"workspace" json:"workspace" mapstructure:"workspace"`
+}
+
+func (c AsanaConnection) GetName() string {
+	return c.Name
+}
+
+type DynamoDBConnection struct {
+	Name            string `yaml:"name" json:"name" mapstructure:"name"`
+	AccessKeyID     string `yaml:"access_key_id" json:"access_key_id" mapstructure:"access_key_id"`
+	SecretAccessKey string `yaml:"secret_access_key" json:"secret_access_key" mapstructure:"secret_access_key"`
+	Region          string `yaml:"region" json:"region" mapstructure:"region"`
+}
+
+func (c DynamoDBConnection) GetName() string {
+	return c.Name
+}
