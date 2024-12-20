@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -179,6 +180,7 @@ func shouldFileChange(path string) (bool, error) {
 	if err != nil {
 		return false, errors2.Wrap(err, "failed to read original content")
 	}
+	normalizedOriginalContent := normalizeLineEndings(originalContent)
 	// Create the asset
 	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(path)
 	if err != nil {
@@ -195,6 +197,7 @@ func shouldFileChange(path string) (bool, error) {
 	if err != nil {
 		return false, errors2.Wrap(err, "failed to read new content")
 	}
+	normalizedNewContent := normalizeLineEndings(newContent)
 
 	// Restore the original content to the file
 	err = afero.WriteFile(fs, path, originalContent, 0644)
@@ -202,8 +205,8 @@ func shouldFileChange(path string) (bool, error) {
 		return false, errors2.Wrap(err, "failed to restore original content")
 	}
 
-	// Compare the original and new content
-	return string(originalContent) != string(newContent), nil
+	// Compare the normalized original and new content
+	return string(normalizedOriginalContent) != string(normalizedNewContent), nil
 }
 
 func checkChangesForSingleAsset(repoOrAsset, output string) error {
@@ -225,4 +228,9 @@ func checkChangesForSingleAsset(repoOrAsset, output string) error {
 	}
 	infoPrinter.Printf("success: Asset '%s' doesn't need reformatting", repoOrAsset)
 	return nil
+}
+
+func normalizeLineEndings(content []byte) []byte {
+	content = bytes.ReplaceAll(content, []byte("\r\n"), []byte("\n"))
+	return bytes.ReplaceAll(content, []byte("\r"), []byte("\n"))
 }
