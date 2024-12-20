@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -779,7 +781,6 @@ func TestApplyFilters(t *testing.T) {
 			expectError:     true,
 			expectedError:   "no assets found with exclude tag 'non-existent-tag'",
 		},
-
 		{
 			name: "Exclude Tag and the downstreams",
 			pipeline: &pipeline.Pipeline{
@@ -1058,7 +1059,7 @@ func TestParseDate(t *testing.T) {
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expectedStart, startDate)
 				assert.Equal(t, tt.expectedEnd, endDate)
 			}
@@ -1168,6 +1169,128 @@ func TestCheckLint(t *testing.T) {
 			err = CheckLint(parser, tt.foundPipeline, tt.pipelinePath, logger)
 
 			require.NoError(t, err, "Expected no error but got one")
+		})
+	}
+}
+
+func TestReadState(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		statePath         string
+		stateContent      string
+		expectedError     bool
+		filter            *Filter
+		expectedFilter    *Filter
+		runConfig         *scheduler.RunConfig
+		expectedRunConfig *scheduler.RunConfig
+	}{
+		{
+			name:      "Valid State",
+			statePath: "/logs/run",
+			stateContent: `{
+				"parameters": {
+					"tag": "test-tag",
+					"only": ["task-type"],
+					"pushMetadata": true,
+					"excludeTag": "exclude-tag"
+				}
+			}`,
+			expectedError: false,
+			filter:        &Filter{},
+			expectedFilter: &Filter{
+				IncludeTag:    "test-tag",
+				OnlyTaskTypes: []string{"task-type"},
+				PushMetaData:  true,
+				ExcludeTag:    "exclude-tag",
+			},
+			runConfig:         &scheduler.RunConfig{},
+			expectedRunConfig: &scheduler.RunConfig{},
+		},
+		{
+			name:              "Empty State",
+			statePath:         "/logs/run",
+			stateContent:      `{}`,
+			expectedError:     false,
+			filter:            &Filter{},
+			expectedFilter:    &Filter{},
+			runConfig:         &scheduler.RunConfig{},
+			expectedRunConfig: &scheduler.RunConfig{},
+		},
+		{
+			name:      "Pre-filled Filter Values",
+			statePath: "/logs/run",
+			stateContent: `{
+				"parameters": {
+					"tag": "new-tag",
+					"only": ["new-task-type"],
+					"pushMetadata": false,
+					"excludeTag": "new-exclude-tag"
+				}
+			}`,
+			expectedError: false,
+			filter: &Filter{
+				IncludeTag:    "old-tag",
+				OnlyTaskTypes: []string{"old-task-type"},
+				PushMetaData:  true,
+				ExcludeTag:    "old-exclude-tag",
+			},
+			expectedFilter: &Filter{
+				IncludeTag:    "new-tag",
+				OnlyTaskTypes: []string{"new-task-type"},
+				PushMetaData:  false,
+				ExcludeTag:    "new-exclude-tag",
+			},
+			runConfig:         &scheduler.RunConfig{},
+			expectedRunConfig: &scheduler.RunConfig{},
+		},
+		{
+			name:      "Partial Pre-filled Filter Values",
+			statePath: "/logs/run",
+			stateContent: `{
+				"parameters": {
+					"tag": "partial-tag"
+				}
+			}`,
+			expectedError: false,
+			filter: &Filter{
+				IncludeTag:    "existing-tag",
+				OnlyTaskTypes: []string{"existing-task-type"},
+				PushMetaData:  true,
+				ExcludeTag:    "existing-exclude-tag",
+			},
+			expectedFilter: &Filter{
+				IncludeTag:   "partial-tag",
+				PushMetaData: false,
+				ExcludeTag:   "",
+			},
+			runConfig:         &scheduler.RunConfig{},
+			expectedRunConfig: &scheduler.RunConfig{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			fs := afero.NewMemMapFs()
+			err := afero.WriteFile(fs, filepath.Join(tt.statePath, "2024_12_19_22_59_13.json"), []byte(tt.stateContent), 0o644)
+			require.NoError(t, err)
+
+			filter := tt.filter
+			runConfig := tt.runConfig
+
+			pipelineState, err := ReadState(fs, tt.statePath, filter)
+
+			if tt.expectedError {
+				require.Error(t, err)
+				assert.Nil(t, pipelineState)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, pipelineState)
+				assert.Equal(t, tt.expectedFilter, filter)
+				assert.Equal(t, tt.expectedRunConfig, runConfig)
+			}
 		})
 	}
 }

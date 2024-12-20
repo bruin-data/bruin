@@ -260,15 +260,12 @@ func Run(isDebug *bool) *cli.Command {
 			}
 			var pipelineState *scheduler.PipelineState
 			if c.Bool("continue") {
-				pipelineState, err = scheduler.ReadState(afero.NewOsFs(), statePath)
+				pipelineState, err = ReadState(afero.NewOsFs(), statePath, filter)
 				if err != nil {
 					errorPrinter.Printf("Failed to restore state: %v\n", err)
 					return err
 				}
-				filter.IncludeTag = pipelineState.Parameters.Tag
-				filter.OnlyTaskTypes = pipelineState.Parameters.Only
-				filter.PushMetaData = pipelineState.Parameters.PushMetadata
-				filter.ExcludeTag = pipelineState.Parameters.ExcludeTag
+
 				runConfig = &pipelineState.Parameters
 
 				parsedStartDate, parsedEndDate, err := ParseDate(runConfig.StartDate, runConfig.EndDate, logger)
@@ -355,6 +352,24 @@ func Run(isDebug *bool) *cli.Command {
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
 	}
+}
+
+func ReadState(fs afero.Fs, statePath string, filter *Filter) (*scheduler.PipelineState, error) {
+	pipelineState, err := scheduler.ReadState(fs, statePath)
+	if err != nil {
+		errorPrinter.Printf("Failed to restore state: %v\n", err)
+		return nil, err
+	}
+
+	filter.IncludeTag = pipelineState.Parameters.Tag
+
+	filter.OnlyTaskTypes = pipelineState.Parameters.Only
+
+	filter.PushMetaData = pipelineState.Parameters.PushMetadata
+
+	filter.ExcludeTag = pipelineState.Parameters.ExcludeTag
+
+	return pipelineState, nil
 }
 
 func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.SugaredLogger) (*pipeline.Pipeline, bool, bool, *config.Config, error) {
