@@ -11,12 +11,9 @@ import (
 func BenchmarkLint(b *testing.B) {
 	isDebug := false
 	app := cli.NewApp()
-	app.Commands = []*cli.Command{
-		Lint(&isDebug),
-	}
 
 	for i := 0; i < b.N; i++ {
-		if err := app.Run([]string{"cmd.test", "validate", "./testdata/lineage"}); err != nil {
+		if err := Lint(&isDebug).Run(cli.NewContext(app, nil, nil), "./testdata/lineage"); err != nil {
 			b.Fatalf("Failed to run Lint command: %v", err)
 		}
 	}
