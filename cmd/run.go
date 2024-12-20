@@ -326,6 +326,9 @@ func Run(isDebug *bool) *cli.Command {
 
 			fullRefresh := c.Bool("full-refresh")
 			useUv := c.Bool("use-uv")
+			if filter.PushMetaData {
+				foundPipeline.MetadataPush.Global = true
+			}
 
 			s := scheduler.NewScheduler(logger, foundPipeline, runID)
 
@@ -365,10 +368,9 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to restore state: %v\n", err)
 					return cli.Exit("", 1)
 				}
-			}
-
-			if filter.PushMetaData {
-				foundPipeline.MetadataPush.Global = true
+				if filter.PushMetaData {
+					foundPipeline.MetadataPush.Global = true
+				}
 			}
 
 			if !c.Bool("continue") {
