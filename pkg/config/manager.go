@@ -48,6 +48,7 @@ type Connections struct {
 	Zendesk             []ZendeskConnection             `yaml:"zendesk,omitempty" json:"zendesk,omitempty" mapstructure:"zendesk"`
 	S3                  []S3Connection                  `yaml:"s3,omitempty" json:"s3,omitempty" mapstructure:"s3"`
 	Slack               []SlackConnection               `yaml:"slack,omitempty" json:"slack,omitempty" mapstructure:"slack"`
+	Asana               []AsanaConnection               `yaml:"asana,omitempty" json:"asana,omitempty" mapstructure:"asana"`
 
 	byKey       map[string]any
 	typeNameMap map[string]string
@@ -84,6 +85,7 @@ func (c *Connections) buildConnectionKeyMap() {
 	c.byKey = make(map[string]any)
 	c.typeNameMap = make(map[string]string)
 
+	// todo(turtledev): refactor this block using reflection
 	for i, conn := range c.AwsConnection {
 		c.byKey[conn.Name] = &(c.AwsConnection[i])
 		c.typeNameMap[conn.Name] = "aws"
@@ -232,6 +234,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.Slack {
 		c.byKey[conn.Name] = &(c.Slack[i])
 		c.typeNameMap[conn.Name] = "slack"
+	}
+
+	for i, conn := range c.Asana {
+		c.byKey[conn.Name] = &(c.Asana[i])
+		c.typeNameMap[conn.Name] = "asana"
 	}
 }
 
@@ -422,6 +429,7 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		return fmt.Errorf("environment '%s' does not exist", environmentName)
 	}
 
+	// todo(turtledev): refactor this. It's full of unneccessary repetition
 	switch connType {
 	case "aws":
 		var conn AwsConnection
@@ -633,6 +641,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.DuckDB = append(env.Connections.DuckDB, conn)
+	case "asana":
+		var conn AsanaConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Asana = append(env.Connections.Asana, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -724,6 +739,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Zendesk = removeConnection(env.Connections.Zendesk, connectionName)
 	case "duckdb":
 		env.Connections.DuckDB = removeConnection(env.Connections.DuckDB, connectionName)
+	case "asana":
+		env.Connections.Asana = removeConnection(env.Connections.Asana, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
