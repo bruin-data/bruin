@@ -326,51 +326,10 @@ func Run(isDebug *bool) *cli.Command {
 
 			fullRefresh := c.Bool("full-refresh")
 			useUv := c.Bool("use-uv")
-			if filter.PushMetaData {
-				foundPipeline.MetadataPush.Global = true
-			}
 
 			s := scheduler.NewScheduler(logger, foundPipeline, runID)
-
-			if c.Bool("continue") {
-				pipelineState, err := scheduler.ReadState(afero.NewOsFs(), statePath)
-				if err != nil {
-					errorPrinter.Printf("Failed to restore state: %v\n", err)
-					return cli.Exit("", 1)
-				}
-				only := []string{}
-				if _, ok := pipelineState.Parameters["only"]; ok {
-					only = strings.Split(pipelineState.Parameters["only"], ",")
-				}
-				filter = &Filter{
-					IncludeTag:        pipelineState.Parameters["tag"],
-					OnlyTaskTypes:     only,
-					IncludeDownstream: runDownstreamTasks,
-					PushMetaData:      pipelineState.Parameters["push-metadata"] == "true",
-					SingleTask:        task,
-					ExcludeTag:        pipelineState.Parameters["exclude-tag"],
-				}
-				startDate, err = time.Parse(time.RFC3339, pipelineState.Parameters["startDate"])
-				if err != nil {
-					errorPrinter.Printf("Failed to parse start date from state: %v\n", err)
-					return cli.Exit("", 1)
-				}
-				endDate, err = time.Parse(time.RFC3339, pipelineState.Parameters["endDate"])
-				if err != nil {
-					errorPrinter.Printf("Failed to parse end date from state: %v\n", err)
-					return cli.Exit("", 1)
-				}
-				fullRefresh = pipelineState.Parameters["fullRefresh"] == "true"
-				useUv = pipelineState.Parameters["useUv"] == "true"
-
-				err = s.RestoreState(pipelineState)
-				if err != nil {
-					errorPrinter.Printf("Failed to restore state: %v\n", err)
-					return cli.Exit("", 1)
-				}
-				if filter.PushMetaData {
-					foundPipeline.MetadataPush.Global = true
-				}
+			if filter.PushMetaData {
+				foundPipeline.MetadataPush.Global = true
 			}
 
 			if !c.Bool("continue") {
@@ -435,6 +394,44 @@ func Run(isDebug *bool) *cli.Command {
 		},
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
+	}
+}
+
+func RestoreState(c *cli.Context, s *scheduler.Scheduler, foundPipeline *pipeline.Pipeline, statePath string, filter *Filter, runDownstreamTasks bool, task *pipeline.Asset) error {
+	if c.Bool("continue") {
+		pipelineState, err := scheduler.ReadState(afero.NewOsFs(), statePath)
+		if err != nil {
+			return err
+		}
+		only := []string{}
+		if _, ok := pipelineState.Parameters["only"]; ok {
+			only = strings.Split(pipelineState.Parameters["only"], ",")
+		}
+
+		filter.IncludeTag = pipelineState.Parameters["tag"]
+		filter.OnlyTaskTypes = only
+		filter.IncludeDownstream = runDownstreamTasks
+		filter.PushMetaData = pipelineState.Parameters["push-metadata"] == "true"
+		filter.SingleTask = task
+		filter.ExcludeTag = pipelineState.Parameters["exclude-tag"]
+
+		startDate, err := time.Parse(time.RFC3339, pipelineState.Parameters["startDate"])
+		if err != nil {
+			return err
+		}
+		endDate, err := time.Parse(time.RFC3339, pipelineState.Parameters["endDate"])
+		if err != nil {
+			return err
+		}
+		fullRefresh = pipelineState.Parameters["fullRefresh"] == "true"
+		useUv = pipelineState.Parameters["useUv"] == "true"
+
+		err = s.RestoreState(pipelineState)
+		if err != nil {
+			return err
+		}
+
+		return nil
 	}
 }
 
