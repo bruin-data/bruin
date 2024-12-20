@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"testing"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -12,9 +13,18 @@ func BenchmarkLint(b *testing.B) {
 	isDebug := false
 	app := cli.NewApp()
 
+	b.ReportAllocs()
+	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
+		b.StartTimer()
 		if err := Lint(&isDebug).Run(cli.NewContext(app, nil, nil), "./testdata/lineage"); err != nil {
 			b.Fatalf("Failed to run Lint command: %v", err)
+		}
+		b.StopTimer()
+		elapsed := b.Elapsed()
+		if elapsed > 100*time.Millisecond {
+			b.Fatalf("Benchmark took too long: %v", elapsed)
 		}
 	}
 }
