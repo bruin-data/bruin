@@ -50,12 +50,6 @@ jobs:
       - run: make test
       - name: Run benchmark
         run: go test -bench 'Benchmark' ./cmd/... | tee output.txt
-      - name: Store benchmark result
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          tool: 'go'
-          output-file-path: output.txt  
-
 
   end2end:
     strategy:
