@@ -151,6 +151,7 @@ export default defineConfig({
                         items: [
                             {text: "Adjust", link: "/ingestion/adjust.md"},
                             {text: "Airtable", link: "/ingestion/airtable.md"},
+                            {text: "Asana", link: "/ingestion/asana.md"},
                             {text: "Chess", link: "/ingestion/chess.md"},
                             {text: "Facebook", link: "/ingestion/facebook-ads.md"},
                             {text: "Google Sheets", link: "/ingestion/google_sheets.md"},
