@@ -735,17 +735,21 @@ func (s *Scheduler) RestoreState(state *PipelineState) error {
 	if s.pipeline.GetCompatibilityHash() != state.CompatibilityHash {
 		return errors.New("the pipeline has changed since the last run; please rerun the pipeline")
 	}
+	stateMap := make(map[string]string)
+	for _, state := range state.State {
+		stateMap[state.Name] = state.Status
+	}
+
 	for _, task := range s.taskInstances {
-		for _, state := range state.State {
-			if state.Name == task.GetAsset().Name {
-				switch state.Status {
-				case Failed.String(), UpstreamFailed.String(), Running.String(), Queued.String():
-					task.MarkAs(Pending)
-				case Skipped.String(), Succeeded.String():
-					task.MarkAs(Skipped)
-				default:
-					return fmt.Errorf("unknown status, please create a new issue at https://github.com/bruin-data/bruin/issues/new?template=bug_report.md&title=Unknown+status+ %s", state.Status)
-				}
+		taskName := task.GetAsset().Name
+		if status, exists := stateMap[taskName]; exists {
+			switch status {
+			case Failed.String(), UpstreamFailed.String(), Running.String(), Queued.String():
+				task.MarkAs(Pending)
+			case Skipped.String(), Succeeded.String():
+				task.MarkAs(Skipped)
+			default:
+				return fmt.Errorf("unknown status: %s. Please report this issue at https://github.com/bruin-data/bruin/issues/new", status)
 			}
 		}
 	}

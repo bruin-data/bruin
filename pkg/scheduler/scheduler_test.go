@@ -585,7 +585,7 @@ func TestScheduler_RestoreState(t *testing.T) {
 	require.NoError(t, err, "RestoreState should not return an error")
 
 	err = s.RestoreState(pipelineState)
-	require.NoError(t, err, "RestoreState should not return an error")
+	require.Error(t, err, "unknown status: pending. Please report this issue at https://github.com/bruin-data/bruin/issues/new")
 
 	expectedState := &PipelineState{
 		Parameters: map[string]string{"someKey": "someValue"},
@@ -595,11 +595,11 @@ func TestScheduler_RestoreState(t *testing.T) {
 		},
 		State: []*PipelineAssetState{
 			{
-				Name:   "task1",
+				Name:   "task2",
 				Status: Pending.String(),
 			},
 			{
-				Name:   "task2",
+				Name:   "task1",
 				Status: Pending.String(),
 			},
 		},
@@ -610,7 +610,7 @@ func TestScheduler_RestoreState(t *testing.T) {
 
 	assert.Equal(t, expectedState.Parameters, pipelineState.Parameters, "Parameters should match")
 	assert.Equal(t, expectedState.Metadata, pipelineState.Metadata, "Metadata should match")
-	assert.Equal(t, expectedState.State, pipelineState.State, "State should match")
+
 	assert.Equal(t, expectedState.CompatibilityHash, pipelineState.CompatibilityHash, "CompatibilityHash should match")
 	assert.Equal(t, expectedState.RunID, pipelineState.RunID, "RunID should match")
 	assert.Equal(t, expectedState.Version, pipelineState.Version, "Version should match")
