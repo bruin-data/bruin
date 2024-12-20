@@ -42,10 +42,10 @@ func Format(isDebug *bool) *cli.Command {
 			}
 
 			output := c.String("output")
-			check_lint := c.Bool("lint")
+			checkLint := c.Bool("lint")
 
 			if isPathReferencingAsset(repoOrAsset) {
-				if check_lint {
+				if checkLint {
 					return checkChangesForSingleAsset(repoOrAsset, output)
 				}
 				asset, err := formatAsset(repoOrAsset)
@@ -78,7 +78,7 @@ func Format(isDebug *bool) *cli.Command {
 
 			for _, assetPath := range assetPaths {
 				assetFinderPool.Go(func() {
-					if check_lint {
+					if checkLint {
 						changed, err := shouldFileChange(assetPath)
 						if err != nil {
 							logger.Debugf("failed to process path '%s': %v", assetPath, err)
@@ -112,7 +112,7 @@ func Format(isDebug *bool) *cli.Command {
 			}
 
 			assetFinderPool.Wait()
-			if check_lint && len(errorList) == 0 {
+			if checkLint && len(errorList) == 0 {
 				if len(changedAssetpaths) == 0 {
 					if output == "json" {
 						return nil
@@ -126,7 +126,7 @@ func Format(isDebug *bool) *cli.Command {
 				}
 				return cli.Exit("", 1)
 			}
-			if !check_lint && len(errorList) == 0 {
+			if !checkLint && len(errorList) == 0 {
 				if output == "json" {
 					return nil
 				}
