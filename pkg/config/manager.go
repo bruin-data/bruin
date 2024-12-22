@@ -360,6 +360,10 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 		}
 		// Make GoogleCloudPlatform service account file paths absolute
 		for i, conn := range env.Connections.GoogleCloudPlatform {
+			if conn.ServiceAccountFile == "" {
+				continue
+			}
+
 			if filepath.IsAbs(conn.ServiceAccountFile) {
 				continue
 			}
