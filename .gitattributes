@@ -1,0 +1,13 @@
+# Specify language for Python files
+*.py linguist-language=Python
+
+# Specify language for Go files
+*.go linguist-language=Go
+
+# Exclude test files from language statistics
+tests/** linguist-vendored
+*.test.py linguist-vendored
+
+# Exclude documentation files from language statistics
+docs/** linguist-vendored
+*.md linguist-vendored
