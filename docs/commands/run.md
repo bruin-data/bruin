@@ -32,9 +32,9 @@ bruin run [FLAGS] [optional path to the pipeline/asset]
 |  `--continue` | bool | `false` | Continue from the last failed task. |
 
 
-## Continue from the last failed task
+### Continue from the last failed task
 
-If you want to continue from the last failed task, you can use the `--continue` flag. This will run the pipeline/asset from the last failed task. Bruin will automatically retrive all the flags used in the last run.
+If you want to continue from the last failed task, you can use the `--continue` flag. This will run the pipeline/asset from the last failed task. Bruin will automatically retrive all the flags used in the last run. 
 
 ```bash
 bruin run --continue 
