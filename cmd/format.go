@@ -190,7 +190,7 @@ func shouldFileChange(path string) (bool, error) {
 	}
 
 	// Generate the new content without persisting
-	newContent, err := asset.RenderContent()
+	newContent, err := asset.FormatContent()
 	if err != nil {
 		return false, errors2.Wrap(err, "failed to generate new content without persisting")
 	}

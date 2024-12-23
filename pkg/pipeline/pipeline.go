@@ -784,7 +784,7 @@ func (a *Asset) Persist(fs afero.Fs) error {
 	}
 
 	// Reuse the logic from PersistWithoutWriting
-	content, err := a.RenderContent()
+	content, err := a.FormatContent()
 	if err != nil {
 		return errors.Wrap(err, "failed to generate content for persistence")
 	}
@@ -794,7 +794,7 @@ func (a *Asset) Persist(fs afero.Fs) error {
 	return afero.WriteFile(fs, filePath, content, 0o644)
 }
 
-func (a *Asset) RenderContent() ([]byte, error) {
+func (a *Asset) FormatContent() ([]byte, error) {
 	if a == nil {
 		return nil, errors.New("failed to build an asset, therefore cannot persist it")
 	}
