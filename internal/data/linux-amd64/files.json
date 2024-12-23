@@ -1,5 +1,5 @@
 {
-  "contentHash": "ff0fbe5b0d7042b2a4da470d3f16e6e9fbdf5869afbf98693a8017ea38609560",
+  "contentHash": "1b3f8217083fc583ea587aa08349423dd39ca548a723ac2ee392187744ab7ded",
   "files": [
     {
       "name": "sqlglot",
@@ -427,32 +427,27 @@
       "perm": 2147484141
     },
     {
-      "name": "sqlglotrs-0.2.13.dist-info",
+      "name": "sqlglotrs-0.3.0.dist-info",
       "size": 0,
       "perm": 2147484141
     },
     {
-      "name": "sqlglotrs-0.2.13.dist-info/INSTALLER",
+      "name": "sqlglotrs-0.3.0.dist-info/INSTALLER",
       "size": 4,
       "perm": 420
     },
     {
-      "name": "sqlglotrs-0.2.13.dist-info/METADATA",
-      "size": 546,
+      "name": "sqlglotrs-0.3.0.dist-info/METADATA",
+      "size": 545,
       "perm": 420
     },
     {
-      "name": "sqlglotrs-0.2.13.dist-info/RECORD",
-      "size": 639,
+      "name": "sqlglotrs-0.3.0.dist-info/RECORD",
+      "size": 544,
       "perm": 420
     },
     {
-      "name": "sqlglotrs-0.2.13.dist-info/REQUESTED",
-      "size": 0,
-      "perm": 420
-    },
-    {
-      "name": "sqlglotrs-0.2.13.dist-info/WHEEL",
+      "name": "sqlglotrs-0.3.0.dist-info/WHEEL",
       "size": 129,
       "perm": 420
     },
@@ -463,7 +458,7 @@
     },
     {
       "name": "sqlglotrs/sqlglotrs.cpython-312-x86_64-linux-gnu.so",
-      "size": 826312,
+      "size": 802848,
       "perm": 493,
       "compressed": true
     }
