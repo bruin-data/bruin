@@ -3,7 +3,6 @@ import sys
 import logging
 import os
 from parser.main import get_column_lineage, get_tables
-from datetime import datetime
 
 from pathlib import Path
 

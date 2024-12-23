@@ -21,13 +21,13 @@ const (
 
 type contextKey string
 
+var TelemetryKey string
 var (
-	TelemetryKey = ""
-	OptOut       = false
-	AppVersion   = ""
-	RunID        = ""
-	client       analytics.Client
-	lock         sync.Mutex
+	OptOut     = false
+	AppVersion = ""
+	RunID      = ""
+	client     analytics.Client
+	lock       sync.Mutex
 )
 
 func Init() io.Closer {

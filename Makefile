@@ -8,6 +8,7 @@ ERROR_COLOR=\033[31;01m
 WARN_COLOR=\033[33;01m
 TELEMETRY_OPTOUT=1
 CURRENT_DIR=$(pwd)
+TELEMETRY_KEY=""
 FILES := $(wildcard *.yml *.txt *.py)
 
 .PHONY: all clean test build tools format pre-commit tools-update
@@ -19,8 +20,7 @@ deps: tools
 
 build: deps
 	@echo "$(OK_COLOR)==> Building the application...$(NO_COLOR)"
-	@CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0))" -o "$(BUILD_DIR)/$(NAME)" "$(BUILD_SRC)"
-
+	@CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0)) -X main.TelemetryKey=$(TELEMETRY_KEY)" -o "$(BUILD_DIR)/$(NAME)" "$(BUILD_SRC)"
 
 integration-test: build
 	@touch integration-tests/.git

@@ -1424,7 +1424,7 @@ test_cases = [
             "raw.Teams": {
                 "Id": "INTEGER",
                 "Name": "STRING",
-            }
+            },
         },
         "expected": [
             {
@@ -1440,12 +1440,13 @@ test_cases = [
         ],
         "expected_non_selected": [
             {
-                'name': 'id',
-                'upstream': [{'column': 'id', 'table': 'raw.Organizations'}]},
+                "name": "id",
+                "upstream": [{"column": "id", "table": "raw.Organizations"}],
+            },
             {
-                'name': 'organizationid',
-                'upstream': [{'column': 'organizationid', 'table': 'raw.Users'}]
-            }
+                "name": "organizationid",
+                "upstream": [{"column": "organizationid", "table": "raw.Users"}],
+            },
         ],
     },
     {
@@ -1466,7 +1467,7 @@ test_cases = [
                 "CreatedDate": "TIMESTAMP",
                 "CreatedById": "INTEGER",
                 "UpdatedDate": "TIMESTAMP",
-                "UpdatedById": "INTEGER"
+                "UpdatedById": "INTEGER",
             },
             "raw.teams": {
                 "Id": "INTEGER",
@@ -1482,7 +1483,7 @@ test_cases = [
                 "CreatedById": "INTEGER",
                 "UpdatedDate": "TIMESTAMP",
                 "UpdatedById": "INTEGER",
-                "IsGuest": "BOOLEAN"
+                "IsGuest": "BOOLEAN",
             },
         },
         "expected": [
@@ -1498,18 +1499,12 @@ test_cases = [
             },
         ],
         "expected_non_selected": [
+            {"name": "id", "upstream": [{"column": "id", "table": "raw.teams"}]},
+            {"name": "name", "upstream": [{"column": "name", "table": "raw.teams"}]},
             {
-                'name': 'id',
-                'upstream': [{'column': 'id', 'table': 'raw.teams'}]
+                "name": "teamid",
+                "upstream": [{"column": "teamid", "table": "raw.teammemberships"}],
             },
-            {
-                'name': 'name',
-                'upstream': [{'column': 'name', 'table': 'raw.teams'}]
-            },
-            {
-                'name': 'teamid',
-                'upstream': [{'column': 'teamid', 'table': 'raw.teammemberships'}]
-            }
         ],
     },
 ]
@@ -1519,11 +1514,11 @@ test_cases = [
     "query,schema,expected,expected_non_selected,dialect",
     [
         (
-                tc["query"],
-                tc["schema"],
-                tc["expected"],
-                tc["expected_non_selected"],
-                tc["dialect"],
+            tc["query"],
+            tc["schema"],
+            tc["expected"],
+            tc["expected_non_selected"],
+            tc["dialect"],
         )
         for tc in test_cases
     ],

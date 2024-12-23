@@ -12,14 +12,14 @@ import (
 )
 
 var (
-	version = "dev"
-	commit  = ""
+	version      = "dev"
+	commit       = ""
+	TelemetryKey string
 )
 
 func main() {
 	isDebug := false
 	color.NoColor = false
-
 	var optOut bool
 	if os.Getenv("TELEMETRY_OPTOUT") != "" {
 		optOut = true
@@ -27,8 +27,7 @@ func main() {
 
 	v.Version = version
 	v.Commit = commit
-
-	telemetry.TelemetryKey = os.Getenv("TELEMETRY_KEY")
+	telemetry.TelemetryKey = TelemetryKey
 	telemetry.OptOut = optOut
 	telemetry.AppVersion = v.Version
 	client := telemetry.Init()
