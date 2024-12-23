@@ -94,7 +94,7 @@ func Lint(isDebug *bool) *cli.Command {
 
 			logger.Debugf("loaded the config from path '%s'", configFilePath)
 
-			err = switchEnvironment(c, cm, os.Stdin)
+			err = switchEnvironment(c.String("environment"), c.Bool("force"), cm, os.Stdin)
 			if err != nil {
 				return err
 			}

@@ -124,19 +124,21 @@ type PipelineState struct {
 }
 
 type RunConfig struct {
-	Downstream   bool     `json:"downstream"`
-	StartDate    string   `json:"startDate"`
-	EndDate      string   `json:"endDate"`
-	Workers      int      `json:"workers"`
-	Environment  string   `json:"environment"`
-	Force        bool     `json:"force"`
-	PushMetadata bool     `json:"pushMetadata"`
-	NoLogFile    bool     `json:"noLogFile"`
-	FullRefresh  bool     `json:"fullRefresh"`
-	UseUV        bool     `json:"useUV"`
-	Tag          string   `json:"tag"`
-	ExcludeTag   string   `json:"excludeTag"`
-	Only         []string `json:"only"`
+	Downstream        bool     `json:"downstream"`
+	StartDate         string   `json:"startDate"`
+	EndDate           string   `json:"endDate"`
+	Workers           int      `json:"workers"`
+	Environment       string   `json:"environment"`
+	Force             bool     `json:"force"`
+	PushMetadata      bool     `json:"pushMetadata"`
+	NoLogFile         bool     `json:"noLogFile"`
+	FullRefresh       bool     `json:"fullRefresh"`
+	UseUV             bool     `json:"useUV"`
+	Tag               string   `json:"tag"`
+	ExcludeTag        string   `json:"excludeTag"`
+	Only              []string `json:"only"`
+	Output            string   `json:"output"`
+	ExpUseWingetForUv bool     `json:"expUseWingetForUv"`
 }
 
 type PipelineAssetState struct {
