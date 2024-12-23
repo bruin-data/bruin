@@ -305,7 +305,7 @@ func (r *ConnectionsCommand) ListConnections(pathToProject, output, environment 
 		fmt.Println()
 	}
 
-	return nil
+	return err
 }
 
 func printErrorForOutput(output string, err error) {
