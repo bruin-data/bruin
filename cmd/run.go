@@ -155,19 +155,21 @@ func Run(isDebug *bool) *cli.Command {
 			logger := makeLogger(*isDebug)
 			// Initialize runConfig with values from cli.Context
 			runConfig := &scheduler.RunConfig{
-				Downstream:   c.Bool("downstream"),
-				StartDate:    c.String("start-date"),
-				EndDate:      c.String("end-date"),
-				Workers:      c.Int("workers"),
-				Environment:  c.String("environment"),
-				Force:        c.Bool("force"),
-				PushMetadata: c.Bool("push-metadata"),
-				NoLogFile:    c.Bool("no-log-file"),
-				FullRefresh:  c.Bool("full-refresh"),
-				UseUV:        c.Bool("use-uv"),
-				Tag:          c.String("tag"),
-				ExcludeTag:   c.String("exclude-tag"),
-				Only:         c.StringSlice("only"),
+				Downstream:        c.Bool("downstream"),
+				StartDate:         c.String("start-date"),
+				EndDate:           c.String("end-date"),
+				Workers:           c.Int("workers"),
+				Environment:       c.String("environment"),
+				Force:             c.Bool("force"),
+				PushMetadata:      c.Bool("push-metadata"),
+				NoLogFile:         c.Bool("no-log-file"),
+				FullRefresh:       c.Bool("full-refresh"),
+				UseUV:             c.Bool("use-uv"),
+				Tag:               c.String("tag"),
+				ExcludeTag:        c.String("exclude-tag"),
+				Only:              c.StringSlice("only"),
+				Output:            c.String("output"),
+				ExpUseWingetForUv: c.Bool("exp-use-winget-for-uv"),
 			}
 
 			var startDate, endDate time.Time
@@ -204,55 +206,12 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			}
 
-			err = switchEnvironment(c, pipelineInfo.Config, os.Stdin)
-			if err != nil {
-				return err
-			}
-
-			connectionManager, errs := connection.NewManagerFromConfig(pipelineInfo.Config)
-			if len(errs) > 0 {
-				printErrors(errs, c.String("output"), "Failed to register connections")
-				return cli.Exit("", 1)
-			}
-
 			// handle log files
 			runID := time.Now().Format("2006_01_02_15_04_05")
-			if !runConfig.NoLogFile {
-				logFileName := fmt.Sprintf("%s__%s", runID, foundPipeline.Name)
-				if pipelineInfo.RunningForAnAsset {
-					logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, task.Name)
-				}
-
-				logPath, err := filepath.Abs(fmt.Sprintf("%s/%s/%s.log", repoRoot.Path, LogsFolder, logFileName))
-				if err != nil {
-					errorPrinter.Printf("Failed to create log file: %v\n", err)
-					return cli.Exit("", 1)
-				}
-
-				fn, err2 := logOutput(logPath)
-				if err2 != nil {
-					errorPrinter.Printf("Failed to create log file: %v\n", err2)
-					return cli.Exit("", 1)
-				}
-
-				defer fn()
-				color.Output = os.Stdout
-
-				err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, LogsFolder+"/*.log")
-				if err != nil {
-					errorPrinter.Printf("Failed to add the log file to .gitignore: %v\n", err)
-					return cli.Exit("", 1)
-				}
-			}
-			infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", foundPipeline.Name, len(foundPipeline.Assets))
-
-			if pipelineInfo.RunningForAnAsset {
-				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
-			}
 
 			parser, err := sqlparser.NewSQLParser(false)
 			if err != nil {
-				printError(err, c.String("output"), "Could not initialize sql parser")
+				printError(err, runConfig.Output, "Could not initialize sql parser")
 			}
 
 			if err := CheckLint(parser, foundPipeline, inputPath, logger); err != nil {
@@ -291,6 +250,18 @@ func Run(isDebug *bool) *cli.Command {
 				foundPipeline.MetadataPush.Global = true
 			}
 
+			if !runConfig.NoLogFile {
+				err = ConfigureLogs(pipelineInfo, foundPipeline, task, runID, repoRoot)
+				if err != nil {
+					return err
+				}
+			}
+			infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", foundPipeline.Name, len(foundPipeline.Assets))
+
+			if pipelineInfo.RunningForAnAsset {
+				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
+			}
+
 			s := scheduler.NewScheduler(logger, foundPipeline, runID)
 
 			if c.Bool("continue") {
@@ -298,6 +269,17 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to restore state: %v\n", err)
 					return cli.Exit("", 1)
 				}
+			}
+
+			err = switchEnvironment(runConfig.Environment, runConfig.Force, pipelineInfo.Config, os.Stdin)
+			if err != nil {
+				return err
+			}
+
+			connectionManager, errs := connection.NewManagerFromConfig(pipelineInfo.Config)
+			if len(errs) > 0 {
+				printErrors(errs, runConfig.Output, "Failed to register connections")
+				return cli.Exit("", 1)
 			}
 
 			if !c.Bool("continue") {
@@ -322,7 +304,7 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			ex, err := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"))
+			ex, err := executor.NewConcurrent(logger, mainExecutors, runConfig.Workers)
 			if err != nil {
 				errorPrinter.Printf("Failed to create executor: %v\n", err)
 				return cli.Exit("", 1)
@@ -333,7 +315,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
-			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, c.Bool("exp-use-winget-for-uv")) //nolint:staticcheck
+			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, runConfig.ExpUseWingetForUv) //nolint:staticcheck
 
 			ex.Start(runCtx, s.WorkQueue, s.Results)
 
@@ -363,6 +345,35 @@ func Run(isDebug *bool) *cli.Command {
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
 	}
+}
+
+func ConfigureLogs(pipelineInfo *PipelineInfo, foundPipeline *pipeline.Pipeline, task *pipeline.Asset, runID string, repoRoot *git.Repo) error {
+	logFileName := fmt.Sprintf("%s__%s", runID, foundPipeline.Name)
+	if pipelineInfo.RunningForAnAsset {
+		logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, task.Name)
+	}
+
+	logPath, err := filepath.Abs(fmt.Sprintf("%s/%s/%s.log", repoRoot.Path, LogsFolder, logFileName))
+	if err != nil {
+		errorPrinter.Printf("Failed to create log file: %v\n", err)
+		return err
+	}
+
+	fn, err2 := logOutput(logPath)
+	if err2 != nil {
+		errorPrinter.Printf("Failed to create log file: %v\n", err2)
+		return err
+	}
+
+	defer fn()
+	color.Output = os.Stdout
+
+	err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, LogsFolder+"/*.log")
+	if err != nil {
+		errorPrinter.Printf("Failed to add the log file to .gitignore: %v\n", err)
+		return err
+	}
+	return nil
 }
 
 func ReadState(fs afero.Fs, statePath string, filter *Filter) (*scheduler.PipelineState, error) {

@@ -21,8 +21,7 @@ type ErrorResponses struct {
 	Error []string `json:"error"`
 }
 
-func switchEnvironment(c *cli.Context, cm *config.Config, stdin io.ReadCloser) error {
-	env := c.String("environment")
+func switchEnvironment(env string, force bool, cm *config.Config, stdin io.ReadCloser) error {
 	if env == "" {
 		return nil
 	}
@@ -34,7 +33,7 @@ func switchEnvironment(c *cli.Context, cm *config.Config, stdin io.ReadCloser) e
 	}
 
 	// if env name is similar to "prod" ask for confirmation
-	if !c.Bool("force") && strings.Contains(strings.ToLower(env), "prod") {
+	if !force && strings.Contains(strings.ToLower(env), "prod") {
 		prompt := promptui.Prompt{
 			Label:     "You are using a production environment. Are you sure you want to continue?",
 			IsConfirm: true,
