@@ -184,12 +184,6 @@ func Run(isDebug *bool) *cli.Command {
 			if err != nil {
 				return err
 			}
-			foundPipeline := pipelineInfo.Pipeline
-
-			if runConfig.Downstream {
-				infoPrinter.Println("The downstream tasks will be executed as well.")
-				pipelineInfo.RunDownstreamTasks = true
-			}
 
 			repoRoot, err := git.FindRepoFromPath(inputPath)
 			if err != nil {
@@ -209,16 +203,22 @@ func Run(isDebug *bool) *cli.Command {
 			// handle log files
 			runID := time.Now().Format("2006_01_02_15_04_05")
 
+			infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
+
+			if pipelineInfo.RunningForAnAsset {
+				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
+			}
+
 			parser, err := sqlparser.NewSQLParser(false)
 			if err != nil {
 				printError(err, runConfig.Output, "Could not initialize sql parser")
 			}
 
-			if err := CheckLint(parser, foundPipeline, inputPath, logger); err != nil {
+			if err := CheckLint(parser, pipelineInfo.Pipeline, inputPath, logger); err != nil {
 				return err
 			}
 
-			statePath := filepath.Join(repoRoot.Path, "logs/runs", foundPipeline.Name)
+			statePath := filepath.Join(repoRoot.Path, "logs/runs", pipelineInfo.Pipeline.Name)
 
 			filter := &Filter{
 				IncludeTag:        runConfig.Tag,
@@ -246,29 +246,43 @@ func Run(isDebug *bool) *cli.Command {
 				endDate = parsedEndDate
 			}
 
-			if filter.PushMetaData {
-				foundPipeline.MetadataPush.Global = true
+			foundPipeline := pipelineInfo.Pipeline
+
+			if runConfig.Downstream {
+				infoPrinter.Println("The downstream tasks will be executed as well.")
+				pipelineInfo.RunDownstreamTasks = true
 			}
 
 			if !runConfig.NoLogFile {
-				err = ConfigureLogs(pipelineInfo, foundPipeline, task, runID, repoRoot)
-				if err != nil {
-					return err
+				logFileName := fmt.Sprintf("%s__%s", runID, foundPipeline.Name)
+				if pipelineInfo.RunningForAnAsset {
+					logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, task.Name)
 				}
-			}
-			infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", foundPipeline.Name, len(foundPipeline.Assets))
 
-			if pipelineInfo.RunningForAnAsset {
-				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
-			}
-
-			s := scheduler.NewScheduler(logger, foundPipeline, runID)
-
-			if c.Bool("continue") {
-				if err := s.RestoreState(pipelineState); err != nil {
-					errorPrinter.Printf("Failed to restore state: %v\n", err)
+				logPath, err := filepath.Abs(fmt.Sprintf("%s/%s/%s.log", repoRoot.Path, LogsFolder, logFileName))
+				if err != nil {
+					errorPrinter.Printf("Failed to create log file: %v\n", err)
 					return cli.Exit("", 1)
 				}
+
+				fn, err2 := logOutput(logPath)
+				if err2 != nil {
+					errorPrinter.Printf("Failed to create log file: %v\n", err2)
+					return cli.Exit("", 1)
+				}
+
+				defer fn()
+				color.Output = os.Stdout
+
+				err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, LogsFolder+"/*.log")
+				if err != nil {
+					errorPrinter.Printf("Failed to add the log file to .gitignore: %v\n", err)
+					return cli.Exit("", 1)
+				}
+			}
+
+			if filter.PushMetaData {
+				foundPipeline.MetadataPush.Global = true
 			}
 
 			err = switchEnvironment(runConfig.Environment, runConfig.Force, pipelineInfo.Config, os.Stdin)
@@ -280,6 +294,15 @@ func Run(isDebug *bool) *cli.Command {
 			if len(errs) > 0 {
 				printErrors(errs, runConfig.Output, "Failed to register connections")
 				return cli.Exit("", 1)
+			}
+
+			s := scheduler.NewScheduler(logger, foundPipeline, runID)
+
+			if c.Bool("continue") {
+				if err := s.RestoreState(pipelineState); err != nil {
+					errorPrinter.Printf("Failed to restore state: %v\n", err)
+					return cli.Exit("", 1)
+				}
 			}
 
 			if !c.Bool("continue") {
@@ -304,7 +327,7 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			ex, err := executor.NewConcurrent(logger, mainExecutors, runConfig.Workers)
+			ex, err := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"))
 			if err != nil {
 				errorPrinter.Printf("Failed to create executor: %v\n", err)
 				return cli.Exit("", 1)
@@ -345,35 +368,6 @@ func Run(isDebug *bool) *cli.Command {
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
 	}
-}
-
-func ConfigureLogs(pipelineInfo *PipelineInfo, foundPipeline *pipeline.Pipeline, task *pipeline.Asset, runID string, repoRoot *git.Repo) error {
-	logFileName := fmt.Sprintf("%s__%s", runID, foundPipeline.Name)
-	if pipelineInfo.RunningForAnAsset {
-		logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, task.Name)
-	}
-
-	logPath, err := filepath.Abs(fmt.Sprintf("%s/%s/%s.log", repoRoot.Path, LogsFolder, logFileName))
-	if err != nil {
-		errorPrinter.Printf("Failed to create log file: %v\n", err)
-		return err
-	}
-
-	fn, err2 := logOutput(logPath)
-	if err2 != nil {
-		errorPrinter.Printf("Failed to create log file: %v\n", err2)
-		return err
-	}
-
-	defer fn()
-	color.Output = os.Stdout
-
-	err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, LogsFolder+"/*.log")
-	if err != nil {
-		errorPrinter.Printf("Failed to add the log file to .gitignore: %v\n", err)
-		return err
-	}
-	return nil
 }
 
 func ReadState(fs afero.Fs, statePath string, filter *Filter) (*scheduler.PipelineState, error) {
