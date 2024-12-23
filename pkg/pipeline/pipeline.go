@@ -783,52 +783,18 @@ func (a *Asset) Persist(fs afero.Fs) error {
 		return errors.New("failed to build an asset, therefore cannot persist it")
 	}
 
-	a.removeRedundanciesBeforePersisting()
-
-	buf := bytes.NewBuffer(nil)
-	enc := yaml.NewEncoder(buf)
-	enc.SetIndent(2)
-
-	err := enc.Encode(a)
+	// Reuse the logic from PersistWithoutWriting
+	content, err := a.RenderContent()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to generate content for persistence")
 	}
 
-	yamlConfig := buf.Bytes()
-
-	keysToAddSpace := []string{"custom_checks", "depends", "columns", "materialization", "secrets", "parameters"}
-	for _, key := range keysToAddSpace {
-		yamlConfig = bytes.ReplaceAll(yamlConfig, []byte("\n"+key+":"), []byte("\n\n"+key+":"))
-	}
-
+	// Write the generated content to the file
 	filePath := a.ExecutableFile.Path
-	beginning := ""
-	end := ""
-	executableContent := ""
-
-	if strings.HasSuffix(a.ExecutableFile.Path, ".sql") {
-		// we are dealing with a SQL asset with an embedded YAML block, treat accordingly.
-		beginning = "/* " + configMarkerString + "\n\n"
-		end = "\n" + configMarkerString + " */" + "\n\n"
-		executableContent = a.ExecutableFile.Content
-	}
-
-	if strings.HasSuffix(a.ExecutableFile.Path, ".py") {
-		// we are dealing with a Python asset with an embedded YAML block, treat accordingly.
-		beginning = `""" ` + configMarkerString + "\n\n"
-		end = "\n" + configMarkerString + ` """` + "\n\n"
-		executableContent = a.ExecutableFile.Content
-	}
-
-	stringVersion := beginning + string(yamlConfig) + end + executableContent
-	if !strings.HasSuffix(stringVersion, "\n") {
-		stringVersion += "\n"
-	}
-
-	return afero.WriteFile(fs, filePath, []byte(stringVersion), 0o644)
+	return afero.WriteFile(fs, filePath, content, 0o644)
 }
 
-func (a *Asset) PersistWithoutWriting() ([]byte, error) {
+func (a *Asset) RenderContent() ([]byte, error) {
 	if a == nil {
 		return nil, errors.New("failed to build an asset, therefore cannot persist it")
 	}
