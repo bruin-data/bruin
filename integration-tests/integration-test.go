@@ -114,7 +114,6 @@ func main() {
 		os.Exit(1)
 	}
 	expectExitCode("run --continue ./continue", 0)
-
 }
 
 func expectOutputIncludes(command string, code int, contains []string) {
