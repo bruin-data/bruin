@@ -1,18 +1,6 @@
 name: CI Checks
 
 on:
-  push:
-    branches: [ main ]
-    paths-ignore:
-      - 'docs/**'
-      - 'examples/**'
-      - 'resources/**'
-      - 'templates/**'
-      - 'install.sh'
-      - 'README.md'
-      - 'Makefile'
-      - 'package.json'
-      - 'package-lock.json'
   pull_request:
     branches: [ main ]
     paths-ignore:
@@ -25,7 +13,7 @@ on:
       - 'Makefile'
       - 'package.json'
       - 'package-lock.json'
-
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || (github.ref == 'refs/heads/main' && github.sha || github.ref) }}
