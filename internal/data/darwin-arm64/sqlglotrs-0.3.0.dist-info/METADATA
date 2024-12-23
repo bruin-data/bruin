@@ -1,0 +1,13 @@
+Metadata-Version: 2.3
+Name: sqlglotrs
+Version: 0.3.0
+Classifier: Programming Language :: Rust
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: License :: OSI Approved :: MIT License
+Summary: An easily customizable SQL parser and transpiler
+Author-email: Toby Mao <toby.mao@gmail.com>
+License: MIT
+Requires-Python: >=3.7
+Project-URL: Homepage, https://github.com/tobymao/sqlglot
+Project-URL: Issues, https://github.com/tobymao/sqlglot/issues

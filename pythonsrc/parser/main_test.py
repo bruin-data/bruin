@@ -297,23 +297,22 @@ test_cases_non_selected_columns = [
         ],
     },
 ]
-
 test_cases = [
     {
         "name": "nested subqueries",
         "dialect": "bigquery",
         "query": """
-            select *
-            from table1
-            join (
-                select *
-                from (
-                    select *
-                    from table2
-                ) t2
-            ) t3
-            using(a)
-        """,
+             select *
+             from table1
+             join (
+                 select *
+                 from (
+                     select *
+                     from table2
+                 ) t2
+             ) t3
+             using(a)
+         """,
         "schema": {
             "table1": {"a": "str", "b": "int64"},
             "table2": {"a": "str", "c": "int64"},
@@ -352,17 +351,17 @@ test_cases = [
         "name": "case-when",
         "dialect": "bigquery",
         "query": """
-            SELECT
-                items.item_id as item_id,
-                CASE
-                    WHEN price > 1000 AND t2.somecol < 250 THEN 'high'
-                    WHEN price > 100 THEN 'medium'
-                    ELSE 'low'
-                END as price_category
-            FROM items
-            JOIN orders as t2 on items.item_id = t2.item_id
-            WHERE in_stock = true
-        """,
+             SELECT
+                 items.item_id as item_id,
+                 CASE
+                     WHEN price > 1000 AND t2.somecol < 250 THEN 'high'
+                     WHEN price > 100 THEN 'medium'
+                     ELSE 'low'
+                 END as price_category
+             FROM items
+             JOIN orders as t2 on items.item_id = t2.item_id
+             WHERE in_stock = true
+         """,
         "schema": {
             "items": {"item_id": "str", "price": "int64", "in_stock": "bool"},
             "orders": {"item_id": "str", "somecol": "int64"},
@@ -402,10 +401,10 @@ test_cases = [
         "name": "simple join",
         "dialect": "bigquery",
         "query": """
-            SELECT t1.col1, t2.col2
-            FROM table1 t1
-            JOIN table2 t2 ON t1.id = t2.id
-        """,
+             SELECT t1.col1, t2.col2
+             FROM table1 t1
+             JOIN table2 t2 ON t1.id = t2.id
+         """,
         "schema": {
             "table1": {"id": "str", "col1": "int64"},
             "table2": {"id": "str", "col2": "int64"},
@@ -436,10 +435,10 @@ test_cases = [
         "name": "aggregate function",
         "dialect": "bigquery",
         "query": """
-            SELECT customer_id as cid, COUNT(order_id) as order_count
-            FROM orders
-            GROUP BY customer_id
-        """,
+             SELECT customer_id as cid, COUNT(order_id) as order_count
+             FROM orders
+             GROUP BY customer_id
+         """,
         "schema": {
             "orders": {"customer_id": "str", "order_id": "int64"},
         },
@@ -466,11 +465,11 @@ test_cases = [
         "name": "subquery in select",
         "dialect": "bigquery",
         "query": """
-            SELECT
-                emp_id,
-                (SELECT AVG(salary) FROM salaries WHERE salaries.emp_id = employees.emp_id) as avg_salary
-            FROM employees
-        """,
+             SELECT
+                 emp_id,
+                 (SELECT AVG(salary) FROM salaries WHERE salaries.emp_id = employees.emp_id) as avg_salary
+             FROM employees
+         """,
         "schema": {
             "employees": {"emp_id": "str"},
             "salaries": {"emp_id": "str", "salary": "int64"},
@@ -501,10 +500,10 @@ test_cases = [
         "name": "union all",
         "dialect": "bigquery",
         "query": """
-            SELECT id, name FROM customers
-            UNION ALL
-            SELECT id, name FROM employees
-        """,
+             SELECT id, name FROM customers
+             UNION ALL
+             SELECT id, name FROM employees
+         """,
         "schema": {
             "customers": {"id": "str", "name": "str"},
             "employees": {"id": "str", "name": "str"},
@@ -533,10 +532,10 @@ test_cases = [
         "name": "self join",
         "dialect": "bigquery",
         "query": """
-            SELECT e1.id, e2.manager_id
-            FROM employees e1
-            JOIN employees e2 ON e1.manager_id = e2.id
-        """,
+             SELECT e1.id, e2.manager_id
+             FROM employees e1
+             JOIN employees e2 ON e1.manager_id = e2.id
+         """,
         "schema": {
             "employees": {"id": "str", "manager_id": "str"},
         },
@@ -566,23 +565,23 @@ test_cases = [
         "name": "complex case-when",
         "dialect": "bigquery",
         "query": """
-            SELECT
-                sales.id,
-                CASE
-                    WHEN sales.amount > 500 THEN 'large'
-                    WHEN sales.amount > 100 THEN 'medium'
-                    ELSE 'small'
-                END as sale_size,
-                CASE
-                    WHEN regions.name = 'North' THEN 'N'
-                    WHEN regions.name = 'South' THEN 'S'
-                    ELSE 'Other'
-                END as region_abbr,
-                'fixed' as fixed,
-                now() as updated_at
-            FROM sales
-            JOIN regions ON sales.region_id = regions.id
-        """,
+             SELECT
+                 sales.id,
+                 CASE
+                     WHEN sales.amount > 500 THEN 'large'
+                     WHEN sales.amount > 100 THEN 'medium'
+                     ELSE 'small'
+                 END as sale_size,
+                 CASE
+                     WHEN regions.name = 'North' THEN 'N'
+                     WHEN regions.name = 'South' THEN 'S'
+                     ELSE 'Other'
+                 END as region_abbr,
+                 'fixed' as fixed,
+                 now() as updated_at
+             FROM sales
+             JOIN regions ON sales.region_id = regions.id
+         """,
         "schema": {
             "sales": {"id": "str", "amount": "int64", "region_id": "str"},
             "regions": {"id": "str", "name": "str"},
@@ -618,14 +617,14 @@ test_cases = [
         "name": "aggregate functions with multiple columns",
         "dialect": "bigquery",
         "query": """
-            SELECT
-                customer_id,
-                SUM(order_amount) as total_amount,
-                AVG(order_amount) as average_amount,
-                COUNT(order_id) as order_count
-            FROM orders
-            GROUP BY customer_id
-        """,
+             SELECT
+                 customer_id,
+                 SUM(order_amount) as total_amount,
+                 AVG(order_amount) as average_amount,
+                 COUNT(order_id) as order_count
+             FROM orders
+             GROUP BY customer_id
+         """,
         "schema": {
             "orders": {
                 "customer_id": "str",
@@ -666,9 +665,9 @@ test_cases = [
         "name": "upper function",
         "dialect": "bigquery",
         "query": """
-            SELECT UPPER(name) as upper_name
-            FROM users
-        """,
+             SELECT UPPER(name) as upper_name
+             FROM users
+         """,
         "schema": {
             "users": {"name": "str"},
         },
@@ -685,9 +684,9 @@ test_cases = [
         "name": "lower function",
         "dialect": "bigquery",
         "query": """
-            SELECT LOWER(email) as lower_email
-            FROM users
-        """,
+             SELECT LOWER(email) as lower_email
+             FROM users
+         """,
         "schema": {
             "users": {"email": "str"},
         },
@@ -704,9 +703,9 @@ test_cases = [
         "name": "length function",
         "dialect": "bigquery",
         "query": """
-            SELECT LENGTH(description) as description_length
-            FROM products
-        """,
+             SELECT LENGTH(description) as description_length
+             FROM products
+         """,
         "schema": {
             "products": {"description": "str"},
         },
@@ -723,9 +722,9 @@ test_cases = [
         "name": "trim function",
         "dialect": "bigquery",
         "query": """
-            SELECT TRIM(whitespace_column) as trimmed_column
-            FROM data
-        """,
+             SELECT TRIM(whitespace_column) as trimmed_column
+             FROM data
+         """,
         "schema": {
             "data": {"whitespace_column": "str"},
         },
@@ -742,9 +741,9 @@ test_cases = [
         "name": "round function",
         "dialect": "bigquery",
         "query": """
-            SELECT ROUND(price, 2) as rounded_price
-            FROM products
-        """,
+             SELECT ROUND(price, 2) as rounded_price
+             FROM products
+         """,
         "schema": {
             "products": {"price": "float"},
         },
@@ -761,9 +760,9 @@ test_cases = [
         "name": "coalesce function",
         "dialect": "bigquery",
         "query": """
-            SELECT COALESCE(middle_name, 'N/A') as middle_name
-            FROM users
-        """,
+             SELECT COALESCE(middle_name, 'N/A') as middle_name
+             FROM users
+         """,
         "schema": {
             "users": {"middle_name": "str"},
         },
@@ -780,9 +779,9 @@ test_cases = [
         "name": "cast function",
         "dialect": "bigquery",
         "query": """
-            SELECT CAST(order_id AS INT) as order_id_int
-            FROM orders
-        """,
+             SELECT CAST(order_id AS INT) as order_id_int
+             FROM orders
+         """,
         "schema": {
             "orders": {"order_id": "str"},
         },
@@ -799,9 +798,9 @@ test_cases = [
         "name": "date function",
         "dialect": "bigquery",
         "query": """
-            SELECT DATE(order_date) as order_date_only
-            FROM orders
-        """,
+             SELECT DATE(order_date) as order_date_only
+             FROM orders
+         """,
         "schema": {
             "orders": {"order_date": "datetime"},
         },
@@ -818,9 +817,9 @@ test_cases = [
         "name": "extract function",
         "dialect": "bigquery",
         "query": """
-            SELECT EXTRACT(YEAR FROM order_date) as order_year
-            FROM orders
-        """,
+             SELECT EXTRACT(YEAR FROM order_date) as order_year
+             FROM orders
+         """,
         "schema": {
             "orders": {"order_date": "datetime"},
         },
@@ -837,9 +836,9 @@ test_cases = [
         "name": "substring function",
         "dialect": "bigquery",
         "query": """
-            SELECT SUBSTRING(name FROM 1 FOR 3) as name_prefix
-            FROM users
-        """,
+             SELECT SUBSTRING(name FROM 1 FOR 3) as name_prefix
+             FROM users
+         """,
         "schema": {
             "users": {"name": "str"},
         },
@@ -856,9 +855,9 @@ test_cases = [
         "name": "floor function",
         "dialect": "bigquery",
         "query": """
-            SELECT FLOOR(price) as floored_price
-            FROM products
-        """,
+             SELECT FLOOR(price) as floored_price
+             FROM products
+         """,
         "schema": {
             "products": {"price": "float"},
         },
@@ -875,9 +874,9 @@ test_cases = [
         "name": "ceil function",
         "dialect": "bigquery",
         "query": """
-            SELECT CEIL(price) as ceiled_price
-            FROM products
-        """,
+             SELECT CEIL(price) as ceiled_price
+             FROM products
+         """,
         "schema": {
             "products": {"price": "float"},
         },
@@ -894,9 +893,9 @@ test_cases = [
         "name": "mysql date_format function",
         "dialect": "mysql",
         "query": """
-            SELECT DATE_FORMAT(order_date, '%Y-%m-%d') as formatted_date
-            FROM orders
-        """,
+             SELECT DATE_FORMAT(order_date, '%Y-%m-%d') as formatted_date
+             FROM orders
+         """,
         "schema": {
             "orders": {"order_date": "datetime"},
         },
@@ -913,9 +912,9 @@ test_cases = [
         "name": "snowflake to_timestamp function",
         "dialect": "snowflake",
         "query": """
-            SELECT TO_TIMESTAMP(order_date) as timestamp_date
-            FROM orders
-        """,
+             SELECT TO_TIMESTAMP(order_date) as timestamp_date
+             FROM orders
+         """,
         "schema": {
             "orders": {"order_date": "str"},
         },
@@ -932,9 +931,9 @@ test_cases = [
         "name": "duckdb current_timestamp function",
         "dialect": "duckdb",
         "query": """
-            SELECT order_id,CURRENT_TIMESTAMP as current_time
-            FROM orders
-        """,
+             SELECT order_id,CURRENT_TIMESTAMP as current_time
+             FROM orders
+         """,
         "schema": {
             "orders": {"order_id": "str"},
         },
@@ -956,9 +955,9 @@ test_cases = [
         "name": "redshift date_trunc function",
         "dialect": "redshift",
         "query": """
-            SELECT DATE_TRUNC('month', order_date) as month_start
-            FROM orders
-        """,
+             SELECT DATE_TRUNC('month', order_date) as month_start
+             FROM orders
+         """,
         "schema": {
             "orders": {"order_date": "datetime"},
         },
@@ -975,41 +974,41 @@ test_cases = [
         "name": "dashboard.report",
         "dialect": "bigquery",
         "query": """
-        SELECT
-            t1.col1,
-            t1.col2,
-            t1.col3,
-            t1.col4,
-            t1.col5,
-            t1.col6,
-            t1.col7 is not null as is_refunded,
-            1 as ai_credits,
-            if(t2.col1 is not null, 1, 0) as ai_credits_used,
-            t3.col1 as TeamName,
-            t3.col2 as TeamId,
-            t4.col1,
-            t4.col2,
-            t5.col1 as Organization,
-            t5.col2 as OrganizationId,
-            t4.col3,
-            t4.col4,
-            t6.col1 as ProgramName,
-            t5.col3,
-            t5.col4
-        FROM `dataset1.table1` as t1
-        INNER JOIN `dataset2.table2` as t6
-            ON t1.col3 = t6.col1
-        INNER JOIN `dataset3.table3` as t5
-            ON t6.col2 = t5.col2
-        LEFT JOIN `dataset4.table4` as t7
-            ON t7.col1 = t1.col4
-        LEFT JOIN `dataset5.table5` as t2
-            ON t1.col1 = t2.col2
-        LEFT JOIN `dataset6.table6` as t3
-            ON t3.col2 = cast(t2.col3 as int64)
-        LEFT JOIN `dataset7.table7` as t4
-            ON t4.col5 = safe_cast(t1.col5 as int64)
-    """,
+         SELECT
+             t1.col1,
+             t1.col2,
+             t1.col3,
+             t1.col4,
+             t1.col5,
+             t1.col6,
+             t1.col7 is not null as is_refunded,
+             1 as ai_credits,
+             if(t2.col1 is not null, 1, 0) as ai_credits_used,
+             t3.col1 as TeamName,
+             t3.col2 as TeamId,
+             t4.col1,
+             t4.col2,
+             t5.col1 as Organization,
+             t5.col2 as OrganizationId,
+             t4.col3,
+             t4.col4,
+             t6.col1 as ProgramName,
+             t5.col3,
+             t5.col4
+         FROM `dataset1.table1` as t1
+         INNER JOIN `dataset2.table2` as t6
+             ON t1.col3 = t6.col1
+         INNER JOIN `dataset3.table3` as t5
+             ON t6.col2 = t5.col2
+         LEFT JOIN `dataset4.table4` as t7
+             ON t7.col1 = t1.col4
+         LEFT JOIN `dataset5.table5` as t2
+             ON t1.col1 = t2.col2
+         LEFT JOIN `dataset6.table6` as t3
+             ON t3.col2 = cast(t2.col3 as int64)
+         LEFT JOIN `dataset7.table7` as t4
+             ON t4.col5 = safe_cast(t1.col5 as int64)
+     """,
         "schema": {
             "dataset1.table1": {
                 "col1": "STRING",
@@ -1178,41 +1177,41 @@ test_cases = [
         "name": "project_report",
         "dialect": "bigquery",
         "query": """
-       SELECT
-           p1.col1,
-           p1.col2,
-           p1.col3,
-           p1.col4,
-           p1.col5,
-           p1.col6,
-           p1.col7 is not null as is_active,
-           1 as project_credits,
-           if(p2.col1 is not null, 1, 0) as credits_used,
-           p3.col1 as ProjectName,
-           p3.col2 as ProjectId,
-           p4.col1,
-           p4.col2,
-           p5.col1 as Department,
-           p5.col2 as DepartmentId,
-           p4.col3,
-           p4.col4,
-           p6.col1 as ProgramName,
-           p5.col3,
-           p5.col4
-       FROM `project1.dataset1.table1` as p1
-       INNER JOIN `project2.dataset2.table2` as p6
-           ON p1.col3 = p6.col1
-       INNER JOIN `project3.dataset3.table3` as p5
-           ON p6.col2 = p5.col2
-       LEFT JOIN `project4.dataset4.table4` as p7
-           ON p7.col1 = p1.col4
-       LEFT JOIN `project5.dataset5.table5` as p2
-           ON p1.col1 = p2.col2
-       LEFT JOIN `project6.dataset6.table6` as p3
-           ON p3.col2 = cast(p2.col3 as int64)
-       LEFT JOIN `project7.dataset7.table7` as p4
-           ON p4.col5 = safe_cast(p1.col5 as int64)
-   """,
+        SELECT
+            p1.col1,
+            p1.col2,
+            p1.col3,
+            p1.col4,
+            p1.col5,
+            p1.col6,
+            p1.col7 is not null as is_active,
+            1 as project_credits,
+            if(p2.col1 is not null, 1, 0) as credits_used,
+            p3.col1 as ProjectName,
+            p3.col2 as ProjectId,
+            p4.col1,
+            p4.col2,
+            p5.col1 as Department,
+            p5.col2 as DepartmentId,
+            p4.col3,
+            p4.col4,
+            p6.col1 as ProgramName,
+            p5.col3,
+            p5.col4
+        FROM `project1.dataset1.table1` as p1
+        INNER JOIN `project2.dataset2.table2` as p6
+            ON p1.col3 = p6.col1
+        INNER JOIN `project3.dataset3.table3` as p5
+            ON p6.col2 = p5.col2
+        LEFT JOIN `project4.dataset4.table4` as p7
+            ON p7.col1 = p1.col4
+        LEFT JOIN `project5.dataset5.table5` as p2
+            ON p1.col1 = p2.col2
+        LEFT JOIN `project6.dataset6.table6` as p3
+            ON p3.col2 = cast(p2.col3 as int64)
+        LEFT JOIN `project7.dataset7.table7` as p4
+            ON p4.col5 = safe_cast(p1.col5 as int64)
+    """,
         "schema": {
             "project1.dataset1.table1": {
                 "col1": "STRING",
@@ -1399,6 +1398,120 @@ test_cases = [
         ],
         "expected_non_selected": [],
     },
+    {
+        "name": "simple nested table references",
+        "dialect": "bigquery",
+        "query": """
+    select
+        u.OrganizationId,
+        o.Name as Organization,
+    from raw.Users as u
+    inner join `raw.Organizations` o
+        on u.OrganizationId = o.Id
+    """,
+        "schema": {
+            "raw.Organizations": {
+                "Id": "INTEGER",
+                "Name": "STRING",
+            },
+            "raw.Users": {
+                "OrganizationId": "INTEGER",
+            },
+            "raw.TeamMemberships": {
+                "UserId": "INTEGER",
+                "TeamId": "INTEGER",
+            },
+            "raw.Teams": {
+                "Id": "INTEGER",
+                "Name": "STRING",
+            }
+        },
+        "expected": [
+            {
+                "name": "organization",
+                "type": "TEXT",
+                "upstream": [{"column": "name", "table": "raw.Organizations"}],
+            },
+            {
+                "name": "organizationid",
+                "type": "INT",
+                "upstream": [{"column": "organizationid", "table": "raw.Users"}],
+            },
+        ],
+        "expected_non_selected": [
+            {
+                'name': 'id',
+                'upstream': [{'column': 'id', 'table': 'raw.Organizations'}]},
+            {
+                'name': 'organizationid',
+                'upstream': [{'column': 'organizationid', 'table': 'raw.Users'}]
+            }
+        ],
+    },
+    {
+        "name": "failing scenario for CTEs and case-sensitive fields",
+        "dialect": "bigquery",
+        "query": """
+    SELECT Teams.Name, count(*) as c
+    FROM raw.TeamMemberships as TeamMemberships
+    join raw.Teams 
+        on Teams.Id = TeamMemberships.TeamId
+    GROUP BY 1
+""",
+        "schema": {
+            "raw.TeamMemberships": {
+                "Id": "INTEGER",
+                "UserId": "INTEGER",
+                "TeamId": "INTEGER",
+                "CreatedDate": "TIMESTAMP",
+                "CreatedById": "INTEGER",
+                "UpdatedDate": "TIMESTAMP",
+                "UpdatedById": "INTEGER"
+            },
+            "raw.teams": {
+                "Id": "INTEGER",
+                "Name": "STRING",
+                "Description": "STRING",
+                "ResourceId": "INTEGER",
+                "OrganizationId": "INTEGER",
+                "TimeZoneId": "INTEGER",
+                "TeamMemberCount": "INTEGER",
+                "TeamLeaderId": "INTEGER",
+                "Active": "BOOLEAN",
+                "CreatedDate": "TIMESTAMP",
+                "CreatedById": "INTEGER",
+                "UpdatedDate": "TIMESTAMP",
+                "UpdatedById": "INTEGER",
+                "IsGuest": "BOOLEAN"
+            },
+        },
+        "expected": [
+            {
+                "name": "c",
+                "type": "BIGINT",
+                "upstream": [],
+            },
+            {
+                "name": "name",
+                "type": "TEXT",
+                "upstream": [{"column": "name", "table": "raw.teams"}],
+            },
+        ],
+        "expected_non_selected": [
+            {
+                'name': 'id',
+                'upstream': [{'column': 'id', 'table': 'raw.teams'}]
+            },
+            {
+                'name': 'name',
+                'upstream': [{'column': 'name', 'table': 'raw.teams'}]
+            },
+            {
+                'name': 'teamid',
+                'upstream': [{'column': 'teamid', 'table': 'raw.teammemberships'}]
+            }
+        ],
+    },
 ]
 
 
@@ -1406,11 +1519,11 @@ test_cases = [
     "query,schema,expected,expected_non_selected,dialect",
     [
         (
-            tc["query"],
-            tc["schema"],
-            tc["expected"],
-            tc["expected_non_selected"],
-            tc["dialect"],
+                tc["query"],
+                tc["schema"],
+                tc["expected"],
+                tc["expected_non_selected"],
+                tc["dialect"],
         )
         for tc in test_cases
     ],

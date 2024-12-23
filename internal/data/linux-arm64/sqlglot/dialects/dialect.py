@@ -8,14 +8,20 @@ from functools import reduce
 from sqlglot import exp
 from sqlglot.errors import ParseError
 from sqlglot.generator import Generator, unsupported_args
-from sqlglot.helper import AutoName, flatten, is_int, seq_get, subclasses
+from sqlglot.helper import AutoName, flatten, is_int, seq_get, subclasses, to_bool
 from sqlglot.jsonpath import JSONPathTokenizer, parse as parse_json_path
 from sqlglot.parser import Parser
 from sqlglot.time import TIMEZONES, format_time, subsecond_precision
 from sqlglot.tokens import Token, Tokenizer, TokenType
 from sqlglot.trie import new_trie
 
-DATE_ADD_OR_DIFF = t.Union[exp.DateAdd, exp.TsOrDsAdd, exp.DateDiff, exp.TsOrDsDiff]
+DATE_ADD_OR_DIFF = t.Union[
+    exp.DateAdd,
+    exp.DateDiff,
+    exp.DateSub,
+    exp.TsOrDsAdd,
+    exp.TsOrDsDiff,
+]
 DATE_ADD_OR_SUB = t.Union[exp.DateAdd, exp.TsOrDsAdd, exp.DateSub]
 JSON_EXTRACT_TYPE = t.Union[exp.JSONExtract, exp.JSONExtractScalar]
 
@@ -264,6 +270,13 @@ class Dialect(metaclass=_Dialect):
         False: Disables function name normalization.
     """
 
+    PRESERVE_ORIGINAL_NAMES: bool = False
+    """
+    Whether the name of the function should be preserved inside the node's metadata,
+    can be useful for roundtripping deprecated vs new functions that share an AST node
+    e.g JSON_VALUE vs JSON_EXTRACT_SCALAR in BigQuery
+    """
+
     LOG_BASE_FIRST: t.Optional[bool] = True
     """
     Whether the base comes first in the `LOG` function.
@@ -396,6 +409,16 @@ class Dialect(metaclass=_Dialect):
 
     ARRAY_AGG_INCLUDES_NULLS: t.Optional[bool] = True
     """Whether ArrayAgg needs to filter NULL values."""
+
+    PROMOTE_TO_INFERRED_DATETIME_TYPE = False
+    """
+    This flag is used in the optimizer's canonicalize rule and determines whether x will be promoted
+    to the literal's type in x::DATE < '2020-01-01 12:05:03' (i.e., DATETIME). When false, the literal
+    is cast to x's type to match it instead.
+    """
+
+    SUPPORTS_VALUES_DEFAULT = True
+    """Whether the DEFAULT keyword is supported in the VALUES clause."""
 
     REGEXP_EXTRACT_DEFAULT_GROUP = 0
     """The default value for the capturing group."""
@@ -753,14 +776,7 @@ class Dialect(metaclass=_Dialect):
                     elif len(pair) == 2:
                         value = pair[1].strip()
 
-                        # Coerce the value to boolean if it matches to the truthy/falsy values below
-                        value_lower = value.lower()
-                        if value_lower in ("true", "1"):
-                            value = True
-                        elif value_lower in ("false", "0"):
-                            value = False
-
-                    kwargs[key] = value
+                    kwargs[key] = to_bool(value)
 
             except ValueError:
                 raise ValueError(
@@ -1537,7 +1553,7 @@ def merge_without_target_sql(self: Generator, expression: exp.Merge) -> str:
     if alias:
         targets.add(normalize(alias.this))
 
-    for when in expression.expressions:
+    for when in expression.args["whens"].expressions:
         # only remove the target names from the THEN clause
         # theyre still valid in the <condition> part of WHEN MATCHED / WHEN NOT MATCHED
         # ref: https://github.com/TobikoData/sqlmesh/issues/2934
@@ -1724,3 +1740,14 @@ def explode_to_unnest_sql(self: Generator, expression: exp.Lateral) -> str:
 
 def timestampdiff_sql(self: Generator, expression: exp.DatetimeDiff | exp.TimestampDiff) -> str:
     return self.func("TIMESTAMPDIFF", expression.unit, expression.expression, expression.this)
+
+
+def no_make_interval_sql(self: Generator, expression: exp.MakeInterval, sep: str = ", ") -> str:
+    args = []
+    for unit, value in expression.args.items():
+        if isinstance(value, exp.Kwarg):
+            value = value.expression
+
+        args.append(f"{value} {unit}")
+
+    return f"INTERVAL '{self.format_args(*args, sep=sep)}'"

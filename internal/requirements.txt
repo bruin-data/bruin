@@ -1,2 +1,1 @@
-sqlglot==25.30.0
-sqlglotrs==0.2.13
+sqlglot[rs]==26.0.1

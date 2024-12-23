@@ -9,7 +9,6 @@ from sqlglot.dialects.dialect import (
     JSON_EXTRACT_TYPE,
     NormalizationStrategy,
     approx_count_distinct_sql,
-    arg_max_or_min_no_count,
     arrow_json_extract_sql,
     binary_from_function,
     bool_xor_sql,
@@ -35,6 +34,7 @@ from sqlglot.dialects.dialect import (
     sha256_sql,
     build_regexp_extract,
     explode_to_unnest_sql,
+    no_make_interval_sql,
 )
 from sqlglot.generator import unsupported_args
 from sqlglot.helper import seq_get
@@ -297,6 +297,7 @@ class DuckDB(Dialect):
         return super().to_json_path(path)
 
     class Tokenizer(tokens.Tokenizer):
+        BYTE_STRINGS = [("e'", "'"), ("E'", "'")]
         HEREDOC_STRINGS = ["$"]
 
         HEREDOC_TAG_IS_IDENTIFIER = True
@@ -309,12 +310,13 @@ class DuckDB(Dialect):
             "^@": TokenType.CARET_AT,
             "@>": TokenType.AT_GT,
             "<@": TokenType.LT_AT,
-            "ATTACH": TokenType.COMMAND,
+            "ATTACH": TokenType.ATTACH,
             "BINARY": TokenType.VARBINARY,
             "BITSTRING": TokenType.BIT,
             "BPCHAR": TokenType.TEXT,
             "CHAR": TokenType.TEXT,
             "CHARACTER VARYING": TokenType.TEXT,
+            "DETACH": TokenType.DETACH,
             "EXCLUDE": TokenType.EXCEPT,
             "LOGICAL": TokenType.BOOLEAN,
             "ONLY": TokenType.ONLY,
@@ -447,6 +449,12 @@ class DuckDB(Dialect):
             exp.DataType.Type.TEXT: lambda dtype: exp.DataType.build("TEXT"),
         }
 
+        STATEMENT_PARSERS = {
+            **parser.Parser.STATEMENT_PARSERS,
+            TokenType.ATTACH: lambda self: self._parse_attach_detach(),
+            TokenType.DETACH: lambda self: self._parse_attach_detach(is_attach=False),
+        }
+
         def _parse_table_sample(self, as_modifier: bool = False) -> t.Optional[exp.TableSample]:
             # https://duckdb.org/docs/sql/samples.html
             sample = super()._parse_table_sample(as_modifier=as_modifier)
@@ -482,6 +490,29 @@ class DuckDB(Dialect):
                 return super()._pivot_column_names(aggregations)
             return pivot_column_names(aggregations, dialect="duckdb")
 
+        def _parse_attach_detach(self, is_attach=True) -> exp.Attach | exp.Detach:
+            def _parse_attach_option() -> exp.AttachOption:
+                return self.expression(
+                    exp.AttachOption,
+                    this=self._parse_var(any_token=True),
+                    expression=self._parse_field(any_token=True),
+                )
+
+            self._match(TokenType.DATABASE)
+            exists = self._parse_exists(not_=is_attach)
+            this = self._parse_alias(self._parse_primary_or_var(), explicit=True)
+
+            if self._match(TokenType.L_PAREN, advance=False):
+                expressions = self._parse_wrapped_csv(_parse_attach_option)
+            else:
+                expressions = None
+
+            return (
+                self.expression(exp.Attach, this=this, exists=exists, expressions=expressions)
+                if is_attach
+                else self.expression(exp.Detach, this=this, exists=exists)
+            )
+
     class Generator(generator.Generator):
         PARAMETER_TOKEN = "$"
         NAMED_PLACEHOLDER_TOKEN = "$"
@@ -514,8 +545,6 @@ class DuckDB(Dialect):
             exp.ApproxDistinct: approx_count_distinct_sql,
             exp.Array: inline_array_unless_query,
             exp.ArrayFilter: rename_func("LIST_FILTER"),
-            exp.ArgMax: arg_max_or_min_no_count("ARG_MAX"),
-            exp.ArgMin: arg_max_or_min_no_count("ARG_MIN"),
             exp.ArraySort: _array_sort_sql,
             exp.ArraySum: rename_func("LIST_SUM"),
             exp.BitwiseXor: rename_func("XOR"),
@@ -558,6 +587,7 @@ class DuckDB(Dialect):
             exp.Lateral: explode_to_unnest_sql,
             exp.LogicalOr: rename_func("BOOL_OR"),
             exp.LogicalAnd: rename_func("BOOL_AND"),
+            exp.MakeInterval: lambda self, e: no_make_interval_sql(self, e, sep=" "),
             exp.MD5Digest: lambda self, e: self.func("UNHEX", self.func("MD5", e.this)),
             exp.MonthsBetween: lambda self, e: self.func(
                 "DATEDIFF",
@@ -645,6 +675,7 @@ class DuckDB(Dialect):
             exp.DataType.Type.BINARY: "BLOB",
             exp.DataType.Type.BPCHAR: "TEXT",
             exp.DataType.Type.CHAR: "TEXT",
+            exp.DataType.Type.DATETIME: "TIMESTAMP",
             exp.DataType.Type.FLOAT: "REAL",
             exp.DataType.Type.NCHAR: "TEXT",
             exp.DataType.Type.NVARCHAR: "TEXT",
@@ -991,3 +1022,12 @@ class DuckDB(Dialect):
             return self.func(
                 "REGEXP_EXTRACT", expression.this, expression.expression, group, params
             )
+
+        @unsupported_args("culture")
+        def numbertostr_sql(self, expression: exp.NumberToStr) -> str:
+            fmt = expression.args.get("format")
+            if fmt and fmt.is_int:
+                return self.func("FORMAT", f"'{{:,.{fmt.name}f}}'", expression.this)
+
+            self.unsupported("Only integer formats are supported by NumberToStr")
+            return self.function_fallback_sql(expression)
