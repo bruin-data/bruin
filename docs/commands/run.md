@@ -29,6 +29,19 @@ bruin run [FLAGS] [optional path to the pipeline/asset]
 | `--push-metadata` | bool | `false` | Push metadata to the destination database if supported (currently BigQuery). |
 | `--tag` | str | - | Pick assets with the given tag. |
 | `--workers` | int | `16` | Number of workers to run tasks in parallel. |
+|  `--continue` | bool | `false` | Continue from the last failed asset. |
+
+
+### Continue from the last failed asset
+
+If you want to continue from the last failed task, you can use the `--continue` flag. This will run the pipeline/asset from the last failed task. Bruin will automatically retrive all the flags used in the last run. 
+
+```bash
+bruin run --continue 
+```
+
+> [!NOTE]
+> This will only work if the pipeline structure is not changed. If the pipeline structure has changed in any way, including asset dependencies, you will need to run the pipeline/asset from the beginning. This is to ensure that the pipeline/asset is run in the correct order.
 
 ### Focused Runs: Filtering by Tags and Task Types
 As detailed in the flag section above, the  `--tag`, `--downstream`, and `--only` flags provide powerful ways to filter and control which tasks in your pipeline are executed. These flags can also be combined to fine-tune pipeline runs, allowing you to execute specific subsets of tasks based on tags, include their downstream dependencies, and restrict execution to certain task types.
