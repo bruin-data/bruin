@@ -128,7 +128,7 @@ func main() {
 		},
 		Metadata: scheduler.Metadata{
 			Version: "dev",
-			OS:      "darwin",
+			OS:      runtime.GOOS,
 		},
 		State: []*scheduler.PipelineAssetState{
 			{
@@ -178,7 +178,7 @@ func main() {
 		},
 		Metadata: scheduler.Metadata{
 			Version: "dev",
-			OS:      "darwin",
+			OS:      runtime.GOOS,
 		},
 		State: []*scheduler.PipelineAssetState{
 			{
