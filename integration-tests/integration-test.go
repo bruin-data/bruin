@@ -11,8 +11,10 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/bruin-data/bruin/pkg/scheduler"
 	jd "github.com/josephburnett/jd/lib"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 )
 
 var currentFolder string
@@ -109,11 +111,103 @@ func main() {
 	)
 
 	expectExitCode("run ./continue", 1)
+
+	state := readState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"))
+
+	expectedState(state, &scheduler.PipelineState{
+		Parameters: scheduler.RunConfig{
+			Downstream:   false,
+			Workers:      16,
+			Environment:  "",
+			Force:        false,
+			PushMetadata: false,
+			NoLogFile:    false,
+			FullRefresh:  false,
+			UseUV:        false,
+			Tag:          "",
+			ExcludeTag:   "",
+			Only:         nil,
+		},
+		Metadata: scheduler.Metadata{
+			Version: "dev",
+			OS:      "darwin",
+		},
+		State: []*scheduler.PipelineAssetState{
+			{
+				Name:   "chess_playground.games",
+				Status: "succeeded",
+			},
+			{
+				Name:   "chess_playground.profiles",
+				Status: "succeeded",
+			},
+			{
+				Name:   "chess_playground.game_outcome_summary",
+				Status: "succeeded",
+			},
+			{
+				Name:   "chess_playground.player_profile_summary",
+				Status: "succeeded",
+			},
+			{
+				Name:   "chess_playground.player_summary",
+				Status: "failed",
+			},
+		},
+		Version:           "1.0.0",
+		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
+	})
 	if err := copyFile(filepath.Join(currentFolder, "./player_summary.sql"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")); err != nil {
 		fmt.Println("Failed to copy file:", err)
 		os.Exit(1)
 	}
 	expectExitCode("run --continue ./continue", 0)
+	state = readState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"))
+	expectedState(state, &scheduler.PipelineState{
+		Parameters: scheduler.RunConfig{
+			Downstream:   false,
+			StartDate:    "2024-12-22 00:00:00.000000",
+			EndDate:      "2024-12-22 23:59:59.999999",
+			Workers:      16,
+			Environment:  "",
+			Force:        false,
+			PushMetadata: false,
+			NoLogFile:    false,
+			FullRefresh:  false,
+			UseUV:        false,
+			Tag:          "",
+			ExcludeTag:   "",
+			Only:         nil,
+		},
+		Metadata: scheduler.Metadata{
+			Version: "dev",
+			OS:      "darwin",
+		},
+		State: []*scheduler.PipelineAssetState{
+			{
+				Name:   "chess_playground.games",
+				Status: "skipped",
+			},
+			{
+				Name:   "chess_playground.profiles",
+				Status: "skipped",
+			},
+			{
+				Name:   "chess_playground.game_outcome_summary",
+				Status: "skipped",
+			},
+			{
+				Name:   "chess_playground.player_profile_summary",
+				Status: "skipped",
+			},
+			{
+				Name:   "chess_playground.player_summary",
+				Status: "succeeded",
+			},
+		},
+		Version:           "1.0.0",
+		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
+	})
 }
 
 func expectOutputIncludes(command string, code int, contains []string) {
@@ -246,4 +340,59 @@ func copyFile(src, dst string) error {
 	}
 
 	return nil
+}
+
+func readState(dir string) *scheduler.PipelineState {
+	state, err := scheduler.ReadState(afero.NewOsFs(), dir)
+	if err != nil {
+		return nil
+	}
+	return state
+}
+
+func expectedState(state *scheduler.PipelineState, expected *scheduler.PipelineState) {
+	if state.Parameters.Workers != expected.Parameters.Workers {
+		fmt.Println("Mismatch in Workers")
+		os.Exit(1)
+	}
+	if state.Parameters.Environment != expected.Parameters.Environment {
+		fmt.Println("Mismatch in Environment")
+		os.Exit(1)
+	}
+
+	if state.Metadata.Version != expected.Metadata.Version {
+		fmt.Println("Mismatch in Version")
+		os.Exit(1)
+	}
+	if state.Metadata.OS != expected.Metadata.OS {
+		fmt.Println("Mismatch in OS")
+		os.Exit(1)
+	}
+
+	if len(state.State) != len(expected.State) {
+		fmt.Println("Mismatch in State length")
+		os.Exit(1)
+	}
+
+	var dict = make(map[string]string)
+	for _, assetState := range state.State {
+		dict[assetState.Name] = assetState.Status
+	}
+	for _, assetState := range expected.State {
+		if dict[assetState.Name] != assetState.Status {
+			fmt.Println("Mismatch in State")
+			os.Exit(1)
+		}
+	}
+
+	if state.Version != expected.Version {
+		fmt.Println("Mismatch in Version")
+		os.Exit(1)
+	}
+	if state.CompatibilityHash != expected.CompatibilityHash {
+		fmt.Println("Mismatch in CompatibilityHash")
+		os.Exit(1)
+	}
+
+	fmt.Println("Passed")
 }
