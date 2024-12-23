@@ -29,7 +29,7 @@ func Docs() *cli.Command {
 				if err != nil {
 					return errors.Wrap(err, "failed to open the browser")
 				}
-				fmt.Println("Opened documentation in your default browser.")
+				fmt.Println("opened documentation in your default browser.")
 			} else {
 				fmt.Printf("Documentation: %s\n", docsURL)
 			}
