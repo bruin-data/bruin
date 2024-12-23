@@ -44,6 +44,11 @@ func ListConnections() *cli.Command {
 				Aliases: []string{"o"},
 				Usage:   "the output type, possible values are: plain, json",
 			},
+			&cli.StringFlag{
+				Name:    "environment",
+				Aliases: []string{"env"},
+				Usage:   "",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			r := ConnectionsCommand{}
@@ -53,7 +58,7 @@ func ListConnections() *cli.Command {
 				path = c.Args().First()
 			}
 
-			return r.ListConnections(path, c.String("output"))
+			return r.ListConnections(path, c.String("output"), c.String("environment"))
 		},
 	}
 }
@@ -232,17 +237,19 @@ func DeleteConnection() *cli.Command {
 
 type ConnectionsCommand struct{}
 
-func (r *ConnectionsCommand) ListConnections(pathToProject, output string) error {
+func (r *ConnectionsCommand) ListConnections(pathToProject, output, environment string) error {
 	defer RecoverFromPanic()
-
 	repoRoot, err := git.FindRepoFromPath(pathToProject)
 	if err != nil {
 		errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
 		return cli.Exit("", 1)
 	}
-
 	configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
 	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	if err != nil {
+		errorPrinter.Printf("Failed to load or create the config file: %v\n", err)
+		return cli.Exit("", 1)
+	}
 
 	if output == "json" {
 		js, err := json.Marshal(cm)
@@ -255,6 +262,32 @@ func (r *ConnectionsCommand) ListConnections(pathToProject, output string) error
 		return nil
 	}
 
+	// Check if a specific environment is requested
+	if environment != "" {
+		env, exists := cm.Environments[environment]
+		if !exists {
+			errorPrinter.Printf("Environment '%s' not found.\n", environment)
+			return cli.Exit("", 1)
+		}
+
+		fmt.Println()
+		infoPrinter.Printf("Environment: %s\n", environment)
+
+		t := table.NewWriter()
+		t.SetOutputMirror(os.Stdout)
+		t.AppendHeader(table.Row{"Type", "Name"})
+
+		rows := env.Connections.ConnectionsSummaryList()
+
+		for row, connType := range rows {
+			t.AppendRow(table.Row{connType, row})
+		}
+		t.Render()
+		fmt.Println()
+
+		return nil
+	}
+	// If no specific environment is requested, iterate through all environments
 	for envName, env := range cm.Environments {
 		fmt.Println()
 		infoPrinter.Printf("Environment: %s\n", envName)
@@ -272,7 +305,7 @@ func (r *ConnectionsCommand) ListConnections(pathToProject, output string) error
 		fmt.Println()
 	}
 
-	return err
+	return nil
 }
 
 func printErrorForOutput(output string, err error) {
