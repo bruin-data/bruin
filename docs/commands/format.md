@@ -23,3 +23,4 @@ Specifies the output format for the command.
 Possible values:
 - `plain` (default): Prints human-readable messages.
 - `json`: Prints errors (if any) in JSON format.  
+- `fail-if-changed`: fail the command if any of the assets need reformatting

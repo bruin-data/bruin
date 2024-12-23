@@ -28,8 +28,8 @@ func Format(isDebug *bool) *cli.Command {
 				Usage:   "the output type, possible values are: plain, json",
 			},
 			&cli.BoolFlag{
-				Name:  "lint",
-				Usage: "check if any file needs to be formatted",
+				Name:  "fail-if-changed",
+				Usage: "fail the command if any of the assets need reformatting",
 				Value: false,
 			},
 		},
@@ -42,7 +42,7 @@ func Format(isDebug *bool) *cli.Command {
 			}
 
 			output := c.String("output")
-			checkLint := c.Bool("lint")
+			checkLint := c.Bool("fail-if-changed")
 
 			if isPathReferencingAsset(repoOrAsset) {
 				if checkLint {

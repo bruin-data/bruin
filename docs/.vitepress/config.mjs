@@ -215,6 +215,7 @@ export default defineConfig({
                     {text: "Overview", link: "/cloud/overview"},
                     {text: "Cross-pipeline dependencies", link: "/cloud/cross-pipeline"},
                     {text: "Notifications", link: "/cloud/notifications"},
+                    {text: "DBT", link: "/cloud/dbt"},
                 ],
             },
         ],

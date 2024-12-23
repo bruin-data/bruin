@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,6 +32,7 @@ func main() {
 			panic(err)
 		}
 	}
+
 	expectJSONOutput("internal parse-pipeline happy-path", "happy-path/expectations/pipeline.yml.json")
 	expectExitCode("run --tag include --exclude-tag exclude chess-extended", 0)
 	expectExitCode("run --tag include --exclude-tag exclude chess-extended/expectations/chess_games.asset.yml", 1)
@@ -39,7 +41,7 @@ func main() {
 		0,
 		[]string{"Executed 1 tasks", "total_games:positive"},
 	)
-	expectExitCode("format --lint ./chess-extended/assets/chess_games.asset.yml", 0)
+	expectExitCode("format --fail-if-changed ./chess-extended/assets/chess_games.asset.yml", 0)
 	expectOutputIncludes(
 		"run --tag include --exclude-tag exclude --only main chess-extended",
 		0,
@@ -105,6 +107,13 @@ func main() {
 		"internal parse-asset -c lineage/assets/example.sql",
 		"lineage/expectations/lineage-asset.json",
 	)
+
+	expectExitCode("run ./continue", 1)
+	if err := copyFile(filepath.Join(currentFolder, "./player_summary.sql"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")); err != nil {
+		fmt.Println("Failed to copy file:", err)
+		os.Exit(1)
+	}
+	expectExitCode("run --continue ./continue", 0)
 }
 
 func expectOutputIncludes(command string, code int, contains []string) {
@@ -216,4 +225,25 @@ func runCommandWithExitCode(command string) (string, int, error) {
 		return output, 1, err
 	}
 	return output, 0, nil
+}
+
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open source file: %w", err)
+	}
+	defer sourceFile.Close()
+
+	destinationFile, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("failed to create destination file: %w", err)
+	}
+	defer destinationFile.Close()
+
+	_, err = io.Copy(destinationFile, sourceFile)
+	if err != nil {
+		return fmt.Errorf("failed to copy file: %w", err)
+	}
+
+	return nil
 }

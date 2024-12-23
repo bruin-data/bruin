@@ -84,9 +84,9 @@ This downstream has an external dependency that runs every 2 minutes.
 The in order to run the downstream we will wait until the upstream has successful runs with data intervals covering fully the downstream data interval.
 For example for the aforementioned `2025-10-11 15:30:00`to `2025-10-11 15:35:00`, we would need downstream to have for example.
 
- * `2025-10-11 15:30:00`to `2025-10-11 15:32:00
- * `2025-10-11 15:32:00`to `2025-10-11 15:34:00
- * `2025-10-11 15:34:00`to `2025-10-11 15:36:00
+ * `2025-10-11 15:30:00`to `2025-10-11 15:32:00`
+ * `2025-10-11 15:32:00`to `2025-10-11 15:34:00`
+ * `2025-10-11 15:34:00`to `2025-10-11 15:36:00`
 
 These intervals fully cover the original downstream interval and thus the downstream can run.
 
