@@ -29,7 +29,7 @@ bruin run [FLAGS] [optional path to the pipeline/asset]
 | `--push-metadata` | bool | `false` | Push metadata to the destination database if supported (currently BigQuery). |
 | `--tag` | str | - | Pick assets with the given tag. |
 | `--workers` | int | `16` | Number of workers to run tasks in parallel. |
-|  `--continue` | bool | `false` | Continue from the last failed task. |
+|  `--continue` | bool | `false` | Continue from the last failed asset. |
 
 
 ### Continue from the last failed task
