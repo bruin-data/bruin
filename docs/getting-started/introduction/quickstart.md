@@ -33,7 +33,7 @@ bruin run
 
 In a nutshell, an asset is anything that generates value with data. In practice, an asset can be a table in your data warehouse, a Python script, or a file in S3. Bruin represents assets in code, put under the `assets` folder.
 
-In order to create a new asset, you can simply create a new file under the `assets` folder. Let's start with a SQL asset.
+In order to create a new asset, you can simply create a new file under the `assets` folder. Let's start with an ingestr asset.
 
 ### Creating a `ingestr` asset
 Let's start by ingesting some data from an external source.
@@ -45,10 +45,12 @@ You can create ingestr assets with a file `assets/players.asset.yml`
 ```yaml
 name: dataset.players
 type: ingestr
-connection: duckdb
+
 parameters:
-  source_connection: chess
-  source_table: players
+  destination: duckdb
+  source_connection: chess-default
+  source_table: profiles
+
 ```
 
 The configuration in the YAML file has a few bits:
@@ -60,6 +62,25 @@ The configuration in the YAML file has a few bits:
 
 That's it, this asset will load data from the `chess` source and load it into your DuckDB database.
 
+### Setting up your `.bruin.yml` file
+To ensure the asset works correctly, configure your environments and connections by editing your ` .bruin.yml`  file. This file specifies environments and the connections your pipeline will use.
+
+Modify the `.bruin.yml` file as follows:
+```yaml
+default_environment: default
+environments:
+  default:
+    connections:
+      duckdb:
+        - name: "duckdb-default"
+          path: "duckdb.db"
+      chess:
+        - name: "chess-default"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
+
+```
 You can run this asset either via the Bruin VS Code extension, or in the terminal:
 ```bash
 bruin run assets/players.asset.yml
@@ -89,7 +110,7 @@ GROUP BY 1
 
 This asset have a few lines of configuration at the top:
 - `name`: the name of the asset, needs to be unique within a pipeline
-- `type`: `duckdb.sql` means BigQuery SQL, Bruin supports many other types of assets.
+- `type`: `duckdb.sql` means DuckDB SQL, Bruin supports many other types of assets.
 - `materialization`: take the query result and materialize it as a table
 
 Bruin will take the result of the given query, and will create a `dataset.player_stats` table on DuckDB with it. You can also use `view`
