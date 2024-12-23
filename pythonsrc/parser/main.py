@@ -114,7 +114,11 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
         return {"columns": []}
     try:
         nested_schema = schema_dict_to_schema_object(schema)
-        optimized = optimize(parsed, nested_schema, dialect=dialect)
+        try:
+            optimized = optimize(parsed, nested_schema, dialect=dialect)
+        except Exception as e:
+            # try again without dialect, this solves some issues, e.g. https://github.com/tobymao/sqlglot/issues/4538
+            optimized = optimize(parsed, nested_schema)
     except Exception as e:
         logging.error(f"Error optimizing query: {e}, query and schema: { json.dumps({'query': query, 'schema': schema}) }")
         return {"columns": [], "error": str(e)}
