@@ -120,7 +120,7 @@ func Run(isDebug *bool) *cli.Command {
 			},
 			&cli.BoolFlag{
 				Name:  "continue",
-				Usage: "use continue to run the pipeline from the last failed task",
+				Usage: "use continue to run the pipeline from the last failed asset",
 			},
 			&cli.StringFlag{
 				Name:    "tag",
