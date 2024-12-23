@@ -175,35 +175,26 @@ func formatAsset(path string) (*pipeline.Asset, error) {
 
 func shouldFileChange(path string) (bool, error) {
 	fs := afero.NewOsFs()
+
 	// Read the original content from the file
 	originalContent, err := afero.ReadFile(fs, path)
 	if err != nil {
 		return false, errors2.Wrap(err, "failed to read original content")
 	}
 	normalizedOriginalContent := normalizeLineEndings(originalContent)
+
 	// Create the asset
 	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(path)
 	if err != nil {
 		return false, errors2.Wrap(err, "failed to build the asset")
 	}
-	// Persist the asset (modifies the file)
-	err = asset.Persist(fs)
-	if err != nil {
-		return false, errors2.Wrap(err, "failed to persist the asset")
-	}
 
-	// Read the new content after persisting
-	newContent, err := afero.ReadFile(fs, path)
+	// Generate the new content without persisting
+	newContent, err := asset.PersistWithoutWriting()
 	if err != nil {
-		return false, errors2.Wrap(err, "failed to read new content")
+		return false, errors2.Wrap(err, "failed to generate new content without persisting")
 	}
 	normalizedNewContent := normalizeLineEndings(newContent)
-
-	// Restore the original content to the file
-	err = afero.WriteFile(fs, path, originalContent, 0o644)
-	if err != nil {
-		return false, errors2.Wrap(err, "failed to restore original content")
-	}
 
 	// Compare the normalized original and new content
 	return string(normalizedOriginalContent) != string(normalizedNewContent), nil

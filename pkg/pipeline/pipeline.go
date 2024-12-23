@@ -828,6 +828,53 @@ func (a *Asset) Persist(fs afero.Fs) error {
 	return afero.WriteFile(fs, filePath, []byte(stringVersion), 0o644)
 }
 
+func (a *Asset) PersistWithoutWriting() ([]byte, error) {
+	if a == nil {
+		return nil, errors.New("failed to build an asset, therefore cannot persist it")
+	}
+
+	a.removeRedundanciesBeforePersisting()
+
+	buf := bytes.NewBuffer(nil)
+	enc := yaml.NewEncoder(buf)
+	enc.SetIndent(2)
+
+	err := enc.Encode(a)
+	if err != nil {
+		return nil, err
+	}
+
+	yamlConfig := buf.Bytes()
+
+	keysToAddSpace := []string{"custom_checks", "depends", "columns", "materialization", "secrets", "parameters"}
+	for _, key := range keysToAddSpace {
+		yamlConfig = bytes.ReplaceAll(yamlConfig, []byte("\n"+key+":"), []byte("\n\n"+key+":"))
+	}
+
+	beginning := ""
+	end := ""
+	executableContent := ""
+
+	if strings.HasSuffix(a.ExecutableFile.Path, ".sql") {
+		beginning = "/* " + configMarkerString + "\n\n"
+		end = "\n" + configMarkerString + " */" + "\n\n"
+		executableContent = a.ExecutableFile.Content
+	}
+
+	if strings.HasSuffix(a.ExecutableFile.Path, ".py") {
+		beginning = `""" ` + configMarkerString + "\n\n"
+		end = "\n" + configMarkerString + ` """` + "\n\n"
+		executableContent = a.ExecutableFile.Content
+	}
+
+	stringVersion := beginning + string(yamlConfig) + end + executableContent
+	if !strings.HasSuffix(stringVersion, "\n") {
+		stringVersion += "\n"
+	}
+
+	return []byte(stringVersion), nil
+}
+
 func uniqueAssets(assets []*Asset) []*Asset {
 	seenValues := make(map[string]bool, len(assets))
 	unique := make([]*Asset, 0, len(assets))
