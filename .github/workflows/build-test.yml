@@ -1,8 +1,24 @@
 name: CI Checks
 
 on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'docs/**'
+      - 'examples/**'
+      - 'resources/**'
+      - 'templates/**'
+      - 'install.sh'
+      - 'README.md'
+      - 'Makefile'
+      - 'package.json'
+      - 'package-lock.json'
   pull_request:
     branches: [ main ]
+    types:
+      - opened
+      - reopened
+      - synchronize
     paths-ignore:
       - 'docs/**'
       - 'examples/**'
