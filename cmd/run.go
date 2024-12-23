@@ -155,19 +155,21 @@ func Run(isDebug *bool) *cli.Command {
 			logger := makeLogger(*isDebug)
 			// Initialize runConfig with values from cli.Context
 			runConfig := &scheduler.RunConfig{
-				Downstream:   c.Bool("downstream"),
-				StartDate:    c.String("start-date"),
-				EndDate:      c.String("end-date"),
-				Workers:      c.Int("workers"),
-				Environment:  c.String("environment"),
-				Force:        c.Bool("force"),
-				PushMetadata: c.Bool("push-metadata"),
-				NoLogFile:    c.Bool("no-log-file"),
-				FullRefresh:  c.Bool("full-refresh"),
-				UseUV:        c.Bool("use-uv"),
-				Tag:          c.String("tag"),
-				ExcludeTag:   c.String("exclude-tag"),
-				Only:         c.StringSlice("only"),
+				Downstream:        c.Bool("downstream"),
+				StartDate:         c.String("start-date"),
+				EndDate:           c.String("end-date"),
+				Workers:           c.Int("workers"),
+				Environment:       c.String("environment"),
+				Force:             c.Bool("force"),
+				PushMetadata:      c.Bool("push-metadata"),
+				NoLogFile:         c.Bool("no-log-file"),
+				FullRefresh:       c.Bool("full-refresh"),
+				UseUV:             c.Bool("use-uv"),
+				Tag:               c.String("tag"),
+				ExcludeTag:        c.String("exclude-tag"),
+				Only:              c.StringSlice("only"),
+				Output:            c.String("output"),
+				ExpUseWingetForUv: c.Bool("exp-use-winget-for-uv"),
 			}
 
 			var startDate, endDate time.Time
@@ -181,12 +183,6 @@ func Run(isDebug *bool) *cli.Command {
 			pipelineInfo, err := GetPipeline(inputPath, runConfig, logger)
 			if err != nil {
 				return err
-			}
-			foundPipeline := pipelineInfo.Pipeline
-
-			if runConfig.Downstream {
-				infoPrinter.Println("The downstream tasks will be executed as well.")
-				pipelineInfo.RunDownstreamTasks = true
 			}
 
 			repoRoot, err := git.FindRepoFromPath(inputPath)
@@ -204,47 +200,10 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			}
 
-			err = switchEnvironment(c, pipelineInfo.Config, os.Stdin)
-			if err != nil {
-				return err
-			}
-
-			connectionManager, errs := connection.NewManagerFromConfig(pipelineInfo.Config)
-			if len(errs) > 0 {
-				printErrors(errs, c.String("output"), "Failed to register connections")
-				return cli.Exit("", 1)
-			}
-
 			// handle log files
 			runID := time.Now().Format("2006_01_02_15_04_05")
-			if !runConfig.NoLogFile {
-				logFileName := fmt.Sprintf("%s__%s", runID, foundPipeline.Name)
-				if pipelineInfo.RunningForAnAsset {
-					logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, task.Name)
-				}
 
-				logPath, err := filepath.Abs(fmt.Sprintf("%s/%s/%s.log", repoRoot.Path, LogsFolder, logFileName))
-				if err != nil {
-					errorPrinter.Printf("Failed to create log file: %v\n", err)
-					return cli.Exit("", 1)
-				}
-
-				fn, err2 := logOutput(logPath)
-				if err2 != nil {
-					errorPrinter.Printf("Failed to create log file: %v\n", err2)
-					return cli.Exit("", 1)
-				}
-
-				defer fn()
-				color.Output = os.Stdout
-
-				err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, LogsFolder+"/*.log")
-				if err != nil {
-					errorPrinter.Printf("Failed to add the log file to .gitignore: %v\n", err)
-					return cli.Exit("", 1)
-				}
-			}
-			infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", foundPipeline.Name, len(foundPipeline.Assets))
+			infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
 
 			if pipelineInfo.RunningForAnAsset {
 				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
@@ -252,14 +211,14 @@ func Run(isDebug *bool) *cli.Command {
 
 			parser, err := sqlparser.NewSQLParser(false)
 			if err != nil {
-				printError(err, c.String("output"), "Could not initialize sql parser")
+				printError(err, runConfig.Output, "Could not initialize sql parser")
 			}
 
-			if err := CheckLint(parser, foundPipeline, inputPath, logger); err != nil {
+			if err := CheckLint(parser, pipelineInfo.Pipeline, inputPath, logger); err != nil {
 				return err
 			}
 
-			statePath := filepath.Join(repoRoot.Path, "logs/runs", foundPipeline.Name)
+			statePath := filepath.Join(repoRoot.Path, "logs/runs", pipelineInfo.Pipeline.Name)
 
 			filter := &Filter{
 				IncludeTag:        runConfig.Tag,
@@ -287,8 +246,54 @@ func Run(isDebug *bool) *cli.Command {
 				endDate = parsedEndDate
 			}
 
+			foundPipeline := pipelineInfo.Pipeline
+
+			if runConfig.Downstream {
+				infoPrinter.Println("The downstream tasks will be executed as well.")
+				pipelineInfo.RunDownstreamTasks = true
+			}
+
+			if !runConfig.NoLogFile {
+				logFileName := fmt.Sprintf("%s__%s", runID, foundPipeline.Name)
+				if pipelineInfo.RunningForAnAsset {
+					logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, task.Name)
+				}
+
+				logPath, err := filepath.Abs(fmt.Sprintf("%s/%s/%s.log", repoRoot.Path, LogsFolder, logFileName))
+				if err != nil {
+					errorPrinter.Printf("Failed to create log file: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				fn, err2 := logOutput(logPath)
+				if err2 != nil {
+					errorPrinter.Printf("Failed to create log file: %v\n", err2)
+					return cli.Exit("", 1)
+				}
+
+				defer fn()
+				color.Output = os.Stdout
+
+				err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, LogsFolder+"/*.log")
+				if err != nil {
+					errorPrinter.Printf("Failed to add the log file to .gitignore: %v\n", err)
+					return cli.Exit("", 1)
+				}
+			}
+
 			if filter.PushMetaData {
 				foundPipeline.MetadataPush.Global = true
+			}
+
+			err = switchEnvironment(runConfig.Environment, runConfig.Force, pipelineInfo.Config, os.Stdin)
+			if err != nil {
+				return err
+			}
+
+			connectionManager, errs := connection.NewManagerFromConfig(pipelineInfo.Config)
+			if len(errs) > 0 {
+				printErrors(errs, runConfig.Output, "Failed to register connections")
+				return cli.Exit("", 1)
 			}
 
 			s := scheduler.NewScheduler(logger, foundPipeline, runID)
@@ -333,7 +338,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
-			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, c.Bool("exp-use-winget-for-uv")) //nolint:staticcheck
+			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, runConfig.ExpUseWingetForUv) //nolint:staticcheck
 
 			ex.Start(runCtx, s.WorkQueue, s.Results)
 
