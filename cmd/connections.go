@@ -252,6 +252,33 @@ func (r *ConnectionsCommand) ListConnections(pathToProject, output, environment 
 	}
 
 	if output == "json" {
+		if environment != "" {
+			// Check if the specified environment exists
+			env, exists := cm.Environments[environment]
+			if !exists {
+				errorPrinter.Printf("Environment '%s' not found.\n", environment)
+				return cli.Exit("", 1)
+			}
+
+			// Construct the output structure to include the environment name
+			envOutput := map[string]interface{}{
+				environment: map[string]interface{}{
+					"connections": env.Connections,
+				},
+			}
+
+			// Marshal the structured output to JSON
+			js, err := json.Marshal(envOutput)
+			if err != nil {
+				printErrorJSON(err)
+				return cli.Exit("", 1)
+			}
+
+			fmt.Println(string(js))
+			return nil
+		}
+
+		// Marshal the entire configuration if no specific environment is specified
 		js, err := json.Marshal(cm)
 		if err != nil {
 			printErrorJSON(err)
