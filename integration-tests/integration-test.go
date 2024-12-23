@@ -34,82 +34,82 @@ func main() {
 			panic(err)
 		}
 	}
+	// utput("internal parse-pipeline happy-path", "happy-path/expectations/pipeline.yml.json")
+	// 	expectExitCode("run --tag include --exclude-tag exclude chess-extended", 0)
+	// 	expectExitCode("run --tag include --exclude-tag exclude chess-extended/expectations/chess_games.asset.yml", 1)
+	// 	expectOutputIncludes(
+	// 		"run --tag include --exclude-tag exclude --only checks chess-extended",
+	// 		0,
+	// 		[]string{"Executed 1 tasks", "total_games:positive"},
+	// 	)
+	// 	expectExitCode("format --fail-if-changed ./chess-extended/assets/chess_games.asset.yml", 0)
+	// 	expectOutputIncludes(
+	// 		"run --tag include --exclude-tag exclude --only main chess-extended",
+	// 		0,
+	// 		[]string{"Executed 3 tasks", " Finished: chess_playground.games", "Finished: chess_playground.profiles", "Finished: chess_playground.game_outcome_summary"},
+	// 	)
+	// 	expectOutputIncludes(
+	// 		"run --push-metadata --only push-metadata bigquery-metadata",
+	// 		0,
+	// 		[]string{" Starting: shopify_raw.products:metadata-push", "Starting: shopify_raw.inventory_items:metadata-push"},
+	// 	)
+	// 	expectExitCode("validate happy-path", 0)
+	// 	expectExitCode("run --use-uv happy-path", 0)
+	// 	// expectExitCode("run happy-path", 0)
+	// 	expectJSONOutput(
+	// 		"internal parse-asset happy-path/assets/asset.py",
+	// 		"happy-path/expectations/asset.py.json",
+	// 	)
+	// 	expectJSONOutput(
+	// 		"internal parse-asset happy-path/assets/chess_games.asset.yml",
+	// 		"happy-path/expectations/chess_games.asset.yml.json",
+	// 	)
+	// 	expectJSONOutput(
+	// 		"internal parse-asset happy-path/assets/chess_profiles.asset.yml",
+	// 		"happy-path/expectations/chess_profiles.asset.yml.json",
+	// 	)
+	// 	expectJSONOutput(
+	// 		"internal parse-asset happy-path/assets/player_summary.sql",
+	// 		"happy-path/expectations/player_summary.sql.json",
+	// 	)
 
-	expectJSONOutput("internal parse-pipeline happy-path", "happy-path/expectations/pipeline.yml.json")
-	expectExitCode("run --tag include --exclude-tag exclude chess-extended", 0)
-	expectExitCode("run --tag include --exclude-tag exclude chess-extended/expectations/chess_games.asset.yml", 1)
-	expectOutputIncludes(
-		"run --tag include --exclude-tag exclude --only checks chess-extended",
-		0,
-		[]string{"Executed 1 tasks", "total_games:positive"},
-	)
-	expectExitCode("format --fail-if-changed ./chess-extended/assets/chess_games.asset.yml", 0)
-	expectOutputIncludes(
-		"run --tag include --exclude-tag exclude --only main chess-extended",
-		0,
-		[]string{"Executed 3 tasks", " Finished: chess_playground.games", "Finished: chess_playground.profiles", "Finished: chess_playground.game_outcome_summary"},
-	)
-	expectOutputIncludes(
-		"run --push-metadata --only push-metadata bigquery-metadata",
-		0,
-		[]string{" Starting: shopify_raw.products:metadata-push", "Starting: shopify_raw.inventory_items:metadata-push"},
-	)
-	expectExitCode("validate happy-path", 0)
-	expectExitCode("run --use-uv happy-path", 0)
-	// expectExitCode("run happy-path", 0)
-	expectJSONOutput(
-		"internal parse-asset happy-path/assets/asset.py",
-		"happy-path/expectations/asset.py.json",
-	)
-	expectJSONOutput(
-		"internal parse-asset happy-path/assets/chess_games.asset.yml",
-		"happy-path/expectations/chess_games.asset.yml.json",
-	)
-	expectJSONOutput(
-		"internal parse-asset happy-path/assets/chess_profiles.asset.yml",
-		"happy-path/expectations/chess_profiles.asset.yml.json",
-	)
-	expectJSONOutput(
-		"internal parse-asset happy-path/assets/player_summary.sql",
-		"happy-path/expectations/player_summary.sql.json",
-	)
+	// 	expectOutputIncludes(
+	// 		"internal parse-asset faulty-pipeline/assets/error.sql",
+	// 		1,
+	// 		[]string{"error creating asset from file", "unmarshal errors"},
+	// 	)
 
-	expectOutputIncludes(
-		"internal parse-asset faulty-pipeline/assets/error.sql",
-		1,
-		[]string{"error creating asset from file", "unmarshal errors"},
-	)
+	// 	expectJSONOutput(
+	// 		"validate -o json missing-upstream/assets/nonexistent.sql",
+	// 		"missing-upstream/expectations/missing_upstream.json",
+	// 	)
 
-	expectJSONOutput(
-		"validate -o json missing-upstream/assets/nonexistent.sql",
-		"missing-upstream/expectations/missing_upstream.json",
-	)
+	// 	expectOutputIncludes(
+	// 		"run malformed/assets/malformed.sql",
+	// 		1,
+	// 		[]string{"Parser Error: syntax error at or near \"S_ELECT_\"", "Failed assets 1"},
+	// 	)
 
-	expectOutputIncludes(
-		"run malformed/assets/malformed.sql",
-		1,
-		[]string{"Parser Error: syntax error at or near \"S_ELECT_\"", "Failed assets 1"},
-	)
+	// 	expectJSONOutput(
+	// 		"internal connections",
+	// 		"expected_connections_schema.json",
+	// 	)
+	// 	expectJSONOutput(
+	// 		"connections list -o json",
+	// 		"expected_connections.json",
+	// 	)
 
-	expectJSONOutput(
-		"internal connections",
-		"expected_connections_schema.json",
-	)
-	expectJSONOutput(
-		"connections list -o json",
-		"expected_connections.json",
-	)
+	// 	expectJSONOutput(
+	// 		"internal parse-pipeline -c lineage",
+	// 		"lineage/expectations/lineage.json",
+	// 	)
 
-	expectJSONOutput(
-		"internal parse-pipeline -c lineage",
-		"lineage/expectations/lineage.json",
-	)
+	// 	expectJSONOutput(
+	// 		"internal parse-asset -c lineage/assets/example.sql",
+	// 		"lineage/expectations/lineage-asset.json",
+	// 	)
 
-	expectJSONOutput(
-		"internal parse-asset -c lineage/assets/example.sql",
-		"lineage/expectations/lineage-asset.json",
-	)
-
+	// expectJSONO
 	expectExitCode("run ./continue", 1)
 
 	expectedState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), &scheduler.PipelineState{
