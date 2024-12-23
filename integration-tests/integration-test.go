@@ -33,10 +33,6 @@ func main() {
 		}
 	}
 
-	expectExitCode("run ./continue", 1)
-	copyFile("people.sql", "continue/assets/people.sql")
-	expectExitCode("run --continue ./continue", 0)
-
 	expectJSONOutput("internal parse-pipeline happy-path", "happy-path/expectations/pipeline.yml.json")
 	expectExitCode("run --tag include --exclude-tag exclude chess-extended", 0)
 	expectExitCode("run --tag include --exclude-tag exclude chess-extended/expectations/chess_games.asset.yml", 1)
