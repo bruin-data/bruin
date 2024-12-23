@@ -112,9 +112,7 @@ func main() {
 
 	expectExitCode("run ./continue", 1)
 
-	state := readState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"))
-
-	expectedState(state, &scheduler.PipelineState{
+	expectedState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), &scheduler.PipelineState{
 		Parameters: scheduler.RunConfig{
 			Downstream:   false,
 			Workers:      16,
@@ -162,8 +160,7 @@ func main() {
 		os.Exit(1)
 	}
 	expectExitCode("run --continue ./continue", 0)
-	state = readState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"))
-	expectedState(state, &scheduler.PipelineState{
+	expectedState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), &scheduler.PipelineState{
 		Parameters: scheduler.RunConfig{
 			Downstream:   false,
 			StartDate:    "2024-12-22 00:00:00.000000",
@@ -350,7 +347,8 @@ func readState(dir string) *scheduler.PipelineState {
 	return state
 }
 
-func expectedState(state *scheduler.PipelineState, expected *scheduler.PipelineState) {
+func expectedState(dir string, expected *scheduler.PipelineState) {
+	state := readState(dir)
 	if state.Parameters.Workers != expected.Parameters.Workers {
 		fmt.Println("Mismatch in Workers")
 		os.Exit(1)
