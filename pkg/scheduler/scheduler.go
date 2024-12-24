@@ -133,7 +133,7 @@ type RunConfig struct {
 	PushMetadata      bool     `json:"pushMetadata"`
 	NoLogFile         bool     `json:"noLogFile"`
 	FullRefresh       bool     `json:"fullRefresh"`
-	UseUV             bool     `json:"useUV"`
+	UsePip            bool     `json:"useUV"`
 	Tag               string   `json:"tag"`
 	ExcludeTag        string   `json:"excludeTag"`
 	Only              []string `json:"only"`

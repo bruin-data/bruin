@@ -55,7 +55,7 @@ func main() {
 		[]string{" Starting: shopify_raw.products:metadata-push", "Starting: shopify_raw.inventory_items:metadata-push"},
 	)
 	expectExitCode("validate happy-path", 0)
-	expectExitCode("run --use-uv happy-path", 0)
+	expectExitCode("run happy-path", 0)
 	// expectExitCode("run happy-path", 0)
 	expectJSONOutput(
 		"internal parse-asset happy-path/assets/asset.py",
@@ -203,7 +203,7 @@ func customTestForContinue(currentFolder string) {
 			PushMetadata: false,
 			NoLogFile:    false,
 			FullRefresh:  false,
-			UseUV:        false,
+			UsePip:       false,
 			Tag:          "",
 			ExcludeTag:   "",
 			Only:         nil,
@@ -255,7 +255,7 @@ func customTestForContinue(currentFolder string) {
 			PushMetadata: false,
 			NoLogFile:    false,
 			FullRefresh:  false,
-			UseUV:        false,
+			UsePip:       false,
 			Tag:          "",
 			ExcludeTag:   "",
 			Only:         nil,
