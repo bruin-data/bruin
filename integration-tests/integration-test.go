@@ -155,10 +155,17 @@ func main() {
 		Version:           "1.0.0",
 		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
 	})
-	if err := copyFile(filepath.Join(currentFolder, "./player_summary.sql"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")); err != nil {
+
+	if err := copyFile(filepath.Join(currentFolder, "continue/assets/player_summary.sql"), filepath.Join(currentFolder, "./player_summary.sql.bak")); err != nil {
 		fmt.Println("Failed to copy file:", err)
 		os.Exit(1)
 	}
+
+	if err := copyFile(filepath.Join(currentFolder, "player_summary.sql"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")); err != nil {
+		fmt.Println("Failed to copy file:", err)
+		os.Exit(1)
+	}
+
 	expectExitCode("run --continue ./continue", 0)
 	expectedState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), &scheduler.PipelineState{
 		Parameters: scheduler.RunConfig{
@@ -205,6 +212,11 @@ func main() {
 		Version:           "1.0.0",
 		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
 	})
+
+	if err := copyFile(filepath.Join(currentFolder, "./player_summary.sql.bak"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")); err != nil {
+		fmt.Println("Failed to copy file:", err)
+		os.Exit(1)
+	}
 }
 
 func expectOutputIncludes(command string, code int, contains []string) {
@@ -392,5 +404,5 @@ func expectedState(dir string, expected *scheduler.PipelineState) {
 		os.Exit(1)
 	}
 
-	fmt.Println("Passed")
+	fmt.Println("Passed State Match")
 }
