@@ -59,8 +59,6 @@ func main() {
 				Destination: &isDebug,
 			},
 		},
-		Before: telemetry.BeforeCommand,
-		After:  telemetry.AfterCommand,
 		Commands: []*cli.Command{
 			cmd.Lint(&isDebug),
 			cmd.Run(&isDebug),
