@@ -36,7 +36,7 @@ require (
 	github.com/uber/athenadriver v1.1.15
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/xlab/treeprint v1.2.0
-	github.com/y-bruin/iapetus v0.0.0-20241224174110-b20fcc70d866
+	github.com/y-bruin/iapetus v0.0.0-20241224184809-e1649285be4f
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
@@ -186,5 +186,3 @@ require (
 	gotest.tools/gotestsum v1.8.2 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
 )
-
-replace github.com/y-bruin/iapetus => ../integration-test-suits

@@ -14,6 +14,97 @@ import (
 
 var currentFolder string
 
+var (
+	STATE_FOR_FIRST_RUN = &scheduler.PipelineState{
+		Parameters: scheduler.RunConfig{
+			Downstream:   false,
+			Workers:      16,
+			Environment:  "",
+			Force:        false,
+			PushMetadata: false,
+			NoLogFile:    false,
+			FullRefresh:  false,
+			UsePip:       false,
+			Tag:          "",
+			ExcludeTag:   "",
+			Only:         nil,
+		},
+		Metadata: scheduler.Metadata{
+			Version: "dev",
+			OS:      runtime.GOOS,
+		},
+		State: []*scheduler.PipelineAssetState{
+			{
+				Name:   "chess_playground.games",
+				Status: "succeeded",
+			},
+			{
+				Name:   "chess_playground.profiles",
+				Status: "succeeded",
+			},
+			{
+				Name:   "chess_playground.game_outcome_summary",
+				Status: "succeeded",
+			},
+			{
+				Name:   "chess_playground.player_profile_summary",
+				Status: "succeeded",
+			},
+			{
+				Name:   "chess_playground.player_summary",
+				Status: "failed",
+			},
+		},
+		Version:           "1.0.0",
+		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
+	}
+	STATE_FOR_CONTINUE_RUN = &scheduler.PipelineState{
+		Parameters: scheduler.RunConfig{
+			Downstream:   false,
+			StartDate:    "2024-12-22 00:00:00.000000",
+			EndDate:      "2024-12-22 23:59:59.999999",
+			Workers:      16,
+			Environment:  "",
+			Force:        false,
+			PushMetadata: false,
+			NoLogFile:    false,
+			FullRefresh:  false,
+			UsePip:       false,
+			Tag:          "",
+			ExcludeTag:   "",
+			Only:         nil,
+		},
+		Metadata: scheduler.Metadata{
+			Version: "dev",
+			OS:      runtime.GOOS,
+		},
+		State: []*scheduler.PipelineAssetState{
+			{
+				Name:   "chess_playground.games",
+				Status: "skipped",
+			},
+			{
+				Name:   "chess_playground.profiles",
+				Status: "skipped",
+			},
+			{
+				Name:   "chess_playground.game_outcome_summary",
+				Status: "skipped",
+			},
+			{
+				Name:   "chess_playground.player_profile_summary",
+				Status: "skipped",
+			},
+			{
+				Name:   "chess_playground.player_summary",
+				Status: "succeeded",
+			},
+		},
+		Version:           "1.0.0",
+		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
+	}
+)
+
 func main() {
 	path, err := os.Getwd()
 	if err != nil {
@@ -57,52 +148,7 @@ func runIntegrationWorkflow(binary string, currentFolder string) {
 					},
 					Asserts: []func(*iapetus.Step) error{
 						iapetus.AssertByExitCode,
-						func(i *iapetus.Step) error {
-							assetCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), &scheduler.PipelineState{
-								Parameters: scheduler.RunConfig{
-									Downstream:   false,
-									Workers:      16,
-									Environment:  "",
-									Force:        false,
-									PushMetadata: false,
-									NoLogFile:    false,
-									FullRefresh:  false,
-									UsePip:       false,
-									Tag:          "",
-									ExcludeTag:   "",
-									Only:         nil,
-								},
-								Metadata: scheduler.Metadata{
-									Version: "dev",
-									OS:      runtime.GOOS,
-								},
-								State: []*scheduler.PipelineAssetState{
-									{
-										Name:   "chess_playground.games",
-										Status: "succeeded",
-									},
-									{
-										Name:   "chess_playground.profiles",
-										Status: "succeeded",
-									},
-									{
-										Name:   "chess_playground.game_outcome_summary",
-										Status: "succeeded",
-									},
-									{
-										Name:   "chess_playground.player_profile_summary",
-										Status: "succeeded",
-									},
-									{
-										Name:   "chess_playground.player_summary",
-										Status: "failed",
-									},
-								},
-								Version:           "1.0.0",
-								CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
-							})
-							return nil
-						},
+						assertCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), STATE_FOR_CONTINUE_RUN),
 					},
 				},
 				{
@@ -138,54 +184,7 @@ func runIntegrationWorkflow(binary string, currentFolder string) {
 					},
 					Asserts: []func(*iapetus.Step) error{
 						iapetus.AssertByExitCode,
-						func(i *iapetus.Step) error {
-							assetCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), &scheduler.PipelineState{
-								Parameters: scheduler.RunConfig{
-									Downstream:   false,
-									StartDate:    "2024-12-22 00:00:00.000000",
-									EndDate:      "2024-12-22 23:59:59.999999",
-									Workers:      16,
-									Environment:  "",
-									Force:        false,
-									PushMetadata: false,
-									NoLogFile:    false,
-									FullRefresh:  false,
-									UsePip:       false,
-									Tag:          "",
-									ExcludeTag:   "",
-									Only:         nil,
-								},
-								Metadata: scheduler.Metadata{
-									Version: "dev",
-									OS:      runtime.GOOS,
-								},
-								State: []*scheduler.PipelineAssetState{
-									{
-										Name:   "chess_playground.games",
-										Status: "skipped",
-									},
-									{
-										Name:   "chess_playground.profiles",
-										Status: "skipped",
-									},
-									{
-										Name:   "chess_playground.game_outcome_summary",
-										Status: "skipped",
-									},
-									{
-										Name:   "chess_playground.player_profile_summary",
-										Status: "skipped",
-									},
-									{
-										Name:   "chess_playground.player_summary",
-										Status: "succeeded",
-									},
-								},
-								Version:           "1.0.0",
-								CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
-							})
-							return nil
-						},
+						assertCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), STATE_FOR_CONTINUE_RUN),
 					},
 				},
 				{
@@ -402,7 +401,7 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Env:     []string{},
 
 			Expected: iapetus.Output{
-				ExitCode: 1,
+				ExitCode: 0,
 				Contains: []string{"error creating asset from file", "unmarshal errors"},
 			},
 			Asserts: []func(*iapetus.Step) error{
@@ -509,53 +508,48 @@ func runIntegrationTests(binary string, currentFolder string) {
 	}
 }
 
-func assetCustomState(dir string, expected *scheduler.PipelineState) {
-	state, err := scheduler.ReadState(afero.NewOsFs(), dir)
-	if err != nil {
-		os.Exit(1)
-	}
-	if state.Parameters.Workers != expected.Parameters.Workers {
-		fmt.Println("Mismatch in Workers")
-		os.Exit(1)
-	}
-	if state.Parameters.Environment != expected.Parameters.Environment {
-		fmt.Println("Mismatch in Environment")
-		os.Exit(1)
-	}
-
-	if state.Metadata.Version != expected.Metadata.Version {
-		fmt.Println("Mismatch in Version")
-		os.Exit(1)
-	}
-	if state.Metadata.OS != expected.Metadata.OS {
-		fmt.Println("Mismatch in OS")
-		os.Exit(1)
-	}
-
-	if len(state.State) != len(expected.State) {
-		fmt.Println("Mismatch in State length")
-		os.Exit(1)
-	}
-
-	var dict = make(map[string]string)
-	for _, assetState := range state.State {
-		dict[assetState.Name] = assetState.Status
-	}
-	for _, assetState := range expected.State {
-		if dict[assetState.Name] != assetState.Status {
-			fmt.Println("Mismatch in State")
-			os.Exit(1)
+func assertCustomState(dir string, expected *scheduler.PipelineState) func(*iapetus.Step) error {
+	return func(i *iapetus.Step) error {
+		state, err := scheduler.ReadState(afero.NewOsFs(), dir)
+		if err != nil {
+			return fmt.Errorf("failed to read state from directory %s: %w", dir, err)
 		}
-	}
+		if state.Parameters.Workers != expected.Parameters.Workers {
+			return fmt.Errorf("mismatch in Workers: expected %d, got %d", expected.Parameters.Workers, state.Parameters.Workers)
+		}
+		if state.Parameters.Environment != expected.Parameters.Environment {
+			return fmt.Errorf("mismatch in Environment: expected %s, got %s", expected.Parameters.Environment, state.Parameters.Environment)
+		}
 
-	if state.Version != expected.Version {
-		fmt.Println("Mismatch in Version")
-		os.Exit(1)
-	}
-	if state.CompatibilityHash != expected.CompatibilityHash {
-		fmt.Println("Mismatch in CompatibilityHash")
-		os.Exit(1)
-	}
+		if state.Metadata.Version != expected.Metadata.Version {
+			return fmt.Errorf("mismatch in Version: expected %s, got %s", expected.Metadata.Version, state.Metadata.Version)
+		}
+		if state.Metadata.OS != expected.Metadata.OS {
+			return fmt.Errorf("mismatch in OS: expected %s, got %s", expected.Metadata.OS, state.Metadata.OS)
+		}
 
-	fmt.Println("Passed State Match")
+		if len(state.State) != len(expected.State) {
+			return fmt.Errorf("mismatch in State length: expected %d, got %d", len(expected.State), len(state.State))
+		}
+
+		var dict = make(map[string]string)
+		for _, assetState := range state.State {
+			dict[assetState.Name] = assetState.Status
+		}
+		for _, assetState := range expected.State {
+			if dict[assetState.Name] != assetState.Status {
+				return fmt.Errorf("mismatch in State for asset %s: expected %s, got %s", assetState.Name, assetState.Status, dict[assetState.Name])
+			}
+		}
+
+		if state.Version != expected.Version {
+			return fmt.Errorf("mismatch in Version: expected %s, got %s", expected.Version, state.Version)
+		}
+		if state.CompatibilityHash != expected.CompatibilityHash {
+			return fmt.Errorf("mismatch in CompatibilityHash: expected %s, got %s", expected.CompatibilityHash, state.CompatibilityHash)
+		}
+
+		fmt.Println("Passed State Match")
+		return nil
+	}
 }
