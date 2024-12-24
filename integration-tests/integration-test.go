@@ -110,6 +110,88 @@ func main() {
 		"lineage/expectations/lineage-asset.json",
 	)
 
+	customTestForContinue(currentFolder)
+}
+
+func expectOutputIncludes(command string, code int, contains []string) {
+	output, exitCode, err := runCommandWithExitCode(command)
+	if err != nil {
+		if exitCode != code {
+			fmt.Println("Failed:", err)
+			os.Exit(1)
+		}
+	}
+
+	for _, c := range contains {
+		if !strings.Contains(output, c) {
+			fmt.Printf("Failed:, output of '%s does not contain '%s'", command, c)
+			os.Exit(1)
+		}
+	}
+
+	fmt.Println("Passed")
+}
+
+func expectJSONOutput(command string, jsonFilePath string) {
+	output, err := runCommand(command)
+	if err != nil {
+		fmt.Println("Failed:", err)
+		os.Exit(1)
+	}
+
+	expectation, err := jd.ReadJsonFile(filepath.Join(currentFolder, jsonFilePath))
+	if err != nil {
+		fmt.Println("Failed to read expectation:", err)
+		os.Exit(1)
+	}
+
+	// normalize linebreaks
+	parsedOutput, err := jd.ReadJsonString(strings.ReplaceAll(output, "\\r\\n", "\\n"))
+	if err != nil {
+		fmt.Println("Failed to parse output:", err)
+		os.Exit(1)
+	}
+
+	diff := expectation.Diff(parsedOutput)
+	if len(diff) != 0 {
+		var path jd.JsonNode
+		for _, d := range diff {
+			// Paths are hell to normalize, we skip
+			path = d.Path[len(d.Path)-1]
+			if path.Json() == "\"path\"" {
+				continue
+			}
+			fmt.Println("Mismatch at: ", d.Path)
+			fmt.Print("Expected json: ")
+			fmt.Println(d.NewValues)
+			fmt.Print("Not Matching found json: ")
+			fmt.Println(d.OldValues)
+
+			os.Exit(1)
+		}
+	}
+	fmt.Println("Passed")
+}
+
+func expectExitCode(command string, code int) {
+	output, exitCode, err := runCommandWithExitCode(command)
+	if err != nil {
+		if exitCode != code {
+			fmt.Println(strconv.Itoa(code) + " Was expected but got:" + strconv.Itoa(exitCode))
+			fmt.Printf("Error: %v\n", err)
+			fmt.Println(output)
+			os.Exit(1)
+		}
+		// Handle other errors
+		fmt.Printf("Error running command: %v\n", err)
+		fmt.Println(output)
+		return
+	}
+
+	fmt.Println("Passed")
+}
+
+func customTestForContinue(currentFolder string) {
 	expectExitCode("run ./continue", 1)
 
 	expectedState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), &scheduler.PipelineState{
@@ -212,84 +294,6 @@ func main() {
 		fmt.Println("Failed to copy file:", err)
 		os.Exit(1)
 	}
-}
-
-func expectOutputIncludes(command string, code int, contains []string) {
-	output, exitCode, err := runCommandWithExitCode(command)
-	if err != nil {
-		if exitCode != code {
-			fmt.Println("Failed:", err)
-			os.Exit(1)
-		}
-	}
-
-	for _, c := range contains {
-		if !strings.Contains(output, c) {
-			fmt.Printf("Failed:, output of '%s does not contain '%s'", command, c)
-			os.Exit(1)
-		}
-	}
-
-	fmt.Println("Passed")
-}
-
-func expectJSONOutput(command string, jsonFilePath string) {
-	output, err := runCommand(command)
-	if err != nil {
-		fmt.Println("Failed:", err)
-		os.Exit(1)
-	}
-
-	expectation, err := jd.ReadJsonFile(filepath.Join(currentFolder, jsonFilePath))
-	if err != nil {
-		fmt.Println("Failed to read expectation:", err)
-		os.Exit(1)
-	}
-
-	// normalize linebreaks
-	parsedOutput, err := jd.ReadJsonString(strings.ReplaceAll(output, "\\r\\n", "\\n"))
-	if err != nil {
-		fmt.Println("Failed to parse output:", err)
-		os.Exit(1)
-	}
-
-	diff := expectation.Diff(parsedOutput)
-	if len(diff) != 0 {
-		var path jd.JsonNode
-		for _, d := range diff {
-			// Paths are hell to normalize, we skip
-			path = d.Path[len(d.Path)-1]
-			if path.Json() == "\"path\"" {
-				continue
-			}
-			fmt.Println("Mismatch at: ", d.Path)
-			fmt.Print("Expected json: ")
-			fmt.Println(d.NewValues)
-			fmt.Print("Not Matching found json: ")
-			fmt.Println(d.OldValues)
-
-			os.Exit(1)
-		}
-	}
-	fmt.Println("Passed")
-}
-
-func expectExitCode(command string, code int) {
-	output, exitCode, err := runCommandWithExitCode(command)
-	if err != nil {
-		if exitCode != code {
-			fmt.Println(strconv.Itoa(code) + " Was expected but got:" + strconv.Itoa(exitCode))
-			fmt.Printf("Error: %v\n", err)
-			fmt.Println(output)
-			os.Exit(1)
-		}
-		// Handle other errors
-		fmt.Printf("Error running command: %v\n", err)
-		fmt.Println(output)
-		return
-	}
-
-	fmt.Println("Passed")
 }
 
 func runCommand(command string) (string, error) {
