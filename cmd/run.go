@@ -115,8 +115,8 @@ func Run(isDebug *bool) *cli.Command {
 				Usage:   "truncate the table before running",
 			},
 			&cli.BoolFlag{
-				Name:  "use-uv",
-				Usage: "use uv for managing Python dependencies",
+				Name:  "use-pip",
+				Usage: "use pip for managing Python dependencies",
 			},
 			&cli.BoolFlag{
 				Name:  "continue",
@@ -164,7 +164,7 @@ func Run(isDebug *bool) *cli.Command {
 				PushMetadata:      c.Bool("push-metadata"),
 				NoLogFile:         c.Bool("no-log-file"),
 				FullRefresh:       c.Bool("full-refresh"),
-				UseUV:             c.Bool("use-uv"),
+				UsePip:            c.Bool("use-pip"),
 				Tag:               c.String("tag"),
 				ExcludeTag:        c.String("exclude-tag"),
 				Only:              c.StringSlice("only"),
@@ -321,7 +321,7 @@ func Run(isDebug *bool) *cli.Command {
 			infoPrinter.Printf("\nStarting the pipeline execution...\n")
 			infoPrinter.Println()
 
-			mainExecutors, err := setupExecutors(s, pipelineInfo.Config, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UseUV)
+			mainExecutors, err := setupExecutors(s, pipelineInfo.Config, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -591,7 +591,7 @@ func setupExecutors(
 	pipelineName string,
 	runID string,
 	fullRefresh bool,
-	useUvForPython bool,
+	usePipForPython bool,
 ) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
 
@@ -601,10 +601,10 @@ func setupExecutors(
 
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
 		jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh)
-		if useUvForPython {
-			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperatorWithUv(config, conn, jinjaVariables)
-		} else {
+		if usePipForPython {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinjaVariables)
+		} else {
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperatorWithUv(config, conn, jinjaVariables)
 		}
 	}
 

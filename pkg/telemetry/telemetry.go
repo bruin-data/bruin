@@ -76,7 +76,7 @@ func SendEventWithAssetStats(event string, stats map[string]int, context *cli.Co
 		"downstream":    context.Bool("downstream"),
 		"push_metadata": context.Bool("push-metadata"),
 		"full_refresh":  context.Bool("full-refresh"),
-		"use_uv":        context.Bool("use-uv"),
+		"use_pip":       context.Bool("use-pip"),
 		"force":         context.Bool("force"),
 	}
 
