@@ -156,13 +156,8 @@ func main() {
 		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
 	})
 
-	if err := copyFile(filepath.Join(currentFolder, "continue/assets/player_summary.sql"), filepath.Join(currentFolder, "./player_summary.sql.bak")); err != nil {
-		fmt.Println("Failed to copy file:", err)
-		os.Exit(1)
-	}
-
-	if err := copyFile(filepath.Join(currentFolder, "player_summary.sql"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")); err != nil {
-		fmt.Println("Failed to copy file:", err)
+	if err := setupForContinue(currentFolder); err != nil {
+		fmt.Println("Failed to setup test case for continue:", err)
 		os.Exit(1)
 	}
 
@@ -357,6 +352,19 @@ func readState(dir string) *scheduler.PipelineState {
 		return nil
 	}
 	return state
+}
+
+func setupForContinue(currentFolder string) error {
+	if err := copyFile(filepath.Join(currentFolder, "continue/assets/player_summary.sql"), filepath.Join(currentFolder, "./player_summary.sql.bak")); err != nil {
+		fmt.Println("Failed to copy file:", err)
+		return err
+	}
+
+	if err := copyFile(filepath.Join(currentFolder, "player_summary.sql"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")); err != nil {
+		fmt.Println("Failed to copy file:", err)
+		return err
+	}
+	return nil
 }
 
 func expectedState(dir string, expected *scheduler.PipelineState) {
