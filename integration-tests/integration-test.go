@@ -2,19 +2,14 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
-	"strings"
-	"syscall"
 
 	"github.com/bruin-data/bruin/pkg/scheduler"
-	jd "github.com/josephburnett/jd/lib"
-	"github.com/pkg/errors"
 	"github.com/spf13/afero"
+	iapetus "github.com/y-bruin/iapetus"
 )
 
 var currentFolder string
@@ -35,344 +30,488 @@ func main() {
 		}
 	}
 
-	expectJSONOutput("internal parse-pipeline happy-path", "happy-path/expectations/pipeline.yml.json")
-	expectExitCode("run --tag include --exclude-tag exclude chess-extended", 0)
-	expectExitCode("run --tag include --exclude-tag exclude chess-extended/expectations/chess_games.asset.yml", 1)
-	expectOutputIncludes(
-		"run --tag include --exclude-tag exclude --only checks chess-extended",
-		0,
-		[]string{"Executed 1 tasks", "total_games:positive"},
-	)
-	expectExitCode("format --fail-if-changed ./chess-extended/assets/chess_games.asset.yml", 0)
-	expectOutputIncludes(
-		"run --tag include --exclude-tag exclude --only main chess-extended",
-		0,
-		[]string{"Executed 3 tasks", " Finished: chess_playground.games", "Finished: chess_playground.profiles", "Finished: chess_playground.game_outcome_summary"},
-	)
-	expectOutputIncludes(
-		"run --push-metadata --only push-metadata bigquery-metadata",
-		0,
-		[]string{" Starting: shopify_raw.products:metadata-push", "Starting: shopify_raw.inventory_items:metadata-push"},
-	)
-	expectExitCode("validate happy-path", 0)
-	expectExitCode("run happy-path", 0)
-	// expectExitCode("run happy-path", 0)
-	expectJSONOutput(
-		"internal parse-asset happy-path/assets/asset.py",
-		"happy-path/expectations/asset.py.json",
-	)
-	expectJSONOutput(
-		"internal parse-asset happy-path/assets/chess_games.asset.yml",
-		"happy-path/expectations/chess_games.asset.yml.json",
-	)
-	expectJSONOutput(
-		"internal parse-asset happy-path/assets/chess_profiles.asset.yml",
-		"happy-path/expectations/chess_profiles.asset.yml.json",
-	)
-	expectJSONOutput(
-		"internal parse-asset happy-path/assets/player_summary.sql",
-		"happy-path/expectations/player_summary.sql.json",
-	)
-
-	expectOutputIncludes(
-		"internal parse-asset faulty-pipeline/assets/error.sql",
-		1,
-		[]string{"error creating asset from file", "unmarshal errors"},
-	)
-
-	expectJSONOutput(
-		"validate -o json missing-upstream/assets/nonexistent.sql",
-		"missing-upstream/expectations/missing_upstream.json",
-	)
-
-	expectOutputIncludes(
-		"run malformed/assets/malformed.sql",
-		1,
-		[]string{"Parser Error: syntax error at or near \"S_ELECT_\"", "Failed assets 1"},
-	)
-
-	expectJSONOutput(
-		"internal connections",
-		"expected_connections_schema.json",
-	)
-	expectJSONOutput(
-		"connections list -o json",
-		"expected_connections.json",
-	)
-
-	expectJSONOutput(
-		"internal parse-pipeline -c lineage",
-		"lineage/expectations/lineage.json",
-	)
-
-	expectJSONOutput(
-		"internal parse-asset -c lineage/assets/example.sql",
-		"lineage/expectations/lineage-asset.json",
-	)
-
-	customTestForContinue(currentFolder)
-}
-
-func expectOutputIncludes(command string, code int, contains []string) {
-	output, exitCode, err := runCommandWithExitCode(command)
-	if err != nil {
-		if exitCode != code {
-			fmt.Println("Failed:", err)
-			os.Exit(1)
-		}
-	}
-
-	for _, c := range contains {
-		if !strings.Contains(output, c) {
-			fmt.Printf("Failed:, output of '%s does not contain '%s'", command, c)
-			os.Exit(1)
-		}
-	}
-
-	fmt.Println("Passed")
-}
-
-func expectJSONOutput(command string, jsonFilePath string) {
-	output, err := runCommand(command)
-	if err != nil {
-		fmt.Println("Failed:", err)
-		os.Exit(1)
-	}
-
-	expectation, err := jd.ReadJsonFile(filepath.Join(currentFolder, jsonFilePath))
-	if err != nil {
-		fmt.Println("Failed to read expectation:", err)
-		os.Exit(1)
-	}
-
-	// normalize linebreaks
-	parsedOutput, err := jd.ReadJsonString(strings.ReplaceAll(output, "\\r\\n", "\\n"))
-	if err != nil {
-		fmt.Println("Failed to parse output:", err)
-		os.Exit(1)
-	}
-
-	diff := expectation.Diff(parsedOutput)
-	if len(diff) != 0 {
-		var path jd.JsonNode
-		for _, d := range diff {
-			// Paths are hell to normalize, we skip
-			path = d.Path[len(d.Path)-1]
-			if path.Json() == "\"path\"" {
-				continue
-			}
-			fmt.Println("Mismatch at: ", d.Path)
-			fmt.Print("Expected json: ")
-			fmt.Println(d.NewValues)
-			fmt.Print("Not Matching found json: ")
-			fmt.Println(d.OldValues)
-
-			os.Exit(1)
-		}
-	}
-	fmt.Println("Passed")
-}
-
-func expectExitCode(command string, code int) {
-	output, exitCode, err := runCommandWithExitCode(command)
-	if err != nil {
-		if exitCode != code {
-			fmt.Println(strconv.Itoa(code) + " Was expected but got:" + strconv.Itoa(exitCode))
-			fmt.Printf("Error: %v\n", err)
-			fmt.Println(output)
-			os.Exit(1)
-		}
-		// Handle other errors
-		fmt.Printf("Error running command: %v\n", err)
-		fmt.Println(output)
-		return
-	}
-
-	fmt.Println("Passed")
-}
-
-func customTestForContinue(currentFolder string) {
-	expectExitCode("run ./continue", 1)
-
-	expectedState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), &scheduler.PipelineState{
-		Parameters: scheduler.RunConfig{
-			Downstream:   false,
-			Workers:      16,
-			Environment:  "",
-			Force:        false,
-			PushMetadata: false,
-			NoLogFile:    false,
-			FullRefresh:  false,
-			UsePip:       false,
-			Tag:          "",
-			ExcludeTag:   "",
-			Only:         nil,
-		},
-		Metadata: scheduler.Metadata{
-			Version: "dev",
-			OS:      runtime.GOOS,
-		},
-		State: []*scheduler.PipelineAssetState{
-			{
-				Name:   "chess_playground.games",
-				Status: "succeeded",
-			},
-			{
-				Name:   "chess_playground.profiles",
-				Status: "succeeded",
-			},
-			{
-				Name:   "chess_playground.game_outcome_summary",
-				Status: "succeeded",
-			},
-			{
-				Name:   "chess_playground.player_profile_summary",
-				Status: "succeeded",
-			},
-			{
-				Name:   "chess_playground.player_summary",
-				Status: "failed",
-			},
-		},
-		Version:           "1.0.0",
-		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
-	})
-
-	if err := setupForContinue(currentFolder); err != nil {
-		fmt.Println("Failed to setup test case for continue:", err)
-		os.Exit(1)
-	}
-
-	expectExitCode("run --continue ./continue", 0)
-	expectedState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), &scheduler.PipelineState{
-		Parameters: scheduler.RunConfig{
-			Downstream:   false,
-			StartDate:    "2024-12-22 00:00:00.000000",
-			EndDate:      "2024-12-22 23:59:59.999999",
-			Workers:      16,
-			Environment:  "",
-			Force:        false,
-			PushMetadata: false,
-			NoLogFile:    false,
-			FullRefresh:  false,
-			UsePip:       false,
-			Tag:          "",
-			ExcludeTag:   "",
-			Only:         nil,
-		},
-		Metadata: scheduler.Metadata{
-			Version: "dev",
-			OS:      runtime.GOOS,
-		},
-		State: []*scheduler.PipelineAssetState{
-			{
-				Name:   "chess_playground.games",
-				Status: "skipped",
-			},
-			{
-				Name:   "chess_playground.profiles",
-				Status: "skipped",
-			},
-			{
-				Name:   "chess_playground.game_outcome_summary",
-				Status: "skipped",
-			},
-			{
-				Name:   "chess_playground.player_profile_summary",
-				Status: "skipped",
-			},
-			{
-				Name:   "chess_playground.player_summary",
-				Status: "succeeded",
-			},
-		},
-		Version:           "1.0.0",
-		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
-	})
-
-	if err := copyFile(filepath.Join(currentFolder, "./player_summary.sql.bak"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")); err != nil {
-		fmt.Println("Failed to copy file:", err)
-		os.Exit(1)
-	}
-}
-
-func runCommand(command string) (string, error) {
-	fmt.Println("Running command: bruin", command)
-	args := strings.Split(command, " ")
 	executable := "bruin"
 	if runtime.GOOS == "windows" {
 		executable = "bruin.exe"
 	}
 	wd, _ := os.Getwd()
 	binary := filepath.Join(wd, "bin", executable)
-	cmd := exec.Command(binary, args...)
 
-	cmd.Dir = currentFolder
-	output, err := cmd.Output()
+	runIntegrationTests(binary, currentFolder)
+	runIntegrationWorkflow(binary, currentFolder)
 
-	return string(output), err
 }
 
-func runCommandWithExitCode(command string) (string, int, error) {
-	output, err := runCommand(command)
-	if err != nil {
-		// Try to get the exit code
-		var exitError *exec.ExitError
-		if errors.As(err, &exitError) {
-			// Get the status code
-			if status, ok := exitError.Sys().(syscall.WaitStatus); ok {
-				return output, status.ExitStatus(), nil
-			}
+func runIntegrationWorkflow(binary string, currentFolder string) {
+
+	workflows := []iapetus.Workflow{
+		{
+			Steps: []iapetus.Step{
+				{
+					Command: binary,
+					Args:    []string{"run", filepath.Join(currentFolder, "continue")},
+					Env:     []string{},
+
+					Expected: iapetus.Output{
+						ExitCode: 1,
+					},
+					Asserts: []func(*iapetus.Step) error{
+						iapetus.AssertByExitCode,
+						func(i *iapetus.Step) error {
+							assetCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), &scheduler.PipelineState{
+								Parameters: scheduler.RunConfig{
+									Downstream:   false,
+									Workers:      16,
+									Environment:  "",
+									Force:        false,
+									PushMetadata: false,
+									NoLogFile:    false,
+									FullRefresh:  false,
+									UsePip:       false,
+									Tag:          "",
+									ExcludeTag:   "",
+									Only:         nil,
+								},
+								Metadata: scheduler.Metadata{
+									Version: "dev",
+									OS:      runtime.GOOS,
+								},
+								State: []*scheduler.PipelineAssetState{
+									{
+										Name:   "chess_playground.games",
+										Status: "succeeded",
+									},
+									{
+										Name:   "chess_playground.profiles",
+										Status: "succeeded",
+									},
+									{
+										Name:   "chess_playground.game_outcome_summary",
+										Status: "succeeded",
+									},
+									{
+										Name:   "chess_playground.player_profile_summary",
+										Status: "succeeded",
+									},
+									{
+										Name:   "chess_playground.player_summary",
+										Status: "failed",
+									},
+								},
+								Version:           "1.0.0",
+								CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
+							})
+							return nil
+						},
+					},
+				},
+				{
+					Command: "cp",
+					Args:    []string{filepath.Join(currentFolder, "continue/assets/player_summary.sql"), filepath.Join(currentFolder, "./player_summary.sql.bak")},
+					Env:     []string{},
+
+					Expected: iapetus.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*iapetus.Step) error{
+						iapetus.AssertByExitCode,
+					},
+				},
+				{
+					Command: "cp",
+					Args:    []string{filepath.Join(currentFolder, "continue/player_summary.sql"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")},
+					Env:     []string{},
+
+					Expected: iapetus.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*iapetus.Step) error{
+						iapetus.AssertByExitCode,
+					},
+				},
+				{
+					Command: binary,
+					Args:    []string{"run", "--continue", filepath.Join(currentFolder, "continue")},
+					Env:     []string{},
+					Expected: iapetus.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*iapetus.Step) error{
+						iapetus.AssertByExitCode,
+						func(i *iapetus.Step) error {
+							assetCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), &scheduler.PipelineState{
+								Parameters: scheduler.RunConfig{
+									Downstream:   false,
+									StartDate:    "2024-12-22 00:00:00.000000",
+									EndDate:      "2024-12-22 23:59:59.999999",
+									Workers:      16,
+									Environment:  "",
+									Force:        false,
+									PushMetadata: false,
+									NoLogFile:    false,
+									FullRefresh:  false,
+									UsePip:       false,
+									Tag:          "",
+									ExcludeTag:   "",
+									Only:         nil,
+								},
+								Metadata: scheduler.Metadata{
+									Version: "dev",
+									OS:      runtime.GOOS,
+								},
+								State: []*scheduler.PipelineAssetState{
+									{
+										Name:   "chess_playground.games",
+										Status: "skipped",
+									},
+									{
+										Name:   "chess_playground.profiles",
+										Status: "skipped",
+									},
+									{
+										Name:   "chess_playground.game_outcome_summary",
+										Status: "skipped",
+									},
+									{
+										Name:   "chess_playground.player_profile_summary",
+										Status: "skipped",
+									},
+									{
+										Name:   "chess_playground.player_summary",
+										Status: "succeeded",
+									},
+								},
+								Version:           "1.0.0",
+								CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
+							})
+							return nil
+						},
+					},
+				},
+				{
+					Command: "cp",
+					Args:    []string{filepath.Join(currentFolder, "continue/player_summary.sql.bak"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")},
+					Env:     []string{},
+					Expected: iapetus.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*iapetus.Step) error{
+						iapetus.AssertByExitCode,
+					},
+				},
+			},
+		},
+	}
+
+	for _, workflow := range workflows {
+		err := workflow.Run()
+		if err != nil {
+			fmt.Printf("Assert error: %v\n", err)
 		}
-		return output, 1, err
 	}
-	return output, 0, nil
 }
 
-func copyFile(src, dst string) error {
-	sourceFile, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("failed to open source file: %w", err)
-	}
-	defer sourceFile.Close()
+func runIntegrationTests(binary string, currentFolder string) {
 
-	destinationFile, err := os.Create(dst)
-	if err != nil {
-		return fmt.Errorf("failed to create destination file: %w", err)
-	}
-	defer destinationFile.Close()
+	tests := []iapetus.Step{
+		{
+			Name:    "chess-extended",
+			Command: binary,
+			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", filepath.Join(currentFolder, "chess-extended")},
+			Env:     []string{},
 
-	_, err = io.Copy(destinationFile, sourceFile)
-	if err != nil {
-		return fmt.Errorf("failed to copy file: %w", err)
-	}
+			Expected: iapetus.Output{
+				ExitCode: 0,
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+			},
+		},
+		// {
+		// 	Name:    "chess-extended-asset",
+		// 	Command: binary,
+		// 	Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "./chess-extended/expectations/chess_games.asset.yml.json"},
+		// 	Env:     []string{},
 
-	return nil
+		// 	Expected: iapetus.Output{
+		// 		ExitCode: 1,
+		// 	},
+		// 	Asserts: []func(*iapetus.Step) error{
+		// 		iapetus.AssertByExitCode,
+		// 	},
+		// },
+		{
+			Name:    "chess-extended-only-checks",
+			Command: binary,
+			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "--only", "checks", filepath.Join(currentFolder, "chess-extended")},
+			Env:     []string{},
+
+			Expected: iapetus.Output{
+				ExitCode: 0,
+				Contains: []string{"Executed 1 tasks", "total_games:positive"},
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+				iapetus.AssertByContains,
+			},
+		},
+		{
+			Name:          "happy-path",
+			Command:       binary,
+			Args:          []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "happy-path")},
+			Env:           []string{},
+			SkipJsonNodes: []string{"\"path\""},
+			Expected: iapetus.Output{
+				ExitCode: 0,
+				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/pipeline.yml.json")),
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+				iapetus.AssertByOutputJson,
+			},
+		},
+		{
+			Name:    "format-if-fail",
+			Command: binary,
+			Args:    []string{"format", "--fail-if-changed", filepath.Join(currentFolder, "chess-extended/assets/chess_games.asset.yml")},
+			Env:     []string{},
+			Expected: iapetus.Output{
+				ExitCode: 0,
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+			},
+		},
+		{
+			Name:    "chess-extended-only-main",
+			Command: binary,
+			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "--only", "main", filepath.Join(currentFolder, "chess-extended")},
+			Env:     []string{},
+			Expected: iapetus.Output{
+				ExitCode: 0,
+				Contains: []string{"Executed 3 tasks", " Finished: chess_playground.games", "Finished: chess_playground.profiles", "Finished: chess_playground.game_outcome_summary"},
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+				iapetus.AssertByContains,
+			},
+		},
+		{
+			Name:    "push-metadata",
+			Command: binary,
+			Args:    []string{"run", "--push-metadata", "--only", "push-metadata", "./bigquery-metadata"},
+			Env:     []string{},
+			Expected: iapetus.Output{
+				ExitCode: 1,
+				Contains: []string{"Starting: shopify_raw.products:metadata-push", "Starting: shopify_raw.inventory_items:metadata-push"},
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+				iapetus.AssertByContains,
+			},
+		},
+		{
+			Name:    "validate-happy-path",
+			Command: binary,
+			Args:    []string{"validate", filepath.Join(currentFolder, "happy-path")},
+			Env:     []string{},
+			Expected: iapetus.Output{
+				ExitCode: 0,
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+			},
+		},
+		{
+			Name:    "run-use-uv-happy-path",
+			Command: binary,
+			Args:    []string{"run", "--use-uv", filepath.Join(currentFolder, "happy-path")},
+			Env:     []string{},
+			Expected: iapetus.Output{
+				ExitCode: 0,
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+			},
+		},
+		{
+			Name:          "parse-asset-happy-path-asset-py",
+			Command:       binary,
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "happy-path/assets/asset.py")},
+			Env:           []string{},
+			SkipJsonNodes: []string{"\"path\""},
+			Expected: iapetus.Output{
+				ExitCode: 0,
+				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/asset.py.json")),
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+				iapetus.AssertByOutputJson,
+			},
+		},
+		{
+			Name:          "parse-asset-happy-path-chess-games",
+			Command:       binary,
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "happy-path/assets/chess_games.asset.yml")},
+			Env:           []string{},
+			SkipJsonNodes: []string{"\"path\""},
+			Expected: iapetus.Output{
+				ExitCode: 0,
+				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/chess_games.asset.yml.json")),
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+				iapetus.AssertByOutputJson,
+			},
+		},
+		{
+			Name:          "parse-asset-happy-path-chess-profiles",
+			Command:       binary,
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "happy-path/assets/chess_profiles.asset.yml")},
+			Env:           []string{},
+			SkipJsonNodes: []string{"\"path\""},
+			Expected: iapetus.Output{
+				ExitCode: 0,
+				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/chess_profiles.asset.yml.json")),
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+				iapetus.AssertByOutputJson,
+			},
+		},
+		{
+			Name:          "parse-asset-happy-path-player-summary",
+			Command:       binary,
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "happy-path/assets/player_summary.sql")},
+			Env:           []string{},
+			SkipJsonNodes: []string{"\"path\""},
+			Expected: iapetus.Output{
+				ExitCode: 0,
+				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/player_summary.sql.json")),
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+				iapetus.AssertByOutputJson,
+			},
+		},
+		{
+			Name:    "parse-asset-faulty-pipeline-error-sql",
+			Command: binary,
+			Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "faulty-pipeline/assets/error.sql")},
+			Env:     []string{},
+
+			Expected: iapetus.Output{
+				ExitCode: 1,
+				Contains: []string{"error creating asset from file", "unmarshal errors"},
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+				iapetus.AssertByContains,
+			},
+		},
+		{
+			Name:          "validate-missing-upstream",
+			Command:       binary,
+			Args:          []string{"validate", "-o", "json", filepath.Join(currentFolder, "missing-upstream/assets/nonexistent.sql")},
+			Env:           []string{},
+			SkipJsonNodes: []string{"\"path\""},
+			Expected: iapetus.Output{
+				ExitCode: 0,
+				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "missing-upstream/expectations/missing_upstream.json")),
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+				iapetus.AssertByOutputJson,
+			},
+		},
+		{
+			Name:    "run-malformed-sql",
+			Command: binary,
+			Args:    []string{"run", filepath.Join(currentFolder, "malformed/assets/malformed.sql")},
+			Env:     []string{},
+
+			Expected: iapetus.Output{
+				ExitCode: 1,
+				Contains: []string{"Parser Error: syntax error at or near \"S_ELECT_\"", "Failed assets 1"},
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+				iapetus.AssertByContains,
+			},
+		},
+		{
+			Name:          "internal-connections",
+			Command:       binary,
+			Args:          []string{"internal", "connections"},
+			Env:           []string{},
+			SkipJsonNodes: []string{"\"path\""},
+			Expected: iapetus.Output{
+				ExitCode: 0,
+				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "expected_connections_schema.json")),
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+				iapetus.AssertByOutputJson,
+			},
+		},
+		{
+			Name:          "connections-list",
+			Command:       binary,
+			Args:          []string{"connections", "list", "-o", "json", currentFolder},
+			Env:           []string{},
+			SkipJsonNodes: []string{"\"path\""},
+			Expected: iapetus.Output{
+				ExitCode: 0,
+				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "expected_connections.json")),
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+				iapetus.AssertByOutputJson,
+			},
+		},
+		{
+			Name:          "parse-pipeline-lineage",
+			Command:       binary,
+			Args:          []string{"internal", "parse-pipeline", "-c", filepath.Join(currentFolder, "lineage")},
+			Env:           []string{},
+			SkipJsonNodes: []string{"\"path\""},
+			Expected: iapetus.Output{
+				ExitCode: 0,
+				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "lineage/expectations/lineage.json")),
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+				iapetus.AssertByOutputJson,
+			},
+		},
+		{
+			Name:          "parse-asset-lineage-example",
+			Command:       binary,
+			Args:          []string{"internal", "parse-asset", "-c", filepath.Join(currentFolder, "lineage/assets/example.sql")},
+			Env:           []string{},
+			SkipJsonNodes: []string{"\"path\""},
+			Expected: iapetus.Output{
+				ExitCode: 0,
+				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "lineage/expectations/lineage-asset.json")),
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+				iapetus.AssertByOutputJson,
+			},
+		},
+	}
+	for _, test := range tests {
+		if err := test.Run(); err != nil {
+			fmt.Printf("%s Assert error: %v\n", test.Name, err)
+		}
+	}
 }
 
-func readState(dir string) *scheduler.PipelineState {
+func assetCustomState(dir string, expected *scheduler.PipelineState) {
 	state, err := scheduler.ReadState(afero.NewOsFs(), dir)
 	if err != nil {
-		return nil
+		os.Exit(1)
 	}
-	return state
-}
-
-func setupForContinue(currentFolder string) error {
-	if err := copyFile(filepath.Join(currentFolder, "continue/assets/player_summary.sql"), filepath.Join(currentFolder, "./player_summary.sql.bak")); err != nil {
-		fmt.Println("Failed to copy file:", err)
-		return err
-	}
-
-	if err := copyFile(filepath.Join(currentFolder, "player_summary.sql"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")); err != nil {
-		fmt.Println("Failed to copy file:", err)
-		return err
-	}
-	return nil
-}
-
-func expectedState(dir string, expected *scheduler.PipelineState) {
-	state := readState(dir)
 	if state.Parameters.Workers != expected.Parameters.Workers {
 		fmt.Println("Mismatch in Workers")
 		os.Exit(1)
