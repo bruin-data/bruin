@@ -425,9 +425,6 @@ func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.S
 			}, err
 		}
 	}
-	if !runningForAnAsset && runConfig.Downstream {
-		infoPrinter.Println("Ignoring the '--downstream' flag since you are running the whole pipeline")
-	}
 
 	configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
 	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
@@ -458,7 +455,7 @@ func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.S
 	return &PipelineInfo{
 		Pipeline:           foundPipeline,
 		RunningForAnAsset:  runningForAnAsset,
-		RunDownstreamTasks: runDownstreamTasks,
+		RunDownstreamTasks: runConfig.Downstream,
 		Config:             cm,
 	}, nil
 }
