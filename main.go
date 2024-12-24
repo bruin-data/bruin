@@ -27,6 +27,9 @@ func main() {
 
 	v.Version = version
 	v.Commit = commit
+	if TelemetryKey == "" {
+		TelemetryKey = os.Getenv("TELEMETRY_KEY")
+	}
 	telemetry.TelemetryKey = TelemetryKey
 	telemetry.OptOut = optOut
 	telemetry.AppVersion = v.Version
