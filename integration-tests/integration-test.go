@@ -50,6 +50,16 @@ func main() {
 		[]string{"Executed 3 tasks", " Finished: chess_playground.games", "Finished: chess_playground.profiles", "Finished: chess_playground.game_outcome_summary"},
 	)
 	expectOutputIncludes(
+		"run --downstream ./chess-extended/assets/game_outcome_summary.sql",
+		0,
+		[]string{"Executed 4 tasks", " Finished: chess_playground.game_outcome_summary", "Finished: chess_playground.game_outcome_summary:total_games:positive", "Finished: chess_playground.player_summary", " Finished: chess_playground.player_summary:total_games:non_negative"},
+	)
+	expectOutputIncludes(
+		"run --downstream --only main ./chess-extended/assets/game_outcome_summary.sql",
+		0,
+		[]string{"Executed 2 tasks", " Finished: chess_playground.game_outcome_summary", "Finished: chess_playground.player_summary"},
+	)
+	expectOutputIncludes(
 		"run --push-metadata --only push-metadata bigquery-metadata",
 		0,
 		[]string{" Starting: shopify_raw.products:metadata-push", "Starting: shopify_raw.inventory_items:metadata-push"},
