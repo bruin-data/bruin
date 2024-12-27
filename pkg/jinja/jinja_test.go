@@ -145,6 +145,12 @@ group by 1`,
 09
 10`,
 		},
+		{
+			name:  "string comparison",
+			query: `"a" < "b": {{ "a" < "b" }}`,
+			args:  Context{},
+			want:  `"a" < "b": True`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
