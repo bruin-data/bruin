@@ -227,10 +227,11 @@ func runIntegrationTests(binary string, currentFolder string) {
 				iapetus.AssertByExitCode,
 			},
 		},
+
 		// {
-		// 	Name:    "chess-extended-asset",
+		// 	Name:    "chess-extended-exclude-tag",
 		// 	Command: binary,
-		// 	Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "./chess-extended/expectations/chess_games.asset.yml.json"},
+		// 	Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", filepath.Join(currentFolder, "chess-extended/expectations/chess_games.asset.yml")},
 		// 	Env:     []string{},
 
 		// 	Expected: iapetus.Output{
@@ -296,20 +297,20 @@ func runIntegrationTests(binary string, currentFolder string) {
 				iapetus.AssertByContains,
 			},
 		},
-		// {
-		// 	Name:    "push-metadata",
-		// 	Command: binary,
-		// 	Args:    []string{"run", "--push-metadata", "--only", "push-metadata", "./bigquery-metadata"},
-		// 	Env:     []string{},
-		// 	Expected: iapetus.Output{
-		// 		ExitCode: 0,
-		// 		Contains: []string{"Starting: shopify_raw.products:metadata-push", "Starting: shopify_raw.inventory_items:metadata-push"},
-		// 	},
-		// 	Asserts: []func(*iapetus.Step) error{
-		// 		iapetus.AssertByExitCode,
-		// 		iapetus.AssertByContains,
-		// 	},
-		// },
+		{
+			Name:    "push-metadata",
+			Command: binary,
+			Args:    []string{"run", "--push-metadata", "--only", "push-metadata", filepath.Join(currentFolder, "bigquery-metadata")},
+			Env:     []string{},
+			Expected: iapetus.Output{
+				ExitCode: 1,
+				Contains: []string{"Starting: shopify_raw.products:metadata-push", "Starting: shopify_raw.inventory_items:metadata-push"},
+			},
+			Asserts: []func(*iapetus.Step) error{
+				iapetus.AssertByExitCode,
+				iapetus.AssertByContains,
+			},
+		},
 		{
 			Name:    "validate-happy-path",
 			Command: binary,
@@ -401,7 +402,7 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Env:     []string{},
 
 			Expected: iapetus.Output{
-				ExitCode: 0,
+				ExitCode: 1,
 				Contains: []string{"error creating asset from file", "unmarshal errors"},
 			},
 			Asserts: []func(*iapetus.Step) error{

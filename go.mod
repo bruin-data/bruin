@@ -1,8 +1,8 @@
 module github.com/bruin-data/bruin
 
-go 1.22.0
+go 1.23
 
-toolchain go1.22.2
+toolchain go1.23.4
 
 require (
 	cloud.google.com/go/bigquery v1.60.0
@@ -80,6 +80,7 @@ require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
+	github.com/cenkalti/backoff/v5 v5.0.0 // indirect
 	github.com/charmbracelet/lipgloss v0.13.0 // indirect
 	github.com/charmbracelet/x/ansi v0.4.0 // indirect
 	github.com/charmbracelet/x/term v0.2.0 // indirect
@@ -186,3 +187,5 @@ require (
 	gotest.tools/gotestsum v1.8.2 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
 )
+
+replace github.com/y-bruin/iapetus => ../integration-test-suits
