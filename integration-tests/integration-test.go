@@ -145,10 +145,12 @@ func runIntegrationWorkflow(binary string, currentFolder string) {
 func runIntegrationTests(binary string, currentFolder string) {
 	tests := getTasks(binary, currentFolder)
 	for _, test := range tests {
-		if err := test.Run(); err != nil {
-			fmt.Printf("%s Assert error: %v\n", test.Name, err)
-			os.Exit(1)
-		}
+		go func() {
+			if err := test.Run(); err != nil {
+				fmt.Printf("%s Assert error: %v\n", test.Name, err)
+				os.Exit(1)
+			}
+		}()
 	}
 }
 
@@ -247,9 +249,8 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "chess-extended",
 			Command: binary,
-			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", filepath.Join(currentFolder, "chess-extended")},
+			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "--environment", "chess-extended", filepath.Join(currentFolder, "chess-extended")},
 			Env:     []string{},
-
 			Expected: e2e.Output{
 				ExitCode: 0,
 			},
@@ -260,7 +261,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "chess-extended-only-checks",
 			Command: binary,
-			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "--only", "checks", filepath.Join(currentFolder, "chess-extended")},
+			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "--only", "checks", "--environment", "chess-extended-only-checks", filepath.Join(currentFolder, "chess-extended")},
 			Env:     []string{},
 
 			Expected: e2e.Output{
@@ -287,7 +288,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "chess-extended-only-main",
 			Command: binary,
-			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "--only", "main", filepath.Join(currentFolder, "chess-extended")},
+			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "--only", "main", "--environment", "default", filepath.Join(currentFolder, "chess-extended")},
 			Env:     []string{},
 
 			Expected: e2e.Output{
@@ -300,9 +301,54 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
+			Name:          "parse-asset-happy-path-chess-games",
+			Command:       binary,
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "chess-extended/assets/chess_games.asset.yml")},
+			Env:           []string{},
+			SkipJSONNodes: []string{"\"path\""},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "chess-extended/expectations/chess_games.asset.yml.json")),
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJSON,
+			},
+		},
+		{
+			Name:          "parse-asset-happy-path-chess-profiles",
+			Command:       binary,
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "chess-extended/assets/chess_profiles.asset.yml")},
+			Env:           []string{},
+			SkipJSONNodes: []string{"\"path\""},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "chess-extended/expectations/chess_profiles.asset.yml.json")),
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJSON,
+			},
+		},
+		{
+			Name:          "parse-asset-happy-path-country",
+			Command:       binary,
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "example/assets/country.sql")},
+			Env:           []string{},
+			SkipJSONNodes: []string{"\"path\""},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "example/expectations/country.sql.json")),
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJSON,
+			},
+		},
+		{
 			Name:    "downstream-chess-extended",
 			Command: binary,
-			Args:    []string{"run", "--downstream", filepath.Join(currentFolder, "chess-extended/assets/game_outcome_summary.sql")},
+			Args:    []string{"run", "--downstream", "--environment", "downstream-chess-extended", filepath.Join(currentFolder, "chess-extended/assets/game_outcome_summary.sql")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
@@ -316,7 +362,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "downstream-only-main-chess-extended",
 			Command: binary,
-			Args:    []string{"run", "--downstream", "--only", "main", filepath.Join(currentFolder, "chess-extended/assets/game_outcome_summary.sql")},
+			Args:    []string{"run", "--downstream", "--only", "main", "--environment", "downstream-only-main-chess-extended", filepath.Join(currentFolder, "chess-extended/assets/game_outcome_summary.sql")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
@@ -330,7 +376,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "push-metadata",
 			Command: binary,
-			Args:    []string{"run", "--push-metadata", "--only", "push-metadata", filepath.Join(currentFolder, "bigquery-metadata")},
+			Args:    []string{"run", "--push-metadata", "--only", "push-metadata", "--environment", "push-metadata", filepath.Join(currentFolder, "bigquery-metadata")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 1,
@@ -356,7 +402,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "run-use-uv-happy-path",
 			Command: binary,
-			Args:    []string{"run", "--use-uv", filepath.Join(currentFolder, "chess-extended")},
+			Args:    []string{"run", "--use-uv", "--environment", "run-use-uv-happy-path", filepath.Join(currentFolder, "chess-extended")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
@@ -413,7 +459,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "run-malformed-sql",
 			Command: binary,
-			Args:    []string{"run", filepath.Join(currentFolder, "malformed/assets/malformed.sql")},
+			Args:    []string{"run", "--environment", "default", filepath.Join(currentFolder, "malformed/assets/malformed.sql")},
 			Env:     []string{},
 
 			Expected: e2e.Output{
