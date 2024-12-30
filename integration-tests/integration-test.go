@@ -362,9 +362,9 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
-			Name:    "run-use-uv-happy-path",
+			Name:    "run-use-uv",
 			Command: binary,
-			Args:    []string{"run", "--use-uv", filepath.Join(currentFolder, "happy-path")},
+			Args:    []string{"run", "--use-uv", filepath.Join(currentFolder, "test-pipelines/run-use-uv-pipeline")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
