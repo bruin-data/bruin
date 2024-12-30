@@ -1,9 +1,22 @@
 default_environment: default
 environments:
-  chess-extended:
+  default:
     connections:
       duckdb:
         - name: "chess-default"
+          path: "chess-default.db"
+      chess:
+        - name: "chess-default"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
+      generic:
+        - name: KEY1
+          value: value1
+  chess-extended:
+    connections:
+      duckdb:
+        - name: "duckdb-default"
           path: "chess-extended.db"
       chess:
         - name: "chess-default"
@@ -16,7 +29,7 @@ environments:
   chess-extended-only-checks:
     connections:
       duckdb:
-        - name: "chess-default"
+        - name: "duckdb-default"
           path: "chess-extended-only-checks.db"
       chess:
         - name: "chess-default"
@@ -29,8 +42,71 @@ environments:
   chess-extended-only-main:
     connections:
       duckdb:
-        - name: "chess-default"
+        - name: "duckdb-default"
           path: "chess-extended-only-main.db"
+      chess:
+        - name: "chess-default"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
+      generic:
+        - name: KEY1
+          value: value1
+  downstream-chess-extended:
+    connections:
+      duckdb:
+        - name: "duckdb-default"
+          path: "downstream-chess-extended.db"
+      chess:
+        - name: "chess-default"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
+      generic:
+        - name: KEY1
+          value: value1
+  downstream-only-main-chess-extended:
+    connections:
+      duckdb:
+        - name: "duckdb-default"
+          path: "downstream-only-main-chess-extended.db"
+      chess:
+        - name: "chess-default"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
+      generic:
+        - name: KEY1
+          value: value1
+
+  push-metadata:
+    connections:
+      duckdb:
+        - name: "duckdb-default"
+          path: "push-metadata.db"
+      chess:
+        - name: "chess-default"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
+      generic:
+        - name: KEY1
+          value: value1
+  run-use-uv-happy-path:
+    connections:
+      duckdb:
+        - name: "duckdb-default"
+          path: "run-use-uv-happy-path.db"
+      chess:
+        - name: "chess-default"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
+  run-malformed-sql:
+    connections:
+      duckdb:
+        - name: "duckdb-default"
+          path: "run-malformed-sql.db"
       chess:
         - name: "chess-default"
           players:

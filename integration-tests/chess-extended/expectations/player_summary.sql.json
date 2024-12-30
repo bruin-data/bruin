@@ -6,7 +6,10 @@
     "type": "duckdb.sql",
     "description": "",
     "connection": "",
-    "tags": [],
+    "tags": [
+      "include",
+      "exclude"
+    ],
     "materialization": {
       "type": "table",
       "strategy": "",
@@ -15,6 +18,16 @@
       "incremental_key": ""
     },
     "upstreams": [
+      {
+        "type": "asset",
+        "value": "chess_playground.game_outcome_summary",
+        "columns": []
+      },
+      {
+        "type": "asset",
+        "value": "chess_playground.player_profile_summary",
+        "columns": []
+      },
       {
         "type": "asset",
         "value": "chess_playground.games",
@@ -31,12 +44,12 @@
     "owner": "",
     "executable_file": {
       "name": "player_summary.sql",
-      "path": "/integration-tests/happy-path/assets/player_summary.sql",
-      "content": "WITH game_results AS (\n    SELECT\n        CASE\n            WHEN g.white-\u003e\u003e'result' = 'win' THEN g.white-\u003e\u003e'@id'\n            WHEN g.black-\u003e\u003e'result' = 'win' THEN g.black-\u003e\u003e'@id'\n            ELSE NULL\n            END AS winner_aid,\n        g.white-\u003e\u003e'@id' AS white_aid,\n    g.black-\u003e\u003e'@id' AS black_aid\nFROM chess_playground.games g\n)\n\nSELECT\n    p.username,\n    p.aid,\n    COUNT(*) AS total_games,\n    COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) AS white_wins,\n    COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) AS black_wins,\n    COUNT(CASE WHEN g.white_aid = p.aid THEN 1 END) AS white_games,\n    COUNT(CASE WHEN g.black_aid = p.aid THEN 1 END) AS black_games,\n    ROUND(COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) * 100.0 / NULLIF(COUNT(CASE WHEN g.white_aid = p.aid THEN 1 END), 0), 2) AS white_win_rate,\n    ROUND(COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) * 100.0 / NULLIF(COUNT(CASE WHEN g.black_aid = p.aid THEN 1 END), 0), 2) AS black_win_rate\nFROM chess_playground.profiles p\nLEFT JOIN game_results g\n       ON p.aid IN (g.white_aid, g.black_aid)\nGROUP BY p.username, p.aid\nORDER BY total_games DESC"
+      "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-extended/assets/player_summary.sql",
+      "content": "WITH game_results AS (\n    SELECT\n        CASE\n            WHEN g.white->>'result' = 'win' THEN g.white->>'@id'\n            WHEN g.black->>'result' = 'win' THEN g.black->>'@id'\n            ELSE NULL\n            END AS winner_aid,\n        g.white->>'@id' AS white_aid,\n    g.black->>'@id' AS black_aid\nFROM chess_playground.games g\n    )\n\nSELECT\n    p.username,\n    p.aid,\n    COUNT(*) AS total_games,\n    COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) +\n    COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) AS total_wins,\n    ROUND(\n            (COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) +\n             COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END)) * 100.0 /\n            NULLIF(COUNT(*), 0),\n            2\n    ) AS win_rate\nFROM chess_playground.profiles p\n         LEFT JOIN game_results g\n                   ON p.aid IN (g.white_aid, g.black_aid)\nGROUP BY p.username, p.aid\nORDER BY total_games DESC;"
     },
     "definition_file": {
       "name": "player_summary.sql",
-      "path": "/integration-tests/happy-path/assets/player_summary.sql",
+      "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-extended/assets/player_summary.sql",
       "type": "comment"
     },
     "parameters": {},
@@ -44,19 +57,49 @@
     "columns": [
       {
         "entity_attribute": null,
+        "name": "username",
+        "type": "string",
+        "description": "Username of the player",
+        "primary_key": false,
+        "update_on_merge": false,
+        "checks": [],
+        "upstreams": []
+      },
+      {
+        "entity_attribute": null,
         "name": "total_games",
         "type": "integer",
-        "description": "the games",
+        "description": "Total games played by the player",
         "primary_key": false,
         "update_on_merge": false,
         "checks": [
           {
-            "id": "df9255080865c27b164a7de36a0a26bcc00345dddd66849d96aa96a2c68266ea",
-            "name": "positive",
+            "id": "71e658a6b97f8131681df2677cf56ee5b572d4555fca6ead261ddc46fb08d31a",
+            "name": "non_negative",
             "value": null,
             "blocking": true
           }
         ],
+        "upstreams": []
+      },
+      {
+        "entity_attribute": null,
+        "name": "total_wins",
+        "type": "integer",
+        "description": "Total games won by the player",
+        "primary_key": false,
+        "update_on_merge": false,
+        "checks": [],
+        "upstreams": []
+      },
+      {
+        "entity_attribute": null,
+        "name": "win_rate",
+        "type": "float",
+        "description": "Win rate of the player",
+        "primary_key": false,
+        "update_on_merge": false,
+        "checks": [],
         "upstreams": []
       }
     ],
@@ -67,12 +110,12 @@
   },
   "pipeline": {
     "legacy_id": "",
-    "name": "integration_test",
+    "name": "chess_extended_duckdb",
     "schedule": "",
     "start_date": "",
     "definition_file": {
       "name": "pipeline.yml",
-      "path": "/integration-tests/happy-path/pipeline.yml"
+      "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-extended/pipeline.yml"
     },
     "default_parameters": {},
     "default_connections": {},
@@ -98,12 +141,12 @@
         "owner": "",
         "executable_file": {
           "name": "asset.py",
-          "path": "/integration-tests/happy-path/assets/asset.py",
+          "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-extended/assets/asset.py",
           "content": "import os\nimport duckdb\n\nif os.getenv('INJECTED1') != \"value1\":\n    raise Exception(\"KEY1 is not injected correctly\")\n\ncon = duckdb.connect(database = \"duckdb.db\", read_only = False)\n\ncon.execute(\"SELECT * FROM chess_playground.player_summary\")\nresult = con.fetchall()\nif len(result) != 2:\n    raise Exception(\"Incorrect number of rows in player_summary\")"
         },
         "definition_file": {
           "name": "asset.py",
-          "path": "/integration-tests/happy-path/assets/asset.py",
+          "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-extended/assets/asset.py",
           "type": "comment"
         },
         "parameters": {},
@@ -126,7 +169,9 @@
         "type": "ingestr",
         "description": "",
         "connection": "",
-        "tags": [],
+        "tags": [
+          "include"
+        ],
         "materialization": null,
         "upstreams": [],
         "image": "",
@@ -134,12 +179,12 @@
         "owner": "",
         "executable_file": {
           "name": "chess_games.asset.yml",
-          "path": "/integration-tests/happy-path/assets/chess_games.asset.yml",
-          "content": "name: chess_playground.games\ntype: ingestr\nparameters:\n  source_connection: chess-default\n  source_table: games\n  destination: duckdb"
+          "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-extended/assets/chess_games.asset.yml",
+          "content": "name: chess_playground.games\ntype: ingestr\ntags:\n  - include\n\nparameters:\n  destination: duckdb\n  source_connection: chess-default\n  source_table: games\n"
         },
         "definition_file": {
           "name": "chess_games.asset.yml",
-          "path": "/integration-tests/happy-path/assets/chess_games.asset.yml",
+          "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-extended/assets/chess_games.asset.yml",
           "type": "yaml"
         },
         "parameters": {
@@ -161,7 +206,9 @@
         "type": "ingestr",
         "description": "",
         "connection": "",
-        "tags": [],
+        "tags": [
+          "include"
+        ],
         "materialization": null,
         "upstreams": [],
         "image": "",
@@ -169,12 +216,12 @@
         "owner": "",
         "executable_file": {
           "name": "chess_profiles.asset.yml",
-          "path": "/integration-tests/happy-path/assets/chess_profiles.asset.yml",
-          "content": "name: chess_playground.profiles\ntype: ingestr\nparameters:\n  source_connection: chess-default\n  source_table: profiles\n  destination: duckdb"
+          "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-extended/assets/chess_profiles.asset.yml",
+          "content": "name: chess_playground.profiles\ntype: ingestr\nparameters:\n  source_connection: chess-default\n  source_table: profiles\n  destination: duckdb\ntags:\n    - include"
         },
         "definition_file": {
           "name": "chess_profiles.asset.yml",
-          "path": "/integration-tests/happy-path/assets/chess_profiles.asset.yml",
+          "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-extended/assets/chess_profiles.asset.yml",
           "type": "yaml"
         },
         "parameters": {
@@ -190,13 +237,15 @@
         "athena": null
       },
       {
-        "id": "8361c0131fda306b28fd4f3c8f2af121cca5e57baf77a771b4cb218abda4ca5b",
+        "id": "25b80ab44f1ee3a39d3eb3e783fffbe52fdbf90de5d569d324cae7f2f84929d6",
         "uri": "",
-        "name": "chess_playground.player_summary",
+        "name": "chess_playground.game_outcome_summary",
         "type": "duckdb.sql",
         "description": "",
         "connection": "",
-        "tags": [],
+        "tags": [
+          "include"
+        ],
         "materialization": {
           "type": "table",
           "strategy": "",
@@ -205,6 +254,173 @@
           "incremental_key": ""
         },
         "upstreams": [
+          {
+            "type": "asset",
+            "value": "chess_playground.games",
+            "columns": []
+          }
+        ],
+        "image": "",
+        "instance": "",
+        "owner": "",
+        "executable_file": {
+          "name": "game_outcome_summary.sql",
+          "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-extended/assets/game_outcome_summary.sql",
+          "content": "SELECT\n    g.white->>'result' AS result_type,\n    COUNT(*) AS total_games\nFROM chess_playground.games g\nWHERE g.white->>'result' IS NOT NULL\nGROUP BY g.white->>'result'\nORDER BY total_games DESC;"
+        },
+        "definition_file": {
+          "name": "game_outcome_summary.sql",
+          "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-extended/assets/game_outcome_summary.sql",
+          "type": "comment"
+        },
+        "parameters": {},
+        "secrets": [],
+        "columns": [
+          {
+            "entity_attribute": null,
+            "name": "result_type",
+            "type": "string",
+            "description": "Type of game result (win, draw, etc.)",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [],
+            "upstreams": []
+          },
+          {
+            "entity_attribute": null,
+            "name": "total_games",
+            "type": "integer",
+            "description": "Total number of games with this result",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [
+              {
+                "id": "f4b11da964c5589f2a98b25c2897e947bf22dd3589dc86c65fee169f9f8b1b6b",
+                "name": "positive",
+                "value": null,
+                "blocking": true
+              }
+            ],
+            "upstreams": []
+          }
+        ],
+        "custom_checks": [],
+        "metadata": {},
+        "snowflake": null,
+        "athena": null
+      },
+      {
+        "id": "27c346e9c791304ad7b65461d61e983c9c19a2ba21232feb8a41943da9a9f34f",
+        "uri": "",
+        "name": "chess_playground.player_profile_summary",
+        "type": "duckdb.sql",
+        "description": "",
+        "connection": "",
+        "tags": [
+          "exclude"
+        ],
+        "materialization": {
+          "type": "table",
+          "strategy": "",
+          "partition_by": "",
+          "cluster_by": null,
+          "incremental_key": ""
+        },
+        "upstreams": [
+          {
+            "type": "asset",
+            "value": "chess_playground.profiles",
+            "columns": []
+          }
+        ],
+        "image": "",
+        "instance": "",
+        "owner": "",
+        "executable_file": {
+          "name": "player_profile_summary.sql",
+          "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-extended/assets/player_profile_summary.sql",
+          "content": "SELECT\n    COUNT(*) AS total_players,\n    COUNT(CASE WHEN p.status = 'active' THEN 1 END) AS active_players,\n    COUNT(CASE WHEN p.status = 'inactive' THEN 1 END) AS inactive_players\nFROM chess_playground.profiles p;"
+        },
+        "definition_file": {
+          "name": "player_profile_summary.sql",
+          "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-extended/assets/player_profile_summary.sql",
+          "type": "comment"
+        },
+        "parameters": {},
+        "secrets": [],
+        "columns": [
+          {
+            "entity_attribute": null,
+            "name": "total_players",
+            "type": "integer",
+            "description": "Total number of players in the profiles table",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [
+              {
+                "id": "523a0c08bb3321cd6440e9a0249a8c63dbaf96ba5cea76deccaf029d39f7e830",
+                "name": "positive",
+                "value": null,
+                "blocking": true
+              }
+            ],
+            "upstreams": []
+          },
+          {
+            "entity_attribute": null,
+            "name": "active_players",
+            "type": "integer",
+            "description": "Number of players marked as active",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [],
+            "upstreams": []
+          },
+          {
+            "entity_attribute": null,
+            "name": "inactive_players",
+            "type": "integer",
+            "description": "Number of players marked as inactive",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [],
+            "upstreams": []
+          }
+        ],
+        "custom_checks": [],
+        "metadata": {},
+        "snowflake": null,
+        "athena": null
+      },
+      {
+        "id": "8361c0131fda306b28fd4f3c8f2af121cca5e57baf77a771b4cb218abda4ca5b",
+        "uri": "",
+        "name": "chess_playground.player_summary",
+        "type": "duckdb.sql",
+        "description": "",
+        "connection": "",
+        "tags": [
+          "include",
+          "exclude"
+        ],
+        "materialization": {
+          "type": "table",
+          "strategy": "",
+          "partition_by": "",
+          "cluster_by": null,
+          "incremental_key": ""
+        },
+        "upstreams": [
+          {
+            "type": "asset",
+            "value": "chess_playground.game_outcome_summary",
+            "columns": []
+          },
+          {
+            "type": "asset",
+            "value": "chess_playground.player_profile_summary",
+            "columns": []
+          },
           {
             "type": "asset",
             "value": "chess_playground.games",
@@ -221,12 +437,12 @@
         "owner": "",
         "executable_file": {
           "name": "player_summary.sql",
-          "path": "/integration-tests/happy-path/assets/player_summary.sql",
-          "content": "WITH game_results AS (\n    SELECT\n        CASE\n            WHEN g.white-\u003e\u003e'result' = 'win' THEN g.white-\u003e\u003e'@id'\n            WHEN g.black-\u003e\u003e'result' = 'win' THEN g.black-\u003e\u003e'@id'\n            ELSE NULL\n            END AS winner_aid,\n        g.white-\u003e\u003e'@id' AS white_aid,\n    g.black-\u003e\u003e'@id' AS black_aid\nFROM chess_playground.games g\n)\n\nSELECT\n    p.username,\n    p.aid,\n    COUNT(*) AS total_games,\n    COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) AS white_wins,\n    COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) AS black_wins,\n    COUNT(CASE WHEN g.white_aid = p.aid THEN 1 END) AS white_games,\n    COUNT(CASE WHEN g.black_aid = p.aid THEN 1 END) AS black_games,\n    ROUND(COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) * 100.0 / NULLIF(COUNT(CASE WHEN g.white_aid = p.aid THEN 1 END), 0), 2) AS white_win_rate,\n    ROUND(COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) * 100.0 / NULLIF(COUNT(CASE WHEN g.black_aid = p.aid THEN 1 END), 0), 2) AS black_win_rate\nFROM chess_playground.profiles p\nLEFT JOIN game_results g\n       ON p.aid IN (g.white_aid, g.black_aid)\nGROUP BY p.username, p.aid\nORDER BY total_games DESC"
+          "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-extended/assets/player_summary.sql",
+          "content": "WITH game_results AS (\n    SELECT\n        CASE\n            WHEN g.white->>'result' = 'win' THEN g.white->>'@id'\n            WHEN g.black->>'result' = 'win' THEN g.black->>'@id'\n            ELSE NULL\n            END AS winner_aid,\n        g.white->>'@id' AS white_aid,\n    g.black->>'@id' AS black_aid\nFROM chess_playground.games g\n    )\n\nSELECT\n    p.username,\n    p.aid,\n    COUNT(*) AS total_games,\n    COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) +\n    COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) AS total_wins,\n    ROUND(\n            (COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) +\n             COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END)) * 100.0 /\n            NULLIF(COUNT(*), 0),\n            2\n    ) AS win_rate\nFROM chess_playground.profiles p\n         LEFT JOIN game_results g\n                   ON p.aid IN (g.white_aid, g.black_aid)\nGROUP BY p.username, p.aid\nORDER BY total_games DESC;"
         },
         "definition_file": {
           "name": "player_summary.sql",
-          "path": "/integration-tests/happy-path/assets/player_summary.sql",
+          "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-extended/assets/player_summary.sql",
           "type": "comment"
         },
         "parameters": {},
@@ -234,19 +450,49 @@
         "columns": [
           {
             "entity_attribute": null,
+            "name": "username",
+            "type": "string",
+            "description": "Username of the player",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [],
+            "upstreams": []
+          },
+          {
+            "entity_attribute": null,
             "name": "total_games",
             "type": "integer",
-            "description": "the games",
+            "description": "Total games played by the player",
             "primary_key": false,
             "update_on_merge": false,
             "checks": [
               {
-                "id": "df9255080865c27b164a7de36a0a26bcc00345dddd66849d96aa96a2c68266ea",
-                "name": "positive",
+                "id": "71e658a6b97f8131681df2677cf56ee5b572d4555fca6ead261ddc46fb08d31a",
+                "name": "non_negative",
                 "value": null,
                 "blocking": true
               }
             ],
+            "upstreams": []
+          },
+          {
+            "entity_attribute": null,
+            "name": "total_wins",
+            "type": "integer",
+            "description": "Total games won by the player",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [],
+            "upstreams": []
+          },
+          {
+            "entity_attribute": null,
+            "name": "win_rate",
+            "type": "float",
+            "description": "Win rate of the player",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [],
             "upstreams": []
           }
         ],
@@ -268,6 +514,6 @@
     "retries": 0
   },
   "repo": {
-    "path": "/integration-tests"
+    "path": "/Users/yuvraj/Workspace/bruin/integration-tests"
   }
 }

@@ -11,8 +11,8 @@
       ],
       "duckdb": [
         {
-          "name": "duckdb-default",
-          "path": "duckdb.db"
+          "name": "chess-default",
+          "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-default.db"
         }
       ],
       "chess": [
@@ -27,7 +27,7 @@
     }
   },
   "environments": {
-    "default": {
+    "chess-extended": {
       "connections": {
         "generic": [
           {
@@ -38,7 +38,201 @@
         "duckdb": [
           {
             "name": "duckdb-default",
-            "path": "duckdb.db"
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-extended.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-default",
+            "players": [
+              "MagnusCarlsen",
+              "Hikaru"
+            ]
+          }
+        ]
+      }
+    },
+    "chess-extended-only-checks": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-default",
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-extended-only-checks.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-default",
+            "players": [
+              "MagnusCarlsen",
+              "Hikaru"
+            ]
+          }
+        ]
+      }
+    },
+    "chess-extended-only-main": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-default",
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-extended-only-main.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-default",
+            "players": [
+              "MagnusCarlsen",
+              "Hikaru"
+            ]
+          }
+        ]
+      }
+    },
+    "default": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "chess-default",
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/chess-default.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-default",
+            "players": [
+              "MagnusCarlsen",
+              "Hikaru"
+            ]
+          }
+        ]
+      }
+    },
+    "downstream-chess-extended": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-default",
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/downstream-chess-extended.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-default",
+            "players": [
+              "MagnusCarlsen",
+              "Hikaru"
+            ]
+          }
+        ]
+      }
+    },
+    "downstream-only-main-chess-extended": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-default",
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/downstream-only-main-chess-extended.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-default",
+            "players": [
+              "MagnusCarlsen",
+              "Hikaru"
+            ]
+          }
+        ]
+      }
+    },
+    "push-metadata": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-default",
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/push-metadata.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-default",
+            "players": [
+              "MagnusCarlsen",
+              "Hikaru"
+            ]
+          }
+        ]
+      }
+    },
+    "run-malformed-sql": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-default",
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/run-malformed-sql.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-default",
+            "players": [
+              "MagnusCarlsen",
+              "Hikaru"
+            ]
+          }
+        ]
+      }
+    },
+    "run-use-uv-happy-path": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-default",
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/run-use-uv-happy-path.db"
           }
         ],
         "chess": [
