@@ -41,10 +41,10 @@ const (
 	AssetTypeSynapseQuery         = AssetType("synapse.sql")
 	AssetTypeIngestr              = AssetType("ingestr")
 	AssetTypeTableau              = AssetType("tableau")
-
-	RunConfigFullRefresh = RunConfig("full-refresh")
-	RunConfigStartDate   = RunConfig("start-date")
-	RunConfigEndDate     = RunConfig("end-date")
+	AssetTypeBQSource             = AssetType("bq.source")
+	RunConfigFullRefresh          = RunConfig("full-refresh")
+	RunConfigStartDate            = RunConfig("start-date")
+	RunConfigEndDate              = RunConfig("end-date")
 )
 
 var defaultMapping = map[string]string{
