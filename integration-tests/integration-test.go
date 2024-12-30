@@ -35,28 +35,24 @@ var (
 		},
 		State: []*scheduler.PipelineAssetState{
 			{
-				Name:   "chess_playground.games",
+				Name:   "users",
 				Status: "succeeded",
 			},
 			{
-				Name:   "chess_playground.profiles",
-				Status: "succeeded",
+				Name:   "country",
+				Status: "failed",
 			},
 			{
-				Name:   "chess_playground.game_outcome_summary",
-				Status: "succeeded",
+				Name:   "example",
+				Status: "failed",
 			},
 			{
-				Name:   "chess_playground.player_profile_summary",
-				Status: "succeeded",
-			},
-			{
-				Name:   "chess_playground.player_summary",
+				Name:   "people",
 				Status: "failed",
 			},
 		},
 		Version:           "1.0.0",
-		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
+		CompatibilityHash: "39c095c875c072225e2927db0a6488153524215636cb2e6672a1056b80bc64c3",
 	}
 	stateForContinueRun = &scheduler.PipelineState{
 		Parameters: scheduler.RunConfig{
@@ -80,28 +76,24 @@ var (
 		},
 		State: []*scheduler.PipelineAssetState{
 			{
-				Name:   "chess_playground.games",
-				Status: "skipped",
-			},
-			{
-				Name:   "chess_playground.profiles",
-				Status: "skipped",
-			},
-			{
-				Name:   "chess_playground.game_outcome_summary",
-				Status: "skipped",
-			},
-			{
-				Name:   "chess_playground.player_profile_summary",
-				Status: "skipped",
-			},
-			{
-				Name:   "chess_playground.player_summary",
+				Name:   "users",
 				Status: "succeeded",
+			},
+			{
+				Name:   "country",
+				Status: "failed",
+			},
+			{
+				Name:   "example",
+				Status: "failed",
+			},
+			{
+				Name:   "people",
+				Status: "failed",
 			},
 		},
 		Version:           "1.0.0",
-		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
+		CompatibilityHash: "39c095c875c072225e2927db0a6488153524215636cb2e6672a1056b80bc64c3",
 	}
 )
 
@@ -163,12 +155,12 @@ func runIntegrationTests(binary string, currentFolder string) {
 func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Workflow {
 	return []e2e.Workflow{
 		{
-			Name: "continue after failure",
+			Name: "example after failure",
 			Steps: []e2e.Task{
 				{
 					Name:    "run first time",
 					Command: binary,
-					Args:    []string{"run", filepath.Join(currentFolder, "continue")},
+					Args:    []string{"run", filepath.Join(currentFolder, "example-continue")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -176,13 +168,13 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
-						e2e.AssertCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), stateForFirstRun),
+						e2e.AssertCustomState(filepath.Join(currentFolder, "/logs/runs/example_continue"), stateForFirstRun),
 					},
 				},
 				{
 					Name:    "copy player_summary.sql to tempfile",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "continue/assets/player_summary.sql"), tempfile},
+					Args:    []string{filepath.Join(currentFolder, "example/assets/example.sql"), tempfile},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -195,7 +187,7 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 				{
 					Name:    "copy player_summary.sql to continue",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "player_summary.sql"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")},
+					Args:    []string{filepath.Join(currentFolder, "example.sql"), filepath.Join(currentFolder, "example/assets/example.sql")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -208,20 +200,20 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 				{
 					Name:    "run continue",
 					Command: binary,
-					Args:    []string{"run", "--continue", filepath.Join(currentFolder, "continue")},
+					Args:    []string{"run", "--continue", filepath.Join(currentFolder, "example-continue")},
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
-						e2e.AssertCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), stateForContinueRun),
+						e2e.AssertCustomState(filepath.Join(currentFolder, "/logs/runs/example_continue"), stateForContinueRun),
 					},
 				},
 				{
 					Name:    "copy player_summary.sql back to continue",
 					Command: "cp",
-					Args:    []string{tempfile, filepath.Join(currentFolder, "continue/assets/player_summary.sql")},
+					Args:    []string{tempfile, filepath.Join(currentFolder, "example/assets/example.sql")},
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,
@@ -238,14 +230,14 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 func getTasks(binary string, currentFolder string) []e2e.Task {
 	return []e2e.Task{
 		{
-			Name:          "happy-path",
+			Name:          "example",
 			Command:       binary,
-			Args:          []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "happy-path")},
+			Args:          []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "example")},
 			Env:           []string{},
 			SkipJSONNodes: []string{"\"path\""},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   helpers.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/pipeline.yml.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "example/expectations/pipeline.yml.json")),
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -352,7 +344,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "validate-happy-path",
 			Command: binary,
-			Args:    []string{"validate", filepath.Join(currentFolder, "happy-path")},
+			Args:    []string{"validate", filepath.Join(currentFolder, "example")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
@@ -364,7 +356,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "run-use-uv-happy-path",
 			Command: binary,
-			Args:    []string{"run", "--use-uv", filepath.Join(currentFolder, "happy-path")},
+			Args:    []string{"run", "--use-uv", filepath.Join(currentFolder, "chess-extended")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
@@ -376,57 +368,12 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:          "parse-asset-happy-path-asset-py",
 			Command:       binary,
-			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "happy-path/assets/asset.py")},
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "example/assets/country.sql")},
 			Env:           []string{},
 			SkipJSONNodes: []string{"\"path\""},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   helpers.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/asset.py.json")),
-			},
-			Asserts: []func(*e2e.Task) error{
-				e2e.AssertByExitCode,
-				e2e.AssertByOutputJSON,
-			},
-		},
-		{
-			Name:          "parse-asset-happy-path-chess-games",
-			Command:       binary,
-			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "happy-path/assets/chess_games.asset.yml")},
-			Env:           []string{},
-			SkipJSONNodes: []string{"\"path\""},
-			Expected: e2e.Output{
-				ExitCode: 0,
-				Output:   helpers.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/chess_games.asset.yml.json")),
-			},
-			Asserts: []func(*e2e.Task) error{
-				e2e.AssertByExitCode,
-				e2e.AssertByOutputJSON,
-			},
-		},
-		{
-			Name:          "parse-asset-happy-path-chess-profiles",
-			Command:       binary,
-			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "happy-path/assets/chess_profiles.asset.yml")},
-			Env:           []string{},
-			SkipJSONNodes: []string{"\"path\""},
-			Expected: e2e.Output{
-				ExitCode: 0,
-				Output:   helpers.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/chess_profiles.asset.yml.json")),
-			},
-			Asserts: []func(*e2e.Task) error{
-				e2e.AssertByExitCode,
-				e2e.AssertByOutputJSON,
-			},
-		},
-		{
-			Name:          "parse-asset-happy-path-player-summary",
-			Command:       binary,
-			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "happy-path/assets/player_summary.sql")},
-			Env:           []string{},
-			SkipJSONNodes: []string{"\"path\""},
-			Expected: e2e.Output{
-				ExitCode: 0,
-				Output:   helpers.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/player_summary.sql.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "example/expectations/country.sql.json")),
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -511,12 +458,12 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:          "parse-pipeline-lineage",
 			Command:       binary,
-			Args:          []string{"internal", "parse-pipeline", "-c", filepath.Join(currentFolder, "lineage")},
+			Args:          []string{"internal", "parse-pipeline", "-c", filepath.Join(currentFolder, "example")},
 			Env:           []string{},
 			SkipJSONNodes: []string{"\"path\""},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   helpers.ReadFile(filepath.Join(currentFolder, "lineage/expectations/lineage.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "example/expectations/lineage.json")),
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -526,12 +473,12 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:          "parse-asset-lineage-example",
 			Command:       binary,
-			Args:          []string{"internal", "parse-asset", "-c", filepath.Join(currentFolder, "lineage/assets/example.sql")},
+			Args:          []string{"internal", "parse-asset", "-c", filepath.Join(currentFolder, "example/assets/example.sql")},
 			Env:           []string{},
 			SkipJSONNodes: []string{"\"path\""},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   helpers.ReadFile(filepath.Join(currentFolder, "lineage/expectations/lineage-asset.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "example/expectations/lineage-asset.json")),
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
