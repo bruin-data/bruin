@@ -120,7 +120,10 @@ func main() {
 		"lineage/expectations/lineage-asset.json",
 	)
 
-	customTestForContinue(currentFolder)
+	if err := customTestForContinue(currentFolder); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }
 
 func expectOutputIncludes(command string, code int, contains []string) {
@@ -201,9 +204,8 @@ func expectExitCode(command string, code int) {
 	fmt.Println("Passed")
 }
 
-func customTestForContinue(currentFolder string) {
-	expectExitCode("run ./continue", 1)
-
+func customTestForContinue(currentFolder string) error {
+	expectExitCode("run ./continue", 0)
 	expectedState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), &scheduler.PipelineState{
 		Parameters: scheduler.RunConfig{
 			Downstream:   false,
@@ -248,9 +250,18 @@ func customTestForContinue(currentFolder string) {
 		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
 	})
 
-	if err := setupForContinue(currentFolder); err != nil {
-		fmt.Println("Failed to setup test case for continue:", err)
-		os.Exit(1)
+	tempfile, err := os.CreateTemp("", "tempfile-*.sql")
+	if err != nil {
+		return fmt.Errorf("failed to create temporary file: %w", err)
+	}
+	defer func() {
+		if err := tempfile.Close(); err != nil {
+			fmt.Println("Failed to close temporary file:", err)
+		}
+	}()
+
+	if err := setupForContinue(currentFolder, tempfile.Name()); err != nil {
+		return fmt.Errorf("failed to setup test case for continue: %w", err)
 	}
 
 	expectExitCode("run --continue ./continue", 0)
@@ -300,10 +311,11 @@ func customTestForContinue(currentFolder string) {
 		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
 	})
 
-	if err := copyFile(filepath.Join(currentFolder, "./player_summary.sql.bak"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")); err != nil {
-		fmt.Println("Failed to copy file:", err)
-		os.Exit(1)
+	if err := copyFile(tempfile.Name(), filepath.Join(currentFolder, "continue/assets/player_summary.sql")); err != nil {
+		return fmt.Errorf("failed to copy file: %w", err)
 	}
+
+	return nil
 }
 
 func runCommand(command string) (string, error) {
@@ -368,8 +380,8 @@ func readState(dir string) *scheduler.PipelineState {
 	return state
 }
 
-func setupForContinue(currentFolder string) error {
-	if err := copyFile(filepath.Join(currentFolder, "continue/assets/player_summary.sql"), filepath.Join(currentFolder, "./player_summary.sql.bak")); err != nil {
+func setupForContinue(currentFolder string, tempfile string) error {
+	if err := copyFile(filepath.Join(currentFolder, "continue/assets/player_summary.sql"), tempfile); err != nil {
 		fmt.Println("Failed to copy file:", err)
 		return err
 	}
