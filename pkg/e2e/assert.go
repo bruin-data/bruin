@@ -24,7 +24,7 @@ func AssertByOutputString(i *Task) error {
 	return nil
 }
 
-func AssertByOutputJson(i *Task) error {
+func AssertByOutputJSON(i *Task) error {
 	expectation, err := jd.ReadJsonString(i.Expected.Output)
 	if err != nil {
 		return errors.New("Failed to read expectation: " + err.Error())
@@ -37,23 +37,32 @@ func AssertByOutputJson(i *Task) error {
 	}
 
 	diff := expectation.Diff(parsedOutput)
+
 	if len(diff) != 0 {
 		var path jd.JsonNode
 		for _, d := range diff {
 			path = d.Path[len(d.Path)-1]
-			for _, skip := range i.SkipJsonNodes {
-				if path.Json() == skip {
-					continue
+			if len(i.SkipJSONNodes) > 0 {
+				exists := false
+				for _, skip := range i.SkipJSONNodes {
+					if path.Json() == skip {
+						exists = true
+					}
 				}
+				if !exists {
+					return fmt.Errorf(
+						"mismatch at path %v. Expected json: %v, but found: %v",
+						d.Path, d.NewValues, d.OldValues,
+					)
+				}
+			} else {
 				return fmt.Errorf(
 					"mismatch at path %v. Expected json: %v, but found: %v",
 					d.Path, d.NewValues, d.OldValues,
 				)
 			}
-
 		}
 	}
-
 	return nil
 }
 

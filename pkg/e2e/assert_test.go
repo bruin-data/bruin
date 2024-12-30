@@ -5,6 +5,7 @@ import (
 )
 
 func TestAssertByExitCode(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		input   *Task
@@ -16,6 +17,7 @@ func TestAssertByExitCode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := AssertByExitCode(tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AssertByExitCode() error = %v, wantErr %v", err, tt.wantErr)
@@ -25,6 +27,7 @@ func TestAssertByExitCode(t *testing.T) {
 }
 
 func TestAssertByOutputString(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		input   *Task
@@ -42,6 +45,7 @@ func TestAssertByOutputString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := AssertByOutputString(tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AssertByOutputString() error = %v, wantErr %v", err, tt.wantErr)
@@ -51,7 +55,7 @@ func TestAssertByOutputString(t *testing.T) {
 }
 
 func TestAssertByOutputJson(t *testing.T) {
-	// Assuming parseJSONOutputs and compareJSON are implemented correctly
+	t.Parallel()
 	tests := []struct {
 		name    string
 		input   *Task
@@ -69,7 +73,8 @@ func TestAssertByOutputJson(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := AssertByOutputJson(tt.input)
+			t.Parallel()
+			err := AssertByOutputJSON(tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AssertByOutputJson() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -78,6 +83,7 @@ func TestAssertByOutputJson(t *testing.T) {
 }
 
 func TestAssertByError(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		input   *Task
@@ -95,6 +101,7 @@ func TestAssertByError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := AssertByError(tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AssertByError() error = %v, wantErr %v", err, tt.wantErr)

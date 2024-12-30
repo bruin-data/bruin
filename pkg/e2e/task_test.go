@@ -5,6 +5,7 @@ import (
 )
 
 func TestIntegrationTest_Run(t *testing.T) {
+	t.Parallel()
 	test := &Task{
 		Command: "echo",
 		Args:    []string{"Hello, World!"},
@@ -21,6 +22,7 @@ func TestIntegrationTest_Run(t *testing.T) {
 }
 
 func TestIntegrationTest_RunCommandError(t *testing.T) {
+	t.Parallel()
 	test := &Task{
 		Command: "invalid_command",
 

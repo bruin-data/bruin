@@ -160,6 +160,7 @@ func TestGetLatestFileInDir(t *testing.T) {
 }
 
 func TestGetExitCode(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		err      error
@@ -172,6 +173,7 @@ func TestGetExitCode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := GetExitCode(tt.err); got != tt.expected {
 				t.Errorf("getExitCode() = %v, want %v", got, tt.expected)
 			}
@@ -180,6 +182,7 @@ func TestGetExitCode(t *testing.T) {
 }
 
 func TestParseJSONOutputs(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name             string
 		actual, expected string
@@ -192,6 +195,7 @@ func TestParseJSONOutputs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			_, _, err := ParseJSONOutputs(tt.actual, tt.expected)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseJSONOutputs() error = %v, wantErr %v", err, tt.wantErr)

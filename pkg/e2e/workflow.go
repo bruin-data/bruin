@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// Define a custom error type for workflow errors
 type WorkflowError struct {
 	StepName     string
 	WorkflowName string

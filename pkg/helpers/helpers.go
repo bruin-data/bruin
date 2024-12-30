@@ -176,7 +176,8 @@ func GetExitCode(err error) int {
 	if err == nil {
 		return 0
 	}
-	if exitError, ok := err.(*exec.ExitError); ok {
+	var exitError *exec.ExitError
+	if errors.As(err, &exitError) {
 		return exitError.ExitCode()
 	}
 	return -1

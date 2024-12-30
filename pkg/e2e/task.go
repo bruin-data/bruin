@@ -19,7 +19,7 @@ type Task struct {
 	Env           []string
 	Expected      Output
 	Actual        Output
-	SkipJsonNodes []string
+	SkipJSONNodes []string
 	Asserts       []func(*Task) error
 }
 
@@ -56,7 +56,7 @@ func (s *Task) Run() error {
 }
 
 func (s *Task) runAttempt() error {
-	cmd := exec.Command(s.Command, s.Args...)
+	cmd := exec.Command(s.Command, s.Args...) //nolint:gosec
 	cmd.Env = append(os.Environ(), s.Env...)
 
 	output, err := cmd.CombinedOutput()
