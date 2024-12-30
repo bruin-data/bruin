@@ -219,6 +219,11 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			statePath := filepath.Join(repoRoot.Path, "logs/runs", pipelineInfo.Pipeline.Name)
+			err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/runs")
+			if err != nil {
+				errorPrinter.Printf("Failed to add the run state folder to .gitignore: %v\n", err)
+				return cli.Exit("", 1)
+			}
 
 			filter := &Filter{
 				IncludeTag:        runConfig.Tag,
