@@ -253,9 +253,9 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
-			Name:    "chess-extended",
+			Name:    "run-with-tags",
 			Command: binary,
-			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", filepath.Join(currentFolder, "chess-extended")},
+			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", filepath.Join(currentFolder, "test-pipelines/run-with-tags-pipeline")},
 			Env:     []string{},
 
 			Expected: e2e.Output{
@@ -266,9 +266,9 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
-			Name:    "chess-extended-only-checks",
+			Name:    "run-with-filters",
 			Command: binary,
-			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "--only", "checks", filepath.Join(currentFolder, "chess-extended")},
+			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "--only", "checks", filepath.Join(currentFolder, "test-pipelines/run-with-filters-pipeline")},
 			Env:     []string{},
 
 			Expected: e2e.Output{
@@ -283,7 +283,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "format-if-fail",
 			Command: binary,
-			Args:    []string{"format", "--fail-if-changed", filepath.Join(currentFolder, "chess-extended/assets/chess_games.asset.yml")},
+			Args:    []string{"format", "--fail-if-changed", filepath.Join(currentFolder, "test-pipelines/format-if-changed-pipeline/assets/correctly-formatted.sql")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
@@ -293,9 +293,9 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
-			Name:    "chess-extended-only-main",
+			Name:    "run-with-filters-case2",
 			Command: binary,
-			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "--only", "main", filepath.Join(currentFolder, "chess-extended")},
+			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "--only", "main", filepath.Join(currentFolder, "test-pipelines/run-with-filters-case2-pipeline")},
 			Env:     []string{},
 
 			Expected: e2e.Output{
@@ -308,9 +308,9 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
-			Name:    "downstream-chess-extended",
+			Name:    "run-with-downstream",
 			Command: binary,
-			Args:    []string{"run", "--downstream", filepath.Join(currentFolder, "chess-extended/assets/game_outcome_summary.sql")},
+			Args:    []string{"run", "--downstream", filepath.Join(currentFolder, "test-pipelines/run-with-downstream-pipeline/assets/game_outcome_summary.sql")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
@@ -322,9 +322,9 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
-			Name:    "downstream-only-main-chess-extended",
+			Name:    "run-main-with-downstream",
 			Command: binary,
-			Args:    []string{"run", "--downstream", "--only", "main", filepath.Join(currentFolder, "chess-extended/assets/game_outcome_summary.sql")},
+			Args:    []string{"run", "--downstream", "--only", "main", filepath.Join(currentFolder, "test-pipelines/run-main-with-downstream-pipeline/assets/game_outcome_summary.sql")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
@@ -338,7 +338,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "push-metadata",
 			Command: binary,
-			Args:    []string{"run", "--push-metadata", "--only", "push-metadata", filepath.Join(currentFolder, "bigquery-metadata")},
+			Args:    []string{"run", "--push-metadata", "--only", "push-metadata", filepath.Join(currentFolder, "test-pipelines/push-metadata-pipeline")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 1,
