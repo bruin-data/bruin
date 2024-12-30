@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -161,4 +162,37 @@ func GetLatestFileInDir(fs afero.Fs, dir string) (string, error) {
 		return "", errors.New("no files found in directory")
 	}
 	return latestFile, nil
+}
+
+func ReadFile(path string) string {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		panic(err)
+	}
+	return string(content)
+}
+
+func GetExitCode(err error) int {
+	if err == nil {
+		return 0
+	}
+	var exitError *exec.ExitError
+	if errors.As(err, &exitError) {
+		return exitError.ExitCode()
+	}
+	return -1
+}
+
+func ParseJSONOutputs(actual, expected string) (interface{}, interface{}, error) {
+	var actualData, expectedData interface{}
+
+	if err := json.Unmarshal([]byte(actual), &actualData); err != nil {
+		return nil, nil, fmt.Errorf("failed to parse actual output as JSON: %w", err)
+	}
+
+	if err := json.Unmarshal([]byte(expected), &expectedData); err != nil {
+		return nil, nil, fmt.Errorf("failed to parse expected output as JSON: %w", err)
+	}
+
+	return actualData, expectedData, nil
 }
