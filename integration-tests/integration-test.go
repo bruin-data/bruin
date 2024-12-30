@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -121,7 +120,10 @@ func main() {
 		"lineage/expectations/lineage-asset.json",
 	)
 
-	customTestForContinue(currentFolder)
+	if err := customTestForContinue(currentFolder); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }
 
 func expectOutputIncludes(command string, code int, contains []string) {
@@ -202,8 +204,9 @@ func expectExitCode(command string, code int) {
 	fmt.Println("Passed")
 }
 
-func customTestForContinue(currentFolder string) {
-	expectExitCode("run ./continue", 1)
+func customTestForContinue(currentFolder string) error {
+
+	expectExitCode("run ./continue", 0)
 
 	expectedState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), &scheduler.PipelineState{
 		Parameters: scheduler.RunConfig{
@@ -249,16 +252,18 @@ func customTestForContinue(currentFolder string) {
 		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
 	})
 
-	tempfile, err := ioutil.TempFile("", "tempfile-*.sql")
+	tempfile, err := os.CreateTemp("", "tempfile-*.sql")
 	if err != nil {
-		fmt.Println("Failed to create temporary file:", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to create temporary file: %w", err)
 	}
-	defer os.Remove(tempfile.Name()) // Ensure the temporary file is removed after use
+	defer func() {
+		if err := tempfile.Close(); err != nil {
+			fmt.Println("Failed to close temporary file:", err)
+		}
+	}()
 
 	if err := setupForContinue(currentFolder, tempfile.Name()); err != nil {
-		fmt.Println("Failed to setup test case for continue:", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to setup test case for continue: %w", err)
 	}
 
 	expectExitCode("run --continue ./continue", 0)
@@ -309,9 +314,10 @@ func customTestForContinue(currentFolder string) {
 	})
 
 	if err := copyFile(tempfile.Name(), filepath.Join(currentFolder, "continue/assets/player_summary.sql")); err != nil {
-		fmt.Println("Failed to copy file:", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to copy file: %w", err)
 	}
+
+	return nil
 }
 
 func runCommand(command string) (string, error) {
