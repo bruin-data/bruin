@@ -205,9 +205,7 @@ func expectExitCode(command string, code int) {
 }
 
 func customTestForContinue(currentFolder string) error {
-
 	expectExitCode("run ./continue", 0)
-
 	expectedState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), &scheduler.PipelineState{
 		Parameters: scheduler.RunConfig{
 			Downstream:   false,
