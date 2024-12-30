@@ -242,7 +242,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Command:       binary,
 			Args:          []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "happy-path")},
 			Env:           []string{},
-			SkipJSONNodes: []string{"\"path\""},
+			SkipJSONNodes: []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
 				Output:   helpers.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/pipeline.yml.json")),

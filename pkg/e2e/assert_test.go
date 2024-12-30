@@ -68,7 +68,7 @@ func TestAssertByOutputJson(t *testing.T) {
 		{"Mismatched JSON Outputs", &Task{
 			Actual:   Output{0, `{"key":"value1"}`, "", []string{}},
 			Expected: Output{0, `{"key":"value2"}`, "", []string{}},
-		}, false},
+		}, true},
 	}
 
 	for _, tt := range tests {
