@@ -436,7 +436,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "parse-asset-faulty-pipeline-error-sql",
 			Command: binary,
-			Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "faulty-pipeline/assets/error.sql")},
+			Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/faulty-pipeline/assets/error.sql")},
 			Env:     []string{},
 
 			Expected: e2e.Output{
@@ -509,14 +509,14 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
-			Name:          "parse-pipeline-lineage",
+			Name:          "parse-lineage",
 			Command:       binary,
-			Args:          []string{"internal", "parse-pipeline", "-c", filepath.Join(currentFolder, "lineage")},
+			Args:          []string{"internal", "parse-pipeline", "-c", filepath.Join(currentFolder, "test-pipelines/parse-lineage-pipeline")},
 			Env:           []string{},
 			SkipJSONNodes: []string{"\"path\""},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   helpers.ReadFile(filepath.Join(currentFolder, "lineage/expectations/lineage.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/parse-lineage-pipeline/expectations/lineage.json")),
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -524,14 +524,14 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
-			Name:          "parse-asset-lineage-example",
+			Name:          "parse-asset-lineage",
 			Command:       binary,
-			Args:          []string{"internal", "parse-asset", "-c", filepath.Join(currentFolder, "lineage/assets/example.sql")},
+			Args:          []string{"internal", "parse-asset", "-c", filepath.Join(currentFolder, "test-pipelines/parse-asset-lineage-pipeline/assets/example.sql")},
 			Env:           []string{},
 			SkipJSONNodes: []string{"\"path\""},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   helpers.ReadFile(filepath.Join(currentFolder, "lineage/expectations/lineage-asset.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/parse-asset-lineage-pipeline/expectations/lineage-asset.json")),
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
