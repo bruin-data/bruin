@@ -451,12 +451,12 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:          "validate-missing-upstream",
 			Command:       binary,
-			Args:          []string{"validate", "-o", "json", filepath.Join(currentFolder, "missing-upstream/assets/nonexistent.sql")},
+			Args:          []string{"validate", "-o", "json", filepath.Join(currentFolder, "test-pipelines/missing-upstream-pipeline/assets/nonexistent.sql")},
 			Env:           []string{},
 			SkipJSONNodes: []string{"\"path\""},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   helpers.ReadFile(filepath.Join(currentFolder, "missing-upstream/expectations/missing_upstream.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/missing-upstream-pipeline/expectations/missing_upstream.json")),
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -466,7 +466,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "run-malformed-sql",
 			Command: binary,
-			Args:    []string{"run", filepath.Join(currentFolder, "malformed/assets/malformed.sql")},
+			Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/run-malformed-pipeline/assets/malformed.sql")},
 			Env:     []string{},
 
 			Expected: e2e.Output{
