@@ -32,7 +32,6 @@ func (w *Workflow) Run() error {
 	}
 
 	for _, task := range w.Steps {
-		log.Printf("Running step: %s", task.Name)
 		if err := task.Run(); err != nil {
 			wfErr := &WorkflowError{
 				StepName:     task.Name,

@@ -15,7 +15,7 @@ import (
 var currentFolder string
 
 var (
-	STATE_FOR_FIRST_RUN = &scheduler.PipelineState{
+	stateForFirstRun = &scheduler.PipelineState{
 		Parameters: scheduler.RunConfig{
 			Downstream:   false,
 			Workers:      16,
@@ -58,7 +58,7 @@ var (
 		Version:           "1.0.0",
 		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
 	}
-	STATE_FOR_CONTINUE_RUN = &scheduler.PipelineState{
+	stateForContinueRun = &scheduler.PipelineState{
 		Parameters: scheduler.RunConfig{
 			Downstream:   false,
 			StartDate:    "2024-12-22 00:00:00.000000",
@@ -134,73 +134,14 @@ func main() {
 }
 
 func runIntegrationWorkflow(binary string, currentFolder string) {
-	workflows := []e2e.Workflow{
-		{
-			Name: "continue after failure",
-			Steps: []e2e.Task{
-				{
-					Command: binary,
-					Args:    []string{"run", filepath.Join(currentFolder, "continue")},
-					Env:     []string{},
-
-					Expected: e2e.Output{
-						ExitCode: 1,
-					},
-					Asserts: []func(*e2e.Task) error{
-						e2e.AssertByExitCode,
-						e2e.AssertCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), STATE_FOR_CONTINUE_RUN),
-					},
-				},
-				{
-					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "continue/assets/player_summary.sql"), filepath.Join(currentFolder, "./player_summary.sql.bak")},
-					Env:     []string{},
-
-					Expected: e2e.Output{
-						ExitCode: 0,
-					},
-					Asserts: []func(*e2e.Task) error{
-						e2e.AssertByExitCode,
-					},
-				},
-				{
-					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "continue/player_summary.sql"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")},
-					Env:     []string{},
-
-					Expected: e2e.Output{
-						ExitCode: 0,
-					},
-					Asserts: []func(*e2e.Task) error{
-						e2e.AssertByExitCode,
-					},
-				},
-				{
-					Command: binary,
-					Args:    []string{"run", "--continue", filepath.Join(currentFolder, "continue")},
-					Env:     []string{},
-					Expected: e2e.Output{
-						ExitCode: 0,
-					},
-					Asserts: []func(*e2e.Task) error{
-						e2e.AssertByExitCode,
-						e2e.AssertCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), STATE_FOR_CONTINUE_RUN),
-					},
-				},
-				{
-					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "continue/player_summary.sql.bak"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")},
-					Env:     []string{},
-					Expected: e2e.Output{
-						ExitCode: 0,
-					},
-					Asserts: []func(*e2e.Task) error{
-						e2e.AssertByExitCode,
-					},
-				},
-			},
-		},
+	tempfile, err := os.CreateTemp("", "bruin-test-continue")
+	if err != nil {
+		fmt.Println("Failed to create temporary file:", err)
+		os.Exit(1)
 	}
+	defer tempfile.Close()
+
+	workflows := getWorkflow(binary, currentFolder, tempfile.Name())
 
 	for _, workflow := range workflows {
 		err := workflow.Run()
@@ -212,50 +153,92 @@ func runIntegrationWorkflow(binary string, currentFolder string) {
 }
 
 func runIntegrationTests(binary string, currentFolder string) {
+	tests := getTasks(binary, currentFolder)
+	for _, test := range tests {
+		if err := test.Run(); err != nil {
+			fmt.Printf("%s Assert error: %v\n", test.Name, err)
+			os.Exit(1)
+		}
+	}
+}
 
-	tests := []e2e.Task{
+func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Workflow {
+	return []e2e.Workflow{
 		{
-			Name:    "chess-extended",
-			Command: binary,
-			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", filepath.Join(currentFolder, "chess-extended")},
-			Env:     []string{},
+			Name: "continue after failure",
+			Steps: []e2e.Task{
+				{
+					Name:    "run first time",
+					Command: binary,
+					Args:    []string{"run", filepath.Join(currentFolder, "continue")},
+					Env:     []string{},
 
-			Expected: e2e.Output{
-				ExitCode: 0,
-			},
-			Asserts: []func(*e2e.Task) error{
-				e2e.AssertByExitCode,
+					Expected: e2e.Output{
+						ExitCode: 1,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), stateForFirstRun),
+					},
+				},
+				{
+					Name:    "copy player_summary.sql to tempfile",
+					Command: "cp",
+					Args:    []string{filepath.Join(currentFolder, "continue/assets/player_summary.sql"), tempfile},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "copy player_summary.sql to continue",
+					Command: "cp",
+					Args:    []string{filepath.Join(currentFolder, "player_summary.sql"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "run continue",
+					Command: binary,
+					Args:    []string{"run", "--continue", filepath.Join(currentFolder, "continue")},
+					Env:     []string{},
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), stateForContinueRun),
+					},
+				},
+				{
+					Name:    "copy player_summary.sql back to continue",
+					Command: "cp",
+					Args:    []string{tempfile, filepath.Join(currentFolder, "continue/assets/player_summary.sql")},
+					Env:     []string{},
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
 			},
 		},
+	}
+}
 
-		// {
-		// 	Name:    "chess-extended-exclude-tag",
-		// 	Command: binary,
-		// 	Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", filepath.Join(currentFolder, "chess-extended/expectations/chess_games.asset.yml")},
-		// 	Env:     []string{},
-
-		// 	Expected: e2e.Output{
-		// 		ExitCode: 1,
-		// 	},
-		// 	Asserts: []func(*e2e.Task) error{
-		// 		e2e.AssertByExitCode,
-		// 	},
-		// },
-		{
-			Name:    "chess-extended-only-checks",
-			Command: binary,
-			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "--only", "checks", filepath.Join(currentFolder, "chess-extended")},
-			Env:     []string{},
-
-			Expected: e2e.Output{
-				ExitCode: 0,
-				Contains: []string{"Executed 1 tasks", "total_games:positive"},
-			},
-			Asserts: []func(*e2e.Task) error{
-				e2e.AssertByExitCode,
-				e2e.AssertByContains,
-			},
-		},
+func getTasks(binary string, currentFolder string) []e2e.Task {
+	return []e2e.Task{
 		{
 			Name:          "happy-path",
 			Command:       binary,
@@ -272,6 +255,47 @@ func runIntegrationTests(binary string, currentFolder string) {
 			},
 		},
 		{
+			Name:    "chess-extended",
+			Command: binary,
+			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", filepath.Join(currentFolder, "chess-extended")},
+			Env:     []string{},
+
+			Expected: e2e.Output{
+				ExitCode: 0,
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+			},
+		},
+		{
+			Name:    "chess-extended-exclude-tag",
+			Command: binary,
+			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", filepath.Join(currentFolder, "chess-extended/expectations/chess_games.asset.yml")},
+			Env:     []string{},
+
+			Expected: e2e.Output{
+				ExitCode: 1,
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+			},
+		},
+		{
+			Name:    "chess-extended-only-checks",
+			Command: binary,
+			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "--only", "checks", filepath.Join(currentFolder, "chess-extended")},
+			Env:     []string{},
+
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Executed 1 tasks", "total_games:positive"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
 			Name:    "format-if-fail",
 			Command: binary,
 			Args:    []string{"format", "--fail-if-changed", filepath.Join(currentFolder, "chess-extended/assets/chess_games.asset.yml")},
@@ -284,13 +308,27 @@ func runIntegrationTests(binary string, currentFolder string) {
 			},
 		},
 		{
-			Name:    "chess-extended-only-main",
+			Name:    "downstream-chess-extended",
 			Command: binary,
-			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "--only", "main", filepath.Join(currentFolder, "chess-extended")},
+			Args:    []string{"run", "--downstream", filepath.Join(currentFolder, "chess-extended/assets/game_outcome_summary.sql")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Executed 3 tasks", " Finished: chess_playground.games", "Finished: chess_playground.profiles", "Finished: chess_playground.game_outcome_summary"},
+				Contains: []string{"Executed 4 tasks", " Finished: chess_playground.game_outcome_summary", "Finished: chess_playground.game_outcome_summary:total_games:positive", "Finished: chess_playground.player_summary", " Finished: chess_playground.player_summary:total_games:non_negative"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "downstream-only-main-chess-extended",
+			Command: binary,
+			Args:    []string{"run", "--downstream", "--only", "main", filepath.Join(currentFolder, "chess-extended/assets/game_outcome_summary.sql")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Executed 2 tasks", " Finished: chess_playground.game_outcome_summary", "Finished: chess_playground.player_summary"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -303,8 +341,8 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Args:    []string{"run", "--push-metadata", "--only", "push-metadata", filepath.Join(currentFolder, "bigquery-metadata")},
 			Env:     []string{},
 			Expected: e2e.Output{
-				ExitCode: 1,
-				Contains: []string{"Starting: shopify_raw.products:metadata-push", "Starting: shopify_raw.inventory_items:metadata-push"},
+				ExitCode: 0,
+				Contains: []string{" Starting: shopify_raw.products:metadata-push", "Starting: shopify_raw.inventory_items:metadata-push"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -500,11 +538,5 @@ func runIntegrationTests(binary string, currentFolder string) {
 				e2e.AssertByOutputJson,
 			},
 		},
-	}
-	for _, test := range tests {
-		if err := test.Run(); err != nil {
-			fmt.Printf("%s Assert error: %v\n", test.Name, err)
-			os.Exit(1)
-		}
 	}
 }

@@ -1,8 +1,8 @@
 module github.com/bruin-data/bruin
 
-go 1.23
+go 1.22
 
-toolchain go1.23.4
+toolchain go1.22.9
 
 require (
 	cloud.google.com/go/bigquery v1.60.0
