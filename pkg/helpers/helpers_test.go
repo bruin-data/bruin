@@ -2,11 +2,13 @@ package helpers
 
 import (
 	"encoding/json"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -155,4 +157,45 @@ func TestGetLatestFileInDir(t *testing.T) {
 
 	expectedLatestFile := filepath.Join(dir, "file3.txt")
 	assert.Equal(t, expectedLatestFile, latestFile, "Latest file should be the one with the most recent modification time")
+}
+
+func TestGetExitCode(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected int
+	}{
+		{"No error", nil, 0},
+		{"Exit error", &exec.ExitError{}, -1},
+		{"Non-exit error", errors.New("some error"), -1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetExitCode(tt.err); got != tt.expected {
+				t.Errorf("getExitCode() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseJSONOutputs(t *testing.T) {
+	tests := []struct {
+		name             string
+		actual, expected string
+		wantErr          bool
+	}{
+		{"Valid JSON", `{"key": "value"}`, `{"key": "value"}`, false},
+		{"Invalid actual JSON", `{"key": "value"`, `{"key": "value"}`, true},
+		{"Invalid expected JSON", `{"key": "value"}`, `{"key": "value"`, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, err := ParseJSONOutputs(tt.actual, tt.expected)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseJSONOutputs() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }

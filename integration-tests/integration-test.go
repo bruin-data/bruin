@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/bruin-data/bruin/pkg/e2e"
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/scheduler"
-	"github.com/spf13/afero"
-	iapetus "github.com/y-bruin/iapetus"
 )
 
 var currentFolder string
@@ -134,21 +134,21 @@ func main() {
 }
 
 func runIntegrationWorkflow(binary string, currentFolder string) {
-	workflows := []iapetus.Workflow{
+	workflows := []e2e.Workflow{
 		{
 			Name: "continue after failure",
-			Steps: []iapetus.Step{
+			Steps: []e2e.Task{
 				{
 					Command: binary,
 					Args:    []string{"run", filepath.Join(currentFolder, "continue")},
 					Env:     []string{},
 
-					Expected: iapetus.Output{
+					Expected: e2e.Output{
 						ExitCode: 1,
 					},
-					Asserts: []func(*iapetus.Step) error{
-						iapetus.AssertByExitCode,
-						assertCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), STATE_FOR_CONTINUE_RUN),
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), STATE_FOR_CONTINUE_RUN),
 					},
 				},
 				{
@@ -156,11 +156,11 @@ func runIntegrationWorkflow(binary string, currentFolder string) {
 					Args:    []string{filepath.Join(currentFolder, "continue/assets/player_summary.sql"), filepath.Join(currentFolder, "./player_summary.sql.bak")},
 					Env:     []string{},
 
-					Expected: iapetus.Output{
+					Expected: e2e.Output{
 						ExitCode: 0,
 					},
-					Asserts: []func(*iapetus.Step) error{
-						iapetus.AssertByExitCode,
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
 					},
 				},
 				{
@@ -168,34 +168,34 @@ func runIntegrationWorkflow(binary string, currentFolder string) {
 					Args:    []string{filepath.Join(currentFolder, "continue/player_summary.sql"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")},
 					Env:     []string{},
 
-					Expected: iapetus.Output{
+					Expected: e2e.Output{
 						ExitCode: 0,
 					},
-					Asserts: []func(*iapetus.Step) error{
-						iapetus.AssertByExitCode,
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
 					},
 				},
 				{
 					Command: binary,
 					Args:    []string{"run", "--continue", filepath.Join(currentFolder, "continue")},
 					Env:     []string{},
-					Expected: iapetus.Output{
+					Expected: e2e.Output{
 						ExitCode: 0,
 					},
-					Asserts: []func(*iapetus.Step) error{
-						iapetus.AssertByExitCode,
-						assertCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), STATE_FOR_CONTINUE_RUN),
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertCustomState(filepath.Join(currentFolder, "/logs/runs/continue_duckdb"), STATE_FOR_CONTINUE_RUN),
 					},
 				},
 				{
 					Command: "cp",
 					Args:    []string{filepath.Join(currentFolder, "continue/player_summary.sql.bak"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")},
 					Env:     []string{},
-					Expected: iapetus.Output{
+					Expected: e2e.Output{
 						ExitCode: 0,
 					},
-					Asserts: []func(*iapetus.Step) error{
-						iapetus.AssertByExitCode,
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
 					},
 				},
 			},
@@ -213,18 +213,18 @@ func runIntegrationWorkflow(binary string, currentFolder string) {
 
 func runIntegrationTests(binary string, currentFolder string) {
 
-	tests := []iapetus.Step{
+	tests := []e2e.Task{
 		{
 			Name:    "chess-extended",
 			Command: binary,
 			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", filepath.Join(currentFolder, "chess-extended")},
 			Env:     []string{},
 
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 0,
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
 			},
 		},
 
@@ -234,11 +234,11 @@ func runIntegrationTests(binary string, currentFolder string) {
 		// 	Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", filepath.Join(currentFolder, "chess-extended/expectations/chess_games.asset.yml")},
 		// 	Env:     []string{},
 
-		// 	Expected: iapetus.Output{
+		// 	Expected: e2e.Output{
 		// 		ExitCode: 1,
 		// 	},
-		// 	Asserts: []func(*iapetus.Step) error{
-		// 		iapetus.AssertByExitCode,
+		// 	Asserts: []func(*e2e.Task) error{
+		// 		e2e.AssertByExitCode,
 		// 	},
 		// },
 		{
@@ -247,13 +247,13 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "--only", "checks", filepath.Join(currentFolder, "chess-extended")},
 			Env:     []string{},
 
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 0,
 				Contains: []string{"Executed 1 tasks", "total_games:positive"},
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
-				iapetus.AssertByContains,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
 			},
 		},
 		{
@@ -262,13 +262,13 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Args:          []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "happy-path")},
 			Env:           []string{},
 			SkipJsonNodes: []string{"\"path\""},
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/pipeline.yml.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/pipeline.yml.json")),
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
-				iapetus.AssertByOutputJson,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJson,
 			},
 		},
 		{
@@ -276,11 +276,11 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Command: binary,
 			Args:    []string{"format", "--fail-if-changed", filepath.Join(currentFolder, "chess-extended/assets/chess_games.asset.yml")},
 			Env:     []string{},
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 0,
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
 			},
 		},
 		{
@@ -288,13 +288,13 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Command: binary,
 			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "--only", "main", filepath.Join(currentFolder, "chess-extended")},
 			Env:     []string{},
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 0,
 				Contains: []string{"Executed 3 tasks", " Finished: chess_playground.games", "Finished: chess_playground.profiles", "Finished: chess_playground.game_outcome_summary"},
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
-				iapetus.AssertByContains,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
 			},
 		},
 		{
@@ -302,13 +302,13 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Command: binary,
 			Args:    []string{"run", "--push-metadata", "--only", "push-metadata", filepath.Join(currentFolder, "bigquery-metadata")},
 			Env:     []string{},
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 1,
 				Contains: []string{"Starting: shopify_raw.products:metadata-push", "Starting: shopify_raw.inventory_items:metadata-push"},
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
-				iapetus.AssertByContains,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
 			},
 		},
 		{
@@ -316,11 +316,11 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Command: binary,
 			Args:    []string{"validate", filepath.Join(currentFolder, "happy-path")},
 			Env:     []string{},
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 0,
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
 			},
 		},
 		{
@@ -328,11 +328,11 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Command: binary,
 			Args:    []string{"run", "--use-uv", filepath.Join(currentFolder, "happy-path")},
 			Env:     []string{},
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 0,
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
 			},
 		},
 		{
@@ -341,13 +341,13 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "happy-path/assets/asset.py")},
 			Env:           []string{},
 			SkipJsonNodes: []string{"\"path\""},
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/asset.py.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/asset.py.json")),
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
-				iapetus.AssertByOutputJson,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJson,
 			},
 		},
 		{
@@ -356,13 +356,13 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "happy-path/assets/chess_games.asset.yml")},
 			Env:           []string{},
 			SkipJsonNodes: []string{"\"path\""},
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/chess_games.asset.yml.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/chess_games.asset.yml.json")),
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
-				iapetus.AssertByOutputJson,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJson,
 			},
 		},
 		{
@@ -371,13 +371,13 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "happy-path/assets/chess_profiles.asset.yml")},
 			Env:           []string{},
 			SkipJsonNodes: []string{"\"path\""},
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/chess_profiles.asset.yml.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/chess_profiles.asset.yml.json")),
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
-				iapetus.AssertByOutputJson,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJson,
 			},
 		},
 		{
@@ -386,13 +386,13 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "happy-path/assets/player_summary.sql")},
 			Env:           []string{},
 			SkipJsonNodes: []string{"\"path\""},
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/player_summary.sql.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "happy-path/expectations/player_summary.sql.json")),
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
-				iapetus.AssertByOutputJson,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJson,
 			},
 		},
 		{
@@ -401,13 +401,13 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "faulty-pipeline/assets/error.sql")},
 			Env:     []string{},
 
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 1,
 				Contains: []string{"error creating asset from file", "unmarshal errors"},
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
-				iapetus.AssertByContains,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
 			},
 		},
 		{
@@ -416,13 +416,13 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Args:          []string{"validate", "-o", "json", filepath.Join(currentFolder, "missing-upstream/assets/nonexistent.sql")},
 			Env:           []string{},
 			SkipJsonNodes: []string{"\"path\""},
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "missing-upstream/expectations/missing_upstream.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "missing-upstream/expectations/missing_upstream.json")),
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
-				iapetus.AssertByOutputJson,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJson,
 			},
 		},
 		{
@@ -431,13 +431,13 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Args:    []string{"run", filepath.Join(currentFolder, "malformed/assets/malformed.sql")},
 			Env:     []string{},
 
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 1,
 				Contains: []string{"Parser Error: syntax error at or near \"S_ELECT_\"", "Failed assets 1"},
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
-				iapetus.AssertByContains,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
 			},
 		},
 		{
@@ -446,13 +446,13 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Args:          []string{"internal", "connections"},
 			Env:           []string{},
 			SkipJsonNodes: []string{"\"path\""},
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "expected_connections_schema.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "expected_connections_schema.json")),
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
-				iapetus.AssertByOutputJson,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJson,
 			},
 		},
 		{
@@ -461,13 +461,13 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Args:          []string{"connections", "list", "-o", "json", currentFolder},
 			Env:           []string{},
 			SkipJsonNodes: []string{"\"path\""},
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "expected_connections.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "expected_connections.json")),
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
-				iapetus.AssertByOutputJson,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJson,
 			},
 		},
 		{
@@ -476,13 +476,13 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Args:          []string{"internal", "parse-pipeline", "-c", filepath.Join(currentFolder, "lineage")},
 			Env:           []string{},
 			SkipJsonNodes: []string{"\"path\""},
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "lineage/expectations/lineage.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "lineage/expectations/lineage.json")),
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
-				iapetus.AssertByOutputJson,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJson,
 			},
 		},
 		{
@@ -491,13 +491,13 @@ func runIntegrationTests(binary string, currentFolder string) {
 			Args:          []string{"internal", "parse-asset", "-c", filepath.Join(currentFolder, "lineage/assets/example.sql")},
 			Env:           []string{},
 			SkipJsonNodes: []string{"\"path\""},
-			Expected: iapetus.Output{
+			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   iapetus.ReadFile(filepath.Join(currentFolder, "lineage/expectations/lineage-asset.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "lineage/expectations/lineage-asset.json")),
 			},
-			Asserts: []func(*iapetus.Step) error{
-				iapetus.AssertByExitCode,
-				iapetus.AssertByOutputJson,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJson,
 			},
 		},
 	}
@@ -506,51 +506,5 @@ func runIntegrationTests(binary string, currentFolder string) {
 			fmt.Printf("%s Assert error: %v\n", test.Name, err)
 			os.Exit(1)
 		}
-	}
-}
-
-func assertCustomState(dir string, expected *scheduler.PipelineState) func(*iapetus.Step) error {
-	return func(i *iapetus.Step) error {
-		state, err := scheduler.ReadState(afero.NewOsFs(), dir)
-		if err != nil {
-			return fmt.Errorf("failed to read state from directory %s: %w", dir, err)
-		}
-		if state.Parameters.Workers != expected.Parameters.Workers {
-			return fmt.Errorf("mismatch in Workers: expected %d, got %d", expected.Parameters.Workers, state.Parameters.Workers)
-		}
-		if state.Parameters.Environment != expected.Parameters.Environment {
-			return fmt.Errorf("mismatch in Environment: expected %s, got %s", expected.Parameters.Environment, state.Parameters.Environment)
-		}
-
-		if state.Metadata.Version != expected.Metadata.Version {
-			return fmt.Errorf("mismatch in Version: expected %s, got %s", expected.Metadata.Version, state.Metadata.Version)
-		}
-		if state.Metadata.OS != expected.Metadata.OS {
-			return fmt.Errorf("mismatch in OS: expected %s, got %s", expected.Metadata.OS, state.Metadata.OS)
-		}
-
-		if len(state.State) != len(expected.State) {
-			return fmt.Errorf("mismatch in State length: expected %d, got %d", len(expected.State), len(state.State))
-		}
-
-		var dict = make(map[string]string)
-		for _, assetState := range state.State {
-			dict[assetState.Name] = assetState.Status
-		}
-		for _, assetState := range expected.State {
-			if dict[assetState.Name] != assetState.Status {
-				return fmt.Errorf("mismatch in State for asset %s: expected %s, got %s", assetState.Name, assetState.Status, dict[assetState.Name])
-			}
-		}
-
-		if state.Version != expected.Version {
-			return fmt.Errorf("mismatch in Version: expected %s, got %s", expected.Version, state.Version)
-		}
-		if state.CompatibilityHash != expected.CompatibilityHash {
-			return fmt.Errorf("mismatch in CompatibilityHash: expected %s, got %s", expected.CompatibilityHash, state.CompatibilityHash)
-		}
-
-		fmt.Println("Passed State Match")
-		return nil
 	}
 }

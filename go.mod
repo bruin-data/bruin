@@ -19,6 +19,7 @@ require (
 	github.com/jackc/pgx/v5 v5.5.5
 	github.com/jedib0t/go-pretty/v6 v6.5.9
 	github.com/jmoiron/sqlx v1.3.5
+	github.com/josephburnett/jd v1.9.1
 	github.com/kluctl/go-embed-python v0.0.0-3.12.3-20240415-2
 	github.com/manifoldco/promptui v0.9.0
 	github.com/marcboeker/go-duckdb v1.8.2
@@ -36,7 +37,6 @@ require (
 	github.com/uber/athenadriver v1.1.15
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/xlab/treeprint v1.2.0
-	github.com/y-bruin/iapetus v0.0.0-20241224184809-e1649285be4f
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
@@ -80,7 +80,6 @@ require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
-	github.com/cenkalti/backoff/v5 v5.0.0 // indirect
 	github.com/charmbracelet/lipgloss v0.13.0 // indirect
 	github.com/charmbracelet/x/ansi v0.4.0 // indirect
 	github.com/charmbracelet/x/term v0.2.0 // indirect
@@ -123,7 +122,6 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20231201235250-de7065d80cb9 // indirect
 	github.com/jackc/puddle/v2 v2.2.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/josephburnett/jd v1.9.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
@@ -187,5 +185,3 @@ require (
 	gotest.tools/gotestsum v1.8.2 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
 )
-
-replace github.com/y-bruin/iapetus => ../integration-test-suits
