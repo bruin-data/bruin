@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -248,7 +249,14 @@ func customTestForContinue(currentFolder string) {
 		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
 	})
 
-	if err := setupForContinue(currentFolder); err != nil {
+	tempfile, err := ioutil.TempFile("", "tempfile-*.sql")
+	if err != nil {
+		fmt.Println("Failed to create temporary file:", err)
+		os.Exit(1)
+	}
+	defer os.Remove(tempfile.Name()) // Ensure the temporary file is removed after use
+
+	if err := setupForContinue(currentFolder, tempfile.Name()); err != nil {
 		fmt.Println("Failed to setup test case for continue:", err)
 		os.Exit(1)
 	}
@@ -300,7 +308,7 @@ func customTestForContinue(currentFolder string) {
 		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
 	})
 
-	if err := copyFile(filepath.Join(currentFolder, "./player_summary.sql.bak"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")); err != nil {
+	if err := copyFile(tempfile.Name(), filepath.Join(currentFolder, "continue/assets/player_summary.sql")); err != nil {
 		fmt.Println("Failed to copy file:", err)
 		os.Exit(1)
 	}
@@ -368,8 +376,8 @@ func readState(dir string) *scheduler.PipelineState {
 	return state
 }
 
-func setupForContinue(currentFolder string) error {
-	if err := copyFile(filepath.Join(currentFolder, "continue/assets/player_summary.sql"), filepath.Join(currentFolder, "./player_summary.sql.bak")); err != nil {
+func setupForContinue(currentFolder string, tempfile string) error {
+	if err := copyFile(filepath.Join(currentFolder, "continue/assets/player_summary.sql"), tempfile); err != nil {
 		fmt.Println("Failed to copy file:", err)
 		return err
 	}
