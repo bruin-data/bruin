@@ -370,7 +370,7 @@ func ValidateAssetBigqueryValidation(ctx context.Context, p *pipeline.Pipeline, 
 				Description: "Materialization is not allowed on a seed asset",
 			})
 		}
-		seedFilePath := filepath.Join(filepath.Dir(asset.DefinitionFile.Path), asset.Parameters["source_table"])
+		seedFilePath := filepath.Join(filepath.Dir(asset.DefinitionFile.Path), asset.Parameters["path"])
 		if _, err := os.Stat(seedFilePath); os.IsNotExist(err) {
 			issues = append(issues, &Issue{
 				Task:        asset,
