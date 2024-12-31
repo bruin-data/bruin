@@ -23,7 +23,8 @@ build: deps
 	@CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0)) -X main.TelemetryKey=$(TELEMETRY_KEY)" -o "$(BUILD_DIR)/$(NAME)" "$(BUILD_SRC)"
 
 integration-test: build
-	@rm -rf integration-tests/duckdb-files && mkdir -p integration-tests/duckdb-files  # Clean up and recreate the directory
+	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
+	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
 	@touch integration-tests/.git
 	@touch integration-tests/bruin
 	@rm -rf integration-tests/.git
@@ -31,7 +32,6 @@ integration-test: build
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
 	@go run integration-tests/integration-test.go
-
 
 clean:
 	@rm -rf ./bin
