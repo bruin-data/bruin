@@ -618,6 +618,15 @@ func setupExecutors(
 
 	customCheckRunner := ansisql.NewCustomCheckOperator(conn, renderer)
 
+	if s.WillRunTaskOfType(pipeline.AssetTypeBigquerySeed) {
+		jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh)
+		if usePipForPython {
+			mainExecutors[pipeline.AssetTypeBigquerySeed][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinjaVariables)
+		} else {
+			mainExecutors[pipeline.AssetTypeBigquerySeed][scheduler.TaskInstanceTypeMain] = python.NewLocalOperatorWithUv(config, conn, jinjaVariables)
+		}
+	}
+
 	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery {
 		bqOperator := bigquery.NewBasicOperator(conn, wholeFileExtractor, bigquery.NewMaterializer(fullRefresh))
 

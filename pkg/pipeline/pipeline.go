@@ -30,6 +30,8 @@ const (
 	AssetTypeBigqueryQuery        = AssetType("bq.sql")
 	AssetTypeBigqueryTableSensor  = AssetType("bq.sensor.table")
 	AssetTypeBigqueryQuerySensor  = AssetType("bq.sensor.query")
+	AssetTypeBigquerySource       = AssetType("bq.source")
+	AssetTypeBigquerySeed         = AssetType("bq.seed")
 	AssetTypeDuckDBQuery          = AssetType("duckdb.sql")
 	AssetTypeEmpty                = AssetType("empty")
 	AssetTypePostgresQuery        = AssetType("pg.sql")
@@ -41,7 +43,6 @@ const (
 	AssetTypeSynapseQuery         = AssetType("synapse.sql")
 	AssetTypeIngestr              = AssetType("ingestr")
 	AssetTypeTableau              = AssetType("tableau")
-	AssetTypeBQSource             = AssetType("bq.source")
 	RunConfigFullRefresh          = RunConfig("full-refresh")
 	RunConfigStartDate            = RunConfig("start-date")
 	RunConfigEndDate              = RunConfig("end-date")
@@ -451,6 +452,7 @@ type AssetType string
 var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeBigqueryQuery:        "google_cloud_platform",
 	AssetTypeBigqueryTableSensor:  "google_cloud_platform",
+	AssetTypeBigquerySeed:         "google_cloud_platform",
 	AssetTypeSnowflakeQuery:       "snowflake",
 	AssetTypeSnowflakeQuerySensor: "snowflake",
 	AssetTypePostgresQuery:        "postgres",
@@ -1007,6 +1009,10 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 		}
 
 		return []string{}, errors.Errorf("No default connection for type: '%s'", assetType)
+	} else if assetType == AssetTypeBigquerySeed {
+		// TODO: implement logic for seed
+		// Local CSV to Bigquery
+		return []string{"google_cloud_platform"}, nil
 	} else {
 		conn, err := p.GetConnectionNameForAsset(asset)
 		if err != nil {
