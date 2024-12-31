@@ -612,11 +612,7 @@ func setupExecutors(
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeBigquerySeed) {
 		jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh)
-		if usePipForPython {
-			mainExecutors[pipeline.AssetTypeBigquerySeed][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinjaVariables)
-		} else {
-			mainExecutors[pipeline.AssetTypeBigquerySeed][scheduler.TaskInstanceTypeMain] = python.NewLocalOperatorWithUv(config, conn, jinjaVariables)
-		}
+		mainExecutors[pipeline.AssetTypeBigquerySeed][scheduler.TaskInstanceTypeMain] = python.NewLocalOperatorForBigquerySeed(config, conn, jinjaVariables)
 	}
 
 	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID)

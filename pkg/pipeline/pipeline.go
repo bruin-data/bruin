@@ -1009,10 +1009,6 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 		}
 
 		return []string{}, errors.Errorf("No default connection for type: '%s'", assetType)
-	} else if assetType == AssetTypeBigquerySeed {
-		// TODO: implement logic for seed
-		// Local CSV to Bigquery
-		return []string{"google_cloud_platform"}, nil
 	} else {
 		conn, err := p.GetConnectionNameForAsset(asset)
 		if err != nil {
@@ -1031,7 +1027,9 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 	assetType := asset.Type
 	if assetType == AssetTypeIngestr {
 		assetType = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
-	} else if assetType == AssetTypePython || assetType == AssetTypeEmpty || assetType == AssetTypeBQSource {
+	} else if assetType == AssetTypeBigquerySeed {
+		assetType = IngestrTypeConnectionMapping["bigquery"]
+	} else if assetType == AssetTypePython || assetType == AssetTypeEmpty {
 		assetType = p.GetMajorityAssetTypesFromSQLAssets(AssetTypeBigqueryQuery)
 	}
 
@@ -1065,6 +1063,7 @@ func (p *Pipeline) WipeContentOfAssets() {
 func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) AssetType {
 	taskTypeCounts := map[AssetType]int{
 		AssetTypeBigqueryQuery:   0,
+		AssetTypeBigquerySeed:    0,
 		AssetTypeSnowflakeQuery:  0,
 		AssetTypePostgresQuery:   0,
 		AssetTypeMsSQLQuery:      0,
@@ -1092,6 +1091,14 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 			}
 
 			assetType, ok = IngestrTypeConnectionMapping[ingestrDestination]
+			if !ok {
+				continue
+			}
+		}
+
+		if assetType == AssetTypeBigquerySeed {
+			var ok bool
+			assetType, ok = IngestrTypeConnectionMapping["bigquery"]
 			if !ok {
 				continue
 			}
