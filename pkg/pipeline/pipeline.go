@@ -453,6 +453,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeBigqueryQuery:        "google_cloud_platform",
 	AssetTypeBigqueryTableSensor:  "google_cloud_platform",
 	AssetTypeBigquerySeed:         "google_cloud_platform",
+	AssetTypeBigquerySource:       "google_cloud_platform",
 	AssetTypeSnowflakeQuery:       "snowflake",
 	AssetTypeSnowflakeQuerySensor: "snowflake",
 	AssetTypePostgresQuery:        "postgres",
