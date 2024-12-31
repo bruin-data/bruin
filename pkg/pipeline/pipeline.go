@@ -30,6 +30,7 @@ const (
 	AssetTypeBigqueryQuery        = AssetType("bq.sql")
 	AssetTypeBigqueryTableSensor  = AssetType("bq.sensor.table")
 	AssetTypeBigqueryQuerySensor  = AssetType("bq.sensor.query")
+	AssetTypeBigquerySource       = AssetType("bq.source")
 	AssetTypeDuckDBQuery          = AssetType("duckdb.sql")
 	AssetTypeEmpty                = AssetType("empty")
 	AssetTypePostgresQuery        = AssetType("pg.sql")
@@ -41,7 +42,6 @@ const (
 	AssetTypeSynapseQuery         = AssetType("synapse.sql")
 	AssetTypeIngestr              = AssetType("ingestr")
 	AssetTypeTableau              = AssetType("tableau")
-	AssetTypeBQSource             = AssetType("bq.source")
 	RunConfigFullRefresh          = RunConfig("full-refresh")
 	RunConfigStartDate            = RunConfig("start-date")
 	RunConfigEndDate              = RunConfig("end-date")
@@ -451,6 +451,7 @@ type AssetType string
 var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeBigqueryQuery:        "google_cloud_platform",
 	AssetTypeBigqueryTableSensor:  "google_cloud_platform",
+	AssetTypeBigquerySource:       "google_cloud_platform",
 	AssetTypeSnowflakeQuery:       "snowflake",
 	AssetTypeSnowflakeQuerySensor: "snowflake",
 	AssetTypePostgresQuery:        "postgres",
@@ -1025,7 +1026,7 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 	assetType := asset.Type
 	if assetType == AssetTypeIngestr {
 		assetType = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
-	} else if assetType == AssetTypePython || assetType == AssetTypeEmpty || assetType == AssetTypeBQSource {
+	} else if assetType == AssetTypePython || assetType == AssetTypeEmpty {
 		assetType = p.GetMajorityAssetTypesFromSQLAssets(AssetTypeBigqueryQuery)
 	}
 
