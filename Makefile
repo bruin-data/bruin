@@ -25,13 +25,15 @@ build: deps
 integration-test: build
 	@touch integration-tests/.git
 	@touch integration-tests/bruin
-	@touch integration-tests/duckdb.db
+	@mkdir -p integration-tests/duckdb-files
 	@rm -rf integration-tests/.git
-	@rm  integration-tests/bruin
-	@rm integration-tests/duckdb.db
+	@rm integration-tests/bruin
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@go run integration-tests/integration-test.go
+	# Ensure cleanup happens regardless of success or failure of the test
+	@trap "rm -rf integration-tests/duckdb-files" EXIT; \
+	go run integration-tests/integration-test.go
+
 
 clean:
 	@rm -rf ./bin
