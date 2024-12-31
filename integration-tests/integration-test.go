@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 
 	"github.com/bruin-data/bruin/pkg/e2e"
 	"github.com/bruin-data/bruin/pkg/helpers"
@@ -128,38 +129,76 @@ func main() {
 	wd, _ := os.Getwd()
 	binary := filepath.Join(wd, "bin", executable)
 
-	runIntegrationTests(binary, currentFolder)
-	runIntegrationWorkflow(binary, currentFolder)
+	// Run workflows in parallel
+	runIntegrationWorkflows(binary, currentFolder)
+
+	// Run tasks in parallel
+	runIntegrationTasks(binary, currentFolder)
 }
 
-func runIntegrationWorkflow(binary string, currentFolder string) {
+// runIntegrationWorkflows runs workflows concurrently but ensures sequential execution within each workflow
+func runIntegrationWorkflows(binary string, currentFolder string) {
 	tempfile, err := os.CreateTemp("", "bruin-test-continue")
 	if err != nil {
 		fmt.Println("Failed to create temporary file:", err)
 		os.Exit(1)
 	}
+	defer os.Remove(tempfile.Name())
 
 	workflows := getWorkflow(binary, currentFolder, tempfile.Name())
+	var wg sync.WaitGroup
+	errCh := make(chan error, len(workflows)) // Buffered channel to collect errors
 
 	for _, workflow := range workflows {
-		err := workflow.Run()
-		if err != nil {
-			fmt.Printf("Assert error: %v\n", err)
-			os.Exit(1)
-		}
+		wg.Add(1)
+		go func(w e2e.Workflow) {
+			defer wg.Done()
+			for _, step := range w.Steps {
+				if err := step.Run(); err != nil {
+					errCh <- fmt.Errorf("Workflow %s, Step %s: %v", w.Name, step.Name, err)
+					return
+				}
+			}
+		}(workflow)
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	// Collect and handle errors
+	for err := range errCh {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }
 
-func runIntegrationTests(binary string, currentFolder string) {
+// runIntegrationTasks runs tasks concurrently
+func runIntegrationTasks(binary string, currentFolder string) {
 	tests := getTasks(binary, currentFolder)
+	var wg sync.WaitGroup
+	errCh := make(chan error, len(tests)) // Buffered channel to collect errors
+
 	for _, test := range tests {
-		if err := test.Run(); err != nil {
-			fmt.Printf("%s Assert error: %v\n", test.Name, err)
-			os.Exit(1)
-		}
+		wg.Add(1)
+		go func(t e2e.Task) {
+			defer wg.Done()
+			if err := t.Run(); err != nil {
+				errCh <- fmt.Errorf("Task %s: %v", t.Name, err)
+			}
+		}(test)
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	// Collect and handle errors
+	for err := range errCh {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }
 
+// getWorkflow defines workflows and ensures sequential execution within steps
 func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Workflow {
 	return []e2e.Workflow{
 		{
@@ -170,7 +209,6 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 					Command: binary,
 					Args:    []string{"run", filepath.Join(currentFolder, "continue")},
 					Env:     []string{},
-
 					Expected: e2e.Output{
 						ExitCode: 1,
 					},
@@ -184,7 +222,6 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 					Command: "cp",
 					Args:    []string{filepath.Join(currentFolder, "continue/assets/player_summary.sql"), tempfile},
 					Env:     []string{},
-
 					Expected: e2e.Output{
 						ExitCode: 0,
 					},
@@ -197,7 +234,6 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 					Command: "cp",
 					Args:    []string{filepath.Join(currentFolder, "player_summary.sql"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")},
 					Env:     []string{},
-
 					Expected: e2e.Output{
 						ExitCode: 0,
 					},
@@ -234,7 +270,6 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 		},
 	}
 }
-
 func getTasks(binary string, currentFolder string) []e2e.Task {
 	return []e2e.Task{
 		{
