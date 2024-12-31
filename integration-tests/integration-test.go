@@ -173,7 +173,6 @@ func runIntegrationWorkflows(binary string, currentFolder string) {
 			return // Replace os.Exit(1) with return.
 		}
 		defer os.Remove(tempfile.Name())
-
 	}
 }
 
