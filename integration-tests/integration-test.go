@@ -140,7 +140,7 @@ func main() {
 func runIntegrationWorkflows(binary string, currentFolder string) {
 	tempfile, err := os.CreateTemp("", "bruin-test-continue")
 	if err != nil {
-		fmt.Println("Failed to create temporary file:", err)
+		fmt.Println("failed to create temporary file:", err)
 		os.Exit(1)
 	}
 	defer os.Remove(tempfile.Name())
@@ -155,7 +155,7 @@ func runIntegrationWorkflows(binary string, currentFolder string) {
 			defer wg.Done()
 			for _, step := range w.Steps {
 				if err := step.Run(); err != nil {
-					errCh <- fmt.Errorf("Workflow %s, Step %s: %w", w.Name, step.Name, err)
+					errCh <- fmt.Errorf("workflow %s, Step %s: %w", w.Name, step.Name, err)
 					return
 				}
 			}
@@ -169,7 +169,7 @@ func runIntegrationWorkflows(binary string, currentFolder string) {
 	for err := range errCh {
 		fmt.Println(err)
 		if err != nil {
-			fmt.Println("Failed to create temporary file:", err)
+			fmt.Println("failed to create temporary file:", err)
 			return // Replace os.Exit(1) with return.
 		}
 		defer os.Remove(tempfile.Name())
@@ -188,7 +188,7 @@ func runIntegrationTasks(binary string, currentFolder string) {
 		go func(t e2e.Task) {
 			defer wg.Done()
 			if err := t.Run(); err != nil {
-				errCh <- fmt.Errorf("Task %s: %w", t.Name, err)
+				errCh <- fmt.Errorf("task %s: %w", t.Name, err)
 			}
 		}(test)
 	}
