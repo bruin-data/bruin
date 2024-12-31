@@ -136,7 +136,7 @@ func main() {
 	runIntegrationTasks(binary, currentFolder)
 }
 
-// runIntegrationWorkflows runs workflows concurrently but ensures sequential execution within each workflow
+// runIntegrationWorkflows runs workflows concurrently but ensures sequential execution within each workflow.
 func runIntegrationWorkflows(binary string, currentFolder string) {
 	tempfile, err := os.CreateTemp("", "bruin-test-continue")
 	if err != nil {
@@ -147,7 +147,7 @@ func runIntegrationWorkflows(binary string, currentFolder string) {
 
 	workflows := getWorkflow(binary, currentFolder, tempfile.Name())
 	var wg sync.WaitGroup
-	errCh := make(chan error, len(workflows)) // Buffered channel to collect errors
+	errCh := make(chan error, len(workflows)) // Buffered channel to collect errors.
 
 	for _, workflow := range workflows {
 		wg.Add(1)
@@ -155,7 +155,7 @@ func runIntegrationWorkflows(binary string, currentFolder string) {
 			defer wg.Done()
 			for _, step := range w.Steps {
 				if err := step.Run(); err != nil {
-					errCh <- fmt.Errorf("Workflow %s, Step %s: %v", w.Name, step.Name, err)
+					errCh <- fmt.Errorf("Workflow %s, Step %s: %w", w.Name, step.Name, err)
 					return
 				}
 			}
@@ -168,22 +168,27 @@ func runIntegrationWorkflows(binary string, currentFolder string) {
 	// Collect and handle errors
 	for err := range errCh {
 		fmt.Println(err)
-		os.Exit(1)
+		if err != nil {
+			fmt.Println("Failed to create temporary file:", err)
+			return // Replace os.Exit(1) with return.
+		}
+		defer os.Remove(tempfile.Name())
+
 	}
 }
 
-// runIntegrationTasks runs tasks concurrently
+// runIntegrationTasks runs tasks concurrently.
 func runIntegrationTasks(binary string, currentFolder string) {
 	tests := getTasks(binary, currentFolder)
 	var wg sync.WaitGroup
-	errCh := make(chan error, len(tests)) // Buffered channel to collect errors
+	errCh := make(chan error, len(tests)) // Buffered channel to collect errors.
 
 	for _, test := range tests {
 		wg.Add(1)
 		go func(t e2e.Task) {
 			defer wg.Done()
 			if err := t.Run(); err != nil {
-				errCh <- fmt.Errorf("Task %s: %v", t.Name, err)
+				errCh <- fmt.Errorf("Task %s: %w", t.Name, err)
 			}
 		}(test)
 	}
@@ -198,7 +203,7 @@ func runIntegrationTasks(binary string, currentFolder string) {
 	}
 }
 
-// getWorkflow defines workflows and ensures sequential execution within steps
+// getWorkflow defines workflows and ensures sequential execution within steps.
 func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Workflow {
 	return []e2e.Workflow{
 		{
