@@ -451,6 +451,7 @@ type AssetType string
 var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeBigqueryQuery:        "google_cloud_platform",
 	AssetTypeBigqueryTableSensor:  "google_cloud_platform",
+	AssetTypeBQSource:             "google_cloud_platform",
 	AssetTypeSnowflakeQuery:       "snowflake",
 	AssetTypeSnowflakeQuerySensor: "snowflake",
 	AssetTypePostgresQuery:        "postgres",
@@ -1025,7 +1026,7 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 	assetType := asset.Type
 	if assetType == AssetTypeIngestr {
 		assetType = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
-	} else if assetType == AssetTypePython || assetType == AssetTypeEmpty || assetType == AssetTypeBQSource {
+	} else if assetType == AssetTypePython || assetType == AssetTypeEmpty {
 		assetType = p.GetMajorityAssetTypesFromSQLAssets(AssetTypeBigqueryQuery)
 	}
 
