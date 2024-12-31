@@ -33,6 +33,7 @@ const (
 	AssetTypeBigquerySource       = AssetType("bq.source")
 	AssetTypeBigquerySeed         = AssetType("bq.seed")
 	AssetTypeDuckDBQuery          = AssetType("duckdb.sql")
+	AssetTypeDuckDBSeed           = AssetType("duckdb.seed")
 	AssetTypeEmpty                = AssetType("empty")
 	AssetTypePostgresQuery        = AssetType("pg.sql")
 	AssetTypeRedshiftQuery        = AssetType("rs.sql")
@@ -463,6 +464,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeSynapseQuery:         "synapse",
 	AssetTypeAthenaQuery:          "athena",
 	AssetTypeDuckDBQuery:          "duckdb",
+	AssetTypeDuckDBSeed:           "duckdb",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -1028,8 +1030,6 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 	assetType := asset.Type
 	if assetType == AssetTypeIngestr {
 		assetType = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
-	} else if assetType == AssetTypeBigquerySeed {
-		assetType = IngestrTypeConnectionMapping["bigquery"]
 	} else if assetType == AssetTypePython || assetType == AssetTypeEmpty {
 		assetType = p.GetMajorityAssetTypesFromSQLAssets(AssetTypeBigqueryQuery)
 	}
@@ -1064,7 +1064,6 @@ func (p *Pipeline) WipeContentOfAssets() {
 func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) AssetType {
 	taskTypeCounts := map[AssetType]int{
 		AssetTypeBigqueryQuery:   0,
-		AssetTypeBigquerySeed:    0,
 		AssetTypeSnowflakeQuery:  0,
 		AssetTypePostgresQuery:   0,
 		AssetTypeMsSQLQuery:      0,
@@ -1092,14 +1091,6 @@ func (p *Pipeline) GetMajorityAssetTypesFromSQLAssets(defaultIfNone AssetType) A
 			}
 
 			assetType, ok = IngestrTypeConnectionMapping[ingestrDestination]
-			if !ok {
-				continue
-			}
-		}
-
-		if assetType == AssetTypeBigquerySeed {
-			var ok bool
-			assetType, ok = IngestrTypeConnectionMapping["bigquery"]
 			if !ok {
 				continue
 			}

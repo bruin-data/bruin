@@ -275,3 +275,80 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 		})
 	}
 }
+
+func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
+	t.Parallel()
+
+	mockBq := new(mockConnection)
+	mockBq.On("GetIngestrURI").Return("bigquery://uri-here", nil)
+	mockSf := new(mockConnection)
+	mockSf.On("GetIngestrURI").Return("snowflake://uri-here", nil)
+	mockDuck := new(mockConnection)
+	mockDuck.On("GetIngestrURI").Return("duckdb:////some/path", nil)
+
+	fetcher := simpleConnectionFetcher{
+		connections: map[string]*mockConnection{
+			"bq":   mockBq,
+			"sf":   mockSf,
+			"duck": mockDuck,
+		},
+	}
+
+	finder := new(mockFinder)
+
+	tests := []struct {
+		name        string
+		asset       *pipeline.Asset
+		fullRefresh bool
+		want        []string
+	}{
+		{
+			name: "create+replace, basic scenario",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "bq",
+				Type:       pipeline.AssetTypeBigquerySeed,
+				Parameters: map[string]string{
+					"path": "seed.csv",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "csv://seed.csv", "--source-table", "seed.raw", "--dest-uri", "bigquery://uri-here", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+		},
+		{
+			name: "duck db source, basic scenario",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Type:       pipeline.AssetTypeDuckDBSeed,
+				Connection: "duck",
+				Parameters: map[string]string{
+					"path": "seed.csv",
+				},
+			},
+			want: []string{"ingest", "--source-uri", "csv://seed.csv", "--source-table", "seed.raw", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			runner := new(mockRunner)
+			runner.On("RunIngestr", mock.Anything, tt.want, repo).Return(nil)
+
+			o := &SeedOperator{
+				conn:   &fetcher,
+				finder: finder,
+				runner: runner,
+			}
+
+			ti := scheduler.AssetInstance{
+				Pipeline: &pipeline.Pipeline{},
+				Asset:    tt.asset,
+			}
+
+			ctx := context.WithValue(context.Background(), pipeline.RunConfigFullRefresh, tt.fullRefresh)
+
+			err := o.Run(ctx, &ti)
+			require.NoError(t, err)
+		})
+	}
+}

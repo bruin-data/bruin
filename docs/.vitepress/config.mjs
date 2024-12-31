@@ -127,6 +127,7 @@ export default defineConfig({
                     {
                         text: "Asset Types", items: [
                             {text: "SQL", link: "/assets/sql"},
+                            {text: "SQL Seed", link: "/assets/sql-seed"},
                             {text: "Ingestr", link: "/assets/ingestr"},
                             {text: "Python Assets", link: "/assets/python"},
                         ]

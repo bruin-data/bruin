@@ -538,5 +538,19 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 				e2e.AssertByOutputJSON,
 			},
 		},
+		{
+			Name:    "run-seed-data",
+			Command: binary,
+			Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/run-seed-data/assets/seed.asset.yml")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Executed 12 tasks", " Finished: raw.seed", " Finished: raw.seed:name:not_null", "Finished: raw.seed:networking_through:accepted_values", "Finished: raw.seed:networking_through:not_null", "Finished: raw.seed:position:not_null"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
 	}
 }

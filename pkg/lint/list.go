@@ -169,11 +169,11 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlPa
 			ApplicableLevels: []Level{LevelPipeline},
 		},
 		&SimpleRule{
-			Identifier:       "assets-bigquery-validation",
+			Identifier:       "assets-seed-validation",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
-			Validator:        CallFuncForEveryAsset(ValidateAssetBigqueryValidation),
-			AssetValidator:   ValidateAssetBigqueryValidation,
+			Validator:        CallFuncForEveryAsset(ValidateAssetSeedValidation),
+			AssetValidator:   ValidateAssetSeedValidation,
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
 		UsedTableValidatorRule{

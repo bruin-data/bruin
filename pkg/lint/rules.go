@@ -360,55 +360,66 @@ func ValidateCustomCheckQueryExists(ctx context.Context, p *pipeline.Pipeline, a
 	return issues, nil
 }
 
-func ValidateAssetBigqueryValidation(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if asset.Type == pipeline.AssetTypeBigquerySeed {
-		// Check if materialization is defined
 		if asset.Materialization.Type != pipeline.MaterializationTypeNone {
 			issues = append(issues, &Issue{
 				Task:        asset,
 				Description: "Materialization is not allowed on a seed asset",
 			})
 		}
+		if asset.Parameters["path"] == "" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Seed file path is required",
+			})
+			return issues, nil
+		}
+
 		seedFilePath := filepath.Join(filepath.Dir(asset.DefinitionFile.Path), asset.Parameters["path"])
-		if _, err := os.Stat(seedFilePath); os.IsNotExist(err) {
+		_, err := os.Stat(seedFilePath)
+		if os.IsNotExist(err) {
 			issues = append(issues, &Issue{
 				Task:        asset,
 				Description: "Seed file does not exist or cannot be found",
 			})
-		} else {
-			file, err := os.Open(seedFilePath)
+			return issues, nil
+		}
+
+		file, err := os.Open(seedFilePath)
+		if err != nil {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Failed to open seed file",
+			})
+			return issues, nil
+		}
+		columnMap := make(map[string]bool)
+		defer file.Close()
+		if file != nil {
+			reader := csv.NewReader(file)
+			headers, err := reader.Read()
 			if err != nil {
 				issues = append(issues, &Issue{
 					Task:        asset,
-					Description: "Failed to open seed file",
+					Description: "CSV file cannot be parsed",
 				})
-			} else {
-				defer file.Close()
-				reader := csv.NewReader(file)
-				headers, err := reader.Read()
-				if err != nil {
-					issues = append(issues, &Issue{
-						Task:        asset,
-						Description: "CSV file cannot be parsed",
-					})
-				} else {
-					columnMap := make(map[string]bool)
-					for _, header := range headers {
-						columnMap[header] = true
-					}
-					for _, column := range asset.Columns {
-						if !columnMap[column.Name] {
-							issues = append(issues, &Issue{
-								Task:        asset,
-								Description: fmt.Sprintf("Column '%s' is defined in the asset but does not exist in the CSV", column.Name),
-							})
-						}
-					}
-				}
+				return issues, nil
+			}
+			for _, header := range headers {
+				columnMap[header] = true
 			}
 		}
 
+		for _, column := range asset.Columns {
+			if !columnMap[column.Name] {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: fmt.Sprintf("Column '%s' is defined in the asset but does not exist in the CSV", column.Name),
+				})
+			}
+		}
 	}
 	return issues, nil
 }

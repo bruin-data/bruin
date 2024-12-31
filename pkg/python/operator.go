@@ -98,24 +98,6 @@ func NewLocalOperatorWithUv(config *config.Config, conn *connection.Manager, env
 	}
 }
 
-func NewLocalOperatorForBigquerySeed(config *config.Config, conn *connection.Manager, envVariables map[string]string) *LocalOperator {
-	cmdRunner := &CommandRunner{}
-
-	return &LocalOperator{
-		repoFinder: &git.RepoFinder{},
-		module:     &ModulePathFinder{},
-		runner: &UvPythonRunner{
-			Cmd: cmdRunner,
-			UvInstaller: &UvChecker{
-				cmd: CommandRunner{},
-			},
-			conn: conn,
-		},
-		envVariables: envVariables,
-		config:       config,
-	}
-}
-
 func (o *LocalOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	_, ok := ti.(*scheduler.AssetInstance)
 	if !ok {
