@@ -2,6 +2,7 @@ package lint
 
 import (
 	"context"
+	"encoding/csv"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -355,6 +356,59 @@ func ValidateCustomCheckQueryExists(ctx context.Context, p *pipeline.Pipeline, a
 				Description: fmt.Sprintf("Custom check '%s' query cannot be empty", check.Name),
 			})
 		}
+	}
+	return issues, nil
+}
+
+func ValidateAssetBigqueryValidation(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if asset.Type == pipeline.AssetTypeBigquerySeed {
+		// Check if materialization is defined
+		if asset.Materialization.Type != pipeline.MaterializationTypeNone {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Materialization is not allowed on a seed asset",
+			})
+		}
+		seedFilePath := filepath.Join(filepath.Dir(asset.DefinitionFile.Path), asset.Parameters["source_table"])
+		if _, err := os.Stat(seedFilePath); os.IsNotExist(err) {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Seed file does not exist or cannot be found",
+			})
+		} else {
+			file, err := os.Open(seedFilePath)
+			if err != nil {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "Failed to open seed file",
+				})
+			} else {
+				defer file.Close()
+				reader := csv.NewReader(file)
+				headers, err := reader.Read()
+				if err != nil {
+					issues = append(issues, &Issue{
+						Task:        asset,
+						Description: "CSV file cannot be parsed",
+					})
+				} else {
+					columnMap := make(map[string]bool)
+					for _, header := range headers {
+						columnMap[header] = true
+					}
+					for _, column := range asset.Columns {
+						if !columnMap[column.Name] {
+							issues = append(issues, &Issue{
+								Task:        asset,
+								Description: fmt.Sprintf("Column '%s' is defined in the asset but does not exist in the CSV", column.Name),
+							})
+						}
+					}
+				}
+			}
+		}
+
 	}
 	return issues, nil
 }
