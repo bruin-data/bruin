@@ -255,7 +255,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "run-with-tags",
 			Command: binary,
-			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", filepath.Join(currentFolder, "test-pipelines/run-with-tags-pipeline")},
+			Args:    []string{"run", "--env", "env-run-with-tags", "--tag", "include", "--exclude-tag", "exclude", filepath.Join(currentFolder, "test-pipelines/run-with-tags-pipeline")},
 			Env:     []string{},
 
 			Expected: e2e.Output{
@@ -268,12 +268,12 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "run-with-filters",
 			Command: binary,
-			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "--only", "checks", filepath.Join(currentFolder, "test-pipelines/run-with-filters-pipeline")},
+			Args:    []string{"run", "-env", "env-run-with-filters", "--tag", "include", "--exclude-tag", "exclude", filepath.Join(currentFolder, "test-pipelines/run-with-filters-pipeline")},
 			Env:     []string{},
 
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Executed 1 tasks", "total_games:positive"},
+				Contains: []string{"Executed 4 tasks", "Finished: chess_playground.games", " Finished: chess_playground.game_outcome_summary", "Finished: chess_playground.game_outcome_summary:total_games:positive", "Finished: chess_playground.profiles"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -295,7 +295,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "run-main-with-filters",
 			Command: binary,
-			Args:    []string{"run", "--tag", "include", "--exclude-tag", "exclude", "--only", "main", filepath.Join(currentFolder, "test-pipelines/run-main-with-filters-pipeline")},
+			Args:    []string{"run", "--env", "env-run-main-with-filters", "--tag", "include", "--exclude-tag", "exclude", "--only", "main", filepath.Join(currentFolder, "test-pipelines/run-main-with-filters-pipeline")},
 			Env:     []string{},
 
 			Expected: e2e.Output{
@@ -310,11 +310,11 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "run-with-downstream",
 			Command: binary,
-			Args:    []string{"run", "--downstream", filepath.Join(currentFolder, "test-pipelines/run-with-downstream-pipeline/assets/game_outcome_summary.sql")},
+			Args:    []string{"run", "--env", "env-run-with-downstream", "--downstream", filepath.Join(currentFolder, "test-pipelines/run-with-downstream-pipeline/assets/products.sql")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Executed 4 tasks", " Finished: chess_playground.game_outcome_summary", "Finished: chess_playground.game_outcome_summary:total_games:positive", "Finished: chess_playground.player_summary", " Finished: chess_playground.player_summary:total_games:non_negative"},
+				Contains: []string{"Executed 5 tasks", "Finished: products", "Finished: products:price:positive", "Finished: product_price_summary", "Finished: product_price_summary:product_count:non_negative", "Finished: product_price_summary:total_stock:non_negative"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -324,11 +324,11 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "run-main-with-downstream",
 			Command: binary,
-			Args:    []string{"run", "--downstream", "--only", "main", filepath.Join(currentFolder, "test-pipelines/run-main-with-downstream-pipeline/assets/game_outcome_summary.sql")},
+			Args:    []string{"run", "--env", "env-run-main-with-downstream", "--downstream", "--only", "main", filepath.Join(currentFolder, "test-pipelines/run-main-with-downstream-pipeline/assets/products.sql")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Executed 2 tasks", " Finished: chess_playground.game_outcome_summary", "Finished: chess_playground.player_summary"},
+				Contains: []string{"Executed 2 tasks", "Finished: products", "Finished: product_price_summary"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -338,7 +338,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "push-metadata",
 			Command: binary,
-			Args:    []string{"run", "--push-metadata", "--only", "push-metadata", filepath.Join(currentFolder, "test-pipelines/push-metadata-pipeline")},
+			Args:    []string{"run", "--env", "env-push-metadata", "--push-metadata", "--only", "push-metadata", filepath.Join(currentFolder, "test-pipelines/push-metadata-pipeline")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 1,
@@ -364,7 +364,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "run-use-uv",
 			Command: binary,
-			Args:    []string{"run", "--use-uv", filepath.Join(currentFolder, "test-pipelines/run-use-uv-pipeline")},
+			Args:    []string{"run", "--env", "env-run-use-uv", "--use-uv", filepath.Join(currentFolder, "test-pipelines/run-use-uv-pipeline")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
@@ -466,7 +466,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "run-malformed-sql",
 			Command: binary,
-			Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/run-malformed-pipeline/assets/malformed.sql")},
+			Args:    []string{"run", "--env", "env-run-malformed-sql", filepath.Join(currentFolder, "test-pipelines/run-malformed-pipeline/assets/malformed.sql")},
 			Env:     []string{},
 
 			Expected: e2e.Output{
