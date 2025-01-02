@@ -31,6 +31,7 @@ type Selector interface {
 
 type MetadataUpdater interface {
 	UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipeline.Asset) error
+	DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) (err error)
 }
 
 type DB interface {
@@ -270,7 +271,7 @@ func (d *Client) Ping(ctx context.Context) error {
 	return nil // Return nil if the query runs successfully
 }
 
-func (d *Client) CompareTableClusteringAndPartitioning(ctx context.Context, tableName string, asset *pipeline.Asset) (mismatch bool, err error) {
+func (d *Client) DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) (err error) {
 	tableComponents := strings.Split(tableName, ".")
 	if len(tableComponents) != 2 {
 		err = fmt.Errorf("table name must be in schema.table format, '%s' given", tableName)
@@ -283,50 +284,82 @@ func (d *Client) CompareTableClusteringAndPartitioning(ctx context.Context, tabl
 		err = fmt.Errorf("failed to fetch metadata for table '%s': %w", tableName, err)
 		return
 	}
-	partitioningMismatch := comparePartitioning(meta, asset)
-	clusteringMismatch := compareClustering(meta, asset)
-
-	// Return whether there's a mismatch
-	mismatch = partitioningMismatch || clusteringMismatch
+	// Check if partitioning or clustering exists in metadata
+	hasPartitioning := meta.TimePartitioning != nil || meta.RangePartitioning != nil
+	hasClustering := meta.Clustering != nil && len(meta.Clustering.Fields) > 0
+	// If neither partitioning nor clustering exists, do nothing
+	if !hasPartitioning && !hasClustering {
+		return
+	}
+	partitioningMismatch := false
+	clusteringMismatch := false
+	if hasPartitioning {
+		partitioningMismatch = !IsSamePartitioning(meta, asset)
+	}
+	if hasClustering {
+		clusteringMismatch = !IsSameClustering(meta, asset)
+	}
+	mismatch := partitioningMismatch || clusteringMismatch
+	if mismatch {
+		err = tableRef.Delete(ctx)
+		if err != nil {
+			err = fmt.Errorf("failed to delete table '%s': %w", tableName, err)
+			return
+		}
+		fmt.Printf("Table '%s' deleted successfully.\n", tableName)
+		fmt.Printf("Recreating the table with the new clustering and partitioning strategies...\n")
+	}
 	return
 }
 
-func comparePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
+func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
 	if meta.TimePartitioning != nil {
 		if meta.TimePartitioning.Field != asset.Materialization.PartitionBy {
-			fmt.Printf("Mismatch in time partitioning field: BigQuery=%s, User=%s\n", meta.TimePartitioning.Field, asset.Materialization.PartitionBy)
-			return true
+			fmt.Printf(
+				"Mismatch detected: Your table has a time partitioning strategy with the field '%s', "+
+					"but you are attempting to use the field '%s'. Your table will be dropped and recreated.\n",
+				meta.TimePartitioning.Field,
+				asset.Materialization.PartitionBy,
+			)
+			return false
 		}
-	} else if asset.Materialization.PartitionBy != "" {
-		fmt.Printf("User provided time partitioning, but none found in BigQuery.\n")
-		return true
 	}
 	if meta.RangePartitioning != nil {
 		if meta.RangePartitioning.Field != asset.Materialization.PartitionBy {
-			fmt.Printf("Mismatch in range partitioning field: BigQuery=%s, User=%s\n", meta.RangePartitioning.Field, asset.Materialization.PartitionBy)
-			return true
+			fmt.Printf(
+				"Mismatch detected: Your table has a range partitioning strategy with the field '%s', "+
+					"but you are attempting to use the field '%s'. Your table will be dropped and recreated.\n", meta.RangePartitioning.Field,
+				asset.Materialization.PartitionBy,
+			)
+			return false
 		}
-	} else if asset.Materialization.PartitionBy != "" {
-		fmt.Printf("User provided range partitioning, but none found in BigQuery.\n")
-		return true
 	}
-
-	return false
+	return true
 }
 
-func compareClustering(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
+func IsSameClustering(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
 	bigQueryFields := meta.Clustering.Fields
 	userFields := asset.Materialization.ClusterBy
+
 	if len(bigQueryFields) != len(userFields) {
-		fmt.Printf("Mismatch in clustering fields length: BigQuery=%v, User=%v\n", bigQueryFields, userFields)
-		return true
+		fmt.Printf(
+			"Mismatch detected: Your table has %d clustering fields (%v), but you are trying to use %d fields (%v). "+
+				"Your table will be dropped and recreated.\n",
+			len(bigQueryFields), bigQueryFields, len(userFields), userFields,
+		)
+		return false
 	}
+
 	for i := range bigQueryFields {
 		if bigQueryFields[i] != userFields[i] {
-			fmt.Printf("Mismatch in clustering fields: BigQuery=%v, User=%v\n", bigQueryFields, userFields)
-			return true
+			fmt.Printf(
+				"Mismatch detected: Your table is clustered by '%s' at position %d, "+
+					"but you are trying to cluster by '%s'. Your table will be dropped and recreated.\n",
+				bigQueryFields[i], i+1, userFields[i],
+			)
+			return false
 		}
 	}
 
-	return false
+	return true
 }
