@@ -538,5 +538,34 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 				e2e.AssertByOutputJSON,
 			},
 		},
+		{
+			Name:    "run-seed-data",
+			Command: binary,
+			Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/run-seed-data/assets/seed.asset.yml")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Executed 5 tasks"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:          "parse-asset-seed-data",
+			Command:       binary,
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/run-seed-data/assets/seed.asset.yml")},
+			Env:           []string{},
+			SkipJSONNodes: []string{"\"path\""},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/run-seed-data/expectations/seed.asset.yml.json")),
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJSON,
+			},
+		},
 	}
 }

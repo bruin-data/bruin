@@ -31,7 +31,9 @@ const (
 	AssetTypeBigqueryTableSensor  = AssetType("bq.sensor.table")
 	AssetTypeBigqueryQuerySensor  = AssetType("bq.sensor.query")
 	AssetTypeBigquerySource       = AssetType("bq.source")
+	AssetTypeBigquerySeed         = AssetType("bq.seed")
 	AssetTypeDuckDBQuery          = AssetType("duckdb.sql")
+	AssetTypeDuckDBSeed           = AssetType("duckdb.seed")
 	AssetTypeEmpty                = AssetType("empty")
 	AssetTypePostgresQuery        = AssetType("pg.sql")
 	AssetTypeRedshiftQuery        = AssetType("rs.sql")
@@ -451,6 +453,7 @@ type AssetType string
 var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeBigqueryQuery:        "google_cloud_platform",
 	AssetTypeBigqueryTableSensor:  "google_cloud_platform",
+	AssetTypeBigquerySeed:         "google_cloud_platform",
 	AssetTypeBigquerySource:       "google_cloud_platform",
 	AssetTypeSnowflakeQuery:       "snowflake",
 	AssetTypeSnowflakeQuerySensor: "snowflake",
@@ -461,6 +464,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeSynapseQuery:         "synapse",
 	AssetTypeAthenaQuery:          "athena",
 	AssetTypeDuckDBQuery:          "duckdb",
+	AssetTypeDuckDBSeed:           "duckdb",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{

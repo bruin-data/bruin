@@ -601,6 +601,11 @@ func setupExecutors(
 	// this should go away once we incorporate URIs into the assets
 	estimateCustomCheckType := s.FindMajorityOfTypes(pipeline.AssetTypeBigqueryQuery)
 
+	seedOperator, err := ingestr.NewSeedOperator(conn)
+	if err != nil {
+		return nil, err
+	}
+
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
 		jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh)
 		if usePipForPython {
@@ -618,7 +623,7 @@ func setupExecutors(
 
 	customCheckRunner := ansisql.NewCustomCheckOperator(conn, renderer)
 
-	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery {
+	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery || s.WillRunTaskOfType(pipeline.AssetTypeBigquerySeed) {
 		bqOperator := bigquery.NewBasicOperator(conn, wholeFileExtractor, bigquery.NewMaterializer(fullRefresh))
 
 		bqCheckRunner, err := bigquery.NewColumnCheckOperator(conn)
@@ -633,6 +638,10 @@ func setupExecutors(
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeMetadataPush] = metadataPushOperator
 
+		mainExecutors[pipeline.AssetTypeBigquerySeed][scheduler.TaskInstanceTypeMain] = seedOperator
+		mainExecutors[pipeline.AssetTypeBigquerySeed][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner
+		mainExecutors[pipeline.AssetTypeBigquerySeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypeBigquerySeed][scheduler.TaskInstanceTypeMetadataPush] = metadataPushOperator
 		// we set the Python runners to run the checks on BigQuery assuming that there won't be many usecases where a user has both BQ and Snowflake
 		if estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner
@@ -748,7 +757,7 @@ func setupExecutors(
 		}
 	}
 
-	if s.WillRunTaskOfType(pipeline.AssetTypeDuckDBQuery) || estimateCustomCheckType == pipeline.AssetTypeDuckDBQuery {
+	if s.WillRunTaskOfType(pipeline.AssetTypeDuckDBQuery) || estimateCustomCheckType == pipeline.AssetTypeDuckDBQuery || s.WillRunTaskOfType(pipeline.AssetTypeDuckDBSeed) {
 		duckDBOperator := duck.NewBasicOperator(conn, wholeFileExtractor, duck.NewMaterializer(fullRefresh))
 		duckDBCustomCheckRunner := ansisql.NewCustomCheckOperator(conn, renderer)
 		duckDBCheckRunner := duck.NewColumnCheckOperator(conn)
@@ -756,6 +765,11 @@ func setupExecutors(
 		mainExecutors[pipeline.AssetTypeDuckDBQuery][scheduler.TaskInstanceTypeMain] = duckDBOperator
 		mainExecutors[pipeline.AssetTypeDuckDBQuery][scheduler.TaskInstanceTypeColumnCheck] = duckDBCheckRunner
 		mainExecutors[pipeline.AssetTypeDuckDBQuery][scheduler.TaskInstanceTypeCustomCheck] = duckDBCustomCheckRunner
+
+		mainExecutors[pipeline.AssetTypeDuckDBSeed][scheduler.TaskInstanceTypeMain] = seedOperator
+		mainExecutors[pipeline.AssetTypeDuckDBSeed][scheduler.TaskInstanceTypeColumnCheck] = duckDBCheckRunner
+		mainExecutors[pipeline.AssetTypeDuckDBSeed][scheduler.TaskInstanceTypeCustomCheck] = duckDBCustomCheckRunner
+
 		if estimateCustomCheckType == pipeline.AssetTypeDuckDBQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = duckDBCheckRunner
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = duckDBCustomCheckRunner

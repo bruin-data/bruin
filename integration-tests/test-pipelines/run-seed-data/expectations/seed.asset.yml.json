@@ -1,0 +1,243 @@
+{
+  "asset": {
+    "id": "3c80839e56779484af2542f23fd99f49d1a6905a99122ecb3a29c0b57dc83fe9",
+    "uri": "",
+    "name": "seed.raw",
+    "type": "duckdb.seed",
+    "description": "This asset loads a CSV file into a DuckDB database.",
+    "connection": "",
+    "tags": [],
+    "materialization": null,
+    "upstreams": [],
+    "image": "",
+    "instance": "",
+    "owner": "",
+    "executable_file": {
+      "name": "seed.asset.yml",
+      "path": "/integration-tests/test-pipelines/run-seed-data/assets/seed.asset.yml",
+      "content": "name: seed.raw\ntype: duckdb.seed\n\ndescription: This asset loads a CSV file into a DuckDB database.\ncolumns:\n  - name: name\n    type: varchar\n    description: \"Contact person's full name\"\n    checks:\n      - name: not_null\n  - name: networking_through\n    type: varchar\n    description: \"Source or connection through which contact was made\"\n    checks:\n      - name: not_null\n      - name: accepted_values\n        value:\n          - LinkedIn\n          - Twitter\n          - Facebook\n          - Instagram\n  - name: position\n    type: varchar\n    description: \"Contact's job position or title\"\n    checks:\n      - name: not_null\n  - name: contact_date\n    type: varchar\n    description: \"Date when contact was established\"\n\n\nparameters:\n  path: ./seed.csv\n"
+    },
+    "definition_file": {
+      "name": "seed.asset.yml",
+      "path": "/integration-tests/test-pipelines/run-seed-data/assets/seed.asset.yml",
+      "type": "yaml"
+    },
+    "parameters": {
+      "path": "./seed.csv"
+    },
+    "secrets": [],
+    "columns": [
+      {
+        "entity_attribute": null,
+        "name": "name",
+        "type": "varchar",
+        "description": "Contact person's full name",
+        "primary_key": false,
+        "update_on_merge": false,
+        "checks": [
+          {
+            "id": "6d0edf3e6836006758d1213e7927cf9530d9dcdf9dcccc6638bee257dd73e857",
+            "name": "not_null",
+            "value": null,
+            "blocking": true
+          }
+        ],
+        "upstreams": []
+      },
+      {
+        "entity_attribute": null,
+        "name": "networking_through",
+        "type": "varchar",
+        "description": "Source or connection through which contact was made",
+        "primary_key": false,
+        "update_on_merge": false,
+        "checks": [
+          {
+            "id": "3a6115e7ac5dffc8f0c0c6cb8ea427296f7656167d574e5cefde62a37535222f",
+            "name": "not_null",
+            "value": null,
+            "blocking": true
+          },
+          {
+            "id": "5d4569e858cbc6f56cf8ca9d934b743f4fa3b9b870d24f99dab7a390b1bb5168",
+            "name": "accepted_values",
+            "value": [
+              "LinkedIn",
+              "Twitter",
+              "Facebook",
+              "Instagram"
+            ],
+            "blocking": true
+          }
+        ],
+        "upstreams": []
+      },
+      {
+        "entity_attribute": null,
+        "name": "position",
+        "type": "varchar",
+        "description": "Contact's job position or title",
+        "primary_key": false,
+        "update_on_merge": false,
+        "checks": [
+          {
+            "id": "d625425165fba6cc0d5c0ecf233d6d719b3bcadba8845f31396ce94acf051d60",
+            "name": "not_null",
+            "value": null,
+            "blocking": true
+          }
+        ],
+        "upstreams": []
+      },
+      {
+        "entity_attribute": null,
+        "name": "contact_date",
+        "type": "varchar",
+        "description": "Date when contact was established",
+        "primary_key": false,
+        "update_on_merge": false,
+        "checks": [],
+        "upstreams": []
+      }
+    ],
+    "custom_checks": [],
+    "metadata": {},
+    "snowflake": null,
+    "athena": null
+  },
+  "pipeline": {
+    "legacy_id": "",
+    "name": "bruin-init",
+    "schedule": "daily",
+    "start_date": "2023-03-20",
+    "definition_file": {
+      "name": "pipeline.yml",
+      "path": "/integration-tests/test-pipelines/run-seed-data/pipeline.yml"
+    },
+    "default_parameters": {},
+    "default_connections": {
+      "duckdb": "duckdb-default"
+    },
+    "assets": [
+      {
+        "id": "3c80839e56779484af2542f23fd99f49d1a6905a99122ecb3a29c0b57dc83fe9",
+        "uri": "",
+        "name": "seed.raw",
+        "type": "duckdb.seed",
+        "description": "This asset loads a CSV file into a DuckDB database.",
+        "connection": "",
+        "tags": [],
+        "materialization": null,
+        "upstreams": [],
+        "image": "",
+        "instance": "",
+        "owner": "",
+        "executable_file": {
+          "name": "seed.asset.yml",
+          "path": "/integration-tests/test-pipelines/run-seed-data/assets/seed.asset.yml",
+          "content": "name: seed.raw\ntype: duckdb.seed\n\ndescription: This asset loads a CSV file into a DuckDB database.\ncolumns:\n  - name: name\n    type: varchar\n    description: \"Contact person's full name\"\n    checks:\n      - name: not_null\n  - name: networking_through\n    type: varchar\n    description: \"Source or connection through which contact was made\"\n    checks:\n      - name: not_null\n      - name: accepted_values\n        value:\n          - LinkedIn\n          - Twitter\n          - Facebook\n          - Instagram\n  - name: position\n    type: varchar\n    description: \"Contact's job position or title\"\n    checks:\n      - name: not_null\n  - name: contact_date\n    type: varchar\n    description: \"Date when contact was established\"\n\n\nparameters:\n  path: ./seed.csv\n"
+        },
+        "definition_file": {
+          "name": "seed.asset.yml",
+          "path": "/integration-tests/test-pipelines/run-seed-data/assets/seed.asset.yml",
+          "type": "yaml"
+        },
+        "parameters": {
+          "path": "./seed.csv"
+        },
+        "secrets": [],
+        "columns": [
+          {
+            "entity_attribute": null,
+            "name": "name",
+            "type": "varchar",
+            "description": "Contact person's full name",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [
+              {
+                "id": "6d0edf3e6836006758d1213e7927cf9530d9dcdf9dcccc6638bee257dd73e857",
+                "name": "not_null",
+                "value": null,
+                "blocking": true
+              }
+            ],
+            "upstreams": []
+          },
+          {
+            "entity_attribute": null,
+            "name": "networking_through",
+            "type": "varchar",
+            "description": "Source or connection through which contact was made",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [
+              {
+                "id": "3a6115e7ac5dffc8f0c0c6cb8ea427296f7656167d574e5cefde62a37535222f",
+                "name": "not_null",
+                "value": null,
+                "blocking": true
+              },
+              {
+                "id": "5d4569e858cbc6f56cf8ca9d934b743f4fa3b9b870d24f99dab7a390b1bb5168",
+                "name": "accepted_values",
+                "value": [
+                  "LinkedIn",
+                  "Twitter",
+                  "Facebook",
+                  "Instagram"
+                ],
+                "blocking": true
+              }
+            ],
+            "upstreams": []
+          },
+          {
+            "entity_attribute": null,
+            "name": "position",
+            "type": "varchar",
+            "description": "Contact's job position or title",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [
+              {
+                "id": "d625425165fba6cc0d5c0ecf233d6d719b3bcadba8845f31396ce94acf051d60",
+                "name": "not_null",
+                "value": null,
+                "blocking": true
+              }
+            ],
+            "upstreams": []
+          },
+          {
+            "entity_attribute": null,
+            "name": "contact_date",
+            "type": "varchar",
+            "description": "Date when contact was established",
+            "primary_key": false,
+            "update_on_merge": false,
+            "checks": [],
+            "upstreams": []
+          }
+        ],
+        "custom_checks": [],
+        "metadata": {},
+        "snowflake": null,
+        "athena": null
+      }
+    ],
+    "notifications": {
+      "slack": [],
+      "ms_teams": [],
+      "discord": []
+    },
+    "catchup": false,
+    "metadata_push": {
+      "bigquery": false
+    },
+    "retries": 0
+  },
+  "repo": {
+    "path": "/integration-tests"
+  }
+}
