@@ -651,7 +651,7 @@ func setupExecutors(
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypePostgresQuery) || estimateCustomCheckType == pipeline.AssetTypePostgresQuery ||
-		s.WillRunTaskOfType(pipeline.AssetTypeRedshiftQuery) || estimateCustomCheckType == pipeline.AssetTypeRedshiftQuery {
+		s.WillRunTaskOfType(pipeline.AssetTypeRedshiftQuery) || estimateCustomCheckType == pipeline.AssetTypeRedshiftQuery || s.WillRunTaskOfType(pipeline.AssetTypeRedshiftSeed) {
 		pgCheckRunner := postgres.NewColumnCheckOperator(conn)
 		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, postgres.NewMaterializer(fullRefresh))
 
@@ -674,7 +674,7 @@ func setupExecutors(
 		}
 	}
 
-	shouldInitiateSnowflake := s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuerySensor) || estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery
+	shouldInitiateSnowflake := s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuerySensor) || estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeSeed)
 	if shouldInitiateSnowflake {
 		sfOperator := snowflake.NewBasicOperator(conn, wholeFileExtractor, snowflake.NewMaterializer(fullRefresh))
 
@@ -701,7 +701,7 @@ func setupExecutors(
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuery) || estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery ||
-		s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuery) || estimateCustomCheckType == pipeline.AssetTypeSynapseQuery {
+		s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuery) || estimateCustomCheckType == pipeline.AssetTypeSynapseQuery || s.WillRunTaskOfType(pipeline.AssetTypeMsSQLSeed) {
 		msOperator := mssql.NewBasicOperator(conn, wholeFileExtractor, mssql.NewMaterializer(fullRefresh))
 		synapseOperator := synapse.NewBasicOperator(conn, wholeFileExtractor, synapse.NewMaterializer(fullRefresh))
 
@@ -727,7 +727,7 @@ func setupExecutors(
 		}
 	}
 
-	if s.WillRunTaskOfType(pipeline.AssetTypeDatabricksQuery) || estimateCustomCheckType == pipeline.AssetTypeDatabricksQuery {
+	if s.WillRunTaskOfType(pipeline.AssetTypeDatabricksQuery) || estimateCustomCheckType == pipeline.AssetTypeDatabricksQuery || s.WillRunTaskOfType(pipeline.AssetTypeDatabricksSeed) {
 		databricksOperator := databricks.NewBasicOperator(conn, wholeFileExtractor, databricks.NewMaterializer(fullRefresh))
 		databricksCheckRunner := databricks.NewColumnCheckOperator(conn)
 
@@ -759,7 +759,7 @@ func setupExecutors(
 		mainExecutors[pipeline.AssetTypeIngestr][scheduler.TaskInstanceTypeCustomCheck] = ingestrCustomCheckRunner
 	}
 
-	if s.WillRunTaskOfType(pipeline.AssetTypeAthenaQuery) || estimateCustomCheckType == pipeline.AssetTypeAthenaQuery {
+	if s.WillRunTaskOfType(pipeline.AssetTypeAthenaQuery) || estimateCustomCheckType == pipeline.AssetTypeAthenaQuery || s.WillRunTaskOfType(pipeline.AssetTypeAthenaSeed) {
 		athenaOperator := athena.NewBasicOperator(conn, wholeFileExtractor, athena.NewMaterializer(fullRefresh))
 		athenaCustomCheckRunner := ansisql.NewCustomCheckOperator(conn, renderer)
 		athenaCheckRunner := athena.NewColumnCheckOperator(conn)

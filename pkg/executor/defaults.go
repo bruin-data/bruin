@@ -152,7 +152,9 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
 	pipeline.AssetTypeSnowflakeSeed: {
-		scheduler.TaskInstanceTypeMain: NoOpOperator{},
+		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
 	},
 	"appsflyer.export.bq": {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
