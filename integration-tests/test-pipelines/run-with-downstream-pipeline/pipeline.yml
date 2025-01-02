@@ -1,1 +1,3 @@
-name: chess_extended_duckdb
+name: run-with-downstream-pipeline
+default_connections:
+  duckdb: "duckdb-run-with-downstream"

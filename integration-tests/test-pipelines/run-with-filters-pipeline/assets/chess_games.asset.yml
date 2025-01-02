@@ -5,5 +5,5 @@ tags:
 
 parameters:
   destination: duckdb
-  source_connection: chess-default
+  source_connection: chess-run-with-filters
   source_table: games
