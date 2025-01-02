@@ -178,7 +178,7 @@ func BenchmarkExcludeItemsInDirectoryContainingFile(b *testing.B) {
 	}
 	file := "task.yml"
 
-	for range make([]struct{}, b.N) {
+	for i := 0; i < b.N; i++ { //nolint:intrange
 		ExcludeSubItemsInDirectoryContainingFile(filePaths, file)
 	}
 }
