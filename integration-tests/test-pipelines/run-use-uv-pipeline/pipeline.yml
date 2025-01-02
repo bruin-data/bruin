@@ -1,0 +1,4 @@
+name: run-use-uv-pipeline
+default_connections:
+  duckdb: "duckdb-run-use-uv"
+  chess:  "chess-run-use-uv"

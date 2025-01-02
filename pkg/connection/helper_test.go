@@ -10,7 +10,7 @@ func TestValidateServiceAccountFile(t *testing.T) {
 	t.Parallel()
 
 	// Create a temporary file for testing.
-	tempFile, err := os.CreateTemp("", "service_account.json")
+	tempFile, err := os.CreateTemp(t.TempDir(), "service_account.json")
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
@@ -46,11 +46,13 @@ func TestValidateServiceAccountFile(t *testing.T) {
 	}
 
 	// Test empty file.
-	emptyFile, err := os.CreateTemp("", "empty_file.json")
+	emptyFile, err := os.CreateTemp(t.TempDir(), "empty_file.json")
 	if err != nil {
 		t.Fatalf("failed to create empty temp file: %v", err)
 	}
 	defer os.Remove(emptyFile.Name())
+	emptyFile.Close()
+
 	if err := validateServiceAccountFile(emptyFile.Name()); err == nil {
 		t.Error("expected error for empty file, got none")
 	}
@@ -102,7 +104,7 @@ func TestValidateServiceAccountJSON(t *testing.T) {
 	}
 
 	// Test using a file path that exist
-	tempFile, err := os.CreateTemp("", "service_account.json")
+	tempFile, err := os.CreateTemp(t.TempDir(), "service_account.json")
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
@@ -111,6 +113,8 @@ func TestValidateServiceAccountJSON(t *testing.T) {
 	if _, err := tempFile.WriteString(validJSON); err != nil {
 		t.Fatalf("failed to write to temp file: %v", err)
 	}
+	tempFile.Close()
+
 	if err := validateServiceAccountJSON(tempFile.Name()); err == nil {
 		t.Error("expected error for file path, got none")
 	} else if err.Error() != "please use service_account_file instead of service_account_json to define path" {

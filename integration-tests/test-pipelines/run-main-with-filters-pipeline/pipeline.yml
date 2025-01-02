@@ -1,0 +1,4 @@
+name: run-main-with-filters-pipeline
+default_connections:
+  duckdb: "duckdb-run-main-with-filters"
+  chess:  "chess-run-main-with-filters"

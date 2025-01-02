@@ -3,7 +3,7 @@ package ingestr
 import (
 	"context"
 	"fmt"
-	"strconv"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -29,6 +29,12 @@ type ingestrRunner interface {
 }
 
 type BasicOperator struct {
+	conn   connectionFetcher
+	runner ingestrRunner
+	finder repoFinder
+}
+
+type SeedOperator struct {
 	conn   connectionFetcher
 	runner ingestrRunner
 	finder repoFinder
@@ -134,18 +140,17 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		cmdArgs = append(cmdArgs, "--sql-backend", sqlBackend)
 	}
 
-	injectIntervals, ok := ti.GetAsset().Parameters["inject_intervals"]
-	if ok {
-		boolInject, err := strconv.ParseBool(injectIntervals)
-		if err != nil {
-			return errors.Wrap(err, "failed to parse inject_intervals")
+	if ctx.Value(pipeline.RunConfigStartDate) != nil {
+		startTimeInstance, okParse := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
+		if okParse {
+			cmdArgs = append(cmdArgs, "--interval-start", startTimeInstance.Format(time.RFC3339))
 		}
+	}
 
-		if boolInject {
-			startDateString := ctx.Value(pipeline.RunConfigStartDate).(time.Time).Format(time.RFC3339)
-			endDateString := ctx.Value(pipeline.RunConfigEndDate).(time.Time).Format(time.RFC3339)
-
-			cmdArgs = append(cmdArgs, "--interval-start", startDateString, "--interval-end", endDateString)
+	if ctx.Value(pipeline.RunConfigEndDate) != nil {
+		endTimeInstance, okParse := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
+		if okParse {
+			cmdArgs = append(cmdArgs, "--interval-end", endTimeInstance.Format(time.RFC3339))
 		}
 	}
 
@@ -168,6 +173,65 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	if strings.HasPrefix(sourceURI, "duckdb://") && sourceURI != destURI {
 		duck.LockDatabase(sourceURI)
 		defer duck.UnlockDatabase(sourceURI)
+	}
+
+	return o.runner.RunIngestr(ctx, cmdArgs, repo)
+}
+
+func NewSeedOperator(conn *connection.Manager) (*SeedOperator, error) {
+	uvRunner := &python.UvPythonRunner{
+		UvInstaller: &python.UvChecker{},
+		Cmd:         &python.CommandRunner{},
+	}
+
+	return &SeedOperator{conn: conn, runner: uvRunner, finder: &git.RepoFinder{}}, nil
+}
+
+func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	// Source connection
+	sourceConnectionPath, ok := ti.GetAsset().Parameters["path"]
+	if !ok {
+		return errors.New("source connection not configured")
+	}
+
+	sourceURI := "csv://" + filepath.Join(filepath.Dir(ti.GetAsset().ExecutableFile.Path), sourceConnectionPath)
+
+	destConnectionName, err := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
+	if err != nil {
+		return err
+	}
+
+	destConnection, err := o.conn.GetConnection(destConnectionName)
+	if err != nil {
+		return fmt.Errorf("destination connection %s not found", destConnectionName)
+	}
+
+	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
+	if err != nil {
+		return errors.New("could not get the source uri")
+	}
+
+	destTable := ti.GetAsset().Name
+
+	cmdArgs := []string{
+		"ingest",
+		"--source-uri",
+		sourceURI,
+		"--source-table",
+		"seed.raw",
+		"--dest-uri",
+		destURI,
+		"--dest-table",
+		destTable,
+		"--yes",
+		"--progress",
+		"log",
+	}
+
+	path := ti.GetAsset().ExecutableFile.Path
+	repo, err := o.finder.Repo(path)
+	if err != nil {
+		return errors.Wrap(err, "failed to find repo to run Ingestr")
 	}
 
 	return o.runner.RunIngestr(ctx, cmdArgs, repo)

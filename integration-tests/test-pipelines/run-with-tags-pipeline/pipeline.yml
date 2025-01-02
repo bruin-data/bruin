@@ -1,0 +1,5 @@
+name: run_with_tags
+
+default_connections:
+  duckdb: "duckdb-run-with-tags"
+  chess:  "chess-run-with-tags"

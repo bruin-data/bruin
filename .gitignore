@@ -140,6 +140,7 @@ glossary.yaml
 # pixi dev env 
 .pixi
 
+integration-tests/duckdb-files
 integration-tests/duckdb.db
 integration-tests/logs
 integration-tests/bruin

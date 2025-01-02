@@ -168,6 +168,14 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser sqlPa
 			Validator:        ValidateAssetDirectoryExist,
 			ApplicableLevels: []Level{LevelPipeline},
 		},
+		&SimpleRule{
+			Identifier:       "assets-seed-validation",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			Validator:        CallFuncForEveryAsset(ValidateAssetSeedValidation),
+			AssetValidator:   ValidateAssetSeedValidation,
+			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
+		},
 		UsedTableValidatorRule{
 			renderer: jinja.NewRendererWithYesterday("your-pipeline", "some-run-id"),
 			parser:   parser,

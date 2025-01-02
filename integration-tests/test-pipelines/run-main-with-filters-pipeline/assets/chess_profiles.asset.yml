@@ -1,0 +1,8 @@
+name: chess_playground.profiles
+type: ingestr
+parameters:
+  destination: duckdb
+  source_connection: chess-run-main-with-filters
+  source_table: profiles
+tags:
+    - include

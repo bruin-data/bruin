@@ -1,0 +1,5 @@
+name: run-main-with-downstream-pipeline
+
+default_connections:
+  duckdb: "duckdb-run-main-with-downstream"
+  chess:  "chess-run-main-with-downstream"

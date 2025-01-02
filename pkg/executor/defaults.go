@@ -27,6 +27,14 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 	"bq.sensor.partition": {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
+	pipeline.AssetTypeBigquerySource: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
+	pipeline.AssetTypeBigquerySeed: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
 	"gcs.from.s3": {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
@@ -80,6 +88,11 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
 	},
 	pipeline.AssetTypeDuckDBQuery: {
+		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
+	},
+	pipeline.AssetTypeDuckDBSeed: {
 		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
 		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
 		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
