@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/helpers"
@@ -48,6 +49,7 @@ func (s *Task) Run() error {
 				time.Sleep(1 * time.Second)
 				continue
 			}
+			fmt.Println("Command: ", s.Command, strings.Join(s.Args, " "))
 			return fmt.Errorf("assertion failed for task %s: %w", s.Name, err)
 		}
 		return nil
