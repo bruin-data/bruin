@@ -10,7 +10,7 @@ func TestValidateServiceAccountFile(t *testing.T) {
 	t.Parallel()
 
 	// Create a temporary file for testing.
-	tempFile, err := os.CreateTemp("", "service_account.json")
+	tempFile, err := os.CreateTemp(t.TempDir(), "service_account.json")
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestValidateServiceAccountFile(t *testing.T) {
 	}
 
 	// Test empty file.
-	emptyFile, err := os.CreateTemp("", "empty_file.json")
+	emptyFile, err := os.CreateTemp(t.TempDir(), "empty_file.json")
 	if err != nil {
 		t.Fatalf("failed to create empty temp file: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestValidateServiceAccountJSON(t *testing.T) {
 	}
 
 	// Test using a file path that exist
-	tempFile, err := os.CreateTemp("", "service_account.json")
+	tempFile, err := os.CreateTemp(t.TempDir(), "service_account.json")
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
