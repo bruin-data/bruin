@@ -1,7 +1,7 @@
 name: seed.raw
 type: duckdb.seed
 
-description: This asset manages the ingestion of Google Sheet data into BigQuery. It captures customer contact information including names, networking sources, job positions, and contact dates. The asset includes data quality checks to ensure critical fields like name, networking source, and position are properly populated.
+description: This asset loads a CSV file into a DuckDB database.
 columns:
   - name: name
     type: varchar

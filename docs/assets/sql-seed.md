@@ -1,7 +1,7 @@
-# SQL Seed Assets
-Bruin supports running SQL assets against a variety of data platforms natively. Along with SQL assets, Bruin also supports running SQL Seed assets that will populate a table with data from a csv file. 
+# Seed Assets
+Seeds are CSV-files that contain data that is prepared outside of your pipeline that will be loaded into your data platform. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the destination platform accurately.
 
-You can define SQL Seed assets in a file ending with `.yaml`:
+You can define seed assets in a file ending with `.yaml`:
 ```bruin-yaml
 name: dashboard.hello_bq
 type: duckdb.seed
@@ -13,6 +13,10 @@ parameters:
 The `type` key in the configuration defines what platform to run the query against. 
 
 You can see the "Data Platforms" on the left sidebar to see supported types.
+
+## Parameters
+
+The `parameters` key in the configuration defines the parameters for the seed asset. The `path` parameter is the path to the CSV file that will be loaded into the data platform. path is relative to the asset definition file.
 
 ##  Examples
 The examples below show how load a csv into a Duckdb & bigquery database.
