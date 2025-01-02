@@ -51,6 +51,8 @@ func TestValidateServiceAccountFile(t *testing.T) {
 		t.Fatalf("failed to create empty temp file: %v", err)
 	}
 	defer os.Remove(emptyFile.Name())
+	emptyFile.Close()
+
 	if err := validateServiceAccountFile(emptyFile.Name()); err == nil {
 		t.Error("expected error for empty file, got none")
 	}
@@ -111,6 +113,8 @@ func TestValidateServiceAccountJSON(t *testing.T) {
 	if _, err := tempFile.WriteString(validJSON); err != nil {
 		t.Fatalf("failed to write to temp file: %v", err)
 	}
+	tempFile.Close()
+
 	if err := validateServiceAccountJSON(tempFile.Name()); err == nil {
 		t.Error("expected error for file path, got none")
 	} else if err.Error() != "please use service_account_file instead of service_account_json to define path" {
