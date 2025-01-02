@@ -130,49 +130,27 @@ func main() {
 	binary := filepath.Join(wd, "bin", executable)
 
 	// Run workflows in parallel
-	runIntegrationWorkflows(binary, currentFolder)
+	runIntegrationWorkflow(binary, currentFolder)
 
 	// Run tasks in parallel
 	runIntegrationTasks(binary, currentFolder)
 }
 
-// runIntegrationWorkflows runs workflows concurrently but ensures sequential execution within each workflow.
-func runIntegrationWorkflows(binary string, currentFolder string) {
+func runIntegrationWorkflow(binary string, currentFolder string) {
 	tempfile, err := os.CreateTemp("", "bruin-test-continue")
 	if err != nil {
-		fmt.Println("failed to create temporary file:", err)
+		fmt.Println("Failed to create temporary file:", err)
 		os.Exit(1)
 	}
-	defer os.Remove(tempfile.Name())
 
 	workflows := getWorkflow(binary, currentFolder, tempfile.Name())
-	var wg sync.WaitGroup
-	errCh := make(chan error, len(workflows)) // Buffered channel to collect errors.
 
 	for _, workflow := range workflows {
-		wg.Add(1)
-		go func(w e2e.Workflow) {
-			defer wg.Done()
-			for _, step := range w.Steps {
-				if err := step.Run(); err != nil {
-					errCh <- fmt.Errorf("workflow %s, Step %s: %w", w.Name, step.Name, err)
-					return
-				}
-			}
-		}(workflow)
-	}
-
-	wg.Wait()
-	close(errCh)
-
-	// Collect and handle errors
-	for err := range errCh {
-		fmt.Println(err)
+		err := workflow.Run()
 		if err != nil {
-			fmt.Println("failed to create temporary file:", err)
-			return // Replace os.Exit(1) with return.
+			fmt.Printf("Assert error: %v\n", err)
+			os.Exit(1)
 		}
-		defer os.Remove(tempfile.Name())
 	}
 }
 
