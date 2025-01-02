@@ -786,7 +786,7 @@ func BenchmarkAssetMarshalJSON(b *testing.B) {
 	require.NoError(b, err)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range make([]struct{}, b.N) {
 		_, err := json.Marshal(got)
 		if err != nil {
 			b.Fatal(err)
@@ -892,7 +892,7 @@ func BenchmarkClearSpacesAtLineEndings(b *testing.B) {
 	GROUP BY 1
 	ORDER BY 2 DESC
 `
-	for i := 0; i < b.N; i++ {
+	for range make([]struct{}, b.N) {
 		pipeline.ClearSpacesAtLineEndings(content)
 	}
 }
