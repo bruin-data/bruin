@@ -168,7 +168,7 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 				{
 					Name:    "run first time",
 					Command: binary,
-					Args:    []string{"run", filepath.Join(currentFolder, "continue")},
+					Args:    []string{"run", "--start-date", "2024-01-01", "--end-date", "2024-12-31", filepath.Join(currentFolder, "continue")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -208,7 +208,7 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 				{
 					Name:    "run continue",
 					Command: binary,
-					Args:    []string{"run", "--continue", filepath.Join(currentFolder, "continue")},
+					Args:    []string{"run", "--start-date", "2024-01-01", "--end-date", "2024-12-31", "--continue", filepath.Join(currentFolder, "continue")},
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,
@@ -255,7 +255,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "run-with-tags",
 			Command: binary,
-			Args:    []string{"run", "--env", "env-run-with-tags", "--tag", "include", "--exclude-tag", "exclude", filepath.Join(currentFolder, "test-pipelines/run-with-tags-pipeline")},
+			Args:    []string{"run", "--env", "env-run-with-tags", "--tag", "include", "--exclude-tag", "exclude", "--start-date", "2024-01-01", "--end-date", "2024-12-31", filepath.Join(currentFolder, "test-pipelines/run-with-tags-pipeline")},
 			Env:     []string{},
 
 			Expected: e2e.Output{
@@ -268,7 +268,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "run-with-filters",
 			Command: binary,
-			Args:    []string{"run", "-env", "env-run-with-filters", "--tag", "include", "--exclude-tag", "exclude", filepath.Join(currentFolder, "test-pipelines/run-with-filters-pipeline")},
+			Args:    []string{"run", "-env", "env-run-with-filters", "--tag", "include", "--exclude-tag", "exclude", "--start-date", "2024-01-01", "--end-date", "2024-12-31", filepath.Join(currentFolder, "test-pipelines/run-with-filters-pipeline")},
 			Env:     []string{},
 
 			Expected: e2e.Output{
@@ -295,7 +295,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "run-main-with-filters",
 			Command: binary,
-			Args:    []string{"run", "--env", "env-run-main-with-filters", "--tag", "include", "--exclude-tag", "exclude", "--only", "main", filepath.Join(currentFolder, "test-pipelines/run-main-with-filters-pipeline")},
+			Args:    []string{"run", "--env", "env-run-main-with-filters", "--tag", "include", "--exclude-tag", "exclude", "--only", "main", "--start-date", "2024-01-01", "--end-date", "2024-12-31", filepath.Join(currentFolder, "test-pipelines/run-main-with-filters-pipeline")},
 			Env:     []string{},
 
 			Expected: e2e.Output{
