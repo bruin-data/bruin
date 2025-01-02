@@ -198,7 +198,6 @@ func (d *Client) UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipel
 	if asset.Description == "" && (len(asset.Columns) == 0 || !anyColumnHasDescription) {
 		return NoMetadataUpdatedError{}
 	}
-
 	tableComponents := strings.Split(asset.Name, ".")
 	if len(tableComponents) != 2 {
 		return fmt.Errorf("asset name must be in schema.table format to update the metadata, '%s' given", asset.Name)
@@ -228,7 +227,6 @@ func (d *Client) UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipel
 	if asset.Description != "" {
 		update.Description = asset.Description
 	}
-
 	primaryKeys := asset.ColumnNamesWithPrimaryKey()
 	if len(primaryKeys) > 0 {
 		update.TableConstraints = &bigquery.TableConstraints{
@@ -270,4 +268,65 @@ func (d *Client) Ping(ctx context.Context) error {
 	}
 
 	return nil // Return nil if the query runs successfully
+}
+
+func (d *Client) CompareTableClusteringAndPartitioning(ctx context.Context, tableName string, asset *pipeline.Asset) (mismatch bool, err error) {
+	tableComponents := strings.Split(tableName, ".")
+	if len(tableComponents) != 2 {
+		err = fmt.Errorf("table name must be in schema.table format, '%s' given", tableName)
+		return
+	}
+	tableRef := d.client.Dataset(tableComponents[0]).Table(tableComponents[1])
+	// Fetch table metadata
+	meta, err := tableRef.Metadata(ctx)
+	if err != nil {
+		err = fmt.Errorf("failed to fetch metadata for table '%s': %w", tableName, err)
+		return
+	}
+	partitioningMismatch := comparePartitioning(meta, asset)
+	clusteringMismatch := compareClustering(meta, asset)
+
+	// Return whether there's a mismatch
+	mismatch = partitioningMismatch || clusteringMismatch
+	return
+}
+
+func comparePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
+	if meta.TimePartitioning != nil {
+		if meta.TimePartitioning.Field != asset.Materialization.PartitionBy {
+			fmt.Printf("Mismatch in time partitioning field: BigQuery=%s, User=%s\n", meta.TimePartitioning.Field, asset.Materialization.PartitionBy)
+			return true
+		}
+	} else if asset.Materialization.PartitionBy != "" {
+		fmt.Printf("User provided time partitioning, but none found in BigQuery.\n")
+		return true
+	}
+	if meta.RangePartitioning != nil {
+		if meta.RangePartitioning.Field != asset.Materialization.PartitionBy {
+			fmt.Printf("Mismatch in range partitioning field: BigQuery=%s, User=%s\n", meta.RangePartitioning.Field, asset.Materialization.PartitionBy)
+			return true
+		}
+	} else if asset.Materialization.PartitionBy != "" {
+		fmt.Printf("User provided range partitioning, but none found in BigQuery.\n")
+		return true
+	}
+
+	return false
+}
+
+func compareClustering(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
+	bigQueryFields := meta.Clustering.Fields
+	userFields := asset.Materialization.ClusterBy
+	if len(bigQueryFields) != len(userFields) {
+		fmt.Printf("Mismatch in clustering fields length: BigQuery=%v, User=%v\n", bigQueryFields, userFields)
+		return true
+	}
+	for i := range bigQueryFields {
+		if bigQueryFields[i] != userFields[i] {
+			fmt.Printf("Mismatch in clustering fields: BigQuery=%v, User=%v\n", bigQueryFields, userFields)
+			return true
+		}
+	}
+
+	return false
 }
