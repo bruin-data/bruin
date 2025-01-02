@@ -280,7 +280,7 @@ func (m Materialization) MarshalJSON() ([]byte, error) {
 	})
 }
 
-type ColumnCheckValue struct {
+type ColumnCheckValue struct { //nolint: recvcheck
 	IntArray    *[]int    `json:"int_array"`
 	Int         *int      `json:"int"`
 	Float       *float64  `json:"float"`
@@ -875,7 +875,7 @@ func uniqueAssets(assets []*Asset) []*Asset {
 	return unique
 }
 
-type EmptyStringMap map[string]string
+type EmptyStringMap map[string]string //nolint: recvcheck
 
 func (m EmptyStringMap) MarshalJSON() ([]byte, error) { //nolint: stylecheck
 	if m == nil {
@@ -903,7 +903,7 @@ func (b *EmptyStringMap) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type EmptyStringArray []string
+type EmptyStringArray []string //nolint: recvcheck
 
 func (a EmptyStringArray) MarshalJSON() ([]byte, error) {
 	if a == nil {

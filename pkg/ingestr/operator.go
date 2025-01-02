@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -141,18 +140,17 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		cmdArgs = append(cmdArgs, "--sql-backend", sqlBackend)
 	}
 
-	injectIntervals, ok := ti.GetAsset().Parameters["inject_intervals"]
-	if ok {
-		boolInject, err := strconv.ParseBool(injectIntervals)
-		if err != nil {
-			return errors.Wrap(err, "failed to parse inject_intervals")
+	if ctx.Value(pipeline.RunConfigStartDate) != nil {
+		startTimeInstance, okParse := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
+		if okParse {
+			cmdArgs = append(cmdArgs, "--interval-start", startTimeInstance.Format(time.RFC3339))
 		}
+	}
 
-		if boolInject {
-			startDateString := ctx.Value(pipeline.RunConfigStartDate).(time.Time).Format(time.RFC3339)
-			endDateString := ctx.Value(pipeline.RunConfigEndDate).(time.Time).Format(time.RFC3339)
-
-			cmdArgs = append(cmdArgs, "--interval-start", startDateString, "--interval-end", endDateString)
+	if ctx.Value(pipeline.RunConfigEndDate) != nil {
+		endTimeInstance, okParse := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
+		if okParse {
+			cmdArgs = append(cmdArgs, "--interval-end", endTimeInstance.Format(time.RFC3339))
 		}
 	}
 
