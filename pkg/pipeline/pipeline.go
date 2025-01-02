@@ -31,7 +31,9 @@ const (
 	AssetTypeBigqueryTableSensor  = AssetType("bq.sensor.table")
 	AssetTypeBigqueryQuerySensor  = AssetType("bq.sensor.query")
 	AssetTypeBigquerySource       = AssetType("bq.source")
+	AssetTypeBigquerySeed         = AssetType("bq.seed")
 	AssetTypeDuckDBQuery          = AssetType("duckdb.sql")
+	AssetTypeDuckDBSeed           = AssetType("duckdb.seed")
 	AssetTypeEmpty                = AssetType("empty")
 	AssetTypePostgresQuery        = AssetType("pg.sql")
 	AssetTypeRedshiftQuery        = AssetType("rs.sql")
@@ -270,7 +272,8 @@ func (m Materialization) MarshalJSON() ([]byte, error) {
 	})
 }
 
-type ColumnCheckValue struct {
+
+type ColumnCheckValue struct { //nolint: recvcheck
 	IntArray    *[]int    `json:"int_array"`
 	Int         *int      `json:"int"`
 	Float       *float64  `json:"float"`
@@ -451,6 +454,7 @@ type AssetType string
 var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeBigqueryQuery:        "google_cloud_platform",
 	AssetTypeBigqueryTableSensor:  "google_cloud_platform",
+	AssetTypeBigquerySeed:         "google_cloud_platform",
 	AssetTypeBigquerySource:       "google_cloud_platform",
 	AssetTypeSnowflakeQuery:       "snowflake",
 	AssetTypeSnowflakeQuerySensor: "snowflake",
@@ -461,6 +465,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeSynapseQuery:         "synapse",
 	AssetTypeAthenaQuery:          "athena",
 	AssetTypeDuckDBQuery:          "duckdb",
+	AssetTypeDuckDBSeed:           "duckdb",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -856,7 +861,8 @@ func uniqueAssets(assets []*Asset) []*Asset {
 	return unique
 }
 
-type EmptyStringMap map[string]string
+
+type EmptyStringMap map[string]string //nolint: recvcheck
 
 func (m EmptyStringMap) MarshalJSON() ([]byte, error) { //nolint: stylecheck
 	if m == nil {
@@ -884,8 +890,8 @@ func (b *EmptyStringMap) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type EmptyStringArray []string
 
+type EmptyStringArray []string //nolint: recvcheck
 func (a EmptyStringArray) MarshalJSON() ([]byte, error) {
 	if a == nil {
 		return []byte{'[', ']'}, nil
