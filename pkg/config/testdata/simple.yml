@@ -181,6 +181,11 @@ environments:
           access_key_id: "access-key-786"
           secret_access_key: "shhh,secret"
           region: "ap-south-1"
+      googleads:
+        - name: googleads-0
+          dev_token: dev-0
+          customer_id: "1234567890"
+          service_account_json: '{"email": "no-reply@googleads-0.com"}'
       generic:
         - name: key1
           value: value1
