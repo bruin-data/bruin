@@ -203,7 +203,7 @@ func (d *Client) getTableRef(tableName string) (*bigquery.Table, error) {
 	if len(tableComponents) == 3 {
 		return d.client.DatasetInProject(tableComponents[0], tableComponents[1]).Table(tableComponents[2]), nil
 	} else if len(tableComponents) == 2 {
-		return d.client.Dataset(tableComponents[0]).Table(tableComponents[1]), nil
+		return d.client.DatasetInProject(d.config.ProjectID, tableComponents[0]).Table(tableComponents[1]), nil
 	}
 	return nil, fmt.Errorf("table name must be in dataset.table or project.dataset.table format, '%s' given", tableName)
 }
