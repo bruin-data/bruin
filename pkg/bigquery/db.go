@@ -351,8 +351,8 @@ func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) boo
 	if meta.RangePartitioning != nil {
 		if meta.RangePartitioning.Field != asset.Materialization.PartitionBy {
 			fmt.Printf(
-				"Mismatch detected: Your table has a range partitioning strategy with the field '%s', "+
-					"but you are attempting to use the field '%s'. Your table will be dropped and recreated.\n", meta.RangePartitioning.Field,
+				"Mismatch detected: Your table has a range partitioning strategy with the field '%s',"+
+					"but you are attempting to use the field '%s'.Your table will be dropped and recreated.\n", meta.RangePartitioning.Field,
 				asset.Materialization.PartitionBy,
 			)
 			return false
@@ -367,9 +367,9 @@ func IsSameClustering(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool 
 
 	if len(bigQueryFields) != len(userFields) {
 		fmt.Printf(
-			"Mismatch detected: Your table has %d clustering fields (%v), but you are trying to use %d fields (%v). "+
+			"Mismatch detected: Your table has the  clustering fields (%v), but you are trying to use the fields (%v). "+
 				"Your table will be dropped and recreated.\n",
-			len(bigQueryFields), bigQueryFields, len(userFields), userFields,
+			bigQueryFields, userFields,
 		)
 		return false
 	}
