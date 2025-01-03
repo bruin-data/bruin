@@ -31,13 +31,17 @@ type Selector interface {
 
 type MetadataUpdater interface {
 	UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipeline.Asset) error
-	DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) (err error)
+}
+
+type TableManager interface {
+	DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error
 }
 
 type DB interface {
 	Querier
 	Selector
 	MetadataUpdater
+	TableManager
 }
 
 type Client struct {
@@ -271,45 +275,51 @@ func (d *Client) Ping(ctx context.Context) error {
 	return nil // Return nil if the query runs successfully
 }
 
-func (d *Client) DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) (err error) {
+func (d *Client) DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
 	tableComponents := strings.Split(tableName, ".")
 	if len(tableComponents) != 2 {
-		err = fmt.Errorf("table name must be in schema.table format, '%s' given", tableName)
-		return
+		return fmt.Errorf("table name must be in schema.table format, '%s' given", tableName)
 	}
+
 	tableRef := d.client.Dataset(tableComponents[0]).Table(tableComponents[1])
+
 	// Fetch table metadata
 	meta, err := tableRef.Metadata(ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to fetch metadata for table '%s': %w", tableName, err)
-		return
+		return fmt.Errorf("failed to fetch metadata for table '%s': %w", tableName, err)
 	}
+
 	// Check if partitioning or clustering exists in metadata
 	hasPartitioning := meta.TimePartitioning != nil || meta.RangePartitioning != nil
 	hasClustering := meta.Clustering != nil && len(meta.Clustering.Fields) > 0
+
 	// If neither partitioning nor clustering exists, do nothing
 	if !hasPartitioning && !hasClustering {
-		return
+		return nil
 	}
+
 	partitioningMismatch := false
 	clusteringMismatch := false
+
 	if hasPartitioning {
 		partitioningMismatch = !IsSamePartitioning(meta, asset)
 	}
+
 	if hasClustering {
 		clusteringMismatch = !IsSameClustering(meta, asset)
 	}
+
 	mismatch := partitioningMismatch || clusteringMismatch
 	if mismatch {
-		err = tableRef.Delete(ctx)
-		if err != nil {
-			err = fmt.Errorf("failed to delete table '%s': %w", tableName, err)
-			return
+		if err := tableRef.Delete(ctx); err != nil {
+			return fmt.Errorf("failed to delete table '%s': %w", tableName, err)
 		}
+
 		fmt.Printf("Table '%s' deleted successfully.\n", tableName)
 		fmt.Printf("Recreating the table with the new clustering and partitioning strategies...\n")
 	}
-	return
+
+	return nil
 }
 
 func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
