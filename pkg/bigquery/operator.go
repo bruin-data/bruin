@@ -14,6 +14,7 @@ import (
 
 type materializer interface {
 	Render(task *pipeline.Asset, query string) (string, error)
+	IsFullRefresh() bool
 }
 
 type queryExtractor interface {
@@ -56,7 +57,6 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if len(queries) > 1 && t.Materialization.Type != pipeline.MaterializationTypeNone {
 		return errors.New("cannot enable materialization for tasks with multiple queries")
 	}
-
 	q := queries[0]
 	materialized, err := o.materializer.Render(t, q.String())
 	if err != nil {
@@ -73,6 +73,12 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	conn, err := o.connection.GetBqConnection(connName)
 	if err != nil {
 		return err
+	}
+	if o.materializer.IsFullRefresh() {
+		err = conn.DeleteTableIfPartitioningOrClusteringMismatch(ctx, t.Name, t)
+		if err != nil {
+			return errors.Wrap(err, "failed to compare clustering and partitioning metadata")
+		}
 	}
 
 	return conn.RunQueryWithoutResult(ctx, q)

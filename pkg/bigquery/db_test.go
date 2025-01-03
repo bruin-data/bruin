@@ -22,6 +22,8 @@ import (
 	"google.golang.org/api/option"
 )
 
+const testProjectID = "test-project"
+
 func TestDB_IsValid(t *testing.T) {
 	t.Parallel()
 
@@ -121,10 +123,10 @@ func TestDB_IsValid(t *testing.T) {
 
 			client, err := bigquery.NewClient(
 				context.Background(),
-				"some-project-id",
+				testProjectID,
 				option.WithEndpoint(server.URL),
 				option.WithCredentials(&google.Credentials{
-					ProjectID: "some-project-id",
+					ProjectID: testProjectID,
 					TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
 						AccessToken: "some-token",
 					}),
@@ -150,7 +152,7 @@ func TestDB_IsValid(t *testing.T) {
 func TestDB_RunQueryWithoutResult(t *testing.T) {
 	t.Parallel()
 
-	projectID := "test-project"
+	projectID := testProjectID
 	jobID := "test-job"
 
 	tests := []struct {
@@ -308,7 +310,7 @@ func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse,
 func TestDB_Select(t *testing.T) {
 	t.Parallel()
 
-	projectID := "test-project"
+	projectID := testProjectID
 	jobID := "test-job"
 
 	tests := []struct {
@@ -469,7 +471,7 @@ func TestDB_Select(t *testing.T) {
 func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 	t.Parallel()
 
-	projectID := "test-project"
+	projectID := testProjectID
 	schema := "myschema"
 	table := "mytable"
 	assetName := fmt.Sprintf("%s.%s", schema, table)
@@ -636,7 +638,12 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 			require.NoError(t, err)
 			client.Location = "US"
 
-			d := Client{client: client}
+			d := Client{
+				client: client,
+				config: &Config{
+					ProjectID: projectID,
+				},
+			}
 
 			err = d.UpdateTableMetadataIfNotExist(context.Background(), tt.asset)
 			if tt.err == nil {
@@ -651,7 +658,7 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 func TestDB_SelectWithSchema(t *testing.T) {
 	t.Parallel()
 
-	projectID := "test-project"
+	projectID := testProjectID
 	jobID := "test-job"
 
 	tests := []struct {
@@ -807,6 +814,446 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			} else {
 				assert.EqualError(t, err, tt.err.Error())
 			}
+		})
+	}
+}
+
+func TestClient_getTableRef(t *testing.T) {
+	t.Parallel()
+
+	projectID := testProjectID
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	tests := []struct {
+		name        string
+		tableName   string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:      "valid two-part table name",
+			tableName: "dataset.table",
+			wantErr:   false,
+		},
+		{
+			name:      "valid three-part table name",
+			tableName: "project.dataset.table",
+			wantErr:   false,
+		},
+		{
+			name:        "invalid one-part table name",
+			tableName:   "table",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "invalid four-part table name",
+			tableName:   "a.b.c.d",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "empty table name",
+			tableName:   "",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "invalid trailing dot",
+			tableName:   "dataset.table.",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "invalid leading dot",
+			tableName:   ".dataset.table",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "invalid consecutive dots",
+			tableName:   "project..table",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "only dots",
+			tableName:   "..",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "three dots",
+			tableName:   "...",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			client, err := bigquery.NewClient(
+				context.Background(),
+				projectID,
+				option.WithEndpoint(srv.URL),
+				option.WithCredentials(&google.Credentials{
+					ProjectID: projectID,
+					TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+						AccessToken: "some-token",
+					}),
+				}),
+			)
+			require.NoError(t, err)
+
+			d := Client{
+				client: client,
+				config: &Config{
+					ProjectID: projectID,
+				},
+			}
+
+			tableRef, err := d.getTableRef(tt.tableName)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				assert.Nil(t, tableRef)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, tableRef)
+
+			// For two-part names, verify the table and dataset
+			if strings.Count(tt.tableName, ".") == 1 {
+				parts := strings.Split(tt.tableName, ".")
+				assert.Equal(t, parts[0], tableRef.DatasetID)
+				assert.Equal(t, parts[1], tableRef.TableID)
+				assert.Equal(t, projectID, tableRef.ProjectID)
+			}
+
+			// For three-part names, verify project, dataset and table
+			if strings.Count(tt.tableName, ".") == 2 {
+				parts := strings.Split(tt.tableName, ".")
+				assert.Equal(t, parts[0], tableRef.ProjectID)
+				assert.Equal(t, parts[1], tableRef.DatasetID)
+				assert.Equal(t, parts[2], tableRef.TableID)
+			}
+		})
+	}
+}
+
+func TestClient_getTableRef_TableNameValidation(t *testing.T) {
+	t.Parallel()
+
+	projectID := "test-project"
+	client := &Client{
+		client: &bigquery.Client{},
+		config: &Config{
+			ProjectID: projectID,
+		},
+	}
+
+	tests := []struct {
+		name        string
+		tableName   string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:      "valid two-part table name",
+			tableName: "dataset.table",
+			wantErr:   false,
+		},
+		{
+			name:      "valid three-part table name",
+			tableName: "project.dataset.table",
+			wantErr:   false,
+		},
+		{
+			name:        "invalid one-part table name",
+			tableName:   "table",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "invalid four-part table name",
+			tableName:   "a.b.c.d",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "empty table name",
+			tableName:   "",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "invalid trailing dot",
+			tableName:   "dataset.table.",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "invalid leading dot",
+			tableName:   ".dataset.table",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "invalid consecutive dots",
+			tableName:   "project..table",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "only dots",
+			tableName:   "..",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "three dots",
+			tableName:   "...",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tableRef, err := client.getTableRef(tt.tableName)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				assert.Nil(t, tableRef)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, tableRef)
+
+			// For two-part names, verify the table and dataset
+			if strings.Count(tt.tableName, ".") == 1 {
+				parts := strings.Split(tt.tableName, ".")
+				assert.Equal(t, parts[0], tableRef.DatasetID)
+				assert.Equal(t, parts[1], tableRef.TableID)
+				assert.Equal(t, projectID, tableRef.ProjectID)
+			}
+
+			// For three-part names, verify project, dataset and table
+			if strings.Count(tt.tableName, ".") == 2 {
+				parts := strings.Split(tt.tableName, ".")
+				assert.Equal(t, parts[0], tableRef.ProjectID)
+				assert.Equal(t, parts[1], tableRef.DatasetID)
+				assert.Equal(t, parts[2], tableRef.TableID)
+			}
+		})
+	}
+}
+
+func TestIsSamePartitioning(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		meta     *bigquery.TableMetadata
+		asset    *pipeline.Asset
+		expected bool
+	}{
+		{
+			name: "matching time partitioning",
+			meta: &bigquery.TableMetadata{
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field: "date_field",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "date_field",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "mismatched time partitioning",
+			meta: &bigquery.TableMetadata{
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field: "date_field",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "other_field",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "matching range partitioning",
+			meta: &bigquery.TableMetadata{
+				RangePartitioning: &bigquery.RangePartitioning{
+					Field: "id_field",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "id_field",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "mismatched range partitioning",
+			meta: &bigquery.TableMetadata{
+				RangePartitioning: &bigquery.RangePartitioning{
+					Field: "id_field",
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "other_field",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "no partitioning in metadata but asset wants it",
+			meta: &bigquery.TableMetadata{},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "some_field",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "no partitioning in metadata and asset doesn't want it",
+			meta: &bigquery.TableMetadata{},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "",
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := IsSamePartitioning(tt.meta, tt.asset)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestIsSameClustering(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		meta     *bigquery.TableMetadata
+		asset    *pipeline.Asset
+		expected bool
+	}{
+		{
+			name: "matching single field clustering",
+			meta: &bigquery.TableMetadata{
+				Clustering: &bigquery.Clustering{
+					Fields: []string{"field1"},
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					ClusterBy: []string{"field1"},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "matching multiple fields clustering",
+			meta: &bigquery.TableMetadata{
+				Clustering: &bigquery.Clustering{
+					Fields: []string{"field1", "field2", "field3"},
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					ClusterBy: []string{"field1", "field2", "field3"},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "different number of clustering fields",
+			meta: &bigquery.TableMetadata{
+				Clustering: &bigquery.Clustering{
+					Fields: []string{"field1", "field2"},
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					ClusterBy: []string{"field1"},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "different field order",
+			meta: &bigquery.TableMetadata{
+				Clustering: &bigquery.Clustering{
+					Fields: []string{"field1", "field2"},
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					ClusterBy: []string{"field2", "field1"},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "different field names",
+			meta: &bigquery.TableMetadata{
+				Clustering: &bigquery.Clustering{
+					Fields: []string{"field1", "field2"},
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					ClusterBy: []string{"field1", "field3"},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "empty clustering fields in both",
+			meta: &bigquery.TableMetadata{
+				Clustering: &bigquery.Clustering{
+					Fields: []string{},
+				},
+			},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					ClusterBy: []string{},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := IsSameClustering(tt.meta, tt.asset)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

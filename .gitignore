@@ -147,3 +147,4 @@ integration-tests/bruin
 !integration-tests/.bruin.yml
 
 venv
+logs/runs
