@@ -123,10 +123,10 @@ func TestDB_IsValid(t *testing.T) {
 
 			client, err := bigquery.NewClient(
 				context.Background(),
-				"some-project-id",
+				testProjectID,
 				option.WithEndpoint(server.URL),
 				option.WithCredentials(&google.Credentials{
-					ProjectID: "some-project-id",
+					ProjectID: testProjectID,
 					TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
 						AccessToken: "some-token",
 					}),
@@ -152,7 +152,7 @@ func TestDB_IsValid(t *testing.T) {
 func TestDB_RunQueryWithoutResult(t *testing.T) {
 	t.Parallel()
 
-	projectID := "test-project"
+	projectID := testProjectID
 	jobID := "test-job"
 
 	tests := []struct {
@@ -310,7 +310,7 @@ func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse,
 func TestDB_Select(t *testing.T) {
 	t.Parallel()
 
-	projectID := "test-project"
+	projectID := testProjectID
 	jobID := "test-job"
 
 	tests := []struct {
@@ -471,7 +471,7 @@ func TestDB_Select(t *testing.T) {
 func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 	t.Parallel()
 
-	projectID := "test-project"
+	projectID := testProjectID
 	schema := "myschema"
 	table := "mytable"
 	assetName := fmt.Sprintf("%s.%s", schema, table)
@@ -638,7 +638,12 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 			require.NoError(t, err)
 			client.Location = "US"
 
-			d := Client{client: client}
+			d := Client{
+				client: client,
+				config: &Config{
+					ProjectID: projectID,
+				},
+			}
 
 			err = d.UpdateTableMetadataIfNotExist(context.Background(), tt.asset)
 			if tt.err == nil {
@@ -653,7 +658,7 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 func TestDB_SelectWithSchema(t *testing.T) {
 	t.Parallel()
 
-	projectID := "test-project"
+	projectID := testProjectID
 	jobID := "test-job"
 
 	tests := []struct {
@@ -905,7 +910,12 @@ func TestClient_getTableRef(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			d := Client{client: client}
+			d := Client{
+				client: client,
+				config: &Config{
+					ProjectID: projectID,
+				},
+			}
 
 			tableRef, err := d.getTableRef(tt.tableName)
 			if tt.wantErr {
@@ -1015,7 +1025,6 @@ func TestClient_getTableRef_TableNameValidation(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1127,7 +1136,6 @@ func TestIsSamePartitioning(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			result := IsSamePartitioning(tt.meta, tt.asset)
@@ -1232,7 +1240,6 @@ func TestIsSameClustering(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			result := IsSameClustering(tt.meta, tt.asset)
