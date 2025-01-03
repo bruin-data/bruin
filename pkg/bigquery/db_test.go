@@ -1124,11 +1124,21 @@ func TestIsSamePartitioning(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "no partitioning in metadata",
+			name: "no partitioning in metadata but asset wants it",
 			meta: &bigquery.TableMetadata{},
 			asset: &pipeline.Asset{
 				Materialization: pipeline.Materialization{
 					PartitionBy: "some_field",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "no partitioning in metadata and asset doesn't want it",
+			meta: &bigquery.TableMetadata{},
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{
+					PartitionBy: "",
 				},
 			},
 			expected: true,
