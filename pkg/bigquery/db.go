@@ -315,7 +315,7 @@ func (d *Client) DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Conte
 			return fmt.Errorf("failed to delete table '%s': %w", tableName, err)
 		}
 
-		fmt.Printf("Table '%s' deleted successfully.\n", tableName)
+		fmt.Printf("Table '%s' dropped successfully.\n", tableName)
 		fmt.Printf("Recreating the table with the new clustering and partitioning strategies...\n")
 	}
 
