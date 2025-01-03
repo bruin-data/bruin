@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sync"
 
 	"github.com/bruin-data/bruin/pkg/e2e"
 	"github.com/bruin-data/bruin/pkg/helpers"
@@ -129,11 +128,8 @@ func main() {
 	wd, _ := os.Getwd()
 	binary := filepath.Join(wd, "bin", executable)
 
-	// Run workflows in parallel
+	runIntegrationTests(binary, currentFolder)
 	runIntegrationWorkflow(binary, currentFolder)
-
-	// Run tasks in parallel
-	runIntegrationTasks(binary, currentFolder)
 }
 
 func runIntegrationWorkflow(binary string, currentFolder string) {
@@ -154,33 +150,16 @@ func runIntegrationWorkflow(binary string, currentFolder string) {
 	}
 }
 
-// runIntegrationTasks runs tasks concurrently.
-func runIntegrationTasks(binary string, currentFolder string) {
+func runIntegrationTests(binary string, currentFolder string) {
 	tests := getTasks(binary, currentFolder)
-	var wg sync.WaitGroup
-	errCh := make(chan error, len(tests)) // Buffered channel to collect errors.
-
 	for _, test := range tests {
-		wg.Add(1)
-		go func(t e2e.Task) {
-			defer wg.Done()
-			if err := t.Run(); err != nil {
-				errCh <- fmt.Errorf("task %s: %w", t.Name, err)
-			}
-		}(test)
-	}
-
-	wg.Wait()
-	close(errCh)
-
-	// Collect and handle errors
-	for err := range errCh {
-		fmt.Println(err)
-		os.Exit(1)
+		if err := test.Run(); err != nil {
+			fmt.Printf("%s Assert error: %v\n", test.Name, err)
+			os.Exit(1)
+		}
 	}
 }
 
-// getWorkflow defines workflows and ensures sequential execution within steps.
 func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Workflow {
 	return []e2e.Workflow{
 		{
@@ -191,6 +170,7 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 					Command: binary,
 					Args:    []string{"run", "--start-date", "2024-01-01", "--end-date", "2024-12-31", filepath.Join(currentFolder, "continue")},
 					Env:     []string{},
+
 					Expected: e2e.Output{
 						ExitCode: 1,
 					},
@@ -204,6 +184,7 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 					Command: "cp",
 					Args:    []string{filepath.Join(currentFolder, "continue/assets/player_summary.sql"), tempfile},
 					Env:     []string{},
+
 					Expected: e2e.Output{
 						ExitCode: 0,
 					},
@@ -216,6 +197,7 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 					Command: "cp",
 					Args:    []string{filepath.Join(currentFolder, "player_summary.sql"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")},
 					Env:     []string{},
+
 					Expected: e2e.Output{
 						ExitCode: 0,
 					},
@@ -252,6 +234,7 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 		},
 	}
 }
+
 func getTasks(binary string, currentFolder string) []e2e.Task {
 	return []e2e.Task{
 		{
@@ -558,7 +541,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "run-seed-data",
 			Command: binary,
-			Args:    []string{"run --env env-run-seed-data", filepath.Join(currentFolder, "test-pipelines/run-seed-data/assets/seed.asset.yml")},
+			Args:    []string{"run", "--env", "env-run-seed-data", filepath.Join(currentFolder, "test-pipelines/run-seed-data/assets/seed.asset.yml")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
@@ -567,6 +550,21 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
 				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:          "parse-asset-seed-data",
+			Command:       binary,
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/run-seed-data/assets/seed.asset.yml")},
+			Env:           []string{},
+			SkipJSONNodes: []string{"\"path\""},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/run-seed-data/expectations/seed.asset.yml.json")),
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJSON,
 			},
 		},
 	}
