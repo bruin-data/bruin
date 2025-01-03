@@ -116,7 +116,7 @@
     },
     "default_parameters": {},
     "default_connections": {
-      "duckdb": "duckdb-default"
+      "duckdb": "duckdb-run-seed-data"
     },
     "assets": [
       {

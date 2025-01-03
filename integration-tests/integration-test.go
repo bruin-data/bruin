@@ -541,7 +541,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "run-seed-data",
 			Command: binary,
-			Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/run-seed-data/assets/seed.asset.yml")},
+			Args:    []string{"run", "--env", "env-run-seed-data", filepath.Join(currentFolder, "test-pipelines/run-seed-data/assets/seed.asset.yml")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
