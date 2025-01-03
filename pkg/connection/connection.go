@@ -17,6 +17,7 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/dynamodb"
 	"github.com/bruin-data/bruin/pkg/facebookads"
+	"github.com/bruin-data/bruin/pkg/googleads"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/gsheets"
 	"github.com/bruin-data/bruin/pkg/hana"
@@ -69,6 +70,7 @@ type Manager struct {
 	Asana        map[string]*asana.Client
 	DynamoDB     map[string]*dynamodb.Client
 	Zendesk      map[string]*zendesk.Client
+	GoogleAds    map[string]*googleads.Client
 	mutex        sync.Mutex
 }
 
@@ -243,6 +245,13 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connZendesk, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Zendesk)...)
+
+	connGoogleAds, err := m.GetGoogleAdsConnectionWithoutDefault(name)
+	if err == nil {
+		return connGoogleAds, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GoogleAds)...)
+
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
 
@@ -834,6 +843,25 @@ func (m *Manager) GetDynamoDBConnectionWithoutDefault(name string) (*dynamodb.Cl
 	db, ok := m.DynamoDB[name]
 	if !ok {
 		return nil, errors.Errorf("dynamodb connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetGoogleAdsConnection(name string) (*googleads.Client, error) {
+	db, err := m.GetGoogleAdsConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetGoogleAdsConnectionWithoutDefault("googleads-default")
+}
+
+func (m *Manager) GetGoogleAdsConnectionWithoutDefault(name string) (*googleads.Client, error) {
+	if m.GoogleAds == nil {
+		return nil, errors.New("no googleads connections found")
+	}
+	db, ok := m.GoogleAds[name]
+	if !ok {
+		return nil, errors.Errorf("googleads connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -1565,6 +1593,26 @@ func (m *Manager) AddDynamoDBConnectionFromConfig(connection *config.DynamoDBCon
 	return nil
 }
 
+func (m *Manager) AddGoogleAdsConnectionFromConfig(connection *config.GoogleAdsConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.GoogleAds == nil {
+		m.GoogleAds = make(map[string]*googleads.Client)
+	}
+
+	client, err := googleads.NewClient(googleads.Config{
+		CustomerID:         connection.CustomerID,
+		DeveloperToken:     connection.DeveloperToken,
+		ServiceAccountFile: connection.ServiceAccountFile,
+		ServiceAccountJSON: connection.ServiceAccountJSON,
+	})
+	if err != nil {
+		return err
+	}
+	m.GoogleAds[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddZendeskConnectionFromConfig(connection *config.ZendeskConnection) error {
 	m.mutex.Lock()
 	if m.Zendesk == nil {
@@ -1888,6 +1936,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			err := connectionManager.AddZendeskConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add zendesk connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.GoogleAds {
+		wg.Go(func() {
+			err := connectionManager.AddGoogleAdsConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add googleads connection '%s'", conn.Name))
 			}
 		})
 	}

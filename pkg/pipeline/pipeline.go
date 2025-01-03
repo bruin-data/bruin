@@ -82,6 +82,7 @@ var defaultMapping = map[string]string{
 	"slack":                 "slack-default",
 	"asana":                 "asana-default",
 	"dynamodb":              "dynamodb-default",
+	"googleads":             "googleads-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}
