@@ -43,7 +43,6 @@ const (
 	AssetTypeAthenaQuery          = AssetType("athena.sql")
 	AssetTypeAthenaSQLSensor      = AssetType("athena.sensor.query")
 	AssetTypeAthenaSeed           = AssetType("athena.seed")
-	AssetTypeAthenaSensor         = AssetType("athena.sensor")
 	AssetTypeMsSQLQuery           = AssetType("ms.sql")
 	AssetTypeMsSQLSeed            = AssetType("ms.seed")
 	AssetTypeDatabricksQuery      = AssetType("databricks.sql")

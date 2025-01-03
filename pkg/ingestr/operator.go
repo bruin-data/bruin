@@ -234,7 +234,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		"--progress",
 		"log",
 	}
-	fmt.Println(strings.Join(cmdArgs, " "))
+
 	path := ti.GetAsset().ExecutableFile.Path
 	repo, err := o.finder.Repo(path)
 	if err != nil {

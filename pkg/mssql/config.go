@@ -36,7 +36,7 @@ func (c *Config) GetIngestrURI() string {
 		User:     url.UserPassword(c.Username, c.Password),
 		Host:     fmt.Sprintf("%s:%d", c.Host, c.Port),
 		Path:     c.Database,
-		RawQuery: "trust_server_certificate=yes&driver=ODBC+Driver+18+for+SQL+Server",
+		RawQuery: "TrustServerCertificate=yes&driver=ODBC+Driver+18+for+SQL+Server",
 	}
 
 	return u.String()
