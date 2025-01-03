@@ -52,13 +52,21 @@ func CreateTaskFromFileComments(fs afero.Fs) TaskCreator {
 func isEmbeddedYamlComment(file afero.File, prefixes []string) bool {
 	scanner := bufio.NewScanner(file)
 	defer func() { _, _ = file.Seek(0, io.SeekStart) }()
-	scanner.Scan()
-	rowText := scanner.Text()
-
-	for _, prefix := range prefixes {
-		if strings.HasPrefix(rowText, prefix) {
-			return true
+	for scanner.Scan() {
+		rowText := scanner.Text()
+		if rowText == "" || strings.TrimSpace(rowText) == "" {
+			continue
 		}
+
+		// find the first non-empty row, if it contains the prefix, return true
+		for _, prefix := range prefixes {
+			if strings.HasPrefix(strings.TrimSpace(rowText), prefix) {
+				return true
+			}
+		}
+
+		// if the first non-empty row doesn't contain the prefix, return false
+		return false
 	}
 
 	return false
