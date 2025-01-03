@@ -176,6 +176,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE TABLE x AS select * from users"}).
 					Return(nil)
+				f.m.On("IsFullRefresh").Return(false)
 			},
 			args: args{
 				t: &pipeline.Asset{
@@ -198,7 +199,6 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			mat := new(mockMaterializer)
 			conn := new(mockConnectionFetcher)
 			conn.On("GetBqConnection", "gcp-default").Return(client, nil)
-
 			if tt.setup != nil {
 				tt.setup(&fields{
 					q: client,

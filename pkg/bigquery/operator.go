@@ -78,8 +78,6 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
-	za := t.Materialization.Strategy
-	print(za)
 	if o.materializer.IsFullRefresh() {
 		err = conn.DeleteTableIfPartitioningOrClusteringMismatch(ctx, t.Name, t)
 		if err != nil {
