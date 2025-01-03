@@ -1,4 +1,5 @@
-/* @bruin
+
+ /* @bruin
 name: some-sql-task
 description: some description goes here
 type: bq.sql
