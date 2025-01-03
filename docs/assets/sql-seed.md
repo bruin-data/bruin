@@ -38,21 +38,3 @@ B,LinkedIn,SDE 2,2024-01-01
 ```
 
 This operation will load the csv into a table called `seed.raw` in the Duckdb database.
-
-### Simplest: Load csv into a Bigquery
-```bruin-yaml
-name: dashboard.hello_bq
-type: bq.seed
-
-parameters:
-    path: seed.csv
-```
-
-Example CSV:
-```csv
-name,networking_through,position,contact_date
-Y,LinkedIn,SDE,2024-01-01
-B,LinkedIn,SDE 2,2024-01-01
-```
-
-This operation will load the csv into a table called `seed.raw` in the Bigquery database.
