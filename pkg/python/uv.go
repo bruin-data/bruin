@@ -181,7 +181,7 @@ func (u *UvPythonRunner) Run(ctx context.Context, execCtx *executionContext) err
 	return u.runWithMaterialization(ctx, execCtx, pythonVersion)
 }
 
-func (u *UvPythonRunner) RunIngestr(ctx context.Context, args []string, repo *git.Repo) error {
+func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []string, repo *git.Repo) error {
 	binaryFullPath, err := u.UvInstaller.EnsureUvInstalled(ctx)
 	if err != nil {
 		return err
@@ -189,9 +189,14 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args []string, repo *gi
 	u.binaryFullPath = binaryFullPath
 
 	ingestrPackageName := "ingestr@" + ingestrVersion
+
+	withCommand := []string{}
+	for _, pkg := range extraPackages {
+		withCommand = append(withCommand, "--with", pkg)
+	}
 	err = u.Cmd.Run(ctx, repo, &CommandInstance{
 		Name: u.binaryFullPath,
-		Args: []string{"tool", "install", "--force", "--quiet", "--python", pythonVersionForIngestr, ingestrPackageName},
+		Args: append([]string{"tool", "install"}, append(withCommand, []string{"--force", "--quiet", "--python", pythonVersionForIngestr, ingestrPackageName}...)...),
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to install ingestr")
