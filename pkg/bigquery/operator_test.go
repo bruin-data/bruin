@@ -197,6 +197,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			client := new(mockQuerierWithResult)
 			extractor := new(mockExtractor)
 			mat := new(mockMaterializer)
+			mat.On("IsFullRefresh").Return(false)
 			conn := new(mockConnectionFetcher)
 			conn.On("GetBqConnection", "gcp-default").Return(client, nil)
 			if tt.setup != nil {
