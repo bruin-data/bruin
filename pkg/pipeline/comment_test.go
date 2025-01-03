@@ -347,7 +347,6 @@ func BenchmarkCreateTaskFromFileComments(b *testing.B) {
 
 	file := "testdata/comments/test.py"
 
-
 	for range make([]struct{}, b.N) {
 		_, err := pipeline.CreateTaskFromFileComments(afero.NewOsFs())(file)
 		require.NoError(b, err)
