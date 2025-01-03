@@ -22,6 +22,10 @@ import (
 	"google.golang.org/api/option"
 )
 
+const (
+	testProjectID = "test-project"
+)
+
 func TestDB_IsValid(t *testing.T) {
 	t.Parallel()
 
@@ -150,7 +154,7 @@ func TestDB_IsValid(t *testing.T) {
 func TestDB_RunQueryWithoutResult(t *testing.T) {
 	t.Parallel()
 
-	projectID := "test-project"
+	projectID := testProjectID
 	jobID := "test-job"
 
 	tests := []struct {
@@ -257,58 +261,10 @@ func TestDB_RunQueryWithoutResult(t *testing.T) {
 	}
 }
 
-type jobSubmitResponse struct {
-	response   any
-	statusCode int
-}
-
-type queryResultResponse struct {
-	response   *bigquery2.GetQueryResultsResponse
-	statusCode int
-}
-
-func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse, qrr queryResultResponse) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries/%s?", projectID, jobID)) {
-			w.WriteHeader(qrr.statusCode)
-
-			response, err := json.Marshal(qrr.response)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			_, err = w.Write(response)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return
-		} else if r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries", projectID)) {
-			w.WriteHeader(jsr.statusCode)
-
-			response, err := json.Marshal(jsr.response)
-			if err != nil {
-				t.Fatal(err)
-			} // Updated error handling
-
-			_, err = w.Write(response)
-			if err != nil {
-				t.Fatal(err)
-			} // Updated error handling
-			return
-		}
-
-		w.WriteHeader(http.StatusInternalServerError)
-		_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
-		if err != nil {
-			t.Fatal(err)
-		} // Updated error handling
-	})
-}
-
 func TestDB_Select(t *testing.T) {
 	t.Parallel()
 
-	projectID := "test-project"
+	projectID := testProjectID
 	jobID := "test-job"
 
 	tests := []struct {
@@ -378,50 +334,6 @@ func TestDB_Select(t *testing.T) {
 						JobId: "job-id",
 					},
 					JobComplete: true,
-					Schema: &bigquery2.TableSchema{
-						Fields: []*bigquery2.TableFieldSchema{
-							{
-								Name: "first_name",
-								Type: "STRING",
-							},
-							{
-								Name: "last_name",
-								Type: "STRING",
-							},
-							{
-								Name: "age",
-								Type: "INTEGER",
-							},
-						},
-					},
-					Rows: []*bigquery2.TableRow{
-						{
-							F: []*bigquery2.TableCell{
-								{
-									V: "jane",
-								},
-								{
-									V: "doe",
-								},
-								{
-									V: "30",
-								},
-							},
-						},
-						{
-							F: []*bigquery2.TableCell{
-								{
-									V: "joe",
-								},
-								{
-									V: "doe",
-								},
-								{
-									V: "28",
-								},
-							},
-						},
-					},
 				},
 				statusCode: http.StatusOK,
 			},
@@ -469,7 +381,7 @@ func TestDB_Select(t *testing.T) {
 func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 	t.Parallel()
 
-	projectID := "test-project"
+	projectID := testProjectID
 	schema := "myschema"
 	table := "mytable"
 	assetName := fmt.Sprintf("%s.%s", schema, table)
@@ -651,7 +563,7 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 func TestDB_SelectWithSchema(t *testing.T) {
 	t.Parallel()
 
-	projectID := "test-project"
+	projectID := testProjectID
 	jobID := "test-job"
 
 	tests := []struct {
@@ -809,4 +721,176 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClient_getTableRef(t *testing.T) {
+	t.Parallel()
+
+	projectID := testProjectID
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	tests := []struct {
+		name        string
+		tableName   string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:      "valid two-part table name",
+			tableName: "dataset.table",
+			wantErr:   false,
+		},
+		{
+			name:      "valid three-part table name",
+			tableName: "project.dataset.table",
+			wantErr:   false,
+		},
+		{
+			name:        "invalid one-part table name",
+			tableName:   "table",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "invalid four-part table name",
+			tableName:   "a.b.c.d",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "empty table name",
+			tableName:   "",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "invalid trailing dot",
+			tableName:   "dataset.table.",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "invalid leading dot",
+			tableName:   ".dataset.table",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "invalid consecutive dots",
+			tableName:   "project..table",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "only dots",
+			tableName:   "..",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "three dots",
+			tableName:   "...",
+			wantErr:     true,
+			errContains: "must be in dataset.table or project.dataset.table format",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			client, err := bigquery.NewClient(
+				context.Background(),
+				projectID,
+				option.WithEndpoint(srv.URL),
+				option.WithCredentials(&google.Credentials{
+					ProjectID: projectID,
+					TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+						AccessToken: "some-token",
+					}),
+				}),
+			)
+			require.NoError(t, err)
+
+			d := Client{client: client}
+
+			tableRef, err := d.getTableRef(tt.tableName)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				assert.Nil(t, tableRef)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, tableRef)
+
+			// For two-part names, verify the table and dataset
+			if strings.Count(tt.tableName, ".") == 1 {
+				parts := strings.Split(tt.tableName, ".")
+				assert.Equal(t, parts[0], tableRef.DatasetID)
+				assert.Equal(t, parts[1], tableRef.TableID)
+				assert.Equal(t, projectID, tableRef.ProjectID)
+			}
+
+			// For three-part names, verify project, dataset and table
+			if strings.Count(tt.tableName, ".") == 2 {
+				parts := strings.Split(tt.tableName, ".")
+				assert.Equal(t, parts[0], tableRef.ProjectID)
+				assert.Equal(t, parts[1], tableRef.DatasetID)
+				assert.Equal(t, parts[2], tableRef.TableID)
+			}
+		})
+	}
+}
+
+func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse, qrr queryResultResponse) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries/%s?", projectID, jobID)) {
+			w.WriteHeader(qrr.statusCode)
+
+			response, err := json.Marshal(qrr.response)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = w.Write(response)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return
+		} else if r.Method == http.MethodPost && strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/queries", projectID)) {
+			w.WriteHeader(jsr.statusCode)
+
+			response, err := json.Marshal(jsr.response)
+			if err != nil {
+				t.Fatal(err)
+			} // Updated error handling
+
+			_, err = w.Write(response)
+			if err != nil {
+				t.Fatal(err)
+			} // Updated error handling
+			return
+		}
+
+		w.WriteHeader(http.StatusInternalServerError)
+		_, err := w.Write([]byte("there is no test definition found for the given request: " + r.Method + " " + r.RequestURI))
+		if err != nil {
+			t.Fatal(err)
+		} // Updated error handling
+	})
+}
+
+type jobSubmitResponse struct {
+	response   any
+	statusCode int
+}
+
+type queryResultResponse struct {
+	response   *bigquery2.GetQueryResultsResponse
+	statusCode int
 }

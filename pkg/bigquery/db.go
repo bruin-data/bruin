@@ -190,6 +190,24 @@ func (m NoMetadataUpdatedError) Error() string {
 	return "no metadata found for the given asset to be pushed to BigQuery"
 }
 
+func (d *Client) getTableRef(tableName string) (*bigquery.Table, error) {
+	tableComponents := strings.Split(tableName, ".")
+
+	// Check for empty components
+	for _, component := range tableComponents {
+		if component == "" {
+			return nil, fmt.Errorf("table name must be in dataset.table or project.dataset.table format, '%s' given", tableName)
+		}
+	}
+
+	if len(tableComponents) == 3 {
+		return d.client.DatasetInProject(tableComponents[0], tableComponents[1]).Table(tableComponents[2]), nil
+	} else if len(tableComponents) == 2 {
+		return d.client.Dataset(tableComponents[0]).Table(tableComponents[1]), nil
+	}
+	return nil, fmt.Errorf("table name must be in dataset.table or project.dataset.table format, '%s' given", tableName)
+}
+
 func (d *Client) UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
 	anyColumnHasDescription := false
 	colsByName := make(map[string]*pipeline.Column, len(asset.Columns))
@@ -203,12 +221,10 @@ func (d *Client) UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipel
 	if asset.Description == "" && (len(asset.Columns) == 0 || !anyColumnHasDescription) {
 		return NoMetadataUpdatedError{}
 	}
-	tableComponents := strings.Split(asset.Name, ".")
-	if len(tableComponents) != 2 {
-		return fmt.Errorf("asset name must be in schema.table format to update the metadata, '%s' given", asset.Name)
+	tableRef, err := d.getTableRef(asset.Name)
+	if err != nil {
+		return err
 	}
-
-	tableRef := d.client.Dataset(tableComponents[0]).Table(tableComponents[1])
 	meta, err := tableRef.Metadata(ctx)
 	if err != nil {
 		return err
@@ -276,12 +292,10 @@ func (d *Client) Ping(ctx context.Context) error {
 }
 
 func (d *Client) DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
-	tableComponents := strings.Split(tableName, ".")
-	if len(tableComponents) != 2 {
-		return fmt.Errorf("table name must be in schema.table format, '%s' given", tableName)
+	tableRef, err := d.getTableRef(tableName)
+	if err != nil {
+		return err
 	}
-
-	tableRef := d.client.Dataset(tableComponents[0]).Table(tableComponents[1])
 
 	// Fetch table metadata
 	meta, err := tableRef.Metadata(ctx)
