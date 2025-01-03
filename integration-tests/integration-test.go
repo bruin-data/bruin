@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sync"
 
 	"github.com/bruin-data/bruin/pkg/e2e"
 	"github.com/bruin-data/bruin/pkg/helpers"
@@ -129,7 +128,7 @@ func main() {
 	wd, _ := os.Getwd()
 	binary := filepath.Join(wd, "bin", executable)
 
-	runIntegrationTasks(binary, currentFolder)
+	runIntegrationTests(binary, currentFolder)
 	runIntegrationWorkflow(binary, currentFolder)
 }
 
@@ -151,29 +150,13 @@ func runIntegrationWorkflow(binary string, currentFolder string) {
 	}
 }
 
-// runIntegrationTasks runs tasks concurrently.
-func runIntegrationTasks(binary string, currentFolder string) {
+func runIntegrationTests(binary string, currentFolder string) {
 	tests := getTasks(binary, currentFolder)
-	var wg sync.WaitGroup
-	errCh := make(chan error, len(tests)) // Buffered channel to collect errors.
-
 	for _, test := range tests {
-		wg.Add(1)
-		go func(t e2e.Task) {
-			defer wg.Done()
-			if err := t.Run(); err != nil {
-				errCh <- fmt.Errorf("task %s: %w", t.Name, err)
-			}
-		}(test)
-	}
-
-	wg.Wait()
-	close(errCh)
-
-	// Collect and handle errors
-	for err := range errCh {
-		fmt.Println(err)
-		os.Exit(1)
+		if err := test.Run(); err != nil {
+			fmt.Printf("%s Assert error: %v\n", test.Name, err)
+			os.Exit(1)
+		}
 	}
 }
 
