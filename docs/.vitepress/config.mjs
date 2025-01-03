@@ -157,6 +157,7 @@ export default defineConfig({
                             {text: "DynamoDB", link: "/ingestion/dynamodb.md"},
                             {text: "Facebook", link: "/ingestion/facebook-ads.md"},
                             {text: "Google Sheets", link: "/ingestion/google_sheets.md"},
+                            {text: "Google Ads", link: "/ingestion/google-ads.md"},
                             {text: "Gorgias", link: "/ingestion/gorgias"},
                             {text: "Hubspot", link: "/ingestion/hubspot.md"},
                             {text: "Kafka", link: "/ingestion/kafka.md"},
