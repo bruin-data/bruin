@@ -178,7 +178,6 @@ func BenchmarkExcludeItemsInDirectoryContainingFile(b *testing.B) {
 	}
 	file := "task.yml"
 
-
 	for range make([]struct{}, b.N) {
 		ExcludeSubItemsInDirectoryContainingFile(filePaths, file)
 	}
