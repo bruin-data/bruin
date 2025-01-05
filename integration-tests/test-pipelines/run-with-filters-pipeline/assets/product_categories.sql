@@ -20,8 +20,6 @@ columns:
   - name: description
     type: VARCHAR
     description: "Description of the product category"
-tags:
-     - include
 @bruin */
 
 SELECT
