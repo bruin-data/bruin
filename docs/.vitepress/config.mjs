@@ -169,6 +169,7 @@ export default defineConfig({
                             {text: "Shopify", link: "/ingestion/shopify"},
                             {text: "Stripe", link: "/ingestion/stripe.md"},
                             {text: "Slack", link: "/ingestion/slack.md"},
+                            {text: "TikTok Ads", link: "/ingestion/tiktokads.md"},
                             {text: "Zendesk", link: "/ingestion/zendesk.md"},
                         ],
                     },
