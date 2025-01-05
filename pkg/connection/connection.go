@@ -33,6 +33,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/slack"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/stripe"
+	"github.com/bruin-data/bruin/pkg/tiktokads"
 	"github.com/bruin-data/bruin/pkg/zendesk"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc"
@@ -69,6 +70,7 @@ type Manager struct {
 	Asana        map[string]*asana.Client
 	DynamoDB     map[string]*dynamodb.Client
 	Zendesk      map[string]*zendesk.Client
+	TikTokAds    map[string]*tiktokads.Client
 	mutex        sync.Mutex
 }
 
@@ -241,6 +243,11 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	connZendesk, err := m.GetZendeskConnectionWithoutDefault(name)
 	if err == nil {
 		return connZendesk, nil
+	}
+
+	connTikTokAds, err := m.GetTikTokAdsConnectionWithoutDefault(name)
+	if err == nil {
+		return connTikTokAds, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Zendesk)...)
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
@@ -834,6 +841,25 @@ func (m *Manager) GetDynamoDBConnectionWithoutDefault(name string) (*dynamodb.Cl
 	db, ok := m.DynamoDB[name]
 	if !ok {
 		return nil, errors.Errorf("dynamodb connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetTikTokAdsConnection(name string) (*tiktokads.Client, error) {
+	db, err := m.GetTikTokAdsConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetTikTokAdsConnectionWithoutDefault("tiktokads-default")
+}
+
+func (m *Manager) GetTikTokAdsConnectionWithoutDefault(name string) (*tiktokads.Client, error) {
+	if m.TikTokAds == nil {
+		return nil, errors.New("no tiktokads connections found")
+	}
+	db, ok := m.TikTokAds[name]
+	if !ok {
+		return nil, errors.Errorf("tiktokads connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -1587,6 +1613,27 @@ func (m *Manager) AddZendeskConnectionFromConfig(connection *config.ZendeskConne
 	return nil
 }
 
+func (m *Manager) AddTikTokAdsConnectionFromConfig(connection *config.TikTokAdsConnection) error {
+	m.mutex.Lock()
+	if m.TikTokAds == nil {
+		m.TikTokAds = make(map[string]*tiktokads.Client)
+	}
+	m.mutex.Unlock()
+	client, err := tiktokads.NewClient(tiktokads.Config{
+		AccessToken:   connection.AccessToken,
+		AdvertiserIDs: connection.AdvertiserIDs,
+		Timezone:      connection.Timezone,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.TikTokAds[connection.Name] = client
+
+	return nil
+}
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
 
@@ -1888,6 +1935,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			err := connectionManager.AddZendeskConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add zendesk connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.TikTokAds {
+		wg.Go(func() {
+			err := connectionManager.AddTikTokAdsConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add tiktokads connection '%s'", conn.Name))
 			}
 		})
 	}
