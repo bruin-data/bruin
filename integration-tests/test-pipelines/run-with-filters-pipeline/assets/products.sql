@@ -4,7 +4,8 @@ type: duckdb.sql
 
 materialization:
   type: table
-
+tags:
+   - include
 columns:
   - name: product_id
     type: INTEGER

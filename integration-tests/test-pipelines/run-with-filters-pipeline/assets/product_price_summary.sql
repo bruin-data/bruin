@@ -7,7 +7,9 @@ materialization:
 
 depends:
   - products
-
+tags:
+   - include
+   - exclude
 columns:
   - name: price_range
     type: VARCHAR

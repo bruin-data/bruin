@@ -3,7 +3,8 @@ name: shipping_providers
 type: duckdb.sql
 materialization:
   type: table
-
+tags:
+   - include
 columns:
   - name: provider_id
     type: INTEGER

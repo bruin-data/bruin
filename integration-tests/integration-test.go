@@ -273,7 +273,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Executed 4 tasks", "Finished: chess_playground.games", " Finished: chess_playground.game_outcome_summary", "Finished: chess_playground.game_outcome_summary:total_games:positive", "Finished: chess_playground.profiles"},
+				Contains: []string{"Executed 3 tasks", "Finished: shipping_provider", "Finished: products", "Finished: products:price:positive"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
