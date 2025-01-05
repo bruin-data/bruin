@@ -391,12 +391,12 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:          "parse-asset-happy-path-chess-games",
 			Command:       binary,
-			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/happy-path/assets/chess_games.asset.yml")},
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-happy-path/assets/chess_games.asset.yml")},
 			Env:           []string{},
 			SkipJSONNodes: []string{"\"path\""},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/happy-path/expectations/chess_games.asset.yml.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/parse-happy-path/expectations/chess_games.asset.yml.json")),
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -406,12 +406,12 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:          "parse-asset-happy-path-chess-profiles",
 			Command:       binary,
-			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/happy-path/assets/chess_profiles.asset.yml")},
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-happy-path/assets/chess_profiles.asset.yml")},
 			Env:           []string{},
 			SkipJSONNodes: []string{"\"path\""},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/happy-path/expectations/chess_profiles.asset.yml.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/parse-happy-path/expectations/chess_profiles.asset.yml.json")),
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -421,12 +421,12 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:          "parse-asset-happy-path-player-summary",
 			Command:       binary,
-			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/happy-path/assets/player_summary.sql")},
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-happy-path/assets/player_summary.sql")},
 			Env:           []string{},
 			SkipJSONNodes: []string{"\"path\""},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/happy-path/expectations/player_summary.sql.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/parse-happy-path/expectations/player_summary.sql.json")),
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
