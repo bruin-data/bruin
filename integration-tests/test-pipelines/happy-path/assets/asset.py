@@ -19,7 +19,7 @@ if os.getenv('INJECTED1') != "value1":
 
 con = duckdb.connect(database = "duckdb.db", read_only = False)
 
-con.execute("SELECT * FROM chess_playground.player_summary")
+con.execute("SELECT * FROM products")
 result = con.fetchall()
-if len(result) != 2:
+if len(result) != 4:
     raise Exception("Incorrect number of rows in player_summary")
