@@ -35,28 +35,24 @@ var (
 		},
 		State: []*scheduler.PipelineAssetState{
 			{
-				Name:   "chess_playground.games",
+				Name:   "product_categories",
 				Status: "succeeded",
 			},
 			{
-				Name:   "chess_playground.profiles",
+				Name:   "product_price_summary",
 				Status: "succeeded",
 			},
 			{
-				Name:   "chess_playground.game_outcome_summary",
+				Name:   "products",
 				Status: "succeeded",
 			},
 			{
-				Name:   "chess_playground.player_profile_summary",
-				Status: "succeeded",
-			},
-			{
-				Name:   "chess_playground.player_summary",
+				Name:   "shipping_providers",
 				Status: "failed",
 			},
 		},
 		Version:           "1.0.0",
-		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
+		CompatibilityHash: "e62a4c57b82d5452bc57cab24f45eb4abda2a737b0269492de0030fba452ed7e",
 	}
 	stateForContinueRun = &scheduler.PipelineState{
 		Parameters: scheduler.RunConfig{
@@ -80,28 +76,25 @@ var (
 		},
 		State: []*scheduler.PipelineAssetState{
 			{
-				Name:   "chess_playground.games",
+				Name:   "product_categories",
 				Status: "skipped",
 			},
 			{
-				Name:   "chess_playground.profiles",
+				Name:   "product_price_summary",
 				Status: "skipped",
 			},
 			{
-				Name:   "chess_playground.game_outcome_summary",
+				Name:   "products",
 				Status: "skipped",
 			},
+
 			{
-				Name:   "chess_playground.player_profile_summary",
-				Status: "skipped",
-			},
-			{
-				Name:   "chess_playground.player_summary",
+				Name:   "shipping_providers",
 				Status: "succeeded",
 			},
 		},
 		Version:           "1.0.0",
-		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
+		CompatibilityHash: "e62a4c57b82d5452bc57cab24f45eb4abda2a737b0269492de0030fba452ed7e",
 	}
 )
 
@@ -180,9 +173,9 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 					},
 				},
 				{
-					Name:    "copy player_summary.sql to tempfile",
+					Name:    "copy shipping_providers.sql to tempfile",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "continue/assets/player_summary.sql"), tempfile},
+					Args:    []string{filepath.Join(currentFolder, "continue/assets/shipping_providers.sql"), tempfile},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -193,9 +186,9 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 					},
 				},
 				{
-					Name:    "copy player_summary.sql to continue",
+					Name:    "copy shipping_providers.sql to continue",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "player_summary.sql"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")},
+					Args:    []string{filepath.Join(currentFolder, "shipping_providers.sql"), filepath.Join(currentFolder, "continue/assets/shipping_providers.sql")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -219,9 +212,9 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 					},
 				},
 				{
-					Name:    "copy player_summary.sql back to continue",
+					Name:    "copy broken shipping_providers.sql back to continue",
 					Command: "cp",
-					Args:    []string{tempfile, filepath.Join(currentFolder, "continue/assets/player_summary.sql")},
+					Args:    []string{tempfile, filepath.Join(currentFolder, "continue/assets/shipping_providers.sql")},
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,
