@@ -26,6 +26,7 @@ const (
 
 	AssetTypePython               = AssetType("python")
 	AssetTypeSnowflakeQuery       = AssetType("sf.sql")
+	AssetTypeSnowflakeSeed        = AssetType("sf.seed")
 	AssetTypeSnowflakeQuerySensor = AssetType("sf.sensor.query")
 	AssetTypeBigqueryQuery        = AssetType("bq.sql")
 	AssetTypeBigqueryTableSensor  = AssetType("bq.sensor.table")
@@ -36,12 +37,18 @@ const (
 	AssetTypeDuckDBSeed           = AssetType("duckdb.seed")
 	AssetTypeEmpty                = AssetType("empty")
 	AssetTypePostgresQuery        = AssetType("pg.sql")
+	AssetTypePostgresSeed         = AssetType("pg.seed")
 	AssetTypeRedshiftQuery        = AssetType("rs.sql")
+	AssetTypeRedshiftSeed         = AssetType("rs.seed")
 	AssetTypeAthenaQuery          = AssetType("athena.sql")
 	AssetTypeAthenaSQLSensor      = AssetType("athena.sensor.query")
+	AssetTypeAthenaSeed           = AssetType("athena.seed")
 	AssetTypeMsSQLQuery           = AssetType("ms.sql")
+	AssetTypeMsSQLSeed            = AssetType("ms.seed")
 	AssetTypeDatabricksQuery      = AssetType("databricks.sql")
+	AssetTypeDatabricksSeed       = AssetType("databricks.seed")
 	AssetTypeSynapseQuery         = AssetType("synapse.sql")
+	AssetTypeSynapseSeed          = AssetType("synapse.seed")
 	AssetTypeIngestr              = AssetType("ingestr")
 	AssetTypeTableau              = AssetType("tableau")
 	RunConfigFullRefresh          = RunConfig("full-refresh")
@@ -457,12 +464,19 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeBigquerySource:       "google_cloud_platform",
 	AssetTypeSnowflakeQuery:       "snowflake",
 	AssetTypeSnowflakeQuerySensor: "snowflake",
+	AssetTypeSnowflakeSeed:        "snowflake",
 	AssetTypePostgresQuery:        "postgres",
+	AssetTypePostgresSeed:         "postgres",
 	AssetTypeRedshiftQuery:        "redshift",
+	AssetTypeRedshiftSeed:         "redshift",
 	AssetTypeMsSQLQuery:           "mssql",
+	AssetTypeMsSQLSeed:            "mssql",
 	AssetTypeDatabricksQuery:      "databricks",
+	AssetTypeDatabricksSeed:       "databricks",
 	AssetTypeSynapseQuery:         "synapse",
+	AssetTypeSynapseSeed:          "synapse",
 	AssetTypeAthenaQuery:          "athena",
+	AssetTypeAthenaSeed:           "athena",
 	AssetTypeDuckDBQuery:          "duckdb",
 	AssetTypeDuckDBSeed:           "duckdb",
 }

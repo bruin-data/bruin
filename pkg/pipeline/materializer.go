@@ -44,3 +44,7 @@ func removeComments(query string) string {
 	newBytes := re.ReplaceAll(bytes, []byte(""))
 	return string(newBytes)
 }
+
+func (m *Materializer) IsFullRefresh() bool {
+	return m.FullRefresh
+}
