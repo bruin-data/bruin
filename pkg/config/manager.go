@@ -46,6 +46,7 @@ type Connections struct {
 	Chess               []ChessConnection               `yaml:"chess,omitempty" json:"chess,omitempty" mapstructure:"chess"`
 	Airtable            []AirtableConnection            `yaml:"airtable,omitempty" json:"airtable,omitempty" mapstructure:"airtable"`
 	Zendesk             []ZendeskConnection             `yaml:"zendesk,omitempty" json:"zendesk,omitempty" mapstructure:"zendesk"`
+	TikTokAds           []TikTokAdsConnection           `yaml:"tiktokads,omitempty" json:"tiktokads,omitempty" mapstructure:"tiktokads"`
 	S3                  []S3Connection                  `yaml:"s3,omitempty" json:"s3,omitempty" mapstructure:"s3"`
 	Slack               []SlackConnection               `yaml:"slack,omitempty" json:"slack,omitempty" mapstructure:"slack"`
 	Asana               []AsanaConnection               `yaml:"asana,omitempty" json:"asana,omitempty" mapstructure:"asana"`
@@ -245,6 +246,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.DynamoDB {
 		c.byKey[conn.Name] = &(c.DynamoDB[i])
 		c.typeNameMap[conn.Name] = "dynamodb"
+	}
+
+	for i, conn := range c.TikTokAds {
+		c.byKey[conn.Name] = &(c.TikTokAds[i])
+		c.typeNameMap[conn.Name] = "tiktokads"
 	}
 }
 
@@ -665,6 +671,14 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.DynamoDB = append(env.Connections.DynamoDB, conn)
+
+	case "tiktokads":
+		var conn TikTokAdsConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.TikTokAds = append(env.Connections.TikTokAds, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -760,6 +774,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Asana = removeConnection(env.Connections.Asana, connectionName)
 	case "dynamodb":
 		env.Connections.DynamoDB = removeConnection(env.Connections.DynamoDB, connectionName)
+	case "tiktokads":
+		env.Connections.TikTokAds = removeConnection(env.Connections.TikTokAds, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}

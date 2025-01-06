@@ -296,6 +296,14 @@ func TestLoadFromFile(t *testing.T) {
 					Subdomain:  "zendeskUrl",
 				},
 			},
+			TikTokAds: []TikTokAdsConnection{
+				{
+					Name:          "tiktokads-1",
+					AccessToken:   "access-token-123",
+					AdvertiserIDs: "advertiser-id-123,advertiser-id-456",
+					Timezone:      "UTC",
+				},
+			},
 		},
 	}
 
