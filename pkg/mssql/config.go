@@ -32,10 +32,11 @@ func (c *Config) ToDBConnectionURI() string {
 
 func (c *Config) GetIngestrURI() string {
 	u := &url.URL{
-		Scheme: "mssql",
-		User:   url.UserPassword(c.Username, c.Password),
-		Host:   fmt.Sprintf("%s:%d", c.Host, c.Port),
-		Path:   c.Database,
+		Scheme:   "mssql",
+		User:     url.UserPassword(c.Username, c.Password),
+		Host:     fmt.Sprintf("%s:%d", c.Host, c.Port),
+		Path:     c.Database,
+		RawQuery: "TrustServerCertificate=yes&driver=ODBC+Driver+18+for+SQL+Server",
 	}
 
 	return u.String()
