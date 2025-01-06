@@ -140,3 +140,38 @@ type: bq.sensor.query
 parameters:
     query: select exists(select 1 from upstream_table where inserted_at > "{{ end_timestamp }}"
 ```
+
+### `bq.seed`
+`bq.seed` are a special type of assets that are used to represent are CSV-files that contain data that is prepared outside of your pipeline that will be loaded into your bigquery database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the bigquery database.
+
+You can define seed assets in a file ending with `.yaml`:
+```yaml
+name: dashboard.hello
+type: bq.seed
+
+parameters:
+    path: seed.csv
+```
+
+**Parameters**:
+- `path`:  The `path` parameter is the path to the CSV file that will be loaded into the data platform. path is relative to the asset definition file.
+
+
+####  Examples: Load csv into a BigQuery database
+
+The examples below show how load a csv into a bigquery database.
+```yaml
+name: dashboard.hello
+type: bq.seed
+
+parameters:
+    path: seed.csv
+```
+
+Example CSV:
+
+```csv
+name,networking_through,position,contact_date
+Y,LinkedIn,SDE,2024-01-01
+B,LinkedIn,SDE 2,2024-01-01
+```

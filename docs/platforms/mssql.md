@@ -53,3 +53,38 @@ select
 from monthly_sales
 order by order_year, order_month;
 ```
+
+### `ms.seed`
+`ms.seed` are a special type of assets that are used to represent are CSV-files that contain data that is prepared outside of your pipeline that will be loaded into your mssql database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the mssql database.
+
+You can define seed assets in a file ending with `.yaml`:
+```yaml
+name: dashboard.hello
+type: ms.seed
+
+parameters:
+    path: seed.csv
+```
+
+**Parameters**:
+- `path`:  The `path` parameter is the path to the CSV file that will be loaded into the data platform. path is relative to the asset definition file.
+
+
+####  Examples: Load csv into a MSSQL database
+
+The examples below show how load a csv into a mssql database.
+```yaml
+name: dashboard.hello
+type: ms.seed
+
+parameters:
+    path: seed.csv
+```
+
+Example CSV:
+
+```csv
+name,networking_through,position,contact_date
+Y,LinkedIn,SDE,2024-01-01
+B,LinkedIn,SDE 2,2024-01-01
+```
