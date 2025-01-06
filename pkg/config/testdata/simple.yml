@@ -186,6 +186,11 @@ environments:
           value: value1
         - name: key2
           value: value2
+      tiktokads:
+        - name: "tiktokads-1"
+          access_token: "access-token-123"
+          advertiser_ids: "advertiser-id-123,advertiser-id-456"
+          timezone: "UTC"
 
   prod:
     connections:

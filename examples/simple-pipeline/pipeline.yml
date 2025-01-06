@@ -30,3 +30,4 @@ default_connections:
   zendesk : "my-zendesk"
   asana: "my-asana"
   dynamodb: "my-dynamodb"
+  tiktokads: "my-tiktokads"
