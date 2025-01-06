@@ -297,20 +297,15 @@ func (d *Client) DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Conte
 	if err != nil {
 		return err
 	}
-
 	// Fetch table metadata
 	meta, err := tableRef.Metadata(ctx)
 	if err != nil {
-		// Check if the error is a Google API 404 Not Found error
 		var apiErr *googleapi.Error
 		if errors.As(err, &apiErr) && apiErr.Code == 404 {
 			return nil
 		}
-		// For all other errors, return the error
 		return fmt.Errorf("failed to fetch metadata for table '%s': %w", tableName, err)
 	}
-
-	// Check if partitioning or clustering exists in metadata or is wanted by asset
 	if meta.TimePartitioning != nil || meta.RangePartitioning != nil || asset.Materialization.PartitionBy != "" || len(asset.Materialization.ClusterBy) > 0 {
 		if !IsSamePartitioning(meta, asset) || !IsSameClustering(meta, asset) {
 			if err := tableRef.Delete(ctx); err != nil {
@@ -326,7 +321,6 @@ func (d *Client) DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Conte
 }
 
 func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
-	// If asset wants partitioning but table has none
 	if asset.Materialization.PartitionBy != "" &&
 		meta.TimePartitioning == nil &&
 		meta.RangePartitioning == nil {
@@ -337,7 +331,7 @@ func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) boo
 		return false
 	}
 
-	// Safe to proceed only if table has any partitioning
+	//proceed only if table has any partitioning
 	if meta.TimePartitioning == nil && meta.RangePartitioning == nil {
 		return true
 	}
@@ -367,7 +361,6 @@ func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) boo
 }
 
 func IsSameClustering(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
-	// If asset wants clustering but table has none
 	if len(asset.Materialization.ClusterBy) > 0 &&
 		(meta.Clustering == nil || len(meta.Clustering.Fields) == 0) {
 		fmt.Printf(
@@ -377,7 +370,7 @@ func IsSameClustering(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool 
 		return false
 	}
 
-	// Safe to proceed only if table has clustering
+	//proceed only if table has clustering
 	if meta.Clustering == nil {
 		return true
 	}
