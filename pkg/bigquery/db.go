@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -35,7 +36,7 @@ type MetadataUpdater interface {
 
 type TableManager interface {
 	DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error
-	CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error
+	CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context, datasetNameCache sync.Map) error
 }
 
 type DB interface {
@@ -397,7 +398,7 @@ func IsSameClustering(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool 
 	return true
 }
 
-func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error {
+func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context, datasetNameCache sync.Map) error {
 	tableName := asset.Name
 	tableComponents := strings.Split(tableName, ".")
 	var datasetName string
@@ -406,10 +407,12 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 	} else if len(tableComponents) == 3 {
 		datasetName = tableComponents[1]
 	}
+	if _, exists := datasetNameCache.Load(datasetName); exists {
+		return nil
+	}
 	datasets := d.client.Datasets(ctx)
 	for {
 		dataset, err := datasets.Next()
-		// Process the dataset
 		if errors.Is(err, iterator.Done) {
 			break
 		}
@@ -417,11 +420,13 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 			return err
 		}
 		if datasetName == dataset.DatasetID {
+			datasetNameCache.Store(datasetName, true)
 			return nil
 		}
 	}
 	if err := d.client.Dataset(datasetName).Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
 		return err
 	}
+	datasetNameCache.Store(datasetName, true) // Cache the created dataset
 	return nil
 }

@@ -3,6 +3,7 @@ package bigquery
 import (
 	"context"
 	"io"
+	"sync"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/executor"
@@ -27,9 +28,10 @@ type connectionFetcher interface {
 }
 
 type BasicOperator struct {
-	connection   connectionFetcher
-	extractor    queryExtractor
-	materializer materializer
+	connection       connectionFetcher
+	extractor        queryExtractor
+	materializer     materializer
+	datasetNameCache sync.Map
 }
 
 func NewBasicOperator(conn connectionFetcher, extractor queryExtractor, materializer materializer) *BasicOperator {
@@ -53,7 +55,6 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if len(queries) == 0 {
 		return nil
 	}
-
 	if len(queries) > 1 && t.Materialization.Type != pipeline.MaterializationTypeNone {
 		return errors.New("cannot enable materialization for tasks with multiple queries")
 	}
@@ -74,7 +75,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
-	if err := conn.CreateDataSetIfNotExist(t, ctx); err != nil {
+	if err := conn.CreateDataSetIfNotExist(t, ctx, o.datasetNameCache); err != nil {
 		return err
 	}
 	if o.materializer.IsFullRefresh() {
