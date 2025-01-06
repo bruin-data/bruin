@@ -236,6 +236,16 @@
           }
         ]
       }
+    },
+    "env-run-seed-data": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-run-seed-data",
+            "path": "duckdb-files/run-seed-data.db"
+          }
+        ]
+      }
     }
   }
 }

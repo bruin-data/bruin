@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -57,6 +58,20 @@ func (m *mockQuerierWithResult) SelectWithSchema(ctx context.Context, q *query.Q
 	}
 
 	return result, args.Error(1)
+}
+func (m *mockQuerierWithResult) DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
+	args := m.Called(ctx, tableName, asset)
+	return args.Error(0)
+}
+
+func (m *mockQuerierWithResult) IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
+	args := m.Called(meta, asset)
+	return args.Bool(0)
+}
+
+func (m *mockQuerierWithResult) IsSameClustering(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
+	args := m.Called(meta, asset)
+	return args.Bool(0)
 }
 
 type mockConnectionFetcher struct {

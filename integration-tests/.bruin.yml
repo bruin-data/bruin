@@ -111,3 +111,8 @@ environments:
       generic:
         - name: KEY1
           value: value1
+  env-run-seed-data:
+    connections:
+      duckdb:
+        - name: "duckdb-run-seed-data"
+          path: "duckdb-files/run-seed-data.db"
