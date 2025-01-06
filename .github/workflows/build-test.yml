@@ -73,6 +73,7 @@ jobs:
 
   dockerBuild:
     runs-on: ubuntu-latest
+    name: Docker Build
     steps:
       - uses: actions/checkout@v4
       

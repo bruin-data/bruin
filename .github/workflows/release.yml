@@ -33,6 +33,7 @@ jobs:
 
   dockerBuild:
     runs-on: ubuntu-latest
+    name: Docker Build & Push
     needs: integration-tests
     steps:
       - uses: actions/checkout@v4
