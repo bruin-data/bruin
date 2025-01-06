@@ -301,6 +301,12 @@ func (d *Client) DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Conte
 	// Fetch table metadata
 	meta, err := tableRef.Metadata(ctx)
 	if err != nil {
+		// Check if the error is a Google API 404 Not Found error
+		var apiErr *googleapi.Error
+		if errors.As(err, &apiErr) && apiErr.Code == 404 {
+			return nil
+		}
+		// For all other errors, return the error
 		return fmt.Errorf("failed to fetch metadata for table '%s': %w", tableName, err)
 	}
 
@@ -399,31 +405,4 @@ func IsSameClustering(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool 
 	}
 
 	return true
-}
-
-func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error {
-	tableName := asset.Name
-	tableComponents := strings.Split(tableName, ".")
-	var datasetName string
-	if len(tableComponents) == 2 {
-		datasetName = tableComponents[0]
-	} else if len(tableComponents) == 3 {
-		datasetName = tableComponents[1]
-	}
-	datasets := d.client.Datasets(ctx)
-	for {
-		dataset, err := datasets.Next()
-		// Process the dataset
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		if datasetName == dataset.DatasetID {
-			return nil
-		}
-	}
-	d.client.DatasetInProject(d.config.ProjectID, datasetName)
-	return nil
 }
