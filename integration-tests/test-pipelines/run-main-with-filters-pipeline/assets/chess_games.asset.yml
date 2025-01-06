@@ -1,9 +1,0 @@
-name: chess_playground.games
-type: ingestr
-tags:
-  - include
-
-parameters:
-  destination: duckdb
-  source_connection: chess-run-main-with-filters
-  source_table: games
