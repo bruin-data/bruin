@@ -42,8 +42,8 @@ type mockRunner struct {
 	mock.Mock
 }
 
-func (m *mockRunner) RunIngestr(ctx context.Context, args []string, repo *git.Repo) error {
-	return m.Called(ctx, args, repo).Error(0)
+func (m *mockRunner) RunIngestr(ctx context.Context, args, extraPackages []string, repo *git.Repo) error {
+	return m.Called(ctx, args, extraPackages, repo).Error(0)
 }
 
 func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
@@ -67,10 +67,11 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 	finder := new(mockFinder)
 
 	tests := []struct {
-		name        string
-		asset       *pipeline.Asset
-		fullRefresh bool
-		want        []string
+		name          string
+		asset         *pipeline.Asset
+		fullRefresh   bool
+		want          []string
+		extraPackages []string
 	}{
 		{
 			name: "create+replace, basic scenario",
@@ -255,7 +256,7 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			t.Parallel()
 
 			runner := new(mockRunner)
-			runner.On("RunIngestr", mock.Anything, tt.want, repo).Return(nil)
+			runner.On("RunIngestr", mock.Anything, tt.want, tt.extraPackages, repo).Return(nil)
 
 			o := &BasicOperator{
 				conn:   &fetcher,
@@ -297,10 +298,11 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 	finder := new(mockFinder)
 
 	tests := []struct {
-		name        string
-		asset       *pipeline.Asset
-		fullRefresh bool
-		want        []string
+		name          string
+		asset         *pipeline.Asset
+		fullRefresh   bool
+		want          []string
+		extraPackages []string
 	}{
 		{
 			name: "create+replace, basic scenario",
@@ -332,7 +334,7 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 			t.Parallel()
 
 			runner := new(mockRunner)
-			runner.On("RunIngestr", mock.Anything, tt.want, repo).Return(nil)
+			runner.On("RunIngestr", mock.Anything, tt.want, tt.extraPackages, repo).Return(nil)
 
 			o := &SeedOperator{
 				conn:   &fetcher,
