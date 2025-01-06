@@ -93,7 +93,7 @@ group by order_date;
 
 You can define seed assets in a file ending with `.yaml`:
 ```yaml
-name: dashboard.hello_bq
+name: dashboard.hello
 type: athena.seed
 
 parameters:
@@ -108,7 +108,7 @@ parameters:
 
 The examples below show how load a csv into a athena database.
 ```yaml
-name: dashboard.hello_bq
+name: dashboard.hello
 type: athena.seed
 
 parameters:

@@ -8,7 +8,7 @@ Here's a sample asset with materialization:
 ```bruin-sql
 /* @bruin
 
-name: dashboard.hello_bq
+name: dashboard.hello
 type: bq.sql
 
 materialization:
@@ -35,7 +35,7 @@ Here's an example of an asset with `create+replace` materialization:
 ```bruin-sql
 /* @bruin
 
-name: dashboard.hello_bq
+name: dashboard.hello
 type: bq.sql
 
 materialization:
@@ -48,7 +48,7 @@ union all
 select 2 as one
 ```
 
-The result will be a table `dashboard.hello_bq` with the result of the query.
+The result will be a table `dashboard.hello` with the result of the query.
 
 ## `delete+insert`
 `delete+insert` strategy is useful for incremental updates. It deletes the rows that are no longer present in the query results and inserts the new rows. This is useful when you have a large table and you want to minimize the amount of data that needs to be written.
@@ -65,7 +65,7 @@ Here's an example of an asset with `delete+insert` materialization:
 ```bruin-sql
 /* @bruin
 
-name: dashboard.hello_bq
+name: dashboard.hello
 type: bq.sql
 
 materialization:
@@ -88,7 +88,7 @@ Bruin will simply run the query, and insert the results into the destination tab
 ```bruin-sql
 /* @bruin
 
-name: dashboard.hello_bq
+name: dashboard.hello
 type: bq.sql
 
 materialization:
@@ -116,7 +116,7 @@ Here's a sample asset with `merge` materialization:
 ```bruin-sql
 /* @bruin
 
-name: dashboard.hello_bq
+name: dashboard.hello
 type: bq.sql
 
 materialization:

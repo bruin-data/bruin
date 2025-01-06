@@ -59,7 +59,7 @@ order by order_year, order_month;
 
 You can define seed assets in a file ending with `.yaml`:
 ```yaml
-name: dashboard.hello_bq
+name: dashboard.hello
 type: ms.seed
 
 parameters:
@@ -74,7 +74,7 @@ parameters:
 
 The examples below show how load a csv into a mssql database.
 ```yaml
-name: dashboard.hello_bq
+name: dashboard.hello
 type: ms.seed
 
 parameters:

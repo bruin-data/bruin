@@ -83,7 +83,7 @@ commit transaction;
 
 You can define seed assets in a file ending with `.yaml`:
 ```yaml
-name: dashboard.hello_bq
+name: dashboard.hello
 type: rs.seed
 
 parameters:
@@ -98,7 +98,7 @@ parameters:
 
 The examples below show how load a csv into a redshift database.
 ```yaml
-name: dashboard.hello_bq
+name: dashboard.hello
 type: rs.seed
 
 parameters:

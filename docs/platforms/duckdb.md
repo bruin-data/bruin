@@ -64,7 +64,7 @@ FROM events.customers
 
 You can define seed assets in a file ending with `.yaml`:
 ```yaml
-name: dashboard.hello_bq
+name: dashboard.hello
 type: duckdb.seed
 
 parameters:
@@ -79,7 +79,7 @@ parameters:
 
 The examples below show how load a csv into a duckdb database.
 ```yaml
-name: dashboard.hello_bq
+name: dashboard.hello
 type: duckdb.seed
 
 parameters:
