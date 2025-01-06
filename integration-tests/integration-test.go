@@ -35,28 +35,24 @@ var (
 		},
 		State: []*scheduler.PipelineAssetState{
 			{
-				Name:   "chess_playground.games",
+				Name:   "product_categories",
 				Status: "succeeded",
 			},
 			{
-				Name:   "chess_playground.profiles",
+				Name:   "product_price_summary",
 				Status: "succeeded",
 			},
 			{
-				Name:   "chess_playground.game_outcome_summary",
+				Name:   "products",
 				Status: "succeeded",
 			},
 			{
-				Name:   "chess_playground.player_profile_summary",
-				Status: "succeeded",
-			},
-			{
-				Name:   "chess_playground.player_summary",
+				Name:   "shipping_providers",
 				Status: "failed",
 			},
 		},
 		Version:           "1.0.0",
-		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
+		CompatibilityHash: "e62a4c57b82d5452bc57cab24f45eb4abda2a737b0269492de0030fba452ed7e",
 	}
 	stateForContinueRun = &scheduler.PipelineState{
 		Parameters: scheduler.RunConfig{
@@ -80,28 +76,25 @@ var (
 		},
 		State: []*scheduler.PipelineAssetState{
 			{
-				Name:   "chess_playground.games",
+				Name:   "product_categories",
 				Status: "skipped",
 			},
 			{
-				Name:   "chess_playground.profiles",
+				Name:   "product_price_summary",
 				Status: "skipped",
 			},
 			{
-				Name:   "chess_playground.game_outcome_summary",
+				Name:   "products",
 				Status: "skipped",
 			},
+
 			{
-				Name:   "chess_playground.player_profile_summary",
-				Status: "skipped",
-			},
-			{
-				Name:   "chess_playground.player_summary",
+				Name:   "shipping_providers",
 				Status: "succeeded",
 			},
 		},
 		Version:           "1.0.0",
-		CompatibilityHash: "6a4a1598e729fea65eeaa889aa0602be3133a465bcdde84843ff02954497ff65",
+		CompatibilityHash: "e62a4c57b82d5452bc57cab24f45eb4abda2a737b0269492de0030fba452ed7e",
 	}
 )
 
@@ -180,9 +173,9 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 					},
 				},
 				{
-					Name:    "copy player_summary.sql to tempfile",
+					Name:    "copy shipping_providers.sql to tempfile",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "continue/assets/player_summary.sql"), tempfile},
+					Args:    []string{filepath.Join(currentFolder, "continue/assets/shipping_providers.sql"), tempfile},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -193,9 +186,9 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 					},
 				},
 				{
-					Name:    "copy player_summary.sql to continue",
+					Name:    "copy shipping_providers.sql to continue",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "player_summary.sql"), filepath.Join(currentFolder, "continue/assets/player_summary.sql")},
+					Args:    []string{filepath.Join(currentFolder, "shipping_providers.sql"), filepath.Join(currentFolder, "continue/assets/shipping_providers.sql")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -219,9 +212,9 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 					},
 				},
 				{
-					Name:    "copy player_summary.sql back to continue",
+					Name:    "copy broken shipping_providers.sql back to continue",
 					Command: "cp",
-					Args:    []string{tempfile, filepath.Join(currentFolder, "continue/assets/player_summary.sql")},
+					Args:    []string{tempfile, filepath.Join(currentFolder, "continue/assets/shipping_providers.sql")},
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,
@@ -273,7 +266,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Executed 4 tasks", "Finished: chess_playground.games", " Finished: chess_playground.game_outcome_summary", "Finished: chess_playground.game_outcome_summary:total_games:positive", "Finished: chess_playground.profiles"},
+				Contains: []string{"Executed 3 tasks", "Finished: shipping_provider", "Finished: products", "Finished: products:price:positive"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -300,7 +293,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Executed 3 tasks", " Finished: chess_playground.games", "Finished: chess_playground.profiles", "Finished: chess_playground.game_outcome_summary"},
+				Contains: []string{"Executed 2 tasks", "Finished: shipping_provider", "Finished: products"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -376,12 +369,12 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:          "parse-asset-happy-path-asset-py",
 			Command:       binary,
-			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/happy-path/assets/asset.py")},
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-happy-path/assets/asset.py")},
 			Env:           []string{},
 			SkipJSONNodes: []string{"\"path\""},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/happy-path/expectations/asset.py.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/parse-happy-path/expectations/asset.py.json")),
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -391,12 +384,12 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:          "parse-asset-happy-path-chess-games",
 			Command:       binary,
-			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/happy-path/assets/chess_games.asset.yml")},
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-happy-path/assets/chess_games.asset.yml")},
 			Env:           []string{},
 			SkipJSONNodes: []string{"\"path\""},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/happy-path/expectations/chess_games.asset.yml.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/parse-happy-path/expectations/chess_games.asset.yml.json")),
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -406,12 +399,12 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:          "parse-asset-happy-path-chess-profiles",
 			Command:       binary,
-			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/happy-path/assets/chess_profiles.asset.yml")},
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-happy-path/assets/chess_profiles.asset.yml")},
 			Env:           []string{},
 			SkipJSONNodes: []string{"\"path\""},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/happy-path/expectations/chess_profiles.asset.yml.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/parse-happy-path/expectations/chess_profiles.asset.yml.json")),
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -421,12 +414,12 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:          "parse-asset-happy-path-player-summary",
 			Command:       binary,
-			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/happy-path/assets/player_summary.sql")},
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-happy-path/assets/player_summary.sql")},
 			Env:           []string{},
 			SkipJSONNodes: []string{"\"path\""},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/happy-path/expectations/player_summary.sql.json")),
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/parse-happy-path/expectations/player_summary.sql.json")),
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
