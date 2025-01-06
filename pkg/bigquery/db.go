@@ -35,7 +35,6 @@ type MetadataUpdater interface {
 
 type TableManager interface {
 	DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error
-	CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error
 }
 
 type DB interface {
