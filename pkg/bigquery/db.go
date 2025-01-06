@@ -330,7 +330,6 @@ func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) boo
 		return false
 	}
 
-	//proceed only if table has any partitioning
 	if meta.TimePartitioning == nil && meta.RangePartitioning == nil {
 		return true
 	}
@@ -368,8 +367,6 @@ func IsSameClustering(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool 
 		)
 		return false
 	}
-
-	//proceed only if table has clustering
 	if meta.Clustering == nil {
 		return true
 	}
