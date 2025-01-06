@@ -2,7 +2,7 @@
 Seeds are CSV-files that contain data that is prepared outside of your pipeline that will be loaded into your data platform. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the destination platform accurately.
 
 You can define seed assets in a file ending with `.yaml`:
-```bruin-yaml
+```yaml
 name: dashboard.hello_bq
 type: duckdb.seed
 
@@ -22,7 +22,7 @@ The `parameters` key in the configuration defines the parameters for the seed as
 The examples below show how load a csv into a Duckdb & bigquery database.
 
 ### Simplest: Load csv into a Duckdb
-```bruin-yaml
+```yaml
 name: dashboard.hello_bq
 type: duckdb.seed
 
