@@ -444,3 +444,14 @@ type DynamoDBConnection struct {
 func (c DynamoDBConnection) GetName() string {
 	return c.Name
 }
+
+type TikTokAdsConnection struct {
+	Name          string `yaml:"name" json:"name" mapstructure:"name"`
+	AccessToken   string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
+	AdvertiserIDs string `yaml:"advertiser_ids" json:"advertiser_ids" mapstructure:"advertiser_ids"`
+	Timezone      string `yaml:"timezone" json:"timezone,omitempty" mapstructure:"timezone"`
+}
+
+func (c TikTokAdsConnection) GetName() string {
+	return c.Name
+}
