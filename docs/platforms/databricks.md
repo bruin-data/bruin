@@ -81,7 +81,7 @@ parameters:
 ```
 
 **Parameters**:
-- `path`:  The `path` parameter is the path to the CSV file that will be loaded into the data platform. path is relative to the asset definition file.
+- `path`:  The `path` parameter is the path to the CSV file that will be loaded into the data platform. path is relative to the asset definition file. If the path is not provided, the asset name will be used to find the CSV file in the same directory as the asset definition file.
 
 
 ####  Examples: Load csv into a Databricks database

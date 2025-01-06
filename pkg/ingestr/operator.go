@@ -192,9 +192,10 @@ func NewSeedOperator(conn *connection.Manager) (*SeedOperator, error) {
 func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	var extraPackages []string
 	// Source connection
-	sourceConnectionPath, ok := ti.GetAsset().Parameters["path"]
-	if !ok {
-		return errors.New("source connection not configured")
+	sourceConnectionPath := ti.GetAsset().Name + ".csv"
+
+	if ti.GetAsset().Parameters != nil && ti.GetAsset().Parameters["path"] != "" {
+		sourceConnectionPath = ti.GetAsset().Parameters["path"]
 	}
 
 	sourceURI := "csv://" + filepath.Join(filepath.Dir(ti.GetAsset().ExecutableFile.Path), sourceConnectionPath)

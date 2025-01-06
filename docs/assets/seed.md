@@ -16,7 +16,7 @@ You can see the "Data Platforms" on the left sidebar to see supported types.
 
 ## Parameters
 
-The `parameters` key in the configuration defines the parameters for the seed asset. The `path` parameter is the path to the CSV file that will be loaded into the data platform. path is relative to the asset definition file.
+The `parameters` key in the configuration defines the parameters for the seed asset. The `path` parameter is the path to the CSV file that will be loaded into the data platform. path is relative to the asset definition file. If the path is not provided, the asset name will be used to find the CSV file in the same directory as the asset definition file.
 
 ##  Examples
 The examples below show how load a csv into a Duckdb & bigquery database.

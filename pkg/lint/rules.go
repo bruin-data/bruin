@@ -362,27 +362,24 @@ func ValidateCustomCheckQueryExists(ctx context.Context, p *pipeline.Pipeline, a
 
 func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
-	if asset.Type == pipeline.AssetTypeBigquerySeed {
+	if strings.HasSuffix(string(asset.Type), ".seed") {
 		if asset.Materialization.Type != pipeline.MaterializationTypeNone {
 			issues = append(issues, &Issue{
 				Task:        asset,
 				Description: "Materialization is not allowed on a seed asset",
 			})
 		}
-		if asset.Parameters["path"] == "" {
-			issues = append(issues, &Issue{
-				Task:        asset,
-				Description: "Seed file path is required",
-			})
-			return issues, nil
+		seedFilePath := filepath.Join(filepath.Dir(asset.ExecutableFile.Path), asset.Name+".csv")
+
+		if asset.Parameters != nil && asset.Parameters["path"] != "" {
+			seedFilePath = filepath.Join(filepath.Dir(asset.ExecutableFile.Path), asset.Parameters["path"])
 		}
 
-		seedFilePath := filepath.Join(filepath.Dir(asset.DefinitionFile.Path), asset.Parameters["path"])
 		_, err := os.Stat(seedFilePath)
 		if os.IsNotExist(err) {
 			issues = append(issues, &Issue{
 				Task:        asset,
-				Description: "Seed file does not exist or cannot be found",
+				Description: "Seed file does not exist or cannot be found at " + seedFilePath,
 			})
 			return issues, nil
 		}
@@ -391,7 +388,7 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 		if err != nil {
 			issues = append(issues, &Issue{
 				Task:        asset,
-				Description: "Failed to open seed file",
+				Description: "Failed to open seed file at " + seedFilePath,
 			})
 			return issues, nil
 		}
@@ -403,7 +400,7 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 			if err != nil {
 				issues = append(issues, &Issue{
 					Task:        asset,
-					Description: "CSV file cannot be parsed",
+					Description: "CSV file cannot be parsed at " + seedFilePath,
 				})
 				return issues, nil
 			}
@@ -416,7 +413,7 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 			if !columnMap[column.Name] {
 				issues = append(issues, &Issue{
 					Task:        asset,
-					Description: fmt.Sprintf("Column '%s' is defined in the asset but does not exist in the CSV", column.Name),
+					Description: fmt.Sprintf("Column '%s' is defined in the asset but does not exist in the CSV at %s", column.Name, seedFilePath),
 				})
 			}
 		}

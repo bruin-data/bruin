@@ -1,0 +1,32 @@
+name: seed.raw_data
+type: duckdb.seed
+
+description: This asset loads a CSV file into a DuckDB database.
+columns:
+  - name: name
+    type: varchar
+    description: "Contact person's full name"
+    checks:
+      - name: not_null
+  - name: networking_through
+    type: varchar
+    description: "Source or connection through which contact was made"
+    checks:
+      - name: not_null
+      - name: accepted_values
+        value:
+          - LinkedIn
+          - Twitter
+          - Facebook
+          - Instagram
+  - name: position
+    type: varchar
+    description: "Contact's job position or title"
+    checks:
+      - name: not_null
+  - name: contact_date
+    type: varchar
+    description: "Date when contact was established"
+
+depends:
+  - seed.raw

@@ -541,11 +541,11 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "run-seed-data",
 			Command: binary,
-			Args:    []string{"run", "--env", "env-run-seed-data", filepath.Join(currentFolder, "test-pipelines/run-seed-data/assets/seed.asset.yml")},
+			Args:    []string{"run", "--env", "env-run-seed-data", filepath.Join(currentFolder, "test-pipelines/run-seed-data")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Executed 5 tasks"},
+				Contains: []string{"Successfully validated 2 assets", "Executed 10 tasks"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
