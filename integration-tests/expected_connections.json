@@ -246,6 +246,26 @@
           }
         ]
       }
+    },
+    "env-ingestr": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-ingestr",
+            "path": "duckdb-files/ingestr.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-ingestr",
+            "players": [
+              "MagnusCarlsen",
+              "Hikaru"
+            ]
+          }
+        ]
+      }
     }
+
   }
 }
