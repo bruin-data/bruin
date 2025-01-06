@@ -121,7 +121,8 @@ func main() {
 	wd, _ := os.Getwd()
 	binary := filepath.Join(wd, "bin", executable)
 
-	runIntegrationTests(binary, currentFolder)
+	includeIngestr := os.Getenv("INCLUDE_INGESTR") == "1"
+	runIntegrationTests(binary, currentFolder, includeIngestr)
 	runIntegrationWorkflow(binary, currentFolder)
 }
 
@@ -143,8 +144,12 @@ func runIntegrationWorkflow(binary string, currentFolder string) {
 	}
 }
 
-func runIntegrationTests(binary string, currentFolder string) {
+func runIntegrationTests(binary string, currentFolder string, includeIngestr bool) {
 	tests := getTasks(binary, currentFolder)
+	if includeIngestr {
+		ingestrTasks := getIngestrTasks(binary, currentFolder)
+		tests = append(tests, ingestrTasks...)
+	}
 	for _, test := range tests {
 		if err := test.Run(); err != nil {
 			fmt.Printf("%s Assert error: %v\n", test.Name, err)
@@ -558,6 +563,25 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
 				e2e.AssertByOutputJSON,
+			},
+		},
+	}
+}
+
+func getIngestrTasks(binary string, currentFolder string) []e2e.Task {
+	return []e2e.Task{
+		{
+			Name:    "ingestr-pipeline",
+			Command: binary,
+			Args:    []string{"run", "-env", "env-ingestr", filepath.Join(currentFolder, "test-pipelines/ingestr-pipeline")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Executed 4 tasks", "Finished: chess_playground.profiles", "Finished: chess_playground.games", "Finished: chess_playground.player_summary", "Finished: chess_playground.player_summary:total_games:positive"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
 			},
 		},
 	}
