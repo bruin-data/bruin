@@ -37,6 +37,7 @@ type MetadataUpdater interface {
 type TableManager interface {
 	DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error
 	CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error
+	DeleteTableIfMaterializationTypeMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error
 }
 
 type DB interface {
@@ -296,6 +297,7 @@ func (d *Client) Ping(ctx context.Context) error {
 }
 
 func (d *Client) DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
+
 	tableRef, err := d.getTableRef(tableName)
 	if err != nil {
 		return err
@@ -433,5 +435,29 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 		return err
 	}
 	d.datasetNameCache.Store(datasetName, true) // Cache the created dataset
+}
+
+func (d Client) DeleteTableIfMaterializationTypeMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
+	if asset.Materialization.Type == pipeline.MaterializationTypeNone {
+		return nil
+	}
+	tableRef, err := d.getTableRef(tableName)
+	if err != nil {
+		return err
+	}
+	meta, err := tableRef.Metadata(ctx)
+	if err != nil {
+		var apiErr *googleapi.Error
+		if errors.As(err, &apiErr) && apiErr.Code == 404 {
+			return nil
+		}
+		return fmt.Errorf("failed to fetch metadata for table '%s': %w", tableName, err)
+	}
+	tableType := meta.Type
+	if strings.ToLower(string(tableType)) != strings.ToLower(string(asset.Materialization.Type)) {
+		if err := tableRef.Delete(ctx); err != nil {
+			return fmt.Errorf("failed to delete table '%s': %w", tableName, err)
+		}
+	}
 	return nil
 }
