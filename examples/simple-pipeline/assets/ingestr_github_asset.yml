@@ -1,0 +1,9 @@
+name: public.github
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: github
+  source_table: 'issues'
+
+  destination: postgres
