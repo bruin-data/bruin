@@ -1,19 +1,13 @@
-FROM cgr.dev/chainguard/go:latest AS builder
+FROM debian:bookworm-slim
 
-WORKDIR /app 
+ARG VERSION=latest
 
-COPY go.mod ./
+RUN apt-get update && apt-get install -y curl
 
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    go mod download
+RUN  adduser --disabled-password --gecos '' bruin
 
-COPY . .
+USER bruin
 
-RUN make build
+RUN curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh -s -- -d ${VERSION}
 
-FROM cgr.dev/chainguard/go:latest
-
-COPY --from=builder /app/bin/bruin /app/bin/bruin
-
-ENTRYPOINT ["/app/bin/bruin"]
+CMD ["home/bruin/.local/bin/bruin"]
