@@ -1,11 +1,17 @@
 package bigquery
 
 import (
-	"cloud.google.com/go/bigquery"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
@@ -15,11 +21,6 @@ import (
 	bigquery2 "google.golang.org/api/bigquery/v2"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"testing"
-	"time"
 )
 
 const testProjectID = "test-project"
@@ -1334,7 +1335,10 @@ func TestClient_DeleteTableIfMaterializationTypeMismatch(t *testing.T) {
 						return
 					}
 					w.WriteHeader(http.StatusOK)
-					json.NewEncoder(w).Encode(tt.tableResponse)
+					if err := json.NewEncoder(w).Encode(tt.tableResponse); err != nil {
+						fmt.Printf("Error encoding table response: %v\n", err)
+					}
+
 					return
 
 				case http.MethodDelete:
