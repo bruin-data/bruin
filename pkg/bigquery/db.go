@@ -297,7 +297,6 @@ func (d *Client) Ping(ctx context.Context) error {
 }
 
 func (d *Client) DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
-
 	tableRef, err := d.getTableRef(tableName)
 	if err != nil {
 		return err
@@ -435,9 +434,10 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 		return err
 	}
 	d.datasetNameCache.Store(datasetName, true) // Cache the created dataset
+	return nil
 }
 
-func (d Client) DeleteTableIfMaterializationTypeMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
+func (d *Client) DeleteTableIfMaterializationTypeMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
 	if asset.Materialization.Type == pipeline.MaterializationTypeNone {
 		return nil
 	}
@@ -454,7 +454,7 @@ func (d Client) DeleteTableIfMaterializationTypeMismatch(ctx context.Context, ta
 		return fmt.Errorf("failed to fetch metadata for table '%s': %w", tableName, err)
 	}
 	tableType := meta.Type
-	if strings.ToLower(string(tableType)) != strings.ToLower(string(asset.Materialization.Type)) {
+	if !strings.EqualFold(string(tableType), string(asset.Materialization.Type)) {
 		if err := tableRef.Delete(ctx); err != nil {
 			return fmt.Errorf("failed to delete table '%s': %w", tableName, err)
 		}
