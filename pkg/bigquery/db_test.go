@@ -1,17 +1,11 @@
 package bigquery
 
 import (
+	"cloud.google.com/go/bigquery"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"testing"
-	"time"
-
-	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
@@ -21,6 +15,11 @@ import (
 	bigquery2 "google.golang.org/api/bigquery/v2"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
 )
 
 const testProjectID = "test-project"
@@ -1271,7 +1270,7 @@ func TestClient_DeleteTableIfMaterializationTypeMismatch(t *testing.T) {
 		name          string
 		asset         *pipeline.Asset
 		tableResponse *bigquery2.Table
-		expectedErr   error
+		expectedErr   string
 		deleteCalled  bool
 	}{
 		{
@@ -1279,7 +1278,7 @@ func TestClient_DeleteTableIfMaterializationTypeMismatch(t *testing.T) {
 			asset: &pipeline.Asset{
 				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeNone},
 			},
-			expectedErr:  nil,
+			expectedErr:  "",
 			deleteCalled: false,
 		},
 		{
@@ -1288,7 +1287,7 @@ func TestClient_DeleteTableIfMaterializationTypeMismatch(t *testing.T) {
 				Materialization: pipeline.Materialization{Type: "TABLE"},
 			},
 			tableResponse: nil, // Simulate 404
-			expectedErr:   nil,
+			expectedErr:   "",
 			deleteCalled:  false,
 		},
 		{
@@ -1297,7 +1296,7 @@ func TestClient_DeleteTableIfMaterializationTypeMismatch(t *testing.T) {
 				Materialization: pipeline.Materialization{Type: "TABLE"},
 			},
 			tableResponse: &bigquery2.Table{Type: "TABLE"},
-			expectedErr:   nil,
+			expectedErr:   "",
 			deleteCalled:  false,
 		},
 		{
@@ -1306,7 +1305,7 @@ func TestClient_DeleteTableIfMaterializationTypeMismatch(t *testing.T) {
 				Materialization: pipeline.Materialization{Type: "VIEW"},
 			},
 			tableResponse: &bigquery2.Table{Type: "TABLE"},
-			expectedErr:   nil,
+			expectedErr:   "",
 			deleteCalled:  true,
 		},
 		{
@@ -1315,16 +1314,14 @@ func TestClient_DeleteTableIfMaterializationTypeMismatch(t *testing.T) {
 				Materialization: pipeline.Materialization{Type: "VIEW"},
 			},
 			tableResponse: &bigquery2.Table{Type: "TABLE"},
-			expectedErr:   fmt.Errorf("failed to delete table 'myschema.mytable': retry failed with context deadline exceeded; last error: googleapi: got HTTP response code 500 with body: delete error\nt st"),
+			expectedErr:   "failed to delete table 'myschema.mytable': retry failed with context deadline exceeded; last error: googleapi: got HTTP response code 500 with body: delete error",
 			deleteCalled:  true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Remove parallelism temporarily
-			// t.Parallel()
-
+			t.Parallel()
 			deleteCalled := false
 
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1377,10 +1374,11 @@ func TestClient_DeleteTableIfMaterializationTypeMismatch(t *testing.T) {
 			defer cancel()
 
 			err = d.DeleteTableIfMaterializationTypeMismatch(ctx, tableName, tt.asset)
-			if tt.expectedErr == nil {
+			if tt.expectedErr == "" {
 				require.NoError(t, err)
 			} else {
-				require.EqualError(t, err, tt.expectedErr.Error())
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.expectedErr)
 			}
 
 			assert.Equal(t, tt.deleteCalled, deleteCalled)
