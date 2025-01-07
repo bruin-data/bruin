@@ -3,7 +3,7 @@
 name: python_asset
 image: python:3.11
 depends:
-    - products
+    - chess_playground.player_summary
 
 secrets:
     - key: KEY1
@@ -17,9 +17,9 @@ import duckdb
 if os.getenv('INJECTED1') != "value1":
     raise Exception("KEY1 is not injected correctly")
 
-con = duckdb.connect(database = "duckdb-files/duckdb.db", read_only = False)
+con = duckdb.connect(database = "duckdb.db", read_only = False)
 
-con.execute("SELECT * FROM products")
+con.execute("SELECT * FROM chess_playground.player_summary")
 result = con.fetchall()
-if len(result) != 4:
+if len(result) != 2:
     raise Exception("Incorrect number of rows in player_summary")

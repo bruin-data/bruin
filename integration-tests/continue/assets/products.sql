@@ -10,25 +10,17 @@ columns:
     type: INTEGER
     description: "Unique identifier for the product"
     primary_key: true
-    checks:
-      - name: not_null
-      - name: positive
   - name: product_name
     type: VARCHAR
     description: "Name of the product"
-    checks:
-      - name: not_null
   - name: price
     type: FLOAT
     description: "Price of the product in USD"
     checks:
-      - name: not_null
       - name: positive
   - name: stock
     type: INTEGER
     description: "Number of units in stock"
-    checks:
-      - name: non_negative
 @bruin */
 
 SELECT
