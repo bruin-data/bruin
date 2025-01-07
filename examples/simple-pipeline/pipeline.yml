@@ -31,3 +31,4 @@ default_connections:
   asana: "my-asana"
   dynamodb: "my-dynamodb"
   tiktokads: "my-tiktokads"
+  github: "my-github"
