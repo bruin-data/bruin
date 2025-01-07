@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -1254,6 +1255,135 @@ func TestIsSameClustering(t *testing.T) {
 			t.Parallel()
 			result := IsSameClustering(tt.meta, tt.asset)
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestClient_DeleteTableIfMaterializationTypeMismatch(t *testing.T) {
+	t.Parallel()
+
+	projectID := "test-project"
+	schema := "myschema"
+	table := "mytable"
+	tableName := fmt.Sprintf("%s.%s", schema, table)
+
+	tests := []struct {
+		name          string
+		asset         *pipeline.Asset
+		tableResponse *bigquery2.Table
+		expectedErr   error
+		deleteCalled  bool
+	}{
+		{
+			name: "asset has no materialization type",
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeNone},
+			},
+			expectedErr:  nil,
+			deleteCalled: false,
+		},
+		{
+			name: "table not found (404)",
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{Type: "TABLE"},
+			},
+			tableResponse: nil, // Simulate 404
+			expectedErr:   nil,
+			deleteCalled:  false,
+		},
+		{
+			name: "materialization type matches",
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{Type: "TABLE"},
+			},
+			tableResponse: &bigquery2.Table{Type: "TABLE"},
+			expectedErr:   nil,
+			deleteCalled:  false,
+		},
+		{
+			name: "materialization type mismatch",
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{Type: "VIEW"},
+			},
+			tableResponse: &bigquery2.Table{Type: "TABLE"},
+			expectedErr:   nil,
+			deleteCalled:  true,
+		},
+		{
+			name: "delete fails",
+			asset: &pipeline.Asset{
+				Materialization: pipeline.Materialization{Type: "VIEW"},
+			},
+			tableResponse: &bigquery2.Table{Type: "TABLE"},
+			expectedErr:   fmt.Errorf("failed to delete table 'myschema.mytable': retry failed with context deadline exceeded; last error: googleapi: got HTTP response code 500 with body: delete error\nt st"),
+			deleteCalled:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Remove parallelism temporarily
+			// t.Parallel()
+
+			deleteCalled := false
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				fmt.Println("Request received:", r.Method, r.URL.Path)
+
+				switch r.Method {
+				case http.MethodGet:
+					if tt.tableResponse == nil {
+						w.WriteHeader(http.StatusNotFound)
+						return
+					}
+					w.WriteHeader(http.StatusOK)
+					json.NewEncoder(w).Encode(tt.tableResponse)
+					return
+
+				case http.MethodDelete:
+					deleteCalled = true
+					if tt.name == "delete fails" {
+						http.Error(w, "delete error", http.StatusInternalServerError)
+						return
+					}
+					w.WriteHeader(http.StatusOK)
+					return
+				default:
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				}
+			}))
+			defer server.Close()
+
+			client, err := bigquery.NewClient(
+				context.Background(),
+				projectID,
+				option.WithHTTPClient(&http.Client{Timeout: 10 * time.Second}),
+				option.WithEndpoint(server.URL),
+				option.WithCredentials(&google.Credentials{
+					ProjectID: projectID,
+					TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+						AccessToken: "test-token",
+					}),
+				}),
+			)
+			require.NoError(t, err)
+
+			d := Client{
+				client: client,
+				config: &Config{ProjectID: projectID},
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+
+			err = d.DeleteTableIfMaterializationTypeMismatch(ctx, tableName, tt.asset)
+			if tt.expectedErr == nil {
+				require.NoError(t, err)
+			} else {
+				require.EqualError(t, err, tt.expectedErr.Error())
+			}
+
+			assert.Equal(t, tt.deleteCalled, deleteCalled)
 		})
 	}
 }
