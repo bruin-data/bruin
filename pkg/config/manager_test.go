@@ -304,6 +304,14 @@ func TestLoadFromFile(t *testing.T) {
 					Timezone:      "UTC",
 				},
 			},
+			GitHub: []GitHubConnection{
+				{
+					Name:        "github-1",
+					AccessToken: "access-token-123",
+					Owner:       "owner-123",
+					Repo:        "repo-123",
+				},
+			},
 		},
 	}
 
