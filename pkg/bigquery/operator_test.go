@@ -198,7 +198,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			extractor := new(mockExtractor)
 			mat := new(mockMaterializer)
 			mat.On("IsFullRefresh").Return(false)
-			client.On("CreateDataSetIfNotExist", mock.AnythingOfType("*pipeline.Asset"), mock.Anything).Return(nil)
+			client.On("CreateDataSetIfNotExist", mock.AnythingOfType("*pipeline.Asset"), mock.Anything, mock.Anything).Return(nil)
 
 			conn := new(mockConnectionFetcher)
 			conn.On("GetBqConnection", "gcp-default").Return(client, nil)
