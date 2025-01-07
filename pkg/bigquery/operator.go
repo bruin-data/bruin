@@ -75,7 +75,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
-	if err := conn.CreateDataSetIfNotExist(t, ctx, o.datasetNameCache); err != nil {
+	if err := conn.CreateDataSetIfNotExist(t, ctx); err != nil {
 		return err
 	}
 	if o.materializer.IsFullRefresh() {

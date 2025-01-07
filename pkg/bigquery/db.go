@@ -36,7 +36,7 @@ type MetadataUpdater interface {
 
 type TableManager interface {
 	DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error
-	CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context, datasetNameCache sync.Map) error
+	CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error
 }
 
 type DB interface {
@@ -47,8 +47,9 @@ type DB interface {
 }
 
 type Client struct {
-	client *bigquery.Client
-	config *Config
+	client           *bigquery.Client
+	config           *Config
+	datasetNameCache *sync.Map
 }
 
 func NewDB(c *Config) (*Client, error) {
@@ -81,8 +82,9 @@ func NewDB(c *Config) (*Client, error) {
 	}
 
 	return &Client{
-		client: client,
-		config: c,
+		client:           client,
+		config:           c,
+		datasetNameCache: &sync.Map{},
 	}, nil
 }
 
@@ -398,24 +400,19 @@ func IsSameClustering(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool 
 	return true
 }
 
-func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context, datasetNameCache sync.Map) error {
+func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error {
 	tableName := asset.Name
 	tableComponents := strings.Split(tableName, ".")
 	var datasetName string
-	var projectID string
 	if len(tableComponents) == 2 {
 		datasetName = tableComponents[0]
-		projectID = d.config.ProjectID
 	} else if len(tableComponents) == 3 {
 		datasetName = tableComponents[1]
-		projectID = tableComponents[0]
 	}
-	name := strings.Join([]string{projectID, datasetName}, ".")
 	// Check the cache for the dataset
-	if _, exists := datasetNameCache.Load(name); exists {
+	if _, exists := d.datasetNameCache.Load(datasetName); exists {
 		return nil
 	}
-
 	// Check BigQuery for existing datasets
 	datasets := d.client.Datasets(ctx)
 	for {
@@ -427,7 +424,7 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 			return err
 		}
 		if datasetName == dataset.DatasetID {
-			datasetNameCache.Store(name, true) // Add to cache
+			d.datasetNameCache.Store(datasetName, true) // Add to cache
 			return nil
 		}
 	}
@@ -435,6 +432,6 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 	if err := d.client.Dataset(datasetName).Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
 		return err
 	}
-	datasetNameCache.Store(name, true) // Cache the created dataset
+	d.datasetNameCache.Store(datasetName, true) // Cache the created dataset
 	return nil
 }
