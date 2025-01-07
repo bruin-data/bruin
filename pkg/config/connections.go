@@ -455,3 +455,15 @@ type TikTokAdsConnection struct {
 func (c TikTokAdsConnection) GetName() string {
 	return c.Name
 }
+
+// github://?access_token=<access_token>&owner=<owner>&repo=<repo>
+type GitHubConnection struct {
+	Name        string `yaml:"name" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
+	Owner       string `yaml:"owner" json:"owner" mapstructure:"owner"`
+	Repo        string `yaml:"repo" json:"repo" mapstructure:"repo"`
+}
+
+func (c GitHubConnection) GetName() string {
+	return c.Name
+}
