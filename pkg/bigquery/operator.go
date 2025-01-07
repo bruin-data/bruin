@@ -2,15 +2,13 @@ package bigquery
 
 import (
 	"context"
-	"io"
-	"sync"
-
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
+	"io"
 )
 
 type materializer interface {
@@ -28,10 +26,9 @@ type connectionFetcher interface {
 }
 
 type BasicOperator struct {
-	connection       connectionFetcher
-	extractor        queryExtractor
-	materializer     materializer
-	datasetNameCache sync.Map
+	connection   connectionFetcher
+	extractor    queryExtractor
+	materializer materializer
 }
 
 func NewBasicOperator(conn connectionFetcher, extractor queryExtractor, materializer materializer) *BasicOperator {

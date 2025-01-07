@@ -3,7 +3,6 @@ package bigquery
 import (
 	"context"
 	"fmt"
-	"sync"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -75,7 +74,7 @@ func (m *mockQuerierWithResult) IsSameClustering(meta *bigquery.TableMetadata, a
 	return args.Bool(0)
 }
 
-func (m *mockQuerierWithResult) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context, datasetNameCache sync.Map) error {
+func (m *mockQuerierWithResult) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error {
 	args := m.Called(asset, ctx)
 	return args.Error(0)
 }
