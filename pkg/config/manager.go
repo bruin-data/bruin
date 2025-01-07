@@ -42,6 +42,7 @@ type Connections struct {
 	Kafka               []KafkaConnection               `yaml:"kafka,omitempty" json:"kafka,omitempty" mapstructure:"kafka"`
 	DuckDB              []DuckDBConnection              `yaml:"duckdb,omitempty" json:"duckdb,omitempty" mapstructure:"duckdb"`
 	Hubspot             []HubspotConnection             `yaml:"hubspot,omitempty" json:"hubspot,omitempty" mapstructure:"hubspot"`
+	GitHub              []GitHubConnection              `yaml:"github,omitempty" json:"github,omitempty" mapstructure:"github"`
 	GoogleSheets        []GoogleSheetsConnection        `yaml:"google_sheets,omitempty" json:"google_sheets,omitempty" mapstructure:"google_sheets"`
 	Chess               []ChessConnection               `yaml:"chess,omitempty" json:"chess,omitempty" mapstructure:"chess"`
 	Airtable            []AirtableConnection            `yaml:"airtable,omitempty" json:"airtable,omitempty" mapstructure:"airtable"`
@@ -251,6 +252,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.TikTokAds {
 		c.byKey[conn.Name] = &(c.TikTokAds[i])
 		c.typeNameMap[conn.Name] = "tiktokads"
+	}
+
+	for i, conn := range c.GitHub {
+		c.byKey[conn.Name] = &(c.GitHub[i])
+		c.typeNameMap[conn.Name] = "github"
 	}
 }
 
@@ -679,6 +685,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.TikTokAds = append(env.Connections.TikTokAds, conn)
+	case "github":
+		var conn GitHubConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.GitHub = append(env.Connections.GitHub, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -776,6 +789,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.DynamoDB = removeConnection(env.Connections.DynamoDB, connectionName)
 	case "tiktokads":
 		env.Connections.TikTokAds = removeConnection(env.Connections.TikTokAds, connectionName)
+	case "github":
+		env.Connections.GitHub = removeConnection(env.Connections.GitHub, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
