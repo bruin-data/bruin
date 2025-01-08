@@ -81,6 +81,10 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		if err != nil {
 			return errors.Wrap(err, "failed to compare clustering and partitioning metadata")
 		}
+		err = conn.DeleteTableIfMaterializationTypeMismatch(ctx, t.Name, t)
+		if err != nil {
+			return errors.Wrap(err, "failed to compare table materialization type with expected type")
+		}
 	}
 
 	return conn.RunQueryWithoutResult(ctx, q)
