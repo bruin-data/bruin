@@ -44,7 +44,7 @@ func (m *mockQuerierWithResult) Ping(ctx context.Context) error {
 	args := m.Called(ctx)
 	return args.Error(0)
 }
-func (m *mockQuerierWithResult) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error {
+func (m *mockQuerierWithResult) CreateDataBaseIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
 	args := m.Called(asset, ctx)
 	return args.Error(0)
 }

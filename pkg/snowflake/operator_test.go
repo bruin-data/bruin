@@ -189,8 +189,9 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			extractor := new(mockExtractor)
 			mat := new(mockMaterializer)
 			conn := new(mockConnectionFetcher)
-			conn.On("GetSfConnection", mock.Anything).Return(client, nil)
 
+			conn.On("GetSfConnection", mock.Anything).Return(client, nil)
+			client.On("CreateDataBaseIfNotExist", mock.AnythingOfType("*pipeline.Asset"), mock.Anything).Return(nil)
 			if tt.setup != nil {
 				tt.setup(&fields{
 					q: client,
