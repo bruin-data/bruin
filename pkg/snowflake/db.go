@@ -204,7 +204,7 @@ func (db *DB) CreateDataBaseIfNotExist(ctx context.Context, asset *pipeline.Asse
 		return nil
 	}
 	createQuery := query.Query{
-		Query: fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", databaseName),
+		Query: "CREATE DATABASE IF NOT EXISTS " + databaseName,
 	}
 	if err := db.RunQueryWithoutResult(ctx, &createQuery); err != nil {
 		return errors.Wrapf(err, "failed to create or ensure database: %s", databaseName)
