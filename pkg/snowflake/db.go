@@ -3,11 +3,11 @@ package snowflake
 import (
 	"context"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"io"
 	"strings"
 	"sync"
 
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -197,7 +197,7 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 	return result, nil
 }
 
-func (db *DB) CreateDataBaseIfNotExists(ctx context.Context, asset *pipeline.Asset) error {
+func (db *DB) CreateDataBaseIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
 	databaseName := strings.Split(asset.Name, ".")[0]
 	// Check the cache for the database
 	if _, exists := db.databaseNameCache.Load(databaseName); exists {
