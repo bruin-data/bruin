@@ -198,7 +198,15 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 }
 
 func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
-	schemaName := strings.ToUpper(strings.Split(asset.Name, ".")[0])
+	tableComponents := strings.Split(asset.Name, ".")
+	var schemaName string
+	if len(tableComponents) == 2 {
+		schemaName = strings.ToUpper(tableComponents[0])
+	} else if len(tableComponents) == 3 {
+		schemaName = strings.ToUpper(tableComponents[1])
+	} else {
+		return nil
+	}
 	// Check the cache for the database
 	if _, exists := db.schemaNameCache.Load(schemaName); exists {
 		return nil
