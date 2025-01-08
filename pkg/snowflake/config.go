@@ -6,8 +6,9 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/snowflakedb/gosnowflake"
 	"net/url"
+
+	"github.com/snowflakedb/gosnowflake"
 )
 
 type Config struct {
@@ -90,7 +91,7 @@ func parsePrivateKey(content string) (*rsa.PrivateKey, error) {
 	}
 	pk, ok := privateKey.(*rsa.PrivateKey)
 	if !ok {
-		return nil, fmt.Errorf("interface convertion. expected type *rsa.PrivateKey, but got %T", privateKey)
+		return nil, fmt.Errorf("interface conversion. expected type *rsa.PrivateKey, but got %T", privateKey)
 	}
 	return pk, nil
 }

@@ -399,7 +399,7 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 			if filepath.IsAbs(conn.PrivateKeyPath) {
 				continue
 			}
-			
+
 			env.Connections.Snowflake[i].PrivateKeyPath = filepath.Join(configLocation, conn.PrivateKeyPath)
 		}
 	}
