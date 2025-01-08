@@ -95,3 +95,7 @@ lint-python:
 
 	@echo "$(OK_COLOR)==> Running Python linting with flake8...$(NO_COLOR)"
 	@ruff check --fix ./pythonsrc
+
+lint:
+	@echo "$(OK_COLOR)>> Running golangci-lint ...$(NO_COLOR)"
+	golangci-lint run --timeout 10m60s ./...
