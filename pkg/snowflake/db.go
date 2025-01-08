@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -17,8 +19,9 @@ const (
 )
 
 type DB struct {
-	conn   *sqlx.DB
-	config *Config
+	conn            *sqlx.DB
+	config          *Config
+	schemaNameCache *sync.Map
 }
 
 func NewDB(c *Config) (*DB, error) {
@@ -34,7 +37,11 @@ func NewDB(c *Config) (*DB, error) {
 		return nil, errors.Wrapf(err, "failed to connect to snowflake")
 	}
 
-	return &DB{conn: db, config: c}, nil
+	return &DB{
+		conn:            db,
+		config:          c,
+		schemaNameCache: &sync.Map{},
+	}, nil
 }
 
 func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
@@ -92,7 +99,6 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 
 		result = append(result, columns)
 	}
-
 	return result, err
 }
 
@@ -189,4 +195,30 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 	}
 
 	return result, nil
+}
+
+func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	tableComponents := strings.Split(asset.Name, ".")
+	var schemaName string
+	switch len(tableComponents) {
+	case 2:
+		schemaName = strings.ToUpper(tableComponents[0])
+	case 3:
+		schemaName = strings.ToUpper(tableComponents[1])
+	default:
+		return nil
+	}
+	// Check the cache for the database
+	if _, exists := db.schemaNameCache.Load(schemaName); exists {
+		return nil
+	}
+	createQuery := query.Query{
+		Query: "CREATE SCHEMA IF NOT EXISTS " + schemaName,
+	}
+	if err := db.RunQueryWithoutResult(ctx, &createQuery); err != nil {
+		return errors.Wrapf(err, "failed to create or ensure database: %s", schemaName)
+	}
+	db.schemaNameCache.Store(schemaName, true)
+
+	return nil
 }
