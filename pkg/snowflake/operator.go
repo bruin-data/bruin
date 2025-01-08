@@ -141,7 +141,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return err
 	}
 
-	conn.CreateDataBaseIfNotExist(ctx, t)
+	err = conn.CreateDataBaseIfNotExist(ctx, t)
 	if err != nil {
 		return err
 	}
