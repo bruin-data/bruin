@@ -14,7 +14,7 @@ const (
 	MssqlDialect      = "mssql"
 	DatabricksDialect = "databricks"
 	AthenaDialect     = "athena"
-	SynapseDialect    = "synapse"
+	SynapseDialect    = "mssql"
 )
 
 // Make the map immutable and use constants.
