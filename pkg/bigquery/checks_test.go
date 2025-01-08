@@ -74,6 +74,11 @@ func (m *mockQuerierWithResult) IsSameClustering(meta *bigquery.TableMetadata, a
 	return args.Bool(0)
 }
 
+func (m *mockQuerierWithResult) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error {
+	args := m.Called(asset, ctx)
+	return args.Error(0)
+}
+
 type mockConnectionFetcher struct {
 	mock.Mock
 }
