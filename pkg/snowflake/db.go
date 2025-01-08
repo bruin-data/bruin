@@ -200,11 +200,12 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
 	tableComponents := strings.Split(asset.Name, ".")
 	var schemaName string
-	if len(tableComponents) == 2 {
+	switch len(tableComponents) {
+	case 2:
 		schemaName = strings.ToUpper(tableComponents[0])
-	} else if len(tableComponents) == 3 {
+	case 3:
 		schemaName = strings.ToUpper(tableComponents[1])
-	} else {
+	default:
 		return nil
 	}
 	// Check the cache for the database
