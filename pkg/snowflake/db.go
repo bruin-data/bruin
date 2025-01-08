@@ -3,8 +3,10 @@ package snowflake
 import (
 	"context"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"io"
 	"strings"
+	"sync"
 
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
@@ -17,8 +19,9 @@ const (
 )
 
 type DB struct {
-	conn   *sqlx.DB
-	config *Config
+	conn              *sqlx.DB
+	config            *Config
+	databaseNameCache *sync.Map
 }
 
 func NewDB(c *Config) (*DB, error) {
@@ -34,7 +37,11 @@ func NewDB(c *Config) (*DB, error) {
 		return nil, errors.Wrapf(err, "failed to connect to snowflake")
 	}
 
-	return &DB{conn: db, config: c}, nil
+	return &DB{
+		conn:              db,
+		config:            c,
+		databaseNameCache: &sync.Map{},
+	}, nil
 }
 
 func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
@@ -92,7 +99,6 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 
 		result = append(result, columns)
 	}
-
 	return result, err
 }
 
@@ -189,4 +195,21 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 	}
 
 	return result, nil
+}
+
+func (db *DB) CreateDataBaseIfNotExists(ctx context.Context, asset *pipeline.Asset) error {
+	databaseName := strings.Split(asset.Name, ".")[0]
+	// Check the cache for the database
+	if _, exists := db.databaseNameCache.Load(databaseName); exists {
+		return nil
+	}
+	createQuery := query.Query{
+		Query: fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", databaseName),
+	}
+	if err := db.RunQueryWithoutResult(ctx, &createQuery); err != nil {
+		return errors.Wrapf(err, "failed to create or ensure database: %s", databaseName)
+	}
+	db.databaseNameCache.Store(databaseName, true)
+
+	return nil
 }
