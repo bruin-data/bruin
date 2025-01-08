@@ -59,6 +59,7 @@ func (m *mockQuerierWithResult) SelectWithSchema(ctx context.Context, q *query.Q
 
 	return result, args.Error(1)
 }
+
 func (m *mockQuerierWithResult) DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
 	args := m.Called(ctx, tableName, asset)
 	return args.Error(0)
