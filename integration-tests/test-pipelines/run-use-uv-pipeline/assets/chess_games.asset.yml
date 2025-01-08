@@ -1,6 +1,0 @@
-name: chess_playground.games
-type: ingestr
-parameters:
-  source_connection: chess-run-use-uv
-  source_table: games
-  destination: duckdb

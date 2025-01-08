@@ -31,7 +31,18 @@ integration-test: build
 	@rm integration-tests/bruin
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@go run integration-tests/integration-test.go
+	@INCLUDE_INGESTR=1 go run integration-tests/integration-test.go
+
+integration-test-light: build
+	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
+	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
+	@touch integration-tests/.git
+	@touch integration-tests/bruin
+	@rm -rf integration-tests/.git
+	@rm integration-tests/bruin
+	@echo "$(OK_COLOR)==> Running light integration tests...$(NO_COLOR)"
+	@cd integration-tests && git init
+	@INCLUDE_INGESTR=0 go run integration-tests/integration-test.go
 
 clean:
 	@rm -rf ./bin

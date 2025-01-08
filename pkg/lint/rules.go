@@ -362,7 +362,7 @@ func ValidateCustomCheckQueryExists(ctx context.Context, p *pipeline.Pipeline, a
 
 func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
-	if asset.Type == pipeline.AssetTypeBigquerySeed {
+	if strings.HasSuffix(string(asset.Type), ".seed") {
 		if asset.Materialization.Type != pipeline.MaterializationTypeNone {
 			issues = append(issues, &Issue{
 				Task:        asset,
