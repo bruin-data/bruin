@@ -197,8 +197,8 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 	return result, nil
 }
 
-func (db *DB) CreateDataBaseIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
-	databaseName := strings.Split(asset.Name, ".")[0]
+func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	databaseName := strings.ToUpper(strings.Split(asset.Name, ".")[0])
 	// Check the cache for the database
 	if _, exists := db.databaseNameCache.Load(databaseName); exists {
 		return nil

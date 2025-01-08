@@ -25,7 +25,7 @@ type SfClient interface {
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 	Ping(ctx context.Context) error
 	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
-	CreateDataBaseIfNotExist(ctx context.Context, asset *pipeline.Asset) error
+	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error
 }
 
 type connectionFetcher interface {
@@ -141,7 +141,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return err
 	}
 
-	err = conn.CreateDataBaseIfNotExist(ctx, t)
+	err = conn.CreateSchemaIfNotExist(ctx, t)
 	if err != nil {
 		return err
 	}
