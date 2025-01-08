@@ -19,9 +19,9 @@ const (
 )
 
 type DB struct {
-	conn              *sqlx.DB
-	config            *Config
-	databaseNameCache *sync.Map
+	conn            *sqlx.DB
+	config          *Config
+	schemaNameCache *sync.Map
 }
 
 func NewDB(c *Config) (*DB, error) {
@@ -38,9 +38,9 @@ func NewDB(c *Config) (*DB, error) {
 	}
 
 	return &DB{
-		conn:              db,
-		config:            c,
-		databaseNameCache: &sync.Map{},
+		conn:            db,
+		config:          c,
+		schemaNameCache: &sync.Map{},
 	}, nil
 }
 
@@ -198,18 +198,18 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 }
 
 func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
-	databaseName := strings.ToUpper(strings.Split(asset.Name, ".")[0])
+	schemaName := strings.ToUpper(strings.Split(asset.Name, ".")[0])
 	// Check the cache for the database
-	if _, exists := db.databaseNameCache.Load(databaseName); exists {
+	if _, exists := db.schemaNameCache.Load(schemaName); exists {
 		return nil
 	}
 	createQuery := query.Query{
-		Query: "CREATE DATABASE IF NOT EXISTS " + databaseName,
+		Query: "CREATE SCHEMA IF NOT EXISTS " + schemaName,
 	}
 	if err := db.RunQueryWithoutResult(ctx, &createQuery); err != nil {
-		return errors.Wrapf(err, "failed to create or ensure database: %s", databaseName)
+		return errors.Wrapf(err, "failed to create or ensure database: %s", schemaName)
 	}
-	db.databaseNameCache.Store(databaseName, true)
+	db.schemaNameCache.Store(schemaName, true)
 
 	return nil
 }

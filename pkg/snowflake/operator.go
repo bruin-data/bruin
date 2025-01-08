@@ -82,7 +82,10 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
-
+	err = conn.CreateSchemaIfNotExist(ctx, t)
+	if err != nil {
+		return err
+	}
 	return conn.RunQueryWithoutResult(ctx, q)
 }
 
@@ -137,11 +140,6 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	}
 
 	conn, err := o.connection.GetSfConnection(connName)
-	if err != nil {
-		return err
-	}
-
-	err = conn.CreateSchemaIfNotExist(ctx, t)
 	if err != nil {
 		return err
 	}
