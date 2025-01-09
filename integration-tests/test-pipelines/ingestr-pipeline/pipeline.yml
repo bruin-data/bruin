@@ -1,0 +1,4 @@
+name: ingestr-pipeline
+default_connections:
+  duckdb: "duckdb-ingestr"
+  chess: "chess-ingestr"

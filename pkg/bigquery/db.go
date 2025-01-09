@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -35,6 +36,8 @@ type MetadataUpdater interface {
 
 type TableManager interface {
 	DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error
+	CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error
+	DeleteTableIfMaterializationTypeMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error
 }
 
 type DB interface {
@@ -45,8 +48,9 @@ type DB interface {
 }
 
 type Client struct {
-	client *bigquery.Client
-	config *Config
+	client           *bigquery.Client
+	config           *Config
+	datasetNameCache *sync.Map
 }
 
 func NewDB(c *Config) (*Client, error) {
@@ -79,8 +83,9 @@ func NewDB(c *Config) (*Client, error) {
 	}
 
 	return &Client{
-		client: client,
-		config: c,
+		client:           client,
+		config:           c,
+		datasetNameCache: &sync.Map{},
 	}, nil
 }
 
@@ -394,4 +399,65 @@ func IsSameClustering(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool 
 	}
 
 	return true
+}
+
+func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error {
+	tableName := asset.Name
+	tableComponents := strings.Split(tableName, ".")
+	var datasetName string
+	if len(tableComponents) == 2 {
+		datasetName = tableComponents[0]
+	} else if len(tableComponents) == 3 {
+		datasetName = tableComponents[1]
+	}
+	// Check the cache for the dataset
+	if _, exists := d.datasetNameCache.Load(datasetName); exists {
+		return nil
+	}
+	// Check BigQuery for existing datasets
+	datasets := d.client.Datasets(ctx)
+	for {
+		dataset, err := datasets.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if datasetName == dataset.DatasetID {
+			d.datasetNameCache.Store(datasetName, true) // Add to cache
+			return nil
+		}
+	}
+	// Create the dataset if it does not exist
+	if err := d.client.Dataset(datasetName).Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
+		return err
+	}
+	d.datasetNameCache.Store(datasetName, true) // Cache the created dataset
+	return nil
+}
+
+func (d *Client) DeleteTableIfMaterializationTypeMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
+	if asset.Materialization.Type == pipeline.MaterializationTypeNone {
+		return nil
+	}
+	tableRef, err := d.getTableRef(tableName)
+	if err != nil {
+		return err
+	}
+	meta, err := tableRef.Metadata(ctx)
+	if err != nil {
+		var apiErr *googleapi.Error
+		if errors.As(err, &apiErr) && apiErr.Code == 404 {
+			return nil
+		}
+		return fmt.Errorf("failed to fetch metadata for table '%s': %w", tableName, err)
+	}
+	tableType := meta.Type
+	if !strings.EqualFold(string(tableType), string(asset.Materialization.Type)) {
+		if err := tableRef.Delete(ctx); err != nil {
+			return fmt.Errorf("failed to delete table '%s': %w", tableName, err)
+		}
+	}
+	return nil
 }
