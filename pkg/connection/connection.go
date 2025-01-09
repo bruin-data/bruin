@@ -14,6 +14,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/chess"
+	"github.com/bruin-data/bruin/pkg/clickhouse"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
@@ -78,6 +79,7 @@ type Manager struct {
 	GitHub       map[string]*github.Client
 	AppStore     map[string]*appstore.Client
 	LinkedInAds  map[string]*linkedinads.Client
+	ClickHouse   map[string]*clickhouse.Client
 	mutex        sync.Mutex
 }
 
@@ -199,6 +201,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.DuckDB)...)
 
+	connClickHouse, err := m.GetClickHouseConnectionWithoutDefault(name)
+	if err == nil {
+		return connClickHouse, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.ClickHouse)...)
+
 	connHubspot, err := m.GetHubspotConnectionWithoutDefault(name)
 	if err == nil {
 		return connHubspot, nil
@@ -318,6 +326,26 @@ func (m *Manager) GetDuckDBConnectionWithoutDefault(name string) (duck.DuckDBCli
 	db, ok := m.DuckDB[name]
 	if !ok {
 		return nil, errors.Errorf("DuckDB connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetClickHouseConnection(name string) (clickhouse.ClickHouseClient, error) {
+	db, err := m.GetClickHouseConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetClickHouseConnectionWithoutDefault("clickhouse-default")
+}
+
+func (m *Manager) GetClickHouseConnectionWithoutDefault(name string) (clickhouse.ClickHouseClient, error) {
+	if m.ClickHouse == nil {
+		return nil, errors.New("no clickhouse connections found")
+	}
+	db, ok := m.ClickHouse[name]
+	if !ok {
+		return nil, errors.Errorf("clickhouse connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -1549,6 +1577,32 @@ func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnect
 	return nil
 }
 
+func (m *Manager) AddClickHouseConnectionFromConfig(connection *config.ClickHouseConnection) error {
+	m.mutex.Lock()
+	if m.ClickHouse == nil {
+		m.ClickHouse = make(map[string]*clickhouse.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := clickhouse.NewClient(&clickhouse.Config{
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Username: connection.Username,
+		Password: connection.Password,
+		Database: connection.Database,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.ClickHouse[connection.Name] = client
+
+	return nil
+}
+
 func (m *Manager) AddChessConnectionFromConfig(connection *config.ChessConnection) error {
 	m.mutex.Lock()
 	if m.Chess == nil {
@@ -2023,6 +2077,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			err := connectionManager.AddDuckDBConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add duckdb connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.ClickHouse {
+		wg.Go(func() {
+			err := connectionManager.AddClickHouseConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add clickhouse connection '%s'", conn.Name))
 			}
 		})
 	}
