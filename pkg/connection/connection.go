@@ -18,6 +18,7 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/dynamodb"
 	"github.com/bruin-data/bruin/pkg/facebookads"
+	"github.com/bruin-data/bruin/pkg/github"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/gsheets"
 	"github.com/bruin-data/bruin/pkg/hana"
@@ -72,6 +73,7 @@ type Manager struct {
 	DynamoDB     map[string]*dynamodb.Client
 	Zendesk      map[string]*zendesk.Client
 	TikTokAds    map[string]*tiktokads.Client
+	GitHub       map[string]*github.Client
 	mutex        sync.Mutex
 }
 
@@ -245,12 +247,19 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	if err == nil {
 		return connZendesk, nil
 	}
-
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Zendesk)...)
 	connTikTokAds, err := m.GetTikTokAdsConnectionWithoutDefault(name)
 	if err == nil {
 		return connTikTokAds, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Zendesk)...)
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.TikTokAds)...)
+
+	connGitHub, err := m.GetGitHubConnectionWithoutDefault(name)
+	if err == nil {
+		return connGitHub, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GitHub)...)
+
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
 
@@ -842,6 +851,25 @@ func (m *Manager) GetDynamoDBConnectionWithoutDefault(name string) (*dynamodb.Cl
 	db, ok := m.DynamoDB[name]
 	if !ok {
 		return nil, errors.Errorf("dynamodb connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetGitHubConnection(name string) (*github.Client, error) {
+	db, err := m.GetGitHubConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetGitHubConnectionWithoutDefault("github-default")
+}
+
+func (m *Manager) GetGitHubConnectionWithoutDefault(name string) (*github.Client, error) {
+	if m.GitHub == nil {
+		return nil, errors.New("no github connections found")
+	}
+	db, ok := m.GitHub[name]
+	if !ok {
+		return nil, errors.Errorf("github connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -1645,6 +1673,29 @@ func (m *Manager) AddTikTokAdsConnectionFromConfig(connection *config.TikTokAdsC
 	return nil
 }
 
+func (m *Manager) AddGitHubConnectionFromConfig(connection *config.GitHubConnection) error {
+	m.mutex.Lock()
+	if m.GitHub == nil {
+		m.GitHub = make(map[string]*github.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := github.NewClient(github.Config{
+		AccessToken: connection.AccessToken,
+		Owner:       connection.Owner,
+		Repo:        connection.Repo,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.GitHub[connection.Name] = client
+
+	return nil
+}
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
 
@@ -1955,6 +2006,14 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			err := connectionManager.AddTikTokAdsConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add tiktokads connection '%s'", conn.Name))
+			}
+		})
+	}
+	for _, conn := range cm.SelectedEnvironment.Connections.GitHub {
+		wg.Go(func() {
+			err := connectionManager.AddGitHubConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add github connection '%s'", conn.Name))
 			}
 		})
 	}

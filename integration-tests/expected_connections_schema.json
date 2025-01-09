@@ -349,6 +349,12 @@
             "$ref": "#/$defs/TikTokAdsConnection"
           },
           "type": "array"
+        },
+        "github": {
+          "items": {
+            "$ref": "#/$defs/GitHubConnection"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -1035,6 +1041,29 @@
         "host",
         "port",
         "database"
+      ]
+    },
+    "GitHubConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "owner",
+        "repo"
       ]
     },
     "ZendeskConnection": {
