@@ -768,39 +768,37 @@ func setupExecutors(
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeAthenaQuery) || estimateCustomCheckType == pipeline.AssetTypeAthenaQuery || s.WillRunTaskOfType(pipeline.AssetTypeAthenaSeed) {
 		athenaOperator := athena.NewBasicOperator(conn, wholeFileExtractor, athena.NewMaterializer(fullRefresh))
-		athenaCustomCheckRunner := ansisql.NewCustomCheckOperator(conn, renderer)
 		athenaCheckRunner := athena.NewColumnCheckOperator(conn)
 
 		mainExecutors[pipeline.AssetTypeAthenaQuery][scheduler.TaskInstanceTypeMain] = athenaOperator
 		mainExecutors[pipeline.AssetTypeAthenaQuery][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner
-		mainExecutors[pipeline.AssetTypeAthenaQuery][scheduler.TaskInstanceTypeCustomCheck] = athenaCustomCheckRunner
+		mainExecutors[pipeline.AssetTypeAthenaQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		mainExecutors[pipeline.AssetTypeAthenaSeed][scheduler.TaskInstanceTypeMain] = seedOperator
 		mainExecutors[pipeline.AssetTypeAthenaSeed][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner
-		mainExecutors[pipeline.AssetTypeAthenaSeed][scheduler.TaskInstanceTypeCustomCheck] = athenaCustomCheckRunner
+		mainExecutors[pipeline.AssetTypeAthenaSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		if estimateCustomCheckType == pipeline.AssetTypeAthenaQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner
-			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = athenaCustomCheckRunner
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		}
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeDuckDBQuery) || estimateCustomCheckType == pipeline.AssetTypeDuckDBQuery || s.WillRunTaskOfType(pipeline.AssetTypeDuckDBSeed) {
 		duckDBOperator := duck.NewBasicOperator(conn, wholeFileExtractor, duck.NewMaterializer(fullRefresh))
-		duckDBCustomCheckRunner := ansisql.NewCustomCheckOperator(conn, renderer)
 		duckDBCheckRunner := duck.NewColumnCheckOperator(conn)
 
 		mainExecutors[pipeline.AssetTypeDuckDBQuery][scheduler.TaskInstanceTypeMain] = duckDBOperator
 		mainExecutors[pipeline.AssetTypeDuckDBQuery][scheduler.TaskInstanceTypeColumnCheck] = duckDBCheckRunner
-		mainExecutors[pipeline.AssetTypeDuckDBQuery][scheduler.TaskInstanceTypeCustomCheck] = duckDBCustomCheckRunner
+		mainExecutors[pipeline.AssetTypeDuckDBQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		mainExecutors[pipeline.AssetTypeDuckDBSeed][scheduler.TaskInstanceTypeMain] = seedOperator
 		mainExecutors[pipeline.AssetTypeDuckDBSeed][scheduler.TaskInstanceTypeColumnCheck] = duckDBCheckRunner
-		mainExecutors[pipeline.AssetTypeDuckDBSeed][scheduler.TaskInstanceTypeCustomCheck] = duckDBCustomCheckRunner
+		mainExecutors[pipeline.AssetTypeDuckDBSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		if estimateCustomCheckType == pipeline.AssetTypeDuckDBQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = duckDBCheckRunner
-			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = duckDBCustomCheckRunner
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		}
 	}
 
