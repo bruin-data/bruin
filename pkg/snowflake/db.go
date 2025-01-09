@@ -223,7 +223,7 @@ func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset)
 	return nil
 }
 
-func (db *DB) HandleMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset, errorMessage string, creationQuery *query.Query) error {
+func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset, errorMessage string, creationQuery *query.Query) error {
 	tableComponents := strings.Split(asset.Name, ".")
 	var schemaName string
 	var tableName string

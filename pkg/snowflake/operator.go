@@ -27,7 +27,7 @@ type SfClient interface {
 	Ping(ctx context.Context) error
 	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
 	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error
-	HandleMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset, errorMessage string, creationQuery *query.Query) error
+	RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset, errorMessage string, creationQuery *query.Query) error
 }
 
 type connectionFetcher interface {
@@ -92,7 +92,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	err = conn.RunQueryWithoutResult(ctx, q)
 	if err != nil {
 		if o.materializer.IsFullRefresh() {
-			if handleErr := conn.HandleMaterializationTypeMismatch(ctx, t, err.Error(), q); handleErr != nil {
+			if handleErr := conn.RecreateTableOnMaterializationTypeMismatch(ctx, t, err.Error(), q); handleErr != nil {
 				return errors.Wrap(handleErr, "query execution failed during full refresh handling")
 			}
 			return nil

@@ -48,7 +48,7 @@ func (m *mockQuerierWithResult) CreateSchemaIfNotExist(ctx context.Context, asse
 	args := m.Called(asset, ctx)
 	return args.Error(0)
 }
-func (m *mockQuerierWithResult) HandleMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset, errorMessage string, creationQuery *query.Query) error {
+func (m *mockQuerierWithResult) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset, errorMessage string, creationQuery *query.Query) error {
 	args := m.Called(ctx, asset, errorMessage, creationQuery)
 	return args.Error(0)
 }

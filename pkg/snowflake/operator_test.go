@@ -196,7 +196,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			mat.On("IsFullRefresh").Return(false)
 			conn.On("GetSfConnection", mock.Anything).Return(client, nil)
 			client.On("CreateSchemaIfNotExist", mock.AnythingOfType("*pipeline.Asset"), mock.Anything).Return(nil)
-			client.On("HandleMaterializationTypeMismatch", mock.AnythingOfType("*pipeline.Asset"), mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			client.On("RecreateTableOnMaterializationTypeMismatch", mock.AnythingOfType("*pipeline.Asset"), mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			if tt.setup != nil {
 				tt.setup(&fields{
 					q: client,
