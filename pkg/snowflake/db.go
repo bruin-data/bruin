@@ -223,26 +223,36 @@ func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset)
 	return nil
 }
 
-func (db *DB) HandleObjectAlreadyExists(ctx context.Context, objectName, errorMessage string, creationQuery *query.Query) error {
-	var objectType string
+func (db *DB) HandleMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset, errorMessage string, creationQuery *query.Query) error {
+	tableComponents := strings.Split(asset.Name, ".")
+	var schemaName string
+	switch len(tableComponents) {
+	case 2:
+		schemaName = strings.ToUpper(tableComponents[0])
+	case 3:
+		schemaName = strings.ToUpper(tableComponents[1])
+	default:
+		return nil
+	}
+	var materializationType string
 	switch {
 	case strings.Contains(errorMessage, "as TABLE"):
-		objectType = "TABLE"
+		materializationType = "TABLE"
 	case strings.Contains(errorMessage, "as VIEW"):
-		objectType = "VIEW"
+		materializationType = "VIEW"
 	default:
 		return nil
 	}
 
 	dropQuery := query.Query{
-		Query: fmt.Sprintf("DROP %s IF EXISTS %s", objectType, objectName),
+		Query: fmt.Sprintf("DROP %s IF EXISTS %s", materializationType, schemaName),
 	}
 	if dropErr := db.RunQueryWithoutResult(ctx, &dropQuery); dropErr != nil {
-		return errors.Wrapf(dropErr, "failed to drop existing %s: %s", objectType, objectName)
+		return errors.Wrapf(dropErr, "failed to drop existing %s: %s", materializationType, schemaName)
 	}
 
 	if retryErr := db.RunQueryWithoutResult(ctx, creationQuery); retryErr != nil {
-		return errors.Wrap(retryErr, fmt.Sprintf("failed to recreate %s after dropping existing one", objectType))
+		return errors.Wrap(retryErr, fmt.Sprintf("failed to recreate %s after dropping existing one", materializationType))
 	}
 
 	return nil
