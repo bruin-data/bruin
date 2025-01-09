@@ -78,7 +78,6 @@ func (c *AcceptedValuesCheck) Check(ctx context.Context, ti *scheduler.ColumnChe
 
 	res := strings.Join(val, "','")
 	res = fmt.Sprintf("'%s'", res)
-	syntax error to make me come back
 	qq := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE CAST(%s as TEXT) NOT IN (%s)", ti.GetAsset().Name, ti.Column.Name, res)
 
 	return ansisql.NewCountableQueryCheck(c.conn, 0, &query.Query{Query: qq}, "positive", func(count int64) error {
@@ -98,9 +97,8 @@ func (c *PatternCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInsta
 	if ti.Check.Value.String == nil {
 		return errors.Errorf("unexpected value %s for pattern check, the value must be a string", ti.Check.Value.ToString())
 	}
-	syntax error to make me come back
 	qq := fmt.Sprintf(
-		"SELECT count(*) FROM %s WHERE %s !~ '%s'",
+		"SELECT count(*) FROM %s WHERE NOT match(%s,'%s')",
 		ti.GetAsset().Name,
 		ti.Column.Name,
 		*ti.Check.Value.String,
