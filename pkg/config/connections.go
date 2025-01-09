@@ -194,28 +194,30 @@ func (c RedshiftConnection) GetName() string {
 }
 
 type SnowflakeConnection struct {
-	Name      string `yaml:"name" json:"name" mapstructure:"name"`
-	Account   string `yaml:"account" json:"account" mapstructure:"account"`
-	Username  string `yaml:"username" json:"username" mapstructure:"username"`
-	Password  string `yaml:"password" json:"password" mapstructure:"password"`
-	Region    string `yaml:"region" json:"region" mapstructure:"region"`
-	Role      string `yaml:"role" json:"role" mapstructure:"role"`
-	Database  string `yaml:"database" json:"database" mapstructure:"database"`
-	Schema    string `yaml:"schema" json:"schema" mapstructure:"schema"`
-	Warehouse string `yaml:"warehouse" json:"warehouse" mapstructure:"warehouse"`
+	Name           string `yaml:"name" json:"name" mapstructure:"name"`
+	Account        string `yaml:"account" json:"account" mapstructure:"account"`
+	Username       string `yaml:"username" json:"username" mapstructure:"username"`
+	Password       string `yaml:"password" json:"password" mapstructure:"password"`
+	Region         string `yaml:"region" json:"region" mapstructure:"region"`
+	Role           string `yaml:"role" json:"role" mapstructure:"role"`
+	Database       string `yaml:"database" json:"database" mapstructure:"database"`
+	Schema         string `yaml:"schema" json:"schema" mapstructure:"schema"`
+	Warehouse      string `yaml:"warehouse" json:"warehouse" mapstructure:"warehouse"`
+	PrivateKeyPath string `yaml:"private_key_path" json:"private_key_path" mapstructure:"private_key_path"`
 }
 
 func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]string{
-		"name":      c.Name,
-		"account":   c.Account,
-		"username":  c.Username,
-		"password":  c.Password,
-		"region":    c.Region,
-		"role":      c.Role,
-		"database":  c.Database,
-		"schema":    c.Schema,
-		"warehouse": c.Warehouse,
+		"name":             c.Name,
+		"account":          c.Account,
+		"username":         c.Username,
+		"password":         c.Password,
+		"region":           c.Region,
+		"role":             c.Role,
+		"database":         c.Database,
+		"schema":           c.Schema,
+		"warehouse":        c.Warehouse,
+		"private_key_path": c.PrivateKeyPath,
 	})
 }
 

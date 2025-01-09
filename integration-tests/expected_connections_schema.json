@@ -974,6 +974,9 @@
         },
         "warehouse": {
           "type": "string"
+        },
+        "private_key_path": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
@@ -987,7 +990,8 @@
         "role",
         "database",
         "schema",
-        "warehouse"
+        "warehouse",
+        "private_key_path"
       ]
     },
     "StripeConnection": {

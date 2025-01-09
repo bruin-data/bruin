@@ -3,6 +3,7 @@ package connection
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
@@ -945,15 +946,25 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 	}
 	m.mutex.Unlock()
 
+	privateKey := ""
+	if connection.PrivateKeyPath != "" {
+		privateKeyBytes, err := os.ReadFile(connection.PrivateKeyPath)
+		if err != nil {
+			return err
+		}
+		privateKey = string(privateKeyBytes)
+	}
+
 	db, err := snowflake.NewDB(&snowflake.Config{
-		Account:   connection.Account,
-		Username:  connection.Username,
-		Password:  connection.Password,
-		Region:    connection.Region,
-		Role:      connection.Role,
-		Database:  connection.Database,
-		Schema:    connection.Schema,
-		Warehouse: connection.Warehouse,
+		Account:    connection.Account,
+		Username:   connection.Username,
+		Password:   connection.Password,
+		Region:     connection.Region,
+		Role:       connection.Role,
+		Database:   connection.Database,
+		Schema:     connection.Schema,
+		Warehouse:  connection.Warehouse,
+		PrivateKey: privateKey,
 	})
 	if err != nil {
 		return err

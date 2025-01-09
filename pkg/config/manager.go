@@ -395,6 +395,19 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 				env.Connections.MySQL[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
 			}
 		}
+
+		// Make Snowflake private key path absolute
+		for i, conn := range env.Connections.Snowflake {
+			if conn.PrivateKeyPath == "" {
+				continue
+			}
+
+			if filepath.IsAbs(conn.PrivateKeyPath) {
+				continue
+			}
+
+			env.Connections.Snowflake[i].PrivateKeyPath = filepath.Join(configLocation, conn.PrivateKeyPath)
+		}
 	}
 
 	err = config.SelectEnvironment(config.DefaultEnvironmentName)
