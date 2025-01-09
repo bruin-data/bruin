@@ -13,6 +13,7 @@ import (
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/clickhouse"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/date"
@@ -169,6 +170,7 @@ func Render() *cli.Command {
 					pipeline.AssetTypeSynapseQuery:    synapse.NewRenderer(fullRefresh),
 					pipeline.AssetTypeAthenaQuery:     athena.NewRenderer(fullRefresh, resultsLocation),
 					pipeline.AssetTypeDuckDBQuery:     duck.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeClickHouse:      clickhouse.NewMaterializer(fullRefresh),
 				},
 				builder: DefaultPipelineBuilder,
 				writer:  os.Stdout,
