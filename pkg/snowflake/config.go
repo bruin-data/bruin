@@ -98,7 +98,7 @@ func parsePrivateKey(content string) (*rsa.PrivateKey, error) {
 	if err != nil {
 		// Check if the error suggests encryption issues
 		if strings.Contains(err.Error(), "encrypted") {
-			return nil, errors.New("failed to parse encrypted private key. Provide an unencrypted key")
+			return nil, errors.New("failed to parse encrypted private due to an encryption issue, please provide an unencrypted key")
 		}
 		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
