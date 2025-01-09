@@ -90,7 +90,7 @@ func parsePrivateKey(content string) (*rsa.PrivateKey, error) {
 
 	// Check for keywords in the PEM block type to identify encryption
 	if block.Type == "ENCRYPTED PRIVATE KEY" {
-		return nil, errors.New("encrypted private keys are not supported. Please provide an unencrypted key")
+		return nil, errors.New("encrypted private keys are not supported at the moment, please provide an unencrypted key")
 	}
 
 	// Attempt to parse the private key
