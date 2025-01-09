@@ -222,3 +222,28 @@ func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset)
 
 	return nil
 }
+
+func (db *DB) HandleObjectAlreadyExists(ctx context.Context, objectName, errorMessage string, creationQuery *query.Query) error {
+	var objectType string
+	switch {
+	case strings.Contains(errorMessage, "as TABLE"):
+		objectType = "TABLE"
+	case strings.Contains(errorMessage, "as VIEW"):
+		objectType = "VIEW"
+	default:
+		return nil
+	}
+
+	dropQuery := query.Query{
+		Query: fmt.Sprintf("DROP %s IF EXISTS %s", objectType, objectName),
+	}
+	if dropErr := db.RunQueryWithoutResult(ctx, &dropQuery); dropErr != nil {
+		return errors.Wrapf(dropErr, "failed to drop existing %s: %s", objectType, objectName)
+	}
+
+	if retryErr := db.RunQueryWithoutResult(ctx, creationQuery); retryErr != nil {
+		return errors.Wrap(retryErr, fmt.Sprintf("failed to recreate %s after dropping existing one", objectType))
+	}
+
+	return nil
+}
