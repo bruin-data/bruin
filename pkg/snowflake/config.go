@@ -106,7 +106,7 @@ func parsePrivateKey(content string) (*rsa.PrivateKey, error) {
 	// Assert the type to *rsa.PrivateKey
 	pk, ok := privateKey.(*rsa.PrivateKey)
 	if !ok {
-		return nil, fmt.Errorf("interface conversion: expected type *rsa.PrivateKey, but got %T", privateKey)
+		return nil, fmt.Errorf("failed to convert parsed private key to an actual instance, got '%T' instead", privateKey)
 	}
 
 	return pk, nil
