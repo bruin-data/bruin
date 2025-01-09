@@ -89,14 +89,15 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
-
 	err = conn.RunQueryWithoutResult(ctx, q)
-	if err != nil && o.materializer.IsFullRefresh() {
-		handleErr := conn.HandleMaterializationTypeMismatch(ctx, t, err.Error(), q)
-		if handleErr != nil {
-			return errors.Wrap(handleErr, "query execution failed")
+	if err != nil {
+		if o.materializer.IsFullRefresh() {
+			if handleErr := conn.HandleMaterializationTypeMismatch(ctx, t, err.Error(), q); handleErr != nil {
+				return errors.Wrap(handleErr, "query execution failed during full refresh handling")
+			}
+			return nil
 		}
-	} else if err != nil {
+
 		return errors.Wrap(err, "query execution failed")
 	}
 
