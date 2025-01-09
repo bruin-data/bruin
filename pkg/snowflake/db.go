@@ -237,9 +237,12 @@ func (db *DB) HandleMaterializationTypeMismatch(ctx context.Context, asset *pipe
 	var materializationType string
 	switch {
 	case strings.Contains(errorMessage, "as TABLE"):
+
 		materializationType = "TABLE"
+
 	case strings.Contains(errorMessage, "as VIEW"):
 		materializationType = "VIEW"
+
 	default:
 		return nil
 	}
