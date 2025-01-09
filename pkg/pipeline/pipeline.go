@@ -51,6 +51,8 @@ const (
 	AssetTypeSynapseSeed          = AssetType("synapse.seed")
 	AssetTypeIngestr              = AssetType("ingestr")
 	AssetTypeTableau              = AssetType("tableau")
+	AssetTypeClickHouse           = AssetType("clickhouse.sql")
+	AssetTypeClickHouseSeed       = AssetType("clickhouse.seed")
 	RunConfigFullRefresh          = RunConfig("full-refresh")
 	RunConfigStartDate            = RunConfig("start-date")
 	RunConfigEndDate              = RunConfig("end-date")
