@@ -14,6 +14,7 @@ import (
 
 type materializer interface {
 	Render(task *pipeline.Asset, query string) (string, error)
+	IsFullRefresh() bool
 }
 
 type queryExtractor interface {
@@ -86,7 +87,11 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
-	return conn.RunQueryWithoutResult(ctx, q)
+	err =conn.RunQueryWithoutResult(ctx, q)
+	if err != nil && o.materializer. {
+
+	}
+	return
 }
 
 func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOperator {
