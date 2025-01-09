@@ -6,9 +6,10 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/snowflakedb/gosnowflake"
 	"net/url"
 	"strings"
+
+	"github.com/snowflakedb/gosnowflake"
 )
 
 type Config struct {
