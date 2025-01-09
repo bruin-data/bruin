@@ -226,11 +226,14 @@ func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset)
 func (db *DB) HandleMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset, errorMessage string, creationQuery *query.Query) error {
 	tableComponents := strings.Split(asset.Name, ".")
 	var schemaName string
+	var tableName string
 	switch len(tableComponents) {
 	case 2:
 		schemaName = strings.ToUpper(tableComponents[0])
+		tableName = strings.ToUpper(tableComponents[1])
 	case 3:
 		schemaName = strings.ToUpper(tableComponents[1])
+		tableName = strings.ToUpper(tableComponents[2])
 	default:
 		return nil
 	}
@@ -248,8 +251,9 @@ func (db *DB) HandleMaterializationTypeMismatch(ctx context.Context, asset *pipe
 	}
 
 	dropQuery := query.Query{
-		Query: fmt.Sprintf("DROP %s IF EXISTS %s", materializationType, schemaName),
+		Query: fmt.Sprintf("DROP %s IF EXISTS %s.%s", materializationType, schemaName, tableName),
 	}
+
 	if dropErr := db.RunQueryWithoutResult(ctx, &dropQuery); dropErr != nil {
 		return errors.Wrapf(dropErr, "failed to drop existing %s: %s", materializationType, schemaName)
 	}
