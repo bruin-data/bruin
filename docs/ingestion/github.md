@@ -1,9 +1,9 @@
 # GitHub
 GitHub is a developer platform that allows developers to create, store, manage and share their code.
 
-Bruin supports GitHub as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from GitHub into your data warehouse.
+Bruin supports GitHub as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from GitHub into your data platform.
 
-In order to set up GitHub connection, you need to add a configuration item in the `.bruin.yml` file and `asset` file. You need `access_token`, `owner` and `repo`. For details on how to obtain these credentials and to grant necessary permissions, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/github#setup-guide)
+In order to set up GitHub connection, you need to add a configuration item in the `.bruin.yml` file and `asset` file. If you want to fetch from private repositories, you need to provide `access_token`, `owner` and `repo`.For details on how to obtain these credentials and to grant necessary permissions, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/github#setup-guide). If you want to fetch from public repositories, you only need to provide `owner` and `repo`.
 
 Follow the steps below to correctly set up GitHub as a data source and run ingestion.
 
@@ -12,14 +12,13 @@ To connect to GitHub as a source, you need to add a configuration item to the co
 
 ```yaml
 connections:
-  <destination_connection_details>
   github:
     - name: my-github
       access_token: "token_123"
       owner: "John"
       repo: "repo_123"
 ```
-- `access_token` (required): Used for authentication and is necessary to access data through the GitHub API.
+- `access_token` (optional): Used for authentication to access data through the GitHub API for private repositories. 
 - `owner` (required): The owner of the repository.
 - `repo` (required): The name of the repository.
 

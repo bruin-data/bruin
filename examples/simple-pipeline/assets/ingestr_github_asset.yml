@@ -3,7 +3,7 @@ type: ingestr
 connection: postgres
 
 parameters:
-  source_connection: github
-  source_table: 'issues'
+  source_connection: my-github
+  source_table: 'pull_requests'
 
   destination: postgres

@@ -1058,7 +1058,6 @@
       "type": "object",
       "required": [
         "name",
-        "access_token",
         "owner",
         "repo"
       ]

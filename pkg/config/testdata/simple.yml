@@ -193,9 +193,14 @@ environments:
           timezone: "UTC"
       github:
         - name: "github-1"
-          access_token: "access-token-123"
-          owner: "owner-123"
-          repo: "repo-123"
+          owner: "owner-456"
+          repo: "repo-456"
+
+        - name: "github-2"
+          access_token: "token-123"
+          owner: "owner-456"
+          repo: "repo-456"
+
 
   prod:
     connections:

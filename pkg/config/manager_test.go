@@ -306,10 +306,15 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			GitHub: []GitHubConnection{
 				{
-					Name:        "github-1",
-					AccessToken: "access-token-123",
-					Owner:       "owner-123",
-					Repo:        "repo-123",
+					Name:  "github-1",
+					Owner: "owner-456",
+					Repo:  "repo-456",
+				},
+				{
+					Name:        "github-2",
+					AccessToken: "token-123",
+					Owner:       "owner-456",
+					Repo:        "repo-456",
 				},
 			},
 		},
