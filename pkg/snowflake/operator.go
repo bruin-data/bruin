@@ -14,6 +14,7 @@ import (
 
 type materializer interface {
 	Render(task *pipeline.Asset, query string) (string, error)
+	IsFullRefresh() bool
 }
 
 type queryExtractor interface {
@@ -26,6 +27,7 @@ type SfClient interface {
 	Ping(ctx context.Context) error
 	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
 	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error
+	RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error
 }
 
 type connectionFetcher interface {
@@ -85,6 +87,12 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	err = conn.CreateSchemaIfNotExist(ctx, t)
 	if err != nil {
 		return err
+	}
+	if o.materializer.IsFullRefresh() {
+		err = conn.RecreateTableOnMaterializationTypeMismatch(ctx, t)
+		if err != nil {
+			return err
+		}
 	}
 	return conn.RunQueryWithoutResult(ctx, q)
 }
