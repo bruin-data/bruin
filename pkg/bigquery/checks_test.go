@@ -74,6 +74,7 @@ func (m *mockQuerierWithResult) IsSameClustering(meta *bigquery.TableMetadata, a
 	args := m.Called(meta, asset)
 	return args.Bool(0)
 }
+
 func (m *mockQuerierWithResult) DeleteTableIfMaterializationTypeMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
 	args := m.Called(ctx, tableName, asset)
 	return args.Error(0)

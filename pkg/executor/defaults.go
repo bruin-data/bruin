@@ -30,6 +30,8 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 	pipeline.AssetTypeBigquerySource: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
 	},
 	pipeline.AssetTypeBigquerySeed: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
