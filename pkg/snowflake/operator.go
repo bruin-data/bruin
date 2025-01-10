@@ -26,6 +26,7 @@ type SfClient interface {
 	Ping(ctx context.Context) error
 	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
 	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error
+	PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error
 }
 
 type connectionFetcher interface {
@@ -82,11 +83,27 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
+
+	// Ensure schema exists
 	err = conn.CreateSchemaIfNotExist(ctx, t)
 	if err != nil {
 		return err
 	}
-	return conn.RunQueryWithoutResult(ctx, q)
+
+	// Run the main query
+	err = conn.RunQueryWithoutResult(ctx, q)
+	if err != nil {
+		return err
+	}
+	// Push metadata after the query execution
+	if p.MetadataPush.HasAnyEnabled() {
+		err = conn.PushColumnDescriptions(ctx, t)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOperator {
