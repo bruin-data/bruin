@@ -262,7 +262,6 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 		return errors.Wrapf(err, "failed to query column metadata for %s.%s", schemaName, tableName)
 	}
 
-	// Map existing comments for comparison
 	existingComments := make(map[string]string)
 	for _, row := range rows {
 		columnName := row[0].(string)
