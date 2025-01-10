@@ -235,7 +235,7 @@ func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, as
 		schemaName = strings.ToUpper(tableComponents[1])
 		tableName = strings.ToUpper(tableComponents[2])
 	default:
-		return errors.New("invalid asset name format")
+		return nil
 	}
 
 	queryStr := fmt.Sprintf(
