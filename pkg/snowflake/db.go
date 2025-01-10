@@ -223,7 +223,7 @@ func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset)
 	return nil
 }
 
-func (d *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error {
+func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error {
 	tableComponents := strings.Split(asset.Name, ".")
 	var schemaName string
 	var tableName string
