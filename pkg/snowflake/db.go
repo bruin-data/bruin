@@ -245,7 +245,7 @@ func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, as
 
 	result, err := db.Select(ctx, &query.Query{Query: queryStr})
 	if err != nil {
-		return errors.Wrapf(err, "failed to query INFORMATION_SCHEMA.TABLES for %s.%s", schemaName, tableName)
+		return errors.Wrapf(err, "unable to retrieve table metadata for '%s.%s'", schemaName, tableName)
 	}
 
 	if len(result) == 0 {
