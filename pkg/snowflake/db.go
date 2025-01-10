@@ -255,9 +255,9 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 		`SELECT COLUMN_NAME, COMMENT 
          FROM %s.INFORMATION_SCHEMA.COLUMNS 
          WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'`,
-		d.config.Database, schemaName, tableName)
+		db.config.Database, schemaName, tableName)
 
-	rows, err := d.Select(ctx, &query.Query{Query: queryStr})
+	rows, err := db.Select(ctx, &query.Query{Query: queryStr})
 	if err != nil {
 		return errors.Wrapf(err, "failed to query column metadata for %s.%s", schemaName, tableName)
 	}
@@ -278,9 +278,9 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 		if col.Description != "" && existingComments[col.Name] != col.Description {
 			updateQuery := fmt.Sprintf(
 				`ALTER TABLE %s.%s.%s MODIFY COLUMN %s COMMENT '%s'`,
-				d.config.Database, schemaName, tableName, col.Name, col.Description,
+				db.config.Database, schemaName, tableName, col.Name, col.Description,
 			)
-			if err := d.RunQueryWithoutResult(ctx, &query.Query{Query: updateQuery}); err != nil {
+			if err := db.RunQueryWithoutResult(ctx, &query.Query{Query: updateQuery}); err != nil {
 				return errors.Wrapf(err, "failed to update description for column %s", col.Name)
 			}
 		}
@@ -290,9 +290,9 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 	if asset.Description != "" {
 		updateTableQuery := fmt.Sprintf(
 			`COMMENT ON TABLE %s.%s.%s IS '%s'`,
-			d.config.Database, schemaName, tableName, asset.Description,
+			db.config.Database, schemaName, tableName, asset.Description,
 		)
-		if err := d.RunQueryWithoutResult(ctx, &query.Query{Query: updateTableQuery}); err != nil {
+		if err := db.RunQueryWithoutResult(ctx, &query.Query{Query: updateTableQuery}); err != nil {
 			return errors.Wrap(err, "failed to update table description")
 		}
 	}
