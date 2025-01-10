@@ -27,7 +27,7 @@ type SfClient interface {
 	Ping(ctx context.Context) error
 	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
 	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error
-	RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset, errorMessage string, creationQuery *query.Query) error
+	RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error
 }
 
 type connectionFetcher interface {
@@ -84,24 +84,17 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
-
 	err = conn.CreateSchemaIfNotExist(ctx, t)
 	if err != nil {
 		return err
 	}
-	err = conn.RunQueryWithoutResult(ctx, q)
-	if err != nil {
-		if o.materializer.IsFullRefresh() {
-			if handleErr := conn.RecreateTableOnMaterializationTypeMismatch(ctx, t, err.Error(), q); handleErr != nil {
-				return errors.Wrap(handleErr, "query execution failed during full refresh handling")
-			}
-			return nil
+	if o.materializer.IsFullRefresh() {
+		err = conn.RecreateTableOnMaterializationTypeMismatch(ctx, t)
+		if err != nil {
+			return err
 		}
-
-		return errors.Wrap(err, "query execution failed")
 	}
-
-	return nil
+	return conn.RunQueryWithoutResult(ctx, q)
 }
 
 func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOperator {

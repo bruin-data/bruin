@@ -223,7 +223,7 @@ func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset)
 	return nil
 }
 
-func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset, errorMessage string, creationQuery *query.Query) error {
+func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error {
 	tableComponents := strings.Split(asset.Name, ".")
 	var schemaName string
 	var tableName string
@@ -235,31 +235,49 @@ func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, as
 		schemaName = strings.ToUpper(tableComponents[1])
 		tableName = strings.ToUpper(tableComponents[2])
 	default:
-		return nil
+		return errors.New("invalid asset name format")
 	}
+
+	queryStr := fmt.Sprintf(
+		`SELECT TABLE_TYPE FROM %s.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'`,
+		db.config.Database, schemaName, tableName,
+	)
+
+	result, err := db.Select(ctx, &query.Query{Query: queryStr})
+	if err != nil {
+		return errors.Wrapf(err, "failed to query INFORMATION_SCHEMA.TABLES for %s.%s", schemaName, tableName)
+	}
+
+	if len(result) == 0 {
+		return errors.New(fmt.Sprintf("table or view %s.%s does not exist", schemaName, tableName))
+	}
+
 	var materializationType string
-	switch {
-	case strings.Contains(errorMessage, "as TABLE"):
+	if typeField, ok := result[0][0].(string); ok {
+		materializationType = typeField
+	}
 
+	if materializationType == "" {
+		return errors.New("could not determine the materialization type")
+	}
+	var dbMaterializationType pipeline.MaterializationType
+	switch materializationType {
+	case "BASE TABLE":
+		dbMaterializationType = pipeline.MaterializationTypeTable
 		materializationType = "TABLE"
-
-	case strings.Contains(errorMessage, "as VIEW"):
-		materializationType = "VIEW"
-
+	case "VIEW":
+		dbMaterializationType = pipeline.MaterializationTypeView
 	default:
-		return nil
+		dbMaterializationType = pipeline.MaterializationTypeNone
 	}
+	if dbMaterializationType != asset.Materialization.Type {
+		dropQuery := query.Query{
+			Query: fmt.Sprintf("DROP %s IF EXISTS %s.%s", materializationType, schemaName, tableName),
+		}
 
-	dropQuery := query.Query{
-		Query: fmt.Sprintf("DROP %s IF EXISTS %s.%s", materializationType, schemaName, tableName),
-	}
-
-	if dropErr := db.RunQueryWithoutResult(ctx, &dropQuery); dropErr != nil {
-		return errors.Wrapf(dropErr, "failed to drop existing %s: %s", materializationType, schemaName)
-	}
-
-	if retryErr := db.RunQueryWithoutResult(ctx, creationQuery); retryErr != nil {
-		return errors.Wrap(retryErr, fmt.Sprintf("failed to recreate %s after dropping existing one", materializationType))
+		if dropErr := db.RunQueryWithoutResult(ctx, &dropQuery); dropErr != nil {
+			return errors.Wrapf(dropErr, "failed to drop existing %s: %s.%s", materializationType, schemaName, tableName)
+		}
 	}
 
 	return nil
