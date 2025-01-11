@@ -100,13 +100,14 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
-	
+
 	if p.MetadataPush.HasAnyEnabled() {
 		err = conn.PushColumnDescriptions(ctx, t)
 		if err != nil {
 			return err
 		}
 	}
+	return nil
 }
 
 func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOperator {
