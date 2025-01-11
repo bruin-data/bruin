@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"sync"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
@@ -330,7 +330,6 @@ func TestDB_SelectWithSchema(t *testing.T) {
 
 func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 	t.Parallel()
-
 	tests := []struct {
 		name          string
 		mockSetup     func(mock sqlmock.Sqlmock)
@@ -346,7 +345,6 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 
 				mock.ExpectQuery(`DROP VIEW IF EXISTS TEST_SCHEMA.TEST_TABLE`).
 					WillReturnRows(sqlmock.NewRows(nil))
-
 			},
 			asset: &pipeline.Asset{
 				Name: "test_schema.test_table",
@@ -421,6 +419,7 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// Setup sqlmock
 			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 			require.NoError(t, err)
@@ -519,6 +518,7 @@ func TestDB_CreateSchemaIfNotExist(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// Setup sqlmock
 			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 			require.NoError(t, err)
