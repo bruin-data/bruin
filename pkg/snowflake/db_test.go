@@ -552,3 +552,70 @@ func TestDB_CreateSchemaIfNotExist(t *testing.T) {
 		})
 	}
 }
+
+func TestDB_PushColumnDescriptions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		asset         *pipeline.Asset
+		mockSetup     func(mock sqlmock.Sqlmock)
+		expectedError string
+	}{
+		// Other test cases...
+
+		{
+			name: "error during querying existing metadata",
+			asset: &pipeline.Asset{
+				Name:        "test_schema.test_table",
+				Description: "",
+				Columns:     []pipeline.Column{},
+			},
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// Simulate an error during querying the column metadata
+				mock.ExpectQuery(
+					`SELECT COLUMN_NAME, COMMENT 
+                     FROM MYDB.INFORMATION_SCHEMA.COLUMNS 
+                     WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`,
+				).WillReturnError(errors.New("query error")) // Simulate the query error
+			},
+			expectedError: "failed to query column metadata for TEST_SCHEMA.TEST_TABLE: query error", // Expected error
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup sqlmock
+			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+			defer mockDB.Close()
+
+			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+
+			// Initialize the DB struct
+			db := &DB{
+				conn: sqlxDB,
+				config: &Config{
+					Database: "MYDB",
+				},
+			}
+
+			// Apply the mock setup
+			tt.mockSetup(mock)
+
+			// Call the function under test
+			err = db.PushColumnDescriptions(context.Background(), tt.asset)
+
+			// Validate the result
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+			}
+
+			// Ensure all expectations were met
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
