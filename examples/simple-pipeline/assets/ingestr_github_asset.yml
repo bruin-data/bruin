@@ -1,0 +1,9 @@
+name: public.github
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: my-github
+  source_table: 'pull_requests'
+
+  destination: postgres

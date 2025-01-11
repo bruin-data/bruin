@@ -156,6 +156,7 @@ export default defineConfig({
                             {text: "Chess", link: "/ingestion/chess.md"},
                             {text: "DynamoDB", link: "/ingestion/dynamodb.md"},
                             {text: "Facebook", link: "/ingestion/facebook-ads.md"},
+                            {text: "GitHub", link: "/ingestion/github.md"},
                             {text: "Google Sheets", link: "/ingestion/google_sheets.md"},
                             {text: "Gorgias", link: "/ingestion/gorgias"},
                             {text: "Hubspot", link: "/ingestion/hubspot.md"},

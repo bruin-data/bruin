@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/snowflakedb/gosnowflake"
 )
@@ -29,6 +30,15 @@ func (c Config) DSN() (string, error) {
 		authType = gosnowflake.AuthTypeJwt
 	}
 
+	var privateKey *rsa.PrivateKey
+	var err error
+	if c.PrivateKey != "" {
+		privateKey, err = parsePrivateKey(c.PrivateKey)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse private key: %w", err)
+		}
+	}
+
 	snowflakeConfig := gosnowflake.Config{
 		Authenticator: authType,
 		Account:       c.Account,
@@ -39,16 +49,7 @@ func (c Config) DSN() (string, error) {
 		Database:      c.Database,
 		Schema:        c.Schema,
 		Warehouse:     c.Warehouse,
-		PrivateKey: func() *rsa.PrivateKey {
-			if c.PrivateKey == "" {
-				return nil
-			}
-			key, err := parsePrivateKey(c.PrivateKey)
-			if err != nil {
-				return nil
-			}
-			return key
-		}(),
+		PrivateKey:    privateKey,
 	}
 
 	return gosnowflake.DSN(&snowflakeConfig)
@@ -81,17 +82,32 @@ func (c Config) IsValid() bool {
 }
 
 func parsePrivateKey(content string) (*rsa.PrivateKey, error) {
+	// Decode the PEM block
 	block, _ := pem.Decode([]byte(content))
 	if block == nil {
 		return nil, errors.New("failed to parse PEM block containing the private key")
 	}
+
+	// Check for keywords in the PEM block type to identify encryption
+	if block.Type == "ENCRYPTED PRIVATE KEY" {
+		return nil, errors.New("encrypted private keys are not supported at the moment, please provide an unencrypted key")
+	}
+
+	// Attempt to parse the private key
 	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
-		return nil, err
+		// Check if the error suggests encryption issues
+		if strings.Contains(err.Error(), "encrypted") {
+			return nil, errors.New("failed to parse encrypted private due to an encryption issue, please provide an unencrypted key")
+		}
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
+
+	// Assert the type to *rsa.PrivateKey
 	pk, ok := privateKey.(*rsa.PrivateKey)
 	if !ok {
-		return nil, fmt.Errorf("interface conversion. expected type *rsa.PrivateKey, but got %T", privateKey)
+		return nil, fmt.Errorf("failed to convert parsed private key to an actual instance, got '%T' instead", privateKey)
 	}
+
 	return pk, nil
 }

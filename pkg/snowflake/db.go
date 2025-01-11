@@ -223,7 +223,8 @@ func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset)
 	return nil
 }
 
-func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error {
+
+func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error {
 	tableComponents := strings.Split(asset.Name, ".")
 	var schemaName string
 	var tableName string
@@ -237,64 +238,124 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 	default:
 		return nil
 	}
-	anyColumnHasDescription := false
-	colsByName := make(map[string]*pipeline.Column, len(asset.Columns))
-
-	for _, col := range asset.Columns {
-		colsByName[col.Name] = &col
-		if col.Description != "" {
-			anyColumnHasDescription = true
-		}
-	}
-
-	if asset.Description == "" && (len(asset.Columns) == 0 || !anyColumnHasDescription) {
-		return errors.New("no metadata to push: table and columns have no descriptions")
-	}
 
 	queryStr := fmt.Sprintf(
-		`SELECT COLUMN_NAME, COMMENT 
-         FROM %s.INFORMATION_SCHEMA.COLUMNS 
-         WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'`,
-		db.config.Database, schemaName, tableName)
+		`SELECT TABLE_TYPE FROM %s.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'`,
+		db.config.Database, schemaName, tableName,
+	)
 
-	rows, err := db.Select(ctx, &query.Query{Query: queryStr})
+	result, err := db.Select(ctx, &query.Query{Query: queryStr})
 	if err != nil {
-		return errors.Wrapf(err, "failed to query column metadata for %s.%s", schemaName, tableName)
+		return errors.Wrapf(err, "unable to retrieve table metadata for '%s.%s'", schemaName, tableName)
 	}
 
-	existingComments := make(map[string]string)
-	for _, row := range rows {
-		columnName := row[0].(string)
-		comment := ""
-		if row[1] != nil {
-			comment = row[1].(string)
+	if len(result) == 0 {
+		return errors.New(fmt.Sprintf("table or view %s.%s does not exist", schemaName, tableName))
+	}
+
+	var materializationType string
+	if typeField, ok := result[0][0].(string); ok {
+		materializationType = typeField
+	}
+
+	if materializationType == "" {
+		return errors.New("could not determine the materialization type")
+	}
+	var dbMaterializationType pipeline.MaterializationType
+	switch materializationType {
+	case "BASE TABLE":
+		dbMaterializationType = pipeline.MaterializationTypeTable
+		materializationType = "TABLE"
+	case "VIEW":
+		dbMaterializationType = pipeline.MaterializationTypeView
+	default:
+		dbMaterializationType = pipeline.MaterializationTypeNone
+	}
+	if dbMaterializationType != asset.Materialization.Type {
+		dropQuery := query.Query{
+			Query: fmt.Sprintf("DROP %s IF EXISTS %s.%s", materializationType, schemaName, tableName),
 		}
-		existingComments[columnName] = comment
-	}
 
-	// Find columns that need updates
-	for _, col := range asset.Columns {
-		if col.Description != "" && existingComments[col.Name] != col.Description {
-			updateQuery := fmt.Sprintf(
-				`ALTER TABLE %s.%s.%s MODIFY COLUMN %s COMMENT '%s'`,
-				db.config.Database, schemaName, tableName, col.Name, col.Description,
-			)
-			if err := db.RunQueryWithoutResult(ctx, &query.Query{Query: updateQuery}); err != nil {
-				return errors.Wrapf(err, "failed to update description for column %s", col.Name)
-			}
-		}
-	}
-
-	// Update table description if needed
-	if asset.Description != "" {
-		updateTableQuery := fmt.Sprintf(
-			`COMMENT ON TABLE %s.%s.%s IS '%s'`,
-			db.config.Database, schemaName, tableName, asset.Description,
-		)
-		if err := db.RunQueryWithoutResult(ctx, &query.Query{Query: updateTableQuery}); err != nil {
-			return errors.Wrap(err, "failed to update table description")
+		if dropErr := db.RunQueryWithoutResult(ctx, &dropQuery); dropErr != nil {
+			return errors.Wrapf(dropErr, "failed to drop existing %s: %s.%s", materializationType, schemaName, tableName)
 		}
 	}
 
 	return nil
 }
+
+func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error {
+ 	tableComponents := strings.Split(asset.Name, ".")
+ 	var schemaName string
+ 	var tableName string
+ 	switch len(tableComponents) {
+ 	case 2:
+ 		schemaName = strings.ToUpper(tableComponents[0])
+ 		tableName = strings.ToUpper(tableComponents[1])
+ 	case 3:
+ 		schemaName = strings.ToUpper(tableComponents[1])
+ 		tableName = strings.ToUpper(tableComponents[2])
+ 	default:
+ 		return nil
+ 	}
+ 	anyColumnHasDescription := false
+ 	colsByName := make(map[string]*pipeline.Column, len(asset.Columns))
+
+ 	for _, col := range asset.Columns {
+ 		colsByName[col.Name] = &col
+ 		if col.Description != "" {
+ 			anyColumnHasDescription = true
+ 		}
+ 	}
+
+ 	if asset.Description == "" && (len(asset.Columns) == 0 || !anyColumnHasDescription) {
+ 		return errors.New("no metadata to push: table and columns have no descriptions")
+ 	}
+
+ 	queryStr := fmt.Sprintf(
+ 		`SELECT COLUMN_NAME, COMMENT 
+          FROM %s.INFORMATION_SCHEMA.COLUMNS 
+          WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'`,
+ 		db.config.Database, schemaName, tableName)
+
+ 	rows, err := db.Select(ctx, &query.Query{Query: queryStr})
+ 	if err != nil {
+ 		return errors.Wrapf(err, "failed to query column metadata for %s.%s", schemaName, tableName)
+ 	}
+
+ 	existingComments := make(map[string]string)
+ 	for _, row := range rows {
+ 		columnName := row[0].(string)
+ 		comment := ""
+ 		if row[1] != nil {
+ 			comment = row[1].(string)
+ 		}
+ 		existingComments[columnName] = comment
+ 	}
+
+ 	// Find columns that need updates
+ 	for _, col := range asset.Columns {
+ 		if col.Description != "" && existingComments[col.Name] != col.Description {
+ 			updateQuery := fmt.Sprintf(
+ 				`ALTER TABLE %s.%s.%s MODIFY COLUMN %s COMMENT '%s'`,
+ 				db.config.Database, schemaName, tableName, col.Name, col.Description,
+ 			)
+ 			if err := db.RunQueryWithoutResult(ctx, &query.Query{Query: updateQuery}); err != nil {
+ 				return errors.Wrapf(err, "failed to update description for column %s", col.Name)
+ 			}
+ 		}
+ 	}
+
+ 	// Update table description if needed
+ 	if asset.Description != "" {
+ 		updateTableQuery := fmt.Sprintf(
+ 			`COMMENT ON TABLE %s.%s.%s IS '%s'`,
+ 			db.config.Database, schemaName, tableName, asset.Description,
+ 		)
+ 		if err := db.RunQueryWithoutResult(ctx, &query.Query{Query: updateTableQuery}); err != nil {
+ 			return errors.Wrap(err, "failed to update table description")
+ 		}
+ 	}
+
+ 	return nil
+ }
