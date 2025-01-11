@@ -52,7 +52,7 @@ func (m *mockQuerierWithResult) CreateSchemaIfNotExist(ctx context.Context, asse
 
 func (m *mockQuerierWithResult) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error {
 	args := m.Called(asset, ctx)
-  	return args.Error(0)
+	return args.Error(0)
 }
 
 func (m *mockQuerierWithResult) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error {
