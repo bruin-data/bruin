@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -318,6 +319,115 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tt.want, got)
+			}
+
+			// Ensure all expectations were met
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		mockSetup     func(mock sqlmock.Sqlmock)
+		asset         *pipeline.Asset
+		expectedError string
+	}{
+		{
+			name: "materialization type mismatch, table dropped and recreated",
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// Mock the SELECT query to check the table type
+				mock.ExpectQuery(`SELECT TABLE_TYPE FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE"}).AddRow("VIEW"))
+
+				mock.ExpectQuery(`DROP VIEW IF EXISTS TEST_SCHEMA.TEST_TABLE`).
+					WillReturnRows(sqlmock.NewRows(nil))
+
+			},
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+			},
+		},
+		{
+			name: "table or view does not exist",
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// Mock the SELECT query to return no rows
+				mock.ExpectQuery(`SELECT TABLE_TYPE FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE"}))
+			},
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+			},
+			expectedError: "table or view TEST_SCHEMA.TEST_TABLE does not exist",
+		},
+		{
+			name: "error during table type retrieval",
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// Mock the SELECT query to return an error
+				mock.ExpectQuery(`SELECT TABLE_TYPE FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+					WillReturnError(errors.New("query error"))
+			},
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+			},
+			expectedError: "unable to retrieve table metadata for 'TEST_SCHEMA.TEST_TABLE': query error",
+		},
+		{
+			name: "materialization type matches, no action taken",
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// Mock the SELECT query to return the same type
+				mock.ExpectQuery(`SELECT TABLE_TYPE FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE"}).AddRow("BASE TABLE"))
+			},
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup sqlmock
+			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+			defer mockDB.Close()
+			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+
+			// Initialize the DB struct with the mock connection
+			db := &DB{
+				conn: sqlxDB,
+				config: &Config{ // Pass a pointer to Config
+					Database: "MYDB",
+				},
+			}
+
+			// Apply the mock setup for this test
+			tt.mockSetup(mock)
+
+			// Call the function under test
+			err = db.RecreateTableOnMaterializationTypeMismatch(context.Background(), tt.asset)
+
+			// Validate the expected outcome
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
 			}
 
 			// Ensure all expectations were met
