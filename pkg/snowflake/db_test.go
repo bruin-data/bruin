@@ -399,6 +399,24 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "asset name with 1 component",
+			asset: &pipeline.Asset{
+				Name: "test_table",
+			},
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// No query expected, function should return early
+			},
+		},
+		{
+			name: "asset name with 4 components",
+			asset: &pipeline.Asset{
+				Name: "project.dataset.schema.table",
+			},
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// No query expected, function should return early
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -478,6 +496,24 @@ func TestDB_CreateSchemaIfNotExist(t *testing.T) {
 					WillReturnError(errors.New("creation failed"))
 			},
 			expectedError: "failed to create or ensure database: TEST_SCHEMA: creation failed",
+		},
+		{
+			name: "asset name with 1 component",
+			asset: &pipeline.Asset{
+				Name: "test_table",
+			},
+			mockSetup: func(mock sqlmock.Sqlmock, cache *sync.Map) {
+				// No query expected, function should return early
+			},
+		},
+		{
+			name: "asset name with 4 components",
+			asset: &pipeline.Asset{
+				Name: "project.dataset.schema.table",
+			},
+			mockSetup: func(mock sqlmock.Sqlmock, cache *sync.Map) {
+				// No query expected, function should return early
+			},
 		},
 	}
 
