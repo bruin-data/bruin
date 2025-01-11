@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"sync"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -423,6 +424,86 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 			err = db.RecreateTableOnMaterializationTypeMismatch(context.Background(), tt.asset)
 
 			// Validate the expected outcome
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+			}
+
+			// Ensure all expectations were met
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestDB_CreateSchemaIfNotExist(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		asset         *pipeline.Asset
+		mockSetup     func(mock sqlmock.Sqlmock, cache *sync.Map)
+		expectedError string
+	}{
+		{
+			name: "schema already exists in cache",
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+			},
+			mockSetup: func(mock sqlmock.Sqlmock, cache *sync.Map) {
+				// Simulate schema being already cached
+				cache.Store("TEST_SCHEMA", true)
+			},
+		},
+		{
+			name: "schema does not exist, create successfully",
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+			},
+			mockSetup: func(mock sqlmock.Sqlmock, cache *sync.Map) {
+				// Simulate schema not in cache
+				mock.ExpectQuery("CREATE SCHEMA IF NOT EXISTS TEST_SCHEMA").
+					WillReturnRows(sqlmock.NewRows(nil)) // Simulate success with an empty result
+			},
+		},
+		{
+			name: "schema creation fails",
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+			},
+			mockSetup: func(mock sqlmock.Sqlmock, cache *sync.Map) {
+				// Simulate schema not in cache and error during creation
+				mock.ExpectQuery("CREATE SCHEMA IF NOT EXISTS TEST_SCHEMA").
+					WillReturnError(errors.New("creation failed"))
+			},
+			expectedError: "failed to create or ensure database: TEST_SCHEMA: creation failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup sqlmock
+			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+			defer mockDB.Close()
+
+			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+
+			// Initialize the DB struct with a schema cache
+			cache := &sync.Map{}
+			db := &DB{
+				conn:            sqlxDB,
+				schemaNameCache: cache,
+			}
+
+			// Apply the mock setup
+			tt.mockSetup(mock, cache)
+
+			// Call the function under test
+			err = db.CreateSchemaIfNotExist(context.Background(), tt.asset)
+
+			// Validate the result
 			if tt.expectedError != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedError)
