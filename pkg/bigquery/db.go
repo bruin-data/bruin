@@ -197,20 +197,20 @@ func (m NoMetadataUpdatedError) Error() string {
 
 func (d *Client) getTableRef(tableName string) (*bigquery.Table, error) {
 	tableComponents := strings.Split(tableName, ".")
-
 	// Check for empty components
 	for _, component := range tableComponents {
 		if component == "" {
 			return nil, fmt.Errorf("table name must be in dataset.table or project.dataset.table format, '%s' given", tableName)
 		}
 	}
-
-	if len(tableComponents) == 3 {
-		return d.client.DatasetInProject(tableComponents[0], tableComponents[1]).Table(tableComponents[2]), nil
-	} else if len(tableComponents) == 2 {
+	switch len(tableComponents) {
+	case 2:
 		return d.client.DatasetInProject(d.config.ProjectID, tableComponents[0]).Table(tableComponents[1]), nil
+	case 3:
+		return d.client.DatasetInProject(tableComponents[0], tableComponents[1]).Table(tableComponents[2]), nil
+	default:
+		return nil, fmt.Errorf("table name must be in dataset.table or project.dataset.table format, '%s' given", tableName)
 	}
-	return nil, fmt.Errorf("table name must be in dataset.table or project.dataset.table format, '%s' given", tableName)
 }
 
 func (d *Client) UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
@@ -405,16 +405,19 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 	tableName := asset.Name
 	tableComponents := strings.Split(tableName, ".")
 	var datasetName string
-	if len(tableComponents) == 2 {
+
+	switch len(tableComponents) {
+	case 2:
 		datasetName = tableComponents[0]
-	} else if len(tableComponents) == 3 {
+	case 3:
 		datasetName = tableComponents[1]
+	default:
+		return nil
 	}
-	// Check the cache for the dataset
+
 	if _, exists := d.datasetNameCache.Load(datasetName); exists {
 		return nil
 	}
-	// Check BigQuery for existing datasets
 	datasets := d.client.Datasets(ctx)
 	for {
 		dataset, err := datasets.Next()
@@ -425,15 +428,14 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 			return err
 		}
 		if datasetName == dataset.DatasetID {
-			d.datasetNameCache.Store(datasetName, true) // Add to cache
+			d.datasetNameCache.Store(datasetName, true)
 			return nil
 		}
 	}
-	// Create the dataset if it does not exist
 	if err := d.client.Dataset(datasetName).Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
 		return err
 	}
-	d.datasetNameCache.Store(datasetName, true) // Cache the created dataset
+	d.datasetNameCache.Store(datasetName, true)
 	return nil
 }
 
