@@ -405,18 +405,19 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 	tableName := asset.Name
 	tableComponents := strings.Split(tableName, ".")
 	var datasetName string
-	if len(tableComponents) == 2 {
+
+	switch len(tableComponents) {
+	case 2:
 		datasetName = tableComponents[0]
-	} else if len(tableComponents) == 3 {
+	case 3:
 		datasetName = tableComponents[1]
-	} else {
+	default:
 		return nil
 	}
-	// Check the cache for the dataset
+
 	if _, exists := d.datasetNameCache.Load(datasetName); exists {
 		return nil
 	}
-	// Check BigQuery for existing datasets
 	datasets := d.client.Datasets(ctx)
 	for {
 		dataset, err := datasets.Next()
@@ -427,15 +428,14 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 			return err
 		}
 		if datasetName == dataset.DatasetID {
-			d.datasetNameCache.Store(datasetName, true) // Add to cache
+			d.datasetNameCache.Store(datasetName, true)
 			return nil
 		}
 	}
-	// Create the dataset if it does not exist
 	if err := d.client.Dataset(datasetName).Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
 		return err
 	}
-	d.datasetNameCache.Store(datasetName, true) // Cache the created dataset
+	d.datasetNameCache.Store(datasetName, true)
 	return nil
 }
 
