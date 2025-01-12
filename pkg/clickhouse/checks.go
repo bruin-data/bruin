@@ -3,12 +3,13 @@ package clickhouse
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
-	"strconv"
-	"strings"
 )
 
 type selectorFetcher interface {

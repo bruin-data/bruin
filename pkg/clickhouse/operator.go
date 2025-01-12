@@ -2,11 +2,11 @@ package clickhouse
 
 import (
 	"context"
-	"github.com/pkg/errors"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/pkg/errors"
 )
 
 type materializer interface {
@@ -33,9 +33,8 @@ type BasicOperator struct {
 	materializer materializer
 }
 
-func (b BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
-	// TODO implement me
-	panic("implement me")
+func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	return o.RunTask(ctx, ti.GetPipeline(), ti.GetAsset())
 }
 
 func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {

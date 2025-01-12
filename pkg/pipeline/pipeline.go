@@ -315,7 +315,7 @@ func (ccv *ColumnCheckValue) MarshalJSON() ([]byte, error) {
 	return []byte("null"), nil
 }
 
-func (ccv ColumnCheckValue) MarshalYAML() (interface{}, error) {
+func (ccv *ColumnCheckValue) MarshalYAML() (interface{}, error) {
 	if ccv.IntArray != nil {
 		return ccv.IntArray, nil
 	}
@@ -880,12 +880,12 @@ func uniqueAssets(assets []*Asset) []*Asset {
 
 type EmptyStringMap map[string]string
 
-func (m EmptyStringMap) MarshalJSON() ([]byte, error) { //nolint: stylecheck
+func (m *EmptyStringMap) MarshalJSON() ([]byte, error) { //nolint: stylecheck
 	if m == nil {
 		return []byte{'{', '}'}, nil
 	}
 
-	return json.Marshal(map[string]string(m))
+	return json.Marshal(map[string]string(*m))
 }
 
 func (b *EmptyStringMap) UnmarshalJSON(data []byte) error {
@@ -908,12 +908,12 @@ func (b *EmptyStringMap) UnmarshalJSON(data []byte) error {
 
 type EmptyStringArray []string
 
-func (a EmptyStringArray) MarshalJSON() ([]byte, error) {
+func (a *EmptyStringArray) MarshalJSON() ([]byte, error) {
 	if a == nil {
 		return []byte{'[', ']'}, nil
 	}
 
-	return json.Marshal([]string(a))
+	return json.Marshal([]string(*a))
 }
 
 func (a *EmptyStringArray) UnmarshalJSON(data []byte) error {
