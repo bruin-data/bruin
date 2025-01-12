@@ -197,20 +197,20 @@ func (m NoMetadataUpdatedError) Error() string {
 
 func (d *Client) getTableRef(tableName string) (*bigquery.Table, error) {
 	tableComponents := strings.Split(tableName, ".")
-
 	// Check for empty components
 	for _, component := range tableComponents {
 		if component == "" {
 			return nil, fmt.Errorf("table name must be in dataset.table or project.dataset.table format, '%s' given", tableName)
 		}
 	}
-
-	if len(tableComponents) == 3 {
-		return d.client.DatasetInProject(tableComponents[0], tableComponents[1]).Table(tableComponents[2]), nil
-	} else if len(tableComponents) == 2 {
+	switch len(tableComponents) {
+	case 2:
 		return d.client.DatasetInProject(d.config.ProjectID, tableComponents[0]).Table(tableComponents[1]), nil
+	case 3:
+		return d.client.DatasetInProject(tableComponents[0], tableComponents[1]).Table(tableComponents[2]), nil
+	default:
+		return nil, fmt.Errorf("table name must be in dataset.table or project.dataset.table format, '%s' given", tableName)
 	}
-	return nil, fmt.Errorf("table name must be in dataset.table or project.dataset.table format, '%s' given", tableName)
 }
 
 func (d *Client) UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
