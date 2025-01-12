@@ -409,6 +409,8 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 		datasetName = tableComponents[0]
 	} else if len(tableComponents) == 3 {
 		datasetName = tableComponents[1]
+	} else {
+		return nil
 	}
 	// Check the cache for the dataset
 	if _, exists := d.datasetNameCache.Load(datasetName); exists {
