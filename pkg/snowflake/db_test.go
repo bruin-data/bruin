@@ -574,7 +574,7 @@ func TestDB_PushColumnDescriptions(t *testing.T) {
 			expectedError: "no metadata to push: table and columns have no descriptions",
 		},
 		{
-			name: "successfully update column descriptions",
+			name: "successfully update column descriptions with concatenated queries",
 			asset: &pipeline.Asset{
 				Name:        "test_schema.test_table",
 				Description: "",
@@ -587,20 +587,22 @@ func TestDB_PushColumnDescriptions(t *testing.T) {
 				// Simulate querying existing metadata
 				mock.ExpectQuery(
 					`SELECT COLUMN_NAME, COMMENT 
-                     FROM MYDB.INFORMATION_SCHEMA.COLUMNS 
-                     WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`,
+             FROM MYDB.INFORMATION_SCHEMA.COLUMNS 
+             WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`,
 				).WillReturnRows(sqlmock.NewRows([]string{"COLUMN_NAME", "COMMENT"}).
 					AddRow("COL1", ""). // No description exists
 					AddRow("COL2", ""), // No description exists
 				)
 
-				// Simulate updating column descriptions
-				mock.ExpectQuery(`ALTER TABLE MYDB.TEST_SCHEMA.TEST_TABLE MODIFY COLUMN col1 COMMENT 'Description 1'`).
-					WillReturnRows(sqlmock.NewRows(nil))
-				mock.ExpectQuery(`ALTER TABLE MYDB.TEST_SCHEMA.TEST_TABLE MODIFY COLUMN col2 COMMENT 'Description 2'`).
-					WillReturnRows(sqlmock.NewRows(nil))
+				mock.ExpectQuery(
+					`ALTER TABLE MYDB.TEST_SCHEMA.TEST_TABLE 
+             MODIFY COLUMN col1 COMMENT 'Description 1'; 
+             ALTER TABLE MYDB.TEST_SCHEMA.TEST_TABLE 
+             MODIFY COLUMN col2 COMMENT 'Description 2'`,
+				).WillReturnRows(sqlmock.NewRows(nil)) // Expect 2 rows to be affected
 			},
 		},
+
 		{
 			name: "successfully update table description",
 			asset: &pipeline.Asset{
@@ -648,17 +650,20 @@ func TestDB_PushColumnDescriptions(t *testing.T) {
 				},
 			},
 			mockSetup: func(mock sqlmock.Sqlmock) {
+				// Simulate querying existing metadata
 				mock.ExpectQuery(
 					`SELECT COLUMN_NAME, COMMENT 
-                     FROM MYDB.INFORMATION_SCHEMA.COLUMNS 
-                     WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`,
+             FROM MYDB.INFORMATION_SCHEMA.COLUMNS 
+             WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`,
 				).WillReturnRows(sqlmock.NewRows([]string{"COLUMN_NAME", "COMMENT"}).
 					AddRow("COL1", "")) // No description exists
 
-				mock.ExpectQuery(`ALTER TABLE MYDB.TEST_SCHEMA.TEST_TABLE MODIFY COLUMN col1 COMMENT 'Description 1'`).
-					WillReturnError(errors.New("update error"))
+				// Simulate an error during column description update
+				mock.ExpectQuery(
+					`ALTER TABLE MYDB.TEST_SCHEMA.TEST_TABLE MODIFY COLUMN col1 COMMENT 'Description 1'`,
+				).WillReturnError(errors.New("update error"))
 			},
-			expectedError: "failed to update description for column col1: update error",
+			expectedError: "failed to update column descriptions: update error",
 		},
 		{
 			name: "error during updating table description",
