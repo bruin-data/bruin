@@ -15,7 +15,7 @@ type Config struct {
 }
 
 func (c *Config) ToClickHouseOptions() *click_house.Options {
-	return &click_house.Options{
+	opt := click_house.Options{
 		Addr: []string{fmt.Sprintf("%s:%d", c.Host, c.Port)},
 		Auth: click_house.Auth{
 			Database: c.Database,
@@ -23,6 +23,7 @@ func (c *Config) ToClickHouseOptions() *click_house.Options {
 			Password: c.Password,
 		},
 	}
+	return &opt
 }
 
 func (c *Config) GetIngestrURI() string {

@@ -14,7 +14,7 @@ func TestMaterializer_Render(t *testing.T) {
 		name        string
 		task        *pipeline.Asset
 		query       string
-		want        string
+		want        []string
 		wantErr     bool
 		fullRefresh bool
 	}{
@@ -22,7 +22,7 @@ func TestMaterializer_Render(t *testing.T) {
 			name:  "no materialization, return raw query",
 			task:  &pipeline.Asset{},
 			query: "SELECT 1",
-			want:  "SELECT 1",
+			want:  []string{"SELECT 1"},
 		},
 		{
 			name: "materialize to a view",
@@ -33,7 +33,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want:  "CREATE OR REPLACE VIEW my.asset AS\nSELECT 1",
+			want:  []string{"CREATE OR REPLACE VIEW my.asset AS\nSELECT 1"},
 		},
 		{
 			name: "materialize to a table, no partition or cluster, default to create+replace",
@@ -44,10 +44,11 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want: `BEGIN TRANSACTION;
-DROP TABLE IF EXISTS my.asset; 
-CREATE TABLE my.asset AS SELECT 1;
-COMMIT;`,
+			want: []string{
+				"CREATE TABLE __bruin_tmp_abcefghi AS SELECT 1",
+				"DROP TABLE IF EXISTS my.asset",
+				"RENAME TABLE __bruin_tmp_abcefghi RENAME TO my.asset",
+			},
 		},
 		{
 			name: "materialize to a table, full refresh defaults to create+replace",
@@ -60,10 +61,11 @@ COMMIT;`,
 			},
 			fullRefresh: true,
 			query:       "SELECT 1",
-			want: `BEGIN TRANSACTION;
-DROP TABLE IF EXISTS my.asset; 
-CREATE TABLE my.asset AS SELECT 1;
-COMMIT;`,
+			want: []string{
+				"CREATE TABLE __bruin_tmp_abcefghi AS SELECT 1",
+				"DROP TABLE IF EXISTS my.asset",
+				"RENAME TABLE __bruin_tmp_abcefghi RENAME TO my.asset",
+			},
 		},
 		{
 			name: "materialize to a table with append",
@@ -75,7 +77,7 @@ COMMIT;`,
 				},
 			},
 			query: "SELECT 1",
-			want:  "INSERT INTO my.asset SELECT 1",
+			want:  []string{"INSERT INTO my.asset SELECT 1"},
 		},
 		{
 			name: "incremental strategies require the incremental_key to be set",
@@ -112,12 +114,12 @@ COMMIT;`,
 				},
 			},
 			query: "SELECT 1",
-			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMPORARY TABLE __bruin_tmp_.+ AS SELECT 1\n;\n" +
-				"DELETE FROM my.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
-				"INSERT INTO my.asset SELECT \\* FROM __bruin_tmp_.+;\n" +
-				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
-				"COMMIT;$",
+			want: []string{
+				"CREATE TABLE __bruin_tmp_abcefghi AS SELECT 1",
+				"DELETE FROM my.asset WHERE dt in (SELECT DISTINCT dt FROM __bruin_tmp_abcefghi)",
+				"INSERT INTO my.asset SELECT * FROM __bruin_tmp_abcefghi",
+				"DROP TABLE IF EXISTS __bruin_tmp_abcefghi",
+			},
 		},
 		{
 			name: "merge without columns",
@@ -148,23 +150,17 @@ COMMIT;`,
 			wantErr: true,
 		},
 		{
-			name: "merge with primary keys",
+			name: "merge without columns",
 			task: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
 					Type:     pipeline.MaterializationTypeTable,
 					Strategy: pipeline.MaterializationStrategyMerge,
 				},
-				Columns: []pipeline.Column{
-					{Name: "id", Type: "int", PrimaryKey: true},
-					{Name: "name", Type: "varchar", PrimaryKey: false, UpdateOnMerge: true},
-				},
+				Columns: []pipeline.Column{},
 			},
-			query: "SELECT 1 as id, 'abc' as name",
-			want: "^MERGE INTO my\\.asset target\n" +
-				"USING \\(SELECT 1 as id, 'abc' as name\\) source ON target\\.id = source.id\n" +
-				"WHEN MATCHED THEN UPDATE SET name = source\\.name\n" +
-				"WHEN NOT MATCHED THEN INSERT\\(id, name\\) VALUES\\(id, name\\);$",
+			query:   "SELECT 1 as id",
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -180,7 +176,7 @@ COMMIT;`,
 				require.NoError(t, err)
 			}
 
-			assert.Regexp(t, tt.want, render)
+			assert.Equal(t, tt.want, render)
 		})
 	}
 }

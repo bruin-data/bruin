@@ -170,7 +170,7 @@ func Render() *cli.Command {
 					pipeline.AssetTypeSynapseQuery:    synapse.NewRenderer(fullRefresh),
 					pipeline.AssetTypeAthenaQuery:     athena.NewRenderer(fullRefresh, resultsLocation),
 					pipeline.AssetTypeDuckDBQuery:     duck.NewMaterializer(fullRefresh),
-					pipeline.AssetTypeClickHouse:      clickhouse.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeClickHouse:      clickhouse.NewRenderer(fullRefresh),
 				},
 				builder: DefaultPipelineBuilder,
 				writer:  os.Stdout,

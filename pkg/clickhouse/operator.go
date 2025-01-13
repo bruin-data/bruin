@@ -10,7 +10,7 @@ import (
 )
 
 type materializer interface {
-	Render(task *pipeline.Asset, query string) (string, error)
+	Render(task *pipeline.Asset, query string) ([]string, error)
 }
 
 type queryExtractor interface {
@@ -20,6 +20,8 @@ type queryExtractor interface {
 type ClickHouseClient interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
+	Ping(ctx context.Context) error
+	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
 }
 
 type connectionFetcher interface {
@@ -52,12 +54,11 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	q := queries[0]
-	materialized, err := o.materializer.Render(t, q.String())
+	materializedQueries, err := o.materializer.Render(t, q.String())
 	if err != nil {
 		return err
 	}
 
-	q.Query = materialized
 	connName, err := p.GetConnectionNameForAsset(t)
 	if err != nil {
 		return err
@@ -68,7 +69,15 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	return conn.RunQueryWithoutResult(ctx, q)
+	for _, queryString := range materializedQueries {
+		p := &query.Query{Query: queryString}
+		err = conn.RunQueryWithoutResult(ctx, p)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func NewBasicOperator(conn connectionFetcher, extractor queryExtractor, materializer materializer) *BasicOperator {
