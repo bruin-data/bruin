@@ -2,11 +2,11 @@ package snowflake
 
 import (
 	"context"
-	"github.com/bruin-data/bruin/pkg/executor"
 	"io"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
