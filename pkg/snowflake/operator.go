@@ -2,6 +2,8 @@ package snowflake
 
 import (
 	"context"
+	"github.com/bruin-data/bruin/pkg/executor"
+	"io"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
@@ -95,19 +97,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 			return err
 		}
 	}
-	// Run the main query
-	err = conn.RunQueryWithoutResult(ctx, q)
-	if err != nil {
-		return err
-	}
-
-	if p.MetadataPush.HasAnyEnabled() {
-		err = conn.PushColumnDescriptions(ctx, t)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return conn.RunQueryWithoutResult(ctx, q)
 }
 
 func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOperator {
@@ -181,6 +171,41 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		}
 
 		time.Sleep(time.Duration(o.secondsToSleep) * time.Second)
+	}
+
+	return nil
+}
+
+type MetadataOperator struct {
+	connection connectionFetcher
+}
+
+func NewMetadataPushOperator(conn connectionFetcher) *MetadataOperator {
+	return &MetadataOperator{
+		connection: conn,
+	}
+}
+
+func (o *MetadataOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	connName, err := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
+	if err != nil {
+		return err
+	}
+
+	client, err := o.connection.GetSfConnection(connName)
+	if err != nil {
+		return err
+	}
+
+	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
+	if writer == nil {
+		return errors.New("no writer found in context, please create an issue for this: https://github.com/bruin-data/bruin/issues")
+	}
+
+	err = client.PushColumnDescriptions(ctx, ti.GetAsset())
+	if err != nil {
+		_, _ = writer.Write([]byte("Failed to push metadata to Snowflake, skipping...\n"))
+		return err
 	}
 
 	return nil
