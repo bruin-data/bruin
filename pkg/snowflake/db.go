@@ -297,17 +297,8 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 	default:
 		return nil
 	}
-	anyColumnHasDescription := false
-	colsByName := make(map[string]*pipeline.Column, len(asset.Columns))
 
-	for _, col := range asset.Columns {
-		colsByName[col.Name] = &col
-		if col.Description != "" {
-			anyColumnHasDescription = true
-		}
-	}
-
-	if asset.Description == "" && (len(asset.Columns) == 0 || !anyColumnHasDescription) {
+	if asset.Description == "" && len(asset.Columns) == 0 {
 		return errors.New("no metadata to push: table and columns have no descriptions")
 	}
 
@@ -333,19 +324,23 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 	}
 
 	// Find columns that need updates
+	var updateQueries []string
 	for _, col := range asset.Columns {
 		if col.Description != "" && existingComments[col.Name] != col.Description {
-			updateQuery := fmt.Sprintf(
+			query := fmt.Sprintf(
 				`ALTER TABLE %s.%s.%s MODIFY COLUMN %s COMMENT '%s'`,
 				db.config.Database, schemaName, tableName, col.Name, col.Description,
 			)
-			if err := db.RunQueryWithoutResult(ctx, &query.Query{Query: updateQuery}); err != nil {
-				return errors.Wrapf(err, "failed to update description for column %s", col.Name)
-			}
+			updateQueries = append(updateQueries, query)
+		}
+	}
+	if len(updateQueries) > 0 {
+		batchQuery := strings.Join(updateQueries, "; ")
+		if err := db.RunQueryWithoutResult(ctx, &query.Query{Query: batchQuery}); err != nil {
+			return errors.Wrap(err, "failed to update column descriptions")
 		}
 	}
 
-	// Update table description if needed
 	if asset.Description != "" {
 		updateTableQuery := fmt.Sprintf(
 			`COMMENT ON TABLE %s.%s.%s IS '%s'`,
