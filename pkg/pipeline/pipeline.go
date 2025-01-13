@@ -82,6 +82,7 @@ var defaultMapping = map[string]string{
 	"appsflyer":             "appsflyer-default",
 	"kafka":                 "kafka-default",
 	"duckdb":                "duckdb-default",
+	"clickhouse":            "clickhouse-default",
 	"hubspot":               "hubspot-default",
 	"google_sheets":         "google-sheets-default",
 	"chess":                 "chess-default",
@@ -483,6 +484,8 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeAthenaSeed:           "athena",
 	AssetTypeDuckDBQuery:          "duckdb",
 	AssetTypeDuckDBSeed:           "duckdb",
+	AssetTypeClickHouse:           "clickhouse",
+	AssetTypeClickHouseSeed:       "clickhouse",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{

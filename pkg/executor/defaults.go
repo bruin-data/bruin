@@ -64,6 +64,16 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
 		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
 	},
+	pipeline.AssetTypeClickHouse: {
+		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
+	},
+	pipeline.AssetTypeClickHouseSeed: {
+		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
+	},
 	pipeline.AssetTypePostgresSeed: {
 		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
 		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
