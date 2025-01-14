@@ -294,29 +294,31 @@ type ColumnCheckValue struct {
 }
 
 func (ccv *ColumnCheckValue) MarshalJSON() ([]byte, error) {
-	if ccv.IntArray != nil {
-		return json.Marshal(ccv.IntArray)
+	actual := *ccv
+
+	if actual.IntArray != nil {
+		return json.Marshal(actual.IntArray)
 	}
-	if ccv.Int != nil {
-		return json.Marshal(ccv.Int)
+	if actual.Int != nil {
+		return json.Marshal(actual.Int)
 	}
-	if ccv.Float != nil {
-		return json.Marshal(ccv.Float)
+	if actual.Float != nil {
+		return json.Marshal(actual.Float)
 	}
-	if ccv.StringArray != nil {
-		return json.Marshal(ccv.StringArray)
+	if actual.StringArray != nil {
+		return json.Marshal(actual.StringArray)
 	}
-	if ccv.String != nil {
-		return json.Marshal(ccv.String)
+	if actual.String != nil {
+		return json.Marshal(actual.String)
 	}
-	if ccv.Bool != nil {
-		return json.Marshal(ccv.Bool)
+	if actual.Bool != nil {
+		return json.Marshal(actual.Bool)
 	}
 
 	return []byte("null"), nil
 }
 
-func (ccv *ColumnCheckValue) MarshalYAML() (interface{}, error) {
+func (ccv ColumnCheckValue) MarshalYAML() (interface{}, error) {
 	if ccv.IntArray != nil {
 		return ccv.IntArray, nil
 	}
@@ -335,7 +337,6 @@ func (ccv *ColumnCheckValue) MarshalYAML() (interface{}, error) {
 	if ccv.Bool != nil {
 		return ccv.Bool, nil
 	}
-
 	return nil, nil
 }
 
@@ -883,12 +884,12 @@ func uniqueAssets(assets []*Asset) []*Asset {
 
 type EmptyStringMap map[string]string
 
-func (m *EmptyStringMap) MarshalJSON() ([]byte, error) { //nolint: stylecheck
+func (m EmptyStringMap) MarshalJSON() ([]byte, error) { //nolint: stylecheck
 	if m == nil {
 		return []byte{'{', '}'}, nil
 	}
 
-	return json.Marshal(map[string]string(*m))
+	return json.Marshal(map[string]string(m))
 }
 
 func (b *EmptyStringMap) UnmarshalJSON(data []byte) error {
@@ -911,12 +912,12 @@ func (b *EmptyStringMap) UnmarshalJSON(data []byte) error {
 
 type EmptyStringArray []string
 
-func (a *EmptyStringArray) MarshalJSON() ([]byte, error) {
+func (a EmptyStringArray) MarshalJSON() ([]byte, error) {
 	if a == nil {
 		return []byte{'[', ']'}, nil
 	}
 
-	return json.Marshal([]string(*a))
+	return json.Marshal([]string(a))
 }
 
 func (a *EmptyStringArray) UnmarshalJSON(data []byte) error {
