@@ -317,6 +317,14 @@ func TestLoadFromFile(t *testing.T) {
 					Repo:        "repo-456",
 				},
 			},
+			AppStore: []AppStoreConnection{
+				{
+					Name:     "appstore-1",
+					IssuerID: "issuer-id-123",
+					KeyID:    "key-id-123",
+					KeyPath:  "/path/to/key.pem",
+				},
+			},
 		},
 	}
 

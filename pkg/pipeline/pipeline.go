@@ -90,6 +90,7 @@ var defaultMapping = map[string]string{
 	"asana":                 "asana-default",
 	"dynamodb":              "dynamodb-default",
 	"tiktokads":             "tiktokads-default",
+	"appstore":              "appstore-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}

@@ -9,6 +9,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/adjust"
 	"github.com/bruin-data/bruin/pkg/airtable"
 	"github.com/bruin-data/bruin/pkg/appsflyer"
+	"github.com/bruin-data/bruin/pkg/appstore"
 	"github.com/bruin-data/bruin/pkg/asana"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
@@ -74,6 +75,7 @@ type Manager struct {
 	Zendesk      map[string]*zendesk.Client
 	TikTokAds    map[string]*tiktokads.Client
 	GitHub       map[string]*github.Client
+	AppStore     map[string]*appstore.Client
 	mutex        sync.Mutex
 }
 
@@ -259,6 +261,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connGitHub, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GitHub)...)
+
+	connAppStore, err := m.GetAppStoreConnectionWithoutDefault(name)
+	if err == nil {
+		return connAppStore, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.AppStore)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -889,6 +897,25 @@ func (m *Manager) GetTikTokAdsConnectionWithoutDefault(name string) (*tiktokads.
 	db, ok := m.TikTokAds[name]
 	if !ok {
 		return nil, errors.Errorf("tiktokads connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetAppStoreConnection(name string) (*appstore.Client, error) {
+	db, err := m.GetAppStoreConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetAppStoreConnectionWithoutDefault("appstore-default")
+}
+
+func (m *Manager) GetAppStoreConnectionWithoutDefault(name string) (*appstore.Client, error) {
+	if m.AppStore == nil {
+		return nil, errors.New("no appstore connections found")
+	}
+	db, ok := m.AppStore[name]
+	if !ok {
+		return nil, errors.Errorf("appstore connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -1696,6 +1723,30 @@ func (m *Manager) AddGitHubConnectionFromConfig(connection *config.GitHubConnect
 	return nil
 }
 
+func (m *Manager) AddAppStoreConnectionFromConfig(connection *config.AppStoreConnection) error {
+	m.mutex.Lock()
+	if m.AppStore == nil {
+		m.AppStore = make(map[string]*appstore.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := appstore.NewClient(appstore.Config{
+		IssuerID:  connection.IssuerID,
+		KeyID:     connection.KeyID,
+		KeyPath:   connection.KeyPath,
+		KeyBase64: connection.KeyBase64,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.AppStore[connection.Name] = client
+
+	return nil
+}
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
 
@@ -2014,6 +2065,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			err := connectionManager.AddGitHubConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add github connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.AppStore {
+		wg.Go(func() {
+			err := connectionManager.AddAppStoreConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add appstore connection '%s'", conn.Name))
 			}
 		})
 	}
