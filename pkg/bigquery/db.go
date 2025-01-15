@@ -229,17 +229,17 @@ func (d *Client) UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipel
 	}
 	tableRef, err := d.getTableRef(asset.Name)
 	if err != nil {
+		return err
+	}
+
+	meta, err := tableRef.Metadata(ctx)
+	if err != nil {
 		var apiErr *googleapi.Error
 		if errors.As(err, &apiErr) && apiErr.Code == 404 {
 			return nil
 		}
 		return err
 	}
-	meta, err := tableRef.Metadata(ctx)
-	if err != nil {
-		return err
-	}
-
 	schema := meta.Schema
 	colsChanged := false
 	for _, field := range schema {
