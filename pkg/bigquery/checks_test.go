@@ -60,9 +60,9 @@ func (m *mockQuerierWithResult) SelectWithSchema(ctx context.Context, q *query.Q
 	return result, args.Error(1)
 }
 
-func (m *mockQuerierWithResult) DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
-	args := m.Called(ctx, tableName, asset)
-	return args.Error(0)
+func (m *mockQuerierWithResult) IsPartitioningOrClusteringMismatch(ctx context.Context, meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
+	args := m.Called(ctx, meta, asset)
+	return args.Bool(0)
 }
 
 func (m *mockQuerierWithResult) IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
@@ -75,13 +75,17 @@ func (m *mockQuerierWithResult) IsSameClustering(meta *bigquery.TableMetadata, a
 	return args.Bool(0)
 }
 
-func (m *mockQuerierWithResult) DeleteTableIfMaterializationTypeMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
-	args := m.Called(ctx, tableName, asset)
-	return args.Error(0)
+func (m *mockQuerierWithResult) IsMaterializationTypeMismatch(ctx context.Context, meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
+	args := m.Called(ctx, meta, asset)
+	return args.Bool(0)
 }
 
 func (m *mockQuerierWithResult) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error {
 	args := m.Called(asset, ctx)
+	return args.Error(0)
+}
+func (m *mockQuerierWithResult) DropTableOnMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
+	args := m.Called(asset, tableName, ctx)
 	return args.Error(0)
 }
 

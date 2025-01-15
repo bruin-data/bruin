@@ -35,9 +35,10 @@ type MetadataUpdater interface {
 }
 
 type TableManager interface {
-	DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error
+	DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, meta *bigquery.TableMetadata, asset *pipeline.Asset) error
 	CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error
-	DeleteTableIfMaterializationTypeMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error
+	DeleteTableIfMaterializationTypeMismatch(ctx context.Context, meta *bigquery.TableMetadata, asset *pipeline.Asset) error
+	DropTableOnMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error
 }
 
 type DB interface {
