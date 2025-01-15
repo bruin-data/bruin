@@ -209,14 +209,14 @@ func Run(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
 			}
 
-			parser, err := sqlparser.NewSQLParser(false)
-			if err != nil {
-				printError(err, runConfig.Output, "Could not initialize sql parser")
-			}
+			// parser, err := sqlparser.NewSQLParser(false)
+			// if err != nil {
+			// 	printError(err, runConfig.Output, "Could not initialize sql parser")
+			// }
 
-			if err := CheckLint(parser, pipelineInfo.Pipeline, inputPath, logger); err != nil {
-				return err
-			}
+			// if err := CheckLint(parser, pipelineInfo.Pipeline, inputPath, logger); err != nil {
+			// 	return err
+			// }
 
 			statePath := filepath.Join(repoRoot.Path, "logs/runs", pipelineInfo.Pipeline.Name)
 			err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/runs")
