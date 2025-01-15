@@ -296,29 +296,14 @@ func (d *Client) Ping(ctx context.Context) error {
 	return nil // Return nil if the query runs successfully
 }
 
-func (d *Client) DeleteTableIfPartitioningOrClusteringMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
-	tableRef, err := d.getTableRef(tableName)
-	if err != nil {
-		return err
-	}
-	// Fetch table metadata
-	meta, err := tableRef.Metadata(ctx)
-	if err != nil {
-		var apiErr *googleapi.Error
-		if errors.As(err, &apiErr) && apiErr.Code == 404 {
-			return nil
-		}
-		return fmt.Errorf("failed to fetch metadata for table '%s': %w", tableName, err)
-	}
+func (d *Client) IsPartitioningOrClusteringMismatch(ctx context.Context, meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
+
 	if meta.TimePartitioning != nil || meta.RangePartitioning != nil || asset.Materialization.PartitionBy != "" || len(asset.Materialization.ClusterBy) > 0 {
 		if !IsSamePartitioning(meta, asset) || !IsSameClustering(meta, asset) {
-			if err := tableRef.Delete(ctx); err != nil {
-				return fmt.Errorf("failed to delete table '%s': %w", tableName, err)
-			}
+			return true
 		}
 	}
-
-	return nil
+	return false
 }
 
 func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
@@ -408,10 +393,19 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 	return nil
 }
 
-func (d *Client) DeleteTableIfMaterializationTypeMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
+func (d *Client) IsMaterializationTypeMismatch(ctx context.Context, meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
 	if asset.Materialization.Type == pipeline.MaterializationTypeNone {
-		return nil
+		return false
 	}
+
+	tableType := meta.Type
+	if !strings.EqualFold(string(tableType), string(asset.Materialization.Type)) {
+		return true
+	}
+	return false
+}
+
+func (d *Client) DropTableOnMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
 	tableRef, err := d.getTableRef(tableName)
 	if err != nil {
 		return err
@@ -424,8 +418,7 @@ func (d *Client) DeleteTableIfMaterializationTypeMismatch(ctx context.Context, t
 		}
 		return fmt.Errorf("failed to fetch metadata for table '%s': %w", tableName, err)
 	}
-	tableType := meta.Type
-	if !strings.EqualFold(string(tableType), string(asset.Materialization.Type)) {
+	if d.IsMaterializationTypeMismatch(ctx, meta, asset) || d.IsPartitioningOrClusteringMismatch(ctx, meta, asset) {
 		if err := tableRef.Delete(ctx); err != nil {
 			return fmt.Errorf("failed to delete table '%s': %w", tableName, err)
 		}
