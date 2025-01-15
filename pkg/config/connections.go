@@ -469,3 +469,15 @@ type GitHubConnection struct {
 func (c GitHubConnection) GetName() string {
 	return c.Name
 }
+
+type AppStoreConnection struct {
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	KeyID    string `yaml:"key_id" json:"key_id" mapstructure:"key_id"`
+	IssuerID string `yaml:"issuer_id" json:"issuer_id" mapstructure:"issuer_id"`
+	KeyPath  string `yaml:"key_path" json:"key_path" mapstructure:"key_path"`
+	Key      string `yaml:"key" json:"key" mapstructure:"key"`
+}
+
+func (c AppStoreConnection) GetName() string {
+	return c.Name
+}
