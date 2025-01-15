@@ -48,10 +48,14 @@ type DB interface {
 	TableManager
 }
 
+var (
+	datasetNameCache sync.Map // Global cache for dataset existence
+	datasetLocks     sync.Map // Global map for dataset-specific locks
+)
+
 type Client struct {
-	client           *bigquery.Client
-	config           *Config
-	datasetNameCache *sync.Map
+	client *bigquery.Client
+	config *Config
 }
 
 func NewDB(c *Config) (*Client, error) {
@@ -84,9 +88,8 @@ func NewDB(c *Config) (*Client, error) {
 	}
 
 	return &Client{
-		client:           client,
-		config:           c,
-		datasetNameCache: &sync.Map{},
+		client: client,
+		config: c,
 	}, nil
 }
 
@@ -358,6 +361,7 @@ func IsSameClustering(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool 
 
 	return true
 }
+
 func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error {
 	tableName := asset.Name
 	tableComponents := strings.Split(tableName, ".")
@@ -374,35 +378,37 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 	default:
 		return nil
 	}
+
 	cacheKey := fmt.Sprintf("%s.%s", projectID, datasetName)
-	if _, exists := d.datasetNameCache.Load(cacheKey); exists {
+
+	if _, exists := datasetNameCache.Load(cacheKey); exists {
 		return nil
 	}
-	it := d.client.Datasets(ctx)
-	it.ProjectID = projectID
-	found := false
-	for {
-		dataset, err := it.Next()
-		if errors.Is(err, iterator.Done) {
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("failed to list datasets in project '%s': %w", projectID, err)
-		}
 
-		if dataset.DatasetID == datasetName {
-			found = true
-			break
+	lock, _ := datasetLocks.LoadOrStore(cacheKey, &sync.Mutex{})
+	mutex := lock.(*sync.Mutex)
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if _, exists := datasetNameCache.Load(cacheKey); exists {
+		return nil
+	}
+
+	dataset := d.client.DatasetInProject(projectID, datasetName)
+	_, err := dataset.Metadata(ctx)
+	if err != nil {
+		var apiErr *googleapi.Error
+		if errors.As(err, &apiErr) && apiErr.Code == 404 {
+			if err := dataset.Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
+				return fmt.Errorf("failed to create dataset '%s': %w", cacheKey, err)
+			}
+			datasetNameCache.Store(cacheKey, true)
+		} else {
+			return fmt.Errorf("failed to fetch metadata for table '%s': %w", tableName, err)
 		}
 	}
 
-	if !found {
-		dataset := d.client.DatasetInProject(projectID, datasetName)
-		if err := dataset.Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
-			return fmt.Errorf("failed to create dataset '%s': %w", cacheKey, err)
-		}
-	}
-	d.datasetNameCache.Store(cacheKey, true)
 	return nil
 }
 
