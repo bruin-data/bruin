@@ -403,10 +403,7 @@ func (d *Client) IsMaterializationTypeMismatch(ctx context.Context, meta *bigque
 	}
 
 	tableType := meta.Type
-	if !strings.EqualFold(string(tableType), string(asset.Materialization.Type)) {
-		return true
-	}
-	return false
+	return !strings.EqualFold(string(tableType), string(asset.Materialization.Type))
 }
 
 func (d *Client) DropTableOnMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
