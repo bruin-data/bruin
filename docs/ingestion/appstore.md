@@ -13,7 +13,7 @@ To connect to AppStore, you need to add a configuration item to the connections 
 
 ```yaml
     connections:
-      dynamodb:
+      appstore:
         - name: "my-appstore"
           key_id: "my-key-id"
           issuer_id: "my-issuer-id"

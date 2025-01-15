@@ -25,7 +25,7 @@ func (c *Config) GetIngestrURI() string {
 	}
 
 	uri := url.URL{
-		Scheme:   "dynamodb",
+		Scheme:   "appstore",
 		RawQuery: params.Encode(),
 	}
 	return uri.String()
