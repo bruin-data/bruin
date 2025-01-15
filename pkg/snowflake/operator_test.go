@@ -29,6 +29,11 @@ func (m *mockMaterializer) Render(t *pipeline.Asset, query string) (string, erro
 	return res.Get(0).(string), res.Error(1)
 }
 
+func (m *mockMaterializer) IsFullRefresh() bool {
+	res := m.Called()
+	return res.Bool(0)
+}
+
 func TestBasicOperator_RunTask(t *testing.T) {
 	t.Parallel()
 
@@ -140,7 +145,6 @@ func TestBasicOperator_RunTask(t *testing.T) {
 
 				f.m.On("Render", mock.Anything, "select * from users").
 					Return("select * from users", nil)
-
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).
 					Return(nil)
 			},
@@ -189,9 +193,10 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			extractor := new(mockExtractor)
 			mat := new(mockMaterializer)
 			conn := new(mockConnectionFetcher)
-
+			mat.On("IsFullRefresh").Return(false)
 			conn.On("GetSfConnection", mock.Anything).Return(client, nil)
 			client.On("CreateSchemaIfNotExist", mock.AnythingOfType("*pipeline.Asset"), mock.Anything).Return(nil)
+			client.On("RecreateTableOnMaterializationTypeMismatch", mock.AnythingOfType("*pipeline.Asset"), mock.Anything).Return(nil)
 			if tt.setup != nil {
 				tt.setup(&fields{
 					q: client,
