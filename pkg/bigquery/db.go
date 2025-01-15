@@ -358,42 +358,51 @@ func IsSameClustering(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool 
 
 	return true
 }
-
 func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error {
 	tableName := asset.Name
 	tableComponents := strings.Split(tableName, ".")
 	var datasetName string
+	var projectID string
 
 	switch len(tableComponents) {
 	case 2:
+		projectID = d.config.ProjectID
 		datasetName = tableComponents[0]
 	case 3:
 		datasetName = tableComponents[1]
+		projectID = tableComponents[0]
 	default:
 		return nil
 	}
-
-	if _, exists := d.datasetNameCache.Load(datasetName); exists {
+	cacheKey := fmt.Sprintf("%s.%s", projectID, datasetName)
+	if _, exists := d.datasetNameCache.Load(cacheKey); exists {
 		return nil
 	}
-	datasets := d.client.Datasets(ctx)
+	it := d.client.Datasets(ctx)
+	it.ProjectID = projectID
+	found := false
 	for {
-		dataset, err := datasets.Next()
+		dataset, err := it.Next()
 		if errors.Is(err, iterator.Done) {
 			break
 		}
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to list datasets in project '%s': %w", projectID, err)
 		}
-		if datasetName == dataset.DatasetID {
-			d.datasetNameCache.Store(datasetName, true)
-			return nil
+
+		if dataset.DatasetID == datasetName {
+			found = true
+			break
 		}
 	}
-	if err := d.client.Dataset(datasetName).Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
-		return err
+
+	if !found {
+		dataset := d.client.DatasetInProject(projectID, datasetName)
+		if err := dataset.Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
+			return fmt.Errorf("failed to create dataset '%s': %w", cacheKey, err)
+		}
 	}
-	d.datasetNameCache.Store(datasetName, true)
+	d.datasetNameCache.Store(cacheKey, true)
 	return nil
 }
 
