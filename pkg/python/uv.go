@@ -188,7 +188,6 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 	}
 	u.binaryFullPath = binaryFullPath
 
-	// ingestrPackageName := "ingestr@" + ingestrVersion
 	ingestrPackageName, isLocal := u.ingestrPackage(ctx)
 
 	installCmdline := []string{"tool", "install"}
