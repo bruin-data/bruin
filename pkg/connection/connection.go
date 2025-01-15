@@ -1731,10 +1731,10 @@ func (m *Manager) AddAppStoreConnectionFromConfig(connection *config.AppStoreCon
 	m.mutex.Unlock()
 
 	client, err := appstore.NewClient(appstore.Config{
-		IssuerID:  connection.IssuerID,
-		KeyID:     connection.KeyID,
-		KeyPath:   connection.KeyPath,
-		KeyBase64: connection.KeyBase64,
+		IssuerID: connection.IssuerID,
+		KeyID:    connection.KeyID,
+		KeyPath:  connection.KeyPath,
+		Key:      connection.Key,
 	})
 	if err != nil {
 		return err

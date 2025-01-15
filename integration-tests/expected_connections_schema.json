@@ -53,7 +53,7 @@
         "key_path": {
           "type": "string"
         },
-        "key_base64": {
+        "key": {
           "type": "string"
         }
       },
@@ -64,7 +64,7 @@
         "key_id",
         "issuer_id",
         "key_path",
-        "key_base64"
+        "key"
       ]
     },
     "AppsflyerConnection": {

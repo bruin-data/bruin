@@ -19,16 +19,18 @@ To connect to AppStore, you need to add a configuration item to the connections 
           issuer_id: "my-issuer-id"
           key_path: /path/to/private/key
 
-          # optionally, you can specify the key as a 
-          # base64 encoded string
-          key_base64: "<base64 encoded private key>"
+          # alternatively, you can specify the key inline
+          key: |
+            -----BEGIN PRIVATE KEY-----
+            (example key. Your key will have a bunch of encoded data here)
+            -----END PRIVATE KEY-----
           
 ```
 
 * `key_id`: ID of the key.
 * `issuer_id`: Issuer ID of the key.
 * `key_path`: Path to the private key.
-* `key_base64`: base64 encoded contents of the private key.
+* `key`: encoded contents of the private key. Be sure to use `|` yaml scalar when specifying the key inline.
 
 For details on how to obtain these credentials, please refer [here](https://bruin-data.github.io/ingestr/supported-sources/appstore.html#setting-up-appstore-integration).
 

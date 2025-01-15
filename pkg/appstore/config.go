@@ -1,14 +1,15 @@
 package appstore
 
 import (
+	"encoding/base64"
 	"net/url"
 )
 
 type Config struct {
-	IssuerID  string
-	KeyID     string
-	KeyPath   string
-	KeyBase64 string
+	IssuerID string
+	KeyID    string
+	KeyPath  string
+	Key      string
 }
 
 func (c *Config) GetIngestrURI() string {
@@ -20,8 +21,11 @@ func (c *Config) GetIngestrURI() string {
 	switch {
 	case c.KeyPath != "":
 		params.Set("key_path", c.KeyPath)
-	case c.KeyBase64 != "":
-		params.Set("key_base64", c.KeyBase64)
+	case c.Key != "":
+		params.Set(
+			"key_base64",
+			base64.StdEncoding.EncodeToString([]byte(c.Key)),
+		)
 	}
 
 	uri := url.URL{
