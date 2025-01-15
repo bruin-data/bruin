@@ -188,18 +188,35 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 	}
 	u.binaryFullPath = binaryFullPath
 
-	ingestrPackageName := "ingestr@" + ingestrVersion
+	// ingestrPackageName := "ingestr@" + ingestrVersion
+	ingestrPackageName, isLocal := u.ingestrPackage(ctx)
 
-	withCommand := []string{}
+	installCmdline := []string{"tool", "install"}
 	for _, pkg := range extraPackages {
-		withCommand = append(withCommand, "--with", pkg)
+		installCmdline = append(installCmdline, "--with", pkg)
 	}
+	installCmdline = append(
+		installCmdline,
+		"--force",
+		"--quiet",
+		"--python",
+		pythonVersionForIngestr,
+	)
+	if isLocal {
+		installCmdline = append(installCmdline, "--reinstall")
+	}
+	installCmdline = append(installCmdline, ingestrPackageName)
+
 	err = u.Cmd.Run(ctx, repo, &CommandInstance{
 		Name: u.binaryFullPath,
-		Args: append([]string{"tool", "install"}, append(withCommand, []string{"--force", "--quiet", "--python", pythonVersionForIngestr, ingestrPackageName}...)...),
+		Args: installCmdline,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to install ingestr")
+	}
+
+	if isLocal {
+		ingestrPackageName = "ingestr"
 	}
 
 	flags := []string{"tool", "run", "--python", pythonVersionForIngestr, ingestrPackageName}
@@ -382,6 +399,18 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	_, _ = output.Write([]byte("Successfully loaded the data from the asset into the destination.\n"))
 
 	return nil
+}
+
+func (u *UvPythonRunner) ingestrPackage(ctx context.Context) (string, bool) {
+	localIngestr := ctx.Value(LocalIngestr)
+	if localIngestr != nil {
+		ingestrPath, ok := localIngestr.(string)
+		if ok && ingestrPath != "" {
+			// maybe verify that the destination exists?
+			return ingestrPath, true
+		}
+	}
+	return "ingestr@" + ingestrVersion, false
 }
 
 const PythonArrowTemplate = `
