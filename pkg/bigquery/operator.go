@@ -78,7 +78,6 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	if o.materializer.IsFullRefresh() {
-
 		err = conn.DropTableOnMismatch(ctx, t.Name, t)
 		if err != nil {
 			return errors.Wrapf(err, "failed to check for mismatches for table '%s'", t.Name)

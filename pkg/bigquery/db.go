@@ -302,7 +302,6 @@ func (d *Client) Ping(ctx context.Context) error {
 }
 
 func (d *Client) IsPartitioningOrClusteringMismatch(ctx context.Context, meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
-
 	if meta.TimePartitioning != nil || meta.RangePartitioning != nil || asset.Materialization.PartitionBy != "" || len(asset.Materialization.ClusterBy) > 0 {
 		if !IsSamePartitioning(meta, asset) || !IsSameClustering(meta, asset) {
 			return true
