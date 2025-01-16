@@ -209,12 +209,7 @@ func Run(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
 			}
 
-			parser, err := sqlparser.NewSQLParser(false)
-			if err != nil {
-				printError(err, runConfig.Output, "Could not initialize sql parser")
-			}
-
-			if err := CheckLint(parser, pipelineInfo.Pipeline, inputPath, logger); err != nil {
+			if err := CheckLint(pipelineInfo.Pipeline, inputPath, logger, nil); err != nil {
 				return err
 			}
 
@@ -502,7 +497,7 @@ func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger 
 	return startDate, endDate, inputPath, nil
 }
 
-func CheckLint(parser *sqlparser.SQLParser, foundPipeline *pipeline.Pipeline, pipelinePath string, logger *zap.SugaredLogger) error {
+func CheckLint(foundPipeline *pipeline.Pipeline, pipelinePath string, logger *zap.SugaredLogger, parser *sqlparser.SQLParser) error {
 	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, parser)
 	if err != nil {
 		errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
