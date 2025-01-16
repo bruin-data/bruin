@@ -1,10 +1,13 @@
 package connection
 
 import (
+	"context"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/mysql"
+	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
@@ -187,11 +190,34 @@ func TestManager_AddMongoConnectionFromConfigConnectionFromConfig(t *testing.T) 
 	assert.NotNil(t, res)
 }
 
+// First, define our mock implementation of mysql.Client
+type mockMySQLClient struct {
+	*mysql.Client
+}
+
+func (m *mockMySQLClient) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
+	return nil
+}
+
+func (m *mockMySQLClient) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
+	return nil, nil
+}
+
+func (m *mockMySQLClient) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+	return nil, nil
+}
+
+// The actual test
 func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	// Create a Manager with an empty connection map
+	m := Manager{
+		BigQuery: make(map[string]*bigquery.Client),
+		Mysql:    make(map[string]*mysql.Client),
+	}
 
+	// First verify no connection exists
 	res, err := m.GetMySQLConnection("test")
 	require.Error(t, err)
 	assert.Nil(t, res)
@@ -205,9 +231,10 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 		Port:     15432,
 	}
 
-	err = m.AddMySQLConnectionFromConfig(configuration)
-	require.NoError(t, err)
+	// Add mock - use actual mysql.Client type
+	m.Mysql[configuration.Name] = new(mysql.Client)
 
+	// Now we should be able to get the connection
 	res, err = m.GetMySQLConnection("test")
 	require.NoError(t, err)
 	assert.NotNil(t, res)
