@@ -211,13 +211,11 @@ func (m *mockMySQLClient) SelectWithSchema(ctx context.Context, queryObj *query.
 func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	// Create a Manager with an empty connection map
 	m := Manager{
 		BigQuery: make(map[string]*bigquery.Client),
 		Mysql:    make(map[string]*mysql.Client),
 	}
 
-	// First verify no connection exists
 	res, err := m.GetMySQLConnection("test")
 	require.Error(t, err)
 	assert.Nil(t, res)
@@ -230,11 +228,9 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 		Database: "db",
 		Port:     15432,
 	}
-
 	// Add mock - use actual mysql.Client type
 	m.Mysql[configuration.Name] = new(mysql.Client)
 
-	// Now we should be able to get the connection
 	res, err = m.GetMySQLConnection("test")
 	require.NoError(t, err)
 	assert.NotNil(t, res)
