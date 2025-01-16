@@ -32,3 +32,4 @@ default_connections:
   dynamodb: "my-dynamodb"
   tiktokads: "my-tiktokads"
   github: "my-github"
+  gcs: "my-gcs"

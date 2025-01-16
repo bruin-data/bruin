@@ -19,6 +19,7 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/dynamodb"
 	"github.com/bruin-data/bruin/pkg/facebookads"
+	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/github"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/gsheets"
@@ -76,6 +77,7 @@ type Manager struct {
 	TikTokAds    map[string]*tiktokads.Client
 	GitHub       map[string]*github.Client
 	AppStore     map[string]*appstore.Client
+	GCS          map[string]*gcs.Client
 	mutex        sync.Mutex
 }
 
@@ -267,6 +269,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connAppStore, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.AppStore)...)
+
+	connGCS, err := m.GetGCSConnectionWithoutDefault(name)
+	if err == nil {
+		return connGCS, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GCS)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -916,6 +924,25 @@ func (m *Manager) GetAppStoreConnectionWithoutDefault(name string) (*appstore.Cl
 	db, ok := m.AppStore[name]
 	if !ok {
 		return nil, errors.Errorf("appstore connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetGCSConnection(name string) (*gcs.Client, error) {
+	db, err := m.GetGCSConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetGCSConnectionWithoutDefault("gcs-default")
+}
+
+func (m *Manager) GetGCSConnectionWithoutDefault(name string) (*gcs.Client, error) {
+	if m.GCS == nil {
+		return nil, errors.New("no gcs connections found")
+	}
+	db, ok := m.GCS[name]
+	if !ok {
+		return nil, errors.Errorf("gcs connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -1747,6 +1774,29 @@ func (m *Manager) AddAppStoreConnectionFromConfig(connection *config.AppStoreCon
 	return nil
 }
 
+func (m *Manager) AddGCSConnectionFromConfig(connection *config.GCSConnection) error {
+	m.mutex.Lock()
+	if m.GCS == nil {
+		m.GCS = make(map[string]*gcs.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := gcs.NewClient(gcs.Config{
+		BucketName:         connection.BucketName,
+		ServiceAccountFile: connection.ServiceAccountFile,
+		ServiceAccountJSON: connection.ServiceAccountJSON,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.GCS[connection.Name] = client
+
+	return nil
+}
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
 
@@ -2074,6 +2124,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			err := connectionManager.AddAppStoreConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add appstore connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.GCS {
+		wg.Go(func() {
+			err := connectionManager.AddGCSConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add gcs connection '%s'", conn.Name))
 			}
 		})
 	}

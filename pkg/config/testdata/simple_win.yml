@@ -206,6 +206,10 @@ environments:
           key_id: "key-id-123"
           key_path: "/path/to/key.pem"
           issuer_id: "issuer-id-123"
+      gcs:
+        - name: "gcs-1"
+          bucket_name: "bucket-name-123"
+          service_account_json: "/path/to/service_account.json"
   prod:
     connections:
       google_cloud_platform:

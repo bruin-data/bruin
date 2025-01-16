@@ -91,6 +91,7 @@ var defaultMapping = map[string]string{
 	"dynamodb":              "dynamodb-default",
 	"tiktokads":             "tiktokads-default",
 	"appstore":              "appstore-default",
+	"gcs":                   "gcs-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}

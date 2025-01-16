@@ -325,6 +325,13 @@ func TestLoadFromFile(t *testing.T) {
 					KeyPath:  "/path/to/key.pem",
 				},
 			},
+			GCS: []GCSConnection{
+				{
+					Name:               "gcs-1",
+					BucketName:         "bucket-name-123",
+					ServiceAccountFile: "/path/to/service_account.json",
+				},
+			},
 		},
 	}
 

@@ -389,6 +389,12 @@
             "$ref": "#/$defs/AppStoreConnection"
           },
           "type": "array"
+        },
+        "gcs": {
+          "items": {
+            "$ref": "#/$defs/GCSConnection"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -489,6 +495,30 @@
         "name",
         "access_token",
         "account_id"
+      ]
+    },
+    "GCSConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "bucket_name": {
+          "type": "string"
+        },
+        "service_account_file": {
+          "type": "string"
+        },
+        "service_account_json": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "bucket_name",
+        "service_account_file",
+        "service_account_json"
       ]
     },
     "GenericConnection": {
