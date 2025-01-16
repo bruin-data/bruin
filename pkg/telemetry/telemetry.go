@@ -92,11 +92,19 @@ func BeforeCommand(c *cli.Context) error {
 	return nil
 }
 
-func AfterCommand(context *cli.Context) error {
-	start := context.Context.Value(contextKey(startTimeKey))
+func AfterCommand(c *cli.Context) error {
+	val := c.Context.Value(contextKey(startTimeKey))
+	start, ok := val.(time.Time)
+	if !ok {
+		// If it's not a time.Time (or is nil), just return.
+		// This avoids a panic and means we won't log telemetry for this run.
+		return nil
+	}
+
+	duration := time.Since(start).Milliseconds()
 	SendEvent("command_end", analytics.Properties{
-		"command":     context.Command.Name,
-		"duration_ms": time.Since(start.(time.Time)).Milliseconds(),
+		"command":     c.Command.Name,
+		"duration_ms": duration,
 	})
 	return nil
 }
