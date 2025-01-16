@@ -102,7 +102,6 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 }
 
 func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
-	// Convert query object to string and execute it
 	queryString := queryObj.String()
 	rows, err := c.conn.QueryContext(ctx, queryString)
 	if err != nil {
@@ -112,7 +111,6 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	}
 	defer rows.Close()
 
-	// Initialize the result struct
 	result := &query.QueryResult{
 		Columns: []string{},
 		Rows:    [][]interface{}{},
@@ -136,6 +134,14 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		if err := rows.Scan(columnPointers...); err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
+
+		// convert []byte -> string
+		for i, v := range row {
+			if b, ok := v.([]byte); ok {
+				row[i] = string(b)
+			}
+		}
+
 		result.Rows = append(result.Rows, row)
 	}
 
@@ -144,5 +150,4 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	}
 
 	return result, nil
-
 }
