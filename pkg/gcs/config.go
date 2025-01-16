@@ -2,6 +2,7 @@ package gcs
 
 import (
 	"encoding/base64"
+	"fmt"
 	"net/url"
 )
 
@@ -11,7 +12,12 @@ type Config struct {
 	ServiceAccountJSON string
 }
 
-func (c Config) GetIngestrURI() string {
+func (c Config) GetIngestrURI() (string, error) {
+	missingCredentials := c.ServiceAccountFile == "" && c.ServiceAccountJSON == ""
+	if missingCredentials {
+		return "", fmt.Errorf("either service_account_file or service_account_json must be provided")
+	}
+
 	params := url.Values{}
 	switch {
 	case c.ServiceAccountFile != "":
@@ -27,5 +33,5 @@ func (c Config) GetIngestrURI() string {
 		Host:     c.BucketName,
 		RawQuery: params.Encode(),
 	}
-	return uri.String()
+	return uri.String(), nil
 }

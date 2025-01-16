@@ -9,5 +9,5 @@ func NewClient(c Config) (*Client, error) {
 }
 
 func (c *Client) GetIngestrURI() (string, error) {
-	return c.config.GetIngestrURI(), nil
+	return c.config.GetIngestrURI()
 }
