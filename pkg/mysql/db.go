@@ -90,6 +90,13 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 			return nil, errors.Wrap(err, "failed to scan row")
 		}
 
+		// Convert []byte to string
+		for i, v := range values {
+			if b, ok := v.([]byte); ok {
+				values[i] = string(b)
+			}
+		}
+
 		collectedRows = append(collectedRows, values)
 	}
 
