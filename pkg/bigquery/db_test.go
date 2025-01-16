@@ -1259,133 +1259,51 @@ func TestIsSameClustering(t *testing.T) {
 	}
 }
 
-func TestClient_DeleteTableIfMaterializationTypeMismatch(t *testing.T) {
+func TestClient_IsMaterializationTypeMismatch(t *testing.T) {
 	t.Parallel()
 
-	projectID := "test-project"
-	schema := "myschema"
-	table := "mytable"
-	tableName := fmt.Sprintf("%s.%s", schema, table)
-
 	tests := []struct {
-		name          string
-		asset         *pipeline.Asset
-		tableResponse *bigquery2.Table
-		expectedErr   string
-		deleteCalled  bool
+		name             string
+		asset            *pipeline.Asset
+		meta             *bigquery.TableMetadata
+		expectedMismatch bool
 	}{
 		{
 			name: "asset has no materialization type",
 			asset: &pipeline.Asset{
 				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeNone},
 			},
-			expectedErr:  "",
-			deleteCalled: false,
-		},
-		{
-			name: "table not found (404)",
-			asset: &pipeline.Asset{
-				Materialization: pipeline.Materialization{Type: "TABLE"},
-			},
-			tableResponse: nil, // Simulate 404
-			expectedErr:   "",
-			deleteCalled:  false,
+			meta:             &bigquery.TableMetadata{Type: "TABLE"},
+			expectedMismatch: false,
 		},
 		{
 			name: "materialization type matches",
 			asset: &pipeline.Asset{
 				Materialization: pipeline.Materialization{Type: "TABLE"},
 			},
-			tableResponse: &bigquery2.Table{Type: "TABLE"},
-			expectedErr:   "",
-			deleteCalled:  false,
+			meta:             &bigquery.TableMetadata{Type: "TABLE"},
+			expectedMismatch: false,
 		},
 		{
 			name: "materialization type mismatch",
 			asset: &pipeline.Asset{
 				Materialization: pipeline.Materialization{Type: "VIEW"},
 			},
-			tableResponse: &bigquery2.Table{Type: "TABLE"},
-			expectedErr:   "",
-			deleteCalled:  true,
-		},
-		{
-			name: "delete fails",
-			asset: &pipeline.Asset{
-				Materialization: pipeline.Materialization{Type: "VIEW"},
-			},
-			tableResponse: &bigquery2.Table{Type: "TABLE"},
-			expectedErr:   "failed to delete table 'myschema.mytable': retry failed with context deadline exceeded; last error: googleapi: got HTTP response code 500 with body: delete error",
-			deleteCalled:  true,
+			meta:             &bigquery.TableMetadata{Type: "TABLE"},
+			expectedMismatch: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			deleteCalled := false
 
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				fmt.Println("Request received:", r.Method, r.URL.Path)
-
-				switch r.Method {
-				case http.MethodGet:
-					if tt.tableResponse == nil {
-						w.WriteHeader(http.StatusNotFound)
-						return
-					}
-					w.WriteHeader(http.StatusOK)
-					if err := json.NewEncoder(w).Encode(tt.tableResponse); err != nil {
-						fmt.Printf("Error encoding table response: %v\n", err)
-					}
-
-					return
-
-				case http.MethodDelete:
-					deleteCalled = true
-					if tt.name == "delete fails" {
-						http.Error(w, "delete error", http.StatusInternalServerError)
-						return
-					}
-					w.WriteHeader(http.StatusOK)
-					return
-				default:
-					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-				}
-			}))
-			defer server.Close()
-
-			client, err := bigquery.NewClient(
-				context.Background(),
-				projectID,
-				option.WithHTTPClient(&http.Client{Timeout: 10 * time.Second}),
-				option.WithEndpoint(server.URL),
-				option.WithCredentials(&google.Credentials{
-					ProjectID: projectID,
-					TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
-						AccessToken: "test-token",
-					}),
-				}),
-			)
-			require.NoError(t, err)
-
-			d := Client{
-				client: client,
-				config: &Config{ProjectID: projectID},
-			}
-
+			d := Client{}
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 
-			err = d.DeleteTableIfMaterializationTypeMismatch(ctx, tableName, tt.asset)
-			if tt.expectedErr == "" {
-				require.NoError(t, err)
-			} else {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.expectedErr)
-			}
-
-			assert.Equal(t, tt.deleteCalled, deleteCalled)
+			mismatch := d.IsMaterializationTypeMismatch(ctx, tt.meta, tt.asset)
+			assert.Equal(t, tt.expectedMismatch, mismatch)
 		})
 	}
 }

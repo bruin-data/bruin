@@ -201,6 +201,11 @@ environments:
           access_token: "token-123"
           owner: "owner-456"
           repo: "repo-456"
+      appstore:
+        - name: "appstore-1"
+          key_id: "key-id-123"
+          key_path: "/path/to/key.pem"
+          issuer_id: "issuer-id-123"
   prod:
     connections:
       google_cloud_platform:

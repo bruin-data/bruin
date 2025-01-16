@@ -52,6 +52,7 @@ type Connections struct {
 	Slack               []SlackConnection               `yaml:"slack,omitempty" json:"slack,omitempty" mapstructure:"slack"`
 	Asana               []AsanaConnection               `yaml:"asana,omitempty" json:"asana,omitempty" mapstructure:"asana"`
 	DynamoDB            []DynamoDBConnection            `yaml:"dynamodb,omitempty" json:"dynamodb,omitempty" mapstructure:"dynamodb"`
+	AppStore            []AppStoreConnection            `yaml:"appstore,omitempty" json:"appstore,omitempty" mapstructure:"appstore"`
 
 	byKey       map[string]any
 	typeNameMap map[string]string
@@ -257,6 +258,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.GitHub {
 		c.byKey[conn.Name] = &(c.GitHub[i])
 		c.typeNameMap[conn.Name] = "github"
+	}
+
+	for i, conn := range c.AppStore {
+		c.byKey[conn.Name] = &(c.AppStore[i])
+		c.typeNameMap[conn.Name] = "appstore"
 	}
 }
 
@@ -705,6 +711,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.GitHub = append(env.Connections.GitHub, conn)
+	case "appstore":
+		var conn AppStoreConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.AppStore = append(env.Connections.AppStore, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -804,6 +817,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.TikTokAds = removeConnection(env.Connections.TikTokAds, connectionName)
 	case "github":
 		env.Connections.GitHub = removeConnection(env.Connections.GitHub, connectionName)
+	case "appstore":
+		env.Connections.AppStore = removeConnection(env.Connections.AppStore, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
