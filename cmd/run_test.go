@@ -1133,6 +1133,40 @@ func TestValidation(t *testing.T) {
 	}
 }
 
+func TestCheckLintFunc(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name          string
+		foundPipeline *pipeline.Pipeline
+		pipelinePath  string
+	}{
+		{
+			name: "Lint Rule Error",
+			foundPipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+			},
+			pipelinePath: "path/to/pipeline",
+		},
+		{
+			name: "Linting Error",
+
+			foundPipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+			},
+			pipelinePath: "path/to/pipeline",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			logger := zaptest.NewLogger(t).Sugar()
+			err := CheckLint(tt.foundPipeline, tt.pipelinePath, logger)
+			require.NoError(t, err, "Expected no error but got one")
+		})
+	}
+}
+
 func TestReadState(t *testing.T) {
 	t.Parallel()
 
