@@ -1161,7 +1161,7 @@ func TestCheckLintFunc(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			logger := zaptest.NewLogger(t).Sugar()
-			err := CheckLint(tt.foundPipeline, tt.pipelinePath, logger)
+			err := CheckLint(tt.foundPipeline, tt.pipelinePath, logger, nil)
 			require.NoError(t, err, "Expected no error but got one")
 		})
 	}

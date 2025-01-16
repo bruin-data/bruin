@@ -35,6 +35,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/synapse"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/fatih/color"
@@ -208,7 +209,7 @@ func Run(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
 			}
 
-			if err := CheckLint(pipelineInfo.Pipeline, inputPath, logger); err != nil {
+			if err := CheckLint(pipelineInfo.Pipeline, inputPath, logger, nil); err != nil {
 				return err
 			}
 
@@ -496,8 +497,8 @@ func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger 
 	return startDate, endDate, inputPath, nil
 }
 
-func CheckLint(foundPipeline *pipeline.Pipeline, pipelinePath string, logger *zap.SugaredLogger) error {
-	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true)
+func CheckLint(foundPipeline *pipeline.Pipeline, pipelinePath string, logger *zap.SugaredLogger, parser *sqlparser.SQLParser) error {
+	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, parser)
 	if err != nil {
 		errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
 		return err
