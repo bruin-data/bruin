@@ -2,7 +2,7 @@ package gcs
 
 import (
 	"encoding/base64"
-	"fmt"
+	"errors"
 	"net/url"
 )
 
@@ -15,7 +15,7 @@ type Config struct {
 func (c Config) GetIngestrURI() (string, error) {
 	missingCredentials := c.ServiceAccountFile == "" && c.ServiceAccountJSON == ""
 	if missingCredentials {
-		return "", fmt.Errorf("GCS: either service_account_file or service_account_json must be provided")
+		return "", errors.New("GCS: either service_account_file or service_account_json must be provided")
 	}
 
 	params := url.Values{}
