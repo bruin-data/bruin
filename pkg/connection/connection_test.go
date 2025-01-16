@@ -190,7 +190,6 @@ func TestManager_AddMongoConnectionFromConfigConnectionFromConfig(t *testing.T) 
 	assert.NotNil(t, res)
 }
 
-// First, define our mock implementation of mysql.Client
 type mockMySQLClient struct {
 	*mysql.Client
 }
@@ -207,7 +206,6 @@ func (m *mockMySQLClient) SelectWithSchema(ctx context.Context, queryObj *query.
 	return nil, nil
 }
 
-// The actual test
 func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
