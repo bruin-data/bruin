@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 
@@ -52,10 +51,10 @@ func (c *Client) GetIngestrURI() (string, error) {
 	return c.config.GetIngestrURI(), nil
 }
 
-type connection interface {
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-}
+//type connection interface {
+//	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+//	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+//}
 
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
 	_, err := c.conn.ExecContext(ctx, query.String())
