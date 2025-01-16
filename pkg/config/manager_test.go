@@ -325,6 +325,13 @@ func TestLoadFromFile(t *testing.T) {
 					KeyPath:  "/path/to/key.pem",
 				},
 			},
+			LinkedInAds: []LinkedInAdsConnection{
+				{
+					Name:        "linkedinads-1",
+					AccessToken: "access-token-123",
+					AccountIds:  "account-id-123,account-id-456",
+				},
+			},
 		},
 	}
 
