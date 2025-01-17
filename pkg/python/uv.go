@@ -202,6 +202,8 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 		pythonVersionForIngestr,
 	)
 	if isLocal {
+		// when local ingestr package is specified, we want
+		// to pull the latest changes
 		installCmdline = append(installCmdline, "--reinstall")
 	}
 	installCmdline = append(installCmdline, ingestrPackageName)
@@ -215,7 +217,32 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 	}
 
 	if isLocal {
+		// ingestrPackageName() returns the absolute path of
+		// the directory containing the ingestr package if it is local.
 		ingestrPackageName = "ingestr"
+
+		// When we use a local ingestr package that has the same
+		// version as the latest published version, it causes the
+		// published package to not be installed when we run
+		// without local ingestr. This is because when uv compares the
+		// installed version with the latest published version
+		// it sees that they're the same so it skips the
+		// installation altogether. To mitigate this, we change the
+		// version of the local ingestr package to debug.
+		//
+		// if for some reason this doesn't work for you,
+		// you can workaround this issue by uninstall the ingestr
+		// package using:
+		//   uv tool uninstall ingestr
+		// and then running the command again.
+		err = u.setIngestrVersionToDebug(pythonVersionForIngestr)
+		if err != nil {
+			u.Cmd.Run(ctx, repo, &CommandInstance{
+				Name: u.binaryFullPath,
+				Args: []string{"tool", "uninstall", "--quiet", "--python", pythonVersionForIngestr, ingestrPackageName},
+			})
+			return fmt.Errorf("failed to set ingestr package version to debug: %w", err)
+		}
 	}
 
 	flags := []string{"tool", "run", "--python", pythonVersionForIngestr, ingestrPackageName}
@@ -410,6 +437,20 @@ func (u *UvPythonRunner) ingestrPackage(ctx context.Context) (string, bool) {
 		}
 	}
 	return "ingestr@" + ingestrVersion, false
+}
+
+func (u *UvPythonRunner) setIngestrVersionToDebug(pythonVersion string) error {
+	// hacky code up ahead
+
+	// find path of the site-packages for uv tool
+	_ = exec.Command(u.binaryFullPath, "run", "--python", pythonVersion, "-m", "site", "--user-site")
+
+	// find the version of the installed ingestr package
+
+	// rename the installed ingestr package to debug
+
+	// TODO
+	return nil
 }
 
 const PythonArrowTemplate = `
