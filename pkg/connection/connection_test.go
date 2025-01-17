@@ -192,8 +192,7 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 	t.Parallel()
 
 	m := Manager{
-		BigQuery: make(map[string]*bigquery.Client),
-		Mysql:    make(map[string]*mysql.Client),
+		Mysql: make(map[string]*mysql.Client),
 	}
 
 	res, err := m.GetMySQLConnection("test")
