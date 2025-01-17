@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -66,7 +67,7 @@ func CastResultToInteger(res [][]interface{}) (int64, error) {
 		}
 		return 0, nil
 	case uint64:
-		return int64(v), nil
+		return int64(math.Abs(float64(v))), nil
 
 	case string:
 		atoi, err := strconv.Atoi(v)
