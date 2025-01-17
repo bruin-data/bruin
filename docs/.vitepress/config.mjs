@@ -109,6 +109,7 @@ export default defineConfig({
                 collapsed: false,
                 items: [
                     {text: "AWS Athena", link: "/platforms/athena"},
+                    {text: "Clickhouse", link: "/platforms/clickhouse"},
                     {text: "Databricks", link: "/platforms/databricks"},
                     {text: "DuckDB", link: "/platforms/duckdb"},
                     {text: "Google BigQuery", link: "/platforms/bigquery"},

@@ -3,7 +3,7 @@
 Bruin supports AWS Athena as a query engine, which means you can use Bruin to build tables and views in your data lake with Athena.
 
 > [!WARNING]
-> Bruin materializations will always create Iceberg tables on Athena. You can still write SQL scripts for legacy tables and not use [materialization](../assets/materialization.md) features.
+> Bruin materializations will always create Iceberg tables on Athena. You can still write SQL scripts for legacy tables and not use [materialization](../../assets/materialization.md) features.
 
 
 ## Connection
@@ -29,7 +29,7 @@ The field `database` is optional, if not provided, it will default to `default`.
 ## Athena Assets
 
 ### `athena.sql`
-Runs a materialized Athena asset or an SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
+Runs a materialized Athena asset or an SQL script. For detailed parameters, you can check [Definition Schema](../../assets/definition-schema.md) page.
 
 ### Examples
 Create a view to aggregate website traffic data
@@ -39,7 +39,6 @@ name: website_traffic.view
 type: athena.sql
 materialization:
     type: view
-@bruin */
 
 select
     date,
@@ -48,6 +47,7 @@ select
     avg(session_duration) as avg_session_duration
 from raw_web_traffic
 group by date;
+@bruin */
 ```
 
 Create a table to analyze daily sales performance:
@@ -57,7 +57,6 @@ name: daily_sales_analysis.view
 type: athena.sql
 materialization:
     type: table
-@bruin */
 
 select
     order_date,
@@ -66,6 +65,7 @@ select
     avg(total_amount) as avg_order_value
 from sales_data
 group by order_date;
+@bruin */
 ```
 
 Bruin Athena assets support partitioning by one column only
@@ -76,7 +76,6 @@ type: athena.sql
 materialization:
     type: table
     partition_by: order_date # <----------
-@bruin */
 
 select
     order_date,
@@ -85,6 +84,7 @@ select
     avg(total_amount) as avg_order_value
 from sales_data
 group by order_date;
+@bruin */
 ```
 
 
