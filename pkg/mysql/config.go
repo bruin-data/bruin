@@ -52,11 +52,17 @@ func (c Config) GetIngestrURI() string {
 }
 
 func (c Config) ToDBConnectionURI() string {
-	u := &url.URL{
-		User: url.UserPassword(c.Username, c.Password),
-		Host: c.Host,
-		Path: c.Database,
+	if c.Port == 0 {
+		c.Port = 3306
 	}
 
-	return u.String()
+	hostPort := fmt.Sprintf("%s:%d", c.Host, c.Port)
+
+	return fmt.Sprintf(
+		"%s:%s@tcp(%s)/%s",
+		c.Username,
+		c.Password,
+		hostPort,
+		c.Database,
+	)
 }
