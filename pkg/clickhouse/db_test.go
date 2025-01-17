@@ -43,15 +43,23 @@ func (r MockRows) Next() bool {
 	return (*r.index) <= len(r.rows)
 }
 
+type scanner interface {
+	SetValues(values []any)
+}
+
 func (r MockRows) Scan(dest ...any) error {
 	if r.scanError != nil {
 		return r.scanError
 	}
 
 	data := r.rows[(*r.index)-1]
-	for i := range dest {
-		dest[i] = data[i]
+	content := dest[0]
+	scr, ok := (content).(scanner)
+	if !ok {
+		panic("This shouldn't happen")
 	}
+
+	scr.SetValues(data)
 
 	return nil
 }

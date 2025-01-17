@@ -16,7 +16,6 @@ columns:
   - name: country
     type: varchar
     description: "the country"
-    primary_key: true
     checks:
         - name: not_null
   - name: name

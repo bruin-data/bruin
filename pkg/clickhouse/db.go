@@ -9,6 +9,21 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Rowscanner exists since clickhouse library requires us to scan either to a specific type or an implementor of the
+// interface sql.Scanner, cannot scan directly to interface{}.
+type RowScanner struct {
+	values []any
+}
+
+func (s *RowScanner) SetValues(values []any) {
+	s.values = values
+}
+
+func (s *RowScanner) Scan(src any) error {
+	s.values = append(s.values, src)
+	return nil
+}
+
 type Client struct {
 	connection connection
 	config     ClickHouseConfig
@@ -57,11 +72,12 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 
 	collectedRows := make([][]interface{}, 0)
 	for rows.Next() {
-		result := make([]interface{}, len(rows.Columns()))
-		if err := rows.Scan(result...); err != nil {
+		result := RowScanner{}
+		if err := rows.Scan(&result); err != nil {
 			return nil, errors.Wrap(err, "failed to scan row")
 		}
-		collectedRows = append(collectedRows, result)
+
+		collectedRows = append(collectedRows, result.values)
 	}
 
 	return collectedRows, nil
@@ -87,11 +103,11 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 
 	collectedRows := make([][]interface{}, 0)
 	for rows.Next() {
-		result := make([]interface{}, len(rows.Columns()))
-		if err := rows.Scan(result...); err != nil {
+		result := RowScanner{}
+		if err := rows.Scan(&result); err != nil {
 			return nil, errors.Wrap(err, "failed to scan row")
 		}
-		collectedRows = append(collectedRows, result)
+		collectedRows = append(collectedRows, result.values)
 	}
 
 	return &query.QueryResult{Columns: columns, Rows: collectedRows}, nil
