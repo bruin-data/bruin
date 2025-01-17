@@ -1,6 +1,6 @@
 # Clickhouse
 
-Bruin supports [Clickhouse](https://clickhouse.com/) as a data platform so you can create [assets](../assets/definition-schema.md) that will result in tables and views in your clickhouse data warehouse
+Bruin supports [Clickhouse](https://clickhouse.com/) as a data platform so you can create [assets](../assets/definition-schema.md) that will result in tables and views in your clickhouse data warehouse.
 
 ## Connection
 In order to have set up a Clickhouse connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema:
@@ -16,7 +16,7 @@ connections:
           database: "dev"
 ```
 
-The field `database` is optional, if not provided, it will use the default database
+The field `database` is optional, if not provided, it will use the default database.
 
 ## Clickhouse Assets
 
@@ -24,7 +24,7 @@ The field `database` is optional, if not provided, it will use the default datab
 Runs a materialized clickhouse asset or an SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 ### Examples
-Create a view to determine the top 10 earning drivers in a taxi company
+Create a view to determine the top 10 earning drivers in a taxi company:
 ```bruin-sql
 /* @bruin
 name: highest_earning_drivers
@@ -42,7 +42,7 @@ ORDER BY total_earnings DESC
 LIMIT 10;
 ```
 
-View Top 5 Customers by Spending
+View Top 5 Customers by Spending:
 ```bruin-sql
 /* @bruin
 name: top_five_customers
@@ -62,7 +62,7 @@ LIMIT 5;
 @bruin */
 ```
 
-Table with average driver rating
+Table with average driver rating:
 ```bruin-sql
 /* @bruin
 name: average_Rating
@@ -101,7 +101,7 @@ parameters:
 
 ####  Examples: Load csv into a Clickhouse database
 
-The examples below show how load a csv into a clickhouse database.
+The examples below show how to load a csv into a clickhouse database:
 ```yaml
 name: dashboard.hello
 type: clickhouse.seed
