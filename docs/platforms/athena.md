@@ -3,7 +3,7 @@
 Bruin supports AWS Athena as a query engine, which means you can use Bruin to build tables and views in your data lake with Athena.
 
 > [!WARNING]
-> Bruin materializations will always create Iceberg tables on Athena. You can still write SQL scripts for legacy tables and not use [materialization](../../assets/materialization.md) features.
+> Bruin materializations will always create Iceberg tables on Athena. You can still write SQL scripts for legacy tables and not use [materialization](../assets/materialization.md) features.
 
 
 ## Connection
@@ -29,7 +29,7 @@ The field `database` is optional, if not provided, it will default to `default`.
 ## Athena Assets
 
 ### `athena.sql`
-Runs a materialized Athena asset or an SQL script. For detailed parameters, you can check [Definition Schema](../../assets/definition-schema.md) page.
+Runs a materialized Athena asset or an SQL script. For detailed parameters, you can check [Definition Schema](../assets/definition-schema.md) page.
 
 ### Examples
 Create a view to aggregate website traffic data
