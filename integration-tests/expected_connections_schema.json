@@ -178,6 +178,38 @@
         "players"
       ]
     },
+    "ClickHouseConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "database": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "database"
+      ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -315,6 +347,12 @@
         "duckdb": {
           "items": {
             "$ref": "#/$defs/DuckDBConnection"
+          },
+          "type": "array"
+        },
+        "clickhouse": {
+          "items": {
+            "$ref": "#/$defs/ClickHouseConnection"
           },
           "type": "array"
         },

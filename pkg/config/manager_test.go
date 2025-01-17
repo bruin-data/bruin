@@ -224,6 +224,16 @@ func TestLoadFromFile(t *testing.T) {
 					Path: duckPath,
 				},
 			},
+			ClickHouse: []ClickHouseConnection{
+				{
+					Name:     "conn-clickhouse",
+					Host:     "clickhousehost",
+					Port:     8123,
+					Username: "clickhouseuser",
+					Password: "clickhousepass",
+					Database: "clickhousedb",
+				},
+			},
 			Hubspot: []HubspotConnection{
 				{
 					Name:   "conn21",

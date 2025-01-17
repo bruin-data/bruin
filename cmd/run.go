@@ -17,6 +17,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/clickhouse"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/databricks"
@@ -768,39 +769,56 @@ func setupExecutors(
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeAthenaQuery) || estimateCustomCheckType == pipeline.AssetTypeAthenaQuery || s.WillRunTaskOfType(pipeline.AssetTypeAthenaSeed) {
 		athenaOperator := athena.NewBasicOperator(conn, wholeFileExtractor, athena.NewMaterializer(fullRefresh))
-		athenaCustomCheckRunner := ansisql.NewCustomCheckOperator(conn, renderer)
 		athenaCheckRunner := athena.NewColumnCheckOperator(conn)
 
 		mainExecutors[pipeline.AssetTypeAthenaQuery][scheduler.TaskInstanceTypeMain] = athenaOperator
 		mainExecutors[pipeline.AssetTypeAthenaQuery][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner
-		mainExecutors[pipeline.AssetTypeAthenaQuery][scheduler.TaskInstanceTypeCustomCheck] = athenaCustomCheckRunner
+		mainExecutors[pipeline.AssetTypeAthenaQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		mainExecutors[pipeline.AssetTypeAthenaSeed][scheduler.TaskInstanceTypeMain] = seedOperator
 		mainExecutors[pipeline.AssetTypeAthenaSeed][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner
-		mainExecutors[pipeline.AssetTypeAthenaSeed][scheduler.TaskInstanceTypeCustomCheck] = athenaCustomCheckRunner
+		mainExecutors[pipeline.AssetTypeAthenaSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		if estimateCustomCheckType == pipeline.AssetTypeAthenaQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = athenaCheckRunner
-			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = athenaCustomCheckRunner
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		}
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeDuckDBQuery) || estimateCustomCheckType == pipeline.AssetTypeDuckDBQuery || s.WillRunTaskOfType(pipeline.AssetTypeDuckDBSeed) {
 		duckDBOperator := duck.NewBasicOperator(conn, wholeFileExtractor, duck.NewMaterializer(fullRefresh))
-		duckDBCustomCheckRunner := ansisql.NewCustomCheckOperator(conn, renderer)
 		duckDBCheckRunner := duck.NewColumnCheckOperator(conn)
 
 		mainExecutors[pipeline.AssetTypeDuckDBQuery][scheduler.TaskInstanceTypeMain] = duckDBOperator
 		mainExecutors[pipeline.AssetTypeDuckDBQuery][scheduler.TaskInstanceTypeColumnCheck] = duckDBCheckRunner
-		mainExecutors[pipeline.AssetTypeDuckDBQuery][scheduler.TaskInstanceTypeCustomCheck] = duckDBCustomCheckRunner
+		mainExecutors[pipeline.AssetTypeDuckDBQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		mainExecutors[pipeline.AssetTypeDuckDBSeed][scheduler.TaskInstanceTypeMain] = seedOperator
 		mainExecutors[pipeline.AssetTypeDuckDBSeed][scheduler.TaskInstanceTypeColumnCheck] = duckDBCheckRunner
-		mainExecutors[pipeline.AssetTypeDuckDBSeed][scheduler.TaskInstanceTypeCustomCheck] = duckDBCustomCheckRunner
+		mainExecutors[pipeline.AssetTypeDuckDBSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		if estimateCustomCheckType == pipeline.AssetTypeDuckDBQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = duckDBCheckRunner
-			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = duckDBCustomCheckRunner
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		}
+	}
+
+	// ClickHouse
+	if s.WillRunTaskOfType(pipeline.AssetTypeClickHouse) || estimateCustomCheckType == pipeline.AssetTypeClickHouse || s.WillRunTaskOfType(pipeline.AssetTypeClickHouseSeed) {
+		clickHouseOperator := clickhouse.NewBasicOperator(conn, wholeFileExtractor, clickhouse.NewMaterializer(fullRefresh))
+		checkRunner := clickhouse.NewColumnCheckOperator(conn)
+
+		mainExecutors[pipeline.AssetTypeClickHouse][scheduler.TaskInstanceTypeMain] = clickHouseOperator
+		mainExecutors[pipeline.AssetTypeClickHouse][scheduler.TaskInstanceTypeColumnCheck] = checkRunner
+		mainExecutors[pipeline.AssetTypeClickHouse][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeClickHouseSeed][scheduler.TaskInstanceTypeMain] = seedOperator
+		mainExecutors[pipeline.AssetTypeClickHouseSeed][scheduler.TaskInstanceTypeColumnCheck] = checkRunner
+		mainExecutors[pipeline.AssetTypeClickHouseSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		if estimateCustomCheckType == pipeline.AssetTypeClickHouse {
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = checkRunner
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		}
 	}
 
