@@ -36,18 +36,24 @@ func TestMaterializer_Render(t *testing.T) {
 			want:  []string{"CREATE OR REPLACE VIEW my.asset AS\nSELECT 1"},
 		},
 		{
-			name: "materialize to a table, no partition or cluster, default to create+replace",
+			name: "materialize to a table, default to create+replace",
 			task: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
 					Type: pipeline.MaterializationTypeTable,
 				},
+				Columns: []pipeline.Column{
+					{
+						Name:       "id",
+						PrimaryKey: true,
+					},
+				},
 			},
 			query: "SELECT 1",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi AS SELECT 1",
+				"CREATE TABLE __bruin_tmp_abcefghi PRIMARY KEY id AS SELECT 1",
 				"DROP TABLE IF EXISTS my.asset",
-				"RENAME TABLE __bruin_tmp_abcefghi RENAME TO my.asset",
+				"RENAME TABLE __bruin_tmp_abcefghi TO my.asset",
 			},
 		},
 		{
@@ -58,13 +64,19 @@ func TestMaterializer_Render(t *testing.T) {
 					Type:     pipeline.MaterializationTypeTable,
 					Strategy: pipeline.MaterializationStrategyMerge,
 				},
+				Columns: []pipeline.Column{
+					{
+						Name:       "id",
+						PrimaryKey: true,
+					},
+				},
 			},
 			fullRefresh: true,
 			query:       "SELECT 1",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi AS SELECT 1",
+				"CREATE TABLE __bruin_tmp_abcefghi PRIMARY KEY id AS SELECT 1",
 				"DROP TABLE IF EXISTS my.asset",
-				"RENAME TABLE __bruin_tmp_abcefghi RENAME TO my.asset",
+				"RENAME TABLE __bruin_tmp_abcefghi TO my.asset",
 			},
 		},
 		{
@@ -112,10 +124,16 @@ func TestMaterializer_Render(t *testing.T) {
 					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
 					IncrementalKey: "dt",
 				},
+				Columns: []pipeline.Column{
+					{
+						Name:       "id",
+						PrimaryKey: true,
+					},
+				},
 			},
 			query: "SELECT 1",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi AS SELECT 1",
+				"CREATE TABLE __bruin_tmp_abcefghi PRIMARY KEY id AS SELECT 1",
 				"DELETE FROM my.asset WHERE dt in (SELECT DISTINCT dt FROM __bruin_tmp_abcefghi)",
 				"INSERT INTO my.asset SELECT * FROM __bruin_tmp_abcefghi",
 				"DROP TABLE IF EXISTS __bruin_tmp_abcefghi",

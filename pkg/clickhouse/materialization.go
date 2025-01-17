@@ -25,7 +25,7 @@ var matMap = AssetMaterializationMap{
 		pipeline.MaterializationStrategyAppend:        buildAppendQuery,
 		pipeline.MaterializationStrategyCreateReplace: buildCreateReplaceQuery,
 		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
-		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
+		pipeline.MaterializationStrategyMerge:         errorMaterializer,
 	},
 }
 
@@ -49,10 +49,24 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 		return nil, fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", strategy)
 	}
 
+	if len(task.Columns) == 0 {
+		return nil, fmt.Errorf("materialization strategy %s requires the `columns` field to be set", strategy)
+	}
+
+	primaryKeys := task.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) != 1 {
+		return nil, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at EXACTLY one column", strategy)
+	}
+
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
 	queries := []string{
-		fmt.Sprintf("CREATE TABLE %s AS %s", tempTableName, query),
+		fmt.Sprintf(
+			"CREATE TABLE %s PRIMARY KEY %s AS %s",
+			tempTableName,
+			task.ColumnNamesWithPrimaryKey()[0],
+			query,
+		),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
@@ -61,61 +75,28 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) ([]string, error)
 	return queries, nil
 }
 
-func buildMergeQuery(asset *pipeline.Asset, query string) ([]string, error) {
-	if len(asset.Columns) == 0 {
-		return nil, fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
-	}
-
-	primaryKeys := asset.ColumnNamesWithPrimaryKey()
-	if len(primaryKeys) == 0 {
-		return nil, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
-	}
-
-	nonPrimaryKeys := asset.ColumnNamesWithUpdateOnMerge()
-	columnNames := asset.ColumnNames()
-
-	on := make([]string, 0, len(primaryKeys))
-	for _, key := range primaryKeys {
-		on = append(on, fmt.Sprintf("target.%s = source.%s", key, key))
-	}
-	onQuery := strings.Join(on, " AND ")
-
-	allColumnValues := strings.Join(columnNames, ", ")
-
-	whenMatchedThenQuery := ""
-
-	if len(nonPrimaryKeys) > 0 {
-		matchedUpdateStatements := make([]string, 0, len(nonPrimaryKeys))
-		for _, col := range nonPrimaryKeys {
-			matchedUpdateStatements = append(matchedUpdateStatements, fmt.Sprintf("%s = source.%s", col, col))
-		}
-
-		matchedUpdateQuery := strings.Join(matchedUpdateStatements, ", ")
-		whenMatchedThenQuery = "WHEN MATCHED THEN UPDATE SET " + matchedUpdateQuery
-	}
-
-	mergeLines := []string{
-		fmt.Sprintf("MERGE INTO %s target", asset.Name),
-		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
-		whenMatchedThenQuery,
-		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, allColumnValues),
-	}
-
-	return []string{strings.Join(mergeLines, " ")}, nil
-}
-
 func buildCreateReplaceQuery(task *pipeline.Asset, query string) ([]string, error) {
+	if len(task.Columns) == 0 {
+		return nil, fmt.Errorf("materialization strategy %s requires the `columns` field to be set", task.Materialization.Strategy)
+	}
+
+	primaryKeys := task.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) != 1 {
+		return nil, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at EXACTLY one column", task.Materialization.Strategy)
+	}
+
 	query = strings.TrimSuffix(query, ";")
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
 	return []string{
 		fmt.Sprintf(
-			"CREATE TABLE %s AS %s",
+			"CREATE TABLE %s PRIMARY KEY %s AS %s",
 			tempTableName,
+			task.ColumnNamesWithPrimaryKey()[0],
 			query,
 		),
 		"DROP TABLE IF EXISTS " + task.Name,
-		fmt.Sprintf("RENAME TABLE %s RENAME TO %s", tempTableName, task.Name),
+		fmt.Sprintf("RENAME TABLE %s TO %s", tempTableName, task.Name),
 	}, nil
 }
