@@ -481,3 +481,13 @@ type AppStoreConnection struct {
 func (c AppStoreConnection) GetName() string {
 	return c.Name
 }
+
+type LinkedInAdsConnection struct {
+	Name        string `yaml:"name" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
+	AccountIds  string `yaml:"account_ids" json:"account_ids" mapstructure:"account_ids"`
+}
+
+func (c LinkedInAdsConnection) GetName() string {
+	return c.Name
+}

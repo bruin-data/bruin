@@ -163,6 +163,7 @@ export default defineConfig({
                             {text: "Hubspot", link: "/ingestion/hubspot.md"},
                             {text: "Kafka", link: "/ingestion/kafka.md"},
                             {text: "Klaviyo", link: "/ingestion/klaviyo.md"},
+                            {text: "LinkedIn Ads", link: "/ingestion/linkedinads.md"},
                             {text: "MongoDB", link: "/ingestion/mongo"},
                             {text: "MySQL", link: "/ingestion/mysql"},
                             {text: "Notion", link: "/ingestion/notion"},

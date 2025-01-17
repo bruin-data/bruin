@@ -26,6 +26,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/hubspot"
 	"github.com/bruin-data/bruin/pkg/kafka"
 	"github.com/bruin-data/bruin/pkg/klaviyo"
+	"github.com/bruin-data/bruin/pkg/linkedinads"
 	"github.com/bruin-data/bruin/pkg/mongo"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
@@ -76,6 +77,7 @@ type Manager struct {
 	TikTokAds    map[string]*tiktokads.Client
 	GitHub       map[string]*github.Client
 	AppStore     map[string]*appstore.Client
+	LinkedInAds  map[string]*linkedinads.Client
 	mutex        sync.Mutex
 }
 
@@ -267,6 +269,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connAppStore, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.AppStore)...)
+
+	connLinkedInAds, err := m.GetLinkedInAdsConnectionWithoutDefault(name)
+	if err == nil {
+		return connLinkedInAds, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.LinkedInAds)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -916,6 +924,25 @@ func (m *Manager) GetAppStoreConnectionWithoutDefault(name string) (*appstore.Cl
 	db, ok := m.AppStore[name]
 	if !ok {
 		return nil, errors.Errorf("appstore connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetLinkedInAdsConnection(name string) (*linkedinads.Client, error) {
+	db, err := m.GetLinkedInAdsConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetLinkedInAdsConnectionWithoutDefault("linkedinads-default")
+}
+
+func (m *Manager) GetLinkedInAdsConnectionWithoutDefault(name string) (*linkedinads.Client, error) {
+	if m.LinkedInAds == nil {
+		return nil, errors.New("no linkedinads connections found")
+	}
+	db, ok := m.LinkedInAds[name]
+	if !ok {
+		return nil, errors.Errorf("linkedinads connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -1747,6 +1774,25 @@ func (m *Manager) AddAppStoreConnectionFromConfig(connection *config.AppStoreCon
 	return nil
 }
 
+func (m *Manager) AddLinkedInAdsConnectionFromConfig(connection *config.LinkedInAdsConnection) error {
+	m.mutex.Lock()
+	if m.LinkedInAds == nil {
+		m.LinkedInAds = make(map[string]*linkedinads.Client)
+	}
+	m.mutex.Unlock()
+	client, err := linkedinads.NewClient(linkedinads.Config{
+		AccessToken: connection.AccessToken,
+		AccountIds:  connection.AccountIds,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.LinkedInAds[connection.Name] = client
+	return nil
+}
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
 
@@ -2074,6 +2120,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			err := connectionManager.AddAppStoreConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add appstore connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.LinkedInAds {
+		wg.Go(func() {
+			err := connectionManager.AddLinkedInAdsConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add linkedinads connection '%s'", conn.Name))
 			}
 		})
 	}
