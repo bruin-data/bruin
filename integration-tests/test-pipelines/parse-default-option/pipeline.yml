@@ -1,0 +1,13 @@
+name: integration_test
+default_connections:
+  duckdb: "duckdb-env-run-default-option"
+  chess:  "chess-run-default-option"
+default:
+  type: ingestr
+  secrets:
+    - key: KEY2
+      inject_as: INJECTED2
+  parameters:
+    source_connection: chess-run-default-option
+    destination: duckdb
+    

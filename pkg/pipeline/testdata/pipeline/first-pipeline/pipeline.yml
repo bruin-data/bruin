@@ -4,10 +4,6 @@ retries: 3
 default_connections:
   slack: "slack-connection"
   gcpConnectionId: "gcp-connection-id-here"
-default_parameters:
-  param1: "value1"
-  param2: "value2"
-
 notifications:
   slack:
     - channel: "#channel1"
