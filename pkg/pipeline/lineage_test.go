@@ -8,18 +8,29 @@ import (
 
 var SQLParser *sqlparser.SQLParser
 
+func SetupSQLParser() error {
+	if SQLParser == nil {
+		var err error
+		sqlParser, err := sqlparser.NewSQLParser(true)
+		if err != nil {
+			return err
+		}
+		err = sqlParser.Start()
+		if err != nil {
+			return err
+		}
+		SQLParser = sqlParser
+	}
+	return nil
+}
+
 func TestParseLineageRecursively(t *testing.T) {
 	t.Parallel()
-	var err error
-	sqlParser, err := sqlparser.NewSQLParser(true)
+
+	err := SetupSQLParser()
 	if err != nil {
 		t.Errorf("error initializing SQL parser: %v", err)
 	}
-	err = sqlParser.Start()
-	if err != nil {
-		t.Errorf("error starting SQL parser: %v", err)
-	}
-	SQLParser = sqlParser
 	testCases := map[string]func(*testing.T){
 		"basic recursive parsing":   testBasicRecursiveParsing,
 		"joins and complex queries": testJoinsAndComplexQueries,
@@ -284,9 +295,9 @@ func testBasicRecursiveParsing(t *testing.T) {
 					{
 						Name: "source_table",
 						Columns: []Column{
-							{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key", UpdateOnMerge: true},
-							{Name: "name", Type: "str", Description: "User name", UpdateOnMerge: true},
-							{Name: "age", Type: "int64", Description: "User age", UpdateOnMerge: true},
+							{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
+							{Name: "name", Type: "str", Description: "User name"},
+							{Name: "age", Type: "int64", Description: "User age"},
 						},
 						ExecutableFile: ExecutableFile{
 							Content: "SELECT * FROM data_table",
@@ -1041,4 +1052,171 @@ func testDialectSpecificFeatures(t *testing.T) {
 		},
 	}
 	runLineageTests(t, tests)
+}
+
+func TestAddColumnToAsset(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name          string
+		asset         *Asset
+		colName       string
+		upstreamAsset *Asset
+		upstreamCol   *Column
+		after         *Asset
+		want          error
+	}{
+		{
+			name: "column entry",
+			asset: &Asset{
+				Name: "test",
+				ID:   "test",
+				Upstreams: []Upstream{
+					{Value: "test2"},
+				},
+				Columns: []Column{
+					{Name: "id", Type: "integer", Description: "Just a number"},
+				},
+			},
+			colName: "id",
+			upstreamCol: &Column{
+				Name:        "id",
+				Type:        "integer",
+				Description: "Just a test",
+			},
+			upstreamAsset: &Asset{
+				Name: "test2",
+				Columns: []Column{
+					{Name: "id", Type: "integer", Description: "Just a test"},
+				},
+			},
+			after: &Asset{Name: "test", ID: "test", Upstreams: []Upstream{{Value: "test2"}}, Type: "duckdb.sql", Columns: []Column{{Name: "id", Type: "integer", Description: "Just a number", Upstreams: []*UpstreamColumn{
+				{Column: "id", Table: "test2"},
+			}}}},
+		},
+		{
+			name: "column entry 2",
+			asset: &Asset{
+				Name: "test",
+				ID:   "test",
+				Upstreams: []Upstream{
+					{Value: "test2"},
+				},
+				Type: "duckdb.sql",
+				Columns: []Column{
+					{Name: "id", Type: "integer"},
+				},
+			},
+			colName: "id",
+			upstreamCol: &Column{
+				Name:        "id",
+				Type:        "integer",
+				Description: "Just a test",
+			},
+			upstreamAsset: &Asset{
+				Name: "test2",
+				Type: "duckdb.sql",
+				Columns: []Column{
+					{Name: "id", Type: "integer", Description: "Just a test"},
+				},
+			},
+			after: &Asset{Name: "test", ID: "test", Upstreams: []Upstream{{Value: "test2"}}, Type: "duckdb.sql", Columns: []Column{{Name: "id", Type: "integer", Description: "Just a test", EntityAttribute: nil, Upstreams: []*UpstreamColumn{
+				{Column: "id", Table: "test2"},
+			}}}},
+		},
+		{
+			name: "upstream column type change",
+			asset: &Asset{
+				Name: "test",
+				Upstreams: []Upstream{
+					{Value: "test2"},
+				},
+				Columns: []Column{
+					{Name: "id", Type: "integer", Description: "Just a number"},
+				},
+			},
+			colName: "id",
+			upstreamCol: &Column{
+				Name:        "id",
+				Type:        "bigint",
+				Description: "Just a test",
+			},
+			upstreamAsset: &Asset{
+				Name: "test2",
+				Columns: []Column{
+					{Name: "id", Type: "bigint", Description: "Just a test"},
+				},
+			},
+			after: &Asset{Name: "test", Upstreams: []Upstream{{Value: "test2"}}, Type: "duckdb.sql", Columns: []Column{{Name: "id", Type: "integer", Description: "Just a number", Upstreams: []*UpstreamColumn{
+				{Column: "id", Table: "test2"},
+			}}}},
+		},
+		{
+			name: "upstream column addition",
+			asset: &Asset{
+				Name: "test",
+				ID:   "test",
+				Upstreams: []Upstream{
+					{Value: "test2"},
+				},
+				Columns: []Column{},
+			},
+			colName: "new_col",
+			upstreamCol: &Column{
+				Name:        "new_col",
+				Type:        "string",
+				Description: "New column",
+			},
+			upstreamAsset: &Asset{
+				Name: "test2",
+				Columns: []Column{
+					{Name: "id", Type: "integer", Description: "Just a test"},
+					{Name: "new_col", Type: "string", Description: "New column"},
+				},
+			},
+			after: &Asset{
+				Name:      "test",
+				ID:        "test",
+				Upstreams: []Upstream{{Value: "test2"}},
+				Type:      "duckdb.sql",
+				Columns: []Column{{Name: "new_col", Type: "string", Description: "New column", Upstreams: []*UpstreamColumn{
+					{Column: "new_col", Table: "test2"},
+				}}},
+			},
+		},
+	}
+	err := SetupSQLParser()
+	if err != nil {
+		t.Errorf("error initializing SQL parser: %v", err)
+	}
+	lineage := NewLineageExtractor(SQLParser)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			err := lineage.addColumnToAsset(test.asset, test.colName, test.upstreamAsset, test.upstreamCol)
+			if err != nil {
+				t.Errorf("error adding column to asset: %v", err)
+			}
+			for _, col := range test.asset.Columns {
+				upstreamCol := test.after.GetColumnWithName(col.Name)
+				if upstreamCol == nil {
+					t.Errorf("upstream column not found: %v", col.Name)
+					continue
+				}
+				if col.Name != upstreamCol.Name {
+					t.Errorf("upstream column mismatch: %v %v", col.Name, upstreamCol.Name)
+				}
+				if col.Description != upstreamCol.Description {
+					t.Errorf("upstream column mismatch: %v %v", col.Description, upstreamCol.Description)
+				}
+
+				if col.Type != upstreamCol.Type {
+					t.Errorf("upstream column mismatch: %v %v", col.Type, upstreamCol.Type)
+				}
+
+				if len(upstreamCol.Upstreams) != len(col.Upstreams) {
+					t.Errorf("upstream column mismatch: %v %v", col.Upstreams, upstreamCol.Upstreams)
+				}
+			}
+		})
+	}
 }
