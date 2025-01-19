@@ -49,7 +49,7 @@ name: top_five_customers
 type: clickhouse.sql
 materialization:
     type: view
-
+@bruin */
 
 SELECT 
     customer_id, 
@@ -58,8 +58,6 @@ FROM trips
 GROUP BY customer_id 
 ORDER BY total_spent DESC 
 LIMIT 5;
-
-@bruin */
 ```
 
 Table with average driver rating
@@ -69,8 +67,7 @@ name: average_Rating
 type: clickhouse.sql
 materialization:
     type: table
-    
-
+@bruin */
 
 SELECT 
     driver_id, 
@@ -78,8 +75,6 @@ SELECT
 FROM trips 
 GROUP BY driver_id 
 ORDER BY average_rating DESC;
-
-@bruin */
 ```
 
 

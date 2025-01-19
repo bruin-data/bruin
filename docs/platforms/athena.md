@@ -39,6 +39,7 @@ name: website_traffic.view
 type: athena.sql
 materialization:
     type: view
+@bruin */
 
 select
     date,
@@ -47,7 +48,6 @@ select
     avg(session_duration) as avg_session_duration
 from raw_web_traffic
 group by date;
-@bruin */
 ```
 
 Create a table to analyze daily sales performance:
@@ -57,6 +57,7 @@ name: daily_sales_analysis.view
 type: athena.sql
 materialization:
     type: table
+@bruin */
 
 select
     order_date,
@@ -65,7 +66,6 @@ select
     avg(total_amount) as avg_order_value
 from sales_data
 group by order_date;
-@bruin */
 ```
 
 Bruin Athena assets support partitioning by one column only
@@ -76,6 +76,7 @@ type: athena.sql
 materialization:
     type: table
     partition_by: order_date # <----------
+@bruin */
 
 select
     order_date,
@@ -84,7 +85,6 @@ select
     avg(total_amount) as avg_order_value
 from sales_data
 group by order_date;
-@bruin */
 ```
 
 
