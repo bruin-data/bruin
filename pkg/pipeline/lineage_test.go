@@ -1073,7 +1073,7 @@ func TestAddColumnToAsset(t *testing.T) {
 		want          error
 	}{
 		{
-			name: "test case 1",
+			name: "the existing values should not be overridden",
 			asset: &Asset{
 				Name: "test",
 				ID:   "test",
@@ -1101,7 +1101,7 @@ func TestAddColumnToAsset(t *testing.T) {
 			}}}},
 		},
 		{
-			name: "test case 2",
+			name: "the existing values should not be overridden but the new column should be added",
 			asset: &Asset{
 				Name: "test",
 				ID:   "test",
@@ -1131,7 +1131,7 @@ func TestAddColumnToAsset(t *testing.T) {
 			}}}},
 		},
 		{
-			name: "test case 3",
+			name: "the upstream column type should be changed",
 			asset: &Asset{
 				Name: "test",
 				Upstreams: []Upstream{
@@ -1158,7 +1158,7 @@ func TestAddColumnToAsset(t *testing.T) {
 			}}}},
 		},
 		{
-			name: "test case 4",
+			name: "the new column should be added",
 			asset: &Asset{
 				Name: "test",
 				ID:   "test",

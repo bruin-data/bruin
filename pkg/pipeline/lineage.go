@@ -245,9 +245,6 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 		if len(existingCol.Description) == 0 {
 			existingCol.Description = upstreamCol.Description
 		}
-		if len(existingCol.Checks) == 0 {
-			existingCol.Checks = upstreamCol.Checks
-		}
 		if len(existingCol.Type) == 0 {
 			existingCol.Type = upstreamCol.Type
 		}
