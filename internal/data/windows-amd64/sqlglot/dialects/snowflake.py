@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import typing as t
 
-from sqlglot import exp, generator, parser, tokens, transforms
+from sqlglot import exp, generator, jsonpath, parser, tokens, transforms
 from sqlglot.dialects.dialect import (
     Dialect,
     NormalizationStrategy,
@@ -374,6 +374,10 @@ class Snowflake(Dialect):
             return expression  # type: ignore
 
         return super().quote_identifier(expression, identify=identify)
+
+    class JSONPathTokenizer(jsonpath.JSONPathTokenizer):
+        SINGLE_TOKENS = jsonpath.JSONPathTokenizer.SINGLE_TOKENS.copy()
+        SINGLE_TOKENS.pop("$")
 
     class Parser(parser.Parser):
         IDENTIFY_PIVOT_STRINGS = True
@@ -1224,3 +1228,10 @@ class Snowflake(Dialect):
                 self.unsupported("DateSub cannot be transpiled if the subtracted count is unknown")
 
             return date_delta_sql("DATEADD")(self, expression)
+
+        def select_sql(self, expression: exp.Select) -> str:
+            limit = expression.args.get("limit")
+            offset = expression.args.get("offset")
+            if offset and not limit:
+                expression.limit(exp.Null(), copy=False)
+            return super().select_sql(expression)

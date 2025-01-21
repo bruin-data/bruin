@@ -11,6 +11,7 @@ from sqlglot.dialects.dialect import (
     inline_array_sql,
     json_extract_segments,
     json_path_key_only_name,
+    length_or_char_length_sql,
     no_pivot_sql,
     build_json_extract_path,
     rename_func,
@@ -166,6 +167,8 @@ class ClickHouse(Dialect):
     LOG_BASE_FIRST: t.Optional[bool] = None
     FORCE_EARLY_ALIAS_REF_EXPANSION = True
     PRESERVE_ORIGINAL_NAMES = True
+    NUMBERS_CAN_BE_UNDERSCORE_SEPARATED = True
+    IDENTIFIERS_CAN_START_WITH_DIGIT = True
 
     # https://github.com/ClickHouse/ClickHouse/issues/33935#issue-1112165779
     NORMALIZATION_STRATEGY = NormalizationStrategy.CASE_SENSITIVE
@@ -242,6 +245,7 @@ class ClickHouse(Dialect):
         # * select x from t1 union all (select x from t2 limit 1);
         MODIFIERS_ATTACHED_TO_SET_OP = False
         INTERVAL_SPANS = False
+        OPTIONAL_ALIAS_TOKEN_CTE = False
 
         FUNCTIONS = {
             **parser.Parser.FUNCTIONS,
@@ -259,6 +263,7 @@ class ClickHouse(Dialect):
             "JSONEXTRACTSTRING": build_json_extract_path(
                 exp.JSONExtractScalar, zero_based_indexing=False
             ),
+            "LENGTH": lambda args: exp.Length(this=seq_get(args, 0), binary=True),
             "MAP": parser.build_var_map,
             "MATCH": exp.RegexpLike.from_arg_list,
             "RANDCANONICAL": exp.Rand.from_arg_list,
@@ -631,7 +636,7 @@ class ClickHouse(Dialect):
             return super()._parse_position(haystack_first=True)
 
         # https://clickhouse.com/docs/en/sql-reference/statements/select/with/
-        def _parse_cte(self) -> exp.CTE:
+        def _parse_cte(self) -> t.Optional[exp.CTE]:
             # WITH <identifier> AS <subquery expression>
             cte: t.Optional[exp.CTE] = self._try_parse(super()._parse_cte)
 
@@ -977,6 +982,7 @@ class ClickHouse(Dialect):
             exp.JSONExtractScalar: json_extract_segments("JSONExtractString", quoted_index=False),
             exp.JSONPathKey: json_path_key_only_name,
             exp.JSONPathRoot: lambda *_: "",
+            exp.Length: length_or_char_length_sql,
             exp.Map: lambda self, e: _lower_func(var_map_sql(self, e)),
             exp.Median: rename_func("median"),
             exp.Nullif: rename_func("nullIf"),

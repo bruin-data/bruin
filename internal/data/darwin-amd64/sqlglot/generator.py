@@ -114,12 +114,15 @@ class Generator(metaclass=_Generator):
         **JSON_PATH_PART_TRANSFORMS,
         exp.AllowedValuesProperty: lambda self,
         e: f"ALLOWED_VALUES {self.expressions(e, flat=True)}",
+        exp.AnalyzeColumns: lambda self, e: self.sql(e, "this"),
+        exp.AnalyzeWith: lambda self, e: self.expressions(e, prefix="WITH ", sep=" "),
         exp.ArrayContainsAll: lambda self, e: self.binary(e, "@>"),
         exp.ArrayOverlaps: lambda self, e: self.binary(e, "&&"),
         exp.AutoRefreshProperty: lambda self, e: f"AUTO REFRESH {self.sql(e, 'this')}",
         exp.BackupProperty: lambda self, e: f"BACKUP {self.sql(e, 'this')}",
         exp.CaseSpecificColumnConstraint: lambda _,
         e: f"{'NOT ' if e.args.get('not_') else ''}CASESPECIFIC",
+        exp.Ceil: lambda self, e: self.ceil_floor(e),
         exp.CharacterSetColumnConstraint: lambda self, e: f"CHARACTER SET {self.sql(e, 'this')}",
         exp.CharacterSetProperty: lambda self,
         e: f"{'DEFAULT ' if e.args.get('default') else ''}CHARACTER SET={self.sql(e, 'this')}",
@@ -140,6 +143,7 @@ class Generator(metaclass=_Generator):
         exp.ExecuteAsProperty: lambda self, e: self.naked_property(e),
         exp.Except: lambda self, e: self.set_operations(e),
         exp.ExternalProperty: lambda *_: "EXTERNAL",
+        exp.Floor: lambda self, e: self.ceil_floor(e),
         exp.GlobalProperty: lambda *_: "GLOBAL",
         exp.HeapProperty: lambda *_: "HEAP",
         exp.IcebergProperty: lambda *_: "ICEBERG",
@@ -196,6 +200,7 @@ class Generator(metaclass=_Generator):
         exp.TransientProperty: lambda *_: "TRANSIENT",
         exp.Union: lambda self, e: self.set_operations(e),
         exp.UnloggedProperty: lambda *_: "UNLOGGED",
+        exp.UsingData: lambda self, e: f"USING DATA {self.sql(e, 'this')}",
         exp.Uuid: lambda *_: "UUID()",
         exp.UppercaseColumnConstraint: lambda *_: "UPPERCASE",
         exp.VarMap: lambda self, e: self.func("MAP", e.args["keys"], e.args["values"]),
@@ -1556,7 +1561,8 @@ class Generator(metaclass=_Generator):
         return f"{prefix}{string}"
 
     def partition_sql(self, expression: exp.Partition) -> str:
-        return f"PARTITION({self.expressions(expression, flat=True)})"
+        partition_keyword = "SUBPARTITION" if expression.args.get("subpartition") else "PARTITION"
+        return f"{partition_keyword}({self.expressions(expression, flat=True)})"
 
     def properties_sql(self, expression: exp.Properties) -> str:
         root_properties = []
@@ -1861,7 +1867,8 @@ class Generator(metaclass=_Generator):
             set_keyword = "SET " if self.DUPLICATE_KEY_UPDATE_WITH_SET else ""
             expressions = f" {set_keyword}{expressions}"
 
-        return f"{conflict}{constraint}{conflict_keys}{action}{expressions}"
+        where = self.sql(expression, "where")
+        return f"{conflict}{constraint}{conflict_keys}{action}{expressions}{where}"
 
     def returning_sql(self, expression: exp.Returning) -> str:
         return f"{self.seg('RETURNING')} {self.expressions(expression, flat=True)}"
@@ -1988,6 +1995,7 @@ class Generator(metaclass=_Generator):
 
     def pivot_sql(self, expression: exp.Pivot) -> str:
         expressions = self.expressions(expression, flat=True)
+        direction = "UNPIVOT" if expression.unpivot else "PIVOT"
 
         if expression.this:
             this = self.sql(expression, "this")
@@ -1995,14 +2003,15 @@ class Generator(metaclass=_Generator):
                 return f"UNPIVOT {this}"
 
             on = f"{self.seg('ON')} {expressions}"
+            into = self.sql(expression, "into")
+            into = f"{self.seg('INTO')} {into}" if into else ""
             using = self.expressions(expression, key="using", flat=True)
             using = f"{self.seg('USING')} {using}" if using else ""
             group = self.sql(expression, "group")
-            return f"PIVOT {this}{on}{using}{group}"
+            return f"{direction} {this}{on}{into}{using}{group}"
 
         alias = self.sql(expression, "alias")
         alias = f" AS {alias}" if alias else ""
-        direction = self.seg("UNPIVOT" if expression.unpivot else "PIVOT")
 
         field = self.sql(expression, "field")
 
@@ -2014,7 +2023,7 @@ class Generator(metaclass=_Generator):
 
         default_on_null = self.sql(expression, "default_on_null")
         default_on_null = f" DEFAULT ON NULL ({default_on_null})" if default_on_null else ""
-        return f"{direction}{nulls}({expressions} FOR {field}{default_on_null}){alias}"
+        return f"{self.seg(direction)}{nulls}({expressions} FOR {field}{default_on_null}){alias}"
 
     def version_sql(self, expression: exp.Version) -> str:
         this = f"FOR {expression.name}"
@@ -3529,6 +3538,13 @@ class Generator(metaclass=_Generator):
 
         return "".join(sqls)
 
+    def ceil_floor(self, expression: exp.Ceil | exp.Floor) -> str:
+        to_clause = self.sql(expression, "to")
+        if to_clause:
+            return f"{expression.sql_name()}({self.sql(expression, 'this')} TO {to_clause})"
+
+        return self.function_fallback_sql(expression)
+
     def function_fallback_sql(self, expression: exp.Func) -> str:
         args = []
 
@@ -4637,3 +4653,75 @@ class Generator(metaclass=_Generator):
             every.this.replace(exp.Literal.number(every.name))
 
         return f"START {self.wrap(start)} END {self.wrap(end)} EVERY {self.wrap(self.sql(every))}"
+
+    def unpivotcolumns_sql(self, expression: exp.UnpivotColumns) -> str:
+        name = self.sql(expression, "this")
+        values = self.expressions(expression, flat=True)
+
+        return f"NAME {name} VALUE {values}"
+
+    def analyzesample_sql(self, expression: exp.AnalyzeSample) -> str:
+        kind = self.sql(expression, "kind")
+        sample = self.sql(expression, "sample")
+        return f"SAMPLE {sample} {kind}"
+
+    def analyzestatistics_sql(self, expression: exp.AnalyzeStatistics) -> str:
+        kind = self.sql(expression, "kind")
+        option = self.sql(expression, "option")
+        option = f" {option}" if option else ""
+        this = self.sql(expression, "this")
+        this = f" {this}" if this else ""
+        columns = self.expressions(expression)
+        columns = f" {columns}" if columns else ""
+        return f"{kind}{option} STATISTICS{this}{columns}"
+
+    def analyzehistogram_sql(self, expression: exp.AnalyzeHistogram) -> str:
+        this = self.sql(expression, "this")
+        columns = self.expressions(expression)
+        inner_expression = self.sql(expression, "expression")
+        inner_expression = f" {inner_expression}" if inner_expression else ""
+        update_options = self.sql(expression, "update_options")
+        update_options = f" {update_options} UPDATE" if update_options else ""
+        return f"{this} HISTOGRAM ON {columns}{inner_expression}{update_options}"
+
+    def analyzedelete_sql(self, expression: exp.AnalyzeDelete) -> str:
+        kind = self.sql(expression, "kind")
+        kind = f" {kind}" if kind else ""
+        return f"DELETE{kind} STATISTICS"
+
+    def analyzelistchainedrows_sql(self, expression: exp.AnalyzeListChainedRows) -> str:
+        inner_expression = self.sql(expression, "expression")
+        return f"LIST CHAINED ROWS{inner_expression}"
+
+    def analyzevalidate_sql(self, expression: exp.AnalyzeValidate) -> str:
+        kind = self.sql(expression, "kind")
+        this = self.sql(expression, "this")
+        this = f" {this}" if this else ""
+        inner_expression = self.sql(expression, "expression")
+        return f"VALIDATE {kind}{this}{inner_expression}"
+
+    def analyze_sql(self, expression: exp.Analyze) -> str:
+        options = self.expressions(expression, key="options", sep=" ")
+        options = f" {options}" if options else ""
+        kind = self.sql(expression, "kind")
+        kind = f" {kind}" if kind else ""
+        this = self.sql(expression, "this")
+        this = f" {this}" if this else ""
+        mode = self.sql(expression, "mode")
+        mode = f" {mode}" if mode else ""
+        properties = self.sql(expression, "properties")
+        properties = f" {properties}" if properties else ""
+        partition = self.sql(expression, "partition")
+        partition = f" {partition}" if partition else ""
+        inner_expression = self.sql(expression, "expression")
+        inner_expression = f" {inner_expression}" if inner_expression else ""
+        return f"ANALYZE{options}{kind}{this}{partition}{mode}{inner_expression}{properties}"
+
+    def xmltable_sql(self, expression: exp.XMLTable) -> str:
+        this = self.sql(expression, "this")
+        passing = self.expressions(expression, key="passing")
+        passing = f"{self.sep()}PASSING{self.seg(passing)}" if passing else ""
+        columns = self.expressions(expression, key="columns")
+        columns = f"{self.sep()}COLUMNS{self.seg(columns)}" if columns else ""
+        by_ref = f"{self.sep()}RETURNING SEQUENCE BY REF" if expression.args.get("by_ref") else ""
+        return f"XMLTABLE({self.sep('')}{self.indent(this + passing + by_ref + columns)}{self.seg(')', sep='')}"
