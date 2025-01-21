@@ -1,14 +1,21 @@
 package pipeline
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
-var SQLParser *sqlparser.SQLParser
+var (
+	SQLParser *sqlparser.SQLParser
+	mu        sync.Mutex
+)
 
 func SetupSQLParser() error {
+	mu.Lock()
+	defer mu.Unlock()
+
 	if SQLParser == nil {
 		var err error
 		sqlParser, err := sqlparser.NewSQLParser(true)
