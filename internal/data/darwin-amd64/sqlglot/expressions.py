@@ -59,6 +59,7 @@ class _Expression(type):
 
 
 SQLGLOT_META = "sqlglot.meta"
+SQLGLOT_ANONYMOUS = "sqlglot.anonymous"
 TABLE_PARTS = ("this", "db", "catalog")
 COLUMN_PARTS = ("this", "table", "db", "catalog")
 
@@ -1223,6 +1224,7 @@ class Query(Expression):
         append: bool = True,
         dialect: DialectType = None,
         copy: bool = True,
+        scalar: bool = False,
         **opts,
     ) -> Q:
         """
@@ -1243,6 +1245,7 @@ class Query(Expression):
                 Otherwise, this resets the expressions.
             dialect: the dialect used to parse the input expression.
             copy: if `False`, modify this expression instance in-place.
+            scalar: if `True`, this is a scalar common table expression.
             opts: other options to use to parse the input expressions.
 
         Returns:
@@ -1257,6 +1260,7 @@ class Query(Expression):
             append=append,
             dialect=dialect,
             copy=copy,
+            scalar=scalar,
             **opts,
         )
 
@@ -2290,6 +2294,7 @@ class OnConflict(Expression):
         "action": False,
         "conflict_keys": False,
         "constraint": False,
+        "where": False,
     }
 
 
@@ -2324,7 +2329,7 @@ class LoadData(Expression):
 
 
 class Partition(Expression):
-    arg_types = {"expressions": True}
+    arg_types = {"expressions": True, "subpartition": False}
 
 
 class PartitionRange(Expression):
@@ -3271,12 +3276,12 @@ class Table(Expression):
 
         return parts
 
-    def to_column(self, copy: bool = True) -> Alias | Column | Dot:
+    def to_column(self, copy: bool = True) -> Expression:
         parts = self.parts
         last_part = parts[-1]
 
         if isinstance(last_part, Identifier):
-            col = column(*reversed(parts[0:4]), fields=parts[4:], copy=copy)  # type: ignore
+            col: Expression = column(*reversed(parts[0:4]), fields=parts[4:], copy=copy)  # type: ignore
         else:
             # This branch will be reached if a function or array is wrapped in a `Table`
             col = last_part
@@ -4243,11 +4248,18 @@ class Pivot(Expression):
         "columns": False,
         "include_nulls": False,
         "default_on_null": False,
+        "into": False,
     }
 
     @property
     def unpivot(self) -> bool:
         return bool(self.args.get("unpivot"))
+
+
+# https://duckdb.org/docs/sql/statements/unpivot#simplified-unpivot-syntax
+# UNPIVOT ... INTO [NAME <col_name> VALUE <col_value>][...,]
+class UnpivotColumns(Expression):
+    arg_types = {"this": True, "expressions": True}
 
 
 class Window(Condition):
@@ -4702,6 +4714,68 @@ class Alter(Expression):
     @property
     def actions(self) -> t.List[Expression]:
         return self.args.get("actions") or []
+
+
+class Analyze(Expression):
+    arg_types = {
+        "kind": False,
+        "this": False,
+        "options": False,
+        "mode": False,
+        "partition": False,
+        "expression": False,
+        "properties": False,
+    }
+
+
+class AnalyzeStatistics(Expression):
+    arg_types = {
+        "kind": True,
+        "option": False,
+        "this": False,
+        "expressions": False,
+    }
+
+
+class AnalyzeHistogram(Expression):
+    arg_types = {
+        "this": True,
+        "expressions": True,
+        "expression": False,
+        "update_options": False,
+    }
+
+
+class AnalyzeSample(Expression):
+    arg_types = {"kind": True, "sample": True}
+
+
+class AnalyzeListChainedRows(Expression):
+    arg_types = {"expression": False}
+
+
+class AnalyzeDelete(Expression):
+    arg_types = {"kind": False}
+
+
+class AnalyzeWith(Expression):
+    arg_types = {"expressions": True}
+
+
+class AnalyzeValidate(Expression):
+    arg_types = {
+        "kind": True,
+        "this": False,
+        "expression": False,
+    }
+
+
+class AnalyzeColumns(Expression):
+    pass
+
+
+class UsingData(Expression):
+    pass
 
 
 class AddConstraint(Expression):
@@ -5485,7 +5559,7 @@ class Collate(Binary, Func):
 
 
 class Ceil(Func):
-    arg_types = {"this": True, "decimals": False}
+    arg_types = {"this": True, "decimals": False, "to": False}
     _sql_names = ["CEIL", "CEILING"]
 
 
@@ -5800,7 +5874,7 @@ class Unnest(Func, UDTF):
 
 
 class Floor(Func):
-    arg_types = {"this": True, "decimals": False}
+    arg_types = {"this": True, "decimals": False, "to": False}
 
 
 class FromBase64(Func):
@@ -5880,6 +5954,10 @@ class Nullif(Func):
 
 class Initcap(Func):
     arg_types = {"this": True, "expression": False}
+
+
+class IsAscii(Func):
+    pass
 
 
 class IsNan(Func):
@@ -6140,8 +6218,8 @@ class Right(Func):
 
 
 class Length(Func):
-    arg_types = {"this": True, "binary": False}
-    _sql_names = ["LENGTH", "LEN"]
+    arg_types = {"this": True, "binary": False, "encoding": False}
+    _sql_names = ["LENGTH", "LEN", "CHAR_LENGTH", "CHARACTER_LENGTH"]
 
 
 class Levenshtein(Func):
@@ -6590,6 +6668,10 @@ class Unhex(Func):
     pass
 
 
+class Unicode(Func):
+    pass
+
+
 # https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#unix_date
 class UnixDate(Func):
     pass
@@ -7003,11 +7085,15 @@ def _apply_cte_builder(
     append: bool = True,
     dialect: DialectType = None,
     copy: bool = True,
+    scalar: bool = False,
     **opts,
 ) -> E:
     alias_expression = maybe_parse(alias, dialect=dialect, into=TableAlias, **opts)
-    as_expression = maybe_parse(as_, dialect=dialect, **opts)
-    cte = CTE(this=as_expression, alias=alias_expression, materialized=materialized)
+    as_expression = maybe_parse(as_, dialect=dialect, copy=copy, **opts)
+    if scalar and not isinstance(as_expression, Subquery):
+        # scalar CTE must be wrapped in a subquery
+        as_expression = Subquery(this=as_expression)
+    cte = CTE(this=as_expression, alias=alias_expression, materialized=materialized, scalar=scalar)
     return _apply_child_list_builder(
         cte,
         instance=instance,
@@ -7375,11 +7461,10 @@ def merge(
     Returns:
         Merge: The syntax tree for the MERGE statement.
     """
-    expressions = []
+    expressions: t.List[Expression] = []
     for when_expr in when_exprs:
-        expressions.extend(
-            maybe_parse(when_expr, dialect=dialect, copy=copy, into=Whens, **opts).expressions
-        )
+        expression = maybe_parse(when_expr, dialect=dialect, copy=copy, into=Whens, **opts)
+        expressions.extend([expression] if isinstance(expression, When) else expression.expressions)
 
     merge = Merge(
         this=maybe_parse(into, dialect=dialect, copy=copy, **opts),
