@@ -178,6 +178,38 @@
         "players"
       ]
     },
+    "ClickHouseConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "database": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "database"
+      ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -318,6 +350,12 @@
           },
           "type": "array"
         },
+        "clickhouse": {
+          "items": {
+            "$ref": "#/$defs/ClickHouseConnection"
+          },
+          "type": "array"
+        },
         "hubspot": {
           "items": {
             "$ref": "#/$defs/HubspotConnection"
@@ -387,6 +425,12 @@
         "appstore": {
           "items": {
             "$ref": "#/$defs/AppStoreConnection"
+          },
+          "type": "array"
+        },
+        "linkedinads": {
+          "items": {
+            "$ref": "#/$defs/LinkedInAdsConnection"
           },
           "type": "array"
         }
@@ -1127,6 +1171,22 @@
         "oauth_token",
         "sub_domain"
       ]
+    },
+    "LinkedInAdsConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "account_ids": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": ["name", "access_token", "account_ids"]
     }
   }
 }

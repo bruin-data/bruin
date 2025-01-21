@@ -206,6 +206,17 @@ environments:
           key_id: "key-id-123"
           key_path: "/path/to/key.pem"
           issuer_id: "issuer-id-123"
+      linkedinads:
+        - name: "linkedinads-1"
+          access_token: "access-token-123"
+          account_ids: "account-id-123,account-id-456"
+      clickhouse:
+        - name: "conn-clickhouse"
+          host: "clickhousehost"
+          port: 8123
+          username: "clickhouseuser"
+          password: "clickhousepass"
+          database: "clickhousedb"
   prod:
     connections:
       google_cloud_platform:

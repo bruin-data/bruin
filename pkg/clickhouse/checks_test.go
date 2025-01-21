@@ -1,4 +1,4 @@
-package snowflake
+package clickhouse
 
 import (
 	"context"
@@ -32,6 +32,7 @@ func (m *mockQuerierWithResult) SelectWithSchema(ctx context.Context, q *query.Q
 	if get == nil {
 		return nil, args.Error(1)
 	}
+
 	return get.(*query.QueryResult), args.Error(1)
 }
 
@@ -42,16 +43,6 @@ func (m *mockQuerierWithResult) RunQueryWithoutResult(ctx context.Context, query
 
 func (m *mockQuerierWithResult) Ping(ctx context.Context) error {
 	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *mockQuerierWithResult) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
-	args := m.Called(asset, ctx)
-	return args.Error(0)
-}
-
-func (m *mockQuerierWithResult) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error {
-	args := m.Called(ctx, asset)
 	return args.Error(0)
 }
 
@@ -69,14 +60,14 @@ func (m *mockConnectionFetcher) GetConnection(name string) (interface{}, error) 
 	return get, args.Error(1)
 }
 
-func (m *mockConnectionFetcher) GetSfConnection(name string) (SfClient, error) {
+func (m *mockConnectionFetcher) GetClickHouseConnection(name string) (ClickHouseClient, error) {
 	args := m.Called(name)
 	get := args.Get(0)
 	if get == nil {
 		return nil, args.Error(1)
 	}
 
-	return get.(SfClient), args.Error(1)
+	return get.(ClickHouseClient), args.Error(1)
 }
 
 func TestAcceptedValuesCheck_Check(t *testing.T) {
@@ -89,7 +80,7 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 			conn.On("GetConnection", "test").Return(q, nil)
 			return &AcceptedValuesCheck{conn: conn}
 		},
-		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN ('test','test2')",
+		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as TEXT) NOT IN ('test','test2')",
 		"column 'test_column' has 5 rows that are not in the accepted values",
 		&pipeline.ColumnCheck{
 			Name: "accepted_values",
@@ -106,7 +97,7 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 			conn.On("GetConnection", "test").Return(q, nil)
 			return &AcceptedValuesCheck{conn: conn}
 		},
-		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN ('1','2')",
+		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as TEXT) NOT IN ('1','2')",
 		"column 'test_column' has 5 rows that are not in the accepted values",
 		&pipeline.ColumnCheck{
 			Name: "accepted_values",
@@ -303,7 +294,7 @@ func TestCustomCheck(t *testing.T) {
 func TestPatternCheck_Check(t *testing.T) {
 	t.Parallel()
 
-	pattern := "(a|b)"
+	pattern := "SOMEPATTERN"
 
 	runTestsForCountZeroCheck(
 		t,
@@ -312,8 +303,8 @@ func TestPatternCheck_Check(t *testing.T) {
 			conn.On("GetConnection", "test").Return(q, nil)
 			return &PatternCheck{conn: conn}
 		},
-		"SELECT count(*) FROM dataset.test_asset WHERE test_column NOT REGEXP '(a|b)'",
-		"column test_column has 5 values that don't satisfy the pattern (a|b)",
+		"SELECT count(*) FROM dataset.test_asset WHERE NOT match(test_column,'SOMEPATTERN')",
+		"column test_column has 5 values that don't satisfy the pattern SOMEPATTERN",
 		&pipeline.ColumnCheck{
 			Name: "pattern",
 			Value: pipeline.ColumnCheckValue{

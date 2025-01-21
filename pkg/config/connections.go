@@ -340,6 +340,19 @@ func (d DuckDBConnection) GetName() string {
 	return d.Name
 }
 
+type ClickHouseConnection struct {
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port"     json:"port" mapstructure:"port"`
+	Database string `yaml:"database" json:"database" mapstructure:"database"`
+}
+
+func (c ClickHouseConnection) GetName() string {
+	return c.Name
+}
+
 type AppsflyerConnection struct {
 	Name   string `yaml:"name" json:"name" mapstructure:"name"`
 	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
@@ -479,5 +492,15 @@ type AppStoreConnection struct {
 }
 
 func (c AppStoreConnection) GetName() string {
+	return c.Name
+}
+
+type LinkedInAdsConnection struct {
+	Name        string `yaml:"name" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
+	AccountIds  string `yaml:"account_ids" json:"account_ids" mapstructure:"account_ids"`
+}
+
+func (c LinkedInAdsConnection) GetName() string {
 	return c.Name
 }

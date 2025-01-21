@@ -85,7 +85,11 @@ linters-settings:
       - databricks.Client
       - athena.Client
       - duckdb.DuckDBClient
+      - clickhouse.ClickHouseClient
       - tea.Model
+      - driver.Rows
+      - driver.Row
+      - driver.Batch
   goconst:
     min-len: 5
     min-occurrences: 5

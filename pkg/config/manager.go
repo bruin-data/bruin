@@ -41,6 +41,7 @@ type Connections struct {
 	Appsflyer           []AppsflyerConnection           `yaml:"appsflyer,omitempty" json:"appsflyer,omitempty" mapstructure:"appsflyer"`
 	Kafka               []KafkaConnection               `yaml:"kafka,omitempty" json:"kafka,omitempty" mapstructure:"kafka"`
 	DuckDB              []DuckDBConnection              `yaml:"duckdb,omitempty" json:"duckdb,omitempty" mapstructure:"duckdb"`
+	ClickHouse          []ClickHouseConnection          `yaml:"clickhouse,omitempty" json:"clickhouse,omitempty" mapstructure:"clickhouse"`
 	Hubspot             []HubspotConnection             `yaml:"hubspot,omitempty" json:"hubspot,omitempty" mapstructure:"hubspot"`
 	GitHub              []GitHubConnection              `yaml:"github,omitempty" json:"github,omitempty" mapstructure:"github"`
 	GoogleSheets        []GoogleSheetsConnection        `yaml:"google_sheets,omitempty" json:"google_sheets,omitempty" mapstructure:"google_sheets"`
@@ -53,6 +54,7 @@ type Connections struct {
 	Asana               []AsanaConnection               `yaml:"asana,omitempty" json:"asana,omitempty" mapstructure:"asana"`
 	DynamoDB            []DynamoDBConnection            `yaml:"dynamodb,omitempty" json:"dynamodb,omitempty" mapstructure:"dynamodb"`
 	AppStore            []AppStoreConnection            `yaml:"appstore,omitempty" json:"appstore,omitempty" mapstructure:"appstore"`
+	LinkedInAds         []LinkedInAdsConnection         `yaml:"linkedinads,omitempty" json:"linkedinads,omitempty" mapstructure:"linkedinads"`
 
 	byKey       map[string]any
 	typeNameMap map[string]string
@@ -263,6 +265,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.AppStore {
 		c.byKey[conn.Name] = &(c.AppStore[i])
 		c.typeNameMap[conn.Name] = "appstore"
+	}
+
+	for i, conn := range c.LinkedInAds {
+		c.byKey[conn.Name] = &(c.LinkedInAds[i])
+		c.typeNameMap[conn.Name] = "linkedinads"
 	}
 }
 
@@ -718,6 +725,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.AppStore = append(env.Connections.AppStore, conn)
+	case "linkedinads":
+		var conn LinkedInAdsConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.LinkedInAds = append(env.Connections.LinkedInAds, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -819,6 +833,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.GitHub = removeConnection(env.Connections.GitHub, connectionName)
 	case "appstore":
 		env.Connections.AppStore = removeConnection(env.Connections.AppStore, connectionName)
+	case "linkedinads":
+		env.Connections.LinkedInAds = removeConnection(env.Connections.LinkedInAds, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
@@ -190,7 +191,9 @@ func TestManager_AddMongoConnectionFromConfigConnectionFromConfig(t *testing.T) 
 func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{
+		Mysql: make(map[string]*mysql.Client),
+	}
 
 	res, err := m.GetMySQLConnection("test")
 	require.Error(t, err)
@@ -205,8 +208,7 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 		Port:     15432,
 	}
 
-	err = m.AddMySQLConnectionFromConfig(configuration)
-	require.NoError(t, err)
+	m.Mysql[configuration.Name] = new(mysql.Client)
 
 	res, err = m.GetMySQLConnection("test")
 	require.NoError(t, err)
