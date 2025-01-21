@@ -62,6 +62,7 @@ class Dialects(str, Enum):
     DATABRICKS = "databricks"
     DORIS = "doris"
     DRILL = "drill"
+    DRUID = "druid"
     DUCKDB = "duckdb"
     HIVE = "hive"
     MATERIALIZE = "materialize"
@@ -419,6 +420,9 @@ class Dialect(metaclass=_Dialect):
 
     SUPPORTS_VALUES_DEFAULT = True
     """Whether the DEFAULT keyword is supported in the VALUES clause."""
+
+    NUMBERS_CAN_BE_UNDERSCORE_SEPARATED = False
+    """Whether number literals can include underscores for better readability"""
 
     REGEXP_EXTRACT_DEFAULT_GROUP = 0
     """The default value for the capturing group."""
@@ -1086,7 +1090,19 @@ def str_position_sql(
         this = self.func("SUBSTR", this, position)
         position_offset = f" + {position} - 1"
 
-    return self.func(str_position_func_name, this, substr, instance) + position_offset
+    strpos_sql = self.func(str_position_func_name, this, substr, instance)
+
+    if position_offset:
+        zero = exp.Literal.number(0)
+        # If match is not found (returns 0) the position offset should not be applied
+        case = exp.If(
+            this=exp.EQ(this=strpos_sql, expression=zero),
+            true=zero,
+            false=strpos_sql + position_offset,
+        )
+        strpos_sql = self.sql(case)
+
+    return strpos_sql
 
 
 def struct_extract_sql(self: Generator, expression: exp.StructExtract) -> str:
@@ -1554,19 +1570,25 @@ def merge_without_target_sql(self: Generator, expression: exp.Merge) -> str:
         targets.add(normalize(alias.this))
 
     for when in expression.args["whens"].expressions:
-        # only remove the target names from the THEN clause
-        # theyre still valid in the <condition> part of WHEN MATCHED / WHEN NOT MATCHED
-        # ref: https://github.com/TobikoData/sqlmesh/issues/2934
-        then = when.args.get("then")
+        # only remove the target table names from certain parts of WHEN MATCHED / WHEN NOT MATCHED
+        # they are still valid in the <condition>, the right hand side of each UPDATE and the VALUES part
+        # (not the column list) of the INSERT
+        then: exp.Insert | exp.Update | None = when.args.get("then")
         if then:
-            then.transform(
-                lambda node: (
-                    exp.column(node.this)
-                    if isinstance(node, exp.Column) and normalize(node.args.get("table")) in targets
-                    else node
-                ),
-                copy=False,
-            )
+            if isinstance(then, exp.Update):
+                for equals in then.find_all(exp.EQ):
+                    equal_lhs = equals.this
+                    if (
+                        isinstance(equal_lhs, exp.Column)
+                        and normalize(equal_lhs.args.get("table")) in targets
+                    ):
+                        equal_lhs.replace(exp.column(equal_lhs.this))
+            if isinstance(then, exp.Insert):
+                column_list = then.this
+                if isinstance(column_list, exp.Tuple):
+                    for column in column_list.expressions:
+                        if normalize(column.args.get("table")) in targets:
+                            column.replace(exp.column(column.this))
 
     return self.merge_sql(expression)
 
@@ -1751,3 +1773,8 @@ def no_make_interval_sql(self: Generator, expression: exp.MakeInterval, sep: str
         args.append(f"{value} {unit}")
 
     return f"INTERVAL '{self.format_args(*args, sep=sep)}'"
+
+
+def length_or_char_length_sql(self: Generator, expression: exp.Length) -> str:
+    length_func = "LENGTH" if expression.args.get("binary") else "CHAR_LENGTH"
+    return self.func(length_func, expression.this)

@@ -84,6 +84,7 @@ func (m *mockQuerierWithResult) CreateDataSetIfNotExist(asset *pipeline.Asset, c
 	args := m.Called(asset, ctx)
 	return args.Error(0)
 }
+
 func (m *mockQuerierWithResult) DropTableOnMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
 	args := m.Called(asset, tableName, ctx)
 	return args.Error(0)
