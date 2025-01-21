@@ -1073,7 +1073,7 @@ func TestAddColumnToAsset(t *testing.T) {
 		want          error
 	}{
 		{
-			name: "column entry",
+			name: "test case 1",
 			asset: &Asset{
 				Name: "test",
 				ID:   "test",
@@ -1101,7 +1101,7 @@ func TestAddColumnToAsset(t *testing.T) {
 			}}}},
 		},
 		{
-			name: "column entry 2",
+			name: "test case 2",
 			asset: &Asset{
 				Name: "test",
 				ID:   "test",
@@ -1131,7 +1131,7 @@ func TestAddColumnToAsset(t *testing.T) {
 			}}}},
 		},
 		{
-			name: "upstream column type change",
+			name: "test case 3",
 			asset: &Asset{
 				Name: "test",
 				Upstreams: []Upstream{
@@ -1158,7 +1158,7 @@ func TestAddColumnToAsset(t *testing.T) {
 			}}}},
 		},
 		{
-			name: "upstream column addition",
+			name: "test case 4",
 			asset: &Asset{
 				Name: "test",
 				ID:   "test",
