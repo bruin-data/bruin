@@ -855,8 +855,8 @@ func (a *Asset) FormatContent() ([]byte, error) {
 	}
 
 	if strings.HasSuffix(a.ExecutableFile.Path, ".py") {
-		beginning = `""" ` + configMarkerString + "\n\n"
-		end = "\n" + configMarkerString + ` """` + "\n\n"
+		beginning = `"""` + configMarkerString + "\n\n"
+		end = "\n" + configMarkerString + `"""` + "\n\n"
 		executableContent = a.ExecutableFile.Content
 	}
 
