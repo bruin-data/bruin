@@ -232,11 +232,7 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 
 // addColumnToAsset adds a new column to the asset based on upstream information.
 func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstreamAsset *Asset, upstreamCol *Column) error {
-	if upstreamCol == nil || colName == "" {
-		return errors.New("invalid arguments: all parameters must be non-nil and colName must not be empty")
-	}
-
-	if asset == nil {
+	if asset == nil || upstreamCol == nil || colName == "" {
 		return errors.New("invalid arguments: all parameters must be non-nil and colName must not be empty")
 	}
 
@@ -255,13 +251,15 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 		if existingCol.EntityAttribute == nil {
 			existingCol.EntityAttribute = upstreamCol.EntityAttribute
 		}
-
-		for _, newUpstream := range upstreamCol.Upstreams {
-			if !upstreamExists(existingCol.Upstreams, *newUpstream) {
-				existingCol.Upstreams = append(existingCol.Upstreams, newUpstream)
-			}
+		newUpstream := UpstreamColumn{
+			Column: upstreamCol.Name,
 		}
-
+		if upstreamAsset != nil {
+			newUpstream.Table = upstreamAsset.Name
+		}
+		if !upstreamExists(existingCol.Upstreams, newUpstream) {
+			existingCol.Upstreams = append(existingCol.Upstreams, &newUpstream)
+		}
 		for key, col := range asset.Columns {
 			if strings.EqualFold(col.Name, existingCol.Name) {
 				asset.Columns[key] = *existingCol
@@ -270,7 +268,25 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 		return nil
 	}
 
-	asset.Columns = append(asset.Columns, *upstreamCol)
+	newCol := &Column{
+		Name:            colName,
+		PrimaryKey:      false,
+		Type:            upstreamCol.Type,
+		Checks:          []ColumnCheck{},
+		Description:     upstreamCol.Description,
+		EntityAttribute: upstreamCol.EntityAttribute,
+		Upstreams:       []*UpstreamColumn{},
+		UpdateOnMerge:   upstreamCol.UpdateOnMerge,
+	}
+
+	if upstreamAsset != nil {
+		newCol.Upstreams = append(newCol.Upstreams, &UpstreamColumn{
+			Column: upstreamCol.Name,
+			Table:  upstreamAsset.Name,
+		})
+	}
+
+	asset.Columns = append(asset.Columns, *newCol)
 	return nil
 }
 
