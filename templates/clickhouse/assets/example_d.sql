@@ -11,7 +11,7 @@ columns:
   - name: id
     type: integer
     primary_key: true
-  - name: german_person
+  - name: name
     type: varchar
    @bruin */
 
