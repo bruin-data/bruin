@@ -64,7 +64,7 @@ func (m *mockConnectionFetcher) GetConnection(name string) (interface{}, error) 
 	return get, args.Error(1)
 }
 
-func (m *mockConnectionFetcher) GetAthenaConnection(name string) (Client, error) {
+func (m *mockConnectionFetcher) GetAthenaConnectionWithoutDefault(name string) (Client, error) {
 	args := m.Called(name)
 	get := args.Get(0)
 	if get == nil {
