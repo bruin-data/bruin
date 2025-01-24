@@ -70,6 +70,7 @@ export default defineConfig({
                         collapsed: true,
                         items: [
                             { text: "athena", link: "/getting-started/templates-docs/athena-README.md" },
+                            { text: "clickhouse", link: "/getting-started/templates-docs/clickhouse-README.md" },
                             { text: "chess", link: "/getting-started/templates-docs/chess-README.md" },
                             { text: "duckdb", link: "/getting-started/templates-docs/duckdb-README.md" },
                             { text: "firebase", link: "/getting-started/templates-docs/firebase-README.md" },
