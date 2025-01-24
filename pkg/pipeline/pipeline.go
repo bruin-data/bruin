@@ -483,6 +483,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeSynapseSeed:          "synapse",
 	AssetTypeAthenaQuery:          "athena",
 	AssetTypeAthenaSeed:           "athena",
+	AssetTypeAthenaSQLSensor:      "athena",
 	AssetTypeDuckDBQuery:          "duckdb",
 	AssetTypeDuckDBSeed:           "duckdb",
 	AssetTypeClickHouse:           "clickhouse",
