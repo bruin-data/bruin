@@ -224,6 +224,16 @@ func TestLoadFromFile(t *testing.T) {
 					Path: duckPath,
 				},
 			},
+			ClickHouse: []ClickHouseConnection{
+				{
+					Name:     "conn-clickhouse",
+					Host:     "clickhousehost",
+					Port:     8123,
+					Username: "clickhouseuser",
+					Password: "clickhousepass",
+					Database: "clickhousedb",
+				},
+			},
 			Hubspot: []HubspotConnection{
 				{
 					Name:   "conn21",
@@ -315,6 +325,21 @@ func TestLoadFromFile(t *testing.T) {
 					AccessToken: "token-123",
 					Owner:       "owner-456",
 					Repo:        "repo-456",
+				},
+			},
+			AppStore: []AppStoreConnection{
+				{
+					Name:     "appstore-1",
+					IssuerID: "issuer-id-123",
+					KeyID:    "key-id-123",
+					KeyPath:  "/path/to/key.pem",
+				},
+			},
+			LinkedInAds: []LinkedInAdsConnection{
+				{
+					Name:        "linkedinads-1",
+					AccessToken: "access-token-123",
+					AccountIds:  "account-id-123,account-id-456",
 				},
 			},
 		},

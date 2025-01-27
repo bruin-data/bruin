@@ -51,6 +51,8 @@ const (
 	AssetTypeSynapseSeed          = AssetType("synapse.seed")
 	AssetTypeIngestr              = AssetType("ingestr")
 	AssetTypeTableau              = AssetType("tableau")
+	AssetTypeClickHouse           = AssetType("clickhouse.sql")
+	AssetTypeClickHouseSeed       = AssetType("clickhouse.seed")
 	RunConfigFullRefresh          = RunConfig("full-refresh")
 	RunConfigStartDate            = RunConfig("start-date")
 	RunConfigEndDate              = RunConfig("end-date")
@@ -80,6 +82,7 @@ var defaultMapping = map[string]string{
 	"appsflyer":             "appsflyer-default",
 	"kafka":                 "kafka-default",
 	"duckdb":                "duckdb-default",
+	"clickhouse":            "clickhouse-default",
 	"hubspot":               "hubspot-default",
 	"google_sheets":         "google-sheets-default",
 	"chess":                 "chess-default",
@@ -90,6 +93,7 @@ var defaultMapping = map[string]string{
 	"asana":                 "asana-default",
 	"dynamodb":              "dynamodb-default",
 	"tiktokads":             "tiktokads-default",
+	"appstore":              "appstore-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}
@@ -290,23 +294,25 @@ type ColumnCheckValue struct {
 }
 
 func (ccv *ColumnCheckValue) MarshalJSON() ([]byte, error) {
-	if ccv.IntArray != nil {
-		return json.Marshal(ccv.IntArray)
+	actual := *ccv
+
+	if actual.IntArray != nil {
+		return json.Marshal(actual.IntArray)
 	}
-	if ccv.Int != nil {
-		return json.Marshal(ccv.Int)
+	if actual.Int != nil {
+		return json.Marshal(actual.Int)
 	}
-	if ccv.Float != nil {
-		return json.Marshal(ccv.Float)
+	if actual.Float != nil {
+		return json.Marshal(actual.Float)
 	}
-	if ccv.StringArray != nil {
-		return json.Marshal(ccv.StringArray)
+	if actual.StringArray != nil {
+		return json.Marshal(actual.StringArray)
 	}
-	if ccv.String != nil {
-		return json.Marshal(ccv.String)
+	if actual.String != nil {
+		return json.Marshal(actual.String)
 	}
-	if ccv.Bool != nil {
-		return json.Marshal(ccv.Bool)
+	if actual.Bool != nil {
+		return json.Marshal(actual.Bool)
 	}
 
 	return []byte("null"), nil
@@ -331,7 +337,6 @@ func (ccv ColumnCheckValue) MarshalYAML() (interface{}, error) {
 	if ccv.Bool != nil {
 		return ccv.Bool, nil
 	}
-
 	return nil, nil
 }
 
@@ -478,8 +483,11 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeSynapseSeed:          "synapse",
 	AssetTypeAthenaQuery:          "athena",
 	AssetTypeAthenaSeed:           "athena",
+	AssetTypeAthenaSQLSensor:      "athena",
 	AssetTypeDuckDBQuery:          "duckdb",
 	AssetTypeDuckDBSeed:           "duckdb",
+	AssetTypeClickHouse:           "clickhouse",
+	AssetTypeClickHouseSeed:       "clickhouse",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -848,8 +856,8 @@ func (a *Asset) FormatContent() ([]byte, error) {
 	}
 
 	if strings.HasSuffix(a.ExecutableFile.Path, ".py") {
-		beginning = `""" ` + configMarkerString + "\n\n"
-		end = "\n" + configMarkerString + ` """` + "\n\n"
+		beginning = `"""` + configMarkerString + "\n\n"
+		end = "\n" + configMarkerString + `"""` + "\n\n"
 		executableContent = a.ExecutableFile.Content
 	}
 

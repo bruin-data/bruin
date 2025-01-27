@@ -366,7 +366,6 @@ func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
 					Type: pipeline.MaterializationTypeTable,
 				},
 			},
-			expectedError: "table or view TEST_SCHEMA.TEST_TABLE does not exist",
 		},
 		{
 			name: "error during table type retrieval",

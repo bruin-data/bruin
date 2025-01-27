@@ -5,7 +5,7 @@
   "start_date": "",
   "definition_file": {
     "name": "pipeline.yml",
-    "path": "__PIPELINEDIR__pipeline.yml"
+    "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/pipeline.yml"
   },
   "default_parameters": {},
   "default_connections": {},
@@ -46,12 +46,12 @@
       "owner": "",
       "executable_file": {
         "name": "country.sql",
-        "path": "__ASSETSDIR__country.sql",
+        "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/country.sql",
         "content": ""
       },
       "definition_file": {
         "name": "country.sql",
-        "path": "__ASSETSDIR__country.sql",
+        "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/country.sql",
         "type": "comment"
       },
       "parameters": {},
@@ -61,7 +61,7 @@
           "entity_attribute": null,
           "name": "country",
           "type": "varchar",
-          "description": "",
+          "description": "Just a country",
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
@@ -76,7 +76,7 @@
           "entity_attribute": null,
           "name": "id",
           "type": "integer",
-          "description": "",
+          "description": "Just a number",
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
@@ -151,12 +151,12 @@
       "owner": "",
       "executable_file": {
         "name": "example.sql",
-        "path": "__ASSETSDIR__example.sql",
+        "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/example.sql",
         "content": ""
       },
       "definition_file": {
         "name": "example.sql",
-        "path": "__ASSETSDIR__example.sql",
+        "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/example.sql",
         "type": "comment"
       },
       "parameters": {},
@@ -166,7 +166,7 @@
           "entity_attribute": null,
           "name": "country",
           "type": "varchar",
-          "description": "",
+          "description": "Just a country",
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
@@ -181,7 +181,7 @@
           "entity_attribute": null,
           "name": "last_name",
           "type": "varchar",
-          "description": "",
+          "description": "Just a last name",
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
@@ -196,7 +196,7 @@
           "entity_attribute": null,
           "name": "name",
           "type": "varchar",
-          "description": "",
+          "description": "Just a name",
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
@@ -211,7 +211,7 @@
           "entity_attribute": null,
           "name": "updated_at",
           "type": "timestamp",
-          "description": "",
+          "description": "Just a timestamp",
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
@@ -276,12 +276,12 @@
       "owner": "",
       "executable_file": {
         "name": "people.sql",
-        "path": "__ASSETSDIR__people.sql",
+        "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/people.sql",
         "content": ""
       },
       "definition_file": {
         "name": "people.sql",
-        "path": "__ASSETSDIR__people.sql",
+        "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/people.sql",
         "type": "comment"
       },
       "parameters": {},
@@ -291,7 +291,7 @@
           "entity_attribute": null,
           "name": "created_at",
           "type": "timestamp",
-          "description": "",
+          "description": "Just a timestamp",
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
@@ -306,7 +306,7 @@
           "entity_attribute": null,
           "name": "id",
           "type": "integer",
-          "description": "",
+          "description": "Just a number",
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
@@ -321,7 +321,7 @@
           "entity_attribute": null,
           "name": "last_name",
           "type": "varchar",
-          "description": "",
+          "description": "Just a last name",
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
@@ -336,7 +336,7 @@
           "entity_attribute": null,
           "name": "name",
           "type": "varchar",
-          "description": "",
+          "description": "Just a name",
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
@@ -374,12 +374,12 @@
       "owner": "",
       "executable_file": {
         "name": "users.sql",
-        "path": "__ASSETSDIR__users.sql",
+        "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/users.sql",
         "content": ""
       },
       "definition_file": {
         "name": "users.sql",
-        "path": "__ASSETSDIR__users.sql",
+        "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/users.sql",
         "type": "comment"
       },
       "parameters": {},

@@ -7,7 +7,6 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
-	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1162,12 +1161,7 @@ func TestCheckLintFunc(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			logger := zaptest.NewLogger(t).Sugar()
-			parser, err := sqlparser.NewSQLParser(false)
-			if err != nil {
-				require.Error(t, err, "Expected an error but got none")
-			}
-			err = CheckLint(parser, tt.foundPipeline, tt.pipelinePath, logger)
-
+			err := CheckLint(tt.foundPipeline, tt.pipelinePath, logger, nil)
 			require.NoError(t, err, "Expected no error but got one")
 		})
 	}

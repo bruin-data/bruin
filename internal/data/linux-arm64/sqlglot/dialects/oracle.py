@@ -9,6 +9,7 @@ from sqlglot.dialects.dialect import (
     build_formatted_time,
     no_ilike_sql,
     rename_func,
+    str_position_sql,
     to_number_with_nls_param,
     trim_sql,
 )
@@ -143,7 +144,6 @@ class Oracle(Dialect):
                 this=self._parse_format_json(self._parse_bitwise()),
                 order=self._parse_order(),
             ),
-            "XMLTABLE": lambda self: self._parse_xml_table(),
             "JSON_EXISTS": lambda self: self._parse_json_exists(),
         }
 
@@ -177,26 +177,6 @@ class Oracle(Dialect):
                 ("CHECK", "OPTION"),
             ),
         }
-
-        def _parse_xml_table(self) -> exp.XMLTable:
-            this = self._parse_string()
-
-            passing = None
-            columns = None
-
-            if self._match_text_seq("PASSING"):
-                # The BY VALUE keywords are optional and are provided for semantic clarity
-                self._match_text_seq("BY", "VALUE")
-                passing = self._parse_csv(self._parse_column)
-
-            by_ref = self._match_text_seq("RETURNING", "SEQUENCE", "BY", "REF")
-
-            if self._match_text_seq("COLUMNS"):
-                columns = self._parse_csv(self._parse_field_def)
-
-            return self.expression(
-                exp.XMLTable, this=this, passing=passing, columns=columns, by_ref=by_ref
-            )
 
         def _parse_json_array(self, expr_type: t.Type[E], **kwargs) -> E:
             return self.expression(
@@ -311,12 +291,17 @@ class Oracle(Dialect):
             exp.DateTrunc: lambda self, e: self.func("TRUNC", e.this, e.unit),
             exp.Group: transforms.preprocess([transforms.unalias_group]),
             exp.ILike: no_ilike_sql,
+            exp.LogicalOr: rename_func("MAX"),
+            exp.LogicalAnd: rename_func("MIN"),
             exp.Mod: rename_func("MOD"),
             exp.Select: transforms.preprocess(
                 [
                     transforms.eliminate_distinct_on,
                     transforms.eliminate_qualify,
                 ]
+            ),
+            exp.StrPosition: lambda self, e: str_position_sql(
+                self, e, str_position_func_name="INSTR"
             ),
             exp.StrToTime: lambda self, e: self.func("TO_TIMESTAMP", e.this, self.format_time(e)),
             exp.StrToDate: lambda self, e: self.func("TO_DATE", e.this, self.format_time(e)),
@@ -329,6 +314,7 @@ class Oracle(Dialect):
             exp.ToChar: lambda self, e: self.function_fallback_sql(e),
             exp.ToNumber: to_number_with_nls_param,
             exp.Trim: _trim_sql,
+            exp.Unicode: lambda self, e: f"ASCII(UNISTR({self.sql(e.this)}))",
             exp.UnixToTime: lambda self,
             e: f"TO_DATE('1970-01-01', 'YYYY-MM-DD') + ({self.sql(e, 'this')} / 86400)",
         }
@@ -347,17 +333,6 @@ class Oracle(Dialect):
 
         def offset_sql(self, expression: exp.Offset) -> str:
             return f"{super().offset_sql(expression)} ROWS"
-
-        def xmltable_sql(self, expression: exp.XMLTable) -> str:
-            this = self.sql(expression, "this")
-            passing = self.expressions(expression, key="passing")
-            passing = f"{self.sep()}PASSING{self.seg(passing)}" if passing else ""
-            columns = self.expressions(expression, key="columns")
-            columns = f"{self.sep()}COLUMNS{self.seg(columns)}" if columns else ""
-            by_ref = (
-                f"{self.sep()}RETURNING SEQUENCE BY REF" if expression.args.get("by_ref") else ""
-            )
-            return f"XMLTABLE({self.sep('')}{self.indent(this + passing + by_ref + columns)}{self.seg(')', sep='')}"
 
         def add_column_sql(self, expression: exp.Alter) -> str:
             actions = self.expressions(expression, key="actions", flat=True)
@@ -394,3 +369,6 @@ class Oracle(Dialect):
                     expressions.append(self.sql(expression))
 
             return f" /*+ {self.expressions(sqls=expressions, sep=self.QUERY_HINT_SEP).strip()} */"
+
+        def isascii_sql(self, expression: exp.IsAscii) -> str:
+            return f"NVL(REGEXP_LIKE({self.sql(expression.this)}, '^[' || CHR(1) || '-' || CHR(127) || ']*$'), TRUE)"

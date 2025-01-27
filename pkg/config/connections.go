@@ -340,6 +340,19 @@ func (d DuckDBConnection) GetName() string {
 	return d.Name
 }
 
+type ClickHouseConnection struct {
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port"     json:"port" mapstructure:"port"`
+	Database string `yaml:"database" json:"database" mapstructure:"database"`
+}
+
+func (c ClickHouseConnection) GetName() string {
+	return c.Name
+}
+
 type AppsflyerConnection struct {
 	Name   string `yaml:"name" json:"name" mapstructure:"name"`
 	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
@@ -467,5 +480,27 @@ type GitHubConnection struct {
 }
 
 func (c GitHubConnection) GetName() string {
+	return c.Name
+}
+
+type AppStoreConnection struct {
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	KeyID    string `yaml:"key_id" json:"key_id" mapstructure:"key_id"`
+	IssuerID string `yaml:"issuer_id" json:"issuer_id" mapstructure:"issuer_id"`
+	KeyPath  string `yaml:"key_path" json:"key_path" mapstructure:"key_path"`
+	Key      string `yaml:"key" json:"key" mapstructure:"key"`
+}
+
+func (c AppStoreConnection) GetName() string {
+	return c.Name
+}
+
+type LinkedInAdsConnection struct {
+	Name        string `yaml:"name" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
+	AccountIds  string `yaml:"account_ids" json:"account_ids" mapstructure:"account_ids"`
+}
+
+func (c LinkedInAdsConnection) GetName() string {
 	return c.Name
 }

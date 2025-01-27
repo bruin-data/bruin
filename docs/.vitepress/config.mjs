@@ -70,6 +70,7 @@ export default defineConfig({
                         collapsed: true,
                         items: [
                             { text: "athena", link: "/getting-started/templates-docs/athena-README.md" },
+                            { text: "clickhouse", link: "/getting-started/templates-docs/clickhouse-README.md" },
                             { text: "chess", link: "/getting-started/templates-docs/chess-README.md" },
                             { text: "duckdb", link: "/getting-started/templates-docs/duckdb-README.md" },
                             { text: "firebase", link: "/getting-started/templates-docs/firebase-README.md" },
@@ -109,6 +110,7 @@ export default defineConfig({
                 collapsed: false,
                 items: [
                     {text: "AWS Athena", link: "/platforms/athena"},
+                    {text: "Clickhouse", link: "/platforms/clickhouse"},
                     {text: "Databricks", link: "/platforms/databricks"},
                     {text: "DuckDB", link: "/platforms/duckdb"},
                     {text: "Google BigQuery", link: "/platforms/bigquery"},
@@ -152,6 +154,7 @@ export default defineConfig({
                         items: [
                             {text: "Adjust", link: "/ingestion/adjust.md"},
                             {text: "Airtable", link: "/ingestion/airtable.md"},
+                            {text: "AppStore", link: "/ingestion/appstore.md"},
                             {text: "Asana", link: "/ingestion/asana.md"},
                             {text: "Chess", link: "/ingestion/chess.md"},
                             {text: "DynamoDB", link: "/ingestion/dynamodb.md"},
@@ -162,6 +165,7 @@ export default defineConfig({
                             {text: "Hubspot", link: "/ingestion/hubspot.md"},
                             {text: "Kafka", link: "/ingestion/kafka.md"},
                             {text: "Klaviyo", link: "/ingestion/klaviyo.md"},
+                            {text: "LinkedIn Ads", link: "/ingestion/linkedinads.md"},
                             {text: "MongoDB", link: "/ingestion/mongo"},
                             {text: "MySQL", link: "/ingestion/mysql"},
                             {text: "Notion", link: "/ingestion/notion"},

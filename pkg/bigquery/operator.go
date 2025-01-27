@@ -76,14 +76,11 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err := conn.CreateDataSetIfNotExist(t, ctx); err != nil {
 		return err
 	}
+
 	if o.materializer.IsFullRefresh() {
-		err = conn.DeleteTableIfPartitioningOrClusteringMismatch(ctx, t.Name, t)
+		err = conn.DropTableOnMismatch(ctx, t.Name, t)
 		if err != nil {
-			return errors.Wrap(err, "failed to compare clustering and partitioning metadata")
-		}
-		err = conn.DeleteTableIfMaterializationTypeMismatch(ctx, t.Name, t)
-		if err != nil {
-			return errors.Wrap(err, "failed to compare table materialization type with expected type")
+			return errors.Wrapf(err, "failed to check for mismatches for table '%s'", t.Name)
 		}
 	}
 

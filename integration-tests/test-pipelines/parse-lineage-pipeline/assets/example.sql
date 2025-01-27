@@ -7,7 +7,6 @@ materialization:
 depends:
   - country
   - people
-
 @bruin */
 
 select 
