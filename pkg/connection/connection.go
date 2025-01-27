@@ -1881,7 +1881,6 @@ func (m *Manager) AddGCSConnectionFromConfig(connection *config.GCSConnection) e
 	m.mutex.Unlock()
 
 	client, err := gcs.NewClient(gcs.Config{
-		BucketName:         connection.BucketName,
 		ServiceAccountFile: connection.ServiceAccountFile,
 		ServiceAccountJSON: connection.ServiceAccountJSON,
 	})

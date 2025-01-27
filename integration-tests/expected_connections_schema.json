@@ -546,9 +546,6 @@
         "name": {
           "type": "string"
         },
-        "bucket_name": {
-          "type": "string"
-        },
         "service_account_file": {
           "type": "string"
         },
@@ -560,7 +557,6 @@
       "type": "object",
       "required": [
         "name",
-        "bucket_name",
         "service_account_file",
         "service_account_json"
       ]
@@ -771,6 +767,26 @@
       "required": [
         "name",
         "api_key"
+      ]
+    },
+    "LinkedInAdsConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "account_ids": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token",
+        "account_ids"
       ]
     },
     "MongoConnection": {
@@ -1201,22 +1217,6 @@
         "oauth_token",
         "sub_domain"
       ]
-    },
-    "LinkedInAdsConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "access_token": {
-          "type": "string"
-        },
-        "account_ids": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": ["name", "access_token", "account_ids"]
     }
   }
 }

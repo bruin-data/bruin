@@ -7,7 +7,6 @@ import (
 )
 
 type Config struct {
-	BucketName         string
 	ServiceAccountFile string
 	ServiceAccountJSON string
 }
@@ -30,7 +29,6 @@ func (c Config) GetIngestrURI() (string, error) {
 	}
 	uri := url.URL{
 		Scheme:   "gs",
-		Host:     c.BucketName,
 		RawQuery: params.Encode(),
 	}
 	return uri.String(), nil
