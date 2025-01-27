@@ -398,7 +398,6 @@ func PingConnection() *cli.Command {
 				}
 
 			}
-
 			manager, errs := connection.NewManagerFromConfig(cm)
 			if len(errs) > 0 {
 				// Handle each error in the errs slice
