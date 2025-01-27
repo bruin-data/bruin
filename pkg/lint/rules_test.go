@@ -1800,6 +1800,46 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			wantErrMessage: "",
 			wantErr:        assert.NoError,
 		},
+		{
+			name: "ingestr asset with merge strategy but no primary key",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection": "conn1",
+					"source_table":      "table1",
+					"destination":       "dest1",
+				},
+				Materialization: pipeline.Materialization{
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "col1"},
+					{Name: "col2"},
+				},
+			},
+			wantErrMessage: "Materialization strategy 'merge' requires the 'primary_key' field to be set on at least one column",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "valid ingestr asset with merge strategy and primary key",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection": "conn1",
+					"source_table":      "table1",
+					"destination":       "dest1",
+				},
+				Materialization: pipeline.Materialization{
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "col1", PrimaryKey: true},
+					{Name: "col2"},
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
