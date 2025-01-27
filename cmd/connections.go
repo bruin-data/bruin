@@ -385,17 +385,13 @@ func PingConnection() *cli.Command {
 				return cli.Exit("", 1)
 			}
 			if environment == "" {
-				err = cm.SelectEnvironment(cm.DefaultEnvironmentName)
-				if err != nil {
-					printErrorForOutput(output, errors2.Wrap(err, "failed to select the environment"))
-					return cli.Exit("", 1)
-				}
-			} else {
-				err = cm.SelectEnvironment(environment)
-				if err != nil {
-					printErrorForOutput(output, errors2.Wrap(err, "failed to select the environment"))
-					return cli.Exit("", 1)
-				}
+				environment = cm.DefaultEnvironmentName
+			}	
+			err = cm.SelectEnvironment(environment)
+			if err != nil {
+				printErrorForOutput(output, errors2.Wrap(err, "failed to select the environment"))
+				return cli.Exit("", 1)
+			
 
 			}
 			manager, errs := connection.NewManagerFromConfig(cm)
