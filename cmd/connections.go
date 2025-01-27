@@ -354,6 +354,11 @@ func PingConnection() *cli.Command {
 				Usage:   "the name of the environment (e.g., dev, prod). If not specified, the default environment will be used",
 			},
 			&cli.StringFlag{
+				Name:   "type",
+				Usage:  "deprecated: connection type is now automatically detected",
+				Hidden: true,
+			},
+			&cli.StringFlag{
 				Name:     "name",
 				Aliases:  []string{"n"},
 				Usage:    "the name of the connection to test",
@@ -386,13 +391,11 @@ func PingConnection() *cli.Command {
 			}
 			if environment == "" {
 				environment = cm.DefaultEnvironmentName
-			}	
+			}
 			err = cm.SelectEnvironment(environment)
 			if err != nil {
 				printErrorForOutput(output, errors2.Wrap(err, "failed to select the environment"))
 				return cli.Exit("", 1)
-			
-
 			}
 			manager, errs := connection.NewManagerFromConfig(cm)
 			if len(errs) > 0 {
