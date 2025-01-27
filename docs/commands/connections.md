@@ -90,7 +90,25 @@ bruin connections delete -e staging -n test-connection -o json
 To test if a connection is valid, you can use the test command. 
 This command runs a simple validation check for the connection.
 
-
 ```bash
-bruin connections test --env <environment> --type <connection-type> --name <connection-name>
+bruin connections test --name <connection-name> [--env <environment>]
+```
+
+If no environment flag (`--env`) is provided, the default environment from your `.bruin.yml` will be used.
+
+### Examples
+
+Test a connection in the default environment:
+```bash
+bruin connections test --name my-bigquery-conn
+```
+
+Test a connection in a specific environment:
+```bash
+bruin connections test --name my-snowflake-conn --env production
+```
+
+You can also get the output in JSON format:
+```bash
+bruin connections test --name my-postgres-conn --env staging --output json
 ```
