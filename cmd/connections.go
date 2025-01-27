@@ -349,15 +349,9 @@ func PingConnection() *cli.Command {
 		Usage: "Test the validity of a connection in an environment",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:     "environment",
-				Aliases:  []string{"e", "env"},
-				Usage:    "the name of the environment (e.g., dev, prod)",
-				Required: true,
-			},
-			&cli.StringFlag{
-				Name:     "type",
-				Usage:    "the type of the connection (e.g., snowflake, bigquery)",
-				Required: true,
+				Name:    "environment",
+				Aliases: []string{"e", "env"},
+				Usage:   "the name of the environment (e.g., dev, prod). If not specified, the default environment will be used",
 			},
 			&cli.StringFlag{
 				Name:     "name",
@@ -375,7 +369,6 @@ func PingConnection() *cli.Command {
 		Action: func(c *cli.Context) error {
 			// Extract command-line arguments
 			environment := c.String("environment")
-			connType := c.String("type")
 			name := c.String("name")
 			output := c.String("output")
 
@@ -391,11 +384,19 @@ func PingConnection() *cli.Command {
 				printErrorForOutput(output, errors2.Wrap(err, "failed to load or create config"))
 				return cli.Exit("", 1)
 			}
+			if environment == "" {
+				err = cm.SelectEnvironment(cm.DefaultEnvironmentName)
+				if err != nil {
+					printErrorForOutput(output, errors2.Wrap(err, "failed to select the environment"))
+					return cli.Exit("", 1)
+				}
+			} else {
+				err = cm.SelectEnvironment(environment)
+				if err != nil {
+					printErrorForOutput(output, errors2.Wrap(err, "failed to select the environment"))
+					return cli.Exit("", 1)
+				}
 
-			err = cm.SelectEnvironment(environment)
-			if err != nil {
-				printErrorForOutput(output, errors2.Wrap(err, "failed to select the environment"))
-				return cli.Exit("", 1)
 			}
 
 			manager, errs := connection.NewManagerFromConfig(cm)
@@ -409,19 +410,20 @@ func PingConnection() *cli.Command {
 
 			conn, err := manager.GetConnection(name)
 			if err != nil {
-				printErrorForOutput(output, errors2.Wrap(err, fmt.Sprintf("failed to get %s connection", connType)))
+				printErrorForOutput(output, errors2.Wrap(err, fmt.Sprintf("failed to get connection '%s'", name)))
 				return cli.Exit("", 1)
 			}
+
 			if tester, ok := conn.(interface {
 				Ping(ctx context.Context) error
 			}); ok {
 				testErr := tester.Ping(context.Background())
 				if testErr != nil {
-					printErrorForOutput(output, errors2.Wrap(testErr, fmt.Sprintf("failed to run test query on %s connection", connType)))
+					printErrorForOutput(output, errors2.Wrap(testErr, fmt.Sprintf("failed to test connection '%s'", name)))
 					return cli.Exit("", 1)
 				}
 			} else {
-				infoPrinter.Printf("Connection type %s does not support testing yet.\n", connType)
+				infoPrinter.Printf("Connection '%s' does not support testing yet.\n", name)
 				return nil
 			}
 
@@ -436,7 +438,7 @@ func PingConnection() *cli.Command {
 				}
 				fmt.Println(string(jsonBytes))
 			} else {
-				infoPrinter.Printf("Successfully tested connection: %s with type: %s in environment: %s\n", name, connType, environment)
+				infoPrinter.Printf("Successfully tested connection '%s' in environment: %s\n", name, environment)
 			}
 
 			return nil
