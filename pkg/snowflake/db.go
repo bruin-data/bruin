@@ -249,7 +249,7 @@ func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, as
 	}
 
 	if len(result) == 0 {
-		return errors.New(fmt.Sprintf("table or view %s.%s does not exist", schemaName, tableName))
+		return nil
 	}
 
 	var materializationType string
