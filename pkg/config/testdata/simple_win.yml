@@ -206,6 +206,7 @@ environments:
           key_id: "key-id-123"
           key_path: "/path/to/key.pem"
           issuer_id: "issuer-id-123"
+<<<<<<< HEAD
       linkedinads:
         - name: "linkedinads-1"
           access_token: "access-token-123"
@@ -217,6 +218,12 @@ environments:
           username: "clickhouseuser"
           password: "clickhousepass"
           database: "clickhousedb"
+=======
+      gcs:
+        - name: "gcs-1"
+          bucket_name: "bucket-name-123"
+          service_account_file: "/path/to/service_account.json"
+>>>>>>> gcs-source/BRU-1421
   prod:
     connections:
       google_cloud_platform:

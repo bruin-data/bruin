@@ -342,6 +342,13 @@ func TestLoadFromFile(t *testing.T) {
 					AccountIds:  "account-id-123,account-id-456",
 				},
 			},
+			GCS: []GCSConnection{
+				{
+					Name:               "gcs-1",
+					BucketName:         "bucket-name-123",
+					ServiceAccountFile: "/path/to/service_account.json",
+				},
+			},
 		},
 	}
 

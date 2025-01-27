@@ -216,6 +216,12 @@ environments:
           username: "clickhouseuser"
           password: "clickhousepass"
           database: "clickhousedb"
+      gcs:
+        - name: "gcs-1"
+          bucket_name: "bucket-name-123"
+          service_account_file: "/path/to/service_account.json"
+
+
   prod:
     connections:
       google_cloud_platform:
