@@ -5,7 +5,7 @@
 
 Bruin supports GCS as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from GCS into your data warehouse.
 
-In order to set up the GCS connection, you need to add a configuration item in the `.bruin.yml` file and in the `asset` file. You will need the  `bucket_name`, `service_account_file`, or `service_account_json`. For details on how to obtain these credentials, please refer [here](https://bruin-data.github.io/ingestr/supported-sources/gcs.html#setting-up-a-gcs-integration).
+In order to set up the GCS connection, you need to add a configuration item in the `.bruin.yml` file and in the `asset` file. You will need the `service_account_file` or `service_account_json`. For details on how to obtain these credentials, please refer [here](https://bruin-data.github.io/ingestr/supported-sources/gcs.html#setting-up-a-gcs-integration).
 
 Follow the steps below to correctly set up GCS as a data source and run ingestion.
 
@@ -16,12 +16,10 @@ To connect to GCS, you need to add a configuration item to the connections secti
 ```yaml
     connections:
       gcs:
+          # name of your connection
         - name: "my-gcs"
-          bucket_name: "my_bucket"
-
           # you can either specify a path to the service account file
           service_account_file: "path/to/file.json"
-
           # or you can specify the service account json directly
           service_account_json: |
             {
@@ -29,7 +27,6 @@ To connect to GCS, you need to add a configuration item to the connections secti
               ...
             }
 ```
-- `bucket_name`: The name of the bucket
 - `service_account_file`: The path to the service account JSON file
 - `service_account_json`: The service account JSON content itself
 
@@ -44,7 +41,7 @@ connection: postgres
 
 parameters:
   source_connection: my-gcs
-  source_table: '/students_details.csv'
+  source_table: 'my-bucket/students_details.csv'
 
   destination: postgres
 ```
@@ -52,10 +49,10 @@ parameters:
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the gcs connection defined in .bruin.yml.
-- `source_table`: The path of the file in your gcs bucket that you want to ingest.
+- `source_table`: bucket name and file path (or [glob](https://bruin-data.github.io/ingestr/supported-sources/gcs.html#file-pattern)) separated by a forward slash (`/`).
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```
 bruin run assets/gcs_ingestion.yml
 ```
-As a result of this command, Bruin will ingest data from the given gcs table into your Postgres database.
+As a result of this command, Bruin will ingest data from the given gcs bucket into your Postgres database.
