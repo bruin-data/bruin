@@ -470,7 +470,6 @@ func testBasicRecursiveParsing(t *testing.T) {
 		},
 	}
 	for range 1000 {
-		t.Parallel()
 		runLineageTests(t, tests)
 	}
 }
