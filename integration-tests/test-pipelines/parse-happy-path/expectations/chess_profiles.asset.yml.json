@@ -43,7 +43,6 @@
       "name": "pipeline.yml",
       "path": "/integration-tests/happy-path/pipeline.yml"
     },
-    "default_parameters": {},
     "default_connections": {},
     "assets": [
       {

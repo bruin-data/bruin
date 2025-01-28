@@ -5,9 +5,12 @@
   "start_date": "",
   "definition_file": {
     "name": "pipeline.yml",
-    "path": "__PIPELINEDIR__pipeline.yml"
+    "path": "integration-tests/test-pipelines/parse-default-option/pipeline.yml"
   },
-  "default_connections": {},
+  "default_connections": {
+    "chess": "chess-run-default-option",
+    "duckdb": "duckdb-env-run-default-option"
+  },
   "assets": [
     {
       "id": "17c2f1111545c0e72ea13a3a07fb3d5a4d96074d128ed10c1c03cc477401d61a",
@@ -30,19 +33,26 @@
       "owner": "",
       "executable_file": {
         "name": "asset.py",
-        "path": "__ASSETSDIR__asset.py",
+        "path": "integration-tests/test-pipelines/parse-default-option/assets/asset.py",
         "content": ""
       },
       "definition_file": {
         "name": "asset.py",
-        "path": "__ASSETSDIR__asset.py",
+        "path": "integration-tests/test-pipelines/parse-default-option/assets/asset.py",
         "type": "comment"
       },
-      "parameters": {},
+      "parameters": {
+        "destination": "duckdb",
+        "source_connection": "chess-run-default-option"
+      },
       "secrets": [
         {
           "secret_key": "KEY1",
           "injected_key": "INJECTED1"
+        },
+        {
+          "secret_key": "KEY2",
+          "injected_key": "INJECTED2"
         }
       ],
       "columns": [],
@@ -66,20 +76,25 @@
       "owner": "",
       "executable_file": {
         "name": "chess_games.asset.yml",
-        "path": "__ASSETSDIR__chess_games.asset.yml",
+        "path": "integration-tests/test-pipelines/parse-default-option/assets/chess_games.asset.yml",
         "content": ""
       },
       "definition_file": {
         "name": "chess_games.asset.yml",
-        "path": "__ASSETSDIR__chess_games.asset.yml",
+        "path": "integration-tests/test-pipelines/parse-default-option/assets/chess_games.asset.yml",
         "type": "yaml"
       },
       "parameters": {
         "destination": "duckdb",
-        "source_connection": "chess-default",
+        "source_connection": "chess-run-default-option",
         "source_table": "games"
       },
-      "secrets": [],
+      "secrets": [
+        {
+          "secret_key": "KEY2",
+          "injected_key": "INJECTED2"
+        }
+      ],
       "columns": [],
       "custom_checks": [],
       "metadata": {},
@@ -101,20 +116,25 @@
       "owner": "",
       "executable_file": {
         "name": "chess_profiles.asset.yml",
-        "path": "__ASSETSDIR__chess_profiles.asset.yml",
+        "path": "integration-tests/test-pipelines/parse-default-option/assets/chess_profiles.asset.yml",
         "content": ""
       },
       "definition_file": {
         "name": "chess_profiles.asset.yml",
-        "path": "__ASSETSDIR__chess_profiles.asset.yml",
+        "path": "integration-tests/test-pipelines/parse-default-option/assets/chess_profiles.asset.yml",
         "type": "yaml"
       },
       "parameters": {
         "destination": "duckdb",
-        "source_connection": "chess-default",
+        "source_connection": "chess-run-default-option",
         "source_table": "profiles"
       },
-      "secrets": [],
+      "secrets": [
+        {
+          "secret_key": "KEY2",
+          "injected_key": "INJECTED2"
+        }
+      ],
       "columns": [],
       "custom_checks": [],
       "metadata": {},
@@ -153,16 +173,24 @@
       "owner": "",
       "executable_file": {
         "name": "player_summary.sql",
-        "path": "__ASSETSDIR__player_summary.sql",
+        "path": "integration-tests/test-pipelines/parse-default-option/assets/player_summary.sql",
         "content": ""
       },
       "definition_file": {
         "name": "player_summary.sql",
-        "path": "__ASSETSDIR__player_summary.sql",
+        "path": "integration-tests/test-pipelines/parse-default-option/assets/player_summary.sql",
         "type": "comment"
       },
-      "parameters": {},
-      "secrets": [],
+      "parameters": {
+        "destination": "duckdb",
+        "source_connection": "chess-run-default-option"
+      },
+      "secrets": [
+        {
+          "secret_key": "KEY2",
+          "injected_key": "INJECTED2"
+        }
+      ],
       "columns": [
         {
           "entity_attribute": null,
@@ -197,5 +225,18 @@
   "metadata_push": {
     "bigquery": false
   },
-  "retries": 0
+  "retries": 0,
+  "default": {
+    "type": "ingestr",
+    "parameters": {
+      "destination": "duckdb",
+      "source_connection": "chess-run-default-option"
+    },
+    "secrets": [
+      {
+        "SecretKey": "KEY2",
+        "InjectedKey": "INJECTED2"
+      }
+    ]
+  }
 }

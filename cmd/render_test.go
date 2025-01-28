@@ -13,8 +13,8 @@ type mockBuilder struct {
 	mock.Mock
 }
 
-func (m *mockBuilder) CreateAssetFromFile(path string) (*pipeline.Asset, error) {
-	called := m.Called(path)
+func (m *mockBuilder) CreateAssetFromFile(path string, foundPipeline *pipeline.Pipeline) (*pipeline.Asset, error) {
+	called := m.Called(path, foundPipeline)
 	if called.Get(0) == nil {
 		return nil, called.Error(1)
 	}
@@ -100,7 +100,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				taskPath: "/path/to/asset",
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateAssetFromFile", "/path/to/asset").
+				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
 					Return(nil, assert.AnError)
 			},
 			wantErr: assert.Error,
@@ -111,7 +111,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				taskPath: "/path/to/asset",
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateAssetFromFile", "/path/to/asset").
+				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
 					Return(nil, nil)
 			},
 			wantErr: assert.Error,
@@ -122,7 +122,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				taskPath: "/path/to/asset",
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateAssetFromFile", "/path/to/asset").
+				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
 					Return(bqAsset, nil)
 
 				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
@@ -136,7 +136,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				taskPath: "/path/to/asset",
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateAssetFromFile", "/path/to/asset").
+				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
 					Return(bqAsset, nil)
 
 				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
@@ -153,7 +153,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				taskPath: "/path/to/asset",
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateAssetFromFile", "/path/to/asset").
+				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
 					Return(bqAsset, nil)
 
 				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
@@ -173,7 +173,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				taskPath: "/path/to/asset",
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateAssetFromFile", "/path/to/asset").
+				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
 					Return(nonBqAsset, nil)
 
 				f.extractor.On("ExtractQueriesFromString", nonBqAsset.ExecutableFile.Content).
@@ -209,7 +209,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				writer:  f.writer,
 			}
 
-			tt.wantErr(t, render.Run(tt.args.taskPath))
+			tt.wantErr(t, render.Run(tt.args.taskPath, nil))
 			f.extractor.AssertExpectations(t)
 			f.bqMaterializer.AssertExpectations(t)
 			f.builder.AssertExpectations(t)

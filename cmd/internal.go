@@ -282,7 +282,7 @@ func PatchAsset() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			asset, err := DefaultPipelineBuilder.CreateAssetFromFile(assetPath)
+			asset, err := DefaultPipelineBuilder.CreateAssetFromFile(assetPath, nil)
 			if err != nil {
 				printErrorJSON(errors2.Wrap(err, "failed to create asset from the given path"))
 				return cli.Exit("", 1)
