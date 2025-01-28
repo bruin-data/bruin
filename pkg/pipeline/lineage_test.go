@@ -469,7 +469,10 @@ func testBasicRecursiveParsing(t *testing.T) {
 			want: nil,
 		},
 	}
-	runLineageTests(t, tests)
+	for range 1000 {
+		t.Parallel()
+		runLineageTests(t, tests)
+	}
 }
 
 func testJoinsAndComplexQueries(t *testing.T) {
