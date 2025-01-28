@@ -347,6 +347,7 @@ type ClickHouseConnection struct {
 	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
 	Port     int    `yaml:"port"     json:"port" mapstructure:"port"`
 	Database string `yaml:"database" json:"database" mapstructure:"database"`
+	HTTPPort string `yaml:"http_port" json:"http_port" mapstructure:"http_port"`
 }
 
 func (c ClickHouseConnection) GetName() string {

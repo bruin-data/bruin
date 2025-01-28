@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"fmt"
+	"strconv"
 
 	click_house "github.com/ClickHouse/clickhouse-go/v2"
 )
@@ -12,6 +13,7 @@ type Config struct {
 	Host     string
 	Port     int
 	Database string
+	HTTPPort string
 }
 
 func (c *Config) ToClickHouseOptions() *click_house.Options {
@@ -27,6 +29,9 @@ func (c *Config) ToClickHouseOptions() *click_house.Options {
 }
 
 func (c *Config) GetIngestrURI() string {
-	// TODO
-	return ""
+	if c.HTTPPort != "" {
+		return "clickhouse://" + c.Username + ":" + c.Password + "@" + c.Host + ":" + strconv.Itoa(c.Port) + "?http_port=" + c.HTTPPort
+	} else {
+		return "clickhouse://" + c.Username + ":" + c.Password + "@" + c.Host + ":" + strconv.Itoa(c.Port)
+	}
 }

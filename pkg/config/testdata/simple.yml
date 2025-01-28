@@ -216,6 +216,7 @@ environments:
           username: "clickhouseuser"
           password: "clickhousepass"
           database: "clickhousedb"
+          http_port: "8124"
   prod:
     connections:
       google_cloud_platform:

@@ -271,6 +271,11 @@ func (c *Connections) buildConnectionKeyMap() {
 		c.byKey[conn.Name] = &(c.LinkedInAds[i])
 		c.typeNameMap[conn.Name] = "linkedinads"
 	}
+
+	for i, conn := range c.ClickHouse {
+		c.byKey[conn.Name] = &(c.ClickHouse[i])
+		c.typeNameMap[conn.Name] = "clickhouse"
+	}
 }
 
 type Environment struct {
@@ -732,6 +737,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.LinkedInAds = append(env.Connections.LinkedInAds, conn)
+	case "clickhouse":
+		var conn ClickHouseConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.ClickHouse = append(env.Connections.ClickHouse, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -835,6 +847,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.AppStore = removeConnection(env.Connections.AppStore, connectionName)
 	case "linkedinads":
 		env.Connections.LinkedInAds = removeConnection(env.Connections.LinkedInAds, connectionName)
+	case "clickhouse":
+		env.Connections.ClickHouse = removeConnection(env.Connections.ClickHouse, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}

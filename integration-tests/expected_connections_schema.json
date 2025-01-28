@@ -197,6 +197,9 @@
         },
         "database": {
           "type": "string"
+        },
+        "http_port": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
@@ -207,7 +210,8 @@
         "password",
         "host",
         "port",
-        "database"
+        "database",
+        "http_port"
       ]
     },
     "Connections": {
