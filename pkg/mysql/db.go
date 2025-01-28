@@ -157,3 +157,16 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 
 	return result, nil
 }
+
+func (c *Client) Ping(ctx context.Context) error {
+	q := query.Query{
+		Query: "SELECT 1",
+	}
+
+	err := c.RunQueryWithoutResult(ctx, &q)
+	if err != nil {
+		return errors.Wrap(err, "failed to run test query on MySQL connection")
+	}
+
+	return nil
+}
