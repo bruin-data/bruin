@@ -565,6 +565,65 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 				e2e.AssertByOutputJSON,
 			},
 		},
+		{
+			Name:    "run-asset-default-option-pipeline",
+			Command: binary,
+			Args:    []string{"run", "--env", "env-run-default-option", filepath.Join(currentFolder, "test-pipelines/parse-default-option")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Successfully validated 4 assets", "Executed 5 tasks", "Finished: chess_playground.player_summary", "Finished: chess_playground.games", "Finished: python_asset"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:          "parse-asset-default-option-pipeline",
+			Command:       binary,
+			Args:          []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "test-pipelines/parse-default-option")},
+			Env:           []string{},
+			SkipJSONNodes: []string{"\"path\""},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/parse-default-option/expectations/pipeline.yml.json")),
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJSON,
+			},
+		},
+		{
+			Name:          "parse-asset-default-option-asset-py",
+			Command:       binary,
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-default-option/assets/asset.py")},
+			Env:           []string{},
+			SkipJSONNodes: []string{"\"path\""},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/parse-default-option/expectations/asset.py.json")),
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJSON,
+			},
+		},
+		{
+			Name:          "parse-asset-default-option-chess-games",
+			Command:       binary,
+			Args:          []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-default-option/assets/chess_games.asset.yml")},
+			Env:           []string{},
+			SkipJSONNodes: []string{"\"path\""},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/parse-default-option/expectations/chess_games.asset.yml.json")),
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJSON,
+			},
+		},
 	}
 }
 

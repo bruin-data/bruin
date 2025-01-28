@@ -12,7 +12,7 @@
       "duckdb": [
         {
           "name": "duckdb-default",
-          "path": "duckdb-files/duckdb.db"
+          "path": "integration-tests/duckdb-files/duckdb.db"
         }
       ],
       "chess": [
@@ -38,12 +38,205 @@
         "duckdb": [
           {
             "name": "duckdb-default",
-            "path": "duckdb-files/duckdb.db"
+            "path": "integration-tests/duckdb-files/duckdb.db"
           }
         ],
         "chess": [
           {
             "name": "chess-default",
+            "players": [
+              "MagnusCarlsen",
+              "Hikaru"
+            ]
+          }
+        ]
+      }
+    },
+    "env-ingestr": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-ingestr",
+            "path": "integration-tests/duckdb-files/ingestr.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-ingestr",
+            "players": [
+              "MagnusCarlsen",
+              "Hikaru"
+            ]
+          }
+        ]
+      }
+    },
+    "env-push-metadata": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-push-metadata",
+            "path": "integration-tests/duckdb-files/push-metadata.db"
+          }
+        ]
+      }
+    },
+    "env-run-default-option": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          },
+          {
+            "name": "KEY2",
+            "value": "value2"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-env-run-default-option",
+            "path": "integration-tests/duckdb-files/env-run-default-option.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-run-default-option",
+            "players": [
+              "MagnusCarlsen",
+              "Hikaru"
+            ]
+          }
+        ]
+      }
+    },
+    "env-run-main-with-downstream": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-run-main-with-downstream",
+            "path": "integration-tests/duckdb-files/run-main-with-downstream.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-run-main-with-downstream",
+            "players": [
+              "MagnusCarlsen",
+              "Hikaru"
+            ]
+          }
+        ]
+      }
+    },
+    "env-run-main-with-filters": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-run-main-with-filters",
+            "path": "integration-tests/duckdb-files/run-main-with-filters.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-run-main-with-filters",
+            "players": [
+              "MagnusCarlsen",
+              "Hikaru"
+            ]
+          }
+        ]
+      }
+    },
+    "env-run-malformed-sql": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-run-malformed-sql",
+            "path": "integration-tests/duckdb-files/run-malformed-sql.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-run-malformed-sql",
+            "players": [
+              "MagnusCarlsen",
+              "Hikaru"
+            ]
+          }
+        ]
+      }
+    },
+    "env-run-seed-data": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-run-seed-data",
+            "path": "integration-tests/duckdb-files/run-seed-data.db"
+          }
+        ]
+      }
+    },
+    "env-run-use-uv": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-env-run-use-uv",
+            "path": "integration-tests/duckdb-files/env-run-use-uv.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-run-use-uv",
+            "players": [
+              "MagnusCarlsen",
+              "Hikaru"
+            ]
+          }
+        ]
+      }
+    },
+    "env-run-with-downstream": {
+      "connections": {
+        "generic": [
+          {
+            "name": "KEY1",
+            "value": "value1"
+          }
+        ],
+        "duckdb": [
+          {
+            "name": "duckdb-run-with-downstream",
+            "path": "integration-tests/duckdb-files/run-with-downstream.db"
+          }
+        ],
+        "chess": [
+          {
+            "name": "chess-run-with-downstream",
             "players": [
               "MagnusCarlsen",
               "Hikaru"
@@ -63,7 +256,7 @@
         "duckdb": [
           {
             "name": "duckdb-run-with-filters",
-            "path": "duckdb-files/run-with-filters.db"
+            "path": "integration-tests/duckdb-files/run-with-filters.db"
           }
         ],
         "chess": [
@@ -88,176 +281,12 @@
         "duckdb": [
           {
             "name": "duckdb-run-with-tags",
-            "path": "duckdb-files/run-with-tags.db"
+            "path": "integration-tests/duckdb-files/run-with-tags.db"
           }
         ],
         "chess": [
           {
             "name": "chess-run-with-tags",
-            "players": [
-              "MagnusCarlsen",
-              "Hikaru"
-            ]
-          }
-        ]
-      }
-    },
-    "env-run-main-with-filters": {
-      "connections": {
-        "generic": [
-          {
-            "name": "KEY1",
-            "value": "value1"
-          }
-        ],
-        "duckdb": [
-          {
-            "name": "duckdb-run-main-with-filters",
-            "path": "duckdb-files/run-main-with-filters.db"
-          }
-        ],
-        "chess": [
-          {
-            "name": "chess-run-main-with-filters",
-            "players": [
-              "MagnusCarlsen",
-              "Hikaru"
-            ]
-          }
-        ]
-      }
-    },
-    "env-run-with-downstream": {
-      "connections": {
-        "generic": [
-          {
-            "name": "KEY1",
-            "value": "value1"
-          }
-        ],
-        "duckdb": [
-          {
-            "name": "duckdb-run-with-downstream",
-            "path": "duckdb-files/run-with-downstream.db"
-          }
-        ],
-        "chess": [
-          {
-            "name": "chess-run-with-downstream",
-            "players": [
-              "MagnusCarlsen",
-              "Hikaru"
-            ]
-          }
-        ]
-      }
-    },
-    "env-run-main-with-downstream": {
-      "connections": {
-        "generic": [
-          {
-            "name": "KEY1",
-            "value": "value1"
-          }
-        ],
-        "duckdb": [
-          {
-            "name": "duckdb-run-main-with-downstream",
-            "path": "duckdb-files/run-main-with-downstream.db"
-          }
-        ],
-        "chess": [
-          {
-            "name": "chess-run-main-with-downstream",
-            "players": [
-              "MagnusCarlsen",
-              "Hikaru"
-            ]
-          }
-        ]
-      }
-    },
-    "env-push-metadata": {
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-push-metadata",
-            "path": "duckdb-files/push-metadata.db"
-          }
-        ]
-      }
-    },
-    "env-run-use-uv": {
-      "connections": {
-        "generic": [
-          {
-            "name": "KEY1",
-            "value": "value1"
-          }
-        ],
-        "duckdb": [
-          {
-            "name": "duckdb-env-run-use-uv",
-            "path": "duckdb-files/env-run-use-uv.db"
-          }
-        ],
-        "chess": [
-          {
-            "name": "chess-run-use-uv",
-            "players": [
-              "MagnusCarlsen",
-              "Hikaru"
-            ]
-          }
-        ]
-      }
-    },
-    "env-run-malformed-sql": {
-      "connections": {
-        "generic": [
-          {
-            "name": "KEY1",
-            "value": "value1"
-          }
-        ],
-        "duckdb": [
-          {
-            "name": "duckdb-run-malformed-sql",
-            "path": "duckdb-files/run-malformed-sql.db"
-          }
-        ],
-        "chess": [
-          {
-            "name": "chess-run-malformed-sql",
-            "players": [
-              "MagnusCarlsen",
-              "Hikaru"
-            ]
-          }
-        ]
-      }
-    },
-    "env-run-seed-data": {
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-run-seed-data",
-            "path": "duckdb-files/run-seed-data.db"
-          }
-        ]
-      }
-    },
-    "env-ingestr": {
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-ingestr",
-            "path": "duckdb-files/ingestr.db"
-          }
-        ],
-        "chess": [
-          {
-            "name": "chess-ingestr",
             "players": [
               "MagnusCarlsen",
               "Hikaru"

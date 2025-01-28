@@ -10,10 +10,6 @@
   "metadata_push": {
     "bigquery": false
   },
-  "default_parameters": {
-    "param1": "value1",
-    "param2": "value2"
-  },
   "default_connections": {
     "gcpConnectionId": "gcp-connection-id-here",
     "slack": "slack-connection"

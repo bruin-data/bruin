@@ -7,7 +7,6 @@
     "name": "pipeline.yml",
     "path": "integration-tests/test-pipelines/parse-lineage-pipeline/pipeline.yml"
   },
-  "default_parameters": {},
   "default_connections": {},
   "assets": [
     {

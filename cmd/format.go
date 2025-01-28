@@ -89,7 +89,7 @@ func Format(isDebug *bool) *cli.Command {
 							changedAssetpaths = append(changedAssetpaths, assetPath)
 						}
 					} else {
-						asset, err := DefaultPipelineBuilder.CreateAssetFromFile(assetPath)
+						asset, err := DefaultPipelineBuilder.CreateAssetFromFile(assetPath, nil)
 						if err != nil {
 							logger.Debugf("failed to process path '%s': %v", assetPath, err)
 							return
@@ -165,7 +165,7 @@ func Format(isDebug *bool) *cli.Command {
 }
 
 func formatAsset(path string) (*pipeline.Asset, error) {
-	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(path)
+	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(path, nil)
 	if err != nil {
 		return nil, errors2.Wrap(err, "failed to build the asset")
 	}
@@ -184,7 +184,7 @@ func shouldFileChange(path string) (bool, error) {
 	normalizedOriginalContent := normalizeLineEndings(originalContent)
 
 	// Create the asset
-	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(path)
+	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(path, nil)
 	if err != nil {
 		return false, errors2.Wrap(err, "failed to build the asset")
 	}

@@ -7,7 +7,6 @@
     "name": "pipeline.yml",
     "path": "__BASEDIR__\\testdata\\pipeline\\pipeline-with-no-assets\\pipeline.yml"
   },
-  "default_parameters": {},
   "default_connections": {
     "gcpConnectionId": "gcp-connection-id-here",
     "slack": "slack-connection"

@@ -194,7 +194,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			var task *pipeline.Asset
 			if pipelineInfo.RunningForAnAsset {
-				task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath)
+				task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath, pipelineInfo.Pipeline)
 				if err != nil {
 					errorPrinter.Printf("Failed to build asset: %v\n", err)
 					return cli.Exit("", 1)
@@ -400,23 +400,8 @@ func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.S
 
 	var task *pipeline.Asset
 	runDownstreamTasks := false
-	if runningForAnAsset {
-		task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath)
-		if err != nil {
-			errorPrinter.Printf("Failed to build asset: %v. Are you sure you used the correct path?\n", err.Error())
-			return &PipelineInfo{
-				RunningForAnAsset:  runningForAnAsset,
-				RunDownstreamTasks: runDownstreamTasks,
-			}, err
-		}
-		if task == nil {
-			errorPrinter.Printf("The given file path doesn't seem to be a Bruin task definition: '%s'\n", inputPath)
-			return &PipelineInfo{
-				RunningForAnAsset:  runningForAnAsset,
-				RunDownstreamTasks: runDownstreamTasks,
-			}, err
-		}
 
+	if runningForAnAsset {
 		pipelinePath, err = path.GetPipelineRootFromTask(inputPath, pipelineDefinitionFiles)
 		if err != nil {
 			errorPrinter.Printf("Failed to find the pipeline this task belongs to: '%s'\n", inputPath)
@@ -451,6 +436,28 @@ func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.S
 			RunDownstreamTasks: runDownstreamTasks,
 			Config:             cm,
 		}, err
+	}
+
+	if runningForAnAsset {
+		task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath, foundPipeline)
+		if err != nil {
+			errorPrinter.Printf("Failed to build asset: %v. Are you sure you used the correct path?\n", err.Error())
+			return &PipelineInfo{
+				RunningForAnAsset:  runningForAnAsset,
+				RunDownstreamTasks: runDownstreamTasks,
+				Pipeline:           foundPipeline,
+				Config:             cm,
+			}, err
+		}
+		if task == nil {
+			errorPrinter.Printf("The given file path doesn't seem to be a Bruin task definition: '%s'\n", inputPath)
+			return &PipelineInfo{
+				RunningForAnAsset:  runningForAnAsset,
+				RunDownstreamTasks: runDownstreamTasks,
+				Pipeline:           foundPipeline,
+				Config:             cm,
+			}, err
+		}
 	}
 
 	return &PipelineInfo{
