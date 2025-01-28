@@ -976,9 +976,15 @@ type Pipeline struct {
 	Catchup            bool                   `json:"catchup" yaml:"catchup" mapstructure:"catchup"`
 	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push" mapstructure:"metadata_push"`
 	Retries            int                    `json:"retries" yaml:"retries" mapstructure:"retries"`
-	DefaultValues      map[string]interface{} `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
+	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
 	TasksByType        map[AssetType][]*Asset `json:"-"`
 	tasksByName        map[string]*Asset
+}
+
+type DefaultValues struct {
+	Type       string            `json:"type" yaml:"type" mapstructure:"type"`
+	Parameters map[string]string `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
+	Secrets    []secretMapping   `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
 }
 
 func (p *Pipeline) GetCompatibilityHash() string {
@@ -1413,19 +1419,8 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 	}
 
 	if foundPipeline != nil && foundPipeline.DefaultValues != nil {
-		defaultValuesBytes, err := json.Marshal(foundPipeline.DefaultValues)
-		if err != nil {
-			return nil, errors.Wrapf(err, "error converting default values to bytes")
-		}
-		var result taskDefinition
-
-		err = path.ConvertYamlToObject(defaultValuesBytes, &result)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(task.Type) == 0 && len(result.Type) > 0 {
-			task.Type = AssetType(result.Type)
+		if len(task.Type) == 0 && len(foundPipeline.DefaultValues.Type) > 0 {
+			task.Type = AssetType(foundPipeline.DefaultValues.Type)
 		}
 
 		// merge parameters from the default values to task parameters
@@ -1433,7 +1428,7 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 			task.Parameters = EmptyStringMap{}
 		}
 
-		for key, value := range result.Parameters {
+		for key, value := range foundPipeline.DefaultValues.Parameters {
 			if _, exists := task.Parameters[key]; !exists {
 				task.Parameters[key] = value
 			}
@@ -1443,7 +1438,7 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 		for _, secret := range task.Secrets {
 			existingSecrets[secret.SecretKey] = true
 		}
-		for _, secret := range result.Secrets {
+		for _, secret := range foundPipeline.DefaultValues.Secrets {
 			secretMap := SecretMapping(secret)
 			if !existingSecrets[secretMap.SecretKey] {
 				task.Secrets = append(task.Secrets, secretMap)
