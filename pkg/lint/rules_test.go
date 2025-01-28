@@ -1805,12 +1805,10 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
 				Parameters: map[string]string{
-					"source_connection": "conn1",
-					"source_table":      "table1",
-					"destination":       "dest1",
-				},
-				Materialization: pipeline.Materialization{
-					Strategy: pipeline.MaterializationStrategyMerge,
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "dest1",
+					"incremental_strategy": "merge",
 				},
 				Columns: []pipeline.Column{
 					{Name: "col1"},
@@ -1825,12 +1823,10 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 			asset: &pipeline.Asset{
 				Type: pipeline.AssetTypeIngestr,
 				Parameters: map[string]string{
-					"source_connection": "conn1",
-					"source_table":      "table1",
-					"destination":       "dest1",
-				},
-				Materialization: pipeline.Materialization{
-					Strategy: pipeline.MaterializationStrategyMerge,
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "dest1",
+					"incremental_strategy": "merge",
 				},
 				Columns: []pipeline.Column{
 					{Name: "col1", PrimaryKey: true},
