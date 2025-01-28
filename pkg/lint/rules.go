@@ -270,7 +270,7 @@ func EnsureIngestrAssetIsValidForASingleAsset(ctx context.Context, p *pipeline.P
 			Description: "Ingestr assets do not support the 'update_on_merge' field, the strategy used decide the update behavior",
 		})
 	}
-	if asset.Materialization.Strategy == pipeline.MaterializationStrategyMerge {
+	if value, exists := asset.Parameters["incremental_strategy"]; exists && value == "merge" {
 		primaryKeys := asset.ColumnNamesWithPrimaryKey()
 		if len(primaryKeys) == 0 {
 			issues = append(issues, &Issue{
