@@ -92,6 +92,7 @@ var defaultMapping = map[string]string{
 	"slack":                 "slack-default",
 	"asana":                 "asana-default",
 	"dynamodb":              "dynamodb-default",
+	"googleads":             "googleads-default",
 	"tiktokads":             "tiktokads-default",
 	"appstore":              "appstore-default",
 	"gcs":                   "gcs-default",

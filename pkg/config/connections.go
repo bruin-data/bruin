@@ -460,6 +460,18 @@ func (c DynamoDBConnection) GetName() string {
 	return c.Name
 }
 
+type GoogleAdsConnection struct {
+	Name               string `yaml:"name" json:"name" mapstructure:"name"`
+	CustomerID         string `yaml:"customer_id" json:"customer_id" mapstructure:"customer_id"`
+	ServiceAccountJSON string `yaml:"service_account_json" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
+	ServiceAccountFile string `yaml:"service_account_file" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
+	DeveloperToken     string `yaml:"dev_token" json:"dev_token" mapstructure:"dev_token"`
+}
+
+func (c GoogleAdsConnection) GetName() string {
+	return c.Name
+}
+
 type TikTokAdsConnection struct {
 	Name          string `yaml:"name" json:"name" mapstructure:"name"`
 	AccessToken   string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
