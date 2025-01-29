@@ -504,3 +504,13 @@ type LinkedInAdsConnection struct {
 func (c LinkedInAdsConnection) GetName() string {
 	return c.Name
 }
+
+type GCSConnection struct {
+	Name               string `yaml:"name" json:"name" mapstructure:"name"`
+	ServiceAccountFile string `yaml:"service_account_file" json:"service_account_file" mapstructure:"service_account_file"`
+	ServiceAccountJSON string `yaml:"service_account_json" json:"service_account_json" mapstructure:"service_account_json"`
+}
+
+func (c GCSConnection) GetName() string {
+	return c.Name
+}

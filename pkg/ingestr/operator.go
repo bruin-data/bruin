@@ -69,7 +69,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 	sourceURI, err := sourceConnection.(pipelineConnection).GetIngestrURI()
 	if err != nil {
-		return errors.New("could not get the source uri")
+		return fmt.Errorf("could not get the source uri: %w", err)
 	}
 
 	// some connection types can be shared among sources, therefore inferring source URI from the connection type is not
