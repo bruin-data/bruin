@@ -95,6 +95,7 @@ var defaultMapping = map[string]string{
 	"googleads":             "googleads-default",
 	"tiktokads":             "tiktokads-default",
 	"appstore":              "appstore-default",
+	"gcs":                   "gcs-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}
@@ -947,6 +948,7 @@ func PipelineFromPath(filePath string, fs afero.Fs) (*Pipeline, error) {
 	if err != nil && errors.As(err, &yamlError) {
 		return nil, &ParseError{Msg: "error parsing bruin pipeline definition :" + err.Error()}
 	}
+
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing bruin pipeline file at '%s'", filePath)
 	}
@@ -965,21 +967,26 @@ func (mp *MetadataPush) HasAnyEnabled() bool {
 }
 
 type Pipeline struct {
-	LegacyID           string         `json:"legacy_id" yaml:"id" mapstructure:"id"`
-	Name               string         `json:"name" yaml:"name" mapstructure:"name"`
-	Schedule           Schedule       `json:"schedule" yaml:"schedule" mapstructure:"schedule"`
-	StartDate          string         `json:"start_date" yaml:"start_date" mapstructure:"start_date"`
-	DefinitionFile     DefinitionFile `json:"definition_file"`
-	DefaultParameters  EmptyStringMap `json:"default_parameters" yaml:"default_parameters" mapstructure:"default_parameters"`
-	DefaultConnections EmptyStringMap `json:"default_connections" yaml:"default_connections" mapstructure:"default_connections"`
-	Assets             []*Asset       `json:"assets"`
-	Notifications      Notifications  `json:"notifications" yaml:"notifications" mapstructure:"notifications"`
-	Catchup            bool           `json:"catchup" yaml:"catchup" mapstructure:"catchup"`
-	MetadataPush       MetadataPush   `json:"metadata_push" yaml:"metadata_push" mapstructure:"metadata_push"`
-	Retries            int            `json:"retries" yaml:"retries" mapstructure:"retries"`
+	LegacyID           string                 `json:"legacy_id" yaml:"id" mapstructure:"id"`
+	Name               string                 `json:"name" yaml:"name" mapstructure:"name"`
+	Schedule           Schedule               `json:"schedule" yaml:"schedule" mapstructure:"schedule"`
+	StartDate          string                 `json:"start_date" yaml:"start_date" mapstructure:"start_date"`
+	DefinitionFile     DefinitionFile         `json:"definition_file"`
+	DefaultConnections EmptyStringMap         `json:"default_connections" yaml:"default_connections" mapstructure:"default_connections"`
+	Assets             []*Asset               `json:"assets"`
+	Notifications      Notifications          `json:"notifications" yaml:"notifications" mapstructure:"notifications"`
+	Catchup            bool                   `json:"catchup" yaml:"catchup" mapstructure:"catchup"`
+	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push" mapstructure:"metadata_push"`
+	Retries            int                    `json:"retries" yaml:"retries" mapstructure:"retries"`
+	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
+	TasksByType        map[AssetType][]*Asset `json:"-"`
+	tasksByName        map[string]*Asset
+}
 
-	TasksByType map[AssetType][]*Asset `json:"-"`
-	tasksByName map[string]*Asset
+type DefaultValues struct {
+	Type       string            `json:"type" yaml:"type" mapstructure:"type"`
+	Parameters map[string]string `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
+	Secrets    []secretMapping   `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
 }
 
 func (p *Pipeline) GetCompatibilityHash() string {
@@ -1285,7 +1292,6 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 	if err != nil {
 		return nil, err
 	}
-
 	// this is needed until we migrate all the pipelines to use the new naming convention
 	if pipeline.Name == "" {
 		pipeline.Name = pipeline.LegacyID
@@ -1315,19 +1321,13 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 	}
 
 	for _, file := range taskFiles {
-		task, err := b.CreateAssetFromFile(file)
+		task, err := b.CreateAssetFromFile(file, pipeline)
 		if err != nil {
 			return nil, err
 		}
 
 		if task == nil {
 			continue
-		}
-
-		// if the definition comes from a Python file the asset is always a Python asset, so force it
-		// at least that's the hypothesis for now
-		if strings.HasSuffix(task.ExecutableFile.Path, ".py") && task.Type == "" {
-			task.Type = AssetTypePython
 		}
 
 		task.upstream = make([]*Asset, 0)
@@ -1385,34 +1385,67 @@ func fileHasSuffix(arr []string, str string) bool {
 	return false
 }
 
-func (b *Builder) CreateAssetFromFile(path string) (*Asset, error) {
+func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) (*Asset, error) {
 	isSeparateDefinitionFile := false
 	creator := b.commentTaskCreator
 
-	if fileHasSuffix(b.config.TasksFileSuffixes, path) {
+	if fileHasSuffix(b.config.TasksFileSuffixes, filePath) {
 		creator = b.yamlTaskCreator
 		isSeparateDefinitionFile = true
 	}
 
-	task, err := creator(path)
+	task, err := creator(filePath)
 	if err != nil {
 		if errors.As(err, &ParseError{}) {
 			return nil, err
 		}
 
-		return nil, errors.Wrapf(err, "error creating asset from file '%s'", path)
+		return nil, errors.Wrapf(err, "error creating asset from file '%s'", filePath)
 	}
 
 	if task == nil {
 		return nil, nil
 	}
 
-	task.DefinitionFile.Name = filepath.Base(path)
-	task.DefinitionFile.Path = path
+	// if the definition comes from a Python file the asset is always a Python asset, so force it
+	// at least that's the hypothesis for now
+	if strings.HasSuffix(task.ExecutableFile.Path, ".py") && task.Type == "" {
+		task.Type = AssetTypePython
+	}
+
+	task.DefinitionFile.Name = filepath.Base(filePath)
+	task.DefinitionFile.Path = filePath
 	task.DefinitionFile.Type = CommentTask
 	if isSeparateDefinitionFile {
 		task.DefinitionFile.Type = YamlTask
 	}
 
+	if foundPipeline != nil && foundPipeline.DefaultValues != nil {
+		if len(task.Type) == 0 && len(foundPipeline.DefaultValues.Type) > 0 {
+			task.Type = AssetType(foundPipeline.DefaultValues.Type)
+		}
+
+		// merge parameters from the default values to task parameters
+		if len(task.Parameters) == 0 {
+			task.Parameters = EmptyStringMap{}
+		}
+
+		for key, value := range foundPipeline.DefaultValues.Parameters {
+			if _, exists := task.Parameters[key]; !exists {
+				task.Parameters[key] = value
+			}
+		}
+		// merge secrets from the default values to task secrets
+		existingSecrets := make(map[string]bool)
+		for _, secret := range task.Secrets {
+			existingSecrets[secret.SecretKey] = true
+		}
+		for _, secret := range foundPipeline.DefaultValues.Secrets {
+			secretMap := SecretMapping(secret)
+			if !existingSecrets[secretMap.SecretKey] {
+				task.Secrets = append(task.Secrets, secretMap)
+			}
+		}
+	}
 	return task, nil
 }

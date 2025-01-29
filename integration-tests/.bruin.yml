@@ -13,7 +13,6 @@ environments:
       generic:
         - name: KEY1
           value: value1
-
   env-run-with-filters:
     connections:
       duckdb:
@@ -98,6 +97,21 @@ environments:
       generic:
         - name: KEY1
           value: value1
+  env-run-default-option:
+    connections:
+      duckdb:
+        - name: "duckdb-env-run-default-option"
+          path: "duckdb-files/env-run-default-option.db"
+      chess:
+        - name: "chess-run-default-option"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
+      generic:
+        - name: KEY1
+          value: value1
+        - name: KEY2
+          value: value2
   env-run-malformed-sql:
     connections:
       duckdb:

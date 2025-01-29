@@ -174,3 +174,56 @@ func TestClient_SelectWithSchema(t *testing.T) {
 		})
 	}
 }
+
+func TestClient_Ping(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		mockConnection func(mock sqlmock.Sqlmock)
+		wantErr        bool
+		errorMessage   string
+	}{
+		{
+			name: "successful ping",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec(`SELECT 1`).
+					WillReturnResult(sqlmock.NewResult(0, 0))
+			},
+			wantErr: false,
+		},
+		{
+			name: "failed ping",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec(`SELECT 1`).
+					WillReturnError(errors.New("connection refused"))
+			},
+			wantErr:      true,
+			errorMessage: "failed to run test query on MySQL connection: failed to execute query: connection refused",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+			defer mockDB.Close()
+			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+
+			tt.mockConnection(mock)
+			client := Client{conn: sqlxDB}
+
+			err = client.Ping(context.Background())
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Equal(t, tt.errorMessage, err.Error())
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}

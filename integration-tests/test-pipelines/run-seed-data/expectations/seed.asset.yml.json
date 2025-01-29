@@ -114,7 +114,6 @@
       "name": "pipeline.yml",
       "path": "/integration-tests/test-pipelines/run-seed-data/pipeline.yml"
     },
-    "default_parameters": {},
     "default_connections": {
       "duckdb": "duckdb-run-seed-data"
     },
