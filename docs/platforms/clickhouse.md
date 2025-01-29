@@ -11,18 +11,11 @@ connections:
         - name: "connection_name"
           username: "clickhouse"
           password: "XXXXXXXXXX"
-          host: "some-clickhouse-host.somedomain.com"
+          host: "some-clickhouse-host.somedomain.com"   
           port: 9000
-          database: "dev"
-          http_port: 8123
+          database: "dev" # Optional for other assets, but should not be provided when using ClickHouse as an ingestr destination/source, as ingestr takes the database from the asset file. 
+          http_port: 8123 #only specify if you are using clickhouse as ingestr destination/source, by default it is 8123
 ```
-The field `database` is optional, if not provided, it will use the default database and you don't need to provide the `http_port`.
-
-> [!NOTE]
-> If you are using the `ingestr asset`, you do not need to specify the `database` in the `bruin.yml` file. 
-> You can provide the `http_port`, but it is optional. If not provided, it will use the default port `8123`.
-
-
 ## Ingestr Assets:
 After adding connection in `bruin.yml`. To ingest data to clickhouse, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., stripe_ingestion.yml) inside the assets folder and add the following content:
 ### 
