@@ -49,7 +49,7 @@ parameters:
 - `type`: Specifies the type of the asset. Set this to ingestr to use the ingestr data pipeline.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the gcs connection defined in .bruin.yml.
-- `source_table`: bucket name and file path (or [glob](https://bruin-data.github.io/ingestr/supported-sources/gcs.html#file-pattern)) separated by a forward slash (`/`).
+- `source_table`: bucket name and file path (or [file glob](https://bruin-data.github.io/ingestr/supported-sources/gcs.html#file-pattern)) separated by a forward slash (`/`).
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```
