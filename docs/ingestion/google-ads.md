@@ -49,7 +49,7 @@ connection: postgres
 
 parameters:
   source_connection: my-googleads
-  source_table: 'campaigns'
+  source_table: 'campaign_report_daily'
   destination: postgres
 ```
 
@@ -60,6 +60,8 @@ parameters:
 - source_table: The name of the resource in Google Ads you want to ingest. 
 
 You can find a list of supported tables [here](https://bruin-data.github.io/ingestr/supported-sources/google-ads.html#tables).
+
+You can also request a custom report by specifying the source table as `daily:{resource}:{dimensions}:{metrics}`. See [ingestr googleads docs](https://bruin-data.github.io/ingestr/supported-sources/google-ads.html#custom-reports) for more information.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```
