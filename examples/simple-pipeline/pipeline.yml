@@ -33,4 +33,3 @@ default_connections:
   tiktokads: "my-tiktokads"
   github: "my-github"
   linkedinads: "my-linkedinads"
-  clickhouse: "my-clickhouse"
