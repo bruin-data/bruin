@@ -27,12 +27,12 @@ from sqlglot.dialects.dialect import (
     build_timestamp_trunc,
     rename_func,
     sha256_sql,
-    str_position_sql,
     struct_extract_sql,
     timestamptrunc_sql,
     timestrtotime_sql,
     trim_sql,
     ts_or_ds_add_cast,
+    str_position_sql,
 )
 from sqlglot.helper import is_int, seq_get
 from sqlglot.parser import binary_range_parser
@@ -370,6 +370,7 @@ class Postgres(Dialect):
 
         FUNCTIONS = {
             **parser.Parser.FUNCTIONS,
+            "ASCII": exp.Unicode.from_arg_list,
             "DATE_TRUNC": build_timestamp_trunc,
             "DIV": lambda args: exp.cast(
                 binary_from_function(exp.IntDiv)(args), exp.DataType.Type.DECIMAL
@@ -377,6 +378,7 @@ class Postgres(Dialect):
             "GENERATE_SERIES": _build_generate_series,
             "JSON_EXTRACT_PATH": build_json_extract_path(exp.JSONExtract),
             "JSON_EXTRACT_PATH_TEXT": build_json_extract_path(exp.JSONExtractScalar),
+            "LENGTH": lambda args: exp.Length(this=seq_get(args, 0), encoding=seq_get(args, 1)),
             "MAKE_TIME": exp.TimeFromParts.from_arg_list,
             "MAKE_TIMESTAMP": exp.TimestampFromParts.from_arg_list,
             "NOW": exp.CurrentTimestamp.from_arg_list,
@@ -605,6 +607,7 @@ class Postgres(Dialect):
             exp.VariancePop: rename_func("VAR_POP"),
             exp.Variance: rename_func("VAR_SAMP"),
             exp.Xor: bool_xor_sql,
+            exp.Unicode: rename_func("ASCII"),
             exp.UnixToTime: _unix_to_time_sql,
             exp.Levenshtein: _levenshtein_sql,
         }
@@ -716,3 +719,6 @@ class Postgres(Dialect):
 
         def computedcolumnconstraint_sql(self, expression: exp.ComputedColumnConstraint) -> str:
             return f"GENERATED ALWAYS AS ({self.sql(expression, 'this')}) STORED"
+
+        def isascii_sql(self, expression: exp.IsAscii) -> str:
+            return f"({self.sql(expression.this)} ~ '^[[:ascii:]]*$')"

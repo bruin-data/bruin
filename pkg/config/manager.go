@@ -41,16 +41,21 @@ type Connections struct {
 	Appsflyer           []AppsflyerConnection           `yaml:"appsflyer,omitempty" json:"appsflyer,omitempty" mapstructure:"appsflyer"`
 	Kafka               []KafkaConnection               `yaml:"kafka,omitempty" json:"kafka,omitempty" mapstructure:"kafka"`
 	DuckDB              []DuckDBConnection              `yaml:"duckdb,omitempty" json:"duckdb,omitempty" mapstructure:"duckdb"`
+	ClickHouse          []ClickHouseConnection          `yaml:"clickhouse,omitempty" json:"clickhouse,omitempty" mapstructure:"clickhouse"`
 	Hubspot             []HubspotConnection             `yaml:"hubspot,omitempty" json:"hubspot,omitempty" mapstructure:"hubspot"`
+	GitHub              []GitHubConnection              `yaml:"github,omitempty" json:"github,omitempty" mapstructure:"github"`
 	GoogleSheets        []GoogleSheetsConnection        `yaml:"google_sheets,omitempty" json:"google_sheets,omitempty" mapstructure:"google_sheets"`
 	Chess               []ChessConnection               `yaml:"chess,omitempty" json:"chess,omitempty" mapstructure:"chess"`
 	Airtable            []AirtableConnection            `yaml:"airtable,omitempty" json:"airtable,omitempty" mapstructure:"airtable"`
 	Zendesk             []ZendeskConnection             `yaml:"zendesk,omitempty" json:"zendesk,omitempty" mapstructure:"zendesk"`
+	TikTokAds           []TikTokAdsConnection           `yaml:"tiktokads,omitempty" json:"tiktokads,omitempty" mapstructure:"tiktokads"`
 	S3                  []S3Connection                  `yaml:"s3,omitempty" json:"s3,omitempty" mapstructure:"s3"`
 	Slack               []SlackConnection               `yaml:"slack,omitempty" json:"slack,omitempty" mapstructure:"slack"`
 	Asana               []AsanaConnection               `yaml:"asana,omitempty" json:"asana,omitempty" mapstructure:"asana"`
 	DynamoDB            []DynamoDBConnection            `yaml:"dynamodb,omitempty" json:"dynamodb,omitempty" mapstructure:"dynamodb"`
 	GoogleAds           []GoogleAdsConnection           `yaml:"googleads,omitempty" json:"googleads,omitempty" mapstructure:"googleads"`
+	AppStore            []AppStoreConnection            `yaml:"appstore,omitempty" json:"appstore,omitempty" mapstructure:"appstore"`
+	LinkedInAds         []LinkedInAdsConnection         `yaml:"linkedinads,omitempty" json:"linkedinads,omitempty" mapstructure:"linkedinads"`
 
 	byKey       map[string]any
 	typeNameMap map[string]string
@@ -252,6 +257,26 @@ func (c *Connections) buildConnectionKeyMap() {
 		c.byKey[conn.Name] = &(c.GoogleAds[i])
 		c.typeNameMap[conn.Name] = "googleads"
 	}
+
+	for i, conn := range c.TikTokAds {
+		c.byKey[conn.Name] = &(c.TikTokAds[i])
+		c.typeNameMap[conn.Name] = "tiktokads"
+	}
+
+	for i, conn := range c.GitHub {
+		c.byKey[conn.Name] = &(c.GitHub[i])
+		c.typeNameMap[conn.Name] = "github"
+	}
+
+	for i, conn := range c.AppStore {
+		c.byKey[conn.Name] = &(c.AppStore[i])
+		c.typeNameMap[conn.Name] = "appstore"
+	}
+
+	for i, conn := range c.LinkedInAds {
+		c.byKey[conn.Name] = &(c.LinkedInAds[i])
+		c.typeNameMap[conn.Name] = "linkedinads"
+	}
 }
 
 type Environment struct {
@@ -388,6 +413,19 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 			if conn.SslKeyPath != "" && !filepath.IsAbs(conn.SslKeyPath) {
 				env.Connections.MySQL[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
 			}
+		}
+
+		// Make Snowflake private key path absolute
+		for i, conn := range env.Connections.Snowflake {
+			if conn.PrivateKeyPath == "" {
+				continue
+			}
+
+			if filepath.IsAbs(conn.PrivateKeyPath) {
+				continue
+			}
+
+			env.Connections.Snowflake[i].PrivateKeyPath = filepath.Join(configLocation, conn.PrivateKeyPath)
 		}
 	}
 
@@ -679,6 +717,34 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.GoogleAds = append(env.Connections.GoogleAds, conn)
+	case "tiktokads":
+		var conn TikTokAdsConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.TikTokAds = append(env.Connections.TikTokAds, conn)
+	case "github":
+		var conn GitHubConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.GitHub = append(env.Connections.GitHub, conn)
+	case "appstore":
+		var conn AppStoreConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.AppStore = append(env.Connections.AppStore, conn)
+	case "linkedinads":
+		var conn LinkedInAdsConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.LinkedInAds = append(env.Connections.LinkedInAds, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -776,6 +842,14 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.DynamoDB = removeConnection(env.Connections.DynamoDB, connectionName)
 	case "googleads":
 		env.Connections.GoogleAds = removeConnection(env.Connections.GoogleAds, connectionName)
+	case "tiktokads":
+		env.Connections.TikTokAds = removeConnection(env.Connections.TikTokAds, connectionName)
+	case "github":
+		env.Connections.GitHub = removeConnection(env.Connections.GitHub, connectionName)
+	case "appstore":
+		env.Connections.AppStore = removeConnection(env.Connections.AppStore, connectionName)
+	case "linkedinads":
+		env.Connections.LinkedInAds = removeConnection(env.Connections.LinkedInAds, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}

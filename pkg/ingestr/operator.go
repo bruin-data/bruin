@@ -25,7 +25,7 @@ type repoFinder interface {
 }
 
 type ingestrRunner interface {
-	RunIngestr(ctx context.Context, args []string, repo *git.Repo) error
+	RunIngestr(ctx context.Context, args, extraPackages []string, repo *git.Repo) error
 }
 
 type BasicOperator struct {
@@ -54,6 +54,8 @@ func NewBasicOperator(conn *connection.Manager) (*BasicOperator, error) {
 }
 
 func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	var extraPackages []string
+
 	// Source connection
 	sourceConnectionName, ok := ti.GetAsset().Parameters["source_connection"]
 	if !ok {
@@ -175,7 +177,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		defer duck.UnlockDatabase(sourceURI)
 	}
 
-	return o.runner.RunIngestr(ctx, cmdArgs, repo)
+	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
 }
 
 func NewSeedOperator(conn *connection.Manager) (*SeedOperator, error) {
@@ -188,6 +190,7 @@ func NewSeedOperator(conn *connection.Manager) (*SeedOperator, error) {
 }
 
 func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	var extraPackages []string
 	// Source connection
 	sourceConnectionPath, ok := ti.GetAsset().Parameters["path"]
 	if !ok {
@@ -213,6 +216,10 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 
 	destTable := ti.GetAsset().Name
 
+	if strings.HasPrefix(destURI, "mssql://") {
+		extraPackages = []string{"pyodbc==5.1.0"}
+	}
+
 	cmdArgs := []string{
 		"ingest",
 		"--source-uri",
@@ -234,5 +241,5 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return errors.Wrap(err, "failed to find repo to run Ingestr")
 	}
 
-	return o.runner.RunIngestr(ctx, cmdArgs, repo)
+	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
 }

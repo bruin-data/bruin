@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -17,8 +19,9 @@ const (
 )
 
 type DB struct {
-	conn   *sqlx.DB
-	config *Config
+	conn            *sqlx.DB
+	config          *Config
+	schemaNameCache *sync.Map
 }
 
 func NewDB(c *Config) (*DB, error) {
@@ -34,7 +37,11 @@ func NewDB(c *Config) (*DB, error) {
 		return nil, errors.Wrapf(err, "failed to connect to snowflake")
 	}
 
-	return &DB{conn: db, config: c}, nil
+	return &DB{
+		conn:            db,
+		config:          c,
+		schemaNameCache: &sync.Map{},
+	}, nil
 }
 
 func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
@@ -92,7 +99,6 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 
 		result = append(result, columns)
 	}
-
 	return result, err
 }
 
@@ -189,4 +195,161 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 	}
 
 	return result, nil
+}
+
+func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	tableComponents := strings.Split(asset.Name, ".")
+	var schemaName string
+	switch len(tableComponents) {
+	case 2:
+		schemaName = strings.ToUpper(tableComponents[0])
+	case 3:
+		schemaName = strings.ToUpper(tableComponents[1])
+	default:
+		return nil
+	}
+	// Check the cache for the database
+	if _, exists := db.schemaNameCache.Load(schemaName); exists {
+		return nil
+	}
+	createQuery := query.Query{
+		Query: "CREATE SCHEMA IF NOT EXISTS " + schemaName,
+	}
+	if err := db.RunQueryWithoutResult(ctx, &createQuery); err != nil {
+		return errors.Wrapf(err, "failed to create or ensure database: %s", schemaName)
+	}
+	db.schemaNameCache.Store(schemaName, true)
+
+	return nil
+}
+
+func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error {
+	tableComponents := strings.Split(asset.Name, ".")
+	var schemaName string
+	var tableName string
+	switch len(tableComponents) {
+	case 2:
+		schemaName = strings.ToUpper(tableComponents[0])
+		tableName = strings.ToUpper(tableComponents[1])
+	case 3:
+		schemaName = strings.ToUpper(tableComponents[1])
+		tableName = strings.ToUpper(tableComponents[2])
+	default:
+		return nil
+	}
+
+	queryStr := fmt.Sprintf(
+		`SELECT TABLE_TYPE FROM %s.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'`,
+		db.config.Database, schemaName, tableName,
+	)
+
+	result, err := db.Select(ctx, &query.Query{Query: queryStr})
+	if err != nil {
+		return errors.Wrapf(err, "unable to retrieve table metadata for '%s.%s'", schemaName, tableName)
+	}
+
+	if len(result) == 0 {
+		return nil
+	}
+
+	var materializationType string
+	if typeField, ok := result[0][0].(string); ok {
+		materializationType = typeField
+	}
+
+	if materializationType == "" {
+		return errors.New("could not determine the materialization type")
+	}
+	var dbMaterializationType pipeline.MaterializationType
+	switch materializationType {
+	case "BASE TABLE":
+		dbMaterializationType = pipeline.MaterializationTypeTable
+		materializationType = "TABLE"
+	case "VIEW":
+		dbMaterializationType = pipeline.MaterializationTypeView
+	default:
+		dbMaterializationType = pipeline.MaterializationTypeNone
+	}
+	if dbMaterializationType != asset.Materialization.Type {
+		dropQuery := query.Query{
+			Query: fmt.Sprintf("DROP %s IF EXISTS %s.%s", materializationType, schemaName, tableName),
+		}
+
+		if dropErr := db.RunQueryWithoutResult(ctx, &dropQuery); dropErr != nil {
+			return errors.Wrapf(dropErr, "failed to drop existing %s: %s.%s", materializationType, schemaName, tableName)
+		}
+	}
+
+	return nil
+}
+
+func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error {
+	tableComponents := strings.Split(asset.Name, ".")
+	var schemaName string
+	var tableName string
+	switch len(tableComponents) {
+	case 2:
+		schemaName = strings.ToUpper(tableComponents[0])
+		tableName = strings.ToUpper(tableComponents[1])
+	case 3:
+		schemaName = strings.ToUpper(tableComponents[1])
+		tableName = strings.ToUpper(tableComponents[2])
+	default:
+		return nil
+	}
+
+	if asset.Description == "" && len(asset.Columns) == 0 {
+		return errors.New("no metadata to push: table and columns have no descriptions")
+	}
+
+	queryStr := fmt.Sprintf(
+		`SELECT COLUMN_NAME, COMMENT 
+          FROM %s.INFORMATION_SCHEMA.COLUMNS 
+          WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'`,
+		db.config.Database, schemaName, tableName)
+
+	rows, err := db.Select(ctx, &query.Query{Query: queryStr})
+	if err != nil {
+		return errors.Wrapf(err, "failed to query column metadata for %s.%s", schemaName, tableName)
+	}
+
+	existingComments := make(map[string]string)
+	for _, row := range rows {
+		columnName := row[0].(string)
+		comment := ""
+		if row[1] != nil {
+			comment = row[1].(string)
+		}
+		existingComments[columnName] = comment
+	}
+
+	// Find columns that need updates
+	var updateQueries []string
+	for _, col := range asset.Columns {
+		if col.Description != "" && existingComments[col.Name] != col.Description {
+			query := fmt.Sprintf(
+				`ALTER TABLE %s.%s.%s MODIFY COLUMN %s COMMENT '%s'`,
+				db.config.Database, schemaName, tableName, col.Name, col.Description,
+			)
+			updateQueries = append(updateQueries, query)
+		}
+	}
+	if len(updateQueries) > 0 {
+		batchQuery := strings.Join(updateQueries, "; ")
+		if err := db.RunQueryWithoutResult(ctx, &query.Query{Query: batchQuery}); err != nil {
+			return errors.Wrap(err, "failed to update column descriptions")
+		}
+	}
+
+	if asset.Description != "" {
+		updateTableQuery := fmt.Sprintf(
+			`COMMENT ON TABLE %s.%s.%s IS '%s'`,
+			db.config.Database, schemaName, tableName, asset.Description,
+		)
+		if err := db.RunQueryWithoutResult(ctx, &query.Query{Query: updateTableQuery}); err != nil {
+			return errors.Wrap(err, "failed to update table description")
+		}
+	}
+
+	return nil
 }

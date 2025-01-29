@@ -39,6 +39,34 @@
         "access_token"
       ]
     },
+    "AppStoreConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "key_id": {
+          "type": "string"
+        },
+        "issuer_id": {
+          "type": "string"
+        },
+        "key_path": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "key_id",
+        "issuer_id",
+        "key_path",
+        "key"
+      ]
+    },
     "AppsflyerConnection": {
       "properties": {
         "name": {
@@ -148,6 +176,38 @@
       "required": [
         "name",
         "players"
+      ]
+    },
+    "ClickHouseConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "database": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "database"
       ]
     },
     "Connections": {
@@ -290,9 +350,21 @@
           },
           "type": "array"
         },
+        "clickhouse": {
+          "items": {
+            "$ref": "#/$defs/ClickHouseConnection"
+          },
+          "type": "array"
+        },
         "hubspot": {
           "items": {
             "$ref": "#/$defs/HubspotConnection"
+          },
+          "type": "array"
+        },
+        "github": {
+          "items": {
+            "$ref": "#/$defs/GitHubConnection"
           },
           "type": "array"
         },
@@ -320,6 +392,12 @@
           },
           "type": "array"
         },
+        "tiktokads": {
+          "items": {
+            "$ref": "#/$defs/TikTokAdsConnection"
+          },
+          "type": "array"
+        },
         "s3": {
           "items": {
             "$ref": "#/$defs/S3Connection"
@@ -344,9 +422,21 @@
           },
           "type": "array"
         },
+<<<<<<< HEAD
         "googleads": {
           "items": {
             "$ref": "#/$defs/GoogleAdsConnection"
+=======
+        "appstore": {
+          "items": {
+            "$ref": "#/$defs/AppStoreConnection"
+          },
+          "type": "array"
+        },
+        "linkedinads": {
+          "items": {
+            "$ref": "#/$defs/LinkedInAdsConnection"
+>>>>>>> main
           },
           "type": "array"
         }
@@ -467,11 +557,16 @@
         "value"
       ]
     },
+<<<<<<< HEAD
     "GoogleAdsConnection": {
+=======
+    "GitHubConnection": {
+>>>>>>> main
       "properties": {
         "name": {
           "type": "string"
         },
+<<<<<<< HEAD
         "customer_id": {
           "type": "string"
         },
@@ -482,6 +577,15 @@
           "type": "string"
         },
         "dev_token": {
+=======
+        "access_token": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "repo": {
+>>>>>>> main
           "type": "string"
         }
       },
@@ -489,8 +593,13 @@
       "type": "object",
       "required": [
         "name",
+<<<<<<< HEAD
         "customer_id",
         "dev_token"
+=======
+        "owner",
+        "repo"
+>>>>>>> main
       ]
     },
     "GoogleCloudPlatformConnection": {
@@ -971,6 +1080,9 @@
         },
         "warehouse": {
           "type": "string"
+        },
+        "private_key_path": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
@@ -984,7 +1096,8 @@
         "role",
         "database",
         "schema",
-        "warehouse"
+        "warehouse",
+        "private_key_path"
       ]
     },
     "StripeConnection": {
@@ -1036,6 +1149,29 @@
         "database"
       ]
     },
+    "TikTokAdsConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "advertiser_ids": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token",
+        "advertiser_ids"
+      ]
+    },
     "ZendeskConnection": {
       "properties": {
         "name": {
@@ -1063,6 +1199,22 @@
         "oauth_token",
         "sub_domain"
       ]
+    },
+    "LinkedInAdsConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "account_ids": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": ["name", "access_token", "account_ids"]
     }
   }
 }

@@ -32,7 +32,7 @@ func NewMaterializer(fullRefresh bool) *pipeline.Materializer {
 }
 
 func errorMaterializer(asset *pipeline.Asset, query string) (string, error) {
-	return "", fmt.Errorf("materialization strategy %s is not supported for materialization type %s", asset.Materialization.Strategy, asset.Materialization.Type)
+	return "", fmt.Errorf("materialization strategy %s is not supported for materialization type %s and asset type %s", asset.Materialization.Strategy, asset.Materialization.Type, asset.Type)
 }
 
 func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {

@@ -362,7 +362,7 @@ func ValidateCustomCheckQueryExists(ctx context.Context, p *pipeline.Pipeline, a
 
 func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
-	if asset.Type == pipeline.AssetTypeBigquerySeed {
+	if strings.HasSuffix(string(asset.Type), ".seed") {
 		if asset.Materialization.Type != pipeline.MaterializationTypeNone {
 			issues = append(issues, &Issue{
 				Task:        asset,
@@ -657,6 +657,14 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 	case pipeline.MaterializationTypeTable:
 		if asset.Materialization.Strategy == pipeline.MaterializationStrategyNone {
 			return issues, nil
+		}
+
+		if asset.Materialization.IncrementalKey != "" &&
+			asset.Materialization.Strategy != pipeline.MaterializationStrategyDeleteInsert {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Incremental key is only supported with 'delete+insert' strategy",
+			})
 		}
 
 		switch asset.Materialization.Strategy {

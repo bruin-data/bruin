@@ -146,4 +146,7 @@ integration-tests/logs
 integration-tests/bruin
 !integration-tests/.bruin.yml
 
+duckdb.db
+
 venv
+logs/runs

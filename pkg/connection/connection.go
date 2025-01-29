@@ -3,20 +3,24 @@ package connection
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
 	"github.com/bruin-data/bruin/pkg/airtable"
 	"github.com/bruin-data/bruin/pkg/appsflyer"
+	"github.com/bruin-data/bruin/pkg/appstore"
 	"github.com/bruin-data/bruin/pkg/asana"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/chess"
+	"github.com/bruin-data/bruin/pkg/clickhouse"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/dynamodb"
 	"github.com/bruin-data/bruin/pkg/facebookads"
+	"github.com/bruin-data/bruin/pkg/github"
 	"github.com/bruin-data/bruin/pkg/googleads"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/gsheets"
@@ -24,6 +28,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/hubspot"
 	"github.com/bruin-data/bruin/pkg/kafka"
 	"github.com/bruin-data/bruin/pkg/klaviyo"
+	"github.com/bruin-data/bruin/pkg/linkedinads"
 	"github.com/bruin-data/bruin/pkg/mongo"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
@@ -34,6 +39,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/slack"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/stripe"
+	"github.com/bruin-data/bruin/pkg/tiktokads"
 	"github.com/bruin-data/bruin/pkg/zendesk"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc"
@@ -71,6 +77,11 @@ type Manager struct {
 	DynamoDB     map[string]*dynamodb.Client
 	Zendesk      map[string]*zendesk.Client
 	GoogleAds    map[string]*googleads.Client
+	TikTokAds    map[string]*tiktokads.Client
+	GitHub       map[string]*github.Client
+	AppStore     map[string]*appstore.Client
+	LinkedInAds  map[string]*linkedinads.Client
+	ClickHouse   map[string]*clickhouse.Client
 	mutex        sync.Mutex
 }
 
@@ -192,6 +203,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.DuckDB)...)
 
+	connClickHouse, err := m.GetClickHouseConnectionWithoutDefault(name)
+	if err == nil {
+		return connClickHouse, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.ClickHouse)...)
+
 	connHubspot, err := m.GetHubspotConnectionWithoutDefault(name)
 	if err == nil {
 		return connHubspot, nil
@@ -251,6 +268,29 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connGoogleAds, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GoogleAds)...)
+	connTikTokAds, err := m.GetTikTokAdsConnectionWithoutDefault(name)
+	if err == nil {
+		return connTikTokAds, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.TikTokAds)...)
+
+	connGitHub, err := m.GetGitHubConnectionWithoutDefault(name)
+	if err == nil {
+		return connGitHub, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GitHub)...)
+
+	connAppStore, err := m.GetAppStoreConnectionWithoutDefault(name)
+	if err == nil {
+		return connAppStore, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.AppStore)...)
+
+	connLinkedInAds, err := m.GetLinkedInAdsConnectionWithoutDefault(name)
+	if err == nil {
+		return connLinkedInAds, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.LinkedInAds)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -294,6 +334,26 @@ func (m *Manager) GetDuckDBConnectionWithoutDefault(name string) (duck.DuckDBCli
 	db, ok := m.DuckDB[name]
 	if !ok {
 		return nil, errors.Errorf("DuckDB connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetClickHouseConnection(name string) (clickhouse.ClickHouseClient, error) {
+	db, err := m.GetClickHouseConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetClickHouseConnectionWithoutDefault("clickhouse-default")
+}
+
+func (m *Manager) GetClickHouseConnectionWithoutDefault(name string) (clickhouse.ClickHouseClient, error) {
+	if m.ClickHouse == nil {
+		return nil, errors.New("no clickhouse connections found")
+	}
+	db, ok := m.ClickHouse[name]
+	if !ok {
+		return nil, errors.Errorf("clickhouse connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -866,6 +926,82 @@ func (m *Manager) GetGoogleAdsConnectionWithoutDefault(name string) (*googleads.
 	return db, nil
 }
 
+func (m *Manager) GetGitHubConnection(name string) (*github.Client, error) {
+	db, err := m.GetGitHubConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetGitHubConnectionWithoutDefault("github-default")
+}
+
+func (m *Manager) GetGitHubConnectionWithoutDefault(name string) (*github.Client, error) {
+	if m.GitHub == nil {
+		return nil, errors.New("no github connections found")
+	}
+	db, ok := m.GitHub[name]
+	if !ok {
+		return nil, errors.Errorf("github connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetTikTokAdsConnection(name string) (*tiktokads.Client, error) {
+	db, err := m.GetTikTokAdsConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetTikTokAdsConnectionWithoutDefault("tiktokads-default")
+}
+
+func (m *Manager) GetTikTokAdsConnectionWithoutDefault(name string) (*tiktokads.Client, error) {
+	if m.TikTokAds == nil {
+		return nil, errors.New("no tiktokads connections found")
+	}
+	db, ok := m.TikTokAds[name]
+	if !ok {
+		return nil, errors.Errorf("tiktokads connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetAppStoreConnection(name string) (*appstore.Client, error) {
+	db, err := m.GetAppStoreConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetAppStoreConnectionWithoutDefault("appstore-default")
+}
+
+func (m *Manager) GetAppStoreConnectionWithoutDefault(name string) (*appstore.Client, error) {
+	if m.AppStore == nil {
+		return nil, errors.New("no appstore connections found")
+	}
+	db, ok := m.AppStore[name]
+	if !ok {
+		return nil, errors.Errorf("appstore connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetLinkedInAdsConnection(name string) (*linkedinads.Client, error) {
+	db, err := m.GetLinkedInAdsConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetLinkedInAdsConnectionWithoutDefault("linkedinads-default")
+}
+
+func (m *Manager) GetLinkedInAdsConnectionWithoutDefault(name string) (*linkedinads.Client, error) {
+	if m.LinkedInAds == nil {
+		return nil, errors.New("no linkedinads connections found")
+	}
+	db, ok := m.LinkedInAds[name]
+	if !ok {
+		return nil, errors.Errorf("linkedinads connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
 func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatformConnection) error {
 	m.mutex.Lock()
 	if m.BigQuery == nil {
@@ -919,15 +1055,25 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 	}
 	m.mutex.Unlock()
 
+	privateKey := ""
+	if connection.PrivateKeyPath != "" {
+		privateKeyBytes, err := os.ReadFile(connection.PrivateKeyPath)
+		if err != nil {
+			return err
+		}
+		privateKey = string(privateKeyBytes)
+	}
+
 	db, err := snowflake.NewDB(&snowflake.Config{
-		Account:   connection.Account,
-		Username:  connection.Username,
-		Password:  connection.Password,
-		Region:    connection.Region,
-		Role:      connection.Role,
-		Database:  connection.Database,
-		Schema:    connection.Schema,
-		Warehouse: connection.Warehouse,
+		Account:    connection.Account,
+		Username:   connection.Username,
+		Password:   connection.Password,
+		Region:     connection.Region,
+		Role:       connection.Role,
+		Database:   connection.Database,
+		Schema:     connection.Schema,
+		Warehouse:  connection.Warehouse,
+		PrivateKey: privateKey,
 	})
 	if err != nil {
 		return err
@@ -1458,6 +1604,32 @@ func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnect
 	return nil
 }
 
+func (m *Manager) AddClickHouseConnectionFromConfig(connection *config.ClickHouseConnection) error {
+	m.mutex.Lock()
+	if m.ClickHouse == nil {
+		m.ClickHouse = make(map[string]*clickhouse.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := clickhouse.NewClient(&clickhouse.Config{
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Username: connection.Username,
+		Password: connection.Password,
+		Database: connection.Database,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.ClickHouse[connection.Name] = client
+
+	return nil
+}
+
 func (m *Manager) AddChessConnectionFromConfig(connection *config.ChessConnection) error {
 	m.mutex.Lock()
 	if m.Chess == nil {
@@ -1632,6 +1804,93 @@ func (m *Manager) AddZendeskConnectionFromConfig(connection *config.ZendeskConne
 	defer m.mutex.Unlock()
 	m.Zendesk[connection.Name] = client
 
+	return nil
+}
+
+func (m *Manager) AddTikTokAdsConnectionFromConfig(connection *config.TikTokAdsConnection) error {
+	m.mutex.Lock()
+	if m.TikTokAds == nil {
+		m.TikTokAds = make(map[string]*tiktokads.Client)
+	}
+	m.mutex.Unlock()
+	client, err := tiktokads.NewClient(tiktokads.Config{
+		AccessToken:   connection.AccessToken,
+		AdvertiserIDs: connection.AdvertiserIDs,
+		Timezone:      connection.Timezone,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.TikTokAds[connection.Name] = client
+
+	return nil
+}
+
+func (m *Manager) AddGitHubConnectionFromConfig(connection *config.GitHubConnection) error {
+	m.mutex.Lock()
+	if m.GitHub == nil {
+		m.GitHub = make(map[string]*github.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := github.NewClient(github.Config{
+		AccessToken: connection.AccessToken,
+		Owner:       connection.Owner,
+		Repo:        connection.Repo,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.GitHub[connection.Name] = client
+
+	return nil
+}
+
+func (m *Manager) AddAppStoreConnectionFromConfig(connection *config.AppStoreConnection) error {
+	m.mutex.Lock()
+	if m.AppStore == nil {
+		m.AppStore = make(map[string]*appstore.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := appstore.NewClient(appstore.Config{
+		IssuerID: connection.IssuerID,
+		KeyID:    connection.KeyID,
+		KeyPath:  connection.KeyPath,
+		Key:      connection.Key,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.AppStore[connection.Name] = client
+
+	return nil
+}
+
+func (m *Manager) AddLinkedInAdsConnectionFromConfig(connection *config.LinkedInAdsConnection) error {
+	m.mutex.Lock()
+	if m.LinkedInAds == nil {
+		m.LinkedInAds = make(map[string]*linkedinads.Client)
+	}
+	m.mutex.Unlock()
+	client, err := linkedinads.NewClient(linkedinads.Config{
+		AccessToken: connection.AccessToken,
+		AccountIds:  connection.AccountIds,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.LinkedInAds[connection.Name] = client
 	return nil
 }
 
@@ -1869,6 +2128,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 		})
 	}
 
+	for _, conn := range cm.SelectedEnvironment.Connections.ClickHouse {
+		wg.Go(func() {
+			err := connectionManager.AddClickHouseConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add clickhouse connection '%s'", conn.Name))
+			}
+		})
+	}
+
 	for _, conn := range cm.SelectedEnvironment.Connections.Hubspot {
 		wg.Go(func() {
 			err := connectionManager.AddHubspotConnectionFromConfig(&conn)
@@ -1945,6 +2213,41 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			err := connectionManager.AddGoogleAdsConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add googleads connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.TikTokAds {
+		wg.Go(func() {
+			err := connectionManager.AddTikTokAdsConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add tiktokads connection '%s'", conn.Name))
+			}
+		})
+	}
+	for _, conn := range cm.SelectedEnvironment.Connections.GitHub {
+		wg.Go(func() {
+			err := connectionManager.AddGitHubConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add github connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.AppStore {
+		wg.Go(func() {
+			err := connectionManager.AddAppStoreConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add appstore connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.LinkedInAds {
+		wg.Go(func() {
+			err := connectionManager.AddLinkedInAdsConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add linkedinads connection '%s'", conn.Name))
 			}
 		})
 	}

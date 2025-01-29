@@ -70,6 +70,7 @@ export default defineConfig({
                         collapsed: true,
                         items: [
                             { text: "athena", link: "/getting-started/templates-docs/athena-README.md" },
+                            { text: "clickhouse", link: "/getting-started/templates-docs/clickhouse-README.md" },
                             { text: "chess", link: "/getting-started/templates-docs/chess-README.md" },
                             { text: "duckdb", link: "/getting-started/templates-docs/duckdb-README.md" },
                             { text: "firebase", link: "/getting-started/templates-docs/firebase-README.md" },
@@ -109,6 +110,7 @@ export default defineConfig({
                 collapsed: false,
                 items: [
                     {text: "AWS Athena", link: "/platforms/athena"},
+                    {text: "Clickhouse", link: "/platforms/clickhouse"},
                     {text: "Databricks", link: "/platforms/databricks"},
                     {text: "DuckDB", link: "/platforms/duckdb"},
                     {text: "Google BigQuery", link: "/platforms/bigquery"},
@@ -127,7 +129,7 @@ export default defineConfig({
                     {
                         text: "Asset Types", items: [
                             {text: "SQL", link: "/assets/sql"},
-                            {text: "Seed", link: "/assets/sql-seed"},
+                            {text: "Seed", link: "/assets/seed"},
                             {text: "Ingestr", link: "/assets/ingestr"},
                             {text: "Python Assets", link: "/assets/python"},
                         ]
@@ -152,16 +154,19 @@ export default defineConfig({
                         items: [
                             {text: "Adjust", link: "/ingestion/adjust.md"},
                             {text: "Airtable", link: "/ingestion/airtable.md"},
+                            {text: "AppStore", link: "/ingestion/appstore.md"},
                             {text: "Asana", link: "/ingestion/asana.md"},
                             {text: "Chess", link: "/ingestion/chess.md"},
                             {text: "DynamoDB", link: "/ingestion/dynamodb.md"},
                             {text: "Facebook", link: "/ingestion/facebook-ads.md"},
+                            {text: "GitHub", link: "/ingestion/github.md"},
                             {text: "Google Sheets", link: "/ingestion/google_sheets.md"},
                             {text: "Google Ads", link: "/ingestion/google-ads.md"},
                             {text: "Gorgias", link: "/ingestion/gorgias"},
                             {text: "Hubspot", link: "/ingestion/hubspot.md"},
                             {text: "Kafka", link: "/ingestion/kafka.md"},
                             {text: "Klaviyo", link: "/ingestion/klaviyo.md"},
+                            {text: "LinkedIn Ads", link: "/ingestion/linkedinads.md"},
                             {text: "MongoDB", link: "/ingestion/mongo"},
                             {text: "MySQL", link: "/ingestion/mysql"},
                             {text: "Notion", link: "/ingestion/notion"},
@@ -170,6 +175,7 @@ export default defineConfig({
                             {text: "Shopify", link: "/ingestion/shopify"},
                             {text: "Stripe", link: "/ingestion/stripe.md"},
                             {text: "Slack", link: "/ingestion/slack.md"},
+                            {text: "TikTok Ads", link: "/ingestion/tiktokads.md"},
                             {text: "Zendesk", link: "/ingestion/zendesk.md"},
                         ],
                     },
@@ -216,8 +222,9 @@ export default defineConfig({
                 items: [
                     {text: "Overview", link: "/cloud/overview"},
                     {text: "Cross-pipeline dependencies", link: "/cloud/cross-pipeline"},
+                    {text: "dbt Projects", link: "/cloud/dbt"},
                     {text: "Notifications", link: "/cloud/notifications"},
-                    {text: "DBT", link: "/cloud/dbt"},
+                    {text: "Instance Types", link: "/cloud/instance-types"},
                 ],
             },
         ],

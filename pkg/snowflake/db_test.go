@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
@@ -321,6 +323,390 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			}
 
 			// Ensure all expectations were met
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestDB_RecreateTableOnMaterializationTypeMismatch(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name          string
+		mockSetup     func(mock sqlmock.Sqlmock)
+		asset         *pipeline.Asset
+		expectedError string
+	}{
+		{
+			name: "materialization type mismatch, table dropped and recreated",
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// Mock the SELECT query to check the table type
+				mock.ExpectQuery(`SELECT TABLE_TYPE FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE"}).AddRow("VIEW"))
+
+				mock.ExpectQuery(`DROP VIEW IF EXISTS TEST_SCHEMA.TEST_TABLE`).
+					WillReturnRows(sqlmock.NewRows(nil))
+			},
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+			},
+		},
+		{
+			name: "table or view does not exist",
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// Mock the SELECT query to return no rows
+				mock.ExpectQuery(`SELECT TABLE_TYPE FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE"}))
+			},
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+			},
+		},
+		{
+			name: "error during table type retrieval",
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// Mock the SELECT query to return an error
+				mock.ExpectQuery(`SELECT TABLE_TYPE FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+					WillReturnError(errors.New("query error"))
+			},
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+			},
+			expectedError: "unable to retrieve table metadata for 'TEST_SCHEMA.TEST_TABLE': query error",
+		},
+		{
+			name: "materialization type matches, no action taken",
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// Mock the SELECT query to return the same type
+				mock.ExpectQuery(`SELECT TABLE_TYPE FROM MYDB.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`).
+					WillReturnRows(sqlmock.NewRows([]string{"TABLE_TYPE"}).AddRow("BASE TABLE"))
+			},
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+			},
+		},
+		{
+			name: "asset name with 1 component",
+			asset: &pipeline.Asset{
+				Name: "test_table",
+			},
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// No query expected, function should return early
+			},
+		},
+		{
+			name: "asset name with 4 components",
+			asset: &pipeline.Asset{
+				Name: "project.dataset.schema.table",
+			},
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// No query expected, function should return early
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// Setup sqlmock
+			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+			defer mockDB.Close()
+			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+
+			// Initialize the DB struct with the mock connection
+			db := &DB{
+				conn: sqlxDB,
+				config: &Config{ // Pass a pointer to Config
+					Database: "MYDB",
+				},
+			}
+
+			// Apply the mock setup for this test
+			tt.mockSetup(mock)
+
+			// Call the function under test
+			err = db.RecreateTableOnMaterializationTypeMismatch(context.Background(), tt.asset)
+
+			// Validate the expected outcome
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+			}
+
+			// Ensure all expectations were met
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestDB_CreateSchemaIfNotExist(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		asset         *pipeline.Asset
+		mockSetup     func(mock sqlmock.Sqlmock, cache *sync.Map)
+		expectedError string
+	}{
+		{
+			name: "schema already exists in cache",
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+			},
+			mockSetup: func(mock sqlmock.Sqlmock, cache *sync.Map) {
+				// Simulate schema being already cached
+				cache.Store("TEST_SCHEMA", true)
+			},
+		},
+		{
+			name: "schema does not exist, create successfully",
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+			},
+			mockSetup: func(mock sqlmock.Sqlmock, cache *sync.Map) {
+				// Simulate schema not in cache
+				mock.ExpectQuery("CREATE SCHEMA IF NOT EXISTS TEST_SCHEMA").
+					WillReturnRows(sqlmock.NewRows(nil)) // Simulate success with an empty result
+			},
+		},
+		{
+			name: "schema creation fails",
+			asset: &pipeline.Asset{
+				Name: "test_schema.test_table",
+			},
+			mockSetup: func(mock sqlmock.Sqlmock, cache *sync.Map) {
+				// Simulate schema not in cache and error during creation
+				mock.ExpectQuery("CREATE SCHEMA IF NOT EXISTS TEST_SCHEMA").
+					WillReturnError(errors.New("creation failed"))
+			},
+			expectedError: "failed to create or ensure database: TEST_SCHEMA: creation failed",
+		},
+		{
+			name: "asset name with 1 component",
+			asset: &pipeline.Asset{
+				Name: "test_table",
+			},
+			mockSetup: func(mock sqlmock.Sqlmock, cache *sync.Map) {
+				// No query expected, function should return early
+			},
+		},
+		{
+			name: "asset name with 4 components",
+			asset: &pipeline.Asset{
+				Name: "project.dataset.schema.table",
+			},
+			mockSetup: func(mock sqlmock.Sqlmock, cache *sync.Map) {
+				// No query expected, function should return early
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// Setup sqlmock
+			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+			defer mockDB.Close()
+
+			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+
+			// Initialize the DB struct with a schema cache
+			cache := &sync.Map{}
+			db := &DB{
+				conn:            sqlxDB,
+				schemaNameCache: cache,
+			}
+
+			// Apply the mock setup
+			tt.mockSetup(mock, cache)
+
+			// Call the function under test
+			err = db.CreateSchemaIfNotExist(context.Background(), tt.asset)
+
+			// Validate the result
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+			}
+
+			// Ensure all expectations were met
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestDB_PushColumnDescriptions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		asset         *pipeline.Asset
+		mockSetup     func(mock sqlmock.Sqlmock)
+		expectedError string
+	}{
+		{
+			name: "no metadata to push",
+			asset: &pipeline.Asset{
+				Name:    "test_schema.test_table",
+				Columns: []pipeline.Column{},
+			},
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// No database interaction expected since there is no metadata to push
+			},
+			expectedError: "no metadata to push: table and columns have no descriptions",
+		},
+		{
+			name: "successfully update column descriptions with concatenated queries",
+			asset: &pipeline.Asset{
+				Name:        "test_schema.test_table",
+				Description: "",
+				Columns: []pipeline.Column{
+					{Name: "col1", Description: "Description 1"},
+					{Name: "col2", Description: "Description 2"},
+				},
+			},
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// Simulate querying existing metadata
+				mock.ExpectQuery(
+					`SELECT COLUMN_NAME, COMMENT 
+             FROM MYDB.INFORMATION_SCHEMA.COLUMNS 
+             WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`,
+				).WillReturnRows(sqlmock.NewRows([]string{"COLUMN_NAME", "COMMENT"}).
+					AddRow("COL1", ""). // No description exists
+					AddRow("COL2", ""), // No description exists
+				)
+
+				mock.ExpectQuery(
+					`ALTER TABLE MYDB.TEST_SCHEMA.TEST_TABLE 
+             MODIFY COLUMN col1 COMMENT 'Description 1'; 
+             ALTER TABLE MYDB.TEST_SCHEMA.TEST_TABLE 
+             MODIFY COLUMN col2 COMMENT 'Description 2'`,
+				).WillReturnRows(sqlmock.NewRows(nil)) // Expect 2 rows to be affected
+			},
+		},
+
+		{
+			name: "successfully update table description",
+			asset: &pipeline.Asset{
+				Name:        "test_schema.test_table",
+				Description: "Table description",
+				Columns:     []pipeline.Column{},
+			},
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// Simulate querying existing metadata
+				mock.ExpectQuery(
+					`SELECT COLUMN_NAME, COMMENT 
+                     FROM MYDB.INFORMATION_SCHEMA.COLUMNS 
+                     WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`,
+				).WillReturnRows(sqlmock.NewRows(nil)) // No columns exist
+
+				// Simulate updating table description
+				mock.ExpectQuery(`COMMENT ON TABLE MYDB.TEST_SCHEMA.TEST_TABLE IS 'Table description'`).
+					WillReturnRows(sqlmock.NewRows(nil))
+			},
+		},
+		{
+			name: "error during querying existing metadata",
+			asset: &pipeline.Asset{
+				Name:        "test_schema.test_table",
+				Description: "Table description", // Add a description to ensure it doesn't return early
+				Columns:     []pipeline.Column{},
+			},
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// Simulate an error during querying the column metadata
+				mock.ExpectQuery(
+					`SELECT COLUMN_NAME, COMMENT 
+			 FROM MYDB.INFORMATION_SCHEMA.COLUMNS 
+			 WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`,
+				).WillReturnError(errors.New("query error")) // Simulate the query error
+			},
+			expectedError: "failed to query column metadata for TEST_SCHEMA.TEST_TABLE: query error", // Expected error
+		},
+		{
+			name: "error during updating column description",
+			asset: &pipeline.Asset{
+				Name:        "test_schema.test_table",
+				Description: "",
+				Columns: []pipeline.Column{
+					{Name: "col1", Description: "Description 1"},
+				},
+			},
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				// Simulate querying existing metadata
+				mock.ExpectQuery(
+					`SELECT COLUMN_NAME, COMMENT 
+             FROM MYDB.INFORMATION_SCHEMA.COLUMNS 
+             WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`,
+				).WillReturnRows(sqlmock.NewRows([]string{"COLUMN_NAME", "COMMENT"}).
+					AddRow("COL1", "")) // No description exists
+
+				// Simulate an error during column description update
+				mock.ExpectQuery(
+					`ALTER TABLE MYDB.TEST_SCHEMA.TEST_TABLE MODIFY COLUMN col1 COMMENT 'Description 1'`,
+				).WillReturnError(errors.New("update error"))
+			},
+			expectedError: "failed to update column descriptions: update error",
+		},
+		{
+			name: "error during updating table description",
+			asset: &pipeline.Asset{
+				Name:        "test_schema.test_table",
+				Description: "Table description",
+				Columns:     []pipeline.Column{},
+			},
+			mockSetup: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(
+					`SELECT COLUMN_NAME, COMMENT 
+                     FROM MYDB.INFORMATION_SCHEMA.COLUMNS 
+                     WHERE TABLE_SCHEMA = 'TEST_SCHEMA' AND TABLE_NAME = 'TEST_TABLE'`,
+				).WillReturnRows(sqlmock.NewRows(nil)) // No columns exist
+				mock.ExpectQuery(`COMMENT ON TABLE MYDB.TEST_SCHEMA.TEST_TABLE IS 'Table description'`).
+					WillReturnError(errors.New("update error"))
+			},
+			expectedError: "failed to update table description: update error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+			defer mockDB.Close()
+
+			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+			db := &DB{
+				conn: sqlxDB,
+				config: &Config{
+					Database: "MYDB",
+				},
+			}
+			tt.mockSetup(mock)
+			err = db.PushColumnDescriptions(context.Background(), tt.asset)
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+			}
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}

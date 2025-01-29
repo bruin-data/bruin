@@ -1,11 +1,11 @@
-""" @bruin
+"""@bruin
 name: basic
 type: python
 tags:
     - tag1
     - tag2
 
-@bruin """
+@bruin"""
 
 import json
 import os

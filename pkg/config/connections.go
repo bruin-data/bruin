@@ -194,28 +194,30 @@ func (c RedshiftConnection) GetName() string {
 }
 
 type SnowflakeConnection struct {
-	Name      string `yaml:"name" json:"name" mapstructure:"name"`
-	Account   string `yaml:"account" json:"account" mapstructure:"account"`
-	Username  string `yaml:"username" json:"username" mapstructure:"username"`
-	Password  string `yaml:"password" json:"password" mapstructure:"password"`
-	Region    string `yaml:"region" json:"region" mapstructure:"region"`
-	Role      string `yaml:"role" json:"role" mapstructure:"role"`
-	Database  string `yaml:"database" json:"database" mapstructure:"database"`
-	Schema    string `yaml:"schema" json:"schema" mapstructure:"schema"`
-	Warehouse string `yaml:"warehouse" json:"warehouse" mapstructure:"warehouse"`
+	Name           string `yaml:"name" json:"name" mapstructure:"name"`
+	Account        string `yaml:"account" json:"account" mapstructure:"account"`
+	Username       string `yaml:"username" json:"username" mapstructure:"username"`
+	Password       string `yaml:"password" json:"password" mapstructure:"password"`
+	Region         string `yaml:"region" json:"region" mapstructure:"region"`
+	Role           string `yaml:"role" json:"role" mapstructure:"role"`
+	Database       string `yaml:"database" json:"database" mapstructure:"database"`
+	Schema         string `yaml:"schema" json:"schema" mapstructure:"schema"`
+	Warehouse      string `yaml:"warehouse" json:"warehouse" mapstructure:"warehouse"`
+	PrivateKeyPath string `yaml:"private_key_path" json:"private_key_path" mapstructure:"private_key_path"`
 }
 
 func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]string{
-		"name":      c.Name,
-		"account":   c.Account,
-		"username":  c.Username,
-		"password":  c.Password,
-		"region":    c.Region,
-		"role":      c.Role,
-		"database":  c.Database,
-		"schema":    c.Schema,
-		"warehouse": c.Warehouse,
+		"name":             c.Name,
+		"account":          c.Account,
+		"username":         c.Username,
+		"password":         c.Password,
+		"region":           c.Region,
+		"role":             c.Role,
+		"database":         c.Database,
+		"schema":           c.Schema,
+		"warehouse":        c.Warehouse,
+		"private_key_path": c.PrivateKeyPath,
 	})
 }
 
@@ -338,6 +340,19 @@ func (d DuckDBConnection) GetName() string {
 	return d.Name
 }
 
+type ClickHouseConnection struct {
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port"     json:"port" mapstructure:"port"`
+	Database string `yaml:"database" json:"database" mapstructure:"database"`
+}
+
+func (c ClickHouseConnection) GetName() string {
+	return c.Name
+}
+
 type AppsflyerConnection struct {
 	Name   string `yaml:"name" json:"name" mapstructure:"name"`
 	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
@@ -454,5 +469,50 @@ type GoogleAdsConnection struct {
 }
 
 func (c GoogleAdsConnection) GetName() string {
+	return c.Name
+}
+
+type TikTokAdsConnection struct {
+	Name          string `yaml:"name" json:"name" mapstructure:"name"`
+	AccessToken   string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
+	AdvertiserIDs string `yaml:"advertiser_ids" json:"advertiser_ids" mapstructure:"advertiser_ids"`
+	Timezone      string `yaml:"timezone" json:"timezone,omitempty" mapstructure:"timezone"`
+}
+
+func (c TikTokAdsConnection) GetName() string {
+	return c.Name
+}
+
+// github://?access_token=<access_token>&owner=<owner>&repo=<repo>
+type GitHubConnection struct {
+	Name        string `yaml:"name" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token" json:"access_token,omitempty" mapstructure:"access_token"`
+	Owner       string `yaml:"owner" json:"owner" mapstructure:"owner"`
+	Repo        string `yaml:"repo" json:"repo" mapstructure:"repo"`
+}
+
+func (c GitHubConnection) GetName() string {
+	return c.Name
+}
+
+type AppStoreConnection struct {
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	KeyID    string `yaml:"key_id" json:"key_id" mapstructure:"key_id"`
+	IssuerID string `yaml:"issuer_id" json:"issuer_id" mapstructure:"issuer_id"`
+	KeyPath  string `yaml:"key_path" json:"key_path" mapstructure:"key_path"`
+	Key      string `yaml:"key" json:"key" mapstructure:"key"`
+}
+
+func (c AppStoreConnection) GetName() string {
+	return c.Name
+}
+
+type LinkedInAdsConnection struct {
+	Name        string `yaml:"name" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
+	AccountIds  string `yaml:"account_ids" json:"account_ids" mapstructure:"account_ids"`
+}
+
+func (c LinkedInAdsConnection) GetName() string {
 	return c.Name
 }

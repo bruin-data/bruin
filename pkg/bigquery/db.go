@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -33,11 +34,24 @@ type MetadataUpdater interface {
 	UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipeline.Asset) error
 }
 
+type TableManager interface {
+	IsPartitioningOrClusteringMismatch(ctx context.Context, meta *bigquery.TableMetadata, asset *pipeline.Asset) bool
+	CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error
+	IsMaterializationTypeMismatch(ctx context.Context, meta *bigquery.TableMetadata, asset *pipeline.Asset) bool
+	DropTableOnMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error
+}
+
 type DB interface {
 	Querier
 	Selector
 	MetadataUpdater
+	TableManager
 }
+
+var (
+	datasetNameCache sync.Map // Global cache for dataset existence
+	datasetLocks     sync.Map // Global map for dataset-specific locks
+)
 
 type Client struct {
 	client *bigquery.Client
@@ -185,6 +199,24 @@ func (m NoMetadataUpdatedError) Error() string {
 	return "no metadata found for the given asset to be pushed to BigQuery"
 }
 
+func (d *Client) getTableRef(tableName string) (*bigquery.Table, error) {
+	tableComponents := strings.Split(tableName, ".")
+	// Check for empty components
+	for _, component := range tableComponents {
+		if component == "" {
+			return nil, fmt.Errorf("table name must be in dataset.table or project.dataset.table format, '%s' given", tableName)
+		}
+	}
+	switch len(tableComponents) {
+	case 2:
+		return d.client.DatasetInProject(d.config.ProjectID, tableComponents[0]).Table(tableComponents[1]), nil
+	case 3:
+		return d.client.DatasetInProject(tableComponents[0], tableComponents[1]).Table(tableComponents[2]), nil
+	default:
+		return nil, fmt.Errorf("table name must be in dataset.table or project.dataset.table format, '%s' given", tableName)
+	}
+}
+
 func (d *Client) UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
 	anyColumnHasDescription := false
 	colsByName := make(map[string]*pipeline.Column, len(asset.Columns))
@@ -198,18 +230,19 @@ func (d *Client) UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipel
 	if asset.Description == "" && (len(asset.Columns) == 0 || !anyColumnHasDescription) {
 		return NoMetadataUpdatedError{}
 	}
-
-	tableComponents := strings.Split(asset.Name, ".")
-	if len(tableComponents) != 2 {
-		return fmt.Errorf("asset name must be in schema.table format to update the metadata, '%s' given", asset.Name)
-	}
-
-	tableRef := d.client.Dataset(tableComponents[0]).Table(tableComponents[1])
-	meta, err := tableRef.Metadata(ctx)
+	tableRef, err := d.getTableRef(asset.Name)
 	if err != nil {
 		return err
 	}
 
+	meta, err := tableRef.Metadata(ctx)
+	if err != nil {
+		var apiErr *googleapi.Error
+		if errors.As(err, &apiErr) && apiErr.Code == 404 {
+			return nil
+		}
+		return err
+	}
 	schema := meta.Schema
 	colsChanged := false
 	for _, field := range schema {
@@ -228,7 +261,6 @@ func (d *Client) UpdateTableMetadataIfNotExist(ctx context.Context, asset *pipel
 	if asset.Description != "" {
 		update.Description = asset.Description
 	}
-
 	primaryKeys := asset.ColumnNamesWithPrimaryKey()
 	if len(primaryKeys) > 0 {
 		update.TableConstraints = &bigquery.TableConstraints{
@@ -270,4 +302,142 @@ func (d *Client) Ping(ctx context.Context) error {
 	}
 
 	return nil // Return nil if the query runs successfully
+}
+
+func (d *Client) IsPartitioningOrClusteringMismatch(ctx context.Context, meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
+	if meta.TimePartitioning != nil || meta.RangePartitioning != nil || asset.Materialization.PartitionBy != "" || len(asset.Materialization.ClusterBy) > 0 {
+		if !IsSamePartitioning(meta, asset) || !IsSameClustering(meta, asset) {
+			return true
+		}
+	}
+	return false
+}
+
+func IsSamePartitioning(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
+	if asset.Materialization.PartitionBy != "" &&
+		meta.TimePartitioning == nil &&
+		meta.RangePartitioning == nil {
+		return false
+	}
+
+	if meta.TimePartitioning == nil && meta.RangePartitioning == nil {
+		return true
+	}
+
+	if meta.TimePartitioning != nil {
+		if meta.TimePartitioning.Field != asset.Materialization.PartitionBy {
+			return false
+		}
+	}
+	if meta.RangePartitioning != nil {
+		if meta.RangePartitioning.Field != asset.Materialization.PartitionBy {
+			return false
+		}
+	}
+	return true
+}
+
+func IsSameClustering(meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
+	if len(asset.Materialization.ClusterBy) > 0 &&
+		(meta.Clustering == nil || len(meta.Clustering.Fields) == 0) {
+		return false
+	}
+	if meta.Clustering == nil {
+		return true
+	}
+
+	bigQueryFields := meta.Clustering.Fields
+	userFields := asset.Materialization.ClusterBy
+
+	if len(bigQueryFields) != len(userFields) {
+		return false
+	}
+
+	for i := range bigQueryFields {
+		if bigQueryFields[i] != userFields[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error {
+	tableName := asset.Name
+	tableComponents := strings.Split(tableName, ".")
+	var datasetName string
+	var projectID string
+
+	switch len(tableComponents) {
+	case 2:
+		projectID = d.config.ProjectID
+		datasetName = tableComponents[0]
+	case 3:
+		datasetName = tableComponents[1]
+		projectID = tableComponents[0]
+	default:
+		return nil
+	}
+
+	cacheKey := fmt.Sprintf("%s.%s", projectID, datasetName)
+
+	if _, exists := datasetNameCache.Load(cacheKey); exists {
+		return nil
+	}
+
+	lock, _ := datasetLocks.LoadOrStore(cacheKey, &sync.Mutex{})
+	mutex := lock.(*sync.Mutex)
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if _, exists := datasetNameCache.Load(cacheKey); exists {
+		return nil
+	}
+
+	dataset := d.client.DatasetInProject(projectID, datasetName)
+	_, err := dataset.Metadata(ctx)
+	if err != nil {
+		var apiErr *googleapi.Error
+		if errors.As(err, &apiErr) && apiErr.Code == 404 {
+			if err := dataset.Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
+				return fmt.Errorf("failed to create dataset '%s': %w", cacheKey, err)
+			}
+			datasetNameCache.Store(cacheKey, true)
+		} else {
+			return fmt.Errorf("failed to fetch metadata for table '%s': %w", tableName, err)
+		}
+	}
+
+	return nil
+}
+
+func (d *Client) IsMaterializationTypeMismatch(ctx context.Context, meta *bigquery.TableMetadata, asset *pipeline.Asset) bool {
+	if asset.Materialization.Type == pipeline.MaterializationTypeNone {
+		return false
+	}
+
+	tableType := meta.Type
+	return !strings.EqualFold(string(tableType), string(asset.Materialization.Type))
+}
+
+func (d *Client) DropTableOnMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error {
+	tableRef, err := d.getTableRef(tableName)
+	if err != nil {
+		return err
+	}
+	meta, err := tableRef.Metadata(ctx)
+	if err != nil {
+		var apiErr *googleapi.Error
+		if errors.As(err, &apiErr) && apiErr.Code == 404 {
+			return nil
+		}
+		return fmt.Errorf("failed to fetch metadata for table '%s': %w", tableName, err)
+	}
+	if d.IsMaterializationTypeMismatch(ctx, meta, asset) || d.IsPartitioningOrClusteringMismatch(ctx, meta, asset) {
+		if err := tableRef.Delete(ctx); err != nil {
+			return fmt.Errorf("failed to delete table '%s': %w", tableName, err)
+		}
+	}
+	return nil
 }

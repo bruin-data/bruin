@@ -172,6 +172,7 @@ class SQLite(Dialect):
         TRANSFORMS = {
             **generator.Generator.TRANSFORMS,
             exp.AnyValue: any_value_to_max_sql,
+            exp.Chr: rename_func("CHAR"),
             exp.Concat: concat_to_dpipe_sql,
             exp.CountIf: count_if_to_sum,
             exp.Create: transforms.preprocess([_transform_create]),
@@ -300,3 +301,6 @@ class SQLite(Dialect):
             this = expression.this
             this = f" {this}" if this else ""
             return f"BEGIN{this} TRANSACTION"
+
+        def isascii_sql(self, expression: exp.IsAscii) -> str:
+            return f"(NOT {self.sql(expression.this)} GLOB CAST(x'2a5b5e012d7f5d2a' AS TEXT))"

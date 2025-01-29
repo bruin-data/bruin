@@ -29,7 +29,7 @@ type queryExtractor interface {
 }
 
 type connectionFetcher interface {
-	GetAthenaConnection(name string) (Client, error)
+	GetAthenaConnectionWithoutDefault(name string) (Client, error)
 	GetConnection(name string) (interface{}, error)
 }
 
@@ -70,7 +70,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, err := o.connection.GetAthenaConnection(connName)
+	conn, err := o.connection.GetAthenaConnectionWithoutDefault(connName)
 	if err != nil {
 		return err
 	}
@@ -142,7 +142,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return err
 	}
 
-	conn, err := o.connection.GetAthenaConnection(connName)
+	conn, err := o.connection.GetAthenaConnectionWithoutDefault(connName)
 	if err != nil {
 		return err
 	}
