@@ -217,6 +217,11 @@ environments:
           password: "clickhousepass"
           database: "clickhousedb"
           http_port: "8124"
+      gcs:
+        - name: "gcs-1"
+          service_account_file: "/path/to/service_account.json"
+
+
   prod:
     connections:
       google_cloud_platform:

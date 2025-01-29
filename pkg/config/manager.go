@@ -55,6 +55,7 @@ type Connections struct {
 	DynamoDB            []DynamoDBConnection            `yaml:"dynamodb,omitempty" json:"dynamodb,omitempty" mapstructure:"dynamodb"`
 	AppStore            []AppStoreConnection            `yaml:"appstore,omitempty" json:"appstore,omitempty" mapstructure:"appstore"`
 	LinkedInAds         []LinkedInAdsConnection         `yaml:"linkedinads,omitempty" json:"linkedinads,omitempty" mapstructure:"linkedinads"`
+	GCS                 []GCSConnection                 `yaml:"gcs,omitempty" json:"gcs,omitempty" mapstructure:"gcs"`
 
 	byKey       map[string]any
 	typeNameMap map[string]string
@@ -270,6 +271,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.LinkedInAds {
 		c.byKey[conn.Name] = &(c.LinkedInAds[i])
 		c.typeNameMap[conn.Name] = "linkedinads"
+	}
+
+	for i, conn := range c.GCS {
+		c.byKey[conn.Name] = &(c.GCS[i])
+		c.typeNameMap[conn.Name] = "gcs"
 	}
 
 	for i, conn := range c.ClickHouse {
@@ -737,6 +743,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.LinkedInAds = append(env.Connections.LinkedInAds, conn)
+	case "gcs":
+		var conn GCSConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.GCS = append(env.Connections.GCS, conn)
 	case "clickhouse":
 		var conn ClickHouseConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -847,6 +860,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.AppStore = removeConnection(env.Connections.AppStore, connectionName)
 	case "linkedinads":
 		env.Connections.LinkedInAds = removeConnection(env.Connections.LinkedInAds, connectionName)
+	case "gcs":
+		env.Connections.GCS = removeConnection(env.Connections.GCS, connectionName)
 	case "clickhouse":
 		env.Connections.ClickHouse = removeConnection(env.Connections.ClickHouse, connectionName)
 	default:
