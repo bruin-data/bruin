@@ -13,7 +13,7 @@ connections:
           password: "XXXXXXXXXX"
           host: "some-clickhouse-host.somedomain.com"   
           port: 9000
-          database: "dev" #Optional for other assets, but should not be provided when using ClickHouse as an ingestr destination, as ingestr takes the database name from the asset file. 
+          database: "dev" #Optional for other assets, uneffective when using ClickHouse as an ingestr destination, as ingestr takes the database name from the asset file. 
           http_port: 8123 #Only specify if you are using clickhouse as ingestr destination, by default it is 8123
 ```
 ## Ingestr Assets:
