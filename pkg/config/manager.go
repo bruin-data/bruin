@@ -17,12 +17,12 @@ import (
 	"github.com/spf13/afero"
 )
 
-// ConnectionMerger defines how connections should be merged
+// ConnectionMerger defines how connections should be merged.
 type ConnectionMerger interface {
 	MergeFrom(source *Connections) error
 }
 
-// Make sure Connections implements ConnectionMerger
+// Make sure Connections implements ConnectionMerger.
 var _ ConnectionMerger = (*Connections)(nil)
 
 type Connections struct {
