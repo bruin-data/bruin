@@ -77,6 +77,45 @@ func (m model) View() string {
 
 	return s.String()
 }
+
+func mergeTemplateConfig(centralConfig *config.Config, templateBruinContent []byte) error {
+	var templateConfig config.Config
+	if err := yaml.Unmarshal(templateBruinContent, &templateConfig); err != nil {
+		return fmt.Errorf("could not parse template's .bruin.yml: %w", err)
+	}
+
+	// Initialize environments map if it doesn't exist
+	if centralConfig.Environments == nil {
+		centralConfig.Environments = make(map[string]config.Environment)
+	}
+
+	// Merge environments and their connections from template into central config
+	for templateEnvName, templateEnv := range templateConfig.Environments {
+		if err := mergeEnvironment(centralConfig, templateEnvName, templateEnv); err != nil {
+			return fmt.Errorf("failed to merge environment %s: %w", templateEnvName, err)
+		}
+	}
+
+	return nil
+}
+
+func mergeEnvironment(centralConfig *config.Config, templateEnvName string, templateEnv config.Environment) error {
+	if _, exists := centralConfig.Environments[templateEnvName]; !exists {
+		centralConfig.Environments[templateEnvName] = templateEnv
+		return nil
+	}
+
+	centralEnvCopy := centralConfig.Environments[templateEnvName]
+	if centralEnvCopy.Connections == nil {
+		centralEnvCopy.Connections = templateEnv.Connections
+	} else if err := centralEnvCopy.Connections.MergeFrom(templateEnv.Connections); err != nil {
+		return fmt.Errorf("could not merge connections: %w", err)
+	}
+
+	centralConfig.Environments[templateEnvName] = centralEnvCopy
+	return nil
+}
+
 func Init() *cli.Command {
 	folders, err := templates.Templates.ReadDir(".")
 	if err != nil {
@@ -189,34 +228,9 @@ func Init() *cli.Command {
 			templateBruinPath := templateName + "/.bruin.yml"
 			templateBruinContent, err := templates.Templates.ReadFile(templateBruinPath)
 			if err == nil { // Only process if file exists
-				var templateConfig config.Config
-				if err := yaml.Unmarshal(templateBruinContent, &templateConfig); err != nil {
-					errorPrinter.Printf("Could not parse template's .bruin.yml: %v\n", err)
+				if err := mergeTemplateConfig(centralConfig, templateBruinContent); err != nil {
+					errorPrinter.Printf("%v\n", err)
 					return err
-				}
-
-				// Initialize environments map if it doesn't exist
-				if centralConfig.Environments == nil {
-					centralConfig.Environments = make(map[string]config.Environment)
-				}
-
-				// Merge environments and their connections from template into central config
-				for templateEnvName, templateEnv := range templateConfig.Environments {
-					if _, exists := centralConfig.Environments[templateEnvName]; !exists {
-						centralConfig.Environments[templateEnvName] = templateEnv
-					} else {
-						// Create a copy of the central environment to modify
-						centralEnvCopy := centralConfig.Environments[templateEnvName]
-						if centralEnvCopy.Connections == nil {
-							centralEnvCopy.Connections = templateEnv.Connections
-						} else {
-							if err := centralEnvCopy.Connections.MergeFrom(templateEnv.Connections); err != nil {
-								errorPrinter.Printf("Could not merge connections: %v\n", err)
-								return err
-							}
-						}
-						centralConfig.Environments[templateEnvName] = centralEnvCopy
-					}
 				}
 
 				// Write back the updated config
@@ -242,7 +256,6 @@ func Init() *cli.Command {
 					return nil
 				}
 
-				// Walk returns the root as if it was its own content
 				if d.IsDir() {
 					return nil
 				}
