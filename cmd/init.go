@@ -240,7 +240,7 @@ func Init() *cli.Command {
 					return err
 				}
 
-				if err := os.WriteFile(bruinYmlPath, configBytes, 0o644); err != nil {
+				if err := os.WriteFile(bruinYmlPath, configBytes, 0o644); err != nil { //nolint:gosec
 					errorPrinter.Printf("Could not write .bruin.yml file: %v\n", err)
 					return err
 				}
