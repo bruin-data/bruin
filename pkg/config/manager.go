@@ -893,3 +893,126 @@ func removeConnection[T interface{ GetName() string }](connections []T, name str
 	}
 	return connections
 }
+
+func (c *Connections) MergeFrom(source *Connections) error {
+	if source == nil {
+		return fmt.Errorf("source connections cannot be nil")
+	}
+
+	if source.AwsConnection != nil {
+		c.AwsConnection = append(c.AwsConnection, source.AwsConnection...)
+	}
+	if source.AthenaConnection != nil {
+		c.AthenaConnection = append(c.AthenaConnection, source.AthenaConnection...)
+	}
+	if source.GoogleCloudPlatform != nil {
+		c.GoogleCloudPlatform = append(c.GoogleCloudPlatform, source.GoogleCloudPlatform...)
+	}
+	if source.Snowflake != nil {
+		c.Snowflake = append(c.Snowflake, source.Snowflake...)
+	}
+	if source.Postgres != nil {
+		c.Postgres = append(c.Postgres, source.Postgres...)
+	}
+	if source.RedShift != nil {
+		c.RedShift = append(c.RedShift, source.RedShift...)
+	}
+	if source.MsSQL != nil {
+		c.MsSQL = append(c.MsSQL, source.MsSQL...)
+	}
+	if source.Databricks != nil {
+		c.Databricks = append(c.Databricks, source.Databricks...)
+	}
+	if source.Synapse != nil {
+		c.Synapse = append(c.Synapse, source.Synapse...)
+	}
+	if source.Mongo != nil {
+		c.Mongo = append(c.Mongo, source.Mongo...)
+	}
+	if source.MySQL != nil {
+		c.MySQL = append(c.MySQL, source.MySQL...)
+	}
+	if source.Notion != nil {
+		c.Notion = append(c.Notion, source.Notion...)
+	}
+	if source.HANA != nil {
+		c.HANA = append(c.HANA, source.HANA...)
+	}
+	if source.Shopify != nil {
+		c.Shopify = append(c.Shopify, source.Shopify...)
+	}
+	if source.Gorgias != nil {
+		c.Gorgias = append(c.Gorgias, source.Gorgias...)
+	}
+	if source.Klaviyo != nil {
+		c.Klaviyo = append(c.Klaviyo, source.Klaviyo...)
+	}
+	if source.Adjust != nil {
+		c.Adjust = append(c.Adjust, source.Adjust...)
+	}
+	if source.Generic != nil {
+		c.Generic = append(c.Generic, source.Generic...)
+	}
+	if source.FacebookAds != nil {
+		c.FacebookAds = append(c.FacebookAds, source.FacebookAds...)
+	}
+	if source.Stripe != nil {
+		c.Stripe = append(c.Stripe, source.Stripe...)
+	}
+	if source.Appsflyer != nil {
+		c.Appsflyer = append(c.Appsflyer, source.Appsflyer...)
+	}
+	if source.Kafka != nil {
+		c.Kafka = append(c.Kafka, source.Kafka...)
+	}
+	if source.DuckDB != nil {
+		c.DuckDB = append(c.DuckDB, source.DuckDB...)
+	}
+	if source.ClickHouse != nil {
+		c.ClickHouse = append(c.ClickHouse, source.ClickHouse...)
+	}
+	if source.Hubspot != nil {
+		c.Hubspot = append(c.Hubspot, source.Hubspot...)
+	}
+	if source.GitHub != nil {
+		c.GitHub = append(c.GitHub, source.GitHub...)
+	}
+	if source.GoogleSheets != nil {
+		c.GoogleSheets = append(c.GoogleSheets, source.GoogleSheets...)
+	}
+	if source.Chess != nil {
+		c.Chess = append(c.Chess, source.Chess...)
+	}
+	if source.Airtable != nil {
+		c.Airtable = append(c.Airtable, source.Airtable...)
+	}
+	if source.Zendesk != nil {
+		c.Zendesk = append(c.Zendesk, source.Zendesk...)
+	}
+	if source.TikTokAds != nil {
+		c.TikTokAds = append(c.TikTokAds, source.TikTokAds...)
+	}
+	if source.S3 != nil {
+		c.S3 = append(c.S3, source.S3...)
+	}
+	if source.Slack != nil {
+		c.Slack = append(c.Slack, source.Slack...)
+	}
+	if source.Asana != nil {
+		c.Asana = append(c.Asana, source.Asana...)
+	}
+	if source.DynamoDB != nil {
+		c.DynamoDB = append(c.DynamoDB, source.DynamoDB...)
+	}
+	if source.AppStore != nil {
+		c.AppStore = append(c.AppStore, source.AppStore...)
+	}
+	if source.LinkedInAds != nil {
+		c.LinkedInAds = append(c.LinkedInAds, source.LinkedInAds...)
+	}
+	if source.GCS != nil {
+		c.GCS = append(c.GCS, source.GCS...)
+	}
+
+	return nil
+}
