@@ -105,6 +105,8 @@ func (c *Connections) buildConnectionKeyMap() {
 
 		yamlTag := connectionsType.Field(i).Tag.Get("yaml")
 		if len(yamlTag) == 0 {
+			// this is meant to be caught by our tests
+			// this shouldn't happen during runtime.
 			msg := fmt.Sprintf(
 				"Expected field %s.%s to have a non-empty `yaml` tag",
 				connectionsType.Name(),
