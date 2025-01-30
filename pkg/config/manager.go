@@ -6,6 +6,8 @@ import (
 	"fmt"
 	fs2 "io/fs"
 	"path/filepath"
+	"reflect"
+	"strings"
 
 	"github.com/bruin-data/bruin/pkg/git"
 	path2 "github.com/bruin-data/bruin/pkg/path"
@@ -93,195 +95,34 @@ func (c *Connections) buildConnectionKeyMap() {
 	c.byKey = make(map[string]any)
 	c.typeNameMap = make(map[string]string)
 
-	// todo(turtledev): refactor this block using reflection
-	for i, conn := range c.AwsConnection {
-		c.byKey[conn.Name] = &(c.AwsConnection[i])
-		c.typeNameMap[conn.Name] = "aws"
-	}
+	connections := reflect.ValueOf(c).Elem()
+	connectionsType := connections.Type()
+	for i := range connectionsType.NumField() {
+		field := connections.Field(i)
+		if field.Type().Kind() != reflect.Slice {
+			continue
+		}
 
-	for i, conn := range c.AthenaConnection {
-		c.byKey[conn.Name] = &(c.AthenaConnection[i])
-		c.typeNameMap[conn.Name] = "athena"
-	}
+		yamlTag := connectionsType.Field(i).Tag.Get("yaml")
+		if len(yamlTag) == 0 {
+			msg := fmt.Sprintf(
+				"Expected field %s.%s to have a non-empty `yaml` tag",
+				connectionsType.Name(),
+				connectionsType.Field(i).Name,
+			)
+			panic(msg)
+		}
+		sep := strings.Index(yamlTag, ",")
+		if sep > 0 {
+			yamlTag = yamlTag[:sep]
+		}
 
-	for i, conn := range c.GoogleCloudPlatform {
-		c.byKey[conn.Name] = &(c.GoogleCloudPlatform[i])
-		c.typeNameMap[conn.Name] = "google_cloud_platform"
-	}
-
-	for i, conn := range c.Snowflake {
-		c.byKey[conn.Name] = &(c.Snowflake[i])
-		c.typeNameMap[conn.Name] = "snowflake"
-	}
-
-	for i, conn := range c.Postgres {
-		c.byKey[conn.Name] = &(c.Postgres[i])
-		c.typeNameMap[conn.Name] = "postgres"
-	}
-
-	for i, conn := range c.RedShift {
-		c.byKey[conn.Name] = &(c.RedShift[i])
-		c.typeNameMap[conn.Name] = "redshift"
-	}
-
-	for i, conn := range c.MsSQL {
-		c.byKey[conn.Name] = &(c.MsSQL[i])
-		c.typeNameMap[conn.Name] = "mssql"
-	}
-
-	for i, conn := range c.Databricks {
-		c.byKey[conn.Name] = &(c.Databricks[i])
-		c.typeNameMap[conn.Name] = "databricks"
-	}
-
-	for i, conn := range c.Synapse {
-		c.byKey[conn.Name] = &(c.Synapse[i])
-		c.typeNameMap[conn.Name] = "synapse"
-	}
-
-	for i, conn := range c.Mongo {
-		c.byKey[conn.Name] = &(c.Mongo[i])
-		c.typeNameMap[conn.Name] = "mongo"
-	}
-
-	for i, conn := range c.MySQL {
-		c.byKey[conn.Name] = &(c.MySQL[i])
-		c.typeNameMap[conn.Name] = "mysql"
-	}
-
-	for i, conn := range c.Notion {
-		c.byKey[conn.Name] = &(c.Notion[i])
-		c.typeNameMap[conn.Name] = "notion"
-	}
-
-	for i, conn := range c.HANA {
-		c.byKey[conn.Name] = &(c.HANA[i])
-		c.typeNameMap[conn.Name] = "hana"
-	}
-
-	for i, conn := range c.Shopify {
-		c.byKey[conn.Name] = &(c.Shopify[i])
-		c.typeNameMap[conn.Name] = "shopify"
-	}
-
-	for i, conn := range c.Gorgias {
-		c.byKey[conn.Name] = &(c.Gorgias[i])
-		c.typeNameMap[conn.Name] = "gorgias"
-	}
-
-	for i, conn := range c.Klaviyo {
-		c.byKey[conn.Name] = &(c.Klaviyo[i])
-		c.typeNameMap[conn.Name] = "klaviyo"
-	}
-
-	for i, conn := range c.Adjust {
-		c.byKey[conn.Name] = &(c.Adjust[i])
-		c.typeNameMap[conn.Name] = "adjust"
-	}
-
-	for i, conn := range c.Generic {
-		c.byKey[conn.Name] = &(c.Generic[i])
-		c.typeNameMap[conn.Name] = "generic"
-	}
-
-	for i, conn := range c.FacebookAds {
-		c.byKey[conn.Name] = &(c.FacebookAds[i])
-		c.typeNameMap[conn.Name] = "facebookads"
-	}
-
-	for i, conn := range c.Stripe {
-		c.byKey[conn.Name] = &(c.Stripe[i])
-		c.typeNameMap[conn.Name] = "stripe"
-	}
-
-	for i, conn := range c.Appsflyer {
-		c.byKey[conn.Name] = &(c.Appsflyer[i])
-		c.typeNameMap[conn.Name] = "appsflyer"
-	}
-
-	for i, conn := range c.Kafka {
-		c.byKey[conn.Name] = &(c.Kafka[i])
-		c.typeNameMap[conn.Name] = "kafka"
-	}
-
-	for i, conn := range c.DuckDB {
-		c.byKey[conn.Name] = &(c.DuckDB[i])
-		c.typeNameMap[conn.Name] = "duckdb"
-	}
-
-	for i, conn := range c.Hubspot {
-		c.byKey[conn.Name] = &(c.Hubspot[i])
-		c.typeNameMap[conn.Name] = "hubspot"
-	}
-
-	for i, conn := range c.GoogleSheets {
-		c.byKey[conn.Name] = &(c.GoogleSheets[i])
-		c.typeNameMap[conn.Name] = "google_sheets"
-	}
-
-	for i, conn := range c.Chess {
-		c.byKey[conn.Name] = &(c.Chess[i])
-		c.typeNameMap[conn.Name] = "chess"
-	}
-
-	for i, conn := range c.Airtable {
-		c.byKey[conn.Name] = &(c.Airtable[i])
-		c.typeNameMap[conn.Name] = "airtable"
-	}
-
-	for i, conn := range c.Zendesk {
-		c.byKey[conn.Name] = &(c.Zendesk[i])
-		c.typeNameMap[conn.Name] = "zendesk"
-	}
-
-	for i, conn := range c.S3 {
-		c.byKey[conn.Name] = &(c.S3[i])
-		c.typeNameMap[conn.Name] = "s3"
-	}
-
-	for i, conn := range c.Slack {
-		c.byKey[conn.Name] = &(c.Slack[i])
-		c.typeNameMap[conn.Name] = "slack"
-	}
-
-	for i, conn := range c.Asana {
-		c.byKey[conn.Name] = &(c.Asana[i])
-		c.typeNameMap[conn.Name] = "asana"
-	}
-
-	for i, conn := range c.DynamoDB {
-		c.byKey[conn.Name] = &(c.DynamoDB[i])
-		c.typeNameMap[conn.Name] = "dynamodb"
-	}
-
-	for i, conn := range c.GoogleAds {
-		c.byKey[conn.Name] = &(c.GoogleAds[i])
-		c.typeNameMap[conn.Name] = "googleads"
-	}
-
-	for i, conn := range c.TikTokAds {
-		c.byKey[conn.Name] = &(c.TikTokAds[i])
-		c.typeNameMap[conn.Name] = "tiktokads"
-	}
-
-	for i, conn := range c.GitHub {
-		c.byKey[conn.Name] = &(c.GitHub[i])
-		c.typeNameMap[conn.Name] = "github"
-	}
-
-	for i, conn := range c.AppStore {
-		c.byKey[conn.Name] = &(c.AppStore[i])
-		c.typeNameMap[conn.Name] = "appstore"
-	}
-
-	for i, conn := range c.LinkedInAds {
-		c.byKey[conn.Name] = &(c.LinkedInAds[i])
-		c.typeNameMap[conn.Name] = "linkedinads"
-	}
-
-	for i, conn := range c.GCS {
-		c.byKey[conn.Name] = &(c.GCS[i])
-		c.typeNameMap[conn.Name] = "gcs"
+		for i := range field.Len() {
+			fieldItem := field.Index(i)
+			connection := fieldItem.Interface().(Named)
+			c.byKey[connection.GetName()] = fieldItem.Addr().Interface()
+			c.typeNameMap[connection.GetName()] = yamlTag
+		}
 	}
 }
 
