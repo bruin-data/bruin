@@ -29,7 +29,9 @@ func (c *Config) ToClickHouseOptions() *click_house.Options {
 
 func (c *Config) GetIngestrURI() string {
 	if c.HTTPPort != 0 {
+		//nolint:nosprintfhostport
 		return fmt.Sprintf("clickhouse://%s:%s@%s:%d?http_port=%d", c.Username, c.Password, c.Host, c.Port, c.HTTPPort)
 	}
+	//nolint:nosprintfhostport
 	return fmt.Sprintf("clickhouse://%s:%s@%s:%d", c.Username, c.Password, c.Host, c.Port)
 }
