@@ -17,6 +17,14 @@ import (
 	"github.com/spf13/afero"
 )
 
+// ConnectionMerger defines how connections should be merged
+type ConnectionMerger interface {
+	MergeFrom(source *Connections) error
+}
+
+// Make sure Connections implements ConnectionMerger
+var _ ConnectionMerger = (*Connections)(nil)
+
 type Connections struct {
 	AwsConnection       []AwsConnection                 `yaml:"aws,omitempty" json:"aws,omitempty" mapstructure:"aws"`
 	AthenaConnection    []AthenaConnection              `yaml:"athena,omitempty" json:"athena,omitempty" mapstructure:"athena"`
@@ -894,6 +902,7 @@ func removeConnection[T interface{ GetName() string }](connections []T, name str
 	return connections
 }
 
+// MergeFrom implements ConnectionMerger interface
 func (c *Connections) MergeFrom(source *Connections) error {
 	if source == nil {
 		return fmt.Errorf("source connections cannot be nil")

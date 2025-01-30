@@ -1150,3 +1150,375 @@ func TestCanRunTaskInstances(t *testing.T) {
 		})
 	}
 }
+
+func TestConnections_MergeFrom(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		target      *Connections
+		source      *Connections
+		want        *Connections
+		expectedErr bool
+	}{
+		{
+			name:        "nil source should error",
+			target:      &Connections{},
+			source:      nil,
+			expectedErr: true,
+		},
+		{
+			name: "merge empty source should not change target",
+			target: &Connections{
+				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+					{Name: "existing-conn"},
+				},
+			},
+			source: &Connections{},
+			want: &Connections{
+				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+					{Name: "existing-conn"},
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "merge multiple connection types",
+			target: &Connections{
+				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+					{Name: "gcp1"},
+				},
+				Snowflake: []SnowflakeConnection{
+					{Name: "sf1"},
+				},
+			},
+			source: &Connections{
+				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+					{Name: "gcp2"},
+				},
+				Postgres: []PostgresConnection{
+					{Name: "pg1"},
+				},
+			},
+			want: &Connections{
+				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+					{Name: "gcp1"},
+					{Name: "gcp2"},
+				},
+				Snowflake: []SnowflakeConnection{
+					{Name: "sf1"},
+				},
+				Postgres: []PostgresConnection{
+					{Name: "pg1"},
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name:   "merge into empty target",
+			target: &Connections{},
+			source: &Connections{
+				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+					{Name: "gcp1"},
+				},
+				Snowflake: []SnowflakeConnection{
+					{Name: "sf1"},
+				},
+			},
+			want: &Connections{
+				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+					{Name: "gcp1"},
+				},
+				Snowflake: []SnowflakeConnection{
+					{Name: "sf1"},
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "merge connections with same name but different types",
+			target: &Connections{
+				Snowflake: []SnowflakeConnection{
+					{Name: "prod-db"},
+				},
+			},
+			source: &Connections{
+				Postgres: []PostgresConnection{
+					{Name: "prod-db"},
+				},
+			},
+			want: &Connections{
+				Snowflake: []SnowflakeConnection{
+					{Name: "prod-db"},
+				},
+				Postgres: []PostgresConnection{
+					{Name: "prod-db"},
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "merge development and production environments",
+			target: &Connections{
+				Snowflake: []SnowflakeConnection{
+					{
+						Name:     "dev-db",
+						Username: "dev_user",
+						Password: "dev_pass",
+						Database: "dev_db",
+					},
+				},
+				Postgres: []PostgresConnection{
+					{
+						Name:     "dev-pg",
+						Username: "dev_pg_user",
+						Password: "dev_pg_pass",
+						Database: "dev_pg_db",
+					},
+				},
+			},
+			source: &Connections{
+				Snowflake: []SnowflakeConnection{
+					{
+						Name:     "prod-db",
+						Username: "prod_user",
+						Password: "prod_pass",
+						Database: "prod_db",
+					},
+				},
+				Postgres: []PostgresConnection{
+					{
+						Name:     "prod-pg",
+						Username: "prod_pg_user",
+						Password: "prod_pg_pass",
+						Database: "prod_pg_db",
+					},
+				},
+			},
+			want: &Connections{
+				Snowflake: []SnowflakeConnection{
+					{
+						Name:     "dev-db",
+						Username: "dev_user",
+						Password: "dev_pass",
+						Database: "dev_db",
+					},
+					{
+						Name:     "prod-db",
+						Username: "prod_user",
+						Password: "prod_pass",
+						Database: "prod_db",
+					},
+				},
+				Postgres: []PostgresConnection{
+					{
+						Name:     "dev-pg",
+						Username: "dev_pg_user",
+						Password: "dev_pg_pass",
+						Database: "dev_pg_db",
+					},
+					{
+						Name:     "prod-pg",
+						Username: "prod_pg_user",
+						Password: "prod_pg_pass",
+						Database: "prod_pg_db",
+					},
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name:   "merge with all connection types",
+			target: &Connections{},
+			source: &Connections{
+				AwsConnection:       []AwsConnection{{Name: "aws1"}},
+				AthenaConnection:    []AthenaConnection{{Name: "athena1"}},
+				GoogleCloudPlatform: []GoogleCloudPlatformConnection{{Name: "gcp1"}},
+				Snowflake:           []SnowflakeConnection{{Name: "sf1"}},
+				Postgres:            []PostgresConnection{{Name: "pg1"}},
+				RedShift:            []RedshiftConnection{{Name: "rs1"}},
+				MsSQL:               []MsSQLConnection{{Name: "mssql1"}},
+				Databricks:          []DatabricksConnection{{Name: "db1"}},
+				Synapse:             []SynapseConnection{{Name: "syn1"}},
+				Mongo:               []MongoConnection{{Name: "mongo1"}},
+				MySQL:               []MySQLConnection{{Name: "mysql1"}},
+				Notion:              []NotionConnection{{Name: "notion1"}},
+				HANA:                []HANAConnection{{Name: "hana1"}},
+				Shopify:             []ShopifyConnection{{Name: "shopify1"}},
+				Gorgias:             []GorgiasConnection{{Name: "gorgias1"}},
+				Klaviyo:             []KlaviyoConnection{{Name: "klaviyo1"}},
+				DuckDB:              []DuckDBConnection{{Name: "duckdb1"}},
+				ClickHouse:          []ClickHouseConnection{{Name: "clickhouse1"}},
+			},
+			want: &Connections{
+				AwsConnection:       []AwsConnection{{Name: "aws1"}},
+				AthenaConnection:    []AthenaConnection{{Name: "athena1"}},
+				GoogleCloudPlatform: []GoogleCloudPlatformConnection{{Name: "gcp1"}},
+				Snowflake:           []SnowflakeConnection{{Name: "sf1"}},
+				Postgres:            []PostgresConnection{{Name: "pg1"}},
+				RedShift:            []RedshiftConnection{{Name: "rs1"}},
+				MsSQL:               []MsSQLConnection{{Name: "mssql1"}},
+				Databricks:          []DatabricksConnection{{Name: "db1"}},
+				Synapse:             []SynapseConnection{{Name: "syn1"}},
+				Mongo:               []MongoConnection{{Name: "mongo1"}},
+				MySQL:               []MySQLConnection{{Name: "mysql1"}},
+				Notion:              []NotionConnection{{Name: "notion1"}},
+				HANA:                []HANAConnection{{Name: "hana1"}},
+				Shopify:             []ShopifyConnection{{Name: "shopify1"}},
+				Gorgias:             []GorgiasConnection{{Name: "gorgias1"}},
+				Klaviyo:             []KlaviyoConnection{{Name: "klaviyo1"}},
+				DuckDB:              []DuckDBConnection{{Name: "duckdb1"}},
+				ClickHouse:          []ClickHouseConnection{{Name: "clickhouse1"}},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "merge existing GCP connections",
+			target: &Connections{
+				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+					{
+						Name:               "gcp-dev",
+						ServiceAccountJSON: "{\"key\": \"dev-value\"}",
+						ProjectID:          "dev-project",
+					},
+					{
+						Name:               "gcp-staging",
+						ServiceAccountJSON: "{\"key\": \"staging-value\"}",
+						ProjectID:          "staging-project",
+					},
+				},
+			},
+			source: &Connections{
+				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+					{
+						Name:               "gcp-prod",
+						ServiceAccountJSON: "{\"key\": \"prod-value\"}",
+						ProjectID:          "prod-project",
+					},
+				},
+			},
+			want: &Connections{
+				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+					{
+						Name:               "gcp-dev",
+						ServiceAccountJSON: "{\"key\": \"dev-value\"}",
+						ProjectID:          "dev-project",
+					},
+					{
+						Name:               "gcp-staging",
+						ServiceAccountJSON: "{\"key\": \"staging-value\"}",
+						ProjectID:          "staging-project",
+					},
+					{
+						Name:               "gcp-prod",
+						ServiceAccountJSON: "{\"key\": \"prod-value\"}",
+						ProjectID:          "prod-project",
+					},
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "merge existing Postgres and MySQL connections",
+			target: &Connections{
+				Postgres: []PostgresConnection{
+					{
+						Name:     "pg-dev",
+						Host:     "dev-host",
+						Port:     5432,
+						Username: "dev-user",
+						Password: "dev-pass",
+						Database: "dev-db",
+					},
+				},
+				MySQL: []MySQLConnection{
+					{
+						Name:     "mysql-dev",
+						Host:     "dev-host",
+						Port:     3306,
+						Username: "dev-user",
+						Password: "dev-pass",
+						Database: "dev-db",
+					},
+				},
+			},
+			source: &Connections{
+				Postgres: []PostgresConnection{
+					{
+						Name:     "pg-prod",
+						Host:     "prod-host",
+						Port:     5432,
+						Username: "prod-user",
+						Password: "prod-pass",
+						Database: "prod-db",
+					},
+				},
+				MySQL: []MySQLConnection{
+					{
+						Name:     "mysql-prod",
+						Host:     "prod-host",
+						Port:     3306,
+						Username: "prod-user",
+						Password: "prod-pass",
+						Database: "prod-db",
+					},
+				},
+			},
+			want: &Connections{
+				Postgres: []PostgresConnection{
+					{
+						Name:     "pg-dev",
+						Host:     "dev-host",
+						Port:     5432,
+						Username: "dev-user",
+						Password: "dev-pass",
+						Database: "dev-db",
+					},
+					{
+						Name:     "pg-prod",
+						Host:     "prod-host",
+						Port:     5432,
+						Username: "prod-user",
+						Password: "prod-pass",
+						Database: "prod-db",
+					},
+				},
+				MySQL: []MySQLConnection{
+					{
+						Name:     "mysql-dev",
+						Host:     "dev-host",
+						Port:     3306,
+						Username: "dev-user",
+						Password: "dev-pass",
+						Database: "dev-db",
+					},
+					{
+						Name:     "mysql-prod",
+						Host:     "prod-host",
+						Port:     3306,
+						Username: "prod-user",
+						Password: "prod-pass",
+						Database: "prod-db",
+					},
+				},
+			},
+			expectedErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.target.MergeFrom(tt.source)
+
+			if tt.expectedErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.EqualExportedValues(t, tt.want, tt.target)
+		})
+	}
+}
