@@ -232,6 +232,7 @@ func TestLoadFromFile(t *testing.T) {
 					Username: "clickhouseuser",
 					Password: "clickhousepass",
 					Database: "clickhousedb",
+					HTTPPort: 8124,
 				},
 			},
 			Hubspot: []HubspotConnection{

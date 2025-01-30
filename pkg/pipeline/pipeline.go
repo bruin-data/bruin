@@ -501,6 +501,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"databricks": AssetTypeDatabricksQuery,
 	"synapse":    AssetTypeSynapseQuery,
 	"duckdb":     AssetTypeDuckDBQuery,
+	"clickhouse": AssetTypeClickHouse,
 }
 
 type SecretMapping struct {

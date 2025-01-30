@@ -1643,6 +1643,7 @@ func (m *Manager) AddClickHouseConnectionFromConfig(connection *config.ClickHous
 		Username: connection.Username,
 		Password: connection.Password,
 		Database: connection.Database,
+		HTTPPort: connection.HTTPPort,
 	})
 	if err != nil {
 		return err
