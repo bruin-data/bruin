@@ -426,6 +426,12 @@
           },
           "type": "array"
         },
+        "googleads": {
+          "items": {
+            "$ref": "#/$defs/GoogleAdsConnection"
+          },
+          "type": "array"
+        },
         "appstore": {
           "items": {
             "$ref": "#/$defs/AppStoreConnection"
@@ -602,6 +608,32 @@
         "name",
         "owner",
         "repo"
+      ]
+    },
+    "GoogleAdsConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "customer_id": {
+          "type": "string"
+        },
+        "service_account_json": {
+          "type": "string"
+        },
+        "service_account_file": {
+          "type": "string"
+        },
+        "dev_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "customer_id",
+        "dev_token"
       ]
     },
     "GoogleCloudPlatformConnection": {

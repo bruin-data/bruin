@@ -307,6 +307,14 @@ func TestLoadFromFile(t *testing.T) {
 					Subdomain:  "zendeskUrl",
 				},
 			},
+			GoogleAds: []GoogleAdsConnection{
+				{
+					Name:               "googleads-0",
+					DeveloperToken:     "dev-0",
+					CustomerID:         "1234567890",
+					ServiceAccountJSON: `{"email": "no-reply@googleads-0.com"}`,
+				},
+			},
 			TikTokAds: []TikTokAdsConnection{
 				{
 					Name:          "tiktokads-1",

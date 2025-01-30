@@ -162,6 +162,7 @@ export default defineConfig({
                             {text: "GitHub", link: "/ingestion/github.md"},
                             {text: "Google Cloud Storage", link: "/ingestion/gcs.md"},
                             {text: "Google Sheets", link: "/ingestion/google_sheets.md"},
+                            {text: "Google Ads", link: "/ingestion/google-ads.md"},
                             {text: "Gorgias", link: "/ingestion/gorgias"},
                             {text: "Hubspot", link: "/ingestion/hubspot.md"},
                             {text: "Kafka", link: "/ingestion/kafka.md"},

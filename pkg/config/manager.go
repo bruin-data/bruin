@@ -53,6 +53,7 @@ type Connections struct {
 	Slack               []SlackConnection               `yaml:"slack,omitempty" json:"slack,omitempty" mapstructure:"slack"`
 	Asana               []AsanaConnection               `yaml:"asana,omitempty" json:"asana,omitempty" mapstructure:"asana"`
 	DynamoDB            []DynamoDBConnection            `yaml:"dynamodb,omitempty" json:"dynamodb,omitempty" mapstructure:"dynamodb"`
+	GoogleAds           []GoogleAdsConnection           `yaml:"googleads,omitempty" json:"googleads,omitempty" mapstructure:"googleads"`
 	AppStore            []AppStoreConnection            `yaml:"appstore,omitempty" json:"appstore,omitempty" mapstructure:"appstore"`
 	LinkedInAds         []LinkedInAdsConnection         `yaml:"linkedinads,omitempty" json:"linkedinads,omitempty" mapstructure:"linkedinads"`
 	GCS                 []GCSConnection                 `yaml:"gcs,omitempty" json:"gcs,omitempty" mapstructure:"gcs"`
@@ -251,6 +252,11 @@ func (c *Connections) buildConnectionKeyMap() {
 	for i, conn := range c.DynamoDB {
 		c.byKey[conn.Name] = &(c.DynamoDB[i])
 		c.typeNameMap[conn.Name] = "dynamodb"
+	}
+
+	for i, conn := range c.GoogleAds {
+		c.byKey[conn.Name] = &(c.GoogleAds[i])
+		c.typeNameMap[conn.Name] = "googleads"
 	}
 
 	for i, conn := range c.TikTokAds {
@@ -715,6 +721,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		conn.Name = name
 		env.Connections.DynamoDB = append(env.Connections.DynamoDB, conn)
 
+	case "googleads":
+		var conn GoogleAdsConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.GoogleAds = append(env.Connections.GoogleAds, conn)
 	case "tiktokads":
 		var conn TikTokAdsConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -852,6 +865,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Asana = removeConnection(env.Connections.Asana, connectionName)
 	case "dynamodb":
 		env.Connections.DynamoDB = removeConnection(env.Connections.DynamoDB, connectionName)
+	case "googleads":
+		env.Connections.GoogleAds = removeConnection(env.Connections.GoogleAds, connectionName)
 	case "tiktokads":
 		env.Connections.TikTokAds = removeConnection(env.Connections.TikTokAds, connectionName)
 	case "github":
