@@ -902,10 +902,10 @@ func removeConnection[T interface{ GetName() string }](connections []T, name str
 	return connections
 }
 
-// MergeFrom implements ConnectionMerger interface
+// MergeFrom implements ConnectionMerger interface.
 func (c *Connections) MergeFrom(source *Connections) error {
 	if source == nil {
-		return fmt.Errorf("source connections cannot be nil")
+		return errors.New("source connections cannot be nil")
 	}
 
 	if source.AwsConnection != nil {
