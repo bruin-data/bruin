@@ -107,9 +107,12 @@ func mergeEnvironment(centralConfig *config.Config, templateEnvName string, temp
 
 	centralEnvCopy := centralConfig.Environments[templateEnvName]
 	if centralEnvCopy.Connections == nil {
-		centralEnvCopy.Connections = templateEnv.Connections
-	} else if err := centralEnvCopy.Connections.MergeFrom(templateEnv.Connections); err != nil {
-		return fmt.Errorf("could not merge connections: %w", err)
+		centralEnvCopy.Connections = &config.Connections{}
+	}
+
+	// Merge the connections from template into central copy
+	if err := centralEnvCopy.Connections.MergeFrom(templateEnv.Connections); err != nil {
+		return err
 	}
 
 	centralConfig.Environments[templateEnvName] = centralEnvCopy
@@ -182,8 +185,9 @@ func Init() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			// Check if current directory is in a git repository
-			if _, err := git.FindRepoFromPath("."); err != nil {
+			var bruinYmlPath string
+			repoRoot, err := git.FindRepoFromPath(".")
+			if err != nil {
 				// Not in a git repo, create a bruin root directory
 				if err := os.MkdirAll("bruin", 0o755); err != nil {
 					errorPrinter.Printf("Failed to create the bruin root folder: %v\n", err)
@@ -199,26 +203,13 @@ func Init() *cli.Command {
 					return cli.Exit("", 1)
 				}
 
-				// Update inputPath to be within bruin directory
+				bruinYmlPath = filepath.Join("bruin", ".bruin.yml")
 				inputPath = filepath.Join("bruin", inputPath)
-			}
-
-			err = os.Mkdir(inputPath, 0o755)
-			if err != nil {
-				errorPrinter.Printf("Failed to create the folder %s: %v\n", inputPath, err)
-				return cli.Exit("", 1)
-			}
-
-			var bruinYmlPath string
-			if _, err := git.FindRepoFromPath("."); err != nil {
-				// Not in a git repo, use bruin directory
-				bruinYmlPath = "bruin/.bruin.yml"
 			} else {
-				// In a git repo, use current directory
-				bruinYmlPath = ".bruin.yml"
+				bruinYmlPath = filepath.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			centralConfig, err := config.LoadOrCreate(afero.NewOsFs(), bruinYmlPath)
+			centralConfig, err := config.LoadOrCreateWithoutPathAbsolutization(afero.NewOsFs(), bruinYmlPath)
 			if err != nil {
 				errorPrinter.Printf("Could not write .bruin.yml file: %v\n", err)
 				return err
@@ -240,7 +231,7 @@ func Init() *cli.Command {
 					return err
 				}
 
-				if err := os.WriteFile(bruinYmlPath, configBytes, 0o644); err != nil { //nolint:gosec
+				if err := os.WriteFile(bruinYmlPath, configBytes, 0o644); err != nil {
 					errorPrinter.Printf("Could not write .bruin.yml file: %v\n", err)
 					return err
 				}
@@ -256,6 +247,7 @@ func Init() *cli.Command {
 					return nil
 				}
 
+				// Walk returns the root as if it was its own content
 				if d.IsDir() {
 					return nil
 				}
