@@ -239,10 +239,6 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 		return errors.New("invalid arguments: all parameters must be non-nil and colName must not be empty")
 	}
 
-	if upstreamAsset == nil {
-		asset.Columns = append(asset.Columns, *upstreamCol)
-		return nil
-	}
 	if colName == "*" {
 		return nil
 	}
