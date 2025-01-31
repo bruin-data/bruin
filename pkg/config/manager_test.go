@@ -428,12 +428,7 @@ func TestLoadFromFile(t *testing.T) {
 func TestLoadOrCreate(t *testing.T) {
 	t.Parallel()
 
-	var servicefile string
-	if runtime.GOOS == "windows" {
-		servicefile = "C:\\path\\to\\service_account.json\""
-	} else {
-		servicefile = "/path/to/service_account.json"
-	}
+	servicefile := "path/to/service_account.json"
 	configPath := "/some/path/to/config.yml"
 	defaultEnv := &Environment{
 		Connections: &Connections{
@@ -550,12 +545,7 @@ func TestLoadOrCreate(t *testing.T) {
 func TestLoadOrCreateWithoutPathAbsolutization(t *testing.T) {
 	t.Parallel()
 
-	var servicefile string
-	if runtime.GOOS == "windows" {
-		servicefile = "path/to/service_account.json"
-	} else {
-		servicefile = "path/to/service_account.json"
-	}
+	servicefile := "path/to/service_account.json"
 	configPath := "some/path/to/config.yml"
 	defaultEnv := &Environment{
 		Connections: &Connections{

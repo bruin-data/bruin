@@ -452,8 +452,6 @@ func LoadOrCreate(fs afero.Fs, path string) (*Config, error) {
 
 	return config, nil
 }
-
-// LoadOrCreateWithoutPathAbsolutization uses LoadFromFile without path absolutization
 func LoadOrCreateWithoutPathAbsolutization(fs afero.Fs, path string) (*Config, error) {
 	config, err := LoadFromFile(fs, path)
 	if err != nil && !errors.Is(err, fs2.ErrNotExist) {
@@ -905,18 +903,16 @@ func removeConnection[T interface{ GetName() string }](connections []T, name str
 	return connections
 }
 
-// Helper function to merge connections while avoiding duplicates
-func mergeConnectionList[T interface{ GetName() string }](c *Connections, existing *[]T, new []T) {
-	if new == nil {
+func mergeConnectionList[T interface{ GetName() string }](existing *[]T, newConnections []T) {
+	if newConnections == nil {
 		return
 	}
-	// Create a map of existing names for quick lookup
 	existingNames := make(map[string]bool)
 	for _, conn := range *existing {
 		existingNames[conn.GetName()] = true
 	}
 
-	for _, conn := range new {
+	for _, conn := range newConnections {
 		if !existingNames[conn.GetName()] {
 			*existing = append(*existing, conn)
 		}
@@ -933,44 +929,44 @@ func (c *Connections) MergeFrom(source *Connections) error {
 		c.buildConnectionKeyMap()
 	}
 
-	mergeConnectionList(c, &c.AwsConnection, source.AwsConnection)
-	mergeConnectionList(c, &c.AthenaConnection, source.AthenaConnection)
-	mergeConnectionList(c, &c.GoogleCloudPlatform, source.GoogleCloudPlatform)
-	mergeConnectionList(c, &c.Snowflake, source.Snowflake)
-	mergeConnectionList(c, &c.Postgres, source.Postgres)
-	mergeConnectionList(c, &c.RedShift, source.RedShift)
-	mergeConnectionList(c, &c.MsSQL, source.MsSQL)
-	mergeConnectionList(c, &c.Databricks, source.Databricks)
-	mergeConnectionList(c, &c.Synapse, source.Synapse)
-	mergeConnectionList(c, &c.Mongo, source.Mongo)
-	mergeConnectionList(c, &c.MySQL, source.MySQL)
-	mergeConnectionList(c, &c.Notion, source.Notion)
-	mergeConnectionList(c, &c.HANA, source.HANA)
-	mergeConnectionList(c, &c.Shopify, source.Shopify)
-	mergeConnectionList(c, &c.Gorgias, source.Gorgias)
-	mergeConnectionList(c, &c.Klaviyo, source.Klaviyo)
-	mergeConnectionList(c, &c.Adjust, source.Adjust)
-	mergeConnectionList(c, &c.Generic, source.Generic)
-	mergeConnectionList(c, &c.FacebookAds, source.FacebookAds)
-	mergeConnectionList(c, &c.Stripe, source.Stripe)
-	mergeConnectionList(c, &c.Appsflyer, source.Appsflyer)
-	mergeConnectionList(c, &c.Kafka, source.Kafka)
-	mergeConnectionList(c, &c.DuckDB, source.DuckDB)
-	mergeConnectionList(c, &c.ClickHouse, source.ClickHouse)
-	mergeConnectionList(c, &c.Hubspot, source.Hubspot)
-	mergeConnectionList(c, &c.GitHub, source.GitHub)
-	mergeConnectionList(c, &c.GoogleSheets, source.GoogleSheets)
-	mergeConnectionList(c, &c.Chess, source.Chess)
-	mergeConnectionList(c, &c.Airtable, source.Airtable)
-	mergeConnectionList(c, &c.Zendesk, source.Zendesk)
-	mergeConnectionList(c, &c.TikTokAds, source.TikTokAds)
-	mergeConnectionList(c, &c.S3, source.S3)
-	mergeConnectionList(c, &c.Slack, source.Slack)
-	mergeConnectionList(c, &c.Asana, source.Asana)
-	mergeConnectionList(c, &c.DynamoDB, source.DynamoDB)
-	mergeConnectionList(c, &c.AppStore, source.AppStore)
-	mergeConnectionList(c, &c.LinkedInAds, source.LinkedInAds)
-	mergeConnectionList(c, &c.GCS, source.GCS)
+	mergeConnectionList(&c.AwsConnection, source.AwsConnection)
+	mergeConnectionList(&c.AthenaConnection, source.AthenaConnection)
+	mergeConnectionList(&c.GoogleCloudPlatform, source.GoogleCloudPlatform)
+	mergeConnectionList(&c.Snowflake, source.Snowflake)
+	mergeConnectionList(&c.Postgres, source.Postgres)
+	mergeConnectionList(&c.RedShift, source.RedShift)
+	mergeConnectionList(&c.MsSQL, source.MsSQL)
+	mergeConnectionList(&c.Databricks, source.Databricks)
+	mergeConnectionList(&c.Synapse, source.Synapse)
+	mergeConnectionList(&c.Mongo, source.Mongo)
+	mergeConnectionList(&c.MySQL, source.MySQL)
+	mergeConnectionList(&c.Notion, source.Notion)
+	mergeConnectionList(&c.HANA, source.HANA)
+	mergeConnectionList(&c.Shopify, source.Shopify)
+	mergeConnectionList(&c.Gorgias, source.Gorgias)
+	mergeConnectionList(&c.Klaviyo, source.Klaviyo)
+	mergeConnectionList(&c.Adjust, source.Adjust)
+	mergeConnectionList(&c.Generic, source.Generic)
+	mergeConnectionList(&c.FacebookAds, source.FacebookAds)
+	mergeConnectionList(&c.Stripe, source.Stripe)
+	mergeConnectionList(&c.Appsflyer, source.Appsflyer)
+	mergeConnectionList(&c.Kafka, source.Kafka)
+	mergeConnectionList(&c.DuckDB, source.DuckDB)
+	mergeConnectionList(&c.ClickHouse, source.ClickHouse)
+	mergeConnectionList(&c.Hubspot, source.Hubspot)
+	mergeConnectionList(&c.GitHub, source.GitHub)
+	mergeConnectionList(&c.GoogleSheets, source.GoogleSheets)
+	mergeConnectionList(&c.Chess, source.Chess)
+	mergeConnectionList(&c.Airtable, source.Airtable)
+	mergeConnectionList(&c.Zendesk, source.Zendesk)
+	mergeConnectionList(&c.TikTokAds, source.TikTokAds)
+	mergeConnectionList(&c.S3, source.S3)
+	mergeConnectionList(&c.Slack, source.Slack)
+	mergeConnectionList(&c.Asana, source.Asana)
+	mergeConnectionList(&c.DynamoDB, source.DynamoDB)
+	mergeConnectionList(&c.AppStore, source.AppStore)
+	mergeConnectionList(&c.LinkedInAds, source.LinkedInAds)
+	mergeConnectionList(&c.GCS, source.GCS)
 
 	c.buildConnectionKeyMap()
 	return nil
