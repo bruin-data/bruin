@@ -389,60 +389,6 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 		config.DefaultEnvironmentName = "default"
 	}
 
-	absoluteConfigPath, err := filepath.Abs(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get absolute path: %w", err)
-	}
-	configLocation := filepath.Dir(absoluteConfigPath)
-
-	// Make duckdb paths absolute
-	for _, env := range config.Environments {
-		for i, conn := range env.Connections.DuckDB {
-			if filepath.IsAbs(conn.Path) {
-				continue
-			}
-			env.Connections.DuckDB[i].Path = filepath.Join(configLocation, conn.Path)
-		}
-		// Make GoogleCloudPlatform service account file paths absolute
-		for i, conn := range env.Connections.GoogleCloudPlatform {
-			if conn.ServiceAccountFile == "" {
-				continue
-			}
-
-			if filepath.IsAbs(conn.ServiceAccountFile) {
-				continue
-			}
-			env.Connections.GoogleCloudPlatform[i].ServiceAccountFile = filepath.Join(configLocation, conn.ServiceAccountFile)
-		}
-		// Make MySQL SSL file paths absolute
-		for i, conn := range env.Connections.MySQL {
-			if conn.SslCaPath != "" && !filepath.IsAbs(conn.SslCaPath) {
-				env.Connections.MySQL[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
-			}
-
-			if conn.SslCertPath != "" && !filepath.IsAbs(conn.SslCertPath) {
-				env.Connections.MySQL[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
-			}
-
-			if conn.SslKeyPath != "" && !filepath.IsAbs(conn.SslKeyPath) {
-				env.Connections.MySQL[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
-			}
-		}
-
-		// Make Snowflake private key path absolute
-		for i, conn := range env.Connections.Snowflake {
-			if conn.PrivateKeyPath == "" {
-				continue
-			}
-
-			if filepath.IsAbs(conn.PrivateKeyPath) {
-				continue
-			}
-
-			env.Connections.Snowflake[i].PrivateKeyPath = filepath.Join(configLocation, conn.PrivateKeyPath)
-		}
-	}
-
 	err = config.SelectEnvironment(config.DefaultEnvironmentName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select default environment: %w", err)
@@ -451,7 +397,64 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 	return &config, nil
 }
 
+func makePathsAbsolute(env *Environment, configLocation string) {
+	// Make duckdb paths absolute
+	for i, conn := range env.Connections.DuckDB {
+		if !filepath.IsAbs(conn.Path) {
+			env.Connections.DuckDB[i].Path = filepath.Join(configLocation, conn.Path)
+		}
+	}
+
+	// Make GoogleCloudPlatform service account file paths absolute
+	for i, conn := range env.Connections.GoogleCloudPlatform {
+		if conn.ServiceAccountFile != "" && !filepath.IsAbs(conn.ServiceAccountFile) {
+			env.Connections.GoogleCloudPlatform[i].ServiceAccountFile = filepath.Join(configLocation, conn.ServiceAccountFile)
+		}
+	}
+
+	// Make MySQL SSL file paths absolute
+	for i, conn := range env.Connections.MySQL {
+		if conn.SslCaPath != "" && !filepath.IsAbs(conn.SslCaPath) {
+			env.Connections.MySQL[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
+		}
+		if conn.SslCertPath != "" && !filepath.IsAbs(conn.SslCertPath) {
+			env.Connections.MySQL[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
+		}
+		if conn.SslKeyPath != "" && !filepath.IsAbs(conn.SslKeyPath) {
+			env.Connections.MySQL[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
+		}
+	}
+
+	// Make Snowflake private key path absolute
+	for i, conn := range env.Connections.Snowflake {
+		if conn.PrivateKeyPath != "" && !filepath.IsAbs(conn.PrivateKeyPath) {
+			env.Connections.Snowflake[i].PrivateKeyPath = filepath.Join(configLocation, conn.PrivateKeyPath)
+		}
+	}
+}
+
 func LoadOrCreate(fs afero.Fs, path string) (*Config, error) {
+	config, err := LoadOrCreateWithoutPathAbsolutization(fs, path)
+	if err != nil {
+		return nil, err
+	}
+
+	absoluteConfigPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get absolute path: %w", err)
+	}
+	configLocation := filepath.Dir(absoluteConfigPath)
+
+	// Make paths absolute for all environments
+	for _, env := range config.Environments {
+		makePathsAbsolute(&env, configLocation)
+	}
+
+	return config, nil
+}
+
+// LoadOrCreateWithoutPathAbsolutization uses LoadFromFile without path absolutization
+func LoadOrCreateWithoutPathAbsolutization(fs afero.Fs, path string) (*Config, error) {
 	config, err := LoadFromFile(fs, path)
 	if err != nil && !errors.Is(err, fs2.ErrNotExist) {
 		return nil, err
@@ -902,126 +905,73 @@ func removeConnection[T interface{ GetName() string }](connections []T, name str
 	return connections
 }
 
+// Helper function to merge connections while avoiding duplicates
+func mergeConnectionList[T interface{ GetName() string }](c *Connections, existing *[]T, new []T) {
+	if new == nil {
+		return
+	}
+	// Create a map of existing names for quick lookup
+	existingNames := make(map[string]bool)
+	for _, conn := range *existing {
+		existingNames[conn.GetName()] = true
+	}
+
+	for _, conn := range new {
+		if !existingNames[conn.GetName()] {
+			*existing = append(*existing, conn)
+		}
+	}
+}
+
 // MergeFrom implements ConnectionMerger interface.
 func (c *Connections) MergeFrom(source *Connections) error {
 	if source == nil {
 		return errors.New("source connections cannot be nil")
 	}
 
-	if source.AwsConnection != nil {
-		c.AwsConnection = append(c.AwsConnection, source.AwsConnection...)
-	}
-	if source.AthenaConnection != nil {
-		c.AthenaConnection = append(c.AthenaConnection, source.AthenaConnection...)
-	}
-	if source.GoogleCloudPlatform != nil {
-		c.GoogleCloudPlatform = append(c.GoogleCloudPlatform, source.GoogleCloudPlatform...)
-	}
-	if source.Snowflake != nil {
-		c.Snowflake = append(c.Snowflake, source.Snowflake...)
-	}
-	if source.Postgres != nil {
-		c.Postgres = append(c.Postgres, source.Postgres...)
-	}
-	if source.RedShift != nil {
-		c.RedShift = append(c.RedShift, source.RedShift...)
-	}
-	if source.MsSQL != nil {
-		c.MsSQL = append(c.MsSQL, source.MsSQL...)
-	}
-	if source.Databricks != nil {
-		c.Databricks = append(c.Databricks, source.Databricks...)
-	}
-	if source.Synapse != nil {
-		c.Synapse = append(c.Synapse, source.Synapse...)
-	}
-	if source.Mongo != nil {
-		c.Mongo = append(c.Mongo, source.Mongo...)
-	}
-	if source.MySQL != nil {
-		c.MySQL = append(c.MySQL, source.MySQL...)
-	}
-	if source.Notion != nil {
-		c.Notion = append(c.Notion, source.Notion...)
-	}
-	if source.HANA != nil {
-		c.HANA = append(c.HANA, source.HANA...)
-	}
-	if source.Shopify != nil {
-		c.Shopify = append(c.Shopify, source.Shopify...)
-	}
-	if source.Gorgias != nil {
-		c.Gorgias = append(c.Gorgias, source.Gorgias...)
-	}
-	if source.Klaviyo != nil {
-		c.Klaviyo = append(c.Klaviyo, source.Klaviyo...)
-	}
-	if source.Adjust != nil {
-		c.Adjust = append(c.Adjust, source.Adjust...)
-	}
-	if source.Generic != nil {
-		c.Generic = append(c.Generic, source.Generic...)
-	}
-	if source.FacebookAds != nil {
-		c.FacebookAds = append(c.FacebookAds, source.FacebookAds...)
-	}
-	if source.Stripe != nil {
-		c.Stripe = append(c.Stripe, source.Stripe...)
-	}
-	if source.Appsflyer != nil {
-		c.Appsflyer = append(c.Appsflyer, source.Appsflyer...)
-	}
-	if source.Kafka != nil {
-		c.Kafka = append(c.Kafka, source.Kafka...)
-	}
-	if source.DuckDB != nil {
-		c.DuckDB = append(c.DuckDB, source.DuckDB...)
-	}
-	if source.ClickHouse != nil {
-		c.ClickHouse = append(c.ClickHouse, source.ClickHouse...)
-	}
-	if source.Hubspot != nil {
-		c.Hubspot = append(c.Hubspot, source.Hubspot...)
-	}
-	if source.GitHub != nil {
-		c.GitHub = append(c.GitHub, source.GitHub...)
-	}
-	if source.GoogleSheets != nil {
-		c.GoogleSheets = append(c.GoogleSheets, source.GoogleSheets...)
-	}
-	if source.Chess != nil {
-		c.Chess = append(c.Chess, source.Chess...)
-	}
-	if source.Airtable != nil {
-		c.Airtable = append(c.Airtable, source.Airtable...)
-	}
-	if source.Zendesk != nil {
-		c.Zendesk = append(c.Zendesk, source.Zendesk...)
-	}
-	if source.TikTokAds != nil {
-		c.TikTokAds = append(c.TikTokAds, source.TikTokAds...)
-	}
-	if source.S3 != nil {
-		c.S3 = append(c.S3, source.S3...)
-	}
-	if source.Slack != nil {
-		c.Slack = append(c.Slack, source.Slack...)
-	}
-	if source.Asana != nil {
-		c.Asana = append(c.Asana, source.Asana...)
-	}
-	if source.DynamoDB != nil {
-		c.DynamoDB = append(c.DynamoDB, source.DynamoDB...)
-	}
-	if source.AppStore != nil {
-		c.AppStore = append(c.AppStore, source.AppStore...)
-	}
-	if source.LinkedInAds != nil {
-		c.LinkedInAds = append(c.LinkedInAds, source.LinkedInAds...)
-	}
-	if source.GCS != nil {
-		c.GCS = append(c.GCS, source.GCS...)
+	if c.typeNameMap == nil {
+		c.buildConnectionKeyMap()
 	}
 
+	mergeConnectionList(c, &c.AwsConnection, source.AwsConnection)
+	mergeConnectionList(c, &c.AthenaConnection, source.AthenaConnection)
+	mergeConnectionList(c, &c.GoogleCloudPlatform, source.GoogleCloudPlatform)
+	mergeConnectionList(c, &c.Snowflake, source.Snowflake)
+	mergeConnectionList(c, &c.Postgres, source.Postgres)
+	mergeConnectionList(c, &c.RedShift, source.RedShift)
+	mergeConnectionList(c, &c.MsSQL, source.MsSQL)
+	mergeConnectionList(c, &c.Databricks, source.Databricks)
+	mergeConnectionList(c, &c.Synapse, source.Synapse)
+	mergeConnectionList(c, &c.Mongo, source.Mongo)
+	mergeConnectionList(c, &c.MySQL, source.MySQL)
+	mergeConnectionList(c, &c.Notion, source.Notion)
+	mergeConnectionList(c, &c.HANA, source.HANA)
+	mergeConnectionList(c, &c.Shopify, source.Shopify)
+	mergeConnectionList(c, &c.Gorgias, source.Gorgias)
+	mergeConnectionList(c, &c.Klaviyo, source.Klaviyo)
+	mergeConnectionList(c, &c.Adjust, source.Adjust)
+	mergeConnectionList(c, &c.Generic, source.Generic)
+	mergeConnectionList(c, &c.FacebookAds, source.FacebookAds)
+	mergeConnectionList(c, &c.Stripe, source.Stripe)
+	mergeConnectionList(c, &c.Appsflyer, source.Appsflyer)
+	mergeConnectionList(c, &c.Kafka, source.Kafka)
+	mergeConnectionList(c, &c.DuckDB, source.DuckDB)
+	mergeConnectionList(c, &c.ClickHouse, source.ClickHouse)
+	mergeConnectionList(c, &c.Hubspot, source.Hubspot)
+	mergeConnectionList(c, &c.GitHub, source.GitHub)
+	mergeConnectionList(c, &c.GoogleSheets, source.GoogleSheets)
+	mergeConnectionList(c, &c.Chess, source.Chess)
+	mergeConnectionList(c, &c.Airtable, source.Airtable)
+	mergeConnectionList(c, &c.Zendesk, source.Zendesk)
+	mergeConnectionList(c, &c.TikTokAds, source.TikTokAds)
+	mergeConnectionList(c, &c.S3, source.S3)
+	mergeConnectionList(c, &c.Slack, source.Slack)
+	mergeConnectionList(c, &c.Asana, source.Asana)
+	mergeConnectionList(c, &c.DynamoDB, source.DynamoDB)
+	mergeConnectionList(c, &c.AppStore, source.AppStore)
+	mergeConnectionList(c, &c.LinkedInAds, source.LinkedInAds)
+	mergeConnectionList(c, &c.GCS, source.GCS)
+
+	c.buildConnectionKeyMap()
 	return nil
 }
