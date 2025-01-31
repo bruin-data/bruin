@@ -137,5 +137,7 @@ default:
       inject_as: INJECTED1
 ```
 
+For more detail, Please check the example from the template [here](https://github.com/bruin-data/templates/blob/main/chess/pipeline.yml).
+
 ## Sensors
 Sensors are a special type of assets that are used to wait on certain external signals. Sensors are useful to wait on external signals such as a table being created in an external database, or a file being uploaded to S3. A common usecase for sensors is when there are datasets/files/tables that are created by a separate process and you need to wait for them to be created before running your assets.
