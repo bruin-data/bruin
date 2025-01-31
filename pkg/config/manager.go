@@ -17,14 +17,6 @@ import (
 	"github.com/spf13/afero"
 )
 
-// ConnectionMerger defines how connections should be merged.
-type ConnectionMerger interface {
-	MergeFrom(source *Connections) error
-}
-
-// Make sure Connections implements ConnectionMerger.
-var _ ConnectionMerger = (*Connections)(nil)
-
 type Connections struct {
 	AwsConnection       []AwsConnection                 `yaml:"aws,omitempty" json:"aws,omitempty" mapstructure:"aws"`
 	AthenaConnection    []AthenaConnection              `yaml:"athena,omitempty" json:"athena,omitempty" mapstructure:"athena"`
@@ -389,6 +381,60 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 		config.DefaultEnvironmentName = "default"
 	}
 
+	absoluteConfigPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get absolute path: %w", err)
+	}
+	configLocation := filepath.Dir(absoluteConfigPath)
+
+	// Make duckdb paths absolute
+	for _, env := range config.Environments {
+		for i, conn := range env.Connections.DuckDB {
+			if filepath.IsAbs(conn.Path) {
+				continue
+			}
+			env.Connections.DuckDB[i].Path = filepath.Join(configLocation, conn.Path)
+		}
+		// Make GoogleCloudPlatform service account file paths absolute
+		for i, conn := range env.Connections.GoogleCloudPlatform {
+			if conn.ServiceAccountFile == "" {
+				continue
+			}
+
+			if filepath.IsAbs(conn.ServiceAccountFile) {
+				continue
+			}
+			env.Connections.GoogleCloudPlatform[i].ServiceAccountFile = filepath.Join(configLocation, conn.ServiceAccountFile)
+		}
+		// Make MySQL SSL file paths absolute
+		for i, conn := range env.Connections.MySQL {
+			if conn.SslCaPath != "" && !filepath.IsAbs(conn.SslCaPath) {
+				env.Connections.MySQL[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
+			}
+
+			if conn.SslCertPath != "" && !filepath.IsAbs(conn.SslCertPath) {
+				env.Connections.MySQL[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
+			}
+
+			if conn.SslKeyPath != "" && !filepath.IsAbs(conn.SslKeyPath) {
+				env.Connections.MySQL[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
+			}
+		}
+
+		// Make Snowflake private key path absolute
+		for i, conn := range env.Connections.Snowflake {
+			if conn.PrivateKeyPath == "" {
+				continue
+			}
+
+			if filepath.IsAbs(conn.PrivateKeyPath) {
+				continue
+			}
+
+			env.Connections.Snowflake[i].PrivateKeyPath = filepath.Join(configLocation, conn.PrivateKeyPath)
+		}
+	}
+
 	err = config.SelectEnvironment(config.DefaultEnvironmentName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select default environment: %w", err)
@@ -397,62 +443,7 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 	return &config, nil
 }
 
-func makePathsAbsolute(env *Environment, configLocation string) {
-	// Make duckdb paths absolute
-	for i, conn := range env.Connections.DuckDB {
-		if !filepath.IsAbs(conn.Path) {
-			env.Connections.DuckDB[i].Path = filepath.Join(configLocation, conn.Path)
-		}
-	}
-
-	// Make GoogleCloudPlatform service account file paths absolute
-	for i, conn := range env.Connections.GoogleCloudPlatform {
-		if conn.ServiceAccountFile != "" && !filepath.IsAbs(conn.ServiceAccountFile) {
-			env.Connections.GoogleCloudPlatform[i].ServiceAccountFile = filepath.Join(configLocation, conn.ServiceAccountFile)
-		}
-	}
-
-	// Make MySQL SSL file paths absolute
-	for i, conn := range env.Connections.MySQL {
-		if conn.SslCaPath != "" && !filepath.IsAbs(conn.SslCaPath) {
-			env.Connections.MySQL[i].SslCaPath = filepath.Join(configLocation, conn.SslCaPath)
-		}
-		if conn.SslCertPath != "" && !filepath.IsAbs(conn.SslCertPath) {
-			env.Connections.MySQL[i].SslCertPath = filepath.Join(configLocation, conn.SslCertPath)
-		}
-		if conn.SslKeyPath != "" && !filepath.IsAbs(conn.SslKeyPath) {
-			env.Connections.MySQL[i].SslKeyPath = filepath.Join(configLocation, conn.SslKeyPath)
-		}
-	}
-
-	// Make Snowflake private key path absolute
-	for i, conn := range env.Connections.Snowflake {
-		if conn.PrivateKeyPath != "" && !filepath.IsAbs(conn.PrivateKeyPath) {
-			env.Connections.Snowflake[i].PrivateKeyPath = filepath.Join(configLocation, conn.PrivateKeyPath)
-		}
-	}
-}
-
 func LoadOrCreate(fs afero.Fs, path string) (*Config, error) {
-	config, err := LoadOrCreateWithoutPathAbsolutization(fs, path)
-	if err != nil {
-		return nil, err
-	}
-
-	absoluteConfigPath, err := filepath.Abs(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get absolute path: %w", err)
-	}
-	configLocation := filepath.Dir(absoluteConfigPath)
-
-	// Make paths absolute for all environments
-	for _, env := range config.Environments {
-		makePathsAbsolute(&env, configLocation)
-	}
-
-	return config, nil
-}
-func LoadOrCreateWithoutPathAbsolutization(fs afero.Fs, path string) (*Config, error) {
 	config, err := LoadFromFile(fs, path)
 	if err != nil && !errors.Is(err, fs2.ErrNotExist) {
 		return nil, err
@@ -489,6 +480,55 @@ func LoadOrCreateWithoutPathAbsolutization(fs afero.Fs, path string) (*Config, e
 
 func ensureConfigIsInGitignore(fs afero.Fs, filePath string) error {
 	return git.EnsureGivenPatternIsInGitignore(fs, filepath.Dir(filePath), filepath.Base(filePath))
+}
+
+func LoadOrCreateWithoutPathAbsolutization(fs afero.Fs, path string) (*Config, error) {
+	var config Config
+
+	err := path2.ReadYaml(fs, path, &config)
+	if err != nil && !errors.Is(err, fs2.ErrNotExist) {
+		return nil, err
+	}
+
+	if err == nil {
+		config.fs = fs
+		config.path = path
+
+		if config.DefaultEnvironmentName == "" {
+			config.DefaultEnvironmentName = "default"
+		}
+
+		err = config.SelectEnvironment(config.DefaultEnvironmentName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to select default environment: %w", err)
+		}
+
+		return &config, ensureConfigIsInGitignore(fs, path)
+	}
+
+	defaultEnv := Environment{
+		Connections: &Connections{},
+	}
+	config = Config{
+		fs:   fs,
+		path: path,
+
+		DefaultEnvironmentName:  "default",
+		SelectedEnvironment:     &defaultEnv,
+		SelectedEnvironmentName: "default",
+		Environments: map[string]Environment{
+			"default": defaultEnv,
+		},
+	}
+
+	err = config.Persist()
+	if err != nil {
+		return nil, fmt.Errorf("failed to persist config: %w", err)
+	}
+
+	config.SelectedEnvironment.Connections.buildConnectionKeyMap()
+
+	return &config, ensureConfigIsInGitignore(fs, path)
 }
 
 func (c *Config) AddConnection(environmentName, name, connType string, creds map[string]interface{}) error {

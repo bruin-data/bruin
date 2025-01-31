@@ -428,7 +428,12 @@ func TestLoadFromFile(t *testing.T) {
 func TestLoadOrCreate(t *testing.T) {
 	t.Parallel()
 
-	servicefile := "path/to/service_account.json"
+	var servicefile string
+	if runtime.GOOS == "windows" {
+		servicefile = "C:\\path\\to\\service_account.json\""
+	} else {
+		servicefile = "/path/to/service_account.json"
+	}
 	configPath := "/some/path/to/config.yml"
 	defaultEnv := &Environment{
 		Connections: &Connections{
@@ -1630,183 +1635,6 @@ func TestConnections_MergeFrom(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.EqualExportedValues(t, tt.want, tt.target)
-		})
-	}
-}
-
-func TestMakePathsAbsolute(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name           string
-		env            *Environment
-		configLocation string
-		want           *Environment
-	}{
-		{
-			name: "should make DuckDB paths absolute",
-			env: &Environment{
-				Connections: &Connections{
-					DuckDB: []DuckDBConnection{
-						{
-							Name: "duck1",
-							Path: "relative/path/db.duck",
-						},
-						{
-							Name: "duck2",
-							Path: "/absolute/path/db.duck",
-						},
-					},
-				},
-			},
-			configLocation: "/config/dir",
-			want: &Environment{
-				Connections: &Connections{
-					DuckDB: []DuckDBConnection{
-						{
-							Name: "duck1",
-							Path: "/config/dir/relative/path/db.duck",
-						},
-						{
-							Name: "duck2",
-							Path: "/absolute/path/db.duck",
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "should make GCP service account paths absolute",
-			env: &Environment{
-				Connections: &Connections{
-					GoogleCloudPlatform: []GoogleCloudPlatformConnection{
-						{
-							Name:               "gcp1",
-							ServiceAccountFile: "relative/path/sa.json",
-						},
-						{
-							Name:               "gcp2",
-							ServiceAccountFile: "/absolute/path/sa.json",
-						},
-						{
-							Name: "gcp3",
-							// No service account file
-						},
-					},
-				},
-			},
-			configLocation: "/config/dir",
-			want: &Environment{
-				Connections: &Connections{
-					GoogleCloudPlatform: []GoogleCloudPlatformConnection{
-						{
-							Name:               "gcp1",
-							ServiceAccountFile: "/config/dir/relative/path/sa.json",
-						},
-						{
-							Name:               "gcp2",
-							ServiceAccountFile: "/absolute/path/sa.json",
-						},
-						{
-							Name: "gcp3",
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "should make MySQL SSL paths absolute",
-			env: &Environment{
-				Connections: &Connections{
-					MySQL: []MySQLConnection{
-						{
-							Name:        "mysql1",
-							SslCaPath:   "relative/path/ca.pem",
-							SslCertPath: "relative/path/cert.pem",
-							SslKeyPath:  "relative/path/key.pem",
-						},
-						{
-							Name:        "mysql2",
-							SslCaPath:   "/absolute/path/ca.pem",
-							SslCertPath: "/absolute/path/cert.pem",
-							SslKeyPath:  "/absolute/path/key.pem",
-						},
-						{
-							Name: "mysql3",
-							// No SSL paths
-						},
-					},
-				},
-			},
-			configLocation: "/config/dir",
-			want: &Environment{
-				Connections: &Connections{
-					MySQL: []MySQLConnection{
-						{
-							Name:        "mysql1",
-							SslCaPath:   "/config/dir/relative/path/ca.pem",
-							SslCertPath: "/config/dir/relative/path/cert.pem",
-							SslKeyPath:  "/config/dir/relative/path/key.pem",
-						},
-						{
-							Name:        "mysql2",
-							SslCaPath:   "/absolute/path/ca.pem",
-							SslCertPath: "/absolute/path/cert.pem",
-							SslKeyPath:  "/absolute/path/key.pem",
-						},
-						{
-							Name: "mysql3",
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "should make Snowflake private key path absolute",
-			env: &Environment{
-				Connections: &Connections{
-					Snowflake: []SnowflakeConnection{
-						{
-							Name:           "snow1",
-							PrivateKeyPath: "relative/path/key.p8",
-						},
-						{
-							Name:           "snow2",
-							PrivateKeyPath: "/absolute/path/key.p8",
-						},
-						{
-							Name: "snow3",
-							// No private key path
-						},
-					},
-				},
-			},
-			configLocation: "/config/dir",
-			want: &Environment{
-				Connections: &Connections{
-					Snowflake: []SnowflakeConnection{
-						{
-							Name:           "snow1",
-							PrivateKeyPath: "/config/dir/relative/path/key.p8",
-						},
-						{
-							Name:           "snow2",
-							PrivateKeyPath: "/absolute/path/key.p8",
-						},
-						{
-							Name: "snow3",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			makePathsAbsolute(tt.env, tt.configLocation)
-			assert.Equal(t, tt.want, tt.env)
 		})
 	}
 }
