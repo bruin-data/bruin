@@ -1,9 +1,9 @@
-name: public.stripe
+name: ingestDB.stripe
 type: ingestr
-connection: postgres
 
 parameters:
   source_connection: my-stripe
   source_table: 'customer'
 
-  destination: postgres
+  destination: clickhouse
+  
