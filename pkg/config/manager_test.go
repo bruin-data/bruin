@@ -25,6 +25,8 @@ func TestLoadFromFile(t *testing.T) {
 		servicefile = "/path/to/service_account.json"
 	}
 
+	clickhouse_secure_value := 0
+
 	devEnv := Environment{
 		Connections: &Connections{
 			GoogleCloudPlatform: []GoogleCloudPlatformConnection{
@@ -224,6 +226,7 @@ func TestLoadFromFile(t *testing.T) {
 					Path: duckPath,
 				},
 			},
+
 			ClickHouse: []ClickHouseConnection{
 				{
 					Name:     "conn-clickhouse",
@@ -233,7 +236,7 @@ func TestLoadFromFile(t *testing.T) {
 					Password: "clickhousepass",
 					Database: "clickhousedb",
 					HTTPPort: 8124,
-					Secure:   0,
+					Secure:   &clickhouse_secure_value,
 				},
 			},
 			Hubspot: []HubspotConnection{
