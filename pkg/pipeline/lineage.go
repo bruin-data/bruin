@@ -190,10 +190,11 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 			if upstream.Table == asset.Name {
 				continue
 			}
+
 			upstreamAsset := foundPipeline.GetAssetByName(upstream.Table)
 			if upstreamAsset == nil {
 				if err := p.addColumnToAsset(asset, lineageCol.Name, nil, &Column{
-					Name:   upstream.Column,
+					Name:   lineageCol.Name,
 					Type:   lineageCol.Type,
 					Checks: []ColumnCheck{},
 					Upstreams: []*UpstreamColumn{
@@ -211,7 +212,7 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 			upstreamCol := upstreamAsset.GetColumnWithName(upstream.Column)
 			if upstreamCol == nil {
 				upstreamCol = &Column{
-					Name:   upstream.Column,
+					Name:   lineageCol.Name,
 					Type:   lineageCol.Type,
 					Checks: []ColumnCheck{},
 					Upstreams: []*UpstreamColumn{
@@ -232,7 +233,7 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 
 // addColumnToAsset adds a new column to the asset based on upstream information.
 func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstreamAsset *Asset, upstreamCol *Column) error {
-	if asset == nil || upstreamCol == nil || colName == "" {
+	if asset == nil || colName == "" {
 		return errors.New("invalid arguments: all parameters must be non-nil and colName must not be empty")
 	}
 
@@ -240,6 +241,14 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 		return nil
 	}
 
+	if upstreamAsset == nil {
+		existingCol := asset.GetColumnWithName(strings.ToLower(upstreamCol.Name))
+		if existingCol == nil {
+			asset.Columns = append(asset.Columns, *upstreamCol)
+			return nil
+		}
+		return nil
+	}
 	existingCol := asset.GetColumnWithName(colName)
 	if existingCol != nil {
 		if len(existingCol.Description) == 0 {
@@ -254,6 +263,7 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 		newUpstream := UpstreamColumn{
 			Column: upstreamCol.Name,
 		}
+
 		if upstreamAsset != nil {
 			newUpstream.Table = upstreamAsset.Name
 		}
@@ -293,8 +303,7 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 // upstreamExists checks if a given upstream already exists in the list.
 func upstreamExists(upstreams []*UpstreamColumn, newUpstream UpstreamColumn) bool {
 	for _, existingUpstream := range upstreams {
-		if strings.EqualFold(existingUpstream.Column, newUpstream.Column) &&
-			strings.EqualFold(existingUpstream.Table, newUpstream.Table) {
+		if strings.EqualFold(existingUpstream.Column, newUpstream.Column) {
 			return true
 		}
 	}

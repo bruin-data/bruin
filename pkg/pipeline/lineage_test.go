@@ -593,7 +593,7 @@ func testJoinsAndComplexQueries(t *testing.T) {
 							},
 							{
 								Name:        "total_amount",
-								Type:        "int64",
+								Type:        "float64",
 								Description: "Total order amount",
 								Upstreams: []*UpstreamColumn{
 									{Column: "quantity", Table: "orders"},
@@ -694,6 +694,78 @@ func testJoinsAndComplexQueries(t *testing.T) {
 
 func testAdvancedSQLFeatures(t *testing.T) {
 	tests := []TestCase{
+		{
+			name: "snowflake column name with as",
+			pipeline: &Pipeline{
+				Assets: []*Asset{
+					{
+						Name: "sales_summary",
+						Type: "bq.sql",
+						ExecutableFile: ExecutableFile{
+							Content: `
+								SELECT 
+									order_date as order,
+									COUNT(DISTINCT customer_id) as unique_customers,
+									SUM(amount) as total_sales,
+									AVG(amount) as avg_sale,
+									NOW() as report_generated_at
+								FROM raw_sales
+								GROUP BY DATE_TRUNC(order_date, MONTH)
+							`,
+						},
+						Upstreams: []Upstream{{Value: "raw_sales"}},
+					},
+					{
+						Name: "raw_sales",
+						Type: "bq.sql",
+						ExecutableFile: ExecutableFile{
+							Content: "SELECT * FROM data_sales",
+						},
+						Columns: []Column{
+							{Name: "order_date", Type: "timestamp", Description: "Order timestamp"},
+							{Name: "customer_id", Type: "int64", Description: "Customer identifier"},
+							{Name: "amount", Type: "float64", Description: "Sale amount"},
+						},
+					},
+				},
+			},
+			after: &Pipeline{
+				Assets: []*Asset{
+					{
+						Name: "sales_summary",
+						ExecutableFile: ExecutableFile{
+							Content: `
+								SELECT 
+									order_date as order,
+									COUNT(DISTINCT customer_id) as unique_customers,
+									SUM(amount) as total_sales,
+									AVG(amount) as avg_sale,
+									NOW() as report_generated_at
+								FROM raw_sales
+								GROUP BY DATE_TRUNC(order_date, MONTH)
+							`,
+						},
+						Columns: []Column{
+							{Name: "order", Type: "timestamp", Description: "Order timestamp", Upstreams: []*UpstreamColumn{{Column: "order_date", Table: "raw_sales"}}},
+							{Name: "unique_customers", Type: "int64", Description: "Customer identifier", Upstreams: []*UpstreamColumn{{Column: "customer_id", Table: "raw_sales"}}},
+							{Name: "total_sales", Type: "float64", Description: "Sale amount", Upstreams: []*UpstreamColumn{{Column: "amount", Table: "raw_sales"}}},
+							{Name: "avg_sale", Type: "float64", Description: "Sale amount", Upstreams: []*UpstreamColumn{{Column: "amount", Table: "raw_sales"}}},
+							{Name: "report_generated_at", Type: "UNKNOWN", Description: "Report generated at", Upstreams: []*UpstreamColumn{{}}},
+						},
+						Upstreams: []Upstream{{Value: "raw_sales"}},
+					},
+					{
+						Name: "raw_sales",
+						Columns: []Column{
+							{Name: "order_date", Type: "timestamp", Description: "Order timestamp"},
+							{Name: "customer_id", Type: "int64", Description: "Customer identifier"},
+							{Name: "amount", Type: "float64", Description: "Sale amount"},
+						},
+					},
+				},
+			},
+			want: nil,
+		},
 		{
 			name: "advanced SQL functions and aggregations",
 			pipeline: &Pipeline{
