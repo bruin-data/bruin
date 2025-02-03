@@ -1,7 +1,7 @@
 # Seed Assets
 Seeds are CSV-files that contain data that is prepared outside of your pipeline that will be loaded into your data platform. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the destination platform accurately.
 
-You can define seed assets in a file ending with `.yaml`:
+You can define seed assets in a file ending with `.asset.yaml`:
 ```yaml
 name: dashboard.hello
 type: duckdb.seed

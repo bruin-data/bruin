@@ -36,17 +36,15 @@ func NewRenderer(context Context) *Renderer {
 
 func PythonEnvVariables(startDate, endDate *time.Time, pipelineName, runID string, fullRefresh bool) map[string]string {
 	vars := map[string]string{
-		"BRUIN_START_DATE":        startDate.Format("2006-01-02"),
-		"BRUIN_START_DATE_NODASH": startDate.Format("20060102"),
-		"BRUIN_START_DATETIME":    startDate.Format("2006-01-02T15:04:05"),
-		"BRUIN_START_TIMESTAMP":   startDate.Format("2006-01-02T15:04:05.000000Z07:00"),
-		"BRUIN_END_DATE":          endDate.Format("2006-01-02"),
-		"BRUIN_END_DATE_NODASH":   endDate.Format("20060102"),
-		"BRUIN_END_DATETIME":      endDate.Format("2006-01-02T15:04:05"),
-		"BRUIN_END_TIMESTAMP":     endDate.Format("2006-01-02T15:04:05.000000Z07:00"),
-		"BRUIN_RUN_ID":            runID,
-		"BRUIN_PIPELINE":          pipelineName,
-		"BRUIN_FULL_REFRESH":      "",
+		"BRUIN_START_DATE":      startDate.Format("2006-01-02"),
+		"BRUIN_START_DATETIME":  startDate.Format("2006-01-02T15:04:05"),
+		"BRUIN_START_TIMESTAMP": startDate.Format("2006-01-02T15:04:05.000000Z07:00"),
+		"BRUIN_END_DATE":        endDate.Format("2006-01-02"),
+		"BRUIN_END_DATETIME":    endDate.Format("2006-01-02T15:04:05"),
+		"BRUIN_END_TIMESTAMP":   endDate.Format("2006-01-02T15:04:05.000000Z07:00"),
+		"BRUIN_RUN_ID":          runID,
+		"BRUIN_PIPELINE":        pipelineName,
+		"BRUIN_FULL_REFRESH":    "",
 	}
 
 	if fullRefresh {
