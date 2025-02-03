@@ -593,7 +593,7 @@ func testJoinsAndComplexQueries(t *testing.T) {
 							},
 							{
 								Name:        "total_amount",
-								Type:        "int64",
+								Type:        "float64",
 								Description: "Total order amount",
 								Upstreams: []*UpstreamColumn{
 									{Column: "quantity", Table: "orders"},
