@@ -200,6 +200,9 @@
         },
         "http_port": {
           "type": "integer"
+        },
+        "secure": {
+          "type": "integer"
         }
       },
       "additionalProperties": false,
@@ -211,7 +214,8 @@
         "host",
         "port",
         "database",
-        "http_port"
+        "http_port",
+        "secure"
       ]
     },
     "Connections": {
