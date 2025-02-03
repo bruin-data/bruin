@@ -1507,6 +1507,146 @@ test_cases = [
             },
         ],
     },
+    {
+        "name": "snowflake function call",
+        "dialect": "snowflake",
+        "query": """
+WITH ufd AS (
+    SELECT
+        user_id,
+        MIN(date_utc) as my_date_col
+    FROM fact.some_daily_metrics
+    GROUP BY 1
+),
+user_retention AS (
+    SELECT
+        d.user_id,
+        MAX(CASE WHEN DATEDIFF(day, f.my_date_col, d.date_utc) = 1 THEN 1 ELSE 0 END) as some_day1_metric,
+    FROM fact.some_daily_metrics d
+    INNER JOIN ufd f ON d.user_id = f.user_id
+    GROUP BY 1
+)
+SELECT
+    d.user_id, 
+    DATEDIFF(day, MAX(d.date_utc), CURRENT_DATE()) as recency,
+    COUNT(DISTINCT d.date_utc) as active_days, 
+    MIN_BY(d.first_device_type, d.first_activity_timestamp) as first_device_type, 
+    AVG(NULLIF(d.estimated_session_duration, 0)) as avg_session_duration, 
+    SUM(d.event_start) as total_event_start, 
+    MAX(r.some_day1_metric) as some_day1_metric, 
+    case when sum(d.event_start) > 0 then 'Player' else 'Visitor' end as user_type, 
+FROM fact.some_daily_metrics d
+LEFT JOIN user_retention r ON d.user_id = r.user_id
+GROUP BY 1
+        """,
+        "schema": {
+            "fact.some_daily_metrics": {
+                "user_id": "integer",
+                "date_utc": "date",
+                "first_device_type": "string",
+                "first_activity_timestamp": "timestamp",
+                "estimated_session_duration": "float",
+                "event_start": "integer",
+            }
+        },
+        "expected": [
+            {
+                "name": "ACTIVE_DAYS",
+                "type": "BIGINT",
+                "upstream": [
+                    {
+                        "column": "DATE_UTC",
+                        "table": "FACT.SOME_DAILY_METRICS",
+                    },
+                ],
+            },
+            {
+                "name": "AVG_SESSION_DURATION",
+                "type": "DOUBLE",
+                "upstream": [
+                    {
+                        "column": "ESTIMATED_SESSION_DURATION",
+                        "table": "FACT.SOME_DAILY_METRICS",
+                    },
+                ],
+            },
+            {
+                "name": "FIRST_DEVICE_TYPE",
+                "type": "UNKNOWN",
+                "upstream": [
+                    {
+                        "column": "FIRST_ACTIVITY_TIMESTAMP",
+                        "table": "FACT.SOME_DAILY_METRICS",
+                    },
+                    {
+                        "column": "FIRST_DEVICE_TYPE",
+                        "table": "FACT.SOME_DAILY_METRICS",
+                    },
+                ],
+            },
+            {
+                "name": "RECENCY",
+                "type": "INT",
+                "upstream": [
+                    {
+                        "column": "DATE_UTC",
+                        "table": "FACT.SOME_DAILY_METRICS",
+                    },
+                ],
+            },
+            {
+                "name": "SOME_DAY1_METRIC",
+                "type": "INT",
+                "upstream": [
+                    {
+                        "column": "DATE_UTC",
+                        "table": "FACT.SOME_DAILY_METRICS",
+                    },
+                ],
+            },
+            {
+                "name": "TOTAL_EVENT_START",
+                "type": "BIGINT",
+                "upstream": [
+                    {
+                        "column": "EVENT_START",
+                        "table": "FACT.SOME_DAILY_METRICS",
+                    },
+                ],
+            },
+            {
+                "name": "USER_ID",
+                "type": "INT",
+                "upstream": [
+                    {
+                        "column": "USER_ID",
+                        "table": "FACT.SOME_DAILY_METRICS",
+                    },
+                ],
+            },
+            {
+                "name": "USER_TYPE",
+                "type": "VARCHAR",
+                "upstream": [
+                    {
+                        "column": "EVENT_START",
+                        "table": "FACT.SOME_DAILY_METRICS",
+                    },
+                ],
+            },
+        ],
+        "expected_non_selected": [
+            {
+                "name": "USER_ID",
+                "upstream": [
+                    {
+                        "column": "USER_ID",
+                        "table": "FACT.SOME_DAILY_METRICS",
+                    },
+                ],
+            }
+        ],
+    },
 ]
 
 
@@ -1526,8 +1666,8 @@ test_cases = [
 )
 def test_get_column_lineage(query, schema, expected, expected_non_selected, dialect):
     result = get_column_lineage(query, schema, dialect)
-    assert result["columns"] == expected
-    assert result["non_selected_columns"] == expected_non_selected
+    assert expected == result["columns"]
+    assert expected_non_selected == result["non_selected_columns"]
 
 
 @pytest.mark.parametrize(

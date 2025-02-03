@@ -170,6 +170,12 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
             {"column": column.name, "table": column.table}
         )
     non_selected_columns = list(non_selected_columns_dict.values())
+
+    for col in result:
+        col["upstream"] = sorted(col["upstream"], key=lambda x: x["column"].lower())
+    for col in non_selected_columns:
+        col["upstream"] = sorted(col["upstream"], key=lambda x: x["column"].lower())
+
     return {
         "columns": result,
         "non_selected_columns": non_selected_columns,
