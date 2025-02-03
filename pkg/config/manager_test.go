@@ -25,7 +25,7 @@ func TestLoadFromFile(t *testing.T) {
 		servicefile = "/path/to/service_account.json"
 	}
 
-	clickhouse_secure_value := 0
+	clickhouseSecureValue := 0
 
 	devEnv := Environment{
 		Connections: &Connections{
@@ -236,7 +236,7 @@ func TestLoadFromFile(t *testing.T) {
 					Password: "clickhousepass",
 					Database: "clickhousedb",
 					HTTPPort: 8124,
-					Secure:   &clickhouse_secure_value,
+					Secure:   &clickhouseSecureValue,
 				},
 			},
 			Hubspot: []HubspotConnection{
