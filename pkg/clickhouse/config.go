@@ -2,6 +2,8 @@ package clickhouse
 
 import (
 	"fmt"
+	"net/url"
+	"strconv"
 
 	click_house "github.com/ClickHouse/clickhouse-go/v2"
 )
@@ -29,18 +31,21 @@ func (c *Config) ToClickHouseOptions() *click_house.Options {
 }
 
 func (c *Config) GetIngestrURI() string {
-	//nolint:nosprintfhostport
-	uri := fmt.Sprintf("clickhouse://%s:%s@%s:%d", c.Username, c.Password, c.Host, c.Port)
+	uri := url.URL{
+		Scheme: "clickhouse",
+		User:   url.UserPassword(c.Username, c.Password),
+		Host:   fmt.Sprintf("%s:%d", c.Host, c.Port),
+	}
+	query := url.Values{}
+
 	if c.HTTPPort != 0 {
-		uri += fmt.Sprintf("?http_port=%d", c.HTTPPort)
+		query.Set("http_port", strconv.Itoa(c.HTTPPort))
 	}
 	if c.Secure != nil {
-		if c.HTTPPort != 0 {
-			uri += "&"
-		} else {
-			uri += "?"
-		}
-		uri += fmt.Sprintf("secure=%d", *c.Secure)
+		query.Set("secure", strconv.Itoa(*c.Secure))
 	}
-	return uri
+
+	uri.RawQuery = query.Encode()
+
+	return uri.String()
 }
