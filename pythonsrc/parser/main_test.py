@@ -1521,20 +1521,20 @@ WITH ufd AS (
 user_retention AS (
     SELECT
         d.user_id,
-        MAX(CASE WHEN DATEDIFF(day, f.my_date_col, d.date_utc) = 1 THEN 1 ELSE 0 END) as some_day1_metric, -- [fact.some_daily_metrics.date_utc]
+        MAX(CASE WHEN DATEDIFF(day, f.my_date_col, d.date_utc) = 1 THEN 1 ELSE 0 END) as some_day1_metric,
     FROM fact.some_daily_metrics d
     INNER JOIN ufd f ON d.user_id = f.user_id
     GROUP BY 1
 )
 SELECT
-    d.user_id, -- fact.some_daily_metrics.user_id
-    DATEDIFF(day, MAX(d.date_utc), CURRENT_DATE()) as recency, -- [fact.some_daily_metrics.date_utc]
-    COUNT(DISTINCT d.date_utc) as active_days, -- fact.some_daily_metrics.date_utc
-    MIN_BY(d.first_device_type, d.first_activity_timestamp) as first_device_type, -- [fact.some_daily_metrics.first_device_type, fact.some_daily_metrics.first_activity_timestamp]
-    AVG(NULLIF(d.estimated_session_duration, 0)) as avg_session_duration, -- [fact.some_daily_metrics.estimated_session_duration]
-    SUM(d.event_start) as total_event_start, -- [fact.some_daily_metrics.event_start]
-    MAX(r.some_day1_metric) as some_day1_metric, -- [fact.some_daily_metrics.date_utc]
-    case when sum(d.event_start) > 0 then 'Player' else 'Visitor' end as user_type, -- [fact.some_daily_metrics.event_start]
+    d.user_id, 
+    DATEDIFF(day, MAX(d.date_utc), CURRENT_DATE()) as recency,
+    COUNT(DISTINCT d.date_utc) as active_days, 
+    MIN_BY(d.first_device_type, d.first_activity_timestamp) as first_device_type, 
+    AVG(NULLIF(d.estimated_session_duration, 0)) as avg_session_duration, 
+    SUM(d.event_start) as total_event_start, 
+    MAX(r.some_day1_metric) as some_day1_metric, 
+    case when sum(d.event_start) > 0 then 'Player' else 'Visitor' end as user_type, 
 FROM fact.some_daily_metrics d
 LEFT JOIN user_retention r ON d.user_id = r.user_id
 GROUP BY 1
@@ -1666,16 +1666,7 @@ GROUP BY 1
 )
 def test_get_column_lineage(query, schema, expected, expected_non_selected, dialect):
     result = get_column_lineage(query, schema, dialect)
-    result = get_column_lineage(query, schema, dialect)
-
-    expected_cols = []
-    actual_cols = []
-    for col in sorted(expected, key=lambda x: x["name"].lower()):
-        expected_cols.append(sorted(col["upstream"], key=lambda x: x["column"].lower()))
-    for col in sorted(result["columns"], key=lambda x: x["name"].lower()):
-        actual_cols.append(sorted(col["upstream"], key=lambda x: x["column"].lower()))
-
-    assert expected_cols == actual_cols
+    assert expected == result["columns"]
     assert expected_non_selected == result["non_selected_columns"]
 
 
