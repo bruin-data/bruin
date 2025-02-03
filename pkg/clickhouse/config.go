@@ -13,7 +13,7 @@ type Config struct {
 	Port     int
 	Database string
 	HTTPPort int
-	Secure   int
+	Secure   *int
 }
 
 func (c *Config) ToClickHouseOptions() *click_house.Options {
@@ -34,14 +34,13 @@ func (c *Config) GetIngestrURI() string {
 	if c.HTTPPort != 0 {
 		uri += fmt.Sprintf("?http_port=%d", c.HTTPPort)
 	}
-	if c.Secure != 0 {
+	if c.Secure != nil {
 		if c.HTTPPort != 0 {
 			uri += "&"
 		} else {
 			uri += "?"
 		}
-		uri += fmt.Sprintf("secure=%d", c.Secure)
+		uri += fmt.Sprintf("secure=%d", *c.Secure)
 	}
-
 	return uri
 }
