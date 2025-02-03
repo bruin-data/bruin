@@ -1647,6 +1647,125 @@ GROUP BY 1
             }
         ],
     },
+    {
+        "name": "snowflake test",
+        "dialect": "snowflake",
+        "query": """
+       SELECT
+    t.event_date,
+    t.location_code as location,
+    t.session_id as session,
+    COUNT(DISTINCT t.customer_id) as visitor_count,
+    SUM(t.activity_count) as total_activities,
+    SUM(t.interaction_count) as total_interactions,
+    CURRENT_TIMESTAMP() as created_at
+FROM analytics.daily_customer_metrics t
+GROUP BY 1, 2, 3
+ORDER BY 1, 2, 3
+        """,
+        "schema": {
+            "analytics.daily_customer_metrics": {
+                "event_date": "date",
+                "location_code": "string",
+                "session_id": "string",
+                "customer_id": "integer",
+                "activity_count": "integer",
+                "interaction_count": "integer",
+            }
+        },
+        "expected": [
+            {"name": "CREATED_AT", "type": "TIMESTAMP", "upstream": []},
+            {
+                "name": "EVENT_DATE",
+                "type": "DATE",
+                "upstream": [
+                    {
+                        "column": "EVENT_DATE",
+                        "table": "ANALYTICS.DAILY_CUSTOMER_METRICS",
+                    }
+                ],
+            },
+            {
+                "name": "LOCATION",
+                "type": "TEXT",
+                "upstream": [
+                    {
+                        "column": "LOCATION_CODE",
+                        "table": "ANALYTICS.DAILY_CUSTOMER_METRICS",
+                    }
+                ],
+            },
+            {
+                "name": "SESSION",
+                "type": "TEXT",
+                "upstream": [
+                    {
+                        "column": "SESSION_ID",
+                        "table": "ANALYTICS.DAILY_CUSTOMER_METRICS",
+                    }
+                ],
+            },
+            {
+                "name": "TOTAL_ACTIVITIES",
+                "type": "BIGINT",
+                "upstream": [
+                    {
+                        "column": "ACTIVITY_COUNT",
+                        "table": "ANALYTICS.DAILY_CUSTOMER_METRICS",
+                    }
+                ],
+            },
+            {
+                "name": "TOTAL_INTERACTIONS",
+                "type": "BIGINT",
+                "upstream": [
+                    {
+                        "column": "INTERACTION_COUNT",
+                        "table": "ANALYTICS.DAILY_CUSTOMER_METRICS",
+                    }
+                ],
+            },
+            {
+                "name": "VISITOR_COUNT",
+                "type": "BIGINT",
+                "upstream": [
+                    {
+                        "column": "CUSTOMER_ID",
+                        "table": "ANALYTICS.DAILY_CUSTOMER_METRICS",
+                    }
+                ],
+            },
+        ],
+        "expected_non_selected": [
+            {
+                "name": "EVENT_DATE",
+                "upstream": [
+                    {
+                        "column": "EVENT_DATE",
+                        "table": "ANALYTICS.DAILY_CUSTOMER_METRICS",
+                    }
+                ],
+            },
+            {
+                "name": "LOCATION_CODE",
+                "upstream": [
+                    {
+                        "column": "LOCATION_CODE",
+                        "table": "ANALYTICS.DAILY_CUSTOMER_METRICS",
+                    }
+                ],
+            },
+            {
+                "name": "SESSION_ID",
+                "upstream": [
+                    {
+                        "column": "SESSION_ID",
+                        "table": "ANALYTICS.DAILY_CUSTOMER_METRICS",
+                    }
+                ],
+            },
+        ],
+    },
 ]
 
 

@@ -194,7 +194,7 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 			upstreamAsset := foundPipeline.GetAssetByName(upstream.Table)
 			if upstreamAsset == nil {
 				if err := p.addColumnToAsset(asset, lineageCol.Name, nil, &Column{
-					Name:   upstream.Column,
+					Name:   lineageCol.Name,
 					Type:   lineageCol.Type,
 					Checks: []ColumnCheck{},
 					Upstreams: []*UpstreamColumn{
@@ -212,7 +212,7 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 			upstreamCol := upstreamAsset.GetColumnWithName(upstream.Column)
 			if upstreamCol == nil {
 				upstreamCol = &Column{
-					Name:   upstream.Column,
+					Name:   lineageCol.Name,
 					Type:   lineageCol.Type,
 					Checks: []ColumnCheck{},
 					Upstreams: []*UpstreamColumn{
