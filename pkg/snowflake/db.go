@@ -329,7 +329,7 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 		if col.Description != "" && existingComments[col.Name] != col.Description {
 			query := fmt.Sprintf(
 				`ALTER TABLE %s.%s.%s MODIFY COLUMN %s COMMENT '%s'`,
-				db.config.Database, schemaName, tableName, col.Name, col.Description,
+				db.config.Database, schemaName, tableName, col.Name, escapeSQLString(col.Description),
 			)
 			updateQueries = append(updateQueries, query)
 		}
@@ -344,7 +344,7 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 	if asset.Description != "" {
 		updateTableQuery := fmt.Sprintf(
 			`COMMENT ON TABLE %s.%s.%s IS '%s'`,
-			db.config.Database, schemaName, tableName, asset.Description,
+			db.config.Database, schemaName, tableName, escapeSQLString(asset.Description),
 		)
 		if err := db.RunQueryWithoutResult(ctx, &query.Query{Query: updateTableQuery}); err != nil {
 			return errors.Wrap(err, "failed to update table description")
@@ -352,4 +352,8 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 	}
 
 	return nil
+}
+
+func escapeSQLString(s string) string {
+	return strings.ReplaceAll(s, "'", "''") // Escape single quotes for SQL safety
 }
