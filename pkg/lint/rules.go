@@ -808,8 +808,9 @@ func EnsureBigQueryQuerySensorHasTableParameterForASingleAsset(ctx context.Conte
 }
 
 type GlossaryChecker struct {
-	gr            *glossary.GlossaryReader
-	foundGlossary *glossary.Glossary
+	gr                 *glossary.GlossaryReader
+	foundGlossary      *glossary.Glossary
+	cacheFoundGlossary bool
 }
 
 func (g *GlossaryChecker) EnsureAssetEntitiesExistInGlossary(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -817,15 +818,19 @@ func (g *GlossaryChecker) EnsureAssetEntitiesExistInGlossary(ctx context.Context
 	if asset.Columns == nil {
 		return issues, nil
 	}
+	var err error
 
+	foundGlossary := g.foundGlossary
 	if g.foundGlossary == nil {
-		foundGlossary, err := g.gr.GetGlossary(p.DefinitionFile.Path)
+		foundGlossary, err = g.gr.GetGlossary(p.DefinitionFile.Path)
 		if err != nil {
 			g.foundGlossary = &glossary.Glossary{Entities: make([]*glossary.Entity, 0)}
 			return issues, err
 		}
 
-		g.foundGlossary = foundGlossary
+		if foundGlossary != nil && g.cacheFoundGlossary {
+			g.foundGlossary = foundGlossary
+		}
 	}
 
 	for _, column := range asset.Columns {
@@ -849,7 +854,7 @@ func (g *GlossaryChecker) EnsureAssetEntitiesExistInGlossary(ctx context.Context
 			continue
 		}
 
-		entity := g.foundGlossary.GetEntity(column.EntityAttribute.Entity)
+		entity := foundGlossary.GetEntity(column.EntityAttribute.Entity)
 		if entity == nil {
 			issues = append(issues, &Issue{
 				Task:        asset,

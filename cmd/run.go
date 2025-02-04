@@ -506,7 +506,7 @@ func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger 
 }
 
 func CheckLint(foundPipeline *pipeline.Pipeline, pipelinePath string, logger *zap.SugaredLogger, parser *sqlparser.SQLParser) error {
-	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, parser)
+	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, parser, true)
 	if err != nil {
 		errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
 		return err
