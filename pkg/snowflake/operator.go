@@ -202,6 +202,12 @@ func (o *MetadataOperator) Run(ctx context.Context, ti scheduler.TaskInstance) e
 		return errors.New("no writer found in context, please create an issue for this: https://github.com/bruin-data/bruin/issues")
 	}
 
+	// Skip metadata push for views
+	if ti.GetAsset().Materialization.Type == pipeline.MaterializationTypeView {
+		_, _ = writer.Write([]byte("\"Skipping metadata update: Column comments are not supported for Views.\n"))
+		return nil
+	}
+
 	err = client.PushColumnDescriptions(ctx, ti.GetAsset())
 	if err != nil {
 		_, _ = writer.Write([]byte("Failed to push metadata to Snowflake, skipping...\n"))
