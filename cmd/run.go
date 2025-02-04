@@ -494,7 +494,7 @@ func ParseDate(startDateStr, endDateStr string, logger *zap.SugaredLogger) (time
 
 func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger *zap.SugaredLogger) (time.Time, time.Time, string, error) {
 	if inputPath == "" {
-		return time.Now(), time.Now(), "", errors.New("please give a task or pipeline path: bruin run <path to the task definition>)")
+		inputPath = "."
 	}
 
 	startDate, endDate, err := ParseDate(runConfig.StartDate, runConfig.EndDate, logger)
