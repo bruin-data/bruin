@@ -131,6 +131,11 @@ func (c *Connections) buildConnectionKeyMap() {
 		c.byKey[conn.Name] = &(c.ClickHouse[i])
 		c.typeNameMap[conn.Name] = "clickhouse"
 	}
+
+	for i, conn := range c.ClickHouse {
+		c.byKey[conn.Name] = &(c.ClickHouse[i])
+		c.typeNameMap[conn.Name] = "clickhouse"
+	}
 }
 
 type Environment struct {
