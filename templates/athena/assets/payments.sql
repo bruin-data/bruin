@@ -1,6 +1,5 @@
 /* @bruin
 name: payments
-type: athena.sql
 materialization:
    type: view
 columns:

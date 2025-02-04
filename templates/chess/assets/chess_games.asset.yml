@@ -1,6 +1,3 @@
 name: chess_playground.games
-type: ingestr
 parameters:
-  source_connection: chess-default
   source_table: games
-  destination: duckdb
