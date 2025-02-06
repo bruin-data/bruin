@@ -220,7 +220,11 @@ func testBasicRecursiveParsing(t *testing.T) {
 								{Name: "name", Type: "str", Upstreams: []*UpstreamColumn{{Column: "name", Table: "table2"}}, UpdateOnMerge: false, Description: "Just a name", Checks: []ColumnCheck{}},
 								{Name: "age", Type: "int64", Upstreams: []*UpstreamColumn{{Column: "age", Table: "table2"}}, UpdateOnMerge: false, Description: "Just an age", Checks: []ColumnCheck{}},
 							},
-							Upstreams: []Upstream{{Value: "table2"}},
+							Upstreams: []Upstream{{Value: "table2", Columns: []DependsColumn{
+								{Name: "id"},
+								{Name: "name"},
+								{Name: "age"},
+							}}},
 						},
 						{
 							Name: "table2",
