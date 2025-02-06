@@ -1766,7 +1766,60 @@ ORDER BY 1, 2, 3
             },
         ],
     },
+    {
+        "name": "snowflake example with condition",
+        "dialect": "snowflake",
+        "query": """
+        SELECT 
+            case
+                when bookings.CancelledAt is not null
+                then coalesce(bookings.CancellationReason, 'Empty Reason')
+            end as CancellationReason,
+            case
+                when
+                    bookings.Id is not null and
+                    bookingCreditRefundedAt is null and
+                    bookings.Accepted
+                then 1
+                else 0
+            end as credits_spent
+        FROM bookings
+        """,
+        "schema": {
+            "bookings": {
+                "Id": "STRING",
+                "CancelledAt": "TIMESTAMP",
+                "CancellationReason": "STRING",
+                "bookingCreditRefundedAt": "TIMESTAMP",
+                "Accepted": "BOOLEAN",
+            }
+        },
+        "expected": [
+            {
+                "name": "CANCELLATIONREASON",
+                "type": "TEXT",
+                "upstream": [
+                    {"column": "CANCELLATIONREASON", "table": "BOOKINGS"},
+                    {"column": "CANCELLEDAT", "table": "BOOKINGS"},
+                ],
+            },
+            {
+                "name": "CREDITS_SPENT",
+                "type": "INT",
+                "upstream": [
+                    {"column": "ACCEPTED", "table": "BOOKINGS"},
+                    {"column": "BOOKINGCREDITREFUNDEDAT", "table": "BOOKINGS"},
+                    {"column": "ID", "table": "BOOKINGS"},
+                ],
+            },
+        ],
+        "expected_non_selected": [
+           
+        ],
+    },
 ]
+
+#
 
 
 @pytest.mark.parametrize(
