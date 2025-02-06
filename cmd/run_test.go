@@ -7,7 +7,6 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
-	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1072,19 +1071,13 @@ func TestValidation(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 
 	tests := []struct {
-		name          string
-		runConfig     *scheduler.RunConfig
-		inputPath     string
-		expectError   bool
-		expectedError string
+		name              string
+		runConfig         *scheduler.RunConfig
+		inputPath         string
+		expectedInputPath string
+		expectError       bool
+		expectedError     string
 	}{
-		{
-			name:          "Empty Input Path",
-			runConfig:     &scheduler.RunConfig{},
-			inputPath:     "",
-			expectError:   true,
-			expectedError: "please give a task or pipeline path: bruin run <path to the task definition>)",
-		},
 		{
 			name: "Invalid Start Date",
 			runConfig: &scheduler.RunConfig{
@@ -1109,8 +1102,19 @@ func TestValidation(t *testing.T) {
 				StartDate: "2023-12-01",
 				EndDate:   "2023-12-31",
 			},
-			inputPath:   "some/path",
-			expectError: false,
+			inputPath:         "some/path",
+			expectedInputPath: "some/path",
+			expectError:       false,
+		},
+		{
+			name: "valid input without a path, should default to the current path",
+			runConfig: &scheduler.RunConfig{
+				StartDate: "2023-12-01",
+				EndDate:   "2023-12-31",
+			},
+			inputPath:         "",
+			expectedInputPath: ".",
+			expectError:       false,
 		},
 	}
 
@@ -1128,7 +1132,7 @@ func TestValidation(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, time.Date(2023, 12, 1, 0, 0, 0, 0, time.UTC), startDate)
 				assert.Equal(t, time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC), endDate)
-				assert.Equal(t, tt.inputPath, path)
+				assert.Equal(t, tt.expectedInputPath, path)
 			}
 		})
 	}
@@ -1162,12 +1166,7 @@ func TestCheckLintFunc(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			logger := zaptest.NewLogger(t).Sugar()
-			parser, err := sqlparser.NewSQLParser(false)
-			if err != nil {
-				require.Error(t, err, "Expected an error but got none")
-			}
-			err = CheckLint(parser, tt.foundPipeline, tt.pipelinePath, logger)
-
+			err := CheckLint(tt.foundPipeline, tt.pipelinePath, logger, nil)
 			require.NoError(t, err, "Expected no error but got one")
 		})
 	}

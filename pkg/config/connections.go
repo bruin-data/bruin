@@ -340,6 +340,21 @@ func (d DuckDBConnection) GetName() string {
 	return d.Name
 }
 
+type ClickHouseConnection struct {
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port"     json:"port" mapstructure:"port"`
+	Database string `yaml:"database" json:"database" mapstructure:"database"`
+	HTTPPort int    `yaml:"http_port" json:"http_port" mapstructure:"http_port"`
+	Secure   *int   `yaml:"secure" json:"secure" mapstructure:"secure"`
+}
+
+func (c ClickHouseConnection) GetName() string {
+	return c.Name
+}
+
 type AppsflyerConnection struct {
 	Name   string `yaml:"name" json:"name" mapstructure:"name"`
 	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
@@ -447,6 +462,18 @@ func (c DynamoDBConnection) GetName() string {
 	return c.Name
 }
 
+type GoogleAdsConnection struct {
+	Name               string `yaml:"name" json:"name" mapstructure:"name"`
+	CustomerID         string `yaml:"customer_id" json:"customer_id" mapstructure:"customer_id"`
+	ServiceAccountJSON string `yaml:"service_account_json" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
+	ServiceAccountFile string `yaml:"service_account_file" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
+	DeveloperToken     string `yaml:"dev_token" json:"dev_token" mapstructure:"dev_token"`
+}
+
+func (c GoogleAdsConnection) GetName() string {
+	return c.Name
+}
+
 type TikTokAdsConnection struct {
 	Name          string `yaml:"name" json:"name" mapstructure:"name"`
 	AccessToken   string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
@@ -479,5 +506,25 @@ type AppStoreConnection struct {
 }
 
 func (c AppStoreConnection) GetName() string {
+	return c.Name
+}
+
+type LinkedInAdsConnection struct {
+	Name        string `yaml:"name" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
+	AccountIds  string `yaml:"account_ids" json:"account_ids" mapstructure:"account_ids"`
+}
+
+func (c LinkedInAdsConnection) GetName() string {
+	return c.Name
+}
+
+type GCSConnection struct {
+	Name               string `yaml:"name" json:"name" mapstructure:"name"`
+	ServiceAccountFile string `yaml:"service_account_file" json:"service_account_file" mapstructure:"service_account_file"`
+	ServiceAccountJSON string `yaml:"service_account_json" json:"service_account_json" mapstructure:"service_account_json"`
+}
+
+func (c GCSConnection) GetName() string {
 	return c.Name
 }

@@ -1335,6 +1335,23 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
+			name: "table materialization has incremental key but wrong strategy",
+			assets: []*pipeline.Asset{
+				{
+					Name: "task1",
+					Materialization: pipeline.Materialization{
+						Type:           pipeline.MaterializationTypeTable,
+						Strategy:       pipeline.MaterializationStrategyCreateReplace,
+						IncrementalKey: "dt",
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			want: []string{
+				"Incremental key is only supported with 'delete+insert' strategy",
+			},
+		},
+		{
 			name: "table materialization has delete+insert but no incremental key",
 			assets: []*pipeline.Asset{
 				{
@@ -1795,6 +1812,42 @@ func TestEnsureIngestrAssetIsValidForASingleAsset(t *testing.T) {
 					"destination":            "destination",
 					"destination_connection": "destination_connection",
 					"destination_table":      "destination_table",
+				},
+			},
+			wantErrMessage: "",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "ingestr asset with merge strategy but no primary key",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "dest1",
+					"incremental_strategy": "merge",
+				},
+				Columns: []pipeline.Column{
+					{Name: "col1"},
+					{Name: "col2"},
+				},
+			},
+			wantErrMessage: "Materialization strategy 'merge' requires the 'primary_key' field to be set on at least one column",
+			wantErr:        assert.NoError,
+		},
+		{
+			name: "valid ingestr asset with merge strategy and primary key",
+			asset: &pipeline.Asset{
+				Type: pipeline.AssetTypeIngestr,
+				Parameters: map[string]string{
+					"source_connection":    "conn1",
+					"source_table":         "table1",
+					"destination":          "dest1",
+					"incremental_strategy": "merge",
+				},
+				Columns: []pipeline.Column{
+					{Name: "col1", PrimaryKey: true},
+					{Name: "col2"},
 				},
 			},
 			wantErrMessage: "",

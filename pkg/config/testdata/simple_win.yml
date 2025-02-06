@@ -181,6 +181,11 @@ environments:
       slack:
         - name: conn26
           api_key: "slackkey"
+      googleads:
+        - name: googleads-0
+          dev_token: dev-0
+          customer_id: "1234567890"
+          service_account_json: '{"email": "no-reply@googleads-0.com"}'
       generic:
         - name: key1
           value: value1
@@ -206,6 +211,22 @@ environments:
           key_id: "key-id-123"
           key_path: "/path/to/key.pem"
           issuer_id: "issuer-id-123"
+      linkedinads:
+        - name: "linkedinads-1"
+          access_token: "access-token-123"
+          account_ids: "account-id-123,account-id-456"
+      clickhouse:
+        - name: "conn-clickhouse"
+          host: "clickhousehost"
+          port: 8123
+          username: "clickhouseuser"
+          password: "clickhousepass"
+          database: "clickhousedb"
+          http_port: 8124
+          secure: 0
+      gcs:
+        - name: "gcs-1"
+          service_account_file: "/path/to/service_account.json"
   prod:
     connections:
       google_cloud_platform:

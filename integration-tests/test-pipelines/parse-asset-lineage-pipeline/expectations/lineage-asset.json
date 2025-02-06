@@ -46,7 +46,7 @@
             "usage": ""
           },
           {
-            "name": "updated_at",
+            "name": "created_at",
             "usage": ""
           }
         ]
@@ -57,12 +57,12 @@
     "owner": "",
     "executable_file": {
       "name": "example.sql",
-      "path": "__ASSETSDIR__asset.sql",
+      "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/example.sql",
       "content": "select \n    a.name, \n    a.last_name,\n    a.created_at as updated_at,\n    b.country \nfrom people a \njoin country b on a.id = b.id;"
     },
     "definition_file": {
       "name": "example.sql",
-      "path": "__ASSETSDIR__asset.sql",
+      "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/example.sql",
       "type": "comment"
     },
     "parameters": {},
@@ -72,7 +72,7 @@
         "entity_attribute": null,
         "name": "country",
         "type": "varchar",
-        "description": "",
+        "description": "Just a country",
         "primary_key": false,
         "update_on_merge": false,
         "checks": [],
@@ -87,7 +87,7 @@
         "entity_attribute": null,
         "name": "last_name",
         "type": "varchar",
-        "description": "",
+        "description": "Just a last name",
         "primary_key": false,
         "update_on_merge": false,
         "checks": [],
@@ -102,7 +102,7 @@
         "entity_attribute": null,
         "name": "name",
         "type": "varchar",
-        "description": "",
+        "description": "Just a name",
         "primary_key": false,
         "update_on_merge": false,
         "checks": [],
@@ -117,7 +117,7 @@
         "entity_attribute": null,
         "name": "updated_at",
         "type": "timestamp",
-        "description": "",
+        "description": "Just a timestamp",
         "primary_key": false,
         "update_on_merge": false,
         "checks": [],
@@ -141,9 +141,8 @@
     "start_date": "",
     "definition_file": {
       "name": "pipeline.yml",
-      "path": "__PIPELINEDIR__pipeline.yml"
+      "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/pipeline.yml"
     },
-    "default_parameters": {},
     "default_connections": {},
     "assets": [
       {
@@ -182,12 +181,12 @@
         "owner": "",
         "executable_file": {
           "name": "country.sql",
-          "path": "__ASSETSDIR__country.sql",
+          "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/country.sql",
           "content": "select id, country from users where id > 10000;"
         },
         "definition_file": {
           "name": "country.sql",
-          "path": "__ASSETSDIR__country.sql",
+          "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/country.sql",
           "type": "comment"
         },
         "parameters": {},
@@ -197,7 +196,7 @@
             "entity_attribute": null,
             "name": "country",
             "type": "varchar",
-            "description": "",
+            "description": "Just a country",
             "primary_key": false,
             "update_on_merge": false,
             "checks": [],
@@ -212,7 +211,7 @@
             "entity_attribute": null,
             "name": "id",
             "type": "integer",
-            "description": "",
+            "description": "Just a number",
             "primary_key": false,
             "update_on_merge": false,
             "checks": [],
@@ -276,7 +275,7 @@
                 "usage": ""
               },
               {
-                "name": "updated_at",
+                "name": "created_at",
                 "usage": ""
               }
             ]
@@ -287,12 +286,12 @@
         "owner": "",
         "executable_file": {
           "name": "example.sql",
-          "path": "__ASSETSDIR__example.sql",
+          "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/example.sql",
           "content": "select \n    a.name, \n    a.last_name,\n    a.created_at as updated_at,\n    b.country \nfrom people a \njoin country b on a.id = b.id;"
         },
         "definition_file": {
           "name": "example.sql",
-          "path": "__ASSETSDIR__example.sql",
+          "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/example.sql",
           "type": "comment"
         },
         "parameters": {},
@@ -302,7 +301,7 @@
             "entity_attribute": null,
             "name": "country",
             "type": "varchar",
-            "description": "",
+            "description": "Just a country",
             "primary_key": false,
             "update_on_merge": false,
             "checks": [],
@@ -317,7 +316,7 @@
             "entity_attribute": null,
             "name": "last_name",
             "type": "varchar",
-            "description": "",
+            "description": "Just a last name",
             "primary_key": false,
             "update_on_merge": false,
             "checks": [],
@@ -332,7 +331,7 @@
             "entity_attribute": null,
             "name": "name",
             "type": "varchar",
-            "description": "",
+            "description": "Just a name",
             "primary_key": false,
             "update_on_merge": false,
             "checks": [],
@@ -347,7 +346,7 @@
             "entity_attribute": null,
             "name": "updated_at",
             "type": "timestamp",
-            "description": "",
+            "description": "Just a timestamp",
             "primary_key": false,
             "update_on_merge": false,
             "checks": [],
@@ -412,12 +411,12 @@
         "owner": "",
         "executable_file": {
           "name": "people.sql",
-          "path": "__ASSETSDIR__people.sql",
+          "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/people.sql",
           "content": "select \n    id, \n    name, \n    last_name,\n    created_at\nfrom users where country = 'UK';"
         },
         "definition_file": {
           "name": "people.sql",
-          "path": "__ASSETSDIR__people.sql",
+          "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/people.sql",
           "type": "comment"
         },
         "parameters": {},
@@ -427,7 +426,7 @@
             "entity_attribute": null,
             "name": "created_at",
             "type": "timestamp",
-            "description": "",
+            "description": "Just a timestamp",
             "primary_key": false,
             "update_on_merge": false,
             "checks": [],
@@ -442,7 +441,7 @@
             "entity_attribute": null,
             "name": "id",
             "type": "integer",
-            "description": "",
+            "description": "Just a number",
             "primary_key": false,
             "update_on_merge": false,
             "checks": [],
@@ -457,7 +456,7 @@
             "entity_attribute": null,
             "name": "last_name",
             "type": "varchar",
-            "description": "",
+            "description": "Just a last name",
             "primary_key": false,
             "update_on_merge": false,
             "checks": [],
@@ -472,7 +471,7 @@
             "entity_attribute": null,
             "name": "name",
             "type": "varchar",
-            "description": "",
+            "description": "Just a name",
             "primary_key": false,
             "update_on_merge": false,
             "checks": [],
@@ -510,12 +509,12 @@
         "owner": "",
         "executable_file": {
           "name": "users.sql",
-          "path": "__ASSETSDIR__users.sql",
+          "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/users.sql",
           "content": "select *  from user_data;"
         },
         "definition_file": {
           "name": "users.sql",
-          "path": "__ASSETSDIR__users.sql",
+          "path": "integration-tests/test-pipelines/parse-asset-lineage-pipeline/assets/users.sql",
           "type": "comment"
         },
         "parameters": {},
@@ -590,6 +589,6 @@
     "retries": 0
   },
   "repo": {
-    "path": "__BASEDIR__"
+    "path": "integration-tests"
   }
 }

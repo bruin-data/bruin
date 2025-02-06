@@ -25,6 +25,8 @@ func TestLoadFromFile(t *testing.T) {
 		servicefile = "/path/to/service_account.json"
 	}
 
+	clickhouseSecureValue := 0
+
 	devEnv := Environment{
 		Connections: &Connections{
 			GoogleCloudPlatform: []GoogleCloudPlatformConnection{
@@ -224,6 +226,19 @@ func TestLoadFromFile(t *testing.T) {
 					Path: duckPath,
 				},
 			},
+
+			ClickHouse: []ClickHouseConnection{
+				{
+					Name:     "conn-clickhouse",
+					Host:     "clickhousehost",
+					Port:     8123,
+					Username: "clickhouseuser",
+					Password: "clickhousepass",
+					Database: "clickhousedb",
+					HTTPPort: 8124,
+					Secure:   &clickhouseSecureValue,
+				},
+			},
 			Hubspot: []HubspotConnection{
 				{
 					Name:   "conn21",
@@ -296,6 +311,14 @@ func TestLoadFromFile(t *testing.T) {
 					Subdomain:  "zendeskUrl",
 				},
 			},
+			GoogleAds: []GoogleAdsConnection{
+				{
+					Name:               "googleads-0",
+					DeveloperToken:     "dev-0",
+					CustomerID:         "1234567890",
+					ServiceAccountJSON: `{"email": "no-reply@googleads-0.com"}`,
+				},
+			},
 			TikTokAds: []TikTokAdsConnection{
 				{
 					Name:          "tiktokads-1",
@@ -323,6 +346,19 @@ func TestLoadFromFile(t *testing.T) {
 					IssuerID: "issuer-id-123",
 					KeyID:    "key-id-123",
 					KeyPath:  "/path/to/key.pem",
+				},
+			},
+			LinkedInAds: []LinkedInAdsConnection{
+				{
+					Name:        "linkedinads-1",
+					AccessToken: "access-token-123",
+					AccountIds:  "account-id-123,account-id-456",
+				},
+			},
+			GCS: []GCSConnection{
+				{
+					Name:               "gcs-1",
+					ServiceAccountFile: "/path/to/service_account.json",
 				},
 			},
 		},

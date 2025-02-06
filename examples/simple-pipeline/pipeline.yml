@@ -30,5 +30,8 @@ default_connections:
   zendesk : "my-zendesk"
   asana: "my-asana"
   dynamodb: "my-dynamodb"
+  googleads: "my-googleads"
   tiktokads: "my-tiktokads"
   github: "my-github"
+  linkedinads: "my-linkedinads"
+  gcs: "my-gcs"

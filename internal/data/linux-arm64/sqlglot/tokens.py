@@ -410,6 +410,8 @@ class TokenType(AutoName):
     OPTION = auto()
     SINK = auto()
     SOURCE = auto()
+    ANALYZE = auto()
+    NAMESPACE = auto()
 
 
 _ALL_TOKEN_TYPES = list(TokenType)
@@ -766,6 +768,7 @@ class Tokenizer(metaclass=_Tokenizer):
         "LOAD": TokenType.LOAD,
         "LOCK": TokenType.LOCK,
         "MERGE": TokenType.MERGE,
+        "NAMESPACE": TokenType.NAMESPACE,
         "NATURAL": TokenType.NATURAL,
         "NEXT": TokenType.NEXT,
         "NOT": TokenType.NOT,
@@ -936,7 +939,7 @@ class Tokenizer(metaclass=_Tokenizer):
         "SEQUENCE": TokenType.SEQUENCE,
         "VARIANT": TokenType.VARIANT,
         "ALTER": TokenType.ALTER,
-        "ANALYZE": TokenType.COMMAND,
+        "ANALYZE": TokenType.ANALYZE,
         "CALL": TokenType.COMMAND,
         "COMMENT": TokenType.COMMENT,
         "EXPLAIN": TokenType.COMMAND,
@@ -976,6 +979,7 @@ class Tokenizer(metaclass=_Tokenizer):
         "size",
         "tokens",
         "dialect",
+        "use_rs_tokenizer",
         "_start",
         "_current",
         "_line",
@@ -988,15 +992,21 @@ class Tokenizer(metaclass=_Tokenizer):
         "_rs_dialect_settings",
     )
 
-    def __init__(self, dialect: DialectType = None) -> None:
+    def __init__(
+        self, dialect: DialectType = None, use_rs_tokenizer: bool = USE_RS_TOKENIZER
+    ) -> None:
         from sqlglot.dialects import Dialect
 
         self.dialect = Dialect.get_or_raise(dialect)
+
+        # initialize `use_rs_tokenizer`, and allow it to be overwritten per Tokenizer instance
+        self.use_rs_tokenizer = use_rs_tokenizer
 
         if USE_RS_TOKENIZER:
             self._rs_dialect_settings = RsTokenizerDialectSettings(
                 unescaped_sequences=self.dialect.UNESCAPED_SEQUENCES,
                 identifiers_can_start_with_digit=self.dialect.IDENTIFIERS_CAN_START_WITH_DIGIT,
+                numbers_can_be_underscore_separated=self.dialect.NUMBERS_CAN_BE_UNDERSCORE_SEPARATED,
             )
 
         self.reset()
@@ -1018,7 +1028,7 @@ class Tokenizer(metaclass=_Tokenizer):
 
     def tokenize(self, sql: str) -> t.List[Token]:
         """Returns a list of tokens corresponding to the SQL string `sql`."""
-        if USE_RS_TOKENIZER:
+        if self.use_rs_tokenizer:
             return self.tokenize_rs(sql)
 
         self.reset()
@@ -1300,8 +1310,12 @@ class Tokenizer(metaclass=_Tokenizer):
                     self._add(TokenType.NUMBER, number_text)
                     self._add(TokenType.DCOLON, "::")
                     return self._add(token_type, literal)
-                elif self.dialect.IDENTIFIERS_CAN_START_WITH_DIGIT:
-                    return self._add(TokenType.VAR)
+                else:
+                    replaced = literal.replace("_", "")
+                    if self.dialect.NUMBERS_CAN_BE_UNDERSCORE_SEPARATED and replaced.isdigit():
+                        return self._add(TokenType.NUMBER, number_text + replaced)
+                    if self.dialect.IDENTIFIERS_CAN_START_WITH_DIGIT:
+                        return self._add(TokenType.VAR)
 
                 self._advance(-len(literal))
                 return self._add(TokenType.NUMBER, number_text)

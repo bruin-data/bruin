@@ -1,6 +1,5 @@
 /* @bruin
 name: cars
-type: athena.sql
 materialization:
    type: table
    strategy: delete+insert

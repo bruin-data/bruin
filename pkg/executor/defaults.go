@@ -9,23 +9,22 @@ type Config map[scheduler.TaskInstanceType]Operator
 
 var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 	pipeline.AssetTypeBigqueryQuery: {
-		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
-		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
 	},
 	pipeline.AssetTypeBigqueryTableSensor: {
-		scheduler.TaskInstanceTypeMain: NoOpOperator{},
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
 	},
 	pipeline.AssetTypeBigqueryQuerySensor: {
-		scheduler.TaskInstanceTypeMain: NoOpOperator{},
-	},
-	"bq.cost_tracker": {
-		scheduler.TaskInstanceTypeMain: NoOpOperator{},
-	},
-	"bq.transfer": {
-		scheduler.TaskInstanceTypeMain: NoOpOperator{},
-	},
-	"bq.sensor.partition": {
-		scheduler.TaskInstanceTypeMain: NoOpOperator{},
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
 	},
 	pipeline.AssetTypeBigquerySource: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
@@ -36,12 +35,6 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 	pipeline.AssetTypeBigquerySeed: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
-	},
-	"gcs.from.s3": {
-		scheduler.TaskInstanceTypeMain: NoOpOperator{},
-	},
-	"gcs.delete": {
-		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
 	"gcs.sensor.object_sensor_with_prefix": {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
@@ -60,6 +53,16 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 	},
 	pipeline.AssetTypePostgresQuery: {
+		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
+	},
+	pipeline.AssetTypeClickHouse: {
+		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
+	},
+	pipeline.AssetTypeClickHouseSeed: {
 		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
 		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
 		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},

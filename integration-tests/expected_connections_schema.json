@@ -178,6 +178,46 @@
         "players"
       ]
     },
+    "ClickHouseConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "database": {
+          "type": "string"
+        },
+        "http_port": {
+          "type": "integer"
+        },
+        "secure": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "database",
+        "http_port",
+        "secure"
+      ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -318,6 +358,12 @@
           },
           "type": "array"
         },
+        "clickhouse": {
+          "items": {
+            "$ref": "#/$defs/ClickHouseConnection"
+          },
+          "type": "array"
+        },
         "hubspot": {
           "items": {
             "$ref": "#/$defs/HubspotConnection"
@@ -384,9 +430,27 @@
           },
           "type": "array"
         },
+        "googleads": {
+          "items": {
+            "$ref": "#/$defs/GoogleAdsConnection"
+          },
+          "type": "array"
+        },
         "appstore": {
           "items": {
             "$ref": "#/$defs/AppStoreConnection"
+          },
+          "type": "array"
+        },
+        "linkedinads": {
+          "items": {
+            "$ref": "#/$defs/LinkedInAdsConnection"
+          },
+          "type": "array"
+        },
+        "gcs": {
+          "items": {
+            "$ref": "#/$defs/GCSConnection"
           },
           "type": "array"
         }
@@ -491,6 +555,26 @@
         "account_id"
       ]
     },
+    "GCSConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "service_account_file": {
+          "type": "string"
+        },
+        "service_account_json": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "service_account_file",
+        "service_account_json"
+      ]
+    },
     "GenericConnection": {
       "properties": {
         "name": {
@@ -528,6 +612,32 @@
         "name",
         "owner",
         "repo"
+      ]
+    },
+    "GoogleAdsConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "customer_id": {
+          "type": "string"
+        },
+        "service_account_json": {
+          "type": "string"
+        },
+        "service_account_file": {
+          "type": "string"
+        },
+        "dev_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "customer_id",
+        "dev_token"
       ]
     },
     "GoogleCloudPlatformConnection": {
@@ -697,6 +807,26 @@
       "required": [
         "name",
         "api_key"
+      ]
+    },
+    "LinkedInAdsConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        },
+        "account_ids": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token",
+        "account_ids"
       ]
     },
     "MongoConnection": {

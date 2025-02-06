@@ -13,6 +13,7 @@ import (
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/clickhouse"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/date"
@@ -116,7 +117,7 @@ func Render() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			asset, err := DefaultPipelineBuilder.CreateAssetFromFile(inputPath)
+			asset, err := DefaultPipelineBuilder.CreateAssetFromFile(inputPath, pl)
 			if err != nil {
 				printError(err, c.String("output"), "Failed to read the asset definition file:")
 				return cli.Exit("", 1)
@@ -169,13 +170,14 @@ func Render() *cli.Command {
 					pipeline.AssetTypeSynapseQuery:    synapse.NewRenderer(fullRefresh),
 					pipeline.AssetTypeAthenaQuery:     athena.NewRenderer(fullRefresh, resultsLocation),
 					pipeline.AssetTypeDuckDBQuery:     duck.NewMaterializer(fullRefresh),
+					pipeline.AssetTypeClickHouse:      clickhouse.NewRenderer(fullRefresh),
 				},
 				builder: DefaultPipelineBuilder,
 				writer:  os.Stdout,
 				output:  c.String("output"),
 			}
 
-			return r.Run(inputPath)
+			return r.Run(inputPath, pl)
 		},
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
@@ -191,7 +193,7 @@ type queryMaterializer interface {
 }
 
 type taskCreator interface {
-	CreateAssetFromFile(path string) (*pipeline.Asset, error)
+	CreateAssetFromFile(path string, foundPipeline *pipeline.Pipeline) (*pipeline.Asset, error)
 }
 
 type RenderCommand struct {
@@ -203,7 +205,7 @@ type RenderCommand struct {
 	writer io.Writer
 }
 
-func (r *RenderCommand) Run(taskPath string) error {
+func (r *RenderCommand) Run(taskPath string, foundPipeline *pipeline.Pipeline) error {
 	defer RecoverFromPanic()
 
 	if taskPath == "" {
@@ -211,7 +213,7 @@ func (r *RenderCommand) Run(taskPath string) error {
 		return cli.Exit("", 1)
 	}
 
-	task, err := r.builder.CreateAssetFromFile(taskPath)
+	task, err := r.builder.CreateAssetFromFile(taskPath, foundPipeline)
 	if err != nil {
 		r.printErrorOrJsonf("Failed to build asset: %v\n", err.Error())
 		return cli.Exit("", 1)

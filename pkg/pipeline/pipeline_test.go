@@ -170,10 +170,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			Name: "pipeline.yml",
 			Path: path.AbsPathForTests(t, "testdata/pipeline/first-pipeline/pipeline.yml"),
 		},
-		DefaultParameters: map[string]string{
-			"param1": "value1",
-			"param2": "value2",
-		},
+
 		DefaultConnections: map[string]string{
 			"slack":           "slack-connection",
 			"gcpConnectionId": "gcp-connection-id-here",
@@ -254,7 +251,6 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 			assert.Equal(t, tt.want.Schedule, got.Schedule)
 			assert.Equal(t, tt.want.DefinitionFile, got.DefinitionFile)
 			assert.Equal(t, tt.want.DefaultConnections, got.DefaultConnections)
-			assert.Equal(t, tt.want.DefaultParameters, got.DefaultParameters)
 			assert.Equal(t, tt.want.Retries, got.Retries)
 
 			for i, asset := range tt.want.Assets {
@@ -832,7 +828,7 @@ func TestAsset_Persist(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			a, err := cmd.DefaultPipelineBuilder.CreateAssetFromFile(tt.assetPath)
+			a, err := cmd.DefaultPipelineBuilder.CreateAssetFromFile(tt.assetPath, nil)
 			require.NoError(t, err)
 
 			// a.ExecutableFile.Path = tt.expectedPath
