@@ -198,10 +198,12 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 		installCmdline,
 		"--force",
 		"--quiet",
-		"--reinstall",
 		"--python",
 		pythonVersionForIngestr,
 	)
+	if isLocal {
+		installCmdline = append(installCmdline, "--reinstall")
+	}
 	installCmdline = append(installCmdline, ingestrPackageName)
 
 	err = u.Cmd.Run(ctx, repo, &CommandInstance{
