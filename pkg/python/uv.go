@@ -190,6 +190,8 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 
 	ingestrPackageName, isLocal := u.ingestrPackage(ctx)
 
+	// this can probably be refactored into a standalone
+	// method, since it's used in withMaterialisation method as well
 	installCmdline := []string{"tool", "install"}
 	for _, pkg := range extraPackages {
 		installCmdline = append(installCmdline, "--with", pkg)
