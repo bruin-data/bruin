@@ -133,32 +133,32 @@ func (p *LineageExtractor) mergeAstricColumns(foundPipeline *Pipeline, asset *As
 func (p *LineageExtractor) mergeNonSelectedColumns(asset *Asset, lineage *sqlparser.Lineage) []Upstream {
 	upstreams := make([]Upstream, 0)
 	for _, up := range asset.Upstreams {
-		upstream := up
-		lineage.NonSelectedColumns = append(lineage.NonSelectedColumns, lineage.Columns...)
-		dict := map[string]bool{}
-		for _, lineageCol := range lineage.NonSelectedColumns {
-			for _, lineageUpstream := range lineageCol.Upstream {
-				key := fmt.Sprintf("%s-%s", strings.ToLower(lineageUpstream.Table), strings.ToLower(lineageCol.Name))
-				if _, ok := dict[key]; !ok {
-					if strings.EqualFold(lineageUpstream.Table, up.Value) {
-						exists := false
-						for _, col := range upstream.Columns {
-							if strings.EqualFold(col.Name, lineageCol.Name) {
-								exists = true
-								break
-							}
-						}
-						if !exists {
-							upstream.Columns = append(upstream.Columns, DependsColumn{
-								Name: lineageCol.Name,
-							})
-						}
-						dict[key] = true
-					}
-				}
+		processedColumns := make(map[string]bool)
+
+		// Helper function to process columns
+		processColumn := func(table, column string) {
+			key := fmt.Sprintf("%s-%s", strings.ToLower(table), strings.ToLower(column))
+			if !processedColumns[key] && strings.EqualFold(table, up.Value) {
+				processedColumns[key] = true
+				up.Columns = append(up.Columns, DependsColumn{
+					Name: column,
+				})
 			}
 		}
-		upstreams = append(upstreams, upstream)
+
+		for _, lineageCol := range lineage.NonSelectedColumns {
+			for _, lineageUpstream := range lineageCol.Upstream {
+				processColumn(lineageUpstream.Table, lineageCol.Name)
+			}
+		}
+
+		for _, col := range lineage.Columns {
+			for _, colUpstream := range col.Upstream {
+				processColumn(colUpstream.Table, colUpstream.Column)
+			}
+		}
+
+		upstreams = append(upstreams, up)
 	}
 	return upstreams
 }
