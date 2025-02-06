@@ -703,14 +703,17 @@ func testAdvancedSQLFeatures(t *testing.T) {
 						Type: "bq.sql",
 						ExecutableFile: ExecutableFile{
 							Content: `
-								SELECT 
-									order_date as order,
-									COUNT(DISTINCT customer_id) as unique_customers,
-									SUM(amount) as total_sales,
-									AVG(amount) as avg_sale,
-									NOW() as report_generated_at
-								FROM raw_sales
-								GROUP BY DATE_TRUNC(order_date, MONTH)
+       SELECT
+    t.event_date,
+    t.location_code as location,
+    t.session_id as session,
+    COUNT(DISTINCT t.customer_id) as visitor_count,
+    SUM(t.activity_count) as total_activities,
+    SUM(t.interaction_count) as total_interactions,
+    CURRENT_TIMESTAMP() as created_at
+FROM raw_sales t
+GROUP BY 1, 2, 3
+ORDER BY 1, 2, 3
 							`,
 						},
 						Upstreams: []Upstream{{Value: "raw_sales"}},
@@ -722,9 +725,13 @@ func testAdvancedSQLFeatures(t *testing.T) {
 							Content: "SELECT * FROM data_sales",
 						},
 						Columns: []Column{
-							{Name: "order_date", Type: "timestamp", Description: "Order timestamp"},
-							{Name: "customer_id", Type: "int64", Description: "Customer identifier"},
-							{Name: "amount", Type: "float64", Description: "Sale amount"},
+							{Name: "event_date", Type: "date", Description: "Event date"},
+							{Name: "location_code", Type: "string", Description: "Location code"},
+							{Name: "session_id", Type: "integer", Description: "Session identifier"},
+							{Name: "customer_id", Type: "integer", Description: "Count of unique visitors"},
+							{Name: "activity_count", Type: "integer", Description: "Sum of activity counts"},
+							{Name: "interaction_count", Type: "integer", Description: "Sum of activity counts"},
+							{Name: "created_at", Type: "timestamp", Description: "Record creation timestamp"},
 						},
 					},
 				},
@@ -735,31 +742,40 @@ func testAdvancedSQLFeatures(t *testing.T) {
 						Name: "sales_summary",
 						ExecutableFile: ExecutableFile{
 							Content: `
-								SELECT 
-									order_date as order,
-									COUNT(DISTINCT customer_id) as unique_customers,
-									SUM(amount) as total_sales,
-									AVG(amount) as avg_sale,
-									NOW() as report_generated_at
-								FROM raw_sales
-								GROUP BY DATE_TRUNC(order_date, MONTH)
+       SELECT
+    t.event_date,
+    t.location_code as location,
+    t.session_id as session,
+    COUNT(DISTINCT t.customer_id) as visitor_count,
+    SUM(t.activity_count) as total_activities,
+    SUM(t.interaction_count) as total_interactions,
+    CURRENT_TIMESTAMP() as created_at
+FROM raw_sales t
+GROUP BY 1, 2, 3
+ORDER BY 1, 2, 3
 							`,
 						},
 						Columns: []Column{
-							{Name: "order", Type: "timestamp", Description: "Order timestamp", Upstreams: []*UpstreamColumn{{Column: "order_date", Table: "raw_sales"}}},
-							{Name: "unique_customers", Type: "int64", Description: "Customer identifier", Upstreams: []*UpstreamColumn{{Column: "customer_id", Table: "raw_sales"}}},
-							{Name: "total_sales", Type: "float64", Description: "Sale amount", Upstreams: []*UpstreamColumn{{Column: "amount", Table: "raw_sales"}}},
-							{Name: "avg_sale", Type: "float64", Description: "Sale amount", Upstreams: []*UpstreamColumn{{Column: "amount", Table: "raw_sales"}}},
-							{Name: "report_generated_at", Type: "UNKNOWN", Description: "Report generated at", Upstreams: []*UpstreamColumn{{}}},
+							{Name: "event_date", Type: "date", Description: "Order timestamp", Upstreams: []*UpstreamColumn{{Column: "event_date", Table: "raw_sales"}}},
+							{Name: "location", Type: "string", Description: "Customer identifier", Upstreams: []*UpstreamColumn{{Column: "location_code", Table: "raw_sales"}}},
+							{Name: "session", Type: "integer", Description: "Sale amount", Upstreams: []*UpstreamColumn{{Column: "session_id", Table: "raw_sales"}}},
+							{Name: "visitor_count", Type: "integer", Description: "Sale amount", Upstreams: []*UpstreamColumn{{Column: "customer_id", Table: "raw_sales"}}},
+							{Name: "total_activities", Type: "integer", Description: "Report generated at", Upstreams: []*UpstreamColumn{{Column: "activity_count", Table: "raw_sales"}}},
+							{Name: "total_interactions", Type: "integer", Description: "Report generated at", Upstreams: []*UpstreamColumn{{Column: "interaction_count", Table: "raw_sales"}}},
+							{Name: "created_at", Type: "TIMESTAMP", Description: "Report generated at", Upstreams: []*UpstreamColumn{{}}},
 						},
-						Upstreams: []Upstream{{Value: "raw_sales"}},
+						Upstreams: []Upstream{{Value: "raw_sales", Columns: []DependsColumn{{Name: "event_date", Usage: "raw_sales"}, {Name: "location_code", Usage: "raw_sales"}, {Name: "session_id", Usage: "raw_sales"}, {Name: "customer_id", Usage: "raw_sales"}, {Name: "activity_count", Usage: "raw_sales"}, {Name: "interaction_count", Usage: "raw_sales"}}}},
 					},
 					{
 						Name: "raw_sales",
 						Columns: []Column{
-							{Name: "order_date", Type: "timestamp", Description: "Order timestamp"},
-							{Name: "customer_id", Type: "int64", Description: "Customer identifier"},
-							{Name: "amount", Type: "float64", Description: "Sale amount"},
+							{Name: "event_date", Type: "date", Description: "Event date"},
+							{Name: "location_code", Type: "string", Description: "Location code"},
+							{Name: "session_id", Type: "integer", Description: "Session identifier"},
+							{Name: "customer_id", Type: "integer", Description: "Count of unique visitors"},
+							{Name: "activity_count", Type: "integer", Description: "Sum of activity counts"},
+							{Name: "interaction_count", Type: "integer", Description: "Sum of activity counts"},
+							{Name: "created_at", Type: "timestamp", Description: "Record creation timestamp"},
 						},
 					},
 				},
