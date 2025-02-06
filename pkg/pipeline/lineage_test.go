@@ -102,7 +102,6 @@ func assertAssetExists(t *testing.T, afterPipeline *Pipeline, asset *Asset) {
 	}
 
 	if len(asset.Upstreams) == len(assetFound.Upstreams) {
-
 		foundUpstreams := make(map[string]bool)
 		for _, upstream := range asset.Upstreams {
 			for _, upstreamFound := range upstream.Columns {
@@ -111,7 +110,6 @@ func assertAssetExists(t *testing.T, afterPipeline *Pipeline, asset *Asset) {
 		}
 		for _, upstreamFound := range assetFound.Upstreams {
 			for _, upstreamFoundCol := range upstreamFound.Columns {
-
 				if !foundUpstreams[upstreamFoundCol.Name] {
 					t.Errorf("Upstream %s not found in asset %s", upstreamFoundCol.Name, assetFound.Name)
 				}
@@ -154,7 +152,6 @@ func assertAssetExists(t *testing.T, afterPipeline *Pipeline, asset *Asset) {
 			t.Errorf("Column %s.%s upstream count mismatch: got %d, want %d",
 				asset.Name, gotCol.Name, len(gotCol.Upstreams), len(wantCol.Upstreams))
 		}
-
 	}
 }
 
