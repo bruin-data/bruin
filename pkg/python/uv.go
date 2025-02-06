@@ -204,6 +204,7 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 	if isLocal {
 		installCmdline = append(installCmdline, "--reinstall")
 	}
+
 	installCmdline = append(installCmdline, ingestrPackageName)
 
 	err = u.Cmd.Run(ctx, repo, &CommandInstance{
@@ -370,18 +371,24 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}
 
 	ingestrPackageName, isLocal := u.ingestrPackage(ctx)
+	installCmdLine := []string{
+		"tool",
+		"install",
+		"--quiet",
+		"--python",
+		pythonVersionForIngestr,
+	}
+
+	if isLocal {
+		installCmdLine = append(installCmdLine, "--reinstall")
+	}
+	installCmdLine = append(installCmdLine, ingestrPackageName)
+
 	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
 		Name: u.binaryFullPath,
-		Args: []string{
-			"tool",
-			"install",
-			"--quiet",
-			"--reinstall",
-			"--python",
-			pythonVersionForIngestr,
-			ingestrPackageName,
-		},
+		Args: installCmdLine,
 	})
+
 	if err != nil {
 		return errors.Wrap(err, "failed to install ingestr")
 	}
