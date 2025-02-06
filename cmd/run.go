@@ -142,6 +142,10 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "exp-use-winget-for-uv",
 				Usage: "use powershell to manage and install uv on windows, on non-windows systems this has no effect.",
 			},
+			&cli.StringFlag{
+				Name:  "debug-ingestr-src",
+				Usage: "Use ingestr from the given path instead of the builtin version.",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			defer func() {
@@ -340,6 +344,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
 			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, runConfig.ExpUseWingetForUv) //nolint:staticcheck
+			runCtx = context.WithValue(runCtx, python.LocalIngestr, c.String("debug-ingestr-src"))
 
 			ex.Start(runCtx, s.WorkQueue, s.Results)
 
