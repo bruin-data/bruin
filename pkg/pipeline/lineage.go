@@ -110,7 +110,7 @@ func (p *LineageExtractor) parseLineage(foundPipeline *Pipeline, asset *Asset, m
 	return p.processLineageColumns(foundPipeline, asset, lineage)
 }
 
-func (p *LineageExtractor) mergeAstricColumns(foundPipeline *Pipeline, asset *Asset, lineageCol sqlparser.ColumnLineage) error {
+func (p *LineageExtractor) mergeAsteriskColumns(foundPipeline *Pipeline, asset *Asset, lineageCol sqlparser.ColumnLineage) error {
 	for _, upstream := range lineageCol.Upstream {
 		upstreamAsset := foundPipeline.GetAssetByName(strings.ToLower(upstream.Table))
 		if upstreamAsset == nil {
@@ -176,7 +176,7 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 
 	for _, lineageCol := range lineage.Columns {
 		if lineageCol.Name == "*" {
-			err := p.mergeAstricColumns(foundPipeline, asset, lineageCol)
+			err := p.mergeAsteriskColumns(foundPipeline, asset, lineageCol)
 			if err != nil {
 				return err
 			}
