@@ -46,7 +46,7 @@
             "usage": ""
           },
           {
-            "name": "updated_at",
+            "name": "created_at",
             "usage": ""
           }
         ]
@@ -275,7 +275,7 @@
                 "usage": ""
               },
               {
-                "name": "updated_at",
+                "name": "created_at",
                 "usage": ""
               }
             ]
