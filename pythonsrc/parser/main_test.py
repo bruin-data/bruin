@@ -1813,9 +1813,7 @@ ORDER BY 1, 2, 3
                 ],
             },
         ],
-        "expected_non_selected": [
-           
-        ],
+        "expected_non_selected": [],
     },
 ]
 
