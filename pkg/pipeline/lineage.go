@@ -110,15 +110,27 @@ func (p *LineageExtractor) parseLineage(foundPipeline *Pipeline, asset *Asset, m
 	return p.processLineageColumns(foundPipeline, asset, lineage)
 }
 
-func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset *Asset, lineage *sqlparser.Lineage) error {
-	if lineage == nil {
-		return nil
-	}
+func (p *LineageExtractor) mergeAstricColumns(foundPipeline *Pipeline, asset *Asset, lineageCol sqlparser.ColumnLineage) error {
+	for _, upstream := range lineageCol.Upstream {
+		upstreamAsset := foundPipeline.GetAssetByName(strings.ToLower(upstream.Table))
+		if upstreamAsset == nil {
+			return nil
+		}
 
-	if asset == nil {
-		return errors.New("asset cannot be nil")
+		// If upstream column is *, copy all columns from upstream asset
+		if upstream.Column == "*" {
+			for _, upstreamCol := range upstreamAsset.Columns {
+				if err := p.addColumnToAsset(asset, upstreamCol.Name, upstreamAsset, &upstreamCol); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
 	}
+	return nil
+}
 
+func (p *LineageExtractor) mergeNonSelectedColumns(asset *Asset, lineage *sqlparser.Lineage) []Upstream {
 	upstreams := make([]Upstream, 0)
 	for _, up := range asset.Upstreams {
 		upstream := up
@@ -148,25 +160,25 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 		}
 		upstreams = append(upstreams, upstream)
 	}
-	asset.Upstreams = upstreams
+	return upstreams
+}
+
+func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset *Asset, lineage *sqlparser.Lineage) error {
+	if lineage == nil {
+		return nil
+	}
+
+	if asset == nil {
+		return errors.New("asset cannot be nil")
+	}
+
+	asset.Upstreams = p.mergeNonSelectedColumns(asset, lineage)
 
 	for _, lineageCol := range lineage.Columns {
 		if lineageCol.Name == "*" {
-			for _, upstream := range lineageCol.Upstream {
-				upstreamAsset := foundPipeline.GetAssetByName(upstream.Table)
-				if upstreamAsset == nil {
-					continue
-				}
-
-				// If upstream column is *, copy all columns from upstream asset
-				if upstream.Column == "*" {
-					for _, upstreamCol := range upstreamAsset.Columns {
-						if err := p.addColumnToAsset(asset, upstreamCol.Name, upstreamAsset, &upstreamCol); err != nil {
-							return err
-						}
-					}
-					continue
-				}
+			err := p.mergeAstricColumns(foundPipeline, asset, lineageCol)
+			if err != nil {
+				return err
 			}
 			continue
 		}
