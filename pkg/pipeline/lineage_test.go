@@ -695,6 +695,91 @@ func testJoinsAndComplexQueries(t *testing.T) {
 func testAdvancedSQLFeatures(t *testing.T) {
 	tests := []TestCase{
 		{
+			name: "snowflake complex condition",
+			pipeline: &Pipeline{
+				Assets: []*Asset{
+					{
+						Name: "sales_summary",
+						Type: "bq.sql",
+						ExecutableFile: ExecutableFile{
+							Content: `
+        SELECT 
+            case
+                when raw_sales.CancelledAt is not null
+                then coalesce(raw_sales.CancellationReason, 'Empty Reason')
+            end as CancellationReason,
+            case
+                when
+                    raw_sales.Id is not null and
+                    bookingCreditRefundedAt is null and
+                    raw_sales.Accepted
+                then 1
+                else 0
+            end as credits_spent
+        FROM raw_sales
+							`,
+						},
+						Upstreams: []Upstream{{Value: "raw_sales"}},
+					},
+					{
+						Name: "raw_sales",
+						Type: "bq.sql",
+						ExecutableFile: ExecutableFile{
+							Content: "SELECT * FROM data_sales",
+						},
+						Columns: []Column{
+							{Name: "Id", Type: "STRING", Description: "Unique identifier"},
+							{Name: "CancelledAt", Type: "TIMESTAMP", Description: "Cancellation timestamp"},
+							{Name: "CancellationReason", Type: "STRING", Description: "Reason for cancellation"},
+							{Name: "bookingCreditRefundedAt", Type: "TIMESTAMP", Description: "Timestamp when booking credit was refunded"},
+							{Name: "Accepted", Type: "BOOLEAN", Description: "Whether the booking was accepted"},
+						},
+					},
+				},
+			},
+			after: &Pipeline{
+				Assets: []*Asset{
+					{
+						Name: "sales_summary",
+						ExecutableFile: ExecutableFile{
+							Content: `
+        SELECT 
+            case
+                when raw_sales.CancelledAt is not null
+                then coalesce(raw_sales.CancellationReason, 'Empty Reason')
+            end as CancellationReason,
+            case
+                when
+                    raw_sales.Id is not null and
+                    bookingCreditRefundedAt is null and
+                    raw_sales.Accepted
+                then 1
+                else 0
+            end as credits_spent
+        FROM raw_sales
+							`,
+						},
+						Columns: []Column{
+							{Name: "cancellationreason", Type: "STRING", Description: "Reason for cancellation", Upstreams: []*UpstreamColumn{{Column: "CancellationReason", Table: "raw_sales"}, {Column: "CancelledAt", Table: "raw_sales"}}},
+							{Name: "credits_spent", Type: "BOOLEAN", Description: "Whether the booking was accepted", Upstreams: []*UpstreamColumn{{Column: "Accepted", Table: "raw_sales"}, {Column: "bookingCreditRefundedAt", Table: "raw_sales"}, {Column: "Id", Table: "raw_sales"}}},
+						},
+						Upstreams: []Upstream{{Value: "raw_sales"}},
+					},
+					{
+						Name: "raw_sales",
+						Columns: []Column{
+							{Name: "Id", Type: "STRING", Description: "Unique identifier"},
+							{Name: "CancelledAt", Type: "TIMESTAMP", Description: "Cancellation timestamp"},
+							{Name: "CancellationReason", Type: "STRING", Description: "Reason for cancellation"},
+							{Name: "bookingCreditRefundedAt", Type: "TIMESTAMP", Description: "Timestamp when booking credit was refunded"},
+							{Name: "Accepted", Type: "BOOLEAN", Description: "Whether the booking was accepted"},
+						},
+					},
+				},
+			},
+			want: nil,
+		},
+		{
 			name: "snowflake column name with as",
 			pipeline: &Pipeline{
 				Assets: []*Asset{
