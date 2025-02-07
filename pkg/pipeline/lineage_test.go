@@ -256,6 +256,7 @@ func testBasicRecursiveParsing(t *testing.T) {
 							},
 							Upstreams: []Upstream{{Value: "table3", Columns: []DependsColumn{}}},
 						},
+
 						{
 							Name: "table3",
 							Columns: []Column{
@@ -271,6 +272,215 @@ func testBasicRecursiveParsing(t *testing.T) {
 							},
 							ExecutableFile: ExecutableFile{
 								Content: "SELECT id,name,age FROM table4",
+							},
+						},
+					},
+				},
+				want: nil,
+			},
+			{
+				name: "lineage with transformed columns",
+				pipeline: &Pipeline{
+					Assets: []*Asset{
+						{
+							Name: "final_table",
+							Type: "bq.sql",
+							ExecutableFile: ExecutableFile{
+								Content: "SELECT id, UPPER(name) as upper_name, age * 2 as doubled_age FROM source_table",
+							},
+							Upstreams: []Upstream{{Value: "source_table"}},
+						},
+						{
+							Name: "source_table",
+							Columns: []Column{
+								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key", UpdateOnMerge: true},
+								{Name: "name", Type: "str", Description: "User name", UpdateOnMerge: true},
+								{Name: "age", Type: "int64", Description: "User age", UpdateOnMerge: true},
+							},
+							ExecutableFile: ExecutableFile{
+								Content: "SELECT * FROM data_table",
+							},
+						},
+					},
+				},
+				after: &Pipeline{
+					Assets: []*Asset{
+						{
+							Name: "final_table",
+							Type: "bq.sql",
+							ExecutableFile: ExecutableFile{
+								Content: "SELECT id, UPPER(name) as upper_name, age * 2 as doubled_age FROM source_table",
+							},
+							Columns: []Column{
+								{Name: "id", Type: "int64", PrimaryKey: false, Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}, UpdateOnMerge: true, Description: "Primary key", Checks: []ColumnCheck{}},
+								{Name: "upper_name", Type: "str", Upstreams: []*UpstreamColumn{{Column: "name", Table: "source_table"}}, UpdateOnMerge: true, Description: "User name", Checks: []ColumnCheck{}},
+								{Name: "doubled_age", Type: "int64", Upstreams: []*UpstreamColumn{{Column: "age", Table: "source_table"}}, UpdateOnMerge: true, Description: "User age", Checks: []ColumnCheck{}},
+							},
+							Upstreams: []Upstream{{Value: "source_table", Columns: []DependsColumn{{Name: "id"}, {Name: "name"}, {Name: "age"}}}},
+						},
+						{
+							Name: "source_table",
+							Columns: []Column{
+								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
+								{Name: "name", Type: "str", Description: "User name"},
+								{Name: "age", Type: "int64", Description: "User age"},
+							},
+							ExecutableFile: ExecutableFile{
+								Content: "SELECT * FROM data_table",
+							},
+						},
+					},
+				},
+				want: nil,
+			},
+			{
+				name: "lineage with column subset",
+				pipeline: &Pipeline{
+					Assets: []*Asset{
+						{
+							Name: "subset_table",
+							Type: "bq.sql",
+							ExecutableFile: ExecutableFile{
+								Content: "SELECT id, name FROM source_table",
+							},
+							Upstreams: []Upstream{{Value: "source_table"}},
+						},
+						{
+							Name: "source_table",
+							Columns: []Column{
+								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
+								{Name: "name", Type: "str", Description: "User name"},
+								{Name: "age", Type: "int64", Description: "User age"},
+							},
+						},
+					},
+				},
+				after: &Pipeline{
+					Assets: []*Asset{
+						{
+							Name: "subset_table",
+							Type: "bq.sql",
+							ExecutableFile: ExecutableFile{
+								Content: "SELECT id, name FROM source_table",
+							},
+							Columns: []Column{
+								{Name: "id", Type: "int64", PrimaryKey: false, Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
+								{Name: "name", Type: "str", Description: "User name", Upstreams: []*UpstreamColumn{{Column: "name", Table: "source_table"}}},
+							},
+							Upstreams: []Upstream{{Value: "source_table", Columns: []DependsColumn{{Name: "id"}, {Name: "name"}}}},
+						},
+						{
+							Name: "source_table",
+							Columns: []Column{
+								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
+								{Name: "name", Type: "str", Description: "User name"},
+								{Name: "age", Type: "int64", Description: "User age"},
+							},
+						},
+					},
+				},
+				want: nil,
+			},
+			{
+				name: "lineage with column aliases",
+				pipeline: &Pipeline{
+					Assets: []*Asset{
+						{
+							Name: "alias_table",
+							Type: "bq.sql",
+							ExecutableFile: ExecutableFile{
+								Content: "SELECT id as user_id, name as full_name FROM source_table",
+							},
+							Upstreams: []Upstream{{Value: "source_table"}},
+						},
+						{
+							Name: "source_table",
+							Columns: []Column{
+								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
+								{Name: "name", Type: "str", Description: "User name"},
+							},
+							ExecutableFile: ExecutableFile{
+								Content: "SELECT * FROM data_table",
+							},
+						},
+					},
+				},
+				after: &Pipeline{
+					Assets: []*Asset{
+						{
+							Name: "alias_table",
+							Type: "bq.sql",
+							ExecutableFile: ExecutableFile{
+								Content: "SELECT id as user_id, name as full_name FROM source_table",
+							},
+							Columns: []Column{
+								{Name: "user_id", Type: "int64", Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
+								{Name: "full_name", Type: "str", Description: "User name", Upstreams: []*UpstreamColumn{{Column: "name", Table: "source_table"}}},
+							},
+							Upstreams: []Upstream{{Value: "source_table", Columns: []DependsColumn{{Name: "id"}, {Name: "name"}}}},
+						},
+						{
+							Name: "source_table",
+							Columns: []Column{
+								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
+								{Name: "name", Type: "str", Description: "User name"},
+							},
+							ExecutableFile: ExecutableFile{
+								Content: "SELECT * FROM data_table",
+							},
+						},
+					},
+				},
+				want: nil,
+			},
+			{
+				name: "lineage with calculated columns",
+				pipeline: &Pipeline{
+					Assets: []*Asset{
+						{
+							Name: "calc_table",
+							Type: "bq.sql",
+							ExecutableFile: ExecutableFile{
+								Content: "SELECT id, CONCAT(first_name, ' ', last_name) as full_name FROM source_table",
+							},
+							Upstreams: []Upstream{{Value: "source_table"}},
+						},
+						{
+							Name: "source_table",
+							Columns: []Column{
+								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
+								{Name: "first_name", Type: "str", Description: "First name"},
+								{Name: "last_name", Type: "str", Description: "Last name"},
+							},
+							ExecutableFile: ExecutableFile{
+								Content: "SELECT * FROM data_table",
+							},
+						},
+					},
+				},
+				after: &Pipeline{
+					Assets: []*Asset{
+						{
+							Name: "calc_table",
+							Type: "bq.sql",
+							ExecutableFile: ExecutableFile{
+								Content: "SELECT id, CONCAT(first_name, ' ', last_name) as full_name FROM source_table",
+							},
+							Columns: []Column{
+								{Name: "id", Type: "int64", Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
+								{Name: "full_name", Type: "str", Upstreams: []*UpstreamColumn{{Column: "first_name", Table: "source_table"}, {Column: "last_name", Table: "source_table"}}},
+							},
+							Upstreams: []Upstream{{Value: "source_table", Columns: []DependsColumn{{Name: "id"}, {Name: "first_name"}, {Name: "last_name"}}}},
+						},
+						{
+							Name: "source_table",
+							Columns: []Column{
+								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
+								{Name: "first_name", Type: "str", Description: "First name"},
+								{Name: "last_name", Type: "str", Description: "Last name"},
+							},
+							ExecutableFile: ExecutableFile{
+								Content: "SELECT * FROM data_table",
 							},
 						},
 					},
