@@ -79,7 +79,7 @@
         "upstreams": [
           {
             "column": "country",
-            "table": "country"
+            "table": "users"
           }
         ]
       },
@@ -94,7 +94,7 @@
         "upstreams": [
           {
             "column": "last_name",
-            "table": "people"
+            "table": "users"
           }
         ]
       },
@@ -109,7 +109,7 @@
         "upstreams": [
           {
             "column": "name",
-            "table": "people"
+            "table": "users"
           }
         ]
       },
@@ -124,7 +124,7 @@
         "upstreams": [
           {
             "column": "created_at",
-            "table": "people"
+            "table": "users"
           }
         ]
       }
@@ -308,7 +308,7 @@
             "upstreams": [
               {
                 "column": "country",
-                "table": "country"
+                "table": "users"
               }
             ]
           },
@@ -323,7 +323,7 @@
             "upstreams": [
               {
                 "column": "last_name",
-                "table": "people"
+                "table": "users"
               }
             ]
           },
@@ -338,7 +338,7 @@
             "upstreams": [
               {
                 "column": "name",
-                "table": "people"
+                "table": "users"
               }
             ]
           },
@@ -353,7 +353,7 @@
             "upstreams": [
               {
                 "column": "created_at",
-                "table": "people"
+                "table": "users"
               }
             ]
           }
