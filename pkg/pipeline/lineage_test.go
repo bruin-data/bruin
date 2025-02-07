@@ -117,7 +117,6 @@ func assertAssetExists(t *testing.T, afterPipeline *Pipeline, asset *Asset) {
 				}
 			}
 		}
-
 	} else {
 		t.Errorf("Upstream count mismatch for asset %s: got %d, want %d",
 			asset.Name, len(asset.Upstreams), len(assetFound.Upstreams))
@@ -242,7 +241,7 @@ func testBasicRecursiveParsing(t *testing.T) {
 			// 					{Name: "name", Type: "str", Upstreams: []*UpstreamColumn{{Column: "name", Table: "table2"}}, UpdateOnMerge: false, Description: "Just a name", Checks: []ColumnCheck{}},
 			// 					{Name: "age", Type: "int64", Upstreams: []*UpstreamColumn{{Column: "age", Table: "table2"}}, UpdateOnMerge: false, Description: "Just an age", Checks: []ColumnCheck{}},
 			// 				},
-			// 				Upstreams: []Upstream{{Value: "table2", Columns: []DependsColumn{}}},
+			// 				Upstreams: []Upstream{{Value: "table2", Columns: []DependsColumn{{Name: "id"}, {Name: "name"}, {Name: "age"}}}},
 			// 			},
 			// 			{
 			// 				Name: "table2",
@@ -433,64 +432,64 @@ func testBasicRecursiveParsing(t *testing.T) {
 				},
 				want: nil,
 			},
-			// {
-			// 	name: "lineage with calculated columns",
-			// 	pipeline: &Pipeline{
-			// 		Assets: []*Asset{
-			// 			{
-			// 				Name: "calc_table",
-			// 				Type: "bq.sql",
-			// 				ExecutableFile: ExecutableFile{
-			// 					Content: "SELECT id, CONCAT(first_name, ' ', last_name) as full_name FROM source_table",
-			// 				},
-			// 				Upstreams: []Upstream{{Value: "source_table"}},
-			// 			},
-			// 			{
-			// 				Name: "source_table",
-			// 				Columns: []Column{
-			// 					{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
-			// 					{Name: "first_name", Type: "str", Description: "First name"},
-			// 					{Name: "last_name", Type: "str", Description: "Last name"},
-			// 				},
-			// 				ExecutableFile: ExecutableFile{
-			// 					Content: "SELECT * FROM data_table",
-			// 				},
-			// 			},
-			// 		},
-			// 	},
-			// 	after: &Pipeline{
-			// 		Assets: []*Asset{
-			// 			{
-			// 				Name: "calc_table",
-			// 				Type: "bq.sql",
-			// 				ExecutableFile: ExecutableFile{
-			// 					Content: "SELECT id, CONCAT(first_name, ' ', last_name) as full_name FROM source_table",
-			// 				},
-			// 				Columns: []Column{
-			// 					{Name: "id", Type: "int64", Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
-			// 					{Name: "full_name", Type: "str", Upstreams: []*UpstreamColumn{{Column: "first_name", Table: "source_table"}, {Column: "last_name", Table: "source_table"}}},
-			// 				},
-			// 				Upstreams: []Upstream{{Value: "source_table", Columns: []DependsColumn{
-			// 					{Name: "id"},
-			// 					{Name: "first_name"},
-			// 					{Name: "last_name"},
-			// 				}}},
-			// 			},
-			// 			{
-			// 				Name: "source_table",
-			// 				Columns: []Column{
-			// 					{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
-			// 					{Name: "first_name", Type: "str", Description: "First name"},
-			// 					{Name: "last_name", Type: "str", Description: "Last name"},
-			// 				},
-			// 				ExecutableFile: ExecutableFile{
-			// 					Content: "SELECT * FROM data_table",
-			// 				},
-			// 			},
-			// 		},
-			// 	},
-			// 	want: nil,
-			// },
+			{
+				name: "lineage with calculated columns",
+				pipeline: &Pipeline{
+					Assets: []*Asset{
+						{
+							Name: "calc_table",
+							Type: "bq.sql",
+							ExecutableFile: ExecutableFile{
+								Content: "SELECT id, CONCAT(first_name, ' ', last_name) as full_name FROM source_table",
+							},
+							Upstreams: []Upstream{{Value: "source_table"}},
+						},
+						{
+							Name: "source_table",
+							Columns: []Column{
+								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
+								{Name: "first_name", Type: "str", Description: "First name"},
+								{Name: "last_name", Type: "str", Description: "Last name"},
+							},
+							ExecutableFile: ExecutableFile{
+								Content: "SELECT * FROM data_table",
+							},
+						},
+					},
+				},
+				after: &Pipeline{
+					Assets: []*Asset{
+						{
+							Name: "calc_table",
+							Type: "bq.sql",
+							ExecutableFile: ExecutableFile{
+								Content: "SELECT id, CONCAT(first_name, ' ', last_name) as full_name FROM source_table",
+							},
+							Columns: []Column{
+								{Name: "id", Type: "int64", Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
+								{Name: "full_name", Type: "str", Upstreams: []*UpstreamColumn{{Column: "first_name", Table: "source_table"}, {Column: "last_name", Table: "source_table"}}},
+							},
+							Upstreams: []Upstream{{Value: "source_table", Columns: []DependsColumn{
+								{Name: "id"},
+								{Name: "first_name"},
+								{Name: "last_name"},
+							}}},
+						},
+						{
+							Name: "source_table",
+							Columns: []Column{
+								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
+								{Name: "first_name", Type: "str", Description: "First name"},
+								{Name: "last_name", Type: "str", Description: "Last name"},
+							},
+							ExecutableFile: ExecutableFile{
+								Content: "SELECT * FROM data_table",
+							},
+						},
+					},
+				},
+				want: nil,
+			},
 		}
 	}
 
