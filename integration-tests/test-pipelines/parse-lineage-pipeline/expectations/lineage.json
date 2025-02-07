@@ -64,12 +64,7 @@
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
-          "upstreams": [
-            {
-              "column": "id",
-              "table": "users"
-            }
-          ]
+          "upstreams": []
         },
         {
           "entity_attribute": null,
@@ -79,12 +74,7 @@
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
-          "upstreams": [
-            {
-              "column": "country",
-              "table": "users"
-            }
-          ]
+          "upstreams": []
         }
       ],
       "custom_checks": [],
@@ -169,12 +159,7 @@
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
-          "upstreams": [
-            {
-              "column": "country",
-              "table": "country"
-            }
-          ]
+          "upstreams": []
         },
         {
           "entity_attribute": null,
@@ -184,12 +169,7 @@
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
-          "upstreams": [
-            {
-              "column": "last_name",
-              "table": "people"
-            }
-          ]
+          "upstreams": []
         },
         {
           "entity_attribute": null,
@@ -199,12 +179,7 @@
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
-          "upstreams": [
-            {
-              "column": "name",
-              "table": "people"
-            }
-          ]
+          "upstreams": []
         },
         {
           "entity_attribute": null,
@@ -214,12 +189,7 @@
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
-          "upstreams": [
-            {
-              "column": "created_at",
-              "table": "people"
-            }
-          ]
+          "upstreams": []
         }
       ],
       "custom_checks": [],
@@ -294,12 +264,7 @@
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
-          "upstreams": [
-            {
-              "column": "created_at",
-              "table": "users"
-            }
-          ]
+          "upstreams": []
         },
         {
           "entity_attribute": null,
@@ -309,12 +274,7 @@
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
-          "upstreams": [
-            {
-              "column": "id",
-              "table": "users"
-            }
-          ]
+          "upstreams": []
         },
         {
           "entity_attribute": null,
@@ -324,12 +284,7 @@
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
-          "upstreams": [
-            {
-              "column": "last_name",
-              "table": "users"
-            }
-          ]
+          "upstreams": []
         },
         {
           "entity_attribute": null,
@@ -339,12 +294,7 @@
           "primary_key": false,
           "update_on_merge": false,
           "checks": [],
-          "upstreams": [
-            {
-              "column": "name",
-              "table": "users"
-            }
-          ]
+          "upstreams": []
         }
       ],
       "custom_checks": [],
