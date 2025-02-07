@@ -139,10 +139,21 @@ func (p *LineageExtractor) mergeNonSelectedColumns(asset *Asset, lineage *sqlpar
 		processColumn := func(table, column string) {
 			key := fmt.Sprintf("%s-%s", strings.ToLower(table), strings.ToLower(column))
 			if !processedColumns[key] && strings.EqualFold(table, up.Value) {
-				processedColumns[key] = true
-				up.Columns = append(up.Columns, DependsColumn{
-					Name: column,
-				})
+				// Check if column already exists in up.Columns
+				columnExists := false
+				for _, existingCol := range up.Columns {
+					if strings.EqualFold(existingCol.Name, column) {
+						columnExists = true
+						break
+					}
+				}
+
+				if !columnExists {
+					processedColumns[key] = true
+					up.Columns = append(up.Columns, DependsColumn{
+						Name: column,
+					})
+				}
 			}
 		}
 
@@ -155,9 +166,15 @@ func (p *LineageExtractor) mergeNonSelectedColumns(asset *Asset, lineage *sqlpar
 			}
 		}
 
-		for _, col := range asset.Columns {
-			for _, colUpstream := range col.Upstreams {
-				processColumn(colUpstream.Table, colUpstream.Column)
+		for _, col := range lineage.Columns {
+			if col.Name != "*" {
+				for _, colUpstream := range col.Upstream {
+					processColumn(colUpstream.Table, colUpstream.Column)
+				}
+				continue
+			}
+			for _, colUpstream := range asset.Columns {
+				processColumn(colUpstream.Name, colUpstream.Name)
 			}
 		}
 
@@ -183,8 +200,6 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 			}
 			continue
 		}
-
-		asset.Upstreams = p.mergeNonSelectedColumns(asset, lineage)
 
 		if len(lineageCol.Upstream) == 0 {
 			if err := p.addColumnToAsset(asset, lineageCol.Name, nil, &Column{
@@ -240,6 +255,8 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 			}
 		}
 	}
+
+	asset.Upstreams = p.mergeNonSelectedColumns(asset, lineage)
 	return nil
 }
 

@@ -24,15 +24,7 @@
             "usage": ""
           },
           {
-            "name": "id",
-            "usage": ""
-          },
-          {
-            "name": "id",
-            "usage": ""
-          },
-          {
-            "name": "id",
+            "name": "country",
             "usage": ""
           }
         ]
@@ -46,15 +38,15 @@
             "usage": ""
           },
           {
-            "name": "id",
+            "name": "last_name",
             "usage": ""
           },
           {
-            "name": "id",
+            "name": "name",
             "usage": ""
           },
           {
-            "name": "id",
+            "name": "created_at",
             "usage": ""
           }
         ]
@@ -178,10 +170,6 @@
                 "usage": ""
               },
               {
-                "name": "id",
-                "usage": ""
-              },
-              {
                 "name": "country",
                 "usage": ""
               }
@@ -265,15 +253,7 @@
                 "usage": ""
               },
               {
-                "name": "id",
-                "usage": ""
-              },
-              {
-                "name": "id",
-                "usage": ""
-              },
-              {
-                "name": "id",
+                "name": "country",
                 "usage": ""
               }
             ]
@@ -287,15 +267,15 @@
                 "usage": ""
               },
               {
-                "name": "id",
+                "name": "last_name",
                 "usage": ""
               },
               {
-                "name": "id",
+                "name": "name",
                 "usage": ""
               },
               {
-                "name": "id",
+                "name": "created_at",
                 "usage": ""
               }
             ]
@@ -408,30 +388,6 @@
                 "usage": ""
               },
               {
-                "name": "country",
-                "usage": ""
-              },
-              {
-                "name": "created_at",
-                "usage": ""
-              },
-              {
-                "name": "country",
-                "usage": ""
-              },
-              {
-                "name": "created_at",
-                "usage": ""
-              },
-              {
-                "name": "id",
-                "usage": ""
-              },
-              {
-                "name": "country",
-                "usage": ""
-              },
-              {
                 "name": "created_at",
                 "usage": ""
               },
@@ -441,6 +397,10 @@
               },
               {
                 "name": "last_name",
+                "usage": ""
+              },
+              {
+                "name": "name",
                 "usage": ""
               }
             ]

@@ -575,7 +575,7 @@ func testAdvancedSQLFeatures(t *testing.T) {
 							{Name: "cancellationreason", Type: "STRING", Description: "Reason for cancellation", Upstreams: []*UpstreamColumn{{Column: "CancellationReason", Table: "raw_sales"}, {Column: "CancelledAt", Table: "raw_sales"}}},
 							{Name: "credits_spent", Type: "BOOLEAN", Description: "Whether the booking was accepted", Upstreams: []*UpstreamColumn{{Column: "Accepted", Table: "raw_sales"}, {Column: "bookingCreditRefundedAt", Table: "raw_sales"}, {Column: "Id", Table: "raw_sales"}}},
 						},
-						Upstreams: []Upstream{{Value: "raw_sales", Columns: []DependsColumn{{Name: "accepted"}, {Name: "bookingcreditrefundedat"}, {Name: "CancellationReason"}, {Name: "CancelledAt"}, {Name: "id"}}}},
+						Upstreams: []Upstream{{Value: "raw_sales", Columns: []DependsColumn{{Name: "accepted"}, {Name: "bookingcreditrefundedat"}, {Name: "cancellationreason"}, {Name: "cancelledat"}, {Name: "id"}}}},
 					},
 					{
 						Name: "raw_sales",
