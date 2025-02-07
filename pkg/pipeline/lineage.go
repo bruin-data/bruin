@@ -363,7 +363,6 @@ func (p *LineageExtractor) updateAssetColumn(asset *Asset, col *Column) {
 	}
 }
 
-// Helper function to check if upstream exists
 func upstreamExists(upstreams []*UpstreamColumn, newUpstream UpstreamColumn) bool {
 	for _, existing := range upstreams {
 		if strings.EqualFold(existing.Column, newUpstream.Column) &&
