@@ -199,9 +199,6 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 			if upstream.Column == "*" {
 				continue
 			}
-			if upstream.Table == asset.Name {
-				continue
-			}
 
 			upstreamAsset := foundPipeline.GetAssetByName(strings.ToLower(upstream.Table))
 			if upstreamAsset == nil {
@@ -253,15 +250,17 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 		return nil
 	}
 
+	existingCol := asset.GetColumnWithName(colName)
+
 	if upstreamAsset == nil {
-		existingCol := asset.GetColumnWithName(strings.ToLower(upstreamCol.Name))
 		if existingCol == nil {
 			asset.Columns = append(asset.Columns, *upstreamCol)
 			return nil
 		}
+		existingCol.Upstreams = upstreamCol.Upstreams
 		return nil
 	}
-	existingCol := asset.GetColumnWithName(colName)
+
 	if existingCol != nil {
 		if len(existingCol.Description) == 0 {
 			existingCol.Description = upstreamCol.Description
@@ -272,16 +271,15 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 		if existingCol.EntityAttribute == nil {
 			existingCol.EntityAttribute = upstreamCol.EntityAttribute
 		}
-		newUpstream := UpstreamColumn{
-			Column: upstreamCol.Name,
+
+		for _, up := range upstreamCol.Upstreams {
+			exists, index := upstreamExists(existingCol.Upstreams, *up)
+			if !exists {
+				existingCol.Upstreams = append(existingCol.Upstreams, up)
+			}
+			existingCol.Upstreams[index] = up
 		}
 
-		if upstreamAsset != nil {
-			newUpstream.Table = upstreamAsset.Name
-		}
-		if !upstreamExists(existingCol.Upstreams, newUpstream) {
-			existingCol.Upstreams = append(existingCol.Upstreams, &newUpstream)
-		}
 		for key, col := range asset.Columns {
 			if strings.EqualFold(col.Name, existingCol.Name) {
 				asset.Columns[key] = *existingCol
@@ -313,13 +311,13 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 }
 
 // upstreamExists checks if a given upstream already exists in the list.
-func upstreamExists(upstreams []*UpstreamColumn, newUpstream UpstreamColumn) bool {
-	for _, existingUpstream := range upstreams {
+func upstreamExists(upstreams []*UpstreamColumn, newUpstream UpstreamColumn) (bool, int) {
+	for key, existingUpstream := range upstreams {
 		if strings.EqualFold(existingUpstream.Column, newUpstream.Column) {
-			return true
+			return true, key
 		}
 	}
-	return false
+	return false, 0
 }
 
 // makeColumnMap creates a map of column names to their types from a slice of columns.
