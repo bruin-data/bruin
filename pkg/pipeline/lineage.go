@@ -147,13 +147,16 @@ func (p *LineageExtractor) mergeNonSelectedColumns(asset *Asset, lineage *sqlpar
 		}
 
 		for _, lineageCol := range lineage.NonSelectedColumns {
+			if lineageCol.Name == "*" {
+				continue
+			}
 			for _, lineageUpstream := range lineageCol.Upstream {
 				processColumn(lineageUpstream.Table, lineageCol.Name)
 			}
 		}
 
-		for _, col := range lineage.Columns {
-			for _, colUpstream := range col.Upstream {
+		for _, col := range asset.Columns {
+			for _, colUpstream := range col.Upstreams {
 				processColumn(colUpstream.Table, colUpstream.Column)
 			}
 		}
@@ -172,8 +175,6 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 		return errors.New("asset cannot be nil")
 	}
 
-	asset.Upstreams = p.mergeNonSelectedColumns(asset, lineage)
-
 	for _, lineageCol := range lineage.Columns {
 		if lineageCol.Name == "*" {
 			err := p.mergeAsteriskColumns(foundPipeline, asset, lineageCol)
@@ -182,6 +183,8 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 			}
 			continue
 		}
+
+		asset.Upstreams = p.mergeNonSelectedColumns(asset, lineage)
 
 		if len(lineageCol.Upstream) == 0 {
 			if err := p.addColumnToAsset(asset, lineageCol.Name, nil, &Column{
