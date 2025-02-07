@@ -242,7 +242,6 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 
 // addColumnToAsset adds a new column to the asset based on upstream information.
 func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstreamAsset *Asset, upstreamCol *Column) error {
-	// ... existing code ...
 	if asset == nil || colName == "" {
 		return errors.New("invalid arguments: all parameters must be non-nil and colName must not be empty")
 	}
@@ -253,73 +252,61 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 
 	existingCol := asset.GetColumnWithName(colName)
 
+	// Create new upstream column reference
+	newUpstream := &UpstreamColumn{
+		Column: upstreamCol.Name,
+	}
+	if upstreamAsset != nil {
+		newUpstream.Table = upstreamAsset.Name
+	}
+
 	// Handle case when there's no upstream asset
 	if upstreamAsset == nil {
-		return p.handleNoUpstreamAsset(asset, existingCol, upstreamCol)
+		if existingCol == nil {
+			upstreamCol.Upstreams = []*UpstreamColumn{newUpstream}
+			asset.Columns = append(asset.Columns, *upstreamCol)
+			return nil
+		}
+		existingCol.Upstreams = []*UpstreamColumn{newUpstream}
+		p.updateAssetColumn(asset, existingCol)
+		return nil
 	}
 
 	// Handle existing column case
 	if existingCol != nil {
-		return p.updateExistingColumn(asset, existingCol, upstreamCol)
-	}
+		if len(existingCol.Description) == 0 {
+			existingCol.Description = upstreamCol.Description
+		}
+		if len(existingCol.Type) == 0 {
+			existingCol.Type = upstreamCol.Type
+		}
+		if existingCol.EntityAttribute == nil {
+			existingCol.EntityAttribute = upstreamCol.EntityAttribute
+		}
+		existingCol.UpdateOnMerge = upstreamCol.UpdateOnMerge
 
-	// Create new column
-	newCol := p.createNewColumn(colName, upstreamCol)
-	p.updateColumnUpstreams(newCol, upstreamCol.Upstreams)
-	asset.Columns = append(asset.Columns, *newCol)
-
-	return nil
-}
-
-func (p *LineageExtractor) handleNoUpstreamAsset(asset *Asset, existingCol *Column, upstreamCol *Column) error {
-	if existingCol == nil {
-		asset.Columns = append(asset.Columns, *upstreamCol)
+		// Update upstreams
+		if !upstreamExists(existingCol.Upstreams, *newUpstream) {
+			existingCol.Upstreams = append(existingCol.Upstreams, newUpstream)
+		}
+		p.updateAssetColumn(asset, existingCol)
 		return nil
 	}
 
-	existingCol.Upstreams = upstreamCol.Upstreams
-	p.updateAssetColumn(asset, existingCol)
-	return nil
-}
-
-func (p *LineageExtractor) updateExistingColumn(asset *Asset, existingCol *Column, upstreamCol *Column) error {
-	if len(existingCol.Description) == 0 {
-		existingCol.Description = upstreamCol.Description
-	}
-	if len(existingCol.Type) == 0 {
-		existingCol.Type = upstreamCol.Type
-	}
-	if existingCol.EntityAttribute == nil {
-		existingCol.EntityAttribute = upstreamCol.EntityAttribute
-	}
-
-	p.updateColumnUpstreams(existingCol, upstreamCol.Upstreams)
-	p.updateAssetColumn(asset, existingCol)
-	return nil
-}
-
-func (p *LineageExtractor) createNewColumn(colName string, upstreamCol *Column) *Column {
-	return &Column{
+	// Create new column
+	newCol := &Column{
 		Name:            colName,
 		PrimaryKey:      false,
 		Type:            upstreamCol.Type,
 		Checks:          []ColumnCheck{},
 		Description:     upstreamCol.Description,
 		EntityAttribute: upstreamCol.EntityAttribute,
-		Upstreams:       []*UpstreamColumn{},
 		UpdateOnMerge:   upstreamCol.UpdateOnMerge,
+		Upstreams:       []*UpstreamColumn{newUpstream},
 	}
-}
+	asset.Columns = append(asset.Columns, *newCol)
 
-func (p *LineageExtractor) updateColumnUpstreams(col *Column, upstreams []*UpstreamColumn) {
-	for _, up := range upstreams {
-		exists, index := upstreamExists(col.Upstreams, *up)
-		if !exists {
-			col.Upstreams = append(col.Upstreams, up)
-		} else {
-			col.Upstreams[index] = up
-		}
-	}
+	return nil
 }
 
 func (p *LineageExtractor) updateAssetColumn(asset *Asset, col *Column) {
@@ -331,14 +318,15 @@ func (p *LineageExtractor) updateAssetColumn(asset *Asset, col *Column) {
 	}
 }
 
-// upstreamExists checks if a given upstream already exists in the list.
-func upstreamExists(upstreams []*UpstreamColumn, newUpstream UpstreamColumn) (bool, int) {
-	for key, existingUpstream := range upstreams {
-		if strings.EqualFold(existingUpstream.Column, newUpstream.Column) {
-			return true, key
+// Helper function to check if upstream exists
+func upstreamExists(upstreams []*UpstreamColumn, newUpstream UpstreamColumn) bool {
+	for _, existing := range upstreams {
+		if strings.EqualFold(existing.Column, newUpstream.Column) &&
+			strings.EqualFold(existing.Table, newUpstream.Table) {
+			return true
 		}
 	}
-	return false, 0
+	return false
 }
 
 // makeColumnMap creates a map of column names to their types from a slice of columns.
