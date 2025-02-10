@@ -8,6 +8,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/adjust"
 	"github.com/bruin-data/bruin/pkg/airtable"
+	"github.com/bruin-data/bruin/pkg/applovinmax"
 	"github.com/bruin-data/bruin/pkg/appsflyer"
 	"github.com/bruin-data/bruin/pkg/appstore"
 	"github.com/bruin-data/bruin/pkg/asana"
@@ -84,6 +85,7 @@ type Manager struct {
 	LinkedInAds  map[string]*linkedinads.Client
 	ClickHouse   map[string]*clickhouse.Client
 	GCS          map[string]*gcs.Client
+	ApplovinMax  map[string]*applovinmax.Client
 	mutex        sync.Mutex
 }
 
@@ -293,6 +295,13 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connLinkedInAds, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.LinkedInAds)...)
+
+	connApplovinMax, err := m.GetApplovinMaxConnectionWithoutDefault(name)
+	if err == nil {
+		return connApplovinMax, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.ApplovinMax)...)
+
 	connGCS, err := m.GetGCSConnectionWithoutDefault(name)
 	if err == nil {
 		return connGCS, nil
@@ -1024,6 +1033,25 @@ func (m *Manager) GetGCSConnectionWithoutDefault(name string) (*gcs.Client, erro
 	db, ok := m.GCS[name]
 	if !ok {
 		return nil, errors.Errorf("gcs connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetApplovinMaxConnection(name string) (*applovinmax.Client, error) {
+	db, err := m.GetApplovinMaxConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetApplovinMaxConnectionWithoutDefault("applovinmax-default")
+}
+
+func (m *Manager) GetApplovinMaxConnectionWithoutDefault(name string) (*applovinmax.Client, error) {
+	if m.ApplovinMax == nil {
+		return nil, errors.New("no applovinmax connections found")
+	}
+	db, ok := m.ApplovinMax[name]
+	if !ok {
+		return nil, errors.Errorf("applovinmax connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -1944,6 +1972,28 @@ func (m *Manager) AddGCSConnectionFromConfig(connection *config.GCSConnection) e
 	return nil
 }
 
+func (m *Manager) AddApplovinMaxConnectionFromConfig(connection *config.ApplovinMaxConnection) error {
+	m.mutex.Lock()
+	if m.ApplovinMax == nil {
+		m.ApplovinMax = make(map[string]*applovinmax.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := applovinmax.NewClient(applovinmax.Config{
+		APIKey:      connection.APIKey,
+		Application: connection.Application,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.ApplovinMax[connection.Name] = client
+
+	return nil
+}
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
 
@@ -2302,6 +2352,14 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 		})
 	}
 
+	for _, conn := range cm.SelectedEnvironment.Connections.ApplovinMax {
+		wg.Go(func() {
+			err := connectionManager.AddApplovinMaxConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add applovinmax connection '%s'", conn.Name))
+			}
+		})
+	}
 	for _, conn := range cm.SelectedEnvironment.Connections.GCS {
 		wg.Go(func() {
 			err := connectionManager.AddGCSConnectionFromConfig(&conn)
