@@ -39,10 +39,10 @@ func TestParseLineageRecursively(t *testing.T) {
 		t.Errorf("error initializing SQL parser: %v", err)
 	}
 	testCases := map[string]func(*testing.T){
-		"basic recursive parsing": testBasicRecursiveParsing,
-		// "joins and complex queries": testJoinsAndComplexQueries,
-		// "advanced SQL features":     testAdvancedSQLFeatures,
-		// "dialect specific features": testDialectSpecificFeatures,
+		"basic recursive parsing":   testBasicRecursiveParsing,
+		"joins and complex queries": testJoinsAndComplexQueries,
+		"advanced SQL features":     testAdvancedSQLFeatures,
+		"dialect specific features": testDialectSpecificFeatures,
 	}
 
 	for name, tc := range testCases {
