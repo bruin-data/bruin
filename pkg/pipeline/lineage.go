@@ -220,6 +220,7 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 
 			upstreamAsset := foundPipeline.GetAssetByName(strings.ToLower(upstream.Table))
 			if upstreamAsset == nil {
+
 				if err := p.addColumnToAsset(asset, lineageCol.Name, nil, &Column{
 					Name:   lineageCol.Name,
 					Type:   lineageCol.Type,
@@ -250,6 +251,7 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 					},
 				}
 			}
+
 			if err := p.addColumnToAsset(asset, lineageCol.Name, upstreamAsset, upstreamCol); err != nil {
 				return err
 			}
@@ -272,7 +274,6 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 		return p.handleUpstreamColumns(asset, colName, upstreamAsset, upstreamCol, existingCol)
 	}
 
-	// Handle direct column
 	newUpstream := createUpstreamColumn(upstreamCol.Name, upstreamAsset)
 	return p.handleDirectColumn(asset, colName, upstreamAsset, upstreamCol, existingCol, newUpstream)
 }
@@ -289,7 +290,7 @@ func validateInputs(asset *Asset, colName string) error {
 
 func (p *LineageExtractor) handleUpstreamColumns(asset *Asset, colName string, upstreamAsset *Asset, upstreamCol *Column, existingCol *Column) error {
 	for _, upstream := range upstreamCol.Upstreams {
-		newUpstream := createUpstreamColumn(upstream.Column, &Asset{Name: upstream.Table})
+		newUpstream := createUpstreamColumn(upstream.Column, upstreamAsset)
 
 		if upstreamAsset == nil {
 			if err := p.handleNilUpstreamAsset(asset, existingCol, upstreamCol, newUpstream); err != nil {
