@@ -136,7 +136,7 @@ func assertAssetExists(t *testing.T, afterPipeline *Pipeline, asset *Asset) {
 	for _, gotCol := range assetFound.Columns {
 		wantCol, exists := columnMap[gotCol.Name]
 		if !exists {
-			t.Errorf("Unexpected column %s found in asset %s", gotCol.Name, asset.Name)
+			t.Errorf("Unexpected column %s found in asset %s %v", gotCol.Name, asset.Name, gotCol)
 			continue
 		}
 
@@ -212,7 +212,7 @@ func testBasicRecursiveParsing(t *testing.T) {
 						{
 							Name: "table3",
 							Columns: []Column{
-								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Just a number", UpdateOnMerge: false, Checks: []ColumnCheck{
+								{Name: "id", Type: "int64", PrimaryKey: false, Description: "Just a number", UpdateOnMerge: false, Checks: []ColumnCheck{
 									{Name: "not_null"},
 								}},
 								{Name: "name", Type: "str", Description: "Just a name", UpdateOnMerge: false, Checks: []ColumnCheck{
@@ -260,7 +260,7 @@ func testBasicRecursiveParsing(t *testing.T) {
 						{
 							Name: "table3",
 							Columns: []Column{
-								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Just a number", UpdateOnMerge: false, Checks: []ColumnCheck{
+								{Name: "id", Type: "int64", PrimaryKey: false, Description: "Just a number", UpdateOnMerge: false, Checks: []ColumnCheck{
 									{Name: "not_null"},
 								}},
 								{Name: "name", Type: "str", Description: "Just a name", UpdateOnMerge: false, Checks: []ColumnCheck{
@@ -414,7 +414,7 @@ func testBasicRecursiveParsing(t *testing.T) {
 								Content: "SELECT id as user_id, name as full_name FROM source_table",
 							},
 							Columns: []Column{
-								{Name: "user_id", Type: "int64", Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
+								{Name: "user_id", Type: "int64", PrimaryKey: false, Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
 								{Name: "full_name", Type: "str", Description: "User name", Upstreams: []*UpstreamColumn{{Column: "name", Table: "source_table"}}},
 							},
 							Upstreams: []Upstream{{Value: "source_table", Columns: []DependsColumn{{Name: "id"}, {Name: "name"}}}},
@@ -467,7 +467,7 @@ func testBasicRecursiveParsing(t *testing.T) {
 								Content: "SELECT id, CONCAT(first_name, ' ', last_name) as full_name FROM source_table",
 							},
 							Columns: []Column{
-								{Name: "id", Type: "int64", Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
+								{Name: "id", Type: "int64", PrimaryKey: false, Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
 								{Name: "full_name", Type: "str", Upstreams: []*UpstreamColumn{{Column: "first_name", Table: "source_table"}, {Column: "last_name", Table: "source_table"}}},
 							},
 							Upstreams: []Upstream{{Value: "source_table", Columns: []DependsColumn{{Name: "id"}, {Name: "first_name"}, {Name: "last_name"}}}},
@@ -1400,7 +1400,7 @@ func TestAddColumnToAsset(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			err := lineage.addColumnToAsset(test.asset, test.colName, test.upstreamAsset, test.upstreamCol)
+			err := lineage.addColumnToAsset(test.asset, test.colName, test.upstreamCol)
 			if err != nil {
 				t.Errorf("error adding column to asset: %v", err)
 			}
@@ -1424,6 +1424,469 @@ func TestAddColumnToAsset(t *testing.T) {
 				if len(upstreamCol.Upstreams) != len(col.Upstreams) {
 					t.Errorf("upstream column mismatch: %v %v", col.Upstreams, upstreamCol.Upstreams)
 				}
+			}
+		})
+	}
+}
+
+func TestHandleExistingOrNewColumn(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		asset       *Asset
+		upstreamCol *Column
+		existingCol *Column
+		want        *Column
+		wantErr     error
+	}{
+		{
+			name: "update existing column with new upstream",
+			asset: &Asset{
+				Name: "test_table",
+				Columns: []Column{
+					{
+						Name:        "id",
+						Type:        "integer",
+						Description: "Existing description",
+						Upstreams: []*UpstreamColumn{
+							{Column: "old_id", Table: "old_table"},
+						},
+					},
+				},
+			},
+			upstreamCol: &Column{
+				Name:        "id",
+				Type:        "bigint",
+				Description: "New description",
+				Upstreams: []*UpstreamColumn{
+					{Column: "new_id", Table: "new_table"},
+				},
+			},
+			existingCol: &Column{
+				Name:        "id",
+				Type:        "integer",
+				Description: "Existing description",
+				Upstreams: []*UpstreamColumn{
+					{Column: "old_id", Table: "old_table"},
+				},
+			},
+			want: &Column{
+				Name:        "id",
+				Type:        "integer",
+				Description: "Existing description",
+				Upstreams: []*UpstreamColumn{
+					{Column: "old_id", Table: "old_table"},
+					{Column: "new_id", Table: "new_table"},
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "update existing column with duplicate upstream",
+			asset: &Asset{
+				Name: "test_table",
+				Columns: []Column{
+					{
+						Name:        "id",
+						Type:        "integer",
+						Description: "Existing description",
+						Upstreams: []*UpstreamColumn{
+							{Column: "old_id", Table: "old_table"},
+						},
+					},
+				},
+			},
+			upstreamCol: &Column{
+				Name:        "id",
+				Type:        "bigint",
+				Description: "New description",
+				Upstreams: []*UpstreamColumn{
+					{Column: "old_id", Table: "old_table"},
+				},
+			},
+			existingCol: &Column{
+				Name:        "id",
+				Type:        "integer",
+				Description: "Existing description",
+				Upstreams: []*UpstreamColumn{
+					{Column: "old_id", Table: "old_table"},
+				},
+			},
+			want: &Column{
+				Name:        "id",
+				Type:        "integer",
+				Description: "Existing description",
+				Upstreams: []*UpstreamColumn{
+					{Column: "old_id", Table: "old_table"},
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "update existing column with multiple new upstreams",
+			asset: &Asset{
+				Name: "test_table",
+				Columns: []Column{
+					{
+						Name:        "id",
+						Type:        "integer",
+						Description: "Existing description",
+						Upstreams: []*UpstreamColumn{
+							{Column: "old_id", Table: "old_table"},
+						},
+					},
+				},
+			},
+			upstreamCol: &Column{
+				Name:        "id",
+				Type:        "bigint",
+				Description: "New description",
+				Upstreams: []*UpstreamColumn{
+					{Column: "new_id1", Table: "new_table1"},
+					{Column: "new_id2", Table: "new_table2"},
+				},
+			},
+			existingCol: &Column{
+				Name:        "id",
+				Type:        "integer",
+				Description: "Existing description",
+				Upstreams: []*UpstreamColumn{
+					{Column: "old_id", Table: "old_table"},
+				},
+			},
+			want: &Column{
+				Name:        "id",
+				Type:        "integer",
+				Description: "Existing description",
+				Upstreams: []*UpstreamColumn{
+					{Column: "old_id", Table: "old_table"},
+					{Column: "new_id1", Table: "new_table1"},
+					{Column: "new_id2", Table: "new_table2"},
+				},
+			},
+			wantErr: nil,
+		},
+	}
+
+	err := SetupSQLParser()
+	if err != nil {
+		t.Errorf("error initializing SQL parser: %v", err)
+	}
+	lineage := NewLineageExtractor(SQLParser)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := lineage.handleExistingOrNewColumn(tt.asset, tt.upstreamCol, tt.existingCol)
+			if err != tt.wantErr {
+				t.Errorf("handleExistingOrNewColumn() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.existingCol.Name != tt.want.Name {
+				t.Errorf("Column name = %v, want %v", tt.existingCol.Name, tt.want.Name)
+			}
+			if tt.existingCol.Type != tt.want.Type {
+				t.Errorf("Column type = %v, want %v", tt.existingCol.Type, tt.want.Type)
+			}
+			if tt.existingCol.Description != tt.want.Description {
+				t.Errorf("Column description = %v, want %v", tt.existingCol.Description, tt.want.Description)
+			}
+			if len(tt.existingCol.Upstreams) != len(tt.want.Upstreams) {
+				t.Errorf("Column upstreams length = %v, want %v", len(tt.existingCol.Upstreams), len(tt.want.Upstreams))
+			}
+
+			for _, wantUpstream := range tt.want.Upstreams {
+				found := false
+				for _, gotUpstream := range tt.existingCol.Upstreams {
+					if gotUpstream.Column == wantUpstream.Column && gotUpstream.Table == wantUpstream.Table {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("Expected upstream {Column: %v, Table: %v} not found", wantUpstream.Column, wantUpstream.Table)
+				}
+			}
+		})
+	}
+}
+
+func TestUpdateExistingColumn(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		existingCol *Column
+		upstreamCol *Column
+		want        *Column
+	}{
+		{
+			name: "empty existing column should be updated with upstream values",
+			existingCol: &Column{
+				Name: "test_col",
+			},
+			upstreamCol: &Column{
+				Name:            "test_col",
+				Description:     "Test description",
+				Type:            "integer",
+				EntityAttribute: &EntityAttribute{Entity: "test_entity"},
+				UpdateOnMerge:   true,
+			},
+			want: &Column{
+				Name:            "test_col",
+				Description:     "Test description",
+				Type:            "integer",
+				EntityAttribute: &EntityAttribute{Entity: "test_entity"},
+				UpdateOnMerge:   true,
+			},
+		},
+		{
+			name: "existing values should not be overwritten",
+			existingCol: &Column{
+				Name:            "test_col",
+				Description:     "Existing description",
+				Type:            "string",
+				EntityAttribute: &EntityAttribute{Entity: "existing_entity"},
+				UpdateOnMerge:   false,
+			},
+			upstreamCol: &Column{
+				Name:            "test_col",
+				Description:     "New description",
+				Type:            "integer",
+				EntityAttribute: &EntityAttribute{Entity: "new_entity"},
+				UpdateOnMerge:   true,
+			},
+			want: &Column{
+				Name:            "test_col",
+				Description:     "Existing description",
+				Type:            "string",
+				EntityAttribute: &EntityAttribute{Entity: "existing_entity"},
+				UpdateOnMerge:   true,
+			},
+		},
+		{
+			name: "partial existing values should be updated",
+			existingCol: &Column{
+				Name:        "test_col",
+				Description: "Existing description",
+			},
+			upstreamCol: &Column{
+				Name:            "test_col",
+				Description:     "New description",
+				Type:            "integer",
+				EntityAttribute: &EntityAttribute{Entity: "new_entity"},
+				UpdateOnMerge:   true,
+			},
+			want: &Column{
+				Name:            "test_col",
+				Description:     "Existing description",
+				Type:            "integer",
+				EntityAttribute: &EntityAttribute{Entity: "new_entity"},
+				UpdateOnMerge:   true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			updateExistingColumn(tt.existingCol, tt.upstreamCol)
+
+			if tt.existingCol.Description != tt.want.Description {
+				t.Errorf("Description = %v, want %v", tt.existingCol.Description, tt.want.Description)
+			}
+			if tt.existingCol.Type != tt.want.Type {
+				t.Errorf("Type = %v, want %v", tt.existingCol.Type, tt.want.Type)
+			}
+			if tt.existingCol.UpdateOnMerge != tt.want.UpdateOnMerge {
+				t.Errorf("UpdateOnMerge = %v, want %v", tt.existingCol.UpdateOnMerge, tt.want.UpdateOnMerge)
+			}
+
+			if tt.want.EntityAttribute == nil {
+				if tt.existingCol.EntityAttribute != nil {
+					t.Errorf("EntityAttribute = %v, want nil", tt.existingCol.EntityAttribute)
+				}
+			} else {
+				if tt.existingCol.EntityAttribute == nil {
+					t.Errorf("EntityAttribute is nil, want %v", tt.want.EntityAttribute)
+				} else if tt.existingCol.EntityAttribute.Entity != tt.want.EntityAttribute.Entity {
+					t.Errorf("EntityAttribute.Name = %v, want %v", tt.existingCol.EntityAttribute.Entity, tt.want.EntityAttribute.Entity)
+				}
+			}
+		})
+	}
+}
+
+func TestUpdateAssetColumn(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		asset    *Asset
+		newCol   *Column
+		expected []Column
+	}{
+		{
+			name: "update existing column",
+			asset: &Asset{
+				Columns: []Column{
+					{Name: "id", Type: "integer", Description: "old description"},
+					{Name: "name", Type: "string"},
+				},
+			},
+			newCol: &Column{
+				Name:        "id",
+				Type:        "bigint",
+				Description: "new description",
+			},
+			expected: []Column{
+				{Name: "id", Type: "bigint", Description: "new description"},
+				{Name: "name", Type: "string"},
+			},
+		},
+		{
+			name: "case insensitive column match",
+			asset: &Asset{
+				Columns: []Column{
+					{Name: "ID", Type: "integer"},
+					{Name: "name", Type: "string"},
+				},
+			},
+			newCol: &Column{
+				Name: "id",
+				Type: "bigint",
+			},
+			expected: []Column{
+				{Name: "id", Type: "bigint"},
+				{Name: "name", Type: "string"},
+			},
+		},
+		{
+			name: "no matching column",
+			asset: &Asset{
+				Columns: []Column{
+					{Name: "id", Type: "integer"},
+					{Name: "name", Type: "string"},
+				},
+			},
+			newCol: &Column{
+				Name: "age",
+				Type: "integer",
+			},
+			expected: []Column{
+				{Name: "id", Type: "integer"},
+				{Name: "name", Type: "string"},
+			},
+		},
+	}
+
+	lineage := NewLineageExtractor(SQLParser)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			lineage.updateAssetColumn(tt.asset, tt.newCol)
+
+			if len(tt.asset.Columns) != len(tt.expected) {
+				t.Errorf("got %d columns, want %d", len(tt.asset.Columns), len(tt.expected))
+				return
+			}
+
+			for i, got := range tt.asset.Columns {
+				want := tt.expected[i]
+				if got.Name != want.Name {
+					t.Errorf("column[%d].Name = %v, want %v", i, got.Name, want.Name)
+				}
+				if got.Type != want.Type {
+					t.Errorf("column[%d].Type = %v, want %v", i, got.Type, want.Type)
+				}
+				if got.Description != want.Description {
+					t.Errorf("column[%d].Description = %v, want %v", i, got.Description, want.Description)
+				}
+			}
+		})
+	}
+}
+
+func TestUpstreamExists(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		upstreams   []*UpstreamColumn
+		newUpstream *UpstreamColumn
+		wantExists  bool
+	}{
+		{
+			name: "exact match exists",
+			upstreams: []*UpstreamColumn{
+				{Column: "id", Table: "users"},
+				{Column: "name", Table: "profiles"},
+			},
+			newUpstream: &UpstreamColumn{
+				Column: "id",
+				Table:  "users",
+			},
+			wantExists: true,
+		},
+		{
+			name: "case insensitive match exists",
+			upstreams: []*UpstreamColumn{
+				{Column: "ID", Table: "Users"},
+				{Column: "name", Table: "profiles"},
+			},
+			newUpstream: &UpstreamColumn{
+				Column: "id",
+				Table:  "users",
+			},
+			wantExists: true,
+		},
+		{
+			name: "no match - different column",
+			upstreams: []*UpstreamColumn{
+				{Column: "id", Table: "users"},
+				{Column: "name", Table: "profiles"},
+			},
+			newUpstream: &UpstreamColumn{
+				Column: "age",
+				Table:  "users",
+			},
+			wantExists: false,
+		},
+		{
+			name: "no match - different table",
+			upstreams: []*UpstreamColumn{
+				{Column: "id", Table: "users"},
+				{Column: "name", Table: "profiles"},
+			},
+			newUpstream: &UpstreamColumn{
+				Column: "id",
+				Table:  "employees",
+			},
+			wantExists: false,
+		},
+		{
+			name:      "empty upstreams list",
+			upstreams: []*UpstreamColumn{},
+			newUpstream: &UpstreamColumn{
+				Column: "id",
+				Table:  "users",
+			},
+			wantExists: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := upstreamExists(tt.upstreams, tt.newUpstream)
+			if got != tt.wantExists {
+				t.Errorf("upstreamExists() = %v, want %v", got, tt.wantExists)
 			}
 		})
 	}
