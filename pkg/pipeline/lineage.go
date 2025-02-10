@@ -120,6 +120,7 @@ func (p *LineageExtractor) mergeAsteriskColumns(foundPipeline *Pipeline, asset *
 		// If upstream column is *, copy all columns from upstream asset
 		if upstream.Column == "*" {
 			for _, upstreamCol := range upstreamAsset.Columns {
+				upstreamCol.PrimaryKey = false
 				if err := p.addColumnToAsset(asset, upstreamCol.Name, &upstreamCol); err != nil {
 					return err
 				}
@@ -203,10 +204,11 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 
 		if len(lineageCol.Upstream) == 0 {
 			if err := p.addColumnToAsset(asset, lineageCol.Name, &Column{
-				Name:      lineageCol.Name,
-				Type:      lineageCol.Type,
-				Checks:    []ColumnCheck{},
-				Upstreams: []*UpstreamColumn{},
+				Name:       lineageCol.Name,
+				Type:       lineageCol.Type,
+				PrimaryKey: false,
+				Checks:     []ColumnCheck{},
+				Upstreams:  []*UpstreamColumn{},
 			}); err != nil {
 				return err
 			}
@@ -221,9 +223,10 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 			upstreamAsset := foundPipeline.GetAssetByNameCaseInsensitive(upstream.Table)
 			if upstreamAsset == nil {
 				if err := p.addColumnToAsset(asset, lineageCol.Name, &Column{
-					Name:   lineageCol.Name,
-					Type:   lineageCol.Type,
-					Checks: []ColumnCheck{},
+					Name:       lineageCol.Name,
+					Type:       lineageCol.Type,
+					PrimaryKey: false,
+					Checks:     []ColumnCheck{},
 					Upstreams: []*UpstreamColumn{
 						{
 							Column: upstream.Column,
@@ -238,9 +241,10 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 			upstreamCol := upstreamAsset.GetColumnWithName(upstream.Column)
 			if upstreamCol == nil {
 				upstreamCol = &Column{
-					Name:   lineageCol.Name,
-					Type:   lineageCol.Type,
-					Checks: []ColumnCheck{},
+					Name:       lineageCol.Name,
+					Type:       lineageCol.Type,
+					PrimaryKey: false,
+					Checks:     []ColumnCheck{},
 					Upstreams: []*UpstreamColumn{
 						{
 							Column: upstream.Column,
@@ -262,7 +266,6 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 			if err := p.addColumnToAsset(asset, lineageCol.Name, upstreamCol); err != nil {
 				return err
 			}
-
 		}
 	}
 
@@ -309,6 +312,7 @@ func (p *LineageExtractor) handleExistingOrNewColumn(asset *Asset, upstreamCol *
 			existingCol.Upstreams = append(existingCol.Upstreams, upstream)
 		}
 	}
+
 	p.updateAssetColumn(asset, existingCol)
 	return nil
 }
@@ -324,6 +328,7 @@ func updateExistingColumn(existingCol *Column, upstreamCol *Column) {
 		existingCol.EntityAttribute = upstreamCol.EntityAttribute
 	}
 	existingCol.UpdateOnMerge = upstreamCol.UpdateOnMerge
+	existingCol.PrimaryKey = false
 }
 
 func (p *LineageExtractor) updateAssetColumn(asset *Asset, col *Column) {
