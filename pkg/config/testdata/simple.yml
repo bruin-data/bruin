@@ -226,6 +226,10 @@ environments:
       gcs:
         - name: "gcs-1"
           service_account_file: "/path/to/service_account.json"
+      applovinmax:
+        - name: "applovinmax-1"
+          api_key: "api-key-123"
+          application: "application-123"
 
 
   prod:
