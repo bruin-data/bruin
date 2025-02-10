@@ -59,6 +59,7 @@ type Connections struct {
 	AppStore            []AppStoreConnection            `yaml:"appstore,omitempty" json:"appstore,omitempty" mapstructure:"appstore"`
 	LinkedInAds         []LinkedInAdsConnection         `yaml:"linkedinads,omitempty" json:"linkedinads,omitempty" mapstructure:"linkedinads"`
 	GCS                 []GCSConnection                 `yaml:"gcs,omitempty" json:"gcs,omitempty" mapstructure:"gcs"`
+	ApplovinMax         []ApplovinMaxConnection         `yaml:"applovinmax,omitempty" json:"applovinmax,omitempty" mapstructure:"applovinmax"`
 
 	byKey       map[string]any
 	typeNameMap map[string]string
@@ -608,6 +609,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.ClickHouse = append(env.Connections.ClickHouse, conn)
+	case "applovinmax":
+		var conn ApplovinMaxConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.ApplovinMax = append(env.Connections.ApplovinMax, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -717,6 +725,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.GCS = removeConnection(env.Connections.GCS, connectionName)
 	case "clickhouse":
 		env.Connections.ClickHouse = removeConnection(env.Connections.ClickHouse, connectionName)
+	case "applovinmax":
+		env.Connections.ApplovinMax = removeConnection(env.Connections.ApplovinMax, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}

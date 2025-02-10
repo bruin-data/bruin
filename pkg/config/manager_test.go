@@ -361,6 +361,13 @@ func TestLoadFromFile(t *testing.T) {
 					ServiceAccountFile: "/path/to/service_account.json",
 				},
 			},
+			ApplovinMax: []ApplovinMaxConnection{
+				{
+					Name:        "applovinmax-1",
+					APIKey:      "api-key-123",
+					Application: "application-123",
+				},
+			},
 		},
 	}
 
