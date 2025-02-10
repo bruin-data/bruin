@@ -136,7 +136,7 @@ func assertAssetExists(t *testing.T, afterPipeline *Pipeline, asset *Asset) {
 	for _, gotCol := range assetFound.Columns {
 		wantCol, exists := columnMap[gotCol.Name]
 		if !exists {
-			t.Errorf("Unexpected column %s found in asset %s %v", gotCol.Name, asset.Name, gotCol)
+			t.Errorf("Unexpected column %s found in asset %s", gotCol.Name, asset.Name)
 			continue
 		}
 
@@ -212,7 +212,7 @@ func testBasicRecursiveParsing(t *testing.T) {
 						{
 							Name: "table3",
 							Columns: []Column{
-								{Name: "id", Type: "int64", PrimaryKey: false, Description: "Just a number", UpdateOnMerge: false, Checks: []ColumnCheck{
+								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Just a number", UpdateOnMerge: false, Checks: []ColumnCheck{
 									{Name: "not_null"},
 								}},
 								{Name: "name", Type: "str", Description: "Just a name", UpdateOnMerge: false, Checks: []ColumnCheck{
@@ -260,7 +260,7 @@ func testBasicRecursiveParsing(t *testing.T) {
 						{
 							Name: "table3",
 							Columns: []Column{
-								{Name: "id", Type: "int64", PrimaryKey: false, Description: "Just a number", UpdateOnMerge: false, Checks: []ColumnCheck{
+								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Just a number", UpdateOnMerge: false, Checks: []ColumnCheck{
 									{Name: "not_null"},
 								}},
 								{Name: "name", Type: "str", Description: "Just a name", UpdateOnMerge: false, Checks: []ColumnCheck{
@@ -414,7 +414,7 @@ func testBasicRecursiveParsing(t *testing.T) {
 								Content: "SELECT id as user_id, name as full_name FROM source_table",
 							},
 							Columns: []Column{
-								{Name: "user_id", Type: "int64", PrimaryKey: false, Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
+								{Name: "user_id", Type: "int64", Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
 								{Name: "full_name", Type: "str", Description: "User name", Upstreams: []*UpstreamColumn{{Column: "name", Table: "source_table"}}},
 							},
 							Upstreams: []Upstream{{Value: "source_table", Columns: []DependsColumn{{Name: "id"}, {Name: "name"}}}},
@@ -467,7 +467,7 @@ func testBasicRecursiveParsing(t *testing.T) {
 								Content: "SELECT id, CONCAT(first_name, ' ', last_name) as full_name FROM source_table",
 							},
 							Columns: []Column{
-								{Name: "id", Type: "int64", PrimaryKey: false, Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
+								{Name: "id", Type: "int64", Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
 								{Name: "full_name", Type: "str", Upstreams: []*UpstreamColumn{{Column: "first_name", Table: "source_table"}, {Column: "last_name", Table: "source_table"}}},
 							},
 							Upstreams: []Upstream{{Value: "source_table", Columns: []DependsColumn{{Name: "id"}, {Name: "first_name"}, {Name: "last_name"}}}},
