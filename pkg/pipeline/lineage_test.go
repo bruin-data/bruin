@@ -101,6 +101,27 @@ func assertAssetExists(t *testing.T, afterPipeline *Pipeline, asset *Asset) {
 		return
 	}
 
+	if len(asset.Upstreams) == len(assetFound.Upstreams) {
+		foundUpstreams := make(map[string]bool)
+
+		for _, upstreamFound := range assetFound.Upstreams {
+			for _, upstreamFoundCol := range upstreamFound.Columns {
+				foundUpstreams[upstreamFoundCol.Name] = true
+			}
+		}
+
+		for _, upstream := range asset.Upstreams {
+			for _, upstreamFound := range upstream.Columns {
+				if !foundUpstreams[upstreamFound.Name] {
+					t.Errorf("Upstream %s not found in asset %s and column %s", upstreamFound.Name, assetFound.Name, upstream.Value)
+				}
+			}
+		}
+	} else {
+		t.Errorf("Upstream count mismatch for asset %s: got %d, want %d",
+			asset.Name, len(asset.Upstreams), len(assetFound.Upstreams))
+	}
+
 	if len(asset.Columns) != len(assetFound.Columns) {
 		t.Errorf("Column count mismatch for asset %s: got %d, want %d",
 			asset.Name, len(asset.Columns), len(assetFound.Columns))
@@ -220,7 +241,7 @@ func testBasicRecursiveParsing(t *testing.T) {
 								{Name: "name", Type: "str", Upstreams: []*UpstreamColumn{{Column: "name", Table: "table2"}}, UpdateOnMerge: false, Description: "Just a name", Checks: []ColumnCheck{}},
 								{Name: "age", Type: "int64", Upstreams: []*UpstreamColumn{{Column: "age", Table: "table2"}}, UpdateOnMerge: false, Description: "Just an age", Checks: []ColumnCheck{}},
 							},
-							Upstreams: []Upstream{{Value: "table2"}},
+							Upstreams: []Upstream{{Value: "table2", Columns: []DependsColumn{{Name: "id"}, {Name: "name"}, {Name: "age"}}}},
 						},
 						{
 							Name: "table2",
@@ -233,8 +254,9 @@ func testBasicRecursiveParsing(t *testing.T) {
 								{Name: "name", Type: "str", Upstreams: []*UpstreamColumn{{Column: "name", Table: "table3"}}, UpdateOnMerge: false, Description: "Just a name", Checks: []ColumnCheck{}},
 								{Name: "age", Type: "int64", Upstreams: []*UpstreamColumn{{Column: "age", Table: "table3"}}, UpdateOnMerge: false, Description: "Just an age", Checks: []ColumnCheck{}},
 							},
-							Upstreams: []Upstream{{Value: "table3"}},
+							Upstreams: []Upstream{{Value: "table3", Columns: []DependsColumn{}}},
 						},
+
 						{
 							Name: "table3",
 							Columns: []Column{
@@ -294,7 +316,7 @@ func testBasicRecursiveParsing(t *testing.T) {
 								{Name: "upper_name", Type: "str", Upstreams: []*UpstreamColumn{{Column: "name", Table: "source_table"}}, UpdateOnMerge: true, Description: "User name", Checks: []ColumnCheck{}},
 								{Name: "doubled_age", Type: "int64", Upstreams: []*UpstreamColumn{{Column: "age", Table: "source_table"}}, UpdateOnMerge: true, Description: "User age", Checks: []ColumnCheck{}},
 							},
-							Upstreams: []Upstream{{Value: "source_table"}},
+							Upstreams: []Upstream{{Value: "source_table", Columns: []DependsColumn{{Name: "id"}, {Name: "name"}, {Name: "age"}}}},
 						},
 						{
 							Name: "source_table",
@@ -345,7 +367,7 @@ func testBasicRecursiveParsing(t *testing.T) {
 								{Name: "id", Type: "int64", PrimaryKey: false, Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
 								{Name: "name", Type: "str", Description: "User name", Upstreams: []*UpstreamColumn{{Column: "name", Table: "source_table"}}},
 							},
-							Upstreams: []Upstream{{Value: "source_table"}},
+							Upstreams: []Upstream{{Value: "source_table", Columns: []DependsColumn{{Name: "id"}, {Name: "name"}}}},
 						},
 						{
 							Name: "source_table",
@@ -395,7 +417,7 @@ func testBasicRecursiveParsing(t *testing.T) {
 								{Name: "user_id", Type: "int64", Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
 								{Name: "full_name", Type: "str", Description: "User name", Upstreams: []*UpstreamColumn{{Column: "name", Table: "source_table"}}},
 							},
-							Upstreams: []Upstream{{Value: "source_table"}},
+							Upstreams: []Upstream{{Value: "source_table", Columns: []DependsColumn{{Name: "id"}, {Name: "name"}}}},
 						},
 						{
 							Name: "source_table",
@@ -448,7 +470,7 @@ func testBasicRecursiveParsing(t *testing.T) {
 								{Name: "id", Type: "int64", Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
 								{Name: "full_name", Type: "str", Upstreams: []*UpstreamColumn{{Column: "first_name", Table: "source_table"}, {Column: "last_name", Table: "source_table"}}},
 							},
-							Upstreams: []Upstream{{Value: "source_table"}},
+							Upstreams: []Upstream{{Value: "source_table", Columns: []DependsColumn{{Name: "id"}, {Name: "first_name"}, {Name: "last_name"}}}},
 						},
 						{
 							Name: "source_table",
@@ -608,10 +630,10 @@ func testJoinsAndComplexQueries(t *testing.T) {
 							},
 						},
 						Upstreams: []Upstream{
-							{Value: "orders"},
-							{Value: "customers"},
-							{Value: "products"},
-							{Value: "order_status"},
+							{Value: "orders", Columns: []DependsColumn{{Name: "order_id"}, {Name: "customer_id"}, {Name: "product_id"}, {Name: "quantity"}, {Name: "status_id"}}},
+							{Value: "customers", Columns: []DependsColumn{{Name: "customer_id"}, {Name: "customer_name"}}},
+							{Value: "products", Columns: []DependsColumn{{Name: "product_id"}, {Name: "product_name"}, {Name: "price"}}},
+							{Value: "order_status", Columns: []DependsColumn{{Name: "status_id"}, {Name: "status_description"}}},
 						},
 					},
 					{
@@ -649,7 +671,7 @@ func testJoinsAndComplexQueries(t *testing.T) {
 								Upstreams:   []*UpstreamColumn{{Column: "status_id", Table: "raw_orders"}},
 							},
 						},
-						Upstreams: []Upstream{{Value: "raw_orders"}},
+						Upstreams: []Upstream{{Value: "raw_orders", Columns: []DependsColumn{{Name: "order_id"}, {Name: "customer_id"}, {Name: "product_id"}, {Name: "quantity"}, {Name: "status_id"}, {Name: "is_valid"}}}},
 					},
 					{
 						Name: "customers",
@@ -703,21 +725,21 @@ func testAdvancedSQLFeatures(t *testing.T) {
 						Type: "bq.sql",
 						ExecutableFile: ExecutableFile{
 							Content: `
-        SELECT 
-            case
-                when raw_sales.CancelledAt is not null
-                then coalesce(raw_sales.CancellationReason, 'Empty Reason')
-            end as CancellationReason,
-            case
-                when
-                    raw_sales.Id is not null and
-                    bookingCreditRefundedAt is null and
-                    raw_sales.Accepted
-                then 1
-                else 0
-            end as credits_spent
-        FROM raw_sales
-							`,
+		        SELECT
+		            case
+		                when raw_sales.CancelledAt is not null
+		                then coalesce(raw_sales.CancellationReason, 'Empty Reason')
+		            end as CancellationReason,
+		            case
+		                when
+		                    raw_sales.Id is not null and
+		                    bookingCreditRefundedAt is null and
+		                    raw_sales.Accepted
+		                then 1
+		                else 0
+		            end as credits_spent
+		        FROM raw_sales
+									`,
 						},
 						Upstreams: []Upstream{{Value: "raw_sales"}},
 					},
@@ -743,27 +765,27 @@ func testAdvancedSQLFeatures(t *testing.T) {
 						Name: "sales_summary",
 						ExecutableFile: ExecutableFile{
 							Content: `
-        SELECT 
-            case
-                when raw_sales.CancelledAt is not null
-                then coalesce(raw_sales.CancellationReason, 'Empty Reason')
-            end as CancellationReason,
-            case
-                when
-                    raw_sales.Id is not null and
-                    bookingCreditRefundedAt is null and
-                    raw_sales.Accepted
-                then 1
-                else 0
-            end as credits_spent
-        FROM raw_sales
-							`,
+		        SELECT
+		            case
+		                when raw_sales.CancelledAt is not null
+		                then coalesce(raw_sales.CancellationReason, 'Empty Reason')
+		            end as CancellationReason,
+		            case
+		                when
+		                    raw_sales.Id is not null and
+		                    bookingCreditRefundedAt is null and
+		                    raw_sales.Accepted
+		                then 1
+		                else 0
+		            end as credits_spent
+		        FROM raw_sales
+									`,
 						},
 						Columns: []Column{
 							{Name: "cancellationreason", Type: "STRING", Description: "Reason for cancellation", Upstreams: []*UpstreamColumn{{Column: "CancellationReason", Table: "raw_sales"}, {Column: "CancelledAt", Table: "raw_sales"}}},
 							{Name: "credits_spent", Type: "BOOLEAN", Description: "Whether the booking was accepted", Upstreams: []*UpstreamColumn{{Column: "Accepted", Table: "raw_sales"}, {Column: "bookingCreditRefundedAt", Table: "raw_sales"}, {Column: "Id", Table: "raw_sales"}}},
 						},
-						Upstreams: []Upstream{{Value: "raw_sales"}},
+						Upstreams: []Upstream{{Value: "raw_sales", Columns: []DependsColumn{{Name: "accepted"}, {Name: "bookingcreditrefundedat"}, {Name: "cancellationreason"}, {Name: "cancelledat"}, {Name: "id"}}}},
 					},
 					{
 						Name: "raw_sales",
@@ -788,18 +810,18 @@ func testAdvancedSQLFeatures(t *testing.T) {
 						Type: "bq.sql",
 						ExecutableFile: ExecutableFile{
 							Content: `
-       SELECT
-    t.event_date,
-    t.location_code as location,
-    t.session_id as session,
-    COUNT(DISTINCT t.customer_id) as visitor_count,
-    SUM(t.activity_count) as total_activities,
-    SUM(t.interaction_count) as total_interactions,
-    CURRENT_TIMESTAMP() as created_at
-FROM raw_sales t
-GROUP BY 1, 2, 3
-ORDER BY 1, 2, 3
-							`,
+		       SELECT
+		    t.event_date,
+		    t.location_code as location,
+		    t.session_id as session,
+		    COUNT(DISTINCT t.customer_id) as visitor_count,
+		    SUM(t.activity_count) as total_activities,
+		    SUM(t.interaction_count) as total_interactions,
+		    CURRENT_TIMESTAMP() as created_at
+		FROM raw_sales t
+		GROUP BY 1, 2, 3
+		ORDER BY 1, 2, 3
+									`,
 						},
 						Upstreams: []Upstream{{Value: "raw_sales"}},
 					},
@@ -827,18 +849,18 @@ ORDER BY 1, 2, 3
 						Name: "sales_summary",
 						ExecutableFile: ExecutableFile{
 							Content: `
-       SELECT
-    t.event_date,
-    t.location_code as location,
-    t.session_id as session,
-    COUNT(DISTINCT t.customer_id) as visitor_count,
-    SUM(t.activity_count) as total_activities,
-    SUM(t.interaction_count) as total_interactions,
-    CURRENT_TIMESTAMP() as created_at
-FROM raw_sales t
-GROUP BY 1, 2, 3
-ORDER BY 1, 2, 3
-							`,
+		       SELECT
+		    t.event_date,
+		    t.location_code as location,
+		    t.session_id as session,
+		    COUNT(DISTINCT t.customer_id) as visitor_count,
+		    SUM(t.activity_count) as total_activities,
+		    SUM(t.interaction_count) as total_interactions,
+		    CURRENT_TIMESTAMP() as created_at
+		FROM raw_sales t
+		GROUP BY 1, 2, 3
+		ORDER BY 1, 2, 3
+									`,
 						},
 						Columns: []Column{
 							{Name: "event_date", Type: "date", Description: "Event date", Upstreams: []*UpstreamColumn{{Column: "event_date", Table: "raw_sales"}}},
@@ -876,7 +898,7 @@ ORDER BY 1, 2, 3
 						Type: "bq.sql",
 						ExecutableFile: ExecutableFile{
 							Content: `
-								SELECT 
+								SELECT
 									DATE_TRUNC(order_date, MONTH) as month,
 									COUNT(DISTINCT customer_id) as unique_customers,
 									SUM(amount) as total_sales,
@@ -945,11 +967,11 @@ ORDER BY 1, 2, 3
 							},
 							{
 								Name:      "report_generated_at",
-								Upstreams: []*UpstreamColumn{{}},
 								Type:      "UNKNOWN",
+								Upstreams: []*UpstreamColumn{{Column: "", Table: ""}},
 							},
 						},
-						Upstreams: []Upstream{{Value: "raw_sales"}},
+						Upstreams: []Upstream{{Value: "raw_sales", Columns: []DependsColumn{{Name: "order_date"}, {Name: "customer_id"}, {Name: "amount"}}}},
 					},
 					{
 						Name: "raw_sales",
@@ -1060,7 +1082,7 @@ func testDialectSpecificFeatures(t *testing.T) {
 								Checks:        []ColumnCheck{{Name: "positive"}},
 							},
 						},
-						Upstreams: []Upstream{{Value: "raw_sales"}},
+						Upstreams: []Upstream{{Value: "raw_sales", Columns: []DependsColumn{{Name: "sale_date"}, {Name: "category"}, {Name: "amount"}, {Name: "customer_id"}}}},
 					},
 					{
 						Name: "raw_sales",
@@ -1184,8 +1206,8 @@ func testDialectSpecificFeatures(t *testing.T) {
 							},
 						},
 						Upstreams: []Upstream{
-							{Value: "users"},
-							{Value: "user_departments"},
+							{Value: "users", Columns: []DependsColumn{{Name: "manager_id"}, {Name: "name"}, {Name: "hire_date"}}},
+							{Value: "user_departments", Columns: []DependsColumn{{Name: "user_id"}, {Name: "department"}}},
 						},
 					},
 					{
@@ -1255,9 +1277,29 @@ func TestAddColumnToAsset(t *testing.T) {
 					{Name: "id", Type: "integer", Description: "Just a test"},
 				},
 			},
-			after: &Asset{Name: "test", ID: "test", Upstreams: []Upstream{{Value: "test2"}}, Type: "duckdb.sql", Columns: []Column{{Name: "id", Type: "integer", Description: "Just a number", Upstreams: []*UpstreamColumn{
-				{Column: "id", Table: "test2"},
-			}}}},
+			after: &Asset{
+				Name: "test",
+				ID:   "test",
+				Type: "duckdb.sql",
+				Upstreams: []Upstream{
+					{
+						Value: "test2",
+						Columns: []DependsColumn{
+							{Name: "id"},
+						},
+					},
+				},
+				Columns: []Column{
+					{
+						Name:        "id",
+						Type:        "integer",
+						Description: "Just a number",
+						Upstreams: []*UpstreamColumn{
+							{Column: "id", Table: "test2"},
+						},
+					},
+				},
+			},
 		},
 		{
 			name: "the existing values should not be overridden but the new column should be added",

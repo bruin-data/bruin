@@ -1191,6 +1191,16 @@ func (p *Pipeline) GetAssetByPath(assetPath string) *Asset {
 	return nil
 }
 
+func (p *Pipeline) GetAssetByNameCaseInsensitive(assetName string) *Asset {
+	for key, asset := range p.tasksByName {
+		if strings.EqualFold(key, assetName) {
+			return asset
+		}
+	}
+
+	return nil
+}
+
 func (p *Pipeline) GetAssetByName(assetName string) *Asset {
 	p.ensureTaskNameMapIsFilled()
 
