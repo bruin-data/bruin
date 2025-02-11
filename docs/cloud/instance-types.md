@@ -10,13 +10,16 @@ instance: "b1.small"
 
 The following instance types are available in Bruin Cloud:
 
-| Instance Type | CPU | Memory | Description |
-|--------------|-----|--------|-------------|
-| b1.nano      | 250m | 256Mi | Smallest instance type, suitable for lightweight tasks |
-| b1.small     | 500m | 1Gi   | Good for most data processing tasks |
-| b1.medium    | 750m | 2Gi   | For medium-sized workloads |
-| b1.large     | 1    | 4Gi   | For compute-intensive tasks |
-| b1.xlarge    | 2    | 6Gi   | Largest instance type for heavy workloads |
+| Instance Type | CPU  | Memory |
+|---------------|------|--------|
+| b1.nano       | 250m | 256Mi  |
+| b1.small      | 500m | 1Gi    |
+| b1.medium     | 750m | 2Gi    |
+| b1.large      | 1    | 4Gi    |
+| b1.xlarge     | 2    | 6Gi    |
+| b1.2xlarge    | 2    | 8Gi    |
+| b1.3xlarge    | 3    | 12Gi   |
+| b1.4xlarge    | 4    | 16Gi   |
 
 By default, Bruin Cloud will use the `b1.nano` instance type.
 
