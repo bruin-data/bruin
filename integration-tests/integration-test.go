@@ -286,6 +286,20 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 						e2e.AssertByYAML,
 					},
 				},
+				{
+					Name:       "run bruin init chess",
+					Command:    binary,
+					Args:       []string{"init", "chess"},
+					WorkingDir: filepath.Join(tempdir, "test-bruin-init"),
+					Expected: e2e.Output{
+						ExitCode: 0,
+						Output:   helpers.ReadFile(filepath.Join(currentFolder, "expected_bruin_chess.yaml")),
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByYAML,
+					},
+				},
 			},
 		},
 	}
