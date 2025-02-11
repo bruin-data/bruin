@@ -288,7 +288,7 @@ func Init() *cli.Command {
 
 			successPrinter.Printf("\n\nA new '%s' pipeline created successfully in folder '%s'.\n", templateName, inputPath)
 			infoPrinter.Println("\nYou can run the following commands to get started:")
-			infoPrinter.Printf("    bruin validate\n\n")
+			infoPrinter.Printf("    bruin validate %s\n\n", inputPath)
 
 			return nil
 		},
