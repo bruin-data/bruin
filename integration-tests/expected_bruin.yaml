@@ -1,0 +1,11 @@
+default_environment: default
+environments:
+    default:
+        connections:
+            clickhouse:
+                - name: clickhouse-default
+                  username: username
+                  password: password
+                  host: 127.0.0.1
+                  port: 19000
+                  database: default

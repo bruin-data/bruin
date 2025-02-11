@@ -235,9 +235,10 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 			Name: "Bruin init",
 			Steps: []e2e.Task{
 				{
-					Name:    "create a test directory",
-					Command: "mkdir",
-					Args:    []string{"-p", filepath.Join(tempdir, "test-bruin-init")},
+					Name:       "create a test directory",
+					Command:    "mkdir",
+					WorkingDir: tempdir,
+					Args:       []string{"-p", filepath.Join(tempdir, "test-bruin-init")},
 					Expected: e2e.Output{
 						ExitCode: 0,
 					},
@@ -246,9 +247,10 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 					},
 				},
 				{
-					Name:    "change directory to test-bruin-init",
-					Command: "cd",
-					Args:    []string{filepath.Join(tempdir, "test-bruin-init")},
+					Name:       "run git init",
+					Command:    "git",
+					Args:       []string{"init"},
+					WorkingDir: filepath.Join(tempdir, "test-bruin-init"),
 					Expected: e2e.Output{
 						ExitCode: 0,
 					},
@@ -257,36 +259,31 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 					},
 				},
 				{
-					Name:    "run git init",
-					Command: "git",
-					Args:    []string{"init"},
+					Name:       "run bruin init",
+					Command:    binary,
+					Args:       []string{"init", "clickhouse"},
+					WorkingDir: filepath.Join(tempdir, "test-bruin-init"),
 					Expected: e2e.Output{
 						ExitCode: 0,
+						Output:   helpers.ReadFile(filepath.Join(currentFolder, "expected_bruin.yaml")),
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
+						e2e.AssertByYAML,
 					},
 				},
 				{
-					Name:    "run bruin init",
-					Command: binary,
-					Args:    []string{"init", "clickhouse"},
+					Name:       "run bruin init 2",
+					Command:    binary,
+					Args:       []string{"init", "clickhouse", "clickhouse2"},
+					WorkingDir: filepath.Join(tempdir, "test-bruin-init"),
 					Expected: e2e.Output{
 						ExitCode: 0,
+						Output:   helpers.ReadFile(filepath.Join(currentFolder, "expected_bruin.yaml")),
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
-					},
-				},
-				{
-					Name:    "run bruin init 2",
-					Command: binary,
-					Args:    []string{"init", "clickhouse", "clickhouse2"},
-					Expected: e2e.Output{
-						ExitCode: 0,
-					},
-					Asserts: []func(*e2e.Task) error{
-						e2e.AssertByExitCode,
+						e2e.AssertByYAML,
 					},
 				},
 			},

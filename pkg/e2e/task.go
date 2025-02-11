@@ -18,6 +18,7 @@ type Task struct {
 	Retries       int
 	Args          []string
 	Env           []string
+	WorkingDir    string
 	Expected      Output
 	Actual        Output
 	SkipJSONNodes []string
@@ -60,7 +61,9 @@ func (s *Task) Run() error {
 func (s *Task) runAttempt() error {
 	cmd := exec.Command(s.Command, s.Args...) //nolint:gosec
 	cmd.Env = append(os.Environ(), s.Env...)
-
+	if s.WorkingDir != "" {
+		cmd.Dir = s.WorkingDir
+	}
 	output, err := cmd.CombinedOutput()
 	s.Actual.ExitCode = helpers.GetExitCode(err)
 	s.Actual.Output = string(output)
