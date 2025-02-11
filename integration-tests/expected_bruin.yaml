@@ -9,3 +9,5 @@ environments:
                   host: 127.0.0.1
                   port: 19000
                   database: default
+                  http_port: 0
+                  secure: null
