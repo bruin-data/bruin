@@ -1,0 +1,19 @@
+default_environment: default
+environments:
+    default:
+        connections:
+            duckdb:
+                - name: duckdb-default
+                  path: duckdb.db
+            clickhouse:
+                - name: clickhouse-default
+                  username: username
+                  password: password
+                  host: 127.0.0.1
+                  port: 19000
+                  database: default
+            chess:
+                - name: chess-default
+                  players:
+                    - MagnusCarlsen
+                    - Hikaru
