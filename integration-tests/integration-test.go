@@ -127,7 +127,7 @@ func main() {
 }
 
 func runIntegrationWorkflow(binary string, currentFolder string) {
-	tempdir, err := os.MkdirTemp("", "bruin-test")
+	tempdir, err := os.MkdirTemp(os.TempDir(), "bruin-test")
 	if err != nil {
 		fmt.Println("Failed to create temporary directory:", err)
 		os.Exit(1)
@@ -159,6 +159,7 @@ func runIntegrationTests(binary string, currentFolder string, includeIngestr boo
 }
 
 func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Workflow {
+	tempfile := GetTempFile(tempdir, "shipping_providers.sql")
 	return []e2e.Workflow{
 		{
 			Name: "continue after failure",
@@ -180,7 +181,7 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 				{
 					Name:    "copy shipping_providers.sql to tempfile",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "continue/assets/shipping_providers.sql"), GetTempFile(tempdir, "shipping_providers.sql")},
+					Args:    []string{filepath.Join(currentFolder, "continue/assets/shipping_providers.sql"), tempfile},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -219,7 +220,7 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 				{
 					Name:    "copy broken shipping_providers.sql back to continue",
 					Command: "cp",
-					Args:    []string{GetTempFile(tempdir, "shipping_providers.sql"), filepath.Join(currentFolder, "continue/assets/shipping_providers.sql")},
+					Args:    []string{tempfile, filepath.Join(currentFolder, "continue/assets/shipping_providers.sql")},
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,
