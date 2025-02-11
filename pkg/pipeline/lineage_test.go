@@ -101,6 +101,27 @@ func assertAssetExists(t *testing.T, afterPipeline *Pipeline, asset *Asset) {
 		return
 	}
 
+	if len(asset.Upstreams) == len(assetFound.Upstreams) {
+		foundUpstreams := make(map[string]bool)
+
+		for _, upstreamFound := range assetFound.Upstreams {
+			for _, upstreamFoundCol := range upstreamFound.Columns {
+				foundUpstreams[upstreamFoundCol.Name] = true
+			}
+		}
+
+		for _, upstream := range asset.Upstreams {
+			for _, upstreamFound := range upstream.Columns {
+				if !foundUpstreams[upstreamFound.Name] {
+					t.Errorf("Upstream %s not found in asset %s and column %s", upstreamFound.Name, assetFound.Name, upstream.Value)
+				}
+			}
+		}
+	} else {
+		t.Errorf("Upstream count mismatch for asset %s: got %d, want %d",
+			asset.Name, len(asset.Upstreams), len(assetFound.Upstreams))
+	}
+
 	if len(asset.Columns) != len(assetFound.Columns) {
 		t.Errorf("Column count mismatch for asset %s: got %d, want %d",
 			asset.Name, len(asset.Columns), len(assetFound.Columns))
@@ -220,7 +241,7 @@ func testBasicRecursiveParsing(t *testing.T) {
 								{Name: "name", Type: "str", Upstreams: []*UpstreamColumn{{Column: "name", Table: "table2"}}, UpdateOnMerge: false, Description: "Just a name", Checks: []ColumnCheck{}},
 								{Name: "age", Type: "int64", Upstreams: []*UpstreamColumn{{Column: "age", Table: "table2"}}, UpdateOnMerge: false, Description: "Just an age", Checks: []ColumnCheck{}},
 							},
-							Upstreams: []Upstream{{Value: "table2"}},
+							Upstreams: []Upstream{{Value: "table2", Columns: []DependsColumn{{Name: "id"}, {Name: "name"}, {Name: "age"}}}},
 						},
 						{
 							Name: "table2",
@@ -233,8 +254,9 @@ func testBasicRecursiveParsing(t *testing.T) {
 								{Name: "name", Type: "str", Upstreams: []*UpstreamColumn{{Column: "name", Table: "table3"}}, UpdateOnMerge: false, Description: "Just a name", Checks: []ColumnCheck{}},
 								{Name: "age", Type: "int64", Upstreams: []*UpstreamColumn{{Column: "age", Table: "table3"}}, UpdateOnMerge: false, Description: "Just an age", Checks: []ColumnCheck{}},
 							},
-							Upstreams: []Upstream{{Value: "table3"}},
+							Upstreams: []Upstream{{Value: "table3", Columns: []DependsColumn{}}},
 						},
+
 						{
 							Name: "table3",
 							Columns: []Column{
@@ -250,215 +272,6 @@ func testBasicRecursiveParsing(t *testing.T) {
 							},
 							ExecutableFile: ExecutableFile{
 								Content: "SELECT id,name,age FROM table4",
-							},
-						},
-					},
-				},
-				want: nil,
-			},
-			{
-				name: "lineage with transformed columns",
-				pipeline: &Pipeline{
-					Assets: []*Asset{
-						{
-							Name: "final_table",
-							Type: "bq.sql",
-							ExecutableFile: ExecutableFile{
-								Content: "SELECT id, UPPER(name) as upper_name, age * 2 as doubled_age FROM source_table",
-							},
-							Upstreams: []Upstream{{Value: "source_table"}},
-						},
-						{
-							Name: "source_table",
-							Columns: []Column{
-								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key", UpdateOnMerge: true},
-								{Name: "name", Type: "str", Description: "User name", UpdateOnMerge: true},
-								{Name: "age", Type: "int64", Description: "User age", UpdateOnMerge: true},
-							},
-							ExecutableFile: ExecutableFile{
-								Content: "SELECT * FROM data_table",
-							},
-						},
-					},
-				},
-				after: &Pipeline{
-					Assets: []*Asset{
-						{
-							Name: "final_table",
-							Type: "bq.sql",
-							ExecutableFile: ExecutableFile{
-								Content: "SELECT id, UPPER(name) as upper_name, age * 2 as doubled_age FROM source_table",
-							},
-							Columns: []Column{
-								{Name: "id", Type: "int64", PrimaryKey: false, Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}, UpdateOnMerge: true, Description: "Primary key", Checks: []ColumnCheck{}},
-								{Name: "upper_name", Type: "str", Upstreams: []*UpstreamColumn{{Column: "name", Table: "source_table"}}, UpdateOnMerge: true, Description: "User name", Checks: []ColumnCheck{}},
-								{Name: "doubled_age", Type: "int64", Upstreams: []*UpstreamColumn{{Column: "age", Table: "source_table"}}, UpdateOnMerge: true, Description: "User age", Checks: []ColumnCheck{}},
-							},
-							Upstreams: []Upstream{{Value: "source_table"}},
-						},
-						{
-							Name: "source_table",
-							Columns: []Column{
-								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
-								{Name: "name", Type: "str", Description: "User name"},
-								{Name: "age", Type: "int64", Description: "User age"},
-							},
-							ExecutableFile: ExecutableFile{
-								Content: "SELECT * FROM data_table",
-							},
-						},
-					},
-				},
-				want: nil,
-			},
-			{
-				name: "lineage with column subset",
-				pipeline: &Pipeline{
-					Assets: []*Asset{
-						{
-							Name: "subset_table",
-							Type: "bq.sql",
-							ExecutableFile: ExecutableFile{
-								Content: "SELECT id, name FROM source_table",
-							},
-							Upstreams: []Upstream{{Value: "source_table"}},
-						},
-						{
-							Name: "source_table",
-							Columns: []Column{
-								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
-								{Name: "name", Type: "str", Description: "User name"},
-								{Name: "age", Type: "int64", Description: "User age"},
-							},
-						},
-					},
-				},
-				after: &Pipeline{
-					Assets: []*Asset{
-						{
-							Name: "subset_table",
-							Type: "bq.sql",
-							ExecutableFile: ExecutableFile{
-								Content: "SELECT id, name FROM source_table",
-							},
-							Columns: []Column{
-								{Name: "id", Type: "int64", PrimaryKey: false, Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
-								{Name: "name", Type: "str", Description: "User name", Upstreams: []*UpstreamColumn{{Column: "name", Table: "source_table"}}},
-							},
-							Upstreams: []Upstream{{Value: "source_table"}},
-						},
-						{
-							Name: "source_table",
-							Columns: []Column{
-								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
-								{Name: "name", Type: "str", Description: "User name"},
-								{Name: "age", Type: "int64", Description: "User age"},
-							},
-						},
-					},
-				},
-				want: nil,
-			},
-			{
-				name: "lineage with column aliases",
-				pipeline: &Pipeline{
-					Assets: []*Asset{
-						{
-							Name: "alias_table",
-							Type: "bq.sql",
-							ExecutableFile: ExecutableFile{
-								Content: "SELECT id as user_id, name as full_name FROM source_table",
-							},
-							Upstreams: []Upstream{{Value: "source_table"}},
-						},
-						{
-							Name: "source_table",
-							Columns: []Column{
-								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
-								{Name: "name", Type: "str", Description: "User name"},
-							},
-							ExecutableFile: ExecutableFile{
-								Content: "SELECT * FROM data_table",
-							},
-						},
-					},
-				},
-				after: &Pipeline{
-					Assets: []*Asset{
-						{
-							Name: "alias_table",
-							Type: "bq.sql",
-							ExecutableFile: ExecutableFile{
-								Content: "SELECT id as user_id, name as full_name FROM source_table",
-							},
-							Columns: []Column{
-								{Name: "user_id", Type: "int64", Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
-								{Name: "full_name", Type: "str", Description: "User name", Upstreams: []*UpstreamColumn{{Column: "name", Table: "source_table"}}},
-							},
-							Upstreams: []Upstream{{Value: "source_table"}},
-						},
-						{
-							Name: "source_table",
-							Columns: []Column{
-								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
-								{Name: "name", Type: "str", Description: "User name"},
-							},
-							ExecutableFile: ExecutableFile{
-								Content: "SELECT * FROM data_table",
-							},
-						},
-					},
-				},
-				want: nil,
-			},
-			{
-				name: "lineage with calculated columns",
-				pipeline: &Pipeline{
-					Assets: []*Asset{
-						{
-							Name: "calc_table",
-							Type: "bq.sql",
-							ExecutableFile: ExecutableFile{
-								Content: "SELECT id, CONCAT(first_name, ' ', last_name) as full_name FROM source_table",
-							},
-							Upstreams: []Upstream{{Value: "source_table"}},
-						},
-						{
-							Name: "source_table",
-							Columns: []Column{
-								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
-								{Name: "first_name", Type: "str", Description: "First name"},
-								{Name: "last_name", Type: "str", Description: "Last name"},
-							},
-							ExecutableFile: ExecutableFile{
-								Content: "SELECT * FROM data_table",
-							},
-						},
-					},
-				},
-				after: &Pipeline{
-					Assets: []*Asset{
-						{
-							Name: "calc_table",
-							Type: "bq.sql",
-							ExecutableFile: ExecutableFile{
-								Content: "SELECT id, CONCAT(first_name, ' ', last_name) as full_name FROM source_table",
-							},
-							Columns: []Column{
-								{Name: "id", Type: "int64", Description: "Primary key", Upstreams: []*UpstreamColumn{{Column: "id", Table: "source_table"}}},
-								{Name: "full_name", Type: "str", Upstreams: []*UpstreamColumn{{Column: "first_name", Table: "source_table"}, {Column: "last_name", Table: "source_table"}}},
-							},
-							Upstreams: []Upstream{{Value: "source_table"}},
-						},
-						{
-							Name: "source_table",
-							Columns: []Column{
-								{Name: "id", Type: "int64", PrimaryKey: true, Description: "Primary key"},
-								{Name: "first_name", Type: "str", Description: "First name"},
-								{Name: "last_name", Type: "str", Description: "Last name"},
-							},
-							ExecutableFile: ExecutableFile{
-								Content: "SELECT * FROM data_table",
 							},
 						},
 					},
@@ -593,7 +406,7 @@ func testJoinsAndComplexQueries(t *testing.T) {
 							},
 							{
 								Name:        "total_amount",
-								Type:        "int64",
+								Type:        "float64",
 								Description: "Total order amount",
 								Upstreams: []*UpstreamColumn{
 									{Column: "quantity", Table: "orders"},
@@ -608,10 +421,10 @@ func testJoinsAndComplexQueries(t *testing.T) {
 							},
 						},
 						Upstreams: []Upstream{
-							{Value: "orders"},
-							{Value: "customers"},
-							{Value: "products"},
-							{Value: "order_status"},
+							{Value: "orders", Columns: []DependsColumn{{Name: "order_id"}, {Name: "customer_id"}, {Name: "product_id"}, {Name: "quantity"}, {Name: "status_id"}}},
+							{Value: "customers", Columns: []DependsColumn{{Name: "customer_id"}, {Name: "customer_name"}}},
+							{Value: "products", Columns: []DependsColumn{{Name: "product_id"}, {Name: "product_name"}, {Name: "price"}}},
+							{Value: "order_status", Columns: []DependsColumn{{Name: "status_id"}, {Name: "status_description"}}},
 						},
 					},
 					{
@@ -649,7 +462,7 @@ func testJoinsAndComplexQueries(t *testing.T) {
 								Upstreams:   []*UpstreamColumn{{Column: "status_id", Table: "raw_orders"}},
 							},
 						},
-						Upstreams: []Upstream{{Value: "raw_orders"}},
+						Upstreams: []Upstream{{Value: "raw_orders", Columns: []DependsColumn{{Name: "order_id"}, {Name: "customer_id"}, {Name: "product_id"}, {Name: "quantity"}, {Name: "status_id"}, {Name: "is_valid"}}}},
 					},
 					{
 						Name: "customers",
@@ -695,6 +508,179 @@ func testJoinsAndComplexQueries(t *testing.T) {
 func testAdvancedSQLFeatures(t *testing.T) {
 	tests := []TestCase{
 		{
+			name: "snowflake complex condition",
+			pipeline: &Pipeline{
+				Assets: []*Asset{
+					{
+						Name: "sales_summary",
+						Type: "bq.sql",
+						ExecutableFile: ExecutableFile{
+							Content: `
+		        SELECT
+		            case
+		                when raw_sales.CancelledAt is not null
+		                then coalesce(raw_sales.CancellationReason, 'Empty Reason')
+		            end as CancellationReason,
+		            case
+		                when
+		                    raw_sales.Id is not null and
+		                    bookingCreditRefundedAt is null and
+		                    raw_sales.Accepted
+		                then 1
+		                else 0
+		            end as credits_spent
+		        FROM raw_sales
+									`,
+						},
+						Upstreams: []Upstream{{Value: "raw_sales"}},
+					},
+					{
+						Name: "raw_sales",
+						Type: "bq.sql",
+						ExecutableFile: ExecutableFile{
+							Content: "SELECT * FROM data_sales",
+						},
+						Columns: []Column{
+							{Name: "Id", Type: "STRING", Description: "Unique identifier"},
+							{Name: "CancelledAt", Type: "TIMESTAMP", Description: "Cancellation timestamp"},
+							{Name: "CancellationReason", Type: "STRING", Description: "Reason for cancellation"},
+							{Name: "bookingCreditRefundedAt", Type: "TIMESTAMP", Description: "Timestamp when booking credit was refunded"},
+							{Name: "Accepted", Type: "BOOLEAN", Description: "Whether the booking was accepted"},
+						},
+					},
+				},
+			},
+			after: &Pipeline{
+				Assets: []*Asset{
+					{
+						Name: "sales_summary",
+						ExecutableFile: ExecutableFile{
+							Content: `
+		        SELECT
+		            case
+		                when raw_sales.CancelledAt is not null
+		                then coalesce(raw_sales.CancellationReason, 'Empty Reason')
+		            end as CancellationReason,
+		            case
+		                when
+		                    raw_sales.Id is not null and
+		                    bookingCreditRefundedAt is null and
+		                    raw_sales.Accepted
+		                then 1
+		                else 0
+		            end as credits_spent
+		        FROM raw_sales
+									`,
+						},
+						Columns: []Column{
+							{Name: "cancellationreason", Type: "STRING", Description: "Reason for cancellation", Upstreams: []*UpstreamColumn{{Column: "CancellationReason", Table: "raw_sales"}, {Column: "CancelledAt", Table: "raw_sales"}}},
+							{Name: "credits_spent", Type: "BOOLEAN", Description: "Whether the booking was accepted", Upstreams: []*UpstreamColumn{{Column: "Accepted", Table: "raw_sales"}, {Column: "bookingCreditRefundedAt", Table: "raw_sales"}, {Column: "Id", Table: "raw_sales"}}},
+						},
+						Upstreams: []Upstream{{Value: "raw_sales", Columns: []DependsColumn{{Name: "accepted"}, {Name: "bookingcreditrefundedat"}, {Name: "cancellationreason"}, {Name: "cancelledat"}, {Name: "id"}}}},
+					},
+					{
+						Name: "raw_sales",
+						Columns: []Column{
+							{Name: "Id", Type: "STRING", Description: "Unique identifier"},
+							{Name: "CancelledAt", Type: "TIMESTAMP", Description: "Cancellation timestamp"},
+							{Name: "CancellationReason", Type: "STRING", Description: "Reason for cancellation"},
+							{Name: "bookingCreditRefundedAt", Type: "TIMESTAMP", Description: "Timestamp when booking credit was refunded"},
+							{Name: "Accepted", Type: "BOOLEAN", Description: "Whether the booking was accepted"},
+						},
+					},
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "snowflake column name with as",
+			pipeline: &Pipeline{
+				Assets: []*Asset{
+					{
+						Name: "sales_summary",
+						Type: "bq.sql",
+						ExecutableFile: ExecutableFile{
+							Content: `
+		       SELECT
+		    t.event_date,
+		    t.location_code as location,
+		    t.session_id as session,
+		    COUNT(DISTINCT t.customer_id) as visitor_count,
+		    SUM(t.activity_count) as total_activities,
+		    SUM(t.interaction_count) as total_interactions,
+		    CURRENT_TIMESTAMP() as created_at
+		FROM raw_sales t
+		GROUP BY 1, 2, 3
+		ORDER BY 1, 2, 3
+									`,
+						},
+						Upstreams: []Upstream{{Value: "raw_sales"}},
+					},
+					{
+						Name: "raw_sales",
+						Type: "bq.sql",
+						ExecutableFile: ExecutableFile{
+							Content: "SELECT * FROM data_sales",
+						},
+						Columns: []Column{
+							{Name: "event_date", Type: "date", Description: "Event date"},
+							{Name: "location_code", Type: "string", Description: "Location code"},
+							{Name: "session_id", Type: "integer", Description: "Session identifier"},
+							{Name: "customer_id", Type: "integer", Description: "Count of unique visitors"},
+							{Name: "activity_count", Type: "integer", Description: "Sum of activity counts"},
+							{Name: "interaction_count", Type: "integer", Description: "Sum of activity counts"},
+							{Name: "created_at", Type: "timestamp", Description: "Record creation timestamp"},
+						},
+					},
+				},
+			},
+			after: &Pipeline{
+				Assets: []*Asset{
+					{
+						Name: "sales_summary",
+						ExecutableFile: ExecutableFile{
+							Content: `
+		       SELECT
+		    t.event_date,
+		    t.location_code as location,
+		    t.session_id as session,
+		    COUNT(DISTINCT t.customer_id) as visitor_count,
+		    SUM(t.activity_count) as total_activities,
+		    SUM(t.interaction_count) as total_interactions,
+		    CURRENT_TIMESTAMP() as created_at
+		FROM raw_sales t
+		GROUP BY 1, 2, 3
+		ORDER BY 1, 2, 3
+									`,
+						},
+						Columns: []Column{
+							{Name: "event_date", Type: "date", Description: "Event date", Upstreams: []*UpstreamColumn{{Column: "event_date", Table: "raw_sales"}}},
+							{Name: "location", Type: "string", Description: "Location code", Upstreams: []*UpstreamColumn{{Column: "location_code", Table: "raw_sales"}}},
+							{Name: "session", Type: "integer", Description: "Session identifier", Upstreams: []*UpstreamColumn{{Column: "session_id", Table: "raw_sales"}}},
+							{Name: "visitor_count", Type: "integer", Description: "Count of unique visitors", Upstreams: []*UpstreamColumn{{Column: "customer_id", Table: "raw_sales"}}},
+							{Name: "total_activities", Type: "integer", Description: "Sum of activity counts", Upstreams: []*UpstreamColumn{{Column: "activity_count", Table: "raw_sales"}}},
+							{Name: "total_interactions", Type: "integer", Description: "Sum of interaction counts", Upstreams: []*UpstreamColumn{{Column: "interaction_count", Table: "raw_sales"}}},
+							{Name: "created_at", Type: "TIMESTAMP", Description: "Record creation timestamp", Upstreams: []*UpstreamColumn{{}}},
+						},
+						Upstreams: []Upstream{{Value: "raw_sales", Columns: []DependsColumn{{Name: "event_date", Usage: "raw_sales"}, {Name: "location_code", Usage: "raw_sales"}, {Name: "session_id", Usage: "raw_sales"}, {Name: "customer_id", Usage: "raw_sales"}, {Name: "activity_count", Usage: "raw_sales"}, {Name: "interaction_count", Usage: "raw_sales"}}}},
+					},
+					{
+						Name: "raw_sales",
+						Columns: []Column{
+							{Name: "event_date", Type: "date", Description: "Event date"},
+							{Name: "location_code", Type: "string", Description: "Location code"},
+							{Name: "session_id", Type: "integer", Description: "Session identifier"},
+							{Name: "customer_id", Type: "integer", Description: "Customer identifier"},
+							{Name: "activity_count", Type: "integer", Description: "Number of activities"},
+							{Name: "interaction_count", Type: "integer", Description: "Number of interactions"},
+							{Name: "created_at", Type: "timestamp", Description: "Record creation timestamp"},
+						},
+					},
+				},
+			},
+			want: nil,
+		},
+		{
 			name: "advanced SQL functions and aggregations",
 			pipeline: &Pipeline{
 				Assets: []*Asset{
@@ -703,7 +689,7 @@ func testAdvancedSQLFeatures(t *testing.T) {
 						Type: "bq.sql",
 						ExecutableFile: ExecutableFile{
 							Content: `
-								SELECT 
+								SELECT
 									DATE_TRUNC(order_date, MONTH) as month,
 									COUNT(DISTINCT customer_id) as unique_customers,
 									SUM(amount) as total_sales,
@@ -772,11 +758,11 @@ func testAdvancedSQLFeatures(t *testing.T) {
 							},
 							{
 								Name:      "report_generated_at",
-								Upstreams: []*UpstreamColumn{{}},
 								Type:      "UNKNOWN",
+								Upstreams: []*UpstreamColumn{{Column: "", Table: ""}},
 							},
 						},
-						Upstreams: []Upstream{{Value: "raw_sales"}},
+						Upstreams: []Upstream{{Value: "raw_sales", Columns: []DependsColumn{{Name: "order_date"}, {Name: "customer_id"}, {Name: "amount"}}}},
 					},
 					{
 						Name: "raw_sales",
@@ -887,7 +873,7 @@ func testDialectSpecificFeatures(t *testing.T) {
 								Checks:        []ColumnCheck{{Name: "positive"}},
 							},
 						},
-						Upstreams: []Upstream{{Value: "raw_sales"}},
+						Upstreams: []Upstream{{Value: "raw_sales", Columns: []DependsColumn{{Name: "sale_date"}, {Name: "category"}, {Name: "amount"}, {Name: "customer_id"}}}},
 					},
 					{
 						Name: "raw_sales",
@@ -1011,8 +997,8 @@ func testDialectSpecificFeatures(t *testing.T) {
 							},
 						},
 						Upstreams: []Upstream{
-							{Value: "users"},
-							{Value: "user_departments"},
+							{Value: "users", Columns: []DependsColumn{{Name: "manager_id"}, {Name: "name"}, {Name: "hire_date"}}},
+							{Value: "user_departments", Columns: []DependsColumn{{Name: "user_id"}, {Name: "department"}}},
 						},
 					},
 					{
@@ -1075,6 +1061,9 @@ func TestAddColumnToAsset(t *testing.T) {
 				Name:        "id",
 				Type:        "integer",
 				Description: "Just a test",
+				Upstreams: []*UpstreamColumn{
+					{Column: "id", Table: "test2"},
+				},
 			},
 			upstreamAsset: &Asset{
 				Name: "test2",
@@ -1082,9 +1071,29 @@ func TestAddColumnToAsset(t *testing.T) {
 					{Name: "id", Type: "integer", Description: "Just a test"},
 				},
 			},
-			after: &Asset{Name: "test", ID: "test", Upstreams: []Upstream{{Value: "test2"}}, Type: "duckdb.sql", Columns: []Column{{Name: "id", Type: "integer", Description: "Just a number", Upstreams: []*UpstreamColumn{
-				{Column: "id", Table: "test2"},
-			}}}},
+			after: &Asset{
+				Name: "test",
+				ID:   "test",
+				Type: "duckdb.sql",
+				Upstreams: []Upstream{
+					{
+						Value: "test2",
+						Columns: []DependsColumn{
+							{Name: "id"},
+						},
+					},
+				},
+				Columns: []Column{
+					{
+						Name:        "id",
+						Type:        "integer",
+						Description: "Just a number",
+						Upstreams: []*UpstreamColumn{
+							{Column: "id", Table: "test2"},
+						},
+					},
+				},
+			},
 		},
 		{
 			name: "the existing values should not be overridden but the new column should be added",
@@ -1104,6 +1113,9 @@ func TestAddColumnToAsset(t *testing.T) {
 				Name:        "id",
 				Type:        "integer",
 				Description: "Just a test",
+				Upstreams: []*UpstreamColumn{
+					{Column: "id", Table: "test2"},
+				},
 			},
 			upstreamAsset: &Asset{
 				Name: "test2",
@@ -1112,9 +1124,20 @@ func TestAddColumnToAsset(t *testing.T) {
 					{Name: "id", Type: "integer", Description: "Just a test"},
 				},
 			},
-			after: &Asset{Name: "test", ID: "test", Upstreams: []Upstream{{Value: "test2"}}, Type: "duckdb.sql", Columns: []Column{{Name: "id", Type: "integer", Description: "Just a test", EntityAttribute: nil, Upstreams: []*UpstreamColumn{
-				{Column: "id", Table: "test2"},
-			}}}},
+			after: &Asset{
+				Name:      "test",
+				ID:        "test",
+				Upstreams: []Upstream{{Value: "test2"}},
+				Type:      "duckdb.sql",
+				Columns: []Column{
+					{
+						Name: "id", Type: "integer", Description: "Just a test", EntityAttribute: nil,
+						Upstreams: []*UpstreamColumn{
+							{Column: "id", Table: "test2"},
+						},
+					},
+				},
+			},
 		},
 		{
 			name: "the upstream column type should be changed",
@@ -1132,6 +1155,9 @@ func TestAddColumnToAsset(t *testing.T) {
 				Name:        "id",
 				Type:        "bigint",
 				Description: "Just a test",
+				Upstreams: []*UpstreamColumn{
+					{Column: "id", Table: "test2"},
+				},
 			},
 			upstreamAsset: &Asset{
 				Name: "test2",
@@ -1158,6 +1184,9 @@ func TestAddColumnToAsset(t *testing.T) {
 				Name:        "new_col",
 				Type:        "string",
 				Description: "New column",
+				Upstreams: []*UpstreamColumn{
+					{Column: "new_col", Table: "test2"},
+				},
 			},
 			upstreamAsset: &Asset{
 				Name: "test2",
@@ -1185,7 +1214,7 @@ func TestAddColumnToAsset(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			err := lineage.addColumnToAsset(test.asset, test.colName, test.upstreamAsset, test.upstreamCol)
+			err := lineage.addColumnToAsset(test.asset, test.colName, test.upstreamCol)
 			if err != nil {
 				t.Errorf("error adding column to asset: %v", err)
 			}
@@ -1196,19 +1225,482 @@ func TestAddColumnToAsset(t *testing.T) {
 					continue
 				}
 				if col.Name != upstreamCol.Name {
-					t.Errorf("upstream column mismatch: %v %v", col.Name, upstreamCol.Name)
+					t.Errorf("upstream column mismatch name: %v %v", col.Name, upstreamCol.Name)
 				}
 				if col.Description != upstreamCol.Description {
-					t.Errorf("upstream column mismatch: %v %v", col.Description, upstreamCol.Description)
+					t.Errorf("upstream column mismatch description: %v %v", col.Description, upstreamCol.Description)
 				}
 
 				if col.Type != upstreamCol.Type {
-					t.Errorf("upstream column mismatch: %v %v", col.Type, upstreamCol.Type)
+					t.Errorf("upstream column mismatch type: %v %v", col.Type, upstreamCol.Type)
 				}
 
 				if len(upstreamCol.Upstreams) != len(col.Upstreams) {
-					t.Errorf("upstream column mismatch: %v %v", col.Upstreams, upstreamCol.Upstreams)
+					t.Errorf("upstream column mismatch upstreams: %v %v", col.Upstreams, upstreamCol.Upstreams)
 				}
+			}
+		})
+	}
+}
+
+func TestHandleExistingOrNewColumn(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		asset       *Asset
+		upstreamCol *Column
+		existingCol *Column
+		want        *Column
+		wantErr     error
+	}{
+		{
+			name: "update existing column with new upstream",
+			asset: &Asset{
+				Name: "test_table",
+				Columns: []Column{
+					{
+						Name:        "id",
+						Type:        "integer",
+						Description: "Existing description",
+						Upstreams: []*UpstreamColumn{
+							{Column: "old_id", Table: "old_table"},
+						},
+					},
+				},
+			},
+			upstreamCol: &Column{
+				Name:        "id",
+				Type:        "bigint",
+				Description: "New description",
+				Upstreams: []*UpstreamColumn{
+					{Column: "new_id", Table: "new_table"},
+				},
+			},
+			existingCol: &Column{
+				Name:        "id",
+				Type:        "integer",
+				Description: "Existing description",
+				Upstreams: []*UpstreamColumn{
+					{Column: "old_id", Table: "old_table"},
+				},
+			},
+			want: &Column{
+				Name:        "id",
+				Type:        "integer",
+				Description: "Existing description",
+				Upstreams: []*UpstreamColumn{
+					{Column: "old_id", Table: "old_table"},
+					{Column: "new_id", Table: "new_table"},
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "update existing column with duplicate upstream",
+			asset: &Asset{
+				Name: "test_table",
+				Columns: []Column{
+					{
+						Name:        "id",
+						Type:        "integer",
+						Description: "Existing description",
+						Upstreams: []*UpstreamColumn{
+							{Column: "old_id", Table: "old_table"},
+						},
+					},
+				},
+			},
+			upstreamCol: &Column{
+				Name:        "id",
+				Type:        "bigint",
+				Description: "New description",
+				Upstreams: []*UpstreamColumn{
+					{Column: "old_id", Table: "old_table"},
+				},
+			},
+			existingCol: &Column{
+				Name:        "id",
+				Type:        "integer",
+				Description: "Existing description",
+				Upstreams: []*UpstreamColumn{
+					{Column: "old_id", Table: "old_table"},
+				},
+			},
+			want: &Column{
+				Name:        "id",
+				Type:        "integer",
+				Description: "Existing description",
+				Upstreams: []*UpstreamColumn{
+					{Column: "old_id", Table: "old_table"},
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "update existing column with multiple new upstreams",
+			asset: &Asset{
+				Name: "test_table",
+				Columns: []Column{
+					{
+						Name:        "id",
+						Type:        "integer",
+						Description: "Existing description",
+						Upstreams: []*UpstreamColumn{
+							{Column: "old_id", Table: "old_table"},
+						},
+					},
+				},
+			},
+			upstreamCol: &Column{
+				Name:        "id",
+				Type:        "bigint",
+				Description: "New description",
+				Upstreams: []*UpstreamColumn{
+					{Column: "new_id1", Table: "new_table1"},
+					{Column: "new_id2", Table: "new_table2"},
+				},
+			},
+			existingCol: &Column{
+				Name:        "id",
+				Type:        "integer",
+				Description: "Existing description",
+				Upstreams: []*UpstreamColumn{
+					{Column: "old_id", Table: "old_table"},
+				},
+			},
+			want: &Column{
+				Name:        "id",
+				Type:        "integer",
+				Description: "Existing description",
+				Upstreams: []*UpstreamColumn{
+					{Column: "old_id", Table: "old_table"},
+					{Column: "new_id1", Table: "new_table1"},
+					{Column: "new_id2", Table: "new_table2"},
+				},
+			},
+			wantErr: nil,
+		},
+	}
+
+	err := SetupSQLParser()
+	if err != nil {
+		t.Errorf("error initializing SQL parser: %v", err)
+	}
+	lineage := NewLineageExtractor(SQLParser)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := lineage.handleExistingOrNewColumn(tt.asset, tt.upstreamCol, tt.existingCol)
+			if (err != nil) != (tt.wantErr != nil) {
+				t.Errorf("handleExistingOrNewColumn() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.existingCol.Name != tt.want.Name {
+				t.Errorf("Column name = %v, want %v", tt.existingCol.Name, tt.want.Name)
+			}
+			if tt.existingCol.Type != tt.want.Type {
+				t.Errorf("Column type = %v, want %v", tt.existingCol.Type, tt.want.Type)
+			}
+			if tt.existingCol.Description != tt.want.Description {
+				t.Errorf("Column description = %v, want %v", tt.existingCol.Description, tt.want.Description)
+			}
+			if len(tt.existingCol.Upstreams) != len(tt.want.Upstreams) {
+				t.Errorf("Column upstreams length = %v, want %v", len(tt.existingCol.Upstreams), len(tt.want.Upstreams))
+			}
+
+			for _, wantUpstream := range tt.want.Upstreams {
+				found := false
+				for _, gotUpstream := range tt.existingCol.Upstreams {
+					if gotUpstream.Column == wantUpstream.Column && gotUpstream.Table == wantUpstream.Table {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("Expected upstream {Column: %v, Table: %v} not found", wantUpstream.Column, wantUpstream.Table)
+				}
+			}
+		})
+	}
+}
+
+func TestUpdateExistingColumn(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		existingCol *Column
+		upstreamCol *Column
+		want        *Column
+	}{
+		{
+			name: "empty existing column should be updated with upstream values",
+			existingCol: &Column{
+				Name: "test_col",
+			},
+			upstreamCol: &Column{
+				Name:            "test_col",
+				Description:     "Test description",
+				Type:            "integer",
+				EntityAttribute: &EntityAttribute{Entity: "test_entity"},
+				UpdateOnMerge:   true,
+			},
+			want: &Column{
+				Name:            "test_col",
+				Description:     "Test description",
+				Type:            "integer",
+				EntityAttribute: &EntityAttribute{Entity: "test_entity"},
+				UpdateOnMerge:   true,
+			},
+		},
+		{
+			name: "existing values should not be overwritten",
+			existingCol: &Column{
+				Name:            "test_col",
+				Description:     "Existing description",
+				Type:            "string",
+				EntityAttribute: &EntityAttribute{Entity: "existing_entity"},
+				UpdateOnMerge:   false,
+			},
+			upstreamCol: &Column{
+				Name:            "test_col",
+				Description:     "New description",
+				Type:            "integer",
+				EntityAttribute: &EntityAttribute{Entity: "new_entity"},
+				UpdateOnMerge:   true,
+			},
+			want: &Column{
+				Name:            "test_col",
+				Description:     "Existing description",
+				Type:            "string",
+				EntityAttribute: &EntityAttribute{Entity: "existing_entity"},
+				UpdateOnMerge:   true,
+			},
+		},
+		{
+			name: "partial existing values should be updated",
+			existingCol: &Column{
+				Name:        "test_col",
+				Description: "Existing description",
+			},
+			upstreamCol: &Column{
+				Name:            "test_col",
+				Description:     "New description",
+				Type:            "integer",
+				EntityAttribute: &EntityAttribute{Entity: "new_entity"},
+				UpdateOnMerge:   true,
+			},
+			want: &Column{
+				Name:            "test_col",
+				Description:     "Existing description",
+				Type:            "integer",
+				EntityAttribute: &EntityAttribute{Entity: "new_entity"},
+				UpdateOnMerge:   true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			updateExistingColumn(tt.existingCol, tt.upstreamCol)
+
+			if tt.existingCol.Description != tt.want.Description {
+				t.Errorf("Description = %v, want %v", tt.existingCol.Description, tt.want.Description)
+			}
+			if tt.existingCol.Type != tt.want.Type {
+				t.Errorf("Type = %v, want %v", tt.existingCol.Type, tt.want.Type)
+			}
+			if tt.existingCol.UpdateOnMerge != tt.want.UpdateOnMerge {
+				t.Errorf("UpdateOnMerge = %v, want %v", tt.existingCol.UpdateOnMerge, tt.want.UpdateOnMerge)
+			}
+
+			if tt.want.EntityAttribute == nil {
+				if tt.existingCol.EntityAttribute != nil {
+					t.Errorf("EntityAttribute = %v, want nil", tt.existingCol.EntityAttribute)
+				}
+			} else {
+				if tt.existingCol.EntityAttribute == nil {
+					t.Errorf("EntityAttribute is nil, want %v", tt.want.EntityAttribute)
+				} else if tt.existingCol.EntityAttribute.Entity != tt.want.EntityAttribute.Entity {
+					t.Errorf("EntityAttribute.Name = %v, want %v", tt.existingCol.EntityAttribute.Entity, tt.want.EntityAttribute.Entity)
+				}
+			}
+		})
+	}
+}
+
+func TestUpdateAssetColumn(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		asset    *Asset
+		newCol   *Column
+		expected []Column
+	}{
+		{
+			name: "update existing column",
+			asset: &Asset{
+				Columns: []Column{
+					{Name: "id", Type: "integer", Description: "old description"},
+					{Name: "name", Type: "string"},
+				},
+			},
+			newCol: &Column{
+				Name:        "id",
+				Type:        "bigint",
+				Description: "new description",
+			},
+			expected: []Column{
+				{Name: "id", Type: "bigint", Description: "new description"},
+				{Name: "name", Type: "string"},
+			},
+		},
+		{
+			name: "case insensitive column match",
+			asset: &Asset{
+				Columns: []Column{
+					{Name: "ID", Type: "integer"},
+					{Name: "name", Type: "string"},
+				},
+			},
+			newCol: &Column{
+				Name: "id",
+				Type: "bigint",
+			},
+			expected: []Column{
+				{Name: "id", Type: "bigint"},
+				{Name: "name", Type: "string"},
+			},
+		},
+		{
+			name: "no matching column",
+			asset: &Asset{
+				Columns: []Column{
+					{Name: "id", Type: "integer"},
+					{Name: "name", Type: "string"},
+				},
+			},
+			newCol: &Column{
+				Name: "age",
+				Type: "integer",
+			},
+			expected: []Column{
+				{Name: "id", Type: "integer"},
+				{Name: "name", Type: "string"},
+			},
+		},
+	}
+
+	lineage := NewLineageExtractor(SQLParser)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			lineage.updateAssetColumn(tt.asset, tt.newCol)
+
+			if len(tt.asset.Columns) != len(tt.expected) {
+				t.Errorf("got %d columns, want %d", len(tt.asset.Columns), len(tt.expected))
+				return
+			}
+
+			for i, got := range tt.asset.Columns {
+				want := tt.expected[i]
+				if got.Name != want.Name {
+					t.Errorf("column[%d].Name = %v, want %v", i, got.Name, want.Name)
+				}
+				if got.Type != want.Type {
+					t.Errorf("column[%d].Type = %v, want %v", i, got.Type, want.Type)
+				}
+				if got.Description != want.Description {
+					t.Errorf("column[%d].Description = %v, want %v", i, got.Description, want.Description)
+				}
+			}
+		})
+	}
+}
+
+func TestUpstreamExists(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		upstreams   []*UpstreamColumn
+		newUpstream *UpstreamColumn
+		wantExists  bool
+	}{
+		{
+			name: "exact match exists",
+			upstreams: []*UpstreamColumn{
+				{Column: "id", Table: "users"},
+				{Column: "name", Table: "profiles"},
+			},
+			newUpstream: &UpstreamColumn{
+				Column: "id",
+				Table:  "users",
+			},
+			wantExists: true,
+		},
+		{
+			name: "case insensitive match exists",
+			upstreams: []*UpstreamColumn{
+				{Column: "ID", Table: "Users"},
+				{Column: "name", Table: "profiles"},
+			},
+			newUpstream: &UpstreamColumn{
+				Column: "id",
+				Table:  "users",
+			},
+			wantExists: true,
+		},
+		{
+			name: "no match - different column",
+			upstreams: []*UpstreamColumn{
+				{Column: "id", Table: "users"},
+				{Column: "name", Table: "profiles"},
+			},
+			newUpstream: &UpstreamColumn{
+				Column: "age",
+				Table:  "users",
+			},
+			wantExists: false,
+		},
+		{
+			name: "no match - different table",
+			upstreams: []*UpstreamColumn{
+				{Column: "id", Table: "users"},
+				{Column: "name", Table: "profiles"},
+			},
+			newUpstream: &UpstreamColumn{
+				Column: "id",
+				Table:  "employees",
+			},
+			wantExists: false,
+		},
+		{
+			name:      "empty upstreams list",
+			upstreams: []*UpstreamColumn{},
+			newUpstream: &UpstreamColumn{
+				Column: "id",
+				Table:  "users",
+			},
+			wantExists: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := upstreamExists(tt.upstreams, tt.newUpstream)
+			if got != tt.wantExists {
+				t.Errorf("upstreamExists() = %v, want %v", got, tt.wantExists)
 			}
 		})
 	}

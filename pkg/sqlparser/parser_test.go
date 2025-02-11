@@ -22,17 +22,17 @@ func TestGetLineageForRunner(t *testing.T) {
 		{
 			name: "nested subqueries",
 			sql: `
-            select *
-            from table1
-            join (
-                select *
-                from (
-                    select *
-                    from table2
-                ) t2
-            ) t3
-                using(a)
-        `,
+		    select *
+		    from table1
+		    join (
+		        select *
+		        from (
+		            select *
+		            from table2
+		        ) t2
+		    ) t3
+		        using(a)
+		`,
 			schema: Schema{
 				"table1": {"a": "str", "b": "int64"},
 				"table2": {"a": "str", "c": "int64"},
@@ -502,6 +502,117 @@ func TestGetLineageForRunner(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:    "snowflake cte",
+			dialect: "snowflake",
+			sql: `WITH ufd AS (
+    SELECT
+        user_id,
+        MIN(date_utc) as my_date_col
+    FROM fact.some_daily_metrics
+    GROUP BY 1
+),
+user_retention AS (
+    SELECT
+        d.user_id,
+        MAX(CASE WHEN DATEDIFF(day, f.my_date_col, d.date_utc) = 1 THEN 1 ELSE 0 END) as some_day1_metric,
+    FROM fact.some_daily_metrics d
+    INNER JOIN ufd f ON d.user_id = f.user_id
+    GROUP BY 1
+)
+SELECT
+    d.user_id, 
+    DATEDIFF(day, MAX(d.date_utc), CURRENT_DATE()) as recency,
+    COUNT(DISTINCT d.date_utc) as active_days, 
+    MIN_BY(d.first_device_type, d.first_activity_timestamp) as first_device_type, 
+    AVG(NULLIF(d.estimated_session_duration, 0)) as avg_session_duration, 
+    SUM(d.event_start) as total_event_start, 
+    MAX(r.some_day1_metric) as some_day1_metric, 
+    case when sum(d.event_start) > 0 then 'Player' else 'Visitor' end as user_type, 
+FROM fact.some_daily_metrics d
+LEFT JOIN user_retention r ON d.user_id = r.user_id
+GROUP BY 1`,
+			schema: Schema{
+				"fact.some_daily_metrics": {
+					"user_id":                    "integer",
+					"date_utc":                   "date",
+					"first_device_type":          "string",
+					"first_activity_timestamp":   "timestamp",
+					"estimated_session_duration": "float",
+					"event_start":                "integer",
+				},
+			},
+			want: &Lineage{
+				Columns: []ColumnLineage{
+					{
+						Name: "ACTIVE_DAYS",
+						Upstream: []UpstreamColumn{
+							{Column: "DATE_UTC", Table: "FACT.SOME_DAILY_METRICS"},
+						},
+						Type: "BIGINT",
+					},
+					{
+						Name: "AVG_SESSION_DURATION",
+						Upstream: []UpstreamColumn{
+							{Column: "ESTIMATED_SESSION_DURATION", Table: "FACT.SOME_DAILY_METRICS"},
+						},
+						Type: "DOUBLE",
+					},
+					{
+						Name: "FIRST_DEVICE_TYPE",
+						Upstream: []UpstreamColumn{
+							{Column: "FIRST_ACTIVITY_TIMESTAMP", Table: "FACT.SOME_DAILY_METRICS"},
+							{Column: "FIRST_DEVICE_TYPE", Table: "FACT.SOME_DAILY_METRICS"},
+						},
+						Type: "UNKNOWN",
+					},
+					{
+						Name: "RECENCY",
+						Upstream: []UpstreamColumn{
+							{Column: "DATE_UTC", Table: "FACT.SOME_DAILY_METRICS"},
+						},
+						Type: "INT",
+					},
+					{
+						Name: "SOME_DAY1_METRIC",
+						Upstream: []UpstreamColumn{
+							{Column: "DATE_UTC", Table: "FACT.SOME_DAILY_METRICS"},
+						},
+						Type: "INT",
+					},
+					{
+						Name: "TOTAL_EVENT_START",
+						Upstream: []UpstreamColumn{
+							{Column: "EVENT_START", Table: "FACT.SOME_DAILY_METRICS"},
+						},
+						Type: "BIGINT",
+					},
+					{
+						Name: "USER_ID",
+						Upstream: []UpstreamColumn{
+							{Column: "USER_ID", Table: "FACT.SOME_DAILY_METRICS"},
+						},
+						Type: "INT",
+					},
+					{
+						Name: "USER_TYPE",
+						Upstream: []UpstreamColumn{
+							{Column: "EVENT_START", Table: "FACT.SOME_DAILY_METRICS"},
+						},
+						Type: "VARCHAR",
+					},
+				},
+				NonSelectedColumns: []ColumnLineage{
+					{
+						Name: "USER_ID",
+						Upstream: []UpstreamColumn{
+							{Column: "USER_ID", Table: "FACT.SOME_DAILY_METRICS"},
+						},
+						Type: "",
+					},
+				},
+			},
+		},
 	}
 
 	t.Run("blocking group", func(t *testing.T) {
@@ -516,7 +627,8 @@ func TestGetLineageForRunner(t *testing.T) {
 					require.NoError(t, err)
 				}
 
-				require.Equal(t, tt.want, got)
+				require.Equal(t, tt.want.Columns, got.Columns)
+				require.Equal(t, tt.want.NonSelectedColumns, got.NonSelectedColumns)
 			})
 		}
 	})

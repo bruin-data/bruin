@@ -222,9 +222,14 @@ environments:
           password: "clickhousepass"
           database: "clickhousedb"
           http_port: 8124
+          secure: 0
       gcs:
         - name: "gcs-1"
           service_account_file: "/path/to/service_account.json"
+      applovinmax:
+        - name: "applovinmax-1"
+          api_key: "api-key-123"
+          application: "application-123"
 
 
   prod:

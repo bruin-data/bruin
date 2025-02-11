@@ -25,6 +25,8 @@ func TestLoadFromFile(t *testing.T) {
 		servicefile = "/path/to/service_account.json"
 	}
 
+	clickhouseSecureValue := 0
+
 	devEnv := Environment{
 		Connections: &Connections{
 			GoogleCloudPlatform: []GoogleCloudPlatformConnection{
@@ -224,6 +226,7 @@ func TestLoadFromFile(t *testing.T) {
 					Path: duckPath,
 				},
 			},
+
 			ClickHouse: []ClickHouseConnection{
 				{
 					Name:     "conn-clickhouse",
@@ -233,6 +236,7 @@ func TestLoadFromFile(t *testing.T) {
 					Password: "clickhousepass",
 					Database: "clickhousedb",
 					HTTPPort: 8124,
+					Secure:   &clickhouseSecureValue,
 				},
 			},
 			Hubspot: []HubspotConnection{
@@ -355,6 +359,13 @@ func TestLoadFromFile(t *testing.T) {
 				{
 					Name:               "gcs-1",
 					ServiceAccountFile: "/path/to/service_account.json",
+				},
+			},
+			ApplovinMax: []ApplovinMaxConnection{
+				{
+					Name:        "applovinmax-1",
+					APIKey:      "api-key-123",
+					Application: "application-123",
 				},
 			},
 		},

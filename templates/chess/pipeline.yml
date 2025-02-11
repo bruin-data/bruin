@@ -1,1 +1,6 @@
 name: chess_duckdb
+default:
+  type: ingestr
+  parameters:
+    source_connection: chess-default
+    destination: duckdb

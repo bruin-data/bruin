@@ -155,6 +155,7 @@ export default defineConfig({
                             {text: "Adjust", link: "/ingestion/adjust.md"},
                             {text: "Airtable", link: "/ingestion/airtable.md"},
                             {text: "AppStore", link: "/ingestion/appstore.md"},
+                            {text: "AppLovin Max", link: "/ingestion/applovin_max.md"},
                             {text: "Asana", link: "/ingestion/asana.md"},
                             {text: "Chess", link: "/ingestion/chess.md"},
                             {text: "DynamoDB", link: "/ingestion/dynamodb.md"},

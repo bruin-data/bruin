@@ -1,6 +1,5 @@
 /* @bruin
 name: drivers
-type: athena.sql
 materialization:
    type: table
    strategy: append

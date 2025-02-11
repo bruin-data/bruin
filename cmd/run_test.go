@@ -1071,19 +1071,13 @@ func TestValidation(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 
 	tests := []struct {
-		name          string
-		runConfig     *scheduler.RunConfig
-		inputPath     string
-		expectError   bool
-		expectedError string
+		name              string
+		runConfig         *scheduler.RunConfig
+		inputPath         string
+		expectedInputPath string
+		expectError       bool
+		expectedError     string
 	}{
-		{
-			name:          "Empty Input Path",
-			runConfig:     &scheduler.RunConfig{},
-			inputPath:     "",
-			expectError:   true,
-			expectedError: "please give a task or pipeline path: bruin run <path to the task definition>)",
-		},
 		{
 			name: "Invalid Start Date",
 			runConfig: &scheduler.RunConfig{
@@ -1108,8 +1102,19 @@ func TestValidation(t *testing.T) {
 				StartDate: "2023-12-01",
 				EndDate:   "2023-12-31",
 			},
-			inputPath:   "some/path",
-			expectError: false,
+			inputPath:         "some/path",
+			expectedInputPath: "some/path",
+			expectError:       false,
+		},
+		{
+			name: "valid input without a path, should default to the current path",
+			runConfig: &scheduler.RunConfig{
+				StartDate: "2023-12-01",
+				EndDate:   "2023-12-31",
+			},
+			inputPath:         "",
+			expectedInputPath: ".",
+			expectError:       false,
 		},
 	}
 
@@ -1127,7 +1132,7 @@ func TestValidation(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, time.Date(2023, 12, 1, 0, 0, 0, 0, time.UTC), startDate)
 				assert.Equal(t, time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC), endDate)
-				assert.Equal(t, tt.inputPath, path)
+				assert.Equal(t, tt.expectedInputPath, path)
 			}
 		})
 	}

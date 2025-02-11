@@ -35,7 +35,7 @@ var AvailablePythonVersions = map[string]bool{
 const (
 	UvVersion               = "0.5.0"
 	pythonVersionForIngestr = "3.11"
-	ingestrVersion          = "0.13.0"
+	ingestrVersion          = "0.13.7"
 )
 
 // UvChecker handles checking and installing the uv package manager.
@@ -188,21 +188,15 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 	}
 	u.binaryFullPath = binaryFullPath
 
-	ingestrPackageName := "ingestr@" + ingestrVersion
-
-	withCommand := []string{}
-	for _, pkg := range extraPackages {
-		withCommand = append(withCommand, "--with", pkg)
-	}
 	err = u.Cmd.Run(ctx, repo, &CommandInstance{
 		Name: u.binaryFullPath,
-		Args: append([]string{"tool", "install"}, append(withCommand, []string{"--force", "--quiet", "--python", pythonVersionForIngestr, ingestrPackageName}...)...),
+		Args: u.ingestrInstallCmd(ctx, extraPackages),
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to install ingestr")
 	}
 
-	flags := []string{"tool", "run", "--python", pythonVersionForIngestr, ingestrPackageName}
+	flags := []string{"tool", "run", "--python", pythonVersionForIngestr, "ingestr"}
 	flags = append(flags, args...)
 
 	noDependencyCommand := &CommandInstance{
@@ -353,16 +347,16 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		}
 	}
 
-	ingestrPackageName := "ingestr@" + ingestrVersion
 	err = u.Cmd.Run(ctx, execCtx.repo, &CommandInstance{
 		Name: u.binaryFullPath,
-		Args: []string{"tool", "install", "--quiet", "--python", pythonVersionForIngestr, ingestrPackageName},
+		Args: u.ingestrInstallCmd(ctx, nil),
 	})
+
 	if err != nil {
 		return errors.Wrap(err, "failed to install ingestr")
 	}
 
-	runArgs := slices.Concat([]string{"tool", "run", "--python", pythonVersionForIngestr, ingestrPackageName}, cmdArgs)
+	runArgs := slices.Concat([]string{"tool", "run", "--python", pythonVersionForIngestr, "ingestr"}, cmdArgs)
 
 	if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
 		boolVal := debug.(*bool)
@@ -382,6 +376,40 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	_, _ = output.Write([]byte("Successfully loaded the data from the asset into the destination.\n"))
 
 	return nil
+}
+
+func (u *UvPythonRunner) ingestrPackage(ctx context.Context) (string, bool) {
+	localIngestr := ctx.Value(LocalIngestr)
+	if localIngestr != nil {
+		ingestrPath, ok := localIngestr.(string)
+		if ok && ingestrPath != "" {
+			// maybe verify that the destination exists?
+			return ingestrPath, true
+		}
+	}
+	return "ingestr@" + ingestrVersion, false
+}
+
+// ingestrInstallCmd returns the uv tool commandline
+// args necessary for installing ingestr.
+func (u *UvPythonRunner) ingestrInstallCmd(ctx context.Context, pkgs []string) []string {
+	ingestrPackageName, isLocal := u.ingestrPackage(ctx)
+	cmdline := []string{
+		"tool",
+		"install",
+		"--force",
+		"--quiet",
+		"--python",
+		pythonVersionForIngestr,
+	}
+	for _, pkg := range pkgs {
+		cmdline = append(cmdline, "--with", pkg)
+	}
+	if isLocal {
+		cmdline = append(cmdline, "--reinstall")
+	}
+	cmdline = append(cmdline, ingestrPackageName)
+	return cmdline
 }
 
 const PythonArrowTemplate = `

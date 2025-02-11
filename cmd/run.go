@@ -142,6 +142,10 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "exp-use-winget-for-uv",
 				Usage: "use powershell to manage and install uv on windows, on non-windows systems this has no effect.",
 			},
+			&cli.StringFlag{
+				Name:  "debug-ingestr-src",
+				Usage: "Use ingestr from the given path instead of the builtin version.",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			defer func() {
@@ -340,6 +344,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
 			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
 			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, runConfig.ExpUseWingetForUv) //nolint:staticcheck
+			runCtx = context.WithValue(runCtx, python.LocalIngestr, c.String("debug-ingestr-src"))
 
 			ex.Start(runCtx, s.WorkQueue, s.Results)
 
@@ -494,7 +499,7 @@ func ParseDate(startDateStr, endDateStr string, logger *zap.SugaredLogger) (time
 
 func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger *zap.SugaredLogger) (time.Time, time.Time, string, error) {
 	if inputPath == "" {
-		return time.Now(), time.Now(), "", errors.New("please give a task or pipeline path: bruin run <path to the task definition>)")
+		inputPath = "."
 	}
 
 	startDate, endDate, err := ParseDate(runConfig.StartDate, runConfig.EndDate, logger)
@@ -506,7 +511,7 @@ func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger 
 }
 
 func CheckLint(foundPipeline *pipeline.Pipeline, pipelinePath string, logger *zap.SugaredLogger, parser *sqlparser.SQLParser) error {
-	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, parser)
+	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, parser, true)
 	if err != nil {
 		errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
 		return err

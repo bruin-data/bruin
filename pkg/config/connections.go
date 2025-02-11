@@ -341,13 +341,14 @@ func (d DuckDBConnection) GetName() string {
 }
 
 type ClickHouseConnection struct {
-	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
-	Host     string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
-	Port     int    `yaml:"port,omitempty"     json:"port" mapstructure:"port"`
-	Database string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
-	HTTPPort int    `yaml:"http_port,omitempty" json:"http_port" mapstructure:"http_port"`
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port"     json:"port" mapstructure:"port"`
+	Database string `yaml:"database" json:"database" mapstructure:"database"`
+	HTTPPort int    `yaml:"http_port" json:"http_port" mapstructure:"http_port"`
+	Secure   *int   `yaml:"secure" json:"secure" mapstructure:"secure"`
 }
 
 func (c ClickHouseConnection) GetName() string {
@@ -388,6 +389,16 @@ type ChessConnection struct {
 }
 
 func (c ChessConnection) GetName() string {
+	return c.Name
+}
+
+type ApplovinMaxConnection struct {
+	Name        string `yaml:"name" json:"name" mapstructure:"name"`
+	APIKey      string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+	Application string `yaml:"application" json:"application" mapstructure:"application"`
+}
+
+func (c ApplovinMaxConnection) GetName() string {
 	return c.Name
 }
 

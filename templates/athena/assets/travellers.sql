@@ -1,6 +1,5 @@
 /* @bruin
 name: travellers
-type: athena.sql
 materialization:
    type: table
 columns:

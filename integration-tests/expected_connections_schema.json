@@ -200,6 +200,9 @@
         },
         "http_port": {
           "type": "integer"
+        },
+        "secure": {
+          "type": "integer"
         }
       },
       "additionalProperties": false,
@@ -211,7 +214,8 @@
         "host",
         "port",
         "database",
-        "http_port"
+        "http_port",
+        "secure"
       ]
     },
     "Connections": {
@@ -447,6 +451,12 @@
         "gcs": {
           "items": {
             "$ref": "#/$defs/GCSConnection"
+          },
+          "type": "array"
+        },
+        "applovinmax": {
+          "items": {
+            "$ref": "#/$defs/ApplovinMaxConnection"
           },
           "type": "array"
         }
@@ -1226,6 +1236,26 @@
         "advertiser_ids"
       ]
     },
+    "ApplovinMaxConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        },
+        "application": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key",
+        "application"
+      ]
+    },
     "ZendeskConnection": {
       "properties": {
         "name": {
@@ -1254,5 +1284,6 @@
         "sub_domain"
       ]
     }
+    
   }
 }

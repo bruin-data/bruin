@@ -1,6 +1,5 @@
 /* @bruin
 name: example
-type: duckdb.sql
 materialization:
    type: table
 
