@@ -8,9 +8,9 @@ import (
 )
 
 type AwsConnection struct {
-	Name      string `yaml:"name" json:"name" mapstructure:"name"`
-	AccessKey string `yaml:"access_key" json:"access_key" mapstructure:"access_key"`
-	SecretKey string `yaml:"secret_key" json:"secret_key" mapstructure:"secret_key"`
+	Name      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessKey string `yaml:"access_key,omitempty" json:"access_key" mapstructure:"access_key"`
+	SecretKey string `yaml:"secret_key,omitempty" json:"secret_key" mapstructure:"secret_key"`
 }
 
 func (c AwsConnection) GetName() string {
@@ -18,11 +18,11 @@ func (c AwsConnection) GetName() string {
 }
 
 type GoogleCloudPlatformConnection struct { //nolint:recvcheck
-	Name               string `yaml:"name" json:"name" mapstructure:"name"`
-	ServiceAccountJSON string `yaml:"service_account_json" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
-	ServiceAccountFile string `yaml:"service_account_file" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
-	ProjectID          string `yaml:"project_id" json:"project_id" mapstructure:"project_id"`
-	Location           string `yaml:"location" json:"location,omitempty" mapstructure:"location"`
+	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
+	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
+	ProjectID          string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
+	Location           string `yaml:"location,omitempty" json:"location,omitempty" mapstructure:"location"`
 	rawCredentials     *google.Credentials
 }
 
@@ -79,12 +79,12 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 }
 
 type AthenaConnection struct {
-	Name             string `yaml:"name" json:"name" mapstructure:"name"`
-	AccessKey        string `yaml:"access_key_id" json:"access_key_id" mapstructure:"access_key_id"`
-	SecretKey        string `yaml:"secret_access_key" json:"secret_access_key" mapstructure:"secret_access_key"`
-	QueryResultsPath string `yaml:"query_results_path" json:"query_results_path" mapstructure:"query_results_path"`
-	Region           string `yaml:"region" json:"region" mapstructure:"region"`
-	Database         string `yaml:"database" json:"database,omitempty" mapstructure:"database"`
+	Name             string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessKey        string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id"`
+	SecretKey        string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key"`
+	QueryResultsPath string `yaml:"query_results_path,omitempty" json:"query_results_path" mapstructure:"query_results_path"`
+	Region           string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
+	Database         string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 }
 
 func (c AthenaConnection) GetName() string {
@@ -92,12 +92,12 @@ func (c AthenaConnection) GetName() string {
 }
 
 type SynapseConnection struct {
-	Name     string `yaml:"name" json:"name" mapstructure:"name"`
-	Username string `yaml:"username" json:"username" mapstructure:"username"`
-	Password string `yaml:"password" json:"password" mapstructure:"password"`
-	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
-	Port     int    `yaml:"port"     json:"port" mapstructure:"port" jsonschema:"default=1433"`
-	Database string `yaml:"database" json:"database" mapstructure:"database"`
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=1433"`
+	Database string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
 }
 
 func (c SynapseConnection) GetName() string {
@@ -105,13 +105,13 @@ func (c SynapseConnection) GetName() string {
 }
 
 type DatabricksConnection struct {
-	Name    string `yaml:"name"  json:"name" mapstructure:"name"`
-	Token   string `yaml:"token" json:"token" mapstructure:"token"`
-	Path    string `yaml:"path"  json:"path" mapstructure:"path"`
-	Host    string `yaml:"host"  json:"host" mapstructure:"host"`
-	Port    int    `yaml:"port"  json:"port" mapstructure:"port" jsonschema:"default=443"`
-	Catalog string `yaml:"catalog"  json:"catalog" mapstructure:"catalog"`
-	Schema  string `yaml:"schema"  json:"schema" mapstructure:"schema"`
+	Name    string `yaml:"name,omitempty"  json:"name" mapstructure:"name"`
+	Token   string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
+	Path    string `yaml:"path,omitempty"  json:"path" mapstructure:"path"`
+	Host    string `yaml:"host,omitempty"  json:"host" mapstructure:"host"`
+	Port    int    `yaml:"port,omitempty"  json:"port" mapstructure:"port" jsonschema:"default=443"`
+	Catalog string `yaml:"catalog,omitempty"  json:"catalog" mapstructure:"catalog"`
+	Schema  string `yaml:"schema,omitempty"  json:"schema" mapstructure:"schema"`
 }
 
 func (c DatabricksConnection) GetName() string {
@@ -119,12 +119,12 @@ func (c DatabricksConnection) GetName() string {
 }
 
 type MongoConnection struct {
-	Name     string `yaml:"name" json:"name" mapstructure:"name"`
-	Username string `yaml:"username" json:"username" mapstructure:"username"`
-	Password string `yaml:"password" json:"password" mapstructure:"password"`
-	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
-	Port     int    `yaml:"port"     json:"port" mapstructure:"port" jsonschema:"default=27017"`
-	Database string `yaml:"database" json:"database" mapstructure:"database"`
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=27017"`
+	Database string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
 }
 
 func (c MongoConnection) GetName() string {
@@ -132,12 +132,12 @@ func (c MongoConnection) GetName() string {
 }
 
 type MsSQLConnection struct {
-	Name     string `yaml:"name" json:"name" mapstructure:"name"`
-	Username string `yaml:"username" json:"username" mapstructure:"username"`
-	Password string `yaml:"password" json:"password" mapstructure:"password"`
-	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
-	Port     int    `yaml:"port"     json:"port" mapstructure:"port" jsonschema:"default=1433"`
-	Database string `yaml:"database" json:"database" mapstructure:"database"`
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=1433"`
+	Database string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
 }
 
 func (c MsSQLConnection) GetName() string {
@@ -145,16 +145,16 @@ func (c MsSQLConnection) GetName() string {
 }
 
 type MySQLConnection struct {
-	Name        string `yaml:"name" json:"name" mapstructure:"name"`
-	Username    string `yaml:"username" json:"username" mapstructure:"username"`
-	Password    string `yaml:"password" json:"password" mapstructure:"password"`
-	Host        string `yaml:"host"     json:"host" mapstructure:"host"`
-	Port        int    `yaml:"port"     json:"port" mapstructure:"port" jsonschema:"default=3306"`
-	Database    string `yaml:"database" json:"database" mapstructure:"database"`
-	Driver      string `yaml:"driver" json:"driver,omitempty" mapstructure:"driver"`
-	SslCaPath   string `yaml:"ssl_ca_path" json:"ssl_ca_path,omitempty" mapstructure:"ssl_ca_path"`
-	SslCertPath string `yaml:"ssl_cert_path" json:"ssl_cert_path,omitempty" mapstructure:"ssl_cert_path"`
-	SslKeyPath  string `yaml:"ssl_key_path" json:"ssl_key_path,omitempty" mapstructure:"ssl_key_path"`
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username    string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password    string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host        string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
+	Port        int    `yaml:"port,omitempty"     json:"port" mapstructure:"port" jsonschema:"default=3306"`
+	Database    string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	Driver      string `yaml:"driver,omitempty" json:"driver,omitempty" mapstructure:"driver"`
+	SslCaPath   string `yaml:"ssl_ca_path,omitempty" json:"ssl_ca_path,omitempty" mapstructure:"ssl_ca_path"`
+	SslCertPath string `yaml:"ssl_cert_path,omitempty" json:"ssl_cert_path,omitempty" mapstructure:"ssl_cert_path"`
+	SslKeyPath  string `yaml:"ssl_key_path,omitempty" json:"ssl_key_path,omitempty" mapstructure:"ssl_key_path"`
 }
 
 func (c MySQLConnection) GetName() string {
@@ -162,15 +162,15 @@ func (c MySQLConnection) GetName() string {
 }
 
 type PostgresConnection struct {
-	Name         string `yaml:"name" json:"name" mapstructure:"name"`
-	Username     string `yaml:"username" json:"username" mapstructure:"username"`
-	Password     string `yaml:"password" json:"password" mapstructure:"password"`
-	Host         string `yaml:"host" json:"host" mapstructure:"host"`
-	Port         int    `yaml:"port" json:"port" mapstructure:"port" jsonschema:"default=5432"`
-	Database     string `yaml:"database" json:"database" mapstructure:"database"`
-	Schema       string `yaml:"schema" json:"schema" mapstructure:"schema"`
-	PoolMaxConns int    `yaml:"pool_max_conns" json:"pool_max_conns" mapstructure:"pool_max_conns" default:"10"`
-	SslMode      string `yaml:"ssl_mode" json:"ssl_mode" mapstructure:"ssl_mode" default:"disable"`
+	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username     string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password     string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host         string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port         int    `yaml:"port,omitempty" json:"port" mapstructure:"port" jsonschema:"default=5432"`
+	Database     string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	Schema       string `yaml:"schema,omitempty" json:"schema" mapstructure:"schema"`
+	PoolMaxConns int    `yaml:"pool_max_conns,omitempty" json:"pool_max_conns" mapstructure:"pool_max_conns" default:"10"`
+	SslMode      string `yaml:"ssl_mode,omitempty" json:"ssl_mode" mapstructure:"ssl_mode" default:"disable"`
 }
 
 func (c PostgresConnection) GetName() string {
@@ -178,15 +178,15 @@ func (c PostgresConnection) GetName() string {
 }
 
 type RedshiftConnection struct {
-	Name         string `yaml:"name" json:"name" mapstructure:"name"`
-	Username     string `yaml:"username" json:"username" mapstructure:"username"`
-	Password     string `yaml:"password" json:"password" mapstructure:"password"`
-	Host         string `yaml:"host" json:"host" mapstructure:"host"`
-	Port         int    `yaml:"port" json:"port" mapstructure:"port" jsonschema:"default=5439"`
-	Database     string `yaml:"database" json:"database" mapstructure:"database"`
-	Schema       string `yaml:"schema" json:"schema" mapstructure:"schema"`
-	PoolMaxConns int    `yaml:"pool_max_conns" json:"pool_max_conns" mapstructure:"pool_max_conns" default:"10"`
-	SslMode      string `yaml:"ssl_mode" json:"ssl_mode" mapstructure:"ssl_mode" default:"disable"`
+	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username     string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password     string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host         string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port         int    `yaml:"port,omitempty" json:"port" mapstructure:"port" jsonschema:"default=5439"`
+	Database     string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	Schema       string `yaml:"schema,omitempty" json:"schema" mapstructure:"schema"`
+	PoolMaxConns int    `yaml:"pool_max_conns,omitempty" json:"pool_max_conns" mapstructure:"pool_max_conns" default:"10"`
+	SslMode      string `yaml:"ssl_mode,omitempty" json:"ssl_mode" mapstructure:"ssl_mode" default:"disable"`
 }
 
 func (c RedshiftConnection) GetName() string {
@@ -194,16 +194,16 @@ func (c RedshiftConnection) GetName() string {
 }
 
 type SnowflakeConnection struct {
-	Name           string `yaml:"name" json:"name" mapstructure:"name"`
-	Account        string `yaml:"account" json:"account" mapstructure:"account"`
-	Username       string `yaml:"username" json:"username" mapstructure:"username"`
-	Password       string `yaml:"password" json:"password" mapstructure:"password"`
-	Region         string `yaml:"region" json:"region" mapstructure:"region"`
-	Role           string `yaml:"role" json:"role" mapstructure:"role"`
-	Database       string `yaml:"database" json:"database" mapstructure:"database"`
-	Schema         string `yaml:"schema" json:"schema" mapstructure:"schema"`
-	Warehouse      string `yaml:"warehouse" json:"warehouse" mapstructure:"warehouse"`
-	PrivateKeyPath string `yaml:"private_key_path" json:"private_key_path" mapstructure:"private_key_path"`
+	Name           string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Account        string `yaml:"account,omitempty" json:"account" mapstructure:"account"`
+	Username       string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password       string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Region         string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
+	Role           string `yaml:"role,omitempty" json:"role" mapstructure:"role"`
+	Database       string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	Schema         string `yaml:"schema,omitempty" json:"schema" mapstructure:"schema"`
+	Warehouse      string `yaml:"warehouse,omitempty" json:"warehouse" mapstructure:"warehouse"`
+	PrivateKeyPath string `yaml:"private_key_path,omitempty" json:"private_key_path" mapstructure:"private_key_path"`
 }
 
 func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
@@ -226,12 +226,12 @@ func (c SnowflakeConnection) GetName() string {
 }
 
 type HANAConnection struct {
-	Name     string `yaml:"name" json:"name" mapstructure:"name"`
-	Username string `yaml:"username" json:"username" mapstructure:"username"`
-	Password string `yaml:"password" json:"password" mapstructure:"password"`
-	Host     string `yaml:"host"     json:"host" mapstructure:"host"`
-	Port     int    `yaml:"port"     json:"port" mapstructure:"port"`
-	Database string `yaml:"database" json:"database" mapstructure:"database"`
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host,omitempty"     json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port,omitempty"     json:"port" mapstructure:"port"`
+	Database string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
 }
 
 func (c HANAConnection) GetName() string {
@@ -239,10 +239,10 @@ func (c HANAConnection) GetName() string {
 }
 
 type GorgiasConnection struct {
-	Name   string `yaml:"name" json:"name" mapstructure:"name"`
-	Domain string `yaml:"domain" json:"domain" mapstructure:"domain"`
-	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
-	Email  string `yaml:"email" json:"email" mapstructure:"email"`
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Domain string `yaml:"domain,omitempty" json:"domain" mapstructure:"domain"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+	Email  string `yaml:"email,omitempty" json:"email" mapstructure:"email"`
 }
 
 func (c GorgiasConnection) GetName() string {
@@ -250,8 +250,8 @@ func (c GorgiasConnection) GetName() string {
 }
 
 type KlaviyoConnection struct {
-	Name   string `yaml:"name" json:"name" mapstructure:"name"`
-	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
 }
 
 func (c KlaviyoConnection) GetName() string {
@@ -259,8 +259,8 @@ func (c KlaviyoConnection) GetName() string {
 }
 
 type AdjustConnection struct {
-	Name   string `yaml:"name" json:"name" mapstructure:"name"`
-	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
 }
 
 func (c AdjustConnection) GetName() string {
@@ -268,9 +268,9 @@ func (c AdjustConnection) GetName() string {
 }
 
 type FacebookAdsConnection struct {
-	Name        string `yaml:"name" json:"name" mapstructure:"name"`
-	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
-	AccountID   string `yaml:"account_id" json:"account_id" mapstructure:"account_id"`
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	AccountID   string `yaml:"account_id,omitempty" json:"account_id" mapstructure:"account_id"`
 }
 
 func (c FacebookAdsConnection) GetName() string {
@@ -278,8 +278,8 @@ func (c FacebookAdsConnection) GetName() string {
 }
 
 type StripeConnection struct {
-	Name   string `yaml:"name" json:"name" mapstructure:"name"`
-	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
 }
 
 func (c StripeConnection) GetName() string {
@@ -287,8 +287,8 @@ func (c StripeConnection) GetName() string {
 }
 
 type NotionConnection struct {
-	Name   string `yaml:"name" json:"name" mapstructure:"name"`
-	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
 }
 
 func (c NotionConnection) GetName() string {
@@ -296,9 +296,9 @@ func (c NotionConnection) GetName() string {
 }
 
 type ShopifyConnection struct {
-	Name   string `yaml:"name" json:"name" mapstructure:"name"`
-	URL    string `yaml:"url" json:"url" mapstructure:"url"`
-	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	URL    string `yaml:"url,omitempty" json:"url" mapstructure:"url"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
 }
 
 func (c ShopifyConnection) GetName() string {
@@ -306,15 +306,15 @@ func (c ShopifyConnection) GetName() string {
 }
 
 type KafkaConnection struct {
-	Name             string `yaml:"name" json:"name" mapstructure:"name"`
-	BootstrapServers string `yaml:"bootstrap_servers" json:"bootstrap_servers" mapstructure:"bootstrap_servers"`
-	GroupID          string `yaml:"group_id" json:"group_id" mapstructure:"group_id"`
-	SecurityProtocol string `yaml:"security_protocol" json:"security_protocol,omitempty" mapstructure:"security_protocol"`
-	SaslMechanisms   string `yaml:"sasl_mechanisms" json:"sasl_mechanisms,omitempty" mapstructure:"sasl_mechanisms"`
-	SaslUsername     string `yaml:"sasl_username" json:"sasl_username,omitempty" mapstructure:"sasl_username"`
-	SaslPassword     string `yaml:"sasl_password" json:"sasl_password,omitempty" mapstructure:"sasl_password"`
-	BatchSize        string `yaml:"batch_size" json:"batch_size,omitempty" mapstructure:"batch_size"`
-	BatchTimeout     string `yaml:"batch_timeout" json:"batch_timeout,omitempty" mapstructure:"batch_timeout"`
+	Name             string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	BootstrapServers string `yaml:"bootstrap_servers,omitempty" json:"bootstrap_servers" mapstructure:"bootstrap_servers"`
+	GroupID          string `yaml:"group_id,omitempty" json:"group_id" mapstructure:"group_id"`
+	SecurityProtocol string `yaml:"security_protocol,omitempty" json:"security_protocol,omitempty" mapstructure:"security_protocol"`
+	SaslMechanisms   string `yaml:"sasl_mechanisms,omitempty" json:"sasl_mechanisms,omitempty" mapstructure:"sasl_mechanisms"`
+	SaslUsername     string `yaml:"sasl_username,omitempty" json:"sasl_username,omitempty" mapstructure:"sasl_username"`
+	SaslPassword     string `yaml:"sasl_password,omitempty" json:"sasl_password,omitempty" mapstructure:"sasl_password"`
+	BatchSize        string `yaml:"batch_size,omitempty" json:"batch_size,omitempty" mapstructure:"batch_size"`
+	BatchTimeout     string `yaml:"batch_timeout,omitempty" json:"batch_timeout,omitempty" mapstructure:"batch_timeout"`
 }
 
 func (c KafkaConnection) GetName() string {
@@ -322,9 +322,9 @@ func (c KafkaConnection) GetName() string {
 }
 
 type AirtableConnection struct {
-	Name        string `yaml:"name" json:"name" mapstructure:"name"`
-	BaseID      string `yaml:"base_id" json:"base_id" mapstructure:"base_id"`
-	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	BaseID      string `yaml:"base_id,omitempty" json:"base_id" mapstructure:"base_id"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
 }
 
 func (c AirtableConnection) GetName() string {
@@ -332,8 +332,8 @@ func (c AirtableConnection) GetName() string {
 }
 
 type DuckDBConnection struct {
-	Name string `yaml:"name" json:"name" mapstructure:"name"`
-	Path string `yaml:"path" json:"path" mapstructure:"path"`
+	Name string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Path string `yaml:"path,omitempty" json:"path" mapstructure:"path"`
 }
 
 func (d DuckDBConnection) GetName() string {
@@ -356,8 +356,8 @@ func (c ClickHouseConnection) GetName() string {
 }
 
 type AppsflyerConnection struct {
-	Name   string `yaml:"name" json:"name" mapstructure:"name"`
-	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
 }
 
 func (c AppsflyerConnection) GetName() string {
@@ -365,8 +365,8 @@ func (c AppsflyerConnection) GetName() string {
 }
 
 type HubspotConnection struct {
-	Name   string `yaml:"name" json:"name" mapstructure:"name"`
-	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
 }
 
 func (c HubspotConnection) GetName() string {
@@ -374,9 +374,9 @@ func (c HubspotConnection) GetName() string {
 }
 
 type GoogleSheetsConnection struct {
-	Name               string `yaml:"name" json:"name" mapstructure:"name"`
-	ServiceAccountJSON string `yaml:"service_account_json" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
-	ServiceAccountFile string `yaml:"service_account_file" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
+	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
+	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
 }
 
 func (c GoogleSheetsConnection) GetName() string {
@@ -384,8 +384,8 @@ func (c GoogleSheetsConnection) GetName() string {
 }
 
 type ChessConnection struct {
-	Name    string   `yaml:"name" json:"name" mapstructure:"name"`
-	Players []string `yaml:"players" json:"players" mapstructure:"players" jsonschema:"default=MagnusCarlsen,default=HikaruNakamura,default=ArjunErigaisi"`
+	Name    string   `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Players []string `yaml:"players,omitempty" json:"players" mapstructure:"players" jsonschema:"default=MagnusCarlsen,default=HikaruNakamura,default=ArjunErigaisi"`
 }
 
 func (c ChessConnection) GetName() string {
@@ -403,8 +403,8 @@ func (c ApplovinMaxConnection) GetName() string {
 }
 
 type GenericConnection struct {
-	Name  string `yaml:"name" json:"name" mapstructure:"name"`
-	Value string `yaml:"value" json:"value" mapstructure:"value"`
+	Name  string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Value string `yaml:"value,omitempty" json:"value" mapstructure:"value"`
 }
 
 func (c GenericConnection) MarshalJSON() ([]byte, error) {
@@ -419,11 +419,11 @@ func (c GenericConnection) GetName() string {
 }
 
 type S3Connection struct {
-	Name            string `yaml:"name" json:"name" mapstructure:"name"`
-	BucketName      string `yaml:"bucket_name" json:"bucket_name" mapstructure:"bucket_name"`
-	PathToFile      string `yaml:"path_to_file" json:"path_to_file" mapstructure:"path_to_file"`
-	AccessKeyID     string `yaml:"access_key_id" json:"access_key_id" mapstructure:"access_key_id"`
-	SecretAccessKey string `yaml:"secret_access_key" json:"secret_access_key" mapstructure:"secret_access_key"`
+	Name            string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	BucketName      string `yaml:"bucket_name,omitempty" json:"bucket_name" mapstructure:"bucket_name"`
+	PathToFile      string `yaml:"path_to_file,omitempty" json:"path_to_file" mapstructure:"path_to_file"`
+	AccessKeyID     string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id"`
+	SecretAccessKey string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key"`
 }
 
 func (c S3Connection) GetName() string {
@@ -431,11 +431,11 @@ func (c S3Connection) GetName() string {
 }
 
 type ZendeskConnection struct {
-	Name       string `yaml:"name" json:"name" mapstructure:"name"`
-	APIToken   string `yaml:"api_token" json:"api_token" mapstructure:"api_token"`
-	Email      string `yaml:"email" json:"email" mapstructure:"email"`
-	OAuthToken string `yaml:"oauth_token" json:"oauth_token" mapstructure:"oauth_token"`
-	Subdomain  string `yaml:"sub_domain" json:"sub_domain" mapstructure:"sub_domain"`
+	Name       string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIToken   string `yaml:"api_token,omitempty" json:"api_token" mapstructure:"api_token"`
+	Email      string `yaml:"email,omitempty" json:"email" mapstructure:"email"`
+	OAuthToken string `yaml:"oauth_token,omitempty" json:"oauth_token" mapstructure:"oauth_token"`
+	Subdomain  string `yaml:"sub_domain,omitempty" json:"sub_domain" mapstructure:"sub_domain"`
 }
 
 func (c ZendeskConnection) GetName() string {
@@ -452,9 +452,9 @@ func (c SlackConnection) GetName() string {
 }
 
 type AsanaConnection struct {
-	Name        string `yaml:"name" json:"name" mapstructure:"name"`
-	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
-	WorkspaceID string `yaml:"workspace" json:"workspace" mapstructure:"workspace"`
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	WorkspaceID string `yaml:"workspace,omitempty" json:"workspace" mapstructure:"workspace"`
 }
 
 func (c AsanaConnection) GetName() string {
@@ -462,10 +462,10 @@ func (c AsanaConnection) GetName() string {
 }
 
 type DynamoDBConnection struct {
-	Name            string `yaml:"name" json:"name" mapstructure:"name"`
-	AccessKeyID     string `yaml:"access_key_id" json:"access_key_id" mapstructure:"access_key_id"`
-	SecretAccessKey string `yaml:"secret_access_key" json:"secret_access_key" mapstructure:"secret_access_key"`
-	Region          string `yaml:"region" json:"region" mapstructure:"region"`
+	Name            string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessKeyID     string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id"`
+	SecretAccessKey string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key"`
+	Region          string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
 }
 
 func (c DynamoDBConnection) GetName() string {
@@ -473,11 +473,11 @@ func (c DynamoDBConnection) GetName() string {
 }
 
 type GoogleAdsConnection struct {
-	Name               string `yaml:"name" json:"name" mapstructure:"name"`
-	CustomerID         string `yaml:"customer_id" json:"customer_id" mapstructure:"customer_id"`
-	ServiceAccountJSON string `yaml:"service_account_json" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
-	ServiceAccountFile string `yaml:"service_account_file" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
-	DeveloperToken     string `yaml:"dev_token" json:"dev_token" mapstructure:"dev_token"`
+	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	CustomerID         string `yaml:"customer_id,omitempty" json:"customer_id" mapstructure:"customer_id"`
+	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
+	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
+	DeveloperToken     string `yaml:"dev_token,omitempty" json:"dev_token" mapstructure:"dev_token"`
 }
 
 func (c GoogleAdsConnection) GetName() string {
@@ -485,10 +485,10 @@ func (c GoogleAdsConnection) GetName() string {
 }
 
 type TikTokAdsConnection struct {
-	Name          string `yaml:"name" json:"name" mapstructure:"name"`
-	AccessToken   string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
-	AdvertiserIDs string `yaml:"advertiser_ids" json:"advertiser_ids" mapstructure:"advertiser_ids"`
-	Timezone      string `yaml:"timezone" json:"timezone,omitempty" mapstructure:"timezone"`
+	Name          string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken   string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	AdvertiserIDs string `yaml:"advertiser_ids,omitempty" json:"advertiser_ids" mapstructure:"advertiser_ids"`
+	Timezone      string `yaml:"timezone,omitempty" json:"timezone,omitempty" mapstructure:"timezone"`
 }
 
 func (c TikTokAdsConnection) GetName() string {
@@ -497,10 +497,10 @@ func (c TikTokAdsConnection) GetName() string {
 
 // github://?access_token=<access_token>&owner=<owner>&repo=<repo>
 type GitHubConnection struct {
-	Name        string `yaml:"name" json:"name" mapstructure:"name"`
-	AccessToken string `yaml:"access_token" json:"access_token,omitempty" mapstructure:"access_token"`
-	Owner       string `yaml:"owner" json:"owner" mapstructure:"owner"`
-	Repo        string `yaml:"repo" json:"repo" mapstructure:"repo"`
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token,omitempty" mapstructure:"access_token"`
+	Owner       string `yaml:"owner,omitempty" json:"owner" mapstructure:"owner"`
+	Repo        string `yaml:"repo,omitempty" json:"repo" mapstructure:"repo"`
 }
 
 func (c GitHubConnection) GetName() string {
@@ -508,11 +508,11 @@ func (c GitHubConnection) GetName() string {
 }
 
 type AppStoreConnection struct {
-	Name     string `yaml:"name" json:"name" mapstructure:"name"`
-	KeyID    string `yaml:"key_id" json:"key_id" mapstructure:"key_id"`
-	IssuerID string `yaml:"issuer_id" json:"issuer_id" mapstructure:"issuer_id"`
-	KeyPath  string `yaml:"key_path" json:"key_path" mapstructure:"key_path"`
-	Key      string `yaml:"key" json:"key" mapstructure:"key"`
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	KeyID    string `yaml:"key_id,omitempty" json:"key_id" mapstructure:"key_id"`
+	IssuerID string `yaml:"issuer_id,omitempty" json:"issuer_id" mapstructure:"issuer_id"`
+	KeyPath  string `yaml:"key_path,omitempty" json:"key_path" mapstructure:"key_path"`
+	Key      string `yaml:"key,omitempty" json:"key" mapstructure:"key"`
 }
 
 func (c AppStoreConnection) GetName() string {
@@ -520,9 +520,9 @@ func (c AppStoreConnection) GetName() string {
 }
 
 type LinkedInAdsConnection struct {
-	Name        string `yaml:"name" json:"name" mapstructure:"name"`
-	AccessToken string `yaml:"access_token" json:"access_token" mapstructure:"access_token"`
-	AccountIds  string `yaml:"account_ids" json:"account_ids" mapstructure:"account_ids"`
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+	AccountIds  string `yaml:"account_ids,omitempty" json:"account_ids" mapstructure:"account_ids"`
 }
 
 func (c LinkedInAdsConnection) GetName() string {
@@ -530,9 +530,9 @@ func (c LinkedInAdsConnection) GetName() string {
 }
 
 type GCSConnection struct {
-	Name               string `yaml:"name" json:"name" mapstructure:"name"`
-	ServiceAccountFile string `yaml:"service_account_file" json:"service_account_file" mapstructure:"service_account_file"`
-	ServiceAccountJSON string `yaml:"service_account_json" json:"service_account_json" mapstructure:"service_account_json"`
+	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file" mapstructure:"service_account_file"`
+	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json" mapstructure:"service_account_json"`
 }
 
 func (c GCSConnection) GetName() string {

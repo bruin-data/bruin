@@ -326,6 +326,55 @@ func ensureConfigIsInGitignore(fs afero.Fs, filePath string) error {
 	return git.EnsureGivenPatternIsInGitignore(fs, filepath.Dir(filePath), filepath.Base(filePath))
 }
 
+func LoadOrCreateWithoutPathAbsolutization(fs afero.Fs, path string) (*Config, error) {
+	var config Config
+
+	err := path2.ReadYaml(fs, path, &config)
+	if err != nil && !errors.Is(err, fs2.ErrNotExist) {
+		return nil, err
+	}
+
+	if err == nil {
+		config.fs = fs
+		config.path = path
+
+		if config.DefaultEnvironmentName == "" {
+			config.DefaultEnvironmentName = "default"
+		}
+
+		err = config.SelectEnvironment(config.DefaultEnvironmentName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to select default environment: %w", err)
+		}
+
+		return &config, ensureConfigIsInGitignore(fs, path)
+	}
+
+	defaultEnv := Environment{
+		Connections: &Connections{},
+	}
+	config = Config{
+		fs:   fs,
+		path: path,
+
+		DefaultEnvironmentName:  "default",
+		SelectedEnvironment:     &defaultEnv,
+		SelectedEnvironmentName: "default",
+		Environments: map[string]Environment{
+			"default": defaultEnv,
+		},
+	}
+
+	err = config.Persist()
+	if err != nil {
+		return nil, fmt.Errorf("failed to persist config: %w", err)
+	}
+
+	config.SelectedEnvironment.Connections.buildConnectionKeyMap()
+
+	return &config, ensureConfigIsInGitignore(fs, path)
+}
+
 func (c *Config) AddConnection(environmentName, name, connType string, creds map[string]interface{}) error {
 	// Check if the environment exists
 	env, exists := c.Environments[environmentName]
@@ -754,4 +803,73 @@ func removeConnection[T interface{ GetName() string }](connections []T, name str
 		}
 	}
 	return connections
+}
+
+func mergeConnectionList[T interface{ GetName() string }](existing *[]T, newConnections []T) {
+	if newConnections == nil {
+		return
+	}
+	existingNames := make(map[string]bool)
+	for _, conn := range *existing {
+		existingNames[conn.GetName()] = true
+	}
+
+	for _, conn := range newConnections {
+		if !existingNames[conn.GetName()] {
+			*existing = append(*existing, conn)
+		}
+	}
+}
+
+// MergeFrom implements ConnectionMerger interface.
+func (c *Connections) MergeFrom(source *Connections) error {
+	if source == nil {
+		return errors.New("source connections cannot be nil")
+	}
+
+	if c.typeNameMap == nil {
+		c.buildConnectionKeyMap()
+	}
+
+	mergeConnectionList(&c.AwsConnection, source.AwsConnection)
+	mergeConnectionList(&c.AthenaConnection, source.AthenaConnection)
+	mergeConnectionList(&c.GoogleCloudPlatform, source.GoogleCloudPlatform)
+	mergeConnectionList(&c.Snowflake, source.Snowflake)
+	mergeConnectionList(&c.Postgres, source.Postgres)
+	mergeConnectionList(&c.RedShift, source.RedShift)
+	mergeConnectionList(&c.MsSQL, source.MsSQL)
+	mergeConnectionList(&c.Databricks, source.Databricks)
+	mergeConnectionList(&c.Synapse, source.Synapse)
+	mergeConnectionList(&c.Mongo, source.Mongo)
+	mergeConnectionList(&c.MySQL, source.MySQL)
+	mergeConnectionList(&c.Notion, source.Notion)
+	mergeConnectionList(&c.HANA, source.HANA)
+	mergeConnectionList(&c.Shopify, source.Shopify)
+	mergeConnectionList(&c.Gorgias, source.Gorgias)
+	mergeConnectionList(&c.Klaviyo, source.Klaviyo)
+	mergeConnectionList(&c.Adjust, source.Adjust)
+	mergeConnectionList(&c.Generic, source.Generic)
+	mergeConnectionList(&c.FacebookAds, source.FacebookAds)
+	mergeConnectionList(&c.Stripe, source.Stripe)
+	mergeConnectionList(&c.Appsflyer, source.Appsflyer)
+	mergeConnectionList(&c.Kafka, source.Kafka)
+	mergeConnectionList(&c.DuckDB, source.DuckDB)
+	mergeConnectionList(&c.ClickHouse, source.ClickHouse)
+	mergeConnectionList(&c.Hubspot, source.Hubspot)
+	mergeConnectionList(&c.GitHub, source.GitHub)
+	mergeConnectionList(&c.GoogleSheets, source.GoogleSheets)
+	mergeConnectionList(&c.Chess, source.Chess)
+	mergeConnectionList(&c.Airtable, source.Airtable)
+	mergeConnectionList(&c.Zendesk, source.Zendesk)
+	mergeConnectionList(&c.TikTokAds, source.TikTokAds)
+	mergeConnectionList(&c.S3, source.S3)
+	mergeConnectionList(&c.Slack, source.Slack)
+	mergeConnectionList(&c.Asana, source.Asana)
+	mergeConnectionList(&c.DynamoDB, source.DynamoDB)
+	mergeConnectionList(&c.AppStore, source.AppStore)
+	mergeConnectionList(&c.LinkedInAds, source.LinkedInAds)
+	mergeConnectionList(&c.GCS, source.GCS)
+
+	c.buildConnectionKeyMap()
+	return nil
 }

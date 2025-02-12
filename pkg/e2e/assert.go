@@ -127,3 +127,21 @@ func AssertCustomState(dir string, expected *scheduler.PipelineState) func(*Task
 		return nil
 	}
 }
+
+func AssertByYAML(i *Task) error {
+	fs := afero.NewOsFs()
+
+	actualBytes, err := afero.ReadFile(fs, i.WorkingDir+"/.bruin.yml")
+	if err != nil {
+		return fmt.Errorf("failed to read .bruin.yaml file: %w", err)
+	}
+
+	actualContent := strings.TrimSpace(strings.ReplaceAll(string(actualBytes), "\r\n", "\n"))
+	expectedContent := strings.TrimSpace(strings.ReplaceAll(i.Expected.Output, "\r\n", "\n"))
+
+	if actualContent != expectedContent {
+		return fmt.Errorf("YAML content mismatch:\nexpected:\n%s\ngot:\n%s", expectedContent, actualContent)
+	}
+
+	return nil
+}

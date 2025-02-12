@@ -127,13 +127,13 @@ func main() {
 }
 
 func runIntegrationWorkflow(binary string, currentFolder string) {
-	tempfile, err := os.CreateTemp("", "bruin-test-continue")
+	tempdir, err := os.MkdirTemp(os.TempDir(), "bruin-test")
 	if err != nil {
-		fmt.Println("Failed to create temporary file:", err)
+		fmt.Println("Failed to create temporary directory:", err)
 		os.Exit(1)
 	}
 
-	workflows := getWorkflow(binary, currentFolder, tempfile.Name())
+	workflows := getWorkflow(binary, currentFolder, tempdir)
 
 	for _, workflow := range workflows {
 		err := workflow.Run()
@@ -158,7 +158,8 @@ func runIntegrationTests(binary string, currentFolder string, includeIngestr boo
 	}
 }
 
-func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Workflow {
+func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Workflow {
+	tempfile := GetTempFile(tempdir, "shipping_providers.sql")
 	return []e2e.Workflow{
 		{
 			Name: "continue after failure",
@@ -226,6 +227,77 @@ func getWorkflow(binary string, currentFolder string, tempfile string) []e2e.Wor
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
+					},
+				},
+			},
+		},
+		{
+			Name: "Bruin init",
+			Steps: []e2e.Task{
+				{
+					Name:       "create a test directory",
+					Command:    "mkdir",
+					WorkingDir: tempdir,
+					Args:       []string{"-p", filepath.Join(tempdir, "test-bruin-init")},
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:       "run git init",
+					Command:    "git",
+					Args:       []string{"init"},
+					WorkingDir: filepath.Join(tempdir, "test-bruin-init"),
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:       "run bruin init",
+					Command:    binary,
+					Args:       []string{"init", "clickhouse"},
+					WorkingDir: filepath.Join(tempdir, "test-bruin-init"),
+					Expected: e2e.Output{
+						ExitCode: 0,
+						Output:   helpers.ReadFile(filepath.Join(currentFolder, "expected_bruin.yaml")),
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByYAML,
+					},
+				},
+				{
+					Name:       "run bruin init 2",
+					Command:    binary,
+					Args:       []string{"init", "clickhouse", "clickhouse2"},
+					WorkingDir: filepath.Join(tempdir, "test-bruin-init"),
+					Expected: e2e.Output{
+						ExitCode: 0,
+						Output:   helpers.ReadFile(filepath.Join(currentFolder, "expected_bruin.yaml")),
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByYAML,
+					},
+				},
+				{
+					Name:       "run bruin init chess",
+					Command:    binary,
+					Args:       []string{"init", "chess"},
+					WorkingDir: filepath.Join(tempdir, "test-bruin-init"),
+					Expected: e2e.Output{
+						ExitCode: 0,
+						Output:   helpers.ReadFile(filepath.Join(currentFolder, "expected_bruin_chess.yaml")),
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByYAML,
 					},
 				},
 			},
@@ -644,4 +716,14 @@ func getIngestrTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 	}
+}
+
+func GetTempFile(tempdir string, filename string) string {
+	tempfile, err := os.CreateTemp(tempdir, filename)
+	if err != nil {
+		fmt.Println("Failed to create temporary file:", err)
+		os.Exit(1)
+	}
+
+	return tempfile.Name()
 }

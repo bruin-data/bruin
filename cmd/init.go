@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	path2 "path"
 	"path/filepath"
 	"strings"
 
@@ -17,6 +16,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -76,6 +76,47 @@ func (m model) View() string {
 	s.WriteString("\n(press q to quit)\n")
 
 	return s.String()
+}
+
+func mergeTemplateConfig(centralConfig *config.Config, templateBruinContent []byte) error {
+	var templateConfig config.Config
+	if err := yaml.Unmarshal(templateBruinContent, &templateConfig); err != nil {
+		return fmt.Errorf("could not parse template's .bruin.yml: %w", err)
+	}
+
+	// Initialize environments map if it doesn't exist
+	if centralConfig.Environments == nil {
+		centralConfig.Environments = make(map[string]config.Environment)
+	}
+
+	// Merge environments and their connections from template into central config
+	for templateEnvName, templateEnv := range templateConfig.Environments {
+		if err := mergeEnvironment(centralConfig, templateEnvName, templateEnv); err != nil {
+			return fmt.Errorf("failed to merge environment %s: %w", templateEnvName, err)
+		}
+	}
+
+	return nil
+}
+
+func mergeEnvironment(centralConfig *config.Config, templateEnvName string, templateEnv config.Environment) error {
+	if _, exists := centralConfig.Environments[templateEnvName]; !exists {
+		centralConfig.Environments[templateEnvName] = templateEnv
+		return nil
+	}
+
+	centralEnvCopy := centralConfig.Environments[templateEnvName]
+	if centralEnvCopy.Connections == nil {
+		centralEnvCopy.Connections = &config.Connections{}
+	}
+
+	// Merge the connections from template into central copy
+	if err := centralEnvCopy.Connections.MergeFrom(templateEnv.Connections); err != nil {
+		return err
+	}
+
+	centralConfig.Environments[templateEnvName] = centralEnvCopy
+	return nil
 }
 
 func Init() *cli.Command {
@@ -138,27 +179,62 @@ func Init() *cli.Command {
 				}
 			}
 
-			// Check if the folder already exists
-			if _, err := os.Stat(inputPath); !os.IsNotExist(err) {
-				errorPrinter.Printf("The folder %s already exists, please choose a different name\n", inputPath)
-				return cli.Exit("", 1)
-			}
 			dir, _ := filepath.Split(inputPath)
 			if dir != "" {
 				errorPrinter.Printf("Traversing up or down in the folder structure is not allowed, provide base folder name only.\n")
 				return cli.Exit("", 1)
 			}
 
-			err = os.Mkdir(inputPath, 0o755)
+			var bruinYmlPath string
+			repoRoot, err := git.FindRepoFromPath(".")
 			if err != nil {
-				errorPrinter.Printf("Failed to create the folder %s: %v\n", inputPath, err)
-				return cli.Exit("", 1)
+				// Not in a git repo, create a bruin root directory
+				if err := os.MkdirAll("bruin", 0o755); err != nil {
+					errorPrinter.Printf("Failed to create the bruin root folder: %v\n", err)
+					return cli.Exit("", 1)
+				}
+
+				// Initialize git repository in the bruin directory
+				cmd := exec.Command("git", "init")
+				cmd.Dir = "bruin"
+				out, err := cmd.CombinedOutput()
+				if err != nil {
+					errorPrinter.Printf("Could not initialize git repository in bruin folder: %s\n", string(out))
+					return cli.Exit("", 1)
+				}
+
+				bruinYmlPath = filepath.Join("bruin", ".bruin.yml")
+				inputPath = filepath.Join("bruin", inputPath)
+			} else {
+				bruinYmlPath = filepath.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			_, err = config.LoadOrCreate(afero.NewOsFs(), path2.Join(inputPath, ".bruin.yml"))
+			centralConfig, err := config.LoadOrCreateWithoutPathAbsolutization(afero.NewOsFs(), bruinYmlPath)
 			if err != nil {
 				errorPrinter.Printf("Could not write .bruin.yml file: %v\n", err)
 				return err
+			}
+
+			// Read template's .bruin.yml if it exists
+			templateBruinPath := templateName + "/.bruin.yml"
+			templateBruinContent, err := templates.Templates.ReadFile(templateBruinPath)
+			if err == nil { // Only process if file exists
+				if err := mergeTemplateConfig(centralConfig, templateBruinContent); err != nil {
+					errorPrinter.Printf("%v\n", err)
+					return err
+				}
+
+				// Write back the updated config
+				configBytes, err := yaml.Marshal(centralConfig)
+				if err != nil {
+					errorPrinter.Printf("Could not marshal .bruin.yml: %v\n", err)
+					return err
+				}
+
+				if err := os.WriteFile(bruinYmlPath, configBytes, 0o644); err != nil { //nolint:gosec
+					errorPrinter.Printf("Could not write .bruin.yml file: %v\n", err)
+					return err
+				}
 			}
 
 			err = fs2.WalkDir(templates.Templates, templateName, func(path string, d fs2.DirEntry, err error) error {
@@ -185,6 +261,11 @@ func Init() *cli.Command {
 				relativePath = strings.TrimPrefix(relativePath, templateName)
 				absolutePath := inputPath + relativePath
 
+				// Skip .bruin.yml as we've already handled it
+				if baseName == ".bruin.yml" {
+					return nil
+				}
+
 				// ignore the error
 				err = os.MkdirAll(absolutePath, os.ModePerm)
 				if err != nil {
@@ -207,19 +288,7 @@ func Init() *cli.Command {
 
 			successPrinter.Printf("\n\nA new '%s' pipeline created successfully in folder '%s'.\n", templateName, inputPath)
 			infoPrinter.Println("\nYou can run the following commands to get started:")
-			infoPrinter.Printf("\n    cd %s\n", inputPath)
-			infoPrinter.Printf("    bruin validate\n\n")
-
-			repoRoot, err := git.FindRepoFromPath(inputPath)
-			if err != nil || repoRoot == nil {
-				cmd := exec.Command("git", "init")
-				cmd.Dir = inputPath
-				out, err := cmd.CombinedOutput()
-				if err != nil {
-					errorPrinter.Printf("Could not initialize git repository: %s\n", string(out))
-					return cli.Exit("", 1)
-				}
-			}
+			infoPrinter.Printf("    bruin validate %s\n\n", inputPath)
 
 			return nil
 		},
