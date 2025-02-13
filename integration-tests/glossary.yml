@@ -1,0 +1,15 @@
+# The `entities` key is used to define entities within the glossary, which can then be referred by different assets.
+entities:  
+  Customer:
+    description: Customer is an individual/business that has registered on our platform.
+    attributes:
+      ID:
+        type: integer
+        description: The unique identifier of the customer in our systems.
+      Email:
+        type: string
+        description: the e-mail address the customer used while registering on our website.
+      Language:
+        type: string
+        description: the language the customer picked during registration.
+  

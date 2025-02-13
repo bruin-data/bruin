@@ -696,6 +696,21 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 				e2e.AssertByOutputJSON,
 			},
 		},
+		{
+			Name:          "parse-asset-extends",
+			Command:       binary,
+			Args:          []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "test-pipelines/parse-asset-extends")},
+			Env:           []string{},
+			SkipJSONNodes: []string{"\"path\""},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/parse-asset-extends/expectations/pipeline.json")),
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJSON,
+			},
+		},
 	}
 }
 

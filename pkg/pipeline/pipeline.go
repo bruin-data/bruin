@@ -601,6 +601,7 @@ type Asset struct {
 	DefinitionFile  TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
 	Parameters      EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
 	Secrets         []SecretMapping    `json:"secrets" yaml:"secrets,omitempty" mapstructure:"secrets"`
+	Extends         []string           `json:"extends" yaml:"extends,omitempty" mapstructure:"extends"`
 	Columns         []Column           `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
 	CustomChecks    []CustomCheck      `json:"custom_checks" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
 	Metadata        EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
@@ -1429,6 +1430,26 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 	task.DefinitionFile.Type = CommentTask
 	if isSeparateDefinitionFile {
 		task.DefinitionFile.Type = YamlTask
+	}
+	entities, err := b.GlossaryReader.GetEntities(foundPipeline.DefinitionFile.Path)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting entities")
+	}
+
+	for _, extend := range task.Extends {
+		for _, entity := range entities {
+			if entity.Name == extend {
+				for _, attribute := range entity.Attributes {
+					task.Columns = append(task.Columns, Column{
+						EntityAttribute: &EntityAttribute{
+							Entity:    entity.Name,
+							Attribute: attribute.Name,
+						},
+					})
+				}
+				break
+			}
+		}
 	}
 
 	if foundPipeline != nil && foundPipeline.DefaultValues != nil {

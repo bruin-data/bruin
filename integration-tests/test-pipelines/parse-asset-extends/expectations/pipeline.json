@@ -1,0 +1,101 @@
+{
+  "legacy_id": "",
+  "name": "integration_test",
+  "schedule": "",
+  "start_date": "",
+  "definition_file": {
+    "name": "pipeline.yml",
+    "path": "integration-tests/test-pipelines/parse-asset-extends/pipeline.yml"
+  },
+  "default_connections": {},
+  "assets": [
+    {
+      "id": "aff64e4fd520bd185cb01adab98d2d20060f621c62d5cad5204712cfa2294ef7",
+      "uri": "",
+      "name": "country",
+      "type": "duckdb.sql",
+      "description": "",
+      "connection": "",
+      "tags": [],
+      "materialization": {
+        "type": "table",
+        "strategy": "",
+        "partition_by": "",
+        "cluster_by": null,
+        "incremental_key": ""
+      },
+      "upstreams": [],
+      "image": "",
+      "instance": "",
+      "owner": "",
+      "executable_file": {
+        "name": "country.sql",
+        "path": "integration-tests/test-pipelines/parse-asset-extends/assets/country.sql",
+        "content": ""
+      },
+      "definition_file": {
+        "name": "country.sql",
+        "path": "integration-tests/test-pipelines/parse-asset-extends/assets/country.sql",
+        "type": "comment"
+      },
+      "parameters": {},
+      "secrets": [],
+      "extends": ["Customer"],
+      "columns": [
+        {
+          "entity_attribute": {
+            "entity": "Customer",
+            "attribute": "Email"
+          },
+          "name": "Email",
+          "type": "string",
+          "description": "the e-mail address the customer used while registering on our website.",
+          "primary_key": false,
+          "update_on_merge": false,
+          "checks": null,
+          "upstreams": null
+        },
+        {
+          "entity_attribute": {
+            "entity": "Customer",
+            "attribute": "Language"
+          },
+          "name": "Language",
+          "type": "string",
+          "description": "the language the customer picked during registration.",
+          "primary_key": false,
+          "update_on_merge": false,
+          "checks": null,
+          "upstreams": null
+        },
+        {
+          "entity_attribute": {
+            "entity": "Customer",
+            "attribute": "ID"
+          },
+          "name": "ID",
+          "type": "integer",
+          "description": "The unique identifier of the customer in our systems.",
+          "primary_key": false,
+          "update_on_merge": false,
+          "checks": null,
+          "upstreams": null
+        }
+      ],
+      "custom_checks": [],
+      "metadata": {},
+      "snowflake": null,
+      "athena": null
+    }
+  ],
+  "notifications": {
+    "slack": [],
+    "ms_teams": [],
+    "discord": []
+  },
+  "catchup": false,
+  "metadata_push": {
+    "bigquery": false
+  },
+  "retries": 0
+}
