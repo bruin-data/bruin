@@ -60,9 +60,9 @@ type Connections struct {
 	LinkedInAds         []LinkedInAdsConnection         `yaml:"linkedinads,omitempty" json:"linkedinads,omitempty" mapstructure:"linkedinads"`
 	GCS                 []GCSConnection                 `yaml:"gcs,omitempty" json:"gcs,omitempty" mapstructure:"gcs"`
 	ApplovinMax         []ApplovinMaxConnection         `yaml:"applovinmax,omitempty" json:"applovinmax,omitempty" mapstructure:"applovinmax"`
-
-	byKey       map[string]any
-	typeNameMap map[string]string
+	Personio            []PersonioConnection            `yaml:"personio,omitempty" json:"personio,omitempty" mapstructure:"personio"`
+	byKey               map[string]any
+	typeNameMap         map[string]string
 }
 
 func (c *Connections) ConnectionsSummaryList() map[string]string {
@@ -665,6 +665,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.ApplovinMax = append(env.Connections.ApplovinMax, conn)
+	case "personio":
+		var conn PersonioConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Personio = append(env.Connections.Personio, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -776,6 +783,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.ClickHouse = removeConnection(env.Connections.ClickHouse, connectionName)
 	case "applovinmax":
 		env.Connections.ApplovinMax = removeConnection(env.Connections.ApplovinMax, connectionName)
+	case "personio":
+		env.Connections.Personio = removeConnection(env.Connections.Personio, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -869,7 +878,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.AppStore, source.AppStore)
 	mergeConnectionList(&c.LinkedInAds, source.LinkedInAds)
 	mergeConnectionList(&c.GCS, source.GCS)
-
+	mergeConnectionList(&c.Personio, source.Personio)
 	c.buildConnectionKeyMap()
 	return nil
 }
