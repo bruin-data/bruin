@@ -45,6 +45,29 @@
       ],
       "columns": [
         {
+          "entity_attribute": null,
+          "name": "mycol1",
+          "type": "",
+          "description": "",
+          "primary_key": false,
+          "update_on_merge": false,
+          "checks": [],
+          "upstreams": []
+        },
+        {
+          "entity_attribute": {
+            "entity": "Customer",
+            "attribute": "Language"
+          },
+          "name": "street_name",
+          "type": "string",
+          "description": "the language the customer picked during registration.",
+          "primary_key": false,
+          "update_on_merge": false,
+          "checks": [],
+          "upstreams": []
+        },
+        {
           "entity_attribute": {
             "entity": "Customer",
             "attribute": "ID"
@@ -65,19 +88,6 @@
           "name": "Email",
           "type": "string",
           "description": "the e-mail address the customer used while registering on our website.",
-          "primary_key": false,
-          "update_on_merge": false,
-          "checks": null,
-          "upstreams": null
-        },
-        {
-          "entity_attribute": {
-            "entity": "Customer",
-            "attribute": "Language"
-          },
-          "name": "Language",
-          "type": "string",
-          "description": "the language the customer picked during registration.",
           "primary_key": false,
           "update_on_merge": false,
           "checks": null,

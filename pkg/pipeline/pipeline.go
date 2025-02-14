@@ -1439,16 +1439,22 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 		}
 
 		var cache = make(map[string][]Column)
+		var cacheEntityColumns = make(map[string]bool)
+		for _, column := range task.Columns {
+			cacheEntityColumns[column.Extends] = true
+		}
 
 		for _, entity := range entities {
 			cache[entity.Name] = make([]Column, 0)
 			for _, attribute := range entity.Attributes {
-				cache[entity.Name] = append(cache[entity.Name], Column{
-					EntityAttribute: &EntityAttribute{
-						Entity:    entity.Name,
-						Attribute: attribute.Name,
-					},
-				})
+				if _, ok := cacheEntityColumns[fmt.Sprintf("%s.%s", entity.Name, attribute.Name)]; !ok {
+					cache[entity.Name] = append(cache[entity.Name], Column{
+						EntityAttribute: &EntityAttribute{
+							Entity:    entity.Name,
+							Attribute: attribute.Name,
+						},
+					})
+				}
 			}
 		}
 
