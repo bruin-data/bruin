@@ -21,6 +21,7 @@
       "name": "task1",
       "description": "This is a hello world task",
       "type": "bash",
+      "extends": null,
       "executable_file": {
         "name": "hello.sh",
         "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/task1/hello.sh",
@@ -60,6 +61,7 @@
       "uri": "",
       "name": "second-task",
       "description": "",
+      "extends": null,
       "type": "bq.transfer",
       "executable_file": {
         "name": "task.yaml",
@@ -96,6 +98,7 @@
       "name": "some-python-task",
       "description": "some description goes here",
       "type": "python",
+      "extends": null,
       "executable_file": {
         "name": "test.py",
         "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/test.py",
@@ -160,6 +163,7 @@
       "id": "5812ba61bb0f08ce192bf074c9de21c19355e08cd52e75d008bbff59e5729e5b",
       "uri": "",
       "name": "some-sql-task",
+      "extends": null,
       "description": "some description goes here",
       "type": "bq.sql",
       "executable_file": {

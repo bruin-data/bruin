@@ -1431,7 +1431,8 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 	if isSeparateDefinitionFile {
 		task.DefinitionFile.Type = YamlTask
 	}
-	if foundPipeline != nil {
+
+	if foundPipeline != nil && b.GlossaryReader != nil {
 		entities, err := b.GlossaryReader.GetEntities(foundPipeline.DefinitionFile.Path)
 		if err != nil {
 			return nil, errors.Wrap(err, "error getting entities")

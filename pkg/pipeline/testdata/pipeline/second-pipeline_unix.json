@@ -21,6 +21,7 @@
       "name": "gcs-to-bq",
       "description": "",
       "type": "bq.transfer",
+      "extends": null,
       "executable_file": {
         "name": "task.yml",
         "path": "__BASEDIR__/testdata/pipeline/second-pipeline/assets/test1/task.yml",
@@ -56,6 +57,7 @@
       "name": "gcs-to-bq-2",
       "description": "",
       "type": "bq.transfer",
+      "extends": null,
       "executable_file": {
         "name": "task.yml",
         "path": "__BASEDIR__/testdata/pipeline/second-pipeline/assets/test2/task.yml",
@@ -91,6 +93,7 @@
       "name": "some-python-task",
       "description": "some description goes here",
       "type": "python",
+      "extends": null,
       "executable_file": {
         "name": "testblockcomments.py",
         "path": "__BASEDIR__/testdata/pipeline/second-pipeline/assets/testblockcomments.py",
