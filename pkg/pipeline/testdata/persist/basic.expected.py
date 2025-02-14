@@ -4,6 +4,7 @@ name: basic
 tags:
   - tag1
   - tag2
+extends: []
 
 @bruin"""
 

@@ -601,7 +601,7 @@ type Asset struct {
 	DefinitionFile  TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
 	Parameters      EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
 	Secrets         []SecretMapping    `json:"secrets" yaml:"secrets,omitempty" mapstructure:"secrets"`
-	Extends         []string           `json:"extends" yaml:"extends,omitempty" mapstructure:"extends"`
+	Extends         []string           `json:"extends" yaml:"extends" mapstructure:"extends"`
 	Columns         []Column           `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
 	CustomChecks    []CustomCheck      `json:"custom_checks" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
 	Metadata        EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
@@ -1431,24 +1431,35 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 	if isSeparateDefinitionFile {
 		task.DefinitionFile.Type = YamlTask
 	}
-	entities, err := b.GlossaryReader.GetEntities(foundPipeline.DefinitionFile.Path)
-	if err != nil {
-		return nil, errors.Wrap(err, "error getting entities")
-	}
 
-	for _, extend := range task.Extends {
+	if foundPipeline != nil && b.GlossaryReader != nil {
+		entities, err := b.GlossaryReader.GetEntities(foundPipeline.DefinitionFile.Path)
+		if err != nil {
+			return nil, errors.Wrap(err, "error getting entities")
+		}
+
+		var cache = make(map[string][]Column)
+		var cacheEntityColumns = make(map[string]bool)
+		for _, column := range task.Columns {
+			cacheEntityColumns[column.Extends] = true
+		}
+
 		for _, entity := range entities {
-			if entity.Name == extend {
-				for _, attribute := range entity.Attributes {
-					task.Columns = append(task.Columns, Column{
+			cache[entity.Name] = make([]Column, 0)
+			for _, attribute := range entity.Attributes {
+				if _, ok := cacheEntityColumns[fmt.Sprintf("%s.%s", entity.Name, attribute.Name)]; !ok {
+					cache[entity.Name] = append(cache[entity.Name], Column{
 						EntityAttribute: &EntityAttribute{
 							Entity:    entity.Name,
 							Attribute: attribute.Name,
 						},
 					})
 				}
-				break
 			}
+		}
+
+		for _, extend := range task.Extends {
+			task.Columns = append(task.Columns, cache[extend]...)
 		}
 	}
 
