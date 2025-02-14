@@ -40,8 +40,23 @@
       },
       "parameters": {},
       "secrets": [],
-      "extends": ["Customer"],
+      "extends": [
+        "Customer"
+      ],
       "columns": [
+        {
+          "entity_attribute": {
+            "entity": "Customer",
+            "attribute": "ID"
+          },
+          "name": "ID",
+          "type": "integer",
+          "description": "The unique identifier of the customer in our systems.",
+          "primary_key": false,
+          "update_on_merge": false,
+          "checks": null,
+          "upstreams": null
+        },
         {
           "entity_attribute": {
             "entity": "Customer",
@@ -63,19 +78,6 @@
           "name": "Language",
           "type": "string",
           "description": "the language the customer picked during registration.",
-          "primary_key": false,
-          "update_on_merge": false,
-          "checks": null,
-          "upstreams": null
-        },
-        {
-          "entity_attribute": {
-            "entity": "Customer",
-            "attribute": "ID"
-          },
-          "name": "ID",
-          "type": "integer",
-          "description": "The unique identifier of the customer in our systems.",
           "primary_key": false,
           "update_on_merge": false,
           "checks": null,
