@@ -451,6 +451,16 @@ func (c SlackConnection) GetName() string {
 	return c.Name
 }
 
+type PersonioConnection struct {
+	Name         string `yaml:"name" json:"name" mapstructure:"name"`
+	ClientID     string `yaml:"client_id" json:"client_id" mapstructure:"client_id"`
+	ClientSecret string `yaml:"client_secret" json:"client_secret" mapstructure:"client_secret"`
+}
+
+func (c PersonioConnection) GetName() string {
+	return c.Name
+}
+
 type AsanaConnection struct {
 	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`

@@ -35,6 +35,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/notion"
+	"github.com/bruin-data/bruin/pkg/personio"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/shopify"
@@ -86,6 +87,7 @@ type Manager struct {
 	ClickHouse   map[string]*clickhouse.Client
 	GCS          map[string]*gcs.Client
 	ApplovinMax  map[string]*applovinmax.Client
+	Personio     map[string]*personio.Client
 	mutex        sync.Mutex
 }
 
@@ -301,6 +303,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connApplovinMax, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.ApplovinMax)...)
+
+	connPersonio, err := m.GetPersonioConnectionWithoutDefault(name)
+	if err == nil {
+		return connPersonio, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Personio)...)
 
 	connGCS, err := m.GetGCSConnectionWithoutDefault(name)
 	if err == nil {
@@ -1052,6 +1060,25 @@ func (m *Manager) GetApplovinMaxConnectionWithoutDefault(name string) (*applovin
 	db, ok := m.ApplovinMax[name]
 	if !ok {
 		return nil, errors.Errorf("applovinmax connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetPersonioConnection(name string) (*personio.Client, error) {
+	db, err := m.GetPersonioConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetPersonioConnectionWithoutDefault("personio-default")
+}
+
+func (m *Manager) GetPersonioConnectionWithoutDefault(name string) (*personio.Client, error) {
+	if m.Personio == nil {
+		return nil, errors.New("no personio connections found")
+	}
+	db, ok := m.Personio[name]
+	if !ok {
+		return nil, errors.Errorf("personio connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -1972,6 +1999,28 @@ func (m *Manager) AddGCSConnectionFromConfig(connection *config.GCSConnection) e
 	return nil
 }
 
+func (m *Manager) AddPersonioConnectionFromConfig(connection *config.PersonioConnection) error {
+	m.mutex.Lock()
+	if m.Personio == nil {
+		m.Personio = make(map[string]*personio.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := personio.NewClient(personio.Config{
+		ClientID:     connection.ClientID,
+		ClientSecret: connection.ClientSecret,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Personio[connection.Name] = client
+
+	return nil
+}
+
 func (m *Manager) AddApplovinMaxConnectionFromConfig(connection *config.ApplovinMaxConnection) error {
 	m.mutex.Lock()
 	if m.ApplovinMax == nil {
@@ -2360,6 +2409,16 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			}
 		})
 	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Personio {
+		wg.Go(func() {
+			err := connectionManager.AddPersonioConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add personio connection '%s'", conn.Name))
+			}
+		})
+	}
+
 	for _, conn := range cm.SelectedEnvironment.Connections.GCS {
 		wg.Go(func() {
 			err := connectionManager.AddGCSConnectionFromConfig(&conn)
