@@ -44,7 +44,7 @@ var typeHintMapping = map[string]string{
 func columnHints(cols []pipeline.Column) string {
 	var hints = make([]string, 0)
 	for _, col := range cols {
-		typ := strings.ToLower(col.Type)
+		typ := normaliseColumnType(col.Type)
 		hint, exists := typeHintMapping[typ]
 		if !exists {
 			continue
@@ -59,6 +59,13 @@ var (
 	camelPattern         = regexp.MustCompile(`([\w])([A-Z][a-z]+)`)
 	multipleSpacePattern = regexp.MustCompile(`\s+`)
 )
+
+func normaliseColumnType(typ string) string {
+	typ = multipleSpacePattern.ReplaceAllString(typ, " ")
+	typ = strings.ToLower(typ)
+	typ = strings.TrimSpace(typ)
+	return typ
+}
 
 func normalizeColumnName(name string) string {
 	// https://dlthub.com/docs/general-usage/schema#naming-convention
