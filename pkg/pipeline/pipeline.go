@@ -601,7 +601,7 @@ type Asset struct {
 	DefinitionFile  TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
 	Parameters      EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
 	Secrets         []SecretMapping    `json:"secrets" yaml:"secrets,omitempty" mapstructure:"secrets"`
-	Extends         []string           `json:"extends" yaml:"extends,omitempty" mapstructure:"extends"`
+	Extends         []string           `json:"extends" yaml:"extends" mapstructure:"extends"`
 	Columns         []Column           `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
 	CustomChecks    []CustomCheck      `json:"custom_checks" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
 	Metadata        EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
@@ -1438,20 +1438,22 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 			return nil, errors.Wrap(err, "error getting entities")
 		}
 
-		for _, extend := range task.Extends {
-			for _, entity := range entities {
-				if entity.Name == extend {
-					for _, attribute := range entity.Attributes {
-						task.Columns = append(task.Columns, Column{
-							EntityAttribute: &EntityAttribute{
-								Entity:    entity.Name,
-								Attribute: attribute.Name,
-							},
-						})
-					}
-					break
-				}
+		var cache = make(map[string][]Column)
+
+		for _, entity := range entities {
+			cache[entity.Name] = make([]Column, 0)
+			for _, attribute := range entity.Attributes {
+				cache[entity.Name] = append(cache[entity.Name], Column{
+					EntityAttribute: &EntityAttribute{
+						Entity:    entity.Name,
+						Attribute: attribute.Name,
+					},
+				})
 			}
+		}
+
+		for _, extend := range task.Extends {
+			task.Columns = append(task.Columns, cache[extend]...)
 		}
 	}
 
