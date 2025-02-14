@@ -39,10 +39,10 @@ var typeHintMapping = map[string]string{
 	"timestamp_tz":     "timestamp",
 }
 
-// columnHints returns an ingestr compatiable type hint string
-// that can be passed via the --column flag to the CLI
+// columnHints returns an ingestr compatible type hint string
+// that can be passed via the --column flag to the CLI.
 func columnHints(cols []pipeline.Column) string {
-	var hints []string
+	var hints = make([]string, 0)
 	for _, col := range cols {
 		typ := strings.ToLower(col.Type)
 		hint, exists := typeHintMapping[typ]
