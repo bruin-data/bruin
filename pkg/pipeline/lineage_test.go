@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"log"
 	"os"
 	"testing"
 
@@ -12,7 +13,10 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	SetupSQLParser()
+	err := SetupSQLParser()
+	if err != nil {
+		log.Panicf("error initializing SQL parser: %v", err)
+	}
 	os.Exit(m.Run())
 }
 
@@ -35,10 +39,6 @@ func SetupSQLParser() error {
 func TestParseLineageRecursively(t *testing.T) {
 	t.Parallel()
 
-	err := SetupSQLParser()
-	if err != nil {
-		t.Errorf("error initializing SQL parser: %v", err)
-	}
 	testCases := map[string]func(*testing.T){
 		"basic recursive parsing":   testBasicRecursiveParsing,
 		"joins and complex queries": testJoinsAndComplexQueries,
@@ -1207,10 +1207,6 @@ func TestAddColumnToAsset(t *testing.T) {
 			},
 		},
 	}
-	err := SetupSQLParser()
-	if err != nil {
-		t.Errorf("error initializing SQL parser: %v", err)
-	}
 	lineage := NewLineageExtractor(SQLParser)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -1384,10 +1380,6 @@ func TestHandleExistingOrNewColumn(t *testing.T) {
 		},
 	}
 
-	err := SetupSQLParser()
-	if err != nil {
-		t.Errorf("error initializing SQL parser: %v", err)
-	}
 	lineage := NewLineageExtractor(SQLParser)
 
 	for _, tt := range tests {
