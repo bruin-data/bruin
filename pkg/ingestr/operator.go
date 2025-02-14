@@ -235,6 +235,11 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		"log",
 	}
 
+	columns := columnHints(ti.GetAsset().Columns)
+	if columns != "" {
+		cmdArgs = append(cmdArgs, "--columns", columns)
+	}
+
 	path := ti.GetAsset().ExecutableFile.Path
 	repo, err := o.finder.Repo(path)
 	if err != nil {
