@@ -245,6 +245,7 @@ type taskDefinition struct {
 	Instance        string            `yaml:"instance"`
 	Materialization materialization   `yaml:"materialization"`
 	Owner           string            `yaml:"owner"`
+	Extends         []string          `yaml:"extends"`
 	Columns         []column          `yaml:"columns"`
 	CustomChecks    []customCheck     `yaml:"custom_checks"`
 	Tags            []string          `yaml:"tags"`
@@ -398,6 +399,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Instance:        definition.Instance,
 		Owner:           definition.Owner,
 		Tags:            definition.Tags,
+		Extends:         definition.Extends,
 		Columns:         columns,
 		CustomChecks:    make([]CustomCheck, len(definition.CustomChecks)),
 		Snowflake:       SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},

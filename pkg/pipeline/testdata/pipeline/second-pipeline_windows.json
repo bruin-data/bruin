@@ -22,6 +22,7 @@
       "description": "",
       "type": "bq.transfer",
       "tags": [],
+      "extends": [],
       "executable_file": {
         "name": "task.yml",
         "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test1\\task.yml",
@@ -51,12 +52,14 @@
       "snowflake": null
     },
     {
+      
       "id": "a01e7580b118b5fbbdc1f7c8de6b8c377c684727e4e8ad574e9153a3dbd46dd1",
       "uri": "",
       "name": "gcs-to-bq-2",
       "description": "",
       "type": "bq.transfer",
       "tags": [],
+      "extends": [],
       "executable_file": {
         "name": "task.yml",
         "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test2\\task.yml",
@@ -95,6 +98,7 @@
         "tag1",
         "tag2:value2"
       ],
+      "extends": [],
       "executable_file": {
         "name": "testblockcomments.py",
         "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\testblockcomments.py",
