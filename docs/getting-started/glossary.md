@@ -139,6 +139,33 @@ columns:
 
 Bruin will parse the `extends` references, and merge them with the corresponding attribute definitions.
 
+
+## Using extends to generate columns in assets
+
+In addition to extending individual attributes, you can also use an extends directly to automatically include all of its attributes as columns in your asset. This is done using the `extends` key at the asset level:
+
+```yaml
+name: raw.customers
+extends: 
+  - Customer  # This will automatically include all Customer attributes as columns
+```
+
+This is equivalent to explicitly extending each attribute of the Customer entity:
+
+```yaml
+name: raw.customers
+columns:
+  - extends: Customer.ID
+  - extends: Customer.Email 
+  - extends: Customer.Language
+```
+
+The `extends` approach is particularly useful when:
+- Your asset represents a complete entity from your glossary
+- You want to ensure all attributes of an entity are included
+- You want to reduce boilerplate in your asset definitions
+
+
 > [!WARNING]
 > Explicit definition of a column will always take priority over entity attributes. Attributes are there to provide defaults, not to override explicit definitions on an asset level. Asset has higher priority than the glossary.
 
