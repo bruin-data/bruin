@@ -231,6 +231,10 @@ environments:
         - name: "applovinmax-1"
           api_key: "api-key-123"
           application: "application-123"
+      personio:
+        - name: "personio-1"
+          client_id: "client-id-123"
+          client_secret: "client-secret-123"
   prod:
     connections:
       google_cloud_platform:

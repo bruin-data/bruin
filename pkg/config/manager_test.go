@@ -368,6 +368,13 @@ func TestLoadFromFile(t *testing.T) {
 					Application: "application-123",
 				},
 			},
+			Personio: []PersonioConnection{
+				{
+					Name:         "personio-1",
+					ClientID:     "client-id-123",
+					ClientSecret: "client-secret-123",
+				},
+			},
 		},
 	}
 

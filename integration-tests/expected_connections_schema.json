@@ -218,6 +218,26 @@
         "secure"
       ]
     },
+    "PersonioConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "client_id",
+        "client_secret"
+      ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -457,6 +477,12 @@
         "applovinmax": {
           "items": {
             "$ref": "#/$defs/ApplovinMaxConnection"
+          },
+          "type": "array"
+        },
+        "personio": {
+          "items": {
+            "$ref": "#/$defs/PersonioConnection"
           },
           "type": "array"
         }
