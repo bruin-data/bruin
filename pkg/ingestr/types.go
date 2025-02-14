@@ -9,9 +9,8 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
-// typHints mapping from different destination
-// types to dlt types
-// 'text' mappings are omitted, since they are the default
+// typeHints mapping from different destination types to dlt types.
+// 'text' mappings are omitted, since they are the default.
 var typeHintMapping = map[string]string{
 	"number":           "bigint",
 	"decimal":          "bigint",
