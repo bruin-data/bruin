@@ -2,7 +2,9 @@ package ingestr
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
@@ -48,7 +50,45 @@ func columnHints(cols []pipeline.Column) string {
 		if !exists {
 			continue
 		}
-		hints = append(hints, fmt.Sprintf("%s:%s", col.Name, hint))
+		name := normalizeColumnName(col.Name)
+		hints = append(hints, fmt.Sprintf("%s:%s", name, hint))
 	}
 	return strings.Join(hints, ",")
+}
+
+var (
+	camelPattern         = regexp.MustCompile(`([\w])([A-Z][a-z]+)`)
+	multipleSpacePattern = regexp.MustCompile(`\s+`)
+)
+
+func normalizeColumnName(name string) string {
+	// https://dlthub.com/docs/general-usage/schema#naming-convention
+	// nested column normalization is not implemented.
+
+	// remove non ASCII characters
+	name = strings.Map(func(c rune) rune {
+		if c > unicode.MaxASCII {
+			return rune(-1)
+		}
+		return c
+	}, name)
+
+	name = strings.TrimSpace(name)
+
+	// merge multiple spaces into one
+	name = multipleSpacePattern.ReplaceAllString(name, " ")
+
+	// convert to snake case
+	name = camelPattern.ReplaceAllString(name, "${1}_${2}")
+
+	// replace space with underscore
+	name = strings.ReplaceAll(name, " ", "_")
+
+	// add underscore if name starts with a number
+	if unicode.IsDigit(rune(name[0])) {
+		name = "_" + name
+	}
+
+	return strings.ToLower(name)
+
 }
