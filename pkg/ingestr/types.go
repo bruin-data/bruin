@@ -96,5 +96,4 @@ func normalizeColumnName(name string) string {
 	}
 
 	return strings.ToLower(name)
-
 }
