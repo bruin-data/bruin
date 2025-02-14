@@ -1431,23 +1431,25 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 	if isSeparateDefinitionFile {
 		task.DefinitionFile.Type = YamlTask
 	}
-	entities, err := b.GlossaryReader.GetEntities(foundPipeline.DefinitionFile.Path)
-	if err != nil {
-		return nil, errors.Wrap(err, "error getting entities")
-	}
+	if foundPipeline != nil {
+		entities, err := b.GlossaryReader.GetEntities(foundPipeline.DefinitionFile.Path)
+		if err != nil {
+			return nil, errors.Wrap(err, "error getting entities")
+		}
 
-	for _, extend := range task.Extends {
-		for _, entity := range entities {
-			if entity.Name == extend {
-				for _, attribute := range entity.Attributes {
-					task.Columns = append(task.Columns, Column{
-						EntityAttribute: &EntityAttribute{
-							Entity:    entity.Name,
-							Attribute: attribute.Name,
-						},
-					})
+		for _, extend := range task.Extends {
+			for _, entity := range entities {
+				if entity.Name == extend {
+					for _, attribute := range entity.Attributes {
+						task.Columns = append(task.Columns, Column{
+							EntityAttribute: &EntityAttribute{
+								Entity:    entity.Name,
+								Attribute: attribute.Name,
+							},
+						})
+					}
+					break
 				}
-				break
 			}
 		}
 	}
