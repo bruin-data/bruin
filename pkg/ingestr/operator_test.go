@@ -328,6 +328,46 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 			},
 			want: []string{"ingest", "--source-uri", "csv://seed.csv", "--source-table", "seed.raw", "--dest-uri", "duckdb:////some/path", "--dest-table", "asset-name", "--yes", "--progress", "log"},
 		},
+		{
+			name: "snowflake seed, type hints test",
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "duck",
+				Parameters: map[string]string{
+					"path": "seed.csv",
+				},
+				Columns: []pipeline.Column{
+					{
+						Name: "id",
+						Type: "integer",
+					},
+					{
+						Name: "load_date",
+						Type: "timestamp_tz",
+					},
+					{
+						Name: "percent",
+						Type: "float4",
+					},
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri",
+				"csv://seed.csv",
+				"--source-table",
+				"seed.raw",
+				"--dest-uri",
+				"duckdb:////some/path",
+				"--dest-table",
+				"asset-name",
+				"--yes",
+				"--progress",
+				"log",
+				"--columns",
+				"id:bigint,load_date:timestamp,percent:double",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
