@@ -5,7 +5,6 @@ type: duckdb.sql
 
 materialization:
   type: table
-extends: []
 
 columns:
   - name: category_id

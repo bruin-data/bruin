@@ -203,6 +203,11 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to build asset: %v\n", err)
 					return cli.Exit("", 1)
 				}
+				task, err = DefaultPipelineBuilder.MutateAsset(task, nil)
+				if err != nil {
+					errorPrinter.Printf("Failed to mutate asset: %v\n", err)
+					return cli.Exit("", 1)
+				}
 			}
 
 			// handle log files
@@ -430,7 +435,7 @@ func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.S
 
 	logger.Debugf("loaded the config from path '%s'", configFilePath)
 
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath)
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath, true)
 	if err != nil {
 		errorPrinter.Println("failed to build pipeline, are you sure you have referred the right path?")
 		errorPrinter.Println("\nHint: You need to run this command with a path to either the pipeline directory or the asset file itself directly.")
@@ -452,6 +457,16 @@ func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.S
 				RunDownstreamTasks: runDownstreamTasks,
 				Pipeline:           foundPipeline,
 				Config:             cm,
+			}, err
+		}
+
+		task, err = DefaultPipelineBuilder.MutateAsset(task, foundPipeline)
+		if err != nil {
+			errorPrinter.Printf("Failed to mutate asset: %v\n", err)
+			return &PipelineInfo{
+				RunningForAnAsset:  runningForAnAsset,
+				RunDownstreamTasks: runDownstreamTasks,
+				Pipeline:           foundPipeline,
 			}, err
 		}
 		if task == nil {

@@ -5,7 +5,6 @@ parameters:
   destination: bigquery
   source_connection: neon
   source_table: public.test_merge
-extends: []
 
 columns:
   - name: qty

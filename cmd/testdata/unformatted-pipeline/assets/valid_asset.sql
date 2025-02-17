@@ -14,7 +14,6 @@ depends:
   - chess_playground.player_profile_summary
   - chess_playground.games
   - chess_playground.profiles
-extends: []
 
 columns:
   - name: username

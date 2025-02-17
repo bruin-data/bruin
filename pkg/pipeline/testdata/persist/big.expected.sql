@@ -31,7 +31,6 @@ depends:
   - dashboard.users
   - dashboard.session_type_mapping
 owner: sabri.karagonen@getbruin.com
-extends: []
 
 columns:
   - name: BookingId

@@ -601,7 +601,7 @@ type Asset struct {
 	DefinitionFile  TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
 	Parameters      EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
 	Secrets         []SecretMapping    `json:"secrets" yaml:"secrets,omitempty" mapstructure:"secrets"`
-	Extends         []string           `json:"extends" yaml:"extends" mapstructure:"extends"`
+	Extends         []string           `json:"extends" yaml:"extends,omitempty" mapstructure:"extends"`
 	Columns         []Column           `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
 	CustomChecks    []CustomCheck      `json:"custom_checks" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
 	Metadata        EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
@@ -1289,7 +1289,7 @@ func resolvePipelineFilePath(basePath string, validFileNames []string, fs afero.
 	return "", fmt.Errorf("no pipeline file found in '%s'. Supported files: %v", basePath, validFileNames)
 }
 
-func (b *Builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, error) {
+func (b *Builder) CreatePipelineFromPath(pathToPipeline string, isMutate bool) (*Pipeline, error) {
 	pipelineFilePath := pathToPipeline
 	if !matchPipelineFileName(pipelineFilePath, b.config.PipelineFileName) {
 		resolvedPath, err := resolvePipelineFilePath(pathToPipeline, b.config.PipelineFileName, b.fs)
@@ -1336,6 +1336,13 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string) (*Pipeline, erro
 		task, err := b.CreateAssetFromFile(file, pipeline)
 		if err != nil {
 			return nil, err
+		}
+
+		if isMutate {
+			task, err = b.MutateAsset(task, pipeline)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		if task == nil {
@@ -1432,7 +1439,11 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 		task.DefinitionFile.Type = YamlTask
 	}
 
-	if foundPipeline != nil && b.GlossaryReader != nil {
+	return task, nil
+}
+
+func (b *Builder) MutateAsset(task *Asset, foundPipeline *Pipeline) (*Asset, error) {
+	if foundPipeline != nil && b.GlossaryReader != nil && task != nil {
 		entities, err := b.GlossaryReader.GetEntities(foundPipeline.DefinitionFile.Path)
 		if err != nil {
 			return nil, errors.Wrap(err, "error getting entities")
@@ -1462,8 +1473,7 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 			task.Columns = append(task.Columns, cache[extend]...)
 		}
 	}
-
-	if foundPipeline != nil && foundPipeline.DefaultValues != nil {
+	if foundPipeline != nil && foundPipeline.DefaultValues != nil && task != nil {
 		if len(task.Type) == 0 && len(foundPipeline.DefaultValues.Type) > 0 {
 			task.Type = AssetType(foundPipeline.DefaultValues.Type)
 		}
@@ -1490,5 +1500,6 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 			}
 		}
 	}
+
 	return task, nil
 }

@@ -235,7 +235,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 
 			p := pipeline.NewBuilder(builderConfig, tt.fields.yamlTaskCreator, tt.fields.commentTaskCreator, fs, nil)
 
-			got, err := p.CreatePipelineFromPath(tt.args.pathToPipeline)
+			got, err := p.CreatePipelineFromPath(tt.args.pathToPipeline, true)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -352,7 +352,7 @@ func TestPipeline_JsonMarshal(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			p, err := cmd.DefaultPipelineBuilder.CreatePipelineFromPath(tt.pipelinePath)
+			p, err := cmd.DefaultPipelineBuilder.CreatePipelineFromPath(tt.pipelinePath, true)
 			require.NoError(t, err)
 
 			got, err := json.Marshal(p)
@@ -479,7 +479,7 @@ func TestPipeline_GetAssetByPath(t *testing.T) {
 		TasksFileSuffixes:   []string{"task.yml", "task.yaml"},
 	}
 	builder := pipeline.NewBuilder(config, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil)
-	p, err := builder.CreatePipelineFromPath("./testdata/pipeline/first-pipeline")
+	p, err := builder.CreatePipelineFromPath("./testdata/pipeline/first-pipeline", true)
 	require.NoError(t, err)
 
 	asset := p.GetAssetByPath("testdata/pipeline/first-pipeline/tasks/task1/task.yml")
@@ -778,7 +778,7 @@ func TestPipeline_GetAssetByName(t *testing.T) {
 }
 
 func BenchmarkAssetMarshalJSON(b *testing.B) {
-	got, err := cmd.DefaultPipelineBuilder.CreatePipelineFromPath("./testdata/pipeline/first-pipeline")
+	got, err := cmd.DefaultPipelineBuilder.CreatePipelineFromPath("./testdata/pipeline/first-pipeline", true)
 	require.NoError(b, err)
 
 	b.ResetTimer()

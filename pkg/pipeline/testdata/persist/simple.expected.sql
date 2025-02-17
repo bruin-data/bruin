@@ -5,7 +5,6 @@ type: bq.sql
 
 materialization:
   type: table
-extends: []
 
 @bruin */
 

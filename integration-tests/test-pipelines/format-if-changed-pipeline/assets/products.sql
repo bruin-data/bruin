@@ -5,8 +5,6 @@ type: duckdb.sql
 materialization:
   type: table
 
-extends: []
-
 columns:
   - name: product_id
     type: INTEGER

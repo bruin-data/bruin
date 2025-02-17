@@ -25,7 +25,6 @@ parameters:
   param1: first-parameter
   param2: second-parameter
   s3_file_path: s3://bucket/path
-extends: []
 
 columns:
   - name: col1
