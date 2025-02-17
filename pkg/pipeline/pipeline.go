@@ -1438,8 +1438,8 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 			return nil, errors.Wrap(err, "error getting entities")
 		}
 
-		var cache = make(map[string][]Column)
-		var cacheEntityColumns = make(map[string]bool)
+		cache := make(map[string][]Column)
+		cacheEntityColumns := make(map[string]bool)
 		for _, column := range task.Columns {
 			cacheEntityColumns[column.Extends] = true
 		}

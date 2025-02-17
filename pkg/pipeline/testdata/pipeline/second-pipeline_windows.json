@@ -22,7 +22,7 @@
       "description": "",
       "type": "bq.transfer",
       "tags": [],
-      "extends": [],
+      "extends": null,
       "executable_file": {
         "name": "task.yml",
         "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test1\\task.yml",
@@ -59,7 +59,7 @@
       "description": "",
       "type": "bq.transfer",
       "tags": [],
-      "extends": [],
+      "extends": null,
       "executable_file": {
         "name": "task.yml",
         "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test2\\task.yml",
@@ -98,7 +98,7 @@
         "tag1",
         "tag2:value2"
       ],
-      "extends": [],
+      "extends": null,
       "executable_file": {
         "name": "testblockcomments.py",
         "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\testblockcomments.py",
