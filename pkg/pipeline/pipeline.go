@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -1456,8 +1457,15 @@ func (b *Builder) MutateAsset(task *Asset, foundPipeline *Pipeline) (*Asset, err
 		}
 
 		for _, entity := range entities {
+			attributeNames := make([]string, 0, len(entity.Attributes))
+			for attrName := range entity.Attributes {
+				attributeNames = append(attributeNames, attrName)
+			}
+			sort.Strings(attributeNames)
+
 			cache[entity.Name] = make([]Column, 0)
-			for _, attribute := range entity.Attributes {
+			for _, attrName := range attributeNames {
+				attribute := entity.Attributes[attrName]
 				if _, ok := cacheEntityColumns[fmt.Sprintf("%s.%s", entity.Name, attribute.Name)]; !ok {
 					cache[entity.Name] = append(cache[entity.Name], Column{
 						EntityAttribute: &EntityAttribute{
