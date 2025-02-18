@@ -70,11 +70,11 @@
         {
           "entity_attribute": {
             "entity": "Customer",
-            "attribute": "ID"
+            "attribute": "Email"
           },
-          "name": "ID",
-          "type": "integer",
-          "description": "The unique identifier of the customer in our systems.",
+          "name": "Email",
+          "type": "string",
+          "description": "the e-mail address the customer used while registering on our website.",
           "primary_key": false,
           "update_on_merge": false,
           "checks": null,
@@ -83,11 +83,11 @@
         {
           "entity_attribute": {
             "entity": "Customer",
-            "attribute": "Email"
+            "attribute": "ID"
           },
-          "name": "Email",
-          "type": "string",
-          "description": "the e-mail address the customer used while registering on our website.",
+          "name": "ID",
+          "type": "integer",
+          "description": "The unique identifier of the customer in our systems.",
           "primary_key": false,
           "update_on_merge": false,
           "checks": null,
