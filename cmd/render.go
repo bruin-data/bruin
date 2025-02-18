@@ -122,6 +122,13 @@ func Render() *cli.Command {
 				printError(err, c.String("output"), "Failed to read the asset definition file:")
 				return cli.Exit("", 1)
 			}
+
+			asset, err = DefaultPipelineBuilder.MutateAsset(asset, nil)
+			if err != nil {
+				printError(errors.New("failed to mutate the asset"), c.String("output"), "Failed to mutate the asset:")
+				return cli.Exit("", 1)
+			}
+
 			if asset == nil {
 				printError(errors.New("no asset found"), c.String("output"), "Failed to read the asset definition file:")
 				return cli.Exit("", 1)

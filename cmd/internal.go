@@ -144,7 +144,7 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool) error {
 		return cli.Exit("", 1)
 	}
 
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath)
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath, true)
 	if err != nil {
 		printErrorJSON(err)
 
@@ -221,7 +221,7 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 		return cli.Exit("", 1)
 	}
 
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath)
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath, true)
 	if err != nil {
 		printErrorJSON(err)
 
@@ -285,6 +285,12 @@ func PatchAsset() *cli.Command {
 			asset, err := DefaultPipelineBuilder.CreateAssetFromFile(assetPath, nil)
 			if err != nil {
 				printErrorJSON(errors2.Wrap(err, "failed to create asset from the given path"))
+				return cli.Exit("", 1)
+			}
+
+			asset, err = DefaultPipelineBuilder.MutateAsset(asset, nil)
+			if err != nil {
+				printErrorJSON(errors2.Wrap(err, "failed to patch the asset with the given json body"))
 				return cli.Exit("", 1)
 			}
 

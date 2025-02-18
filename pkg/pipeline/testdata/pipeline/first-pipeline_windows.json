@@ -22,6 +22,7 @@
       "description": "This is a hello world task",
       "type": "bash",
       "tags": [],
+      "extends": null,
       "executable_file": {
         "name": "hello.sh",
         "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\task1\\hello.sh",
@@ -38,7 +39,6 @@
       },
       "connection": "conn1",
       "secrets": [],
-      "athena": null,
       "upstreams": [
         {
           "type": "asset",
@@ -63,6 +63,7 @@
       "description": "",
       "type": "bq.transfer",
       "tags": [],
+      "extends": null,
       "executable_file": {
         "name": "task.yaml",
         "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\task2\\task.yaml",
@@ -98,6 +99,7 @@
       "description": "some description goes here",
       "type": "python",
       "tags": [],
+      "extends": null,
       "executable_file": {
         "name": "test.py",
         "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\test.py",
@@ -164,6 +166,7 @@
       "description": "some description goes here",
       "type": "bq.sql",
       "tags": [],
+      "extends": null,
       "executable_file": {
         "name": "test.sql",
         "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\test.sql",
