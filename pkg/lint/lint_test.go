@@ -128,11 +128,11 @@ func TestLinter_Lint(t *testing.T) {
 					return []string{"path/to/pipeline1", "path/to/pipeline2", "path/to/pipeline2_some_other_name"}, nil
 				},
 				setupBuilderMock: func(m *mockPipelineBuilder) {
-					m.On("CreatePipelineFromPath", "path/to/pipeline1", mock.Anything).
+					m.On("CreatePipelineFromPath", "path/to/pipeline1", true).
 						Return(&pipeline.Pipeline{}, nil)
-					m.On("CreatePipelineFromPath", "path/to/pipeline2", mock.Anything).
+					m.On("CreatePipelineFromPath", "path/to/pipeline2", true).
 						Return(&pipeline.Pipeline{}, nil)
-					m.On("CreatePipelineFromPath", "path/to/pipeline2_some_other_name", mock.Anything).
+					m.On("CreatePipelineFromPath", "path/to/pipeline2_some_other_name", true).
 						Return(&pipeline.Pipeline{}, nil)
 				},
 				rules: []Rule{errorRule, successRule},
@@ -153,9 +153,9 @@ func TestLinter_Lint(t *testing.T) {
 					return []string{"path/to/pipeline1", "path/to/pipeline2"}, nil
 				},
 				setupBuilderMock: func(m *mockPipelineBuilder) {
-					m.On("CreatePipelineFromPath", "path/to/pipeline1", mock.Anything).
+					m.On("CreatePipelineFromPath", "path/to/pipeline1", true).
 						Return(&pipeline.Pipeline{}, nil)
-					m.On("CreatePipelineFromPath", "path/to/pipeline2", mock.Anything).
+					m.On("CreatePipelineFromPath", "path/to/pipeline2", true).
 						Return(&pipeline.Pipeline{}, nil)
 				},
 				rules: []Rule{successRule, errorRule},
@@ -176,9 +176,9 @@ func TestLinter_Lint(t *testing.T) {
 					return []string{"path/to/pipeline1", "path/to/pipeline2"}, nil
 				},
 				setupBuilderMock: func(m *mockPipelineBuilder) {
-					m.On("CreatePipelineFromPath", "path/to/pipeline1", mock.Anything).
+					m.On("CreatePipelineFromPath", "path/to/pipeline1", true).
 						Return(&pipeline.Pipeline{}, nil)
-					m.On("CreatePipelineFromPath", "path/to/pipeline2", mock.Anything).
+					m.On("CreatePipelineFromPath", "path/to/pipeline2", true).
 						Return(&pipeline.Pipeline{}, nil)
 				},
 				rules: []Rule{successRule, successRule},
@@ -332,11 +332,11 @@ func TestLinter_LintAsset(t *testing.T) {
 					return []string{"path/to/pipeline1", "path/to/pipeline2", "path/to/pipeline2_some_other_name"}, nil
 				},
 				setupBuilderMock: func(m *mockPipelineBuilder) {
-					m.On("CreatePipelineFromPath", "path/to/pipeline1", mock.Anything).
+					m.On("CreatePipelineFromPath", "path/to/pipeline1", true).
 						Return(&pipeline.Pipeline{}, nil)
-					m.On("CreatePipelineFromPath", "path/to/pipeline2", mock.Anything).
+					m.On("CreatePipelineFromPath", "path/to/pipeline2", true).
 						Return(&pipeline.Pipeline{}, nil)
-					m.On("CreatePipelineFromPath", "path/to/pipeline2_some_other_name", mock.Anything).
+					m.On("CreatePipelineFromPath", "path/to/pipeline2_some_other_name", true).
 						Return(&pipeline.Pipeline{}, nil)
 				},
 				rules: []Rule{errorRule, successRule},
@@ -358,7 +358,7 @@ func TestLinter_LintAsset(t *testing.T) {
 					return []string{"path/to/pipeline1"}, nil
 				},
 				setupBuilderMock: func(m *mockPipelineBuilder) {
-					m.On("CreatePipelineFromPath", "path/to/pipeline1", mock.Anything).
+					m.On("CreatePipelineFromPath", "path/to/pipeline1", true).
 						Return(&pipeline.Pipeline{
 							Assets: []*pipeline.Asset{
 								{Name: "my-asset"},
@@ -384,7 +384,7 @@ func TestLinter_LintAsset(t *testing.T) {
 					return []string{"path/to/pipeline1"}, nil
 				},
 				setupBuilderMock: func(m *mockPipelineBuilder) {
-					m.On("CreatePipelineFromPath", "path/to/pipeline1", mock.Anything).
+					m.On("CreatePipelineFromPath", "path/to/pipeline1", true).
 						Return(&pipeline.Pipeline{
 							Assets: []*pipeline.Asset{
 								{Name: "my-asset"},
@@ -410,7 +410,7 @@ func TestLinter_LintAsset(t *testing.T) {
 					return []string{"path/to/pipeline1"}, nil
 				},
 				setupBuilderMock: func(m *mockPipelineBuilder) {
-					m.On("CreatePipelineFromPath", "path/to/pipeline1", mock.Anything).
+					m.On("CreatePipelineFromPath", "path/to/pipeline1", true).
 						Return(&pipeline.Pipeline{
 							Assets: []*pipeline.Asset{
 								{Name: "my-asset"},
@@ -438,7 +438,7 @@ func TestLinter_LintAsset(t *testing.T) {
 					abspath, err := filepath.Abs("./my-asset")
 					require.NoError(t, err)
 
-					m.On("CreatePipelineFromPath", "path/to/pipeline1", mock.Anything).
+					m.On("CreatePipelineFromPath", "path/to/pipeline1", true).
 						Return(&pipeline.Pipeline{
 							Assets: []*pipeline.Asset{
 								{
