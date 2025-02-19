@@ -178,6 +178,14 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			AssetValidator:   ValidateAssetSeedValidation,
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
+		&SimpleRule{
+			Identifier:       "assets-python-validation",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			Validator:        CallFuncForEveryAsset(ValidateAssetPythonValidation),
+			AssetValidator:   ValidateAssetPythonValidation,
+			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
+		},
 	}
 
 	if parser != nil {
