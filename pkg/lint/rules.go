@@ -375,7 +375,7 @@ func ValidateAssetPythonValidation(ctx context.Context, p *pipeline.Pipeline, as
 		return issues, nil
 	}
 
-	if &asset.Materialization != nil && len(asset.Connection) == 0 {
+	if len(asset.Materialization.Type) > 0 && len(asset.Connection) == 0 {
 		issues = append(issues, &Issue{
 			Task:        asset,
 			Description: "A task with materialization must have a connection defined",
