@@ -288,7 +288,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		"--source-table",
 		"asset_data",
 		"--dest-table",
-		"asset_data." + execCtx.asset.Name,
+		execCtx.asset.Name,
 		"--yes",
 		"--progress",
 		"log",
