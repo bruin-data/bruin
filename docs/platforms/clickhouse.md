@@ -1,5 +1,6 @@
 # Clickhouse
-Bruin supports [Clickhouse](https://clickhouse.com/) as both a source and a destination.
+[Clickhouse](https://clickhouse.com/) is a high-performance, column-oriented SQL database management system for online analytical processing.
+Bruin supports Clickhouse as both a source and a destination.
 
 ## Connection
 In order to have set up a Clickhouse connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema:
