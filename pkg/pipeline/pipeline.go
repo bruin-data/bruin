@@ -1511,3 +1511,20 @@ func (b *Builder) MutateAsset(task *Asset, foundPipeline *Pipeline) (*Asset, err
 
 	return task, nil
 }
+
+func (a *Asset) IsSQLAsset() bool {
+	sqlAssetTypes := map[AssetType]bool{
+		AssetTypeBigqueryQuery:   true,
+		AssetTypeSnowflakeQuery:  true,
+		AssetTypePostgresQuery:   true,
+		AssetTypeRedshiftQuery:   true,
+		AssetTypeMsSQLQuery:      true,
+		AssetTypeDatabricksQuery: true,
+		AssetTypeSynapseQuery:    true,
+		AssetTypeAthenaQuery:     true,
+		AssetTypeDuckDBQuery:     true,
+		AssetTypeClickHouse:      true,
+	}
+
+	return sqlAssetTypes[a.Type]
+}
