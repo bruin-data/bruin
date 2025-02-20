@@ -369,6 +369,25 @@ func ValidateCustomCheckQueryExists(ctx context.Context, p *pipeline.Pipeline, a
 	return issues, nil
 }
 
+func ValidatePythonAssetMaterialization(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if asset.Type != pipeline.AssetTypePython {
+		return issues, nil
+	}
+	if asset.Materialization.Type != pipeline.MaterializationTypeTable {
+		return issues, nil
+	}
+
+	if len(asset.Connection) == 0 {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "A task with materialization must have a connection defined",
+		})
+	}
+
+	return issues, nil
+}
+
 func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if strings.HasSuffix(string(asset.Type), ".seed") {

@@ -2357,3 +2357,83 @@ func TestValidateDuplicateColumnNames(t *testing.T) {
 		})
 	}
 }
+
+func TestEnsureValidPythonAssetMaterialization(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		p       *pipeline.Pipeline
+		want    []*Issue
+		wantErr bool
+	}{
+		{
+			name: "valid python asset materialization",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "asset1",
+						Type: pipeline.AssetTypePython,
+						Materialization: pipeline.Materialization{
+							Type: pipeline.MaterializationTypeTable,
+						},
+						Connection: "conn1",
+					},
+				},
+			},
+			want:    []*Issue{},
+			wantErr: false,
+		},
+		{
+			name: "invalid python asset materialization",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "asset1",
+						Type: pipeline.AssetTypePython,
+						Materialization: pipeline.Materialization{
+							Type: pipeline.MaterializationTypeTable,
+						},
+					},
+				},
+			},
+			want: []*Issue{
+				{
+					Task:        &pipeline.Asset{Name: "asset1", Type: pipeline.AssetTypePython, Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable}},
+					Description: "A task with materialization must have a connection defined",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid python asset materialization with view",
+			p: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "asset1",
+						Type: pipeline.AssetTypePython,
+						Materialization: pipeline.Materialization{
+							Type: pipeline.MaterializationTypeView,
+						},
+					},
+				},
+			},
+			want:    []*Issue{},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := ValidatePythonAssetMaterialization(context.Background(), tt.p, tt.p.Assets[0])
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
