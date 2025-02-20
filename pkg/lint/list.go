@@ -182,8 +182,8 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			Identifier:       "assets-python-validation",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
-			Validator:        CallFuncForEveryAsset(ValidateAssetPythonValidation),
-			AssetValidator:   ValidateAssetPythonValidation,
+			Validator:        CallFuncForEveryAsset(ValidatePythonAssetMaterialization),
+			AssetValidator:   ValidatePythonAssetMaterialization,
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
 	}

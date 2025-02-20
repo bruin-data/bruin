@@ -369,13 +369,16 @@ func ValidateCustomCheckQueryExists(ctx context.Context, p *pipeline.Pipeline, a
 	return issues, nil
 }
 
-func ValidateAssetPythonValidation(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+func ValidatePythonAssetMaterialization(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if asset.Type != pipeline.AssetTypePython {
 		return issues, nil
 	}
+	if asset.Materialization.Type != pipeline.MaterializationTypeTable {
+		return issues, nil
+	}
 
-	if len(asset.Materialization.Type) > 0 && len(asset.Connection) == 0 {
+	if len(asset.Connection) == 0 {
 		issues = append(issues, &Issue{
 			Task:        asset,
 			Description: "A task with materialization must have a connection defined",
