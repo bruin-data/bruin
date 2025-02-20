@@ -145,6 +145,62 @@ group by 1`,
 09
 10`,
 		},
+		{
+			name:  "truncate_year",
+			query: "{{ date | truncate_year }}",
+			args: Context{
+				"date": "2024-03-15 14:30:45",
+			},
+			want: "2024-01-01 00:00:00",
+		},
+		{
+			name:  "truncate_month",
+			query: "{{ date | truncate_month }}",
+			args: Context{
+				"date": "2024-03-15 14:30:45",
+			},
+			want: "2024-03-01 00:00:00",
+		},
+		{
+			name:  "truncate_day",
+			query: "{{ date | truncate_day }}",
+			args: Context{
+				"date": "2024-03-15 14:30:45",
+			},
+			want: "2024-03-15 00:00:00",
+		},
+		{
+			name:  "truncate_hour",
+			query: "{{ date | truncate_hour }}",
+			args: Context{
+				"date": "2024-03-15 14:30:45",
+			},
+			want: "2024-03-15 14:00:00",
+		},
+		{
+			name:  "truncate with different format",
+			query: "{{ date | truncate_month | date_format('%Y-%m-%d') }}",
+			args: Context{
+				"date": "2024-03-15",
+			},
+			want: "2024-03-01",
+		},
+		{
+			name:  "chained truncate operations",
+			query: "{{ date | add_days(5) | truncate_month }}",
+			args: Context{
+				"date": "2024-03-15 14:30:45",
+			},
+			want: "2024-03-01 00:00:00",
+		},
+		{
+			name:  "truncate with timestamp",
+			query: "{{ date | truncate_day }}",
+			args: Context{
+				"date": "2024-03-15T14:30:45.123456Z",
+			},
+			want: "2024-03-15T00:00:00.000000Z",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -258,6 +314,11 @@ func TestJinjaRendererErrorHandling(t *testing.T) {
 			name:    "missing endif",
 			query:   "{% if true %}{{ i }}",
 			wantErr: "missing end of the 'if' condition at (Line: 1 Col: 21, near \"\"), did you forget to add 'endif'?",
+		},
+		{
+			name:    "invalid date for truncate",
+			query:   "{{ 'not-a-date' | truncate_year }}",
+			wantErr: "invalid date format",
 		},
 	}
 	for _, tt := range tests {
