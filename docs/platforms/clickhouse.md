@@ -1,6 +1,5 @@
 # Clickhouse
-
-Bruin supports [Clickhouse](https://clickhouse.com/) as a data platform so you can create [assets](../assets/definition-schema.md) that will result in tables and views in your clickhouse data warehouse.
+Bruin supports [Clickhouse](https://clickhouse.com/) as both a source and a destination.
 
 ## Connection
 In order to have set up a Clickhouse connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema:
@@ -13,9 +12,9 @@ connections:
           password: "XXXXXXXXXX"
           host: "some-clickhouse-host.somedomain.com"   
           port: 9000
-          database: "dev" #Optional for other assets, uneffective when using ClickHouse as an ingestr destination, as ingestr takes the database name from the asset file. 
+          database: "dev" #Optional for other assets, uneffective when using ClickHouse as an ingestr destination/source, as ingestr takes the database name from the asset file. 
           http_port: 8443 #Only specify if you are using clickhouse as ingestr destination, by default it is 8443
-          secure: 1 #Only specify if you are using clickhouse as ingestr destination, by default, it is set to 1 (secure). Use 0 for a non-secure connection and 1 for a secure connection.
+          secure: 1 #Only specify if you are using clickhouse as ingestr destination/source, by default, it is set to 1 (secure). Use 0 for a non-secure connection and 1 for a secure connection.
 ```
 ## Ingestr Assets:
 After adding connection in `bruin.yml`. To ingest data to clickhouse, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., stripe_ingestion.yml) inside the assets folder and add the following content:
