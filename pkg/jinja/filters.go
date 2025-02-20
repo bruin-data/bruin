@@ -20,6 +20,7 @@ func init() { //nolint:gochecknoinits
 		"add_minutes":      addMinutes,
 		"add_seconds":      addSeconds,
 		"add_milliseconds": addMilliseconds,
+		"add_months":       addMonths,
 		"date_add":         addDays,
 		"date_format":      formatDate,
 	}
@@ -109,6 +110,18 @@ func addMilliseconds(e *exec.Evaluator, in *exec.Value, params *exec.VarArgs) *e
 
 	return dateModifier(e, in, params, func(t time.Time) time.Time {
 		return t.Add(time.Duration(millisecondsInt) * time.Millisecond)
+	})
+}
+
+func addMonths(e *exec.Evaluator, in *exec.Value, params *exec.VarArgs) *exec.Value {
+	months := params.Args[0].String()
+	monthsInt, err := strconv.Atoi(months)
+	if err != nil {
+		return exec.AsValue(errors.Errorf("invalid number of months for add_months, it must be a valid integer, '%s' given", months))
+	}
+
+	return dateModifier(e, in, params, func(t time.Time) time.Time {
+		return t.AddDate(0, monthsInt, 0)
 	})
 }
 
