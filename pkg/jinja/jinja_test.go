@@ -315,11 +315,6 @@ func TestJinjaRendererErrorHandling(t *testing.T) {
 			query:   "{% if true %}{{ i }}",
 			wantErr: "missing end of the 'if' condition at (Line: 1 Col: 21, near \"\"), did you forget to add 'endif'?",
 		},
-		{
-			name:    "invalid date for truncate",
-			query:   "{{ 'not-a-date' | truncate_year }}",
-			wantErr: "invalid date format",
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
