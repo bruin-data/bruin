@@ -9,13 +9,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/bruin-data/bruin/pkg/jinja"
-	"github.com/bruin-data/bruin/pkg/path"
-	"github.com/bruin-data/bruin/pkg/pipeline"
-
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/path"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -72,185 +71,201 @@ func Query() *cli.Command {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			// Check for connection/query mode
-			hasConnection := c.String("connection") != ""
-			hasQuery := c.String("query") != ""
-			hasAsset := c.String("asset") != ""
-
-			// Check for any other flags besides the allowed ones
-			for _, flag := range c.FlagNames() {
-				if hasConnection && hasQuery {
-					// In connection/query mode, only allow connection, query, and limit
-					if flag != "connection" && flag != "query" && flag != "limit" && flag != "output" {
-						return handleError(c.String("output"),
-							errors.New("when using connection/query mode, only --connection, --query, --limit, and --output flags are allowed"))
-					}
-				} else if hasAsset {
-					// In asset mode, only allow asset, env, limit, and output
-					if flag != "asset" && flag != "env" && flag != "limit" && flag != "output" {
-						return handleError(c.String("output"),
-							errors.New("when using asset mode, only --asset, --env, --limit, and --output flags are allowed"))
-					}
-				}
+			if err := validateFlags(c); err != nil {
+				return handleError(c.String("output"), err)
 			}
 
-			// Validate required combinations
-			if hasConnection || hasQuery {
-				// Both connection and query are required together
-				if !(hasConnection && hasQuery) {
-					return handleError(c.String("output"),
-						errors.New("when using direct query mode, both --connection and --query are required"))
-				}
-			} else if !hasAsset {
-				return handleError(c.String("output"),
-					errors.New("must provide either (--connection and --query) OR --asset"))
+			conn, queryStr, err := prepareQueryExecution(c)
+			if err != nil {
+				return handleError(c.String("output"), err)
 			}
 
-			connectionName := c.String("connection")
-			queryStr := c.String("query")
-			limit := c.Int64("limit")
-			output := c.String("output")
-			assetPath := c.String("asset")
-			env := c.String("env")
-			conn := interface{}(nil)
-			if assetPath == "" {
-				repoRoot, err := git.FindRepoFromPath(".")
-				if err != nil {
-					return handleError(output, errors.Wrap(err, "failed to find the git repository root"))
-				}
-				configFilePath := filepath.Join(repoRoot.Path, ".bruin.yml")
-				fs := afero.NewOsFs()
-				cm, err := config.LoadOrCreate(fs, configFilePath)
-				if err != nil {
-					return handleError(output, errors.Wrap(err, "failed to load or create config"))
-				}
-
-				manager, errs := connection.NewManagerFromConfig(cm)
-				if len(errs) > 0 {
-					for _, err := range errs {
-						return handleError(output, errors.Wrap(err, "failed to create connection manager"))
-					}
-					return cli.Exit("", 1)
-				}
-				conn, err = manager.GetConnection(connectionName)
-				if err != nil {
-					return handleError(output, errors.Wrap(err, "failed to get connection"))
-				}
-
-			} else {
-				pipelineInfo, err := GetPipelineAndAsset(assetPath)
-				if err != nil {
-					return handleError(output, errors.Wrap(err, "failed to get pipeline info"))
-				}
-
-				// Verify that the asset is a SQL asset
-				if !pipelineInfo.Asset.IsSQLAsset() {
-					return handleError(output,
-						errors.Errorf("asset '%s' is not a SQL asset (type: %s). Only SQL assets can be queried",
-							assetPath,
-							pipelineInfo.Asset.Type))
-				}
-
-				if env != "" {
-					err = pipelineInfo.Config.SelectEnvironment(env)
-					if err != nil {
-						return handleError(output,
-							errors.Wrapf(err, "failed to use the environment '%s'", env))
-					}
-				}
-
-				// Create extractor with jinja renderer
-				startDate := time.Now() // You might want to make these configurable
-				endDate := time.Now()
-				extractor := &query.WholeFileExtractor{
-					Fs:       afero.NewOsFs(),
-					Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id"),
-				}
-
-				// Extract the query from the asset
-				queries, err := extractor.ExtractQueriesFromString(pipelineInfo.Asset.ExecutableFile.Content)
-				if err != nil {
-					return handleError(output, errors.Wrap(err, "failed to extract query"))
-				}
-
-				if len(queries) == 0 {
-					return handleError(output, errors.New("no query found in asset"))
-				}
-
-				queryStr = queries[0].Query
-
-				// Get connection info
-				manager, errs := connection.NewManagerFromConfig(pipelineInfo.Config)
-				if len(errs) > 0 {
-					for _, err := range errs {
-						return handleError(output, errors.Wrap(err, "failed to create connection manager"))
-					}
-					return cli.Exit("", 1)
-				}
-
-				conn_name, err := pipelineInfo.Pipeline.GetConnectionNameForAsset(pipelineInfo.Asset)
-				if err != nil {
-					return handleError(output, errors.Wrap(err, "failed to get connection"))
-				}
-
-				conn, err = manager.GetConnection(conn_name)
-				if err != nil {
-					return handleError(output, errors.Wrap(err, fmt.Sprintf("failed to get connection '%s'", conn_name)))
-				}
-			}
-
-			// Check if the connection supports querying with schema
-			if querier, ok := conn.(interface {
-				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
-			}); ok {
-				// Prepare context and query
-				ctx := context.Background()
-				q := query.Query{Query: queryStr}
-
-				// Call SelectWithSchema and retrieve the result
-				result, err := querier.SelectWithSchema(ctx, &q)
-				if err != nil {
-					return handleError(output, errors.Wrap(err, "query execution failed"))
-				}
-
-				// Limit the results after query execution
-				if len(result.Rows) > int(limit) {
-					result.Rows = result.Rows[:limit]
-				}
-
-				// Output result based on format specified
-				if output == "json" {
-					type jsonResponse struct {
-						Columns []map[string]string `json:"columns"`
-						Rows    [][]interface{}     `json:"rows"`
-					}
-
-					// Construct JSON response with structured columns
-					jsonCols := make([]map[string]string, len(result.Columns))
-					for i, colName := range result.Columns {
-						jsonCols[i] = map[string]string{"name": colName}
-					}
-
-					// Prepare the final output struct
-					finalOutput := jsonResponse{
-						Columns: jsonCols,
-						Rows:    result.Rows,
-					}
-
-					jsonData, err := json.Marshal(finalOutput)
-					if err != nil {
-						return handleError(output, errors.Wrap(err, "failed to marshal result to JSON"))
-					}
-					fmt.Println(string(jsonData))
-				} else {
-					printTable(result.Columns, result.Rows)
-				}
-			} else {
-				fmt.Printf("Connection type %s does not support querying.\n", connectionName)
-			}
-			return nil
+			return executeQuery(c, conn, queryStr)
 		},
 	}
+}
+
+func validateFlags(c *cli.Context) error {
+	hasConnection := c.String("connection") != ""
+	hasQuery := c.String("query") != ""
+	hasAsset := c.String("asset") != ""
+
+	// Check for any other flags besides the allowed ones
+	for _, flag := range c.FlagNames() {
+		if hasConnection && hasQuery {
+			if flag != "connection" && flag != "query" && flag != "limit" && flag != "output" {
+				return errors.New("when using connection/query mode, only --connection, --query, --limit, and --output flags are allowed")
+			}
+		} else if hasAsset {
+			if flag != "asset" && flag != "env" && flag != "limit" && flag != "output" {
+				return errors.New("when using asset mode, only --asset, --env, --limit, and --output flags are allowed")
+			}
+		}
+	}
+
+	if hasConnection || hasQuery {
+		if !(hasConnection && hasQuery) {
+			return errors.New("when using direct query mode, both --connection and --query are required")
+		}
+	} else if !hasAsset {
+		return errors.New("must provide either (--connection and --query) OR --asset")
+	}
+
+	return nil
+}
+
+func prepareQueryExecution(c *cli.Context) (interface{}, string, error) {
+	assetPath := c.String("asset")
+	if assetPath == "" {
+		return prepareDirectQuery(c)
+	}
+	return prepareAssetQuery(c)
+}
+
+func prepareDirectQuery(c *cli.Context) (interface{}, string, error) {
+	connectionName := c.String("connection")
+	queryStr := c.String("query")
+
+	repoRoot, err := git.FindRepoFromPath(".")
+	if err != nil {
+		return nil, "", errors.Wrap(err, "failed to find the git repository root")
+	}
+
+	configFilePath := filepath.Join(repoRoot.Path, ".bruin.yml")
+	fs := afero.NewOsFs()
+	cm, err := config.LoadOrCreate(fs, configFilePath)
+	if err != nil {
+		return nil, "", errors.Wrap(err, "failed to load or create config")
+	}
+
+	manager, errs := connection.NewManagerFromConfig(cm)
+	if len(errs) > 0 {
+		return nil, "", errors.Wrap(errs[0], "failed to create connection manager")
+	}
+
+	conn, err := manager.GetConnection(connectionName)
+	if err != nil {
+		return nil, "", errors.Wrap(err, "failed to get connection")
+	}
+
+	return conn, queryStr, nil
+}
+
+func prepareAssetQuery(c *cli.Context) (interface{}, string, error) {
+	assetPath := c.String("asset")
+	env := c.String("env")
+
+	pipelineInfo, err := GetPipelineAndAsset(assetPath)
+	if err != nil {
+		return nil, "", errors.Wrap(err, "failed to get pipeline info")
+	}
+
+	// Verify that the asset is a SQL asset
+	if !pipelineInfo.Asset.IsSQLAsset() {
+		return nil, "", errors.Errorf("asset '%s' is not a SQL asset (type: %s). Only SQL assets can be queried",
+			assetPath,
+			pipelineInfo.Asset.Type)
+	}
+
+	if env != "" {
+		err = pipelineInfo.Config.SelectEnvironment(env)
+		if err != nil {
+			return nil, "", errors.Wrapf(err, "failed to use the environment '%s'", env)
+		}
+	}
+
+	// Create extractor with jinja renderer
+	startDate := time.Now() // You might want to make these configurable
+	endDate := time.Now()
+	extractor := &query.WholeFileExtractor{
+		Fs:       afero.NewOsFs(),
+		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id"),
+	}
+
+	// Extract the query from the asset
+	queries, err := extractor.ExtractQueriesFromString(pipelineInfo.Asset.ExecutableFile.Content)
+	if err != nil {
+		return nil, "", errors.Wrap(err, "failed to extract query")
+	}
+
+	if len(queries) == 0 {
+		return nil, "", errors.New("no query found in asset")
+	}
+
+	queryStr := queries[0].Query
+
+	// Get connection info
+	manager, errs := connection.NewManagerFromConfig(pipelineInfo.Config)
+	if len(errs) > 0 {
+		return nil, "", errors.Wrap(errs[0], "failed to create connection manager")
+	}
+
+	connName, err := pipelineInfo.Pipeline.GetConnectionNameForAsset(pipelineInfo.Asset)
+	if err != nil {
+		return nil, "", errors.Wrap(err, "failed to get connection")
+	}
+
+	conn, err := manager.GetConnection(connName)
+	if err != nil {
+		return nil, "", errors.Wrap(err, fmt.Sprintf("failed to get connection '%s'", connName))
+	}
+
+	return conn, queryStr, nil
+}
+
+func executeQuery(c *cli.Context, conn interface{}, queryStr string) error {
+	// Check if the connection supports querying with schema
+	if querier, ok := conn.(interface {
+		SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
+	}); ok {
+		// Prepare context and query
+		ctx := context.Background()
+		q := query.Query{Query: queryStr}
+
+		// Call SelectWithSchema and retrieve the result
+		result, err := querier.SelectWithSchema(ctx, &q)
+		if err != nil {
+			return handleError(c.String("output"), errors.Wrap(err, "query execution failed"))
+		}
+
+		// Limit the results after query execution
+		limit := c.Int64("limit")
+		if len(result.Rows) > int(limit) {
+			result.Rows = result.Rows[:limit]
+		}
+
+		// Output result based on format specified
+		output := c.String("output")
+		if output == "json" {
+			type jsonResponse struct {
+				Columns []map[string]string `json:"columns"`
+				Rows    [][]interface{}     `json:"rows"`
+			}
+
+			// Construct JSON response with structured columns
+			jsonCols := make([]map[string]string, len(result.Columns))
+			for i, colName := range result.Columns {
+				jsonCols[i] = map[string]string{"name": colName}
+			}
+
+			// Prepare the final output struct
+			finalOutput := jsonResponse{
+				Columns: jsonCols,
+				Rows:    result.Rows,
+			}
+
+			jsonData, err := json.Marshal(finalOutput)
+			if err != nil {
+				return handleError(output, errors.Wrap(err, "failed to marshal result to JSON"))
+			}
+			fmt.Println(string(jsonData))
+		} else {
+			printTable(result.Columns, result.Rows)
+		}
+	} else {
+		fmt.Printf("Connection type %s does not support querying.\n", c.String("connection"))
+	}
+	return nil
 }
 
 func printTable(columnNames []string, rows [][]interface{}) {
