@@ -2030,7 +2030,6 @@ func (m *Manager) AddApplovinMaxConnectionFromConfig(connection *config.Applovin
 
 	client, err := applovinmax.NewClient(applovinmax.Config{
 		APIKey:      connection.APIKey,
-		Application: connection.Application,
 	})
 	if err != nil {
 		return err
