@@ -73,11 +73,12 @@ func Query() *cli.Command {
 			},
 		},
 		Action: func(c *cli.Context) error {
+			fs := afero.NewOsFs()
 			if err := validateFlags(c); err != nil {
 				return handleError(c.String("output"), err)
 			}
 
-			conn, queryStr, err := prepareQueryExecution(c)
+			conn, queryStr, err := prepareQueryExecution(c, fs)
 			if err != nil {
 				return handleError(c.String("output"), err)
 			}
@@ -132,15 +133,15 @@ func validateFlags(c *cli.Context) error {
 	return nil
 }
 
-func prepareQueryExecution(c *cli.Context) (interface{}, string, error) {
+func prepareQueryExecution(c *cli.Context, fs afero.Fs) (interface{}, string, error) {
 	assetPath := c.String("asset")
 	if assetPath == "" {
-		return prepareDirectQuery(c)
+		return prepareDirectQuery(c, fs)
 	}
-	return prepareAssetQuery(c)
+	return prepareAssetQuery(c, fs)
 }
 
-func prepareDirectQuery(c *cli.Context) (interface{}, string, error) {
+func prepareDirectQuery(c *cli.Context, fs afero.Fs) (interface{}, string, error) {
 	connectionName := c.String("connection")
 	queryStr := c.String("query")
 
@@ -150,7 +151,6 @@ func prepareDirectQuery(c *cli.Context) (interface{}, string, error) {
 	}
 
 	configFilePath := filepath.Join(repoRoot.Path, ".bruin.yml")
-	fs := afero.NewOsFs()
 	cm, err := config.LoadOrCreate(fs, configFilePath)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "failed to load or create config")
@@ -169,11 +169,11 @@ func prepareDirectQuery(c *cli.Context) (interface{}, string, error) {
 	return conn, queryStr, nil
 }
 
-func prepareAssetQuery(c *cli.Context) (interface{}, string, error) {
+func prepareAssetQuery(c *cli.Context, fs afero.Fs) (interface{}, string, error) {
 	assetPath := c.String("asset")
 	env := c.String("env")
 
-	pipelineInfo, err := GetPipelineAndAsset(assetPath)
+	pipelineInfo, err := GetPipelineAndAsset(assetPath, fs)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "failed to get pipeline info")
 	}
@@ -196,7 +196,7 @@ func prepareAssetQuery(c *cli.Context) (interface{}, string, error) {
 	startDate := time.Now() // You might want to make these configurable
 	endDate := time.Now()
 	extractor := &query.WholeFileExtractor{
-		Fs:       afero.NewOsFs(),
+		Fs:       fs,
 		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id"),
 	}
 
@@ -341,7 +341,7 @@ func handleError(output string, err error) error {
 	return cli.Exit("", 1)
 }
 
-func GetPipelineAndAsset(inputPath string) (*ppInfo, error) {
+func GetPipelineAndAsset(inputPath string, fs afero.Fs) (*ppInfo, error) {
 	repoRoot, err := git.FindRepoFromPath(inputPath)
 	if err != nil {
 		errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
@@ -359,7 +359,7 @@ func GetPipelineAndAsset(inputPath string) (*ppInfo, error) {
 		return nil, err
 	}
 	configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
-	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+	cm, err := config.LoadOrCreate(fs, configFilePath)
 	if err != nil {
 		errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
 		return nil, err
