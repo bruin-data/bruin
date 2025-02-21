@@ -223,23 +223,16 @@ func prepareAssetQuery(c *cli.Context, fs afero.Fs) (interface{}, string, error)
 }
 
 func executeQuery(c *cli.Context, conn interface{}, queryStr string) error {
-	// Add LIMIT to the query if it doesn't already have one
 	queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn)
-
-	// Check if the connection supports querying with schema
 	if querier, ok := conn.(interface {
 		SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
 	}); ok {
-		// Prepare context and query
 		ctx := context.Background()
 		q := query.Query{Query: queryStr}
-
-		// Call SelectWithSchema and retrieve the result
 		result, err := querier.SelectWithSchema(ctx, &q)
 		if err != nil {
 			return handleError(c.String("output"), errors.Wrap(err, "query execution failed"))
 		}
-
 		// Output result based on format specified
 		output := c.String("output")
 		if output == "json" {
