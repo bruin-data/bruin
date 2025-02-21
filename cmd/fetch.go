@@ -7,7 +7,6 @@ import (
 	"os"
 	path2 "path"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -68,13 +67,14 @@ func Query() *cli.Command {
 				Usage: "Path to a SQL asset file within a Bruin pipeline. This file should contain the query to be executed.",
 			},
 			&cli.StringFlag{
-				Name:  "env",
-				Usage: "Target environment name as defined in .bruin.yml. Specifies the configuration environment for executing the query.",
+				Name:    "environment",
+				Aliases: []string{"env"},
+				Usage:   "Target environment name as defined in .bruin.yml. Specifies the configuration environment for executing the query.",
 			},
 		},
 		Action: func(c *cli.Context) error {
 			fs := afero.NewOsFs()
-			if err := validateFlags(c); err != nil {
+			if err := validateCliFlags(c); err != nil {
 				return handleError(c.String("output"), err)
 			}
 
@@ -88,49 +88,41 @@ func Query() *cli.Command {
 	}
 }
 
-func validateFlags(c *cli.Context) error {
-	hasConnection := c.String("connection") != ""
-	hasQuery := c.String("query") != ""
-	hasAsset := c.String("asset") != ""
+func validateCliFlags(c *cli.Context) error {
+	return validateFlags(
+		c.String("connection"),
+		c.String("query"),
+		c.String("asset"),
+		c.String("environment"),
+	)
+}
 
-	// Map of allowed flags and their aliases
-	allowedFlags := map[string]bool{
-		"connection": true,
-		"c":          true, // alias for connection
-		"query":      true,
-		"q":          true, // alias for query
-		"limit":      true,
-		"l":          true, // alias for limit
-		"output":     true,
-		"o":          true, // alias for output
-		"asset":      true,
-		"env":        true,
-	}
+func validateFlags(connection, query, asset, environment string) error {
+	hasConnection := connection != ""
+	hasQuery := query != ""
+	hasAsset := asset != ""
+	hasEnvironment := environment != ""
 
-	// List of flags that were actually provided by the user
-	for _, flag := range c.FlagNames() {
-		if c.IsSet(flag) {
-			if hasConnection && hasQuery {
-				if !allowedFlags[flag] || flag == "asset" || flag == "env" {
-					return errors.New("when using connection/query mode, only --connection (-c), --query (-q), --limit (-l), and --output (-o) flags are allowed")
-				}
-			} else if hasAsset {
-				if !allowedFlags[flag] || flag == "connection" || flag == "c" || flag == "query" || flag == "q" {
-					return errors.New("when using asset mode, only --asset, --env, --limit (-l), and --output (-o) flags are allowed")
-				}
-			}
-		}
-	}
-
-	if hasConnection || hasQuery {
+	switch {
+	case hasConnection || hasQuery:
 		if !(hasConnection && hasQuery) {
-			return errors.New("when using direct query mode, both --connection and --query are required")
+			return errors.New("direct query mode requires both --connection and --query flags")
 		}
-	} else if !hasAsset {
-		return errors.New("must provide either (--connection and --query) OR --asset")
-	}
+		if hasAsset || hasEnvironment {
+			return errors.New("direct query mode (--connection and --query) cannot be combined with asset mode (--asset and --environment)")
+		}
+		return nil
 
-	return nil
+	case hasAsset:
+		if hasConnection || hasQuery {
+			return errors.New("asset mode (--asset) cannot be combined with direct query mode (--connection and --query)")
+		}
+		return nil
+	default:
+		return errors.New("must use either:\n" +
+			"1. Direct query mode (--connection and --query), or\n" +
+			"2. Asset mode (--asset with optional --environment)")
+	}
 }
 
 func prepareQueryExecution(c *cli.Context, fs afero.Fs) (interface{}, string, error) {
@@ -192,8 +184,7 @@ func prepareAssetQuery(c *cli.Context, fs afero.Fs) (interface{}, string, error)
 		}
 	}
 
-	// Create extractor with jinja renderer
-	startDate := time.Now() // You might want to make these configurable
+	startDate := time.Now()
 	endDate := time.Now()
 	extractor := &query.WholeFileExtractor{
 		Fs:       fs,
@@ -232,23 +223,16 @@ func prepareAssetQuery(c *cli.Context, fs afero.Fs) (interface{}, string, error)
 }
 
 func executeQuery(c *cli.Context, conn interface{}, queryStr string) error {
-	// Add LIMIT to the query if it doesn't already have one
-	queryStr = addLimitToQuery(queryStr, c.Int64("limit"))
-
-	// Check if the connection supports querying with schema
+	queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn)
 	if querier, ok := conn.(interface {
 		SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
 	}); ok {
-		// Prepare context and query
 		ctx := context.Background()
 		q := query.Query{Query: queryStr}
-
-		// Call SelectWithSchema and retrieve the result
 		result, err := querier.SelectWithSchema(ctx, &q)
 		if err != nil {
 			return handleError(c.String("output"), errors.Wrap(err, "query execution failed"))
 		}
-
 		// Output result based on format specified
 		output := c.String("output")
 		if output == "json" {
@@ -283,21 +267,19 @@ func executeQuery(c *cli.Context, conn interface{}, queryStr string) error {
 	return nil
 }
 
-// addLimitToQuery adds or updates a LIMIT clause in the query.
-func addLimitToQuery(query string, limit int64) string {
-	// Regular expression to match LIMIT clause at the end of the query
-	re := regexp.MustCompile(`(?i)(\s*LIMIT\s+)\d+(\s*;?\s*)$`)
+type Limiter interface {
+	Limit(query string, limit int64) string
+}
 
-	// If query already has LIMIT, replace it with the new limit
-	if re.MatchString(query) {
-		return re.ReplaceAllString(query, fmt.Sprintf("${1}%d${2}", limit))
+func addLimitToQuery(query string, limit int64, conn interface{}) string {
+	l, ok := conn.(Limiter)
+	if ok {
+		return l.Limit(query, limit)
+	} else {
+		query = strings.TrimRight(query, "; \n\t")
+
+		return fmt.Sprintf("SELECT * FROM (\n%s\n) as t LIMIT %d", query, limit)
 	}
-
-	// Remove trailing semicolon and whitespace
-	query = strings.TrimRight(query, "; \n\t")
-
-	// Add LIMIT clause
-	return fmt.Sprintf("%s LIMIT %d", query, limit)
 }
 
 func printTable(columnNames []string, rows [][]interface{}) {
