@@ -283,7 +283,7 @@ func executeQuery(c *cli.Context, conn interface{}, queryStr string) error {
 	return nil
 }
 
-// addLimitToQuery adds or updates a LIMIT clause in the query
+// addLimitToQuery adds or updates a LIMIT clause in the query.
 func addLimitToQuery(query string, limit int64) string {
 	// Regular expression to match LIMIT clause at the end of the query
 	re := regexp.MustCompile(`(?i)(\s*LIMIT\s+)\d+(\s*;?\s*)$`)
