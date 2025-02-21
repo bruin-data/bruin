@@ -1,6 +1,7 @@
 package jinja
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -269,6 +270,71 @@ func TestJinjaRendererErrorHandling(t *testing.T) {
 			require.Error(t, err)
 
 			require.Equal(t, tt.wantErr, err.Error())
+		})
+	}
+}
+
+func TestAddMonths(t *testing.T) {
+	tests := []struct {
+		name      string
+		date      string
+		months    string
+		want      string
+		wantError bool
+	}{
+		{
+			name:   "add positive months",
+			date:   "2024-01-15",
+			months: "3",
+			want:   "2024-04-15",
+		},
+		{
+			name:   "add negative months",
+			date:   "2024-01-15",
+			months: "-2",
+			want:   "2023-11-15",
+		},
+		{
+			name:   "add months across year boundary",
+			date:   "2023-12-15",
+			months: "2",
+			want:   "2024-02-15",
+		},
+		{
+			name:   "add zero months",
+			date:   "2024-01-15",
+			months: "0",
+			want:   "2024-01-15",
+		},
+		{
+			name:      "invalid months parameter",
+			date:      "2024-01-15",
+			months:    "invalid",
+			wantError: true,
+		},
+		{
+			name:      "invalid date format",
+			date:      "not-a-date",
+			months:    "1",
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			query := fmt.Sprintf("{{ '%s' | add_months('%s') }}", tt.date, tt.months)
+			renderer := NewRenderer(Context{})
+			result, err := renderer.Render(query)
+
+			if tt.wantError {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.want, result)
 		})
 	}
 }
