@@ -7,6 +7,8 @@ import (
 	"os"
 	path2 "path"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
@@ -90,15 +92,31 @@ func validateFlags(c *cli.Context) error {
 	hasQuery := c.String("query") != ""
 	hasAsset := c.String("asset") != ""
 
-	// Check for any other flags besides the allowed ones
+	// Map of allowed flags and their aliases
+	allowedFlags := map[string]bool{
+		"connection": true,
+		"c":          true, // alias for connection
+		"query":      true,
+		"q":          true, // alias for query
+		"limit":      true,
+		"l":          true, // alias for limit
+		"output":     true,
+		"o":          true, // alias for output
+		"asset":      true,
+		"env":        true,
+	}
+
+	// List of flags that were actually provided by the user
 	for _, flag := range c.FlagNames() {
-		if hasConnection && hasQuery {
-			if flag != "connection" && flag != "query" && flag != "limit" && flag != "output" {
-				return errors.New("when using connection/query mode, only --connection, --query, --limit, and --output flags are allowed")
-			}
-		} else if hasAsset {
-			if flag != "asset" && flag != "env" && flag != "limit" && flag != "output" {
-				return errors.New("when using asset mode, only --asset, --env, --limit, and --output flags are allowed")
+		if c.IsSet(flag) {
+			if hasConnection && hasQuery {
+				if !allowedFlags[flag] || flag == "asset" || flag == "env" {
+					return errors.New("when using connection/query mode, only --connection (-c), --query (-q), --limit (-l), and --output (-o) flags are allowed")
+				}
+			} else if hasAsset {
+				if !allowedFlags[flag] || flag == "connection" || flag == "c" || flag == "query" || flag == "q" {
+					return errors.New("when using asset mode, only --asset, --env, --limit (-l), and --output (-o) flags are allowed")
+				}
 			}
 		}
 	}
@@ -214,6 +232,9 @@ func prepareAssetQuery(c *cli.Context) (interface{}, string, error) {
 }
 
 func executeQuery(c *cli.Context, conn interface{}, queryStr string) error {
+	// Add LIMIT to the query if it doesn't already have one
+	queryStr = addLimitToQuery(queryStr, c.Int64("limit"))
+
 	// Check if the connection supports querying with schema
 	if querier, ok := conn.(interface {
 		SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
@@ -226,12 +247,6 @@ func executeQuery(c *cli.Context, conn interface{}, queryStr string) error {
 		result, err := querier.SelectWithSchema(ctx, &q)
 		if err != nil {
 			return handleError(c.String("output"), errors.Wrap(err, "query execution failed"))
-		}
-
-		// Limit the results after query execution
-		limit := c.Int64("limit")
-		if len(result.Rows) > int(limit) {
-			result.Rows = result.Rows[:limit]
 		}
 
 		// Output result based on format specified
@@ -266,6 +281,23 @@ func executeQuery(c *cli.Context, conn interface{}, queryStr string) error {
 		fmt.Printf("Connection type %s does not support querying.\n", c.String("connection"))
 	}
 	return nil
+}
+
+// addLimitToQuery adds or updates a LIMIT clause in the query
+func addLimitToQuery(query string, limit int64) string {
+	// Regular expression to match LIMIT clause at the end of the query
+	re := regexp.MustCompile(`(?i)(\s*LIMIT\s+)\d+(\s*;?\s*)$`)
+
+	// If query already has LIMIT, replace it with the new limit
+	if re.MatchString(query) {
+		return re.ReplaceAllString(query, fmt.Sprintf("${1}%d${2}", limit))
+	}
+
+	// Remove trailing semicolon and whitespace
+	query = strings.TrimRight(query, "; \n\t")
+
+	// Add LIMIT clause
+	return fmt.Sprintf("%s LIMIT %d", query, limit)
 }
 
 func printTable(columnNames []string, rows [][]interface{}) {
