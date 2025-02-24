@@ -351,7 +351,6 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		Name: u.binaryFullPath,
 		Args: u.ingestrInstallCmd(ctx, nil),
 	})
-
 	if err != nil {
 		return errors.Wrap(err, "failed to install ingestr")
 	}

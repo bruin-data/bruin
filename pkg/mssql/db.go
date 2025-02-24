@@ -2,6 +2,7 @@ package mssql
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/query"
@@ -13,6 +14,10 @@ import (
 type DB struct {
 	conn   *sqlx.DB
 	config *Config
+}
+
+type Limiter interface {
+	Limit(query string, limit int64) string
 }
 
 func NewDB(c *Config) (*DB, error) {
@@ -76,4 +81,9 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 	}
 
 	return result, err
+}
+
+func (db *DB) Limit(query string, limit int64) string {
+	query = strings.TrimRight(query, "; \n\t")
+	return fmt.Sprintf("SELECT TOP %d * FROM (\n%s\n) as t", limit, query)
 }
