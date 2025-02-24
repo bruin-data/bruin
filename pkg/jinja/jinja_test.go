@@ -275,6 +275,7 @@ func TestJinjaRendererErrorHandling(t *testing.T) {
 }
 
 func TestAddMonths(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		date      string
@@ -340,6 +341,7 @@ func TestAddMonths(t *testing.T) {
 }
 
 func TestAddYears(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		date      string
@@ -405,6 +407,7 @@ func TestAddYears(t *testing.T) {
 }
 
 func TestAddDays(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		date      string
@@ -482,6 +485,7 @@ func TestAddDays(t *testing.T) {
 }
 
 func TestAddHours(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		date      string
@@ -565,6 +569,7 @@ func TestAddHours(t *testing.T) {
 }
 
 func TestAddMinutes(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		date      string
@@ -654,6 +659,7 @@ func TestAddMinutes(t *testing.T) {
 }
 
 func TestAddSeconds(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		date      string
@@ -749,6 +755,7 @@ func TestAddSeconds(t *testing.T) {
 }
 
 func TestAddMilliseconds(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		date         string
