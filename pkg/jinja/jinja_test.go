@@ -1,6 +1,7 @@
 package jinja
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -325,6 +326,588 @@ func TestJinjaRendererErrorHandling(t *testing.T) {
 			require.Error(t, err)
 
 			require.Equal(t, tt.wantErr, err.Error())
+		})
+	}
+}
+
+func TestAddMonths(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		date      string
+		months    string
+		want      string
+		wantError bool
+	}{
+		{
+			name:   "add positive months",
+			date:   "2024-01-15",
+			months: "3",
+			want:   "2024-04-15",
+		},
+		{
+			name:   "add negative months",
+			date:   "2024-01-15",
+			months: "-2",
+			want:   "2023-11-15",
+		},
+		{
+			name:   "add months across year boundary",
+			date:   "2023-12-15",
+			months: "2",
+			want:   "2024-02-15",
+		},
+		{
+			name:   "add zero months",
+			date:   "2024-01-15",
+			months: "0",
+			want:   "2024-01-15",
+		},
+		{
+			name:      "invalid months parameter",
+			date:      "2024-01-15",
+			months:    "invalid",
+			wantError: true,
+		},
+		{
+			name:      "invalid date format",
+			date:      "not-a-date",
+			months:    "1",
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			query := fmt.Sprintf("{{ '%s' | add_months('%s') }}", tt.date, tt.months)
+			renderer := NewRenderer(Context{})
+			result, err := renderer.Render(query)
+
+			if tt.wantError {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestAddYears(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		date      string
+		years     string
+		want      string
+		wantError bool
+	}{
+		{
+			name:  "add positive years",
+			date:  "2024-01-15",
+			years: "3",
+			want:  "2027-01-15",
+		},
+		{
+			name:  "add negative years",
+			date:  "2024-01-15",
+			years: "-2",
+			want:  "2022-01-15",
+		},
+		{
+			name:  "add zero years",
+			date:  "2024-01-15",
+			years: "0",
+			want:  "2024-01-15",
+		},
+		{
+			name:  "handle leap year",
+			date:  "2024-02-29",
+			years: "1",
+			want:  "2025-03-01",
+		},
+		{
+			name:      "invalid years parameter",
+			date:      "2024-01-15",
+			years:     "invalid",
+			wantError: true,
+		},
+		{
+			name:      "invalid date format",
+			date:      "not-a-date",
+			years:     "1",
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			query := fmt.Sprintf("{{ '%s' | add_years('%s') }}", tt.date, tt.years)
+			renderer := NewRenderer(Context{})
+			result, err := renderer.Render(query)
+
+			if tt.wantError {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestAddDays(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		date      string
+		days      string
+		want      string
+		wantError bool
+	}{
+		{
+			name: "add positive days",
+			date: "2024-01-15",
+			days: "5",
+			want: "2024-01-20",
+		},
+		{
+			name: "add negative days",
+			date: "2024-01-15",
+			days: "-3",
+			want: "2024-01-12",
+		},
+		{
+			name: "add zero days",
+			date: "2024-01-15",
+			days: "0",
+			want: "2024-01-15",
+		},
+		{
+			name: "cross month boundary",
+			date: "2024-01-30",
+			days: "3",
+			want: "2024-02-02",
+		},
+		{
+			name: "cross year boundary",
+			date: "2023-12-30",
+			days: "3",
+			want: "2024-01-02",
+		},
+		{
+			name: "handle leap year",
+			date: "2024-02-28",
+			days: "1",
+			want: "2024-02-29",
+		},
+		{
+			name:      "invalid days parameter",
+			date:      "2024-01-15",
+			days:      "invalid",
+			wantError: true,
+		},
+		{
+			name:      "invalid date format",
+			date:      "not-a-date",
+			days:      "1",
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			query := fmt.Sprintf("{{ '%s' | add_days('%s') }}", tt.date, tt.days)
+			renderer := NewRenderer(Context{})
+			result, err := renderer.Render(query)
+
+			if tt.wantError {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestAddHours(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		date      string
+		hours     string
+		want      string
+		wantError bool
+	}{
+		{
+			name:  "add positive hours",
+			date:  "2024-01-15 10:30:00",
+			hours: "5",
+			want:  "2024-01-15 15:30:00",
+		},
+		{
+			name:  "add negative hours",
+			date:  "2024-01-15 10:30:00",
+			hours: "-3",
+			want:  "2024-01-15 07:30:00",
+		},
+		{
+			name:  "add zero hours",
+			date:  "2024-01-15 10:30:00",
+			hours: "0",
+			want:  "2024-01-15 10:30:00",
+		},
+		{
+			name:  "cross day boundary forward",
+			date:  "2024-01-15 23:30:00",
+			hours: "2",
+			want:  "2024-01-16 01:30:00",
+		},
+		{
+			name:  "cross day boundary backward",
+			date:  "2024-01-15 01:30:00",
+			hours: "-2",
+			want:  "2024-01-14 23:30:00",
+		},
+		{
+			name:  "cross month boundary",
+			date:  "2024-01-31 23:30:00",
+			hours: "2",
+			want:  "2024-02-01 01:30:00",
+		},
+		{
+			name:  "cross year boundary",
+			date:  "2023-12-31 23:30:00",
+			hours: "2",
+			want:  "2024-01-01 01:30:00",
+		},
+		{
+			name:      "invalid hours parameter",
+			date:      "2024-01-15 10:30:00",
+			hours:     "invalid",
+			wantError: true,
+		},
+		{
+			name:      "invalid date format",
+			date:      "not-a-date",
+			hours:     "1",
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			query := fmt.Sprintf("{{ '%s' | add_hours('%s') }}", tt.date, tt.hours)
+			renderer := NewRenderer(Context{})
+			result, err := renderer.Render(query)
+
+			if tt.wantError {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestAddMinutes(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		date      string
+		minutes   string
+		want      string
+		wantError bool
+	}{
+		{
+			name:    "add positive minutes",
+			date:    "2024-01-15 10:30:00",
+			minutes: "15",
+			want:    "2024-01-15 10:45:00",
+		},
+		{
+			name:    "add negative minutes",
+			date:    "2024-01-15 10:30:00",
+			minutes: "-20",
+			want:    "2024-01-15 10:10:00",
+		},
+		{
+			name:    "add zero minutes",
+			date:    "2024-01-15 10:30:00",
+			minutes: "0",
+			want:    "2024-01-15 10:30:00",
+		},
+		{
+			name:    "cross hour boundary forward",
+			date:    "2024-01-15 10:50:00",
+			minutes: "15",
+			want:    "2024-01-15 11:05:00",
+		},
+		{
+			name:    "cross hour boundary backward",
+			date:    "2024-01-15 10:05:00",
+			minutes: "-10",
+			want:    "2024-01-15 09:55:00",
+		},
+		{
+			name:    "cross day boundary",
+			date:    "2024-01-15 23:55:00",
+			minutes: "10",
+			want:    "2024-01-16 00:05:00",
+		},
+		{
+			name:    "cross month boundary",
+			date:    "2024-01-31 23:55:00",
+			minutes: "10",
+			want:    "2024-02-01 00:05:00",
+		},
+		{
+			name:    "cross year boundary",
+			date:    "2023-12-31 23:55:00",
+			minutes: "10",
+			want:    "2024-01-01 00:05:00",
+		},
+		{
+			name:      "invalid minutes parameter",
+			date:      "2024-01-15 10:30:00",
+			minutes:   "invalid",
+			wantError: true,
+		},
+		{
+			name:      "invalid date format",
+			date:      "not-a-date",
+			minutes:   "1",
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			query := fmt.Sprintf("{{ '%s' | add_minutes('%s') }}", tt.date, tt.minutes)
+			renderer := NewRenderer(Context{})
+			result, err := renderer.Render(query)
+
+			if tt.wantError {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestAddSeconds(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		date      string
+		seconds   string
+		want      string
+		wantError bool
+	}{
+		{
+			name:    "add positive seconds",
+			date:    "2024-01-15 10:30:15",
+			seconds: "30",
+			want:    "2024-01-15 10:30:45",
+		},
+		{
+			name:    "add negative seconds",
+			date:    "2024-01-15 10:30:45",
+			seconds: "-30",
+			want:    "2024-01-15 10:30:15",
+		},
+		{
+			name:    "add zero seconds",
+			date:    "2024-01-15 10:30:15",
+			seconds: "0",
+			want:    "2024-01-15 10:30:15",
+		},
+		{
+			name:    "cross minute boundary forward",
+			date:    "2024-01-15 10:30:45",
+			seconds: "30",
+			want:    "2024-01-15 10:31:15",
+		},
+		{
+			name:    "cross minute boundary backward",
+			date:    "2024-01-15 10:30:15",
+			seconds: "-30",
+			want:    "2024-01-15 10:29:45",
+		},
+		{
+			name:    "cross hour boundary",
+			date:    "2024-01-15 10:59:45",
+			seconds: "30",
+			want:    "2024-01-15 11:00:15",
+		},
+		{
+			name:    "cross day boundary",
+			date:    "2024-01-15 23:59:45",
+			seconds: "30",
+			want:    "2024-01-16 00:00:15",
+		},
+		{
+			name:    "cross month boundary",
+			date:    "2024-01-31 23:59:45",
+			seconds: "30",
+			want:    "2024-02-01 00:00:15",
+		},
+		{
+			name:    "cross year boundary",
+			date:    "2023-12-31 23:59:45",
+			seconds: "30",
+			want:    "2024-01-01 00:00:15",
+		},
+		{
+			name:      "invalid seconds parameter",
+			date:      "2024-01-15 10:30:15",
+			seconds:   "invalid",
+			wantError: true,
+		},
+		{
+			name:      "invalid date format",
+			date:      "not-a-date",
+			seconds:   "1",
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			query := fmt.Sprintf("{{ '%s' | add_seconds('%s') }}", tt.date, tt.seconds)
+			renderer := NewRenderer(Context{})
+			result, err := renderer.Render(query)
+
+			if tt.wantError {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestAddMilliseconds(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name         string
+		date         string
+		milliseconds string
+		want         string
+		wantError    bool
+	}{
+		{
+			name:         "add positive milliseconds",
+			date:         "2024-01-15 10:30:15.500",
+			milliseconds: "300",
+			want:         "2024-01-15 10:30:15.800",
+		},
+		{
+			name:         "add negative milliseconds",
+			date:         "2024-01-15 10:30:15.800",
+			milliseconds: "-300",
+			want:         "2024-01-15 10:30:15.500",
+		},
+		{
+			name:         "add zero milliseconds",
+			date:         "2024-01-15 10:30:15.500",
+			milliseconds: "0",
+			want:         "2024-01-15 10:30:15.500",
+		},
+		{
+			name:         "cross second boundary forward",
+			date:         "2024-01-15 10:30:15.800",
+			milliseconds: "300",
+			want:         "2024-01-15 10:30:16.100",
+		},
+		{
+			name:         "cross second boundary backward",
+			date:         "2024-01-15 10:30:15.200",
+			milliseconds: "-300",
+			want:         "2024-01-15 10:30:14.900",
+		},
+		{
+			name:         "cross minute boundary",
+			date:         "2024-01-15 10:30:59.800",
+			milliseconds: "300",
+			want:         "2024-01-15 10:31:00.100",
+		},
+		{
+			name:         "cross hour boundary",
+			date:         "2024-01-15 10:59:59.800",
+			milliseconds: "300",
+			want:         "2024-01-15 11:00:00.100",
+		},
+		{
+			name:         "cross day boundary",
+			date:         "2024-01-15 23:59:59.800",
+			milliseconds: "300",
+			want:         "2024-01-16 00:00:00.100",
+		},
+		{
+			name:         "cross month boundary",
+			date:         "2024-01-31 23:59:59.800",
+			milliseconds: "300",
+			want:         "2024-02-01 00:00:00.100",
+		},
+		{
+			name:         "cross year boundary",
+			date:         "2023-12-31 23:59:59.800",
+			milliseconds: "300",
+			want:         "2024-01-01 00:00:00.100",
+		},
+		{
+			name:         "invalid milliseconds parameter",
+			date:         "2024-01-15 10:30:15.500",
+			milliseconds: "invalid",
+			wantError:    true,
+		},
+		{
+			name:         "invalid date format",
+			date:         "not-a-date",
+			milliseconds: "1",
+			wantError:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			query := fmt.Sprintf("{{ '%s' | add_milliseconds('%s') }}", tt.date, tt.milliseconds)
+			renderer := NewRenderer(Context{})
+			result, err := renderer.Render(query)
+
+			if tt.wantError {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.want, result)
 		})
 	}
 }
