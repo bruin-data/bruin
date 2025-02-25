@@ -72,7 +72,7 @@ func TestValidateFlags(t *testing.T) {
 			name:        "missing connection in direct mode",
 			query:       "SELECT * FROM table",
 			expectError: true,
-			errorMsg:    "direct query mode requires both --connection and --query flags",
+			errorMsg:    "must use either:\n1. Direct query mode (--connection and --query), or\n2. Asset mode (--asset with optional --environment), or\n3. Auto-detect mode (--asset to detect the connection and --query to run arbitrary queries)"ad,
 		},
 		{
 			name:        "mixing direct query and asset modes",
@@ -85,7 +85,7 @@ func TestValidateFlags(t *testing.T) {
 		{
 			name:        "no flags provided",
 			expectError: true,
-			errorMsg:    "must use either:\n1. Direct query mode (--connection and --query), or\n2. Asset mode (--asset with optional --environment)",
+			errorMsg:    "must use either:\n1. Direct query mode (--connection and --query), or\n2. Asset mode (--asset with optional --environment), or\n3. Auto-detect mode (--asset to detect the connection and --query to run arbitrary queries)",
 		},
 	}
 
