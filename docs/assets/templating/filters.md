@@ -14,7 +14,24 @@ Bruin CLI supports various default filters supported by Jinja, you can see the [
 
 ## Date Filters
 
+### `add_years`
+
+Adds the given number of years to the date.
+
+```jinja
+{{ end_datetime | add_years(2) }}
+```
+
 Bruin supports various date-related filters to format dates that can be chained together.
+
+### `add_months`
+
+Adds the given number of months to the date.
+
+```jinja
+{{ end_datetime | add_months(3) }}
+```
+
 
 ### `add_days`
 
@@ -55,6 +72,7 @@ Adds the given number of milliseconds to the date.
 ```jinja
 {{ end_datetime | add_milliseconds(3) }}
 ```
+
 
 ### `date_add`
 
