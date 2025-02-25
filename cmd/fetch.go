@@ -128,9 +128,19 @@ func validateFlags(connection, query, asset, environment string) error {
 
 func prepareQueryExecution(c *cli.Context, fs afero.Fs) (interface{}, string, error) {
 	assetPath := c.String("asset")
+	queryStr := c.String("query")
+
+	// Direct query mode (no asset path)
 	if assetPath == "" {
 		return prepareDirectQuery(c, fs)
 	}
+
+	// Auto-detect mode (both asset path and query)
+	if queryStr != "" {
+		return prepareAutoDetectQuery(c, fs)
+	}
+
+	// Asset query mode (only asset path)
 	return prepareAssetQuery(c, fs)
 }
 
@@ -138,28 +148,37 @@ func prepareDirectQuery(c *cli.Context, fs afero.Fs) (interface{}, string, error
 	connectionName := c.String("connection")
 	queryStr := c.String("query")
 
+	conn, err := getConnectionFromConfig(connectionName, fs)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return conn, queryStr, nil
+}
+
+func getConnectionFromConfig(connectionName string, fs afero.Fs) (interface{}, error) {
 	repoRoot, err := git.FindRepoFromPath(".")
 	if err != nil {
-		return nil, "", errors.Wrap(err, "failed to find the git repository root")
+		return nil, errors.Wrap(err, "failed to find the git repository root")
 	}
 
 	configFilePath := filepath.Join(repoRoot.Path, ".bruin.yml")
 	cm, err := config.LoadOrCreate(fs, configFilePath)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "failed to load or create config")
+		return nil, errors.Wrap(err, "failed to load or create config")
 	}
 
 	manager, errs := connection.NewManagerFromConfig(cm)
 	if len(errs) > 0 {
-		return nil, "", errors.Wrap(errs[0], "failed to create connection manager")
+		return nil, errors.Wrap(errs[0], "failed to create connection manager")
 	}
 
 	conn, err := manager.GetConnection(connectionName)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "failed to get connection")
+		return nil, errors.Wrap(err, "failed to get connection")
 	}
 
-	return conn, queryStr, nil
+	return conn, nil
 }
 
 func prepareAssetQuery(c *cli.Context, fs afero.Fs) (interface{}, string, error) {
@@ -178,13 +197,20 @@ func prepareAssetQuery(c *cli.Context, fs afero.Fs) (interface{}, string, error)
 			pipelineInfo.Asset.Type)
 	}
 
-	if env != "" {
-		err = pipelineInfo.Config.SelectEnvironment(env)
-		if err != nil {
-			return nil, "", errors.Wrapf(err, "failed to use the environment '%s'", env)
-		}
+	queryStr, err := extractQueryFromAsset(pipelineInfo.Asset, fs)
+	if err != nil {
+		return nil, "", err
 	}
 
+	conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return conn, queryStr, nil
+}
+
+func extractQueryFromAsset(asset *pipeline.Asset, fs afero.Fs) (string, error) {
 	startDate := time.Now()
 	endDate := time.Now()
 	extractor := &query.WholeFileExtractor{
@@ -193,34 +219,43 @@ func prepareAssetQuery(c *cli.Context, fs afero.Fs) (interface{}, string, error)
 	}
 
 	// Extract the query from the asset
-	queries, err := extractor.ExtractQueriesFromString(pipelineInfo.Asset.ExecutableFile.Content)
+	queries, err := extractor.ExtractQueriesFromString(asset.ExecutableFile.Content)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "failed to extract query")
+		return "", errors.Wrap(err, "failed to extract query")
 	}
 
 	if len(queries) == 0 {
-		return nil, "", errors.New("no query found in asset")
+		return "", errors.New("no query found in asset")
 	}
 
-	queryStr := queries[0].Query
+	return queries[0].Query, nil
+}
+
+func getConnectionFromPipelineInfo(pipelineInfo *ppInfo, env string) (interface{}, error) {
+	if env != "" {
+		err := pipelineInfo.Config.SelectEnvironment(env)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to use the environment '%s'", env)
+		}
+	}
 
 	// Get connection info
 	manager, errs := connection.NewManagerFromConfig(pipelineInfo.Config)
 	if len(errs) > 0 {
-		return nil, "", errors.Wrap(errs[0], "failed to create connection manager")
+		return nil, errors.Wrap(errs[0], "failed to create connection manager")
 	}
 
 	connName, err := pipelineInfo.Pipeline.GetConnectionNameForAsset(pipelineInfo.Asset)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "failed to get connection")
+		return nil, errors.Wrap(err, "failed to get connection")
 	}
 
 	conn, err := manager.GetConnection(connName)
 	if err != nil {
-		return nil, "", errors.Wrap(err, fmt.Sprintf("failed to get connection '%s'", connName))
+		return nil, errors.Wrap(err, fmt.Sprintf("failed to get connection '%s'", connName))
 	}
 
-	return conn, queryStr, nil
+	return conn, nil
 }
 
 func executeQuery(c *cli.Context, conn interface{}, queryStr string) error {
@@ -367,4 +402,22 @@ func GetPipelineAndAsset(inputPath string, fs afero.Fs) (*ppInfo, error) {
 		Asset:    task,
 		Config:   cm,
 	}, nil
+}
+
+func prepareAutoDetectQuery(c *cli.Context, fs afero.Fs) (interface{}, string, error) {
+	assetPath := c.String("asset")
+	queryStr := c.String("query")
+	env := c.String("env")
+
+	pipelineInfo, err := GetPipelineAndAsset(assetPath, fs)
+	if err != nil {
+		return nil, "", errors.Wrap(err, "failed to get pipeline info")
+	}
+
+	conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return conn, queryStr, nil
 }
