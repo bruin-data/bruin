@@ -14,7 +14,7 @@ func BenchmarkInternalParsePipeline(b *testing.B) {
 	for range [10]int{} {
 		b.ResetTimer()
 		start := time.Now()
-		if err := r.ParsePipeline("./testdata/lineage", true); err != nil {
+		if err := r.ParsePipeline("./testdata/lineage", true, false); err != nil {
 			b.Fatalf("Failed to run Internal Parse Pipeline command: %v", err)
 		}
 		b.StopTimer()
@@ -52,7 +52,7 @@ func BenchmarkInternalParsePipelineWithoutColumnLineage(b *testing.B) {
 	for range [10]int{} {
 		b.ResetTimer()
 		start := time.Now()
-		if err := r.ParsePipeline("./testdata/lineage", false); err != nil {
+		if err := r.ParsePipeline("./testdata/lineage", false, false); err != nil {
 			b.Fatalf("Failed to run Internal Parse Pipeline command: %v", err)
 		}
 		b.StopTimer()
