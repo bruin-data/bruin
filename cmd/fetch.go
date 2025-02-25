@@ -104,7 +104,7 @@ func validateFlags(connection, query, asset, environment string) error {
 	hasEnvironment := environment != ""
 
 	switch {
-	case hasConnection || hasQuery:
+	case hasConnection:
 		if !(hasConnection && hasQuery) {
 			return errors.New("direct query mode requires both --connection and --query flags")
 		}
@@ -114,14 +114,15 @@ func validateFlags(connection, query, asset, environment string) error {
 		return nil
 
 	case hasAsset:
-		if hasConnection || hasQuery {
+		if hasConnection {
 			return errors.New("asset mode (--asset) cannot be combined with direct query mode (--connection and --query)")
 		}
 		return nil
 	default:
 		return errors.New("must use either:\n" +
 			"1. Direct query mode (--connection and --query), or\n" +
-			"2. Asset mode (--asset with optional --environment)")
+			"2. Asset mode (--asset with optional --environment), or\n" +
+			"3. Auto-detect mode (--asset to detect the connection and --query to run arbitrary queries)")
 	}
 }
 
