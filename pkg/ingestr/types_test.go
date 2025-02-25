@@ -4,7 +4,7 @@ import "testing"
 
 func TestNormaliseColumnName(t *testing.T) {
 	t.Parallel()
-	var testCases = map[string]string{
+	testCases := map[string]string{
 		"CamelCase":        "camel_case",
 		"With Space":       "with_space",
 		"With  Two  Space": "with_two_space",

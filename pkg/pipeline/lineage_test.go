@@ -8,9 +8,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
-var (
-	SQLParser *sqlparser.SQLParser
-)
+var SQLParser *sqlparser.SQLParser
 
 func TestMain(m *testing.M) {
 	err := SetupSQLParser()
