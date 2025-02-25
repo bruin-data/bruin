@@ -73,6 +73,12 @@ func ParsePipeline() *cli.Command {
 				Required:    false,
 				DefaultText: "false",
 			},
+			&cli.BoolFlag{
+				Name:        "exp-slim-response",
+				Usage:       "experimental flag to return a slim response",
+				Required:    false,
+				DefaultText: "false",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			r := ParseCommand{
@@ -80,7 +86,7 @@ func ParsePipeline() *cli.Command {
 				errorPrinter: errorPrinter,
 			}
 
-			return r.ParsePipeline(c.Args().Get(0), c.Bool("column-lineage"))
+			return r.ParsePipeline(c.Args().Get(0), c.Bool("column-lineage"), c.Bool("exp-slim-response"))
 		},
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
@@ -111,7 +117,7 @@ type ParseCommand struct {
 	errorPrinter *color2.Color
 }
 
-func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool) error {
+func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool, slimResponse bool) error {
 	// defer RecoverFromPanic()
 	var lineageWg conc.WaitGroup
 	var sqlParser *sqlparser.SQLParser
@@ -170,7 +176,48 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool) error {
 
 	foundPipeline.WipeContentOfAssets()
 
-	js, err := json.Marshal(foundPipeline)
+	if !slimResponse {
+		js, err := json.Marshal(foundPipeline)
+		if err != nil {
+			printErrorJSON(err)
+			return cli.Exit("", 1)
+		}
+
+		fmt.Println(string(js))
+		return nil
+	}
+
+	type assetSummary struct {
+		ID             string                       `json:"id"`
+		Name           string                       `json:"name"`
+		Type           pipeline.AssetType           `json:"type"`
+		ExecutableFile *pipeline.ExecutableFile     `json:"executable_file"`
+		DefinitionFile *pipeline.TaskDefinitionFile `json:"definition_file"`
+		Upstreams      []pipeline.Upstream          `json:"upstreams"`
+	}
+
+	type pipelineSummary struct {
+		*pipeline.Pipeline
+		Assets []*assetSummary `json:"assets"`
+	}
+
+	ps := pipelineSummary{
+		Pipeline: foundPipeline,
+		Assets:   make([]*assetSummary, len(foundPipeline.Assets)),
+	}
+
+	for i, asset := range foundPipeline.Assets {
+		ps.Assets[i] = &assetSummary{
+			ID:             asset.ID,
+			Name:           asset.Name,
+			Type:           asset.Type,
+			ExecutableFile: &asset.ExecutableFile,
+			DefinitionFile: &asset.DefinitionFile,
+			Upstreams:      asset.Upstreams,
+		}
+	}
+
+	js, err := json.Marshal(ps)
 	if err != nil {
 		printErrorJSON(err)
 		return cli.Exit("", 1)
@@ -244,14 +291,22 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 		}
 	}
 
+	type pipelineSummary struct {
+		Name     string            `json:"name"`
+		Schedule pipeline.Schedule `json:"schedule"`
+	}
+
 	js, err := json.Marshal(struct {
-		Asset    *pipeline.Asset    `json:"asset"`
-		Pipeline *pipeline.Pipeline `json:"pipeline"`
-		Repo     *git.Repo          `json:"repo"`
+		Asset    *pipeline.Asset `json:"asset"`
+		Pipeline pipelineSummary `json:"pipeline"`
+		Repo     *git.Repo       `json:"repo"`
 	}{
-		Asset:    asset,
-		Pipeline: foundPipeline,
-		Repo:     repoRoot,
+		Asset: asset,
+		Pipeline: pipelineSummary{
+			Name:     foundPipeline.Name,
+			Schedule: foundPipeline.Schedule,
+		},
+		Repo: repoRoot,
 	})
 	if err != nil {
 		printErrorJSON(err)

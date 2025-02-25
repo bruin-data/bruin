@@ -42,7 +42,7 @@ var typeHintMapping = map[string]string{
 // columnHints returns an ingestr compatible type hint string
 // that can be passed via the --column flag to the CLI.
 func columnHints(cols []pipeline.Column) string {
-	var hints = make([]string, 0)
+	hints := make([]string, 0)
 	for _, col := range cols {
 		typ := normaliseColumnType(col.Type)
 		hint, exists := typeHintMapping[typ]
