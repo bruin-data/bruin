@@ -1,0 +1,6 @@
+name: bruin-run-python-materialization
+schedule: daily
+start_date: "2023-03-20"
+
+default_connections:
+    duckdb: duckdb-run-python-materialization

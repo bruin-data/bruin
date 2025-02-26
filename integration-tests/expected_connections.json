@@ -304,6 +304,15 @@
           }
         ]
       }
-    }
+    },
+    "env-run-python-materialization": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-run-python-materialization",
+            "path": "integration-tests/duckdb-files/run-python-materialization.db"
+          }
+        ]
+      }
   }
 }

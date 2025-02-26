@@ -726,6 +726,20 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 				e2e.AssertByOutputJSON,
 			},
 		},
+		{
+			Name:    "run-python-materialization",
+			Command: binary,
+			Args:    []string{"run", "--env", "env-run-python-materialization", filepath.Join(currentFolder, "test-pipelines/run-python-materialization")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Successfully validated 3 assets", "Executed 3 tasks", "Finished: materialize.country", "Finished: materialize.city", "Finished: materialize.state"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
 	}
 }
 
