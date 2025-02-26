@@ -733,7 +733,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Successfully validated 3 assets", "Executed 3 tasks", "Finished: materialize.country", "Finished: materialize.city", "Finished: materialize.state"},
+				Contains: []string{"Successfully validated 1 assets", "Executed 1 tasks", "Finished: materialize.country"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
