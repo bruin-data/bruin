@@ -30,7 +30,11 @@ integration-test: build
 	@rm -rf integration-tests/.git
 	@rm integration-tests/bruin
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
-	@cd integration-tests && git init && git commit -m "void" --allow-empty
+	@cd integration-tests \
+		&& git init \
+		&& git config user.email "bot@empty.void" \
+		&& git config user.name "Bot" \
+		&& git commit -m "void" --allow-empty
 	@INCLUDE_INGESTR=1 go run integration-tests/integration-test.go
 
 integration-test-light: build
@@ -41,7 +45,11 @@ integration-test-light: build
 	@rm -rf integration-tests/.git
 	@rm integration-tests/bruin
 	@echo "$(OK_COLOR)==> Running light integration tests...$(NO_COLOR)"
-	@cd integration-tests && git init && git commit -m "void" --allow-empty
+	@cd integration-tests \
+		&& git init \
+		&& git config user.email "bot@empty.void" \
+		&& git config user.name "Bot" \
+		&& git commit -m "void" --allow-empty
 	@INCLUDE_INGESTR=0 go run integration-tests/integration-test.go
 
 clean:
