@@ -6,7 +6,7 @@ materialization:
     type: table
 
 
-connection: duckdb-default
+connection: duckdb-run-python-materialization
 @bruin """
 
 import pandas as pd
