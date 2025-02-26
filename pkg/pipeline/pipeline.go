@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -982,6 +983,7 @@ type Pipeline struct {
 	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push" mapstructure:"metadata_push"`
 	Retries            int                    `json:"retries" yaml:"retries" mapstructure:"retries"`
 	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
+	Commit             string                 `json:"commit"`
 	TasksByType        map[AssetType][]*Asset `json:"-"`
 	tasksByName        map[string]*Asset
 }
@@ -1312,6 +1314,11 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string, isMutate bool) (
 	pipeline.TasksByType = make(map[AssetType][]*Asset)
 	pipeline.tasksByName = make(map[string]*Asset)
 
+	pipeline.Commit, err = b.parseCommit(pathToPipeline)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing commit: %w", err)
+	}
+
 	absPipelineFilePath, err := filepath.Abs(pipelineFilePath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error getting absolute path for pipeline file at '%s'", pipelineFilePath)
@@ -1510,6 +1517,16 @@ func (b *Builder) MutateAsset(task *Asset, foundPipeline *Pipeline) (*Asset, err
 	}
 
 	return task, nil
+}
+
+func (b *Builder) parseCommit(pathToPipeline string) (string, error) {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = pathToPipeline
+	commit, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(commit)), nil
 }
 
 func (a *Asset) IsSQLAsset() bool {
