@@ -227,6 +227,7 @@
         "discord": []
     },
     "catchup": false,
+    "commit": "__GIT_COMMIT__",
     "metadata_push": {
         "bigquery": false
     },

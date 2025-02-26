@@ -250,5 +250,6 @@
     ]
   },
   "catchup": false,
+  "commit": "__GIT_COMMIT__",
   "retries": 3
 }

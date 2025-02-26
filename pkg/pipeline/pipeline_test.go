@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -375,7 +376,10 @@ func TestPipeline_JsonMarshal(t *testing.T) {
 			// don't forget to comment it out again
 			// err = afero.WriteFile(afero.NewOsFs(), path, bytes.ReplaceAll(got, []byte(dir), []byte("__BASEDIR__")), 0o644)
 
-			expected := strings.ReplaceAll(mustRead(t, path), "__BASEDIR__", dir)
+			expected := strings.NewReplacer(
+				"__BASEDIR__", dir,
+				"__GIT_COMMIT__", currentCommit(),
+			).Replace(mustRead(t, path))
 
 			assert.JSONEq(t, expected, string(got))
 
@@ -1037,4 +1041,13 @@ func TestPipeline_GetCompatibilityHash(t *testing.T) {
 			assert.Equal(t, tt.expected, actualHash)
 		})
 	}
+}
+
+func currentCommit() string {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	out, err := cmd.Output()
+	if err != nil {
+		panic(err)
+	}
+	return strings.TrimSpace(string(out))
 }
