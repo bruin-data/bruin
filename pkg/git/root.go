@@ -61,3 +61,14 @@ func isDirectory(path string) bool {
 
 	return fileInfo.IsDir()
 }
+
+func CurrentCommit(path string) (string, error) {
+	command := exec.Command("git", "rev-parse", "HEAD")
+	command.Dir = path
+	res, err := command.Output()
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(res)), nil
+}

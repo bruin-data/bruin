@@ -7,13 +7,13 @@ import (
 	"encoding/json"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/cmd"
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
@@ -376,9 +376,14 @@ func TestPipeline_JsonMarshal(t *testing.T) {
 			// don't forget to comment it out again
 			// err = afero.WriteFile(afero.NewOsFs(), path, bytes.ReplaceAll(got, []byte(dir), []byte("__BASEDIR__")), 0o644)
 
+			commit, err := git.CurrentCommit(".")
+			if err != nil {
+				t.Errorf("could not get current commit: %v", err)
+				return
+			}
 			expected := strings.NewReplacer(
 				"__BASEDIR__", dir,
-				"__GIT_COMMIT__", currentCommit(),
+				"__GIT_COMMIT__", commit,
 			).Replace(mustRead(t, path))
 
 			assert.JSONEq(t, expected, string(got))
@@ -1041,13 +1046,4 @@ func TestPipeline_GetCompatibilityHash(t *testing.T) {
 			assert.Equal(t, tt.expected, actualHash)
 		})
 	}
-}
-
-func currentCommit() string {
-	cmd := exec.Command("git", "rev-parse", "HEAD")
-	out, err := cmd.Output()
-	if err != nil {
-		panic(err)
-	}
-	return strings.TrimSpace(string(out))
 }

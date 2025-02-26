@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
@@ -1314,7 +1315,7 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string, isMutate bool) (
 	pipeline.TasksByType = make(map[AssetType][]*Asset)
 	pipeline.tasksByName = make(map[string]*Asset)
 
-	pipeline.Commit, err = b.parseCommit(pathToPipeline)
+	pipeline.Commit, err = git.CurrentCommit(pathToPipeline)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing commit: %w", err)
 	}
