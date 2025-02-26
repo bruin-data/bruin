@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -1518,16 +1517,6 @@ func (b *Builder) MutateAsset(task *Asset, foundPipeline *Pipeline) (*Asset, err
 	}
 
 	return task, nil
-}
-
-func (b *Builder) parseCommit(pathToPipeline string) (string, error) {
-	cmd := exec.Command("git", "rev-parse", "HEAD")
-	cmd.Dir = pathToPipeline
-	commit, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(commit)), nil
 }
 
 func (a *Asset) IsSQLAsset() bool {
