@@ -35,7 +35,7 @@ var AvailablePythonVersions = map[string]bool{
 const (
 	UvVersion               = "0.5.0"
 	pythonVersionForIngestr = "3.11"
-	ingestrVersion          = "0.13.12"
+	ingestrVersion          = "0.13.13"
 )
 
 // UvChecker handles checking and installing the uv package manager.
@@ -351,7 +351,6 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		Name: u.binaryFullPath,
 		Args: u.ingestrInstallCmd(ctx, nil),
 	})
-
 	if err != nil {
 		return errors.Wrap(err, "failed to install ingestr")
 	}
