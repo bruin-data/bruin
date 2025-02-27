@@ -428,7 +428,7 @@ def import_module_from_path(module_path: str, module_name: str):
 
     return importlib.import_module(module_name)
 
-module = import_module_from_path(r"$REPO_ROOT", "$MODULE_PATH")
+module = import_module_from_path("$REPO_ROOT", "$MODULE_PATH")
 df = module.materialize()
 
 import pyarrow as pa
