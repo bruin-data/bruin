@@ -121,6 +121,7 @@ func (p *LineageExtractor) mergeAsteriskColumns(foundPipeline *Pipeline, asset *
 		if upstream.Column == "*" {
 			for _, upstreamCol := range upstreamAsset.Columns {
 				upstreamCol.PrimaryKey = false
+				upstreamCol.Checks = []ColumnCheck{}
 				if err := p.addColumnToAsset(asset, upstreamCol.Name, &upstreamCol); err != nil {
 					return err
 				}
@@ -255,6 +256,7 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 			} else {
 				upstreamCol.Name = lineageCol.Name
 				upstreamCol.PrimaryKey = false
+				upstreamCol.Checks = []ColumnCheck{}
 				upstreamCol.Upstreams = []*UpstreamColumn{
 					{
 						Column: upstream.Column,
@@ -327,6 +329,7 @@ func updateExistingColumn(existingCol *Column, upstreamCol *Column) {
 	if existingCol.EntityAttribute == nil {
 		existingCol.EntityAttribute = upstreamCol.EntityAttribute
 	}
+
 	existingCol.UpdateOnMerge = upstreamCol.UpdateOnMerge
 	existingCol.PrimaryKey = false
 }
