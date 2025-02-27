@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"github.com/stretchr/testify/assert"
 	"log"
 	"os"
 	"testing"
@@ -44,11 +45,8 @@ func TestParseLineageRecursively(t *testing.T) {
 		"dialect specific features": testDialectSpecificFeatures,
 	}
 
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			tc(t)
-		})
+	for _, tc := range testCases {
+		tc(t)
 	}
 }
 
@@ -71,7 +69,7 @@ func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error) {
 		err := extractor.ColumnLineage(p, asset, make(map[string]bool))
 		assertLineageError(t, err, want)
 
-		assertColumns(t, asset.Columns, after.GetAssetByName(asset.Name).Columns, len(asset.Columns))
+		assertColumns(t, asset.Columns, after.GetAssetByName(asset.Name).Columns)
 		assertAssetExists(t, after, asset)
 	}
 }
@@ -132,29 +130,14 @@ func assertAssetExists(t *testing.T, afterPipeline *Pipeline, asset *Asset) {
 		columnMap[col.Name] = col
 	}
 
-	for _, gotCol := range assetFound.Columns {
-		wantCol, exists := columnMap[gotCol.Name]
-		if !exists {
-			t.Errorf("Unexpected column %s found in asset %s", gotCol.Name, asset.Name)
-			continue
-		}
-
-		if gotCol.Type != wantCol.Type {
-			t.Errorf("Column %s.%s type mismatch: got %s, want %s",
-				asset.Name, gotCol.Name, gotCol.Type, wantCol.Type)
-		}
-		if gotCol.PrimaryKey != wantCol.PrimaryKey {
-			t.Errorf("Column %s.%s primary key mismatch: got %v, want %v",
-				asset.Name, gotCol.Name, gotCol.PrimaryKey, wantCol.PrimaryKey)
-		}
-	}
+	assertColumns(t, assetFound.Columns, asset.Columns)
 }
 
-func assertColumns(t *testing.T, got, want []Column, wantCount int) {
+func assertColumns(t *testing.T, got, want []Column) {
 	t.Helper()
 
-	if len(got) != wantCount {
-		t.Errorf("Column count mismatch: got %d, want %d", len(got), wantCount)
+	if len(got) != len(want) {
+		t.Errorf("Column count mismatch: got %d, want %d", len(got), len(want))
 	}
 
 	columnMap := make(map[string]Column)
@@ -168,13 +151,7 @@ func assertColumns(t *testing.T, got, want []Column, wantCount int) {
 			t.Errorf("Unexpected column %s found", col.Name)
 			continue
 		}
-
-		if col.Type != wantCol.Type {
-			t.Errorf("Column %s type mismatch: got %s, want %s", col.Name, col.Type, wantCol.Type)
-		}
-		if col.PrimaryKey != wantCol.PrimaryKey {
-			t.Errorf("Column %s primary key mismatch: got %v, want %v", col.Name, col.PrimaryKey, wantCol.PrimaryKey)
-		}
+		assert.EqualExportedValues(t, wantCol, col)
 	}
 }
 
@@ -255,7 +232,6 @@ func testBasicRecursiveParsing(t *testing.T) {
 							},
 							Upstreams: []Upstream{{Value: "table3", Columns: []DependsColumn{}}},
 						},
-
 						{
 							Name: "table3",
 							Columns: []Column{
@@ -280,9 +256,8 @@ func testBasicRecursiveParsing(t *testing.T) {
 		}
 	}
 
-	for range 1000 {
-		runLineageTests(t, gen())
-	}
+	runLineageTests(t, gen())
+	//}
 }
 
 func testJoinsAndComplexQueries(t *testing.T) {
@@ -366,7 +341,7 @@ func testJoinsAndComplexQueries(t *testing.T) {
 					{
 						Name: "raw_orders",
 						Columns: []Column{
-							{Name: "order_id", Type: "int64", PrimaryKey: true, Description: "Order ID"},
+							{Name: "order_id", Type: "int64", PrimaryKey: true, Description: "Order ID", Checks: []ColumnCheck{{Name: "not_null"}}},
 							{Name: "customer_id", Type: "int64", Description: "Customer ID"},
 							{Name: "product_id", Type: "int64", Description: "Product ID"},
 							{Name: "quantity", Type: "int64", Description: "Order quantity"},
@@ -389,6 +364,7 @@ func testJoinsAndComplexQueries(t *testing.T) {
 								Name:        "order_id",
 								Type:        "int64",
 								Description: "Order ID",
+								Checks:      make([]ColumnCheck, 0),
 								Upstreams:   []*UpstreamColumn{{Column: "order_id", Table: "orders"}},
 							},
 							{

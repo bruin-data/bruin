@@ -255,6 +255,7 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 			} else {
 				upstreamCol.Name = lineageCol.Name
 				upstreamCol.PrimaryKey = false
+				//upstreamCol.Checks = []ColumnCheck{} TODO: fix this
 				upstreamCol.Upstreams = []*UpstreamColumn{
 					{
 						Column: upstream.Column,
