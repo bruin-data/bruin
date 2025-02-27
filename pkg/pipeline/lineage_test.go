@@ -35,10 +35,8 @@ func SetupSQLParser() error {
 	return nil
 }
 
-func TestParseLineageRecursively(t *testing.T) {
-	t.Parallel()
-
-	tests := []TestCase{
+func getBasicLineageTestCase() []TestCase {
+	return []TestCase{
 		{
 			name: "successful recursive lineage parsing",
 			pipeline: &Pipeline{
@@ -525,6 +523,11 @@ func TestParseLineageRecursively(t *testing.T) {
 			},
 			want: nil,
 		},
+	}
+}
+
+func GetAdvancedSQLTestCase() []TestCase {
+	return []TestCase{
 		{
 			name: "advanced SQL functions and aggregations",
 			pipeline: &Pipeline{
@@ -883,6 +886,12 @@ func TestParseLineageRecursively(t *testing.T) {
 			want: nil,
 		},
 	}
+}
+
+func TestParseLineageRecursively(t *testing.T) {
+	t.Parallel()
+
+	tests := append(getBasicLineageTestCase(), GetAdvancedSQLTestCase()...)
 
 	for _, tt := range tests {
 		runSingleLineageTest(t, tt.pipeline, tt.after, tt.want)
