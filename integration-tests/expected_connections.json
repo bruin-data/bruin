@@ -12,7 +12,7 @@
       "duckdb": [
         {
           "name": "duckdb-default",
-          "path": "integration-tests/duckdb-files/duckdb.db"
+          "path": "/Users/yuvraj/Workspace/bruin/integration-tests/duckdb-files/duckdb.db"
         }
       ],
       "chess": [
@@ -38,7 +38,7 @@
         "duckdb": [
           {
             "name": "duckdb-default",
-            "path": "integration-tests/duckdb-files/duckdb.db"
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/duckdb-files/duckdb.db"
           }
         ],
         "chess": [
@@ -57,7 +57,7 @@
         "duckdb": [
           {
             "name": "duckdb-ingestr",
-            "path": "integration-tests/duckdb-files/ingestr.db"
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/duckdb-files/ingestr.db"
           }
         ],
         "chess": [
@@ -76,7 +76,17 @@
         "duckdb": [
           {
             "name": "duckdb-push-metadata",
-            "path": "integration-tests/duckdb-files/push-metadata.db"
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/duckdb-files/push-metadata.db"
+          }
+        ]
+      }
+    },
+    "env-query-asset": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-query-asset",
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/duckdb-files/query-asset.db"
           }
         ]
       }
@@ -96,7 +106,7 @@
         "duckdb": [
           {
             "name": "duckdb-env-run-default-option",
-            "path": "integration-tests/duckdb-files/env-run-default-option.db"
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/duckdb-files/env-run-default-option.db"
           }
         ],
         "chess": [
@@ -121,7 +131,7 @@
         "duckdb": [
           {
             "name": "duckdb-run-main-with-downstream",
-            "path": "integration-tests/duckdb-files/run-main-with-downstream.db"
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/duckdb-files/run-main-with-downstream.db"
           }
         ],
         "chess": [
@@ -146,7 +156,7 @@
         "duckdb": [
           {
             "name": "duckdb-run-main-with-filters",
-            "path": "integration-tests/duckdb-files/run-main-with-filters.db"
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/duckdb-files/run-main-with-filters.db"
           }
         ],
         "chess": [
@@ -171,7 +181,7 @@
         "duckdb": [
           {
             "name": "duckdb-run-malformed-sql",
-            "path": "integration-tests/duckdb-files/run-malformed-sql.db"
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/duckdb-files/run-malformed-sql.db"
           }
         ],
         "chess": [
@@ -185,12 +195,22 @@
         ]
       }
     },
+    "env-run-python-materialization": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-run-python-materialization",
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/duckdb-files/run-python-materialization.db"
+          }
+        ]
+      }
+    },
     "env-run-seed-data": {
       "connections": {
         "duckdb": [
           {
             "name": "duckdb-run-seed-data",
-            "path": "integration-tests/duckdb-files/run-seed-data.db"
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/duckdb-files/run-seed-data.db"
           }
         ]
       }
@@ -206,7 +226,7 @@
         "duckdb": [
           {
             "name": "duckdb-env-run-use-uv",
-            "path": "integration-tests/duckdb-files/env-run-use-uv.db"
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/duckdb-files/env-run-use-uv.db"
           }
         ],
         "chess": [
@@ -231,7 +251,7 @@
         "duckdb": [
           {
             "name": "duckdb-run-with-downstream",
-            "path": "integration-tests/duckdb-files/run-with-downstream.db"
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/duckdb-files/run-with-downstream.db"
           }
         ],
         "chess": [
@@ -256,7 +276,7 @@
         "duckdb": [
           {
             "name": "duckdb-run-with-filters",
-            "path": "integration-tests/duckdb-files/run-with-filters.db"
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/duckdb-files/run-with-filters.db"
           }
         ],
         "chess": [
@@ -281,7 +301,7 @@
         "duckdb": [
           {
             "name": "duckdb-run-with-tags",
-            "path": "integration-tests/duckdb-files/run-with-tags.db"
+            "path": "/Users/yuvraj/Workspace/bruin/integration-tests/duckdb-files/run-with-tags.db"
           }
         ],
         "chess": [
@@ -294,25 +314,6 @@
           }
         ]
       }
-    },
-    "env-query-asset": {
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-query-asset",
-            "path": "integration-tests/duckdb-files/query-asset.db"
-          }
-        ]
-      }
-    },
-    "env-run-python-materialization": {
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-run-python-materialization",
-            "path": "integration-tests/duckdb-files/run-python-materialization.db"
-          }
-        ]
-      }
+    }
   }
 }
