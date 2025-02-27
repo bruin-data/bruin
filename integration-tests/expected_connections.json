@@ -294,6 +294,16 @@
           }
         ]
       }
+    },
+    "env-query-asset": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-query-asset",
+            "path": "integration-tests/duckdb-files/query-asset.db"
+          }
+        ]
+      }
     }
   }
 }
