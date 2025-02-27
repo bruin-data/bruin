@@ -249,9 +249,9 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		_ = tempPyScript.Close()
 	}(tempPyScript)
 
-	arrowScript := strings.ReplaceAll(PythonArrowTemplate, "$REPO_ROOT", execCtx.repo.Path)
+	arrowScript := strings.ReplaceAll(PythonArrowTemplate, "$REPO_ROOT", strings.ReplaceAll(execCtx.repo.Path, "\\", "\\\\"))
 	arrowScript = strings.ReplaceAll(arrowScript, "$MODULE_PATH", execCtx.module)
-	arrowScript = strings.ReplaceAll(arrowScript, "$ARROW_FILE_PATH", arrowFilePath)
+	arrowScript = strings.ReplaceAll(arrowScript, "$ARROW_FILE_PATH", strings.ReplaceAll(arrowFilePath, "\\", "\\\\"))
 
 	if _, err := io.WriteString(tempPyScript, arrowScript); err != nil {
 		return fmt.Errorf("failed to write to temp file: %w", err)
@@ -428,7 +428,7 @@ def import_module_from_path(module_path: str, module_name: str):
 
     return importlib.import_module(module_name)
 
-module = import_module_from_path("$REPO_ROOT", "$MODULE_PATH")
+module = import_module_from_path(r"$REPO_ROOT", "$MODULE_PATH")
 df = module.materialize()
 
 import pyarrow as pa
