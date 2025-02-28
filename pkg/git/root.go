@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-var knownRepoRoots = make(map[string]string)
+var knownRepoRoots = make(map[string]bool)
 
 // RepoFinder is a wrapper for finding the root path of a git repository.
 type RepoFinder struct{}
@@ -35,8 +35,10 @@ func (*RepoFinder) Repo(path string) (*Repo, error) {
 //}
 
 func FindRepoFromPath(path string) (*Repo, error) {
-	if knownRepoRoots[path] != "" {
-		return &Repo{Path: knownRepoRoots[path]}, nil
+	for knownPath, _ := range knownRepoRoots {
+		if strings.HasPrefix(path, knownPath + "/") {
+			return &Repo{Path: knownPath}, nil
+		}
 	}
 
 	d, err := detectGitPath(path)
@@ -48,7 +50,7 @@ func FindRepoFromPath(path string) (*Repo, error) {
 		d = strings.Replace(d, "/", "\\", -1)
 	}
 
-	knownRepoRoots[path] = d
+	knownRepoRoots[d] = true
 
 	return &Repo{
 		Path: d,
