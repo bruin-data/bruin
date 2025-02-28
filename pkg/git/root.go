@@ -40,6 +40,10 @@ func FindRepoFromPath(path string) (*Repo, error) {
 		return nil, err
 	}
 
+	if runtime.GOOS == "windows" {
+		d = strings.Replace(d, "/", "\\", -1)
+	}
+
 	return &Repo{
 		Path: d,
 	}, nil
