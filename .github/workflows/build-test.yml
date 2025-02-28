@@ -37,6 +37,27 @@ env:
   IMAGE_NAME: bruin-data/bruin
 
 jobs:
+  integration-testss:
+    strategy:
+      matrix:
+        platform: [ ubuntu-24.04, ubuntu-22.04, macos-latest, macos-14, windows-2022 ]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+# TODO: Replace with actions/setup-go once issue is resolved https://github.com/actions/setup-go/pull/515
+      - name: Setup Go 
+        uses: antontroshin/setup-go@windows-go-mod-cache
+        with:
+          go-version-file: 'go.mod'
+          cache-dependency-path: "go.sum"
+      - run: make test
+      - name: Install winget
+        if: matrix.platform == 'windows-2022'
+        uses: Cyberboss/install-winget@v1
+      - run: make integration-test
+        shell: bash
   test:
     strategy:
       matrix:
