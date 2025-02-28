@@ -688,10 +688,10 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 		}
 
 		if asset.Materialization.IncrementalKey != "" &&
-			asset.Materialization.Strategy != pipeline.MaterializationStrategyDeleteInsert {
+			asset.Materialization.Strategy != pipeline.MaterializationStrategyDeleteInsert || asset.Materialization.Strategy != pipeline.MaterializationStrategyTimeInterval {
 			issues = append(issues, &Issue{
 				Task:        asset,
-				Description: "Incremental key is only supported with 'delete+insert' strategy",
+				Description: "Incremental key is only supported with 'delete+insert' or 'time_interval' strategies.",
 			})
 		}
 
