@@ -1,6 +1,7 @@
 package git
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,8 +29,45 @@ func (*RepoFinder) Repo(path string) (*Repo, error) {
 	}, nil
 }
 
+// leaving this here temporarily in case we need to revert back to this version for some reason
+//func FindRepoFromPath(path string) (*Repo, error) {
+//	return (&RepoFinder{}).Repo(path)
+//}
+
 func FindRepoFromPath(path string) (*Repo, error) {
-	return (&RepoFinder{}).Repo(path)
+	d, err := detectGitPath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Repo{
+		Path: d,
+	}, nil
+}
+
+func detectGitPath(path string) (string, error) {
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+
+	for {
+		gitPath := filepath.Join(path, ".git")
+		fi, err := os.Stat(gitPath)
+		if err == nil {
+			if fi.IsDir() {
+				return path, nil
+			}
+
+			return "", fmt.Errorf(".git exist but is not a directory")
+		}
+
+		parent := filepath.Dir(path)
+		if parent == path {
+			return "", fmt.Errorf("no git repository found")
+		}
+		path = parent
+	}
 }
 
 func rootPath(inputPath string) (string, error) {
