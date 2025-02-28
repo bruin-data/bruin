@@ -2,7 +2,7 @@ name: CI Checks
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, debug ]
     paths-ignore:
       - 'docs/**'
       - 'examples/**'
