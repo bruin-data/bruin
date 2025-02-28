@@ -141,4 +141,10 @@ environments:
             - "MagnusCarlsen"
             - "Hikaru"
 
+  env-query-asset:
+    connections:
+      duckdb:
+        - name: "duckdb-query-asset"
+          path: "duckdb-files/query-asset.db"
+
 
