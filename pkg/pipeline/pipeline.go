@@ -957,6 +957,8 @@ func PipelineFromPath(filePath string, fs afero.Fs) (*Pipeline, error) {
 	}
 
 	pl.Assets = make([]*Asset, 0)
+	pl.DefinitionFile.Name = filepath.Base(filePath)
+	pl.DefinitionFile.Path = filePath
 	return &pl, nil
 }
 
