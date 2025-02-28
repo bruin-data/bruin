@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/cmd"
-	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
@@ -376,15 +375,7 @@ func TestPipeline_JsonMarshal(t *testing.T) {
 			// don't forget to comment it out again
 			// err = afero.WriteFile(afero.NewOsFs(), path, bytes.ReplaceAll(got, []byte(dir), []byte("__BASEDIR__")), 0o644)
 
-			commit, err := git.CurrentCommit(".")
-			if err != nil {
-				t.Errorf("could not get current commit: %v", err)
-				return
-			}
-			expected := strings.NewReplacer(
-				"__BASEDIR__", dir,
-				"__GIT_COMMIT__", commit,
-			).Replace(mustRead(t, path))
+			expected := strings.NewReplacer("__BASEDIR__", dir).Replace(mustRead(t, path))
 
 			assert.JSONEq(t, expected, string(got))
 

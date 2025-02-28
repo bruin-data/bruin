@@ -1236,6 +1236,7 @@ type BuilderConfig struct {
 	TasksDirectoryName  string
 	TasksDirectoryNames []string
 	TasksFileSuffixes   []string
+	ParseGitMetadata    bool
 }
 
 type glossaryReader interface {
@@ -1314,9 +1315,11 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string, isMutate bool) (
 	pipeline.TasksByType = make(map[AssetType][]*Asset)
 	pipeline.tasksByName = make(map[string]*Asset)
 
-	pipeline.Commit, err = git.CurrentCommit(pathToPipeline)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing commit: %w", err)
+	if b.config.ParseGitMetadata {
+		pipeline.Commit, err = git.CurrentCommit(pathToPipeline)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing commit: %w", err)
+		}
 	}
 
 	absPipelineFilePath, err := filepath.Abs(pipelineFilePath)

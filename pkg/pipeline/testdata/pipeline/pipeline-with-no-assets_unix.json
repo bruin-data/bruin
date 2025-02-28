@@ -18,7 +18,7 @@
         "discord": []
     },
     "catchup": false,
-    "commit": "__GIT_COMMIT__",
+    "commit": "",
     "metadata_push": {
         "bigquery": false
     },

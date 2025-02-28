@@ -216,6 +216,6 @@
     "ms_teams": []
   },
   "catchup": false,
-  "commit": "__GIT_COMMIT__",
+  "commit": "",
   "retries": 0
 }
