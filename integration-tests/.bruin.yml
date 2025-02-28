@@ -140,6 +140,11 @@ environments:
           players:
             - "MagnusCarlsen"
             - "Hikaru"
+  env-run-python-materialization:
+    connections:
+      duckdb:
+        - name: "duckdb-run-python-materialization"
+          path: "duckdb-files/run-python-materialization.db"
 
   env-query-asset:
     connections:

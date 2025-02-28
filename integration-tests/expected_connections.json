@@ -81,6 +81,16 @@
         ]
       }
     },
+    "env-query-asset": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-query-asset",
+            "path": "integration-tests/duckdb-files/query-asset.db"
+          }
+        ]
+      }
+    },
     "env-run-default-option": {
       "connections": {
         "generic": [
@@ -181,6 +191,16 @@
               "MagnusCarlsen",
               "Hikaru"
             ]
+          }
+        ]
+      }
+    },
+    "env-run-python-materialization": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-run-python-materialization",
+            "path": "integration-tests/duckdb-files/run-python-materialization.db"
           }
         ]
       }
@@ -291,16 +311,6 @@
               "MagnusCarlsen",
               "Hikaru"
             ]
-          }
-        ]
-      }
-    },
-    "env-query-asset": {
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-query-asset",
-            "path": "integration-tests/duckdb-files/query-asset.db"
           }
         ]
       }
