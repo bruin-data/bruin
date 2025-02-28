@@ -7,8 +7,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 )
 
+var rwLock = sync.RWMutex{}
 var knownRepoRoots = make(map[string]bool)
 
 // RepoFinder is a wrapper for finding the root path of a git repository.
@@ -35,11 +37,14 @@ func (*RepoFinder) Repo(path string) (*Repo, error) {
 //}
 
 func FindRepoFromPath(path string) (*Repo, error) {
+	rwLock.RLock()
 	for knownPath, _ := range knownRepoRoots {
-		if strings.HasPrefix(path, knownPath + "/") {
+		if strings.HasPrefix(path, knownPath+"/") {
+			rwLock.RUnlock()
 			return &Repo{Path: knownPath}, nil
 		}
 	}
+	rwLock.RUnlock()
 
 	d, err := detectGitPath(path)
 	if err != nil {
@@ -50,7 +55,9 @@ func FindRepoFromPath(path string) (*Repo, error) {
 		d = strings.Replace(d, "/", "\\", -1)
 	}
 
+	rwLock.Lock()
 	knownRepoRoots[d] = true
+	rwLock.Unlock()
 
 	return &Repo{
 		Path: d,
