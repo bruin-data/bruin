@@ -249,9 +249,9 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		_ = tempPyScript.Close()
 	}(tempPyScript)
 
-	arrowScript := strings.ReplaceAll(PythonArrowTemplate, "$REPO_ROOT", execCtx.repo.Path)
+	arrowScript := strings.ReplaceAll(PythonArrowTemplate, "$REPO_ROOT", strings.ReplaceAll(execCtx.repo.Path, "\\", "\\\\"))
 	arrowScript = strings.ReplaceAll(arrowScript, "$MODULE_PATH", execCtx.module)
-	arrowScript = strings.ReplaceAll(arrowScript, "$ARROW_FILE_PATH", arrowFilePath)
+	arrowScript = strings.ReplaceAll(arrowScript, "$ARROW_FILE_PATH", strings.ReplaceAll(arrowFilePath, "\\", "\\\\"))
 
 	if _, err := io.WriteString(tempPyScript, arrowScript); err != nil {
 		return fmt.Errorf("failed to write to temp file: %w", err)
