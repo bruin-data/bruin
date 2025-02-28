@@ -258,6 +258,10 @@ const (
 	MaterializationStrategyDeleteInsert  MaterializationStrategy = "delete+insert"
 	MaterializationStrategyAppend        MaterializationStrategy = "append"
 	MaterializationStrategyMerge         MaterializationStrategy = "merge"
+	MaterializationStrategyTimeInterval  MaterializationStrategy = "time_interval"
+
+	MaterializationTimeGranularityDate      = "date"
+	MaterializationTimeGranularityTimestamp = "timestamp"
 )
 
 var AllAvailableMaterializationStrategies = []MaterializationStrategy{
@@ -265,14 +269,16 @@ var AllAvailableMaterializationStrategies = []MaterializationStrategy{
 	MaterializationStrategyDeleteInsert,
 	MaterializationStrategyAppend,
 	MaterializationStrategyMerge,
+	MaterializationStrategyTimeInterval,
 }
 
 type Materialization struct {
-	Type           MaterializationType     `json:"type" yaml:"type,omitempty" mapstructure:"type"`
-	Strategy       MaterializationStrategy `json:"strategy" yaml:"strategy,omitempty" mapstructure:"strategy"`
-	PartitionBy    string                  `json:"partition_by" yaml:"partition_by,omitempty" mapstructure:"partition_by"`
-	ClusterBy      []string                `json:"cluster_by" yaml:"cluster_by,omitempty" mapstructure:"cluster_by"`
-	IncrementalKey string                  `json:"incremental_key" yaml:"incremental_key,omitempty" mapstructure:"incremental_key"`
+	Type            MaterializationType     `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	Strategy        MaterializationStrategy `json:"strategy" yaml:"strategy,omitempty" mapstructure:"strategy"`
+	PartitionBy     string                  `json:"partition_by" yaml:"partition_by,omitempty" mapstructure:"partition_by"`
+	ClusterBy       []string                `json:"cluster_by" yaml:"cluster_by,omitempty" mapstructure:"cluster_by"`
+	IncrementalKey  string                  `json:"incremental_key" yaml:"incremental_key,omitempty" mapstructure:"incremental_key"`
+	TimeGranularity string                  `json:"time_granularity" yaml:"time_granularity,omitempty" mapstructure:"time_granularity"`
 }
 
 func (m Materialization) MarshalJSON() ([]byte, error) {
