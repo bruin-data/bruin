@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/cmd"
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
@@ -273,6 +274,27 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 	}
 }
 
+func Test_Builder_ParseGitMetadata(t *testing.T) {
+	t.Parallel()
+	commit, err := git.CurrentCommit("testdata/git-metadata/")
+	if err != nil {
+		t.Errorf("error getting commit: %v", err)
+		return
+	}
+	builder := pipeline.NewBuilder(pipeline.BuilderConfig{
+		PipelineFileName: []string{"pipeline.yaml"},
+		ParseGitMetadata: true,
+	}, nil, nil, afero.NewOsFs(), nil)
+
+	pipeline, err := builder.CreatePipelineFromPath("testdata/git-metadata", false)
+	if err != nil {
+		t.Errorf("error creating pipeline: %v", err)
+		return
+	}
+	assert.Equal(t, "git-metadata", pipeline.LegacyID)
+	assert.Equal(t, commit, pipeline.Commit)
+}
+
 func TestTask_RelativePathToPipelineRoot(t *testing.T) {
 	t.Parallel()
 
@@ -375,7 +397,7 @@ func TestPipeline_JsonMarshal(t *testing.T) {
 			// don't forget to comment it out again
 			// err = afero.WriteFile(afero.NewOsFs(), path, bytes.ReplaceAll(got, []byte(dir), []byte("__BASEDIR__")), 0o644)
 
-			expected := strings.ReplaceAll(mustRead(t, path), "__BASEDIR__", dir)
+			expected := strings.NewReplacer("__BASEDIR__", dir).Replace(mustRead(t, path))
 
 			assert.JSONEq(t, expected, string(got))
 
