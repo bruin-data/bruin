@@ -51,6 +51,8 @@ func (s *Task) Run() error {
 				continue
 			}
 			fmt.Println("Command: ", s.Command, strings.Join(s.Args, " "))
+			fmt.Println("Actual Output: ", s.Actual.Output)
+			fmt.Println("Actual Error: ", s.Actual.Error)
 			return fmt.Errorf("assertion failed for task %s: %w", s.Name, err)
 		}
 		return nil
