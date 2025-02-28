@@ -291,8 +291,8 @@ func Test_Builder_ParseGitMetadata(t *testing.T) {
 		t.Errorf("error creating pipeline: %v", err)
 		return
 	}
-	assert.Equal(t, pipeline.LegacyID, "git-metadata")
-	assert.Equal(t, pipeline.Commit, commit)
+	assert.Equal(t, "git-metadata", pipeline.LegacyID)
+	assert.Equal(t, commit, pipeline.Commit)
 }
 
 func TestTask_RelativePathToPipelineRoot(t *testing.T) {
