@@ -1,7 +1,5 @@
 package applovinmax
 
-import "fmt"
-
 type Config struct {
 	APIKey string
 }
