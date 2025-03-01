@@ -2029,7 +2029,7 @@ func (m *Manager) AddApplovinMaxConnectionFromConfig(connection *config.Applovin
 	m.mutex.Unlock()
 
 	client, err := applovinmax.NewClient(applovinmax.Config{
-		APIKey:      connection.APIKey,
+		APIKey: connection.APIKey,
 	})
 	if err != nil {
 		return err
