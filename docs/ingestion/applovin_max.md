@@ -14,10 +14,8 @@ connections:
       applovinmax:
         - name: "my-applovinmax"
           api_key: "api_key_123"
-          application: "application_123"    
 ```
 - `api_key` (required): It is the `report key` which is used for authenticating the request.
-- `application` (required): The application package name (for Android and Fire OS) or bundle ID (for iOS). 
 
 ### Step 2: Create an asset file for data ingestion
 To ingest data from AppLovin Max, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., applovinmax_ingestion.yml) inside the assets folder and add the following content:
@@ -28,7 +26,7 @@ type: ingestr
 
 parameters:
   source_connection: "my-applovinmax"
-  source_table: 'ad_revenue'
+  source_table: 'user_ad_revenue:com.example.app1'
 
   destination: postgres
 ```
@@ -36,7 +34,7 @@ parameters:
 - `name`: The name of the asset.
 - `type`: Specifies the asset’s type. Set this to `ingestr` to use the ingestr data pipeline. For AppLovin Max, it will be always `ingestr`.
 - `source_connection`: The name of the AppLovin Max connection defined in `.bruin.yml`.
-- `source_table`: The name of the table in AppLovin Max to ingest. Currently, we only support  [ad_revenue](https://developers.applovin.com/en/max/reporting-apis/user-level-ad-revenue-api/)
+- `source_table`: The name of the table in AppLovin Max to ingest. Currently, we only support [user_ad_revenue](https://developers.applovin.com/en/max/reporting-apis/user-level-ad-revenue-api/). The format is `<table_name>:<application_ids>` where `application_ids` is a comma-separated list of application IDs.
 - `destination`: The name of the destination connection.
 
 
