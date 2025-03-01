@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
@@ -982,6 +983,7 @@ type Pipeline struct {
 	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push" mapstructure:"metadata_push"`
 	Retries            int                    `json:"retries" yaml:"retries" mapstructure:"retries"`
 	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
+	Commit             string                 `json:"commit"`
 	TasksByType        map[AssetType][]*Asset `json:"-"`
 	tasksByName        map[string]*Asset
 }
@@ -1234,6 +1236,7 @@ type BuilderConfig struct {
 	TasksDirectoryName  string
 	TasksDirectoryNames []string
 	TasksFileSuffixes   []string
+	ParseGitMetadata    bool
 }
 
 type glossaryReader interface {
@@ -1311,6 +1314,13 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string, isMutate bool) (
 	}
 	pipeline.TasksByType = make(map[AssetType][]*Asset)
 	pipeline.tasksByName = make(map[string]*Asset)
+
+	if b.config.ParseGitMetadata {
+		pipeline.Commit, err = git.CurrentCommit(pathToPipeline)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing commit: %w", err)
+		}
+	}
 
 	absPipelineFilePath, err := filepath.Abs(pipelineFilePath)
 	if err != nil {

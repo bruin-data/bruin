@@ -312,7 +312,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Command:       binary,
 			Args:          []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "test-pipelines/parse-whole-pipeline")},
 			Env:           []string{},
-			SkipJSONNodes: []string{"\"path\"", "\"extends\""},
+			SkipJSONNodes: []string{`"path"`, `"extends"`, `"commit"`},
 			Expected: e2e.Output{
 				ExitCode: 0,
 				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/parse-whole-pipeline/expectations/pipeline.yml.json")),
@@ -598,7 +598,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Command:       binary,
 			Args:          []string{"internal", "parse-pipeline", "-c", filepath.Join(currentFolder, "test-pipelines/parse-lineage-pipeline")},
 			Env:           []string{},
-			SkipJSONNodes: []string{"\"path\"", "\"extends\""},
+			SkipJSONNodes: []string{`"path"`, `"extends"`, `"commit"`},
 			Expected: e2e.Output{
 				ExitCode: 0,
 				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/parse-lineage-pipeline/expectations/lineage.json")),
@@ -671,7 +671,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Command:       binary,
 			Args:          []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "test-pipelines/parse-default-option")},
 			Env:           []string{},
-			SkipJSONNodes: []string{"\"path\"", "\"extends\""},
+			SkipJSONNodes: []string{`"path"`, `"extends"`, `"commit"`},
 			Expected: e2e.Output{
 				ExitCode: 0,
 				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/parse-default-option/expectations/pipeline.yml.json")),
@@ -716,7 +716,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Command:       binary,
 			Args:          []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "test-pipelines/parse-asset-extends")},
 			Env:           []string{},
-			SkipJSONNodes: []string{"\"path\"", "\"extends\""},
+			SkipJSONNodes: []string{`"path"`, `"extends"`, `"commit"`},
 			Expected: e2e.Output{
 				ExitCode: 0,
 				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/parse-asset-extends/expectations/pipeline.json")),
@@ -724,6 +724,20 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
 				e2e.AssertByOutputJSON,
+			},
+		},
+		{
+			Name:    "run-python-materialization",
+			Command: binary,
+			Args:    []string{"run", "--env", "env-run-python-materialization", filepath.Join(currentFolder, "test-pipelines/run-python-materialization")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Successfully validated 1 assets", "Executed 1 tasks", "Finished: materialize.country"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
 			},
 		},
 	}
