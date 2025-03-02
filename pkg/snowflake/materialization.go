@@ -6,6 +6,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/pkg/errors"
 )
 
 var matMap = pipeline.AssetMaterializationMap{
@@ -122,17 +123,17 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error) {
 	if asset.Materialization.IncrementalKey == "" {
-		return "", fmt.Errorf("incremental_key is required for time_interval strategy")
+		return "", errors.New("incremental_key is required for time_interval strategy")
 	}
 
 	if asset.Materialization.TimeGranularity == "" {
-		return "", fmt.Errorf("time_granularity is required for time_interval strategy (must be 'date' or 'timestamp')")
+		return "", errors.New("time_granularity is required for time_interval strategy (must be 'date' or 'timestamp')")
 	}
 
 	switch strings.ToLower(asset.Materialization.TimeGranularity) {
 	case "date", "timestamp":
 	default:
-		return "", fmt.Errorf("time_granularity must be either 'date' or 'timestamp'")
+		return "", errors.New("time_granularity must be either 'date' or 'timestamp'")
 	}
 
 	startVar := "{{start_timestamp}}"
@@ -144,7 +145,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 
 	queries := []string{
 		"BEGIN TRANSACTION",
-		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN %s AND %s`,
+		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
 			asset.Name,
 			asset.Materialization.IncrementalKey,
 			startVar,

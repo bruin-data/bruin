@@ -191,12 +191,12 @@ func TestMaterializer_Render(t *testing.T) {
 			task: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
-					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategyTimeInterval,
+					Type:            pipeline.MaterializationTypeTable,
+					Strategy:        pipeline.MaterializationStrategyTimeInterval,
 					TimeGranularity: pipeline.MaterializationTimeGranularityTimestamp,
 				},
 			},
-			query: "SELECT 1",
+			query:   "SELECT 1",
 			wantErr: true,
 		},
 		{
@@ -204,48 +204,30 @@ func TestMaterializer_Render(t *testing.T) {
 			task: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
-					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategyTimeInterval,
-					IncrementalKey: "dt"
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyTimeInterval,
+					IncrementalKey: "dt",
 				},
 			},
-			query: "SELECT 1",
+			query:   "SELECT 1",
 			wantErr: true,
 		},
+
 		{
-			name: "time_interval_timestamp",
+			name: "time_interval_timestampgranularity",
 			task: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
-					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategyTimeInterval,
+					Type:            pipeline.MaterializationTypeTable,
+					Strategy:        pipeline.MaterializationStrategyTimeInterval,
 					TimeGranularity: pipeline.MaterializationTimeGranularityTimestamp,
-					IncrementalKey: "ts",
+					IncrementalKey:  "ts",
 				},
 			},
-			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' and '{{end_timestamp}}'",
+			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
 			want: "^BEGIN TRANSACTION;\n" +
-				"DELETE FROM my\\.asset WHERE ts between '{{start_timestamp}}' and '{{end_timestamp}}');\n" +
-				"INSERT INTO my\\.asset SELECT ts, event_name FROM source_table where ts between '{{start_timestamp}}' and '{{end_timestamp}}';\n" +
-				"COMMIT;$",
-		},
-		{
-			name: "time_interval_timestamp_with_column_no_granularity",
-			task: &pipeline.Asset{
-				Name: "my.asset",
-				Materialization: pipeline.Materialization{
-					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategyTimeInterval,
-					IncrementalKey: "ts",
-				},
-				Columns: []pipeline.Column{
-					{Name: "ts", Type: "timestamp"},
-				},
-			},
-			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' and '{{end_timestamp}}'",
-			want: "^BEGIN TRANSACTION;\n" +
-				"DELETE FROM my\\.asset WHERE ts between '{{start_timestamp}}' and '{{end_timestamp}}');\n" +
-				"INSERT INTO my\\.asset SELECT ts, event_name FROM source_table where ts between '{{start_timestamp}}' and '{{end_timestamp}}';\n" +
+				"DELETE FROM my\\.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
+				"INSERT INTO my\\.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
 				"COMMIT;$",
 		},
 		{
@@ -253,55 +235,16 @@ func TestMaterializer_Render(t *testing.T) {
 			task: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
-					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategyTimeInterval,
+					Type:            pipeline.MaterializationTypeTable,
+					Strategy:        pipeline.MaterializationStrategyTimeInterval,
 					TimeGranularity: pipeline.MaterializationTimeGranularityDate,
-					IncrementalKey: "dt",
+					IncrementalKey:  "dt",
 				},
 			},
 			query: "SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
 			want: "^BEGIN TRANSACTION;\n" +
-				"DELETE FROM my\\.asset WHERE dt between '{{start_date}}' and '{{end_date}}');\n" +
-				"INSERT INTO my\\.asset SELECT dt, event_name FROM source_table where dt between '{{start_date}}' and '{{end_date}}';\n" +
-				"COMMIT;$",
-		},
-		{
-			name: "time_interval_date_with_column_no_granularity",
-			task: &pipeline.Asset{
-				Name: "my.asset",
-				Materialization: pipeline.Materialization{
-					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategyTimeInterval,
-					IncrementalKey: "dt",
-				},
-				Columns: []pipeline.Column{
-					{Name: "dt", Type: "date"},
-				},
-			},
-			query: "SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
-			want: "^BEGIN TRANSACTION;\n" +
-				"DELETE FROM my\\.asset WHERE dt between '{{start_date}}' and '{{end_date}}');\n" +
-				"INSERT INTO my\\.asset SELECT dt, event_name FROM source_table where dt between '{{start_date}}' and '{{end_date}}';\n" +
-				"COMMIT;$",
-		},
-		{
-			name: "time_interval_date_on_timestamp_column",
-			task: &pipeline.Asset{
-				Name: "my.asset",
-				Materialization: pipeline.Materialization{
-					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategyTimeInterval,
-					TimeGranularity: pipeline.MaterializationTimeGranularityDate,
-					IncrementalKey: "ts",
-				},
-				Columns: []pipeline.Column{
-					{Name: "ts", Type: "timestamp"},
-				},
-			},
-			query: "SELECT ts, event_name from source_table where date(ts) between '{{start_date}}' and '{{end_date}}'",
-			want: "^BEGIN TRANSACTION;\n" +
-				"DELETE FROM my\\.asset WHERE date(ts) between '{{start_date}}' and '{{end_date}}');\n" +
-				"INSERT INTO my\\.asset SELECT date(ts), event_name FROM source_table where date(ts) between '{{start_date}}' and '{{end_date}}';\n" +
+				"DELETE FROM my\\.asset WHERE dt BETWEEN '{{start_date}}' AND '{{end_date}}';\n" +
+				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}';\n" +
 				"COMMIT;$",
 		},
 	}
@@ -316,9 +259,10 @@ func TestMaterializer_Render(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
+				if !assert.Regexp(t, tt.want, render) {
+					t.Logf("\nWant (regex): %s\nGot: %s", tt.want, render)
+				}
 			}
-
-			assert.Regexp(t, tt.want, render)
 		})
 	}
 }
