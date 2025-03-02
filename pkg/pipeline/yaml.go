@@ -139,11 +139,12 @@ func (a *clusterBy) UnmarshalYAML(value *yaml.Node) error {
 }
 
 type materialization struct {
-	Type           string    `yaml:"type"`
-	Strategy       string    `yaml:"strategy"`
-	PartitionBy    string    `yaml:"partition_by"`
-	ClusterBy      clusterBy `yaml:"cluster_by"`
-	IncrementalKey string    `yaml:"incremental_key"`
+	Type            string    `yaml:"type"`
+	Strategy        string    `yaml:"strategy"`
+	PartitionBy     string    `yaml:"partition_by"`
+	ClusterBy       clusterBy `yaml:"cluster_by"`
+	IncrementalKey  string    `yaml:"incremental_key"`
+	TimeGranularity string    `yaml:"time_granularity,omitempty"`
 }
 
 type columnCheckValue struct {
@@ -315,11 +316,12 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 	}
 
 	mat := Materialization{
-		Type:           MaterializationType(strings.ToLower(definition.Materialization.Type)),
-		Strategy:       MaterializationStrategy(strings.ToLower(definition.Materialization.Strategy)),
-		ClusterBy:      definition.Materialization.ClusterBy,
-		PartitionBy:    definition.Materialization.PartitionBy,
-		IncrementalKey: definition.Materialization.IncrementalKey,
+		Type:            MaterializationType(strings.ToLower(definition.Materialization.Type)),
+		Strategy:        MaterializationStrategy(strings.ToLower(definition.Materialization.Strategy)),
+		ClusterBy:       definition.Materialization.ClusterBy,
+		PartitionBy:     definition.Materialization.PartitionBy,
+		IncrementalKey:  definition.Materialization.IncrementalKey,
+		TimeGranularity: definition.Materialization.TimeGranularity,
 	}
 
 	columns := make([]Column, len(definition.Columns))
