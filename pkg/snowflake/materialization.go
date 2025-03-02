@@ -46,7 +46,8 @@ func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
 func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 	mat := task.Materialization
 	strategy := pipeline.MaterializationStrategyDeleteInsert
-
+	tableComponents := strings.Split(task.Name, ".")
+	schemaName := tableComponents[0]
 	if mat.IncrementalKey == "" {
 		return "", fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", strategy)
 	}
@@ -54,6 +55,7 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
 	queries := []string{
+		fmt.Sprintf("USE SCHEMA %s", schemaName),
 		"BEGIN TRANSACTION",
 		fmt.Sprintf("CREATE TEMP TABLE %s AS %s\n", tempTableName, query),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
