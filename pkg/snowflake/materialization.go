@@ -134,6 +134,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	default:
 		return "", fmt.Errorf("time_granularity must be either 'date' or 'timestamp'")
 	}
+
 	startVar := "{{start_timestamp}}"
 	endVar := "{{end_timestamp}}"
 	if strings.ToLower(asset.Materialization.TimeGranularity) == "date" {
@@ -143,7 +144,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 
 	queries := []string{
 		"BEGIN TRANSACTION",
-		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
+		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN %s AND %s`,
 			asset.Name,
 			asset.Materialization.IncrementalKey,
 			startVar,
