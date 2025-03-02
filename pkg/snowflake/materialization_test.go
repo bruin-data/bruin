@@ -132,11 +132,31 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n;\n" +
-				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
-				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp_.+;\n" +
-				"DROP TABLE IF EXISTS __bruin_tmp_.+;\n" +
+			want: "USE SCHEMA MY;\n" +
+				"BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_abcefghi AS SELECT 1\n;\n" +
+				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_abcefghi\\);\n" +
+				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp_abcefghi;\n" +
+				"DROP TABLE IF EXISTS __bruin_tmp_abcefghi;\n" +
+				"COMMIT;$",
+		},
+		{
+			name: "delete+insert with three part name",
+			task: &pipeline.Asset{
+				Name: "db.my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey: "dt",
+				},
+			},
+			query: "SELECT 1",
+			want: "USE SCHEMA MY;\n" +
+				"BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_abcefghi AS SELECT 1\n;\n" +
+				"DELETE FROM db\\.my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_abcefghi\\);\n" +
+				"INSERT INTO db\\.my\\.asset SELECT \\* FROM __bruin_tmp_abcefghi;\n" +
+				"DROP TABLE IF EXISTS __bruin_tmp_abcefghi;\n" +
 				"COMMIT;$",
 		},
 		{
