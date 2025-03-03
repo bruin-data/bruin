@@ -2,8 +2,9 @@ package connection
 
 import (
 	"context"
-	"fmt"
 	"os"
+	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/adjust"
@@ -709,7 +710,6 @@ func (m *Manager) GetFacebookAdsConnectionWithoutDefault(name string) (*facebook
 }
 
 func (m *Manager) GetAppsflyerConnection(name string) (*appsflyer.Client, error) {
-	fmt.Println("Attempting to retrieve AppsFlyer connection with name:", name)
 	db, err := m.GetAppsflyerConnectionWithoutDefault(name)
 	if err == nil {
 		return db, nil
@@ -2001,23 +2001,15 @@ func (m *Manager) AddGCSConnectionFromConfig(connection *config.GCSConnection) e
 
 func (m *Manager) AddPersonioConnectionFromConfig(connection *config.PersonioConnection) error {
 	m.mutex.Lock()
+	defer m.mutex.Unlock()
 	if m.Personio == nil {
 		m.Personio = make(map[string]*personio.Client)
 	}
-	m.mutex.Unlock()
 
-	client, err := personio.NewClient(personio.Config{
+	m.Personio[connection.Name] = personio.NewClient(personio.Config{
 		ClientID:     connection.ClientID,
 		ClientSecret: connection.ClientSecret,
 	})
-	if err != nil {
-		return err
-	}
-
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	m.Personio[connection.Name] = client
-
 	return nil
 }
 
@@ -2042,392 +2034,92 @@ func (m *Manager) AddApplovinMaxConnectionFromConfig(connection *config.Applovin
 	return nil
 }
 
-//nolint:all
+// Define this outside any function
+func processConnections[T any](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {
+	if connections == nil {
+		return
+	}
+	for i := range connections {
+		conn := &connections[i]
+		wg.Go(func() {
+			// Check for environment variable placeholders in connection fields
+			v := reflect.ValueOf(conn).Elem()
+			for i := 0; i < v.NumField(); i++ {
+				field := v.Field(i)
+
+				// Only process string fields
+				if field.Kind() != reflect.String {
+					continue
+				}
+				if !field.CanSet() {
+					continue
+				}
+				strValue := strings.TrimSpace(field.String())
+				if strings.HasPrefix(strValue, "${") && strings.HasSuffix(strValue, "}") {
+					envVarName := strValue[2 : len(strValue)-1]
+					envValue := os.Getenv(envVarName)
+					if envValue != "" {
+						field.SetString(envValue)
+					}
+				}
+			}
+
+			err := adder(conn)
+			if err != nil {
+				mu.Lock()
+				*errList = append(*errList, errors.Wrapf(err, "failed to add connection '%v'", conn))
+				mu.Unlock()
+			}
+		})
+	}
+}
+
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
 
 	var wg conc.WaitGroup
-
 	var errList []error
 	var mu sync.Mutex
 
-	// todo(turtledev): refactor this series of range blocks
-	for _, conn := range cm.SelectedEnvironment.Connections.AthenaConnection {
-		wg.Go(func() {
-			err := connectionManager.AddAthenaConnectionFromConfig(&conn)
-			if err != nil {
-				mu.Lock()
-				errList = append(errList, errors.Wrapf(err, "failed to add AWS connection '%s'", conn.Name))
-				mu.Unlock()
-			}
-		})
-	}
+	processConnections(cm.SelectedEnvironment.Connections.AthenaConnection, connectionManager.AddAthenaConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.GoogleCloudPlatform, connectionManager.AddBqConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Snowflake, connectionManager.AddSfConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Postgres, connectionManager.AddPgConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.RedShift, connectionManager.AddRedshiftConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.MsSQL, connectionManager.AddMsSQLConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Databricks, connectionManager.AddDatabricksConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Synapse, connectionManager.AddSynapseSQLConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Mongo, connectionManager.AddMongoConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.MySQL, connectionManager.AddMySQLConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Notion, connectionManager.AddNotionConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Shopify, connectionManager.AddShopifyConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Gorgias, connectionManager.AddGorgiasConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Klaviyo, connectionManager.AddKlaviyoConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Adjust, connectionManager.AddAdjustConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.FacebookAds, connectionManager.AddFacebookAdsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Stripe, connectionManager.AddStripeConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Appsflyer, connectionManager.AddAppsflyerConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Kafka, connectionManager.AddKafkaConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.GoogleSheets, connectionManager.AddGoogleSheetsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.DuckDB, connectionManager.AddDuckDBConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.ClickHouse, connectionManager.AddClickHouseConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Hubspot, connectionManager.AddHubspotConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Chess, connectionManager.AddChessConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Airtable, connectionManager.AddAirtableConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.S3, connectionManager.AddS3ConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Slack, connectionManager.AddSlackConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Asana, connectionManager.AddAsanaConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.DynamoDB, connectionManager.AddDynamoDBConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Zendesk, connectionManager.AddZendeskConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.GoogleAds, connectionManager.AddGoogleAdsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.TikTokAds, connectionManager.AddTikTokAdsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.GitHub, connectionManager.AddGitHubConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.AppStore, connectionManager.AddAppStoreConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.LinkedInAds, connectionManager.AddLinkedInAdsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.GCS, connectionManager.AddGCSConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Personio, connectionManager.AddPersonioConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.ApplovinMax, connectionManager.AddApplovinMaxConnectionFromConfig, &wg, &errList, &mu)
 
-	for _, conn := range cm.SelectedEnvironment.Connections.GoogleCloudPlatform {
-		wg.Go(func() {
-			err := connectionManager.AddBqConnectionFromConfig(&conn)
-			if err != nil {
-				mu.Lock()
-				errList = append(errList, errors.Wrapf(err, "failed to add BigQuery connection '%s'", conn.Name))
-				mu.Unlock()
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Snowflake {
-		wg.Go(func() {
-			err := connectionManager.AddSfConnectionFromConfig(&conn)
-			if err != nil {
-				mu.Lock()
-				errList = append(errList, errors.Wrapf(err, "failed to add Snowflake connection '%s'", conn.Name))
-				mu.Unlock()
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Postgres {
-		wg.Go(func() {
-			err := connectionManager.AddPgConnectionFromConfig(&conn)
-			if err != nil {
-				mu.Lock()
-				errList = append(errList, errors.Wrapf(err, "failed to add Postgres connection '%s'", conn.Name))
-				mu.Unlock()
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.RedShift {
-		wg.Go(func() {
-			err := connectionManager.AddRedshiftConnectionFromConfig(&conn)
-			if err != nil {
-				mu.Lock()
-				errList = append(errList, errors.Wrapf(err, "failed to add RedShift connection '%s'", conn.Name))
-				mu.Unlock()
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.MsSQL {
-		wg.Go(func() {
-			err := connectionManager.AddMsSQLConnectionFromConfig(&conn)
-			if err != nil {
-				mu.Lock()
-				errList = append(errList, errors.Wrapf(err, "failed to add MsSQL connection '%s'", conn.Name))
-				mu.Unlock()
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Databricks {
-		wg.Go(func() {
-			err := connectionManager.AddDatabricksConnectionFromConfig(&conn)
-			if err != nil {
-				mu.Lock()
-				errList = append(errList, errors.Wrapf(err, "failed to add Databricks connection '%s'", conn.Name))
-				mu.Unlock()
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Synapse {
-		wg.Go(func() {
-			err := connectionManager.AddSynapseSQLConnectionFromConfig(&conn)
-			if err != nil {
-				mu.Lock()
-				errList = append(errList, errors.Wrapf(err, "failed to add Synapse connection '%s'", conn.Name))
-				mu.Unlock()
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Mongo {
-		wg.Go(func() {
-			err := connectionManager.AddMongoConnectionFromConfig(&conn)
-			if err != nil {
-				mu.Lock()
-				errList = append(errList, errors.Wrapf(err, "failed to add Mongo connection '%s'", conn.Name))
-				mu.Unlock()
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.MySQL {
-		wg.Go(func() {
-			err := connectionManager.AddMySQLConnectionFromConfig(&conn)
-			if err != nil {
-				mu.Lock()
-				errList = append(errList, errors.Wrapf(err, "failed to add mysql connection '%s'", conn.Name))
-				mu.Unlock()
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Notion {
-		wg.Go(func() {
-			err := connectionManager.AddNotionConnectionFromConfig(&conn)
-			if err != nil {
-				mu.Lock()
-				errList = append(errList, errors.Wrapf(err, "failed to add notion connection '%s'", conn.Name))
-				mu.Unlock()
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Shopify {
-		wg.Go(func() {
-			err := connectionManager.AddShopifyConnectionFromConfig(&conn)
-			if err != nil {
-				mu.Lock()
-				errList = append(errList, errors.Wrapf(err, "failed to add shopify connection '%s'", conn.Name))
-				mu.Unlock()
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Gorgias {
-		wg.Go(func() {
-			err := connectionManager.AddGorgiasConnectionFromConfig(&conn)
-			if err != nil {
-				mu.Lock()
-				errList = append(errList, errors.Wrapf(err, "failed to add gorgias connection '%s'", conn.Name))
-				mu.Unlock()
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Klaviyo {
-		wg.Go(func() {
-			err := connectionManager.AddKlaviyoConnectionFromConfig(&conn)
-			if err != nil {
-				mu.Lock()
-				errList = append(errList, errors.Wrapf(err, "failed to add klaviyo connection '%s'", conn.Name))
-				mu.Unlock()
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Adjust {
-		wg.Go(func() {
-			err := connectionManager.AddAdjustConnectionFromConfig(&conn)
-			if err != nil {
-				mu.Lock()
-				errList = append(errList, errors.Wrapf(err, "failed to add adjust connection '%s'", conn.Name))
-				mu.Unlock()
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.FacebookAds {
-		wg.Go(func() {
-			err := connectionManager.AddFacebookAdsConnectionFromConfig(&conn)
-			if err != nil {
-				mu.Lock()
-				errList = append(errList, errors.Wrapf(err, "failed to add facebookads connection '%s'", conn.Name))
-				mu.Unlock()
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Stripe {
-		wg.Go(func() {
-			err := connectionManager.AddStripeConnectionFromConfig(&conn)
-			if err != nil {
-				mu.Lock()
-				errList = append(errList, errors.Wrapf(err, "failed to add stripe connection '%s'", conn.Name))
-				mu.Unlock()
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Appsflyer {
-		wg.Go(func() {
-			err := connectionManager.AddAppsflyerConnectionFromConfig(&conn)
-			if err != nil {
-				mu.Lock()
-				errList = append(errList, errors.Wrapf(err, "failed to add appsflyer connection '%s'", conn.Name))
-				mu.Unlock()
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Kafka {
-		wg.Go(func() {
-			err := connectionManager.AddKafkaConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add kafka connection '%s'", conn.Name))
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.GoogleSheets {
-		wg.Go(func() {
-			err := connectionManager.AddGoogleSheetsConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add googlesheets connection '%s'", conn.Name))
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.DuckDB {
-		wg.Go(func() {
-			err := connectionManager.AddDuckDBConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add duckdb connection '%s'", conn.Name))
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.ClickHouse {
-		wg.Go(func() {
-			err := connectionManager.AddClickHouseConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add clickhouse connection '%s'", conn.Name))
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Hubspot {
-		wg.Go(func() {
-			err := connectionManager.AddHubspotConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add hubspot connection '%s'", conn.Name))
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Chess {
-		wg.Go(func() {
-			err := connectionManager.AddChessConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add chess connection '%s'", conn.Name))
-			}
-		})
-	}
-	for _, conn := range cm.SelectedEnvironment.Connections.Airtable {
-		wg.Go(func() {
-			err := connectionManager.AddAirtableConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add airtable connection '%s'", conn.Name))
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.S3 {
-		wg.Go(func() {
-			err := connectionManager.AddS3ConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add s3 connection '%s'", conn.Name))
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Slack {
-		wg.Go(func() {
-			err := connectionManager.AddSlackConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add slack connection '%s'", conn.Name))
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Asana {
-		wg.Go(func() {
-			err := connectionManager.AddAsanaConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add asana connection '%s'", conn.Name))
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.DynamoDB {
-		wg.Go(func() {
-			err := connectionManager.AddDynamoDBConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add dynamodb connection '%s'", conn.Name))
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Zendesk {
-		wg.Go(func() {
-			err := connectionManager.AddZendeskConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add zendesk connection '%s'", conn.Name))
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.GoogleAds {
-		wg.Go(func() {
-			err := connectionManager.AddGoogleAdsConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add googleads connection '%s'", conn.Name))
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.TikTokAds {
-		wg.Go(func() {
-			err := connectionManager.AddTikTokAdsConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add tiktokads connection '%s'", conn.Name))
-			}
-		})
-	}
-	for _, conn := range cm.SelectedEnvironment.Connections.GitHub {
-		wg.Go(func() {
-			err := connectionManager.AddGitHubConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add github connection '%s'", conn.Name))
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.AppStore {
-		wg.Go(func() {
-			err := connectionManager.AddAppStoreConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add appstore connection '%s'", conn.Name))
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.LinkedInAds {
-		wg.Go(func() {
-			err := connectionManager.AddLinkedInAdsConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add linkedinads connection '%s'", conn.Name))
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.ApplovinMax {
-		wg.Go(func() {
-			err := connectionManager.AddApplovinMaxConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add applovinmax connection '%s'", conn.Name))
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.Personio {
-		wg.Go(func() {
-			err := connectionManager.AddPersonioConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add personio connection '%s'", conn.Name))
-			}
-		})
-	}
-
-	for _, conn := range cm.SelectedEnvironment.Connections.GCS {
-		wg.Go(func() {
-			err := connectionManager.AddGCSConnectionFromConfig(&conn)
-			if err != nil {
-				panic(errors.Wrapf(err, "failed to add gcs connection '%s'", conn.Name))
-			}
-		})
-	}
 	wg.Wait()
-
 	return connectionManager, errList
 }

@@ -1,11 +1,13 @@
 package connection
 
 import (
+	"os"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/mysql"
+	"github.com/bruin-data/bruin/pkg/personio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
@@ -308,4 +310,75 @@ func TestManager_AddHANAConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	res, err = m.GetHANAConnection("test")
 	require.NoError(t, err)
 	assert.NotNil(t, res)
+}
+
+func TestNewManagerFromConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		cm     *config.Config
+		env    map[string]string
+		want   *Manager
+		errors []error
+	}{
+		{
+			name: "create manager from a simple config",
+			cm: &config.Config{
+				SelectedEnvironment: &config.Environment{
+					Connections: &config.Connections{
+						Personio: []config.PersonioConnection{
+							{
+								Name:         "key1",
+								ClientID:     "id1",
+								ClientSecret: "secret1",
+							},
+							{
+								Name:         "key2",
+								ClientID:     "${PERSONIO_CLIENT_ID}",
+								ClientSecret: "${PERSONIO_CLIENT_SECRET}",
+							},
+							{
+								Name:         "key3",
+								ClientID:     "${MISSING_PERSONIO_CLIENT_ID}",
+								ClientSecret: "${MISSING_PERSONIO_CLIENT_SECRET}",
+							},
+						},
+					},
+				},
+			},
+			env: map[string]string{
+				"PERSONIO_CLIENT_ID":     "id2",
+				"PERSONIO_CLIENT_SECRET": "secret2",
+			},
+			want: &Manager{
+				Personio: map[string]*personio.Client{
+					"key1": personio.NewClient(personio.Config{
+						ClientID:     "id1",
+						ClientSecret: "secret1",
+					}),
+					"key2": personio.NewClient(personio.Config{
+						ClientID:     "id2",
+						ClientSecret: "secret2",
+					}),
+					"key3": personio.NewClient(personio.Config{
+						ClientID:     "${MISSING_PERSONIO_CLIENT_ID}",
+						ClientSecret: "${MISSING_PERSONIO_CLIENT_SECRET}",
+					}),
+				},
+			},
+			errors: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			for k, v := range tt.env {
+				os.Setenv(k, v)
+			}
+			got, errors := NewManagerFromConfig(tt.cm)
+			assert.Equalf(t, tt.want, got, "NewManagerFromConfig(%v)", tt.cm)
+			assert.Equalf(t, tt.errors, errors, "NewManagerFromConfig(%v)", tt.cm)
+		})
+	}
 }
