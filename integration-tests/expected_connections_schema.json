@@ -1269,17 +1269,13 @@
         },
         "api_key": {
           "type": "string"
-        },
-        "application": {
-          "type": "string"
         }
       },
       "additionalProperties": false,
       "type": "object",
       "required": [
         "name",
-        "api_key",
-        "application"
+        "api_key"
       ]
     },
     "ZendeskConnection": {

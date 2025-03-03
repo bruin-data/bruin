@@ -363,9 +363,8 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			ApplovinMax: []ApplovinMaxConnection{
 				{
-					Name:        "applovinmax-1",
-					APIKey:      "api-key-123",
-					Application: "application-123",
+					Name:   "applovinmax-1",
+					APIKey: "api-key-123",
 				},
 			},
 			Personio: []PersonioConnection{

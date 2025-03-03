@@ -393,9 +393,8 @@ func (c ChessConnection) GetName() string {
 }
 
 type ApplovinMaxConnection struct {
-	Name        string `yaml:"name" json:"name" mapstructure:"name"`
-	APIKey      string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
-	Application string `yaml:"application" json:"application" mapstructure:"application"`
+	Name   string `yaml:"name" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key" json:"api_key" mapstructure:"api_key"`
 }
 
 func (c ApplovinMaxConnection) GetName() string {
