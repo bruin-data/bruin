@@ -10,8 +10,10 @@ import (
 	"sync"
 )
 
-var rwLock = sync.RWMutex{}
-var knownRepoRoots = make(map[string]bool)
+var (
+	rwLock         = sync.RWMutex{}
+	knownRepoRoots = make(map[string]bool)
+)
 
 // RepoFinder is a wrapper for finding the root path of a git repository.
 type RepoFinder struct{}
@@ -38,7 +40,7 @@ func (*RepoFinder) Repo(path string) (*Repo, error) {
 
 func FindRepoFromPath(path string) (*Repo, error) {
 	rwLock.RLock()
-	for knownPath, _ := range knownRepoRoots {
+	for knownPath := range knownRepoRoots {
 		if strings.HasPrefix(path, knownPath+"/") {
 			rwLock.RUnlock()
 			return &Repo{Path: knownPath}, nil
