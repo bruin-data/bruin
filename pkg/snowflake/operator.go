@@ -77,6 +77,18 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	q.Query = materialized
+	if t.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
+		renderedQueries, err := o.extractor.ExtractQueriesFromString(materialized)
+		if err != nil {
+			return errors.Wrap(err, "cannot re-extract/render materialized query for time_interval strategy")
+		}
+
+		if len(renderedQueries) == 0 {
+			return errors.New("rendered queries unexpectedly empty")
+		}
+
+		q.Query = renderedQueries[0].Query
+	}
 
 	connName, err := p.GetConnectionNameForAsset(t)
 	if err != nil {
@@ -87,16 +99,19 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
+
 	err = conn.CreateSchemaIfNotExist(ctx, t)
 	if err != nil {
 		return err
 	}
+
 	if o.materializer.IsFullRefresh() {
 		err = conn.RecreateTableOnMaterializationTypeMismatch(ctx, t)
 		if err != nil {
 			return err
 		}
 	}
+
 	return conn.RunQueryWithoutResult(ctx, q)
 }
 

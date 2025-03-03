@@ -154,7 +154,8 @@
         "strategy": "",
         "partition_by": "",
         "cluster_by": null,
-        "incremental_key": ""
+        "incremental_key": "",
+        "time_granularity": ""
       },
       "upstreams": [
         {
