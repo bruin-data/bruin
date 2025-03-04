@@ -1307,13 +1307,13 @@ type createPipelineConfig struct {
 
 type CreatePipelineOption func(*createPipelineConfig)
 
-func WithGitMetadata() func(*createPipelineConfig) {
+func WithGitMetadata() CreatePipelineOption {
 	return func(o *createPipelineConfig) {
 		o.parseGitMetadata = true
 	}
 }
 
-func WithMutate() func(*createPipelineConfig) {
+func WithMutate() CreatePipelineOption {
 	return func(o *createPipelineConfig) {
 		o.isMutate = true
 	}

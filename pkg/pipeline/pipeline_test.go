@@ -283,10 +283,13 @@ func Test_Builder_ParseGitMetadata(t *testing.T) {
 	}
 	builder := pipeline.NewBuilder(pipeline.BuilderConfig{
 		PipelineFileName: []string{"pipeline.yaml"},
-		ParseGitMetadata: true,
 	}, nil, nil, afero.NewOsFs(), nil)
 
-	pipeline, err := builder.CreatePipelineFromPath("testdata/git-metadata", pipeline.WithMutate())
+	pipeline, err := builder.CreatePipelineFromPath(
+		"testdata/git-metadata",
+		pipeline.WithMutate(),
+		pipeline.WithGitMetadata(),
+	)
 	if err != nil {
 		t.Errorf("error creating pipeline: %v", err)
 		return
