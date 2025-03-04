@@ -135,6 +135,7 @@ export default defineConfig({
                         ]
                     },
                     {text: "Columns", link: "/assets/columns"},
+                    {text: "Credentials", link: "/getting-started/credentials"},
                     {text: "Materialization", link: "/assets/materialization"},
                     {
                         text: " Jinja Templating",
