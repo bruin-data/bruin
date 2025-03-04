@@ -2037,7 +2037,6 @@ func (m *Manager) AddApplovinMaxConnectionFromConfig(connection *config.Applovin
 
 var envVarRegex = regexp.MustCompile(`\${([^}]+)}`)
 
-// Define this outside any function
 func processConnections[T any](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {
 	if connections == nil {
 		return
@@ -2047,7 +2046,7 @@ func processConnections[T any](connections []T, adder func(*T) error, wg *conc.W
 		wg.Go(func() {
 			// Check for environment variable placeholders in connection fields
 			v := reflect.ValueOf(conn).Elem()
-			for i := 0; i < v.NumField(); i++ {
+			for i := range v.NumField() {
 				field := v.Field(i)
 
 				// Only process string fields
