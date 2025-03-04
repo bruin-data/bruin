@@ -98,6 +98,10 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return errors.New("could not get the source uri")
 	}
 
+	if strings.HasPrefix(sourceURI, "mssql://") || strings.HasPrefix(destURI, "mssql://") {
+		extraPackages = []string{"pyodbc==5.1.0"}
+	}
+
 	destTable := ti.GetAsset().Name
 
 	cmdArgs := []string{
