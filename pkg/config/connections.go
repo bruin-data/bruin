@@ -549,10 +549,10 @@ func (c GCSConnection) GetName() string {
 }
 
 type KinesisConnection struct {
-	Name                  string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	AWS_ACCESS_KEY_ID     string `yaml:"aws_access_key_id,omitempty" json:"aws_access_key_id" mapstructure:"aws_access_key_id"`
-	AWS_SECRET_ACCESS_KEY string `yaml:"aws_secret_access_key,omitempty" json:"aws_secret_access_key" mapstructure:"aws_secret_access_key"`
-	Region                string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
+	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AWSACCESSKEYID     string `yaml:"aws_access_key_id,omitempty" json:"aws_access_key_id" mapstructure:"aws_access_key_id"`
+	AWSSECRETACCESSKEY string `yaml:"aws_secret_access_key,omitempty" json:"aws_secret_access_key" mapstructure:"aws_secret_access_key"`
+	Region             string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
 }
 
 func (c KinesisConnection) GetName() string {
