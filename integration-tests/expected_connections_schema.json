@@ -485,6 +485,12 @@
             "$ref": "#/$defs/PersonioConnection"
           },
           "type": "array"
+        },
+        "kinesis": {
+          "items": {
+            "$ref": "#/$defs/KinesisConnection"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -1305,7 +1311,30 @@
         "oauth_token",
         "sub_domain"
       ]
+    },
+    "KinesisConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "aws_access_key_id": {
+          "type": "string"
+        },
+        "aws_secret_access_key": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "aws_access_key_id",
+        "aws_secret_access_key",
+        "region"
+      ]
     }
-    
   }
 }

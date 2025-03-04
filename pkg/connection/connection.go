@@ -29,6 +29,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/hubspot"
 	"github.com/bruin-data/bruin/pkg/kafka"
+	"github.com/bruin-data/bruin/pkg/kinesis"
 	"github.com/bruin-data/bruin/pkg/klaviyo"
 	"github.com/bruin-data/bruin/pkg/linkedinads"
 	"github.com/bruin-data/bruin/pkg/mongo"
@@ -88,6 +89,7 @@ type Manager struct {
 	GCS          map[string]*gcs.Client
 	ApplovinMax  map[string]*applovinmax.Client
 	Personio     map[string]*personio.Client
+	Kinesis      map[string]*kinesis.Client
 	mutex        sync.Mutex
 }
 
@@ -315,6 +317,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connGCS, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GCS)...)
+
+	connKinesis, err := m.GetKinesisConnectionWithoutDefault(name)
+	if err == nil {
+		return connKinesis, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Kinesis)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -1079,6 +1087,25 @@ func (m *Manager) GetPersonioConnectionWithoutDefault(name string) (*personio.Cl
 	db, ok := m.Personio[name]
 	if !ok {
 		return nil, errors.Errorf("personio connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetKinesisConnection(name string) (*kinesis.Client, error) {
+	db, err := m.GetKinesisConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetKinesisConnectionWithoutDefault("kinesis-default")
+}
+
+func (m *Manager) GetKinesisConnectionWithoutDefault(name string) (*kinesis.Client, error) {
+	if m.Kinesis == nil {
+		return nil, errors.New("no kinesis connections found")
+	}
+	db, ok := m.Kinesis[name]
+	if !ok {
+		return nil, errors.Errorf("kinesis connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2042,6 +2069,29 @@ func (m *Manager) AddApplovinMaxConnectionFromConfig(connection *config.Applovin
 	return nil
 }
 
+func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConnection) error {
+	m.mutex.Lock()
+	if m.Kinesis == nil {
+		m.Kinesis = make(map[string]*kinesis.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := kinesis.NewClient(kinesis.Config{
+		AWS_ACCESS_KEY_ID:     connection.AWS_ACCESS_KEY_ID,
+		AWS_SECRET_ACCESS_KEY: connection.AWS_SECRET_ACCESS_KEY,
+		Region:                connection.Region,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Kinesis[connection.Name] = client
+
+	return nil
+}
+
 //nolint:all
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
@@ -2415,6 +2465,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 			err := connectionManager.AddPersonioConnectionFromConfig(&conn)
 			if err != nil {
 				panic(errors.Wrapf(err, "failed to add personio connection '%s'", conn.Name))
+			}
+		})
+	}
+
+	for _, conn := range cm.SelectedEnvironment.Connections.Kinesis {
+		wg.Go(func() {
+			err := connectionManager.AddKinesisConnectionFromConfig(&conn)
+			if err != nil {
+				panic(errors.Wrapf(err, "failed to add kinesis connection '%s'", conn.Name))
 			}
 		})
 	}

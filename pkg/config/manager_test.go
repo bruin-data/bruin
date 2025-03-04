@@ -374,6 +374,14 @@ func TestLoadFromFile(t *testing.T) {
 					ClientSecret: "client-secret-123",
 				},
 			},
+			Kinesis: []KinesisConnection{
+				{
+					Name:                  "kinesis-1",
+					AWS_ACCESS_KEY_ID:     "aws-access-key-id-123",
+					AWS_SECRET_ACCESS_KEY: "aws-secret-access-key-123",
+					Region:                "us-east-1",
+				},
+			},
 		},
 	}
 
