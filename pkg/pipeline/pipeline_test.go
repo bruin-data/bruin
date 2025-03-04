@@ -236,7 +236,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 
 			p := pipeline.NewBuilder(builderConfig, tt.fields.yamlTaskCreator, tt.fields.commentTaskCreator, fs, nil)
 
-			got, err := p.CreatePipelineFromPath(tt.args.pathToPipeline, true)
+			got, err := p.CreatePipelineFromPath(tt.args.pathToPipeline, pipeline.WithMutate())
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -283,10 +283,13 @@ func Test_Builder_ParseGitMetadata(t *testing.T) {
 	}
 	builder := pipeline.NewBuilder(pipeline.BuilderConfig{
 		PipelineFileName: []string{"pipeline.yaml"},
-		ParseGitMetadata: true,
 	}, nil, nil, afero.NewOsFs(), nil)
 
-	pipeline, err := builder.CreatePipelineFromPath("testdata/git-metadata", false)
+	pipeline, err := builder.CreatePipelineFromPath(
+		"testdata/git-metadata",
+		pipeline.WithMutate(),
+		pipeline.WithGitMetadata(),
+	)
 	if err != nil {
 		t.Errorf("error creating pipeline: %v", err)
 		return
@@ -374,7 +377,7 @@ func TestPipeline_JsonMarshal(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			p, err := cmd.DefaultPipelineBuilder.CreatePipelineFromPath(tt.pipelinePath, true)
+			p, err := cmd.DefaultPipelineBuilder.CreatePipelineFromPath(tt.pipelinePath, pipeline.WithMutate())
 			require.NoError(t, err)
 
 			got, err := json.Marshal(p)
@@ -501,7 +504,7 @@ func TestPipeline_GetAssetByPath(t *testing.T) {
 		TasksFileSuffixes:   []string{"task.yml", "task.yaml"},
 	}
 	builder := pipeline.NewBuilder(config, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, nil)
-	p, err := builder.CreatePipelineFromPath("./testdata/pipeline/first-pipeline", true)
+	p, err := builder.CreatePipelineFromPath("./testdata/pipeline/first-pipeline", pipeline.WithMutate())
 	require.NoError(t, err)
 
 	asset := p.GetAssetByPath("testdata/pipeline/first-pipeline/tasks/task1/task.yml")
@@ -800,7 +803,7 @@ func TestPipeline_GetAssetByName(t *testing.T) {
 }
 
 func BenchmarkAssetMarshalJSON(b *testing.B) {
-	got, err := cmd.DefaultPipelineBuilder.CreatePipelineFromPath("./testdata/pipeline/first-pipeline", true)
+	got, err := cmd.DefaultPipelineBuilder.CreatePipelineFromPath("./testdata/pipeline/first-pipeline", pipeline.WithMutate())
 	require.NoError(b, err)
 
 	b.ResetTimer()

@@ -382,7 +382,7 @@ func GetPipelineAndAsset(inputPath string, fs afero.Fs) (*ppInfo, error) {
 		errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
 		return nil, err
 	}
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath, true)
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath, pipeline.WithMutate())
 	if err != nil {
 		errorPrinter.Println("failed to get the pipeline this asset belongs to, are you sure you have referred the right path?")
 		errorPrinter.Println("\nHint: You need to run this command with a path to the asset file itself directly.")
