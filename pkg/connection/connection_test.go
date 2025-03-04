@@ -335,7 +335,7 @@ func TestNewManagerFromConfig(t *testing.T) {
 							},
 							{
 								Name:         "key2",
-								ClientID:     "${PERSONIO_CLIENT_ID}",
+								ClientID:     "val1_${PERSONIO_CLIENT_ID}_val2",
 								ClientSecret: "${PERSONIO_CLIENT_SECRET}",
 							},
 							{
@@ -358,12 +358,12 @@ func TestNewManagerFromConfig(t *testing.T) {
 						ClientSecret: "secret1",
 					}),
 					"key2": personio.NewClient(personio.Config{
-						ClientID:     "id2",
+						ClientID:     "val1_id2_val2",
 						ClientSecret: "secret2",
 					}),
 					"key3": personio.NewClient(personio.Config{
-						ClientID:     "${MISSING_PERSONIO_CLIENT_ID}",
-						ClientSecret: "${MISSING_PERSONIO_CLIENT_SECRET}",
+						ClientID:     "",
+						ClientSecret: "",
 					}),
 				},
 			},

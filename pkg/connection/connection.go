@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -2034,6 +2035,8 @@ func (m *Manager) AddApplovinMaxConnectionFromConfig(connection *config.Applovin
 	return nil
 }
 
+var envVarRegex = regexp.MustCompile(`\${([^}]+)}`)
+
 // Define this outside any function
 func processConnections[T any](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {
 	if connections == nil {
@@ -2055,12 +2058,14 @@ func processConnections[T any](connections []T, adder func(*T) error, wg *conc.W
 					continue
 				}
 				strValue := strings.TrimSpace(field.String())
-				if strings.HasPrefix(strValue, "${") && strings.HasSuffix(strValue, "}") {
-					envVarName := strValue[2 : len(strValue)-1]
+				matches := envVarRegex.FindStringSubmatch(strValue)
+				for len(matches) > 0 {
+					envVarName := matches[1]
 					envValue := os.Getenv(envVarName)
-					if envValue != "" {
-						field.SetString(envValue)
-					}
+					strValue = strings.Replace(strValue, matches[0], envValue, 1)
+					field.SetString(strValue)
+					// Look for more matches after replacement
+					matches = envVarRegex.FindStringSubmatch(strValue)
 				}
 			}
 
