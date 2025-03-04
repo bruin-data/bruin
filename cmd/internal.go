@@ -151,7 +151,7 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool, slimRespons
 		return cli.Exit("", 1)
 	}
 
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath, true)
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath, pipeline.WithMutate())
 	if err != nil {
 		printErrorJSON(err)
 
@@ -286,7 +286,7 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 	// column-level lineage requires the whole pipeline to be parsed by nature, therefore we need to use the default pipeline builder.
 	// however, since the primary usecase of this command requires speed, we'll use a faster alternative if there's no lineage requested.
 	if lineage {
-		foundPipeline, err = DefaultPipelineBuilder.CreatePipelineFromPath(pipelineDefinitionPath, true)
+		foundPipeline, err = DefaultPipelineBuilder.CreatePipelineFromPath(pipelineDefinitionPath, pipeline.WithMutate())
 	} else {
 		foundPipeline, err = pipeline.PipelineFromPath(pipelineDefinitionPath, afero.NewOsFs())
 	}

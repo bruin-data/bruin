@@ -1244,7 +1244,6 @@ type BuilderConfig struct {
 	TasksDirectoryName  string
 	TasksDirectoryNames []string
 	TasksFileSuffixes   []string
-	ParseGitMetadata    bool
 }
 
 type glossaryReader interface {
@@ -1301,7 +1300,31 @@ func resolvePipelineFilePath(basePath string, validFileNames []string, fs afero.
 	return "", fmt.Errorf("no pipeline file found in '%s'. Supported files: %v", basePath, validFileNames)
 }
 
-func (b *Builder) CreatePipelineFromPath(pathToPipeline string, isMutate bool) (*Pipeline, error) {
+type createPipelineConfig struct {
+	parseGitMetadata bool
+	isMutate         bool
+}
+
+type CreatePipelineOption func(*createPipelineConfig)
+
+func WithGitMetadata() CreatePipelineOption {
+	return func(o *createPipelineConfig) {
+		o.parseGitMetadata = true
+	}
+}
+
+func WithMutate() CreatePipelineOption {
+	return func(o *createPipelineConfig) {
+		o.isMutate = true
+	}
+}
+
+func (b *Builder) CreatePipelineFromPath(pathToPipeline string, opts ...CreatePipelineOption) (*Pipeline, error) {
+	config := createPipelineConfig{}
+	for _, opt := range opts {
+		opt(&config)
+	}
+
 	pipelineFilePath := pathToPipeline
 	if !matchPipelineFileName(pipelineFilePath, b.config.PipelineFileName) {
 		resolvedPath, err := resolvePipelineFilePath(pathToPipeline, b.config.PipelineFileName, b.fs)
@@ -1323,7 +1346,7 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string, isMutate bool) (
 	pipeline.TasksByType = make(map[AssetType][]*Asset)
 	pipeline.tasksByName = make(map[string]*Asset)
 
-	if b.config.ParseGitMetadata {
+	if config.parseGitMetadata {
 		pipeline.Commit, err = git.CurrentCommit(pathToPipeline)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing commit: %w", err)
@@ -1357,7 +1380,7 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string, isMutate bool) (
 			return nil, err
 		}
 
-		if isMutate {
+		if config.isMutate {
 			task, err = b.MutateAsset(task, pipeline)
 			if err != nil {
 				return nil, err

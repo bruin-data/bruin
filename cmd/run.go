@@ -435,7 +435,7 @@ func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.S
 
 	logger.Debugf("loaded the config from path '%s'", configFilePath)
 
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath, true)
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath, pipeline.WithMutate())
 	if err != nil {
 		errorPrinter.Println("failed to build pipeline, are you sure you have referred the right path?")
 		errorPrinter.Println("\nHint: You need to run this command with a path to either the pipeline directory or the asset file itself directly.")
