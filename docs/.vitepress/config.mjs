@@ -167,6 +167,7 @@ export default defineConfig({
                             {text: "Gorgias", link: "/ingestion/gorgias"},
                             {text: "Hubspot", link: "/ingestion/hubspot.md"},
                             {text: "Kafka", link: "/ingestion/kafka.md"},
+                            {text: "Kinesis", link: "/ingestion/kinesis.md"},
                             {text: "Klaviyo", link: "/ingestion/klaviyo.md"},
                             {text: "LinkedIn Ads", link: "/ingestion/linkedinads.md"},
                             {text: "MongoDB", link: "/ingestion/mongo"},
