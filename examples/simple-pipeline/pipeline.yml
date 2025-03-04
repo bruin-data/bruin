@@ -35,3 +35,4 @@ default_connections:
   github: "my-github"
   linkedinads: "my-linkedinads"
   gcs: "my-gcs"
+  kinesis: "my-kinesis"
