@@ -188,7 +188,6 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 	}
 	u.binaryFullPath = binaryFullPath
 
-	cmdArgs := u.ingestrInstallCmd(ctx, args)
 	err = u.Cmd.Run(ctx, repo, &CommandInstance{
 		Name: u.binaryFullPath,
 		Args: u.ingestrInstallCmd(ctx, extraPackages),
@@ -198,7 +197,7 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 	}
 
 	flags := []string{"tool", "run", "--python", pythonVersionForIngestr, "ingestr"}
-	flags = append(flags, cmdArgs...)
+	flags = append(flags, args...)
 
 	noDependencyCommand := &CommandInstance{
 		Name:    u.binaryFullPath,
