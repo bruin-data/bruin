@@ -100,9 +100,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 	destTable := ti.GetAsset().Name
 
-	extraPackages = addExtraPackages(destURI, sourceURI, extraPackages)
+	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
 
-	cmdArgs := []string{
+	cmdArgs := python.ConsolidatedParameters(ti.GetAsset(), []string{
 		"ingest",
 		"--source-uri",
 		sourceURI,
@@ -115,7 +115,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		"--yes",
 		"--progress",
 		"log",
-	}
+	})
 
 	incrementalStrategy, ok := ti.GetAsset().Parameters["incremental_strategy"]
 	if ok {
@@ -218,9 +218,9 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 
 	destTable := ti.GetAsset().Name
 
-	extraPackages = addExtraPackages(destURI, sourceURI, extraPackages)
+	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
 
-	cmdArgs := []string{
+	cmdArgs := python.ConsolidatedParameters(ti.GetAsset(), []string{
 		"ingest",
 		"--source-uri",
 		sourceURI,
@@ -233,7 +233,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		"--yes",
 		"--progress",
 		"log",
-	}
+	})
 
 	columns := columnHints(ti.GetAsset().Columns)
 	if columns != "" {
@@ -247,12 +247,4 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	}
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
-}
-
-func addExtraPackages(destURI, sourceURI string, extraPackages []string) []string {
-	if strings.HasPrefix(sourceURI, "mssql://") || strings.HasPrefix(destURI, "mssql://") {
-		extraPackages = []string{"pyodbc==5.1.0"}
-	}
-
-	return extraPackages
 }

@@ -282,7 +282,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	_, _ = output.Write([]byte("Successfully collected the data from the asset, uploading to the destination...\n"))
 
 	// build ingestr flags
-	cmdArgs := u.ingestrLoaderFileFormat(asset, []string{
+	cmdArgs := ConsolidatedParameters(asset, []string{
 		"ingest",
 		"--source-uri",
 		"mmap://" + arrowFilePath,
@@ -410,13 +410,6 @@ func (u *UvPythonRunner) ingestrInstallCmd(ctx context.Context, pkgs []string) [
 	}
 	cmdline = append(cmdline, ingestrPackageName)
 	return cmdline
-}
-
-func (u *UvPythonRunner) ingestrLoaderFileFormat(asset *pipeline.Asset, cmdArgs []string) []string {
-	if format, exists := asset.Parameters["loader_file_format"]; exists && format != "" {
-		cmdArgs = append(cmdArgs, "--loader-file-format", format)
-	}
-	return cmdArgs
 }
 
 const PythonArrowTemplate = `
