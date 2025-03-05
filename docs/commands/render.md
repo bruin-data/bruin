@@ -23,6 +23,7 @@ bruin render [path to asset definition] [flags]
 | `--start-date`     |       | Specify the start date in `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS` format.|
 | `--end-date`       |       | Specify the end date in `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS` format. |
 | `--output [format]`| `-o`  | Specify the output format (e.g., `json`). Defaults to console output.  |
+| `--config-file`    |       | The path to the `.bruin.yml` file. |
 
 
 ### Examples

@@ -123,7 +123,6 @@ func AssertCustomState(dir string, expected *scheduler.PipelineState) func(*Task
 			return fmt.Errorf("mismatch in CompatibilityHash: expected %s, got %s", expected.CompatibilityHash, state.CompatibilityHash)
 		}
 
-		fmt.Println("Passed State Match")
 		return nil
 	}
 }

@@ -42,7 +42,9 @@ func (s *Task) Run() error {
 	log.Printf("Running task: %s", s.Name)
 
 	for attempt := 1; attempt <= s.Retries; attempt++ {
-		log.Printf("Attempt %d of %d for task: %s", attempt, s.Retries, s.Name)
+		if s.Retries > 1 {
+			log.Printf("Attempt %d of %d for task: %s", attempt, s.Retries, s.Name)
+		}
 
 		if err := s.runAttempt(); err != nil {
 			if attempt < s.Retries {

@@ -12,6 +12,12 @@ bruin environments [subcommand]
 
 Displays the environments defined in the `.bruin.yml` configuration file in the current Git repository. The environments can be displayed in plain text or JSON format.
 
+### Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--config-file` | str | - | The path to the `.bruin.yml` file. |
+
 ## Usage
 
 ```bash

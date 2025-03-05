@@ -139,6 +139,7 @@ type RunConfig struct {
 	Only              []string `json:"only"`
 	Output            string   `json:"output"`
 	ExpUseWingetForUv bool     `json:"expUseWingetForUv"`
+	ConfigFilePath    string   `json:"configFilePath"`
 }
 
 type PipelineAssetState struct {
