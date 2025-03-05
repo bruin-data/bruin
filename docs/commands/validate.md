@@ -19,10 +19,12 @@ Defaults to the current directory (".") if not provided.
 
 | Flag                     | Alias     | Description                                                                 |
 |--------------------------|-----------|-----------------------------------------------------------------------------|
-| `--environment`          | `-e, --env` | Specifies the environment to use for validation.                            |
-| `--force`                | `-f`       | Forces validation even if the environment is a production environment.      |
-| `--output [format]`      | `-o`       | Specifies the output type, possible values: `plain`, `json`.                |
-| `--exclude-warnings`     |            | Excludes warnings from the validation output.                               |
+| `--environment`          | `-e, --env` | Specifies the environment to use for validation.                          |
+| `--force`                | `-f`       | Forces validation even if the environment is a production environment.     |
+| `--output [format]`      | `-o`       | Specifies the output type, possible values: `plain`, `json`.               |
+| `--exclude-warnings`     |            | Excludes warnings from the validation output.                              |
+| `--config-file`          |            | The path to the `.bruin.yml` file.                                           |
+
 
 
 ### Dry-run Validation

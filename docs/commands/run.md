@@ -14,13 +14,24 @@ This command is used to execute a Bruin pipeline or a specific asset within a pi
 bruin run [FLAGS] [optional path to the pipeline/asset]
 ```
 <img alt="Bruin - init" src="/chesspipeline.gif" style="margin: 10px;" />
+
+<style>
+table {
+  width: 100%;
+}
+table th:first-child,
+table td:first-child {
+  white-space: nowrap;
+}
+</style>
+
 ## Flags
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--downstream` | bool | `false` | Run all downstream tasks as well. |
-| `--start-date` | str | Beginning of yesterday | The start date of the range the pipeline will run for. Format: YYYY-MM-DD, YYYY-MM-DD HH:MM:SS, or YYYY-MM-DD HH:MM:SS.ffffff |
-| `--end-date` | str | End of yesterday | The end date of the range the pipeline will run for. Format: YYYY-MM-DD, YYYY-MM-DD HH:MM:SS, or YYYY-MM-DD HH:MM:SS.ffffff |
+| `--start-date` | str | Beginning of yesterday | The start date of the range the pipeline will run for. Format: `YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, or `YYYY-MM-DD HH:MM:SS.ffffff` |
+| `--end-date` | str | End of yesterday | The end date of the range the pipeline will run for. Format: `YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, or `YYYY-MM-DD HH:MM:SS.ffffff` |
 | `--environment` | str | - | The environment to use. |
 | `--force` | bool | `false` | Do not ask for confirmation in a production environment. |
 | `--full-refresh` | bool | `false` | Truncate the table before running. |
@@ -30,6 +41,7 @@ bruin run [FLAGS] [optional path to the pipeline/asset]
 | `--tag` | str | - | Pick assets with the given tag. |
 | `--workers` | int | `16` | Number of workers to run tasks in parallel. |
 |  `--continue` | bool | `false` | Continue from the last failed asset. |
+| `--config-file` | str | - | The path to the `.bruin.yml` file. |
 
 
 ### Continue from the last failed asset

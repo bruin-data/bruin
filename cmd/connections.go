@@ -49,6 +49,11 @@ func ListConnections() *cli.Command {
 				Aliases: []string{"env"},
 				Usage:   "",
 			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Usage:   "the path to the .bruin.yml file",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			r := ConnectionsCommand{}
@@ -58,7 +63,18 @@ func ListConnections() *cli.Command {
 				path = c.Args().First()
 			}
 
-			return r.ListConnections(path, c.String("output"), c.String("environment"))
+			configFilePath := c.String("config-file")
+			if configFilePath == "" {
+				repoRoot, err := git.FindRepoFromPath(path)
+				if err != nil {
+					printErrorForOutput(c.String("output"), errors2.Wrap(err, "failed to find the git repository root"))
+					return cli.Exit("", 1)
+				}
+
+				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
+			}
+
+			return r.ListConnections(path, c.String("output"), c.String("environment"), configFilePath)
 		},
 	}
 }
@@ -94,6 +110,11 @@ func AddConnection() *cli.Command {
 				Aliases: []string{"o"},
 				Usage:   "the output type, possible values are: plain, json",
 			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Usage:   "the path to the .bruin.yml file",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			path := "."
@@ -109,13 +130,17 @@ func AddConnection() *cli.Command {
 
 			defer RecoverFromPanic()
 
-			repoRoot, err := git.FindRepoFromPath(path)
-			if err != nil {
-				printErrorForOutput(output, errors2.Wrap(err, "failed to find the git repository root"))
-				return cli.Exit("", 1)
+			configFilePath := c.String("config-file")
+			if configFilePath == "" {
+				repoRoot, err := git.FindRepoFromPath(path)
+				if err != nil {
+					printErrorForOutput(output, errors2.Wrap(err, "failed to find the git repository root"))
+					return cli.Exit("", 1)
+				}
+
+				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
 			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
 			if err != nil {
 				printErrorForOutput(output, errors2.Wrap(err, "failed to load or create config"))
@@ -184,19 +209,28 @@ func DeleteConnection() *cli.Command {
 				DefaultText: "plain",
 				Usage:       "the output type, possible values are: plain, json",
 			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Usage:   "the path to the .bruin.yml file",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			environment := c.String("environment")
 			name := c.String("name")
 			output := c.String("output")
 
-			repoRoot, err := git.FindRepoFromPath(".")
-			if err != nil {
-				printErrorForOutput(output, errors2.Wrap(err, "failed to find the git repository root"))
-				return cli.Exit("", 1)
+			configFilePath := c.String("config-file")
+			if configFilePath == "" {
+				repoRoot, err := git.FindRepoFromPath(".")
+				if err != nil {
+					printErrorForOutput(output, errors2.Wrap(err, "failed to find the git repository root"))
+					return cli.Exit("", 1)
+				}
+
+				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
 			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
 			if err != nil {
 				printErrorForOutput(output, errors2.Wrap(err, "failed to load or create config"))
@@ -237,14 +271,9 @@ func DeleteConnection() *cli.Command {
 
 type ConnectionsCommand struct{}
 
-func (r *ConnectionsCommand) ListConnections(pathToProject, output, environment string) error {
+func (r *ConnectionsCommand) ListConnections(pathToProject, output, environment, configFilePath string) error {
 	defer RecoverFromPanic()
-	repoRoot, err := git.FindRepoFromPath(pathToProject)
-	if err != nil {
-		errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
-		return cli.Exit("", 1)
-	}
-	configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
+
 	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
 	if err != nil {
 		errorPrinter.Printf("Failed to load or create the config file: %v\n", err)
@@ -370,6 +399,11 @@ func PingConnection() *cli.Command {
 				DefaultText: "plain",
 				Usage:       "the output type, possible values are: plain, json",
 			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Usage:   "the path to the .bruin.yml file",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			// Extract command-line arguments
@@ -383,7 +417,11 @@ func PingConnection() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
+			configFilePath := c.String("config-file")
+			if configFilePath == "" {
+				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
+			}
+
 			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
 			if err != nil {
 				printErrorForOutput(output, errors2.Wrap(err, "failed to load or create config"))

@@ -49,6 +49,11 @@ func Lint(isDebug *bool) *cli.Command {
 				Name:  "exclude-warnings",
 				Usage: "exclude warning validations from the output",
 			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Usage:   "the path to the .bruin.yml file",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			// if the output is JSON then we intend to discard all the nicer pretty-print statements
@@ -78,14 +83,19 @@ func Lint(isDebug *bool) *cli.Command {
 			}
 
 			logger.Debugf("using root path '%s'", rootPath)
-			repoRoot, err := git.FindRepoFromPath(rootPath)
-			if err != nil {
-				printError(err, c.String("output"), "Failed to find the git repository root")
-				return cli.Exit("", 1)
-			}
-			logger.Debugf("found repo root '%s'", repoRoot.Path)
 
-			configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
+			configFilePath := c.String("config-file")
+			if configFilePath == "" {
+				repoRoot, err := git.FindRepoFromPath(rootPath)
+				if err != nil {
+					printError(err, c.String("output"), "Failed to find the git repository root")
+					return cli.Exit("", 1)
+				}
+				logger.Debugf("found repo root '%s'", repoRoot.Path)
+
+				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
+			}
+
 			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
 			if err != nil {
 				printError(err, c.String("output"), fmt.Sprintf("Failed to load the config file at '%s'", configFilePath))

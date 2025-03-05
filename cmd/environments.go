@@ -36,30 +36,37 @@ func ListEnvironments(isDebug *bool) *cli.Command {
 				Aliases: []string{"o"},
 				Usage:   "the output type, possible values are: plain, json",
 			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Usage:   "the path to the .bruin.yml file",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			r := EnvironmentListCommand{}
+			logger := makeLogger(*isDebug)
 
-			return r.Run(isDebug, strings.ToLower(c.String("output")))
+			configFilePath := c.String("config-file")
+			if configFilePath == "" {
+				repoRoot, err := git.FindRepoFromPath(path2.Clean("."))
+				if err != nil {
+					printError(errors.Wrap(err, "Failed to find the git repository root"), strings.ToLower(c.String("output")), "")
+					return cli.Exit("", 1)
+				}
+				logger.Debugf("found repo root '%s'", repoRoot.Path)
+				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
+			}
+
+			return r.Run(strings.ToLower(c.String("output")), configFilePath)
 		},
 	}
 }
 
 type EnvironmentListCommand struct{}
 
-func (r *EnvironmentListCommand) Run(isDebug *bool, output string) error {
+func (r *EnvironmentListCommand) Run(output, configFilePath string) error {
 	defer RecoverFromPanic()
 
-	logger := makeLogger(*isDebug)
-
-	repoRoot, err := git.FindRepoFromPath(path2.Clean("."))
-	if err != nil {
-		printError(errors.Wrap(err, "Failed to find the git repository root"), output, "")
-		return cli.Exit("", 1)
-	}
-	logger.Debugf("found repo root '%s'", repoRoot.Path)
-
-	configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
 	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
 	if err != nil {
 		printError(err, output, "Failed to load the config file at "+configFilePath)

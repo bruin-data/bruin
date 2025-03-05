@@ -73,3 +73,8 @@ environments:
 
 > [!INFO]
 > Environment variables are not expanded in the `.bruin.yml` file. They are expanded when Bruin runs your assets.
+
+## Custom Credentials File
+Bruin looks for a `.bruin.yml` file in the project root by default; however, in some cases you might want to override the value per project.
+
+In order to do that, you can simply use the `--config-file` flag in many commands, or you can use `BRUIN_CONFIG_FILE` environment variable.

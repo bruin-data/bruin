@@ -152,7 +152,7 @@ func addSafeDirectory(path string) error {
 		"safe.directory",
 		path,
 	)
-	var stderr = new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
 
 	err := cmd.Run()
