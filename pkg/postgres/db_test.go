@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 
 	_ "github.com/DATA-DOG/go-sqlmock"
@@ -353,7 +352,7 @@ func TestDB_IsValid(t *testing.T) {
 			name: "invalid query is properly handled",
 			setupMock: func(mock pgxmock.PgxPoolIface) {
 				mock.ExpectQuery(`EXPLAIN some broken query;`).
-					WillReturnError(fmt.Errorf("some actual error"))
+					WillReturnError(errors.New("some actual error"))
 			},
 			query: query.Query{
 				Query: "some broken query",

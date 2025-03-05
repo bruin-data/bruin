@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
