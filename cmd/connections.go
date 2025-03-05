@@ -73,8 +73,6 @@ func ListConnections() *cli.Command {
 				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 			}
 
-			fmt.Println("using config path", configFilePath)
-
 			return r.ListConnections(path, c.String("output"), c.String("environment"), configFilePath)
 		},
 	}
