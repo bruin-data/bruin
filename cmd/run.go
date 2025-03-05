@@ -146,8 +146,9 @@ func Run(isDebug *bool) *cli.Command {
 				Usage: "Use ingestr from the given path instead of the builtin version.",
 			},
 			&cli.StringFlag{
-				Name:  "config-file",
-				Usage: "the path to the .bruin.yml file",
+				Name:    "config-file",
+				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Usage:   "the path to the .bruin.yml file",
 			},
 		},
 		Action: func(c *cli.Context) error {

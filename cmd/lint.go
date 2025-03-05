@@ -50,8 +50,9 @@ func Lint(isDebug *bool) *cli.Command {
 				Usage: "exclude warning validations from the output",
 			},
 			&cli.StringFlag{
-				Name:  "config-file",
-				Usage: "the path to the .bruin.yml file",
+				Name:    "config-file",
+				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Usage:   "the path to the .bruin.yml file",
 			},
 		},
 		Action: func(c *cli.Context) error {
