@@ -129,26 +129,49 @@ func validateFlags(connection, query, asset, environment string) error {
 func prepareQueryExecution(c *cli.Context, fs afero.Fs) (interface{}, string, error) {
 	assetPath := c.String("asset")
 	queryStr := c.String("query")
+	env := c.String("env")
 
 	// Direct query mode (no asset path)
 	if assetPath == "" {
-		return prepareDirectQuery(c, fs)
+		connectionName := c.String("connection")
+		queryStr := c.String("query")
+
+		conn, err := getConnectionFromConfig(connectionName, fs)
+		if err != nil {
+			return nil, "", err
+		}
+
+		return conn, queryStr, nil
+	}
+
+	pipelineInfo, err := GetPipelineAndAsset(assetPath, fs)
+	if err != nil {
+		return nil, "", errors.Wrap(err, "failed to get pipeline info")
 	}
 
 	// Auto-detect mode (both asset path and query)
 	if queryStr != "" {
-		return prepareAutoDetectQuery(c, fs)
+		conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
+		if err != nil {
+			return nil, "", err
+		}
+
+		return conn, queryStr, nil
 	}
 
-	// Asset query mode (only asset path)
-	return prepareAssetQuery(c, fs)
-}
+	// Verify that the asset is a SQL asset
+	if !pipelineInfo.Asset.IsSQLAsset() {
+		return nil, "", errors.Errorf("asset '%s' is not a SQL asset (type: %s). Only SQL assets can be queried",
+			assetPath,
+			pipelineInfo.Asset.Type)
+	}
 
-func prepareDirectQuery(c *cli.Context, fs afero.Fs) (interface{}, string, error) {
-	connectionName := c.String("connection")
-	queryStr := c.String("query")
+	queryStr, err = extractQueryFromAsset(pipelineInfo.Asset, fs)
+	if err != nil {
+		return nil, "", err
+	}
 
-	conn, err := getConnectionFromConfig(connectionName, fs)
+	conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
 	if err != nil {
 		return nil, "", err
 	}
@@ -179,35 +202,6 @@ func getConnectionFromConfig(connectionName string, fs afero.Fs) (interface{}, e
 	}
 
 	return conn, nil
-}
-
-func prepareAssetQuery(c *cli.Context, fs afero.Fs) (interface{}, string, error) {
-	assetPath := c.String("asset")
-	env := c.String("env")
-
-	pipelineInfo, err := GetPipelineAndAsset(assetPath, fs)
-	if err != nil {
-		return nil, "", errors.Wrap(err, "failed to get pipeline info")
-	}
-
-	// Verify that the asset is a SQL asset
-	if !pipelineInfo.Asset.IsSQLAsset() {
-		return nil, "", errors.Errorf("asset '%s' is not a SQL asset (type: %s). Only SQL assets can be queried",
-			assetPath,
-			pipelineInfo.Asset.Type)
-	}
-
-	queryStr, err := extractQueryFromAsset(pipelineInfo.Asset, fs)
-	if err != nil {
-		return nil, "", err
-	}
-
-	conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return conn, queryStr, nil
 }
 
 func extractQueryFromAsset(asset *pipeline.Asset, fs afero.Fs) (string, error) {
@@ -405,19 +399,5 @@ func GetPipelineAndAsset(inputPath string, fs afero.Fs) (*ppInfo, error) {
 }
 
 func prepareAutoDetectQuery(c *cli.Context, fs afero.Fs) (interface{}, string, error) {
-	assetPath := c.String("asset")
-	queryStr := c.String("query")
-	env := c.String("env")
 
-	pipelineInfo, err := GetPipelineAndAsset(assetPath, fs)
-	if err != nil {
-		return nil, "", errors.Wrap(err, "failed to get pipeline info")
-	}
-
-	conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return conn, queryStr, nil
 }
