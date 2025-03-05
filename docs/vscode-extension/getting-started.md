@@ -48,4 +48,3 @@ The Bruin extension provides two main panels :
 - **Lineage Panel**: Found at the bottom of VSCode, near the terminal, this panel shows the asset lineage, giving you a visual of how the asset connects to other assets.
 - **Query Preview Panel**: Found near the `Lineage` panel, this panel allows you to preview query results directly within VSCode. When running a query, results will be displayed in this panel, enabling quick debugging and verification without switching to an external database tool.
 
-![Bruin Panels](../public/vscode-extension/panels/bruin-panels.png)
