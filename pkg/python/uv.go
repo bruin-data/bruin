@@ -293,6 +293,9 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		"--progress",
 		"log",
 	}
+	if format, exists := asset.Parameters["loader_file_format"]; exists && format != "" {
+		cmdArgs = append(cmdArgs, "--loader-file-format", format)
+	}
 
 	destConnectionName, err := execCtx.pipeline.GetConnectionNameForAsset(asset)
 	if err != nil {
