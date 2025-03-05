@@ -100,7 +100,13 @@ export default defineConfig({
                         items: [
                             {text: "Getting Started", link: "/vscode-extension/getting-started"},
                             {text: "Configuration", link: "/vscode-extension/configuration"},
-                            {text: "Features", link: "/vscode-extension/features"},
+                            {text: "Panels Overview", link: "/vscode-extension/panel-overview",
+                                items: [
+                                    {text: "Side Panel", link: "/vscode-extension/panels/side-panel"},
+                                    {text: "Lineage", link: "/vscode-extension/panels/lineage-panel"},
+                                    {text: "Query Preview", link: "/vscode-extension/panels/query-preview"},
+                                ],
+                            },
                         ],
                     },
 
