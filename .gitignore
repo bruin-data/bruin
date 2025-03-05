@@ -150,6 +150,3 @@ duckdb.db
 
 venv
 logs/runs
-bruin-another.yml
-.bruin-another.yml
-.bruin2.yml
