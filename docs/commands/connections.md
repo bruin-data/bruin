@@ -30,6 +30,13 @@ Environment: someother
 +---------+-----------+
 ```
 
+
+### Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--config-file` | str | - | The path to the .bruin.yml file. |
+
 ## Add Connection
 
 To add a connection to a specific environment, run the following command:
@@ -42,9 +49,16 @@ This will add the connection to the `.bruin.yml` file and the connection will be
 
 The parameter after `--credentials` is the value of the connection in JSON format, as you would write it in the `.bruin.yml` file. For further reference, you can check the [Connections section](../getting-started/concepts.md#connection) of the documentation.
 
+### Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--config-file` | str | - | The path to the .bruin.yml file. |
+
+
 
 > [!INFO]
-> To be transparent, this command is meant to be used programmatically rather than human beings, since the `credentials` parameter is in JSON format.
+> This command is meant to be used programmatically rather than human beings, since the `credentials` parameter is in JSON format.
 
 ### Example: a GCP connection
 ```bash
@@ -79,6 +93,13 @@ You can define a different path for the repo with an extra argument if you'd lik
 bruin connections delete --env staging --name MY_SECRET <path-to-repo>
 ```
 
+### Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--config-file` | str | - | The path to the .bruin.yml file. |
+
+
 
 ### Example
 
@@ -86,6 +107,7 @@ Delete a connection named "my-connection" from the "production" environment:
 ```
 bruin connections delete -e staging -n test-connection -o json
 ```
+
 ## Test Connection
 To test if a connection is valid, you can use the test command. 
 This command runs a simple validation check for the connection.
@@ -95,6 +117,13 @@ bruin connections test --name <connection-name> [--env <environment>]
 ```
 
 If no environment flag (`--env`) is provided, the default environment from your `.bruin.yml` will be used.
+
+### Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--config-file` | str | - | The path to the `.bruin.yml` file. |
+
 
 ### Examples
 
