@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -113,4 +112,17 @@ func (c *Client) Ping(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (c *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {
+	rows, err := c.connection.Query(ctx, query.ToExplainQuery())
+	if err == nil {
+		err = rows.Err()
+	}
+
+	if rows != nil {
+		defer rows.Close()
+	}
+
+	return err == nil, err
 }

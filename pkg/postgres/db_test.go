@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	_ "github.com/DATA-DOG/go-sqlmock"
@@ -318,6 +319,73 @@ func TestClient_Ping(t *testing.T) {
 			}
 
 			// Verify all expectations are met
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestDB_IsValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		setupMock    func(mock pgxmock.PgxPoolIface)
+		query        query.Query
+		want         bool
+		wantErr      bool
+		errorMessage string
+	}{
+		{
+			name: "simple valid select query is handled",
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				rows := pgxmock.NewRowsWithColumnDefinition(
+					pgconn.FieldDescription{Name: "id"},
+					pgconn.FieldDescription{Name: "name"},
+				).AddRow(1, "John Doe")
+				mock.ExpectQuery("EXPLAIN SELECT 1;").WillReturnRows(rows)
+			},
+			query: query.Query{
+				Query: "SELECT 1",
+			},
+			want: true,
+		},
+		{
+			name: "invalid query is properly handled",
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectQuery(`EXPLAIN some broken query;`).
+					WillReturnError(fmt.Errorf("some actual error"))
+			},
+			query: query.Query{
+				Query: "some broken query",
+			},
+			want:         false,
+			wantErr:      true,
+			errorMessage: "some actual error",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mock, err := pgxmock.NewPool()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer mock.Close()
+
+			tt.setupMock(mock)
+
+			client := Client{connection: mock}
+
+			got, err := client.IsValid(context.Background(), &tt.query)
+			if tt.wantErr {
+				require.Error(t, err)
+				require.Equal(t, tt.errorMessage, err.Error())
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.Equal(t, tt.want, got)
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
