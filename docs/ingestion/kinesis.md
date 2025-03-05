@@ -15,12 +15,12 @@ To connect to Kinesis, you need to add a configuration item to the connections s
     connections:
       kinesis:
         - name: "kinesis"
-          aws_access_key_id: "access_key_id_123"
-          aws_secret_access_key: "secret_access_key_123"
+          access_key_id: "access_key_id_123"
+          secret_access_key: "secret_access_key_123"
           region: "eu-central-1"
 ```
-- `aws_access_key_id`: The access key ID used for authentication with the Kinesis API.
-- `aws_secret_access_key`: The secret access key used for authentication with the Kinesis API.
+- `access_key_id`: The access key ID used for authentication with the Kinesis API.
+- `secret_access_key`: The secret access key used for authentication with the Kinesis API.
 - `region`: The AWS region name where the stream is located.
 
 ### Step 2: Create an asset file for data ingestion
