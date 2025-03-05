@@ -376,10 +376,10 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			Kinesis: []KinesisConnection{
 				{
-					Name:               "kinesis-1",
-					AWSACCESSKEYID:     "aws-access-key-id-123",
-					AWSSECRETACCESSKEY: "aws-secret-access-key-123",
-					Region:             "us-east-1",
+					Name:            "kinesis-1",
+					ACCESSKEYID:     "aws-access-key-id-123",
+					SECRETACCESSKEY: "aws-secret-access-key-123",
+					Region:          "us-east-1",
 				},
 			},
 		},

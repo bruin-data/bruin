@@ -237,8 +237,8 @@ environments:
           client_secret: "client-secret-123"
       kinesis:
         - name: "kinesis-1"
-          aws_access_key_id: "aws-access-key-id-123"
-          aws_secret_access_key: "aws-secret-access-key-123"
+          access_key_id: "aws-access-key-id-123"
+          secret_access_key: "aws-secret-access-key-123"
           region: "us-east-1"
   prod:
     connections:
