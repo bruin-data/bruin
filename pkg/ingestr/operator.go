@@ -104,6 +104,8 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 	destTable := ti.GetAsset().Name
 
+	extraPackages = addExtraPackages(destURI, extraPackages)
+
 	cmdArgs := []string{
 		"ingest",
 		"--source-uri",
@@ -220,9 +222,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 
 	destTable := ti.GetAsset().Name
 
-	if strings.HasPrefix(destURI, "mssql://") {
-		extraPackages = []string{"pyodbc==5.1.0"}
-	}
+	extraPackages = addExtraPackages(destURI, extraPackages)
 
 	cmdArgs := []string{
 		"ingest",
@@ -251,4 +251,11 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	}
 
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
+}
+
+func addExtraPackages(destURI string, extraPackages []string) []string {
+	if strings.HasPrefix(destURI, "mssql://") {
+		extraPackages = []string{"pyodbc==5.1.0"}
+	}
+	return extraPackages
 }
