@@ -98,13 +98,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return errors.New("could not get the source uri")
 	}
 
-	if strings.HasPrefix(sourceURI, "mssql://") || strings.HasPrefix(destURI, "mssql://") {
-		extraPackages = []string{"pyodbc==5.1.0"}
-	}
-
 	destTable := ti.GetAsset().Name
 
-	extraPackages = addExtraPackages(destURI, extraPackages)
+	extraPackages = addExtraPackages(destURI, sourceURI, extraPackages)
 
 	cmdArgs := []string{
 		"ingest",
@@ -222,7 +218,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 
 	destTable := ti.GetAsset().Name
 
-	extraPackages = addExtraPackages(destURI, extraPackages)
+	extraPackages = addExtraPackages(destURI, sourceURI, extraPackages)
 
 	cmdArgs := []string{
 		"ingest",
@@ -253,9 +249,10 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
 }
 
-func addExtraPackages(destURI string, extraPackages []string) []string {
-	if strings.HasPrefix(destURI, "mssql://") {
+func addExtraPackages(destURI, sourceURI string, extraPackages []string) []string {
+	if strings.HasPrefix(sourceURI, "mssql://") || strings.HasPrefix(destURI, "mssql://") {
 		extraPackages = []string{"pyodbc==5.1.0"}
 	}
+
 	return extraPackages
 }
