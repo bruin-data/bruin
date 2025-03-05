@@ -100,6 +100,7 @@ export default defineConfig({
                         items: [
                             {text: "Getting Started", link: "/vscode-extension/getting-started"},
                             {text: "Configuration", link: "/vscode-extension/configuration"},
+                            {text: "Features", link: "/vscode-extension/features"},
                         ],
                     },
 
