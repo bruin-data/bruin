@@ -6,6 +6,11 @@ The Side Panel in the Bruin VSCode extension gives you a comprehensive view of t
 
 ### 1. Asset Details
 - Displays key information about the asset, including its name, type, and description.
+- The Name and Descrtiption are editable from the UI.
+- **Environment Dropdown**: Switch between environments (like *development* or *production*) seamlessly.  
+- **Dates Inputs**: The date/time of the `runs` can be customized directly from the UI. A refresh button is provided to allow adjusting the time of an asset based on the pipline schedule.
+PS: the time is specified in UTC.
+- **SQL Preview**; A preview is provided that 
 
 ### 2. Columns
 - Lists the columns associated with the asset.
