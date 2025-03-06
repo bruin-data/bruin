@@ -168,6 +168,38 @@ func Lint(isDebug *bool) *cli.Command {
 				logger.Debug("no Snowflake connections found, skipping Snowflake validation")
 			}
 
+			if len(cm.SelectedEnvironment.Connections.RedShift) > 0 {
+				rules = append(rules, &lint.QueryValidatorRule{
+					Identifier:  "redshift-validator",
+					TaskType:    pipeline.AssetTypeRedshiftQuery,
+					Connections: connectionManager,
+					Extractor: &query.FileQuerySplitterExtractor{
+						Fs:       fs,
+						Renderer: renderer,
+					},
+					WorkerCount: 32,
+					Logger:      logger,
+				})
+			} else {
+				logger.Debug("no Redshift connections found, skipping Redshift validation")
+			}
+
+			if len(cm.SelectedEnvironment.Connections.Postgres) > 0 {
+				rules = append(rules, &lint.QueryValidatorRule{
+					Identifier:  "postgres-validator",
+					TaskType:    pipeline.AssetTypePostgresQuery,
+					Connections: connectionManager,
+					Extractor: &query.FileQuerySplitterExtractor{
+						Fs:       fs,
+						Renderer: renderer,
+					},
+					WorkerCount: 32,
+					Logger:      logger,
+				})
+			} else {
+				logger.Debug("no Postgres connections found, skipping Postgres validation")
+			}
+
 			var result *lint.PipelineAnalysisResult
 			var errr error
 			if asset == "" {
