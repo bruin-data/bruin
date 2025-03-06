@@ -992,6 +992,7 @@ type Pipeline struct {
 	Retries            int                    `json:"retries" yaml:"retries" mapstructure:"retries"`
 	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
 	Commit             string                 `json:"commit"`
+	Snapshot           string                 `json:"snapshot"`
 	TasksByType        map[AssetType][]*Asset `json:"-"`
 	tasksByName        map[string]*Asset
 }
