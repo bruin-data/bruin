@@ -41,9 +41,10 @@ parameters:
 
 - `name`: The name of the asset.
 - `type`: Specifies the type of the asset. It will be always `ingestr` type for Kinesis.
-- `connection`: This is the destination connection. 
+- `connection`: This is the destination connection name.
 - `source_connection`: The name of the Kinesis connection defined in .bruin.yml.
 - `source_table`: Specify the `stream name` you want to read from. For example, if you want to read from a Kinesis stream named "customer_events", you would use source_table as customer_events.
+-  `destination`: The type of data warehouse where you want to store your data. For example: Postgres, Clickhouse, Snowflake.
 
 
 ### Step 3: [Run](/commands/run) asset to ingest data
