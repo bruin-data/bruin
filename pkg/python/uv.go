@@ -281,7 +281,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	_, _ = output.Write([]byte("Successfully collected the data from the asset, uploading to the destination...\n"))
 
 	// build ingestr flags
-	cmdArgs := ConsolidatedParameters(asset, []string{
+	cmdArgs := ConsolidatedParameters(ctx, asset, []string{
 		"ingest",
 		"--source-uri",
 		"mmap://" + arrowFilePath,
