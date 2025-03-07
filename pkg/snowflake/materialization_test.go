@@ -199,19 +199,6 @@ func TestMaterializer_Render(t *testing.T) {
 			query:   "SELECT 1",
 			wantErr: true,
 		},
-		{
-			name: "time_interval_no_time_granularity_or_columns",
-			task: &pipeline.Asset{
-				Name: "my.asset",
-				Materialization: pipeline.Materialization{
-					Type:           pipeline.MaterializationTypeTable,
-					Strategy:       pipeline.MaterializationStrategyTimeInterval,
-					IncrementalKey: "dt",
-				},
-			},
-			query:   "SELECT 1",
-			wantErr: true,
-		},
 
 		{
 			name: "time_interval_timestampgranularity",

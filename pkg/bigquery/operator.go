@@ -45,7 +45,12 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 }
 
 func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
-	queries, err := o.extractor.ExtractQueriesFromString(t.ExecutableFile.Content)
+	materialized, err := o.materializer.Render(t, t.ExecutableFile.Content)
+	if err != nil {
+		return err
+	}
+
+	queries, err := o.extractor.ExtractQueriesFromString(materialized)
 	if err != nil {
 		return errors.Wrap(err, "cannot extract queries from the task file")
 	}
@@ -57,12 +62,6 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.New("cannot enable materialization for tasks with multiple queries")
 	}
 	q := queries[0]
-	materialized, err := o.materializer.Render(t, q.String())
-	if err != nil {
-		return err
-	}
-
-	q.Query = materialized
 
 	connName, err := p.GetConnectionNameForAsset(t)
 	if err != nil {

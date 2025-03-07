@@ -188,3 +188,76 @@ select 1 as UserId, 'Alice' as UserName
 union all
 select 2 as UserId, 'Bob' as UserName
 ```
+
+### `time_interval`
+
+The `time_interval` strategy is designed for incrementally loading time-based data. It's useful when you want to process data within specific time windows, ensuring efficient updates of historical data while maintaining data consistency.
+
+This strategy requires the following configuration:
+- `incremental_key`: The column used for time-based filtering
+- `time_granularity`: Must be either 'date' or 'timestamp'
+  - Use 'date' when your incremental_key is a DATE column (e.g., '2024-03-20')
+  - Use 'timestamp' when your incremental_key is a TIMESTAMP column (e.g., '2024-03-20 15:30:00')
+
+When running assets with time_interval strategy, you can specify the time window using the start and end date flags:
+```bash
+bruin run --start-date "2024-03-01" --end-date "2024-03-31" path/to/your/asset
+```
+
+By default:
+- `start-date`: Beginning of yesterday (00:00:00.000000)
+- `end-date`: End of yesterday (23:59:59.999999)
+
+Here's a sample asset with `time_interval` materialization:
+```bruin-sql
+/* @bruin
+name: dashboard.hello_bq
+type: bq.sql
+
+materialization:
+  type: table
+  strategy: time_interval
+  time_granularity: date
+  incremental_key: dt
+
+columns:
+  - name: product_id
+    type: INTEGER
+    description: "Unique identifier for the product"
+    primary_key: true
+  - name: product_name
+    type: VARCHAR
+    description: "Name of the product"
+  - name: price
+    type: FLOAT
+    description: "Price of the product in USD"
+  - name: stock
+    type: INTEGER
+    description: "Number of units in stock"
+  - name: dt
+    type: DATE
+    description: "Date when the product was last updated"
+@bruin */
+
+
+SELECT
+    1 AS product_id,
+    'Laptop' AS product_name,
+    999.99 AS price,
+    10 AS stock,
+    DATE '2025-03-15' AS dt
+UNION ALL
+SELECT
+    2 AS product_id,
+    'Smartphone' AS product_name,
+    699.99 AS price,
+    50 AS stock,
+    DATE '2024-03-16' AS dt;
+```
+
+The strategy will:
+1. Begin a transaction
+2. Delete existing records within the specified time interval
+3. Insert new records from the same time interval
+
+
