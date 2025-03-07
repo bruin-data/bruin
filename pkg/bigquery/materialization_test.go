@@ -307,7 +307,7 @@ func TestMaterializer_Render(t *testing.T) {
 			want: "^BEGIN TRANSACTION;\n" +
 				"DELETE FROM my\\.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
 				"INSERT INTO my\\.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
-				"COMMIT;$",
+				"COMMIT TRANSACTION;$",
 		},
 		{
 			name: "time_interval_date",
@@ -324,7 +324,7 @@ func TestMaterializer_Render(t *testing.T) {
 			want: "^BEGIN TRANSACTION;\n" +
 				"DELETE FROM my\\.asset WHERE dt BETWEEN '{{start_date}}' AND '{{end_date}}';\n" +
 				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}';\n" +
-				"COMMIT;$",
+				"COMMIT TRANSACTION;$",
 		},
 	}
 	for _, tt := range tests {
