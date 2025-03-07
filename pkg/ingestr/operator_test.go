@@ -147,8 +147,8 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 				"--dest-table", "asset-name",
 				"--yes",
 				"--progress", "log",
-				"--incremental-strategy", "merge",
 				"--incremental-key", "updated_at",
+				"--incremental-strategy", "merge",
 			},
 		},
 		{

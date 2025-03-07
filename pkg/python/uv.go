@@ -17,7 +17,6 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -319,25 +318,13 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}
 
 	cmdArgs = append(cmdArgs, "--dest-uri", destURI)
-
-	fullRefresh := ctx.Value(pipeline.RunConfigFullRefresh)
-	if fullRefresh != nil && fullRefresh.(bool) {
-		cmdArgs = append(cmdArgs, "--full-refresh")
-	}
-
+	// TODO: Burak, Cam we use the parameters here?
 	if mat.Strategy != "" {
 		cmdArgs = append(cmdArgs, "--incremental-strategy", string(mat.Strategy))
 	}
 
 	if mat.IncrementalKey != "" {
 		cmdArgs = append(cmdArgs, "--incremental-key", mat.IncrementalKey)
-	}
-
-	primaryKeys := asset.ColumnNamesWithPrimaryKey()
-	if len(primaryKeys) > 0 {
-		for _, pk := range primaryKeys {
-			cmdArgs = append(cmdArgs, "--primary-key", pk)
-		}
 	}
 
 	if strings.HasPrefix(destURI, "duckdb://") {
