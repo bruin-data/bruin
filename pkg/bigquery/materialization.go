@@ -6,6 +6,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/pkg/errors"
 )
 
 var matMap = pipeline.AssetMaterializationMap{
@@ -21,6 +22,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyCreateReplace: buildCreateReplaceQuery,
 		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
 		pipeline.MaterializationStrategyMerge:         mergeMaterializer,
+		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
 	},
 }
 
@@ -143,4 +145,42 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 	}
 
 	return fmt.Sprintf("CREATE OR REPLACE TABLE %s %s %s AS\n%s", asset.Name, partitionClause, clusterByClause, query), nil
+}
+
+func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error) {
+	if asset.Materialization.IncrementalKey == "" {
+		return "", errors.New("incremental_key is required for time_interval strategy")
+	}
+
+	if asset.Materialization.TimeGranularity == "" {
+		return "", errors.New("time_granularity is required for time_interval strategy (must be 'date' or 'timestamp')")
+	}
+
+	switch strings.ToLower(asset.Materialization.TimeGranularity) {
+	case "date", "timestamp":
+	default:
+		return "", errors.New("time_granularity must be either 'date' or 'timestamp'")
+	}
+
+	startVar := "{{start_timestamp}}"
+	endVar := "{{end_timestamp}}"
+	if strings.ToLower(asset.Materialization.TimeGranularity) == "date" {
+		startVar = "{{start_date}}"
+		endVar = "{{end_date}}"
+	}
+
+	queries := []string{
+		"BEGIN TRANSACTION",
+		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
+			asset.Name,
+			asset.Materialization.IncrementalKey,
+			startVar,
+			endVar),
+		fmt.Sprintf(`INSERT INTO %s %s`,
+			asset.Name,
+			strings.TrimSuffix(query, ";")),
+		"COMMIT",
+	}
+
+	return strings.Join(queries, ";\n") + ";", nil
 }
