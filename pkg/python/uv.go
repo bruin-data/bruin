@@ -279,6 +279,14 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	_, _ = output.Write([]byte("Successfully collected the data from the asset, uploading to the destination...\n"))
 
+	if mat.Strategy != "" {
+		asset.Parameters["incremental_strategy"] = string(mat.Strategy)
+	}
+
+	if mat.IncrementalKey != "" {
+		asset.Parameters["incremental_key"] = mat.IncrementalKey
+	}
+
 	// build ingestr flags
 	cmdArgs := ConsolidatedParameters(ctx, asset, []string{
 		"ingest",
@@ -318,14 +326,6 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}
 
 	cmdArgs = append(cmdArgs, "--dest-uri", destURI)
-	// TODO: Burak, Cam we use the parameters here?
-	if mat.Strategy != "" {
-		cmdArgs = append(cmdArgs, "--incremental-strategy", string(mat.Strategy))
-	}
-
-	if mat.IncrementalKey != "" {
-		cmdArgs = append(cmdArgs, "--incremental-key", mat.IncrementalKey)
-	}
 
 	if strings.HasPrefix(destURI, "duckdb://") {
 		if dbURIGetter, ok := destConnectionInst.(interface{ GetDBConnectionURI() string }); ok {
