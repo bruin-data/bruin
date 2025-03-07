@@ -251,35 +251,18 @@ const (
 )
 
 type MaterializationStrategy string
+type MaterializationTimeGranularity string
 
 const (
-	MaterializationStrategyNone             MaterializationStrategy = ""
-	MaterializationStrategyCreateReplace    MaterializationStrategy = "create+replace"
-	MaterializationStrategyDeleteInsert     MaterializationStrategy = "delete+insert"
-	MaterializationStrategyAppend           MaterializationStrategy = "append"
-	MaterializationStrategyMerge            MaterializationStrategy = "merge"
-	MaterializationStrategyTimeInterval     MaterializationStrategy = "time_interval"
-	MaterializationTimeGranularityDate                              = "date"
-	MaterializationTimeGranularityTimestamp                         = "timestamp"
+	MaterializationStrategyNone             MaterializationStrategy        = ""
+	MaterializationStrategyCreateReplace    MaterializationStrategy        = "create+replace"
+	MaterializationStrategyDeleteInsert     MaterializationStrategy        = "delete+insert"
+	MaterializationStrategyAppend           MaterializationStrategy        = "append"
+	MaterializationStrategyMerge            MaterializationStrategy        = "merge"
+	MaterializationStrategyTimeInterval     MaterializationStrategy        = "time_interval"
+	MaterializationTimeGranularityDate      MaterializationTimeGranularity = "date"
+	MaterializationTimeGranularityTimestamp MaterializationTimeGranularity = "timestamp"
 )
-
-type TimeGranularity int
-
-const (
-	TimeGranularityDate TimeGranularity = iota
-	TimeGranularityTimestamp
-)
-
-func TimeGranularityFromString(s string) (TimeGranularity, error) {
-	switch strings.ToLower(s) {
-	case "date":
-		return TimeGranularityDate, nil
-	case "timestamp":
-		return TimeGranularityTimestamp, nil
-	default:
-		return TimeGranularityDate, fmt.Errorf("invalid time granularity: %s", s)
-	}
-}
 
 var AllAvailableMaterializationStrategies = []MaterializationStrategy{
 	MaterializationStrategyCreateReplace,
@@ -290,12 +273,12 @@ var AllAvailableMaterializationStrategies = []MaterializationStrategy{
 }
 
 type Materialization struct {
-	Type            MaterializationType     `json:"type" yaml:"type,omitempty" mapstructure:"type"`
-	Strategy        MaterializationStrategy `json:"strategy" yaml:"strategy,omitempty" mapstructure:"strategy"`
-	PartitionBy     string                  `json:"partition_by" yaml:"partition_by,omitempty" mapstructure:"partition_by"`
-	ClusterBy       []string                `json:"cluster_by" yaml:"cluster_by,omitempty" mapstructure:"cluster_by"`
-	IncrementalKey  string                  `json:"incremental_key" yaml:"incremental_key,omitempty" mapstructure:"incremental_key"`
-	TimeGranularity string                  `json:"time_granularity" yaml:"time_granularity,omitempty" mapstructure:"time_granularity"`
+	Type            MaterializationType            `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	Strategy        MaterializationStrategy        `json:"strategy" yaml:"strategy,omitempty" mapstructure:"strategy"`
+	PartitionBy     string                         `json:"partition_by" yaml:"partition_by,omitempty" mapstructure:"partition_by"`
+	ClusterBy       []string                       `json:"cluster_by" yaml:"cluster_by,omitempty" mapstructure:"cluster_by"`
+	IncrementalKey  string                         `json:"incremental_key" yaml:"incremental_key,omitempty" mapstructure:"incremental_key"`
+	TimeGranularity MaterializationTimeGranularity `json:"time_granularity" yaml:"time_granularity,omitempty" mapstructure:"time_granularity"`
 }
 
 func (m Materialization) MarshalJSON() ([]byte, error) {
