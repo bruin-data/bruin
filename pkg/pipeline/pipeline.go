@@ -259,10 +259,27 @@ const (
 	MaterializationStrategyAppend        MaterializationStrategy = "append"
 	MaterializationStrategyMerge         MaterializationStrategy = "merge"
 	MaterializationStrategyTimeInterval  MaterializationStrategy = "time_interval"
-
 	MaterializationTimeGranularityDate      = "date"
 	MaterializationTimeGranularityTimestamp = "timestamp"
 )
+type TimeGranularity int
+
+const (
+    TimeGranularityDate TimeGranularity = iota
+    TimeGranularityTimestamp
+)
+
+func TimeGranularityFromString(s string) (TimeGranularity, error) {
+    switch strings.ToLower(s) {
+    case "date":
+        return TimeGranularityDate, nil
+    case "timestamp":
+        return TimeGranularityTimestamp, nil
+    default:
+        return TimeGranularityDate, fmt.Errorf("invalid time granularity: %s", s)
+    }
+}
+
 
 var AllAvailableMaterializationStrategies = []MaterializationStrategy{
 	MaterializationStrategyCreateReplace,
