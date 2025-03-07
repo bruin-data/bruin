@@ -265,6 +265,67 @@ func TestMaterializer_Render(t *testing.T) {
 				"WHEN MATCHED THEN UPDATE SET target\\.value = source\\.value\n" +
 				"WHEN NOT MATCHED THEN INSERT\\(dt, event_type, value, value2\\) VALUES\\(dt, event_type, value, value2\\);",
 		},
+		{
+			name: "time_interval_no_incremental_key",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:            pipeline.MaterializationTypeTable,
+					Strategy:        pipeline.MaterializationStrategyTimeInterval,
+					TimeGranularity: pipeline.MaterializationTimeGranularityTimestamp,
+				},
+			},
+			query:   "SELECT 1",
+			wantErr: true,
+		},
+		{
+			name: "time_interval_no_time_granularity_or_columns",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyTimeInterval,
+					IncrementalKey: "dt",
+				},
+			},
+			query:   "SELECT 1",
+			wantErr: true,
+		},
+
+		{
+			name: "time_interval_timestampgranularity",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:            pipeline.MaterializationTypeTable,
+					Strategy:        pipeline.MaterializationStrategyTimeInterval,
+					TimeGranularity: pipeline.MaterializationTimeGranularityTimestamp,
+					IncrementalKey:  "ts",
+				},
+			},
+			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
+			want: "^BEGIN TRANSACTION;\n" +
+				"DELETE FROM my\\.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
+				"INSERT INTO my\\.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
+				"COMMIT;$",
+		},
+		{
+			name: "time_interval_date",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:            pipeline.MaterializationTypeTable,
+					Strategy:        pipeline.MaterializationStrategyTimeInterval,
+					TimeGranularity: pipeline.MaterializationTimeGranularityDate,
+					IncrementalKey:  "dt",
+				},
+			},
+			query: "SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
+			want: "^BEGIN TRANSACTION;\n" +
+				"DELETE FROM my\\.asset WHERE dt BETWEEN '{{start_date}}' AND '{{end_date}}';\n" +
+				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}';\n" +
+				"COMMIT;$",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
