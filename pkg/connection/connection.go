@@ -31,6 +31,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/hubspot"
 	"github.com/bruin-data/bruin/pkg/kafka"
+	"github.com/bruin-data/bruin/pkg/kinesis"
 	"github.com/bruin-data/bruin/pkg/klaviyo"
 	"github.com/bruin-data/bruin/pkg/linkedinads"
 	"github.com/bruin-data/bruin/pkg/mongo"
@@ -90,6 +91,7 @@ type Manager struct {
 	GCS          map[string]*gcs.Client
 	ApplovinMax  map[string]*applovinmax.Client
 	Personio     map[string]*personio.Client
+	Kinesis      map[string]*kinesis.Client
 	mutex        sync.Mutex
 }
 
@@ -317,6 +319,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connGCS, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GCS)...)
+
+	connKinesis, err := m.GetKinesisConnectionWithoutDefault(name)
+	if err == nil {
+		return connKinesis, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Kinesis)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -1080,6 +1088,25 @@ func (m *Manager) GetPersonioConnectionWithoutDefault(name string) (*personio.Cl
 	db, ok := m.Personio[name]
 	if !ok {
 		return nil, errors.Errorf("personio connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetKinesisConnection(name string) (*kinesis.Client, error) {
+	db, err := m.GetKinesisConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetKinesisConnectionWithoutDefault("kinesis-default")
+}
+
+func (m *Manager) GetKinesisConnectionWithoutDefault(name string) (*kinesis.Client, error) {
+	if m.Kinesis == nil {
+		return nil, errors.New("no kinesis connections found")
+	}
+	db, ok := m.Kinesis[name]
+	if !ok {
+		return nil, errors.Errorf("kinesis connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2035,6 +2062,27 @@ func (m *Manager) AddApplovinMaxConnectionFromConfig(connection *config.Applovin
 	return nil
 }
 
+func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConnection) error {
+	m.mutex.Lock()
+	if m.Kinesis == nil {
+		m.Kinesis = make(map[string]*kinesis.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := kinesis.NewClient(kinesis.Config{
+		AccessKeyID:     connection.AccessKeyID,
+		SecretAccessKey: connection.SecretAccessKey,
+		Region:          connection.Region,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Kinesis[connection.Name] = client
+	return nil
+}
+
 var envVarRegex = regexp.MustCompile(`\${([^}]+)}`)
 
 func processConnections[T any](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {
@@ -2123,7 +2171,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.GCS, connectionManager.AddGCSConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Personio, connectionManager.AddPersonioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.ApplovinMax, connectionManager.AddApplovinMaxConnectionFromConfig, &wg, &errList, &mu)
-
+	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }

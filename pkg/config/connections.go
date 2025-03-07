@@ -547,3 +547,14 @@ type GCSConnection struct {
 func (c GCSConnection) GetName() string {
 	return c.Name
 }
+
+type KinesisConnection struct {
+	Name            string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessKeyID     string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id"`
+	SecretAccessKey string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key"`
+	Region          string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
+}
+
+func (c KinesisConnection) GetName() string {
+	return c.Name
+}
