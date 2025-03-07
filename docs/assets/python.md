@@ -77,7 +77,7 @@ image: python:3.11
 print('hello world')
 ```
 
-## Environment Variables
+## Environment variables
 Bruin introduces a set of environment variables by default to every Python asset.
 
 The following environment variables are available in every Python asset execution:
@@ -143,6 +143,41 @@ Bruin uses Apache Arrow under the hood to keep the returned data efficiently, an
 - delete the memory-mapped file
 
 This flow ensures that the typing information gathered from the dataframe will be preserved when loading to the destination, and it supports incremental loads, deduplication, and all the other features of ingestr.
+
+## Column-level lineage
+
+Bruin supports column-level lineage for Python assets as well as SQL assets. In order to get column-level lineage, you need to annotate the columns that are exposed by the Bruin asset.
+
+```bruin-python
+""" @bruin
+name: myschema.my_mat_asset 
+materialization:
+  type: table
+  strategy: merge
+
+columns:
+    - name: col1
+      type: int
+      upstreams: // [!code ++]
+        - table: xyz // [!code ++]
+          column: col1 // [!code ++]
+
+@bruin """
+
+import pandas as pd
+
+def materialize():
+    items = 100000
+    df = pd.DataFrame({
+        'col1': range(items),
+        'col2': [f'value_new_{i}' for i in range(items)],
+        'col3': [i * 6.0 for i in range(items)]
+    })
+
+    return df
+```
+
+Bruin will use the annotations to build the column-lineage dependency across all of your assets, including those extracted from SQL automatically.
 
 
 ## Examples
