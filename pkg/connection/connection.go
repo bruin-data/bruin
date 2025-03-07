@@ -2070,8 +2070,8 @@ func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConne
 	m.mutex.Unlock()
 
 	client, err := kinesis.NewClient(kinesis.Config{
-		AccessKeyID:     connection.ACCESSKEYID,
-		SecretAccessKey: connection.SECRETACCESSKEY,
+		AccessKeyID:     connection.AccessKeyID,
+		SecretAccessKey: connection.SecretAccessKey,
 		Region:          connection.Region,
 	})
 	if err != nil {

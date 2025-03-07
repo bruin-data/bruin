@@ -3,7 +3,7 @@
 
 Bruin supports Kinesis as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Kinesis into your data warehouse.
 
-To set up a Kinesis connection, you need to have `aws_access_key_id`, `aws_secret_access_key` and `region`. For more information, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/amazon_kinesis#grab-credentials)
+To set up a Kinesis connection, you need to have `access_key_id`, `secret_access_key` and `region`. For more information, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/amazon_kinesis#grab-credentials)
 
 Follow the steps below to correctly set up Kinesis as a data source and run ingestion:
 
