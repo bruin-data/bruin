@@ -179,7 +179,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 		fmt.Sprintf(`INSERT INTO %s %s`,
 			asset.Name,
 			strings.TrimSuffix(query, ";")),
-		"COMMIT",
+		"COMMIT TRANSACTION",
 	}
 
 	return strings.Join(queries, ";\n") + ";", nil
