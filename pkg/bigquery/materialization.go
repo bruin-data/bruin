@@ -163,7 +163,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 
 	startVar := "{{start_timestamp}}"
 	endVar := "{{end_timestamp}}"
-	if timeGranularity == pipeline.TimeGranularityDate{
+	if timeGranularity == pipeline.TimeGranularityDate {
 		startVar = "{{start_date}}"
 		endVar = "{{end_date}}"
 	}

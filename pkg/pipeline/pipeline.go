@@ -253,33 +253,33 @@ const (
 type MaterializationStrategy string
 
 const (
-	MaterializationStrategyNone          MaterializationStrategy = ""
-	MaterializationStrategyCreateReplace MaterializationStrategy = "create+replace"
-	MaterializationStrategyDeleteInsert  MaterializationStrategy = "delete+insert"
-	MaterializationStrategyAppend        MaterializationStrategy = "append"
-	MaterializationStrategyMerge         MaterializationStrategy = "merge"
-	MaterializationStrategyTimeInterval  MaterializationStrategy = "time_interval"
-	MaterializationTimeGranularityDate      = "date"
-	MaterializationTimeGranularityTimestamp = "timestamp"
+	MaterializationStrategyNone             MaterializationStrategy = ""
+	MaterializationStrategyCreateReplace    MaterializationStrategy = "create+replace"
+	MaterializationStrategyDeleteInsert     MaterializationStrategy = "delete+insert"
+	MaterializationStrategyAppend           MaterializationStrategy = "append"
+	MaterializationStrategyMerge            MaterializationStrategy = "merge"
+	MaterializationStrategyTimeInterval     MaterializationStrategy = "time_interval"
+	MaterializationTimeGranularityDate                              = "date"
+	MaterializationTimeGranularityTimestamp                         = "timestamp"
 )
+
 type TimeGranularity int
 
 const (
-    TimeGranularityDate TimeGranularity = iota
-    TimeGranularityTimestamp
+	TimeGranularityDate TimeGranularity = iota
+	TimeGranularityTimestamp
 )
 
 func TimeGranularityFromString(s string) (TimeGranularity, error) {
-    switch strings.ToLower(s) {
-    case "date":
-        return TimeGranularityDate, nil
-    case "timestamp":
-        return TimeGranularityTimestamp, nil
-    default:
-        return TimeGranularityDate, fmt.Errorf("invalid time granularity: %s", s)
-    }
+	switch strings.ToLower(s) {
+	case "date":
+		return TimeGranularityDate, nil
+	case "timestamp":
+		return TimeGranularityTimestamp, nil
+	default:
+		return TimeGranularityDate, fmt.Errorf("invalid time granularity: %s", s)
+	}
 }
-
 
 var AllAvailableMaterializationStrategies = []MaterializationStrategy{
 	MaterializationStrategyCreateReplace,

@@ -125,7 +125,6 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "query returned an error",
 			setup: func(f *fields) {
-
 				f.m.On("Render", mock.AnythingOfType("*pipeline.Asset"), "some content").
 					Return("some materialized content", nil)
 
@@ -176,7 +175,6 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "query successfully executed with materialization",
 			setup: func(f *fields) {
-
 				f.m.On("Render", mock.AnythingOfType("*pipeline.Asset"), "some content").
 					Return("some materialized content", nil)
 
