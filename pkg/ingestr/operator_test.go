@@ -335,7 +335,6 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand_IntervalStartAndEnd(t
 
 	err := o.Run(ctx, &ti)
 	require.NoError(t, err)
-
 }
 
 func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
