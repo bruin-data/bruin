@@ -195,6 +195,8 @@ print("Hello World!")
 """ @bruin
 name: raw_data.currency_rates
 type: python
+parameters:
+    loader_file_format: jsonl
 secrets:
     - key: bigquery_conn
 @bruin """

@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/bruin-data/bruin/pkg/connection"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/git"
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
@@ -98,13 +96,11 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return errors.New("could not get the source uri")
 	}
 
-	if strings.HasPrefix(sourceURI, "mssql://") || strings.HasPrefix(destURI, "mssql://") {
-		extraPackages = []string{"pyodbc==5.1.0"}
-	}
-
 	destTable := ti.GetAsset().Name
 
-	cmdArgs := []string{
+	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
+
+	cmdArgs := python.ConsolidatedParameters(ctx, ti.GetAsset(), []string{
 		"ingest",
 		"--source-uri",
 		sourceURI,
@@ -117,53 +113,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		"--yes",
 		"--progress",
 		"log",
-	}
-
-	incrementalStrategy, ok := ti.GetAsset().Parameters["incremental_strategy"]
-	if ok {
-		cmdArgs = append(cmdArgs, "--incremental-strategy", incrementalStrategy)
-	}
-
-	incrementalKey, ok := ti.GetAsset().Parameters["incremental_key"]
-	if ok {
-		cmdArgs = append(cmdArgs, "--incremental-key", incrementalKey)
-	}
-
-	primaryKeys := ti.GetAsset().ColumnNamesWithPrimaryKey()
-	if len(primaryKeys) > 0 {
-		for _, pk := range primaryKeys {
-			cmdArgs = append(cmdArgs, "--primary-key", pk)
-		}
-	}
-
-	loaderFileFormat, ok := ti.GetAsset().Parameters["loader_file_format"]
-	if ok {
-		cmdArgs = append(cmdArgs, "--loader-file-format", loaderFileFormat)
-	}
-
-	sqlBackend, ok := ti.GetAsset().Parameters["sql_backend"]
-	if ok {
-		cmdArgs = append(cmdArgs, "--sql-backend", sqlBackend)
-	}
-
-	if ctx.Value(pipeline.RunConfigStartDate) != nil {
-		startTimeInstance, okParse := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
-		if okParse {
-			cmdArgs = append(cmdArgs, "--interval-start", startTimeInstance.Format(time.RFC3339))
-		}
-	}
-
-	if ctx.Value(pipeline.RunConfigEndDate) != nil {
-		endTimeInstance, okParse := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
-		if okParse {
-			cmdArgs = append(cmdArgs, "--interval-end", endTimeInstance.Format(time.RFC3339))
-		}
-	}
-
-	fullRefresh := ctx.Value(pipeline.RunConfigFullRefresh)
-	if fullRefresh != nil && fullRefresh.(bool) {
-		cmdArgs = append(cmdArgs, "--full-refresh")
-	}
+	})
 
 	path := ti.GetAsset().ExecutableFile.Path
 	repo, err := o.finder.Repo(path)
@@ -220,11 +170,9 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 
 	destTable := ti.GetAsset().Name
 
-	if strings.HasPrefix(destURI, "mssql://") {
-		extraPackages = []string{"pyodbc==5.1.0"}
-	}
+	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
 
-	cmdArgs := []string{
+	cmdArgs := python.ConsolidatedParameters(ctx, ti.GetAsset(), []string{
 		"ingest",
 		"--source-uri",
 		sourceURI,
@@ -237,7 +185,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		"--yes",
 		"--progress",
 		"log",
-	}
+	})
 
 	columns := columnHints(ti.GetAsset().Columns)
 	if columns != "" {
