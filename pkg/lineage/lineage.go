@@ -1,4 +1,4 @@
-package pipeline
+package lineage
 
 import (
 	"errors"
@@ -7,6 +7,8 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/dialect"
 	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/lint"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
@@ -28,7 +30,7 @@ func NewLineageExtractor(parser sqlParser) *LineageExtractor {
 }
 
 // TableSchema extracts the table schema from the assets and stores it in the columnMetadata map.
-func (p *LineageExtractor) TableSchema(foundPipeline *Pipeline) sqlparser.Schema {
+func (p *LineageExtractor) TableSchema(foundPipeline *pipeline.Pipeline) sqlparser.Schema {
 	columnMetadata := make(sqlparser.Schema)
 	for _, foundAsset := range foundPipeline.Assets {
 		if len(foundAsset.Columns) > 0 {
@@ -39,7 +41,7 @@ func (p *LineageExtractor) TableSchema(foundPipeline *Pipeline) sqlparser.Schema
 }
 
 // TableSchemaForUpstreams extracts the table schema for a single asset and returns a sqlparser schema only for its upstreams.
-func (p *LineageExtractor) TableSchemaForUpstreams(foundPipeline *Pipeline, asset *Asset) sqlparser.Schema {
+func (p *LineageExtractor) TableSchemaForUpstreams(foundPipeline *pipeline.Pipeline, asset *pipeline.Asset) sqlparser.Schema {
 	columnMetadata := make(sqlparser.Schema)
 	for _, upstream := range asset.Upstreams {
 		if upstream.Type != "asset" {
@@ -55,7 +57,18 @@ func (p *LineageExtractor) TableSchemaForUpstreams(foundPipeline *Pipeline, asse
 }
 
 // ColumnLineage processes the lineage of an asset and its upstream dependencies recursively.
-func (p *LineageExtractor) ColumnLineage(foundPipeline *Pipeline, asset *Asset, processedAssets map[string]bool) error {
+func (p *LineageExtractor) ColumnLineage(foundPipeline *pipeline.Pipeline, asset *pipeline.Asset, processedAssets map[string]bool) *lint.PipelineIssues {
+	issues := lint.PipelineIssues{
+		Issues: map[lint.Rule][]*lint.Issue{},
+	}
+
+	rule := &lint.SimpleRule{
+		Identifier:       "column-lineage",
+		Fast:             true,
+		Severity:         lint.ValidatorSeverityCritical,
+		ApplicableLevels: []lint.Level{lint.LevelPipeline, lint.LevelAsset},
+	}
+
 	if asset == nil {
 		return nil
 	}
@@ -71,16 +84,24 @@ func (p *LineageExtractor) ColumnLineage(foundPipeline *Pipeline, asset *Asset, 
 			continue
 		}
 		_ = p.ColumnLineage(foundPipeline, upstreamAsset, processedAssets)
+
 	}
 
-	_ = p.parseLineage(foundPipeline, asset, p.TableSchemaForUpstreams(foundPipeline, asset))
+	err := p.parseLineage(foundPipeline, asset, p.TableSchemaForUpstreams(foundPipeline, asset))
+	if err != nil {
+		issues.Issues[rule] = append(issues.Issues[rule], &lint.Issue{
+			Task:        asset,
+			Description: err.Error(),
+			Context:     []string{},
+		})
+	}
 
-	return nil
+	return &issues
 }
 
 // ParseLineage analyzes the column lineage for a given asset within a
 // It traces column relationships between the asset and its upstream dependencies.
-func (p *LineageExtractor) parseLineage(foundPipeline *Pipeline, asset *Asset, metadata sqlparser.Schema) error {
+func (p *LineageExtractor) parseLineage(foundPipeline *pipeline.Pipeline, asset *pipeline.Asset, metadata sqlparser.Schema) error {
 	if asset == nil {
 		return errors.New("invalid arguments: asset and pipeline cannot be nil")
 	}
@@ -110,7 +131,7 @@ func (p *LineageExtractor) parseLineage(foundPipeline *Pipeline, asset *Asset, m
 	return p.processLineageColumns(foundPipeline, asset, lineage)
 }
 
-func (p *LineageExtractor) mergeAsteriskColumns(foundPipeline *Pipeline, asset *Asset, lineageCol sqlparser.ColumnLineage) error {
+func (p *LineageExtractor) mergeAsteriskColumns(foundPipeline *pipeline.Pipeline, asset *pipeline.Asset, lineageCol sqlparser.ColumnLineage) error {
 	for _, upstream := range lineageCol.Upstream {
 		upstreamAsset := foundPipeline.GetAssetByNameCaseInsensitive(upstream.Table)
 		if upstreamAsset == nil {
@@ -121,7 +142,7 @@ func (p *LineageExtractor) mergeAsteriskColumns(foundPipeline *Pipeline, asset *
 		if upstream.Column == "*" {
 			for _, upstreamCol := range upstreamAsset.Columns {
 				upstreamCol.PrimaryKey = false
-				upstreamCol.Checks = []ColumnCheck{}
+				upstreamCol.Checks = []pipeline.ColumnCheck{}
 				if err := p.addColumnToAsset(asset, upstreamCol.Name, &upstreamCol); err != nil {
 					return err
 				}
@@ -132,8 +153,8 @@ func (p *LineageExtractor) mergeAsteriskColumns(foundPipeline *Pipeline, asset *
 	return nil
 }
 
-func (p *LineageExtractor) mergeNonSelectedColumns(asset *Asset, lineage *sqlparser.Lineage) []Upstream {
-	upstreams := make([]Upstream, 0)
+func (p *LineageExtractor) mergeNonSelectedColumns(asset *pipeline.Asset, lineage *sqlparser.Lineage) []pipeline.Upstream {
+	upstreams := make([]pipeline.Upstream, 0)
 	for _, up := range asset.Upstreams {
 		processedColumns := make(map[string]bool)
 
@@ -152,7 +173,7 @@ func (p *LineageExtractor) mergeNonSelectedColumns(asset *Asset, lineage *sqlpar
 
 				if !columnExists {
 					processedColumns[key] = true
-					up.Columns = append(up.Columns, DependsColumn{
+					up.Columns = append(up.Columns, pipeline.DependsColumn{
 						Name: column,
 					})
 				}
@@ -185,7 +206,7 @@ func (p *LineageExtractor) mergeNonSelectedColumns(asset *Asset, lineage *sqlpar
 	return upstreams
 }
 
-func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset *Asset, lineage *sqlparser.Lineage) error {
+func (p *LineageExtractor) processLineageColumns(foundPipeline *pipeline.Pipeline, asset *pipeline.Asset, lineage *sqlparser.Lineage) error {
 	if lineage == nil {
 		return nil
 	}
@@ -204,12 +225,12 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 		}
 
 		if len(lineageCol.Upstream) == 0 {
-			if err := p.addColumnToAsset(asset, lineageCol.Name, &Column{
+			if err := p.addColumnToAsset(asset, lineageCol.Name, &pipeline.Column{
 				Name:       lineageCol.Name,
 				Type:       lineageCol.Type,
 				PrimaryKey: false,
-				Checks:     []ColumnCheck{},
-				Upstreams:  []*UpstreamColumn{},
+				Checks:     []pipeline.ColumnCheck{},
+				Upstreams:  []*pipeline.UpstreamColumn{},
 			}); err != nil {
 				return err
 			}
@@ -223,12 +244,12 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 
 			upstreamAsset := foundPipeline.GetAssetByNameCaseInsensitive(upstream.Table)
 			if upstreamAsset == nil {
-				if err := p.addColumnToAsset(asset, lineageCol.Name, &Column{
+				if err := p.addColumnToAsset(asset, lineageCol.Name, &pipeline.Column{
 					Name:       lineageCol.Name,
 					Type:       lineageCol.Type,
 					PrimaryKey: false,
-					Checks:     []ColumnCheck{},
-					Upstreams: []*UpstreamColumn{
+					Checks:     []pipeline.ColumnCheck{},
+					Upstreams: []*pipeline.UpstreamColumn{
 						{
 							Column: upstream.Column,
 							Table:  strings.ToLower(upstream.Table),
@@ -241,12 +262,12 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 			}
 			upstreamCol := upstreamAsset.GetColumnWithName(upstream.Column)
 			if upstreamCol == nil {
-				upstreamCol = &Column{
+				upstreamCol = &pipeline.Column{
 					Name:       lineageCol.Name,
 					Type:       lineageCol.Type,
 					PrimaryKey: false,
-					Checks:     []ColumnCheck{},
-					Upstreams: []*UpstreamColumn{
+					Checks:     []pipeline.ColumnCheck{},
+					Upstreams: []*pipeline.UpstreamColumn{
 						{
 							Column: upstream.Column,
 							Table:  upstreamAsset.Name,
@@ -256,8 +277,8 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 			} else {
 				upstreamCol.Name = lineageCol.Name
 				upstreamCol.PrimaryKey = false
-				upstreamCol.Checks = []ColumnCheck{}
-				upstreamCol.Upstreams = []*UpstreamColumn{
+				upstreamCol.Checks = []pipeline.ColumnCheck{}
+				upstreamCol.Upstreams = []*pipeline.UpstreamColumn{
 					{
 						Column: upstream.Column,
 						Table:  upstreamAsset.Name,
@@ -275,7 +296,7 @@ func (p *LineageExtractor) processLineageColumns(foundPipeline *Pipeline, asset 
 	return nil
 }
 
-func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstreamCol *Column) error {
+func (p *LineageExtractor) addColumnToAsset(asset *pipeline.Asset, colName string, upstreamCol *pipeline.Column) error {
 	if err := validateInputs(asset, colName); err != nil {
 		return err
 	}
@@ -283,7 +304,7 @@ func (p *LineageExtractor) addColumnToAsset(asset *Asset, colName string, upstre
 	return p.handleUpstreamColumns(asset, upstreamCol)
 }
 
-func validateInputs(asset *Asset, colName string) error {
+func validateInputs(asset *pipeline.Asset, colName string) error {
 	if asset == nil || colName == "" {
 		return errors.New("invalid arguments: all parameters must be non-nil and colName must not be empty")
 	}
@@ -293,7 +314,7 @@ func validateInputs(asset *Asset, colName string) error {
 	return nil
 }
 
-func (p *LineageExtractor) handleUpstreamColumns(asset *Asset, upstreamCol *Column) error {
+func (p *LineageExtractor) handleUpstreamColumns(asset *pipeline.Asset, upstreamCol *pipeline.Column) error {
 	existingCol := asset.GetColumnWithName(upstreamCol.Name)
 
 	if existingCol == nil {
@@ -307,7 +328,7 @@ func (p *LineageExtractor) handleUpstreamColumns(asset *Asset, upstreamCol *Colu
 	return nil
 }
 
-func (p *LineageExtractor) handleExistingOrNewColumn(asset *Asset, upstreamCol *Column, existingCol *Column) error {
+func (p *LineageExtractor) handleExistingOrNewColumn(asset *pipeline.Asset, upstreamCol *pipeline.Column, existingCol *pipeline.Column) error {
 	updateExistingColumn(existingCol, upstreamCol)
 	for _, upstream := range upstreamCol.Upstreams {
 		if !upstreamExists(existingCol.Upstreams, upstream) {
@@ -319,7 +340,7 @@ func (p *LineageExtractor) handleExistingOrNewColumn(asset *Asset, upstreamCol *
 	return nil
 }
 
-func updateExistingColumn(existingCol *Column, upstreamCol *Column) {
+func updateExistingColumn(existingCol *pipeline.Column, upstreamCol *pipeline.Column) {
 	if len(existingCol.Description) == 0 {
 		existingCol.Description = upstreamCol.Description
 	}
@@ -334,7 +355,7 @@ func updateExistingColumn(existingCol *Column, upstreamCol *Column) {
 	existingCol.PrimaryKey = false
 }
 
-func (p *LineageExtractor) updateAssetColumn(asset *Asset, col *Column) {
+func (p *LineageExtractor) updateAssetColumn(asset *pipeline.Asset, col *pipeline.Column) {
 	for key, assetCol := range asset.Columns {
 		if strings.EqualFold(assetCol.Name, col.Name) {
 			asset.Columns[key] = *col
@@ -343,7 +364,7 @@ func (p *LineageExtractor) updateAssetColumn(asset *Asset, col *Column) {
 	}
 }
 
-func upstreamExists(upstreams []*UpstreamColumn, newUpstream *UpstreamColumn) bool {
+func upstreamExists(upstreams []*pipeline.UpstreamColumn, newUpstream *pipeline.UpstreamColumn) bool {
 	for _, existing := range upstreams {
 		if strings.EqualFold(existing.Column, newUpstream.Column) &&
 			strings.EqualFold(existing.Table, newUpstream.Table) {
@@ -354,7 +375,7 @@ func upstreamExists(upstreams []*UpstreamColumn, newUpstream *UpstreamColumn) bo
 }
 
 // makeColumnMap creates a map of column names to their types from a slice of columns.
-func makeColumnMap(columns []Column) map[string]string {
+func makeColumnMap(columns []pipeline.Column) map[string]string {
 	if len(columns) == 0 {
 		return make(map[string]string)
 	}
