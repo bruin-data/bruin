@@ -9,25 +9,52 @@ import (
 )
 
 func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs []string) []string {
-	parameters := map[string]string{
-		"loader_file_format":   "--loader-file-format",
-		"incremental_key":      "--incremental-key",
-		"incremental_strategy": "--incremental-strategy",
-		"partition_by":         "--partition-by",
-		"cluster_by":           "--cluster-by",
-		"sql_backend":          "--sql-backend",
-		"loader_file_size":     "--loader-file-size",
-		"schema_naming":        "--schema-naming",
-		"extract_parallelism":  "--extract-parallelism",
-		"sql_reflection_level": "--sql-reflection-level",
-		"sql_limit":            "--sql-limit",
-		"sql_exclude_columns":  "--sql-exclude-columns",
+	if value, exists := asset.Parameters["incremental_key"]; exists && value != "" {
+		cmdArgs = append(cmdArgs, "--incremental-key", value)
 	}
 
-	for param, flag := range parameters {
-		if value, exists := asset.Parameters[param]; exists && value != "" {
-			cmdArgs = append(cmdArgs, flag, value)
-		}
+	if value, exists := asset.Parameters["incremental_strategy"]; exists && value != "" {
+		cmdArgs = append(cmdArgs, "--incremental-strategy", value)
+	}
+
+	if value, exists := asset.Parameters["loader_file_format"]; exists && value != "" {
+		cmdArgs = append(cmdArgs, "--loader-file-format", value)
+	}
+
+	if value, exists := asset.Parameters["partition_by"]; exists && value != "" {
+		cmdArgs = append(cmdArgs, "--partition-by", value)
+	}
+
+	if value, exists := asset.Parameters["cluster_by"]; exists && value != "" {
+		cmdArgs = append(cmdArgs, "--cluster-by", value)
+	}
+
+	if value, exists := asset.Parameters["sql_backend"]; exists && value != "" {
+		cmdArgs = append(cmdArgs, "--sql-backend", value)
+	}
+
+	if value, exists := asset.Parameters["loader_file_size"]; exists && value != "" {
+		cmdArgs = append(cmdArgs, "--loader-file-size", value)
+	}
+
+	if value, exists := asset.Parameters["schema_naming"]; exists && value != "" {
+		cmdArgs = append(cmdArgs, "--schema-naming", value)
+	}
+
+	if value, exists := asset.Parameters["extract_parallelism"]; exists && value != "" {
+		cmdArgs = append(cmdArgs, "--extract-parallelism", value)
+	}
+
+	if value, exists := asset.Parameters["sql_reflection_level"]; exists && value != "" {
+		cmdArgs = append(cmdArgs, "--sql-reflection-level", value)
+	}
+
+	if value, exists := asset.Parameters["sql_limit"]; exists && value != "" {
+		cmdArgs = append(cmdArgs, "--sql-limit", value)
+	}
+
+	if value, exists := asset.Parameters["sql_exclude_columns"]; exists && value != "" {
+		cmdArgs = append(cmdArgs, "--sql-exclude-columns", value)
 	}
 
 	// Handle primary keys
