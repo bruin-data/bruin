@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -120,7 +121,7 @@ COMMIT;`, task.Name, task.Name, query), nil
 
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error) {
 	if asset.Materialization.IncrementalKey == "" {
-		return "", fmt.Errorf("incremental_key is required for time_interval strategy")
+		return "", errors.New("incremental_key is required for time_interval strategy")
 	}
 
 	startVar := "{{start_timestamp}}"
