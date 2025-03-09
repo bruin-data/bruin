@@ -6,6 +6,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/pkg/errors"
 )
 
 func NewMaterializer(fullRefresh bool) *pipeline.Materializer {
@@ -77,7 +78,7 @@ COMMIT;`, task.Name, task.Name, query), nil
 
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error) {
 	if asset.Materialization.IncrementalKey == "" {
-		return "", fmt.Errorf("incremental_key is required for time_interval strategy")
+		return "", errors.New("incremental_key is required for time_interval strategy")
 	}
 
 	startVar := "{{start_timestamp}}"
