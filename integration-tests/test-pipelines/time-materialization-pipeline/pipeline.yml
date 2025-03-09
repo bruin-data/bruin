@@ -1,0 +1,4 @@
+name: time-materialization-pipeline
+
+default_connections:
+   duckdb: "duckdb-time-materialization"

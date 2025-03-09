@@ -1,0 +1,142 @@
+{
+    "columns": [
+        {
+            "name": "product_id"
+        },
+        {
+            "name": "product_name"
+        },
+        {
+            "name": "price"
+        },
+        {
+            "name": "stock"
+        },
+        {
+            "name": "dt"
+        }
+    ],
+    "rows": [
+        [
+            1,
+            "Laptop",
+            {
+                "Width": 5,
+                "Scale": 2,
+                "Value": 99999
+            },
+            10,
+            "2025-03-01T00:00:00Z"
+        ],
+        [
+            2,
+            "Smartphone",
+            {
+                "Width": 5,
+                "Scale": 2,
+                "Value": 69999
+            },
+            50,
+            "2025-03-16T00:00:00Z"
+        ],
+        [
+            3,
+            "Headphones",
+            {
+                "Width": 5,
+                "Scale": 2,
+                "Value": 19999
+            },
+            100,
+            "2025-03-14T00:00:00Z"
+        ],
+        [
+            4,
+            "Monitor",
+            {
+                "Width": 5,
+                "Scale": 2,
+                "Value": 29999
+            },
+            25,
+            "2025-03-15T00:00:00Z"
+        ],
+        [
+            5,
+            "Keyboard",
+            {
+                "Width": 5,
+                "Scale": 2,
+                "Value": 4999
+            },
+            75,
+            "2025-03-10T00:00:00Z"
+        ],
+        [
+            6,
+            "Mouse",
+            {
+                "Width": 5,
+                "Scale": 2,
+                "Value": 2999
+            },
+            120,
+            "2025-03-09T00:00:00Z"
+        ],
+        [
+            7,
+            "Tablet",
+            {
+                "Width": 5,
+                "Scale": 2,
+                "Value": 39999
+            },
+            40,
+            "2025-03-11T00:00:00Z"
+        ],
+        [
+            8,
+            "Smartwatch",
+            {
+                "Width": 5,
+                "Scale": 2,
+                "Value": 24999
+            },
+            30,
+            "2025-03-12T00:00:00Z"
+        ],
+        [
+            9,
+            "Gaming Console",
+            {
+                "Width": 5,
+                "Scale": 2,
+                "Value": 49999
+            },
+            20,
+            "2025-03-13T00:00:00Z"
+        ],
+        [
+            10,
+            "External Hard Drive",
+            {
+                "Width": 5,
+                "Scale": 2,
+                "Value": 8999
+            },
+            60,
+            "2025-03-08T00:00:00Z"
+        ],
+        [
+            11,
+            "Vr Headset",
+            {
+                "Width": 5,
+                "Scale": 2,
+                "Value": 8999
+            },
+            60,
+            "2025-03-13T00:00:00Z"
+        ]
+    ]
+}

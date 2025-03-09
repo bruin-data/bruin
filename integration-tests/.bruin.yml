@@ -151,5 +151,10 @@ environments:
       duckdb:
         - name: "duckdb-query-asset"
           path: "duckdb-files/query-asset.db"
+  env-time-materialization:
+    connections:
+      duckdb:
+        - name: "duckdb-time-materialization"
+          path: "duckdb-files/time-materialization.db"
 
 
