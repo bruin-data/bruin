@@ -729,6 +729,18 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 					Description: "Materialization strategy 'time_interval' requires the 'incremental_key' field to be set",
 				})
 			}
+			if asset.Materialization.TimeGranularity == "" {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "Materialization strategy 'time_interval' requires the 'time_granularity' field to be set",
+				})
+			}
+			if asset.Materialization.TimeGranularity != pipeline.MaterializationTimeGranularityDate && asset.Materialization.TimeGranularity != pipeline.MaterializationTimeGranularityTimestamp {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "'time_granularity' can be either 'date' or 'timestamp'.",
+				})
+			}
 		default:
 			issues = append(issues, &Issue{
 				Task: asset,
