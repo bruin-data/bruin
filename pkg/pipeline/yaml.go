@@ -327,7 +327,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		ClusterBy:       definition.Materialization.ClusterBy,
 		PartitionBy:     definition.Materialization.PartitionBy,
 		IncrementalKey:  definition.Materialization.IncrementalKey,
-		TimeGranularity: definition.Materialization.TimeGranularity,
+		TimeGranularity: MaterializationTimeGranularity(strings.ToLower(definition.Materialization.TimeGranularity)),
 	}
 
 	columns := make([]Column, len(definition.Columns))
