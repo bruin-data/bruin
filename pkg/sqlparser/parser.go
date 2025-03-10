@@ -80,7 +80,7 @@ func (s *SQLParser) Start() error {
 	if err != nil {
 		return err
 	}
-	s.cmd.Stderr = os.Stderr
+	// s.cmd.Stderr = os.Stderr
 
 	s.stdout, err = s.cmd.StdoutPipe()
 	if err != nil {

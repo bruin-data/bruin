@@ -106,85 +106,107 @@ def get_tables(query: str, dialect: str):
         "tables": list(set([get_table_name(table) for table in tables])),
     }
 
-
 def get_column_lineage(query: str, schema: dict, dialect: str):
-    parsed = parse_one(query, dialect=dialect)
+    try:
+        parsed = parse_one(query, dialect=dialect)
+        if not isinstance(parsed, exp.Query):
+            return {"columns": [], "non_selected_columns": [], "errors": ["Failed to parse query"]}
+    except Exception as e:
+        return {"columns": [], "non_selected_columns": [], "errors": [f"Parse error: {str(e)}"]}
+
+    result = []
     errors = []
-    if not isinstance(parsed, exp.Query):
-        return {"columns": []}
+
     try:
         nested_schema = schema_dict_to_schema_object(schema)
         try:
             optimized = optimize(parsed, nested_schema, dialect=dialect)
         except Exception:
-            # try again without dialect, this solves some issues, e.g. https://github.com/tobymao/sqlglot/issues/4538
-            optimized = optimize(parsed, nested_schema)
+            # try again without dialect, this solves some issues
+            try:
+                optimized = optimize(parsed, nested_schema)
+            except Exception as e:
+                return {"columns": [], "non_selected_columns": [], "errors": [f"Optimization error: {str(e)}"]}
     except Exception as e:
-        logging.error(
-            f"Error optimizing query: {e}, query and schema: {json.dumps({'query': query, 'schema': schema})}"
-        )
-    
-        return {"columns": [], "errors": [str(e)]}
+        return {"columns": [], "non_selected_columns": [], "errors": [f"Schema error: {str(e)}"]}
 
-    result = []
+    try:
+        cols = extract_columns(optimized)
+    except Exception as e:
+        return {"columns": [], "non_selected_columns": [], "errors": [f"Column extraction error: {str(e)}"]}
 
-    cols = extract_columns(optimized)
     for col in cols:
         try:
             ll = lineage.lineage(col["name"], optimized, schema, dialect=dialect)
-        except Exception:
-            errors.append(str(e))
-            continue
-
-        cl = []
-        leaves: list[Node] = []
-        find_leaf_nodes(ll, leaves)
-
-        for ds in leaves:
-            if isinstance(ds.expression.this, exp.Literal) or isinstance(
-                ds.expression.this, exp.Anonymous
-            ):
+            cl = []
+            leaves: list[Node] = []
+            
+            try:
+                find_leaf_nodes(ll, leaves)
+            except Exception:
                 continue
 
-            if isinstance(ds.expression, exp.Table):
-                cl.append(
-                    {
-                        "column": ds.name.split(".")[-1],
-                        "table": merge_parts(ds.expression),
-                    }
-                )
+            for ds in leaves:
+                try:
+                    if isinstance(ds.expression.this, exp.Literal) or isinstance(
+                        ds.expression.this, exp.Anonymous
+                    ):
+                        continue
 
-        # Deduplicate based on column-table combination
-        cl = [dict(t) for t in {tuple(d.items()) for d in cl}]
-        cl.sort(key=lambda x: x["table"])
+                    if isinstance(ds.expression, exp.Table):
+                        cl.append(
+                            {
+                                "column": ds.name.split(".")[-1],
+                                "table": merge_parts(ds.expression),
+                            }
+                        )
+                except Exception:
+                    continue
 
-        result.append({"name": col["name"], "upstream": cl, "type": col["type"]})
+            # Deduplicate based on column-table combination
+            cl = [dict(t) for t in {tuple(d.items()) for d in cl}]
+            cl.sort(key=lambda x: x["table"])
+
+            result.append({"name": col["name"], "upstream": cl, "type": col.get("type", "")})
+        except Exception as e:
+            errors.append(f"Lineage error for column {col['name']}: {str(e)}")
+            continue
 
     result.sort(key=lambda x: x["name"])
 
-    non_selected_columns_dict = {}
-    for column in extract_non_selected_columns(optimized):
-        if column.name not in non_selected_columns_dict:
-            non_selected_columns_dict[column.name] = {
-                "name": column.name,
-                "upstream": [],
-            }
-        non_selected_columns_dict[column.name]["upstream"].append(
-            {"column": column.name, "table": column.table}
-        )
-    non_selected_columns = list(non_selected_columns_dict.values())
+    non_selected_columns = []
+    try:
+        non_selected_columns_dict = {}
+        for column in extract_non_selected_columns(optimized):
+            try:
+                if column.name not in non_selected_columns_dict:
+                    non_selected_columns_dict[column.name] = {
+                        "name": column.name,
+                        "upstream": [],
+                    }
+                non_selected_columns_dict[column.name]["upstream"].append(
+                    {"column": column.name, "table": column.table}
+                )
+            except Exception:
+                continue
+        non_selected_columns = list(non_selected_columns_dict.values())
+    except Exception as e:
+        errors.append(f"Non-selected columns error: {str(e)}")
 
-    for col in result:
-        col["upstream"] = sorted(col["upstream"], key=lambda x: x["column"].lower())
-    for col in non_selected_columns:
-        col["upstream"] = sorted(col["upstream"], key=lambda x: x["column"].lower())
+    # Sort upstreams even if there are errors
+    try:
+        for col in result:
+            col["upstream"] = sorted(col["upstream"], key=lambda x: x["column"].lower())
+        for col in non_selected_columns:
+            col["upstream"] = sorted(col["upstream"], key=lambda x: x["column"].lower())
+    except Exception as e:
+        errors.append(f"Sorting error: {str(e)}")
 
     return {
         "columns": result,
         "non_selected_columns": non_selected_columns,
         "errors": errors,
     }
-
 
 def find_leaf_nodes(node: Node, leaf_nodes):
     if not node.downstream:
