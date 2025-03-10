@@ -902,7 +902,6 @@ func assertLineageError(t *testing.T, got *lint.PipelineIssues, want error) {
 	t.Helper()
 
 	if want == nil {
-
 		if len(got.Issues) > 0 {
 			t.Errorf("parseLineageRecursive() error = %v, want nil", got)
 		}
@@ -1287,7 +1286,8 @@ func TestHandleExistingOrNewColumn(t *testing.T) {
 				Name:        "id",
 				Type:        "bigint",
 				Description: "New description",
-				Upstreams: []*pipeline.UpstreamColumn{{Column: "new_id1", Table: "new_table1"},
+				Upstreams: []*pipeline.UpstreamColumn{
+					{Column: "new_id1", Table: "new_table1"},
 					{Column: "new_id2", Table: "new_table2"},
 				},
 			},
@@ -1301,7 +1301,8 @@ func TestHandleExistingOrNewColumn(t *testing.T) {
 				Name:        "id",
 				Type:        "integer",
 				Description: "Existing description",
-				Upstreams: []*pipeline.UpstreamColumn{{Column: "old_id", Table: "old_table"},
+				Upstreams: []*pipeline.UpstreamColumn{
+					{Column: "old_id", Table: "old_table"},
 					{Column: "new_id1", Table: "new_table1"},
 					{Column: "new_id2", Table: "new_table2"},
 				},
