@@ -84,7 +84,6 @@ func (p *LineageExtractor) ColumnLineage(foundPipeline *pipeline.Pipeline, asset
 			continue
 		}
 		_ = p.ColumnLineage(foundPipeline, upstreamAsset, processedAssets)
-
 	}
 
 	err := p.parseLineage(foundPipeline, asset, p.TableSchemaForUpstreams(foundPipeline, asset))
@@ -126,6 +125,10 @@ func (p *LineageExtractor) parseLineage(foundPipeline *pipeline.Pipeline, asset 
 	lineage, err := p.sqlParser.ColumnLineage(query, dialect, metadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse column lineage: %w", err)
+	}
+
+	if len(lineage.Errors) > 0 {
+		return fmt.Errorf("failed to parse column lineage: %s", strings.Join(lineage.Errors, ", "))
 	}
 
 	return p.processLineageColumns(foundPipeline, asset, lineage)

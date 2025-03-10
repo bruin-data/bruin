@@ -1618,3 +1618,71 @@ func TestUpstreamExists(t *testing.T) {
 		})
 	}
 }
+
+func TestLineageError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		pipeline *pipeline.Pipeline
+	}{
+		{
+			name: "parseLineageRecursive() error",
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "table1",
+						Type: "bq.sql",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT * FROM table2",
+						},
+						Upstreams: []pipeline.Upstream{{Value: "table2"}},
+					},
+					{
+						Name: "table2",
+						Type: "bq.sql",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT * FROM",
+						},
+						Upstreams: []pipeline.Upstream{{Value: "table3"}},
+					},
+					{
+						Name: "table3",
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64", PrimaryKey: true, Description: "Just a number", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
+								{Name: "not_null"},
+							}},
+							{Name: "name", Type: "str", Description: "Just a name", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
+								{Name: "not_null"},
+							}},
+							{Name: "age", Type: "int64", Description: "Just an age", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
+								{Name: "not_null"},
+							}},
+						},
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT id,name,age FROM table4",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	lineage := NewLineageExtractor(SQLParser)
+	rule := &lint.SimpleRule{
+		Identifier:       "column-lineage",
+		Fast:             true,
+		Severity:         lint.ValidatorSeverityCritical,
+		ApplicableLevels: []lint.Level{lint.LevelPipeline, lint.LevelAsset},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := lineage.ColumnLineage(tt.pipeline, tt.pipeline.Assets[0], map[string]bool{})
+			if len(got.Issues[rule]) == 0 {
+				t.Errorf("expected errors, got %v ============", got)
+			}
+
+		})
+	}
+}

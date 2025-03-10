@@ -109,6 +109,7 @@ def get_tables(query: str, dialect: str):
 
 def get_column_lineage(query: str, schema: dict, dialect: str):
     parsed = parse_one(query, dialect=dialect)
+    errors = []
     if not isinstance(parsed, exp.Query):
         return {"columns": []}
     try:
@@ -120,9 +121,10 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
             optimized = optimize(parsed, nested_schema)
     except Exception as e:
         logging.error(
-            f"Error optimizing query: {e}, query and schema: { json.dumps({'query': query, 'schema': schema}) }"
+            f"Error optimizing query: {e}, query and schema: {json.dumps({'query': query, 'schema': schema})}"
         )
-        return {"columns": [], "error": str(e)}
+    
+        return {"columns": [], "errors": [str(e)]}
 
     result = []
 
@@ -131,6 +133,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
         try:
             ll = lineage.lineage(col["name"], optimized, schema, dialect=dialect)
         except Exception:
+            errors.append(str(e))
             continue
 
         cl = []
@@ -179,6 +182,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
     return {
         "columns": result,
         "non_selected_columns": non_selected_columns,
+        "errors": errors,
     }
 
 
