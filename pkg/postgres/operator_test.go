@@ -90,7 +90,6 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "multiple queries found but materialization is enabled, should fail",
 			setup: func(f *fields) {
-
 				f.m.On("Render", mock.AnythingOfType("*pipeline.Asset"), "some query").
 					Return("some materialized query", nil)
 				f.e.On("ExtractQueriesFromString", "some materialized query").
