@@ -71,8 +71,6 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 		name          string
 		asset         *pipeline.Asset
 		fullRefresh   bool
-		startTime     *time.Time
-		endTime       *time.Time
 		want          []string
 		extraPackages []string
 	}{
