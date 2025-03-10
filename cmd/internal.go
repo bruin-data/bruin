@@ -8,6 +8,8 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
+	columnLineage "github.com/bruin-data/bruin/pkg/lineage"
+	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
@@ -166,11 +168,23 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool, slimRespons
 
 		defer sqlParser.Close()
 		processedAssets := make(map[string]bool)
-		lineage := pipeline.NewLineageExtractor(sqlParser)
+		lineage := columnLineage.NewLineageExtractor(sqlParser)
+		issues := &lint.PipelineIssues{
+			Issues:   make(map[lint.Rule][]*lint.Issue),
+			Pipeline: foundPipeline,
+		}
+
+		rule := &lint.SimpleRule{
+			Identifier:       "column-lineage",
+			Fast:             true,
+			Severity:         lint.ValidatorSeverityCritical,
+			ApplicableLevels: []lint.Level{lint.LevelPipeline, lint.LevelAsset},
+		}
+
 		for _, asset := range foundPipeline.Assets {
-			if err := lineage.ColumnLineage(foundPipeline, asset, processedAssets); err != nil {
-				printErrorJSON(err)
-				return cli.Exit("", 1)
+			errIssues := lineage.ColumnLineage(foundPipeline, asset, processedAssets)
+			if errIssues != nil {
+				issues.Issues[rule] = append(issues.Issues[rule], errIssues.Issues[rule]...)
 			}
 		}
 	}
@@ -314,11 +328,23 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 			return cli.Exit("", 1)
 		}
 
+		issues := &lint.PipelineIssues{
+			Issues:   make(map[lint.Rule][]*lint.Issue),
+			Pipeline: foundPipeline,
+		}
+
+		rule := &lint.SimpleRule{
+			Identifier:       "column-lineage",
+			Fast:             true,
+			Severity:         lint.ValidatorSeverityCritical,
+			ApplicableLevels: []lint.Level{lint.LevelPipeline, lint.LevelAsset},
+		}
+
 		processedAssets := make(map[string]bool)
-		lineageExtractor := pipeline.NewLineageExtractor(sqlParser)
-		if err := lineageExtractor.ColumnLineage(foundPipeline, asset, processedAssets); err != nil {
-			printErrorJSON(err)
-			return cli.Exit("", 1)
+		lineageExtractor := columnLineage.NewLineageExtractor(sqlParser)
+		errorIssues := lineageExtractor.ColumnLineage(foundPipeline, asset, processedAssets)
+		if errorIssues != nil {
+			issues.Issues[rule] = append(issues.Issues[rule], errorIssues.Issues[rule]...)
 		}
 	}
 
