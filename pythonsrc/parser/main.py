@@ -1,5 +1,3 @@
-import json
-import logging
 from dataclasses import dataclass
 from sqlglot import parse_one, exp, lineage
 from sqlglot.lineage import Node
@@ -106,13 +104,22 @@ def get_tables(query: str, dialect: str):
         "tables": list(set([get_table_name(table) for table in tables])),
     }
 
+
 def get_column_lineage(query: str, schema: dict, dialect: str):
     try:
         parsed = parse_one(query, dialect=dialect)
         if not isinstance(parsed, exp.Query):
-            return {"columns": [], "non_selected_columns": [], "errors": ["Failed to parse query"]}
+            return {
+                "columns": [],
+                "non_selected_columns": [],
+                "errors": ["Failed to parse query"],
+            }
     except Exception as e:
-        return {"columns": [], "non_selected_columns": [], "errors": [f"Parse error: {str(e)}"]}
+        return {
+            "columns": [],
+            "non_selected_columns": [],
+            "errors": [f"Parse error: {str(e)}"],
+        }
 
     result = []
     errors = []
@@ -126,21 +133,33 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
             try:
                 optimized = optimize(parsed, nested_schema)
             except Exception as e:
-                return {"columns": [], "non_selected_columns": [], "errors": [f"Optimization error: {str(e)}"]}
+                return {
+                    "columns": [],
+                    "non_selected_columns": [],
+                    "errors": [f"Optimization error: {str(e)}"],
+                }
     except Exception as e:
-        return {"columns": [], "non_selected_columns": [], "errors": [f"Schema error: {str(e)}"]}
+        return {
+            "columns": [],
+            "non_selected_columns": [],
+            "errors": [f"Schema error: {str(e)}"],
+        }
 
     try:
         cols = extract_columns(optimized)
     except Exception as e:
-        return {"columns": [], "non_selected_columns": [], "errors": [f"Column extraction error: {str(e)}"]}
+        return {
+            "columns": [],
+            "non_selected_columns": [],
+            "errors": [f"Column extraction error: {str(e)}"],
+        }
 
     for col in cols:
         try:
             ll = lineage.lineage(col["name"], optimized, schema, dialect=dialect)
             cl = []
             leaves: list[Node] = []
-            
+
             try:
                 find_leaf_nodes(ll, leaves)
             except Exception:
@@ -167,7 +186,9 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
             cl = [dict(t) for t in {tuple(d.items()) for d in cl}]
             cl.sort(key=lambda x: x["table"])
 
-            result.append({"name": col["name"], "upstream": cl, "type": col.get("type", "")})
+            result.append(
+                {"name": col["name"], "upstream": cl, "type": col.get("type", "")}
+            )
         except Exception as e:
             errors.append(f"Lineage error for column {col['name']}: {str(e)}")
             continue
@@ -207,6 +228,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
         "non_selected_columns": non_selected_columns,
         "errors": errors,
     }
+
 
 def find_leaf_nodes(node: Node, leaf_nodes):
     if not node.downstream:

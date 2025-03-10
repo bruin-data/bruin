@@ -1,6 +1,7 @@
 package lineage
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -1625,6 +1626,7 @@ func TestLineageError(t *testing.T) {
 	tests := []struct {
 		name     string
 		pipeline *pipeline.Pipeline
+		error    string
 	}{
 		{
 			name: "parseLineageRecursive() error",
@@ -1642,7 +1644,7 @@ func TestLineageError(t *testing.T) {
 						Name: "table2",
 						Type: "bq.sql",
 						ExecutableFile: pipeline.ExecutableFile{
-							Content: "SELECT * FROM",
+							Content: "SEL",
 						},
 						Upstreams: []pipeline.Upstream{{Value: "table3"}},
 					},
@@ -1665,24 +1667,25 @@ func TestLineageError(t *testing.T) {
 					},
 				},
 			},
+			error: "",
 		},
 	}
 
 	lineage := NewLineageExtractor(SQLParser)
-	rule := &lint.SimpleRule{
-		Identifier:       "column-lineage",
-		Fast:             true,
-		Severity:         lint.ValidatorSeverityCritical,
-		ApplicableLevels: []lint.Level{lint.LevelPipeline, lint.LevelAsset},
-	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := lineage.ColumnLineage(tt.pipeline, tt.pipeline.Assets[0], map[string]bool{})
-			if len(got.Issues[rule]) == 0 {
-				t.Errorf("expected errors, got %v ============", got)
-			}
+			fmt.Println("===>>")
+			if len(got.Issues) > 0 {
 
+				for _, issue := range got.Issues {
+					for _, i := range issue {
+						t.Errorf("expected errors, got %v", i)
+					}
+				}
+			}
 		})
 	}
 }

@@ -93,7 +93,6 @@ func (p *LineageExtractor) ColumnLineage(foundPipeline *pipeline.Pipeline, asset
 			Description: err.Error(),
 			Context:     []string{},
 		})
-
 	}
 
 	return &issues
