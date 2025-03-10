@@ -1,7 +1,6 @@
 package lineage
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -1636,7 +1635,7 @@ func TestLineageError(t *testing.T) {
 						Name: "table1",
 						Type: "bq.sql",
 						ExecutableFile: pipeline.ExecutableFile{
-							Content: "SELECT * FROM table2",
+							Content: "SELE",
 						},
 						Upstreams: []pipeline.Upstream{{Value: "table2"}},
 					},
@@ -1667,25 +1666,16 @@ func TestLineageError(t *testing.T) {
 					},
 				},
 			},
-			error: "",
+			error: "failed to parse column lineage: Failed to parse query",
 		},
 	}
 
 	lineage := NewLineageExtractor(SQLParser)
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := lineage.ColumnLineage(tt.pipeline, tt.pipeline.Assets[0], map[string]bool{})
-			fmt.Println("===>>")
-			if len(got.Issues) > 0 {
-
-				for _, issue := range got.Issues {
-					for _, i := range issue {
-						t.Errorf("expected errors, got %v", i)
-					}
-				}
-			}
-		})
+		got := lineage.ColumnLineage(tt.pipeline, tt.pipeline.Assets[0], map[string]bool{})
+		if len(got.Issues) == 0 {
+			t.Errorf("expected errors, got zero issue")
+		}
 	}
 }
