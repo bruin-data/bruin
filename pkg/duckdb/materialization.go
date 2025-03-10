@@ -29,7 +29,6 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyCreateReplace: buildCreateReplaceQuery,
 		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
 		pipeline.MaterializationStrategyMerge:         errorMaterializer, // not supported yet,
-		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
 	},
 }
 
