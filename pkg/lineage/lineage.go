@@ -86,7 +86,7 @@ func (p *LineageExtractor) ColumnLineage(foundPipeline *pipeline.Pipeline, asset
 		if upstreamAsset == nil {
 			continue
 		}
-		_ = p.ColumnLineage(foundPipeline, upstreamAsset, processedAssets)
+		issues.Issues = append(issues.Issues, p.ColumnLineage(foundPipeline, upstreamAsset, processedAssets).Issues...)
 	}
 
 	err := p.parseLineage(foundPipeline, asset, p.TableSchemaForUpstreams(foundPipeline, asset))
@@ -94,7 +94,9 @@ func (p *LineageExtractor) ColumnLineage(foundPipeline *pipeline.Pipeline, asset
 		issues.Issues = append(issues.Issues, &LineageIssue{
 			Task:        asset,
 			Description: err.Error(),
-			Context:     []string{},
+			Context: []string{
+				asset.ExecutableFile.Content,
+			},
 		})
 	}
 

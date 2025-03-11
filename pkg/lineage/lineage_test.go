@@ -1624,7 +1624,7 @@ func TestLineageError(t *testing.T) {
 	tests := []struct {
 		name     string
 		pipeline *pipeline.Pipeline
-		error    string
+		error    *LineageIssue
 	}{
 		{
 			name: "parseLineageRecursive() error",
@@ -1665,16 +1665,73 @@ func TestLineageError(t *testing.T) {
 					},
 				},
 			},
-			error: "failed to parse column lineage: Failed to parse query",
+			error: &LineageIssue{
+				Description: "failed to parse column lineage: Failed to parse query",
+			},
+		},
+		{
+			name: "parseLineageRecursive() error",
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "table1",
+						Type: "bq.sql",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT * FROM table2",
+						},
+						Upstreams: []pipeline.Upstream{{Value: "table2"}},
+					},
+					{
+						Name: "table2",
+						Type: "bq.sql",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT * FROM table3",
+						},
+						Upstreams: []pipeline.Upstream{{Value: "table3"}},
+					},
+					{
+						Name: "table3",
+						Type: "bq.sql",
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64", PrimaryKey: true, Description: "Just a number", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
+								{Name: "not_null"},
+							}},
+							{Name: "name", Type: "str", Description: "Just a name", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
+								{Name: "not_null"},
+							}},
+							{Name: "age", Type: "int64", Description: "Just an age", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
+								{Name: "not_null"},
+							}},
+						},
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELE*",
+						},
+					},
+				},
+			},
+			error: &LineageIssue{
+				Description: "failed to parse column lineage: Parse error: Required keyword: 'expression' missing for <class 'sqlglot.expressions.Mul'>. Line 1, Col: 5.\n  SELE\x1b[4m*\x1b[0m",
+			},
 		},
 	}
 
 	lineage := NewLineageExtractor(SQLParser)
 
 	for _, tt := range tests {
-		got := lineage.ColumnLineage(tt.pipeline, tt.pipeline.Assets[0], map[string]bool{})
-		if len(got.Issues) == 0 {
+		processedAssets := make(map[string]bool)
+		issues := make([]*LineageIssue, 0)
+		for _, asset := range tt.pipeline.Assets {
+			got := lineage.ColumnLineage(tt.pipeline, asset, processedAssets)
+			if got != nil {
+				issues = append(issues, got.Issues...)
+			}
+		}
+
+		if len(issues) == 0 {
 			t.Errorf("expected errors, got zero issue")
+		}
+		for _, issue := range issues {
+			assert.Contains(t, tt.error.Description, issue.Description)
 		}
 	}
 }
