@@ -23,9 +23,10 @@ func (c *Config) ToClickHouseOptions() *click_house.Options {
 	var tlsConfig *tls.Config
 	if c.Secure != nil {
 		if *c.Secure == 0 {
-			tlsConfig = &tls.Config{}
+			tlsConfig = &tls.Config{
+				MinVersion: tls.VersionTLS12,
+			}
 		}
-
 	}
 	opt := click_house.Options{
 		TLS:  tlsConfig,
