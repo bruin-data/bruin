@@ -79,11 +79,11 @@ func detectGitPath(path string) (string, error) {
 		gitPath := filepath.Join(path, ".git")
 		fi, err := os.Stat(gitPath)
 		if err == nil {
-			if fi.IsDir() {
+			if fi.IsDir() || fi.Mode().IsRegular() {
 				return path, nil
 			}
 
-			return "", fmt.Errorf(".git exist but is not a directory")
+			return "", fmt.Errorf(".git exist but is not a directory or a file")
 		}
 
 		parent := filepath.Dir(path)
