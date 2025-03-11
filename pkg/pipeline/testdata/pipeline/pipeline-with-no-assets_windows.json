@@ -2,6 +2,7 @@
   "legacy_id": "",
   "name": "pipeline-with-no-assets",
   "schedule": "",
+  "snapshot": "",
   "start_date": "",
   "definition_file": {
     "name": "pipeline.yml",
@@ -21,5 +22,6 @@
     "ms_teams" : []
   },
   "catchup": false,
+  "commit": "",
   "retries": 0
 }

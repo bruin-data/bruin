@@ -53,7 +53,6 @@ type PipelineInfo struct {
 	Pipeline           *pipeline.Pipeline
 	RunningForAnAsset  bool
 	RunDownstreamTasks bool
-	Config             *config.Config
 }
 
 var (
@@ -146,6 +145,11 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "debug-ingestr-src",
 				Usage: "Use ingestr from the given path instead of the builtin version.",
 			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Usage:   "the path to the .bruin.yml file",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			defer func() {
@@ -175,6 +179,7 @@ func Run(isDebug *bool) *cli.Command {
 				Only:              c.StringSlice("only"),
 				Output:            c.String("output"),
 				ExpUseWingetForUv: c.Bool("exp-use-winget-for-uv"),
+				ConfigFilePath:    c.String("config-file"),
 			}
 
 			var startDate, endDate time.Time
@@ -295,12 +300,22 @@ func Run(isDebug *bool) *cli.Command {
 				foundPipeline.MetadataPush.Global = true
 			}
 
-			err = switchEnvironment(runConfig.Environment, runConfig.Force, pipelineInfo.Config, os.Stdin)
+			configFilePath := runConfig.ConfigFilePath
+			if configFilePath == "" {
+				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
+			}
+			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+			if err != nil {
+				errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
+				return cli.Exit("", 1)
+			}
+
+			err = switchEnvironment(runConfig.Environment, runConfig.Force, cm, os.Stdin)
 			if err != nil {
 				return err
 			}
 
-			connectionManager, errs := connection.NewManagerFromConfig(pipelineInfo.Config)
+			connectionManager, errs := connection.NewManagerFromConfig(cm)
 			if len(errs) > 0 {
 				printErrors(errs, runConfig.Output, "Failed to register connections")
 				return cli.Exit("", 1)
@@ -331,7 +346,7 @@ func Run(isDebug *bool) *cli.Command {
 			infoPrinter.Printf("\nStarting the pipeline execution...\n")
 			infoPrinter.Println()
 
-			mainExecutors, err := setupExecutors(s, pipelineInfo.Config, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip)
+			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -396,19 +411,14 @@ func ReadState(fs afero.Fs, statePath string, filter *Filter) (*scheduler.Pipeli
 
 func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.SugaredLogger) (*PipelineInfo, error) {
 	pipelinePath := inputPath
-	repoRoot, err := git.FindRepoFromPath(inputPath)
-	if err != nil {
-		errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
-		return nil, err
-	}
-
 	runningForAnAsset := isPathReferencingAsset(inputPath)
 	if runningForAnAsset && runConfig.Tag != "" {
 		errorPrinter.Printf("You cannot use the '--tag' flag when running a single asset.\n")
-		return nil, err
+		return nil, errors.New("you cannot use the '--tag' flag when running a single asset")
 	}
 
 	var task *pipeline.Asset
+	var err error
 	runDownstreamTasks := false
 
 	if runningForAnAsset {
@@ -422,20 +432,7 @@ func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.S
 		}
 	}
 
-	configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
-	cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
-	if err != nil {
-		errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
-		return &PipelineInfo{
-			RunningForAnAsset:  runningForAnAsset,
-			RunDownstreamTasks: runDownstreamTasks,
-			Config:             cm,
-		}, err
-	}
-
-	logger.Debugf("loaded the config from path '%s'", configFilePath)
-
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath, true)
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath, pipeline.WithMutate())
 	if err != nil {
 		errorPrinter.Println("failed to build pipeline, are you sure you have referred the right path?")
 		errorPrinter.Println("\nHint: You need to run this command with a path to either the pipeline directory or the asset file itself directly.")
@@ -444,7 +441,6 @@ func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.S
 			Pipeline:           foundPipeline,
 			RunningForAnAsset:  runningForAnAsset,
 			RunDownstreamTasks: runDownstreamTasks,
-			Config:             cm,
 		}, err
 	}
 
@@ -456,7 +452,6 @@ func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.S
 				RunningForAnAsset:  runningForAnAsset,
 				RunDownstreamTasks: runDownstreamTasks,
 				Pipeline:           foundPipeline,
-				Config:             cm,
 			}, err
 		}
 
@@ -475,7 +470,6 @@ func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.S
 				RunningForAnAsset:  runningForAnAsset,
 				RunDownstreamTasks: runDownstreamTasks,
 				Pipeline:           foundPipeline,
-				Config:             cm,
 			}, err
 		}
 	}
@@ -484,7 +478,6 @@ func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.S
 		Pipeline:           foundPipeline,
 		RunningForAnAsset:  runningForAnAsset,
 		RunDownstreamTasks: runConfig.Downstream,
-		Config:             cm,
 	}, nil
 }
 

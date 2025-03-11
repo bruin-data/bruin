@@ -13,7 +13,6 @@ WHERE dt BETWEEN '{{ start_date |  date_format('%Y-%m-%d') }}'
 Bruin CLI supports various default filters supported by Jinja, you can see the [list here](https://github.com/NikolaLohinski/gonja/blob/master/docs/filters.md).
 
 ## Date Filters
-
 ### `add_years`
 
 Adds the given number of years to the date.
@@ -73,6 +72,41 @@ Adds the given number of milliseconds to the date.
 {{ end_datetime | add_milliseconds(3) }}
 ```
 
+### `truncate_year`
+
+Truncates the given date to the first day of the year at midnight (00:00:00).
+
+```jinja
+{{ "2024-03-20 15:30:00" | truncate_year }}  
+# Returns: "2024-01-01 00:00:00"
+```
+
+### `truncate_month`
+
+Truncates the given date to the first day of the month at midnight (00:00:00).
+
+```jinja
+{{ "2024-03-20 15:30:00" | truncate_month }}  
+# Returns: "2024-03-01 00:00:00"
+```
+
+### `truncate_day`
+
+Truncates the given date to the start of the day at midnight (00:00:00).
+
+```jinja
+{{ "2024-03-20 15:30:00" | truncate_day }}  
+# Returns: "2024-03-20 00:00:00"
+```
+
+### `truncate_hour`
+
+Truncates the given date to the start of the hour (XX:00:00).
+
+```jinja
+{{ "2024-03-20 15:30:45" | truncate_hour }}  
+# Returns: "2024-03-20 15:00:00"
+```
 
 ### `date_add`
 

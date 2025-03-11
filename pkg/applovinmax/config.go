@@ -1,13 +1,10 @@
 package applovinmax
 
-import "fmt"
-
 type Config struct {
-	APIKey      string
-	Application string
+	APIKey string
 }
 
-// applovinmax://?api_key=<your_api_key>&application=<application_name>
+// applovinmax://?api_key=<your_api_key>
 func (c *Config) GetIngestrURI() string {
-	return fmt.Sprintf("applovinmax://?api_key=%s&application=%s", c.APIKey, c.Application)
+	return "applovinmax://?api_key=" + c.APIKey
 }

@@ -688,10 +688,10 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 		}
 
 		if asset.Materialization.IncrementalKey != "" &&
-			asset.Materialization.Strategy != pipeline.MaterializationStrategyDeleteInsert {
+			asset.Materialization.Strategy != pipeline.MaterializationStrategyDeleteInsert && asset.Materialization.Strategy != pipeline.MaterializationStrategyTimeInterval {
 			issues = append(issues, &Issue{
 				Task:        asset,
-				Description: "Incremental key is only supported with 'delete+insert' strategy",
+				Description: "Incremental key is only supported with 'delete+insert' or 'time_interval' strategies.",
 			})
 		}
 
@@ -722,7 +722,25 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 					Description: "Materialization strategy 'merge' requires the 'primary_key' field to be set on at least one column",
 				})
 			}
-
+		case pipeline.MaterializationStrategyTimeInterval:
+			if asset.Materialization.IncrementalKey == "" {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "Materialization strategy 'time_interval' requires the 'incremental_key' field to be set",
+				})
+			}
+			if asset.Materialization.TimeGranularity == "" {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "Materialization strategy 'time_interval' requires the 'time_granularity' field to be set",
+				})
+			}
+			if asset.Materialization.TimeGranularity != pipeline.MaterializationTimeGranularityDate && asset.Materialization.TimeGranularity != pipeline.MaterializationTimeGranularityTimestamp {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "'time_granularity' can be either 'date' or 'timestamp'.",
+				})
+			}
 		default:
 			issues = append(issues, &Issue{
 				Task: asset,

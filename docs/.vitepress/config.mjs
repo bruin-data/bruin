@@ -100,6 +100,13 @@ export default defineConfig({
                         items: [
                             {text: "Getting Started", link: "/vscode-extension/getting-started"},
                             {text: "Configuration", link: "/vscode-extension/configuration"},
+                            {text: "Panels Overview", link: "/vscode-extension/panel-overview",
+                                items: [
+                                    {text: "Side Panel", link: "/vscode-extension/panels/side-panel"},
+                                    {text: "Lineage", link: "/vscode-extension/panels/lineage-panel"},
+                                    {text: "Query Preview", link: "/vscode-extension/panels/query-preview"},
+                                ],
+                            },
                         ],
                     },
 
@@ -135,6 +142,7 @@ export default defineConfig({
                         ]
                     },
                     {text: "Columns", link: "/assets/columns"},
+                    {text: "Credentials", link: "/getting-started/credentials"},
                     {text: "Materialization", link: "/assets/materialization"},
                     {
                         text: " Jinja Templating",
@@ -167,6 +175,7 @@ export default defineConfig({
                             {text: "Gorgias", link: "/ingestion/gorgias"},
                             {text: "Hubspot", link: "/ingestion/hubspot.md"},
                             {text: "Kafka", link: "/ingestion/kafka.md"},
+                            {text: "Kinesis", link: "/ingestion/kinesis.md"},
                             {text: "Klaviyo", link: "/ingestion/klaviyo.md"},
                             {text: "LinkedIn Ads", link: "/ingestion/linkedinads.md"},
                             {text: "MongoDB", link: "/ingestion/mongo"},

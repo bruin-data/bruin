@@ -51,6 +51,11 @@ func Render() *cli.Command {
 				Aliases: []string{"o"},
 				Usage:   "output format (json)",
 			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Usage:   "the path to the .bruin.yml file",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			fullRefresh := c.Bool("full-refresh")
@@ -142,12 +147,16 @@ func Render() *cli.Command {
 					return cli.Exit("", 1)
 				}
 
-				repoRoot, err := git.FindRepoFromPath(inputPath)
-				if err != nil {
-					printError(err, c.String("output"), "Failed to find the git repository root:")
-					return cli.Exit("", 1)
+				configFilePath := c.String("config-file")
+				if configFilePath == "" {
+					repoRoot, err := git.FindRepoFromPath(inputPath)
+					if err != nil {
+						printError(err, c.String("output"), "Failed to find the git repository root:")
+						return cli.Exit("", 1)
+					}
+					configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
 				}
-				configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
+
 				cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
 				if err != nil {
 					printError(err, c.String("output"), fmt.Sprintf("Failed to load the config file at '%s':", configFilePath))

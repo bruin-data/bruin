@@ -139,11 +139,12 @@ func (a *clusterBy) UnmarshalYAML(value *yaml.Node) error {
 }
 
 type materialization struct {
-	Type           string    `yaml:"type"`
-	Strategy       string    `yaml:"strategy"`
-	PartitionBy    string    `yaml:"partition_by"`
-	ClusterBy      clusterBy `yaml:"cluster_by"`
-	IncrementalKey string    `yaml:"incremental_key"`
+	Type            string    `yaml:"type"`
+	Strategy        string    `yaml:"strategy"`
+	PartitionBy     string    `yaml:"partition_by"`
+	ClusterBy       clusterBy `yaml:"cluster_by"`
+	IncrementalKey  string    `yaml:"incremental_key"`
+	TimeGranularity string    `yaml:"time_granularity,omitempty"`
 }
 
 type columnCheckValue struct {
@@ -199,14 +200,20 @@ type columnCheck struct {
 	Blocking *bool            `yaml:"blocking"`
 }
 
+type columnUpstream struct {
+	Column string `yaml:"column"`
+	Table  string `yaml:"table"`
+}
+
 type column struct {
-	Extends       string        `yaml:"extends"`
-	Name          string        `yaml:"name"`
-	Type          string        `yaml:"type"`
-	Description   string        `yaml:"description"`
-	Tests         []columnCheck `yaml:"checks"`
-	PrimaryKey    bool          `yaml:"primary_key"`
-	UpdateOnMerge bool          `yaml:"update_on_merge"`
+	Extends       string           `yaml:"extends"`
+	Name          string           `yaml:"name"`
+	Type          string           `yaml:"type"`
+	Description   string           `yaml:"description"`
+	Tests         []columnCheck    `yaml:"checks"`
+	PrimaryKey    bool             `yaml:"primary_key"`
+	UpdateOnMerge bool             `yaml:"update_on_merge"`
+	Upstreams     []columnUpstream `yaml:"upstreams"`
 }
 
 type secretMapping struct {
@@ -315,11 +322,12 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 	}
 
 	mat := Materialization{
-		Type:           MaterializationType(strings.ToLower(definition.Materialization.Type)),
-		Strategy:       MaterializationStrategy(strings.ToLower(definition.Materialization.Strategy)),
-		ClusterBy:      definition.Materialization.ClusterBy,
-		PartitionBy:    definition.Materialization.PartitionBy,
-		IncrementalKey: definition.Materialization.IncrementalKey,
+		Type:            MaterializationType(strings.ToLower(definition.Materialization.Type)),
+		Strategy:        MaterializationStrategy(strings.ToLower(definition.Materialization.Strategy)),
+		ClusterBy:       definition.Materialization.ClusterBy,
+		PartitionBy:     definition.Materialization.PartitionBy,
+		IncrementalKey:  definition.Materialization.IncrementalKey,
+		TimeGranularity: MaterializationTimeGranularity(strings.ToLower(definition.Materialization.TimeGranularity)),
 	}
 
 	columns := make([]Column, len(definition.Columns))
@@ -355,6 +363,14 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			}
 		}
 
+		upstreamColumns := make([]*UpstreamColumn, len(column.Upstreams))
+		for index, upstream := range column.Upstreams {
+			upstreamColumns[index] = &UpstreamColumn{
+				Column: upstream.Column,
+				Table:  upstream.Table,
+			}
+		}
+
 		columns[index] = Column{
 			Name:            column.Name,
 			Type:            strings.TrimSpace(column.Type),
@@ -364,12 +380,11 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			UpdateOnMerge:   column.UpdateOnMerge,
 			EntityAttribute: entityDefinition,
 			Extends:         column.Extends,
-			Upstreams:       make([]*UpstreamColumn, 0),
+			Upstreams:       upstreamColumns,
 		}
 	}
 
 	upstreams := make([]Upstream, len(definition.Depends))
-
 	for index, dep := range definition.Depends {
 		cols := make([]DependsColumn, 0)
 		for _, col := range dep.Columns {
