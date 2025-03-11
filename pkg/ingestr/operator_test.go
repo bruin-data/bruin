@@ -3,6 +3,7 @@ package ingestr
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -147,8 +148,8 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 				"--dest-table", "asset-name",
 				"--yes",
 				"--progress", "log",
-				"--incremental-strategy", "merge",
 				"--incremental-key", "updated_at",
+				"--incremental-strategy", "merge",
 			},
 		},
 		{
@@ -177,8 +178,8 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 				"--dest-table", "asset-name",
 				"--yes",
 				"--progress", "log",
-				"--incremental-strategy", "merge",
 				"--incremental-key", "updated_at",
+				"--incremental-strategy", "merge",
 				"--primary-key", "id",
 			},
 		},
@@ -209,8 +210,8 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 				"--dest-table", "asset-name",
 				"--yes",
 				"--progress", "log",
-				"--incremental-strategy", "merge",
 				"--incremental-key", "updated_at",
+				"--incremental-strategy", "merge",
 				"--primary-key", "id",
 				"--primary-key", "date",
 			},
@@ -243,8 +244,8 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 				"--dest-table", "asset-name",
 				"--yes",
 				"--progress", "log",
-				"--incremental-strategy", "merge",
 				"--incremental-key", "updated_at",
+				"--incremental-strategy", "merge",
 				"--primary-key", "id",
 				"--primary-key", "date",
 				"--full-refresh",
@@ -275,6 +276,63 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestBasicOperator_ConvertTaskInstanceToIngestrCommand_IntervalStartAndEnd(t *testing.T) {
+	t.Parallel()
+	mockSf := new(mockConnection)
+	mockSf.On("GetIngestrURI").Return("snowflake://uri-here", nil)
+	mockMS := new(mockConnection)
+	mockMS.On("GetIngestrURI").Return("mssql://uri-here", nil)
+
+	fetcher := simpleConnectionFetcher{
+		connections: map[string]*mockConnection{
+			"sf": mockSf,
+			"ms": mockMS,
+		},
+	}
+
+	finder := new(mockFinder)
+
+	runner := new(mockRunner)
+	runner.On("RunIngestr", mock.Anything, []string{
+		"ingest",
+		"--source-uri", "snowflake://uri-here",
+		"--source-table", "source-table",
+		"--dest-uri", "mssql://uri-here",
+		"--dest-table", "asset-name",
+		"--yes",
+		"--progress", "log",
+		"--interval-start", "2025-01-01T00:00:00Z",
+		"--interval-end", "2025-01-02T00:00:00Z",
+	}, []string{"pyodbc==5.1.0"}, repo).Return(nil)
+
+	o := &BasicOperator{
+		conn:   &fetcher,
+		finder: finder,
+		runner: runner,
+	}
+
+	ti := scheduler.AssetInstance{
+		Pipeline: &pipeline.Pipeline{},
+		Asset: &pipeline.Asset{
+			Name:       "asset-name",
+			Type:       pipeline.AssetTypeMsSQLQuery,
+			Connection: "ms",
+			Parameters: map[string]string{
+				"source_connection": "sf",
+				"source_table":      "source-table",
+				"destination":       "mssql",
+			},
+		},
+	}
+
+	ctx := context.WithValue(context.Background(), pipeline.RunConfigFullRefresh, false)
+	ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
+	ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC))
+
+	err := o.Run(ctx, &ti)
+	require.NoError(t, err)
 }
 
 func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
