@@ -7,13 +7,23 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/dialect"
 	"github.com/bruin-data/bruin/pkg/jinja"
-	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
 type sqlParser interface {
 	ColumnLineage(sql, dialect string, schema sqlparser.Schema) (*sqlparser.Lineage, error)
+}
+
+type LineageError struct {
+	Pipeline *pipeline.Pipeline
+	Issues   []*LineageIssue
+}
+
+type LineageIssue struct {
+	Task        *pipeline.Asset
+	Description string
+	Context     []string
 }
 
 type LineageExtractor struct {
@@ -57,16 +67,9 @@ func (p *LineageExtractor) TableSchemaForUpstreams(foundPipeline *pipeline.Pipel
 }
 
 // ColumnLineage processes the lineage of an asset and its upstream dependencies recursively.
-func (p *LineageExtractor) ColumnLineage(foundPipeline *pipeline.Pipeline, asset *pipeline.Asset, processedAssets map[string]bool) *lint.PipelineIssues {
-	issues := lint.PipelineIssues{
-		Issues: map[lint.Rule][]*lint.Issue{},
-	}
-
-	rule := &lint.SimpleRule{
-		Identifier:       "column-lineage",
-		Fast:             true,
-		Severity:         lint.ValidatorSeverityCritical,
-		ApplicableLevels: []lint.Level{lint.LevelPipeline, lint.LevelAsset},
+func (p *LineageExtractor) ColumnLineage(foundPipeline *pipeline.Pipeline, asset *pipeline.Asset, processedAssets map[string]bool) *LineageError {
+	issues := LineageError{
+		Issues: []*LineageIssue{},
 	}
 
 	if asset == nil {
@@ -88,7 +91,7 @@ func (p *LineageExtractor) ColumnLineage(foundPipeline *pipeline.Pipeline, asset
 
 	err := p.parseLineage(foundPipeline, asset, p.TableSchemaForUpstreams(foundPipeline, asset))
 	if err != nil {
-		issues.Issues[rule] = append(issues.Issues[rule], &lint.Issue{
+		issues.Issues = append(issues.Issues, &LineageIssue{
 			Task:        asset,
 			Description: err.Error(),
 			Context:     []string{},

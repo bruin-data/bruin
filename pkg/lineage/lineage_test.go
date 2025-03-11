@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/stretchr/testify/assert"
@@ -898,12 +897,12 @@ func runSingleLineageTest(t *testing.T, p, after *pipeline.Pipeline, want error)
 	}
 }
 
-func assertLineageError(t *testing.T, got *lint.PipelineIssues, want error) {
+func assertLineageError(t *testing.T, got *LineageError, want error) {
 	t.Helper()
 
 	if want == nil {
 		if len(got.Issues) > 0 {
-			t.Errorf("parseLineageRecursive() error = %v, want nil", got)
+			t.Errorf("assertLineageError() error = %v, want nil", got)
 		}
 		return
 	}
