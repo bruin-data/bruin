@@ -8,6 +8,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
+	lineagepackage "github.com/bruin-data/bruin/pkg/lineage"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
@@ -164,13 +165,18 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool, slimRespons
 			return cli.Exit("", 1)
 		}
 
+		issues := &lineagepackage.LineageError{
+			Issues:   make([]*lineagepackage.LineageIssue, 0),
+			Pipeline: foundPipeline,
+		}
+
 		defer sqlParser.Close()
 		processedAssets := make(map[string]bool)
-		lineage := pipeline.NewLineageExtractor(sqlParser)
+		lineage := lineagepackage.NewLineageExtractor(sqlParser)
 		for _, asset := range foundPipeline.Assets {
-			if err := lineage.ColumnLineage(foundPipeline, asset, processedAssets); err != nil {
-				printErrorJSON(err)
-				return cli.Exit("", 1)
+			errIssues := lineage.ColumnLineage(foundPipeline, asset, processedAssets)
+			if errIssues != nil {
+				issues.Issues = append(issues.Issues, errIssues.Issues...)
 			}
 		}
 	}
@@ -314,11 +320,16 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 			return cli.Exit("", 1)
 		}
 
+		issues := &lineagepackage.LineageError{
+			Issues:   make([]*lineagepackage.LineageIssue, 0),
+			Pipeline: foundPipeline,
+		}
+
 		processedAssets := make(map[string]bool)
-		lineageExtractor := pipeline.NewLineageExtractor(sqlParser)
-		if err := lineageExtractor.ColumnLineage(foundPipeline, asset, processedAssets); err != nil {
-			printErrorJSON(err)
-			return cli.Exit("", 1)
+		lineageExtractor := lineagepackage.NewLineageExtractor(sqlParser)
+		errIssues := lineageExtractor.ColumnLineage(foundPipeline, asset, processedAssets)
+		if errIssues != nil {
+			issues.Issues = append(issues.Issues, errIssues.Issues...)
 		}
 	}
 

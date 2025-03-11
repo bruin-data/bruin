@@ -1,10 +1,11 @@
-package pipeline
+package lineage
 
 import (
 	"log"
 	"os"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/stretchr/testify/assert"
 )
@@ -39,85 +40,85 @@ func getBasicLineageTestCase() []TestCase {
 	return []TestCase{
 		{
 			name: "successful recursive lineage parsing",
-			pipeline: &Pipeline{
-				Assets: []*Asset{
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
 					{
 						Name: "table1",
 						Type: "bq.sql",
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM table2",
 						},
-						Upstreams: []Upstream{{Value: "table2"}},
+						Upstreams: []pipeline.Upstream{{Value: "table2"}},
 					},
 					{
 						Name: "table2",
 						Type: "bq.sql",
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM table3",
 						},
-						Upstreams: []Upstream{{Value: "table3"}},
+						Upstreams: []pipeline.Upstream{{Value: "table3"}},
 					},
 					{
 						Name: "table3",
-						Columns: []Column{
-							{Name: "id", Type: "int64", PrimaryKey: true, Description: "Just a number", UpdateOnMerge: false, Checks: []ColumnCheck{
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64", PrimaryKey: true, Description: "Just a number", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
 								{Name: "not_null"},
 							}},
-							{Name: "name", Type: "str", Description: "Just a name", UpdateOnMerge: false, Checks: []ColumnCheck{
+							{Name: "name", Type: "str", Description: "Just a name", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
 								{Name: "not_null"},
 							}},
-							{Name: "age", Type: "int64", Description: "Just an age", UpdateOnMerge: false, Checks: []ColumnCheck{
+							{Name: "age", Type: "int64", Description: "Just an age", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
 								{Name: "not_null"},
 							}},
 						},
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT id,name,age FROM table4",
 						},
 					},
 				},
 			},
-			after: &Pipeline{
-				Assets: []*Asset{
+			after: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
 					{
 						Name: "table1",
 						Type: "bq.sql",
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM table2",
 						},
-						Columns: []Column{
-							{Name: "id", Type: "int64", PrimaryKey: false, Upstreams: []*UpstreamColumn{{Column: "id", Table: "table2"}}, UpdateOnMerge: false, Description: "Just a number", Checks: []ColumnCheck{}},
-							{Name: "name", Type: "str", Upstreams: []*UpstreamColumn{{Column: "name", Table: "table2"}}, UpdateOnMerge: false, Description: "Just a name", Checks: []ColumnCheck{}},
-							{Name: "age", Type: "int64", Upstreams: []*UpstreamColumn{{Column: "age", Table: "table2"}}, UpdateOnMerge: false, Description: "Just an age", Checks: []ColumnCheck{}},
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64", PrimaryKey: false, Upstreams: []*pipeline.UpstreamColumn{{Column: "id", Table: "table2"}}, UpdateOnMerge: false, Description: "Just a number", Checks: []pipeline.ColumnCheck{}},
+							{Name: "name", Type: "str", Upstreams: []*pipeline.UpstreamColumn{{Column: "name", Table: "table2"}}, UpdateOnMerge: false, Description: "Just a name", Checks: []pipeline.ColumnCheck{}},
+							{Name: "age", Type: "int64", Upstreams: []*pipeline.UpstreamColumn{{Column: "age", Table: "table2"}}, UpdateOnMerge: false, Description: "Just an age", Checks: []pipeline.ColumnCheck{}},
 						},
-						Upstreams: []Upstream{{Value: "table2", Columns: []DependsColumn{{Name: "id"}, {Name: "name"}, {Name: "age"}}}},
+						Upstreams: []pipeline.Upstream{{Value: "table2", Columns: []pipeline.DependsColumn{{Name: "id"}, {Name: "name"}, {Name: "age"}}}},
 					},
 					{
 						Name: "table2",
 						Type: "bq.sql",
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM table3",
 						},
-						Columns: []Column{
-							{Name: "id", Type: "int64", PrimaryKey: false, Upstreams: []*UpstreamColumn{{Column: "id", Table: "table3"}}, UpdateOnMerge: false, Description: "Just a number", Checks: []ColumnCheck{}},
-							{Name: "name", Type: "str", Upstreams: []*UpstreamColumn{{Column: "name", Table: "table3"}}, UpdateOnMerge: false, Description: "Just a name", Checks: []ColumnCheck{}},
-							{Name: "age", Type: "int64", Upstreams: []*UpstreamColumn{{Column: "age", Table: "table3"}}, UpdateOnMerge: false, Description: "Just an age", Checks: []ColumnCheck{}},
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64", PrimaryKey: false, Upstreams: []*pipeline.UpstreamColumn{{Column: "id", Table: "table3"}}, UpdateOnMerge: false, Description: "Just a number", Checks: []pipeline.ColumnCheck{}},
+							{Name: "name", Type: "str", Upstreams: []*pipeline.UpstreamColumn{{Column: "name", Table: "table3"}}, UpdateOnMerge: false, Description: "Just a name", Checks: []pipeline.ColumnCheck{}},
+							{Name: "age", Type: "int64", Upstreams: []*pipeline.UpstreamColumn{{Column: "age", Table: "table3"}}, UpdateOnMerge: false, Description: "Just an age", Checks: []pipeline.ColumnCheck{}},
 						},
-						Upstreams: []Upstream{{Value: "table3", Columns: []DependsColumn{}}},
+						Upstreams: []pipeline.Upstream{{Value: "table3", Columns: []pipeline.DependsColumn{{Name: "id"}, {Name: "name"}, {Name: "age"}}}},
 					},
 					{
 						Name: "table3",
-						Columns: []Column{
-							{Name: "id", Type: "int64", PrimaryKey: true, Description: "Just a number", UpdateOnMerge: false, Checks: []ColumnCheck{
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64", PrimaryKey: true, Description: "Just a number", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
 								{Name: "not_null"},
 							}},
-							{Name: "name", Type: "str", Description: "Just a name", UpdateOnMerge: false, Checks: []ColumnCheck{
+							{Name: "name", Type: "str", Description: "Just a name", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
 								{Name: "not_null"},
 							}},
-							{Name: "age", Type: "int64", Description: "Just an age", UpdateOnMerge: false, Checks: []ColumnCheck{
+							{Name: "age", Type: "int64", Description: "Just an age", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
 								{Name: "not_null"},
 							}},
 						},
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT id,name,age FROM table4",
 						},
 					},
@@ -127,12 +128,12 @@ func getBasicLineageTestCase() []TestCase {
 		},
 		{
 			name: "complex joins with multiple dependencies",
-			pipeline: &Pipeline{
-				Assets: []*Asset{
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
 					{
 						Name: "final_report",
 						Type: "bq.sql",
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: `
 										SELECT
 											o.order_id,
@@ -146,7 +147,7 @@ func getBasicLineageTestCase() []TestCase {
 										LEFT JOIN order_status s ON o.status_id = s.status_id
 									`,
 						},
-						Upstreams: []Upstream{
+						Upstreams: []pipeline.Upstream{
 							{Value: "orders"},
 							{Value: "customers"},
 							{Value: "products"},
@@ -156,7 +157,7 @@ func getBasicLineageTestCase() []TestCase {
 					{
 						Name: "orders",
 						Type: "bq.sql",
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: `
 										SELECT
 											order_id,
@@ -168,88 +169,88 @@ func getBasicLineageTestCase() []TestCase {
 										WHERE is_valid = true
 									`,
 						},
-						Upstreams: []Upstream{{Value: "raw_orders"}},
+						Upstreams: []pipeline.Upstream{{Value: "raw_orders"}},
 					},
 					{
 						Name: "customers",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{Name: "customer_id", Type: "int64", PrimaryKey: true, Description: "Customer ID"},
 							{Name: "customer_name", Type: "str", Description: "Customer full name"},
 						},
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM customers",
 						},
 					},
 					{
 						Name: "products",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{Name: "product_id", Type: "int64", PrimaryKey: true, Description: "Product ID"},
 							{Name: "product_name", Type: "str", Description: "Product name"},
 							{Name: "price", Type: "float64", Description: "Product price"},
 						},
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM products",
 						},
 					},
 					{
 						Name: "order_status",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{Name: "status_id", Type: "int64", PrimaryKey: true, Description: "Status ID"},
 							{Name: "status_description", Type: "str", Description: "Status description"},
 						},
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM order_status",
 						},
 					},
 					{
 						Name: "raw_orders",
-						Columns: []Column{
-							{Name: "order_id", Type: "int64", PrimaryKey: true, Description: "Order ID", Checks: []ColumnCheck{{Name: "not_null"}}},
-							{Name: "customer_id", Type: "int64", Description: "Customer ID", Upstreams: []*UpstreamColumn{{Column: "customer_id", Table: "raw_orders"}}, Checks: []ColumnCheck{}},
-							{Name: "product_id", Type: "int64", Description: "Product ID", Upstreams: []*UpstreamColumn{{Column: "product_id", Table: "raw_orders"}}, Checks: []ColumnCheck{}},
-							{Name: "quantity", Type: "int64", Description: "Order quantity", Upstreams: []*UpstreamColumn{{Column: "quantity", Table: "raw_orders"}}, Checks: []ColumnCheck{}},
-							{Name: "status_id", Type: "int64", Description: "Status ID", Upstreams: []*UpstreamColumn{{Column: "status_id", Table: "raw_orders"}}, Checks: []ColumnCheck{}},
+						Columns: []pipeline.Column{
+							{Name: "order_id", Type: "int64", PrimaryKey: true, Description: "Order ID", Checks: []pipeline.ColumnCheck{{Name: "not_null"}}},
+							{Name: "customer_id", Type: "int64", Description: "Customer ID", Upstreams: []*pipeline.UpstreamColumn{{Column: "customer_id", Table: "raw_orders"}}, Checks: []pipeline.ColumnCheck{}},
+							{Name: "product_id", Type: "int64", Description: "Product ID", Upstreams: []*pipeline.UpstreamColumn{{Column: "product_id", Table: "raw_orders"}}, Checks: []pipeline.ColumnCheck{}},
+							{Name: "quantity", Type: "int64", Description: "Order quantity", Upstreams: []*pipeline.UpstreamColumn{{Column: "quantity", Table: "raw_orders"}}, Checks: []pipeline.ColumnCheck{}},
+							{Name: "status_id", Type: "int64", Description: "Status ID", Upstreams: []*pipeline.UpstreamColumn{{Column: "status_id", Table: "raw_orders"}}, Checks: []pipeline.ColumnCheck{}},
 							{Name: "is_valid", Type: "bool", Description: "Order validity flag"},
 						},
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM raw_orders",
 						},
 					},
 				},
 			},
-			after: &Pipeline{
-				Assets: []*Asset{
+			after: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
 					{
 						Name: "final_report",
 						Type: "bq.sql",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{
 								Name:        "order_id",
 								Type:        "int64",
 								Description: "Order ID",
-								Checks:      make([]ColumnCheck, 0),
-								Upstreams:   []*UpstreamColumn{{Column: "order_id", Table: "orders"}},
+								Checks:      make([]pipeline.ColumnCheck, 0),
+								Upstreams:   []*pipeline.UpstreamColumn{{Column: "order_id", Table: "orders"}},
 							},
 							{
 								Name:        "customer_name",
 								Type:        "str",
 								Description: "Customer full name",
-								Checks:      make([]ColumnCheck, 0),
-								Upstreams:   []*UpstreamColumn{{Column: "customer_name", Table: "customers"}},
+								Checks:      make([]pipeline.ColumnCheck, 0),
+								Upstreams:   []*pipeline.UpstreamColumn{{Column: "customer_name", Table: "customers"}},
 							},
 							{
 								Name:        "product_name",
 								Type:        "str",
 								Description: "Product name",
-								Checks:      make([]ColumnCheck, 0),
-								Upstreams:   []*UpstreamColumn{{Column: "product_name", Table: "products"}},
+								Checks:      make([]pipeline.ColumnCheck, 0),
+								Upstreams:   []*pipeline.UpstreamColumn{{Column: "product_name", Table: "products"}},
 							},
 							{
 								Name:        "total_amount",
 								Type:        "float64",
 								Description: "Product price",
-								Checks:      make([]ColumnCheck, 0),
-								Upstreams: []*UpstreamColumn{
+								Checks:      make([]pipeline.ColumnCheck, 0),
+								Upstreams: []*pipeline.UpstreamColumn{
 									{Column: "quantity", Table: "orders"},
 									{Column: "price", Table: "products"},
 								},
@@ -258,69 +259,69 @@ func getBasicLineageTestCase() []TestCase {
 								Name:        "status_description",
 								Type:        "str",
 								Description: "Status description",
-								Checks:      make([]ColumnCheck, 0),
-								Upstreams:   []*UpstreamColumn{{Column: "status_description", Table: "order_status"}},
+								Checks:      make([]pipeline.ColumnCheck, 0),
+								Upstreams:   []*pipeline.UpstreamColumn{{Column: "status_description", Table: "order_status"}},
 							},
 						},
-						Upstreams: []Upstream{
-							{Value: "orders", Columns: []DependsColumn{{Name: "order_id"}, {Name: "customer_id"}, {Name: "product_id"}, {Name: "quantity"}, {Name: "status_id"}}},
-							{Value: "customers", Columns: []DependsColumn{{Name: "customer_id"}, {Name: "customer_name"}}},
-							{Value: "products", Columns: []DependsColumn{{Name: "product_id"}, {Name: "product_name"}, {Name: "price"}}},
-							{Value: "order_status", Columns: []DependsColumn{{Name: "status_id"}, {Name: "status_description"}}},
+						Upstreams: []pipeline.Upstream{
+							{Value: "orders", Columns: []pipeline.DependsColumn{{Name: "order_id"}, {Name: "customer_id"}, {Name: "product_id"}, {Name: "quantity"}, {Name: "status_id"}}},
+							{Value: "customers", Columns: []pipeline.DependsColumn{{Name: "customer_id"}, {Name: "customer_name"}}},
+							{Value: "products", Columns: []pipeline.DependsColumn{{Name: "product_id"}, {Name: "product_name"}, {Name: "price"}}},
+							{Value: "order_status", Columns: []pipeline.DependsColumn{{Name: "status_id"}, {Name: "status_description"}}},
 						},
 					},
 					{
 						Name: "orders",
 						Type: "bq.sql",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{
 								Name:        "order_id",
 								Type:        "int64",
 								Description: "Order ID",
-								Checks:      []ColumnCheck{},
-								Upstreams:   []*UpstreamColumn{{Column: "order_id", Table: "raw_orders"}},
+								Checks:      []pipeline.ColumnCheck{},
+								Upstreams:   []*pipeline.UpstreamColumn{{Column: "order_id", Table: "raw_orders"}},
 							},
 							{
 								Name:        "customer_id",
 								Type:        "int64",
 								Description: "Customer ID",
-								Upstreams:   []*UpstreamColumn{{Column: "customer_id", Table: "raw_orders"}},
-								Checks:      []ColumnCheck{},
+								Upstreams:   []*pipeline.UpstreamColumn{{Column: "customer_id", Table: "raw_orders"}},
+								Checks:      []pipeline.ColumnCheck{},
 							},
 							{
 								Name:        "product_id",
 								Type:        "int64",
 								Description: "Product ID",
-								Upstreams:   []*UpstreamColumn{{Column: "product_id", Table: "raw_orders"}},
-								Checks:      []ColumnCheck{},
+								Upstreams:   []*pipeline.UpstreamColumn{{Column: "product_id", Table: "raw_orders"}},
+								Checks:      []pipeline.ColumnCheck{},
 							},
 							{
 								Name:        "quantity",
 								Type:        "int64",
 								Description: "Order quantity",
-								Checks:      []ColumnCheck{},
-								Upstreams:   []*UpstreamColumn{},
+								Checks:      []pipeline.ColumnCheck{},
+								Upstreams:   []*pipeline.UpstreamColumn{},
 							},
 							{
 								Name:        "status_id",
 								Type:        "int64",
 								Description: "Status ID",
-								Checks:      make([]ColumnCheck, 0),
-								Upstreams:   []*UpstreamColumn{},
+								Checks:      make([]pipeline.ColumnCheck, 0),
+								Upstreams:   []*pipeline.UpstreamColumn{},
 							},
 						},
-						Upstreams: []Upstream{{Value: "raw_orders", Columns: []DependsColumn{{Name: "order_id"}, {Name: "customer_id"}, {Name: "product_id"}, {Name: "quantity"}, {Name: "status_id"}, {Name: "is_valid"}}}},
+						Upstreams: []pipeline.Upstream{{Value: "raw_orders", Columns: []pipeline.DependsColumn{{Name: "order_id"}, {Name: "customer_id"}, {Name: "product_id"}, {Name: "quantity"}, {Name: "status_id"}, {Name: "is_valid"}}}},
 					},
 					{
 						Name: "customers",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{Name: "customer_id", Type: "int64", PrimaryKey: true, Description: "Customer ID"},
 							{Name: "customer_name", Type: "str", Description: "Customer full name"},
 						},
 					},
 					{
 						Name: "products",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{Name: "product_id", Type: "int64", PrimaryKey: true, Description: "Product ID"},
 							{Name: "product_name", Type: "str", Description: "Product name"},
 							{Name: "price", Type: "float64", Description: "Product price"},
@@ -328,22 +329,22 @@ func getBasicLineageTestCase() []TestCase {
 					},
 					{
 						Name: "order_status",
-						Columns: []Column{
-							{Name: "status_id", Type: "int64", PrimaryKey: true, Description: "Status ID", Checks: []ColumnCheck{}, Upstreams: []*UpstreamColumn{}},
-							{Name: "status_description", Type: "str", Description: "Status description", Checks: []ColumnCheck{}, Upstreams: []*UpstreamColumn{}},
+						Columns: []pipeline.Column{
+							{Name: "status_id", Type: "int64", PrimaryKey: true, Description: "Status ID", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
+							{Name: "status_description", Type: "str", Description: "Status description", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
 						},
 					},
 					{
 						Name: "raw_orders",
-						Columns: []Column{
-							{Name: "order_id", Type: "int64", PrimaryKey: true, Description: "Order ID", Checks: []ColumnCheck{{Name: "not_null"}}},
-							{Name: "customer_id", Type: "int64", Description: "Customer ID", Upstreams: []*UpstreamColumn{{Column: "customer_id", Table: "raw_orders"}}, Checks: []ColumnCheck{}},
-							{Name: "product_id", Type: "int64", Description: "Product ID", Upstreams: []*UpstreamColumn{{Column: "product_id", Table: "raw_orders"}}, Checks: []ColumnCheck{}},
-							{Name: "quantity", Type: "int64", Description: "Order quantity", Upstreams: []*UpstreamColumn{{Column: "quantity", Table: "raw_orders"}}, Checks: []ColumnCheck{}},
-							{Name: "status_id", Type: "int64", Description: "Status ID", Upstreams: []*UpstreamColumn{{Column: "status_id", Table: "raw_orders"}}, Checks: []ColumnCheck{}},
+						Columns: []pipeline.Column{
+							{Name: "order_id", Type: "int64", PrimaryKey: true, Description: "Order ID", Checks: []pipeline.ColumnCheck{{Name: "not_null"}}},
+							{Name: "customer_id", Type: "int64", Description: "Customer ID", Upstreams: []*pipeline.UpstreamColumn{{Column: "customer_id", Table: "raw_orders"}}, Checks: []pipeline.ColumnCheck{}},
+							{Name: "product_id", Type: "int64", Description: "Product ID", Upstreams: []*pipeline.UpstreamColumn{{Column: "product_id", Table: "raw_orders"}}, Checks: []pipeline.ColumnCheck{}},
+							{Name: "quantity", Type: "int64", Description: "Order quantity", Upstreams: []*pipeline.UpstreamColumn{{Column: "quantity", Table: "raw_orders"}}, Checks: []pipeline.ColumnCheck{}},
+							{Name: "status_id", Type: "int64", Description: "Status ID", Upstreams: []*pipeline.UpstreamColumn{{Column: "status_id", Table: "raw_orders"}}, Checks: []pipeline.ColumnCheck{}},
 							{Name: "is_valid", Type: "bool", Description: "Order validity flag"},
 						},
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM raw_orders",
 						},
 					},
@@ -353,12 +354,12 @@ func getBasicLineageTestCase() []TestCase {
 		},
 		{
 			name: "snowflake complex condition",
-			pipeline: &Pipeline{
-				Assets: []*Asset{
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
 					{
 						Name: "sales_summary",
 						Type: "bq.sql",
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: `
 				        SELECT
 				            case
@@ -376,15 +377,15 @@ func getBasicLineageTestCase() []TestCase {
 				        FROM raw_sales
 											`,
 						},
-						Upstreams: []Upstream{{Value: "raw_sales"}},
+						Upstreams: []pipeline.Upstream{{Value: "raw_sales"}},
 					},
 					{
 						Name: "raw_sales",
 						Type: "bq.sql",
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM data_sales",
 						},
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{Name: "Id", Type: "STRING", Description: "Unique identifier"},
 							{Name: "CancelledAt", Type: "TIMESTAMP", Description: "Cancellation timestamp"},
 							{Name: "CancellationReason", Type: "STRING", Description: "Reason for cancellation"},
@@ -394,11 +395,11 @@ func getBasicLineageTestCase() []TestCase {
 					},
 				},
 			},
-			after: &Pipeline{
-				Assets: []*Asset{
+			after: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
 					{
 						Name: "sales_summary",
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: `
 				        SELECT
 				            case
@@ -416,15 +417,15 @@ func getBasicLineageTestCase() []TestCase {
 				        FROM raw_sales
 											`,
 						},
-						Columns: []Column{
-							{Name: "cancellationreason", Type: "STRING", Description: "Reason for cancellation", Checks: []ColumnCheck{}, Upstreams: []*UpstreamColumn{{Column: "cancellationreason", Table: "raw_sales"}, {Column: "cancelledat", Table: "raw_sales"}}},
-							{Name: "credits_spent", Type: "BOOLEAN", Description: "Whether the booking was accepted", Checks: []ColumnCheck{}, Upstreams: []*UpstreamColumn{{Column: "accepted", Table: "raw_sales"}, {Column: "bookingcreditrefundedat", Table: "raw_sales"}, {Column: "id", Table: "raw_sales"}}},
+						Columns: []pipeline.Column{
+							{Name: "cancellationreason", Type: "STRING", Description: "Reason for cancellation", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{{Column: "cancellationreason", Table: "raw_sales"}, {Column: "cancelledat", Table: "raw_sales"}}},
+							{Name: "credits_spent", Type: "BOOLEAN", Description: "Whether the booking was accepted", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{{Column: "accepted", Table: "raw_sales"}, {Column: "bookingcreditrefundedat", Table: "raw_sales"}, {Column: "id", Table: "raw_sales"}}},
 						},
-						Upstreams: []Upstream{{Value: "raw_sales", Columns: []DependsColumn{{Name: "accepted"}, {Name: "bookingcreditrefundedat"}, {Name: "cancellationreason"}, {Name: "cancelledat"}, {Name: "id"}}}},
+						Upstreams: []pipeline.Upstream{{Value: "raw_sales", Columns: []pipeline.DependsColumn{{Name: "accepted"}, {Name: "bookingcreditrefundedat"}, {Name: "cancellationreason"}, {Name: "cancelledat"}, {Name: "id"}}}},
 					},
 					{
 						Name: "raw_sales",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{Name: "Id", Type: "STRING", Description: "Unique identifier"},
 							{Name: "CancelledAt", Type: "TIMESTAMP", Description: "Cancellation timestamp"},
 							{Name: "CancellationReason", Type: "STRING", Description: "Reason for cancellation"},
@@ -438,12 +439,12 @@ func getBasicLineageTestCase() []TestCase {
 		},
 		{
 			name: "snowflake column name with as",
-			pipeline: &Pipeline{
-				Assets: []*Asset{
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
 					{
 						Name: "sales_summary",
 						Type: "bq.sql",
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: `
 				       SELECT
 				    t.event_date,
@@ -457,15 +458,15 @@ func getBasicLineageTestCase() []TestCase {
 				GROUP BY 1, 2, 3
 				ORDER BY 1, 2, 3`,
 						},
-						Upstreams: []Upstream{{Value: "raw_sales"}},
+						Upstreams: []pipeline.Upstream{{Value: "raw_sales"}},
 					},
 					{
 						Name: "raw_sales",
 						Type: "bq.sql",
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM data_sales",
 						},
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{Name: "event_date", Type: "date", Description: "Event date"},
 							{Name: "location_code", Type: "string", Description: "Location code"},
 							{Name: "session_id", Type: "integer", Description: "Session identifier"},
@@ -477,11 +478,11 @@ func getBasicLineageTestCase() []TestCase {
 					},
 				},
 			},
-			after: &Pipeline{
-				Assets: []*Asset{
+			after: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
 					{
 						Name: "sales_summary",
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: `
 				       SELECT
 				    t.event_date,
@@ -496,20 +497,20 @@ func getBasicLineageTestCase() []TestCase {
 				ORDER BY 1, 2, 3
 											`,
 						},
-						Columns: []Column{
-							{Name: "event_date", Type: "date", Description: "Event date", Checks: []ColumnCheck{}, Upstreams: []*UpstreamColumn{{Column: "event_date", Table: "raw_sales"}}},
-							{Name: "location", Type: "string", Description: "Location code", Checks: []ColumnCheck{}, Upstreams: []*UpstreamColumn{{Column: "location_code", Table: "raw_sales"}}},
-							{Name: "session", Type: "integer", Description: "Session identifier", Checks: []ColumnCheck{}, Upstreams: []*UpstreamColumn{{Column: "session_id", Table: "raw_sales"}}},
-							{Name: "visitor_count", Type: "integer", Description: "Customer identifier", Checks: []ColumnCheck{}, Upstreams: []*UpstreamColumn{{Column: "customer_id", Table: "raw_sales"}}},
-							{Name: "total_activities", Type: "integer", Description: "Sum of activity counts", Checks: []ColumnCheck{}, Upstreams: []*UpstreamColumn{{Column: "activity_count", Table: "raw_sales"}}},
-							{Name: "total_interactions", Type: "integer", Description: "Sum of activity counts", PrimaryKey: false, Checks: []ColumnCheck{}, Upstreams: []*UpstreamColumn{{Column: "interaction_count", Table: "raw_sales"}}},
-							{Name: "created_at", Type: "TIMESTAMP", Description: "", Checks: []ColumnCheck{}, Upstreams: []*UpstreamColumn{}},
+						Columns: []pipeline.Column{
+							{Name: "event_date", Type: "date", Description: "Event date", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{{Column: "event_date", Table: "raw_sales"}}},
+							{Name: "location", Type: "string", Description: "Location code", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{{Column: "location_code", Table: "raw_sales"}}},
+							{Name: "session", Type: "integer", Description: "Session identifier", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{{Column: "session_id", Table: "raw_sales"}}},
+							{Name: "visitor_count", Type: "integer", Description: "Customer identifier", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{{Column: "customer_id", Table: "raw_sales"}}},
+							{Name: "total_activities", Type: "integer", Description: "Sum of activity counts", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{{Column: "activity_count", Table: "raw_sales"}}},
+							{Name: "total_interactions", Type: "integer", Description: "Sum of activity counts", PrimaryKey: false, Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{{Column: "interaction_count", Table: "raw_sales"}}},
+							{Name: "created_at", Type: "TIMESTAMP", Description: "", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
 						},
-						Upstreams: []Upstream{{Value: "raw_sales", Columns: []DependsColumn{{Name: "event_date", Usage: "raw_sales"}, {Name: "location_code", Usage: "raw_sales"}, {Name: "session_id", Usage: "raw_sales"}, {Name: "customer_id", Usage: "raw_sales"}, {Name: "activity_count", Usage: "raw_sales"}, {Name: "interaction_count", Usage: "raw_sales"}}}},
+						Upstreams: []pipeline.Upstream{{Value: "raw_sales", Columns: []pipeline.DependsColumn{{Name: "event_date", Usage: "raw_sales"}, {Name: "location_code", Usage: "raw_sales"}, {Name: "session_id", Usage: "raw_sales"}, {Name: "customer_id", Usage: "raw_sales"}, {Name: "activity_count", Usage: "raw_sales"}, {Name: "interaction_count", Usage: "raw_sales"}}}},
 					},
 					{
 						Name: "raw_sales",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{Name: "event_date", Type: "date", Description: "Event date"},
 							{Name: "location_code", Type: "string", Description: "Location code"},
 							{Name: "session_id", Type: "integer", Description: "Session identifier"},
@@ -530,12 +531,12 @@ func GetAdvancedSQLTestCase() []TestCase {
 	return []TestCase{
 		{
 			name: "advanced SQL functions and aggregations",
-			pipeline: &Pipeline{
-				Assets: []*Asset{
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
 					{
 						Name: "sales_summary",
 						Type: "bq.sql",
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: `
 										SELECT
 											DATE_TRUNC(order_date, MONTH) as month,
@@ -553,75 +554,75 @@ func GetAdvancedSQLTestCase() []TestCase {
 									`,
 						},
 
-						Upstreams: []Upstream{{Value: "raw_sales"}},
+						Upstreams: []pipeline.Upstream{{Value: "raw_sales"}},
 					},
 					{
 						Name: "raw_sales",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{Name: "order_date", Type: "timestamp", Description: "Order timestamp"},
 							{Name: "customer_id", Type: "int64", Description: "Customer identifier"},
 							{Name: "amount", Type: "float64", Description: "Sale amount"},
 						},
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM data_sales",
 						},
 					},
 				},
 			},
-			after: &Pipeline{
-				Assets: []*Asset{
+			after: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
 					{
 						Name: "sales_summary",
 						Type: "bq.sql",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{
 								Name:        "month",
 								Type:        "timestamp",
-								Checks:      make([]ColumnCheck, 0),
+								Checks:      make([]pipeline.ColumnCheck, 0),
 								Description: "Order timestamp",
-								Upstreams:   []*UpstreamColumn{{Column: "order_date", Table: "raw_sales"}},
+								Upstreams:   []*pipeline.UpstreamColumn{{Column: "order_date", Table: "raw_sales"}},
 							},
 							{
 								Name:        "unique_customers",
 								Type:        "int64",
-								Checks:      make([]ColumnCheck, 0),
+								Checks:      make([]pipeline.ColumnCheck, 0),
 								Description: "Customer identifier",
-								Upstreams:   []*UpstreamColumn{{Column: "customer_id", Table: "raw_sales"}},
+								Upstreams:   []*pipeline.UpstreamColumn{{Column: "customer_id", Table: "raw_sales"}},
 							},
 							{
 								Name:        "total_sales",
 								Type:        "float64",
 								Description: "Sale amount",
-								Checks:      []ColumnCheck{},
-								Upstreams:   []*UpstreamColumn{{Column: "amount", Table: "raw_sales"}},
+								Checks:      []pipeline.ColumnCheck{},
+								Upstreams:   []*pipeline.UpstreamColumn{{Column: "amount", Table: "raw_sales"}},
 							},
 							{
 								Name:        "avg_sale",
 								Type:        "float64",
 								Description: "Sale amount",
-								Checks:      make([]ColumnCheck, 0),
-								Upstreams:   []*UpstreamColumn{{Column: "amount", Table: "raw_sales"}},
+								Checks:      make([]pipeline.ColumnCheck, 0),
+								Upstreams:   []*pipeline.UpstreamColumn{{Column: "amount", Table: "raw_sales"}},
 							},
 							{
 								Name:        "summary",
 								Type:        "float64",
 								Description: "Sale amount",
-								Checks:      make([]ColumnCheck, 0),
-								Upstreams:   []*UpstreamColumn{{Column: "amount", Table: "raw_sales"}},
+								Checks:      make([]pipeline.ColumnCheck, 0),
+								Upstreams:   []*pipeline.UpstreamColumn{{Column: "amount", Table: "raw_sales"}},
 							},
 							{
 								Name:          "report_generated_at",
 								Type:          "UNKNOWN",
-								Upstreams:     []*UpstreamColumn{},
-								Checks:        make([]ColumnCheck, 0),
+								Upstreams:     []*pipeline.UpstreamColumn{},
+								Checks:        make([]pipeline.ColumnCheck, 0),
 								UpdateOnMerge: false,
 							},
 						},
-						Upstreams: []Upstream{{Value: "raw_sales", Columns: []DependsColumn{{Name: "order_date"}, {Name: "customer_id"}, {Name: "amount"}}}},
+						Upstreams: []pipeline.Upstream{{Value: "raw_sales", Columns: []pipeline.DependsColumn{{Name: "order_date"}, {Name: "customer_id"}, {Name: "amount"}}}},
 					},
 					{
 						Name: "raw_sales",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{Name: "order_date", Type: "timestamp", Description: "Order timestamp"},
 							{Name: "customer_id", Type: "int64", Description: "Customer identifier"},
 							{Name: "amount", Type: "float64", Description: "Sale amount"},
@@ -633,12 +634,12 @@ func GetAdvancedSQLTestCase() []TestCase {
 		},
 		{
 			name: "redshift specific syntax",
-			pipeline: &Pipeline{
-				Assets: []*Asset{
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
 					{
 						Name: "sales_report",
 						Type: "rs.sql",
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: `
 			                    SELECT
 			                        DATE_TRUNC('month', sale_date) as sale_month,
@@ -651,86 +652,78 @@ func GetAdvancedSQLTestCase() []TestCase {
 			                    GROUP BY 1
 			                `,
 						},
-						Upstreams: []Upstream{{Value: "raw_sales"}},
+						Upstreams: []pipeline.Upstream{{Value: "raw_sales"}},
 					},
 					{
 						Name: "raw_sales",
 						Type: "rs.sql",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{Name: "sale_date", Type: "timestamp", PrimaryKey: true, Description: "Sale timestamp"},
 							{Name: "category", Type: "varchar(max)", Description: "Product category"},
 							{Name: "amount", Type: "decimal(18,2)", Description: "Sale amount"},
 							{Name: "customer_id", Type: "bigint", Description: "Customer identifier"},
 						},
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM data_sales",
 						},
 					},
 				},
 			},
-			after: &Pipeline{
-				Assets: []*Asset{
+			after: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
 					{
 						Name: "sales_report",
 						Type: "rs.sql",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{
-								Name:        "sale_month",
-								Type:        "timestamp",
-								Description: "Sale timestamp",
-								Upstreams: []*UpstreamColumn{
-									{Column: "sale_date", Table: "raw_sales"},
-								},
-								Checks:        make([]ColumnCheck, 0),
+								Name:          "sale_month",
+								Type:          "timestamp",
+								Description:   "Sale timestamp",
+								Upstreams:     []*pipeline.UpstreamColumn{{Column: "sale_date", Table: "raw_sales"}},
+								Checks:        make([]pipeline.ColumnCheck, 0),
 								UpdateOnMerge: false,
 							},
 							{
 								Name:        "categories",
 								Type:        "varchar(max)",
 								Description: "Product category",
-								Upstreams: []*UpstreamColumn{
+								Upstreams: []*pipeline.UpstreamColumn{
 									{Column: "category", Table: "raw_sales"},
 								},
-								Checks:        make([]ColumnCheck, 0),
+								Checks:        make([]pipeline.ColumnCheck, 0),
 								UpdateOnMerge: false,
 							},
 							{
-								Name:        "total_sales",
-								Type:        "decimal(18,2)",
-								Description: "Sale amount",
-								Upstreams: []*UpstreamColumn{
-									{Column: "amount", Table: "raw_sales"},
-								},
+								Name:          "total_sales",
+								Type:          "decimal(18,2)",
+								Description:   "Sale amount",
+								Upstreams:     []*pipeline.UpstreamColumn{{Column: "amount", Table: "raw_sales"}},
 								UpdateOnMerge: false,
-								Checks:        []ColumnCheck{},
+								Checks:        []pipeline.ColumnCheck{},
 							},
 							{
-								Name:        "avg_sale",
-								Type:        "decimal(18,2)",
-								Description: "Sale amount",
-								Upstreams: []*UpstreamColumn{
-									{Column: "amount", Table: "raw_sales"},
-								},
-								Checks:        make([]ColumnCheck, 0),
+								Name:          "avg_sale",
+								Type:          "decimal(18,2)",
+								Description:   "Sale amount",
+								Upstreams:     []*pipeline.UpstreamColumn{{Column: "amount", Table: "raw_sales"}},
+								Checks:        make([]pipeline.ColumnCheck, 0),
 								UpdateOnMerge: false,
 							},
 							{
-								Name:        "unique_customers",
-								Type:        "bigint",
-								Description: "Customer identifier",
-								Upstreams: []*UpstreamColumn{
-									{Column: "customer_id", Table: "raw_sales"},
-								},
+								Name:          "unique_customers",
+								Type:          "bigint",
+								Description:   "Customer identifier",
+								Upstreams:     []*pipeline.UpstreamColumn{{Column: "customer_id", Table: "raw_sales"}},
 								UpdateOnMerge: false,
-								Checks:        make([]ColumnCheck, 0),
+								Checks:        make([]pipeline.ColumnCheck, 0),
 							},
 						},
-						Upstreams: []Upstream{{Value: "raw_sales", Columns: []DependsColumn{{Name: "sale_date"}, {Name: "category"}, {Name: "amount"}, {Name: "customer_id"}}}},
+						Upstreams: []pipeline.Upstream{{Value: "raw_sales", Columns: []pipeline.DependsColumn{{Name: "sale_date"}, {Name: "category"}, {Name: "amount"}, {Name: "customer_id"}}}},
 					},
 					{
 						Name: "raw_sales",
 						Type: "rs.sql",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{Name: "sale_date", Type: "timestamp", PrimaryKey: true, Description: "Sale timestamp"},
 							{Name: "category", Type: "varchar(max)", Description: "Product category"},
 							{Name: "amount", Type: "decimal(18,2)", Description: "Sale amount"},
@@ -744,12 +737,12 @@ func GetAdvancedSQLTestCase() []TestCase {
 
 		{
 			name: "postgres specific syntax",
-			pipeline: &Pipeline{
-				Assets: []*Asset{
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
 					{
 						Name: "user_stats",
 						Type: "pg.sql",
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: `
 									 WITH RECURSIVE user_hierarchy AS (
 		    SELECT id, manager_id, name, hire_date, 1 as level
@@ -776,7 +769,7 @@ func GetAdvancedSQLTestCase() []TestCase {
 		GROUP BY name, level;
 								`,
 						},
-						Upstreams: []Upstream{
+						Upstreams: []pipeline.Upstream{
 							{Value: "users"},
 							{Value: "user_departments"},
 						},
@@ -784,100 +777,93 @@ func GetAdvancedSQLTestCase() []TestCase {
 					{
 						Name: "users",
 						Type: "pg.sql",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{Name: "id", Type: "integer", PrimaryKey: true, Description: "User ID"},
 							{Name: "manager_id", Type: "integer", Description: "Manager's user ID"},
 							{Name: "name", Type: "text", Description: "User's name"},
 							{Name: "hire_date", Type: "date", Description: "Hire date"},
 						},
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM data_users",
 						},
 					},
 					{
 						Name: "user_departments",
 						Type: "pg.sql",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{Name: "user_id", Type: "integer", Description: "User ID"},
 							{Name: "department", Type: "text", Description: "Department name"},
 						},
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM data_user_departments",
 						},
 					},
 				},
 			},
-			after: &Pipeline{
-				Assets: []*Asset{
+			after: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
 					{
 						Name: "user_stats",
 						Type: "pg.sql",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{
-								Name:        "name",
-								Type:        "text",
-								Description: "User's name",
-								Checks:      make([]ColumnCheck, 0),
-								Upstreams: []*UpstreamColumn{
-									{Column: "name", Table: "users"},
-								},
+								Name:          "name",
+								Type:          "text",
+								Description:   "User's name",
+								Checks:        make([]pipeline.ColumnCheck, 0),
+								Upstreams:     []*pipeline.UpstreamColumn{{Column: "name", Table: "users"}},
 								UpdateOnMerge: false,
 							},
 							{
-								Name:        "departments",
-								Type:        "text",
-								Description: "Department name",
-								Checks:      make([]ColumnCheck, 0),
-								Upstreams: []*UpstreamColumn{
-									{Column: "department", Table: "user_departments"},
-								},
+								Name:          "departments",
+								Type:          "text",
+								Description:   "Department name",
+								Checks:        make([]pipeline.ColumnCheck, 0),
+								Upstreams:     []*pipeline.UpstreamColumn{{Column: "department", Table: "user_departments"}},
 								UpdateOnMerge: false,
 							},
 							{
 								Name:          "level",
-								Upstreams:     []*UpstreamColumn{},
-								Checks:        make([]ColumnCheck, 0),
+								Upstreams:     []*pipeline.UpstreamColumn{},
+								Checks:        make([]pipeline.ColumnCheck, 0),
 								UpdateOnMerge: false,
 								Type:          "INT",
 							},
 							{
-								Name:        "dept_stats",
-								Type:        "text",
-								Checks:      make([]ColumnCheck, 0),
-								Description: "Department name",
-								Upstreams: []*UpstreamColumn{
-									{Column: "department", Table: "user_departments"},
-									{Column: "hire_date", Table: "users"},
-								},
+								Name:          "dept_stats",
+								Type:          "text",
+								Checks:        make([]pipeline.ColumnCheck, 0),
+								Description:   "Department name",
+								Upstreams:     []*pipeline.UpstreamColumn{{Column: "department", Table: "user_departments"}, {Column: "hire_date", Table: "users"}},
 								UpdateOnMerge: false,
 							},
 						},
-						Upstreams: []Upstream{
-							{Value: "users", Columns: []DependsColumn{{Name: "manager_id"}, {Name: "name"}, {Name: "hire_date"}}},
-							{Value: "user_departments", Columns: []DependsColumn{{Name: "user_id"}, {Name: "department"}}},
+						Upstreams: []pipeline.Upstream{
+							{Value: "users", Columns: []pipeline.DependsColumn{{Name: "manager_id"}, {Name: "name"}, {Name: "hire_date"}}},
+							{Value: "user_departments", Columns: []pipeline.DependsColumn{{Name: "user_id"}, {Name: "department"}}},
 						},
 					},
 					{
 						Name: "users",
 						Type: "pg.sql",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{Name: "id", Type: "integer", PrimaryKey: true, Description: "User ID"},
 							{Name: "manager_id", Type: "integer", Description: "Manager's user ID"},
 							{Name: "name", Type: "text", Description: "User's name"},
 							{Name: "hire_date", Type: "date", Description: "Hire date"},
 						},
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM data_users",
 						},
 					},
 					{
 						Name: "user_departments",
 						Type: "pg.sql",
-						Columns: []Column{
+						Columns: []pipeline.Column{
 							{Name: "user_id", Type: "integer", Description: "User ID"},
 							{Name: "department", Type: "text", Description: "Department name"},
 						},
-						ExecutableFile: ExecutableFile{
+						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM data_user_departments",
 						},
 					},
@@ -898,7 +884,7 @@ func TestParseLineageRecursively(t *testing.T) {
 	}
 }
 
-func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error) {
+func runSingleLineageTest(t *testing.T, p, after *pipeline.Pipeline, want error) {
 	t.Helper()
 
 	extractor := NewLineageExtractor(SQLParser)
@@ -911,22 +897,18 @@ func runSingleLineageTest(t *testing.T, p, after *Pipeline, want error) {
 	}
 }
 
-func assertLineageError(t *testing.T, got, want error) {
+func assertLineageError(t *testing.T, got *LineageError, want error) {
 	t.Helper()
 
 	if want == nil {
-		if got != nil {
-			t.Errorf("parseLineageRecursive() error = %v, want nil", got)
+		if len(got.Issues) > 0 {
+			t.Errorf("assertLineageError() error = %v, want nil", got)
 		}
 		return
 	}
-
-	if got == nil || got.Error() != want.Error() {
-		t.Errorf("parseLineageRecursive() error = %v, want %v", got, want)
-	}
 }
 
-func assertAssetExists(t *testing.T, afterPipeline *Pipeline, asset *Asset) {
+func assertAssetExists(t *testing.T, afterPipeline *pipeline.Pipeline, asset *pipeline.Asset) {
 	t.Helper()
 
 	assetFound := afterPipeline.GetAssetByName(asset.Name)
@@ -962,7 +944,7 @@ func assertAssetExists(t *testing.T, afterPipeline *Pipeline, asset *Asset) {
 		return
 	}
 
-	columnMap := make(map[string]Column)
+	columnMap := make(map[string]pipeline.Column)
 	for _, col := range asset.Columns {
 		columnMap[col.Name] = col
 	}
@@ -970,14 +952,14 @@ func assertAssetExists(t *testing.T, afterPipeline *Pipeline, asset *Asset) {
 	assertColumns(t, assetFound.Columns, asset.Columns)
 }
 
-func assertColumns(t *testing.T, got, want []Column) {
+func assertColumns(t *testing.T, got, want []pipeline.Column) {
 	t.Helper()
 
 	if len(got) != len(want) {
 		t.Errorf("Column count mismatch: got %d, want %d", len(got), len(want))
 	}
 
-	columnMap := make(map[string]Column)
+	columnMap := make(map[string]pipeline.Column)
 	for _, col := range want {
 		columnMap[col.Name] = col
 	}
@@ -1007,8 +989,8 @@ func assertColumns(t *testing.T, got, want []Column) {
 
 type TestCase struct {
 	name     string
-	pipeline *Pipeline
-	after    *Pipeline
+	pipeline *pipeline.Pipeline
+	after    *pipeline.Pipeline
 	want     error
 }
 
@@ -1016,170 +998,158 @@ func TestAddColumnToAsset(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name          string
-		asset         *Asset
+		asset         *pipeline.Asset
 		colName       string
-		upstreamAsset *Asset
-		upstreamCol   *Column
-		after         *Asset
+		upstreamAsset *pipeline.Asset
+		upstreamCol   *pipeline.Column
+		after         *pipeline.Asset
 		want          error
 	}{
 		{
 			name: "the existing values should not be overridden",
-			asset: &Asset{
+			asset: &pipeline.Asset{
 				Name: "test",
 				ID:   "test",
-				Upstreams: []Upstream{
+				Upstreams: []pipeline.Upstream{
 					{Value: "test2"},
 				},
-				Columns: []Column{
+				Columns: []pipeline.Column{
 					{Name: "id", Type: "integer", Description: "Just a number"},
 				},
 			},
 			colName: "id",
-			upstreamCol: &Column{
+			upstreamCol: &pipeline.Column{
 				Name:        "id",
 				Type:        "integer",
 				Description: "Just a test",
-				Upstreams: []*UpstreamColumn{
-					{Column: "id", Table: "test2"},
-				},
+				Upstreams:   []*pipeline.UpstreamColumn{{Column: "id", Table: "test2"}},
 			},
-			upstreamAsset: &Asset{
+			upstreamAsset: &pipeline.Asset{
 				Name: "test2",
-				Columns: []Column{
+				Columns: []pipeline.Column{
 					{Name: "id", Type: "integer", Description: "Just a test"},
 				},
 			},
-			after: &Asset{
+			after: &pipeline.Asset{
 				Name: "test",
 				ID:   "test",
 				Type: "duckdb.sql",
-				Upstreams: []Upstream{
+				Upstreams: []pipeline.Upstream{
 					{
 						Value: "test2",
-						Columns: []DependsColumn{
+						Columns: []pipeline.DependsColumn{
 							{Name: "id"},
 						},
 					},
 				},
-				Columns: []Column{
+				Columns: []pipeline.Column{
 					{
 						Name:        "id",
 						Type:        "integer",
 						Description: "Just a number",
-						Upstreams: []*UpstreamColumn{
-							{Column: "id", Table: "test2"},
-						},
+						Upstreams:   []*pipeline.UpstreamColumn{{Column: "id", Table: "test2"}},
 					},
 				},
 			},
 		},
 		{
 			name: "the existing values should not be overridden but the new column should be added",
-			asset: &Asset{
+			asset: &pipeline.Asset{
 				Name: "test",
 				ID:   "test",
-				Upstreams: []Upstream{
+				Upstreams: []pipeline.Upstream{
 					{Value: "test2"},
 				},
 				Type: "duckdb.sql",
-				Columns: []Column{
+				Columns: []pipeline.Column{
 					{Name: "id", Type: "integer"},
 				},
 			},
 			colName: "id",
-			upstreamCol: &Column{
+			upstreamCol: &pipeline.Column{
 				Name:        "id",
 				Type:        "integer",
 				Description: "Just a test",
-				Upstreams: []*UpstreamColumn{
-					{Column: "id", Table: "test2"},
-				},
+				Upstreams:   []*pipeline.UpstreamColumn{{Column: "id", Table: "test2"}},
 			},
-			upstreamAsset: &Asset{
+			upstreamAsset: &pipeline.Asset{
 				Name: "test2",
 				Type: "duckdb.sql",
-				Columns: []Column{
+				Columns: []pipeline.Column{
 					{Name: "id", Type: "integer", Description: "Just a test"},
 				},
 			},
-			after: &Asset{
+			after: &pipeline.Asset{
 				Name:      "test",
 				ID:        "test",
-				Upstreams: []Upstream{{Value: "test2"}},
+				Upstreams: []pipeline.Upstream{{Value: "test2"}},
 				Type:      "duckdb.sql",
-				Columns: []Column{
+				Columns: []pipeline.Column{
 					{
 						Name: "id", Type: "integer", Description: "Just a test", EntityAttribute: nil,
-						Upstreams: []*UpstreamColumn{
-							{Column: "id", Table: "test2"},
-						},
+						Upstreams: []*pipeline.UpstreamColumn{{Column: "id", Table: "test2"}},
 					},
 				},
 			},
 		},
 		{
 			name: "the upstream column type should be changed",
-			asset: &Asset{
+			asset: &pipeline.Asset{
 				Name: "test",
-				Upstreams: []Upstream{
+				Upstreams: []pipeline.Upstream{
 					{Value: "test2"},
 				},
-				Columns: []Column{
+				Columns: []pipeline.Column{
 					{Name: "id", Type: "integer", Description: "Just a number"},
 				},
 			},
 			colName: "id",
-			upstreamCol: &Column{
+			upstreamCol: &pipeline.Column{
 				Name:        "id",
 				Type:        "bigint",
 				Description: "Just a test",
-				Upstreams: []*UpstreamColumn{
-					{Column: "id", Table: "test2"},
-				},
+				Upstreams:   []*pipeline.UpstreamColumn{{Column: "id", Table: "test2"}},
 			},
-			upstreamAsset: &Asset{
+			upstreamAsset: &pipeline.Asset{
 				Name: "test2",
-				Columns: []Column{
+				Columns: []pipeline.Column{
 					{Name: "id", Type: "bigint", Description: "Just a test"},
 				},
 			},
-			after: &Asset{Name: "test", Upstreams: []Upstream{{Value: "test2"}}, Type: "duckdb.sql", Columns: []Column{{Name: "id", Type: "integer", Description: "Just a number", Upstreams: []*UpstreamColumn{
+			after: &pipeline.Asset{Name: "test", Upstreams: []pipeline.Upstream{{Value: "test2"}}, Type: "duckdb.sql", Columns: []pipeline.Column{{Name: "id", Type: "integer", Description: "Just a number", Upstreams: []*pipeline.UpstreamColumn{
 				{Column: "id", Table: "test2"},
 			}}}},
 		},
 		{
 			name: "the new column should be added",
-			asset: &Asset{
+			asset: &pipeline.Asset{
 				Name: "test",
 				ID:   "test",
-				Upstreams: []Upstream{
+				Upstreams: []pipeline.Upstream{
 					{Value: "test2"},
 				},
-				Columns: []Column{},
+				Columns: []pipeline.Column{},
 			},
 			colName: "new_col",
-			upstreamCol: &Column{
+			upstreamCol: &pipeline.Column{
 				Name:        "new_col",
 				Type:        "string",
 				Description: "New column",
-				Upstreams: []*UpstreamColumn{
-					{Column: "new_col", Table: "test2"},
-				},
+				Upstreams:   []*pipeline.UpstreamColumn{{Column: "new_col", Table: "test2"}},
 			},
-			upstreamAsset: &Asset{
+			upstreamAsset: &pipeline.Asset{
 				Name: "test2",
-				Columns: []Column{
+				Columns: []pipeline.Column{
 					{Name: "id", Type: "integer", Description: "Just a test"},
 					{Name: "new_col", Type: "string", Description: "New column"},
 				},
 			},
-			after: &Asset{
+			after: &pipeline.Asset{
 				Name:      "test",
 				ID:        "test",
-				Upstreams: []Upstream{{Value: "test2"}},
+				Upstreams: []pipeline.Upstream{{Value: "test2"}},
 				Type:      "duckdb.sql",
-				Columns: []Column{{Name: "new_col", Type: "string", Description: "New column", Upstreams: []*UpstreamColumn{
+				Columns: []pipeline.Column{{Name: "new_col", Type: "string", Description: "New column", Upstreams: []*pipeline.UpstreamColumn{
 					{Column: "new_col", Table: "test2"},
 				}}},
 			},
@@ -1223,48 +1193,42 @@ func TestHandleExistingOrNewColumn(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		asset       *Asset
-		upstreamCol *Column
-		existingCol *Column
-		want        *Column
+		asset       *pipeline.Asset
+		upstreamCol *pipeline.Column
+		existingCol *pipeline.Column
+		want        *pipeline.Column
 		wantErr     error
 	}{
 		{
 			name: "update existing column with new upstream",
-			asset: &Asset{
+			asset: &pipeline.Asset{
 				Name: "test_table",
-				Columns: []Column{
+				Columns: []pipeline.Column{
 					{
 						Name:        "id",
 						Type:        "integer",
 						Description: "Existing description",
-						Upstreams: []*UpstreamColumn{
-							{Column: "old_id", Table: "old_table"},
-						},
+						Upstreams:   []*pipeline.UpstreamColumn{{Column: "old_id", Table: "old_table"}},
 					},
 				},
 			},
-			upstreamCol: &Column{
+			upstreamCol: &pipeline.Column{
 				Name:        "id",
 				Type:        "bigint",
 				Description: "New description",
-				Upstreams: []*UpstreamColumn{
-					{Column: "new_id", Table: "new_table"},
-				},
+				Upstreams:   []*pipeline.UpstreamColumn{{Column: "new_id", Table: "new_table"}},
 			},
-			existingCol: &Column{
+			existingCol: &pipeline.Column{
 				Name:        "id",
 				Type:        "integer",
 				Description: "Existing description",
-				Upstreams: []*UpstreamColumn{
-					{Column: "old_id", Table: "old_table"},
-				},
+				Upstreams:   []*pipeline.UpstreamColumn{{Column: "old_id", Table: "old_table"}},
 			},
-			want: &Column{
+			want: &pipeline.Column{
 				Name:        "id",
 				Type:        "integer",
 				Description: "Existing description",
-				Upstreams: []*UpstreamColumn{
+				Upstreams: []*pipeline.UpstreamColumn{
 					{Column: "old_id", Table: "old_table"},
 					{Column: "new_id", Table: "new_table"},
 				},
@@ -1273,82 +1237,70 @@ func TestHandleExistingOrNewColumn(t *testing.T) {
 		},
 		{
 			name: "update existing column with duplicate upstream",
-			asset: &Asset{
+			asset: &pipeline.Asset{
 				Name: "test_table",
-				Columns: []Column{
+				Columns: []pipeline.Column{
 					{
 						Name:        "id",
 						Type:        "integer",
 						Description: "Existing description",
-						Upstreams: []*UpstreamColumn{
-							{Column: "old_id", Table: "old_table"},
-						},
+						Upstreams:   []*pipeline.UpstreamColumn{{Column: "old_id", Table: "old_table"}},
 					},
 				},
 			},
-			upstreamCol: &Column{
+			upstreamCol: &pipeline.Column{
 				Name:        "id",
 				Type:        "bigint",
 				Description: "New description",
-				Upstreams: []*UpstreamColumn{
-					{Column: "old_id", Table: "old_table"},
-				},
+				Upstreams:   []*pipeline.UpstreamColumn{{Column: "old_id", Table: "old_table"}},
 			},
-			existingCol: &Column{
+			existingCol: &pipeline.Column{
 				Name:        "id",
 				Type:        "integer",
 				Description: "Existing description",
-				Upstreams: []*UpstreamColumn{
-					{Column: "old_id", Table: "old_table"},
-				},
+				Upstreams:   []*pipeline.UpstreamColumn{{Column: "old_id", Table: "old_table"}},
 			},
-			want: &Column{
+			want: &pipeline.Column{
 				Name:        "id",
 				Type:        "integer",
 				Description: "Existing description",
-				Upstreams: []*UpstreamColumn{
-					{Column: "old_id", Table: "old_table"},
-				},
+				Upstreams:   []*pipeline.UpstreamColumn{{Column: "old_id", Table: "old_table"}},
 			},
 			wantErr: nil,
 		},
 		{
 			name: "update existing column with multiple new upstreams",
-			asset: &Asset{
+			asset: &pipeline.Asset{
 				Name: "test_table",
-				Columns: []Column{
+				Columns: []pipeline.Column{
 					{
 						Name:        "id",
 						Type:        "integer",
 						Description: "Existing description",
-						Upstreams: []*UpstreamColumn{
-							{Column: "old_id", Table: "old_table"},
-						},
+						Upstreams:   []*pipeline.UpstreamColumn{{Column: "old_id", Table: "old_table"}},
 					},
 				},
 			},
-			upstreamCol: &Column{
+			upstreamCol: &pipeline.Column{
 				Name:        "id",
 				Type:        "bigint",
 				Description: "New description",
-				Upstreams: []*UpstreamColumn{
+				Upstreams: []*pipeline.UpstreamColumn{
 					{Column: "new_id1", Table: "new_table1"},
 					{Column: "new_id2", Table: "new_table2"},
 				},
 			},
-			existingCol: &Column{
+			existingCol: &pipeline.Column{
 				Name:        "id",
 				Type:        "integer",
 				Description: "Existing description",
-				Upstreams: []*UpstreamColumn{
-					{Column: "old_id", Table: "old_table"},
-				},
+				Upstreams:   []*pipeline.UpstreamColumn{{Column: "old_id", Table: "old_table"}},
 			},
-			want: &Column{
+			want: &pipeline.Column{
 				Name:        "id",
 				Type:        "integer",
 				Description: "Existing description",
-				Upstreams: []*UpstreamColumn{
+				Upstreams: []*pipeline.UpstreamColumn{
 					{Column: "old_id", Table: "old_table"},
 					{Column: "new_id1", Table: "new_table1"},
 					{Column: "new_id2", Table: "new_table2"},
@@ -1393,72 +1345,72 @@ func TestUpdateExistingColumn(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		existingCol *Column
-		upstreamCol *Column
-		want        *Column
+		existingCol *pipeline.Column
+		upstreamCol *pipeline.Column
+		want        *pipeline.Column
 	}{
 		{
 			name: "empty existing column should be updated with upstream values",
-			existingCol: &Column{
+			existingCol: &pipeline.Column{
 				Name: "test_col",
 			},
-			upstreamCol: &Column{
+			upstreamCol: &pipeline.Column{
 				Name:            "test_col",
 				Description:     "Test description",
 				Type:            "integer",
-				EntityAttribute: &EntityAttribute{Entity: "test_entity"},
+				EntityAttribute: &pipeline.EntityAttribute{Entity: "test_entity"},
 				UpdateOnMerge:   true,
 			},
-			want: &Column{
+			want: &pipeline.Column{
 				Name:            "test_col",
 				Description:     "Test description",
 				Type:            "integer",
-				EntityAttribute: &EntityAttribute{Entity: "test_entity"},
+				EntityAttribute: &pipeline.EntityAttribute{Entity: "test_entity"},
 				UpdateOnMerge:   true,
 			},
 		},
 		{
 			name: "existing values should not be overwritten",
-			existingCol: &Column{
+			existingCol: &pipeline.Column{
 				Name:            "test_col",
 				Description:     "Existing description",
 				Type:            "string",
-				EntityAttribute: &EntityAttribute{Entity: "existing_entity"},
+				EntityAttribute: &pipeline.EntityAttribute{Entity: "existing_entity"},
 				UpdateOnMerge:   false,
 			},
-			upstreamCol: &Column{
+			upstreamCol: &pipeline.Column{
 				Name:            "test_col",
 				Description:     "New description",
 				Type:            "integer",
-				EntityAttribute: &EntityAttribute{Entity: "new_entity"},
+				EntityAttribute: &pipeline.EntityAttribute{Entity: "new_entity"},
 				UpdateOnMerge:   true,
 			},
-			want: &Column{
+			want: &pipeline.Column{
 				Name:            "test_col",
 				Description:     "Existing description",
 				Type:            "string",
-				EntityAttribute: &EntityAttribute{Entity: "existing_entity"},
+				EntityAttribute: &pipeline.EntityAttribute{Entity: "existing_entity"},
 				UpdateOnMerge:   true,
 			},
 		},
 		{
 			name: "partial existing values should be updated",
-			existingCol: &Column{
+			existingCol: &pipeline.Column{
 				Name:        "test_col",
 				Description: "Existing description",
 			},
-			upstreamCol: &Column{
+			upstreamCol: &pipeline.Column{
 				Name:            "test_col",
 				Description:     "New description",
 				Type:            "integer",
-				EntityAttribute: &EntityAttribute{Entity: "new_entity"},
+				EntityAttribute: &pipeline.EntityAttribute{Entity: "new_entity"},
 				UpdateOnMerge:   true,
 			},
-			want: &Column{
+			want: &pipeline.Column{
 				Name:            "test_col",
 				Description:     "Existing description",
 				Type:            "integer",
-				EntityAttribute: &EntityAttribute{Entity: "new_entity"},
+				EntityAttribute: &pipeline.EntityAttribute{Entity: "new_entity"},
 				UpdateOnMerge:   true,
 			},
 		},
@@ -1500,58 +1452,58 @@ func TestUpdateAssetColumn(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		asset    *Asset
-		newCol   *Column
-		expected []Column
+		asset    *pipeline.Asset
+		newCol   *pipeline.Column
+		expected []pipeline.Column
 	}{
 		{
 			name: "update existing column",
-			asset: &Asset{
-				Columns: []Column{
+			asset: &pipeline.Asset{
+				Columns: []pipeline.Column{
 					{Name: "id", Type: "integer", Description: "old description"},
 					{Name: "name", Type: "string"},
 				},
 			},
-			newCol: &Column{
+			newCol: &pipeline.Column{
 				Name:        "id",
 				Type:        "bigint",
 				Description: "new description",
 			},
-			expected: []Column{
+			expected: []pipeline.Column{
 				{Name: "id", Type: "bigint", Description: "new description"},
 				{Name: "name", Type: "string"},
 			},
 		},
 		{
 			name: "case insensitive column match",
-			asset: &Asset{
-				Columns: []Column{
+			asset: &pipeline.Asset{
+				Columns: []pipeline.Column{
 					{Name: "ID", Type: "integer"},
 					{Name: "name", Type: "string"},
 				},
 			},
-			newCol: &Column{
+			newCol: &pipeline.Column{
 				Name: "id",
 				Type: "bigint",
 			},
-			expected: []Column{
+			expected: []pipeline.Column{
 				{Name: "id", Type: "bigint"},
 				{Name: "name", Type: "string"},
 			},
 		},
 		{
 			name: "no matching column",
-			asset: &Asset{
-				Columns: []Column{
+			asset: &pipeline.Asset{
+				Columns: []pipeline.Column{
 					{Name: "id", Type: "integer"},
 					{Name: "name", Type: "string"},
 				},
 			},
-			newCol: &Column{
+			newCol: &pipeline.Column{
 				Name: "age",
 				Type: "integer",
 			},
-			expected: []Column{
+			expected: []pipeline.Column{
 				{Name: "id", Type: "integer"},
 				{Name: "name", Type: "string"},
 			},
@@ -1591,17 +1543,17 @@ func TestUpstreamExists(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		upstreams   []*UpstreamColumn
-		newUpstream *UpstreamColumn
+		upstreams   []*pipeline.UpstreamColumn
+		newUpstream *pipeline.UpstreamColumn
 		wantExists  bool
 	}{
 		{
 			name: "exact match exists",
-			upstreams: []*UpstreamColumn{
+			upstreams: []*pipeline.UpstreamColumn{
 				{Column: "id", Table: "users"},
 				{Column: "name", Table: "profiles"},
 			},
-			newUpstream: &UpstreamColumn{
+			newUpstream: &pipeline.UpstreamColumn{
 				Column: "id",
 				Table:  "users",
 			},
@@ -1609,11 +1561,11 @@ func TestUpstreamExists(t *testing.T) {
 		},
 		{
 			name: "case insensitive match exists",
-			upstreams: []*UpstreamColumn{
+			upstreams: []*pipeline.UpstreamColumn{
 				{Column: "ID", Table: "Users"},
 				{Column: "name", Table: "profiles"},
 			},
-			newUpstream: &UpstreamColumn{
+			newUpstream: &pipeline.UpstreamColumn{
 				Column: "id",
 				Table:  "users",
 			},
@@ -1621,11 +1573,11 @@ func TestUpstreamExists(t *testing.T) {
 		},
 		{
 			name: "no match - different column",
-			upstreams: []*UpstreamColumn{
+			upstreams: []*pipeline.UpstreamColumn{
 				{Column: "id", Table: "users"},
 				{Column: "name", Table: "profiles"},
 			},
-			newUpstream: &UpstreamColumn{
+			newUpstream: &pipeline.UpstreamColumn{
 				Column: "age",
 				Table:  "users",
 			},
@@ -1633,11 +1585,11 @@ func TestUpstreamExists(t *testing.T) {
 		},
 		{
 			name: "no match - different table",
-			upstreams: []*UpstreamColumn{
+			upstreams: []*pipeline.UpstreamColumn{
 				{Column: "id", Table: "users"},
 				{Column: "name", Table: "profiles"},
 			},
-			newUpstream: &UpstreamColumn{
+			newUpstream: &pipeline.UpstreamColumn{
 				Column: "id",
 				Table:  "employees",
 			},
@@ -1645,8 +1597,8 @@ func TestUpstreamExists(t *testing.T) {
 		},
 		{
 			name:      "empty upstreams list",
-			upstreams: []*UpstreamColumn{},
-			newUpstream: &UpstreamColumn{
+			upstreams: []*pipeline.UpstreamColumn{},
+			newUpstream: &pipeline.UpstreamColumn{
 				Column: "id",
 				Table:  "users",
 			},
@@ -1663,5 +1615,123 @@ func TestUpstreamExists(t *testing.T) {
 				t.Errorf("upstreamExists() = %v, want %v", got, tt.wantExists)
 			}
 		})
+	}
+}
+
+func TestLineageError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		pipeline *pipeline.Pipeline
+		error    *LineageIssue
+	}{
+		{
+			name: "parseLineageRecursive() error",
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "table1",
+						Type: "bq.sql",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELE",
+						},
+						Upstreams: []pipeline.Upstream{{Value: "table2"}},
+					},
+					{
+						Name: "table2",
+						Type: "bq.sql",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SEL",
+						},
+						Upstreams: []pipeline.Upstream{{Value: "table3"}},
+					},
+					{
+						Name: "table3",
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64", PrimaryKey: true, Description: "Just a number", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
+								{Name: "not_null"},
+							}},
+							{Name: "name", Type: "str", Description: "Just a name", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
+								{Name: "not_null"},
+							}},
+							{Name: "age", Type: "int64", Description: "Just an age", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
+								{Name: "not_null"},
+							}},
+						},
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT id,name,age FROM table4",
+						},
+					},
+				},
+			},
+			error: &LineageIssue{
+				Description: "failed to parse column lineage: Failed to parse query",
+			},
+		},
+		{
+			name: "parseLineageRecursive() error",
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{
+						Name: "table1",
+						Type: "bq.sql",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT * FROM table2",
+						},
+						Upstreams: []pipeline.Upstream{{Value: "table2"}},
+					},
+					{
+						Name: "table2",
+						Type: "bq.sql",
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELECT * FROM table3",
+						},
+						Upstreams: []pipeline.Upstream{{Value: "table3"}},
+					},
+					{
+						Name: "table3",
+						Type: "bq.sql",
+						Columns: []pipeline.Column{
+							{Name: "id", Type: "int64", PrimaryKey: true, Description: "Just a number", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
+								{Name: "not_null"},
+							}},
+							{Name: "name", Type: "str", Description: "Just a name", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
+								{Name: "not_null"},
+							}},
+							{Name: "age", Type: "int64", Description: "Just an age", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
+								{Name: "not_null"},
+							}},
+						},
+						ExecutableFile: pipeline.ExecutableFile{
+							Content: "SELE*",
+						},
+					},
+				},
+			},
+			error: &LineageIssue{
+				Description: "failed to parse column lineage: Parse error: Required keyword: 'expression' missing for <class 'sqlglot.expressions.Mul'>. Line 1, Col: 5.\n  SELE\x1b[4m*\x1b[0m",
+			},
+		},
+	}
+
+	lineage := NewLineageExtractor(SQLParser)
+
+	for _, tt := range tests {
+		processedAssets := make(map[string]bool)
+		issues := make([]*LineageIssue, 0)
+		for _, asset := range tt.pipeline.Assets {
+			got := lineage.ColumnLineage(tt.pipeline, asset, processedAssets)
+			if got != nil {
+				issues = append(issues, got.Issues...)
+			}
+		}
+
+		if len(issues) == 0 {
+			t.Errorf("expected errors, got zero issue")
+		}
+		for _, issue := range issues {
+			assert.Contains(t, tt.error.Description, issue.Description)
+		}
 	}
 }
