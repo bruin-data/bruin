@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from sqlglot import parse_one, exp, lineage
 from sqlglot.lineage import Node
@@ -136,22 +137,24 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
                 return {
                     "columns": [],
                     "non_selected_columns": [],
-                    "errors": [f"Optimization error: {str(e)}"],
+                    "errors": [f"Schema Error: {str(e)}"],
                 }
     except Exception as e:
+        logging.error(f"Schema error: {str(e)}")
         return {
             "columns": [],
             "non_selected_columns": [],
-            "errors": [f"Schema error: {str(e)}"],
+            "errors": [],
         }
 
     try:
         cols = extract_columns(optimized)
     except Exception as e:
+        logging.error(f"Error extracting columns: {str(e)}")
         return {
             "columns": [],
             "non_selected_columns": [],
-            "errors": [f"Column extraction error: {str(e)}"],
+            "errors": [],
         }
 
     for col in cols:
@@ -190,7 +193,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
                 {"name": col["name"], "upstream": cl, "type": col.get("type", "")}
             )
         except Exception as e:
-            errors.append(f"Lineage error for column {col['name']}: {str(e)}")
+            logging.error(f"Lineage error for column {col['name']}: {str(e)}")
             continue
 
     result.sort(key=lambda x: x["name"])
@@ -212,7 +215,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
                 continue
         non_selected_columns = list(non_selected_columns_dict.values())
     except Exception as e:
-        errors.append(f"Non-selected columns error: {str(e)}")
+        logging.error(f"Error extracting non-selected columns: {str(e)}")
 
     # Sort upstreams even if there are errors
     try:
@@ -221,7 +224,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
         for col in non_selected_columns:
             col["upstream"] = sorted(col["upstream"], key=lambda x: x["column"].lower())
     except Exception as e:
-        errors.append(f"Sorting error: {str(e)}")
+        logging.error(f"Error: {str(e)}")
 
     return {
         "columns": result,
