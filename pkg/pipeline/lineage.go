@@ -107,6 +107,10 @@ func (p *LineageExtractor) parseLineage(foundPipeline *Pipeline, asset *Asset, m
 		return fmt.Errorf("failed to parse column lineage: %w", err)
 	}
 
+	if len(lineage.Errors) > 0 {
+		return fmt.Errorf("failed to parse column lineage: %s", strings.Join(lineage.Errors, ", "))
+	}
+
 	return p.processLineageColumns(foundPipeline, asset, lineage)
 }
 
