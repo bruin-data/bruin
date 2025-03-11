@@ -50,6 +50,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return errors.Wrap(err, "cannot extract queries from the task file")
 	}
+	if len(queries) == 0 {
+		return nil
+	}
 
 	connName, err := p.GetConnectionNameForAsset(t)
 	if err != nil {
