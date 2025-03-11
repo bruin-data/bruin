@@ -86,7 +86,9 @@ func (p *LineageExtractor) ColumnLineage(foundPipeline *pipeline.Pipeline, asset
 		if upstreamAsset == nil {
 			continue
 		}
-		issues.Issues = append(issues.Issues, p.ColumnLineage(foundPipeline, upstreamAsset, processedAssets).Issues...)
+		if errIssues := p.ColumnLineage(foundPipeline, upstreamAsset, processedAssets); errIssues != nil {
+			issues.Issues = append(issues.Issues, errIssues.Issues...)
+		}
 	}
 
 	err := p.parseLineage(foundPipeline, asset, p.TableSchemaForUpstreams(foundPipeline, asset))
