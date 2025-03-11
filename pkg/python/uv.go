@@ -17,7 +17,6 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -280,8 +279,16 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	_, _ = output.Write([]byte("Successfully collected the data from the asset, uploading to the destination...\n"))
 
+	if mat.Strategy != "" {
+		asset.Parameters["incremental_strategy"] = string(mat.Strategy)
+	}
+
+	if mat.IncrementalKey != "" {
+		asset.Parameters["incremental_key"] = mat.IncrementalKey
+	}
+
 	// build ingestr flags
-	cmdArgs := []string{
+	cmdArgs := ConsolidatedParameters(ctx, asset, []string{
 		"ingest",
 		"--source-uri",
 		"mmap://" + arrowFilePath,
@@ -292,7 +299,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		"--yes",
 		"--progress",
 		"log",
-	}
+	})
 
 	destConnectionName, err := execCtx.pipeline.GetConnectionNameForAsset(asset)
 	if err != nil {
@@ -319,26 +326,6 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}
 
 	cmdArgs = append(cmdArgs, "--dest-uri", destURI)
-
-	fullRefresh := ctx.Value(pipeline.RunConfigFullRefresh)
-	if fullRefresh != nil && fullRefresh.(bool) {
-		cmdArgs = append(cmdArgs, "--full-refresh")
-	}
-
-	if mat.Strategy != "" {
-		cmdArgs = append(cmdArgs, "--incremental-strategy", string(mat.Strategy))
-	}
-
-	if mat.IncrementalKey != "" {
-		cmdArgs = append(cmdArgs, "--incremental-key", mat.IncrementalKey)
-	}
-
-	primaryKeys := asset.ColumnNamesWithPrimaryKey()
-	if len(primaryKeys) > 0 {
-		for _, pk := range primaryKeys {
-			cmdArgs = append(cmdArgs, "--primary-key", pk)
-		}
-	}
 
 	if strings.HasPrefix(destURI, "duckdb://") {
 		if dbURIGetter, ok := destConnectionInst.(interface{ GetDBConnectionURI() string }); ok {
