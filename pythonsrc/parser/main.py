@@ -1,50 +1,7 @@
-import json
-import logging
-from dataclasses import dataclass
 from sqlglot import parse_one, exp, lineage
-from sqlglot.lineage import Node
+from sqlglot.optimizer.scope import build_scope
 from sqlglot.optimizer import optimize
-from sqlglot.optimizer.scope import find_all_in_scope, build_scope
-
-
-@dataclass(frozen=True)
-class Column:
-    name: str
-    table: str
-
-
-def extract_non_selected_columns(parsed: exp.Select) -> list[Column]:
-    where = parsed.find_all(exp.Where)
-    join = parsed.find_all(exp.Join)
-    group = parsed.find_all(exp.Group)
-
-    cols = []
-    tables = extract_tables(parsed)
-    table_alias = {}
-    for table in tables:
-        if table.alias:
-            table_alias[table.alias] = merge_parts(table)
-
-    table_names = {}
-    for table in tables:
-        table_key = merge_parts(table)
-        table_names[table_key] = table
-
-    for scopes in [where, join, group]:
-        for scope in scopes:
-            if scope is None:
-                continue
-            for expr in find_all_in_scope(scope, exp.Column):
-                table_name = expr.table
-
-                if expr.table in table_alias:
-                    table_name = table_alias[expr.table]
-                if table_name in table_names:
-                    cols.append(Column(name=expr.name, table=table_name))
-
-    result = list(set(cols))
-    result.sort(key=lambda x: x.name + x.table)
-    return result
+from sqlglot.lineage import Node
 
 
 def extract_tables(parsed):
@@ -63,18 +20,11 @@ def extract_tables(parsed):
 
 def extract_columns(parsed):
     cols = []
-    found = parsed.find(exp.Select)
-    if found is None:
-        return cols
-    for expression in found.expressions:
+    for expression in parsed.find(exp.Select).expressions:
         if isinstance(expression, exp.CTE):
             continue
-        cols.append(
-            {
-                "name": expression.alias_or_name,
-                "type": str(expression.type),
-            }
-        )
+
+        cols.append(expression.alias_or_name)
 
     return cols
 
@@ -109,29 +59,13 @@ def get_tables(query: str, dialect: str):
 
 def get_column_lineage(query: str, schema: dict, dialect: str):
     parsed = parse_one(query, dialect=dialect)
-    if not isinstance(parsed, exp.Query):
-        return {"columns": []}
-    try:
-        nested_schema = schema_dict_to_schema_object(schema)
-        try:
-            optimized = optimize(parsed, nested_schema, dialect=dialect)
-        except Exception:
-            # try again without dialect, this solves some issues, e.g. https://github.com/tobymao/sqlglot/issues/4538
-            optimized = optimize(parsed, nested_schema)
-    except Exception as e:
-        logging.error(
-            f"Error optimizing query: {e}, query and schema: { json.dumps({'query': query, 'schema': schema}) }"
-        )
-        return {"columns": [], "error": str(e)}
+    optimized = optimize(parsed, schema, dialect=dialect)
 
     result = []
 
     cols = extract_columns(optimized)
     for col in cols:
-        try:
-            ll = lineage.lineage(col["name"], optimized, schema, dialect=dialect)
-        except Exception:
-            continue
+        ll = lineage.lineage(col, optimized, schema, dialect=dialect)
 
         cl = []
         leaves: list[Node] = []
@@ -143,42 +77,20 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
             ):
                 continue
 
-            if isinstance(ds.expression, exp.Table):
-                cl.append(
-                    {
-                        "column": ds.name.split(".")[-1],
-                        "table": merge_parts(ds.expression),
-                    }
-                )
+            cl.append(
+                {"column": ds.name.split(".")[-1], "table": ds.expression.this.name}
+            )
 
         # Deduplicate based on column-table combination
         cl = [dict(t) for t in {tuple(d.items()) for d in cl}]
         cl.sort(key=lambda x: x["table"])
 
-        result.append({"name": col["name"], "upstream": cl, "type": col["type"]})
+        result.append({"name": col, "upstream": cl})
 
     result.sort(key=lambda x: x["name"])
 
-    non_selected_columns_dict = {}
-    for column in extract_non_selected_columns(optimized):
-        if column.name not in non_selected_columns_dict:
-            non_selected_columns_dict[column.name] = {
-                "name": column.name,
-                "upstream": [],
-            }
-        non_selected_columns_dict[column.name]["upstream"].append(
-            {"column": column.name, "table": column.table}
-        )
-    non_selected_columns = list(non_selected_columns_dict.values())
-
-    for col in result:
-        col["upstream"] = sorted(col["upstream"], key=lambda x: x["column"].lower())
-    for col in non_selected_columns:
-        col["upstream"] = sorted(col["upstream"], key=lambda x: x["column"].lower())
-
     return {
         "columns": result,
-        "non_selected_columns": non_selected_columns,
     }
 
 
@@ -188,28 +100,3 @@ def find_leaf_nodes(node: Node, leaf_nodes):
     else:
         for child in node.downstream:
             find_leaf_nodes(child, leaf_nodes)
-
-
-def merge_parts(table: exp.Table) -> str:
-    return ".".join(
-        part.name for part in table.parts if isinstance(part, exp.Identifier)
-    )
-
-
-def schema_dict_to_schema_object(schema_dict: dict) -> dict:
-    result = {}
-
-    for table_path, value in schema_dict.items():
-        current = result
-        parts = table_path.split(".")
-
-        # Handle all parts except the last one
-        for part in parts[:-1]:
-            if part not in current:
-                current[part] = {}
-            current = current[part]
-
-        # Handle the last part
-        current[parts[-1]] = value
-
-    return result
