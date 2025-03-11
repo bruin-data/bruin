@@ -12,9 +12,11 @@ columns:
     - name: col1
       type: int
       primary_key: true
+      upstreams:
+        - table: xyz
+          column: abc
       checks:
         - name: unique
-
 
 @bruin """
 

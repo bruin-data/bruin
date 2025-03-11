@@ -41,8 +41,7 @@ func TestRepo(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			finder := &RepoFinder{}
-			got, err := finder.Repo(tt.path)
+			got, err := FindRepoFromPath(tt.path)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -51,5 +50,18 @@ func TestRepo(t *testing.T) {
 
 			assert.Equal(t, tt.want, got)
 		})
+	}
+}
+
+func BenchmarkFindRepoFromPath(b *testing.B) {
+	// Reset the timer to exclude setup time
+	b.ResetTimer()
+
+	// Run the benchmark
+	for i := 0; i < b.N; i++ {
+		_, err := FindRepoFromPath(".")
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }

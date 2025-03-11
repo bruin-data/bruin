@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
@@ -250,13 +251,17 @@ const (
 )
 
 type MaterializationStrategy string
+type MaterializationTimeGranularity string
 
 const (
-	MaterializationStrategyNone          MaterializationStrategy = ""
-	MaterializationStrategyCreateReplace MaterializationStrategy = "create+replace"
-	MaterializationStrategyDeleteInsert  MaterializationStrategy = "delete+insert"
-	MaterializationStrategyAppend        MaterializationStrategy = "append"
-	MaterializationStrategyMerge         MaterializationStrategy = "merge"
+	MaterializationStrategyNone             MaterializationStrategy        = ""
+	MaterializationStrategyCreateReplace    MaterializationStrategy        = "create+replace"
+	MaterializationStrategyDeleteInsert     MaterializationStrategy        = "delete+insert"
+	MaterializationStrategyAppend           MaterializationStrategy        = "append"
+	MaterializationStrategyMerge            MaterializationStrategy        = "merge"
+	MaterializationStrategyTimeInterval     MaterializationStrategy        = "time_interval"
+	MaterializationTimeGranularityDate      MaterializationTimeGranularity = "date"
+	MaterializationTimeGranularityTimestamp MaterializationTimeGranularity = "timestamp"
 )
 
 var AllAvailableMaterializationStrategies = []MaterializationStrategy{
@@ -264,14 +269,16 @@ var AllAvailableMaterializationStrategies = []MaterializationStrategy{
 	MaterializationStrategyDeleteInsert,
 	MaterializationStrategyAppend,
 	MaterializationStrategyMerge,
+	MaterializationStrategyTimeInterval,
 }
 
 type Materialization struct {
-	Type           MaterializationType     `json:"type" yaml:"type,omitempty" mapstructure:"type"`
-	Strategy       MaterializationStrategy `json:"strategy" yaml:"strategy,omitempty" mapstructure:"strategy"`
-	PartitionBy    string                  `json:"partition_by" yaml:"partition_by,omitempty" mapstructure:"partition_by"`
-	ClusterBy      []string                `json:"cluster_by" yaml:"cluster_by,omitempty" mapstructure:"cluster_by"`
-	IncrementalKey string                  `json:"incremental_key" yaml:"incremental_key,omitempty" mapstructure:"incremental_key"`
+	Type            MaterializationType            `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	Strategy        MaterializationStrategy        `json:"strategy" yaml:"strategy,omitempty" mapstructure:"strategy"`
+	PartitionBy     string                         `json:"partition_by" yaml:"partition_by,omitempty" mapstructure:"partition_by"`
+	ClusterBy       []string                       `json:"cluster_by" yaml:"cluster_by,omitempty" mapstructure:"cluster_by"`
+	IncrementalKey  string                         `json:"incremental_key" yaml:"incremental_key,omitempty" mapstructure:"incremental_key"`
+	TimeGranularity MaterializationTimeGranularity `json:"time_granularity" yaml:"time_granularity,omitempty" mapstructure:"time_granularity"`
 }
 
 func (m Materialization) MarshalJSON() ([]byte, error) {
@@ -957,6 +964,8 @@ func PipelineFromPath(filePath string, fs afero.Fs) (*Pipeline, error) {
 	}
 
 	pl.Assets = make([]*Asset, 0)
+	pl.DefinitionFile.Name = filepath.Base(filePath)
+	pl.DefinitionFile.Path = filePath
 	return &pl, nil
 }
 
@@ -982,6 +991,8 @@ type Pipeline struct {
 	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push" mapstructure:"metadata_push"`
 	Retries            int                    `json:"retries" yaml:"retries" mapstructure:"retries"`
 	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
+	Commit             string                 `json:"commit"`
+	Snapshot           string                 `json:"snapshot"`
 	TasksByType        map[AssetType][]*Asset `json:"-"`
 	tasksByName        map[string]*Asset
 }
@@ -1290,7 +1301,31 @@ func resolvePipelineFilePath(basePath string, validFileNames []string, fs afero.
 	return "", fmt.Errorf("no pipeline file found in '%s'. Supported files: %v", basePath, validFileNames)
 }
 
-func (b *Builder) CreatePipelineFromPath(pathToPipeline string, isMutate bool) (*Pipeline, error) {
+type createPipelineConfig struct {
+	parseGitMetadata bool
+	isMutate         bool
+}
+
+type CreatePipelineOption func(*createPipelineConfig)
+
+func WithGitMetadata() CreatePipelineOption {
+	return func(o *createPipelineConfig) {
+		o.parseGitMetadata = true
+	}
+}
+
+func WithMutate() CreatePipelineOption {
+	return func(o *createPipelineConfig) {
+		o.isMutate = true
+	}
+}
+
+func (b *Builder) CreatePipelineFromPath(pathToPipeline string, opts ...CreatePipelineOption) (*Pipeline, error) {
+	config := createPipelineConfig{}
+	for _, opt := range opts {
+		opt(&config)
+	}
+
 	pipelineFilePath := pathToPipeline
 	if !matchPipelineFileName(pipelineFilePath, b.config.PipelineFileName) {
 		resolvedPath, err := resolvePipelineFilePath(pathToPipeline, b.config.PipelineFileName, b.fs)
@@ -1311,6 +1346,13 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string, isMutate bool) (
 	}
 	pipeline.TasksByType = make(map[AssetType][]*Asset)
 	pipeline.tasksByName = make(map[string]*Asset)
+
+	if config.parseGitMetadata {
+		pipeline.Commit, err = git.CurrentCommit(pathToPipeline)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing commit: %w", err)
+		}
+	}
 
 	absPipelineFilePath, err := filepath.Abs(pipelineFilePath)
 	if err != nil {
@@ -1339,7 +1381,7 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string, isMutate bool) (
 			return nil, err
 		}
 
-		if isMutate {
+		if config.isMutate {
 			task, err = b.MutateAsset(task, pipeline)
 			if err != nil {
 				return nil, err

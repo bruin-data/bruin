@@ -49,6 +49,11 @@ func Lint(isDebug *bool) *cli.Command {
 				Name:  "exclude-warnings",
 				Usage: "exclude warning validations from the output",
 			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Usage:   "the path to the .bruin.yml file",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			// if the output is JSON then we intend to discard all the nicer pretty-print statements
@@ -78,14 +83,19 @@ func Lint(isDebug *bool) *cli.Command {
 			}
 
 			logger.Debugf("using root path '%s'", rootPath)
-			repoRoot, err := git.FindRepoFromPath(rootPath)
-			if err != nil {
-				printError(err, c.String("output"), "Failed to find the git repository root")
-				return cli.Exit("", 1)
-			}
-			logger.Debugf("found repo root '%s'", repoRoot.Path)
 
-			configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
+			configFilePath := c.String("config-file")
+			if configFilePath == "" {
+				repoRoot, err := git.FindRepoFromPath(rootPath)
+				if err != nil {
+					printError(err, c.String("output"), "Failed to find the git repository root")
+					return cli.Exit("", 1)
+				}
+				logger.Debugf("found repo root '%s'", repoRoot.Path)
+
+				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
+			}
+
 			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
 			if err != nil {
 				printError(err, c.String("output"), fmt.Sprintf("Failed to load the config file at '%s'", configFilePath))
@@ -156,6 +166,38 @@ func Lint(isDebug *bool) *cli.Command {
 				})
 			} else {
 				logger.Debug("no Snowflake connections found, skipping Snowflake validation")
+			}
+
+			if len(cm.SelectedEnvironment.Connections.RedShift) > 0 {
+				rules = append(rules, &lint.QueryValidatorRule{
+					Identifier:  "redshift-validator",
+					TaskType:    pipeline.AssetTypeRedshiftQuery,
+					Connections: connectionManager,
+					Extractor: &query.FileQuerySplitterExtractor{
+						Fs:       fs,
+						Renderer: renderer,
+					},
+					WorkerCount: 32,
+					Logger:      logger,
+				})
+			} else {
+				logger.Debug("no Redshift connections found, skipping Redshift validation")
+			}
+
+			if len(cm.SelectedEnvironment.Connections.Postgres) > 0 {
+				rules = append(rules, &lint.QueryValidatorRule{
+					Identifier:  "postgres-validator",
+					TaskType:    pipeline.AssetTypePostgresQuery,
+					Connections: connectionManager,
+					Extractor: &query.FileQuerySplitterExtractor{
+						Fs:       fs,
+						Renderer: renderer,
+					},
+					WorkerCount: 32,
+					Logger:      logger,
+				})
+			} else {
+				logger.Debug("no Postgres connections found, skipping Postgres validation")
 			}
 
 			var result *lint.PipelineAnalysisResult

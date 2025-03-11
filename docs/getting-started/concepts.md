@@ -99,13 +99,6 @@ bruin run /path/to/the/asset/file.sql
 ## Connection
 A connection is a set of credentials that enable Bruin to communicate with an external platform. 
 
-Bruin currently supports the following connection types:
-- Google Cloud Platform
-- Snowflake
-- Postgres
-- AWS Redshift
-- Generic
-
 Platform specific connections have specific schemas, and "generic" connections are built as key-value pairs to inject secrets into your assets from outside. 
 
 Connections are defined in the `.bruin.yml` file locally. A connection has a name and the credentials.

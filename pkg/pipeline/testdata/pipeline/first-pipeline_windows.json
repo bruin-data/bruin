@@ -3,6 +3,7 @@
   "name": "first-pipeline",
   "schedule": "",
   "start_date": "",
+  "snapshot": "",
   "definition_file": {
     "name": "pipeline.yml",
     "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\pipeline.yml"
@@ -250,5 +251,6 @@
     ]
   },
   "catchup": false,
+  "commit": "",
   "retries": 3
 }

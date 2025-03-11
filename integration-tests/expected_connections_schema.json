@@ -485,6 +485,12 @@
             "$ref": "#/$defs/PersonioConnection"
           },
           "type": "array"
+        },
+        "kinesis": {
+          "items": {
+            "$ref": "#/$defs/KinesisConnection"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -1269,17 +1275,13 @@
         },
         "api_key": {
           "type": "string"
-        },
-        "application": {
-          "type": "string"
         }
       },
       "additionalProperties": false,
       "type": "object",
       "required": [
         "name",
-        "api_key",
-        "application"
+        "api_key"
       ]
     },
     "ZendeskConnection": {
@@ -1309,7 +1311,30 @@
         "oauth_token",
         "sub_domain"
       ]
+    },
+    "KinesisConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_key_id": {
+          "type": "string"
+        },
+        "secret_access_key": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_key_id",
+        "secret_access_key",
+        "region"
+      ]
     }
-    
   }
 }

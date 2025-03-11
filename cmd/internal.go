@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -150,7 +151,7 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool, slimRespons
 		return cli.Exit("", 1)
 	}
 
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath, true)
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath, pipeline.WithMutate())
 	if err != nil {
 		printErrorJSON(err)
 
@@ -256,26 +257,56 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 		return cli.Exit("", 1)
 	}
 
-	pipelinePath, err := path.GetPipelineRootFromTask(assetPath, pipelineDefinitionFiles)
+	absoluteAssetPath, err := filepath.Abs(assetPath)
 	if err != nil {
 		printErrorJSON(err)
 		return cli.Exit("", 1)
 	}
 
-	repoRoot, err := git.FindRepoFromPath(assetPath)
+	pipelinePath, err := path.GetPipelineRootFromTask(absoluteAssetPath, pipelineDefinitionFiles)
 	if err != nil {
 		printErrorJSON(err)
 		return cli.Exit("", 1)
 	}
 
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath, true)
+	repoRoot, err := git.FindRepoFromPath(absoluteAssetPath)
 	if err != nil {
 		printErrorJSON(err)
-
 		return cli.Exit("", 1)
 	}
 
-	asset := foundPipeline.GetAssetByPath(assetPath)
+	pipelineDefinitionPath, err := getPipelineDefinitionFullPath(pipelinePath)
+	if err != nil {
+		printErrorJSON(err)
+		return cli.Exit("", 1)
+	}
+
+	var foundPipeline *pipeline.Pipeline
+
+	// column-level lineage requires the whole pipeline to be parsed by nature, therefore we need to use the default pipeline builder.
+	// however, since the primary usecase of this command requires speed, we'll use a faster alternative if there's no lineage requested.
+	if lineage {
+		foundPipeline, err = DefaultPipelineBuilder.CreatePipelineFromPath(pipelineDefinitionPath, pipeline.WithMutate())
+	} else {
+		foundPipeline, err = pipeline.PipelineFromPath(pipelineDefinitionPath, afero.NewOsFs())
+	}
+
+	if err != nil {
+		printErrorJSON(err)
+		return cli.Exit("", 1)
+	}
+
+	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(absoluteAssetPath, nil)
+	if err != nil {
+		printErrorJSON(err)
+		return cli.Exit("", 1)
+	}
+
+	asset, err = DefaultPipelineBuilder.MutateAsset(asset, foundPipeline)
+	if err != nil {
+		printErrorJSON(err)
+		return cli.Exit("", 1)
+	}
 
 	if lineage {
 		panics := lineageWg.WaitAndRecover()

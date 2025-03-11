@@ -30,4 +30,15 @@ func TestConfig_ToIngestr(t *testing.T) {
 	}
 
 	assert.Equal(t, "mssql://user:password@localhost:1433/database?TrustServerCertificate=yes&driver=ODBC+Driver+18+for+SQL+Server", c.GetIngestrURI())
+
+	c = Config{
+		Username: "user",
+		Password: "password",
+		Host:     "localhost",
+		Port:     1433,
+		Database: "database",
+		Query:    "TrustServerCertificate=yes&driver=ODBC+Driver+17+for+SQL+Server",
+	}
+
+	assert.Equal(t, "mssql://user:password@localhost:1433/database?TrustServerCertificate=yes&driver=ODBC+Driver+17+for+SQL+Server", c.GetIngestrURI())
 }

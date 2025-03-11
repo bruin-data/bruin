@@ -2,6 +2,7 @@
   "legacy_id": "",
   "name": "first-pipeline",
   "schedule": "",
+  "snapshot": "",
   "start_date": "",
   "definition_file": {
     "name": "pipeline.yml",
@@ -216,5 +217,6 @@
     "ms_teams": []
   },
   "catchup": false,
+  "commit": "",
   "retries": 0
 }

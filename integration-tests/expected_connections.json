@@ -314,6 +314,16 @@
           }
         ]
       }
+    },
+    "env-time-materialization": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-time-materialization",
+            "path": "integration-tests/duckdb-files/time-materialization.db"
+          }
+        ]
+      }
     }
   }
 }

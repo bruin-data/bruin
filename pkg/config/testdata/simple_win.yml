@@ -235,6 +235,11 @@ environments:
         - name: "personio-1"
           client_id: "client-id-123"
           client_secret: "client-secret-123"
+      kinesis:
+        - name: "kinesis-1"
+          access_key_id: "aws-access-key-id-123"
+          secret_access_key: "aws-secret-access-key-123"
+          region: "us-east-1"
   prod:
     connections:
       google_cloud_platform:

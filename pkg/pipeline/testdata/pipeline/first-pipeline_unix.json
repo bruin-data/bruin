@@ -2,6 +2,7 @@
     "legacy_id": "first-pipeline",
     "name": "first-pipeline",
     "schedule": "",
+    "snapshot": "",
     "start_date": "",
     "definition_file": {
         "name": "pipeline.yml",
@@ -247,6 +248,7 @@
         ]
     },
     "catchup": false,
+    "commit": "",
     "metadata_push": {
         "bigquery": false
     },

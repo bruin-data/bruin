@@ -114,3 +114,16 @@ func (c *Client) Ping(ctx context.Context) error {
 
 	return nil
 }
+
+func (c *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) {
+	rows, err := c.connection.Query(ctx, query.ToExplainQuery())
+	if err == nil {
+		err = rows.Err()
+	}
+
+	if rows != nil {
+		defer rows.Close()
+	}
+
+	return err == nil, err
+}

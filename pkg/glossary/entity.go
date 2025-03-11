@@ -108,7 +108,7 @@ func (r *GlossaryReader) GetEntities(pathToPipeline string) ([]*Entity, error) {
 
 func LoadGlossaryFromFile(path string) (*Glossary, error) {
 	var glossary glossaryYaml
-	err := path2.ReadYaml(afero.NewCacheOnReadFs(afero.NewOsFs(), afero.NewMemMapFs(), 30), path, &glossary)
+	err := path2.ReadYaml(afero.NewOsFs(), path, &glossary)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read entities")
 	}

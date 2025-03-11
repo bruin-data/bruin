@@ -363,9 +363,8 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			ApplovinMax: []ApplovinMaxConnection{
 				{
-					Name:        "applovinmax-1",
-					APIKey:      "api-key-123",
-					Application: "application-123",
+					Name:   "applovinmax-1",
+					APIKey: "api-key-123",
 				},
 			},
 			Personio: []PersonioConnection{
@@ -373,6 +372,14 @@ func TestLoadFromFile(t *testing.T) {
 					Name:         "personio-1",
 					ClientID:     "client-id-123",
 					ClientSecret: "client-secret-123",
+				},
+			},
+			Kinesis: []KinesisConnection{
+				{
+					Name:            "kinesis-1",
+					AccessKeyID:     "aws-access-key-id-123",
+					SecretAccessKey: "aws-secret-access-key-123",
+					Region:          "us-east-1",
 				},
 			},
 		},

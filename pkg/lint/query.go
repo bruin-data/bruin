@@ -213,7 +213,7 @@ func (q *QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.A
 	for index, foundQuery := range queries {
 		wg.Add(1)
 		q.Logger.Debugf("Spawning the %dth index validation for asset '%s'", index, task.Name)
-		go func(index int, foundQuery *query.Query) {
+		go func(foundQuery *query.Query) {
 			defer wg.Done()
 
 			q.Logger.Debugw("Checking if a query is valid", "path", task.ExecutableFile.Path)
@@ -272,7 +272,7 @@ func (q *QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.A
 				mu.Lock()
 				issues = append(issues, &Issue{
 					Task:        task,
-					Description: fmt.Sprintf("Invalid query found at index %d: %s", index, err),
+					Description: fmt.Sprintf("Invalid query found: %s", err),
 					Context: []string{
 						"The failing query is as follows:",
 						foundQuery.Query,
@@ -294,7 +294,7 @@ func (q *QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.A
 
 			duration := time.Since(start)
 			q.Logger.Debugw("Finished with query checking", "path", task.ExecutableFile.Path, "duration", duration)
-		}(index, foundQuery)
+		}(foundQuery)
 	}
 	q.Logger.Debugf("Waiting for all workers to finish for task '%s'", task.Name)
 	wg.Wait()
