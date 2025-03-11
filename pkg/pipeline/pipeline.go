@@ -250,8 +250,10 @@ const (
 	MaterializationTypeTable MaterializationType = "table"
 )
 
-type MaterializationStrategy string
-type MaterializationTimeGranularity string
+type (
+	MaterializationStrategy        string
+	MaterializationTimeGranularity string
+)
 
 const (
 	MaterializationStrategyNone             MaterializationStrategy        = ""
