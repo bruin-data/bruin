@@ -142,7 +142,6 @@ func (p *LineageExtractor) parseLineage(foundPipeline *pipeline.Pipeline, asset 
 	}
 
 	if len(lineage.Errors) > 0 {
-		fmt.Println("lineage", lineage.Errors)
 		return &LineageIssue{
 			Task:        asset,
 			Description: strings.Join(lineage.Errors, ", "),

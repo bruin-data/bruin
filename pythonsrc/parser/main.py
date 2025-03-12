@@ -1,3 +1,4 @@
+
 import logging
 from dataclasses import dataclass
 from sqlglot import parse_one, exp, lineage
@@ -107,22 +108,24 @@ def get_tables(query: str, dialect: str):
 
 
 def get_column_lineage(query: str, schema: dict, dialect: str):
-    errors = []
     try:
         parsed = parse_one(query, dialect=dialect)
         if not isinstance(parsed, exp.Query):
             return {
                 "columns": [],
                 "non_selected_columns": [],
-                "errors": errors,
+                "errors": ["Failed to parse query"],
             }
     except Exception as e:
-        errors.append(str(e))
         return {
             "columns": [],
             "non_selected_columns": [],
-            "errors": errors,
+            "errors": [f"Parse error: {str(e)}"],
         }
+
+    result = []
+    errors = []
+
     try:
         nested_schema = schema_dict_to_schema_object(schema)
         try:
@@ -138,14 +141,11 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
                     "errors": [f"Schema Error: {str(e)}"],
                 }
     except Exception as e:
-        logging.error(
-            f"Error optimizing query: {e}, query and schema: {json.dumps({'query': query, 'schema': schema})}"
-        )
-        errors.append(str(e))
+        logging.error(f"Schema error: {str(e)}")
         return {
             "columns": [],
             "non_selected_columns": [],
-            "errors": errors,
+            "errors": [],
         }
 
     try:
@@ -161,12 +161,8 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
     for col in cols:
         try:
             ll = lineage.lineage(col["name"], optimized, schema, dialect=dialect)
-        except Exception as e:
-            logging.error(
-                f"Error extracting lineage: {e}, query and schema: {json.dumps({'query': query, 'schema': schema})}"
-            )
-            errors.append(str(e))
-            continue
+            cl = []
+            leaves: list[Node] = []
 
             try:
                 find_leaf_nodes(ll, leaves)
