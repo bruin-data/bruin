@@ -743,7 +743,7 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 			}
 			for _, column := range asset.Columns {
 				if column.Name == asset.Materialization.IncrementalKey {
-					if string(asset.Materialization.TimeGranularity) != column.Type {
+					if !strings.EqualFold(string(asset.Materialization.TimeGranularity), column.Type) {
 						issues = append(issues, &Issue{
 							Task:        asset,
 							Description: fmt.Sprintf("Column '%s' type must match time_granularity", column.Name),
