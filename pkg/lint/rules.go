@@ -749,6 +749,7 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 							Description: fmt.Sprintf("Column '%s' type must match time_granularity", column.Name),
 						})
 					}
+					break
 				}
 			}
 		default:
