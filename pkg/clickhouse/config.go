@@ -22,7 +22,7 @@ type Config struct {
 func (c *Config) ToClickHouseOptions() *click_house.Options {
 	var tlsConfig *tls.Config
 	if c.Secure != nil {
-		if *c.Secure == 0 {
+		if *c.Secure == 1 {
 			tlsConfig = &tls.Config{
 				MinVersion: tls.VersionTLS12,
 			}
