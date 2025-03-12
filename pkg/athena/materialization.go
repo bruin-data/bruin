@@ -1,6 +1,7 @@
 package athena
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -26,6 +27,7 @@ var matMap = AssetMaterializationMap{
 		pipeline.MaterializationStrategyCreateReplace: buildCreateReplaceQuery,
 		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
 		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
+		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
 	},
 }
 
@@ -131,4 +133,29 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query, location string) ([]st
 		"DROP TABLE IF EXISTS " + task.Name,
 		fmt.Sprintf("ALTER TABLE %s RENAME TO %s", tempTableName, task.Name),
 	}, nil
+}
+
+func buildTimeIntervalQuery(asset *pipeline.Asset, query string, location string) ([]string, error) {
+	if asset.Materialization.IncrementalKey == "" {
+		return nil, errors.New("incremental_key is required for time_interval strategy")
+	}
+
+	startVar := "{{start_timestamp}}"
+	endVar := "{{end_timestamp}}"
+	if asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate {
+		startVar = "{{start_date}}"
+		endVar = "{{end_date}}"
+	}
+
+	queries := []string{
+		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
+			asset.Name,
+			asset.Materialization.IncrementalKey,
+			startVar,
+			endVar),
+		fmt.Sprintf(`INSERT INTO %s %s`,
+			asset.Name, query),
+	}
+
+	return queries, nil
 }
