@@ -1634,49 +1634,6 @@ func TestLineageError(t *testing.T) {
 						Name: "table1",
 						Type: "bq.sql",
 						ExecutableFile: pipeline.ExecutableFile{
-							Content: "SELE",
-						},
-						Upstreams: []pipeline.Upstream{{Value: "table2"}},
-					},
-					{
-						Name: "table2",
-						Type: "bq.sql",
-						ExecutableFile: pipeline.ExecutableFile{
-							Content: "SEL",
-						},
-						Upstreams: []pipeline.Upstream{{Value: "table3"}},
-					},
-					{
-						Name: "table3",
-						Columns: []pipeline.Column{
-							{Name: "id", Type: "int64", PrimaryKey: true, Description: "Just a number", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
-								{Name: "not_null"},
-							}},
-							{Name: "name", Type: "str", Description: "Just a name", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
-								{Name: "not_null"},
-							}},
-							{Name: "age", Type: "int64", Description: "Just an age", UpdateOnMerge: false, Checks: []pipeline.ColumnCheck{
-								{Name: "not_null"},
-							}},
-						},
-						ExecutableFile: pipeline.ExecutableFile{
-							Content: "SELECT id,name,age FROM table4",
-						},
-					},
-				},
-			},
-			error: &LineageIssue{
-				Description: "failed to parse column lineage: Failed to parse query",
-			},
-		},
-		{
-			name: "parseLineageRecursive() error",
-			pipeline: &pipeline.Pipeline{
-				Assets: []*pipeline.Asset{
-					{
-						Name: "table1",
-						Type: "bq.sql",
-						ExecutableFile: pipeline.ExecutableFile{
 							Content: "SELECT * FROM table2",
 						},
 						Upstreams: []pipeline.Upstream{{Value: "table2"}},
@@ -1710,7 +1667,7 @@ func TestLineageError(t *testing.T) {
 				},
 			},
 			error: &LineageIssue{
-				Description: "failed to parse column lineage: Parse error: Required keyword: 'expression' missing for <class 'sqlglot.expressions.Mul'>. Line 1, Col: 5.\n  SELE\x1b[4m*\x1b[0m",
+				Description: "Parse error: Required keyword: 'expression' missing for <class 'sqlglot.expressions.Mul'>. Line 1, Col: 5.\n  SELE\x1b[4m*\x1b[0m",
 			},
 		},
 	}

@@ -91,15 +91,10 @@ func (p *LineageExtractor) ColumnLineage(foundPipeline *pipeline.Pipeline, asset
 		}
 	}
 
-	err := p.parseLineage(foundPipeline, asset, p.TableSchemaForUpstreams(foundPipeline, asset))
-	if err != nil {
-		issues.Issues = append(issues.Issues, &LineageIssue{
-			Task:        asset,
-			Description: err.Error(),
-			Context: []string{
-				asset.ExecutableFile.Content,
-			},
-		})
+	// TODO: Currently we are ignoring non user errors, we should handle them
+	lineageError, _ := p.parseLineage(foundPipeline, asset, p.TableSchemaForUpstreams(foundPipeline, asset))
+	if lineageError != nil {
+		issues.Issues = append(issues.Issues, lineageError)
 	}
 
 	return &issues
@@ -107,38 +102,60 @@ func (p *LineageExtractor) ColumnLineage(foundPipeline *pipeline.Pipeline, asset
 
 // ParseLineage analyzes the column lineage for a given asset within a
 // It traces column relationships between the asset and its upstream dependencies.
-func (p *LineageExtractor) parseLineage(foundPipeline *pipeline.Pipeline, asset *pipeline.Asset, metadata sqlparser.Schema) error {
+func (p *LineageExtractor) parseLineage(foundPipeline *pipeline.Pipeline, asset *pipeline.Asset, metadata sqlparser.Schema) (*LineageIssue, error) {
 	if asset == nil {
-		return errors.New("invalid arguments: asset and pipeline cannot be nil")
+		return nil, errors.New("invalid arguments: asset and pipeline cannot be nil")
 	}
 
 	dialect, err := dialect.GetDialectByAssetType(string(asset.Type))
 	if err != nil {
-		return nil //nolint:nilerr
+		return nil, nil //nolint:nilerr
 	}
 
 	for _, upstream := range asset.Upstreams {
 		upstreamAsset := foundPipeline.GetAssetByName(upstream.Value)
 		if upstreamAsset == nil {
-			return fmt.Errorf("upstream asset not found: %s", upstream.Value)
+			return &LineageIssue{
+				Task:        asset,
+				Description: "upstream asset not found: " + upstream.Value,
+				Context: []string{
+					asset.ExecutableFile.Content,
+				},
+			}, errors.New("upstream asset not found: " + upstream.Value)
 		}
 	}
 
 	query, err := p.renderer.Render(asset.ExecutableFile.Content)
 	if err != nil {
-		return fmt.Errorf("failed to render the query: %w", err)
+		return &LineageIssue{
+			Task:        asset,
+			Description: err.Error(),
+			Context: []string{
+				asset.ExecutableFile.Content,
+			},
+		}, fmt.Errorf("failed to render the query: %w", err)
 	}
 
 	lineage, err := p.sqlParser.ColumnLineage(query, dialect, metadata)
 	if err != nil {
-		return fmt.Errorf("failed to parse column lineage: %w", err)
+		return nil, fmt.Errorf("failed to parse lineage: %w", err)
 	}
 
 	if len(lineage.Errors) > 0 {
-		return fmt.Errorf("failed to parse column lineage: %s", strings.Join(lineage.Errors, ", "))
+		return &LineageIssue{
+			Task:        asset,
+			Description: strings.Join(lineage.Errors, ", "),
+			Context: []string{
+				asset.ExecutableFile.Content,
+			},
+		}, fmt.Errorf("failed to parse lineage: %s", strings.Join(lineage.Errors, ", "))
 	}
 
-	return p.processLineageColumns(foundPipeline, asset, lineage)
+	if err := p.processLineageColumns(foundPipeline, asset, lineage); err != nil {
+		return nil, fmt.Errorf("failed to process lineage: %w", err)
+	}
+
+	return nil, nil
 }
 
 func (p *LineageExtractor) mergeAsteriskColumns(foundPipeline *pipeline.Pipeline, asset *pipeline.Asset, lineageCol sqlparser.ColumnLineage) error {
