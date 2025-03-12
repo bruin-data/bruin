@@ -741,6 +741,16 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 					Description: "'time_granularity' can be either 'date' or 'timestamp'.",
 				})
 			}
+			for _, column := range asset.Columns {
+				if column.Name == asset.Materialization.IncrementalKey {
+					if string(asset.Materialization.TimeGranularity) != column.Type {
+						issues = append(issues, &Issue{
+							Task:        asset,
+							Description: fmt.Sprintf("Column '%s' type must match time_granularity", column.Name),
+						})
+					}
+				}
+			}
 		default:
 			issues = append(issues, &Issue{
 				Task: asset,
