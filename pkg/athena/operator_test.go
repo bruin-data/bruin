@@ -113,13 +113,12 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "query returned an error",
 			setup: func(f *fields) {
-				f.e.On("ExtractQueriesFromString", "some content").
+				f.m.On("Render", mock.AnythingOfType("*pipeline.Asset"), "some query").
+					Return([]string{"some query"}, nil)
+				f.e.On("ExtractQueriesFromSlice", mock.Anything).
 					Return([]*query.Query{
 						{Query: "select * from users"},
 					}, nil)
-
-				f.m.On("Render", mock.Anything, "select * from users").
-					Return([]string{"select * from users"}, nil)
 
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).
 					Return(errors.New("failed to run query"))
@@ -129,7 +128,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 					Type: pipeline.AssetTypeSnowflakeQuery,
 					ExecutableFile: pipeline.ExecutableFile{
 						Path:    "test-file.sql",
-						Content: "some content",
+						Content: "some query",
 					},
 				},
 			},
