@@ -1634,7 +1634,7 @@ func TestLineageError(t *testing.T) {
 						Name: "table1",
 						Type: "bq.sql",
 						ExecutableFile: pipeline.ExecutableFile{
-							Content: "SELE$",
+							Content: "SELECT * FROM table2",
 						},
 						Upstreams: []pipeline.Upstream{{Value: "table2"}},
 					},
@@ -1642,7 +1642,7 @@ func TestLineageError(t *testing.T) {
 						Name: "table2",
 						Type: "bq.sql",
 						ExecutableFile: pipeline.ExecutableFile{
-							Content: "SELE$",
+							Content: "SELECT * FROM table3",
 						},
 						Upstreams: []pipeline.Upstream{{Value: "table3"}},
 					},

@@ -107,24 +107,22 @@ def get_tables(query: str, dialect: str):
 
 
 def get_column_lineage(query: str, schema: dict, dialect: str):
+    errors = []
     try:
         parsed = parse_one(query, dialect=dialect)
         if not isinstance(parsed, exp.Query):
             return {
                 "columns": [],
                 "non_selected_columns": [],
-                "errors": ["Failed to parse query"],
+                "errors": errors,
             }
     except Exception as e:
+        errors.append(str(e))
         return {
             "columns": [],
             "non_selected_columns": [],
-            "errors": [f"Parse error: {str(e)}"],
+            "errors": errors,
         }
-
-    result = []
-    errors = []
-
     try:
         nested_schema = schema_dict_to_schema_object(schema)
         try:
@@ -140,11 +138,14 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
                     "errors": [f"Schema Error: {str(e)}"],
                 }
     except Exception as e:
-        logging.error(f"Schema error: {str(e)}")
+        logging.error(
+            f"Error optimizing query: {e}, query and schema: {json.dumps({'query': query, 'schema': schema})}"
+        )
+        errors.append(str(e))
         return {
             "columns": [],
             "non_selected_columns": [],
-            "errors": [],
+            "errors": errors,
         }
 
     try:
@@ -160,8 +161,12 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
     for col in cols:
         try:
             ll = lineage.lineage(col["name"], optimized, schema, dialect=dialect)
-            cl = []
-            leaves: list[Node] = []
+        except Exception as e:
+            logging.error(
+                f"Error extracting lineage: {e}, query and schema: {json.dumps({'query': query, 'schema': schema})}"
+            )
+            errors.append(str(e))
+            continue
 
             try:
                 find_leaf_nodes(ll, leaves)

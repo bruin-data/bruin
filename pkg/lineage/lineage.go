@@ -92,11 +92,11 @@ func (p *LineageExtractor) ColumnLineage(foundPipeline *pipeline.Pipeline, asset
 	}
 
 	// TODO: Currently we are ignoring non user errors, we should handle them
-	lineageError, err := p.parseLineage(foundPipeline, asset, p.TableSchemaForUpstreams(foundPipeline, asset))
+	lineageError, _ := p.parseLineage(foundPipeline, asset, p.TableSchemaForUpstreams(foundPipeline, asset))
 	if lineageError != nil {
 		issues.Issues = append(issues.Issues, lineageError)
 	}
-	fmt.Println("issues", err, lineageError)
+
 	return &issues
 }
 
@@ -117,11 +117,11 @@ func (p *LineageExtractor) parseLineage(foundPipeline *pipeline.Pipeline, asset 
 		if upstreamAsset == nil {
 			return &LineageIssue{
 				Task:        asset,
-				Description: fmt.Sprintf("upstream asset not found: %s", upstream.Value),
+				Description: "upstream asset not found: " + upstream.Value,
 				Context: []string{
 					asset.ExecutableFile.Content,
 				},
-			}, fmt.Errorf("upstream asset not found: %s", upstream.Value)
+			}, errors.New("upstream asset not found: " + upstream.Value)
 		}
 	}
 
@@ -142,6 +142,7 @@ func (p *LineageExtractor) parseLineage(foundPipeline *pipeline.Pipeline, asset 
 	}
 
 	if len(lineage.Errors) > 0 {
+		fmt.Println("lineage", lineage.Errors)
 		return &LineageIssue{
 			Task:        asset,
 			Description: strings.Join(lineage.Errors, ", "),
