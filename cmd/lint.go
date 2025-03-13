@@ -24,6 +24,20 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+type jinjaRenderedMaterializer struct {
+	renderer     *jinja.Renderer
+	materializer queryMaterializer
+}
+
+func (j jinjaRenderedMaterializer) Render(asset *pipeline.Asset, query string) (string, error) {
+	materialized, err := j.materializer.Render(asset, query)
+	if err != nil {
+		return "", err
+	}
+
+	return j.renderer.Render(materialized)
+}
+
 func Lint(isDebug *bool) *cli.Command {
 	return &cli.Command{
 		Name:      "validate",
@@ -144,9 +158,12 @@ func Lint(isDebug *bool) *cli.Command {
 						Fs:       fs,
 						Renderer: renderer,
 					},
-					Materializer: bigquery.NewMaterializer(false),
-					WorkerCount:  32,
-					Logger:       logger,
+					Materializer: jinjaRenderedMaterializer{
+						materializer: bigquery.NewMaterializer(false),
+						renderer:     renderer,
+					},
+					WorkerCount: 32,
+					Logger:      logger,
 				})
 			} else {
 				logger.Debug("no GCP connections found, skipping BigQuery validation")

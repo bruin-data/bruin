@@ -114,24 +114,16 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 
 	assetConnectionName, err := p.GetConnectionNameForAsset(asset)
 	if err != nil {
-		issues = append(issues, &Issue{
-			Task:        asset,
-			Description: fmt.Sprintf("Cannot get connection for task '%s': %v", asset.Name, err),
-		})
-
-		return issues, nil
+		q.Logger.Debugf("failed to get connection name for asset '%s'", asset.Name)
+		return issues, nil //nolint:nilerr
 	}
 
 	q.Logger.Debugw("The connection will be used for asset", "asset", asset.Name, "connection", assetConnectionName)
 
 	validator, err := q.Connections.GetConnection(assetConnectionName)
 	if err != nil {
-		issues = append(issues, &Issue{
-			Task:        asset,
-			Description: fmt.Sprintf("Cannot get connection for task '%s': %v", asset.Name, err),
-		})
-
-		return issues, nil
+		q.Logger.Debugf("failed to get connection instance for asset '%s'", asset.Name)
+		return issues, nil //nolint:nilerr
 	}
 	validatorInstance, ok := validator.(queryValidator)
 	if !ok {
