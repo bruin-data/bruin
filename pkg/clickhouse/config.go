@@ -1,6 +1,7 @@
 package clickhouse
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -19,7 +20,16 @@ type Config struct {
 }
 
 func (c *Config) ToClickHouseOptions() *click_house.Options {
+	var tlsConfig *tls.Config
+	if c.Secure != nil {
+		if *c.Secure == 1 {
+			tlsConfig = &tls.Config{
+				MinVersion: tls.VersionTLS12,
+			}
+		}
+	}
 	opt := click_house.Options{
+		TLS:  tlsConfig,
 		Addr: []string{fmt.Sprintf("%s:%d", c.Host, c.Port)},
 		Auth: click_house.Auth{
 			Database: c.Database,
