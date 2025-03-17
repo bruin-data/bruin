@@ -279,6 +279,10 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 
 	_, _ = output.Write([]byte("Successfully collected the data from the asset, uploading to the destination...\n"))
 
+	if len(asset.Parameters) == 0 {
+		asset.Parameters = make(map[string]string)
+	}
+
 	if mat.Strategy != "" {
 		asset.Parameters["incremental_strategy"] = string(mat.Strategy)
 	}
