@@ -125,7 +125,10 @@ func TestRenderCommand_Run(t *testing.T) {
 				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
 					Return(bqAsset, nil)
 
-				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
+				f.bqMaterializer.On("Render", bqAsset, bqAsset.ExecutableFile.Content).
+					Return("some materialized query", nil)
+
+				f.extractor.On("ExtractQueriesFromString", "some materialized query").
 					Return(nil, assert.AnError)
 			},
 			wantErr: assert.Error,
@@ -139,11 +142,9 @@ func TestRenderCommand_Run(t *testing.T) {
 				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
 					Return(bqAsset, nil)
 
-				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
-					Return([]*query.Query{{Query: "SELECT * FROM table1"}}, nil)
-
-				f.bqMaterializer.On("Render", bqAsset, "SELECT * FROM table1").
+				f.bqMaterializer.On("Render", bqAsset, bqAsset.ExecutableFile.Content).
 					Return("", assert.AnError)
+
 			},
 			wantErr: assert.Error,
 		},
@@ -156,13 +157,13 @@ func TestRenderCommand_Run(t *testing.T) {
 				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
 					Return(bqAsset, nil)
 
-				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
-					Return([]*query.Query{{Query: "SELECT * FROM table1"}}, nil)
-
-				f.bqMaterializer.On("Render", bqAsset, "SELECT * FROM table1").
+				f.bqMaterializer.On("Render", bqAsset, bqAsset.ExecutableFile.Content).
 					Return("some-materialized-query", nil)
 
-				f.writer.On("Write", []byte("some-materialized-query\n")).
+				f.extractor.On("ExtractQueriesFromString", "some-materialized-query").
+					Return([]*query.Query{{Query: "some materialized and rendered query"}}, nil)
+
+				f.writer.On("Write", []byte("some materialized and rendered query\n")).
 					Return(0, nil)
 			},
 			wantErr: assert.NoError,
