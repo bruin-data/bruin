@@ -150,3 +150,16 @@ func (f *WholeFileExtractor) ExtractQueriesFromString(content string) ([]*Query,
 		},
 	}, nil
 }
+
+func (f *WholeFileExtractor) ExtractQueriesFromSlice(content []string) ([]*Query, error) {
+	var allQueries []*Query
+	for _, query := range content {
+		queries, err := f.ExtractQueriesFromString(query)
+		if err != nil {
+			return nil, err
+		}
+		allQueries = append(allQueries, queries...)
+	}
+
+	return allQueries, nil
+}
