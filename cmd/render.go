@@ -240,22 +240,27 @@ func (r *RenderCommand) Run(taskPath string, foundPipeline *pipeline.Pipeline) e
 		return cli.Exit("", 1)
 	}
 
-	queries, err := r.extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
+	var materialized string
+	hasMaterializer := false
+	if materializer, ok := r.materializers[task.Type]; ok {
+		materialized, err = materializer.Render(task, task.ExecutableFile.Content)
+		hasMaterializer = true
+		if err != nil {
+			r.printErrorOrJsonf("Failed to materialize the query: %v\n", err.Error())
+			return cli.Exit("", 1)
+		}
+	} else {
+		materialized = task.ExecutableFile.Content
+	}
+
+	queries, err := r.extractor.ExtractQueriesFromString(materialized)
 	if err != nil {
 		r.printErrorOrJSON(err.Error())
 		return cli.Exit("", 1)
 	}
 
 	qq := queries[0]
-
-	if materializer, ok := r.materializers[task.Type]; ok {
-		materialized, err := materializer.Render(task, qq.Query)
-		if err != nil {
-			r.printErrorOrJsonf("Failed to materialize the query: %v\n", err.Error())
-			return cli.Exit("", 1)
-		}
-
-		qq.Query = materialized
+	if hasMaterializer {
 		if r.output != "json" {
 			qq.Query = highlightCode(qq.Query, "sql")
 		}
