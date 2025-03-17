@@ -39,7 +39,6 @@ func TestBasicOperator_RunTask(t *testing.T) {
 
 	type args struct {
 		t *pipeline.Asset
-		p *pipeline.Pipeline
 	}
 
 	type fields struct {
