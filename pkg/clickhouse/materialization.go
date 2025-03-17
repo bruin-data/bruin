@@ -108,6 +108,10 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, erro
 		return nil, errors.New("incremental_key is required for time_interval strategy")
 	}
 
+	if asset.Materialization.TimeGranularity == "" {
+		return nil, errors.New("time_granularity is required for time_interval strategy")
+	}
+
 	startVar := "{{start_timestamp}}"
 	endVar := "{{end_timestamp}}"
 	if asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate {
