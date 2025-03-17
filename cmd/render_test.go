@@ -144,7 +144,6 @@ func TestRenderCommand_Run(t *testing.T) {
 
 				f.bqMaterializer.On("Render", bqAsset, bqAsset.ExecutableFile.Content).
 					Return("", assert.AnError)
-
 			},
 			wantErr: assert.Error,
 		},
