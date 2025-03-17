@@ -87,17 +87,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 						Path:    "test-file.sql",
 						Content: "some content",
 					},
-				},
-				p: &pipeline.Pipeline{
-					Assets: []*pipeline.Asset{
-						{
-							ExecutableFile: pipeline.ExecutableFile{
-								Path:    "test-file.sql",
-								Content: "some content",
-							},
-							Type: pipeline.AssetTypeAthenaQuery,
-						},
-					},
+					Type: pipeline.AssetTypeAthenaQuery,
 				},
 			},
 			wantErr: false,
@@ -121,17 +111,6 @@ func TestBasicOperator_RunTask(t *testing.T) {
 					ExecutableFile: pipeline.ExecutableFile{
 						Path:    "test-file.sql",
 						Content: "some query",
-					},
-				},
-				p: &pipeline.Pipeline{
-					Assets: []*pipeline.Asset{
-						{
-							ExecutableFile: pipeline.ExecutableFile{
-								Path:    "test-file.sql",
-								Content: "some content",
-							},
-							Type: pipeline.AssetTypeAthenaQuery,
-						},
 					},
 				},
 			},
