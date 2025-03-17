@@ -3,7 +3,7 @@ import sys
 import logging
 import os
 from parser.main import get_column_lineage, get_tables
-
+from parser.rename import replace_table_references
 from pathlib import Path
 
 home = str(Path.home())
@@ -42,6 +42,12 @@ def main():
                 logging.info("got get-tables command")
                 c = cmd["contents"]
                 result = get_tables(c["query"], c["dialect"])
+            elif cmd["command"] == "replace-table-references":
+                logging.info("got replace-table-references command")
+                c = cmd["contents"]
+                result = replace_table_references(
+                    c["query"], c["dialect"], c["table_mapping"]
+                )
             elif cmd["command"] == "exit":
                 logging.info("got exit command amx")
                 break

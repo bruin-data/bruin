@@ -264,3 +264,18 @@ def schema_dict_to_schema_object(schema_dict: dict) -> dict:
         current[parts[-1]] = value
 
     return result
+
+
+def replace_table_references(
+    query: str, dialect: str, table_references: dict[str, str]
+):
+    parsed = parse_one(query, dialect=dialect)
+    if parsed is None:
+        return {"error": "unable to parse query"}
+
+    for table_name, new_table_name in table_references.items():
+        for table in parsed.find_all(exp.Table):
+            if table.name == table_name:
+                table.name = new_table_name
+
+    return parsed.sql()

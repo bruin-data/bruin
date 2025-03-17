@@ -760,3 +760,57 @@ from raw.Bookings as bookings
 	s.Close()
 	require.NoError(t, err)
 }
+
+func TestSqlParser_RenameTables(t *testing.T) {
+	s, err := NewSQLParser(true)
+	require.NoError(t, err)
+
+	err = s.Start()
+	require.NoError(t, err)
+
+	tests := []struct {
+		name          string
+		query         string
+		tableMappings map[string]string
+		want          string
+		wantErr       bool
+	}{
+		{
+			name:  "simple select should get an alias if table names are different",
+			query: `SELECT * FROM items`,
+			tableMappings: map[string]string{
+				"items": "new_items",
+			},
+			want: "SELECT * FROM new_items AS items",
+		},
+		{
+			name:  "simple select, just change schema name",
+			query: `SELECT * FROM raw.items`,
+			tableMappings: map[string]string{
+				"raw.items": "raw_dev.items",
+			},
+			want: "SELECT * FROM raw_dev.items",
+		},
+	}
+
+	t.Run("blocking group", func(t *testing.T) {
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				got, err := s.RenameTables(tt.query, "bigquery", tt.tableMappings)
+				if tt.wantErr {
+					require.Error(t, err)
+				} else {
+					require.NoError(t, err)
+				}
+
+				require.Equal(t, tt.want, got)
+			})
+		}
+	})
+
+	// wg.Wait()
+	s.Close()
+	require.NoError(t, err)
+}
