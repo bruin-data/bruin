@@ -90,41 +90,22 @@ func TestRenderCommand_Run(t *testing.T) {
 		{
 			name: "should return error if task path is empty",
 			args: args{
-				task: &pipeline.Asset{},
-			},
-			wantErr: assert.Error,
-		},
-		{
-			name: "should return error if asset fails to be built",
-			args: args{
-				task: &pipeline.Asset{},
-			},
-			setup: func(f *fields) {
-				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
-					Return(nil, assert.AnError)
-			},
-			wantErr: assert.Error,
-		},
-		{
-			name: "should return error if asset building doesnt fail but returns an empty asset",
-			args: args{
-				task: &pipeline.Asset{},
-			},
-			setup: func(f *fields) {
-				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
-					Return(nil, nil)
+				task: nil,
 			},
 			wantErr: assert.Error,
 		},
 		{
 			name: "should return error if failed to extract queries from file",
 			args: args{
-				task: &pipeline.Asset{},
+				task: &pipeline.Asset{
+					Type: pipeline.AssetTypeBigqueryQuery,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path: "/path/to/executable",
+					},
+					Name: "asset1",
+				},
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
-					Return(bqAsset, nil)
-
 				f.bqMaterializer.On("Render", bqAsset, bqAsset.ExecutableFile.Content).
 					Return("some materialized query", nil)
 
@@ -153,12 +134,15 @@ func TestRenderCommand_Run(t *testing.T) {
 		{
 			name: "should materialize if asset is a bigquery query",
 			args: args{
-				task: &pipeline.Asset{},
+				task: &pipeline.Asset{
+					Type: pipeline.AssetTypeBigqueryQuery,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path: "/path/to/executable",
+					},
+					Name: "asset1",
+				},
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
-					Return(bqAsset, nil)
-
 				f.bqMaterializer.On("Render", bqAsset, bqAsset.ExecutableFile.Content).
 					Return("some-materialized-query", nil)
 
@@ -173,12 +157,15 @@ func TestRenderCommand_Run(t *testing.T) {
 		{
 			name: "should skip materialization if asset is a not bigquery query",
 			args: args{
-				task: &pipeline.Asset{},
+				task: &pipeline.Asset{
+					Type: pipeline.AssetTypeSnowflakeQuery,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path: "/path/to/executable",
+					},
+					Name: "asset1",
+				},
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
-					Return(nonBqAsset, nil)
-
 				f.extractor.On("ExtractQueriesFromString", nonBqAsset.ExecutableFile.Content).
 					Return([]*query.Query{{Query: "SELECT * FROM nonbq.table1"}}, nil)
 
