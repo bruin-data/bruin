@@ -128,7 +128,7 @@ func Render() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			asset, err = DefaultPipelineBuilder.MutateAsset(asset, nil)
+			asset, err = DefaultPipelineBuilder.MutateAsset(asset, pl)
 			if err != nil {
 				printError(errors.New("failed to mutate the asset"), c.String("output"), "Failed to mutate the asset:")
 				return cli.Exit("", 1)
@@ -193,7 +193,7 @@ func Render() *cli.Command {
 				output:  c.String("output"),
 			}
 
-			return r.Run(inputPath, pl)
+			return r.Run(asset, pl)
 		},
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
@@ -221,25 +221,9 @@ type RenderCommand struct {
 	writer io.Writer
 }
 
-func (r *RenderCommand) Run(taskPath string, foundPipeline *pipeline.Pipeline) error {
+func (r *RenderCommand) Run(task *pipeline.Asset, foundPipeline *pipeline.Pipeline) error {
 	defer RecoverFromPanic()
-
-	if taskPath == "" {
-		r.printErrorOrJsonf("Please give an asset path to render: bruin render <path to the asset file>)\n")
-		return cli.Exit("", 1)
-	}
-
-	task, err := r.builder.CreateAssetFromFile(taskPath, foundPipeline)
-	if err != nil {
-		r.printErrorOrJsonf("Failed to build asset: %v\n", err.Error())
-		return cli.Exit("", 1)
-	}
-
-	if task == nil {
-		r.printErrorOrJsonf("The given file path doesn't seem to be a Bruin asset definition: '%s'\n", taskPath)
-		return cli.Exit("", 1)
-	}
-
+	var err error
 	var materialized string
 	hasMaterializer := false
 	if materializer, ok := r.materializers[task.Type]; ok {
