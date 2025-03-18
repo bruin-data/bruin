@@ -224,6 +224,9 @@ type RenderCommand struct {
 func (r *RenderCommand) Run(task *pipeline.Asset, foundPipeline *pipeline.Pipeline) error {
 	defer RecoverFromPanic()
 	var err error
+	if task == nil {
+		return errors.New("failed to find the asset: asset cannot be nil")
+	}
 	var materialized string
 	hasMaterializer := false
 	if materializer, ok := r.materializers[task.Type]; ok {
