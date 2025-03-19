@@ -245,11 +245,13 @@ func (r *RenderCommand) Run(task *pipeline.Asset, foundPipeline *pipeline.Pipeli
 
 		qq.Query = materialized
 		if task.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
-			queries, err = r.extractor.ExtractQueriesFromString(materialized)
+			var rextractedQueries []*query.Query
+			rextractedQueries, err = r.extractor.ExtractQueriesFromString(materialized)
 			if err != nil {
 				r.printErrorOrJSON(err.Error())
 				return cli.Exit("", 1)
 			}
+			qq.Query = rextractedQueries[0].Query
 		}
 		if r.output != "json" {
 			qq.Query = highlightCode(qq.Query, "sql")

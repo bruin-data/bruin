@@ -143,7 +143,6 @@ func TestRenderCommand_Run(t *testing.T) {
 				},
 			},
 			setup: func(f *fields) {
-
 				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
 					Return([]*query.Query{{Query: "extracted query"}}, nil)
 				f.bqMaterializer.On("Render", mock.Anything, "extracted query").
