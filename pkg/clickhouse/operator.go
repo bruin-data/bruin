@@ -2,7 +2,6 @@ package clickhouse
 
 import (
 	"context"
-
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -41,16 +40,30 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 }
 
 func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
-	materializedQueries, err := o.materializer.Render(t, t.ExecutableFile.Content)
+	queries, err := o.extractor.ExtractQueriesFromString(t.ExecutableFile.Content)
 	if err != nil {
 		return errors.Wrap(err, "cannot extract queries from the task file")
 	}
-	queries, err := o.extractor.ExtractQueriesFromSlice(materializedQueries)
-	if err != nil {
-		return errors.Wrap(err, "cannot extract queries from the task file")
-	}
+
 	if len(queries) == 0 {
 		return nil
+	}
+
+	if len(queries) > 1 && t.Materialization.Type != pipeline.MaterializationTypeNone {
+		return errors.New("cannot enable materialization for tasks with multiple queries")
+	}
+
+	q := queries[0]
+	materializedQueries, err := o.materializer.Render(t, q.String())
+	if err != nil {
+		return err
+	}
+	var reextractedQueries []*query.Query
+	if t.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
+		reextractedQueries, err = o.extractor.ExtractQueriesFromSlice(materializedQueries)
+		if err != nil {
+			return err
+		}
 	}
 
 	connName, err := p.GetConnectionNameForAsset(t)
@@ -62,14 +75,24 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
-
-	for _, q := range queries {
-		err = conn.RunQueryWithoutResult(ctx, q)
-		if err != nil {
-			return err
+	switch t.Materialization.Strategy {
+	case pipeline.MaterializationStrategyTimeInterval:
+		for _, q := range reextractedQueries {
+			err = conn.RunQueryWithoutResult(ctx, q)
+			if err != nil {
+				return err
+			}
 		}
-	}
+	default:
+		for _, queryString := range materializedQueries {
+			p := &query.Query{Query: queryString}
+			err = conn.RunQueryWithoutResult(ctx, p)
+			if err != nil {
+				return err
+			}
+		}
 
+	}
 	return nil
 }
 

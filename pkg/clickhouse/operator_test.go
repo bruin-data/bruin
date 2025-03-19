@@ -59,9 +59,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "failed to extract queries",
 			setup: func(f *fields) {
-				f.m.On("Render", mock.AnythingOfType("*pipeline.Asset"), "some query").
-					Return([]string{"some query"}, nil)
-				f.e.On("ExtractQueriesFromSlice", []string{"some query"}).
+				f.e.On("ExtractQueriesFromString", "some query").
 					Return([]*query.Query{}, errors.New("failed to extract queries"))
 			},
 			args: args{
@@ -77,9 +75,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "no queries found in file",
 			setup: func(f *fields) {
-				f.m.On("Render", mock.AnythingOfType("*pipeline.Asset"), "some query").
-					Return([]string{"some query"}, nil)
-				f.e.On("ExtractQueriesFromSlice", []string{"some query"}).
+				f.e.On("ExtractQueriesFromString", "some query").
 					Return([]*query.Query{}, nil)
 			},
 			args: args{
@@ -92,16 +88,38 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			},
 			wantErr: false,
 		},
-
+		{
+			name: "multiple queries found but materialization is enabled, should fail",
+			setup: func(f *fields) {
+				f.e.On("ExtractQueriesFromString", "some query").
+					Return([]*query.Query{
+						{Query: "query 1"},
+						{Query: "query 2"},
+					}, nil)
+			},
+			args: args{
+				t: &pipeline.Asset{
+					ExecutableFile: pipeline.ExecutableFile{
+						Path:    "test-file.sql",
+						Content: "some query",
+					},
+					Materialization: pipeline.Materialization{
+						Type: pipeline.MaterializationTypeTable,
+					},
+				},
+			},
+			wantErr: true,
+		},
 		{
 			name: "query returned an error",
 			setup: func(f *fields) {
-				f.m.On("Render", mock.AnythingOfType("*pipeline.Asset"), "some query").
-					Return([]string{"some query"}, nil)
-				f.e.On("ExtractQueriesFromSlice", mock.Anything).
+				f.e.On("ExtractQueriesFromString", "some query").
 					Return([]*query.Query{
 						{Query: "select * from users"},
 					}, nil)
+
+				f.m.On("Render", mock.Anything, "select * from users").
+					Return([]string{"select * from users"}, nil)
 
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).
 					Return(errors.New("failed to run query"))
@@ -120,14 +138,13 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "query successfully executed",
 			setup: func(f *fields) {
-				f.m.On("Render", mock.AnythingOfType("*pipeline.Asset"), "some query").
-					Return([]string{"some query"}, nil)
+				f.e.On("ExtractQueriesFromString", "some query").
+					Return([]*query.Query{
+						{Query: "select * from users"},
+					}, nil)
 
-				f.e.On("ExtractQueriesFromSlice", mock.MatchedBy(func(s []string) bool {
-					return len(s) == 1 && s[0] == "some query"
-				})).Return([]*query.Query{
-					{Query: "select * from users"},
-				}, nil)
+				f.m.On("Render", mock.Anything, "select * from users").
+					Return([]string{"select * from users"}, nil)
 
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).
 					Return(nil)
@@ -146,14 +163,13 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "query successfully executed with materialization",
 			setup: func(f *fields) {
-				f.m.On("Render", mock.AnythingOfType("*pipeline.Asset"), "select * from users").
-					Return([]string{"CREATE TABLE x AS select * from users"}, nil)
+				f.e.On("ExtractQueriesFromString", "some query").
+					Return([]*query.Query{
+						{Query: "select * from users"},
+					}, nil)
 
-				f.e.On("ExtractQueriesFromSlice", mock.MatchedBy(func(s []string) bool {
-					return len(s) == 1 && s[0] == "CREATE TABLE x AS select * from users"
-				})).Return([]*query.Query{
-					{Query: "CREATE TABLE x AS select * from users"},
-				}, nil)
+				f.m.On("Render", mock.Anything, "select * from users").
+					Return([]string{"CREATE TABLE x AS select * from users"}, nil)
 
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE TABLE x AS select * from users"}).
 					Return(nil)
@@ -163,7 +179,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 					Type: pipeline.AssetTypePostgresQuery,
 					ExecutableFile: pipeline.ExecutableFile{
 						Path:    "test-file.sql",
-						Content: "select * from users",
+						Content: "some query",
 					},
 				},
 			},
