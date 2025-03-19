@@ -60,7 +60,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
-
+	q.Query = materialized
 	if t.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
 		renderedQueries, err := o.extractor.ExtractQueriesFromString(materialized)
 		if err != nil {
