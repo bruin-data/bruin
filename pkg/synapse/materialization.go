@@ -27,6 +27,7 @@ var matMap = AssetMaterializationMap{
 		pipeline.MaterializationStrategyCreateReplace: buildCreateReplaceQuery,
 		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
 		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
+		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
 	},
 }
 
@@ -127,4 +128,33 @@ func buildMergeQuery(asset *pipeline.Asset, query string) ([]string, error) {
 	}
 
 	return []string{strings.Join(mergeLines, "\n") + ";"}, nil
+}
+
+func buildTimeIntervalQuery(asset *pipeline.Asset, query string) ([]string, error) {
+	if asset.Materialization.IncrementalKey == "" {
+		return nil, errors.New("incremental_key is required for time_interval strategy")
+	}
+
+	if asset.Materialization.TimeGranularity == "" {
+		return nil, errors.New("time_granularity is required for time_interval strategy")
+	}
+
+	startVar := "{{start_timestamp}}"
+	endVar := "{{end_timestamp}}"
+	if asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate {
+		startVar = "{{start_date}}"
+		endVar = "{{end_date}}"
+	}
+
+	queries := []string{
+		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
+			asset.Name,
+			asset.Materialization.IncrementalKey,
+			startVar,
+			endVar),
+		fmt.Sprintf(`INSERT INTO %s %s`,
+			asset.Name, query),
+	}
+
+	return queries, nil
 }
