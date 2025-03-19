@@ -189,6 +189,32 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "query successfully executed with rendering",
+			setup: func(f *fields) {
+				f.e.On("ExtractQueriesFromString", "{%- set sinks = [\n  'instant_cash',\n] -%}\n\nSELECT 1").
+					Return([]*query.Query{
+						{Query: "SELECT 1"},
+					}, nil)
+
+				f.m.On("Render", mock.Anything, "SELECT 1").
+					Return("CREATE TABLE x AS SELECT 1", nil)
+
+				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE TABLE x AS SELECT 1"}).
+					Return(nil)
+				f.m.On("IsFullRefresh").Return(false)
+			},
+			args: args{
+				t: &pipeline.Asset{
+					Type: pipeline.AssetTypeBigqueryQuery,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path:    "test-file.sql",
+						Content: "{%- set sinks = [\n  'instant_cash',\n] -%}\n\nSELECT 1",
+					},
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
