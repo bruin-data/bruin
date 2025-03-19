@@ -165,7 +165,7 @@ func (f *WholeFileExtractor) ExtractQueriesFromSlice(content []string) ([]*Query
 }
 
 func (f *WholeFileExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
-	var allQueries []string
+	allQueries := make([]string, 0, len(content))
 	for _, query := range content {
 		q, err := f.Renderer.Render(strings.TrimSpace(query))
 		if err != nil {
