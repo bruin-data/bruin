@@ -242,7 +242,8 @@ func TestMaterializer_Render(t *testing.T) {
 			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
 			want: []string{
 				"DELETE FROM my.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}'",
-				"INSERT INTO my.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'"},
+				"INSERT INTO my.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
+			},
 		},
 		{
 			name: "time_interval_date",
