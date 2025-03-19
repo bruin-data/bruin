@@ -65,12 +65,14 @@ var (
 		Usage:       "the start date of the range the pipeline will run for in YYYY-MM-DD, YYYY-MM-DD HH:MM:SS or YYYY-MM-DD HH:MM:SS.ffffff format",
 		DefaultText: "beginning of yesterday, e.g. " + defaultStartDate.Format("2006-01-02 15:04:05.000000"),
 		Value:       defaultStartDate.Format("2006-01-02 15:04:05.000000"),
+		EnvVars:     []string{"BRUIN_START_DATE"},
 	}
 	endDateFlag = &cli.StringFlag{
 		Name:        "end-date",
 		Usage:       "the end date of the range the pipeline will run for in YYYY-MM-DD, YYYY-MM-DD HH:MM:SS or YYYY-MM-DD HH:MM:SS.ffffff format",
 		DefaultText: "end of yesterday, e.g. " + defaultEndDate.Format("2006-01-02 15:04:05") + ".999999",
 		Value:       defaultEndDate.Format("2006-01-02 15:04:05") + ".999999",
+		EnvVars:     []string{"BRUIN_END_DATE"},
 	}
 )
 
@@ -113,6 +115,7 @@ func Run(isDebug *bool) *cli.Command {
 				Name:    "full-refresh",
 				Aliases: []string{"r"},
 				Usage:   "truncate the table before running",
+				EnvVars: []string{"BRUIN_FULL_REFRESH"},
 			},
 			&cli.BoolFlag{
 				Name:  "use-pip",
@@ -180,20 +183,6 @@ func Run(isDebug *bool) *cli.Command {
 				Output:            c.String("output"),
 				ExpUseWingetForUv: c.Bool("exp-use-winget-for-uv"),
 				ConfigFilePath:    c.String("config-file"),
-			}
-
-			// TODO: Decide to use env variable between override or fallback to the flag value
-			// TODO: Also validate the env variable name
-			if os.Getenv("BRUIN_START_DATE") != "" && runConfig.StartDate == "" {
-				runConfig.StartDate = os.Getenv("BRUIN_START_DATE")
-			}
-
-			if os.Getenv("BRUIN_END_DATE") != "" && runConfig.EndDate == "" {
-				runConfig.EndDate = os.Getenv("BRUIN_END_DATE")
-			}
-
-			if os.Getenv("FULL_REFRESH") != "" {
-				runConfig.FullRefresh = os.Getenv("FULL_REFRESH") == "true"
 			}
 
 			var startDate, endDate time.Time
