@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from sqlglot import parse_one, exp, lineage
+from sqlglot import parse_one, parse, exp, lineage
 from sqlglot.lineage import Node
 from sqlglot.optimizer import optimize
 from sqlglot.optimizer.scope import find_all_in_scope, build_scope
@@ -49,7 +49,7 @@ def extract_non_selected_columns(parsed: exp.Select) -> list[Column]:
 def extract_tables(parsed):
     root = build_scope(parsed)
     if root is None:
-        raise Exception("unable to build scope")
+        parsed.find_all(exp.Table)
 
     tables = []
     for scope in root.traverse():
@@ -90,16 +90,24 @@ def get_table_name(table: exp.Table):
 
 def get_tables(query: str, dialect: str):
     try:
-        parsed = parse_one(query, dialect=dialect)
+        parsed = parse(query, dialect=dialect)
         if parsed is None:
             return {"tables": [], "error": "unable to parse query"}
     except Exception as e:
         return {"tables": [], "error": str(e)}
+    
 
-    try:
-        tables = extract_tables(parsed)
-    except Exception as e:
-        return {"tables": [], "error": str(e)}
+    tables = []
+
+    for parsedSingle in parsed:
+        print("running", exp)
+        # print(list(parsedSingle.find_all(exp.Table)))
+
+
+        try:
+            tables.extend(extract_tables(parsedSingle))
+        except Exception as e:
+            return {"tables": [], "error": str(e)}
 
     return {
         "tables": list(set([get_table_name(table) for table in tables])),

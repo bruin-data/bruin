@@ -1,5 +1,5 @@
 import pytest
-from sqlglot import parse_one
+from sqlglot import parse, parse_one
 
 from .rename import replace_table_references
 
@@ -15,6 +15,12 @@ test_cases_rename = [
         "query": "SELECT * FROM raw.items join raw.orders on items.item_id = orders.item_id",
         "table_references": {"raw.items": "t1", "orders": "raw_dev.t2"},
         "expected": "SELECT * FROM t1 AS items JOIN raw_dev.t2 AS orders ON items.item_id = orders.item_id",
+    },
+    {
+        "name": "multiple queries",
+        "query": "DELETE FROM raw.items WHERE item_id = 1; SELECT * FROM raw.items join raw.orders on items.item_id = orders.item_id",
+        "table_references": {"raw.items": "t1", "orders": "raw_dev.t2"},
+        "expected": "DELETE FROM t1 AS items WHERE item_id = 1; SELECT * FROM t1 AS items JOIN raw_dev.t2 AS orders ON items.item_id = orders.item_id",
     },
     {
         "name": "table name in select",
@@ -167,5 +173,5 @@ join t2
 )
 def test_replace_table_references(query, table_references, expected):
     result = replace_table_references(query, "bigquery", table_references)
-    assert result["query"] == parse_one(expected).sql()
+    assert result["query"] == "; ".join([q.sql() for q in parse(expected)])
     assert result["error"] is None

@@ -3,6 +3,8 @@ package postgres
 import (
 	"context"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
+
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -126,4 +128,72 @@ func (c *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) 
 	}
 
 	return err == nil, err
+}
+
+func (c *Client) GetDatabaseSummary(ctx context.Context) ([]ansisql.DBDatabase, error) {
+	q := &query.Query{
+		Query: `
+SELECT
+    table_catalog,
+    table_schema,
+    table_name
+FROM
+    information_schema.tables
+WHERE
+    table_schema NOT IN ('pg_catalog', 'information_schema') AND table_type = 'BASE TABLE'
+ORDER BY table_catalog, table_schema, table_name;
+`}
+
+	// Execute the query
+	result, err := c.SelectWithSchema(ctx, q)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get database summary")
+	}
+
+	// Process the results into the DBDatabase structure
+	databases := make(map[string]*ansisql.DBDatabase)
+	schemas := make(map[string]*ansisql.DBSchema)
+
+	for _, row := range result.Rows {
+		if len(row) != 3 {
+			continue
+		}
+
+		dbName := row[0].(string)
+		schemaName := row[1].(string)
+		tableName := row[2].(string)
+
+		// Create database if it doesn't exist
+		if _, exists := databases[dbName]; !exists {
+			databases[dbName] = &ansisql.DBDatabase{
+				Name:    dbName,
+				Schemas: []*ansisql.DBSchema{},
+			}
+		}
+
+		// Create schema if it doesn't exist
+		schemaKey := dbName + "." + schemaName
+		if _, exists := schemas[schemaKey]; !exists {
+			schema := &ansisql.DBSchema{
+				Name:   schemaName,
+				Tables: []*ansisql.DBTable{},
+			}
+			schemas[schemaKey] = schema
+			databases[dbName].Schemas = append(databases[dbName].Schemas, schema)
+		}
+
+		// Add table to schema
+		table := &ansisql.DBTable{
+			Name:    tableName,
+		}
+		schemas[schemaKey].Tables = append(schemas[schemaKey].Tables, table)
+	}
+
+	// Convert map to slice
+	result2 := make([]ansisql.DBDatabase, 0, len(databases))
+	for _, db := range databases {
+		result2 = append(result2, *db)
+	}
+
+	return result2, nil
 }

@@ -2,8 +2,12 @@ package postgres
 
 import (
 	"context"
+	"fmt"
+	"strings"
+	"sync"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -23,6 +27,7 @@ type PgClient interface {
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
 	Ping(ctx context.Context) error
+	GetDatabaseSummary(ctx context.Context) ([]ansisql.DBDatabase, error)
 }
 
 type connectionFetcher interface {
@@ -30,17 +35,24 @@ type connectionFetcher interface {
 	GetConnection(name string) (interface{}, error)
 }
 
+type parser interface {
+	UsedTables(sql, dialect string) ([]string, error)
+	RenameTables(sql, dialect string, tableMapping map[string]string) (string, error)
+}
+
 type BasicOperator struct {
 	connection   connectionFetcher
 	extractor    queryExtractor
 	materializer materializer
+	parser       parser
 }
 
-func NewBasicOperator(conn connectionFetcher, extractor queryExtractor, materializer materializer) *BasicOperator {
+func NewBasicOperator(conn connectionFetcher, extractor queryExtractor, materializer materializer, parser parser) *BasicOperator {
 	return &BasicOperator{
 		connection:   conn,
 		extractor:    extractor,
 		materializer: materializer,
+		parser:       parser,
 	}
 }
 
@@ -58,8 +70,10 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return nil
 	}
 
-	if len(queries) > 1 && t.Materialization.Type != pipeline.MaterializationTypeNone {
-		return errors.New("cannot enable materialization for tasks with multiple queries")
+	if len(queries) > 1 {
+		// if the code hits here this means that we used an extractor that splits the content into multiple queries.
+		// this is not supported and we should not allow it, Postgres-like platforms accepts multiple SQL statements in a single query, that's what we use instead.
+		return errors.New("Postgres-like operators can only handle one query at a time, this seems like a bug, please report the issue to the Bruin team")
 	}
 
 	q := queries[0]
@@ -87,6 +101,79 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	conn, err := o.connection.GetPgConnection(connName)
+	if err != nil {
+		return err
+	}
+
+	assetName := t.Name
+	assetNameParts := strings.Split(assetName, ".")
+	if len(assetNameParts) != 2 {
+		return conn.RunQueryWithoutResult(ctx, q)
+	}
+
+	schemaName := assetNameParts[0]
+	tableName := assetNameParts[1]
+
+	env, ok := ctx.Value(config.EnvironmentContextKey).(*config.Environment)
+	if !ok {
+		return conn.RunQueryWithoutResult(ctx, q)
+	}
+
+	if env.SchemaPrefix == "" {
+		return conn.RunQueryWithoutResult(ctx, q)
+	}
+
+	fmt.Println("materialized", materialized)
+
+	var wg sync.WaitGroup
+	var usedTables []string
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		var usedTablesError error
+		usedTables, usedTablesError = o.parser.UsedTables(materialized, "postgres")
+		if usedTablesError != nil {
+			fmt.Println("usedTablesError", usedTablesError)
+		}
+		err = usedTablesError
+	}()
+
+	var dbSummary []ansisql.DBDatabase
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		dbSummary, err = conn.GetDatabaseSummary(ctx)
+	}()
+
+	wg.Wait()
+	if err != nil {
+		return err
+	}
+
+	renameMapping := map[string]string{
+		t.Name: fmt.Sprintf("%s_%s.%s", env.SchemaPrefix, schemaName, tableName),
+	}
+
+	for _, tableReference := range usedTables {
+		parts := strings.Split(tableReference, ".")
+		if len(parts) != 2 {
+			continue
+		}
+		schema := parts[0]
+		table := parts[1]
+		devSchema := env.SchemaPrefix + "_" + schema
+		devTable := fmt.Sprintf("%s.%s", devSchema, table)
+
+		for _, db := range dbSummary {
+			if db.TableExists(devSchema, table) {
+				renameMapping[tableReference] = devTable
+			}
+		}
+	}
+
+	q.Query, err = o.parser.RenameTables(q.Query, "postgres", renameMapping)
 	if err != nil {
 		return err
 	}

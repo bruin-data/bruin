@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	_ "github.com/DATA-DOG/go-sqlmock"
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pashagolub/pgxmock/v3"
@@ -380,6 +381,91 @@ func TestDB_IsValid(t *testing.T) {
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Equal(t, tt.errorMessage, err.Error())
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.Equal(t, tt.want, got)
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+
+func TestDB_GetDatabaseSummary(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		setupMock func(mock pgxmock.PgxPoolIface)
+		want      []ansisql.DBDatabase
+		wantErr   string
+	}{
+		{
+			name: "test successful database summary",
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				rows := pgxmock.NewRowsWithColumnDefinition(
+					pgconn.FieldDescription{Name: "database_name"},
+					pgconn.FieldDescription{Name: "schema_name"},
+					pgconn.FieldDescription{Name: "table_name"},
+				).
+				AddRow("database1", "schema1", "table1").
+				AddRow("database1", "schema1", "table2").
+				AddRow("database2", "schema2", "table2")
+
+				mock.ExpectQuery(".*").WillReturnRows(rows)
+			},
+			want: []ansisql.DBDatabase{
+				{
+					Name: "database1",
+					Schemas: []*ansisql.DBSchema{
+						{
+							Name: "schema1",
+							Tables: []*ansisql.DBTable{
+								{
+									Name: "table1",
+								},
+								{
+									Name: "table2",
+								},
+							},
+						},
+					},
+				},
+				{
+					Name: "database2",
+					Schemas: []*ansisql.DBSchema{
+						{
+							Name: "schema2",
+							Tables: []*ansisql.DBTable{
+								{
+									Name: "table2",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mock, err := pgxmock.NewPool()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer mock.Close()
+
+			tt.setupMock(mock)
+
+			client := Client{connection: mock}
+
+			got, err := client.GetDatabaseSummary(context.Background())
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Equal(t, tt.wantErr, err.Error())
 			} else {
 				require.NoError(t, err)
 			}
