@@ -697,8 +697,10 @@ func (s *Scheduler) allDependenciesSucceededForTask(t TaskInstance) bool {
 
 	for _, upstream := range t.GetUpstream() {
 		status := upstream.GetStatus()
-		if status == Pending || status == Queued || status == Running {
-			return false
+		if upstream.Blocking() {
+			if status == Pending || status == Queued || status == Running {
+				return false
+			}
 		}
 	}
 

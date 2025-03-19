@@ -554,6 +554,7 @@ type Upstream struct {
 	Value    string          `json:"value" yaml:"value" mapstructure:"value"`
 	Metadata EmptyStringMap  `json:"metadata,omitempty" yaml:"metadata,omitempty" mapstructure:"metadata"`
 	Columns  []DependsColumn `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
+	Mode     UpstreamMode    `json:"mode" yaml:"mode,omitempty" mapstructure:"mode"`
 }
 
 func (u Upstream) MarshalYAML() (interface{}, error) {
