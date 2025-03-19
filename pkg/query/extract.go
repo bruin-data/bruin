@@ -163,3 +163,16 @@ func (f *WholeFileExtractor) ExtractQueriesFromSlice(content []string) ([]*Query
 
 	return allQueries, nil
 }
+
+func (f *WholeFileExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
+	var allQueries []string
+	for _, query := range content {
+		q, err := f.Renderer.Render(strings.TrimSpace(query))
+		if err != nil {
+			return nil, errors.Wrap(err, "could not render file while extracting the queries from the whole file")
+		}
+		allQueries = append(allQueries, q)
+	}
+
+	return allQueries, nil
+}

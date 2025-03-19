@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"context"
+
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -15,6 +16,7 @@ type materializer interface {
 type queryExtractor interface {
 	ExtractQueriesFromString(content string) ([]*query.Query, error)
 	ExtractQueriesFromSlice(content []string) ([]*query.Query, error)
+	ReextractQueriesFromSlice(content []string) ([]string, error)
 }
 
 type ClickHouseClient interface {
@@ -58,9 +60,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
-	var reextractedQueries []*query.Query
+
 	if t.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
-		reextractedQueries, err = o.extractor.ExtractQueriesFromSlice(materializedQueries)
+		materializedQueries, err = o.extractor.ReextractQueriesFromSlice(materializedQueries)
 		if err != nil {
 			return err
 		}
@@ -75,24 +77,15 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
-	switch t.Materialization.Strategy {
-	case pipeline.MaterializationStrategyTimeInterval:
-		for _, q := range reextractedQueries {
-			err = conn.RunQueryWithoutResult(ctx, q)
-			if err != nil {
-				return err
-			}
-		}
-	default:
-		for _, queryString := range materializedQueries {
-			p := &query.Query{Query: queryString}
-			err = conn.RunQueryWithoutResult(ctx, p)
-			if err != nil {
-				return err
-			}
-		}
 
+	for _, queryString := range materializedQueries {
+		p := &query.Query{Query: queryString}
+		err = conn.RunQueryWithoutResult(ctx, p)
+		if err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 
