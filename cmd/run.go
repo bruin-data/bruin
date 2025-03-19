@@ -182,6 +182,20 @@ func Run(isDebug *bool) *cli.Command {
 				ConfigFilePath:    c.String("config-file"),
 			}
 
+			// TODO: Decide to use env variable between override or fallback to the flag value
+			// TODO: Also validate the env variable name
+			if os.Getenv("BRUIN_START_DATE") != "" && runConfig.StartDate == "" {
+				runConfig.StartDate = os.Getenv("BRUIN_START_DATE")
+			}
+
+			if os.Getenv("BRUIN_END_DATE") != "" && runConfig.EndDate == "" {
+				runConfig.EndDate = os.Getenv("BRUIN_END_DATE")
+			}
+
+			if os.Getenv("FULL_REFRESH") != "" {
+				runConfig.FullRefresh = os.Getenv("FULL_REFRESH") == "true"
+			}
+
 			var startDate, endDate time.Time
 
 			var err error
