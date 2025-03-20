@@ -15,6 +15,8 @@ type materializer interface {
 
 type queryExtractor interface {
 	ExtractQueriesFromString(content string) ([]*query.Query, error)
+	ExtractQueriesFromSlice(content []string) ([]*query.Query, error)
+	ReextractQueriesFromSlice(content []string) ([]string, error)
 }
 
 type ClickHouseClient interface {
@@ -57,6 +59,13 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	materializedQueries, err := o.materializer.Render(t, q.String())
 	if err != nil {
 		return err
+	}
+
+	if t.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
+		materializedQueries, err = o.extractor.ReextractQueriesFromSlice(materializedQueries)
+		if err != nil {
+			return err
+		}
 	}
 
 	connName, err := p.GetConnectionNameForAsset(t)

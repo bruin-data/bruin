@@ -79,7 +79,7 @@ func TestRenderCommand_Run(t *testing.T) {
 		writer         *mockWriter
 	}
 	type args struct {
-		taskPath string
+		task *pipeline.Asset
 	}
 	tests := []struct {
 		name    string
@@ -90,42 +90,26 @@ func TestRenderCommand_Run(t *testing.T) {
 		{
 			name: "should return error if task path is empty",
 			args: args{
-				taskPath: "",
-			},
-			wantErr: assert.Error,
-		},
-		{
-			name: "should return error if asset fails to be built",
-			args: args{
-				taskPath: "/path/to/asset",
-			},
-			setup: func(f *fields) {
-				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
-					Return(nil, assert.AnError)
-			},
-			wantErr: assert.Error,
-		},
-		{
-			name: "should return error if asset building doesnt fail but returns an empty asset",
-			args: args{
-				taskPath: "/path/to/asset",
-			},
-			setup: func(f *fields) {
-				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
-					Return(nil, nil)
+				task: nil,
 			},
 			wantErr: assert.Error,
 		},
 		{
 			name: "should return error if failed to extract queries from file",
 			args: args{
-				taskPath: "/path/to/asset",
+				task: &pipeline.Asset{
+					Type: pipeline.AssetTypeBigqueryQuery,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path: "/path/to/executable",
+					},
+					Name: "asset1",
+				},
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
-					Return(bqAsset, nil)
+				f.bqMaterializer.On("Render", bqAsset, bqAsset.ExecutableFile.Content).
+					Return("some materialized query", nil)
 
-				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
+				f.extractor.On("ExtractQueriesFromString", "some materialized query").
 					Return(nil, assert.AnError)
 			},
 			wantErr: assert.Error,
@@ -133,16 +117,16 @@ func TestRenderCommand_Run(t *testing.T) {
 		{
 			name: "should return error if materialization fails",
 			args: args{
-				taskPath: "/path/to/asset",
+				task: &pipeline.Asset{
+					Type: pipeline.AssetTypeBigqueryQuery,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path: "/path/to/executable",
+					},
+					Name: "asset1",
+				},
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
-					Return(bqAsset, nil)
-
-				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
-					Return([]*query.Query{{Query: "SELECT * FROM table1"}}, nil)
-
-				f.bqMaterializer.On("Render", bqAsset, "SELECT * FROM table1").
+				f.bqMaterializer.On("Render", bqAsset, bqAsset.ExecutableFile.Content).
 					Return("", assert.AnError)
 			},
 			wantErr: assert.Error,
@@ -150,19 +134,22 @@ func TestRenderCommand_Run(t *testing.T) {
 		{
 			name: "should materialize if asset is a bigquery query",
 			args: args{
-				taskPath: "/path/to/asset",
+				task: &pipeline.Asset{
+					Type: pipeline.AssetTypeBigqueryQuery,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path: "/path/to/executable",
+					},
+					Name: "asset1",
+				},
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
-					Return(bqAsset, nil)
-
-				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
-					Return([]*query.Query{{Query: "SELECT * FROM table1"}}, nil)
-
-				f.bqMaterializer.On("Render", bqAsset, "SELECT * FROM table1").
+				f.bqMaterializer.On("Render", bqAsset, bqAsset.ExecutableFile.Content).
 					Return("some-materialized-query", nil)
 
-				f.writer.On("Write", []byte("some-materialized-query\n")).
+				f.extractor.On("ExtractQueriesFromString", "some-materialized-query").
+					Return([]*query.Query{{Query: "some materialized and rendered query"}}, nil)
+
+				f.writer.On("Write", []byte("some materialized and rendered query\n")).
 					Return(0, nil)
 			},
 			wantErr: assert.NoError,
@@ -170,12 +157,15 @@ func TestRenderCommand_Run(t *testing.T) {
 		{
 			name: "should skip materialization if asset is a not bigquery query",
 			args: args{
-				taskPath: "/path/to/asset",
+				task: &pipeline.Asset{
+					Type: pipeline.AssetTypeSnowflakeQuery,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path: "/path/to/executable",
+					},
+					Name: "asset1",
+				},
 			},
 			setup: func(f *fields) {
-				f.builder.On("CreateAssetFromFile", "/path/to/asset", mock.Anything).
-					Return(nonBqAsset, nil)
-
 				f.extractor.On("ExtractQueriesFromString", nonBqAsset.ExecutableFile.Content).
 					Return([]*query.Query{{Query: "SELECT * FROM nonbq.table1"}}, nil)
 
@@ -209,7 +199,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				writer:  f.writer,
 			}
 
-			tt.wantErr(t, render.Run(tt.args.taskPath, nil))
+			tt.wantErr(t, render.Run(tt.args.task, nil))
 			f.extractor.AssertExpectations(t)
 			f.bqMaterializer.AssertExpectations(t)
 			f.builder.AssertExpectations(t)

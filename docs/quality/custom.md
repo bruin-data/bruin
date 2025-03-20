@@ -34,7 +34,7 @@ There are a few fields to configure the check behavior:
 - `query`: required, the query to run as the quality check
 - `description`: optional, add a longer description if needed using Markdown.
 - `value`: optional, a value to compare the quality check output
-  - if not given, Bruin will try to match the query output to be a truthy value, e.g. `true` or `1`.
+  - if not given, Bruin will try to match the query output to be integer zero.
 - `blocking`: optional, whether the test should block running downstreams, default `true`.
 
 ## Examples:
@@ -49,7 +49,8 @@ materialization:
 
 custom_checks:  
   - name: row count is greater than zero    
-    query: SELECT count(*) > 1 FROM dataset.player_count  
+    query: SELECT count(*) > 1 FROM dataset.player_count
+    value: 1  
    
 @bruin */
 
@@ -69,6 +70,7 @@ materialization:
 custom_checks:  
   - name: row count is greater than zero    
     query: SELECT count(*) > 1 FROM dataset.player_count
+    value: 1
     blocking: false  
    
 @bruin */

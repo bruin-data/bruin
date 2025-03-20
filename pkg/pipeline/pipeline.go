@@ -503,6 +503,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
+	"athena":     AssetTypeAthenaQuery,
 	"bigquery":   AssetTypeBigqueryQuery,
 	"snowflake":  AssetTypeSnowflakeQuery,
 	"postgres":   AssetTypePostgresQuery,
@@ -539,7 +540,7 @@ type CustomCheck struct {
 	ID          string          `json:"id" yaml:"-" mapstructure:"-"`
 	Name        string          `json:"name" yaml:"name" mapstructure:"name"`
 	Description string          `json:"description" yaml:"description,omitempty" mapstructure:"description"`
-	Value       int64           `json:"value" yaml:"value,omitempty" mapstructure:"value"`
+	Value       int64           `json:"value" yaml:"value" mapstructure:"value"`
 	Blocking    DefaultTrueBool `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 	Query       string          `json:"query" yaml:"query" mapstructure:"query"`
 }
@@ -1043,7 +1044,11 @@ func (p *Pipeline) GetAllConnectionNamesForAsset(asset *Asset) ([]string, error)
 		}
 
 		// if destination connection not specified, we infer from destination type
-		assetType = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
+		assetType, ok = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
+		if !ok {
+			return []string{}, errors.Errorf("connection type could not be inferred for destination '%s', please specify a `connection` key in the asset", asset.Parameters["destination"])
+		}
+
 		mapping, ok := AssetTypeConnectionMapping[assetType]
 		if !ok {
 			return []string{}, errors.Errorf("No connection mapping found for asset type:'%s' (%s)", assetType, asset.Name)
@@ -1076,8 +1081,12 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 	}
 
 	assetType := asset.Type
+	var ok bool
 	if assetType == AssetTypeIngestr {
-		assetType = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
+		assetType, ok = IngestrTypeConnectionMapping[asset.Parameters["destination"]]
+		if !ok {
+			return "", errors.Errorf("connection type could not be inferred for destination '%s', please specify a `connection` key in the asset", asset.Parameters["destination"])
+		}
 	} else if assetType == AssetTypePython || assetType == AssetTypeEmpty {
 		assetType = p.GetMajorityAssetTypesFromSQLAssets(AssetTypeBigqueryQuery)
 	}

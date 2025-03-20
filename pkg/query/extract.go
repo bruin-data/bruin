@@ -150,3 +150,29 @@ func (f *WholeFileExtractor) ExtractQueriesFromString(content string) ([]*Query,
 		},
 	}, nil
 }
+
+func (f *WholeFileExtractor) ExtractQueriesFromSlice(content []string) ([]*Query, error) {
+	var allQueries []*Query
+	for _, query := range content {
+		queries, err := f.ExtractQueriesFromString(query)
+		if err != nil {
+			return nil, err
+		}
+		allQueries = append(allQueries, queries...)
+	}
+
+	return allQueries, nil
+}
+
+func (f *WholeFileExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
+	allQueries := make([]string, 0, len(content))
+	for _, query := range content {
+		q, err := f.Renderer.Render(strings.TrimSpace(query))
+		if err != nil {
+			return nil, errors.Wrap(err, "could not render file while extracting the queries from the whole file")
+		}
+		allQueries = append(allQueries, q)
+	}
+
+	return allQueries, nil
+}

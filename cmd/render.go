@@ -128,7 +128,7 @@ func Render() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			asset, err = DefaultPipelineBuilder.MutateAsset(asset, nil)
+			asset, err = DefaultPipelineBuilder.MutateAsset(asset, pl)
 			if err != nil {
 				printError(errors.New("failed to mutate the asset"), c.String("output"), "Failed to mutate the asset:")
 				return cli.Exit("", 1)
@@ -193,7 +193,7 @@ func Render() *cli.Command {
 				output:  c.String("output"),
 			}
 
-			return r.Run(inputPath, pl)
+			return r.Run(asset, pl)
 		},
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
@@ -221,41 +221,33 @@ type RenderCommand struct {
 	writer io.Writer
 }
 
-func (r *RenderCommand) Run(taskPath string, foundPipeline *pipeline.Pipeline) error {
+func (r *RenderCommand) Run(task *pipeline.Asset, foundPipeline *pipeline.Pipeline) error {
 	defer RecoverFromPanic()
-
-	if taskPath == "" {
-		r.printErrorOrJsonf("Please give an asset path to render: bruin render <path to the asset file>)\n")
-		return cli.Exit("", 1)
-	}
-
-	task, err := r.builder.CreateAssetFromFile(taskPath, foundPipeline)
-	if err != nil {
-		r.printErrorOrJsonf("Failed to build asset: %v\n", err.Error())
-		return cli.Exit("", 1)
-	}
-
+	var err error
 	if task == nil {
-		r.printErrorOrJsonf("The given file path doesn't seem to be a Bruin asset definition: '%s'\n", taskPath)
-		return cli.Exit("", 1)
+		return errors.New("failed to find the asset: asset cannot be nil")
+	}
+	var materialized string
+	hasMaterializer := false
+	if materializer, ok := r.materializers[task.Type]; ok {
+		materialized, err = materializer.Render(task, task.ExecutableFile.Content)
+		hasMaterializer = true
+		if err != nil {
+			r.printErrorOrJsonf("Failed to materialize the query: %v\n", err.Error())
+			return cli.Exit("", 1)
+		}
+	} else {
+		materialized = task.ExecutableFile.Content
 	}
 
-	queries, err := r.extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
+	queries, err := r.extractor.ExtractQueriesFromString(materialized)
 	if err != nil {
 		r.printErrorOrJSON(err.Error())
 		return cli.Exit("", 1)
 	}
 
 	qq := queries[0]
-
-	if materializer, ok := r.materializers[task.Type]; ok {
-		materialized, err := materializer.Render(task, qq.Query)
-		if err != nil {
-			r.printErrorOrJsonf("Failed to materialize the query: %v\n", err.Error())
-			return cli.Exit("", 1)
-		}
-
-		qq.Query = materialized
+	if hasMaterializer {
 		if r.output != "json" {
 			qq.Query = highlightCode(qq.Query, "sql")
 		}

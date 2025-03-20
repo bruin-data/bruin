@@ -22,6 +22,7 @@ type Client interface {
 
 type queryExtractor interface {
 	ExtractQueriesFromString(content string) ([]*query.Query, error)
+	ExtractQueriesFromSlice(content []string) ([]*query.Query, error)
 }
 
 type connectionFetcher interface {
@@ -48,25 +49,17 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 }
 
 func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
-	queries, err := o.extractor.ExtractQueriesFromString(t.ExecutableFile.Content)
+	materializedQueries, err := o.materializer.Render(t, t.ExecutableFile.Content)
 	if err != nil {
 		return errors.Wrap(err, "cannot extract queries from the task file")
 	}
-
+	queries, err := o.extractor.ExtractQueriesFromSlice(materializedQueries)
+	if err != nil {
+		return errors.Wrap(err, "cannot extract queries from the task file")
+	}
 	if len(queries) == 0 {
 		return nil
 	}
-
-	if len(queries) > 1 && t.Materialization.Type != pipeline.MaterializationTypeNone {
-		return errors.New("cannot enable materialization for tasks with multiple queries")
-	}
-
-	q := queries[0]
-	materializedQueries, err := o.materializer.Render(t, q.String())
-	if err != nil {
-		return err
-	}
-
 	connName, err := p.GetConnectionNameForAsset(t)
 	if err != nil {
 		return err
@@ -77,9 +70,8 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	for _, queryString := range materializedQueries {
-		p := &query.Query{Query: queryString}
-		err = conn.RunQueryWithoutResult(ctx, p)
+	for _, q := range queries {
+		err = conn.RunQueryWithoutResult(ctx, q)
 		if err != nil {
 			return err
 		}
