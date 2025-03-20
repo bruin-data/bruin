@@ -53,7 +53,6 @@
       "snowflake": null
     },
     {
-      
       "id": "a01e7580b118b5fbbdc1f7c8de6b8c377c684727e4e8ad574e9153a3dbd46dd1",
       "uri": "",
       "name": "gcs-to-bq-2",
@@ -128,16 +127,36 @@
       ],
       "athena": null,
       "upstreams": [
-        {"type" : "asset", "value" : "task1",
-        "columns": []},
-        {"type" : "asset", "value" : "task2",
-        "columns": []},
-        {"type" : "asset", "value" : "task3",
-        "columns": []},
-        {"type" : "asset", "value" : "task4",
-        "columns": []},
-        {"type" : "asset", "value" : "task5",
-        "columns": []}
+        {
+          "type": "asset",
+          "value": "task1",
+          "columns": [],
+          "mode": "full"
+        },
+        {
+          "type": "asset",
+          "value": "task2",
+          "columns": [],
+          "mode": "full"
+        },
+        {
+          "type": "asset",
+          "value": "task3",
+          "columns": [],
+          "mode": "full"
+        },
+        {
+          "type": "asset",
+          "value": "task4",
+          "columns": [],
+          "mode": "full"
+        },
+        {
+          "type": "asset",
+          "value": "task5",
+          "columns": [],
+          "mode": "full"
+        }
       ],
       "materialization": null,
       "columns": [

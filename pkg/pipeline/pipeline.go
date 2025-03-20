@@ -540,7 +540,7 @@ type CustomCheck struct {
 	ID          string          `json:"id" yaml:"-" mapstructure:"-"`
 	Name        string          `json:"name" yaml:"name" mapstructure:"name"`
 	Description string          `json:"description" yaml:"description,omitempty" mapstructure:"description"`
-	Value       int64           `json:"value" yaml:"value,omitempty" mapstructure:"value"`
+	Value       int64           `json:"value" yaml:"value" mapstructure:"value"`
 	Blocking    DefaultTrueBool `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
 	Query       string          `json:"query" yaml:"query" mapstructure:"query"`
 }
@@ -555,6 +555,7 @@ type Upstream struct {
 	Value    string          `json:"value" yaml:"value" mapstructure:"value"`
 	Metadata EmptyStringMap  `json:"metadata,omitempty" yaml:"metadata,omitempty" mapstructure:"metadata"`
 	Columns  []DependsColumn `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
+	Mode     UpstreamMode    `json:"mode" yaml:"mode,omitempty" mapstructure:"mode"`
 }
 
 func (u Upstream) MarshalYAML() (interface{}, error) {

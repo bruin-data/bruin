@@ -19,12 +19,14 @@
       {
         "type": "asset",
         "value": "chess_playground.games",
-        "columns": []
+        "columns": [],
+        "mode": "full"
       },
       {
         "type": "asset",
         "value": "chess_playground.profiles",
-        "columns": []
+        "columns": [],
+        "mode": "full"
       }
     ],
     "image": "",

@@ -28,7 +28,8 @@
             "name": "country",
             "usage": ""
           }
-        ]
+        ],
+        "mode": "full"
       },
       {
         "type": "asset",
@@ -50,7 +51,8 @@
             "name": "created_at",
             "usage": ""
           }
-        ]
+        ],
+        "mode": "full"
       }
     ],
     "image": "",

@@ -101,27 +101,32 @@
                 {
                     "type": "asset",
                     "value": "task1",
-                    "columns": []
+                    "columns": [],
+                    "mode": "full"
                 },
                 {
                     "type": "asset",
                     "value": "task2",
-                    "columns": []
+                    "columns": [],
+                    "mode": "full"
                 },
                 {
                     "type": "asset",
                     "value": "task3",
-                    "columns": []
+                    "columns": [],
+                    "mode": "full"
                 },
                 {
                     "type": "asset",
                     "value": "task4",
-                    "columns": []
+                    "columns": [],
+                    "mode": "full"
                 },
                 {
                     "type": "asset",
                     "value": "task5",
-                    "columns": []
+                    "columns": [],
+                    "mode": "full"
                 }
             ],
             "image": "python:3.11",

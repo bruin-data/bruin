@@ -19,6 +19,7 @@ func (m *mockExtractor) ExtractQueriesFromString(content string) ([]*query.Query
 	res := m.Called(content)
 	return res.Get(0).([]*query.Query), res.Error(1)
 }
+
 func (m *mockExtractor) ExtractQueriesFromSlice(content []string) ([]*query.Query, error) {
 	res := m.Called(content)
 	return res.Get(0).([]*query.Query), res.Error(1)

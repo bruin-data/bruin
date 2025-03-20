@@ -65,12 +65,14 @@ var (
 		Usage:       "the start date of the range the pipeline will run for in YYYY-MM-DD, YYYY-MM-DD HH:MM:SS or YYYY-MM-DD HH:MM:SS.ffffff format",
 		DefaultText: "beginning of yesterday, e.g. " + defaultStartDate.Format("2006-01-02 15:04:05.000000"),
 		Value:       defaultStartDate.Format("2006-01-02 15:04:05.000000"),
+		EnvVars:     []string{"BRUIN_START_DATE"},
 	}
 	endDateFlag = &cli.StringFlag{
 		Name:        "end-date",
 		Usage:       "the end date of the range the pipeline will run for in YYYY-MM-DD, YYYY-MM-DD HH:MM:SS or YYYY-MM-DD HH:MM:SS.ffffff format",
 		DefaultText: "end of yesterday, e.g. " + defaultEndDate.Format("2006-01-02 15:04:05") + ".999999",
 		Value:       defaultEndDate.Format("2006-01-02 15:04:05") + ".999999",
+		EnvVars:     []string{"BRUIN_END_DATE"},
 	}
 )
 
@@ -113,6 +115,7 @@ func Run(isDebug *bool) *cli.Command {
 				Name:    "full-refresh",
 				Aliases: []string{"r"},
 				Usage:   "truncate the table before running",
+				EnvVars: []string{"BRUIN_FULL_REFRESH"},
 			},
 			&cli.BoolFlag{
 				Name:  "use-pip",
