@@ -45,7 +45,7 @@
           "type": "asset",
           "value": "gcs-to-bq",
           "columns": [],
-          "mode": ""
+          "mode": "full"
         }
       ],
       "materialization": null,
