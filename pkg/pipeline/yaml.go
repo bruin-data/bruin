@@ -12,6 +12,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	UpstreamModeFull     UpstreamMode = "full"
+	UpstreamModeSymbolic UpstreamMode = "symbolic"
+)
+
 var ValidQualityChecks = map[string]bool{
 	"not_null":        true,
 	"unique":          true,
@@ -42,10 +47,26 @@ type upstreamColumn struct {
 
 type depends []upstream
 
+type UpstreamMode string
+
+func (m UpstreamMode) IsValid() bool {
+	switch m {
+	case UpstreamModeFull, UpstreamModeSymbolic:
+		return true
+	default:
+		return false
+	}
+}
+
+func (m UpstreamMode) String() string {
+	return string(m)
+}
+
 type upstream struct {
-	Value   string  `yaml:"value"`
-	Type    string  `yaml:"type"`
-	Columns columns `yaml:"columns"`
+	Value   string       `yaml:"value"`
+	Type    string       `yaml:"type"`
+	Mode    UpstreamMode `yaml:"mode"`
+	Columns columns      `yaml:"columns"`
 }
 
 func (a *depends) UnmarshalYAML(value *yaml.Node) error {
@@ -391,9 +412,13 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			cols = append(cols, DependsColumn(col))
 		}
 
+		if len(dep.Mode) == 0 {
+			dep.Mode = UpstreamModeFull
+		}
 		upstreams[index] = Upstream{
 			Value:   dep.Value,
 			Type:    dep.Type,
+			Mode:    dep.Mode,
 			Columns: cols,
 		}
 	}

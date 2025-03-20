@@ -26,7 +26,8 @@
                 {
                     "type": "asset",
                     "value": "gcs-to-bq",
-                    "columns": []
+                    "columns": [],
+                    "mode": "full"
                 }
             ],
             "image": "",
@@ -103,32 +104,38 @@
                 {
                     "type": "asset",
                     "value": "task1",
-                    "columns": []
+                    "columns": [],
+                    "mode": ""
                 },
                 {
                     "type": "asset",
                     "value": "task2",
-                    "columns": []
+                    "columns": [],
+                    "mode": ""
                 },
                 {
                     "type": "asset",
                     "value": "task3",
-                    "columns": []
+                    "columns": [],
+                    "mode": ""
                 },
                 {
                     "type": "asset",
                     "value": "task4",
-                    "columns": []
+                    "columns": [],
+                    "mode": ""
                 },
                 {
                     "type": "asset",
                     "value": "task5",
-                    "columns": []
+                    "columns": [],
+                    "mode": ""
                 },
                 {
                     "type": "asset",
                     "value": "task3",
-                    "columns": []
+                    "columns": [],
+                    "mode": ""
                 }
             ],
             "image": "",
@@ -170,32 +177,38 @@
                 {
                     "type": "asset",
                     "value": "task1",
-                    "columns": []
+                    "columns": [],
+                    "mode": ""
                 },
                 {
                     "type": "asset",
                     "value": "task2",
-                    "columns": []
+                    "columns": [],
+                    "mode": ""
                 },
                 {
                     "type": "asset",
                     "value": "task3",
-                    "columns": []
+                    "columns": [],
+                    "mode": ""
                 },
                 {
                     "type": "asset",
                     "value": "task4",
-                    "columns": []
+                    "columns": [],
+                    "mode": ""
                 },
                 {
                     "type": "asset",
                     "value": "task5",
-                    "columns": []
+                    "columns": [],
+                    "mode": ""
                 },
                 {
                     "type": "asset",
                     "value": "task3",
-                    "columns": []
+                    "columns": [],
+                    "mode": ""
                 }
             ],
             "image": "",
