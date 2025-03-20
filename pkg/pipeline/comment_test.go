@@ -76,12 +76,12 @@ func Test_createTaskFromFile(t *testing.T) {
 				Connection: "conn2",
 				Secrets:    []pipeline.SecretMapping{},
 				Upstreams: []pipeline.Upstream{
-					{Value: "task1", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task2", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task4", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task5", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
+					{Value: "task1", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task2", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task4", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task5", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
 				},
 
 				Materialization: pipeline.Materialization{
@@ -128,12 +128,12 @@ func Test_createTaskFromFile(t *testing.T) {
 				Connection: "conn1",
 				Secrets:    []pipeline.SecretMapping{},
 				Upstreams: []pipeline.Upstream{
-					{Value: "task1", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task2", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task4", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task5", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
+					{Value: "task1", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task2", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task4", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task5", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
 				},
 				Materialization: pipeline.Materialization{
 					Type:           pipeline.MaterializationTypeTable,
@@ -178,12 +178,12 @@ func Test_createTaskFromFile(t *testing.T) {
 				Instance:   "b1.nano",
 				Secrets:    []pipeline.SecretMapping{},
 				Upstreams: []pipeline.Upstream{
-					{Value: "task1", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task2", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task4", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task5", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
+					{Value: "task1", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task2", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task4", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task5", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
 				},
 				Columns: []pipeline.Column{
 					{
@@ -259,11 +259,11 @@ func Test_createTaskFromFile(t *testing.T) {
 					},
 				},
 				Upstreams: []pipeline.Upstream{
-					{Value: "task1", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task2", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task4", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
-					{Value: "task5", Type: "asset", Columns: make([]pipeline.DependsColumn, 0)},
+					{Value: "task1", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task2", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task3", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task4", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
+					{Value: "task5", Type: "asset", Columns: make([]pipeline.DependsColumn, 0), Mode: pipeline.UpstreamModeFull},
 				},
 				Columns: []pipeline.Column{
 					{
