@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	UpstreamModeFull        UpstreamMode = "full"
-	UpstreamModeNonSymbolic UpstreamMode = "symbolic"
+	UpstreamModeFull     UpstreamMode = "full"
+	UpstreamModeSymbolic UpstreamMode = "symbolic"
 )
 
 var ValidQualityChecks = map[string]bool{
@@ -51,7 +51,7 @@ type UpstreamMode string
 
 func (m UpstreamMode) IsValid() bool {
 	switch m {
-	case UpstreamModeFull, UpstreamModeNonSymbolic:
+	case UpstreamModeFull, UpstreamModeSymbolic:
 		return true
 	default:
 		return false
