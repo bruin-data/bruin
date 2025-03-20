@@ -14,7 +14,7 @@ import (
 
 const (
 	UpstreamModeFull        UpstreamMode = "full"
-	UpstreamModeNonSymbolic UpstreamMode = "non_symbolic"
+	UpstreamModeNonSymbolic UpstreamMode = "symbolic"
 )
 
 var ValidQualityChecks = map[string]bool{
