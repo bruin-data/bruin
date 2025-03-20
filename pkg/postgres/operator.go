@@ -123,8 +123,6 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return conn.RunQueryWithoutResult(ctx, q)
 	}
 
-	fmt.Println("materialized", materialized)
-
 	var wg sync.WaitGroup
 	var usedTables []string
 

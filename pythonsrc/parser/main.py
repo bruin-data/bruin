@@ -49,13 +49,16 @@ def extract_non_selected_columns(parsed: exp.Select) -> list[Column]:
 def extract_tables(parsed):
     root = build_scope(parsed)
     if root is None:
-        parsed.find_all(exp.Table)
+        return list(parsed.find_all(exp.Table))
 
     tables = []
     for scope in root.traverse():
         for alias, (node, source) in scope.selected_sources.items():
             if isinstance(source, exp.Table):
                 tables.append(source)
+
+    if len(tables) == 0:
+        tables = list(parsed.find_all(exp.Table))
 
     return tables
 
@@ -96,19 +99,14 @@ def get_tables(query: str, dialect: str):
     except Exception as e:
         return {"tables": [], "error": str(e)}
     
-
     tables = []
-
     for parsedSingle in parsed:
-        print("running", exp)
-        # print(list(parsedSingle.find_all(exp.Table)))
-
-
         try:
-            tables.extend(extract_tables(parsedSingle))
+            extracted = extract_tables(parsedSingle)
+            tables.extend(extracted)
         except Exception as e:
             return {"tables": [], "error": str(e)}
-
+       
     return {
         "tables": list(set([get_table_name(table) for table in tables])),
     }
