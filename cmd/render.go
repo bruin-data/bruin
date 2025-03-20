@@ -227,27 +227,32 @@ func (r *RenderCommand) Run(task *pipeline.Asset, foundPipeline *pipeline.Pipeli
 	if task == nil {
 		return errors.New("failed to find the asset: asset cannot be nil")
 	}
-	var materialized string
-	hasMaterializer := false
-	if materializer, ok := r.materializers[task.Type]; ok {
-		materialized, err = materializer.Render(task, task.ExecutableFile.Content)
-		hasMaterializer = true
-		if err != nil {
-			r.printErrorOrJsonf("Failed to materialize the query: %v\n", err.Error())
-			return cli.Exit("", 1)
-		}
-	} else {
-		materialized = task.ExecutableFile.Content
-	}
 
-	queries, err := r.extractor.ExtractQueriesFromString(materialized)
+	queries, err := r.extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
 	if err != nil {
 		r.printErrorOrJSON(err.Error())
 		return cli.Exit("", 1)
 	}
 
 	qq := queries[0]
-	if hasMaterializer {
+
+	if materializer, ok := r.materializers[task.Type]; ok {
+		materialized, err := materializer.Render(task, qq.Query)
+		if err != nil {
+			r.printErrorOrJsonf("Failed to materialize the query: %v\n", err.Error())
+			return cli.Exit("", 1)
+		}
+
+		qq.Query = materialized
+		if task.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
+			var rextractedQueries []*query.Query
+			rextractedQueries, err = r.extractor.ExtractQueriesFromString(materialized)
+			if err != nil {
+				r.printErrorOrJSON(err.Error())
+				return cli.Exit("", 1)
+			}
+			qq.Query = rextractedQueries[0].Query
+		}
 		if r.output != "json" {
 			qq.Query = highlightCode(qq.Query, "sql")
 		}

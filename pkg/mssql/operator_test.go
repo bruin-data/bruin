@@ -54,10 +54,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "failed to extract queries",
 			setup: func(f *fields) {
-				f.m.On("Render", mock.AnythingOfType("*pipeline.Asset"), "some content").
-					Return("some materialized content", nil)
-
-				f.e.On("ExtractQueriesFromString", "some materialized content").
+				f.e.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{}, errors.New("failed to extract queries"))
 			},
 			args: args{
@@ -73,10 +70,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "no queries found in file",
 			setup: func(f *fields) {
-				f.m.On("Render", mock.AnythingOfType("*pipeline.Asset"), "some content").
-					Return("some materialized content", nil)
-
-				f.e.On("ExtractQueriesFromString", "some materialized content").
+				f.e.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{}, nil)
 			},
 			args: args{
@@ -92,14 +86,11 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "multiple queries found but materialization is enabled, should fail",
 			setup: func(f *fields) {
-				f.m.On("Render", mock.AnythingOfType("*pipeline.Asset"), "some content").
-					Return("some materialized content", nil)
-
-				f.e.On("ExtractQueriesFromString", "some materialized content").
+				f.e.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{
 						{Query: "query 1"},
 						{Query: "query 2"},
-					}, errors.New("materialization with multiple queries are not allowed"))
+					}, nil)
 			},
 			args: args{
 				t: &pipeline.Asset{
@@ -117,13 +108,13 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "query returned an error",
 			setup: func(f *fields) {
-				f.m.On("Render", mock.AnythingOfType("*pipeline.Asset"), "some content").
-					Return("some materialized content", nil)
-
-				f.e.On("ExtractQueriesFromString", "some materialized content").
+				f.e.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{
 						{Query: "select * from users"},
 					}, nil)
+
+				f.m.On("Render", mock.Anything, "select * from users").
+					Return("select * from users", nil)
 
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).
 					Return(errors.New("failed to run query"))
@@ -142,13 +133,13 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "query successfully executed",
 			setup: func(f *fields) {
-				f.m.On("Render", mock.AnythingOfType("*pipeline.Asset"), "some content").
-					Return("some materialized content", nil)
-
-				f.e.On("ExtractQueriesFromString", "some materialized content").
+				f.e.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{
 						{Query: "select * from users"},
 					}, nil)
+
+				f.m.On("Render", mock.Anything, "select * from users").
+					Return("select * from users", nil)
 
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).
 					Return(nil)
@@ -167,17 +158,16 @@ func TestBasicOperator_RunTask(t *testing.T) {
 		{
 			name: "query successfully executed with materialization",
 			setup: func(f *fields) {
-				f.m.On("Render", mock.AnythingOfType("*pipeline.Asset"), "some content").
-					Return("some materialized content", nil)
-
-				f.e.On("ExtractQueriesFromString", "some materialized content").
+				f.e.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{
-						{Query: "CREATE TABLE x AS select * from users"},
+						{Query: "select * from users"},
 					}, nil)
+
+				f.m.On("Render", mock.Anything, "select * from users").
+					Return("CREATE TABLE x AS select * from users", nil)
 
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE TABLE x AS select * from users"}).
 					Return(nil)
-				f.m.On("IsFullRefresh").Return(false)
 			},
 			args: args{
 				t: &pipeline.Asset{

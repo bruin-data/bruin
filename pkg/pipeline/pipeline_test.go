@@ -61,6 +61,7 @@ func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 				Type:    "asset",
 				Value:   "gcs-to-bq",
 				Columns: make([]pipeline.DependsColumn, 0),
+				Mode:    pipeline.UpstreamModeFull,
 			},
 		},
 		Columns:      make([]pipeline.Column, 0),
