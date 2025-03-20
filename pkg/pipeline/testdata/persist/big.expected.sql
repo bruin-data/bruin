@@ -141,6 +141,7 @@ custom_checks:
         and date_trunc(StartDateDt, month) = "2022-06-01"
         and credits_spent =1
   - name: Laura Roberts has none cancelled booking in June
+    value: 0
     query: |
       SELECT
         count(*)
@@ -198,6 +199,7 @@ custom_checks:
         and credits_spent =1
         and Status = "Finished"
   - name: Mark Pringle has none rebooking in June
+    value: 0
     query: |
       WITH
       user_coach_bookings as
@@ -217,6 +219,7 @@ custom_checks:
               sum(rebookings) as rebookings,
           from user_coach_bookings
   - name: row counts must be equal
+    value: 0
     query: |-
       select
       (
