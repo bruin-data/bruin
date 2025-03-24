@@ -391,7 +391,6 @@ func TestDB_IsValid(t *testing.T) {
 	}
 }
 
-
 func TestDB_GetDatabaseSummary(t *testing.T) {
 	t.Parallel()
 
@@ -409,9 +408,9 @@ func TestDB_GetDatabaseSummary(t *testing.T) {
 					pgconn.FieldDescription{Name: "schema_name"},
 					pgconn.FieldDescription{Name: "table_name"},
 				).
-				AddRow("database1", "schema1", "table1").
-				AddRow("database1", "schema1", "table2").
-				AddRow("database2", "schema2", "table2")
+					AddRow("database1", "schema1", "table1").
+					AddRow("database1", "schema1", "table2").
+					AddRow("database2", "schema2", "table2")
 
 				mock.ExpectQuery(".*").WillReturnRows(rows)
 			},

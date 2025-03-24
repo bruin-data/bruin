@@ -98,7 +98,7 @@ def get_tables(query: str, dialect: str):
             return {"tables": [], "error": "unable to parse query"}
     except Exception as e:
         return {"tables": [], "error": str(e)}
-    
+
     tables = []
     for parsedSingle in parsed:
         try:
@@ -106,7 +106,7 @@ def get_tables(query: str, dialect: str):
             tables.extend(extracted)
         except Exception as e:
             return {"tables": [], "error": str(e)}
-       
+
     return {
         "tables": list(set([get_table_name(table) for table in tables])),
     }

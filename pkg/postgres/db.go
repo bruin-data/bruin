@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
-
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -142,7 +141,8 @@ FROM
 WHERE
     table_schema NOT IN ('pg_catalog', 'information_schema') AND table_type = 'BASE TABLE'
 ORDER BY table_catalog, table_schema, table_name;
-`}
+`,
+	}
 
 	// Execute the query
 	result, err := c.SelectWithSchema(ctx, q)
@@ -184,7 +184,7 @@ ORDER BY table_catalog, table_schema, table_name;
 
 		// Add table to schema
 		table := &ansisql.DBTable{
-			Name:    tableName,
+			Name: tableName,
 		}
 		schemas[schemaKey].Tables = append(schemas[schemaKey].Tables, table)
 	}

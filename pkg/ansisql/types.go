@@ -1,7 +1,7 @@
 package ansisql
 
 type DBDatabase struct {
-	Name string
+	Name    string
 	Schemas []*DBSchema
 }
 
@@ -19,26 +19,26 @@ func (d *DBDatabase) TableExists(schema, table string) bool {
 }
 
 type DBSchema struct {
-	Name string
+	Name   string
 	Tables []*DBTable
 }
- 
+
 type DBTable struct {
-	Name string
+	Name    string
 	Columns []*DBColumn
 }
 
 type DBColumn struct {
-	Name string
-	Type string
-	Nullable bool
+	Name       string
+	Type       string
+	Nullable   bool
 	PrimaryKey bool
-	Unique bool	
+	Unique     bool
 }
 
 type DBColumnType struct {
-	Name string
-	Size int
+	Name      string
+	Size      int
 	Precision int
-	Scale int
+	Scale     int
 }

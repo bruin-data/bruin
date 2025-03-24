@@ -105,17 +105,14 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	assetName := t.Name
-	assetNameParts := strings.Split(assetName, ".")
-	if len(assetNameParts) != 2 {
+	env, ok := ctx.Value(config.EnvironmentContextKey).(*config.Environment)
+	if !ok {
 		return conn.RunQueryWithoutResult(ctx, q)
 	}
 
-	schemaName := assetNameParts[0]
-	tableName := assetNameParts[1]
-
-	env, ok := ctx.Value(config.EnvironmentContextKey).(*config.Environment)
-	if !ok {
+	assetName := t.Name
+	assetNameParts := strings.Split(assetName, ".")
+	if len(assetNameParts) != 2 {
 		return conn.RunQueryWithoutResult(ctx, q)
 	}
 
@@ -150,8 +147,11 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	renameMapping := map[string]string{
-		t.Name: fmt.Sprintf("%s_%s.%s", env.SchemaPrefix, schemaName, tableName),
+	renameMapping := map[string]string{}
+
+	if strings.HasPrefix(assetNameParts[0], env.SchemaPrefix) {
+		originalAssetName := strings.TrimPrefix(assetName, env.SchemaPrefix)
+		renameMapping[originalAssetName] = assetName
 	}
 
 	for _, tableReference := range usedTables {
@@ -161,7 +161,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 		schema := parts[0]
 		table := parts[1]
-		devSchema := env.SchemaPrefix + "_" + schema
+		devSchema := env.SchemaPrefix + schema
 		devTable := fmt.Sprintf("%s.%s", devSchema, table)
 
 		for _, db := range dbSummary {

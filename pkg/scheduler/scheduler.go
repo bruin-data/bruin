@@ -321,14 +321,6 @@ func (s *Scheduler) InstanceCountByStatus(status TaskInstanceStatus) int {
 	return count
 }
 
-func (s *Scheduler) PrefixAssetNamesForDevelopmentEnvironments(prefix string) int {
-	for _, i := range s.taskInstances {
-		i.GetAsset()
-	}
-
-	return count
-}
-
 func (s *Scheduler) MarkAll(status TaskInstanceStatus) {
 	for _, instance := range s.taskInstances {
 		instance.MarkAs(status)

@@ -1,5 +1,5 @@
 import pytest
-from sqlglot import parse, parse_one
+from sqlglot import parse
 
 from .rename import replace_table_references
 

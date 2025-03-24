@@ -193,15 +193,37 @@ func Run(isDebug *bool) *cli.Command {
 				return err
 			}
 
-			pipelineInfo, err := GetPipeline(c.Context, inputPath, runConfig, logger)
-			if err != nil {
-				return err
-			}
-
 			repoRoot, err := git.FindRepoFromPath(inputPath)
 			if err != nil {
 				errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
 				return cli.Exit("", 1)
+			}
+
+			configFilePath := runConfig.ConfigFilePath
+			if configFilePath == "" {
+				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
+			}
+			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+			if err != nil {
+				errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
+				return cli.Exit("", 1)
+			}
+
+			err = switchEnvironment(runConfig.Environment, runConfig.Force, cm, os.Stdin)
+			if err != nil {
+				return err
+			}
+
+			if cm.SelectedEnvironment.SchemaPrefix != "" {
+				DefaultPipelineBuilder.AddMutator(func(ctx context.Context, asset *pipeline.Asset, foundPipeline *pipeline.Pipeline) (*pipeline.Asset, error) {
+					asset.PrefixSchema(cm.SelectedEnvironment.SchemaPrefix)
+					return asset, nil
+				})
+			}
+
+			pipelineInfo, err := GetPipeline(c.Context, inputPath, runConfig, logger)
+			if err != nil {
+				return err
 			}
 
 			var task *pipeline.Asset
@@ -301,21 +323,6 @@ func Run(isDebug *bool) *cli.Command {
 
 			if filter.PushMetaData {
 				foundPipeline.MetadataPush.Global = true
-			}
-
-			configFilePath := runConfig.ConfigFilePath
-			if configFilePath == "" {
-				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
-			}
-			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
-			if err != nil {
-				errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
-				return cli.Exit("", 1)
-			}
-
-			err = switchEnvironment(runConfig.Environment, runConfig.Force, cm, os.Stdin)
-			if err != nil {
-				return err
 			}
 
 			connectionManager, errs := connection.NewManagerFromConfig(cm)

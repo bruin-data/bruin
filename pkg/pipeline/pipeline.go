@@ -636,7 +636,7 @@ func (a *Asset) PrefixSchema(prefix string) {
 
 	nameParts := strings.Split(a.Name, ".")
 	if len(nameParts) == 2 {
-		a.Name = prefix + "_" + nameParts[0] + "." + nameParts[1]
+		a.Name = prefix + nameParts[0] + "." + nameParts[1]
 	}
 }
 
