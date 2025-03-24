@@ -1347,7 +1347,7 @@ func WithMutate() CreatePipelineOption {
 	}
 }
 
-func (b *Builder) CreatePipelineFromPath(pathToPipeline string, opts ...CreatePipelineOption) (*Pipeline, error) {
+func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline string, opts ...CreatePipelineOption) (*Pipeline, error) {
 	config := createPipelineConfig{}
 	for _, opt := range opts {
 		opt(&config)
@@ -1409,7 +1409,7 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string, opts ...CreatePi
 		}
 
 		if config.isMutate {
-			task, err = b.MutateAsset(context.Background(), task, pipeline)
+			task, err = b.MutateAsset(ctx, task, pipeline)
 			if err != nil {
 				return nil, err
 			}

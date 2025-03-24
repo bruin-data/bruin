@@ -89,7 +89,7 @@ func ParsePipeline() *cli.Command {
 				errorPrinter: errorPrinter,
 			}
 
-			return r.ParsePipeline(c.Args().Get(0), c.Bool("column-lineage"), c.Bool("exp-slim-response"))
+			return r.ParsePipeline(c.Context, c.Args().Get(0), c.Bool("column-lineage"), c.Bool("exp-slim-response"))
 		},
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
@@ -120,7 +120,7 @@ type ParseCommand struct {
 	errorPrinter *color2.Color
 }
 
-func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool, slimResponse bool) error {
+func (r *ParseCommand) ParsePipeline(ctx context.Context, assetPath string, lineage bool, slimResponse bool) error {
 	// defer RecoverFromPanic()
 	var lineageWg conc.WaitGroup
 	var sqlParser *sqlparser.SQLParser
@@ -153,7 +153,7 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool, slimRespons
 		return cli.Exit("", 1)
 	}
 
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath, pipeline.WithMutate())
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, pipeline.WithMutate())
 	if err != nil {
 		printErrorJSON(err)
 
@@ -293,7 +293,7 @@ func (r *ParseCommand) Run(ctx context.Context, assetPath string, lineage bool) 
 	// column-level lineage requires the whole pipeline to be parsed by nature, therefore we need to use the default pipeline builder.
 	// however, since the primary usecase of this command requires speed, we'll use a faster alternative if there's no lineage requested.
 	if lineage {
-		foundPipeline, err = DefaultPipelineBuilder.CreatePipelineFromPath(pipelineDefinitionPath, pipeline.WithMutate())
+		foundPipeline, err = DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelineDefinitionPath, pipeline.WithMutate())
 	} else {
 		foundPipeline, err = pipeline.PipelineFromPath(pipelineDefinitionPath, afero.NewOsFs())
 	}

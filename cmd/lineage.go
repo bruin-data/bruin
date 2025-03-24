@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -34,7 +35,7 @@ func Lineage() *cli.Command {
 				errorPrinter: errorPrinter,
 			}
 
-			return r.Run(c.Args().Get(0), c.Bool("full"), c.String("output"))
+			return r.Run(c.Context, c.Args().Get(0), c.Bool("full"), c.String("output"))
 		},
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
@@ -53,7 +54,7 @@ type LineageCommand struct {
 	errorPrinter printer
 }
 
-func (r *LineageCommand) Run(assetPath string, fullLineage bool, output string) error {
+func (r *LineageCommand) Run(ctx context.Context, assetPath string, fullLineage bool, output string) error {
 	if assetPath == "" {
 		r.errorPrinter.Printf("Please give an asset path to get lineage of: bruin lineage <path to the asset definition>)\n")
 		return cli.Exit("", 1)
@@ -65,7 +66,7 @@ func (r *LineageCommand) Run(assetPath string, fullLineage bool, output string) 
 		return cli.Exit("", 1)
 	}
 
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath)
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath)
 	if err != nil {
 		r.errorPrinter.Println("failed to build pipeline, are you sure you have referred the right path?")
 		r.errorPrinter.Println("\nHint: You need to run this command with a path to the asset file itself directly, and it needs to be inside a pipeline.")
