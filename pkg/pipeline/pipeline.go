@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -1263,17 +1264,24 @@ type glossaryReader interface {
 	GetEntities(pathToPipeline string) ([]*glossary.Entity, error)
 }
 
+type assetMutator func(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error)
+
 type Builder struct {
 	config             BuilderConfig
 	yamlTaskCreator    TaskCreator
 	commentTaskCreator TaskCreator
 	fs                 afero.Fs
+	mutators           []assetMutator
 
 	GlossaryReader glossaryReader
 }
 
 func (b *Builder) SetGlossaryReader(reader glossaryReader) {
 	b.GlossaryReader = reader
+}
+
+func (b *Builder) AddMutator(m assetMutator) {
+	b.mutators = append(b.mutators, m)
 }
 
 type ParseError struct {
@@ -1285,13 +1293,20 @@ func (e ParseError) Error() string {
 }
 
 func NewBuilder(config BuilderConfig, yamlTaskCreator TaskCreator, commentTaskCreator TaskCreator, fs afero.Fs, gr glossaryReader) *Builder {
-	return &Builder{
+	b := &Builder{
 		config:             config,
 		yamlTaskCreator:    yamlTaskCreator,
 		commentTaskCreator: commentTaskCreator,
 		fs:                 fs,
 		GlossaryReader:     gr,
 	}
+
+	b.mutators = []assetMutator{
+		b.fillGlossaryStuff,
+		b.setupDefaultsFromPipeline,
+	}
+
+	return b
 }
 
 func matchPipelineFileName(filePath string, validFileNames []string) bool {
@@ -1394,7 +1409,7 @@ func (b *Builder) CreatePipelineFromPath(pathToPipeline string, opts ...CreatePi
 		}
 
 		if config.isMutate {
-			task, err = b.MutateAsset(task, pipeline)
+			task, err = b.MutateAsset(context.Background(), task, pipeline)
 			if err != nil {
 				return nil, err
 			}
@@ -1497,73 +1512,110 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 	return task, nil
 }
 
-func (b *Builder) MutateAsset(task *Asset, foundPipeline *Pipeline) (*Asset, error) {
-	if foundPipeline != nil && b.GlossaryReader != nil && task != nil {
-		entities, err := b.GlossaryReader.GetEntities(foundPipeline.DefinitionFile.Path)
+func (b *Builder) MutateAsset(ctx context.Context, task *Asset, foundPipeline *Pipeline) (*Asset, error) {
+	for _, mutator := range b.mutators {
+		var err error
+		task, err = mutator(ctx, task, foundPipeline)
 		if err != nil {
-			return nil, errors.Wrap(err, "error getting entities")
-		}
-
-		cache := make(map[string][]Column)
-		cacheEntityColumns := make(map[string]bool)
-		for _, column := range task.Columns {
-			cacheEntityColumns[column.Extends] = true
-		}
-
-		for _, entity := range entities {
-			attributeNames := make([]string, 0, len(entity.Attributes))
-			for attrName := range entity.Attributes {
-				attributeNames = append(attributeNames, attrName)
-			}
-			sort.Strings(attributeNames)
-
-			cache[entity.Name] = make([]Column, 0)
-			for _, attrName := range attributeNames {
-				attribute := entity.Attributes[attrName]
-				if _, ok := cacheEntityColumns[fmt.Sprintf("%s.%s", entity.Name, attribute.Name)]; !ok {
-					cache[entity.Name] = append(cache[entity.Name], Column{
-						EntityAttribute: &EntityAttribute{
-							Entity:    entity.Name,
-							Attribute: attribute.Name,
-						},
-					})
-				}
-			}
-		}
-
-		for _, extend := range task.Extends {
-			task.Columns = append(task.Columns, cache[extend]...)
-		}
-	}
-	if foundPipeline != nil && foundPipeline.DefaultValues != nil && task != nil {
-		if len(task.Type) == 0 && len(foundPipeline.DefaultValues.Type) > 0 {
-			task.Type = AssetType(foundPipeline.DefaultValues.Type)
-		}
-
-		// merge parameters from the default values to task parameters
-		if len(task.Parameters) == 0 {
-			task.Parameters = EmptyStringMap{}
-		}
-
-		for key, value := range foundPipeline.DefaultValues.Parameters {
-			if _, exists := task.Parameters[key]; !exists {
-				task.Parameters[key] = value
-			}
-		}
-		// merge secrets from the default values to task secrets
-		existingSecrets := make(map[string]bool)
-		for _, secret := range task.Secrets {
-			existingSecrets[secret.SecretKey] = true
-		}
-		for _, secret := range foundPipeline.DefaultValues.Secrets {
-			secretMap := SecretMapping(secret)
-			if !existingSecrets[secretMap.SecretKey] {
-				task.Secrets = append(task.Secrets, secretMap)
-			}
+			return nil, err
 		}
 	}
 
 	return task, nil
+}
+
+func (b *Builder) setupDefaultsFromPipeline(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
+	if foundPipeline == nil {
+		return asset, nil
+	}
+
+	if foundPipeline.DefaultValues == nil {
+		return asset, nil
+	}
+
+	if asset == nil {
+		return asset, nil
+	}
+
+	if len(asset.Type) == 0 && len(foundPipeline.DefaultValues.Type) > 0 {
+		asset.Type = AssetType(foundPipeline.DefaultValues.Type)
+	}
+
+	// merge parameters from the default values to asset parameters
+	if len(asset.Parameters) == 0 {
+		asset.Parameters = EmptyStringMap{}
+	}
+
+	for key, value := range foundPipeline.DefaultValues.Parameters {
+		if _, exists := asset.Parameters[key]; !exists {
+			asset.Parameters[key] = value
+		}
+	}
+	// merge secrets from the default values to asset secrets
+	existingSecrets := make(map[string]bool)
+	for _, secret := range asset.Secrets {
+		existingSecrets[secret.SecretKey] = true
+	}
+	for _, secret := range foundPipeline.DefaultValues.Secrets {
+		secretMap := SecretMapping(secret)
+		if !existingSecrets[secretMap.SecretKey] {
+			asset.Secrets = append(asset.Secrets, secretMap)
+		}
+	}
+
+	return asset, nil
+}
+
+func (b *Builder) fillGlossaryStuff(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
+	if foundPipeline == nil {
+		return asset, nil
+	}
+
+	if b.GlossaryReader == nil {
+		return asset, nil
+	}
+
+	if asset == nil {
+		return asset, nil
+	}
+
+	entities, err := b.GlossaryReader.GetEntities(foundPipeline.DefinitionFile.Path)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting entities")
+	}
+
+	cache := make(map[string][]Column)
+	cacheEntityColumns := make(map[string]bool)
+	for _, column := range asset.Columns {
+		cacheEntityColumns[column.Extends] = true
+	}
+
+	for _, entity := range entities {
+		attributeNames := make([]string, 0, len(entity.Attributes))
+		for attrName := range entity.Attributes {
+			attributeNames = append(attributeNames, attrName)
+		}
+		sort.Strings(attributeNames)
+
+		cache[entity.Name] = make([]Column, 0)
+		for _, attrName := range attributeNames {
+			attribute := entity.Attributes[attrName]
+			if _, ok := cacheEntityColumns[fmt.Sprintf("%s.%s", entity.Name, attribute.Name)]; !ok {
+				cache[entity.Name] = append(cache[entity.Name], Column{
+					EntityAttribute: &EntityAttribute{
+						Entity:    entity.Name,
+						Attribute: attribute.Name,
+					},
+				})
+			}
+		}
+	}
+
+	for _, extend := range asset.Extends {
+		asset.Columns = append(asset.Columns, cache[extend]...)
+	}
+
+	return asset, nil
 }
 
 func (a *Asset) IsSQLAsset() bool {

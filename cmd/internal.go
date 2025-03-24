@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -308,7 +309,7 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 		return cli.Exit("", 1)
 	}
 
-	asset, err = DefaultPipelineBuilder.MutateAsset(asset, foundPipeline)
+	asset, err = DefaultPipelineBuilder.MutateAsset(context.Background(), asset, foundPipeline)
 	if err != nil {
 		printErrorJSON(err)
 		return cli.Exit("", 1)
@@ -385,7 +386,7 @@ func PatchAsset() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			asset, err = DefaultPipelineBuilder.MutateAsset(asset, nil)
+			asset, err = DefaultPipelineBuilder.MutateAsset(context.Background(), asset, nil)
 			if err != nil {
 				printErrorJSON(errors2.Wrap(err, "failed to patch the asset with the given json body"))
 				return cli.Exit("", 1)

@@ -211,7 +211,7 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to build asset: %v\n", err)
 					return cli.Exit("", 1)
 				}
-				task, err = DefaultPipelineBuilder.MutateAsset(task, nil)
+				task, err = DefaultPipelineBuilder.MutateAsset(context.Background(), task, nil)
 				if err != nil {
 					errorPrinter.Printf("Failed to mutate asset: %v\n", err)
 					return cli.Exit("", 1)
@@ -458,7 +458,7 @@ func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.S
 			}, err
 		}
 
-		task, err = DefaultPipelineBuilder.MutateAsset(task, foundPipeline)
+		task, err = DefaultPipelineBuilder.MutateAsset(context.Background(), task, foundPipeline)
 		if err != nil {
 			errorPrinter.Printf("Failed to mutate asset: %v\n", err)
 			return &PipelineInfo{
