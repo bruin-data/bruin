@@ -131,7 +131,8 @@ func (c *Connections) buildConnectionKeyMap() {
 }
 
 type Environment struct {
-	Connections *Connections `yaml:"connections" json:"connections" mapstructure:"connections"`
+	Connections  *Connections `yaml:"connections" json:"connections" mapstructure:"connections"`
+	SchemaPrefix string       `yaml:"schema_prefix,omitempty" json:"schema_prefix" mapstructure:"schema_prefix"`
 }
 
 func (e *Environment) GetSecretByKey(key string) (string, error) {
@@ -147,6 +148,12 @@ func (e *Environment) GetSecretByKey(key string) (string, error) {
 	res, err := json.Marshal(v)
 	return string(res), err
 }
+
+type EnvContextKey string
+
+const (
+	EnvironmentContextKey EnvContextKey = "environment"
+)
 
 type Config struct {
 	fs   afero.Fs
@@ -208,6 +215,9 @@ func (c *Config) SelectEnvironment(name string) error {
 	c.SelectedEnvironment = &e
 	c.SelectedEnvironmentName = name
 	c.SelectedEnvironment.Connections.buildConnectionKeyMap()
+	if c.SelectedEnvironment.SchemaPrefix != "" && !strings.HasSuffix(c.SelectedEnvironment.SchemaPrefix, "_") {
+		c.SelectedEnvironment.SchemaPrefix += "_"
+	}
 	return nil
 }
 

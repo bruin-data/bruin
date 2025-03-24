@@ -2,7 +2,7 @@ import pytest
 from sqlglot import parse_one
 from sqlglot.optimizer import optimize
 
-from .main import get_column_lineage, extract_non_selected_columns, Column
+from .main import get_column_lineage, extract_non_selected_columns, Column, get_tables
 
 SCHEMA = {
     "orders": {
@@ -1853,3 +1853,15 @@ def test_extract_non_select_column(query, schema, expected, dialect):
     optimized = optimize(parsed, schema, dialect=dialect)
     result = extract_non_selected_columns(optimized)
     assert result == expected
+
+
+def test_get_tables():
+    dialect = "bigquery"
+
+    query = "SELECT * FROM table1"
+    expected = {"tables": ["table1"]}
+    assert get_tables(query, dialect) == expected
+
+    query = """CREATE TABLE public.example AS SELECT 1 AS id, 'Spain' AS country, 'Juan' AS name UNION ALL SELECT 2 AS id, 'Germany' AS country, 'Markus' AS name UNION ALL SELECT 3 AS id, 'France' AS country, 'Antoine' AS name UNION ALL SELECT 4 AS id, 'Poland' AS country, 'Franciszek' AS name"""
+    expected = {"tables": ["public.example"]}
+    assert get_tables(query, dialect) == expected

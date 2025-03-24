@@ -1,7 +1,7 @@
 /* @bruin
 
 name: public.example
-type: rs.sql
+type: pg.sql
 
 materialization:
    type: table

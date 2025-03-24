@@ -26,6 +26,16 @@ func (m *mockQuerierWithResult) Select(ctx context.Context, q *query.Query) ([][
 	return get.([][]interface{}), args.Error(1)
 }
 
+func (m *mockQuerierWithResult) GetDatabaseSummary(ctx context.Context) ([]ansisql.DBDatabase, error) {
+	args := m.Called(ctx)
+	get := args.Get(0)
+	if get == nil {
+		return nil, args.Error(1)
+	}
+
+	return get.([]ansisql.DBDatabase), args.Error(1)
+}
+
 func (m *mockQuerierWithResult) SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error) {
 	args := m.Called(ctx, q)
 	get := args.Get(0)
