@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -55,7 +56,7 @@ func ParseAsset() *cli.Command {
 				errorPrinter: errorPrinter,
 			}
 
-			return r.Run(c.Args().Get(0), c.Bool("column-lineage"))
+			return r.Run(c.Context, c.Args().Get(0), c.Bool("column-lineage"))
 		},
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
@@ -88,7 +89,7 @@ func ParsePipeline() *cli.Command {
 				errorPrinter: errorPrinter,
 			}
 
-			return r.ParsePipeline(c.Args().Get(0), c.Bool("column-lineage"), c.Bool("exp-slim-response"))
+			return r.ParsePipeline(c.Context, c.Args().Get(0), c.Bool("column-lineage"), c.Bool("exp-slim-response"))
 		},
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
@@ -119,7 +120,7 @@ type ParseCommand struct {
 	errorPrinter *color2.Color
 }
 
-func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool, slimResponse bool) error {
+func (r *ParseCommand) ParsePipeline(ctx context.Context, assetPath string, lineage bool, slimResponse bool) error {
 	// defer RecoverFromPanic()
 	var lineageWg conc.WaitGroup
 	var sqlParser *sqlparser.SQLParser
@@ -152,7 +153,7 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool, slimRespons
 		return cli.Exit("", 1)
 	}
 
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath, pipeline.WithMutate())
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, pipeline.WithMutate())
 	if err != nil {
 		printErrorJSON(err)
 
@@ -235,7 +236,7 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool, slimRespons
 	return err
 }
 
-func (r *ParseCommand) Run(assetPath string, lineage bool) error {
+func (r *ParseCommand) Run(ctx context.Context, assetPath string, lineage bool) error {
 	defer RecoverFromPanic()
 
 	var lineageWg conc.WaitGroup
@@ -292,7 +293,7 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 	// column-level lineage requires the whole pipeline to be parsed by nature, therefore we need to use the default pipeline builder.
 	// however, since the primary usecase of this command requires speed, we'll use a faster alternative if there's no lineage requested.
 	if lineage {
-		foundPipeline, err = DefaultPipelineBuilder.CreatePipelineFromPath(pipelineDefinitionPath, pipeline.WithMutate())
+		foundPipeline, err = DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelineDefinitionPath, pipeline.WithMutate())
 	} else {
 		foundPipeline, err = pipeline.PipelineFromPath(pipelineDefinitionPath, afero.NewOsFs())
 	}
@@ -308,7 +309,7 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 		return cli.Exit("", 1)
 	}
 
-	asset, err = DefaultPipelineBuilder.MutateAsset(asset, foundPipeline)
+	asset, err = DefaultPipelineBuilder.MutateAsset(ctx, asset, foundPipeline)
 	if err != nil {
 		printErrorJSON(err)
 		return cli.Exit("", 1)
@@ -385,7 +386,7 @@ func PatchAsset() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			asset, err = DefaultPipelineBuilder.MutateAsset(asset, nil)
+			asset, err = DefaultPipelineBuilder.MutateAsset(c.Context, asset, nil)
 			if err != nil {
 				printErrorJSON(errors2.Wrap(err, "failed to patch the asset with the given json body"))
 				return cli.Exit("", 1)

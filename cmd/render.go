@@ -128,7 +128,7 @@ func Render() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			asset, err = DefaultPipelineBuilder.MutateAsset(asset, pl)
+			asset, err = DefaultPipelineBuilder.MutateAsset(c.Context, asset, pl)
 			if err != nil {
 				printError(errors.New("failed to mutate the asset"), c.String("output"), "Failed to mutate the asset:")
 				return cli.Exit("", 1)
