@@ -185,7 +185,7 @@ func prepareAssetQuery(c *cli.Context, fs afero.Fs) (interface{}, string, error)
 	assetPath := c.String("asset")
 	env := c.String("env")
 
-	pipelineInfo, err := GetPipelineAndAsset(assetPath, fs)
+	pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "failed to get pipeline info")
 	}
@@ -359,7 +359,7 @@ func handleError(output string, err error) error {
 	return cli.Exit("", 1)
 }
 
-func GetPipelineAndAsset(inputPath string, fs afero.Fs) (*ppInfo, error) {
+func GetPipelineAndAsset(ctx context.Context, inputPath string, fs afero.Fs) (*ppInfo, error) {
 	repoRoot, err := git.FindRepoFromPath(inputPath)
 	if err != nil {
 		errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
@@ -382,7 +382,7 @@ func GetPipelineAndAsset(inputPath string, fs afero.Fs) (*ppInfo, error) {
 		errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
 		return nil, err
 	}
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath, pipeline.WithMutate())
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, pipeline.WithMutate())
 	if err != nil {
 		errorPrinter.Println("failed to get the pipeline this asset belongs to, are you sure you have referred the right path?")
 		errorPrinter.Println("\nHint: You need to run this command with a path to the asset file itself directly.")
@@ -409,7 +409,7 @@ func prepareAutoDetectQuery(c *cli.Context, fs afero.Fs) (interface{}, string, e
 	queryStr := c.String("query")
 	env := c.String("env")
 
-	pipelineInfo, err := GetPipelineAndAsset(assetPath, fs)
+	pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "failed to get pipeline info")
 	}

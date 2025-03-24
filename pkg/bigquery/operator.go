@@ -43,6 +43,7 @@ func NewBasicOperator(conn connectionFetcher, extractor queryExtractor, material
 func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	return o.RunTask(ctx, ti.GetPipeline(), ti.GetAsset())
 }
+
 func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
 	queries, err := o.extractor.ExtractQueriesFromString(t.ExecutableFile.Content)
 	if err != nil {

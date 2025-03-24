@@ -193,7 +193,7 @@ func Run(isDebug *bool) *cli.Command {
 				return err
 			}
 
-			pipelineInfo, err := GetPipeline(inputPath, runConfig, logger)
+			pipelineInfo, err := GetPipeline(c.Context, inputPath, runConfig, logger)
 			if err != nil {
 				return err
 			}
@@ -211,7 +211,7 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to build asset: %v\n", err)
 					return cli.Exit("", 1)
 				}
-				task, err = DefaultPipelineBuilder.MutateAsset(task, nil)
+				task, err = DefaultPipelineBuilder.MutateAsset(c.Context, task, nil)
 				if err != nil {
 					errorPrinter.Printf("Failed to mutate asset: %v\n", err)
 					return cli.Exit("", 1)
@@ -412,7 +412,7 @@ func ReadState(fs afero.Fs, statePath string, filter *Filter) (*scheduler.Pipeli
 	return pipelineState, nil
 }
 
-func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.SugaredLogger) (*PipelineInfo, error) {
+func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.RunConfig, logger *zap.SugaredLogger) (*PipelineInfo, error) {
 	pipelinePath := inputPath
 	runningForAnAsset := isPathReferencingAsset(inputPath)
 	if runningForAnAsset && runConfig.Tag != "" {
@@ -435,7 +435,7 @@ func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.S
 		}
 	}
 
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(pipelinePath, pipeline.WithMutate())
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, pipeline.WithMutate())
 	if err != nil {
 		errorPrinter.Println("failed to build pipeline, are you sure you have referred the right path?")
 		errorPrinter.Println("\nHint: You need to run this command with a path to either the pipeline directory or the asset file itself directly.")
@@ -458,7 +458,7 @@ func GetPipeline(inputPath string, runConfig *scheduler.RunConfig, logger *zap.S
 			}, err
 		}
 
-		task, err = DefaultPipelineBuilder.MutateAsset(task, foundPipeline)
+		task, err = DefaultPipelineBuilder.MutateAsset(ctx, task, foundPipeline)
 		if err != nil {
 			errorPrinter.Printf("Failed to mutate asset: %v\n", err)
 			return &PipelineInfo{

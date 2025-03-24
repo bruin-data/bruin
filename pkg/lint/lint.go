@@ -22,7 +22,7 @@ type (
 )
 
 type pipelineBuilder interface {
-	CreatePipelineFromPath(pathToPipeline string, opts ...pipeline.CreatePipelineOption) (*pipeline.Pipeline, error)
+	CreatePipelineFromPath(ctx context.Context, pathToPipeline string, opts ...pipeline.CreatePipelineOption) (*pipeline.Pipeline, error)
 }
 
 type Issue struct {
@@ -207,7 +207,7 @@ func (l *Linter) extractPipelinesFromPath(rootPath string, pipelineDefinitionFil
 	for _, pipelinePath := range pipelinePaths {
 		l.logger.Debugf("creating pipeline from path '%s'", pipelinePath)
 
-		p, err := l.builder.CreatePipelineFromPath(pipelinePath, pipeline.WithMutate())
+		p, err := l.builder.CreatePipelineFromPath(context.Background(), pipelinePath, pipeline.WithMutate())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating pipeline from path '%s'", pipelinePath)
 		}
