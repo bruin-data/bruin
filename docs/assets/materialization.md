@@ -258,6 +258,6 @@ SELECT
 The strategy will:
 1. Begin a transaction
 2. Delete existing records within the specified time interval
-3. Insert new records from the same time interval
+3. Insert new records from the query given in the asset
 
 
