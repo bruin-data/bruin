@@ -56,7 +56,7 @@ func ParseAsset() *cli.Command {
 				errorPrinter: errorPrinter,
 			}
 
-			return r.Run(c.Args().Get(0), c.Bool("column-lineage"))
+			return r.Run(c.Context, c.Args().Get(0), c.Bool("column-lineage"))
 		},
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
@@ -236,7 +236,7 @@ func (r *ParseCommand) ParsePipeline(assetPath string, lineage bool, slimRespons
 	return err
 }
 
-func (r *ParseCommand) Run(assetPath string, lineage bool) error {
+func (r *ParseCommand) Run(ctx context.Context, assetPath string, lineage bool) error {
 	defer RecoverFromPanic()
 
 	var lineageWg conc.WaitGroup
@@ -309,7 +309,7 @@ func (r *ParseCommand) Run(assetPath string, lineage bool) error {
 		return cli.Exit("", 1)
 	}
 
-	asset, err = DefaultPipelineBuilder.MutateAsset(context.Background(), asset, foundPipeline)
+	asset, err = DefaultPipelineBuilder.MutateAsset(ctx, asset, foundPipeline)
 	if err != nil {
 		printErrorJSON(err)
 		return cli.Exit("", 1)
@@ -386,7 +386,7 @@ func PatchAsset() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			asset, err = DefaultPipelineBuilder.MutateAsset(context.Background(), asset, nil)
+			asset, err = DefaultPipelineBuilder.MutateAsset(c.Context, asset, nil)
 			if err != nil {
 				printErrorJSON(errors2.Wrap(err, "failed to patch the asset with the given json body"))
 				return cli.Exit("", 1)
