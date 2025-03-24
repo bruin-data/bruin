@@ -191,6 +191,42 @@ func (s *SQLParser) UsedTables(sql, dialect string) ([]string, error) {
 	return tables.Tables, nil
 }
 
+func (s *SQLParser) RenameTables(sql string, dialect string, tableMapping map[string]string) (string, error) {
+	err := s.Start()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to start sql parser")
+	}
+
+	command := parserCommand{
+		Command: "replace-table-references",
+		Contents: map[string]interface{}{
+			"query":         sql,
+			"dialect":       dialect,
+			"table_mapping": tableMapping,
+		},
+	}
+
+	responsePayload, err := s.sendCommand(&command)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to send command")
+	}
+
+	var resp struct {
+		Query string `json:"query"`
+		Error string `json:"error"`
+	}
+	err = json.Unmarshal([]byte(responsePayload), &resp)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to unmarshal response")
+	}
+
+	if resp.Error != "" {
+		return "", errors.New(resp.Error)
+	}
+
+	return resp.Query, nil
+}
+
 func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
