@@ -108,6 +108,7 @@ type TaskInstance interface {
 	Blocking() bool
 
 	GetUpstream() []TaskInstance
+	GetUpstreamMode(name string) pipeline.UpstreamMode
 	GetDownstream() []TaskInstance
 	AddUpstream(t TaskInstance)
 	AddDownstream(t TaskInstance)
@@ -201,6 +202,15 @@ func (t *AssetInstance) GetType() TaskInstanceType {
 
 func (t *AssetInstance) GetUpstream() []TaskInstance {
 	return t.upstream
+}
+
+func (t *AssetInstance) GetUpstreamMode(name string) pipeline.UpstreamMode {
+	for _, upstream := range t.GetAsset().Upstreams {
+		if upstream.Value == name {
+			return upstream.Mode
+		}
+	}
+	return pipeline.UpstreamModeFull
 }
 
 func (t *AssetInstance) GetDownstream() []TaskInstance {
@@ -694,17 +704,18 @@ func (s *Scheduler) allDependenciesSucceededForTask(t TaskInstance) bool {
 	if len(t.GetUpstream()) == 0 {
 		return true
 	}
+
 	for _, upstream := range t.GetUpstream() {
-		for _, task := range upstream.GetAsset().Upstreams {
-			if task.Value == t.GetAsset().Name {
-				if task.Mode == pipeline.UpstreamModeSymbolic {
-					return false
-				}
-				break
-			}
+		if upstream.GetUpstreamMode(upstream.GetAsset().Name) == pipeline.UpstreamModeSymbolic {
+			continue
 		}
+
 		status := upstream.GetStatus()
 		if status == Pending || status == Queued || status == Running {
+			return false
+		}
+
+		if status == Failed || status == UpstreamFailed {
 			return false
 		}
 	}
