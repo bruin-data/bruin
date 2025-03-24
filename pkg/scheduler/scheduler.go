@@ -694,8 +694,15 @@ func (s *Scheduler) allDependenciesSucceededForTask(t TaskInstance) bool {
 	if len(t.GetUpstream()) == 0 {
 		return true
 	}
-
 	for _, upstream := range t.GetUpstream() {
+		for _, task := range upstream.GetAsset().Upstreams {
+			if task.Value == t.GetAsset().Name {
+				if task.Mode == pipeline.UpstreamModeSymbolic {
+					return false
+				}
+				break
+			}
+		}
 		status := upstream.GetStatus()
 		if status == Pending || status == Queued || status == Running {
 			return false
