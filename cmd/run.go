@@ -326,8 +326,6 @@ func Run(isDebug *bool) *cli.Command {
 
 			s := scheduler.NewScheduler(logger, foundPipeline, runID)
 
-			mutators := NewFilterMutators(filter, s, foundPipeline)
-
 			if c.Bool("continue") {
 				if err := s.RestoreState(pipelineState); err != nil {
 					errorPrinter.Printf("Failed to restore state: %v\n", err)
@@ -337,7 +335,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			if !c.Bool("continue") {
 				// Apply the filter to mark assets based on include/exclude tags
-				if err := mutators.ApplyAllFilters(s); err != nil {
+				if err := ApplyAllFilters(context.Background(), filter, s, foundPipeline); err != nil {
 					errorPrinter.Printf("Failed to filter assets: %v\n", err)
 					return cli.Exit("", 1)
 				}
@@ -977,7 +975,7 @@ type Filter struct {
 	ExcludeTag        string
 }
 
-func (f *Filter) HandleSingleTask(s *scheduler.Scheduler) error {
+func HandleSingleTask(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
 	if f.SingleTask == nil {
 		return nil
 	}
@@ -993,7 +991,7 @@ func (f *Filter) HandleSingleTask(s *scheduler.Scheduler) error {
 	return nil
 }
 
-func (f *Filter) HandleIncludeTag(s *scheduler.Scheduler, p *pipeline.Pipeline) error {
+func HandleIncludeTags(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
 	if f.IncludeTag == "" {
 		return nil
 	}
@@ -1007,7 +1005,7 @@ func (f *Filter) HandleIncludeTag(s *scheduler.Scheduler, p *pipeline.Pipeline) 
 	return nil
 }
 
-func (f *Filter) HandleExcludeTag(s *scheduler.Scheduler, p *pipeline.Pipeline) error {
+func HandleExcludeTags(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
 	if f.ExcludeTag == "" {
 		return nil
 	}
@@ -1020,7 +1018,7 @@ func (f *Filter) HandleExcludeTag(s *scheduler.Scheduler, p *pipeline.Pipeline) 
 	return nil
 }
 
-func (f *Filter) HandleTaskTypes(s *scheduler.Scheduler) error {
+func FilterTaskTypes(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
 	if len(f.OnlyTaskTypes) > 0 {
 		for _, taskType := range f.OnlyTaskTypes {
 			if taskType != "main" && taskType != "checks" && taskType != "push-metadata" {
@@ -1046,54 +1044,28 @@ func (f *Filter) HandleTaskTypes(s *scheduler.Scheduler) error {
 	return nil
 }
 
-func (f *Filter) HandlePushMetaData(p *pipeline.Pipeline) error {
+func HandlePushMetaData(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
 	if f.PushMetaData {
 		p.MetadataPush.Global = true
 	}
 	return nil
 }
 
-type FilterMutators struct {
-	HandleSingleTask   func() error
-	HandleIncludeTags  func() error
-	HandleExcludeTags  func() error
-	HandlePushMetaData func() error
-	FilterTaskTypes    func() error
-}
+type FilterMutator func(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error
 
-func NewFilterMutators(f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) *FilterMutators {
-	return &FilterMutators{
-		HandleIncludeTags: func() error {
-			return f.HandleIncludeTag(s, p)
-		},
-		HandleExcludeTags: func() error {
-			return f.HandleExcludeTag(s, p)
-		},
-		HandleSingleTask: func() error {
-			return f.HandleSingleTask(s)
-		},
-		HandlePushMetaData: func() error {
-			return f.HandlePushMetaData(p)
-		},
-		FilterTaskTypes: func() error {
-			return f.HandleTaskTypes(s)
-		},
-	}
-}
-
-func (fm *FilterMutators) ApplyAllFilters(s *scheduler.Scheduler) error {
+func ApplyAllFilters(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
 	s.MarkAll(scheduler.Pending)
 
-	funcs := []func() error{
-		fm.HandleSingleTask,
-		fm.HandleIncludeTags,
-		fm.HandleExcludeTags,
-		fm.HandlePushMetaData,
-		fm.FilterTaskTypes,
+	funcs := []FilterMutator{
+		HandleSingleTask,
+		HandleIncludeTags,
+		HandleExcludeTags,
+		HandlePushMetaData,
+		FilterTaskTypes,
 	}
 
 	for _, filterFunc := range funcs {
-		if err := filterFunc(); err != nil {
+		if err := filterFunc(ctx, f, s, p); err != nil {
 			return err
 		}
 	}
