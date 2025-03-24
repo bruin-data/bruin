@@ -981,8 +981,11 @@ func TestApplyFilters(t *testing.T) {
 			logger := zap.NewNop().Sugar()
 			s := scheduler.NewScheduler(logger, tt.pipeline, "test")
 
+			// Create FilterMutators
+			mutators := NewFilterMutators(tt.filter, s, tt.pipeline)
+
 			// Act
-			err := tt.filter.ApplyFiltersAndMarkAssets(tt.pipeline, s)
+			err := mutators.ApplyAllFilters(s)
 
 			// Assert
 			if tt.expectError {
