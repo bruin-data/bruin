@@ -1019,6 +1019,9 @@ func HandleExcludeTags(ctx context.Context, f *Filter, s *scheduler.Scheduler, p
 }
 
 func FilterTaskTypes(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
+	if f.PushMetaData {
+		p.MetadataPush.Global = true
+	}
 	if len(f.OnlyTaskTypes) > 0 {
 		for _, taskType := range f.OnlyTaskTypes {
 			if taskType != "main" && taskType != "checks" && taskType != "push-metadata" {
@@ -1044,13 +1047,6 @@ func FilterTaskTypes(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *
 	return nil
 }
 
-func HandlePushMetaData(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
-	if f.PushMetaData {
-		p.MetadataPush.Global = true
-	}
-	return nil
-}
-
 type FilterMutator func(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error
 
 func ApplyAllFilters(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
@@ -1060,7 +1056,6 @@ func ApplyAllFilters(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *
 		HandleSingleTask,
 		HandleIncludeTags,
 		HandleExcludeTags,
-		HandlePushMetaData,
 		FilterTaskTypes,
 	}
 
