@@ -158,6 +158,7 @@ class Redshift(Postgres):
         SUPPORTS_CONVERT_TIMEZONE = True
         EXCEPT_INTERSECT_SUPPORT_ALL_CLAUSE = False
         SUPPORTS_MEDIAN = True
+        ALTER_SET_TYPE = "TYPE"
 
         # Redshift doesn't have `WITH` as part of their with_properties so we remove it
         WITH_PROPERTIES_PREFIX = " "
@@ -165,6 +166,7 @@ class Redshift(Postgres):
         TYPE_MAPPING = {
             **Postgres.Generator.TYPE_MAPPING,
             exp.DataType.Type.BINARY: "VARBYTE",
+            exp.DataType.Type.BLOB: "VARBYTE",
             exp.DataType.Type.INT: "INTEGER",
             exp.DataType.Type.TIMETZ: "TIME",
             exp.DataType.Type.TIMESTAMPTZ: "TIMESTAMP",

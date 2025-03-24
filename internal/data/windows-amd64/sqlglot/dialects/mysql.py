@@ -12,7 +12,6 @@ from sqlglot.dialects.dialect import (
     build_formatted_time,
     isnull_to_is_null,
     length_or_char_length_sql,
-    locate_to_strposition,
     max_or_greatest,
     min_or_least,
     no_ilike_sql,
@@ -23,11 +22,12 @@ from sqlglot.dialects.dialect import (
     build_date_delta,
     build_date_delta_with_interval,
     rename_func,
-    strposition_to_locate_sql,
+    strposition_sql,
     unit_to_var,
     trim_sql,
     timestrtotime_sql,
 )
+from sqlglot.generator import unsupported_args
 from sqlglot.helper import seq_get
 from sqlglot.tokens import TokenType
 
@@ -192,6 +192,7 @@ class MySQL(Dialect):
             "CHARSET": TokenType.CHARACTER_SET,
             # The DESCRIBE and EXPLAIN statements are synonyms.
             # https://dev.mysql.com/doc/refman/8.4/en/explain.html
+            "BLOB": TokenType.BLOB,
             "EXPLAIN": TokenType.DESCRIBE,
             "FORCE": TokenType.FORCE,
             "IGNORE": TokenType.IGNORE,
@@ -299,6 +300,7 @@ class MySQL(Dialect):
             "CONVERT_TZ": lambda args: exp.ConvertTimezone(
                 source_tz=seq_get(args, 1), target_tz=seq_get(args, 2), timestamp=seq_get(args, 0)
             ),
+            "CURDATE": exp.CurrentDate.from_arg_list,
             "DATE": lambda args: exp.TsOrDsToDate(this=seq_get(args, 0)),
             "DATE_ADD": build_date_delta_with_interval(exp.DateAdd),
             "DATE_FORMAT": build_formatted_time(exp.TimeToStr, "mysql"),
@@ -311,13 +313,14 @@ class MySQL(Dialect):
             "FROM_UNIXTIME": build_formatted_time(exp.UnixToTime, "mysql"),
             "ISNULL": isnull_to_is_null,
             "LENGTH": lambda args: exp.Length(this=seq_get(args, 0), binary=True),
-            "LOCATE": locate_to_strposition,
             "MAKETIME": exp.TimeFromParts.from_arg_list,
             "MONTH": lambda args: exp.Month(this=exp.TsOrDsToDate(this=seq_get(args, 0))),
             "MONTHNAME": lambda args: exp.TimeToStr(
                 this=exp.TsOrDsToDate(this=seq_get(args, 0)),
                 format=exp.Literal.string("%B"),
             ),
+            "SCHEMA": exp.CurrentSchema.from_arg_list,
+            "DATABASE": exp.CurrentSchema.from_arg_list,
             "STR_TO_DATE": _str_to_date,
             "TIMESTAMPDIFF": build_date_delta(exp.TimestampDiff),
             "TO_DAYS": lambda args: exp.paren(
@@ -435,6 +438,11 @@ class MySQL(Dialect):
         ALTER_PARSERS = {
             **parser.Parser.ALTER_PARSERS,
             "MODIFY": lambda self: self._parse_alter_table_alter(),
+        }
+
+        ALTER_ALTER_PARSERS = {
+            **parser.Parser.ALTER_ALTER_PARSERS,
+            "INDEX": lambda self: self._parse_alter_table_alter_index(),
         }
 
         SCHEMA_UNNAMED_CONSTRAINTS = {
@@ -691,6 +699,18 @@ class MySQL(Dialect):
                 on_condition=self._parse_on_condition(),
             )
 
+        def _parse_alter_table_alter_index(self) -> exp.AlterIndex:
+            index = self._parse_field(any_token=True)
+
+            if self._match_text_seq("VISIBLE"):
+                visible = True
+            elif self._match_text_seq("INVISIBLE"):
+                visible = False
+            else:
+                visible = None
+
+            return self.expression(exp.AlterIndex, this=index, visible=visible)
+
     class Generator(generator.Generator):
         INTERVAL_ALLOWS_PLURAL_FORM = False
         LOCKING_READS_SUPPORTED = True
@@ -750,7 +770,9 @@ class MySQL(Dialect):
                     transforms.unnest_generate_date_array_using_recursive_cte,
                 ]
             ),
-            exp.StrPosition: strposition_to_locate_sql,
+            exp.StrPosition: lambda self, e: strposition_sql(
+                self, e, func_name="LOCATE", supports_position=True
+            ),
             exp.StrToDate: _str_to_date_sql,
             exp.StrToTime: _str_to_date_sql,
             exp.Stuff: rename_func("INSERT"),
@@ -789,6 +811,7 @@ class MySQL(Dialect):
             exp.DataType.Type.USMALLINT: "SMALLINT",
             exp.DataType.Type.UTINYINT: "TINYINT",
             exp.DataType.Type.UDECIMAL: "DECIMAL",
+            exp.DataType.Type.UDOUBLE: "DOUBLE",
         }
 
         TIMESTAMP_TYPE_MAPPING = {
@@ -808,6 +831,7 @@ class MySQL(Dialect):
         TYPE_MAPPING.pop(exp.DataType.Type.MEDIUMTEXT)
         TYPE_MAPPING.pop(exp.DataType.Type.LONGTEXT)
         TYPE_MAPPING.pop(exp.DataType.Type.TINYTEXT)
+        TYPE_MAPPING.pop(exp.DataType.Type.BLOB)
         TYPE_MAPPING.pop(exp.DataType.Type.MEDIUMBLOB)
         TYPE_MAPPING.pop(exp.DataType.Type.LONGBLOB)
         TYPE_MAPPING.pop(exp.DataType.Type.TINYBLOB)
@@ -1265,3 +1289,7 @@ class MySQL(Dialect):
 
         def isascii_sql(self, expression: exp.IsAscii) -> str:
             return f"REGEXP_LIKE({self.sql(expression.this)}, '^[[:ascii:]]*$')"
+
+        @unsupported_args("this")
+        def currentschema_sql(self, expression: exp.CurrentSchema) -> str:
+            return self.func("SCHEMA")

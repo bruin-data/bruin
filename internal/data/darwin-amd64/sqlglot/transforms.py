@@ -258,7 +258,7 @@ def eliminate_qualify(expression: exp.Expression) -> exp.Expression:
         }
 
         select_candidates = exp.Window if expression.is_star else (exp.Window, exp.Column)
-        for select_candidate in qualify_filters.find_all(select_candidates):
+        for select_candidate in list(qualify_filters.find_all(select_candidates)):
             if isinstance(select_candidate, exp.Window):
                 if expression_by_alias:
                     for column in select_candidate.find_all(exp.Column):
@@ -907,16 +907,15 @@ def eliminate_join_marks(expression: exp.Expression) -> exp.Expression:
                 len(marked_column_tables) == 1
             ), "Columns of only a single table can be marked with (+) in a given binary predicate"
 
+            # Add predicate if join already copied, or add join if it is new
             join_this = old_joins.get(col.table, query_from).this
-            new_join = exp.Join(this=join_this, on=join_predicate, kind="LEFT")
-
-            # Upsert new_join into new_joins dictionary
-            new_join_alias_or_name = new_join.alias_or_name
-            existing_join = new_joins.get(new_join_alias_or_name)
+            existing_join = new_joins.get(join_this.alias_or_name)
             if existing_join:
-                existing_join.set("on", exp.and_(existing_join.args.get("on"), new_join.args["on"]))
+                existing_join.set("on", exp.and_(existing_join.args["on"], join_predicate))
             else:
-                new_joins[new_join_alias_or_name] = new_join
+                new_joins[join_this.alias_or_name] = exp.Join(
+                    this=join_this.copy(), on=join_predicate.copy(), kind="LEFT"
+                )
 
             # If the parent of the target predicate is a binary node, then it now has only one child
             if isinstance(predicate_parent, exp.Binary):
@@ -934,7 +933,8 @@ def eliminate_join_marks(expression: exp.Expression) -> exp.Expression:
             new_from_name = list(only_old_joins)[0]
             query.set("from", exp.From(this=old_joins[new_from_name].this))
 
-        query.set("joins", list(new_joins.values()))
+        if new_joins:
+            query.set("joins", list(new_joins.values()))
 
         if not where.this:
             where.pop()

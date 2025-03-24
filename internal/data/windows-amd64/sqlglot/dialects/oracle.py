@@ -6,10 +6,11 @@ from sqlglot import exp, generator, parser, tokens, transforms
 from sqlglot.dialects.dialect import (
     Dialect,
     NormalizationStrategy,
+    build_timetostr_or_tochar,
     build_formatted_time,
     no_ilike_sql,
     rename_func,
-    str_position_sql,
+    strposition_sql,
     to_number_with_nls_param,
     trim_sql,
 )
@@ -19,19 +20,6 @@ from sqlglot.tokens import TokenType
 
 if t.TYPE_CHECKING:
     from sqlglot._typing import E
-
-
-def _build_timetostr_or_tochar(args: t.List) -> exp.TimeToStr | exp.ToChar:
-    this = seq_get(args, 0)
-
-    if this and not this.type:
-        from sqlglot.optimizer.annotate_types import annotate_types
-
-        annotate_types(this)
-        if this.is_type(*exp.DataType.TEMPORAL_TYPES):
-            return build_formatted_time(exp.TimeToStr, "oracle", default=True)(args)
-
-    return exp.ToChar.from_arg_list(args)
 
 
 def _trim_sql(self: Oracle.Generator, expression: exp.Trim) -> str:
@@ -117,7 +105,7 @@ class Oracle(Dialect):
             **parser.Parser.FUNCTIONS,
             "NVL": lambda args: build_coalesce(args, is_nvl=True),
             "SQUARE": lambda args: exp.Pow(this=seq_get(args, 0), expression=exp.Literal.number(2)),
-            "TO_CHAR": _build_timetostr_or_tochar,
+            "TO_CHAR": build_timetostr_or_tochar,
             "TO_TIMESTAMP": build_formatted_time(exp.StrToTime, "oracle"),
             "TO_DATE": build_formatted_time(exp.StrToDate, "oracle"),
             "TRUNC": lambda args: exp.DateTrunc(
@@ -153,6 +141,7 @@ class Oracle(Dialect):
             and self.expression(exp.TemporaryProperty, this="GLOBAL"),
             "PRIVATE": lambda self: self._match_text_seq("TEMPORARY")
             and self.expression(exp.TemporaryProperty, this="PRIVATE"),
+            "FORCE": lambda self: self.expression(exp.ForceProperty),
         }
 
         QUERY_MODIFIER_PARSERS = {
@@ -266,10 +255,10 @@ class Oracle(Dialect):
 
         TYPE_MAPPING = {
             **generator.Generator.TYPE_MAPPING,
-            exp.DataType.Type.TINYINT: "NUMBER",
-            exp.DataType.Type.SMALLINT: "NUMBER",
-            exp.DataType.Type.INT: "NUMBER",
-            exp.DataType.Type.BIGINT: "NUMBER",
+            exp.DataType.Type.TINYINT: "SMALLINT",
+            exp.DataType.Type.SMALLINT: "SMALLINT",
+            exp.DataType.Type.INT: "INT",
+            exp.DataType.Type.BIGINT: "INT",
             exp.DataType.Type.DECIMAL: "NUMBER",
             exp.DataType.Type.DOUBLE: "DOUBLE PRECISION",
             exp.DataType.Type.VARCHAR: "VARCHAR2",
@@ -282,6 +271,7 @@ class Oracle(Dialect):
             exp.DataType.Type.VARBINARY: "BLOB",
             exp.DataType.Type.ROWVERSION: "BLOB",
         }
+        TYPE_MAPPING.pop(exp.DataType.Type.BLOB)
 
         TRANSFORMS = {
             **generator.Generator.TRANSFORMS,
@@ -300,8 +290,10 @@ class Oracle(Dialect):
                     transforms.eliminate_qualify,
                 ]
             ),
-            exp.StrPosition: lambda self, e: str_position_sql(
-                self, e, str_position_func_name="INSTR"
+            exp.StrPosition: lambda self, e: (
+                strposition_sql(
+                    self, e, func_name="INSTR", supports_position=True, supports_occurrence=True
+                )
             ),
             exp.StrToTime: lambda self, e: self.func("TO_TIMESTAMP", e.this, self.format_time(e)),
             exp.StrToDate: lambda self, e: self.func("TO_DATE", e.this, self.format_time(e)),

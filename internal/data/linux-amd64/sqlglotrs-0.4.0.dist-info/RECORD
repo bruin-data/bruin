@@ -1,0 +1,7 @@
+sqlglotrs-0.4.0.dist-info/INSTALLER,sha256=zuuue4knoyJ-UwPPXg8fezS7VCrXJQrAP7zeNuwvFQg,4
+sqlglotrs-0.4.0.dist-info/METADATA,sha256=PFQGTYBClp8MWd_-7LAjpJR0Vub1MmXaiGVZgB7Wyvw,545
+sqlglotrs-0.4.0.dist-info/RECORD,,
+sqlglotrs-0.4.0.dist-info/WHEEL,sha256=9eG-9PXVCQLiac52aWp6XMAtXo7kmcaYenxGAZuDM9c,129
+sqlglotrs/__init__.py,sha256=tCQ0zs3bLVVL6H7X2DkYps8LctVa1amhR952vNPJoIQ,119
+sqlglotrs/__pycache__/__init__.cpython-312.pyc,,
+sqlglotrs/sqlglotrs.cpython-312-x86_64-linux-gnu.so,sha256=YK9qHHhRdP67B9nWDU1Eo57q7vIRCAHcdEmsp3rpAyc,816960

@@ -16,14 +16,13 @@ from sqlglot.dialects.dialect import (
     left_to_substring_sql,
     no_ilike_sql,
     no_pivot_sql,
-    no_safe_divide_sql,
     no_timestamp_sql,
     regexp_extract_sql,
     rename_func,
     right_to_substring_sql,
     sha256_sql,
+    strposition_sql,
     struct_extract_sql,
-    str_position_sql,
     timestamptrunc_sql,
     timestrtotime_sql,
     ts_or_ds_add_cast,
@@ -223,6 +222,7 @@ class Presto(Dialect):
     }
 
     class Tokenizer(tokens.Tokenizer):
+        HEX_STRINGS = [("x'", "'"), ("X'", "'")]
         UNICODE_STRINGS = [
             (prefix + q, q)
             for q in t.cast(t.List[str], tokens.Tokenizer.QUOTES)
@@ -292,7 +292,7 @@ class Presto(Dialect):
             "SET_AGG": exp.ArrayUniqueAgg.from_arg_list,
             "SPLIT_TO_MAP": exp.StrToMap.from_arg_list,
             "STRPOS": lambda args: exp.StrPosition(
-                this=seq_get(args, 0), substr=seq_get(args, 1), instance=seq_get(args, 2)
+                this=seq_get(args, 0), substr=seq_get(args, 1), occurrence=seq_get(args, 2)
             ),
             "TO_CHAR": _build_to_char,
             "TO_UNIXTIME": exp.TimeToUnix.from_arg_list,
@@ -393,7 +393,6 @@ class Presto(Dialect):
             exp.Encode: lambda self, e: encode_decode_sql(self, e, "TO_UTF8"),
             exp.FileFormatProperty: lambda self, e: f"FORMAT='{e.name.upper()}'",
             exp.First: _first_last_sql,
-            exp.FirstValue: _first_last_sql,
             exp.FromTimeZone: lambda self,
             e: f"WITH_TIMEZONE({self.sql(e, 'this')}, {self.sql(e, 'zone')}) AT TIME ZONE 'UTC'",
             exp.GenerateSeries: sequence_sql,
@@ -402,9 +401,7 @@ class Presto(Dialect):
             exp.If: if_sql(),
             exp.ILike: no_ilike_sql,
             exp.Initcap: _initcap_sql,
-            exp.JSONExtract: lambda self, e: self.jsonextract_sql(e),
             exp.Last: _first_last_sql,
-            exp.LastValue: _first_last_sql,
             exp.LastDay: lambda self, e: self.func("LAST_DAY_OF_MONTH", e.this),
             exp.Lateral: explode_to_unnest_sql,
             exp.Left: left_to_substring_sql,
@@ -418,7 +415,6 @@ class Presto(Dialect):
             exp.RegexpExtract: regexp_extract_sql,
             exp.RegexpExtractAll: regexp_extract_sql,
             exp.Right: right_to_substring_sql,
-            exp.SafeDivide: no_safe_divide_sql,
             exp.Schema: _schema_sql,
             exp.SchemaCommentProperty: lambda self, e: self.naked_property(e),
             exp.Select: transforms.preprocess(
@@ -430,7 +426,7 @@ class Presto(Dialect):
                 ]
             ),
             exp.SortArray: _no_sort_array,
-            exp.StrPosition: lambda self, e: str_position_sql(self, e, generate_instance=True),
+            exp.StrPosition: lambda self, e: strposition_sql(self, e, supports_occurrence=True),
             exp.StrToDate: lambda self, e: f"CAST({_str_to_time_sql(self, e)} AS DATE)",
             exp.StrToMap: rename_func("SPLIT_TO_MAP"),
             exp.StrToTime: _str_to_time_sql,
