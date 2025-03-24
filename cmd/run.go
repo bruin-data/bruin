@@ -335,7 +335,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			if !c.Bool("continue") {
 				// Apply the filter to mark assets based on include/exclude tags
-				if err := filter.ApplyFiltersAndMarkAssets(foundPipeline, s); err != nil {
+				if err := ApplyAllFilters(context.Background(), filter, s, foundPipeline); err != nil {
 					errorPrinter.Printf("Failed to filter assets: %v\n", err)
 					return cli.Exit("", 1)
 				}
@@ -975,78 +975,94 @@ type Filter struct {
 	ExcludeTag        string
 }
 
-func (f *Filter) ApplyFiltersAndMarkAssets(pipeline *pipeline.Pipeline, s *scheduler.Scheduler) error {
-	// Initially mark all tasks as pending
-	s.MarkAll(scheduler.Pending)
-
-	// Handle single-task execution
-	if f.SingleTask != nil {
-		// Skip all other tasks
-		s.MarkAll(scheduler.Skipped)
-
-		// Mark the single task and optionally its downstream tasks
-		s.MarkAsset(f.SingleTask, scheduler.Pending, f.IncludeDownstream)
-		// Validate that --tag is not allowed with single task execution
-		if f.IncludeTag != "" {
-			return errors.New("you cannot use the '--tag' flag when running a single asset")
-		}
-
-		if f.ExcludeTag != "" {
-			return errors.New("you cannot use the '--exclude-tag' flag when running a single asset")
-		}
+func HandleSingleTask(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
+	if f.SingleTask == nil {
+		return nil
 	}
-	// Default task execution flags
-	runMain := true
-	runChecks := true
-	runPushMetadata := f.PushMetaData || pipeline.MetadataPush.HasAnyEnabled()
-
-	if runPushMetadata {
-		pipeline.MetadataPush.Global = true
+	s.MarkAll(scheduler.Skipped)
+	s.MarkAsset(f.SingleTask, scheduler.Pending, f.IncludeDownstream)
+	if f.IncludeTag != "" {
+		return errors.New("you cannot use the '--tag' flag when running a single asset")
 	}
 
-	// Apply task-type filtering if specified
+	if f.ExcludeTag != "" {
+		return errors.New("you cannot use the '--exclude-tag' flag when running a single asset")
+	}
+	return nil
+}
+
+func HandleIncludeTags(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
+	if f.IncludeTag == "" {
+		return nil
+	}
+	s.MarkAll(scheduler.Skipped)
+	includedAssets := p.GetAssetsByTag(f.IncludeTag)
+	if len(includedAssets) == 0 {
+		return fmt.Errorf("no assets found with include tag '%s'", f.IncludeTag)
+	}
+	s.MarkByTag(f.IncludeTag, scheduler.Pending, f.IncludeDownstream)
+
+	return nil
+}
+
+func HandleExcludeTags(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
+	if f.ExcludeTag == "" {
+		return nil
+	}
+	excludedAssets := p.GetAssetsByTag(f.ExcludeTag)
+	if len(excludedAssets) == 0 {
+		return fmt.Errorf("no assets found with exclude tag '%s'", f.ExcludeTag)
+	}
+	s.MarkByTag(f.ExcludeTag, scheduler.Skipped, f.IncludeDownstream)
+
+	return nil
+}
+
+func FilterTaskTypes(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
+	if f.PushMetaData {
+		p.MetadataPush.Global = true
+	}
 	if len(f.OnlyTaskTypes) > 0 {
-		// Validate the provided task types
 		for _, taskType := range f.OnlyTaskTypes {
 			if taskType != "main" && taskType != "checks" && taskType != "push-metadata" {
 				return fmt.Errorf("invalid value for '--only' flag: '%s', available values are 'main', 'checks', and 'push-metadata'", taskType)
 			}
 		}
 
-		// Update task execution flags based on filtering
-		runMain = slices.Contains(f.OnlyTaskTypes, "main")
-		runChecks = slices.Contains(f.OnlyTaskTypes, "checks")
-		runPushMetadata = slices.Contains(f.OnlyTaskTypes, "push-metadata")
-	}
-	// Handle include tag: Mark included assets as pending
-	if f.IncludeTag != "" {
-		includedAssets := pipeline.GetAssetsByTag(f.IncludeTag)
-		if len(includedAssets) == 0 {
-			return fmt.Errorf("no assets found with include tag '%s'", f.IncludeTag)
+		runMain := slices.Contains(f.OnlyTaskTypes, "main")
+		runChecks := slices.Contains(f.OnlyTaskTypes, "checks")
+		runPushMetadata := slices.Contains(f.OnlyTaskTypes, "push-metadata")
+
+		if !runMain {
+			s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeMain, scheduler.Skipped)
 		}
-		s.MarkAll(scheduler.Skipped) // Skip everything first
-		s.MarkByTag(f.IncludeTag, scheduler.Pending, f.IncludeDownstream)
+		if !runChecks {
+			s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeColumnCheck, scheduler.Skipped)
+			s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeCustomCheck, scheduler.Skipped)
+		}
+		if !runPushMetadata {
+			s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeMetadataPush, scheduler.Skipped)
+		}
+	}
+	return nil
+}
+
+type FilterMutator func(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error
+
+func ApplyAllFilters(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
+	s.MarkAll(scheduler.Pending)
+
+	funcs := []FilterMutator{
+		HandleSingleTask,
+		HandleIncludeTags,
+		HandleExcludeTags,
+		FilterTaskTypes,
 	}
 
-	// Handle  exclude tag: Mark excluded assets as pending
-	if f.ExcludeTag != "" {
-		excludedAssets := pipeline.GetAssetsByTag(f.ExcludeTag)
-		if len(excludedAssets) == 0 {
-			return fmt.Errorf("no assets found with exclude tag '%s'", f.ExcludeTag)
+	for _, filterFunc := range funcs {
+		if err := filterFunc(ctx, f, s, p); err != nil {
+			return err
 		}
-		s.MarkByTag(f.ExcludeTag, scheduler.Skipped, f.IncludeDownstream)
 	}
-	// Mark tasks in the scheduler
-	if !runMain {
-		s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeMain, scheduler.Skipped)
-	}
-	if !runChecks {
-		s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeColumnCheck, scheduler.Skipped)
-		s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeCustomCheck, scheduler.Skipped)
-	}
-	if !runPushMetadata {
-		s.MarkPendingInstancesByType(scheduler.TaskInstanceTypeMetadataPush, scheduler.Skipped)
-	}
-
 	return nil
 }

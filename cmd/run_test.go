@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 	"time"
@@ -981,8 +982,10 @@ func TestApplyFilters(t *testing.T) {
 			logger := zap.NewNop().Sugar()
 			s := scheduler.NewScheduler(logger, tt.pipeline, "test")
 
+			// Create FilterMutators
+
 			// Act
-			err := tt.filter.ApplyFiltersAndMarkAssets(tt.pipeline, s)
+			err := ApplyAllFilters(context.Background(), tt.filter, s, tt.pipeline)
 
 			// Assert
 			if tt.expectError {
