@@ -324,6 +324,16 @@
           }
         ]
       }
+    },
+    "env-run-non-wait-symbolic": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-env-run-non-wait-symbolic",
+            "path": "integration-tests/duckdb-files/env-run-non-wait-symbolic.db"
+          }
+        ]
+      }
     }
   }
 }

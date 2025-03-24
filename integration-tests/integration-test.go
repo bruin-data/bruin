@@ -414,7 +414,6 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Command: binary,
 			Args:    []string{"run", "--env", "env-run-with-tags", "--tag", "include", "--exclude-tag", "exclude", "--start-date", "2024-01-01", "--end-date", "2024-12-31", filepath.Join(currentFolder, "test-pipelines/run-with-tags-pipeline")},
 			Env:     []string{},
-
 			Expected: e2e.Output{
 				ExitCode: 0,
 			},
@@ -821,6 +820,20 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Expected: e2e.Output{
 				ExitCode: 0,
 				Contains: []string{"Successfully validated 1 assets", "Executed 1 tasks", "Finished: materialize.country"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "run-non-wait-symbolic",
+			Command: binary,
+			Args:    []string{"run", "--env", "env-run-non-wait-symbolic", filepath.Join(currentFolder, "test-pipelines/run-non-wait-symbolic")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 1,
+				Contains: []string{"Starting: example", "Finished: example", "Catalog Error: Table with name my does not exist!", "Failed: my-other-asset"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
