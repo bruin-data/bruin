@@ -142,19 +142,22 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string, location string
 	if asset.Materialization.TimeGranularity == "" {
 		return nil, errors.New("time_granularity is required for time_interval strategy")
 	}
-
+	timePrefix := "timestamp"
 	startVar := "{{start_timestamp}}"
 	endVar := "{{end_timestamp}}"
 	if asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate {
 		startVar = "{{start_date}}"
 		endVar = "{{end_date}}"
+		timePrefix = "date"
 	}
 
 	queries := []string{
-		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
+		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN %s '%s' AND %s '%s'`,
 			asset.Name,
 			asset.Materialization.IncrementalKey,
+			timePrefix,
 			startVar,
+			timePrefix,
 			endVar),
 		fmt.Sprintf(`INSERT INTO %s %s`,
 			asset.Name, query),
