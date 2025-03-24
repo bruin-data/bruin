@@ -217,7 +217,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
 			want: []string{
-				"DELETE FROM my.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}'",
+				"DELETE FROM my.asset WHERE ts BETWEEN timestamp '{{start_timestamp}}' AND timestamp '{{end_timestamp}}'",
 				"INSERT INTO my.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
 			},
 		},
@@ -234,7 +234,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
 			want: []string{
-				"DELETE FROM my.asset WHERE dt BETWEEN '{{start_date}}' AND '{{end_date}}'",
+				"DELETE FROM my.asset WHERE dt BETWEEN date '{{start_date}}' AND date '{{end_date}}'",
 				"INSERT INTO my.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
 			},
 		},
