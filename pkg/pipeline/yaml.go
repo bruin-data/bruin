@@ -417,6 +417,9 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			cols = append(cols, DependsColumn(col))
 		}
 
+		if dep.Mode == "" {
+			dep.Mode = UpstreamModeFull
+		}
 		upstreams[index] = Upstream{
 			Value:   dep.Value,
 			Type:    dep.Type,
