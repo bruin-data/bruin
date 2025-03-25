@@ -17,6 +17,7 @@ from sqlglot.dialects.dialect import (
     min_or_least,
     build_date_delta,
     rename_func,
+    strposition_sql,
     trim_sql,
     timestrtotime_sql,
 )
@@ -524,7 +525,7 @@ class TSQL(Dialect):
             "TOP": TokenType.TOP,
             "TIMESTAMP": TokenType.ROWVERSION,
             "TINYINT": TokenType.UTINYINT,
-            "UNIQUEIDENTIFIER": TokenType.UNIQUEIDENTIFIER,
+            "UNIQUEIDENTIFIER": TokenType.UUID,
             "UPDATE STATISTICS": TokenType.COMMAND,
             "XML": TokenType.XML,
         }
@@ -543,6 +544,13 @@ class TSQL(Dialect):
             **parser.Parser.QUERY_MODIFIER_PARSERS,
             TokenType.OPTION: lambda self: ("options", self._parse_options()),
         }
+
+        # T-SQL does not allow BEGIN to be used as an identifier
+        ID_VAR_TOKENS = parser.Parser.ID_VAR_TOKENS - {TokenType.BEGIN}
+        ALIAS_TOKENS = parser.Parser.ALIAS_TOKENS - {TokenType.BEGIN}
+        TABLE_ALIAS_TOKENS = parser.Parser.TABLE_ALIAS_TOKENS - {TokenType.BEGIN}
+        COMMENT_TABLE_ALIAS_TOKENS = parser.Parser.COMMENT_TABLE_ALIAS_TOKENS - {TokenType.BEGIN}
+        UPDATE_ALIAS_TOKENS = parser.Parser.UPDATE_ALIAS_TOKENS - {TokenType.BEGIN}
 
         FUNCTIONS = {
             **parser.Parser.FUNCTIONS,
@@ -571,9 +579,11 @@ class TSQL(Dialect):
             "JSON_VALUE": parser.build_extract_json_with_path(exp.JSONExtractScalar),
             "LEN": _build_with_arg_as_text(exp.Length),
             "LEFT": _build_with_arg_as_text(exp.Left),
+            "NEWID": exp.Uuid.from_arg_list,
             "RIGHT": _build_with_arg_as_text(exp.Right),
             "PARSENAME": _build_parsename,
             "REPLICATE": exp.Repeat.from_arg_list,
+            "SCHEMA_NAME": exp.CurrentSchema.from_arg_list,
             "SQUARE": lambda args: exp.Pow(this=seq_get(args, 0), expression=exp.Literal.number(2)),
             "SYSDATETIME": exp.CurrentTimestamp.from_arg_list,
             "SUSER_NAME": exp.CurrentUser.from_arg_list,
@@ -588,6 +598,8 @@ class TSQL(Dialect):
         PROCEDURE_OPTIONS = dict.fromkeys(
             ("ENCRYPTION", "RECOMPILE", "SCHEMABINDING", "NATIVE_COMPILATION", "EXECUTE"), tuple()
         )
+
+        COLUMN_DEFINITION_MODES = {"OUT", "OUTPUT", "READ_ONLY"}
 
         RETURNS_TABLE_TOKENS = parser.Parser.ID_VAR_TOKENS - {
             TokenType.TABLE,
@@ -727,6 +739,18 @@ class TSQL(Dialect):
             convert.set("strict", strict)
             return convert
 
+        def _parse_column_def(
+            self, this: t.Optional[exp.Expression], computed_column: bool = True
+        ) -> t.Optional[exp.Expression]:
+            this = super()._parse_column_def(this=this, computed_column=computed_column)
+            if not this:
+                return None
+            if self._match(TokenType.EQ):
+                this.set("default", self._parse_disjunction())
+            if self._match_texts(self.COLUMN_DEFINITION_MODES):
+                this.set("output", self._prev.text)
+            return this
+
         def _parse_user_defined_function(
             self, kind: t.Optional[TokenType] = None
         ) -> t.Optional[exp.Expression]:
@@ -768,7 +792,7 @@ class TSQL(Dialect):
 
             if isinstance(create, exp.Create):
                 table = create.this.this if isinstance(create.this, exp.Schema) else create.this
-                if isinstance(table, exp.Table) and table.this.args.get("temporary"):
+                if isinstance(table, exp.Table) and table.this and table.this.args.get("temporary"):
                     if not create.args.get("properties"):
                         create.set("properties", exp.Properties(expressions=[]))
 
@@ -896,6 +920,7 @@ class TSQL(Dialect):
             exp.DataType.Type.SMALLDATETIME: "SMALLDATETIME",
             exp.DataType.Type.UTINYINT: "TINYINT",
             exp.DataType.Type.VARIANT: "SQL_VARIANT",
+            exp.DataType.Type.UUID: "UNIQUEIDENTIFIER",
         }
 
         TYPE_MAPPING.pop(exp.DataType.Type.NCHAR)
@@ -926,6 +951,7 @@ class TSQL(Dialect):
             exp.Min: min_or_least,
             exp.NumberToStr: _format_sql,
             exp.Repeat: rename_func("REPLICATE"),
+            exp.CurrentSchema: rename_func("SCHEMA_NAME"),
             exp.Select: transforms.preprocess(
                 [
                     transforms.eliminate_distinct_on,
@@ -935,8 +961,8 @@ class TSQL(Dialect):
                 ]
             ),
             exp.Stddev: rename_func("STDEV"),
-            exp.StrPosition: lambda self, e: self.func(
-                "CHARINDEX", e.args.get("substr"), e.this, e.args.get("position")
+            exp.StrPosition: lambda self, e: strposition_sql(
+                self, e, func_name="CHARINDEX", supports_position=True
             ),
             exp.Subquery: transforms.preprocess([qualify_derived_table_outputs]),
             exp.SHA: lambda self, e: self.func("HASHBYTES", exp.Literal.string("SHA1"), e.this),
@@ -950,6 +976,7 @@ class TSQL(Dialect):
             exp.TsOrDsAdd: date_delta_sql("DATEADD", cast=True),
             exp.TsOrDsDiff: date_delta_sql("DATEDIFF"),
             exp.TimestampTrunc: lambda self, e: self.func("DATETRUNC", e.unit, e.this),
+            exp.Uuid: lambda *_: "NEWID()",
             exp.DateFromParts: rename_func("DATEFROMPARTS"),
         }
 
@@ -964,14 +991,22 @@ class TSQL(Dialect):
             return f"{scope_name}::{rhs}"
 
         def select_sql(self, expression: exp.Select) -> str:
-            if expression.args.get("offset"):
+            limit = expression.args.get("limit")
+            offset = expression.args.get("offset")
+
+            if isinstance(limit, exp.Fetch) and not offset:
+                # Dialects like Oracle can FETCH directly from a row set but
+                # T-SQL requires an ORDER BY + OFFSET clause in order to FETCH
+                offset = exp.Offset(expression=exp.Literal.number(0))
+                expression.set("offset", offset)
+
+            if offset:
                 if not expression.args.get("order"):
                     # ORDER BY is required in order to use OFFSET in a query, so we use
                     # a noop order by, since we don't really care about the order.
                     # See: https://www.microsoftpressstore.com/articles/article.aspx?p=2314819
                     expression.order_by(exp.select(exp.null()).subquery(), copy=False)
 
-                limit = expression.args.get("limit")
                 if isinstance(limit, exp.Limit):
                     # TOP and OFFSET can't be combined, we need use FETCH instead of TOP
                     # we replace here because otherwise TOP would be generated in select_sql
@@ -1247,20 +1282,6 @@ class TSQL(Dialect):
                 expression.this.set("catalog", None)
             return super().drop_sql(expression)
 
-        def declare_sql(self, expression: exp.Declare) -> str:
-            return f"DECLARE {self.expressions(expression, flat=True)}"
-
-        def declareitem_sql(self, expression: exp.DeclareItem) -> str:
-            variable = self.sql(expression, "this")
-            default = self.sql(expression, "default")
-            default = f" = {default}" if default else ""
-
-            kind = self.sql(expression, "kind")
-            if isinstance(expression.args.get("kind"), exp.Schema):
-                kind = f"TABLE {kind}"
-
-            return f"{variable} AS {kind}{default}"
-
         def options_modifier(self, expression: exp.Expression) -> str:
             options = self.expressions(expression, key="options")
             return f" OPTION{self.wrap(options)}" if options else ""
@@ -1272,3 +1293,11 @@ class TSQL(Dialect):
 
         def isascii_sql(self, expression: exp.IsAscii) -> str:
             return f"(PATINDEX(CONVERT(VARCHAR(MAX), 0x255b5e002d7f5d25) COLLATE Latin1_General_BIN, {self.sql(expression.this)}) = 0)"
+
+        def columndef_sql(self, expression: exp.ColumnDef, sep: str = " ") -> str:
+            this = super().columndef_sql(expression, sep)
+            default = self.sql(expression, "default")
+            default = f" = {default}" if default else ""
+            output = self.sql(expression, "output")
+            output = f" {output}" if output else ""
+            return f"{this}{default}{output}"
