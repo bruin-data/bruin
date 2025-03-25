@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from sqlglot import parse_one, exp, lineage
+from sqlglot import parse_one, parse, exp, lineage
 from sqlglot.lineage import Node
 from sqlglot.optimizer import optimize
 from sqlglot.optimizer.scope import find_all_in_scope, build_scope
@@ -49,13 +49,16 @@ def extract_non_selected_columns(parsed: exp.Select) -> list[Column]:
 def extract_tables(parsed):
     root = build_scope(parsed)
     if root is None:
-        raise Exception("unable to build scope")
+        return list(parsed.find_all(exp.Table))
 
     tables = []
     for scope in root.traverse():
         for alias, (node, source) in scope.selected_sources.items():
             if isinstance(source, exp.Table):
                 tables.append(source)
+
+    if len(tables) == 0:
+        tables = list(parsed.find_all(exp.Table))
 
     return tables
 
@@ -90,16 +93,19 @@ def get_table_name(table: exp.Table):
 
 def get_tables(query: str, dialect: str):
     try:
-        parsed = parse_one(query, dialect=dialect)
+        parsed = parse(query, dialect=dialect)
         if parsed is None:
             return {"tables": [], "error": "unable to parse query"}
     except Exception as e:
         return {"tables": [], "error": str(e)}
 
-    try:
-        tables = extract_tables(parsed)
-    except Exception as e:
-        return {"tables": [], "error": str(e)}
+    tables = []
+    for parsedSingle in parsed:
+        try:
+            extracted = extract_tables(parsedSingle)
+            tables.extend(extracted)
+        except Exception as e:
+            return {"tables": [], "error": str(e)}
 
     return {
         "tables": list(set([get_table_name(table) for table in tables])),
@@ -264,3 +270,18 @@ def schema_dict_to_schema_object(schema_dict: dict) -> dict:
         current[parts[-1]] = value
 
     return result
+
+
+def replace_table_references(
+    query: str, dialect: str, table_references: dict[str, str]
+):
+    parsed = parse_one(query, dialect=dialect)
+    if parsed is None:
+        return {"error": "unable to parse query"}
+
+    for table_name, new_table_name in table_references.items():
+        for table in parsed.find_all(exp.Table):
+            if table.name == table_name:
+                table.name = new_table_name
+
+    return parsed.sql()

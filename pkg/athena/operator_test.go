@@ -24,6 +24,7 @@ func (m *mockExtractor) ExtractQueriesFromSlice(content []string) ([]*query.Quer
 	res := m.Called(content)
 	return res.Get(0).([]*query.Query), res.Error(1)
 }
+
 func (m *mockExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
 	res := m.Called(content)
 	return res.Get(0).([]string), res.Error(1)
