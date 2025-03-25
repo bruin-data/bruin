@@ -204,7 +204,7 @@ func TestApplyFilters(t *testing.T) {
 				},
 				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
 			},
-			filter:          &Filter{IncludeDownstream: true},
+			filter:          &Filter{IncludeDownstream: false},
 			expectedPending: []string{"Task1"},
 			expectError:     false,
 		},
@@ -264,9 +264,9 @@ func TestApplyFilters(t *testing.T) {
 				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
 			},
 			filter:          &Filter{IncludeDownstream: true, IncludeTag: "tag1"},
-			expectedPending: []string{"Task1", "Task2", "Task3"},
-			expectError:     false,
-		},
+			expectedPending: []string{},
+			expectError:     true,
+			expectedError:   "cannot use the --downstream flag when running the whole pipeline"},
 		{
 			name: "Only Check Task Type",
 			pipeline: &pipeline.Pipeline{
@@ -502,11 +502,9 @@ func TestApplyFilters(t *testing.T) {
 				IncludeDownstream: true,
 				IncludeTag:        "tag1",
 			},
-			expectedPending: []string{
-				"Task0", "Task1", "Task4", "Task5", "Task6", "Task7", "Task8",
-				"Task0:Column0:Check0", "Task0:custom-check:customcheck0",
-			}, // task 2 and 3 shouldnt run
-			expectError: false,
+			expectedPending: []string{},
+			expectError:     true,
+			expectedError:   "cannot use the --downstream flag when running the whole pipeline",
 		},
 		{
 			name: "Filter by Tag and Run Matching Downstream Tasks by Type",
@@ -532,8 +530,9 @@ func TestApplyFilters(t *testing.T) {
 				PushMetaData:      true,
 				OnlyTaskTypes:     []string{"push-metadata"},
 			},
-			expectedPending: []string{"Task3:metadata-push", "Task4:metadata-push", "Task9:metadata-push"},
-			expectError:     false,
+			expectedPending: []string{},
+			expectError:     true,
+			expectedError:   "cannot use the --downstream flag when running the whole pipeline",
 		},
 
 		{
@@ -610,7 +609,7 @@ func TestApplyFilters(t *testing.T) {
 				MetadataPush: pipeline.MetadataPush{Global: true, BigQuery: true},
 			},
 			filter: &Filter{
-				IncludeDownstream: true,
+				IncludeDownstream: false,
 				PushMetaData:      true,
 				OnlyTaskTypes:     []string{"checks"},
 			},
@@ -638,7 +637,7 @@ func TestApplyFilters(t *testing.T) {
 				MetadataPush: pipeline.MetadataPush{Global: true, BigQuery: true},
 			},
 			filter: &Filter{
-				IncludeDownstream: true,
+				IncludeDownstream: false,
 				PushMetaData:      true,
 				OnlyTaskTypes:     []string{"main"}, // checks and metadata should be excluded
 			},
@@ -736,7 +735,7 @@ func TestApplyFilters(t *testing.T) {
 			},
 			expectedPending: []string{},
 			expectError:     true,
-			expectedError:   "you cannot use the '--exclude-tag' flag when running a single asset",
+			expectedError:   "when running a single asset with '--exclude-tag', you must also use the '--downstream' flag",
 		},
 
 		{
@@ -801,7 +800,9 @@ func TestApplyFilters(t *testing.T) {
 				ExcludeTag:        "exclude",
 				IncludeDownstream: true,
 			},
-			expectedPending: []string{"Task1", "Task2", "Task3", "Task4"},
+			expectedPending: []string{},
+			expectError:     true,
+			expectedError:   "cannot use the --downstream flag when running the whole pipeline",
 		},
 		{
 			name: "Exclude Tag and the downstreams",
@@ -823,7 +824,9 @@ func TestApplyFilters(t *testing.T) {
 				ExcludeTag:        "exclude",
 				IncludeDownstream: true,
 			},
-			expectedPending: []string{"Task1", "Task2", "Task3", "Task4"},
+			expectedPending: []string{},
+			expectError:     true,
+			expectedError:   "cannot use the --downstream flag when running the whole pipeline",
 		},
 
 		{
@@ -890,7 +893,9 @@ func TestApplyFilters(t *testing.T) {
 				IncludeTag:        "tag1",
 				IncludeDownstream: true,
 			},
-			expectedPending: []string{"Task5", "Task6", "Task7", "Task8"},
+			expectedPending: []string{},
+			expectError:     true,
+			expectedError:   "cannot use the --downstream flag when running the whole pipeline",
 		},
 
 		{
@@ -972,7 +977,32 @@ func TestApplyFilters(t *testing.T) {
 				IncludeDownstream: true,
 				OnlyTaskTypes:     []string{"checks"},
 			},
-			expectedPending: []string{"Task12:Column12:Check12", "Task12:custom-check:customcheck12"},
+			expectedPending: []string{},
+			expectError:     true,
+			expectedError:   "cannot use the --downstream flag when running the whole pipeline",
+		},
+		{
+			name: "Exclude Tag with single asset and the downstream",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					task1,
+					task2,
+					task3,
+					task4,
+					task5,
+					task6,
+					task7,
+					task8,
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				ExcludeTag:        "exclude",
+				IncludeDownstream: true,
+				SingleTask:        task8,
+			},
+			expectedPending: []string{"Task7", "Task6", "Task5"},
 		},
 	}
 
@@ -981,10 +1011,6 @@ func TestApplyFilters(t *testing.T) {
 			t.Parallel() // Enable parallel execution for individual test cases
 			logger := zap.NewNop().Sugar()
 			s := scheduler.NewScheduler(logger, tt.pipeline, "test")
-
-			// Create FilterMutators
-
-			// Act
 			err := ApplyAllFilters(context.Background(), tt.filter, s, tt.pipeline)
 
 			// Assert
