@@ -977,6 +977,9 @@ type Filter struct {
 
 func HandleSingleTask(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
 	if f.SingleTask == nil {
+		if f.IncludeDownstream {
+			return errors.New("cannot use the --downstream flag when running the whole pipeline")
+		}
 		return nil
 	}
 	s.MarkAll(scheduler.Skipped)
@@ -984,9 +987,15 @@ func HandleSingleTask(ctx context.Context, f *Filter, s *scheduler.Scheduler, p 
 	if f.IncludeTag != "" {
 		return errors.New("you cannot use the '--tag' flag when running a single asset")
 	}
-
 	if f.ExcludeTag != "" {
-		return errors.New("you cannot use the '--exclude-tag' flag when running a single asset")
+		if !f.IncludeDownstream {
+			return fmt.Errorf("when running a single asset with '--exclude-tag', you must also use the '--downstream' flag")
+		}
+		excludedAssets := p.GetAssetsByTag(f.ExcludeTag)
+		if len(excludedAssets) == 0 {
+			return fmt.Errorf("no assets found with exclude tag '%s'", f.ExcludeTag)
+		}
+		s.MarkByTag(f.ExcludeTag, scheduler.Skipped, false)
 	}
 	return nil
 }
@@ -1000,12 +1009,15 @@ func HandleIncludeTags(ctx context.Context, f *Filter, s *scheduler.Scheduler, p
 	if len(includedAssets) == 0 {
 		return fmt.Errorf("no assets found with include tag '%s'", f.IncludeTag)
 	}
-	s.MarkByTag(f.IncludeTag, scheduler.Pending, f.IncludeDownstream)
+	s.MarkByTag(f.IncludeTag, scheduler.Pending, false)
 
 	return nil
 }
 
 func HandleExcludeTags(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
+	if f.SingleTask != nil {
+		return nil
+	}
 	if f.ExcludeTag == "" {
 		return nil
 	}
@@ -1013,7 +1025,7 @@ func HandleExcludeTags(ctx context.Context, f *Filter, s *scheduler.Scheduler, p
 	if len(excludedAssets) == 0 {
 		return fmt.Errorf("no assets found with exclude tag '%s'", f.ExcludeTag)
 	}
-	s.MarkByTag(f.ExcludeTag, scheduler.Skipped, f.IncludeDownstream)
+	s.MarkByTag(f.ExcludeTag, scheduler.Skipped, false)
 
 	return nil
 }
