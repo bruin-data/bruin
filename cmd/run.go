@@ -220,6 +220,9 @@ func Run(isDebug *bool) *cli.Command {
 
 			// handle log files
 			runID := time.Now().Format("2006_01_02_15_04_05")
+			if os.Getenv("BRUIN_RUN_ID") != "" {
+				runID = os.Getenv("BRUIN_RUN_ID")
+			}
 
 			infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
 
