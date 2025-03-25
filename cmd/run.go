@@ -989,7 +989,7 @@ func HandleSingleTask(ctx context.Context, f *Filter, s *scheduler.Scheduler, p 
 	}
 	if f.ExcludeTag != "" {
 		if !f.IncludeDownstream {
-			return fmt.Errorf("when running a single asset with '--exclude-tag', you must also use the '--downstream' flag")
+			return errors.New("when running a single asset with '--exclude-tag', you must also use the '--downstream' flag")
 		}
 		excludedAssets := p.GetAssetsByTag(f.ExcludeTag)
 		if len(excludedAssets) == 0 {
