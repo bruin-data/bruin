@@ -1,0 +1,7 @@
+name: non-wait-symbolic
+schedule: daily
+start_date: "2024-01-01"
+default_connections:
+    duckdb: duckdb-env-run-non-wait-symbolic
+default:
+    type: duckdb.sql

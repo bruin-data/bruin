@@ -157,4 +157,8 @@ environments:
         - name: "duckdb-time-materialization"
           path: "duckdb-files/time-materialization.db"
 
-
+  env-run-non-wait-symbolic:
+    connections:
+      duckdb:
+        - name: "duckdb-env-run-non-wait-symbolic"
+          path: "duckdb-files/env-run-non-wait-symbolic.db"

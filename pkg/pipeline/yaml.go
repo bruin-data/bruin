@@ -95,7 +95,12 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 	uri, foundURI := us["uri"]
 	asset, foundAsset := us["asset"]
 	cols, foundColumns := us["columns"]
+	mode, foundMode := us["mode"]
 	colsStruct := columns(nil)
+
+	if !foundMode {
+		mode = UpstreamModeFull.String()
+	}
 
 	if foundColumns {
 		colsSlice, ok := cols.([]any)
@@ -135,7 +140,7 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 		if !ok {
 			return &ParseError{Msg: "`uri` field must be a string"}
 		}
-		*u = upstream{Value: uriString, Type: "uri", Columns: colsStruct}
+		*u = upstream{Value: uriString, Type: "uri", Columns: colsStruct, Mode: UpstreamMode(mode.(string))}
 		return nil
 	}
 
@@ -144,7 +149,7 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 		if !ok {
 			return &ParseError{Msg: "`uri` field must be a string"}
 		}
-		*u = upstream{Value: assetString, Type: "asset", Columns: colsStruct}
+		*u = upstream{Value: assetString, Type: "asset", Columns: colsStruct, Mode: UpstreamMode(mode.(string))}
 		return nil
 	}
 
@@ -412,7 +417,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			cols = append(cols, DependsColumn(col))
 		}
 
-		if len(dep.Mode) == 0 {
+		if dep.Mode == "" {
 			dep.Mode = UpstreamModeFull
 		}
 		upstreams[index] = Upstream{

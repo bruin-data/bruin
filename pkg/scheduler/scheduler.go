@@ -580,6 +580,10 @@ func (s *Scheduler) constructInstanceRelationships() {
 		s.taskNameMap[assetName].AddUpstreamByType(TaskInstanceTypeMetadataPush, ti)
 
 		for _, dep := range ti.GetAsset().Upstreams {
+			if dep.Mode == pipeline.UpstreamModeSymbolic {
+				continue
+			}
+
 			if dep.Type != "asset" {
 				continue
 			}
