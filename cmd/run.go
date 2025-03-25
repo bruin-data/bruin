@@ -371,6 +371,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
 			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, runConfig.ExpUseWingetForUv) //nolint:staticcheck
 			runCtx = context.WithValue(runCtx, python.LocalIngestr, c.String("debug-ingestr-src"))
+			runCtx = context.WithValue(runCtx, config.EnvironmentContextKey, cm.SelectedEnvironment)
 
 			ex.Start(runCtx, s.WorkQueue, s.Results)
 

@@ -2,6 +2,7 @@
   "default_environment_name": "default",
   "selected_environment_name": "default",
   "selected_environment": {
+    "schema_prefix":  "",
     "connections": {
       "generic": [
         {
@@ -28,6 +29,7 @@
   },
   "environments": {
     "default": {
+      "schema_prefix": "",
       "connections": {
         "generic": [
           {
@@ -53,6 +55,7 @@
       }
     },
     "env-ingestr": {
+      "schema_prefix": "",
       "connections": {
         "duckdb": [
           {
@@ -72,6 +75,7 @@
       }
     },
     "env-push-metadata": {
+      "schema_prefix": "",
       "connections": {
         "duckdb": [
           {
@@ -82,6 +86,7 @@
       }
     },
     "env-query-asset": {
+      "schema_prefix": "",
       "connections": {
         "duckdb": [
           {
@@ -92,6 +97,7 @@
       }
     },
     "env-run-default-option": {
+      "schema_prefix": "",
       "connections": {
         "generic": [
           {
@@ -121,6 +127,7 @@
       }
     },
     "env-run-main-with-downstream": {
+      "schema_prefix": "",
       "connections": {
         "generic": [
           {
@@ -146,6 +153,7 @@
       }
     },
     "env-run-main-with-filters": {
+      "schema_prefix": "",
       "connections": {
         "generic": [
           {
@@ -171,6 +179,7 @@
       }
     },
     "env-run-malformed-sql": {
+      "schema_prefix": "",
       "connections": {
         "generic": [
           {
@@ -196,6 +205,7 @@
       }
     },
     "env-run-python-materialization": {
+      "schema_prefix": "",
       "connections": {
         "duckdb": [
           {
@@ -206,6 +216,7 @@
       }
     },
     "env-run-seed-data": {
+      "schema_prefix": "",
       "connections": {
         "duckdb": [
           {
@@ -216,6 +227,7 @@
       }
     },
     "env-run-use-uv": {
+      "schema_prefix": "",
       "connections": {
         "generic": [
           {
@@ -241,6 +253,7 @@
       }
     },
     "env-run-with-downstream": {
+      "schema_prefix": "",
       "connections": {
         "generic": [
           {
@@ -266,6 +279,7 @@
       }
     },
     "env-run-with-filters": {
+      "schema_prefix": "",
       "connections": {
         "generic": [
           {
@@ -291,6 +305,7 @@
       }
     },
     "env-run-with-tags": {
+      "schema_prefix": "",
       "connections": {
         "generic": [
           {
@@ -316,6 +331,7 @@
       }
     },
     "env-time-materialization": {
+      "schema_prefix": "",
       "connections": {
         "duckdb": [
           {
@@ -326,6 +342,7 @@
       }
     },
     "env-run-non-wait-symbolic": {
+      "schema_prefix": "",
       "connections": {
         "duckdb": [
           {
