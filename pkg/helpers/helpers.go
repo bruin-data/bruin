@@ -200,3 +200,11 @@ func ParseJSONOutputs(actual, expected string) (interface{}, interface{}, error)
 
 	return actualData, expectedData, nil
 }
+
+func TrimToLength(s string, max int) string {
+	runes := []rune(s)
+	if len(runes) > max {
+		return string(runes[:max]) + "..."
+	}
+	return s
+}
