@@ -56,6 +56,7 @@ const (
 	AssetTypeTableau              = AssetType("tableau")
 	AssetTypeClickHouse           = AssetType("clickhouse.sql")
 	AssetTypeClickHouseSeed       = AssetType("clickhouse.seed")
+	AssetTypeEMRServerlessSpark   = AssetType("emr_serverless.spark")
 	RunConfigFullRefresh          = RunConfig("full-refresh")
 	RunConfigStartDate            = RunConfig("start-date")
 	RunConfigEndDate              = RunConfig("end-date")

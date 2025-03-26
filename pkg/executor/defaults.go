@@ -170,4 +170,7 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 	pipeline.AssetTypeTableau: {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
+	pipeline.AssetTypeEMRServerlessSpark: {
+		scheduler.TaskInstanceTypeMain: NoOpOperator{},
+	},
 }
