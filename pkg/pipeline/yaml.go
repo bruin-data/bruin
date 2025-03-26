@@ -82,7 +82,7 @@ func (a *depends) UnmarshalYAML(value *yaml.Node) error {
 
 func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 	if value.Kind == yaml.ScalarNode {
-		*u = upstream{Value: value.Value, Type: "asset", Columns: columns(nil)}
+		*u = upstream{Value: value.Value, Type: "asset", Columns: columns(nil), Mode: UpstreamModeFull}
 		return nil
 	}
 
@@ -98,7 +98,7 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 	mode, foundMode := us["mode"]
 	colsStruct := columns(nil)
 
-	if !foundMode {
+	if !foundMode || (mode != UpstreamModeFull.String() && mode != UpstreamModeSymbolic.String()) {
 		mode = UpstreamModeFull.String()
 	}
 
@@ -417,9 +417,10 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			cols = append(cols, DependsColumn(col))
 		}
 
-		if dep.Mode == "" {
+		if dep.Mode == "" || !dep.Mode.IsValid() {
 			dep.Mode = UpstreamModeFull
 		}
+
 		upstreams[index] = Upstream{
 			Value:   dep.Value,
 			Type:    dep.Type,
