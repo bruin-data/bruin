@@ -124,37 +124,37 @@
           "type": "asset",
           "value": "task1",
           "columns": [],
-          "mode": ""
+          "mode": "full"
         },
         {
           "type": "asset",
           "value": "task2",
           "columns": [],
-          "mode": ""
+          "mode": "full"
         },
         {
           "type": "asset",
           "value": "task3",
           "columns": [],
-          "mode": ""
+          "mode": "full"
         },
         {
           "type": "asset",
           "value": "task4",
           "columns": [],
-          "mode": ""
+          "mode": "full"
         },
         {
           "type": "asset",
           "value": "task5",
           "columns": [],
-          "mode": ""
+          "mode": "full"
         },
         {
           "type": "asset",
           "value": "task3",
           "columns": [],
-          "mode": ""
+          "mode": "full"
         }
       ],
       "materialization": null,
@@ -196,37 +196,37 @@
           "type": "asset",
           "value": "task1",
           "columns": [],
-          "mode": ""
+          "mode": "full"
         },
         {
           "type": "asset",
           "value": "task2",
           "columns": [],
-          "mode": ""
+          "mode": "full"
         },
         {
           "type": "asset",
           "value": "task3",
           "columns": [],
-          "mode": ""
+          "mode": "full"
         },
         {
           "type": "asset",
           "value": "task4",
           "columns": [],
-          "mode": ""
+          "mode": "full"
         },
         {
           "type": "asset",
           "value": "task5",
           "columns": [],
-          "mode": ""
+          "mode": "full"
         },
         {
           "type": "asset",
           "value": "task3",
           "columns": [],
-          "mode": ""
+          "mode": "full"
         }
       ],
       "materialization": null,
