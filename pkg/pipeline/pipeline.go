@@ -1442,6 +1442,10 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 
 	for _, asset := range pipeline.Assets {
 		for _, upstream := range asset.Upstreams {
+			if upstream.Mode != UpstreamModeFull && upstream.Mode != UpstreamModeSymbolic {
+				upstream.Mode = UpstreamModeFull
+			}
+
 			if upstream.Type != "asset" {
 				continue
 			}
