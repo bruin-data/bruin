@@ -219,13 +219,16 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Poking %s\n", t.Name)
+	trimmedQuery := helpers.TrimToLength(qq, 50)
+	printer := ctx.Value(executor.KeyPrinter).(io.Writer)
+	if printer, ok = ctx.Value(executor.KeyPrinter).(io.Writer); ok {
+		fmt.Fprintln(printer, "Poking:", trimmedQuery)
+	}
 	for {
 		res, err := conn.Select(ctx, &query.Query{Query: qq})
 		if err != nil {
 			return err
 		}
-
 		intRes, err := helpers.CastResultToInteger(res)
 		if err != nil {
 			return errors.Wrap(err, "failed to parse query sensor result")
@@ -234,8 +237,8 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		if intRes > 0 {
 			break
 		}
-
 		time.Sleep(time.Duration(o.secondsToSleep) * time.Second)
+		fmt.Fprintln(printer, "Info: Sensor didn't return the expected result, waiting for 30 seconds")
 	}
 
 	return nil
