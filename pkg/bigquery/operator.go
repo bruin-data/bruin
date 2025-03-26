@@ -2,6 +2,7 @@ package bigquery
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"time"
 
@@ -218,7 +219,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	if err != nil {
 		return err
 	}
-
+	fmt.Printf("Poking %s\n", t.Name)
 	for {
 		res, err := conn.Select(ctx, &query.Query{Query: qq})
 		if err != nil {
