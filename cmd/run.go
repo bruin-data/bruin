@@ -23,6 +23,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/date"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
+	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/ingestr"
@@ -860,6 +861,14 @@ func setupExecutors(
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = checkRunner
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		}
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeEMRServerlessSpark) {
+		emrServerlessOperator, err := emr_serverless.NewBasicOperator(conn)
+		if err != nil {
+			return nil, err
+		}
+		mainExecutors[pipeline.AssetTypeEMRServerlessSpark][scheduler.TaskInstanceTypeMain] = emrServerlessOperator
 	}
 
 	return mainExecutors, nil
