@@ -3,6 +3,8 @@ package emr_serverless
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -23,15 +25,36 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	applicationId := asset.Parameters["application_id"]
 	executionRole := asset.Parameters["execution_role"]
 	entryPoint := asset.Parameters["entrypoint"]
+	timeout := time.Duration(0)
+	args := []string{}
+
+	if asset.Parameters["timeout"] != "" {
+		t, err := time.ParseDuration(asset.Parameters["timeout"])
+		if err == nil {
+			timeout = t
+		}
+	}
+
+	if asset.Parameters["args"] != "" {
+		arglist := strings.Split(strings.TrimSpace(asset.Parameters["args"]), " ")
+		for _, arg := range arglist {
+			arg = strings.TrimSpace(arg)
+			if arg != "" {
+				args = append(args, arg)
+			}
+		}
+	}
 
 	result, err := op.client.StartJobRun(ctx, &emrserverless.StartJobRunInput{
 		ApplicationId:           aws.String(applicationId),
 		Name:                    aws.String(asset.Name),
 		ExecutionRoleArn:        aws.String(executionRole),
-		ExecutionTimeoutMinutes: aws.Int64(5),
+		ExecutionTimeoutMinutes: aws.Int64(int64(timeout.Seconds())),
 		JobDriver: &types.JobDriverMemberSparkSubmit{
 			Value: types.SparkSubmit{
-				EntryPoint: aws.String(entryPoint),
+				EntryPoint:            aws.String(entryPoint),
+				EntryPointArguments:   args,
+				SparkSubmitParameters: aws.String(asset.Parameters["config"]),
 			},
 		},
 	})
