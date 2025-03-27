@@ -23,7 +23,6 @@ import (
 
 var (
 	terminalJobRunStates = []types.JobRunState{
-		types.JobRunStateCancelled,
 		types.JobRunStateFailed,
 		types.JobRunStateSuccess,
 	}
@@ -170,38 +169,47 @@ func (job Job) Run(ctx context.Context) (err error) {
 	}()
 
 	previousState := types.JobRunState("unknown")
-	attempt := 1
+	var nextToken string
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			runs, err := job.client.ListJobRunAttempts(ctx, &emrserverless.ListJobRunAttemptsInput{
+			listAttemptsInput := &emrserverless.ListJobRunAttemptsInput{
 				ApplicationId: &job.params.ApplicationID,
 				JobRunId:      result.JobRunId,
-			})
+				MaxResults:    aws.Int32(int32(job.params.MaxAttempts)),
+			}
+			if nextToken != "" {
+				listAttemptsInput.NextToken = &nextToken
+			}
+			runs, err := job.client.ListJobRunAttempts(ctx, listAttemptsInput)
 			if err != nil {
 				return fmt.Errorf("error checking job run status: %w", err)
 			}
 			if len(runs.JobRunAttempts) == 0 {
 				return fmt.Errorf("job runs not found")
 			}
-			totalJobRuns := len(runs.JobRunAttempts)
-			if attempt > totalJobRuns {
-				// invariant. attempt _should_ never exceed total job runs.
-				// this can happen when a job run is cancelled externally.
-				return nil
-			}
-			latestRun := runs.JobRunAttempts[attempt-1]
+			latestRun := runs.JobRunAttempts[len(runs.JobRunAttempts)-1]
 			if previousState != latestRun.State {
-				job.logger.Printf("%s | %d/%d | %s", *result.JobRunId, attempt, job.params.MaxAttempts, latestRun.State)
+				job.logger.Printf(
+					"%s | %d/%d | %s | %s",
+					*result.JobRunId,
+					*latestRun.Attempt,
+					job.params.MaxAttempts,
+					latestRun.State,
+					*latestRun.StateDetails,
+				)
 				previousState = latestRun.State
 			}
-			if slices.Contains(terminalJobRunStates, latestRun.State) {
-				if attempt == job.params.MaxAttempts {
-					return nil
-				}
-				attempt++
+			if latestRun.State == types.JobRunStateCancelled {
+				return nil
+			}
+			if slices.Contains(terminalJobRunStates, latestRun.State) && int(*latestRun.Attempt) == job.params.MaxAttempts {
+				return nil
+			}
+			if runs.NextToken != nil {
+				nextToken = *runs.NextToken
 			}
 			time.Sleep(time.Second)
 		}
