@@ -129,7 +129,7 @@ type Job struct {
 	params *JobRunParams
 }
 
-func (job Job) Run(ctx context.Context) error {
+func (job Job) Run(ctx context.Context) (err error) {
 
 	result, err := job.client.StartJobRun(ctx, &emrserverless.StartJobRunInput{
 		ApplicationId:           &job.params.ApplicationID,
@@ -151,13 +151,22 @@ func (job Job) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error submitting job run: %w", err)
 	}
-	job.logger.Printf("job run submitted: %s", *result.JobRunId)
+	job.logger.Printf("created job run: %s", *result.JobRunId)
+	defer func() {
+		if err != nil {
+			job.logger.Printf("error detected. cancelling job run.")
+			job.client.CancelJobRun(context.Background(), &emrserverless.CancelJobRunInput{
+				ApplicationId: &job.params.ApplicationID,
+				JobRunId:      result.JobRunId,
+			})
+		}
+	}()
 
 	previousState := types.JobRunState("unknown")
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return ctx.Err()
 		default:
 			runs, err := job.client.ListJobRunAttempts(ctx, &emrserverless.ListJobRunAttemptsInput{
 				ApplicationId: &job.params.ApplicationID,
@@ -177,7 +186,7 @@ func (job Job) Run(ctx context.Context) error {
 			if slices.Contains(terminalJobRunStates, latestRun.State) {
 				return nil
 			}
-			time.Sleep(time.Second)
+			time.Sleep(time.Second / 4)
 		}
 	}
 }
