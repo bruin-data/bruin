@@ -37,11 +37,15 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 		ctx.Value(executor.KeyPrinter).(io.Writer), "", 0,
 	)
 	asset := ti.GetAsset()
+	pipeline := ti.GetPipeline()
+	connID, err := pipeline.GetConnectionNameForAsset(asset)
+	if err != nil {
+		return fmt.Errorf("error looking up connection name: %w", err)
+	}
+	conn, exists := op.connections[connID]
 
-	conn, exists := op.connections[asset.Connection]
 	if !exists {
-		// todo: error contents
-		return fmt.Errorf("no such connection: %s", asset.Connection)
+		return fmt.Errorf("aws connection not found for '%s", connID)
 	}
 
 	params := parseParams(asset.Parameters)
