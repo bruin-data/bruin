@@ -655,7 +655,7 @@ func setupExecutors(
 		}
 
 		metadataPushOperator := bigquery.NewMetadataPushOperator(conn)
-		bqQuerySensor := bigquery.NewQuerySensor(conn, renderer, 30)
+		bqQuerySensor := bigquery.NewQuerySensor(conn, renderer)
 
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeMain] = bqOperator
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner

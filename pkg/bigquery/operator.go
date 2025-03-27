@@ -182,16 +182,14 @@ type renderer interface {
 }
 
 type QuerySensor struct {
-	connection     connectionFetcher
-	renderer       renderer
-	secondsToSleep int64
+	connection connectionFetcher
+	renderer   renderer
 }
 
-func NewQuerySensor(conn connectionFetcher, renderer renderer, secondsToSleep int64) *QuerySensor {
+func NewQuerySensor(conn connectionFetcher, renderer renderer) *QuerySensor {
 	return &QuerySensor{
-		connection:     conn,
-		renderer:       renderer,
-		secondsToSleep: secondsToSleep,
+		connection: conn,
+		renderer:   renderer,
 	}
 }
 
@@ -209,7 +207,6 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	if err != nil {
 		return errors.Wrap(err, "failed to render query sensor query")
 	}
-
 	connName, err := p.GetConnectionNameForAsset(t)
 	if err != nil {
 		return err
@@ -220,10 +217,11 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return err
 	}
 	trimmedQuery := helpers.TrimToLength(qq, 50)
-	printer := ctx.Value(executor.KeyPrinter).(io.Writer)
-	if printer, ok = ctx.Value(executor.KeyPrinter).(io.Writer); ok {
+	printer, printerExists := ctx.Value(executor.KeyPrinter).(io.Writer)
+	if printerExists {
 		fmt.Fprintln(printer, "Poking:", trimmedQuery)
 	}
+
 	for {
 		res, err := conn.Select(ctx, &query.Query{Query: qq})
 		if err != nil {
@@ -237,9 +235,12 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		if intRes > 0 {
 			break
 		}
-		time.Sleep(time.Duration(o.secondsToSleep) * time.Second)
-		fmt.Fprintln(printer, "Info: Sensor didn't return the expected result, waiting for 30 seconds")
-	}
+		pokeInterval := helpers.GetPokeInterval(ctx, t)
+		time.Sleep(time.Duration(pokeInterval) * time.Second)
+		if printerExists {
+			fmt.Fprintln(printer, "Info: Sensor didn't return the expected result, waiting for", pokeInterval, "seconds")
+		}
 
+	}
 	return nil
 }
