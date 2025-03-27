@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -10,11 +11,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
-)
-
-const (
-	UpstreamModeFull     UpstreamMode = "full"
-	UpstreamModeSymbolic UpstreamMode = "symbolic"
 )
 
 var ValidQualityChecks = map[string]bool{
@@ -47,7 +43,12 @@ type upstreamColumn struct {
 
 type depends []upstream
 
-type UpstreamMode string
+type UpstreamMode int
+
+const (
+	UpstreamModeFull UpstreamMode = iota
+	UpstreamModeSymbolic
+)
 
 func (m UpstreamMode) IsValid() bool {
 	switch m {
@@ -59,7 +60,38 @@ func (m UpstreamMode) IsValid() bool {
 }
 
 func (m UpstreamMode) String() string {
-	return string(m)
+	switch m {
+	case UpstreamModeFull:
+		return "full"
+	case UpstreamModeSymbolic:
+		return "symbolic"
+	default:
+		return "full" // default to full mode for safety
+	}
+}
+
+func (m UpstreamMode) MarshalJSON() ([]byte, error) {
+	return json.Marshal(m.String())
+}
+
+func (m *UpstreamMode) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	*m = MarshalUpstreamMode(s)
+	return nil
+}
+
+func MarshalUpstreamMode(s string) UpstreamMode {
+	switch strings.ToLower(s) {
+	case "full":
+		return UpstreamModeFull
+	case "symbolic":
+		return UpstreamModeSymbolic
+	default:
+		return UpstreamModeFull // default to full mode for safety
+	}
 }
 
 type upstream struct {
@@ -95,11 +127,12 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 	uri, foundURI := us["uri"]
 	asset, foundAsset := us["asset"]
 	cols, foundColumns := us["columns"]
-	mode, foundMode := us["mode"]
 	colsStruct := columns(nil)
 
-	if !foundMode || (mode != UpstreamModeFull.String() && mode != UpstreamModeSymbolic.String()) {
-		mode = UpstreamModeFull.String()
+	mode, foundMode := us["mode"]
+	upstreamMode := UpstreamModeFull
+	if foundMode {
+		upstreamMode = MarshalUpstreamMode(mode.(string))
 	}
 
 	if foundColumns {
@@ -140,7 +173,7 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 		if !ok {
 			return &ParseError{Msg: "`uri` field must be a string"}
 		}
-		*u = upstream{Value: uriString, Type: "uri", Columns: colsStruct, Mode: UpstreamMode(mode.(string))}
+		*u = upstream{Value: uriString, Type: "uri", Columns: colsStruct, Mode: upstreamMode}
 		return nil
 	}
 
@@ -149,7 +182,7 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 		if !ok {
 			return &ParseError{Msg: "`uri` field must be a string"}
 		}
-		*u = upstream{Value: assetString, Type: "asset", Columns: colsStruct, Mode: UpstreamMode(mode.(string))}
+		*u = upstream{Value: assetString, Type: "asset", Columns: colsStruct, Mode: upstreamMode}
 		return nil
 	}
 
@@ -417,7 +450,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			cols = append(cols, DependsColumn(col))
 		}
 
-		if dep.Mode == "" || !dep.Mode.IsValid() {
+		if !dep.Mode.IsValid() {
 			dep.Mode = UpstreamModeFull
 		}
 
