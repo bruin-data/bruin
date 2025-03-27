@@ -453,6 +453,8 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 	return issues, nil
 }
 
+var arnPattern = regexp.MustCompile(`^arn:[^:\n]*:[^:\n]*:[^:\n]*:[^:\n]*:(?:[^:\/\n]*[:\/])?.*$`)
+
 func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if asset.Type != pipeline.AssetTypeEMRServerlessSpark {
@@ -507,6 +509,14 @@ func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset
 				Description: "parameters.max_attempts must be greater than or equal to 1",
 			})
 		}
+	}
+
+	executionRole := strings.TrimSpace(asset.Parameters["execution_role"])
+	if executionRole != "" && !arnPattern.MatchString(executionRole) {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "parameters.execution_role must be an Amazon Resource Name (ARN)",
+		})
 	}
 	return issues, nil
 }
