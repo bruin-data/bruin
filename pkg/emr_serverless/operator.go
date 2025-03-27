@@ -121,9 +121,9 @@ func parseParams(m map[string]string) *JobRunParams {
 		}
 	}
 	if m["max_attempts"] != "" {
-		max, err := strconv.Atoi(m["max_attempts"])
+		max, err := strconv.ParseInt(m["max_attempts"], 10, 32)
 		if err == nil && max > 0 {
-			params.MaxAttempts = max
+			params.MaxAttempts = int(max)
 		}
 	}
 	return &params
