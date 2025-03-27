@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -119,6 +120,12 @@ func parseParams(m map[string]string) *JobRunParams {
 			}
 		}
 	}
+	if m["max_attempts"] != "" {
+		max, err := strconv.Atoi(m["max_attempts"])
+		if err == nil && max > 0 {
+			params.MaxAttempts = max
+		}
+	}
 	return &params
 }
 
@@ -163,6 +170,7 @@ func (job Job) Run(ctx context.Context) (err error) {
 	}()
 
 	previousState := types.JobRunState("unknown")
+	attempt := 1
 	for {
 		select {
 		case <-ctx.Done():
@@ -178,15 +186,24 @@ func (job Job) Run(ctx context.Context) (err error) {
 			if len(runs.JobRunAttempts) == 0 {
 				return fmt.Errorf("job runs not found")
 			}
-			latestRun := runs.JobRunAttempts[len(runs.JobRunAttempts)-1]
+			totalJobRuns := len(runs.JobRunAttempts)
+			if attempt > totalJobRuns {
+				// invariant. attempt _should_ never exceed total job runs.
+				// this can happen when a job run is cancelled externally.
+				return nil
+			}
+			latestRun := runs.JobRunAttempts[attempt-1]
 			if previousState != latestRun.State {
-				job.logger.Printf("job run: %s: %s", *result.JobRunId, latestRun.State)
+				job.logger.Printf("%s | %d/%d | %s", *result.JobRunId, attempt, job.params.MaxAttempts, latestRun.State)
 				previousState = latestRun.State
 			}
 			if slices.Contains(terminalJobRunStates, latestRun.State) {
-				return nil
+				if attempt == job.params.MaxAttempts {
+					return nil
+				}
+				attempt++
 			}
-			time.Sleep(time.Second / 4)
+			time.Sleep(time.Second)
 		}
 	}
 }
