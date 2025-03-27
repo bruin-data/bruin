@@ -102,31 +102,31 @@
                     "type": "asset",
                     "value": "task1",
                     "columns": [],
-                    "mode": "full"
+                    "mode": 0
                 },
                 {
                     "type": "asset",
                     "value": "task2",
                     "columns": [],
-                    "mode": "full"
+                    "mode": 0
                 },
                 {
                     "type": "asset",
                     "value": "task3",
                     "columns": [],
-                    "mode": "full"
+                    "mode": 0
                 },
                 {
                     "type": "asset",
                     "value": "task4",
                     "columns": [],
-                    "mode": "full"
+                    "mode": 0
                 },
                 {
                     "type": "asset",
                     "value": "task5",
                     "columns": [],
-                    "mode": "full"
+                    "mode": 0
                 }
             ],
             "image": "python:3.11",

@@ -26,7 +26,7 @@
           "type": "asset",
           "value": "chess_playground.player_summary",
           "columns": [],
-        "mode": "full"
+        "mode": 0
         }
       ],
       "image": "python:3.11",
@@ -163,13 +163,13 @@
           "type": "asset",
           "value": "chess_playground.games",
           "columns": [],
-        "mode": "full"
+        "mode": 0
         },
         {
           "type": "asset",
           "value": "chess_playground.profiles",
           "columns": [],
-        "mode": "full"
+        "mode": 0
         }
       ],
       "image": "",

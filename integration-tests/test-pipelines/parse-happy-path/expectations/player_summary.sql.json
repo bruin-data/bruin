@@ -20,13 +20,13 @@
         "type": "asset",
         "value": "chess_playground.games",
         "columns": [],
-        "mode": "full"
+        "mode": 0
       },
       {
         "type": "asset",
         "value": "chess_playground.profiles",
         "columns": [],
-        "mode": "full"
+        "mode": 0
       }
     ],
     "image": "",

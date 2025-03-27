@@ -5,7 +5,7 @@
   "start_date": "",
   "definition_file": {
     "name": "pipeline.yml",
-    "path": "__PIPELINEDIR__pipeline.yml"
+    "path": "/integration-tests/test-pipelines/parse-whole-pipeline/pipeline.yml"
   },
   "default_connections": {},
   "assets": [
@@ -23,7 +23,7 @@
           "type": "asset",
           "value": "chess_playground.player_summary",
           "columns": [],
-          "mode": "full"
+          "mode": 0
         }
       ],
       "image": "python:3.11",
@@ -31,12 +31,12 @@
       "owner": "",
       "executable_file": {
         "name": "asset.py",
-        "path": "__ASSETSDIR__asset.py",
+        "path": "/integration-tests/test-pipelines/parse-whole-pipeline/assets/asset.py",
         "content": ""
       },
       "definition_file": {
         "name": "asset.py",
-        "path": "__ASSETSDIR__asset.py",
+        "path": "/integration-tests/test-pipelines/parse-whole-pipeline/assets/asset.py",
         "type": "comment"
       },
       "parameters": {},
@@ -46,6 +46,7 @@
           "injected_key": "INJECTED1"
         }
       ],
+      "extends": null,
       "columns": [],
       "custom_checks": [],
       "metadata": {},
@@ -67,12 +68,12 @@
       "owner": "",
       "executable_file": {
         "name": "chess_games.asset.yml",
-        "path": "__ASSETSDIR__chess_games.asset.yml",
+        "path": "/integration-tests/test-pipelines/parse-whole-pipeline/assets/chess_games.asset.yml",
         "content": ""
       },
       "definition_file": {
         "name": "chess_games.asset.yml",
-        "path": "__ASSETSDIR__chess_games.asset.yml",
+        "path": "/integration-tests/test-pipelines/parse-whole-pipeline/assets/chess_games.asset.yml",
         "type": "yaml"
       },
       "parameters": {
@@ -81,6 +82,7 @@
         "source_table": "games"
       },
       "secrets": [],
+      "extends": null,
       "columns": [],
       "custom_checks": [],
       "metadata": {},
@@ -102,12 +104,12 @@
       "owner": "",
       "executable_file": {
         "name": "chess_profiles.asset.yml",
-        "path": "__ASSETSDIR__chess_profiles.asset.yml",
+        "path": "/integration-tests/test-pipelines/parse-whole-pipeline/assets/chess_profiles.asset.yml",
         "content": ""
       },
       "definition_file": {
         "name": "chess_profiles.asset.yml",
-        "path": "__ASSETSDIR__chess_profiles.asset.yml",
+        "path": "/integration-tests/test-pipelines/parse-whole-pipeline/assets/chess_profiles.asset.yml",
         "type": "yaml"
       },
       "parameters": {
@@ -116,6 +118,7 @@
         "source_table": "profiles"
       },
       "secrets": [],
+      "extends": null,
       "columns": [],
       "custom_checks": [],
       "metadata": {},
@@ -143,13 +146,13 @@
           "type": "asset",
           "value": "chess_playground.games",
           "columns": [],
-          "mode": "full"
+          "mode": 0
         },
         {
           "type": "asset",
           "value": "chess_playground.profiles",
           "columns": [],
-          "mode": "full"
+          "mode": 0
         }
       ],
       "image": "",
@@ -157,16 +160,17 @@
       "owner": "",
       "executable_file": {
         "name": "player_summary.sql",
-        "path": "__ASSETSDIR__player_summary.sql",
+        "path": "/integration-tests/test-pipelines/parse-whole-pipeline/assets/player_summary.sql",
         "content": ""
       },
       "definition_file": {
         "name": "player_summary.sql",
-        "path": "__ASSETSDIR__player_summary.sql",
+        "path": "/integration-tests/test-pipelines/parse-whole-pipeline/assets/player_summary.sql",
         "type": "comment"
       },
       "parameters": {},
       "secrets": [],
+      "extends": null,
       "columns": [
         {
           "entity_attribute": null,
@@ -201,5 +205,7 @@
   "metadata_push": {
     "bigquery": false
   },
-  "retries": 0
+  "retries": 0,
+  "commit": "",
+  "snapshot": ""
 }

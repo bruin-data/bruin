@@ -12,11 +12,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const (
-	UpstreamModeFull     UpstreamMode = "full"
-	UpstreamModeSymbolic UpstreamMode = "symbolic"
-)
-
 var ValidQualityChecks = map[string]bool{
 	"not_null":        true,
 	"unique":          true,
@@ -47,7 +42,12 @@ type upstreamColumn struct {
 
 type depends []upstream
 
-type UpstreamMode string
+type UpstreamMode int
+
+const (
+	UpstreamModeFull UpstreamMode = iota
+	UpstreamModeSymbolic
+)
 
 func (m UpstreamMode) IsValid() bool {
 	switch m {
@@ -59,7 +59,25 @@ func (m UpstreamMode) IsValid() bool {
 }
 
 func (m UpstreamMode) String() string {
-	return string(m)
+	switch m {
+	case UpstreamModeFull:
+		return "full"
+	case UpstreamModeSymbolic:
+		return "symbolic"
+	default:
+		return "full"
+	}
+}
+
+func MarshalUpstreamMode(s string) UpstreamMode {
+	switch strings.ToLower(s) {
+	case "full":
+		return UpstreamModeFull
+	case "symbolic":
+		return UpstreamModeSymbolic
+	default:
+		return UpstreamModeFull // default to full mode for safety
+	}
 }
 
 type upstream struct {
@@ -97,9 +115,13 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 	cols, foundColumns := us["columns"]
 	mode, foundMode := us["mode"]
 	colsStruct := columns(nil)
+	upstreamMode := UpstreamModeFull
+	if foundMode {
+		upstreamMode = MarshalUpstreamMode(mode.(string))
+	}
 
-	if !foundMode || (mode != UpstreamModeFull.String() && mode != UpstreamModeSymbolic.String()) {
-		mode = UpstreamModeFull.String()
+	if upstreamMode != UpstreamModeFull && upstreamMode != UpstreamModeSymbolic {
+		upstreamMode = UpstreamModeFull
 	}
 
 	if foundColumns {
@@ -140,7 +162,8 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 		if !ok {
 			return &ParseError{Msg: "`uri` field must be a string"}
 		}
-		*u = upstream{Value: uriString, Type: "uri", Columns: colsStruct, Mode: UpstreamMode(mode.(string))}
+		*u = upstream{Value: uriString, Type: "uri", Columns: colsStruct, Mode: upstreamMode}
+
 		return nil
 	}
 
@@ -149,7 +172,8 @@ func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
 		if !ok {
 			return &ParseError{Msg: "`uri` field must be a string"}
 		}
-		*u = upstream{Value: assetString, Type: "asset", Columns: colsStruct, Mode: UpstreamMode(mode.(string))}
+		*u = upstream{Value: assetString, Type: "asset", Columns: colsStruct, Mode: upstreamMode}
+
 		return nil
 	}
 
@@ -417,7 +441,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			cols = append(cols, DependsColumn(col))
 		}
 
-		if dep.Mode == "" || !dep.Mode.IsValid() {
+		if !dep.Mode.IsValid() {
 			dep.Mode = UpstreamModeFull
 		}
 

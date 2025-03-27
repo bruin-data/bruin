@@ -13,7 +13,7 @@
         "type": "asset",
         "value": "chess_playground.player_summary",
         "columns": [],
-        "mode": "full"
+        "mode": 0
       }
     ],
     "image": "python:3.11",

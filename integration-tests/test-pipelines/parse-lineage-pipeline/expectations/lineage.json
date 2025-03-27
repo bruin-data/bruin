@@ -39,7 +39,7 @@
               "usage": ""
             }
           ],
-        "mode": "full"
+        "mode": 0
         }
       ],
       "image": "",
@@ -124,7 +124,7 @@
               "usage": ""
             }
           ],
-        "mode": "full"
+        "mode": 0
         },
         {
           "type": "asset",
@@ -147,7 +147,7 @@
               "usage": ""
             }
           ],
-        "mode": "full"
+        "mode": 0
         }
       ],
       "image": "",
@@ -274,7 +274,7 @@
               "usage": ""
             }
           ],
-        "mode": "full"
+        "mode": 0
         }
       ],
       "image": "",
