@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -199,4 +200,27 @@ func ParseJSONOutputs(actual, expected string) (interface{}, interface{}, error)
 	}
 
 	return actualData, expectedData, nil
+}
+
+func TrimToLength(s string, maxLength int) string {
+	runes := []rune(s)
+	if len(runes) > maxLength {
+		return string(runes[:maxLength]) + "..."
+	}
+	return s
+}
+
+func GetPokeInterval(ctx context.Context, t *pipeline.Asset) int64 {
+	pokeIntervalStr, ok := t.Parameters["poke_interval"]
+	var pokeInterval int64
+	if ok {
+		var err error
+		pokeInterval, err = strconv.ParseInt(pokeIntervalStr, 10, 64)
+		if err != nil {
+			pokeInterval = 30
+		}
+	} else {
+		pokeInterval = 30
+	}
+	return pokeInterval
 }

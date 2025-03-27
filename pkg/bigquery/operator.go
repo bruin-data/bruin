@@ -2,10 +2,13 @@ package bigquery
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/executor"
+	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -171,5 +174,72 @@ func (o *MetadataPushOperator) Run(ctx context.Context, ti scheduler.TaskInstanc
 		return err
 	}
 
+	return nil
+}
+
+type renderer interface {
+	Render(query string) (string, error)
+}
+
+type QuerySensor struct {
+	connection connectionFetcher
+	renderer   renderer
+}
+
+func NewQuerySensor(conn connectionFetcher, renderer renderer) *QuerySensor {
+	return &QuerySensor{
+		connection: conn,
+		renderer:   renderer,
+	}
+}
+
+func (o *QuerySensor) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	return o.RunTask(ctx, ti.GetPipeline(), ti.GetAsset())
+}
+
+func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
+	qq, ok := t.Parameters["query"]
+	if !ok {
+		return errors.New("query sensor requires a parameter named 'query'")
+	}
+
+	qq, err := o.renderer.Render(qq)
+	if err != nil {
+		return errors.Wrap(err, "failed to render query sensor query")
+	}
+	connName, err := p.GetConnectionNameForAsset(t)
+	if err != nil {
+		return err
+	}
+
+	conn, err := o.connection.GetBqConnection(connName)
+	if err != nil {
+		return err
+	}
+	trimmedQuery := helpers.TrimToLength(qq, 50)
+	printer, printerExists := ctx.Value(executor.KeyPrinter).(io.Writer)
+	if printerExists {
+		fmt.Fprintln(printer, "Poking:", trimmedQuery)
+	}
+
+	for {
+		res, err := conn.Select(ctx, &query.Query{Query: qq})
+		if err != nil {
+			return err
+		}
+		intRes, err := helpers.CastResultToInteger(res)
+		if err != nil {
+			return errors.Wrap(err, "failed to parse query sensor result")
+		}
+
+		if intRes > 0 {
+			break
+		}
+		pokeInterval := helpers.GetPokeInterval(ctx, t)
+		time.Sleep(time.Duration(pokeInterval) * time.Second)
+		if printerExists {
+			fmt.Fprintln(printer, "Info: Sensor didn't return the expected result, waiting for", pokeInterval, "seconds")
+		}
+	}
 	return nil
 }
