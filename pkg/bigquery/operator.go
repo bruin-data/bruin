@@ -240,7 +240,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 			}
 
 			if intRes > 0 {
-				break
+				return nil
 			}
 			if !o.sensorWatch {
 				return errors.New("Sensor didn't return the expected result")
@@ -252,5 +252,4 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 			}
 		}
 	}
-	return nil
 }
