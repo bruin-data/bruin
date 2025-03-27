@@ -78,12 +78,55 @@ func Query() *cli.Command {
 				return handleError(c.String("output"), err)
 			}
 
-			conn, queryStr, err := prepareQueryExecution(c, fs)
+			connName, conn, queryStr, err := prepareQueryExecution(c, fs)
 			if err != nil {
 				return handleError(c.String("output"), err)
 			}
 
-			return executeQuery(c, conn, queryStr)
+			queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn)
+			if querier, ok := conn.(interface {
+				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
+			}); ok {
+				ctx := context.Background()
+				q := query.Query{Query: queryStr}
+				result, err := querier.SelectWithSchema(ctx, &q)
+				if err != nil {
+					return handleError(c.String("output"), errors.Wrap(err, "query execution failed"))
+				}
+				// Output result based on format specified
+				output := c.String("output")
+				if output == "json" {
+					type jsonResponse struct {
+						Columns  []map[string]string `json:"columns"`
+						Rows     [][]interface{}     `json:"rows"`
+						ConnName string              `json:"connectionName"`
+					}
+
+					// Construct JSON response with structured columns
+					jsonCols := make([]map[string]string, len(result.Columns))
+					for i, colName := range result.Columns {
+						jsonCols[i] = map[string]string{"name": colName}
+					}
+
+					// Prepare the final output struct
+					finalOutput := jsonResponse{
+						Columns:  jsonCols,
+						Rows:     result.Rows,
+						ConnName: connName,
+					}
+
+					jsonData, err := json.Marshal(finalOutput)
+					if err != nil {
+						return handleError(output, errors.Wrap(err, "failed to marshal result to JSON"))
+					}
+					fmt.Println(string(jsonData))
+				} else {
+					printTable(result.Columns, result.Rows)
+				}
+			} else {
+				fmt.Printf("Connection type %s does not support querying.\n", c.String("connection"))
+			}
+			return nil
 		},
 	}
 }
@@ -126,7 +169,7 @@ func validateFlags(connection, query, asset, environment string) error {
 	}
 }
 
-func prepareQueryExecution(c *cli.Context, fs afero.Fs) (interface{}, string, error) {
+func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, string, error) {
 	assetPath := c.String("asset")
 	queryStr := c.String("query")
 
@@ -144,16 +187,16 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (interface{}, string, er
 	return prepareAssetQuery(c, fs)
 }
 
-func prepareDirectQuery(c *cli.Context, fs afero.Fs) (interface{}, string, error) {
+func prepareDirectQuery(c *cli.Context, fs afero.Fs) (string, interface{}, string, error) {
 	connectionName := c.String("connection")
 	queryStr := c.String("query")
 
 	conn, err := getConnectionFromConfig(connectionName, fs)
 	if err != nil {
-		return nil, "", err
+		return "", nil, "", err
 	}
 
-	return conn, queryStr, nil
+	return connectionName, conn, queryStr, nil
 }
 
 func getConnectionFromConfig(connectionName string, fs afero.Fs) (interface{}, error) {
@@ -181,33 +224,33 @@ func getConnectionFromConfig(connectionName string, fs afero.Fs) (interface{}, e
 	return conn, nil
 }
 
-func prepareAssetQuery(c *cli.Context, fs afero.Fs) (interface{}, string, error) {
+func prepareAssetQuery(c *cli.Context, fs afero.Fs) (string, interface{}, string, error) {
 	assetPath := c.String("asset")
 	env := c.String("env")
 
 	pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "failed to get pipeline info")
+		return "", nil, "", errors.Wrap(err, "failed to get pipeline info")
 	}
 
 	// Verify that the asset is a SQL asset
 	if !pipelineInfo.Asset.IsSQLAsset() {
-		return nil, "", errors.Errorf("asset '%s' is not a SQL asset (type: %s). Only SQL assets can be queried",
+		return "", nil, "", errors.Errorf("asset '%s' is not a SQL asset (type: %s). Only SQL assets can be queried",
 			assetPath,
 			pipelineInfo.Asset.Type)
 	}
 
 	queryStr, err := extractQueryFromAsset(pipelineInfo.Asset, fs)
 	if err != nil {
-		return nil, "", err
+		return "", nil, "", err
 	}
 
-	conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
+	connName, conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
 	if err != nil {
-		return nil, "", err
+		return "", nil, "", err
 	}
 
-	return conn, queryStr, nil
+	return connName, conn, queryStr, nil
 }
 
 func extractQueryFromAsset(asset *pipeline.Asset, fs afero.Fs) (string, error) {
@@ -231,76 +274,31 @@ func extractQueryFromAsset(asset *pipeline.Asset, fs afero.Fs) (string, error) {
 	return queries[0].Query, nil
 }
 
-func getConnectionFromPipelineInfo(pipelineInfo *ppInfo, env string) (interface{}, error) {
+func getConnectionFromPipelineInfo(pipelineInfo *ppInfo, env string) (string, interface{}, error) {
 	if env != "" {
 		err := pipelineInfo.Config.SelectEnvironment(env)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to use the environment '%s'", env)
+			return "", nil, errors.Wrapf(err, "failed to use the environment '%s'", env)
 		}
 	}
 
 	// Get connection info
 	manager, errs := connection.NewManagerFromConfig(pipelineInfo.Config)
 	if len(errs) > 0 {
-		return nil, errors.Wrap(errs[0], "failed to create connection manager")
+		return "", nil, errors.Wrap(errs[0], "failed to create connection manager")
 	}
 
 	connName, err := pipelineInfo.Pipeline.GetConnectionNameForAsset(pipelineInfo.Asset)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get connection")
+		return "", nil, errors.Wrap(err, "failed to get connection")
 	}
 
 	conn, err := manager.GetConnection(connName)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("failed to get connection '%s'", connName))
+		return "", nil, errors.Wrap(err, fmt.Sprintf("failed to get connection '%s'", connName))
 	}
 
-	return conn, nil
-}
-
-func executeQuery(c *cli.Context, conn interface{}, queryStr string) error {
-	queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn)
-	if querier, ok := conn.(interface {
-		SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
-	}); ok {
-		ctx := context.Background()
-		q := query.Query{Query: queryStr}
-		result, err := querier.SelectWithSchema(ctx, &q)
-		if err != nil {
-			return handleError(c.String("output"), errors.Wrap(err, "query execution failed"))
-		}
-		// Output result based on format specified
-		output := c.String("output")
-		if output == "json" {
-			type jsonResponse struct {
-				Columns []map[string]string `json:"columns"`
-				Rows    [][]interface{}     `json:"rows"`
-			}
-
-			// Construct JSON response with structured columns
-			jsonCols := make([]map[string]string, len(result.Columns))
-			for i, colName := range result.Columns {
-				jsonCols[i] = map[string]string{"name": colName}
-			}
-
-			// Prepare the final output struct
-			finalOutput := jsonResponse{
-				Columns: jsonCols,
-				Rows:    result.Rows,
-			}
-
-			jsonData, err := json.Marshal(finalOutput)
-			if err != nil {
-				return handleError(output, errors.Wrap(err, "failed to marshal result to JSON"))
-			}
-			fmt.Println(string(jsonData))
-		} else {
-			printTable(result.Columns, result.Rows)
-		}
-	} else {
-		fmt.Printf("Connection type %s does not support querying.\n", c.String("connection"))
-	}
-	return nil
+	return connName, conn, nil
 }
 
 type Limiter interface {
@@ -404,20 +402,20 @@ func GetPipelineAndAsset(ctx context.Context, inputPath string, fs afero.Fs) (*p
 	}, nil
 }
 
-func prepareAutoDetectQuery(c *cli.Context, fs afero.Fs) (interface{}, string, error) {
+func prepareAutoDetectQuery(c *cli.Context, fs afero.Fs) (string, interface{}, string, error) {
 	assetPath := c.String("asset")
 	queryStr := c.String("query")
 	env := c.String("env")
 
 	pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "failed to get pipeline info")
+		return "", nil, "", errors.Wrap(err, "failed to get pipeline info")
 	}
 
-	conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
+	connName, conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
 	if err != nil {
-		return nil, "", err
+		return "", nil, "", err
 	}
 
-	return conn, queryStr, nil
+	return connName, conn, queryStr, nil
 }

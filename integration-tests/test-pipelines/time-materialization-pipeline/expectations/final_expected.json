@@ -116,5 +116,6 @@
             250,
             "2025-04-02T00:00:00Z"
         ]
-    ]
+    ],
+    "connectionName": "duckdb-time-materialization"
 }

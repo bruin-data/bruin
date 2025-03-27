@@ -39,6 +39,7 @@ table td:first-child {
 | `--only` | []str | `main`, `checks` | Limit the types of tasks to run. Options: `main`, `checks`, `push-metadata`. |
 | `--push-metadata` | bool | `false` | Push metadata to the destination database if supported (currently BigQuery). |
 | `--tag` | str | - | Pick assets with the given tag. |
+| `--exclude-tag` | []str | - | Exclude assets with the given tag. |
 | `--workers` | int | `16` | Number of workers to run tasks in parallel. |
 |  `--continue` | bool | `false` | Continue from the last failed asset. |
 | `--config-file` | str | - | The path to the `.bruin.yml` file. |
@@ -56,17 +57,10 @@ bruin run --continue
 > This will only work if the pipeline structure is not changed. If the pipeline structure has changed in any way, including asset dependencies, you will need to run the pipeline/asset from the beginning. This is to ensure that the pipeline/asset is run in the correct order.
 
 ### Focused Runs: Filtering by Tags and Task Types
-As detailed in the flag section above, the  `--tag`, `--downstream`, and `--only` flags provide powerful ways to filter and control which tasks in your pipeline are executed. These flags can also be combined to fine-tune pipeline runs, allowing you to execute specific subsets of tasks based on tags, include their downstream dependencies, and restrict execution to certain task types.
+As detailed in the flag section above, the  `--tag`, `--downstream`, `--exclude-tag`, and `--only` flags provide powerful ways to filter and control which tasks in your pipeline are executed. These flags can also be combined to fine-tune pipeline runs, allowing you to execute specific subsets of tasks based on tags, include their downstream dependencies, and restrict execution to certain task types.
 
-Let’s explore how combining these flags enables highly targeted pipeline execution scenarios:
+Let's explore how combining these flags enables highly targeted pipeline execution scenarios:
 
-### Combining Tags and Downstream
-
-Using `--tag` with `--downstream` filters the assets by tag and includes all downstream dependencies for those tagged assets. For example:
-```bash
-bruin run --tag important_tag --downstream
-```
-This will run all tasks of the assets tagged with `important_tag` and include all downstream tasks that depend on them.
 
 ### Combining Tags and Task Types
 Using `--tag` with `--only` restricts the tasks to specific types for the assets filtered by the given tag. For example:
@@ -75,15 +69,41 @@ bruin run --tag quality_tag --only checks
 ```
 This runs only the `checks` tasks for the assets tagged with `quality_tag` while excluding other task types.
 
-### Combining Tags, Downstream, and Task Types
-
-Adding `--only` to the mix  with `--tag` and `--downstream` allows you to specify the types of tasks to run for the tagged assets and their downstream dependencies. For example:
+### Combining Exclude Tag and Task Types
+Using `--exclude-tag` with `--only` allows you to run specific task types while excluding assets with certain tags. For example:
 ```bash
-bruin run --tag critical_tag --downstream --only main
+bruin run --exclude-tag quality_tag --only checks
 ```
-This command runs only the `main` tasks for the assets tagged with `critical_tag` and their downstream dependencies.
-## Examples
+This runs the `checks` tasks for all assets EXCEPT those tagged with `quality_tag`. This is useful when you want to skip certain assets while running specific task types.
 
+### Combining Tag and Exclude-Tag
+Using `--tag` with `--exclude-tag` allows you to include specific assets and then exclude certain ones based on another tag. For example:
+```bash
+bruin run --tag important_tag --exclude-tag quality_tag
+```
+This command will run tasks for assets tagged with `important_tag` but will exclude those that also have the `quality_tag`. This is useful for focusing on a subset of assets while excluding others that meet certain criteria.
+
+
+### Combining Downstream and Other Filtering Flags
+The `--downstream` flag can be used when running a single asset. You can combine it with other flags like `--exclude-tag` and `--only` to refine your task execution. For example:
+
+- **Using `--downstream` with `--exclude-tag`:**
+  ```bash
+  bruin run --downstream --exclude-tag quality_tag
+  ```
+  This command will run tasks for a single asset and exclude any tasks for assets tagged with `quality_tag`.
+
+- **Using `--downstream` with `--only`:**
+  ```bash
+  bruin run --downstream --only checks
+  ```
+  This command will run only the `checks` tasks for a single asset, allowing you to focus on specific task types.
+
+These combinations provide flexibility in managing task execution by allowing you to exclude certain assets or focus on specific task types while using the `--downstream` flag.
+
+
+
+## Examples
 Run the pipeline from the current directory:
 ```bash
 bruin run
