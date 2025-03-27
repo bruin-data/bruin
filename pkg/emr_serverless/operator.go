@@ -10,11 +10,13 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
+	awsCfg "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless/types"
-	"github.com/bruin-data/bruin/pkg/connection"
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/executor"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 )
 
@@ -27,51 +29,117 @@ var (
 )
 
 type BasicOperator struct {
-	client *emrserverless.Client
+	connections map[string]config.AwsConnection
 }
 
 func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
-
 	logger := log.New(
 		ctx.Value(executor.KeyPrinter).(io.Writer), "", 0,
 	)
-
 	asset := ti.GetAsset()
 
-	// TODO: validation
-	applicationId := asset.Parameters["application_id"]
-	executionRole := asset.Parameters["execution_role"]
-	entryPoint := asset.Parameters["entrypoint"]
-	timeout := time.Duration(0)
-	args := []string{}
-
-	if asset.Parameters["timeout"] != "" {
-		t, err := time.ParseDuration(asset.Parameters["timeout"])
-		if err == nil {
-			timeout = t
-		}
+	conn, exists := op.connections[asset.Connection]
+	if !exists {
+		// todo: error contents
+		return fmt.Errorf("no such connection: %s", asset.Connection)
 	}
 
-	if asset.Parameters["args"] != "" {
-		arglist := strings.Split(strings.TrimSpace(asset.Parameters["args"]), " ")
+	params := parseParams(asset.Parameters)
+	cfg, err := awsCfg.LoadDefaultConfig(
+		ctx,
+		awsCfg.WithRegion(params.Region),
+		awsCfg.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(
+				conn.AccessKey, conn.SecretKey, "",
+			),
+		),
+	)
+
+	if err != nil {
+		return fmt.Errorf("error loading aws config: %w", err)
+	}
+
+	job := Job{
+		logger: logger,
+		client: emrserverless.NewFromConfig(cfg),
+		params: params,
+		asset:  asset,
+	}
+
+	return job.Run(ctx)
+}
+
+func NewBasicOperator(cfg *config.Config) (*BasicOperator, error) {
+	op := &BasicOperator{
+		connections: make(map[string]config.AwsConnection),
+	}
+	for _, conn := range cfg.SelectedEnvironment.Connections.AwsConnection {
+		op.connections[conn.Name] = conn
+	}
+	return op, nil
+}
+
+type JobRunParams struct {
+	ApplicationID string
+	ExecutionRole string
+	Entrypoint    string
+	Args          []string
+	Config        string
+	MaxAttempts   int
+	Timeout       time.Duration
+	Region        string
+}
+
+func parseParams(m map[string]string) *JobRunParams {
+	params := JobRunParams{
+		ApplicationID: m["application_id"],
+		ExecutionRole: m["execution_role"],
+		Entrypoint:    m["entrypoint"],
+		Config:        m["config"],
+		MaxAttempts:   1,
+		Region:        m["region"],
+	}
+
+	if m["timeout"] != "" {
+		t, err := time.ParseDuration(m["timeout"])
+		if err == nil {
+			params.Timeout = t
+		}
+	}
+	if m["args"] != "" {
+		arglist := strings.Split(strings.TrimSpace(m["args"]), " ")
 		for _, arg := range arglist {
 			arg = strings.TrimSpace(arg)
 			if arg != "" {
-				args = append(args, arg)
+				params.Args = append(params.Args, arg)
 			}
 		}
 	}
+	return &params
+}
 
-	result, err := op.client.StartJobRun(ctx, &emrserverless.StartJobRunInput{
-		ApplicationId:           aws.String(applicationId),
-		Name:                    aws.String(asset.Name),
-		ExecutionRoleArn:        aws.String(executionRole),
-		ExecutionTimeoutMinutes: aws.Int64(int64(timeout.Minutes())),
+type Job struct {
+	logger *log.Logger
+	client *emrserverless.Client
+	asset  *pipeline.Asset
+	params *JobRunParams
+}
+
+func (job Job) Run(ctx context.Context) error {
+
+	result, err := job.client.StartJobRun(ctx, &emrserverless.StartJobRunInput{
+		ApplicationId:           &job.params.ApplicationID,
+		Name:                    &job.asset.Name,
+		ExecutionRoleArn:        &job.params.ExecutionRole,
+		ExecutionTimeoutMinutes: aws.Int64(int64(job.params.Timeout.Minutes())),
+		RetryPolicy: &types.RetryPolicy{
+			MaxAttempts: aws.Int32(int32(job.params.MaxAttempts)),
+		},
 		JobDriver: &types.JobDriverMemberSparkSubmit{
 			Value: types.SparkSubmit{
-				EntryPoint:            aws.String(entryPoint),
-				EntryPointArguments:   args,
-				SparkSubmitParameters: aws.String(asset.Parameters["config"]),
+				EntryPoint:            &job.params.Entrypoint,
+				EntryPointArguments:   job.params.Args,
+				SparkSubmitParameters: &job.params.Config,
 			},
 		},
 	})
@@ -79,7 +147,7 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	if err != nil {
 		return fmt.Errorf("error submitting job run: %w", err)
 	}
-	logger.Printf("job run submitted: %s", *result.JobRunId)
+	job.logger.Printf("job run submitted: %s", *result.JobRunId)
 
 	previousState := types.JobRunState("unknown")
 	for {
@@ -87,8 +155,8 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 		case <-ctx.Done():
 			return nil
 		default:
-			runs, err := op.client.ListJobRunAttempts(ctx, &emrserverless.ListJobRunAttemptsInput{
-				ApplicationId: aws.String(applicationId),
+			runs, err := job.client.ListJobRunAttempts(ctx, &emrserverless.ListJobRunAttemptsInput{
+				ApplicationId: &job.params.ApplicationID,
 				JobRunId:      result.JobRunId,
 			})
 			if err != nil {
@@ -99,7 +167,7 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 			}
 			latestRun := runs.JobRunAttempts[len(runs.JobRunAttempts)-1]
 			if previousState != latestRun.State {
-				logger.Printf("job run: %s: %s", *result.JobRunId, latestRun.State)
+				job.logger.Printf("job run: %s: %s", *result.JobRunId, latestRun.State)
 				previousState = latestRun.State
 			}
 			if slices.Contains(terminalJobRunStates, latestRun.State) {
@@ -108,15 +176,4 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 			time.Sleep(time.Second)
 		}
 	}
-}
-
-func NewBasicOperator(cm *connection.Manager) (*BasicOperator, error) {
-	cfg, err := config.LoadDefaultConfig(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("error loading aws config: %w", err)
-	}
-	op := &BasicOperator{
-		client: emrserverless.NewFromConfig(cfg),
-	}
-	return op, nil
 }

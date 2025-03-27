@@ -864,7 +864,7 @@ func setupExecutors(
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeEMRServerlessSpark) {
-		emrServerlessOperator, err := emr_serverless.NewBasicOperator(conn)
+		emrServerlessOperator, err := emr_serverless.NewBasicOperator(config)
 		if err != nil {
 			return nil, err
 		}
