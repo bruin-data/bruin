@@ -23,7 +23,7 @@
           "type": "asset",
           "value": "chess_playground.player_summary",
           "columns": [],
-        "mode": 0
+        "mode": "full"
         }
       ],
       "image": "python:3.11",
@@ -143,13 +143,13 @@
           "type": "asset",
           "value": "chess_playground.games",
           "columns": [],
-        "mode": 0
+        "mode": "full"
         },
         {
           "type": "asset",
           "value": "chess_playground.profiles",
           "columns": [],
-        "mode": 0
+        "mode": "full"
         }
       ],
       "image": "",

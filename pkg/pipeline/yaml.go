@@ -448,7 +448,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		upstreams[index] = Upstream{
 			Value:   dep.Value,
 			Type:    dep.Type,
-			Mode:    dep.Mode,
+			Mode:    dep.Mode.String(),
 			Columns: cols,
 		}
 	}

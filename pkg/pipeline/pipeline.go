@@ -556,7 +556,7 @@ type Upstream struct {
 	Value    string          `json:"value" yaml:"value" mapstructure:"value"`
 	Metadata EmptyStringMap  `json:"metadata,omitempty" yaml:"metadata,omitempty" mapstructure:"metadata"`
 	Columns  []DependsColumn `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
-	Mode     UpstreamMode    `json:"mode" yaml:"mode,omitempty" mapstructure:"mode"`
+	Mode     string          `json:"mode" yaml:"mode,omitempty" mapstructure:"mode"`
 }
 
 func (u Upstream) MarshalYAML() (interface{}, error) {
@@ -1442,8 +1442,8 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 
 	for _, asset := range pipeline.Assets {
 		for _, upstream := range asset.Upstreams {
-			if upstream.Mode != UpstreamModeFull && upstream.Mode != UpstreamModeSymbolic {
-				upstream.Mode = UpstreamModeFull
+			if upstream.Mode != UpstreamModeFull.String() && upstream.Mode != UpstreamModeSymbolic.String() {
+				upstream.Mode = UpstreamModeFull.String()
 			}
 
 			if upstream.Type != "asset" {

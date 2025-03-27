@@ -219,7 +219,7 @@ func commentRowsToTask(commentRows []string) (*Asset, error) {
 		case "depends":
 			values := strings.Split(value, ",")
 			for _, v := range values {
-				task.Upstreams = append(task.Upstreams, Upstream{Type: "asset", Value: strings.TrimSpace(v), Columns: make([]DependsColumn, 0), Mode: UpstreamModeFull})
+				task.Upstreams = append(task.Upstreams, Upstream{Type: "asset", Value: strings.TrimSpace(v), Columns: make([]DependsColumn, 0), Mode: UpstreamModeFull.String()})
 			}
 
 			continue
