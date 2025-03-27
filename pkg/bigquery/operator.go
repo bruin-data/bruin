@@ -200,11 +200,9 @@ func (o *QuerySensor) Run(ctx context.Context, ti scheduler.TaskInstance) error 
 }
 
 func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
-
 	if o.sensorMode == "skip" {
 		return nil
 	}
-
 	qq, ok := t.Parameters["query"]
 	if !ok {
 		return errors.New("query sensor requires a parameter named 'query'")
