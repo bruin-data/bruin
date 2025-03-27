@@ -472,7 +472,7 @@ func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset
 		if value == "" {
 			issues = append(issues, &Issue{
 				Task: asset,
-				Description: fmt.Sprintf(
+				Description: fmt.Sprintf( //nolint
 					"missing required field parameters.%s", key,
 				),
 			})
@@ -493,8 +493,8 @@ func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset
 				Description: "parameters.timeout must be atleast 5m or zero",
 			})
 		}
-
 	}
+
 	maxAttemptsSpec := strings.TrimSpace(asset.Parameters["max_attempts"])
 	if maxAttemptsSpec != "" {
 		maxAttempts, err := strconv.Atoi(maxAttemptsSpec)

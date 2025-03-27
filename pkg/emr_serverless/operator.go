@@ -1,7 +1,8 @@
-package emr_serverless
+package emr_serverless //nolint
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -89,7 +90,7 @@ type JobRunParams struct {
 	Entrypoint    string
 	Args          []string
 	Config        string
-	MaxAttempts   int
+	MaxAttempts   int32
 	Timeout       time.Duration
 	Region        string
 }
@@ -120,9 +121,9 @@ func parseParams(m map[string]string) *JobRunParams {
 		}
 	}
 	if m["max_attempts"] != "" {
-		max, err := strconv.ParseInt(m["max_attempts"], 10, 32)
-		if err == nil && max > 0 {
-			params.MaxAttempts = int(max)
+		maxAttempts, err := strconv.ParseInt(m["max_attempts"], 10, 32)
+		if err == nil && maxAttempts > 0 {
+			params.MaxAttempts = int32(maxAttempts)
 		}
 	}
 	return &params
@@ -135,7 +136,7 @@ type Job struct {
 	params *JobRunParams
 }
 
-func (job Job) Run(ctx context.Context) (err error) {
+func (job Job) Run(ctx context.Context) (err error) { //nolint
 
 	result, err := job.client.StartJobRun(ctx, &emrserverless.StartJobRunInput{
 		ApplicationId:           &job.params.ApplicationID,
@@ -143,7 +144,7 @@ func (job Job) Run(ctx context.Context) (err error) {
 		ExecutionRoleArn:        &job.params.ExecutionRole,
 		ExecutionTimeoutMinutes: aws.Int64(int64(job.params.Timeout.Minutes())),
 		RetryPolicy: &types.RetryPolicy{
-			MaxAttempts: aws.Int32(int32(job.params.MaxAttempts)),
+			MaxAttempts: aws.Int32(int32(job.params.MaxAttempts)), //nolint
 		},
 		JobDriver: &types.JobDriverMemberSparkSubmit{
 			Value: types.SparkSubmit{
@@ -158,10 +159,10 @@ func (job Job) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("error submitting job run: %w", err)
 	}
 	job.logger.Printf("created job run: %s", *result.JobRunId)
-	defer func() {
+	defer func() { //nolint
 		if err != nil {
 			job.logger.Printf("error detected. cancelling job run.")
-			job.client.CancelJobRun(context.Background(), &emrserverless.CancelJobRunInput{
+			job.client.CancelJobRun(context.Background(), &emrserverless.CancelJobRunInput{ //nolint
 				ApplicationId: &job.params.ApplicationID,
 				JobRunId:      result.JobRunId,
 			})
@@ -178,7 +179,7 @@ func (job Job) Run(ctx context.Context) (err error) {
 			listAttemptsInput := &emrserverless.ListJobRunAttemptsInput{
 				ApplicationId: &job.params.ApplicationID,
 				JobRunId:      result.JobRunId,
-				MaxResults:    aws.Int32(int32(job.params.MaxAttempts)),
+				MaxResults:    &job.params.MaxAttempts,
 			}
 			if nextToken != "" {
 				listAttemptsInput.NextToken = &nextToken
@@ -188,7 +189,7 @@ func (job Job) Run(ctx context.Context) (err error) {
 				return fmt.Errorf("error checking job run status: %w", err)
 			}
 			if len(runs.JobRunAttempts) == 0 {
-				return fmt.Errorf("job runs not found")
+				return errors.New("job runs not found")
 			}
 			latestRun := runs.JobRunAttempts[len(runs.JobRunAttempts)-1]
 			if previousState != latestRun.State {
@@ -205,7 +206,7 @@ func (job Job) Run(ctx context.Context) (err error) {
 			if latestRun.State == types.JobRunStateCancelled {
 				return nil
 			}
-			if slices.Contains(terminalJobRunStates, latestRun.State) && int(*latestRun.Attempt) == job.params.MaxAttempts {
+			if slices.Contains(terminalJobRunStates, latestRun.State) && *latestRun.Attempt == job.params.MaxAttempts {
 				return nil
 			}
 			if runs.NextToken != nil {
