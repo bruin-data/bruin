@@ -50,8 +50,8 @@ const (
 	UpstreamModeSymbolic
 )
 
-func (m UpstreamMode) IsValid() bool {
-	switch m {
+func (m *UpstreamMode) IsValid() bool {
+	switch *m {
 	case UpstreamModeFull, UpstreamModeSymbolic:
 		return true
 	default:
@@ -59,8 +59,8 @@ func (m UpstreamMode) IsValid() bool {
 	}
 }
 
-func (m UpstreamMode) String() string {
-	switch m {
+func (m *UpstreamMode) String() string {
+	switch *m {
 	case UpstreamModeFull:
 		return "full"
 	case UpstreamModeSymbolic:
@@ -70,7 +70,7 @@ func (m UpstreamMode) String() string {
 	}
 }
 
-func (m UpstreamMode) MarshalJSON() ([]byte, error) {
+func (m *UpstreamMode) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m.String())
 }
 
