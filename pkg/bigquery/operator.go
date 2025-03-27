@@ -240,7 +240,6 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		if printerExists {
 			fmt.Fprintln(printer, "Info: Sensor didn't return the expected result, waiting for", pokeInterval, "seconds")
 		}
-
 	}
 	return nil
 }
