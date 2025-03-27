@@ -452,6 +452,31 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 	return issues, nil
 }
 
+func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if asset.Type != pipeline.AssetTypeEMRServerlessSpark {
+		return issues, nil
+	}
+
+	required := []string{
+		"application_id",
+		"execution_role",
+		"entrypoint",
+	}
+	for _, key := range required {
+		value := strings.TrimSpace(asset.Parameters[key])
+		if value == "" {
+			issues = append(issues, &Issue{
+				Task: asset,
+				Description: fmt.Sprintf(
+					"EMR Serverless Spark assets require parameters.%s", key,
+				),
+			})
+		}
+	}
+	return issues, nil
+}
+
 // ValidateDuplicateColumnNames checks for duplicate column names within a single asset.
 // It returns a slice of Issues, each representing a duplicate column name found.
 //
