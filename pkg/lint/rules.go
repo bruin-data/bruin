@@ -461,10 +461,18 @@ func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset
 		return issues, nil
 	}
 
+	if strings.TrimSpace(asset.Connection) == "" {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "connection is required",
+		})
+	}
+
 	required := []string{
 		"application_id",
 		"execution_role",
 		"entrypoint",
+		"region",
 	}
 	for _, key := range required {
 		value := strings.TrimSpace(asset.Parameters[key])
