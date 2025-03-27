@@ -144,7 +144,7 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 		ExecutionRoleArn:        &job.params.ExecutionRole,
 		ExecutionTimeoutMinutes: aws.Int64(int64(job.params.Timeout.Minutes())),
 		RetryPolicy: &types.RetryPolicy{
-			MaxAttempts: aws.Int32(int32(job.params.MaxAttempts)), //nolint
+			MaxAttempts: aws.Int32(job.params.MaxAttempts),
 		},
 		JobDriver: &types.JobDriverMemberSparkSubmit{
 			Value: types.SparkSubmit{
