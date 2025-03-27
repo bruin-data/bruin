@@ -182,14 +182,16 @@ type renderer interface {
 }
 
 type QuerySensor struct {
-	connection connectionFetcher
-	renderer   renderer
+	connection  connectionFetcher
+	renderer    renderer
+	sensorWatch bool
 }
 
-func NewQuerySensor(conn connectionFetcher, renderer renderer) *QuerySensor {
+func NewQuerySensor(conn connectionFetcher, renderer renderer, sensorWatch bool) *QuerySensor {
 	return &QuerySensor{
-		connection: conn,
-		renderer:   renderer,
+		connection:  conn,
+		renderer:    renderer,
+		sensorWatch: sensorWatch,
 	}
 }
 
@@ -234,6 +236,9 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 
 		if intRes > 0 {
 			break
+		}
+		if !o.sensorWatch {
+			return errors.New("Sensor didn't return the expected result")
 		}
 		pokeInterval := helpers.GetPokeInterval(ctx, t)
 		time.Sleep(time.Duration(pokeInterval) * time.Second)

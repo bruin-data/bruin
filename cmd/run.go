@@ -112,6 +112,10 @@ func Run(isDebug *bool) *cli.Command {
 				Usage: "do not create a log file for this run",
 			},
 			&cli.BoolFlag{
+				Name:  "sensor-watch",
+				Usage: "Continuously monitor the sensor’s output until it returns true or reaches the expected result",
+			},
+			&cli.BoolFlag{
 				Name:    "full-refresh",
 				Aliases: []string{"r"},
 				Usage:   "truncate the table before running",
@@ -183,6 +187,7 @@ func Run(isDebug *bool) *cli.Command {
 				Output:            c.String("output"),
 				ExpUseWingetForUv: c.Bool("exp-use-winget-for-uv"),
 				ConfigFilePath:    c.String("config-file"),
+				SensorWatch:       c.Bool("sensor-watch"),
 			}
 
 			var startDate, endDate time.Time
@@ -352,7 +357,7 @@ func Run(isDebug *bool) *cli.Command {
 			infoPrinter.Printf("\nStarting the pipeline execution...\n")
 			infoPrinter.Println()
 
-			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip)
+			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorWatch)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -617,6 +622,7 @@ func setupExecutors(
 	runID string,
 	fullRefresh bool,
 	usePipForPython bool,
+	sensorWatch bool,
 ) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
 
@@ -655,7 +661,7 @@ func setupExecutors(
 		}
 
 		metadataPushOperator := bigquery.NewMetadataPushOperator(conn)
-		bqQuerySensor := bigquery.NewQuerySensor(conn, renderer)
+		bqQuerySensor := bigquery.NewQuerySensor(conn, renderer, sensorWatch)
 
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeMain] = bqOperator
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner
