@@ -111,6 +111,11 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "no-log-file",
 				Usage: "do not create a log file for this run",
 			},
+			&cli.StringFlag{
+				Name:        "sensor-mode",
+				DefaultText: "'once' (default), 'skip', 'wait'",
+				Usage:       "Set sensor mode: 'skip' to bypass, 'once' to run once, or 'wait' to loop until expected result",
+			},
 			&cli.BoolFlag{
 				Name:    "full-refresh",
 				Aliases: []string{"r"},
@@ -183,6 +188,7 @@ func Run(isDebug *bool) *cli.Command {
 				Output:            c.String("output"),
 				ExpUseWingetForUv: c.Bool("exp-use-winget-for-uv"),
 				ConfigFilePath:    c.String("config-file"),
+				SensorMode:        c.String("sensor-mode"),
 			}
 
 			var startDate, endDate time.Time
@@ -351,8 +357,14 @@ func Run(isDebug *bool) *cli.Command {
 			sendTelemetry(s, c)
 			infoPrinter.Printf("\nStarting the pipeline execution...\n")
 			infoPrinter.Println()
+			if runConfig.SensorMode != "" {
+				if !(runConfig.SensorMode == "skip" || runConfig.SensorMode == "once" || runConfig.SensorMode == "wait") {
+					errorPrinter.Printf("invalid value for '--mode' flag: '%s', valid options are --skip ,--once, --wait", runConfig.SensorMode)
+					return cli.Exit("", 1)
+				}
+			}
 
-			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip)
+			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -617,6 +629,7 @@ func setupExecutors(
 	runID string,
 	fullRefresh bool,
 	usePipForPython bool,
+	sensorMode string,
 ) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
 
@@ -655,7 +668,7 @@ func setupExecutors(
 		}
 
 		metadataPushOperator := bigquery.NewMetadataPushOperator(conn)
-		bqQuerySensor := bigquery.NewQuerySensor(conn, renderer)
+		bqQuerySensor := bigquery.NewQuerySensor(conn, renderer, sensorMode)
 
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeMain] = bqOperator
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner

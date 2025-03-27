@@ -140,6 +140,7 @@ type RunConfig struct {
 	Output            string   `json:"output"`
 	ExpUseWingetForUv bool     `json:"expUseWingetForUv"`
 	ConfigFilePath    string   `json:"configFilePath"`
+	SensorMode        string   `json:"sensorMode"`
 }
 
 type PipelineAssetState struct {
