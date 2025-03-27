@@ -224,26 +224,32 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		fmt.Fprintln(printer, "Poking:", trimmedQuery)
 	}
 
+	timeout := time.After(24 * time.Hour)
 	for {
-		res, err := conn.Select(ctx, &query.Query{Query: qq})
-		if err != nil {
-			return err
-		}
-		intRes, err := helpers.CastResultToInteger(res)
-		if err != nil {
-			return errors.Wrap(err, "failed to parse query sensor result")
-		}
+		select {
+		case <-timeout:
+			return errors.New("Sensor timed out after 24 hours")
+		default:
+			res, err := conn.Select(ctx, &query.Query{Query: qq})
+			if err != nil {
+				return err
+			}
+			intRes, err := helpers.CastResultToInteger(res)
+			if err != nil {
+				return errors.Wrap(err, "failed to parse query sensor result")
+			}
 
-		if intRes > 0 {
-			break
-		}
-		if !o.sensorWatch {
-			return errors.New("Sensor didn't return the expected result")
-		}
-		pokeInterval := helpers.GetPokeInterval(ctx, t)
-		time.Sleep(time.Duration(pokeInterval) * time.Second)
-		if printerExists {
-			fmt.Fprintln(printer, "Info: Sensor didn't return the expected result, waiting for", pokeInterval, "seconds")
+			if intRes > 0 {
+				break
+			}
+			if !o.sensorWatch {
+				return errors.New("Sensor didn't return the expected result")
+			}
+			pokeInterval := helpers.GetPokeInterval(ctx, t)
+			time.Sleep(time.Duration(pokeInterval) * time.Second)
+			if printerExists {
+				fmt.Fprintln(printer, "Info: Sensor didn't return the expected result, waiting for", pokeInterval, "seconds")
+			}
 		}
 	}
 	return nil
