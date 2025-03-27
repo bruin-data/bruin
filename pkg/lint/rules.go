@@ -469,10 +469,27 @@ func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset
 			issues = append(issues, &Issue{
 				Task: asset,
 				Description: fmt.Sprintf(
-					"EMR Serverless Spark assets require parameters.%s", key,
+					"missing required field parameters.%s", key,
 				),
 			})
 		}
+	}
+	timeoutSpec := strings.TrimSpace(asset.Parameters["timeout"])
+	if timeoutSpec != "" {
+		timeout, err := time.ParseDuration(timeoutSpec)
+		if err != nil {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "parameters.timeout is not a valid duration",
+			})
+		}
+		if timeout != 0 && timeout < (5*time.Minute) {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "parameters.timeout must be atleast 5m or zero",
+			})
+		}
+
 	}
 	return issues, nil
 }
