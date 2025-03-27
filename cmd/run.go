@@ -111,9 +111,10 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "no-log-file",
 				Usage: "do not create a log file for this run",
 			},
-			&cli.BoolFlag{
-				Name:  "sensor-watch",
-				Usage: "Continuously monitor the sensor’s output until it returns true or reaches the expected result",
+			&cli.StringFlag{
+				Name:        "sensor-mode",
+				DefaultText: "'once' (default), 'skip', 'wait'",
+				Usage:       "Set sensor mode: 'skip' to bypass, 'once' to run once, or 'wait' to loop until expected result",
 			},
 			&cli.BoolFlag{
 				Name:    "full-refresh",
@@ -187,7 +188,7 @@ func Run(isDebug *bool) *cli.Command {
 				Output:            c.String("output"),
 				ExpUseWingetForUv: c.Bool("exp-use-winget-for-uv"),
 				ConfigFilePath:    c.String("config-file"),
-				SensorWatch:       c.Bool("sensor-watch"),
+				SensorMode:        c.String("sensor-mode"),
 			}
 
 			var startDate, endDate time.Time
@@ -356,8 +357,13 @@ func Run(isDebug *bool) *cli.Command {
 			sendTelemetry(s, c)
 			infoPrinter.Printf("\nStarting the pipeline execution...\n")
 			infoPrinter.Println()
+			if runConfig.SensorMode != "" {
+				if !(runConfig.SensorMode == "skip" || runConfig.SensorMode == "once" || runConfig.SensorMode == "wait") {
+					return fmt.Errorf("invalid value for '--mode' flag: '%s', valid options are --skip ,--once, --wait", runConfig.SensorMode)
+				}
+			}
 
-			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorWatch)
+			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -622,7 +628,7 @@ func setupExecutors(
 	runID string,
 	fullRefresh bool,
 	usePipForPython bool,
-	sensorWatch bool,
+	sensorMode string,
 ) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
 
@@ -661,7 +667,7 @@ func setupExecutors(
 		}
 
 		metadataPushOperator := bigquery.NewMetadataPushOperator(conn)
-		bqQuerySensor := bigquery.NewQuerySensor(conn, renderer, sensorWatch)
+		bqQuerySensor := bigquery.NewQuerySensor(conn, renderer, sensorMode)
 
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeMain] = bqOperator
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner

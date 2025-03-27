@@ -182,16 +182,16 @@ type renderer interface {
 }
 
 type QuerySensor struct {
-	connection  connectionFetcher
-	renderer    renderer
-	sensorWatch bool
+	connection connectionFetcher
+	renderer   renderer
+	sensorMode string
 }
 
-func NewQuerySensor(conn connectionFetcher, renderer renderer, sensorWatch bool) *QuerySensor {
+func NewQuerySensor(conn connectionFetcher, renderer renderer, sensorMode string) *QuerySensor {
 	return &QuerySensor{
-		connection:  conn,
-		renderer:    renderer,
-		sensorWatch: sensorWatch,
+		connection: conn,
+		renderer:   renderer,
+		sensorMode: sensorMode,
 	}
 }
 
@@ -200,6 +200,11 @@ func (o *QuerySensor) Run(ctx context.Context, ti scheduler.TaskInstance) error 
 }
 
 func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
+
+	if o.sensorMode == "skip" {
+		return nil
+	}
+
 	qq, ok := t.Parameters["query"]
 	if !ok {
 		return errors.New("query sensor requires a parameter named 'query'")
@@ -218,6 +223,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	if err != nil {
 		return err
 	}
+
 	trimmedQuery := helpers.TrimToLength(qq, 50)
 	printer, printerExists := ctx.Value(executor.KeyPrinter).(io.Writer)
 	if printerExists {
@@ -242,9 +248,10 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 			if intRes > 0 {
 				return nil
 			}
-			if !o.sensorWatch {
+			if o.sensorMode == "once" || o.sensorMode == "" {
 				return errors.New("Sensor didn't return the expected result")
 			}
+
 			pokeInterval := helpers.GetPokeInterval(ctx, t)
 			time.Sleep(time.Duration(pokeInterval) * time.Second)
 			if printerExists {
