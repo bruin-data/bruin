@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -490,6 +491,22 @@ func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset
 			})
 		}
 
+	}
+	maxAttemptsSpec := strings.TrimSpace(asset.Parameters["max_attempts"])
+	if maxAttemptsSpec != "" {
+		maxAttempts, err := strconv.Atoi(maxAttemptsSpec)
+		if err != nil {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "parameters.max_attempts is not an integer",
+			})
+		}
+		if maxAttempts == 0 {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "parameters.max_attempts must be greater than or equal to 1",
+			})
+		}
 	}
 	return issues, nil
 }
