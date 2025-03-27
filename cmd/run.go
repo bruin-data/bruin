@@ -359,7 +359,8 @@ func Run(isDebug *bool) *cli.Command {
 			infoPrinter.Println()
 			if runConfig.SensorMode != "" {
 				if !(runConfig.SensorMode == "skip" || runConfig.SensorMode == "once" || runConfig.SensorMode == "wait") {
-					return fmt.Errorf("invalid value for '--mode' flag: '%s', valid options are --skip ,--once, --wait", runConfig.SensorMode)
+					errorPrinter.Printf("invalid value for '--mode' flag: '%s', valid options are --skip ,--once, --wait", runConfig.SensorMode)
+					return cli.Exit("", 1)
 				}
 			}
 
