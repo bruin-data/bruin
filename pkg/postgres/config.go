@@ -50,6 +50,10 @@ func (c Config) GetIngestrURI() string {
 	return connString
 }
 
+func (c Config) GetDatabase() string {
+	return c.Database
+}
+
 type RedShiftConfig struct {
 	Username     string
 	Password     string
@@ -87,4 +91,8 @@ func (c RedShiftConfig) GetIngestrURI() string {
 	)
 
 	return connString
+}
+
+func (c RedShiftConfig) GetDatabase() string {
+	return c.Database
 }

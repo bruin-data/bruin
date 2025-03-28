@@ -4,9 +4,11 @@ import (
 	"context"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/devenv"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
 )
 
@@ -23,6 +25,7 @@ type PgClient interface {
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
 	Ping(ctx context.Context) error
+	GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error)
 }
 
 type connectionFetcher interface {
@@ -30,17 +33,28 @@ type connectionFetcher interface {
 	GetConnection(name string) (interface{}, error)
 }
 
+type devEnv interface {
+	Modify(ctx context.Context, p *pipeline.Pipeline, a *pipeline.Asset, q *query.Query) (*query.Query, error)
+	RegisterAssetForSchemaCache(ctx context.Context, p *pipeline.Pipeline, a *pipeline.Asset, q *query.Query) error
+}
+
 type BasicOperator struct {
 	connection   connectionFetcher
 	extractor    queryExtractor
 	materializer materializer
+	devEnv       devEnv
 }
 
-func NewBasicOperator(conn connectionFetcher, extractor queryExtractor, materializer materializer) *BasicOperator {
+func NewBasicOperator(conn connectionFetcher, extractor queryExtractor, materializer materializer, parser *sqlparser.SQLParser) *BasicOperator {
 	return &BasicOperator{
 		connection:   conn,
 		extractor:    extractor,
 		materializer: materializer,
+		devEnv: &devenv.DevEnvQueryModifier{
+			Dialect: "postgres",
+			Conn:    conn,
+			Parser:  parser,
+		},
 	}
 }
 
@@ -58,8 +72,10 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return nil
 	}
 
-	if len(queries) > 1 && t.Materialization.Type != pipeline.MaterializationTypeNone {
-		return errors.New("cannot enable materialization for tasks with multiple queries")
+	if len(queries) > 1 {
+		// if the code hits here this means that we used an extractor that splits the content into multiple queries.
+		// this is not supported and we should not allow it, Postgres-like platforms accepts multiple SQL statements in a single query, that's what we use instead.
+		return errors.New("Postgres-like operators can only handle one query at a time, this seems like a bug, please report the issue to the Bruin team")
 	}
 
 	q := queries[0]
@@ -91,7 +107,26 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	return conn.RunQueryWithoutResult(ctx, q)
+	if o.devEnv == nil {
+		return conn.RunQueryWithoutResult(ctx, q)
+	}
+
+	q, err = o.devEnv.Modify(ctx, p, t, q)
+	if err != nil {
+		return err
+	}
+
+	err = conn.RunQueryWithoutResult(ctx, q)
+	if err != nil {
+		return err
+	}
+
+	err = o.devEnv.RegisterAssetForSchemaCache(ctx, p, t, q)
+	if err != nil {
+		return errors.Wrap(err, "cannot register asset for schema cache")
+	}
+
+	return nil
 }
 
 func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOperator {
