@@ -55,9 +55,6 @@ parameters:
   # spark configuration (optional)
   config: --conf spark.executor.cores=1
 
-  # maximum retries (optional, defaults to 1)
-  max_attempts: 2
-
   # timeout for the job, defaults to 0 which means no time limit (optional)
   timeout: 10m
 

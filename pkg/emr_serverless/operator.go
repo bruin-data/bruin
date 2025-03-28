@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +25,7 @@ var (
 	terminalJobRunStates = []types.JobRunState{
 		types.JobRunStateFailed,
 		types.JobRunStateSuccess,
+		types.JobRunStateCancelled,
 	}
 )
 
@@ -90,7 +90,6 @@ type JobRunParams struct {
 	Entrypoint    string
 	Args          []string
 	Config        string
-	MaxAttempts   int32
 	Timeout       time.Duration
 	Region        string
 }
@@ -101,7 +100,6 @@ func parseParams(m map[string]string) *JobRunParams {
 		ExecutionRole: m["execution_role"],
 		Entrypoint:    m["entrypoint"],
 		Config:        m["config"],
-		MaxAttempts:   1,
 		Region:        m["region"],
 	}
 
@@ -118,12 +116,6 @@ func parseParams(m map[string]string) *JobRunParams {
 			if arg != "" {
 				params.Args = append(params.Args, arg)
 			}
-		}
-	}
-	if m["max_attempts"] != "" {
-		maxAttempts, err := strconv.ParseInt(m["max_attempts"], 10, 32)
-		if err == nil && maxAttempts > 0 {
-			params.MaxAttempts = int32(maxAttempts)
 		}
 	}
 	return &params
@@ -143,9 +135,6 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 		Name:                    &job.asset.Name,
 		ExecutionRoleArn:        &job.params.ExecutionRole,
 		ExecutionTimeoutMinutes: aws.Int64(int64(job.params.Timeout.Minutes())),
-		RetryPolicy: &types.RetryPolicy{
-			MaxAttempts: aws.Int32(job.params.MaxAttempts),
-		},
 		JobDriver: &types.JobDriverMemberSparkSubmit{
 			Value: types.SparkSubmit{
 				EntryPoint:            &job.params.Entrypoint,
@@ -170,21 +159,15 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 	}()
 
 	previousState := types.JobRunState("unknown")
-	var nextToken string
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			listAttemptsInput := &emrserverless.ListJobRunAttemptsInput{
+			runs, err := job.client.ListJobRunAttempts(ctx, &emrserverless.ListJobRunAttemptsInput{
 				ApplicationId: &job.params.ApplicationID,
 				JobRunId:      result.JobRunId,
-				MaxResults:    &job.params.MaxAttempts,
-			}
-			if nextToken != "" {
-				listAttemptsInput.NextToken = &nextToken
-			}
-			runs, err := job.client.ListJobRunAttempts(ctx, listAttemptsInput)
+			})
 			if err != nil {
 				return fmt.Errorf("error checking job run status: %w", err)
 			}
@@ -194,23 +177,15 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 			latestRun := runs.JobRunAttempts[len(runs.JobRunAttempts)-1]
 			if previousState != latestRun.State {
 				job.logger.Printf(
-					"%s | %d/%d | %s | %s",
+					"%s | %s | %s",
 					*result.JobRunId,
-					*latestRun.Attempt,
-					job.params.MaxAttempts,
 					latestRun.State,
 					*latestRun.StateDetails,
 				)
 				previousState = latestRun.State
 			}
-			if latestRun.State == types.JobRunStateCancelled {
+			if slices.Contains(terminalJobRunStates, latestRun.State) {
 				return nil
-			}
-			if slices.Contains(terminalJobRunStates, latestRun.State) && *latestRun.Attempt == job.params.MaxAttempts {
-				return nil
-			}
-			if runs.NextToken != nil {
-				nextToken = *runs.NextToken
 			}
 			time.Sleep(time.Second)
 		}
