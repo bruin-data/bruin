@@ -6,12 +6,14 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/signal"
 	path2 "path"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
@@ -23,6 +25,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/date"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
+	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/ingestr"
@@ -385,7 +388,10 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, python.LocalIngestr, c.String("debug-ingestr-src"))
 			runCtx = context.WithValue(runCtx, config.EnvironmentContextKey, cm.SelectedEnvironment)
 
-			ex.Start(runCtx, s.WorkQueue, s.Results)
+			exeCtx, cancel := signal.NotifyContext(runCtx, syscall.SIGINT, syscall.SIGTERM)
+			defer cancel()
+
+			ex.Start(exeCtx, s.WorkQueue, s.Results)
 
 			start := time.Now()
 			results := s.Run(runCtx)
@@ -875,6 +881,14 @@ func setupExecutors(
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = checkRunner
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		}
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeEMRServerlessSpark) {
+		emrServerlessOperator, err := emr_serverless.NewBasicOperator(config)
+		if err != nil {
+			return nil, err
+		}
+		mainExecutors[pipeline.AssetTypeEMRServerlessSpark][scheduler.TaskInstanceTypeMain] = emrServerlessOperator
 	}
 
 	return mainExecutors, nil

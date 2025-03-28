@@ -452,6 +452,58 @@ func ValidateAssetSeedValidation(ctx context.Context, p *pipeline.Pipeline, asse
 	return issues, nil
 }
 
+var arnPattern = regexp.MustCompile(`^arn:[^:\n]*:[^:\n]*:[^:\n]*:[^:\n]*:(?:[^:\/\n]*[:\/])?.*$`)
+
+func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if asset.Type != pipeline.AssetTypeEMRServerlessSpark {
+		return issues, nil
+	}
+
+	required := []string{
+		"application_id",
+		"execution_role",
+		"entrypoint",
+		"region",
+	}
+	for _, key := range required {
+		value := strings.TrimSpace(asset.Parameters[key])
+		if value == "" {
+			issues = append(issues, &Issue{
+				Task: asset,
+				Description: fmt.Sprintf( //nolint
+					"missing required field parameters.%s", key,
+				),
+			})
+		}
+	}
+	timeoutSpec := strings.TrimSpace(asset.Parameters["timeout"])
+	if timeoutSpec != "" {
+		timeout, err := time.ParseDuration(timeoutSpec)
+		if err != nil {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "parameters.timeout is not a valid duration",
+			})
+		}
+		if timeout != 0 && timeout < (5*time.Minute) {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "parameters.timeout must be atleast 5m or zero",
+			})
+		}
+	}
+
+	executionRole := strings.TrimSpace(asset.Parameters["execution_role"])
+	if executionRole != "" && !arnPattern.MatchString(executionRole) {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "parameters.execution_role must be an Amazon Resource Name (ARN)",
+		})
+	}
+	return issues, nil
+}
+
 // ValidateDuplicateColumnNames checks for duplicate column names within a single asset.
 // It returns a slice of Issues, each representing a duplicate column name found.
 //

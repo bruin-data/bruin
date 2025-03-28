@@ -126,6 +126,7 @@ export default defineConfig({
                     {text: "Redshift", link: "/platforms/redshift"},
                     {text: "Snowflake", link: "/platforms/snowflake"},
                     {text: "Synapse", link: "/platforms/synapse"},
+                    {text: "AWS EMR Serverless", link: "/platforms/emr_serverless"},
                 ],
             },
             {

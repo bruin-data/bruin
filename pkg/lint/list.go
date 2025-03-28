@@ -186,6 +186,14 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			AssetValidator:   ValidatePythonAssetMaterialization,
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
 		},
+		&SimpleRule{
+			Identifier:       "emr-serverless-spark-validation",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			Validator:        CallFuncForEveryAsset(ValidateEMRServerlessAsset),
+			AssetValidator:   ValidateEMRServerlessAsset,
+			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
+		},
 	}
 
 	if parser != nil {
