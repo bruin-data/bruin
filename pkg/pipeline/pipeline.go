@@ -643,6 +643,23 @@ func (a *Asset) PrefixSchema(prefix string) {
 	}
 }
 
+func (a *Asset) PrefixUpstreams(prefix string) {
+	if prefix == "" {
+		return
+	}
+
+	for i, u := range a.Upstreams {
+		if u.Type != "asset" {
+			continue
+		}
+
+		nameParts := strings.Split(u.Value, ".")
+		if len(nameParts) == 2 {
+			a.Upstreams[i].Value = prefix + nameParts[0] + "." + nameParts[1]
+		}
+	}
+}
+
 // removeRedundanciesBeforePersisting aims to remove unnecessary configuration from the asset.
 // This is particularly useful when we save a formatted version of the asset itself.
 func (a *Asset) removeRedundanciesBeforePersisting() {
