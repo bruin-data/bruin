@@ -266,7 +266,8 @@ func TestApplyFilters(t *testing.T) {
 			filter:          &Filter{IncludeDownstream: true, IncludeTag: "tag1"},
 			expectedPending: []string{},
 			expectError:     true,
-			expectedError:   "cannot use the --downstream flag when running the whole pipeline"},
+			expectedError:   "cannot use the --downstream flag when running the whole pipeline",
+		},
 		{
 			name: "Only Check Task Type",
 			pipeline: &pipeline.Pipeline{

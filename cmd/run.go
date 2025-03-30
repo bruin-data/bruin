@@ -396,7 +396,6 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode, parser)
-
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)

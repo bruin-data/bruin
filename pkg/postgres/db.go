@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"context"
+	"sort"
+
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jackc/pgx/v5"
@@ -139,7 +141,7 @@ FROM
     information_schema.tables
 WHERE
 	table_catalog = $1 AND table_schema NOT IN ('pg_catalog', 'information_schema')
-ORDER BY table_catalog, table_schema, table_name;
+ORDER BY table_schema, table_name;
 `
 
 	rows, err := c.connection.Query(ctx, q, db)
@@ -149,7 +151,7 @@ ORDER BY table_catalog, table_schema, table_name;
 
 	defer rows.Close()
 
-	collectedRows, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) ([]interface{}, error) {
+	collectedRows, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) ([]any, error) {
 		return row.Values()
 	})
 	if err != nil {
@@ -190,6 +192,11 @@ ORDER BY table_catalog, table_schema, table_name;
 	for _, schema := range schemas {
 		summary.Schemas = append(summary.Schemas, schema)
 	}
+
+	// Sort schemas by name
+	sort.Slice(summary.Schemas, func(i, j int) bool {
+		return summary.Schemas[i].Name < summary.Schemas[j].Name
+	})
 
 	return summary, nil
 }
