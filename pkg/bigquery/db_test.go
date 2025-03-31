@@ -1307,3 +1307,65 @@ func TestClient_IsMaterializationTypeMismatch(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildTableExistsQuery(t *testing.T) {
+	tests := []struct {
+		name        string
+		client      *Client
+		tableName   string
+		wantQuery   string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:      "valid dataset.table format",
+			client:    &Client{config: &Config{ProjectID: "test-project"}},
+			tableName: "dataset.table",
+			wantQuery: "SELECT EXISTS (SELECT 1 FROM test-project.dataset.INFORMATION_SCHEMA.TABLES WHERE table_name = 'table')",
+			wantErr:   false,
+		},
+		{
+			name:      "valid project.dataset.table format",
+			client:    &Client{config: &Config{ProjectID: "test-project"}},
+			tableName: "other-project.dataset.table",
+			wantQuery: "SELECT EXISTS (SELECT 1 FROM other-project.dataset.INFORMATION_SCHEMA.TABLES WHERE table_name = 'table')",
+			wantErr:   false,
+		},
+		{
+			name:        "invalid empty component",
+			client:      &Client{config: &Config{ProjectID: "test-project"}},
+			tableName:   "dataset..table",
+			wantErr:     true,
+			errContains: "table name must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "invalid format - too few components",
+			client:      &Client{config: &Config{ProjectID: "test-project"}},
+			tableName:   "single",
+			wantErr:     true,
+			errContains: "table name must be in dataset.table or project.dataset.table format",
+		},
+		{
+			name:        "invalid format - too many components",
+			client:      &Client{config: &Config{ProjectID: "test-project"}},
+			tableName:   "a.b.c.d",
+			wantErr:     true,
+			errContains: "table name must be in dataset.table or project.dataset.table format",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotQuery, err := tt.client.BuildTableExistsQuery(tt.tableName)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantQuery, gotQuery)
+		})
+	}
+}
