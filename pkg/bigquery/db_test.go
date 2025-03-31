@@ -1309,6 +1309,7 @@ func TestClient_IsMaterializationTypeMismatch(t *testing.T) {
 }
 
 func TestBuildTableExistsQuery(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		client      *Client
@@ -1356,15 +1357,16 @@ func TestBuildTableExistsQuery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			gotQuery, err := tt.client.BuildTableExistsQuery(tt.tableName)
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errContains)
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.wantQuery, gotQuery)
 		})
 	}

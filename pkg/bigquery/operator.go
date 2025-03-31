@@ -279,7 +279,7 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if ts.sensorMode == "skip" {
 		return nil
 	}
-	table_name, ok := t.Parameters["table"]
+	tableName, ok := t.Parameters["table"]
 	if !ok {
 		return errors.New("table sensor requires a parameter named 'table'")
 	}
@@ -293,14 +293,14 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	qq, err := conn.BuildTableExistsQuery(table_name)
+	qq, err := conn.BuildTableExistsQuery(tableName)
 	if err != nil {
 		return err
 	}
 
 	printer, printerExists := ctx.Value(executor.KeyPrinter).(io.Writer)
 	if printerExists {
-		fmt.Fprintln(printer, "Poking:", table_name)
+		fmt.Fprintln(printer, "Poking:", tableName)
 	}
 
 	timeout := time.After(24 * time.Hour)
