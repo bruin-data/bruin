@@ -258,3 +258,79 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		}
 	}
 }
+
+type TableSensor struct {
+	connection connectionFetcher
+	sensorMode string
+}
+
+func NewTableSensor(conn connectionFetcher, sensorMode string) *TableSensor {
+	return &TableSensor{
+		connection: conn,
+		sensorMode: sensorMode,
+	}
+}
+
+func (ts *TableSensor) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	return ts.RunTask(ctx, ti.GetPipeline(), ti.GetAsset())
+}
+
+func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
+	if ts.sensorMode == "skip" {
+		return nil
+	}
+	tableName, ok := t.Parameters["table"]
+	if !ok {
+		return errors.New("table sensor requires a parameter named 'table'")
+	}
+	connName, err := p.GetConnectionNameForAsset(t)
+	if err != nil {
+		return err
+	}
+
+	conn, err := ts.connection.GetBqConnection(connName)
+	if err != nil {
+		return err
+	}
+
+	qq, err := conn.BuildTableExistsQuery(tableName)
+	if err != nil {
+		return err
+	}
+
+	printer, printerExists := ctx.Value(executor.KeyPrinter).(io.Writer)
+	if printerExists {
+		fmt.Fprintln(printer, "Poking:", tableName)
+	}
+
+	timeout := time.After(24 * time.Hour)
+	for {
+		select {
+		case <-timeout:
+			return errors.New("Sensor timed out after 24 hours")
+		default:
+			res, err := conn.Select(ctx, &query.Query{Query: qq})
+
+			if err != nil {
+				return err
+			}
+			intRes, err := helpers.CastResultToInteger(res)
+			if err != nil {
+				return errors.Wrap(err, "failed to parse query sensor result")
+			}
+
+			if intRes > 0 {
+				return nil
+			}
+			if ts.sensorMode == "once" || ts.sensorMode == "" {
+				return errors.New("Sensor didn't return the expected result")
+			}
+
+			pokeInterval := helpers.GetPokeInterval(ctx, t)
+			time.Sleep(time.Duration(pokeInterval) * time.Second)
+			if printerExists {
+				fmt.Fprintln(printer, "Info: Sensor didn't return the expected result, waiting for", pokeInterval, "seconds")
+			}
+		}
+	}
+}

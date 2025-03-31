@@ -39,6 +39,7 @@ type TableManager interface {
 	CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Context) error
 	IsMaterializationTypeMismatch(ctx context.Context, meta *bigquery.TableMetadata, asset *pipeline.Asset) bool
 	DropTableOnMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error
+	BuildTableExistsQuery(tableName string) (string, error)
 }
 
 type DB interface {
@@ -440,4 +441,32 @@ func (d *Client) DropTableOnMismatch(ctx context.Context, tableName string, asse
 		}
 	}
 	return nil
+}
+
+func (d *Client) BuildTableExistsQuery(tableName string) (string, error) {
+	tableComponents := strings.Split(tableName, ".")
+	for _, component := range tableComponents {
+		if component == "" {
+			return "", fmt.Errorf("table name must be in dataset.table or project.dataset.table format, '%s' given", tableName)
+		}
+	}
+
+	var datasetRef, targetTable string
+
+	switch len(tableComponents) {
+	case 2:
+		datasetRef = fmt.Sprintf("%s.%s.INFORMATION_SCHEMA.TABLES", d.config.ProjectID, tableComponents[0])
+		targetTable = tableComponents[1]
+	case 3:
+		datasetRef = fmt.Sprintf("%s.%s.INFORMATION_SCHEMA.TABLES", tableComponents[0], tableComponents[1])
+		targetTable = tableComponents[2]
+	default:
+		return "", fmt.Errorf("table name must be in dataset.table or project.dataset.table format, '%s' given", tableName)
+	}
+
+	// Use EXISTS to return true or false
+	query := fmt.Sprintf(`
+		SELECT EXISTS (SELECT 1 FROM %s WHERE table_name = '%s')`, datasetRef, targetTable)
+
+	return strings.TrimSpace(query), nil
 }
