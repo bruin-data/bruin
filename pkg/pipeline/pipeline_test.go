@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"log"
 	"os"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/bruin-data/bruin/cmd"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
@@ -22,6 +24,22 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
+
+type glossaryReader interface {
+	GetEntities(pathToPipeline string) ([]*glossary.Entity, error)
+}
+
+type mockGlossaryReader struct {
+	entities []*glossary.Entity
+	err      error
+}
+
+func (m *mockGlossaryReader) GetEntities(pathToPipeline string) ([]*glossary.Entity, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.entities, nil
+}
 
 func Test_pipelineBuilder_CreatePipelineFromPath(t *testing.T) {
 	t.Parallel()
@@ -1065,4 +1083,130 @@ func TestPipeline_GetCompatibilityHash(t *testing.T) {
 			assert.Equal(t, tt.expected, actualHash)
 		})
 	}
+}
+
+func TestBuilder_SetAssetColumnFromGlossary(t *testing.T) {
+	t.Parallel()
+	t.Run("SetAssetColumnFromGlossary", func(t *testing.T) {
+		tests := []struct {
+			name          string
+			asset         *pipeline.Asset
+			glossarySetup func() glossaryReader
+			wantErr       bool
+			expectedCols  []pipeline.Column
+		}{
+			{
+				name: "successfully enriches columns from glossary",
+				asset: &pipeline.Asset{
+					Name: "test_asset",
+					Columns: []pipeline.Column{
+						{
+							EntityAttribute: &pipeline.EntityAttribute{
+								Entity:    "user",
+								Attribute: "id",
+							},
+						},
+					},
+				},
+				glossarySetup: func() glossaryReader {
+					return &mockGlossaryReader{
+						entities: []*glossary.Entity{
+							{
+								Name: "user",
+								Attributes: map[string]*glossary.Attribute{
+									"id": {
+										Name:        "user_id",
+										Type:        "int",
+										Description: "The user identifier",
+									},
+								},
+							},
+						},
+					}
+				},
+				wantErr: false,
+				expectedCols: []pipeline.Column{
+					{
+						EntityAttribute: &pipeline.EntityAttribute{
+							Entity:    "user",
+							Attribute: "id",
+						},
+						Name:        "user_id",
+						Type:        "int",
+						Description: "The user identifier",
+					},
+				},
+			},
+			{
+				name: "returns error when glossary reader fails",
+				asset: &pipeline.Asset{
+					Name: "test_asset",
+					Columns: []pipeline.Column{
+						{
+							EntityAttribute: &pipeline.EntityAttribute{
+								Entity:    "user",
+								Attribute: "id",
+							},
+						},
+					},
+				},
+				glossarySetup: func() glossaryReader {
+					return &mockGlossaryReader{
+						err: errors.New("failed to read glossary"),
+					}
+				},
+				wantErr: true,
+			},
+			{
+				name: "returns error when entity not found",
+				asset: &pipeline.Asset{
+					Name: "test_asset",
+					Columns: []pipeline.Column{
+						{
+							EntityAttribute: &pipeline.EntityAttribute{
+								Entity:    "nonexistent",
+								Attribute: "id",
+							},
+						},
+					},
+				},
+				glossarySetup: func() glossaryReader {
+					return &mockGlossaryReader{
+						entities: []*glossary.Entity{
+							{
+								Name: "user",
+								Attributes: map[string]*glossary.Attribute{
+									"id": {
+										Name:        "user_id",
+										Type:        "int",
+										Description: "The user identifier",
+									},
+								},
+							},
+						},
+					}
+				},
+				wantErr: true,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				b := &pipeline.Builder{
+					GlossaryReader: tt.glossarySetup(),
+				}
+
+				err := b.SetAssetColumnFromGlossary(tt.asset, "dummy/path")
+
+				if tt.wantErr {
+					assert.Error(t, err)
+					return
+				}
+
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedCols, tt.asset.Columns)
+			})
+		}
+	})
 }
