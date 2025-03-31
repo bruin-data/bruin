@@ -90,6 +90,11 @@ func (m *mockQuerierWithResult) DropTableOnMismatch(ctx context.Context, tableNa
 	return args.Error(0)
 }
 
+func (m *mockQuerierWithResult) BuildTableExistsQuery(tableName string) (string, error) {
+	args := m.Called(tableName)
+	return args.String(0), args.Error(1)
+}
+
 type mockConnectionFetcher struct {
 	mock.Mock
 }
