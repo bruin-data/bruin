@@ -21,13 +21,11 @@ import (
 	"github.com/bruin-data/bruin/pkg/scheduler"
 )
 
-var (
-	terminalJobRunStates = []types.JobRunState{
-		types.JobRunStateFailed,
-		types.JobRunStateSuccess,
-		types.JobRunStateCancelled,
-	}
-)
+var terminalJobRunStates = []types.JobRunState{
+	types.JobRunStateFailed,
+	types.JobRunStateSuccess,
+	types.JobRunStateCancelled,
+}
 
 type BasicOperator struct {
 	connections map[string]config.AwsConnection
@@ -59,7 +57,6 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 			),
 		),
 	)
-
 	if err != nil {
 		return fmt.Errorf("error loading aws config: %w", err)
 	}
@@ -143,7 +140,6 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 			},
 		},
 	})
-
 	if err != nil {
 		return fmt.Errorf("error submitting job run: %w", err)
 	}

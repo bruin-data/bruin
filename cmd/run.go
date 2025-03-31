@@ -202,15 +202,42 @@ func Run(isDebug *bool) *cli.Command {
 				return err
 			}
 
-			pipelineInfo, err := GetPipeline(c.Context, inputPath, runConfig, logger)
-			if err != nil {
-				return err
-			}
-
 			repoRoot, err := git.FindRepoFromPath(inputPath)
 			if err != nil {
 				errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
 				return cli.Exit("", 1)
+			}
+
+			configFilePath := runConfig.ConfigFilePath
+			if configFilePath == "" {
+				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
+			}
+			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
+			if err != nil {
+				errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
+				return cli.Exit("", 1)
+			}
+
+			err = switchEnvironment(runConfig.Environment, runConfig.Force, cm, os.Stdin)
+			if err != nil {
+				return err
+			}
+
+			if cm.SelectedEnvironment.SchemaPrefix != "" {
+				// schema prefix implies a developer environment being configured where different assets within this
+				// execution will be built under prefixed schemas. This requires not just modifying the queries,
+				// but also modifying the asset names so that quality checks actually run against the tables in the new schema.
+				// Since we change the asset names, we need to also prefix the upstream since their names would be changed as well.
+				DefaultPipelineBuilder.AddMutator(func(ctx context.Context, asset *pipeline.Asset, foundPipeline *pipeline.Pipeline) (*pipeline.Asset, error) {
+					asset.PrefixSchema(cm.SelectedEnvironment.SchemaPrefix)
+					asset.PrefixUpstreams(cm.SelectedEnvironment.SchemaPrefix)
+					return asset, nil
+				})
+			}
+
+			pipelineInfo, err := GetPipeline(c.Context, inputPath, runConfig, logger)
+			if err != nil {
+				return err
 			}
 
 			var task *pipeline.Asset
@@ -315,21 +342,6 @@ func Run(isDebug *bool) *cli.Command {
 				foundPipeline.MetadataPush.Global = true
 			}
 
-			configFilePath := runConfig.ConfigFilePath
-			if configFilePath == "" {
-				configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
-			}
-			cm, err := config.LoadOrCreate(afero.NewOsFs(), configFilePath)
-			if err != nil {
-				errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
-				return cli.Exit("", 1)
-			}
-
-			err = switchEnvironment(runConfig.Environment, runConfig.Force, cm, os.Stdin)
-			if err != nil {
-				return err
-			}
-
 			connectionManager, errs := connection.NewManagerFromConfig(cm)
 			if len(errs) > 0 {
 				printErrors(errs, runConfig.Output, "Failed to register connections")
@@ -367,7 +379,23 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			}
 
-			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode)
+			var parser *sqlparser.SQLParser
+			if cm.SelectedEnvironment.SchemaPrefix != "" {
+				// we use the sql parser to rename the tables for dev mode
+				parser, err = sqlparser.NewSQLParser(false)
+				if err != nil {
+					printError(err, c.String("output"), "Could not initialize sql parser")
+				}
+
+				go func() {
+					err := parser.Start()
+					if err != nil {
+						printError(err, c.String("output"), "Could not start sql parser")
+					}
+				}()
+			}
+
+			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode, parser)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -636,6 +664,7 @@ func setupExecutors(
 	fullRefresh bool,
 	usePipForPython bool,
 	sensorMode string,
+	parser *sqlparser.SQLParser,
 ) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
 
@@ -710,7 +739,7 @@ func setupExecutors(
 	if s.WillRunTaskOfType(pipeline.AssetTypePostgresQuery) || estimateCustomCheckType == pipeline.AssetTypePostgresQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeRedshiftQuery) || estimateCustomCheckType == pipeline.AssetTypeRedshiftQuery || s.WillRunTaskOfType(pipeline.AssetTypeRedshiftSeed) || s.WillRunTaskOfType(pipeline.AssetTypePostgresSeed) {
 		pgCheckRunner := postgres.NewColumnCheckOperator(conn)
-		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, postgres.NewMaterializer(fullRefresh))
+		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, postgres.NewMaterializer(fullRefresh), parser)
 
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeMain] = pgOperator
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
