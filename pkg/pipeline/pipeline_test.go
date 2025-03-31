@@ -1204,7 +1204,7 @@ func TestBuilder_SetAssetColumnFromGlossary(t *testing.T) {
 					return
 				}
 
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expectedCols, tt.asset.Columns)
 			})
 		}
