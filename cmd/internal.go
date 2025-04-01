@@ -289,21 +289,24 @@ func (r *ParseCommand) Run(ctx context.Context, assetPath string, lineage bool) 
 	}
 
 	var foundPipeline *pipeline.Pipeline
-
+	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(absoluteAssetPath, nil)
+	if err != nil {
+		printErrorJSON(err)
+		return cli.Exit("", 1)
+	}
 	// column-level lineage requires the whole pipeline to be parsed by nature, therefore we need to use the default pipeline builder.
 	// however, since the primary usecase of this command requires speed, we'll use a faster alternative if there's no lineage requested.
 	if lineage {
 		foundPipeline, err = DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelineDefinitionPath, pipeline.WithMutate())
 	} else {
 		foundPipeline, err = pipeline.PipelineFromPath(pipelineDefinitionPath, afero.NewOsFs())
+		if err != nil {
+			printErrorJSON(err)
+			return cli.Exit("", 1)
+		}
+		err = DefaultPipelineBuilder.SetAssetColumnFromGlossary(asset, pipelineDefinitionPath)
 	}
 
-	if err != nil {
-		printErrorJSON(err)
-		return cli.Exit("", 1)
-	}
-
-	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(absoluteAssetPath, nil)
 	if err != nil {
 		printErrorJSON(err)
 		return cli.Exit("", 1)

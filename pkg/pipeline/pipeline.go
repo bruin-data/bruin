@@ -1669,3 +1669,22 @@ func (a *Asset) IsSQLAsset() bool {
 
 	return sqlAssetTypes[a.Type]
 }
+
+func (b *Builder) SetAssetColumnFromGlossary(asset *Asset, pathToPipeline string) error {
+	var entities []*glossary.Entity
+	var err error
+	if b.GlossaryReader != nil {
+		entities, err = b.GlossaryReader.GetEntities(pathToPipeline)
+		if err != nil {
+			return errors.Wrap(err, "error getting entities")
+		}
+	}
+
+	if len(entities) > 0 {
+		err := asset.EnrichFromEntityAttributes(entities)
+		if err != nil {
+			return errors.Wrap(err, "error enriching asset from entity attributes")
+		}
+	}
+	return nil
+}
