@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -71,6 +72,10 @@ func Query() *cli.Command {
 				Aliases: []string{"env"},
 				Usage:   "Target environment name as defined in .bruin.yml. Specifies the configuration environment for executing the query.",
 			},
+			&cli.BoolFlag{
+				Name:  "export",
+				Usage: "export results to a CSV file ",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			fs := afero.NewOsFs()
@@ -94,6 +99,56 @@ func Query() *cli.Command {
 					return handleError(c.String("output"), errors.Wrap(err, "query execution failed"))
 				}
 				// Output result based on format specified
+				inputPath := c.String("asset")
+				if c.Bool("export") {
+					if inputPath == "" {
+						inputPath = "."
+					}
+					repoRoot, err := git.FindRepoFromPath(inputPath)
+					if err != nil {
+						errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
+						return cli.Exit("", 1)
+					}
+					resultName := fmt.Sprintf("query_result_%s.csv", time.Now().Format("2006-01-02_15-04-05.000"))
+					resultsPath := filepath.Join(repoRoot.Path, "logs/query_results", resultName)
+					err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/query_results")
+					if err != nil {
+						errorPrinter.Printf("Failed to add the run state folder to .gitignore: %v\n", err)
+						return cli.Exit("", 1)
+					}
+
+					err = os.MkdirAll(filepath.Dir(resultsPath), 0755)
+					if err != nil {
+						errorPrinter.Printf("Failed to create directory: %v\n", err)
+						return cli.Exit("", 1)
+					}
+
+					file, err := os.Create(resultsPath)
+					if err != nil {
+						errorPrinter.Printf("Failed to create the result file: %v\n", err)
+						return cli.Exit("", 1)
+					}
+					defer file.Close()
+
+					writer := csv.NewWriter(file)
+					defer writer.Flush()
+					if err := writer.Write(result.Columns); err != nil {
+						errorPrinter.Printf("Failed to write headers: %v\n", err)
+						return cli.Exit("", 1)
+					}
+					for _, row := range result.Rows {
+						rowStrings := make([]string, len(row))
+						for i, val := range row {
+							rowStrings[i] = fmt.Sprintf("%v", val)
+						}
+						if err := writer.Write(rowStrings); err != nil {
+							errorPrinter.Printf("Failed to write row: %v\n", err)
+							return cli.Exit("", 1)
+						}
+					}
+					infoPrinter.Printf("Results exported to %s\n", resultsPath)
+					return nil
+				}
 				output := c.String("output")
 				if output == "json" {
 					type jsonResponse struct {
