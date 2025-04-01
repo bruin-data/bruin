@@ -26,6 +26,7 @@ type PgClient interface {
 	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
 	Ping(ctx context.Context) error
 	GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error)
+	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error
 }
 
 type connectionFetcher interface {
@@ -103,6 +104,11 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	conn, err := o.connection.GetPgConnection(connName)
+	if err != nil {
+		return err
+	}
+
+	err = conn.CreateSchemaIfNotExist(ctx, t)
 	if err != nil {
 		return err
 	}

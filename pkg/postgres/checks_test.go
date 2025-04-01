@@ -51,6 +51,11 @@ func (m *mockQuerierWithResult) GetDatabaseSummary(ctx context.Context) (*ansisq
 	return args.Get(0).(*ansisql.DBDatabase), args.Error(0)
 }
 
+func (m *mockQuerierWithResult) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	args := m.Called(ctx, asset)
+	return args.Error(0)
+}
+
 type mockConnectionFetcher struct {
 	mock.Mock
 }
