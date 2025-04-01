@@ -513,7 +513,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 1,
-				Contains: []string{" Starting: shopify_raw.products:metadata-push", "Starting: shopify_raw.inventory_items:metadata-push"},
+				Contains: []string{"Running:  shopify_raw.products:metadata-push", "Running:  shopify_raw.inventory_items:metadata-push"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -833,7 +833,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 1,
-				Contains: []string{"Starting: example", "Finished: example", "Catalog Error: Table with name my does not exist!", "Failed: my-other-asset"},
+				Contains: []string{"Running:  example", "Finished: example", "Catalog Error: Table with name my does not exist!", "Failed: my-other-asset"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
