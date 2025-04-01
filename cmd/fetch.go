@@ -76,6 +76,10 @@ func Query() *cli.Command {
 				Name:  "export",
 				Usage: "export results to a CSV file ",
 			},
+			&cli.StringFlag{
+				Name:  "export-path",
+				Usage: "specify the path the CSV file should be exported.",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			fs := afero.NewOsFs()
@@ -100,8 +104,10 @@ func Query() *cli.Command {
 				}
 				// Output result based on format specified
 				inputPath := c.String("asset")
+				exportPath := c.String("export-path")
+
 				if c.Bool("export") {
-					err = exportResultsToCSV(result, inputPath)
+					err = exportResultsToCSV(result, inputPath, exportPath)
 					if err != nil {
 						return handleError(c.String("output"), errors.Wrap(err, "failed to export results to CSV"))
 					}
@@ -433,7 +439,7 @@ func prepareAutoDetectQuery(c *cli.Context, fs afero.Fs) (string, interface{}, s
 	return connName, conn, queryStr, nil
 }
 
-func exportResultsToCSV(results *query.QueryResult, inputPath string) error {
+func exportResultsToCSV(results *query.QueryResult, inputPath string, exportPath string) error {
 	if inputPath == "" {
 		inputPath = "."
 	}
@@ -442,20 +448,32 @@ func exportResultsToCSV(results *query.QueryResult, inputPath string) error {
 		errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
 		return cli.Exit("", 1)
 	}
-	resultName := fmt.Sprintf("query_result_%s.csv", time.Now().Format("2006-01-02_15-04-05.000"))
-	resultsPath := filepath.Join(repoRoot.Path, "logs/exports", resultName)
-	err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/exports")
-	if err != nil {
-		errorPrinter.Printf("Failed to add the exports folder to .gitignore: %v\n", err)
-		return cli.Exit("", 1)
-	}
+	var resultsPath string
+	if exportPath == "" {
+		resultName := fmt.Sprintf("query_result_%s.csv", time.Now().Format("2006-01-02_15-04-05.000"))
+		resultsPath = filepath.Join(repoRoot.Path, "logs/exports", resultName)
+		err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/exports")
+		if err != nil {
+			errorPrinter.Printf("Failed to add the exports folder to .gitignore: %v\n", err)
+			return cli.Exit("", 1)
+		}
 
-	err = os.MkdirAll(filepath.Dir(resultsPath), 0755)
-	if err != nil {
-		errorPrinter.Printf("Failed to create directory: %v\n", err)
-		return cli.Exit("", 1)
-	}
+		err = os.MkdirAll(filepath.Dir(resultsPath), 0755)
+		if err != nil {
+			errorPrinter.Printf("Failed to create directory: %v\n", err)
+			return cli.Exit("", 1)
+		}
+	} else {
+		if !filepath.IsAbs(exportPath) {
+			resultsPath, err = filepath.Abs(exportPath)
+			if err != nil {
+				errorPrinter.Printf("Failed to resolve absolute path: %v\n", err)
+			}
+		} else {
+			resultsPath = exportPath
+		}
 
+	}
 	file, err := os.Create(resultsPath)
 	if err != nil {
 		errorPrinter.Printf("Failed to create the result file: %v\n", err)
