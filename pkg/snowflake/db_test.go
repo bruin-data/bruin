@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
@@ -463,16 +464,6 @@ func TestDB_CreateSchemaIfNotExist(t *testing.T) {
 		expectedError string
 	}{
 		{
-			name: "schema already exists in cache",
-			asset: &pipeline.Asset{
-				Name: "test_schema.test_table",
-			},
-			mockSetup: func(mock sqlmock.Sqlmock, cache *sync.Map) {
-				// Simulate schema being already cached
-				cache.Store("TEST_SCHEMA", true)
-			},
-		},
-		{
 			name: "schema does not exist, create successfully",
 			asset: &pipeline.Asset{
 				Name: "test_schema.test_table",
@@ -528,8 +519,8 @@ func TestDB_CreateSchemaIfNotExist(t *testing.T) {
 			// Initialize the DB struct with a schema cache
 			cache := &sync.Map{}
 			db := &DB{
-				conn:            sqlxDB,
-				schemaNameCache: cache,
+				conn:          sqlxDB,
+				schemaCreator: ansisql.NewSchemaCreator(),
 			}
 
 			// Apply the mock setup

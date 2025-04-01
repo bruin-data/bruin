@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"sync"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
@@ -19,9 +19,9 @@ const (
 )
 
 type DB struct {
-	conn            *sqlx.DB
-	config          *Config
-	schemaNameCache *sync.Map
+	conn          *sqlx.DB
+	config        *Config
+	schemaCreator *ansisql.SchemaCreator
 }
 
 func NewDB(c *Config) (*DB, error) {
@@ -38,9 +38,9 @@ func NewDB(c *Config) (*DB, error) {
 	}
 
 	return &DB{
-		conn:            db,
-		config:          c,
-		schemaNameCache: &sync.Map{},
+		conn:          db,
+		config:        c,
+		schemaCreator: ansisql.NewSchemaCreator(),
 	}, nil
 }
 
@@ -198,29 +198,7 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 }
 
 func (db *DB) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
-	tableComponents := strings.Split(asset.Name, ".")
-	var schemaName string
-	switch len(tableComponents) {
-	case 2:
-		schemaName = strings.ToUpper(tableComponents[0])
-	case 3:
-		schemaName = strings.ToUpper(tableComponents[1])
-	default:
-		return nil
-	}
-	// Check the cache for the database
-	if _, exists := db.schemaNameCache.Load(schemaName); exists {
-		return nil
-	}
-	createQuery := query.Query{
-		Query: "CREATE SCHEMA IF NOT EXISTS " + schemaName,
-	}
-	if err := db.RunQueryWithoutResult(ctx, &createQuery); err != nil {
-		return errors.Wrapf(err, "failed to create or ensure database: %s", schemaName)
-	}
-	db.schemaNameCache.Store(schemaName, true)
-
-	return nil
+	return db.schemaCreator.CreateSchemaIfNotExist(ctx, db, asset)
 }
 
 func (db *DB) RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error {
