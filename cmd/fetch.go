@@ -101,52 +101,10 @@ func Query() *cli.Command {
 				// Output result based on format specified
 				inputPath := c.String("asset")
 				if c.Bool("export") {
-					if inputPath == "" {
-						inputPath = "."
-					}
-					repoRoot, err := git.FindRepoFromPath(inputPath)
+					err = exportResultsToCSV(result, inputPath)
 					if err != nil {
-						errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
-						return cli.Exit("", 1)
+						return handleError(c.String("output"), errors.Wrap(err, "failed to export results to CSV"))
 					}
-					resultName := fmt.Sprintf("query_result_%s.csv", time.Now().Format("2006-01-02_15-04-05.000"))
-					resultsPath := filepath.Join(repoRoot.Path, "logs/exports", resultName)
-					err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/exports")
-					if err != nil {
-						errorPrinter.Printf("Failed to add the run state folder to .gitignore: %v\n", err)
-						return cli.Exit("", 1)
-					}
-
-					err = os.MkdirAll(filepath.Dir(resultsPath), 0755)
-					if err != nil {
-						errorPrinter.Printf("Failed to create directory: %v\n", err)
-						return cli.Exit("", 1)
-					}
-
-					file, err := os.Create(resultsPath)
-					if err != nil {
-						errorPrinter.Printf("Failed to create the result file: %v\n", err)
-						return cli.Exit("", 1)
-					}
-					defer file.Close()
-
-					writer := csv.NewWriter(file)
-					defer writer.Flush()
-					if err := writer.Write(result.Columns); err != nil {
-						errorPrinter.Printf("Failed to write headers: %v\n", err)
-						return cli.Exit("", 1)
-					}
-					for _, row := range result.Rows {
-						rowStrings := make([]string, len(row))
-						for i, val := range row {
-							rowStrings[i] = fmt.Sprintf("%v", val)
-						}
-						if err := writer.Write(rowStrings); err != nil {
-							errorPrinter.Printf("Failed to write row: %v\n", err)
-							return cli.Exit("", 1)
-						}
-					}
-					successPrinter.Printf("Results exported to %s\n", resultsPath)
 					return nil
 				}
 				output := c.String("output")
@@ -473,4 +431,55 @@ func prepareAutoDetectQuery(c *cli.Context, fs afero.Fs) (string, interface{}, s
 	}
 
 	return connName, conn, queryStr, nil
+}
+
+func exportResultsToCSV(results *query.QueryResult, inputPath string) error {
+	if inputPath == "" {
+		inputPath = "."
+	}
+	repoRoot, err := git.FindRepoFromPath(inputPath)
+	if err != nil {
+		errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
+		return cli.Exit("", 1)
+	}
+	resultName := fmt.Sprintf("query_result_%s.csv", time.Now().Format("2006-01-02_15-04-05.000"))
+	resultsPath := filepath.Join(repoRoot.Path, "logs/exports", resultName)
+	err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/exports")
+	if err != nil {
+		errorPrinter.Printf("Failed to add the exports folder to .gitignore: %v\n", err)
+		return cli.Exit("", 1)
+	}
+
+	err = os.MkdirAll(filepath.Dir(resultsPath), 0755)
+	if err != nil {
+		errorPrinter.Printf("Failed to create directory: %v\n", err)
+		return cli.Exit("", 1)
+	}
+
+	file, err := os.Create(resultsPath)
+	if err != nil {
+		errorPrinter.Printf("Failed to create the result file: %v\n", err)
+		return cli.Exit("", 1)
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+	if err := writer.Write(results.Columns); err != nil {
+		errorPrinter.Printf("Failed to write headers: %v\n", err)
+		return cli.Exit("", 1)
+	}
+	for _, row := range results.Rows {
+		rowStrings := make([]string, len(row))
+		for i, val := range row {
+			rowStrings[i] = fmt.Sprintf("%v", val)
+		}
+		if err := writer.Write(rowStrings); err != nil {
+			errorPrinter.Printf("Failed to write row: %v\n", err)
+			return cli.Exit("", 1)
+		}
+	}
+
+	successPrinter.Printf("Results succesfully exported to %s\n", resultsPath)
+	return nil
 }
