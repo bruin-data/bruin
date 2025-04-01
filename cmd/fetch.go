@@ -480,6 +480,6 @@ func exportResultsToCSV(results *query.QueryResult, inputPath string) error {
 		}
 	}
 
-	successPrinter.Printf("Results succesfully exported to %s\n", resultsPath)
+	successPrinter.Printf("Results successfully exported to %s\n", resultsPath)
 	return nil
 }
