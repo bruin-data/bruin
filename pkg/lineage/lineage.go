@@ -59,6 +59,10 @@ func (p *LineageExtractor) TableSchemaForUpstreams(foundPipeline *pipeline.Pipel
 		}
 
 		upstreamAsset := foundPipeline.GetAssetByName(upstream.Value)
+		if upstreamAsset == nil {
+			continue
+		}
+
 		if len(upstreamAsset.Columns) > 0 {
 			columnMetadata[upstreamAsset.Name] = makeColumnMap(upstreamAsset.Columns)
 		}
