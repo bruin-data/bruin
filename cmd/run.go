@@ -264,10 +264,10 @@ func Run(isDebug *bool) *cli.Command {
 
 			if pipelineInfo.RunningForAnAsset {
 				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
-			}
-
-			if err := CheckLint(pipelineInfo.Pipeline, inputPath, logger, nil); err != nil {
-				return err
+			} else {
+				if err := CheckLint(pipelineInfo.Pipeline, inputPath, logger, nil); err != nil {
+					return err
+				}
 			}
 
 			statePath := filepath.Join(repoRoot.Path, "logs/runs", pipelineInfo.Pipeline.Name)
