@@ -110,8 +110,8 @@ func Query() *cli.Command {
 						return cli.Exit("", 1)
 					}
 					resultName := fmt.Sprintf("query_result_%s.csv", time.Now().Format("2006-01-02_15-04-05.000"))
-					resultsPath := filepath.Join(repoRoot.Path, "logs/query_results", resultName)
-					err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/query_results")
+					resultsPath := filepath.Join(repoRoot.Path, "logs/exports", resultName)
+					err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/exports")
 					if err != nil {
 						errorPrinter.Printf("Failed to add the run state folder to .gitignore: %v\n", err)
 						return cli.Exit("", 1)
@@ -146,7 +146,7 @@ func Query() *cli.Command {
 							return cli.Exit("", 1)
 						}
 					}
-					infoPrinter.Printf("Results exported to %s\n", resultsPath)
+					successPrinter.Printf("Results exported to %s\n", resultsPath)
 					return nil
 				}
 				output := c.String("output")
