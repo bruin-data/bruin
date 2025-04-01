@@ -51,11 +51,9 @@ func Query() *cli.Command {
 				Required: false,
 			},
 			&cli.Int64Flag{
-				Name:        "limit",
-				Aliases:     []string{"l"},
-				Usage:       "limit the number of rows returned",
-				Value:       1000,
-				DefaultText: "1000",
+				Name:    "limit",
+				Aliases: []string{"l"},
+				Usage:   "limit the number of rows returned",
 			},
 			&cli.StringFlag{
 				Name:        "output",
@@ -87,8 +85,9 @@ func Query() *cli.Command {
 			if err != nil {
 				return handleError(c.String("output"), err)
 			}
-
-			queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn)
+			if c.IsSet("limit") {
+				queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn)
+			}
 			if querier, ok := conn.(interface {
 				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
 			}); ok {
@@ -443,7 +442,7 @@ func exportResultsToCSV(results *query.QueryResult, inputPath string) (string, e
 	if err != nil {
 		return "", err
 	}
-	resultName := fmt.Sprintf("query_result_%s.csv", time.Now().Format("2006-01-02_15-04-05.000"))
+	resultName := fmt.Sprintf("query_result_%s.csv", time.Now().Format("2006-01-02_15-04-05"))
 	resultsPath := filepath.Join(repoRoot.Path, "logs/exports", resultName)
 	err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/exports")
 	if err != nil {
