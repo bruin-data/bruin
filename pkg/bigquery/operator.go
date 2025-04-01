@@ -310,7 +310,6 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 			return errors.New("Sensor timed out after 24 hours")
 		default:
 			res, err := conn.Select(ctx, &query.Query{Query: qq})
-
 			if err != nil {
 				return err
 			}

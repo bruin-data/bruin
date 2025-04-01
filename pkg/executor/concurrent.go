@@ -23,7 +23,8 @@ var (
 		color.FgGreen + color.Faint,
 		color.FgYellow,
 	}
-	faint = color.New(color.Faint).SprintFunc()
+	faint        = color.New(color.Faint).SprintFunc()
+	whitePrinter = color.New(color.FgWhite, color.Faint).SprintfFunc()
 )
 
 type contextKey int
@@ -86,7 +87,8 @@ type worker struct {
 func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstance, results chan<- *scheduler.TaskExecutionResult) {
 	for task := range taskChannel {
 		w.printLock.Lock()
-		w.printer.Printf("[%s] Starting: %s\n", time.Now().Format(timeFormat), task.GetHumanID())
+		timestampStr := whitePrinter("[%s]", time.Now().Format(timeFormat))
+		fmt.Printf("%s %s\n", timestampStr, w.printer.Sprintf("Running:  %s", task.GetHumanID()))
 		w.printLock.Unlock()
 
 		start := time.Now()
@@ -111,7 +113,8 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 			res = "Failed"
 		}
 
-		w.printer.Printf("[%s] %s: %s %s\n", time.Now().Format(timeFormat), res, task.GetHumanID(), faint(durationString))
+		timestampStr = whitePrinter("[%s]", time.Now().Format(timeFormat))
+		fmt.Printf("%s %s\n", timestampStr, w.printer.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
 		w.printLock.Unlock()
 
 		results <- &scheduler.TaskExecutionResult{
@@ -129,7 +132,8 @@ type workerWriter struct {
 }
 
 func (w *workerWriter) Write(p []byte) (int, error) {
-	formatted := w.sprintfFunc("[%s] [%s] %s", time.Now().Format(timeFormat), w.task.Name, string(p))
+	timestampStr := whitePrinter("[%s]", time.Now().Format(timeFormat))
+	formatted := fmt.Sprintf("%s %s", timestampStr, w.sprintfFunc("[%s] %s", w.task.Name, string(p)))
 
 	n, err := w.w.Write([]byte(formatted))
 	if err != nil {
