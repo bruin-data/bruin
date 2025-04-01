@@ -105,7 +105,7 @@ func Query() *cli.Command {
 					if err != nil {
 						return handleError(c.String("output"), errors.Wrap(err, "failed to export results to CSV"))
 					}
-					successMessage := fmt.Sprintf("Results Successfully exported to %s", resultsPath)
+					successMessage := "Results Successfully exported to " + resultsPath
 					return handleSuccess(c.String("output"), successMessage)
 				}
 				output := c.String("output")
