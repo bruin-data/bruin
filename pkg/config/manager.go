@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	fs2 "io/fs"
+	"maps"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -397,6 +398,7 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 	switch connType {
 	case "aws":
 		var conn AwsConnection
+		creds = populateAwsConfigAliases(creds)
 		if err := mapstructure.Decode(creds, &conn); err != nil {
 			return fmt.Errorf("failed to decode credentials: %w", err)
 		}
@@ -901,4 +903,17 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Personio, source.Personio)
 	c.buildConnectionKeyMap()
 	return nil
+}
+
+func populateAwsConfigAliases(creds map[string]any) map[string]any {
+	creds = maps.Clone(creds)
+
+	if creds["access_key"] == nil {
+		creds["access_key"] = creds["aws_access_key_id"]
+	}
+	if creds["secret_key"] == nil {
+		creds["secret_key"] = creds["aws_secret_access_key"]
+	}
+
+	return creds
 }
