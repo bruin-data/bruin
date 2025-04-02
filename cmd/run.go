@@ -162,12 +162,16 @@ func Run(isDebug *bool) *cli.Command {
 				Usage:   "the path to the .bruin.yml file",
 			},
 			&cli.BoolFlag{
-				Name:  "skip-validation",
+				Name:  "no-validation",
 				Usage: "skip validation for this run.",
 			},
 			&cli.BoolFlag{
 				Name:  "no-timestamp",
 				Usage: "skip logging timestamps for this run.",
+			},
+			&cli.BoolFlag{
+				Name:  "no-color",
+				Usage: "plain log output for this run.",
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -273,7 +277,7 @@ func Run(isDebug *bool) *cli.Command {
 			if pipelineInfo.RunningForAnAsset {
 				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
 			} else {
-				if !c.Bool("skip-validation") {
+				if !c.Bool("no-validation") {
 					if err := CheckLint(pipelineInfo.Pipeline, inputPath, logger, nil); err != nil {
 						return err
 					}
@@ -409,8 +413,12 @@ func Run(isDebug *bool) *cli.Command {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
 			}
+			formatOpts := executor.FormattingOptions{
+				DoNotLogTimestamp: c.Bool("no-timestamp"),
+				NoColor:           c.Bool("no-color"),
+			}
 
-			ex, err := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"), c.Bool("no-timestamp"))
+			ex, err := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"), formatOpts)
 			if err != nil {
 				errorPrinter.Printf("Failed to create executor: %v\n", err)
 				return cli.Exit("", 1)

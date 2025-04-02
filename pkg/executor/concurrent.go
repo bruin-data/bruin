@@ -25,6 +25,7 @@ var (
 	}
 	faint        = color.New(color.Faint).SprintFunc()
 	whitePrinter = color.New(color.FgWhite, color.Faint).SprintfFunc()
+	plainColor   = color.New()
 )
 
 type contextKey int
@@ -37,6 +38,11 @@ const (
 	timeFormat = "2006-01-02 15:04:05"
 )
 
+type FormattingOptions struct {
+	DoNotLogTimestamp bool
+	NoColor           bool
+}
+
 type Concurrent struct {
 	workerCount int
 	workers     []*worker
@@ -45,7 +51,7 @@ type Concurrent struct {
 func NewConcurrent(
 	logger *zap.SugaredLogger,
 	taskTypeMap map[pipeline.AssetType]Config,
-	workerCount int, doNotLogTimeStamp bool,
+	workerCount int, formatOpts FormattingOptions,
 ) (*Concurrent, error) {
 	executor := &Sequential{
 		TaskTypeMap: taskTypeMap,
@@ -56,12 +62,12 @@ func NewConcurrent(
 	workers := make([]*worker, workerCount)
 	for i := range workerCount {
 		workers[i] = &worker{
-			id:                fmt.Sprintf("worker-%d", i),
-			executor:          executor,
-			logger:            logger,
-			printer:           color.New(colors[i%len(colors)]),
-			printLock:         &printLock,
-			doNotLogTimestamp: doNotLogTimeStamp,
+			id:         fmt.Sprintf("worker-%d", i),
+			executor:   executor,
+			logger:     logger,
+			printer:    color.New(colors[i%len(colors)]),
+			printLock:  &printLock,
+			formatOpts: formatOpts,
 		}
 	}
 
@@ -78,12 +84,12 @@ func (c Concurrent) Start(ctx context.Context, input chan scheduler.TaskInstance
 }
 
 type worker struct {
-	id                string
-	executor          *Sequential
-	logger            *zap.SugaredLogger
-	printer           *color.Color
-	printLock         *sync.Mutex
-	doNotLogTimestamp bool
+	id         string
+	executor   *Sequential
+	logger     *zap.SugaredLogger
+	printer    *color.Color
+	printLock  *sync.Mutex
+	formatOpts FormattingOptions
 }
 
 func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstance, results chan<- *scheduler.TaskExecutionResult) {
@@ -91,7 +97,10 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 		w.printLock.Lock()
 
 		timestampStr := whitePrinter("[%s]", time.Now().Format(timeFormat))
-		if w.doNotLogTimestamp {
+		if w.formatOpts.NoColor {
+			w.printer = plainColor
+		}
+		if w.formatOpts.DoNotLogTimestamp {
 			fmt.Printf("%s\n", w.printer.Sprintf("Running:  %s", task.GetHumanID()))
 		} else {
 			fmt.Printf("%s %s\n", timestampStr, w.printer.Sprintf("Running:  %s", task.GetHumanID()))
@@ -119,7 +128,8 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 		if err != nil {
 			res = "Failed"
 		}
-		if w.doNotLogTimestamp {
+
+		if w.formatOpts.DoNotLogTimestamp {
 			fmt.Printf("%s\n", w.printer.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
 		} else {
 			timestampStr = whitePrinter("[%s]", time.Now().Format(timeFormat))
