@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	awsCfg "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless"
@@ -154,22 +155,35 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 		}
 	}()
 
-	previousState := types.JobRunState("unknown")
+	var (
+		previousState    = types.JobRunState("unknown")
+		paginationToken  = ""
+		maxAttemptsError = &retry.MaxAttemptsError{}
+	)
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			runs, err := job.client.ListJobRunAttempts(ctx, &emrserverless.ListJobRunAttemptsInput{
+			time.Sleep(3 * time.Second)
+			listJobArgs := &emrserverless.ListJobRunAttemptsInput{
 				ApplicationId: &job.params.ApplicationID,
 				JobRunId:      result.JobRunId,
-			})
+			}
+			if paginationToken != "" {
+				listJobArgs.NextToken = &paginationToken
+			}
+			runs, err := job.client.ListJobRunAttempts(ctx, listJobArgs)
+			if errors.As(err, &maxAttemptsError) {
+				continue
+			}
 			if err != nil {
 				return fmt.Errorf("error checking job run status: %w", err)
 			}
 			if len(runs.JobRunAttempts) == 0 {
 				return errors.New("job runs not found")
 			}
+
 			latestRun := runs.JobRunAttempts[len(runs.JobRunAttempts)-1]
 			if previousState != latestRun.State {
 				job.logger.Printf(
@@ -183,7 +197,9 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 			if slices.Contains(terminalJobRunStates, latestRun.State) {
 				return nil
 			}
-			time.Sleep(time.Second)
+			if runs.NextToken != nil {
+				paginationToken = *runs.NextToken
+			}
 		}
 	}
 }
