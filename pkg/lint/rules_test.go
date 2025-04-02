@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/glossary"
+	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -2434,6 +2435,59 @@ func TestEnsureValidPythonAssetMaterialization(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestWarnRegularYamlFiles_WarnRegularYamlFilesInRepo(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		p       *pipeline.Pipeline
+		want    []*Issue
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "no regular yaml files",
+			p: &pipeline.Pipeline{
+				DefinitionFile: pipeline.DefinitionFile{
+					Path: path.AbsPathForTests(t, "./testdata/regular-yaml-files/pipeline2/pipeline.yml"),
+				},
+			},
+			want:    noIssues,
+			wantErr: assert.NoError,
+		},
+		{
+			name: "regular yaml files are caught",
+			p: &pipeline.Pipeline{
+				DefinitionFile: pipeline.DefinitionFile{
+					Path: path.AbsPathForTests(t, "./testdata/regular-yaml-files/pipeline1/pipeline.yml"),
+				},
+			},
+			want: []*Issue{
+				{
+					Description: "Regular YAML files are not treated as assets, please rename them to `.asset.yml` if you intended to create assets.",
+					Context: []string{
+						"assets/file1.yml",
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			w := &WarnRegularYamlFiles{
+				fs: afero.NewOsFs(),
+			}
+			got, err := w.WarnRegularYamlFilesInRepo(tt.p)
+			if !tt.wantErr(t, err, fmt.Sprintf("WarnRegularYamlFilesInRepo(%v)", tt.p)) {
+				return
+			}
+			assert.Equalf(t, tt.want, got, "WarnRegularYamlFilesInRepo(%v)", tt.p)
 		})
 	}
 }

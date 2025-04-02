@@ -24,6 +24,8 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 		cacheFoundGlossary: cacheFoundGlossary,
 	}
 
+	yamlFileValidator := WarnRegularYamlFiles{fs: fs}
+
 	rules := []Rule{
 		&SimpleRule{
 			Identifier:       "task-name-valid",
@@ -193,6 +195,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			Validator:        CallFuncForEveryAsset(ValidateEMRServerlessAsset),
 			AssetValidator:   ValidateEMRServerlessAsset,
 			ApplicableLevels: []Level{LevelPipeline, LevelAsset},
+		},
+		&SimpleRule{
+			Identifier:       "plain-yaml-files",
+			Fast:             false,
+			Severity:         ValidatorSeverityWarning,
+			Validator:        yamlFileValidator.WarnRegularYamlFilesInRepo,
+			ApplicableLevels: []Level{LevelPipeline},
 		},
 	}
 
