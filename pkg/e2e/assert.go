@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -140,6 +141,51 @@ func AssertByYAML(i *Task) error {
 
 	if actualContent != expectedContent {
 		return fmt.Errorf("YAML content mismatch:\nexpected:\n%s\ngot:\n%s", expectedContent, actualContent)
+	}
+
+	return nil
+}
+
+func AssertByQueryResultCSV(i *Task) error {
+	fs := afero.NewOsFs()
+
+	var result map[string]string
+	if err := json.Unmarshal([]byte(i.Actual.Output), &result); err != nil {
+		return fmt.Errorf("failed to parse JSON output: %w", err)
+	}
+
+	actualPath, ok := result["Results Successfully exported to"]
+	if !ok {
+		return fmt.Errorf("could not find file path in output: %s", i.Actual.Output)
+	}
+
+	// Read the actual file
+	actualBytes, err := afero.ReadFile(fs, actualPath)
+	if err != nil {
+		return fmt.Errorf("failed to read actual CSV file at %s: %w", actualPath, err)
+	}
+
+	// Use expected content directly since it's already the file content
+	expectedContent := strings.TrimSpace(strings.ReplaceAll(i.Expected.Output, "\r\n", "\n"))
+	actualContent := strings.TrimSpace(strings.ReplaceAll(string(actualBytes), "\r\n", "\n"))
+
+	if expectedContent != actualContent {
+		expectedLines := strings.Split(expectedContent, "\n")
+		actualLines := strings.Split(actualContent, "\n")
+
+		if len(expectedLines) != len(actualLines) {
+			return fmt.Errorf("CSV line count mismatch: expected %d lines, got %d lines",
+				len(expectedLines), len(actualLines))
+		}
+		for idx, expectedLine := range expectedLines {
+			if idx >= len(actualLines) {
+				break
+			}
+			if expectedLine != actualLines[idx] {
+				return fmt.Errorf("CSV mismatch at line %d:\nexpected: %s\ngot: %s",
+					idx+1, expectedLine, actualLines[idx])
+			}
+		}
 	}
 
 	return nil
