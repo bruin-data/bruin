@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -13,8 +14,9 @@ import (
 )
 
 type Client struct {
-	connection connection
-	config     PgConfig
+	connection    connection
+	config        PgConfig
+	schemaCreator *ansisql.SchemaCreator
 }
 
 type PgConfig interface {
@@ -34,7 +36,7 @@ func NewClient(ctx context.Context, c PgConfig) (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{connection: conn, config: c}, nil
+	return &Client{connection: conn, config: c, schemaCreator: ansisql.NewSchemaCreator()}, nil
 }
 
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
@@ -199,4 +201,8 @@ ORDER BY table_schema, table_name;
 	})
 
 	return summary, nil
+}
+
+func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	return c.schemaCreator.CreateSchemaIfNotExist(ctx, c, asset)
 }
