@@ -10,4 +10,6 @@ ARG VERSION=latest
 
 RUN curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh -s -- -d ${VERSION}
 
-CMD  ["/home/bruin/.local/bin/bruin"]
+ENV PATH="/home/bruin/.local/bin:${PATH}"
+
+CMD ["bruin"]
