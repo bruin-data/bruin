@@ -2469,7 +2469,7 @@ func TestWarnRegularYamlFiles_WarnRegularYamlFilesInRepo(t *testing.T) {
 				{
 					Description: "Regular YAML files are not treated as assets, please rename them to `.asset.yml` if you intended to create assets.",
 					Context: []string{
-						"assets/file1.yml",
+						filepath.Join("assets", "file1.yml"),
 					},
 				},
 			},
