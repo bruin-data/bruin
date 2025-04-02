@@ -44,6 +44,10 @@ select 2 as one
 Bruin has [an open-source Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=bruin.bruin) extension that does syntax-highlighting for the definition syntax and more.
 :::
 
+::: warning
+Assets that are defined as YAML files have to have file names as `<name>.asset.yml` or `<name>.asset.yaml`. The regular `.yml` files are not considered as assets, since they might be configuration used within the repo.
+:::
+
 ## `name`
 The name of the asset, used for many things including dependencies, materialiation and more. Corresponds to the `schema.table` convention.
 Must consist of letters and dot `.` character.
