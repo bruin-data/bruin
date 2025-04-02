@@ -277,7 +277,7 @@ func Run(isDebug *bool) *cli.Command {
 				runID = os.Getenv("BRUIN_RUN_ID")
 			}
 			executionStartLog := "Starting execution..."
-			if !c.Bool("minimal-logs") { 
+			if !c.Bool("minimal-logs") {
 				infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
 
 				if pipelineInfo.RunningForAnAsset {
