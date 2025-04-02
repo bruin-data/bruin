@@ -1,4 +1,4 @@
-package emr_serverless
+package emr_serverless //nolint
 
 import (
 	"math"

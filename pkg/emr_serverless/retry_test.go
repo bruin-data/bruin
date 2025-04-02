@@ -1,4 +1,4 @@
-package emr_serverless
+package emr_serverless //nolint
 
 import (
 	"testing"
@@ -8,6 +8,8 @@ import (
 )
 
 func TestPollTimer(t *testing.T) {
+	t.Parallel()
+
 	type testCase struct {
 		Retry  int
 		Expect time.Duration
