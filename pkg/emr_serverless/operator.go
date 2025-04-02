@@ -164,8 +164,7 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		default:
-			time.Sleep(3 * time.Second)
+		case <-time.After(3 * time.Second):
 			listJobArgs := &emrserverless.ListJobRunAttemptsInput{
 				ApplicationId: &job.params.ApplicationID,
 				JobRunId:      result.JobRunId,
