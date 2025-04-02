@@ -480,7 +480,8 @@ func exportResultsToCSV(results *query.QueryResult, inputPath string) (string, e
 
 func handleSuccess(output string, message string) error {
 	if output == "json" {
-		jsonSuccessMessage, err := json.Marshal(map[string]string{"Success": message})
+		message = strings.TrimPrefix(message, "Results Successfully exported to ")
+		jsonSuccessMessage, err := json.Marshal(map[string]string{"Results Successfully exported to": message})
 		if err != nil {
 			fmt.Println("Error:", err.Error())
 			return cli.Exit("", 1)
