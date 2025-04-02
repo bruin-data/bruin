@@ -45,7 +45,7 @@ type Concurrent struct {
 func NewConcurrent(
 	logger *zap.SugaredLogger,
 	taskTypeMap map[pipeline.AssetType]Config,
-	workerCount int,
+	workerCount int, doNotLogTimeStamp bool,
 ) (*Concurrent, error) {
 	executor := &Sequential{
 		TaskTypeMap: taskTypeMap,
@@ -56,11 +56,12 @@ func NewConcurrent(
 	workers := make([]*worker, workerCount)
 	for i := range workerCount {
 		workers[i] = &worker{
-			id:        fmt.Sprintf("worker-%d", i),
-			executor:  executor,
-			logger:    logger,
-			printer:   color.New(colors[i%len(colors)]),
-			printLock: &printLock,
+			id:                fmt.Sprintf("worker-%d", i),
+			executor:          executor,
+			logger:            logger,
+			printer:           color.New(colors[i%len(colors)]),
+			printLock:         &printLock,
+			doNotLogTimestamp: doNotLogTimeStamp,
 		}
 	}
 
@@ -77,18 +78,24 @@ func (c Concurrent) Start(ctx context.Context, input chan scheduler.TaskInstance
 }
 
 type worker struct {
-	id        string
-	executor  *Sequential
-	logger    *zap.SugaredLogger
-	printer   *color.Color
-	printLock *sync.Mutex
+	id                string
+	executor          *Sequential
+	logger            *zap.SugaredLogger
+	printer           *color.Color
+	printLock         *sync.Mutex
+	doNotLogTimestamp bool
 }
 
 func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstance, results chan<- *scheduler.TaskExecutionResult) {
 	for task := range taskChannel {
 		w.printLock.Lock()
+
 		timestampStr := whitePrinter("[%s]", time.Now().Format(timeFormat))
-		fmt.Printf("%s %s\n", timestampStr, w.printer.Sprintf("Running:  %s", task.GetHumanID()))
+		if w.doNotLogTimestamp {
+			fmt.Printf("%s\n", w.printer.Sprintf("Running:  %s", task.GetHumanID()))
+		} else {
+			fmt.Printf("%s %s\n", timestampStr, w.printer.Sprintf("Running:  %s", task.GetHumanID()))
+		}
 		w.printLock.Unlock()
 
 		start := time.Now()
@@ -112,11 +119,13 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 		if err != nil {
 			res = "Failed"
 		}
-
-		timestampStr = whitePrinter("[%s]", time.Now().Format(timeFormat))
-		fmt.Printf("%s %s\n", timestampStr, w.printer.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
+		if w.doNotLogTimestamp {
+			fmt.Printf("%s\n", w.printer.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
+		} else {
+			timestampStr = whitePrinter("[%s]", time.Now().Format(timeFormat))
+			fmt.Printf("%s %s\n", timestampStr, w.printer.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
+		}
 		w.printLock.Unlock()
-
 		results <- &scheduler.TaskExecutionResult{
 			Instance: task,
 			Error:    err,
