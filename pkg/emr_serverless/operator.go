@@ -67,6 +67,12 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 		client: emrserverless.NewFromConfig(cfg),
 		params: params,
 		asset:  asset,
+		poll: &PollTimer{
+			BaseDuration: time.Second,
+
+			// maximum backoff: 32 seconds
+			MaxRetry: 5,
+		},
 	}
 
 	return job.Run(ctx)
@@ -124,6 +130,7 @@ type Job struct {
 	client *emrserverless.Client
 	asset  *pipeline.Asset
 	params *JobRunParams
+	poll   *PollTimer
 }
 
 func (job Job) Run(ctx context.Context) (err error) { //nolint
@@ -164,7 +171,7 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(3 * time.Second):
+		case <-time.After(job.poll.Duration()):
 			listJobArgs := &emrserverless.ListJobRunAttemptsInput{
 				ApplicationId: &job.params.ApplicationID,
 				JobRunId:      result.JobRunId,
@@ -174,8 +181,11 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 			}
 			runs, err := job.client.ListJobRunAttempts(ctx, listJobArgs)
 			if errors.As(err, &maxAttemptsError) {
+				job.poll.Increase()
 				continue
 			}
+			job.poll.Reset()
+
 			if err != nil {
 				return fmt.Errorf("error checking job run status: %w", err)
 			}
