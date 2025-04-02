@@ -116,6 +116,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 				f.m.On("Render", mock.Anything, "select * from users").
 					Return("select * from users", nil)
 
+				f.q.On("CreateSchemaIfNotExist", mock.Anything, mock.Anything).Return(nil)
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).
 					Return(errors.New("failed to run query"))
 			},
@@ -140,6 +141,8 @@ func TestBasicOperator_RunTask(t *testing.T) {
 
 				f.m.On("Render", mock.Anything, "select * from users").
 					Return("select * from users", nil)
+
+				f.q.On("CreateSchemaIfNotExist", mock.Anything, mock.Anything).Return(nil)
 
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).
 					Return(nil)
@@ -166,6 +169,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 				f.m.On("Render", mock.Anything, "select * from users").
 					Return("CREATE TABLE x AS select * from users", nil)
 
+				f.q.On("CreateSchemaIfNotExist", mock.Anything, mock.Anything).Return(nil)
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE TABLE x AS select * from users"}).
 					Return(nil)
 			},

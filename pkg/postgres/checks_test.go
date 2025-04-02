@@ -46,6 +46,16 @@ func (m *mockQuerierWithResult) Ping(ctx context.Context) error {
 	return args.Error(0)
 }
 
+func (m *mockQuerierWithResult) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
+	args := m.Called(ctx)
+	return args.Get(0).(*ansisql.DBDatabase), args.Error(0)
+}
+
+func (m *mockQuerierWithResult) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	args := m.Called(ctx, asset)
+	return args.Error(0)
+}
+
 type mockConnectionFetcher struct {
 	mock.Mock
 }

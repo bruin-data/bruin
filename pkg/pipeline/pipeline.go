@@ -632,6 +632,34 @@ func (a *Asset) AddUpstream(asset *Asset) {
 	a.upstream = append(a.upstream, asset)
 }
 
+func (a *Asset) PrefixSchema(prefix string) {
+	if prefix == "" {
+		return
+	}
+
+	nameParts := strings.Split(a.Name, ".")
+	if len(nameParts) == 2 {
+		a.Name = prefix + nameParts[0] + "." + nameParts[1]
+	}
+}
+
+func (a *Asset) PrefixUpstreams(prefix string) {
+	if prefix == "" {
+		return
+	}
+
+	for i, u := range a.Upstreams {
+		if u.Type != "asset" {
+			continue
+		}
+
+		nameParts := strings.Split(u.Value, ".")
+		if len(nameParts) == 2 {
+			a.Upstreams[i].Value = prefix + nameParts[0] + "." + nameParts[1]
+		}
+	}
+}
+
 // removeRedundanciesBeforePersisting aims to remove unnecessary configuration from the asset.
 // This is particularly useful when we save a formatted version of the asset itself.
 func (a *Asset) removeRedundanciesBeforePersisting() {
@@ -1640,4 +1668,23 @@ func (a *Asset) IsSQLAsset() bool {
 	}
 
 	return sqlAssetTypes[a.Type]
+}
+
+func (b *Builder) SetAssetColumnFromGlossary(asset *Asset, pathToPipeline string) error {
+	var entities []*glossary.Entity
+	var err error
+	if b.GlossaryReader != nil {
+		entities, err = b.GlossaryReader.GetEntities(pathToPipeline)
+		if err != nil {
+			return errors.Wrap(err, "error getting entities")
+		}
+	}
+
+	if len(entities) > 0 {
+		err := asset.EnrichFromEntityAttributes(entities)
+		if err != nil {
+			return errors.Wrap(err, "error enriching asset from entity attributes")
+		}
+	}
+	return nil
 }

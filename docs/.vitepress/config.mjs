@@ -4,6 +4,9 @@ import fs from 'fs';
 import path from 'path';
 import {fileURLToPath} from 'url';
 
+
+import { withMermaid } from "vitepress-plugin-mermaid";
+
 // Get the directory name of the current module
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -17,7 +20,7 @@ const bruinPythonGrammar = JSON.parse(
 );
 
 // https://vitepress.dev/reference/site-config
-export default defineConfig({
+export default withMermaid({
     title: "Bruin CLI",
     description: "Open-source multi-language data pipelines",
     base: "/bruin/",
@@ -59,7 +62,10 @@ export default defineConfig({
                     {
                         text: "Features",
                         link: "/getting-started/features",
-                        items: [{text: "Glossary", link: "/getting-started/glossary"}]
+                        items: [
+                            {text: "Glossary", link: "/getting-started/glossary"},
+                            {text: "Developer Environments", link: "/getting-started/devenv"}
+                        ]
                     },
                     {text: "Concepts", link: "/getting-started/concepts"},
                     {text: "Design Principles", link: "/getting-started/design-principles"},
@@ -247,5 +253,13 @@ export default defineConfig({
 
     markdown: {
         languages: ["sql", "yaml", "shell", "python", "json", jinja2Grammar, bruinSqlGrammar, bruinPythonGrammar],
+    },
+
+    mermaid: {
+        // refer https://mermaid.js.org/config/setup/modules/mermaidAPI.html#mermaidapi-configuration-defaults for options
+    },
+    // optionally set additional config for plugin itself with MermaidPluginConfig
+    mermaidPlugin: {
+        class: "mermaid my-class", // set additional css classes for parent container
     },
 });

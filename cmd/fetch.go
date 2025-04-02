@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -50,11 +51,9 @@ func Query() *cli.Command {
 				Required: false,
 			},
 			&cli.Int64Flag{
-				Name:        "limit",
-				Aliases:     []string{"l"},
-				Usage:       "limit the number of rows returned",
-				Value:       1000,
-				DefaultText: "1000",
+				Name:    "limit",
+				Aliases: []string{"l"},
+				Usage:   "limit the number of rows returned",
 			},
 			&cli.StringFlag{
 				Name:        "output",
@@ -71,6 +70,10 @@ func Query() *cli.Command {
 				Aliases: []string{"env"},
 				Usage:   "Target environment name as defined in .bruin.yml. Specifies the configuration environment for executing the query.",
 			},
+			&cli.BoolFlag{
+				Name:  "export",
+				Usage: "export results to a CSV file ",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			fs := afero.NewOsFs()
@@ -82,8 +85,9 @@ func Query() *cli.Command {
 			if err != nil {
 				return handleError(c.String("output"), err)
 			}
-
-			queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn)
+			if c.IsSet("limit") {
+				queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn)
+			}
 			if querier, ok := conn.(interface {
 				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
 			}); ok {
@@ -94,6 +98,16 @@ func Query() *cli.Command {
 					return handleError(c.String("output"), errors.Wrap(err, "query execution failed"))
 				}
 				// Output result based on format specified
+				inputPath := c.String("asset")
+				var resultsPath string
+				if c.Bool("export") {
+					resultsPath, err = exportResultsToCSV(result, inputPath)
+					if err != nil {
+						return handleError(c.String("output"), errors.Wrap(err, "failed to export results to CSV"))
+					}
+					successMessage := "Results Successfully exported to " + resultsPath
+					return handleSuccess(c.String("output"), successMessage)
+				}
 				output := c.String("output")
 				if output == "json" {
 					type jsonResponse struct {
@@ -418,4 +432,63 @@ func prepareAutoDetectQuery(c *cli.Context, fs afero.Fs) (string, interface{}, s
 	}
 
 	return connName, conn, queryStr, nil
+}
+
+func exportResultsToCSV(results *query.QueryResult, inputPath string) (string, error) {
+	if inputPath == "" {
+		inputPath = "."
+	}
+	repoRoot, err := git.FindRepoFromPath(inputPath)
+	if err != nil {
+		return "", err
+	}
+	resultName := fmt.Sprintf("query_result_%s.csv", time.Now().Format("2006-01-02_15-04-05"))
+	resultsPath := filepath.Join(repoRoot.Path, "logs/exports", resultName)
+	err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/exports")
+	if err != nil {
+		return "", err
+	}
+
+	err = os.MkdirAll(filepath.Dir(resultsPath), 0755)
+	if err != nil {
+		return "", err
+	}
+
+	file, err := os.Create(resultsPath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+	if err = writer.Write(results.Columns); err != nil {
+		return "", err
+	}
+	for _, row := range results.Rows {
+		rowStrings := make([]string, len(row))
+		for i, val := range row {
+			rowStrings[i] = fmt.Sprintf("%v", val)
+		}
+		if err = writer.Write(rowStrings); err != nil {
+			return "", err
+		}
+	}
+
+	return resultsPath, nil
+}
+
+func handleSuccess(output string, message string) error {
+	if output == "json" {
+		message = strings.TrimPrefix(message, "Results Successfully exported to ")
+		jsonSuccessMessage, err := json.Marshal(map[string]string{"Results Successfully exported to": message})
+		if err != nil {
+			fmt.Println("Error:", err.Error())
+			return cli.Exit("", 1)
+		}
+		fmt.Println(string(jsonSuccessMessage))
+	} else {
+		successPrinter.Printf("%s\n", message)
+	}
+	return nil
 }
