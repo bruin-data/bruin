@@ -387,7 +387,7 @@ func LoadOrCreateWithoutPathAbsolutization(fs afero.Fs, path string) (*Config, e
 	return &config, ensureConfigIsInGitignore(fs, path)
 }
 
-func (c *Config) AddConnection(environmentName, name, connType string, creds map[string]interface{}) error { //nolint
+func (c *Config) AddConnection(environmentName, name, connType string, creds map[string]interface{}) error {
 	// Check if the environment exists
 	env, exists := c.Environments[environmentName]
 	if !exists {
@@ -398,13 +398,8 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 	switch connType {
 	case "aws":
 		var conn AwsConnection
-
-		// alias for common AWS config
-		c := maps.Clone(creds)
-		c["access_key"] = c["aws_access_key_id"]
-		c["secret_key"] = c["aws_secret_access_key"]
-
-		if err := mapstructure.Decode(c, &conn); err != nil {
+		creds = populateAwsConfigAliases(creds)
+		if err := mapstructure.Decode(creds, &conn); err != nil {
 			return fmt.Errorf("failed to decode credentials: %w", err)
 		}
 		conn.Name = name
@@ -908,4 +903,17 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Personio, source.Personio)
 	c.buildConnectionKeyMap()
 	return nil
+}
+
+func populateAwsConfigAliases(creds map[string]any) map[string]any {
+	creds = maps.Clone(creds)
+
+	if creds["access_key"] == nil {
+		creds["access_key"] = creds["aws_access_key_id"]
+	}
+	if creds["secret_key"] == nil {
+		creds["secret_key"] = creds["aws_secret_access_key"]
+	}
+
+	return creds
 }
