@@ -161,6 +161,14 @@ func Run(isDebug *bool) *cli.Command {
 				EnvVars: []string{"BRUIN_CONFIG_FILE"},
 				Usage:   "the path to the .bruin.yml file",
 			},
+			&cli.BoolFlag{
+				Name:  "skip-validation",
+				Usage: "skip validation for this run.",
+			},
+			&cli.BoolFlag{
+				Name:  "no-timestamp",
+				Usage: "skip logging timestamps for this run.",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			defer func() {
@@ -265,11 +273,12 @@ func Run(isDebug *bool) *cli.Command {
 			if pipelineInfo.RunningForAnAsset {
 				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
 			} else {
-				if err := CheckLint(pipelineInfo.Pipeline, inputPath, logger, nil); err != nil {
-					return err
+				if !c.Bool("skip-validation") {
+					if err := CheckLint(pipelineInfo.Pipeline, inputPath, logger, nil); err != nil {
+						return err
+					}
 				}
 			}
-
 			statePath := filepath.Join(repoRoot.Path, "logs/runs", pipelineInfo.Pipeline.Name)
 			err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/runs")
 			if err != nil {
@@ -401,7 +410,7 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			ex, err := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"))
+			ex, err := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"), c.Bool("no-timestamp"))
 			if err != nil {
 				errorPrinter.Printf("Failed to create executor: %v\n", err)
 				return cli.Exit("", 1)
