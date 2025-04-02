@@ -1,3 +1,4 @@
 logs/*.log
 .bruin.yml
 logs/runs
+logs/exports

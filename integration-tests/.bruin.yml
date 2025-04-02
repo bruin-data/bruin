@@ -162,3 +162,9 @@ environments:
       duckdb:
         - name: "duckdb-env-run-non-wait-symbolic"
           path: "duckdb-files/env-run-non-wait-symbolic.db"
+
+  env-query-export:
+    connections:
+      duckdb:
+        - name: "duckdb-query-export"
+          path: "duckdb-files/env-query-export.db"

@@ -351,6 +351,17 @@
           }
         ]
       }
+    },
+    "env-query-export": {
+      "schema_prefix": "",
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-query-export",
+            "path": "integration-tests/duckdb-files/env-query-export.db"
+          }
+        ]
+      }
     }
   }
 }
