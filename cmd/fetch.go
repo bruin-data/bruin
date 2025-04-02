@@ -449,7 +449,7 @@ func exportResultsToCSV(results *query.QueryResult, inputPath string) (string, e
 		return "", err
 	}
 
-	err = os.MkdirAll(filepath.Dir(resultsPath), 0755)
+	err = os.MkdirAll(filepath.Dir(resultsPath), 0o755)
 	if err != nil {
 		return "", err
 	}
