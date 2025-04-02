@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	fs2 "io/fs"
+	"maps"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -397,7 +398,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 	switch connType {
 	case "aws":
 		var conn AwsConnection
-		if err := mapstructure.Decode(creds, &conn); err != nil {
+
+		// alias for common AWS config
+		c := maps.Clone(creds)
+		c["access_key"] = c["aws_access_key_id"]
+		c["secret_key"] = c["aws_secret_access_key"]
+
+		if err := mapstructure.Decode(c, &conn); err != nil {
 			return fmt.Errorf("failed to decode credentials: %w", err)
 		}
 		conn.Name = name
