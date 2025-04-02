@@ -161,6 +161,23 @@ func Run(isDebug *bool) *cli.Command {
 				EnvVars: []string{"BRUIN_CONFIG_FILE"},
 				Usage:   "the path to the .bruin.yml file",
 			},
+			&cli.BoolFlag{
+				Name:  "no-validation",
+				Usage: "skip validation for this run.",
+			},
+			&cli.BoolFlag{
+				Name:  "no-timestamp",
+				Usage: "skip logging timestamps for this run.",
+			},
+			&cli.BoolFlag{
+				Name:  "no-color",
+				Usage: "plain log output for this run.",
+			},
+			&cli.BoolFlag{
+				Name:   "minimal-logs",
+				Usage:  "skip initial pipeline analysis logs for this run",
+				Hidden: true,
+			},
 		},
 		Action: func(c *cli.Context) error {
 			defer func() {
@@ -259,12 +276,18 @@ func Run(isDebug *bool) *cli.Command {
 			if os.Getenv("BRUIN_RUN_ID") != "" {
 				runID = os.Getenv("BRUIN_RUN_ID")
 			}
+			executionStartLog := "Starting execution..."
+			if !c.Bool("minimal-logs") {
+				infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
 
-			infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
+				if pipelineInfo.RunningForAnAsset {
+					infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
+				}
+				executionStartLog = "Starting the pipeline execution..."
+			}
 
-			if pipelineInfo.RunningForAnAsset {
-				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
-			} else {
+			shouldValidate := !pipelineInfo.RunningForAnAsset && !c.Bool("no-validation")
+			if shouldValidate {
 				if err := CheckLint(pipelineInfo.Pipeline, inputPath, logger, nil); err != nil {
 					return err
 				}
@@ -370,7 +393,7 @@ func Run(isDebug *bool) *cli.Command {
 				return nil
 			}
 			sendTelemetry(s, c)
-			infoPrinter.Printf("\nStarting the pipeline execution...\n")
+			infoPrinter.Printf("\n%s\n", executionStartLog)
 			infoPrinter.Println()
 			if runConfig.SensorMode != "" {
 				if !(runConfig.SensorMode == "skip" || runConfig.SensorMode == "once" || runConfig.SensorMode == "wait") {
@@ -400,8 +423,12 @@ func Run(isDebug *bool) *cli.Command {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
 			}
+			formatOpts := executor.FormattingOptions{
+				DoNotLogTimestamp: c.Bool("no-timestamp"),
+				NoColor:           c.Bool("no-color"),
+			}
 
-			ex, err := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"))
+			ex, err := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"), formatOpts)
 			if err != nil {
 				errorPrinter.Printf("Failed to create executor: %v\n", err)
 				return cli.Exit("", 1)
