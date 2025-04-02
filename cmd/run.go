@@ -173,6 +173,11 @@ func Run(isDebug *bool) *cli.Command {
 				Name:  "no-color",
 				Usage: "plain log output for this run.",
 			},
+			&cli.BoolFlag{
+				Name:   "minimal-logs",
+				Usage:  "skip initial pipeline analysis logs for this run",
+				Hidden: true,
+			},
 		},
 		Action: func(c *cli.Context) error {
 			defer func() {
@@ -271,18 +276,23 @@ func Run(isDebug *bool) *cli.Command {
 			if os.Getenv("BRUIN_RUN_ID") != "" {
 				runID = os.Getenv("BRUIN_RUN_ID")
 			}
+			executionStartLog := "Starting execution..."
+			if !c.Bool("minimal-logs") { 
+				infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
 
-			infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
+				if pipelineInfo.RunningForAnAsset {
+					infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
+				}
+				executionStartLog = "Starting the pipeline execution..."
+			}
 
-			if pipelineInfo.RunningForAnAsset {
-				infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
-			} else {
-				if !c.Bool("no-validation") {
-					if err := CheckLint(pipelineInfo.Pipeline, inputPath, logger, nil); err != nil {
-						return err
-					}
+			shouldValidate := !pipelineInfo.RunningForAnAsset && !c.Bool("no-validation")
+			if shouldValidate {
+				if err := CheckLint(pipelineInfo.Pipeline, inputPath, logger, nil); err != nil {
+					return err
 				}
 			}
+
 			statePath := filepath.Join(repoRoot.Path, "logs/runs", pipelineInfo.Pipeline.Name)
 			err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/runs")
 			if err != nil {
@@ -383,7 +393,7 @@ func Run(isDebug *bool) *cli.Command {
 				return nil
 			}
 			sendTelemetry(s, c)
-			infoPrinter.Printf("\nStarting the pipeline execution...\n")
+			infoPrinter.Printf("\n%s\n", executionStartLog)
 			infoPrinter.Println()
 			if runConfig.SensorMode != "" {
 				if !(runConfig.SensorMode == "skip" || runConfig.SensorMode == "once" || runConfig.SensorMode == "wait") {
