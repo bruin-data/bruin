@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless/types"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -64,7 +66,7 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 
 	job := Job{
 		logger: logger,
-		client: emrserverless.NewFromConfig(cfg),
+		awsCfg: cfg,
 		params: params,
 		asset:  asset,
 		poll: &PollTimer{
@@ -129,13 +131,13 @@ func parseParams(m map[string]string) *JobRunParams {
 
 type Job struct {
 	logger *log.Logger
-	client *emrserverless.Client
+	awsCfg aws.Config
 	asset  *pipeline.Asset
 	params *JobRunParams
 	poll   *PollTimer
 }
 
-func (job Job) startJobRunConfig() *emrserverless.StartJobRunInput {
+func (job Job) buildJobRunConfig() *emrserverless.StartJobRunInput {
 
 	cfg := &emrserverless.StartJobRunInput{
 		ApplicationId:           &job.params.ApplicationID,
@@ -165,18 +167,19 @@ func (job Job) startJobRunConfig() *emrserverless.StartJobRunInput {
 }
 
 func (job Job) Run(ctx context.Context) (err error) { //nolint
+	client := emrserverless.NewFromConfig(job.awsCfg)
 
-	result, err := job.client.StartJobRun(ctx, job.startJobRunConfig())
+	run, err := client.StartJobRun(ctx, job.buildJobRunConfig())
 	if err != nil {
 		return fmt.Errorf("error submitting job run: %w", err)
 	}
-	job.logger.Printf("created job run: %s", *result.JobRunId)
+	job.logger.Printf("created job run: %s", *run.JobRunId)
 	defer func() { //nolint
 		if err != nil {
 			job.logger.Printf("error detected. cancelling job run.")
-			job.client.CancelJobRun(context.Background(), &emrserverless.CancelJobRunInput{ //nolint
+			client.CancelJobRun(context.Background(), &emrserverless.CancelJobRunInput{ //nolint
 				ApplicationId: &job.params.ApplicationID,
-				JobRunId:      result.JobRunId,
+				JobRunId:      run.JobRunId,
 			})
 		}
 	}()
@@ -185,6 +188,7 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 		previousState    = types.JobRunState("unknown")
 		paginationToken  = ""
 		maxAttemptsError = &retry.MaxAttemptsError{}
+		jobLogs          = job.buildLogConsumer(ctx, run)
 	)
 	for {
 		select {
@@ -193,12 +197,12 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 		case <-time.After(job.poll.Duration()):
 			listJobArgs := &emrserverless.ListJobRunAttemptsInput{
 				ApplicationId: &job.params.ApplicationID,
-				JobRunId:      result.JobRunId,
+				JobRunId:      run.JobRunId,
 			}
 			if paginationToken != "" {
 				listJobArgs.NextToken = &paginationToken
 			}
-			runs, err := job.client.ListJobRunAttempts(ctx, listJobArgs)
+			runs, err := client.ListJobRunAttempts(ctx, listJobArgs)
 			if errors.As(err, &maxAttemptsError) {
 				job.poll.Increase()
 				continue
@@ -216,11 +220,14 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 			if previousState != latestRun.State {
 				job.logger.Printf(
 					"%s | %s | %s",
-					*result.JobRunId,
+					*run.JobRunId,
 					latestRun.State,
 					*latestRun.StateDetails,
 				)
 				previousState = latestRun.State
+			}
+			for _, line := range jobLogs.Next() {
+				job.logger.Printf("log | %s | %s ", line.Stream, line.Message)
 			}
 			if slices.Contains(terminalJobRunStates, latestRun.State) {
 				return nil
@@ -230,4 +237,25 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 			}
 		}
 	}
+}
+
+type LogConsumer interface {
+	Next() []LogLine
+}
+
+func (job Job) buildLogConsumer(ctx context.Context, run *emrserverless.StartJobRunOutput) LogConsumer {
+	if job.params.Logs != "" {
+		uri, err := url.Parse(job.params.Logs)
+		if err == nil {
+			return &S3LogConsumer{
+				Ctx:   ctx,
+				URI:   uri,
+				S3cli: s3.NewFromConfig(job.awsCfg),
+				RunID: *run.JobRunId,
+				AppID: *run.ApplicationId,
+			}
+		}
+	}
+
+	return &NoOpLogConsumer{}
 }
