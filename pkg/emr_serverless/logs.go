@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
@@ -18,7 +19,7 @@ type LogLine struct {
 }
 
 type logState struct {
-	size int
+	size int64
 	read int
 }
 
@@ -46,19 +47,20 @@ func (l *S3LogConsumer) Next() (lines []LogLine) {
 
 func (l *S3LogConsumer) readStream(stream string) (lines []LogLine) {
 
-	file := l.logFile(stream)
+	if !l.hasNewLogs(stream) {
+		return nil
+	}
 
-	// todo: check state to detect whether we need
-	// to pull logs or not
 	logStream, err := l.S3cli.GetObject(l.Ctx, &s3.GetObjectInput{
 		Bucket: &l.URI.Host,
-		Key:    &file,
+		Key:    aws.String(l.logFile(stream)),
 	})
 
 	if err != nil {
 		return nil
 	}
 	defer logStream.Body.Close()
+
 	gzReader, err := gzip.NewReader(logStream.Body)
 	if err != nil {
 		return nil
@@ -66,11 +68,19 @@ func (l *S3LogConsumer) readStream(stream string) (lines []LogLine) {
 	defer gzReader.Close()
 
 	scanner := bufio.NewScanner(gzReader)
+	for range l.state[stream].read {
+		scanner.Scan()
+	}
+
 	for scanner.Scan() {
 		lines = append(lines, LogLine{
 			Stream:  stream,
 			Message: strings.TrimSpace(scanner.Text()),
 		})
+	}
+	l.state[stream] = logState{
+		read: len(lines) + l.state[stream].read,
+		size: *logStream.ContentLength,
 	}
 	return
 }
@@ -86,6 +96,22 @@ func (l *S3LogConsumer) logFile(stream string) string {
 	).Path
 
 	return strings.TrimPrefix(fullPath, "/")
+}
+
+func (l *S3LogConsumer) hasNewLogs(stream string) bool {
+	state, exists := l.state[stream]
+	if !exists {
+		return true
+	}
+
+	meta, err := l.S3cli.HeadObject(l.Ctx, &s3.HeadObjectInput{
+		Bucket: &l.URI.Host,
+		Key:    aws.String(l.logFile(stream)),
+	})
+	if err != nil {
+		return false
+	}
+	return *meta.ContentLength != state.size
 }
 
 type NoOpLogConsumer struct{}
