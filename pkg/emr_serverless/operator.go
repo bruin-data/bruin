@@ -96,6 +96,7 @@ type JobRunParams struct {
 	Config        string
 	Timeout       time.Duration
 	Region        string
+	Logs          string
 }
 
 func parseParams(m map[string]string) *JobRunParams {
@@ -105,6 +106,7 @@ func parseParams(m map[string]string) *JobRunParams {
 		Entrypoint:    m["entrypoint"],
 		Config:        m["config"],
 		Region:        m["region"],
+		Logs:          m["logs"],
 	}
 
 	if m["timeout"] != "" {
@@ -133,9 +135,9 @@ type Job struct {
 	poll   *PollTimer
 }
 
-func (job Job) Run(ctx context.Context) (err error) { //nolint
+func (job Job) startJobRunConfig() *emrserverless.StartJobRunInput {
 
-	result, err := job.client.StartJobRun(ctx, &emrserverless.StartJobRunInput{
+	cfg := &emrserverless.StartJobRunInput{
 		ApplicationId:           &job.params.ApplicationID,
 		Name:                    &job.asset.Name,
 		ExecutionRoleArn:        &job.params.ExecutionRole,
@@ -147,7 +149,24 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 				SparkSubmitParameters: &job.params.Config,
 			},
 		},
-	})
+	}
+
+	if job.params.Logs != "" {
+		cfg.ConfigurationOverrides = &types.ConfigurationOverrides{
+			MonitoringConfiguration: &types.MonitoringConfiguration{
+				S3MonitoringConfiguration: &types.S3MonitoringConfiguration{
+					LogUri: aws.String(job.params.Logs),
+				},
+			},
+		}
+	}
+
+	return cfg
+}
+
+func (job Job) Run(ctx context.Context) (err error) { //nolint
+
+	result, err := job.client.StartJobRun(ctx, job.startJobRunConfig())
 	if err != nil {
 		return fmt.Errorf("error submitting job run: %w", err)
 	}
