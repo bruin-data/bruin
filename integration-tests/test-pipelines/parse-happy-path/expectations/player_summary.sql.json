@@ -15,6 +15,10 @@
       "incremental_key": "",
       "time_granularity": ""
     },
+    "interval_modifiers": {
+      "start": "",
+      "end": ""
+    },
     "upstreams": [
       {
         "type": "asset",

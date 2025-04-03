@@ -21,6 +21,10 @@
       "connection": "",
       "tags": [],
       "materialization": null,
+      "interval_modifiers": {
+        "start": "",
+        "end": ""
+      },
       "upstreams": [
         {
           "type": "asset",
@@ -71,6 +75,10 @@
       "connection": "",
       "tags": [],
       "materialization": null,
+      "interval_modifiers": {
+        "start": "",
+        "end": ""
+      },
       "upstreams": [],
       "image": "",
       "instance": "",
@@ -111,6 +119,10 @@
       "connection": "",
       "tags": [],
       "materialization": null,
+      "interval_modifiers": {
+        "start": "",
+        "end": ""
+      },
       "upstreams": [],
       "image": "",
       "instance": "",
@@ -157,6 +169,10 @@
         "cluster_by": null,
         "incremental_key": "",
         "time_granularity": ""
+      },
+      "interval_modifiers": {
+        "start": "",
+        "end": ""
       },
       "upstreams": [
         {
