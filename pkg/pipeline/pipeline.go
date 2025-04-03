@@ -1696,6 +1696,9 @@ func (b *Builder) SetAssetColumnFromGlossary(asset *Asset, pathToPipeline string
 }
 
 func ModifyDate(t time.Time, modifier string) (time.Time, error) {
+	if modifier == "" {
+		return t, nil
+	}
 
 	if len(modifier) < 2 {
 		return t, errors.New("invalid interval format; must contain a number + suffix (h, m, s, or M)")
