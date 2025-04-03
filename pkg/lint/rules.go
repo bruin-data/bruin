@@ -338,6 +338,76 @@ func EnsurePipelineScheduleIsValidCron(p *pipeline.Pipeline) ([]*Issue, error) {
 	return issues, nil
 }
 
+type WarnRegularYamlFiles struct {
+	fs afero.Fs
+}
+
+func (w *WarnRegularYamlFiles) WarnRegularYamlFilesInRepo(p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	if p.DefinitionFile.Path == "" {
+		return issues, nil
+	}
+
+	// Get the directory containing the pipeline file
+	pipelineDir := filepath.Dir(p.DefinitionFile.Path)
+
+	assetsDir := filepath.Join(pipelineDir, "assets")
+	exists, err := afero.DirExists(w.fs, assetsDir)
+	if err != nil || !exists {
+		return issues, nil //nolint:all
+	}
+
+	foundFiles := make([]string, 0)
+
+	// Walk through the assets directory to find .yml files
+	err = afero.Walk(w.fs, assetsDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil //nolint:all
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		isYaml := strings.HasSuffix(path, ".yml") || strings.HasSuffix(path, ".yaml")
+		if !isYaml {
+			return nil
+		}
+
+		isAssetYaml := strings.HasSuffix(path, ".asset.yml") || strings.HasSuffix(path, ".asset.yaml")
+		if isAssetYaml {
+			return nil
+		}
+
+		foundFiles = append(foundFiles, path)
+		return nil
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to walk through assets directory")
+	}
+
+	if len(foundFiles) > 0 {
+		issueContext := make([]string, len(foundFiles))
+		for i, file := range foundFiles {
+			pathToAppend := file
+			relPath, err := filepath.Rel(filepath.Dir(p.DefinitionFile.Path), file)
+			if err == nil {
+				pathToAppend = relPath
+			}
+
+			issueContext[i] = pathToAppend
+		}
+
+		issues = append(issues, &Issue{
+			Description: "Regular YAML files are not treated as assets, please rename them to `.asset.yml` if you intended to create assets.",
+			Context:     issueContext,
+		})
+	}
+
+	return issues, nil
+}
+
 func EnsurePipelineStartDateIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if p.StartDate == "" {
