@@ -49,6 +49,10 @@
         }
       ],
       "materialization": null,
+      "interval_modifiers": {
+        "start": "",
+        "end": ""
+      },
       "columns": [],
       "custom_checks": [],
       "image": "",
