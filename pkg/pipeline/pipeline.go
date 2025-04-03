@@ -1695,18 +1695,18 @@ func (b *Builder) SetAssetColumnFromGlossary(asset *Asset, pathToPipeline string
 	return nil
 }
 
-func (m IntervalModifiers) ModifyDate(t time.Time) (time.Time, error) {
-	s := m.Start
-	if len(s) < 2 {
+func ModifyDate(t time.Time, modifier string) (time.Time, error) {
+
+	if len(modifier) < 2 {
 		return t, errors.New("invalid interval format; must contain a number + suffix (h, m, s, or M)")
 	}
 
-	suffix := s[len(s)-1]
-	numeric := s[:len(s)-1]
+	suffix := modifier[len(modifier)-1]
+	numeric := modifier[:len(modifier)-1]
 
 	value, err := strconv.Atoi(numeric)
 	if err != nil {
-		return t, fmt.Errorf("invalid numeric portion %q in interval %q: %w", numeric, s, err)
+		return t, fmt.Errorf("invalid numeric portion %q in interval %q: %w", numeric, modifier, err)
 	}
 
 	switch suffix {
@@ -1721,6 +1721,6 @@ func (m IntervalModifiers) ModifyDate(t time.Time) (time.Time, error) {
 	case 'M':
 		return t.AddDate(0, value, 0), nil
 	default:
-		return t, fmt.Errorf("unknown interval suffix %q in %q; must be h, m, s, or M", suffix, s)
+		return t, fmt.Errorf("unknown interval suffix %q in %q; must be h, m, s, or M", suffix, modifier)
 	}
 }
