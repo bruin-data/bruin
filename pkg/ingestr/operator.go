@@ -100,7 +100,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
 
-	cmdArgs := python.ConsolidatedParameters(ctx, ti.GetAsset(), []string{
+	cmdArgs, err := python.ConsolidatedParameters(ctx, ti.GetAsset(), []string{
 		"ingest",
 		"--source-uri",
 		sourceURI,
@@ -114,6 +114,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		"--progress",
 		"log",
 	})
+	if err != nil {
+		return err
+	}
 
 	path := ti.GetAsset().ExecutableFile.Path
 	repo, err := o.finder.Repo(path)
@@ -172,7 +175,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
 
-	cmdArgs := python.ConsolidatedParameters(ctx, ti.GetAsset(), []string{
+	cmdArgs, err := python.ConsolidatedParameters(ctx, ti.GetAsset(), []string{
 		"ingest",
 		"--source-uri",
 		sourceURI,
@@ -186,6 +189,9 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		"--progress",
 		"log",
 	})
+	if err != nil {
+		return err
+	}
 
 	columns := columnHints(ti.GetAsset().Columns)
 	if columns != "" {
