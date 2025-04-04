@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/nikolalohinski/gonja/v2/exec"
 	"github.com/stretchr/testify/require"
 )
 
@@ -208,7 +210,7 @@ group by 1`,
 			t.Parallel()
 
 			receiver := NewRenderer(tt.args)
-			got, err := receiver.Render(tt.query)
+			got, err := receiver.Render(tt.query, pipeline.IntervalModifiers{})
 			require.NoError(t, err)
 
 			require.Equal(t, tt.want, got)
@@ -276,7 +278,7 @@ group by 1`,
 			t.Parallel()
 
 			receiver := NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id")
-			got, err := receiver.Render(tt.query)
+			got, err := receiver.Render(tt.query, pipeline.IntervalModifiers{})
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -322,7 +324,7 @@ func TestJinjaRendererErrorHandling(t *testing.T) {
 			t.Parallel()
 
 			receiver := NewRenderer(Context{})
-			_, err := receiver.Render(tt.query)
+			_, err := receiver.Render(tt.query, pipeline.IntervalModifiers{})
 			require.Error(t, err)
 
 			require.Equal(t, tt.wantErr, err.Error())
@@ -383,7 +385,7 @@ func TestAddMonths(t *testing.T) {
 
 			query := fmt.Sprintf("{{ '%s' | add_months('%s') }}", tt.date, tt.months)
 			renderer := NewRenderer(Context{})
-			result, err := renderer.Render(query)
+			result, err := renderer.Render(query, pipeline.IntervalModifiers{})
 
 			if tt.wantError {
 				require.Error(t, err)
@@ -449,7 +451,7 @@ func TestAddYears(t *testing.T) {
 
 			query := fmt.Sprintf("{{ '%s' | add_years('%s') }}", tt.date, tt.years)
 			renderer := NewRenderer(Context{})
-			result, err := renderer.Render(query)
+			result, err := renderer.Render(query, pipeline.IntervalModifiers{})
 
 			if tt.wantError {
 				require.Error(t, err)
@@ -527,7 +529,7 @@ func TestAddDays(t *testing.T) {
 
 			query := fmt.Sprintf("{{ '%s' | add_days('%s') }}", tt.date, tt.days)
 			renderer := NewRenderer(Context{})
-			result, err := renderer.Render(query)
+			result, err := renderer.Render(query, pipeline.IntervalModifiers{})
 
 			if tt.wantError {
 				require.Error(t, err)
@@ -611,7 +613,7 @@ func TestAddHours(t *testing.T) {
 
 			query := fmt.Sprintf("{{ '%s' | add_hours('%s') }}", tt.date, tt.hours)
 			renderer := NewRenderer(Context{})
-			result, err := renderer.Render(query)
+			result, err := renderer.Render(query, pipeline.IntervalModifiers{})
 
 			if tt.wantError {
 				require.Error(t, err)
@@ -701,7 +703,7 @@ func TestAddMinutes(t *testing.T) {
 
 			query := fmt.Sprintf("{{ '%s' | add_minutes('%s') }}", tt.date, tt.minutes)
 			renderer := NewRenderer(Context{})
-			result, err := renderer.Render(query)
+			result, err := renderer.Render(query, pipeline.IntervalModifiers{})
 
 			if tt.wantError {
 				require.Error(t, err)
@@ -797,7 +799,7 @@ func TestAddSeconds(t *testing.T) {
 
 			query := fmt.Sprintf("{{ '%s' | add_seconds('%s') }}", tt.date, tt.seconds)
 			renderer := NewRenderer(Context{})
-			result, err := renderer.Render(query)
+			result, err := renderer.Render(query, pipeline.IntervalModifiers{})
 
 			if tt.wantError {
 				require.Error(t, err)
@@ -899,7 +901,7 @@ func TestAddMilliseconds(t *testing.T) {
 
 			query := fmt.Sprintf("{{ '%s' | add_milliseconds('%s') }}", tt.date, tt.milliseconds)
 			renderer := NewRenderer(Context{})
-			result, err := renderer.Render(query)
+			result, err := renderer.Render(query, pipeline.IntervalModifiers{})
 
 			if tt.wantError {
 				require.Error(t, err)
@@ -908,6 +910,199 @@ func TestAddMilliseconds(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Equal(t, tt.want, result)
+		})
+	}
+}
+
+func TestUpdateContextWithIntervalModifiers(t *testing.T) {
+	tests := []struct {
+		name      string
+		context   map[string]any
+		modifiers pipeline.IntervalModifiers
+		wantErr   bool
+		validate  func(*testing.T, *exec.Context)
+	}{
+		{
+			name: "modify start date +1d",
+			context: map[string]any{
+				"start_date":        time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+				"start_date_nodash": time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+				"start_datetime":    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+				"start_timestamp":   time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			},
+			modifiers: pipeline.IntervalModifiers{Start: "+1d"},
+			validate: func(t *testing.T, ctx *exec.Context) {
+				val, _ := ctx.Get("start_date")
+				require.Equal(t, "2024-01-02", val)
+				val, _ = ctx.Get("start_date_nodash")
+				require.Equal(t, "20240102", val)
+				val, _ = ctx.Get("start_datetime")
+				require.Equal(t, "2024-01-02T00:00:00", val)
+				val, _ = ctx.Get("start_timestamp")
+				require.Equal(t, "2024-01-02T00:00:00.000000Z", val)
+			},
+		},
+		{
+			name: "modify end date -1d",
+			context: map[string]any{
+				"end_date":        time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+				"end_date_nodash": time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+				"end_datetime":    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+				"end_timestamp":   time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			},
+			modifiers: pipeline.IntervalModifiers{End: "-1d"},
+			validate: func(t *testing.T, ctx *exec.Context) {
+				val, _ := ctx.Get("end_date")
+				require.Equal(t, "2023-12-31", val)
+				val, _ = ctx.Get("end_date_nodash")
+				require.Equal(t, "20231231", val)
+				val, _ = ctx.Get("end_datetime")
+				require.Equal(t, "2023-12-31T00:00:00", val)
+				val, _ = ctx.Get("end_timestamp")
+				require.Equal(t, "2023-12-31T00:00:00.000000Z", val)
+			},
+		},
+		{
+			name: "invalid time value",
+			context: map[string]any{
+				"start_date": "not a time",
+			},
+			modifiers: pipeline.IntervalModifiers{Start: "+1d"},
+			wantErr:   true,
+		},
+		{
+			name:      "missing required field",
+			context:   map[string]any{},
+			modifiers: pipeline.IntervalModifiers{Start: "+1d"},
+			wantErr:   true,
+		},
+		{
+			name: "modify with months",
+			context: map[string]any{
+				"start_date":        time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+				"start_date_nodash": time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+				"start_datetime":    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+				"start_timestamp":   time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+				"end_date":          time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+				"end_date_nodash":   time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+				"end_datetime":      time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+				"end_timestamp":     time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			},
+			modifiers: pipeline.IntervalModifiers{
+				Start: "-1M",
+				End:   "+1M",
+			},
+			validate: func(t *testing.T, ctx *exec.Context) {
+				val, _ := ctx.Get("start_date")
+				require.Equal(t, "2023-12-01", val)
+				val, _ = ctx.Get("end_date")
+				require.Equal(t, "2024-02-01", val)
+			},
+		},
+		{
+			name: "modify with seconds",
+			context: map[string]any{
+				"start_date":        time.Date(2024, 1, 1, 23, 59, 45, 0, time.UTC),
+				"start_date_nodash": time.Date(2024, 1, 1, 23, 59, 45, 0, time.UTC),
+				"start_datetime":    time.Date(2024, 1, 1, 23, 59, 45, 0, time.UTC),
+				"start_timestamp":   time.Date(2024, 1, 1, 23, 59, 45, 0, time.UTC),
+			},
+			modifiers: pipeline.IntervalModifiers{Start: "+20s"},
+			validate: func(t *testing.T, ctx *exec.Context) {
+				val, _ := ctx.Get("start_date")
+				require.Equal(t, "2024-01-02", val) // crossed midnight
+				val, _ = ctx.Get("start_datetime")
+				require.Equal(t, "2024-01-02T00:00:05", val)
+				val, _ = ctx.Get("start_timestamp")
+				require.Equal(t, "2024-01-02T00:00:05.000000Z", val)
+			},
+		},
+		{
+			name: "modify with seconds - same day",
+			context: map[string]any{
+				"start_date":        time.Date(2024, 1, 2, 14, 30, 15, 0, time.UTC),
+				"start_date_nodash": time.Date(2024, 1, 2, 14, 30, 15, 0, time.UTC),
+				"start_datetime":    time.Date(2024, 1, 2, 14, 30, 15, 0, time.UTC),
+				"start_timestamp":   time.Date(2024, 1, 2, 14, 30, 15, 0, time.UTC),
+			},
+			modifiers: pipeline.IntervalModifiers{Start: "+2s"},
+			validate: func(t *testing.T, ctx *exec.Context) {
+				val, _ := ctx.Get("start_date")
+				require.Equal(t, "2024-01-02", val) // date remains same
+				val, _ = ctx.Get("start_datetime")
+				require.Equal(t, "2024-01-02T14:30:17", val)
+				val, _ = ctx.Get("start_timestamp")
+				require.Equal(t, "2024-01-02T14:30:17.000000Z", val)
+			},
+		},
+		{
+			name: "modify with seconds on date string",
+			context: map[string]any{
+				"start_date":        time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC),
+				"start_date_nodash": time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC),
+				"start_datetime":    time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC),
+				"start_timestamp":   time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC),
+			},
+			modifiers: pipeline.IntervalModifiers{Start: "+2s"},
+			validate: func(t *testing.T, ctx *exec.Context) {
+				val, _ := ctx.Get("start_date")
+				require.Equal(t, "2024-01-02", val) // date stays the same
+				val, _ = ctx.Get("start_datetime")
+				require.Equal(t, "2024-01-02T00:00:02", val) // adds 2 seconds to midnight
+				val, _ = ctx.Get("start_timestamp")
+				require.Equal(t, "2024-01-02T00:00:02.000000Z", val)
+			},
+		},
+		{
+			name: "cross month boundary with hours",
+			context: map[string]any{
+				"start_date":        time.Date(2024, 1, 31, 23, 0, 0, 0, time.UTC),
+				"start_date_nodash": time.Date(2024, 1, 31, 23, 0, 0, 0, time.UTC),
+				"start_datetime":    time.Date(2024, 1, 31, 23, 0, 0, 0, time.UTC),
+				"start_timestamp":   time.Date(2024, 1, 31, 23, 0, 0, 0, time.UTC),
+			},
+			modifiers: pipeline.IntervalModifiers{Start: "+2h"},
+			validate: func(t *testing.T, ctx *exec.Context) {
+				val, _ := ctx.Get("start_date")
+				require.Equal(t, "2024-02-01", val) // crossed to next month
+				val, _ = ctx.Get("start_datetime")
+				require.Equal(t, "2024-02-01T01:00:00", val)
+				val, _ = ctx.Get("start_timestamp")
+				require.Equal(t, "2024-02-01T01:00:00.000000Z", val)
+			},
+		},
+		{
+			name: "leap year boundary",
+			context: map[string]any{
+				"start_date":        time.Date(2024, 2, 29, 23, 30, 0, 0, time.UTC),
+				"start_date_nodash": time.Date(2024, 2, 29, 23, 30, 0, 0, time.UTC),
+				"start_datetime":    time.Date(2024, 2, 29, 23, 30, 0, 0, time.UTC),
+				"start_timestamp":   time.Date(2024, 2, 29, 23, 30, 0, 0, time.UTC),
+			},
+			modifiers: pipeline.IntervalModifiers{Start: "+1h"},
+			validate: func(t *testing.T, ctx *exec.Context) {
+				val, _ := ctx.Get("start_date")
+				require.Equal(t, "2024-03-01", val) // crossed from leap day to March
+				val, _ = ctx.Get("start_datetime")
+				require.Equal(t, "2024-03-01T00:30:00", val)
+				val, _ = ctx.Get("start_timestamp")
+				require.Equal(t, "2024-03-01T00:30:00.000000Z", val)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := exec.NewContext(tt.context)
+			err := UpdateContextWithIntervalModifiers(ctx, tt.modifiers)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			tt.validate(t, ctx)
 		})
 	}
 }
