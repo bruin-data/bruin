@@ -1,6 +1,7 @@
 package query
 
 import (
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"regexp"
 	"strings"
 
@@ -69,7 +70,7 @@ func (q Query) String() string {
 var queryCommentRegex = regexp.MustCompile(`(?m)(?s)\/\*.*?\*\/|(^|\s)--.*?\n`)
 
 type renderer interface {
-	Render(query string) (string, error)
+	Render(query string, modifiers pipeline.IntervalModifiers) (string, error)
 }
 
 // FileQuerySplitterExtractor is a regular file extractor, but it splits the queries in the given file into multiple
@@ -80,9 +81,9 @@ type FileQuerySplitterExtractor struct {
 	Renderer renderer
 }
 
-func (f FileQuerySplitterExtractor) ExtractQueriesFromString(content string) ([]*Query, error) {
+func (f FileQuerySplitterExtractor) ExtractQueriesFromString(content string, modifiers pipeline.IntervalModifiers) ([]*Query, error) {
 	cleanedUpQueries := queryCommentRegex.ReplaceAllLiteralString(content, "\n")
-	cleanedUpQueries, err := f.Renderer.Render(cleanedUpQueries)
+	cleanedUpQueries, err := f.Renderer.Render(cleanedUpQueries, modifiers)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not render file while extracting the queries with the split query extractor")
 	}
@@ -138,8 +139,8 @@ type WholeFileExtractor struct {
 	Renderer renderer
 }
 
-func (f *WholeFileExtractor) ExtractQueriesFromString(content string) ([]*Query, error) {
-	render, err := f.Renderer.Render(strings.TrimSpace(content))
+func (f *WholeFileExtractor) ExtractQueriesFromString(content string, modifiers pipeline.IntervalModifiers) ([]*Query, error) {
+	render, err := f.Renderer.Render(strings.TrimSpace(content), modifiers)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not render file while extracting the queries from the whole file")
 	}
@@ -151,23 +152,10 @@ func (f *WholeFileExtractor) ExtractQueriesFromString(content string) ([]*Query,
 	}, nil
 }
 
-func (f *WholeFileExtractor) ExtractQueriesFromSlice(content []string) ([]*Query, error) {
-	var allQueries []*Query
-	for _, query := range content {
-		queries, err := f.ExtractQueriesFromString(query)
-		if err != nil {
-			return nil, err
-		}
-		allQueries = append(allQueries, queries...)
-	}
-
-	return allQueries, nil
-}
-
-func (f *WholeFileExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
+func (f *WholeFileExtractor) ReextractQueriesFromSlice(content []string, modifiers pipeline.IntervalModifiers) ([]string, error) {
 	allQueries := make([]string, 0, len(content))
 	for _, query := range content {
-		q, err := f.Renderer.Render(strings.TrimSpace(query))
+		q, err := f.Renderer.Render(strings.TrimSpace(query), modifiers)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not render file while extracting the queries from the whole file")
 		}
