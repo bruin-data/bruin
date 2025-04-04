@@ -44,6 +44,10 @@
       "athena": null,
       "upstreams": [],
       "materialization": null,
+      "interval_modifiers": {
+        "start": "",
+        "end": ""
+      },
       "columns": [],
       "custom_checks": [],
       "image": "",
@@ -80,6 +84,10 @@
       "upstreams": [],
       "athena": null,
       "materialization": null,
+      "interval_modifiers": {
+        "start": "",
+        "end": ""
+      },
       "columns": [],
       "custom_checks": [],
       "image": "",
@@ -159,6 +167,10 @@
         }
       ],
       "materialization": null,
+      "interval_modifiers": {
+        "start": "",
+        "end": ""
+      },
       "columns": [
         {
           "name": "col1",

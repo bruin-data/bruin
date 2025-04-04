@@ -25,6 +25,10 @@
         "incremental_key": "",
         "time_granularity": ""
       },
+      "interval_modifiers": {
+        "start": "",
+        "end": ""
+      },
       "upstreams": [
         {
           "type": "asset",
@@ -109,6 +113,10 @@
         "cluster_by": null,
         "incremental_key": "",
         "time_granularity": ""
+      },
+      "interval_modifiers": {
+        "start": "",
+        "end": ""
       },
       "upstreams": [
         {
@@ -248,6 +256,10 @@
         "incremental_key": "",
         "time_granularity": ""
       },
+      "interval_modifiers": {
+        "start": "",
+        "end": ""
+      },
       "upstreams": [
         {
           "type": "asset",
@@ -374,6 +386,10 @@
         "cluster_by": null,
         "incremental_key": "",
         "time_granularity": ""
+      },
+      "interval_modifiers": {
+        "start": "",
+        "end": ""
       },
       "upstreams": [],
       "image": "",

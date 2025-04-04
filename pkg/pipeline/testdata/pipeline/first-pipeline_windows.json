@@ -49,6 +49,10 @@
         }
       ],
       "materialization": null,
+      "interval_modifiers": {
+        "start": "",
+        "end": ""
+      },
       "columns": [],
       "custom_checks": [],
       "image": "",
@@ -85,6 +89,10 @@
       "secrets": [],
       "upstreams": [],
       "materialization": null,
+      "interval_modifiers": {
+        "start": "",
+        "end": ""
+      },
       "columns": [],
       "custom_checks": [],
       "image": "",
@@ -158,6 +166,10 @@
         }
       ],
       "materialization": null,
+      "interval_modifiers": {
+        "start": "",
+        "end": ""
+      },
       "columns": [],
       "custom_checks": [],
       "image": "",
@@ -230,6 +242,10 @@
         }
       ],
       "materialization": null,
+      "interval_modifiers": {
+        "start": "",
+        "end": ""
+      },
       "columns": [],
       "custom_checks": [],
       "image": "",

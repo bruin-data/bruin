@@ -292,7 +292,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}
 
 	// build ingestr flags
-	cmdArgs := ConsolidatedParameters(ctx, asset, []string{
+	cmdArgs, err := ConsolidatedParameters(ctx, asset, []string{
 		"ingest",
 		"--source-uri",
 		"mmap://" + arrowFilePath,
@@ -304,6 +304,9 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		"--progress",
 		"log",
 	})
+	if err != nil {
+		return err
+	}
 
 	destConnectionName, err := execCtx.pipeline.GetConnectionNameForAsset(asset)
 	if err != nil {

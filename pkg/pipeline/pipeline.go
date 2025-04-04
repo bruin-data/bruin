@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
@@ -600,32 +601,37 @@ func (s AthenaConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s)
 }
 
-type Asset struct {
-	ID              string             `json:"id" yaml:"-" mapstructure:"-"`
-	URI             string             `json:"uri" yaml:"uri,omitempty" mapstructure:"uri"`
-	Name            string             `json:"name" yaml:"name,omitempty" mapstructure:"name"`
-	Type            AssetType          `json:"type" yaml:"type,omitempty" mapstructure:"type"`
-	Description     string             `json:"description" yaml:"description,omitempty" mapstructure:"description"`
-	Connection      string             `json:"connection" yaml:"connection,omitempty" mapstructure:"connection"`
-	Tags            EmptyStringArray   `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
-	Materialization Materialization    `json:"materialization" yaml:"materialization,omitempty" mapstructure:"materialization"`
-	Upstreams       []Upstream         `json:"upstreams" yaml:"depends,omitempty" mapstructure:"depends"`
-	Image           string             `json:"image" yaml:"image,omitempty" mapstructure:"image"`
-	Instance        string             `json:"instance" yaml:"instance,omitempty" mapstructure:"instance"`
-	Owner           string             `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
-	ExecutableFile  ExecutableFile     `json:"executable_file" yaml:"-" mapstructure:"-"`
-	DefinitionFile  TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
-	Parameters      EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
-	Secrets         []SecretMapping    `json:"secrets" yaml:"secrets,omitempty" mapstructure:"secrets"`
-	Extends         []string           `json:"extends" yaml:"extends,omitempty" mapstructure:"extends"`
-	Columns         []Column           `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
-	CustomChecks    []CustomCheck      `json:"custom_checks" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
-	Metadata        EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
-	Snowflake       SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
-	Athena          AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
+type IntervalModifiers struct {
+	Start string `json:"start" yaml:"start" mapstructure:"start"`
+	End   string `json:"end" yaml:"end" mapstructure:"end"`
+}
 
-	upstream   []*Asset
-	downstream []*Asset
+type Asset struct {
+	ID                string             `json:"id" yaml:"-" mapstructure:"-"`
+	URI               string             `json:"uri" yaml:"uri,omitempty" mapstructure:"uri"`
+	Name              string             `json:"name" yaml:"name,omitempty" mapstructure:"name"`
+	Type              AssetType          `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	Description       string             `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	Connection        string             `json:"connection" yaml:"connection,omitempty" mapstructure:"connection"`
+	Tags              EmptyStringArray   `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
+	Materialization   Materialization    `json:"materialization" yaml:"materialization,omitempty" mapstructure:"materialization"`
+	Upstreams         []Upstream         `json:"upstreams" yaml:"depends,omitempty" mapstructure:"depends"`
+	Image             string             `json:"image" yaml:"image,omitempty" mapstructure:"image"`
+	Instance          string             `json:"instance" yaml:"instance,omitempty" mapstructure:"instance"`
+	Owner             string             `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
+	ExecutableFile    ExecutableFile     `json:"executable_file" yaml:"-" mapstructure:"-"`
+	DefinitionFile    TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
+	Parameters        EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
+	Secrets           []SecretMapping    `json:"secrets" yaml:"secrets,omitempty" mapstructure:"secrets"`
+	Extends           []string           `json:"extends" yaml:"extends,omitempty" mapstructure:"extends"`
+	Columns           []Column           `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
+	CustomChecks      []CustomCheck      `json:"custom_checks" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
+	Metadata          EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
+	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
+	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
+	upstream          []*Asset
+	downstream        []*Asset
+	IntervalModifiers IntervalModifiers `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
 }
 
 func (a *Asset) AddUpstream(asset *Asset) {
@@ -1687,4 +1693,37 @@ func (b *Builder) SetAssetColumnFromGlossary(asset *Asset, pathToPipeline string
 		}
 	}
 	return nil
+}
+
+func ModifyDate(t time.Time, modifier string) (time.Time, error) {
+	if modifier == "" {
+		return t, nil
+	}
+
+	if len(modifier) < 2 {
+		return t, errors.New("invalid interval format; must contain a number + suffix (h, m, s, or M)")
+	}
+
+	suffix := modifier[len(modifier)-1]
+	numeric := modifier[:len(modifier)-1]
+
+	value, err := strconv.Atoi(numeric)
+	if err != nil {
+		return t, fmt.Errorf("invalid numeric portion %q in interval %q: %w", numeric, modifier, err)
+	}
+
+	switch suffix {
+	case 'h':
+		return t.Add(time.Duration(value) * time.Hour), nil
+	case 'm':
+		return t.Add(time.Duration(value) * time.Minute), nil
+	case 's':
+		return t.Add(time.Duration(value) * time.Second), nil
+	case 'd':
+		return t.AddDate(0, 0, value), nil
+	case 'M':
+		return t.AddDate(0, value, 0), nil
+	default:
+		return t, fmt.Errorf("unknown interval suffix %q in %q; must be h, m, s, or M", suffix, modifier)
+	}
 }

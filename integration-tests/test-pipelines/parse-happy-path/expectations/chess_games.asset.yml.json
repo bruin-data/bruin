@@ -8,6 +8,10 @@
     "connection": "",
     "tags": [],
     "materialization": null,
+    "interval_modifiers": {
+      "start": "",
+      "end": ""
+    },
     "upstreams": [],
     "image": "",
     "instance": "",
