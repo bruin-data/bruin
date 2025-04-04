@@ -140,7 +140,6 @@ type Job struct {
 }
 
 func (job Job) buildJobRunConfig() *emrserverless.StartJobRunInput {
-
 	cfg := &emrserverless.StartJobRunInput{
 		ApplicationId:           &job.params.ApplicationID,
 		Name:                    &job.asset.Name,

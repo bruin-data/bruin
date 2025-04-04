@@ -575,13 +575,13 @@ func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset
 
 	logLocation := strings.TrimSpace(asset.Parameters["logs"])
 	if logLocation != "" {
-		logUri, err := url.Parse(logLocation)
+		logURI, err := url.Parse(logLocation)
 		if err != nil {
 			issues = append(issues, &Issue{
 				Task:        asset,
 				Description: "parameters.logs must be a valid URI",
 			})
-		} else if logUri.Scheme != "s3" {
+		} else if logURI.Scheme != "s3" {
 			issues = append(issues, &Issue{
 				Task:        asset,
 				Description: "parameters.logs must be a valid S3 URI",

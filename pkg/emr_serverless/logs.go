@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"compress/gzip"
 	"context"
-	"fmt"
 	"net/url"
 	"strings"
 	"sync"
@@ -24,7 +23,7 @@ type logState struct {
 }
 
 type S3LogConsumer struct {
-	Ctx   context.Context
+	Ctx   context.Context //nolint
 	S3cli *s3.Client
 	URI   *url.URL
 	RunID string
@@ -34,7 +33,7 @@ type S3LogConsumer struct {
 	state map[string]logState
 }
 
-func (l *S3LogConsumer) Next() (lines []LogLine) {
+func (l *S3LogConsumer) Next() (lines []LogLine) { //nolint
 	l.once.Do(func() {
 		l.state = make(map[string]logState)
 	})
@@ -45,7 +44,7 @@ func (l *S3LogConsumer) Next() (lines []LogLine) {
 	return lines
 }
 
-func (l *S3LogConsumer) readStream(stream string) (lines []LogLine) {
+func (l *S3LogConsumer) readStream(stream string) (lines []LogLine) { //nolint
 
 	if !l.hasNewLogs(stream) {
 		return nil
@@ -82,7 +81,7 @@ func (l *S3LogConsumer) readStream(stream string) (lines []LogLine) {
 		read: len(lines) + l.state[stream].read,
 		size: *logStream.ContentLength,
 	}
-	return
+	return //nolint
 }
 
 func (l *S3LogConsumer) logFile(stream string) string {
@@ -92,7 +91,7 @@ func (l *S3LogConsumer) logFile(stream string) string {
 		"jobs",
 		l.RunID,
 		"SPARK_DRIVER",
-		fmt.Sprintf("%s.gz", stream),
+		stream+".gz",
 	).Path
 
 	return strings.TrimPrefix(fullPath, "/")
