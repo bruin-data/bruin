@@ -1,10 +1,13 @@
 package jinja
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/bruin-data/bruin/pkg/pipeline"
 
 	"github.com/nikolalohinski/gonja/v2"
 	"github.com/nikolalohinski/gonja/v2/exec"
@@ -81,9 +84,61 @@ func NewRendererWithYesterday(pipelineName, runID string) *Renderer {
 	return NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID)
 }
 
-func (r *Renderer) Render(query string) (string, error) {
-	r.queryRenderLock.Lock()
+func UpdateContextWithIntervalModifiers(ctx *exec.Context, modifiers pipeline.IntervalModifiers) error {
+	modifyAndFormat := func(key string, format string, modifier string) error {
+		value, exists := ctx.Get(key)
+		if !exists {
+			return fmt.Errorf("key %s not found in context", key)
+		}
+		originalTime, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("invalid time value for %s", key)
+		}
 
+		modifiedTime, err := pipeline.ModifyDate(originalTime, modifier)
+		if err != nil {
+			return fmt.Errorf("failed to modify date for %s: %w", key, err)
+		}
+
+		ctx.Set(key, modifiedTime.Format(format))
+		return nil
+	}
+
+	if modifiers.Start != "" {
+		dateFormats := map[string]string{
+			"start_date":        "2006-01-02",
+			"start_date_nodash": "20060102",
+			"start_datetime":    "2006-01-02T15:04:05",
+			"start_timestamp":   "2006-01-02T15:04:05.000000Z07:00",
+		}
+
+		for key, format := range dateFormats {
+			if err := modifyAndFormat(key, format, modifiers.Start); err != nil {
+				return err
+			}
+		}
+	}
+
+	if modifiers.End != "" {
+		dateFormats := map[string]string{
+			"end_date":        "2006-01-02",
+			"end_date_nodash": "20060102",
+			"end_datetime":    "2006-01-02T15:04:05",
+			"end_timestamp":   "2006-01-02T15:04:05.000000Z07:00",
+		}
+
+		for key, format := range dateFormats {
+			if err := modifyAndFormat(key, format, modifiers.End); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (r *Renderer) Render(query string, modifiers pipeline.IntervalModifiers) (string, error) {
+	r.queryRenderLock.Lock()
 	tpl, err := gonja.FromString(query)
 	if err != nil {
 		r.queryRenderLock.Unlock()
@@ -98,6 +153,10 @@ func (r *Renderer) Render(query string) (string, error) {
 
 	// Now you can render the template with the given
 	// gonja.context how often you want to.
+	if err := UpdateContextWithIntervalModifiers(r.context, modifiers); err != nil {
+		return "", err
+	}
+	
 	out, err := tpl.ExecuteToString(r.context)
 	if err != nil {
 		customError := findRenderErrorType(err)
