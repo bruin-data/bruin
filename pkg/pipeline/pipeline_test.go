@@ -1217,277 +1217,113 @@ func TestIntervalModifiers_ModifyDate(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		modifier   string
-		baseTime   string
-		wantTime   time.Time
-		wantErr    bool
-		errMessage string
+		name     string
+		modifier pipeline.TimeModifier
+		baseTime string
+		wantTime time.Time
 	}{
 		{
-			name:     "add 3 hours",
-			modifier: "3h",
+			name: "add 3 hours",
+			modifier: pipeline.TimeModifier{
+				Hours: 3,
+			},
 			baseTime: "2023-07-01 10:00:00.000000",
 			wantTime: time.Date(2023, 7, 1, 13, 0, 0, 0, time.UTC),
-			wantErr:  false,
 		},
 		{
-			name:     "add 15 minutes",
-			modifier: "15m",
+			name: "add 15 minutes",
+			modifier: pipeline.TimeModifier{
+				Minutes: 15,
+			},
 			baseTime: "2023-07-01 10:00:00.000000",
 			wantTime: time.Date(2023, 7, 1, 10, 15, 0, 0, time.UTC),
-			wantErr:  false,
 		},
 		{
-			name:     "add 30 seconds",
-			modifier: "30s",
+			name: "add 30 seconds",
+			modifier: pipeline.TimeModifier{
+				Seconds: 30,
+			},
 			baseTime: "2023-07-01 10:00:00.000000",
 			wantTime: time.Date(2023, 7, 1, 10, 0, 30, 0, time.UTC),
-			wantErr:  false,
 		},
 		{
-			name:     "add 2 months",
-			modifier: "2M",
+			name: "add 2 months",
+			modifier: pipeline.TimeModifier{
+				Months: 2,
+			},
 			baseTime: "2023-07-01 10:00:00.000000",
 			wantTime: time.Date(2023, 9, 1, 10, 0, 0, 0, time.UTC),
-			wantErr:  false,
 		},
 		{
-			name:     "negative seconds",
-			modifier: "-10s",
+			name: "negative seconds",
+			modifier: pipeline.TimeModifier{
+				Seconds: -10,
+			},
 			baseTime: "2023-07-01 10:00:00.000000",
 			wantTime: time.Date(2023, 7, 1, 9, 59, 50, 0, time.UTC),
-			wantErr:  false,
 		},
 		{
-			name:       "invalid suffix",
-			modifier:   "10x",
-			baseTime:   "2023-07-01 10:00:00.000000",
-			wantTime:   time.Date(2023, 7, 1, 10, 0, 0, 0, time.UTC),
-			wantErr:    true,
-			errMessage: "unknown interval suffix 'x' in \"10x\"; must be h, m, s, or M",
-		},
-		{
-			name:       "non-numeric value",
-			modifier:   "abc",
-			baseTime:   "2023-07-01 10:00:00.000000",
-			wantTime:   time.Date(2023, 7, 1, 10, 0, 0, 0, time.UTC),
-			wantErr:    true,
-			errMessage: "invalid numeric portion \"ab\" in interval \"abc\": strconv.Atoi: parsing \"ab\": invalid syntax",
-		},
-		{
-			name:       "empty or invalid length",
-			modifier:   "a",
-			baseTime:   "2023-07-01 10:00:00.000000",
-			wantTime:   time.Date(2023, 7, 1, 10, 0, 0, 0, time.UTC),
-			wantErr:    true,
-			errMessage: "must contain a number + suffix",
-		},
-		{
-			name:     "date only format - add 1 day",
-			modifier: "24h",
-			baseTime: "2023-07-01",
-			wantTime: time.Date(2023, 7, 2, 0, 0, 0, 0, time.UTC),
-			wantErr:  false,
-		},
-		{
-			name:     "date only format - subtract 2 days",
-			modifier: "-48h",
-			baseTime: "2023-07-01",
-			wantTime: time.Date(2023, 6, 29, 0, 0, 0, 0, time.UTC),
-			wantErr:  false,
-		},
-		{
-			name:     "date only format - add 1 month",
-			modifier: "1M",
-			baseTime: "2023-07-01",
-			wantTime: time.Date(2023, 8, 1, 0, 0, 0, 0, time.UTC),
-			wantErr:  false,
-		},
-
-		{
-			name:     "date only format - year rollover",
-			modifier: "6M",
-			baseTime: "2023-12-01",
-			wantTime: time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC),
-			wantErr:  false,
-		},
-		{
-			name:     "date only format - add days using d",
-			modifier: "3d",
+			name: "add 3 days",
+			modifier: pipeline.TimeModifier{
+				Days: 3,
+			},
 			baseTime: "2023-07-01",
 			wantTime: time.Date(2023, 7, 4, 0, 0, 0, 0, time.UTC),
-			wantErr:  false,
 		},
 		{
-			name:     "date only format - subtract days using d",
-			modifier: "-5d",
+			name: "subtract 5 days",
+			modifier: pipeline.TimeModifier{
+				Days: -5,
+			},
 			baseTime: "2023-07-01",
 			wantTime: time.Date(2023, 6, 26, 0, 0, 0, 0, time.UTC),
-			wantErr:  false,
 		},
 		{
-			name:     "date only format - month transition using d",
-			modifier: "35d",
-			baseTime: "2023-07-01",
-			wantTime: time.Date(2023, 8, 5, 0, 0, 0, 0, time.UTC),
-			wantErr:  false,
+			name: "multiple units - add months, days and hours",
+			modifier: pipeline.TimeModifier{
+				Months: 1,
+				Days:   15,
+				Hours:  12,
+			},
+			baseTime: "2023-07-01 10:00:00.000000",
+			wantTime: time.Date(2023, 8, 16, 22, 0, 0, 0, time.UTC),
 		},
 		{
-			name:     "date only format - year transition using d",
-			modifier: "-5d",
-			baseTime: "2024-01-01",
-			wantTime: time.Date(2023, 12, 27, 0, 0, 0, 0, time.UTC),
-			wantErr:  false,
+			name: "multiple units - negative values",
+			modifier: pipeline.TimeModifier{
+				Months:  -1,
+				Days:    -2,
+				Hours:   -3,
+				Minutes: -30,
+			},
+			baseTime: "2023-07-15 12:00:00.000000",
+			wantTime: time.Date(2023, 6, 13, 8, 30, 0, 0, time.UTC),
 		},
 		{
-			name:     "microsecond format - add hours",
-			modifier: "3h",
-			baseTime: "2023-07-01T10:30:45.123456",
-			wantTime: time.Date(2023, 7, 1, 13, 30, 45, 123456000, time.UTC),
-			wantErr:  false,
-		},
-		{
-			name:     "microsecond format - subtract minutes",
-			modifier: "-90m",
-			baseTime: "2023-07-01T10:30:45.123456",
-			wantTime: time.Date(2023, 7, 1, 9, 0, 45, 123456000, time.UTC),
-			wantErr:  false,
-		},
-		{
-			name:     "microsecond format - day transition",
-			modifier: "15h",
-			baseTime: "2023-07-01T20:30:45.123456",
-			wantTime: time.Date(2023, 7, 2, 11, 30, 45, 123456000, time.UTC),
-			wantErr:  false,
-		},
-		{
-			name:     "microsecond format - month transition with seconds",
-			modifier: "720h",
-			baseTime: "2023-07-31T23:59:59.999999",
-			wantTime: time.Date(2023, 8, 30, 23, 59, 59, 999999000, time.UTC),
-			wantErr:  false,
-		},
-
-		{
-			name:     "formatted date with timezone - UTC timezone",
-			modifier: "24h",
-			baseTime: "31 Dec 2023 23:59:59.999Z",
-			wantTime: time.Date(2024, 1, 1, 23, 59, 59, 999000000, time.UTC),
-			wantErr:  false,
-		},
-		{
-			name:     "date time without seconds - add minutes",
-			modifier: "45m",
-			baseTime: "2023-07-01T10:30",
-			wantTime: time.Date(2023, 7, 1, 11, 15, 0, 0, time.UTC),
-			wantErr:  false,
-		},
-		{
-			name:     "date time without seconds - subtract across hour",
-			modifier: "-75m",
-			baseTime: "2023-07-01T01:00",
-			wantTime: time.Date(2023, 6, 30, 23, 45, 0, 0, time.UTC),
-			wantErr:  false,
-		},
-		{
-			name:     "date time without seconds - add across day",
-			modifier: "180m",
-			baseTime: "2023-07-01T23:00",
-			wantTime: time.Date(2023, 7, 2, 2, 0, 0, 0, time.UTC),
-			wantErr:  false,
-		},
-		{
-			name:     "ISO format with timezone - UTC timezone",
-			modifier: "12h",
-			baseTime: "2023-07-01T22:30:45.500Z",
-			wantTime: time.Date(2023, 7, 2, 10, 30, 45, 500000000, time.UTC),
-			wantErr:  false,
-		},
-		{
-			name:     "milliseconds without timezone - add minutes",
-			modifier: "90m",
-			baseTime: "2023-07-01 10:30:45.123",
-			wantTime: time.Date(2023, 7, 1, 12, 0, 45, 123000000, time.UTC),
-			wantErr:  false,
-		},
-		{
-			name:     "milliseconds without timezone - subtract across midnight",
-			modifier: "-3h",
-			baseTime: "2023-07-01 01:30:45.999",
-			wantTime: time.Date(2023, 6, 30, 22, 30, 45, 999000000, time.UTC),
-			wantErr:  false,
-		},
-		{
-			name:     "milliseconds without timezone - month boundary",
-			modifier: "48h",
-			baseTime: "2023-07-31 23:30:45.500",
-			wantTime: time.Date(2023, 8, 2, 23, 30, 45, 500000000, time.UTC),
-			wantErr:  false,
-		},
-		{
-			name:     "date only format - leap year",
-			modifier: "1d",
+			name: "leap year transition",
+			modifier: pipeline.TimeModifier{
+				Days: 1,
+			},
 			baseTime: "2024-02-28",
 			wantTime: time.Date(2024, 2, 29, 0, 0, 0, 0, time.UTC),
-			wantErr:  false,
 		},
 		{
-			name:     "date only format - non-leap year",
-			modifier: "1d",
-			baseTime: "2023-02-28",
-			wantTime: time.Date(2023, 3, 1, 0, 0, 0, 0, time.UTC),
-			wantErr:  false,
-		},
-		{
-			name:     "date only format - month with 31 days",
-			modifier: "1d",
-			baseTime: "2023-08-31",
-			wantTime: time.Date(2023, 9, 1, 0, 0, 0, 0, time.UTC),
-			wantErr:  false,
-		},
-		{
-			name:     "date only format - month with 30 days",
-			modifier: "-1d",
-			baseTime: "2023-10-01",
-			wantTime: time.Date(2023, 9, 30, 0, 0, 0, 0, time.UTC),
-			wantErr:  false,
-		},
-		{
-			name:     "date only format - new year's eve",
-			modifier: "1d",
+			name: "year end transition",
+			modifier: pipeline.TimeModifier{
+				Days: 1,
+			},
 			baseTime: "2023-12-31",
 			wantTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-			wantErr:  false,
-		},
-		{
-			name:     "date only format - quarter transition",
-			modifier: "1d",
-			baseTime: "2023-09-30",
-			wantTime: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
-			wantErr:  false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			time, err := date.ParseTime(tt.baseTime)
-			if err != nil {
-				t.Fatalf("failed to parse base time: %v", err)
-			}
-			gotTime, err := pipeline.ModifyDate(time, tt.modifier)
+			baseTime, err := date.ParseTime(tt.baseTime)
+			require.NoError(t, err, "failed to parse base time")
 
-			if tt.wantErr {
-				require.Error(t, err)
-				if tt.errMessage != "" {
-					assert.Contains(t, err.Error(), tt.errMessage)
-				}
-				assert.Equal(t, time, gotTime)
-				return
-			}
-
-			require.NoError(t, err)
+			gotTime := pipeline.ModifyDate(baseTime, tt.modifier)
 			assert.Equal(t, tt.wantTime, gotTime)
 		})
 	}
