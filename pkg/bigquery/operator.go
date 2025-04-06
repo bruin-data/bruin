@@ -44,6 +44,7 @@ func NewBasicOperator(conn connectionFetcher, extractor queryExtractor, material
 }
 
 func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	o.extractor = helpers.SetNewRenderer(ctx, ti.GetAsset())
 	return o.RunTask(ctx, ti.GetPipeline(), ti.GetAsset())
 }
 
@@ -52,7 +53,6 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return errors.Wrap(err, "cannot extract queries from the task file")
 	}
-
 	if len(queries) == 0 {
 		return nil
 	}

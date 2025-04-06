@@ -13,7 +13,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
@@ -223,4 +225,22 @@ func GetPokeInterval(ctx context.Context, t *pipeline.Asset) int64 {
 		pokeInterval = 30
 	}
 	return pokeInterval
+}
+
+type QueryExtractor interface {
+	ExtractQueriesFromString(filepath string) ([]*query.Query, error)
+}
+
+func SetNewRenderer(ctx context.Context, t *pipeline.Asset) QueryExtractor {
+	startDate := ctx.Value("start_date").(time.Time)
+	endDate := ctx.Value("end_date").(time.Time)
+	pipelineName := ctx.Value("pipeline").(string)
+	runID := ctx.Value("run_id").(string)
+	startDate = pipeline.ModifyDate(startDate, t.IntervalModifiers.Start)
+	endDate = pipeline.ModifyDate(endDate, t.IntervalModifiers.End)
+	newRenderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID)
+
+	return &query.WholeFileExtractor{
+		Renderer: newRenderer,
+	}
 }
