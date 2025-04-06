@@ -639,6 +639,45 @@ type TimeModifier struct {
 	CronPeriods int `json:"cron_periods" yaml:"cron_periods,omitempty" mapstructure:"cron_periods"`
 }
 
+
+
+func (t *TimeModifier) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind != yaml.ScalarNode {
+		return fmt.Errorf("expected scalar node, got %v", value.Kind)
+	}
+
+	modifier := value.Value
+	if len(modifier) < 2 {
+		return fmt.Errorf("invalid time modifier format: %s", modifier)
+	}
+
+	suffix := modifier[len(modifier)-1]
+	numeric := modifier[:len(modifier)-1]
+
+	num, err := strconv.Atoi(numeric)
+	if err != nil {
+		return fmt.Errorf("invalid numeric portion %q in interval %q: %w", numeric, modifier, err)
+	}
+
+	switch suffix {
+	case 'h':
+		t.Hours = num
+	case 'm':
+		t.Minutes = num
+	case 's':
+		t.Seconds = num
+	case 'd':
+		t.Days = num
+	case 'M':
+		t.Months = num
+	default:
+		return fmt.Errorf("unknown interval suffix %q in %q; must be h, m, s, or M", suffix, modifier)
+	}
+
+	return nil
+}
+
+
 func (t TimeModifier) MarshalJSON() ([]byte, error) {
 	if t.Months == 0 && t.Days == 0 && t.Hours == 0 && t.Minutes == 0 && t.Seconds == 0 && t.CronPeriods == 0 {
 		return []byte("null" +
