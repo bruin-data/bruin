@@ -22,10 +22,7 @@
             "connection": "conn1",
             "tags": [],
             "materialization": null,
-            "interval_modifiers": {
-                "start": "",
-                "end": ""
-            },
+            "interval_modifiers": null,
             "upstreams": [
                 {
                     "type": "asset",
@@ -68,10 +65,7 @@
             "connection": "",
             "tags": [],
             "materialization": null,
-            "interval_modifiers": {
-                "start": "",
-                "end": ""
-            },
+            "interval_modifiers": null,
             "upstreams": [],
             "image": "",
             "instance": "",
@@ -108,10 +102,7 @@
             "connection": "first-connection",
             "tags": [],
             "materialization": null,
-            "interval_modifiers": {
-                "start": "",
-                "end": ""
-            },
+            "interval_modifiers": null,
             "upstreams": [
                 {
                     "type": "asset",
@@ -185,10 +176,7 @@
             "connection": "conn2",
             "tags": [],
             "materialization": null,
-            "interval_modifiers": {
-                "start": "",
-                "end": ""
-            },
+            "interval_modifiers": null,
             "upstreams": [
                 {
                     "type": "asset",

@@ -49,10 +49,7 @@
         }
       ],
       "materialization": null,
-      "interval_modifiers": {
-        "start": "",
-        "end": ""
-      },
+      "interval_modifiers": null,
       "columns": [],
       "custom_checks": [],
       "image": "",
@@ -89,10 +86,7 @@
       "secrets": [],
       "upstreams": [],
       "materialization": null,
-      "interval_modifiers": {
-        "start": "",
-        "end": ""
-      },
+      "interval_modifiers": null,
       "columns": [],
       "custom_checks": [],
       "image": "",
@@ -166,10 +160,7 @@
         }
       ],
       "materialization": null,
-      "interval_modifiers": {
-        "start": "",
-        "end": ""
-      },
+      "interval_modifiers": null,
       "columns": [],
       "custom_checks": [],
       "image": "",
@@ -242,10 +233,7 @@
         }
       ],
       "materialization": null,
-      "interval_modifiers": {
-        "start": "",
-        "end": ""
-      },
+      "interval_modifiers": null,
       "columns": [],
       "custom_checks": [],
       "image": "",

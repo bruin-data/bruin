@@ -44,10 +44,7 @@
       "athena": null,
       "upstreams": [],
       "materialization": null,
-      "interval_modifiers": {
-        "start": "",
-        "end": ""
-      },
+      "interval_modifiers": null,
       "columns": [],
       "custom_checks": [],
       "image": "",
@@ -84,10 +81,7 @@
       "upstreams": [],
       "athena": null,
       "materialization": null,
-      "interval_modifiers": {
-        "start": "",
-        "end": ""
-      },
+      "interval_modifiers": null,
       "columns": [],
       "custom_checks": [],
       "image": "",
@@ -167,10 +161,7 @@
         }
       ],
       "materialization": null,
-      "interval_modifiers": {
-        "start": "",
-        "end": ""
-      },
+      "interval_modifiers": null,
       "columns": [
         {
           "name": "col1",

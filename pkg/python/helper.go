@@ -68,10 +68,7 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 	if ctx.Value(pipeline.RunConfigStartDate) != nil {
 		startTimeInstance, okParse := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
 		if okParse {
-			startTime, err := pipeline.ModifyDate(startTimeInstance, asset.IntervalModifiers.Start)
-			if err != nil {
-				return nil, err
-			}
+			startTime := pipeline.ModifyDate(startTimeInstance, asset.IntervalModifiers.Start)
 			cmdArgs = append(cmdArgs, "--interval-start", startTime.Format(time.RFC3339))
 		}
 	}
@@ -79,10 +76,7 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 	if ctx.Value(pipeline.RunConfigEndDate) != nil {
 		endTimeInstance, okParse := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
 		if okParse {
-			endTime, err := pipeline.ModifyDate(endTimeInstance, asset.IntervalModifiers.End)
-			if err != nil {
-				return nil, err
-			}
+			endTime := pipeline.ModifyDate(endTimeInstance, asset.IntervalModifiers.End)
 			cmdArgs = append(cmdArgs, "--interval-end", endTime.Format(time.RFC3339))
 		}
 	}
