@@ -601,11 +601,6 @@ func (s AthenaConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s)
 }
 
-type IntervalModifiers struct {
-	Start string `json:"start" yaml:"start" mapstructure:"start"`
-	End   string `json:"end" yaml:"end" mapstructure:"end"`
-}
-
 type Asset struct {
 	ID                string             `json:"id" yaml:"-" mapstructure:"-"`
 	URI               string             `json:"uri" yaml:"uri,omitempty" mapstructure:"uri"`
@@ -629,9 +624,60 @@ type Asset struct {
 	Metadata          EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
 	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
-	upstream          []*Asset
-	downstream        []*Asset
-	IntervalModifiers IntervalModifiers `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
+	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
+
+	upstream   []*Asset
+	downstream []*Asset
+}
+
+type TimeModifier struct {
+	Months      int `json:"months"`
+	Days        int `json:"days"`
+	Hours       int `json:"hours"`
+	Minutes     int `json:"minutes"`
+	Seconds     int `json:"seconds"`
+	CronPeriods int `json:"cron_periods"`
+}
+
+func (t *TimeModifier) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind != yaml.ScalarNode {
+		return fmt.Errorf("expected scalar node, got %v", value.Kind)
+	}
+
+	modifier := value.Value
+	if len(modifier) < 2 {
+		return fmt.Errorf("invalid time modifier format: %s", modifier)
+	}
+
+	suffix := modifier[len(modifier)-1]
+	numeric := modifier[:len(modifier)-1]
+
+	num, err := strconv.Atoi(numeric)
+	if err != nil {
+		return fmt.Errorf("invalid numeric portion %q in interval %q: %w", numeric, modifier, err)
+	}
+
+	switch suffix {
+	case 'h':
+		t.Hours = num
+	case 'm':
+		t.Minutes = num
+	case 's':
+		t.Seconds = num
+	case 'd':
+		t.Days = num
+	case 'M':
+		t.Months = num
+	default:
+		return fmt.Errorf("unknown interval suffix %q in %q; must be h, m, s, or M", suffix, modifier)
+	}
+
+	return nil
+}
+
+type IntervalModifiers struct {
+	Start TimeModifier `json:"start"`
+	End   TimeModifier `json:"end"`
 }
 
 func (a *Asset) AddUpstream(asset *Asset) {
@@ -1695,35 +1741,11 @@ func (b *Builder) SetAssetColumnFromGlossary(asset *Asset, pathToPipeline string
 	return nil
 }
 
-func ModifyDate(t time.Time, modifier string) (time.Time, error) {
-	if modifier == "" {
-		return t, nil
-	}
+func ModifyDate(t time.Time, modifier TimeModifier) (time.Time) {
+	t = t.AddDate(0, modifier.Months, modifier.Days).
+		Add(time.Duration(modifier.Hours) * time.Hour).
+		Add(time.Duration(modifier.Minutes) * time.Minute).
+		Add(time.Duration(modifier.Seconds) * time.Second)
 
-	if len(modifier) < 2 {
-		return t, errors.New("invalid interval format; must contain a number + suffix (h, m, s, or M)")
-	}
-
-	suffix := modifier[len(modifier)-1]
-	numeric := modifier[:len(modifier)-1]
-
-	value, err := strconv.Atoi(numeric)
-	if err != nil {
-		return t, fmt.Errorf("invalid numeric portion %q in interval %q: %w", numeric, modifier, err)
-	}
-
-	switch suffix {
-	case 'h':
-		return t.Add(time.Duration(value) * time.Hour), nil
-	case 'm':
-		return t.Add(time.Duration(value) * time.Minute), nil
-	case 's':
-		return t.Add(time.Duration(value) * time.Second), nil
-	case 'd':
-		return t.AddDate(0, 0, value), nil
-	case 'M':
-		return t.AddDate(0, value, 0), nil
-	default:
-		return t, fmt.Errorf("unknown interval suffix %q in %q; must be h, m, s, or M", suffix, modifier)
-	}
+	return t
 }
