@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless/types"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -63,10 +65,11 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	}
 
 	job := Job{
-		logger: logger,
-		client: emrserverless.NewFromConfig(cfg),
-		params: params,
-		asset:  asset,
+		logger:    logger,
+		s3Client:  s3.NewFromConfig(cfg),
+		emrClient: emrserverless.NewFromConfig(cfg),
+		params:    params,
+		asset:     asset,
 		poll: &PollTimer{
 			BaseDuration: time.Second,
 
@@ -96,6 +99,7 @@ type JobRunParams struct {
 	Config        string
 	Timeout       time.Duration
 	Region        string
+	Logs          string
 }
 
 func parseParams(m map[string]string) *JobRunParams {
@@ -105,6 +109,7 @@ func parseParams(m map[string]string) *JobRunParams {
 		Entrypoint:    m["entrypoint"],
 		Config:        m["config"],
 		Region:        m["region"],
+		Logs:          m["logs"],
 	}
 
 	if m["timeout"] != "" {
@@ -126,16 +131,16 @@ func parseParams(m map[string]string) *JobRunParams {
 }
 
 type Job struct {
-	logger *log.Logger
-	client *emrserverless.Client
-	asset  *pipeline.Asset
-	params *JobRunParams
-	poll   *PollTimer
+	logger    *log.Logger
+	emrClient *emrserverless.Client
+	s3Client  *s3.Client
+	asset     *pipeline.Asset
+	params    *JobRunParams
+	poll      *PollTimer
 }
 
-func (job Job) Run(ctx context.Context) (err error) { //nolint
-
-	result, err := job.client.StartJobRun(ctx, &emrserverless.StartJobRunInput{
+func (job Job) buildJobRunConfig() *emrserverless.StartJobRunInput {
+	cfg := &emrserverless.StartJobRunInput{
 		ApplicationId:           &job.params.ApplicationID,
 		Name:                    &job.asset.Name,
 		ExecutionRoleArn:        &job.params.ExecutionRole,
@@ -147,17 +152,34 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 				SparkSubmitParameters: &job.params.Config,
 			},
 		},
-	})
+	}
+
+	if job.params.Logs != "" {
+		cfg.ConfigurationOverrides = &types.ConfigurationOverrides{
+			MonitoringConfiguration: &types.MonitoringConfiguration{
+				S3MonitoringConfiguration: &types.S3MonitoringConfiguration{
+					LogUri: aws.String(job.params.Logs),
+				},
+			},
+		}
+	}
+
+	return cfg
+}
+
+func (job Job) Run(ctx context.Context) (err error) { //nolint
+
+	run, err := job.emrClient.StartJobRun(ctx, job.buildJobRunConfig())
 	if err != nil {
 		return fmt.Errorf("error submitting job run: %w", err)
 	}
-	job.logger.Printf("created job run: %s", *result.JobRunId)
+	job.logger.Printf("created job run: %s", *run.JobRunId)
 	defer func() { //nolint
 		if err != nil {
 			job.logger.Printf("error detected. cancelling job run.")
-			job.client.CancelJobRun(context.Background(), &emrserverless.CancelJobRunInput{ //nolint
+			job.emrClient.CancelJobRun(context.Background(), &emrserverless.CancelJobRunInput{ //nolint
 				ApplicationId: &job.params.ApplicationID,
-				JobRunId:      result.JobRunId,
+				JobRunId:      run.JobRunId,
 			})
 		}
 	}()
@@ -166,6 +188,7 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 		previousState    = types.JobRunState("unknown")
 		paginationToken  = ""
 		maxAttemptsError = &retry.MaxAttemptsError{}
+		jobLogs          = job.buildLogConsumer(ctx, run)
 	)
 	for {
 		select {
@@ -174,12 +197,12 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 		case <-time.After(job.poll.Duration()):
 			listJobArgs := &emrserverless.ListJobRunAttemptsInput{
 				ApplicationId: &job.params.ApplicationID,
-				JobRunId:      result.JobRunId,
+				JobRunId:      run.JobRunId,
 			}
 			if paginationToken != "" {
 				listJobArgs.NextToken = &paginationToken
 			}
-			runs, err := job.client.ListJobRunAttempts(ctx, listJobArgs)
+			runs, err := job.emrClient.ListJobRunAttempts(ctx, listJobArgs)
 			if errors.As(err, &maxAttemptsError) {
 				job.poll.Increase()
 				continue
@@ -197,11 +220,14 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 			if previousState != latestRun.State {
 				job.logger.Printf(
 					"%s | %s | %s",
-					*result.JobRunId,
+					*run.JobRunId,
 					latestRun.State,
 					*latestRun.StateDetails,
 				)
 				previousState = latestRun.State
+			}
+			for _, line := range jobLogs.Next() {
+				job.logger.Printf("%s | %s ", line.Stream, line.Message)
 			}
 			if slices.Contains(terminalJobRunStates, latestRun.State) {
 				return nil
@@ -211,4 +237,49 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 			}
 		}
 	}
+}
+
+type LogConsumer interface {
+	Next() []LogLine
+}
+
+func (job Job) buildLogConsumer(ctx context.Context, run *emrserverless.StartJobRunOutput) LogConsumer {
+	logURI := job.resolveLogURI(ctx, run)
+	if logURI != "" {
+		uri, err := url.Parse(logURI)
+		if err == nil {
+			return &S3LogConsumer{
+				Ctx:   ctx,
+				URI:   uri,
+				S3cli: job.s3Client,
+				RunID: *run.JobRunId,
+				AppID: *run.ApplicationId,
+			}
+		}
+	}
+
+	return &NoOpLogConsumer{}
+}
+
+func (job Job) resolveLogURI(ctx context.Context, run *emrserverless.StartJobRunOutput) string {
+	if job.params.Logs != "" {
+		return job.params.Logs
+	}
+
+	app, err := job.emrClient.GetApplication(
+		ctx,
+		&emrserverless.GetApplicationInput{
+			ApplicationId: run.ApplicationId,
+		},
+	)
+	if err != nil {
+		return ""
+	}
+
+	monitoringCfg := *app.Application.MonitoringConfiguration
+	if monitoringCfg.S3MonitoringConfiguration != nil && monitoringCfg.S3MonitoringConfiguration.LogUri != nil {
+		return *monitoringCfg.S3MonitoringConfiguration.LogUri
+	}
+
+	return ""
 }
