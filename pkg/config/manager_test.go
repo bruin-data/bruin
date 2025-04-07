@@ -382,6 +382,12 @@ func TestLoadFromFile(t *testing.T) {
 					Region:          "us-east-1",
 				},
 			},
+			Pipedrive: []PipedriveConnection{
+				{
+					Name:     "pipedrive-1",
+					ApiToken: "token-123",
+				},
+			},
 		},
 	}
 

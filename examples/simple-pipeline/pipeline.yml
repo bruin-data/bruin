@@ -36,3 +36,4 @@ default_connections:
   linkedinads: "my-linkedinads"
   gcs: "my-gcs"
   kinesis: "my-kinesis"
+  pipedrive: "my-pipedrive"
