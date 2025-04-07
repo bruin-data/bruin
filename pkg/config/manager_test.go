@@ -385,7 +385,7 @@ func TestLoadFromFile(t *testing.T) {
 			Pipedrive: []PipedriveConnection{
 				{
 					Name:     "pipedrive-1",
-					ApiToken: "token-123",
+					APIToken: "token-123",
 				},
 			},
 		},

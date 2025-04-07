@@ -2097,7 +2097,7 @@ func (m *Manager) AddPipedriveConnectionFromConfig(connection *config.PipedriveC
 	m.mutex.Unlock()
 
 	client, err := pipedrive.NewClient(pipedrive.Config{
-		ApiToken: connection.ApiToken,
+		APIToken: connection.APIToken,
 	})
 	if err != nil {
 		return err
