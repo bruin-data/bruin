@@ -30,6 +30,14 @@ parameters:
 
 This defines an asset that runs a spark job on `emr_app_123` [EMR Serverless Application](https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/emr-serverless.html) that is defined by the script at `s3://amzn-test-bucket/src/script.py`. The `arn:aws:iam::account_id_1:role/execution_role` defines the AWS permissions that are available to your spark job. 
 
+## Logs
+Bruin supports log streaming for spark jobs. This is only supported for spark logs stored in [S3](https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/logging.html#jobs-log-storage-s3-buckets). Both `DRIVER` and `EXECUTOR` logs are streamed by default.
+
+In order to stream logs, one of the following conditions must be met:
+* Your EMR Serverless Application is pre-configured with an S3 Log Storage Location. 
+* `parameters.logs` is be specified and points to an S3 URI.
+
+
 ## Asset Schema
 Here's the full schema of the `emr_serverless.spark` asset along with a brief explanation:
 ```yaml
@@ -48,6 +56,9 @@ parameters:
 
   # AWS Region of the application (required)
   region: ap-south-1
+
+  # path where logs are stored or should be stored (optional)
+  logs: s3://amzn-test-bucket/logs
 
   # args to pass to the entrypoint (optional)
   args: arg1 arg2
