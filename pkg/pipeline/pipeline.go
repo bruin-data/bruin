@@ -1803,15 +1803,15 @@ func ModifyDateWithCron(cronExpression Schedule, modifier TimeModifier, t time.T
 		return next, nil
 	} else {
 		// For monthly schedules or less frequent , we need a longer lookback period
-		// thats why we need a heuristic to pick a safeStartDate here 
-		//maybe a regex tha ? 
-		// for now we just check for the monthly schedule 
+		//  so we need a heuristic to pick a safeStartDate here
+		// maybe a regex that detects monthly or less frequent periods ?
+		// for now, we just check for the monthly schedule
 		var safeStart time.Time
-		
+
 		if cronExpression == "0 0 1 * *" {
-			safeStart = t.AddDate(-1, 0, 0) // 1 year back 
+			safeStart = t.AddDate(-1, 0, 0) // 1 year back
 		} else {
-			safeStart = t.AddDate(0, -1, 0) // 1 month back 
+			safeStart = t.AddDate(0, -1, 0) // 1 month back
 		}
 		stepsBack := -modifier.CronPeriods
 		var runs []time.Time
