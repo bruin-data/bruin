@@ -22,7 +22,7 @@ type materializer interface {
 
 type queryExtractor interface {
 	ExtractQueriesFromString(filepath string) ([]*query.Query, error)
-	CloneForAsset(ctx context.Context, asset *pipeline.Asset) queryExtractor
+	CloneForAsset(ctx context.Context, asset *pipeline.Asset) *query.WholeFileExtractor
 }
 
 type connectionFetcher interface {
