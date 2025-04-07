@@ -1,8 +1,12 @@
 package query
 
 import (
+	"context"
+	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -175,4 +179,19 @@ func (f *WholeFileExtractor) ReextractQueriesFromSlice(content []string) ([]stri
 	}
 
 	return allQueries, nil
+}
+
+func (f *WholeFileExtractor) CloneForAsset(ctx context.Context, t *pipeline.Asset) *WholeFileExtractor {
+	startDate := ctx.Value("start_date").(time.Time)
+	endDate := ctx.Value("end_date").(time.Time)
+	pipelineName := ctx.Value("pipeline").(string)
+	runID := ctx.Value("run_id").(string)
+	startDate = pipeline.ModifyDate(startDate, t.IntervalModifiers.Start)
+	endDate = pipeline.ModifyDate(endDate, t.IntervalModifiers.End)
+	newRenderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID)
+
+	return &WholeFileExtractor{
+		Renderer: newRenderer,
+		Fs:       f.Fs,
+	}
 }

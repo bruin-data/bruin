@@ -22,6 +22,7 @@ type materializer interface {
 
 type queryExtractor interface {
 	ExtractQueriesFromString(filepath string) ([]*query.Query, error)
+	CloneForAsset(ctx context.Context, asset *pipeline.Asset) queryExtractor
 }
 
 type connectionFetcher interface {
@@ -44,12 +45,14 @@ func NewBasicOperator(conn connectionFetcher, extractor queryExtractor, material
 }
 
 func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
-	o.extractor = helpers.SetNewRenderer(ctx, ti.GetAsset())
+
 	return o.RunTask(ctx, ti.GetPipeline(), ti.GetAsset())
 }
 
 func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
-	queries, err := o.extractor.ExtractQueriesFromString(t.ExecutableFile.Content)
+	
+	extractor := o.extractor.CloneForAsset(ctx, t)
+	queries, err := extractor.ExtractQueriesFromString(t.ExecutableFile.Content)
 	if err != nil {
 		return errors.Wrap(err, "cannot extract queries from the task file")
 	}
@@ -272,6 +275,7 @@ func NewTableSensor(conn connectionFetcher, sensorMode string) *TableSensor {
 }
 
 func (ts *TableSensor) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+
 	return ts.RunTask(ctx, ti.GetPipeline(), ti.GetAsset())
 }
 
