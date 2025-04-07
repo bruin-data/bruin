@@ -1411,3 +1411,177 @@ func TestIntervalModifiers_ModifyDate(t *testing.T) {
 		})
 	}
 }
+
+func TestModifyDateWithCron(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		cronExpr    pipeline.Schedule
+		modifier    pipeline.TimeModifier
+		inputTime   time.Time
+		expected    time.Time
+		expectErr   bool
+		errContains string
+	}{
+		{
+			name:      "zero periods returns same time",
+			cronExpr:  "0 0 * * *",
+			modifier:  pipeline.TimeModifier{CronPeriods: 0},
+			inputTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:        "negative periods returns error",
+			cronExpr:    "0 0 * * *",
+			modifier:    pipeline.TimeModifier{CronPeriods: -1},
+			inputTime:   time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expectErr:   true,
+			errContains: "cron period must be positive",
+		},
+		{
+			name:        "invalid cron expression returns error",
+			cronExpr:    "invalid",
+			modifier:    pipeline.TimeModifier{CronPeriods: 1},
+			inputTime:   time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expectErr:   true,
+			errContains: "error parsing cron expression",
+		},
+		{
+			name:      "advances one day with daily cron",
+			cronExpr:  "0 0 * * *",
+			modifier:  pipeline.TimeModifier{CronPeriods: 1},
+			inputTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "advances three days with daily cron",
+			cronExpr:  "0 0 * * *",
+			modifier:  pipeline.TimeModifier{CronPeriods: 3},
+			inputTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 4, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "every hour advancement",
+			cronExpr:  "0 * * * *",
+			modifier:  pipeline.TimeModifier{CronPeriods: 2},
+			inputTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 1, 2, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "every Monday advancement",
+			cronExpr:  "0 0 * * 1",
+			modifier:  pipeline.TimeModifier{CronPeriods: 1},
+			inputTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), // Monday
+			expected:  time.Date(2024, 1, 8, 0, 0, 0, 0, time.UTC), // Next Monday
+		},
+		{
+			name:      "every 15 minutes",
+			cronExpr:  "*/15 * * * *",
+			modifier:  pipeline.TimeModifier{CronPeriods: 4},
+			inputTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 1, 1, 0, 0, 0, time.UTC), // After 4 periods of 15 mins
+		},
+		{
+			name:      "first day of month",
+			cronExpr:  "0 0 1 * *",
+			modifier:  pipeline.TimeModifier{CronPeriods: 2},
+			inputTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 3, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "complex schedule",
+			cronExpr:  "30 2,14 * * 1-5",
+			modifier:  pipeline.TimeModifier{CronPeriods: 3},
+			inputTime: time.Date(2024, 1, 1, 2, 30, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 2, 14, 30, 0, 0, time.UTC),
+		},
+		{
+			name:      "hourly keyword",
+			cronExpr:  "hourly",
+			modifier:  pipeline.TimeModifier{CronPeriods: 2},
+			inputTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 1, 2, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "@hourly keyword",
+			cronExpr:  "@hourly",
+			modifier:  pipeline.TimeModifier{CronPeriods: 1},
+			inputTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 1, 1, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "daily keyword",
+			cronExpr:  "daily",
+			modifier:  pipeline.TimeModifier{CronPeriods: 3},
+			inputTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 4, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "weekly keyword",
+			cronExpr:  "weekly",
+			modifier:  pipeline.TimeModifier{CronPeriods: 2},
+			inputTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 14, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "monthly keyword",
+			cronExpr:  "monthly",
+			modifier:  pipeline.TimeModifier{CronPeriods: 1},
+			inputTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "continuous keyword",
+			cronExpr:  "continuous",
+			modifier:  pipeline.TimeModifier{CronPeriods: 1},
+			inputTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 1, 0, 1, 0, 0, time.UTC), // 1 minute later
+		},
+		{
+			name:      "@daily equivalent test",
+			cronExpr:  "@daily",
+			modifier:  pipeline.TimeModifier{CronPeriods: 1},
+			inputTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "every 5 minutes",
+			cronExpr:  "*/5 * * * *",
+			modifier:  pipeline.TimeModifier{CronPeriods: 3},
+			inputTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 1, 0, 15, 0, 0, time.UTC), // 3 jumps of 5 minutes
+		},
+		{
+			name:      "every 6 hours",
+			cronExpr:  "0 */6 * * *",
+			modifier:  pipeline.TimeModifier{CronPeriods: 4},
+			inputTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC), // 4 jumps of 6 hours = 24h
+		},
+		{
+			name:      "every 2 hours",
+			cronExpr:  "0 */2 * * *",
+			modifier:  pipeline.TimeModifier{CronPeriods: 3},
+			inputTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 1, 6, 0, 0, 0, time.UTC), // 3 jumps of 2 hours
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := pipeline.ModifyDateWithCron(tt.cronExpr, tt.modifier, tt.inputTime)
+
+			if tt.expectErr {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.errContains)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}

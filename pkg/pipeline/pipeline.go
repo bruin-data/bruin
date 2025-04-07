@@ -18,6 +18,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
+	"github.com/robfig/cron/v3"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 )
@@ -1760,6 +1761,51 @@ func (b *Builder) SetAssetColumnFromGlossary(asset *Asset, pathToPipeline string
 		}
 	}
 	return nil
+}
+
+func normalizeCronExpression(schedule Schedule) Schedule {
+	predefinedSchedules := map[string]string{
+		"hourly":      "0 * * * *",
+		"@hourly":     "0 * * * *",
+		"daily":       "0 0 * * *",
+		"@daily":      "0 0 * * *",
+		"weekly":      "0 0 * * 0",
+		"@weekly":     "0 0 * * 0",
+		"monthly":     "0 0 1 * *",
+		"@monthly":    "0 0 1 * *",
+		"continuous":  "* * * * *",
+		"@continuous": "* * * * *",
+	}
+
+	if cronExpr, exists := predefinedSchedules[string(schedule)]; exists {
+		return Schedule(cronExpr)
+	}
+
+	return schedule
+}
+
+func ModifyDateWithCron(cronExpression Schedule, modifier TimeModifier, t time.Time) (time.Time, error) {
+	cronExpression = normalizeCronExpression(cronExpression)
+	if modifier.CronPeriods == 0 {
+		return t, nil
+	}
+
+	if modifier.CronPeriods < 0 {
+		return time.Time{}, errors.New("cron period must be positive")
+	}
+
+	parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	schedule, err := parser.Parse(string(cronExpression))
+	if err != nil {
+		return time.Time{}, errors.Wrap(err, "error parsing cron expression")
+	}
+	next := t
+
+	for range modifier.CronPeriods {
+		next = schedule.Next(next)
+	}
+
+	return next, nil
 }
 
 func ModifyDate(t time.Time, modifier TimeModifier) time.Time {
