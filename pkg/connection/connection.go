@@ -2,7 +2,6 @@ package connection
 
 import (
 	"context"
-	"github.com/bruin-data/bruin/pkg/pipedrive"
 	"os"
 	"reflect"
 	"regexp"
@@ -40,6 +39,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/notion"
 	"github.com/bruin-data/bruin/pkg/personio"
+	"github.com/bruin-data/bruin/pkg/pipedrive"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/shopify"
