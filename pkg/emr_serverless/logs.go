@@ -54,14 +54,43 @@ func (l *S3LogConsumer) Next() (lines []LogLine) { //nolint
 }
 
 func (l *S3LogConsumer) listLogSources() (sources []logSource) {
+	jobPath := l.URI.JoinPath(
+		"applications",
+		l.AppID,
+		"jobs",
+		l.RunID,
+	)
 	streams := []string{"stdout", "stderr"}
 	for _, stream := range streams {
 		sources = append(sources, logSource{
 			Name:   "SPARK_DRIVER",
 			Stream: stream,
-			URI:    l.driverLogFile(stream),
+			URI:    jobPath.JoinPath("SPARK_DRIVER", stream+".gz"),
 		})
 	}
+
+	executorLogsBasePath := jobPath.JoinPath("SPARK_EXECUTOR/")
+	objs, err := l.S3cli.ListObjectsV2(l.Ctx, &s3.ListObjectsV2Input{
+		Bucket:    &l.URI.Host,
+		Prefix:    aws.String(strings.TrimPrefix(executorLogsBasePath.Path, "/")),
+		Delimiter: aws.String("/"),
+	})
+	if err != nil {
+		return sources
+	}
+	for _, commonPrefix := range objs.CommonPrefixes {
+		prefix := strings.Trim(*commonPrefix.Prefix, "/")
+		prefixSegments := strings.Split(prefix, "/")
+		id := prefixSegments[len(prefixSegments)-1]
+		for _, stream := range streams {
+			sources = append(sources, logSource{
+				Name:   fmt.Sprintf("SPARK_EXECUTOR(%s)", id),
+				Stream: stream,
+				URI:    jobPath.JoinPath("SPARK_EXECUTOR", id, stream+".gz"),
+			})
+		}
+	}
+
 	return sources
 }
 
@@ -105,17 +134,6 @@ func (l *S3LogConsumer) readLogs(source logSource) []LogLine {
 		size: *logStream.ContentLength,
 	}
 	return lines
-}
-
-func (l *S3LogConsumer) driverLogFile(stream string) *url.URL {
-	return l.URI.JoinPath(
-		"applications",
-		l.AppID,
-		"jobs",
-		l.RunID,
-		"SPARK_DRIVER",
-		stream+".gz",
-	)
 }
 
 type NoOpLogConsumer struct{}
