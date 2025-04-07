@@ -639,8 +639,6 @@ type TimeModifier struct {
 	CronPeriods int `json:"cron_periods" yaml:"cron_periods,omitempty" mapstructure:"cron_periods"`
 }
 
-
-
 func (t *TimeModifier) UnmarshalYAML(value *yaml.Node) error {
 	if value.Kind != yaml.ScalarNode {
 		return fmt.Errorf("expected scalar node, got %v", value.Kind)
@@ -676,7 +674,6 @@ func (t *TimeModifier) UnmarshalYAML(value *yaml.Node) error {
 
 	return nil
 }
-
 
 func (t TimeModifier) MarshalJSON() ([]byte, error) {
 	if t.Months == 0 && t.Days == 0 && t.Hours == 0 && t.Minutes == 0 && t.Seconds == 0 && t.CronPeriods == 0 {
