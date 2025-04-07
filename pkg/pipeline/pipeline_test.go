@@ -1432,14 +1432,6 @@ func TestModifyDateWithCron(t *testing.T) {
 			expected:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 		},
 		{
-			name:        "negative periods returns error",
-			cronExpr:    "0 0 * * *",
-			modifier:    pipeline.TimeModifier{CronPeriods: -1},
-			inputTime:   time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-			expectErr:   true,
-			errContains: "cron period must be positive",
-		},
-		{
 			name:        "invalid cron expression returns error",
 			cronExpr:    "invalid",
 			modifier:    pipeline.TimeModifier{CronPeriods: 1},
@@ -1565,6 +1557,85 @@ func TestModifyDateWithCron(t *testing.T) {
 			modifier:  pipeline.TimeModifier{CronPeriods: 3},
 			inputTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 			expected:  time.Date(2024, 1, 1, 6, 0, 0, 0, time.UTC), // 3 jumps of 2 hours
+		},
+		{
+			name:      "negative one daily period",
+			cronExpr:  "0 0 * * *", // daily at midnight
+			modifier:  pipeline.TimeModifier{CronPeriods: -1},
+			inputTime: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "negative hourly periods",
+			cronExpr:  "0 * * * *", // every hour
+			modifier:  pipeline.TimeModifier{CronPeriods: -3},
+			inputTime: time.Date(2024, 1, 1, 3, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "negative weekly periods",
+			cronExpr:  "0 0 * * 0", // every Sunday at midnight
+			modifier:  pipeline.TimeModifier{CronPeriods: -2},
+			inputTime: time.Date(2024, 1, 21, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 7, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "negative with irregular schedule",
+			cronExpr:  "0 */6 * * *", // every 6 hours
+			modifier:  pipeline.TimeModifier{CronPeriods: -4},
+			inputTime: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "negative minute periods",
+			cronExpr:  "*/15 * * * *", // every 15 minutes
+			modifier:  pipeline.TimeModifier{CronPeriods: -4},
+			inputTime: time.Date(2024, 1, 1, 1, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "negative across month boundary",
+			cronExpr:  "0 0 * * *", // daily at midnight
+			modifier:  pipeline.TimeModifier{CronPeriods: -2},
+			inputTime: time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 30, 0, 0, 0, 0, time.UTC),
+		},
+
+		{
+			name:        "too many periods back",
+			cronExpr:    "0 0 * * *", // daily
+			modifier:    pipeline.TimeModifier{CronPeriods: -40},
+			inputTime:   time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
+			expectErr:   true,
+			errContains: "not enough occurrences to go back",
+		},
+		{
+			name:      "negative monthly keyword",
+			cronExpr:  "monthly",
+			modifier:  pipeline.TimeModifier{CronPeriods: -1},
+			inputTime: time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "negative multiple monthly keyword",
+			cronExpr:  "monthly",
+			modifier:  pipeline.TimeModifier{CronPeriods: -3},
+			inputTime: time.Date(2024, 3, 1, 0, 0, 0, 0, time.UTC),
+			expected:  time.Date(2023, 12, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:      "negative continuous keyword",
+			cronExpr:  "continuous",
+			modifier:  pipeline.TimeModifier{CronPeriods: -1},
+			inputTime: time.Date(2024, 1, 1, 0, 1, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), // 1 minute earlier
+		},
+		{
+			name:      "negative multiple continuous keyword",
+			cronExpr:  "continuous",
+			modifier:  pipeline.TimeModifier{CronPeriods: -5},
+			inputTime: time.Date(2024, 1, 1, 0, 5, 0, 0, time.UTC),
+			expected:  time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), // 5 minutes earlier
 		},
 	}
 

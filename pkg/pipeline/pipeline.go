@@ -1790,22 +1790,48 @@ func ModifyDateWithCron(cronExpression Schedule, modifier TimeModifier, t time.T
 		return t, nil
 	}
 
-	if modifier.CronPeriods < 0 {
-		return time.Time{}, errors.New("cron period must be positive")
-	}
-
 	parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 	schedule, err := parser.Parse(string(cronExpression))
 	if err != nil {
 		return time.Time{}, errors.Wrap(err, "error parsing cron expression")
 	}
-	next := t
+	if modifier.CronPeriods > 0 {
+		next := t
+		for range modifier.CronPeriods {
+			next = schedule.Next(next)
+		}
+		return next, nil
+	} else {
+		// For monthly schedules or less frequent , we need a longer lookback period
+		// thats why we need a heuristic to pick a safeStartDate here 
+		//maybe a regex tha ? 
+		// for now we just check for the monthly schedule 
+		var safeStart time.Time
+		
+		if cronExpression == "0 0 1 * *" {
+			safeStart = t.AddDate(-1, 0, 0) // 1 year back 
+		} else {
+			safeStart = t.AddDate(0, -1, 0) // 1 month back 
+		}
+		stepsBack := -modifier.CronPeriods
+		var runs []time.Time
+		occ := schedule.Next(safeStart)
+		for occ.Before(t) {
+			runs = append(runs, occ)
+			occ = schedule.Next(occ)
+		}
+		if len(runs) == 0 {
+			return time.Time{}, errors.New("no occurrences found before the given time")
+		}
 
-	for range modifier.CronPeriods {
-		next = schedule.Next(next)
+		if stepsBack > len(runs) {
+			return time.Time{}, fmt.Errorf(
+				"not enough occurrences to go back %d steps from %v",
+				stepsBack, t,
+			)
+		}
+		return runs[len(runs)-stepsBack], nil
 	}
-
-	return next, nil
 }
 
 func ModifyDate(t time.Time, modifier TimeModifier) time.Time {
