@@ -2094,7 +2094,7 @@ func (m *Manager) AddPipedriveConnectionFromConfig(connection *config.PipedriveC
 	if m.Pipedrive == nil {
 		m.Pipedrive = make(map[string]*pipedrive.Client)
 	}
-	defer m.mutex.Unlock()
+	m.mutex.Unlock()
 
 	client, err := pipedrive.NewClient(pipedrive.Config{
 		ApiToken: connection.ApiToken,
@@ -2218,6 +2218,8 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Personio, connectionManager.AddPersonioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.ApplovinMax, connectionManager.AddApplovinMaxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
+
 	wg.Wait()
 	return connectionManager, errList
 }
