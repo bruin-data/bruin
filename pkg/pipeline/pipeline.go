@@ -18,6 +18,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/pkg/errors"
+	"github.com/robfig/cron/v3"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 )
@@ -1760,6 +1761,77 @@ func (b *Builder) SetAssetColumnFromGlossary(asset *Asset, pathToPipeline string
 		}
 	}
 	return nil
+}
+
+func normalizeCronExpression(schedule Schedule) Schedule {
+	predefinedSchedules := map[string]string{
+		"hourly":      "0 * * * *",
+		"@hourly":     "0 * * * *",
+		"daily":       "0 0 * * *",
+		"@daily":      "0 0 * * *",
+		"weekly":      "0 0 * * 0",
+		"@weekly":     "0 0 * * 0",
+		"monthly":     "0 0 1 * *",
+		"@monthly":    "0 0 1 * *",
+		"continuous":  "* * * * *",
+		"@continuous": "* * * * *",
+	}
+
+	if cronExpr, exists := predefinedSchedules[string(schedule)]; exists {
+		return Schedule(cronExpr)
+	}
+
+	return schedule
+}
+
+func ModifyDateWithCron(cronExpression Schedule, modifier TimeModifier, t time.Time) (time.Time, error) {
+	cronExpression = normalizeCronExpression(cronExpression)
+	if modifier.CronPeriods == 0 {
+		return t, nil
+	}
+
+	parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	schedule, err := parser.Parse(string(cronExpression))
+	if err != nil {
+		return time.Time{}, errors.Wrap(err, "error parsing cron expression")
+	}
+	if modifier.CronPeriods > 0 {
+		next := t
+		for range modifier.CronPeriods {
+			next = schedule.Next(next)
+		}
+		return next, nil
+	} else {
+		// For monthly schedules or less frequent , we need a longer lookback period
+		//  so we need a heuristic to pick a safeStartDate here
+		// maybe a regex that detects monthly or less frequent periods ?
+		// for now, we just check for the monthly schedule
+		var safeStart time.Time
+
+		if cronExpression == "0 0 1 * *" {
+			safeStart = t.AddDate(-1, 0, 0) // 1 year back
+		} else {
+			safeStart = t.AddDate(0, -1, 0) // 1 month back
+		}
+		stepsBack := -modifier.CronPeriods
+		var runs []time.Time
+		occ := schedule.Next(safeStart)
+		for occ.Before(t) {
+			runs = append(runs, occ)
+			occ = schedule.Next(occ)
+		}
+		if len(runs) == 0 {
+			return time.Time{}, errors.New("no occurrences found before the given time")
+		}
+
+		if stepsBack > len(runs) {
+			return time.Time{}, fmt.Errorf(
+				"not enough occurrences to go back %d steps from %v",
+				stepsBack, t,
+			)
+		}
+		return runs[len(runs)-stepsBack], nil
+	}
 }
 
 func ModifyDate(t time.Time, modifier TimeModifier) time.Time {
