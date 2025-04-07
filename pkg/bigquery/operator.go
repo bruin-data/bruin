@@ -22,7 +22,7 @@ type materializer interface {
 
 type queryExtractor interface {
 	ExtractQueriesFromString(filepath string) ([]*query.Query, error)
-	CloneForAsset(ctx context.Context, asset *pipeline.Asset) *query.WholeFileExtractor
+	CloneForAsset(ctx context.Context, asset *pipeline.Asset) query.QueryExtractor
 }
 
 type connectionFetcher interface {
@@ -45,12 +45,10 @@ func NewBasicOperator(conn connectionFetcher, extractor queryExtractor, material
 }
 
 func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
-
 	return o.RunTask(ctx, ti.GetPipeline(), ti.GetAsset())
 }
 
 func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
-	
 	extractor := o.extractor.CloneForAsset(ctx, t)
 	queries, err := extractor.ExtractQueriesFromString(t.ExecutableFile.Content)
 	if err != nil {
@@ -275,7 +273,6 @@ func NewTableSensor(conn connectionFetcher, sensorMode string) *TableSensor {
 }
 
 func (ts *TableSensor) Run(ctx context.Context, ti scheduler.TaskInstance) error {
-
 	return ts.RunTask(ctx, ti.GetPipeline(), ti.GetAsset())
 }
 
