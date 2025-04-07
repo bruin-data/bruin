@@ -227,7 +227,7 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 				previousState = latestRun.State
 			}
 			for _, line := range jobLogs.Next() {
-				job.logger.Printf("%s | %s ", line.Stream, line.Message)
+				job.logger.Printf("%s | %s | %s ", line.Source.Name, line.Source.Stream, line.Message)
 			}
 			if slices.Contains(terminalJobRunStates, latestRun.State) {
 				return nil
