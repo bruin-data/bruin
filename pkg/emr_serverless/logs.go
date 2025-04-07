@@ -14,14 +14,19 @@ import (
 )
 
 type LogLine struct {
-	Stream     string
-	Message    string
-	WorkerType string
+	Message string
+	Source  LogSource
 }
 
 type logState struct {
 	size int64
 	read int
+}
+
+type LogSource struct {
+	URI    *url.URL
+	Name   string
+	Stream string
 }
 
 type S3LogConsumer struct {
@@ -33,12 +38,6 @@ type S3LogConsumer struct {
 
 	once  sync.Once
 	state map[string]logState
-}
-
-type logSource struct {
-	URI    *url.URL
-	Name   string
-	Stream string
 }
 
 func (l *S3LogConsumer) Next() (lines []LogLine) { //nolint
@@ -53,7 +52,7 @@ func (l *S3LogConsumer) Next() (lines []LogLine) { //nolint
 	return lines
 }
 
-func (l *S3LogConsumer) listLogSources() (sources []logSource) {
+func (l *S3LogConsumer) listLogSources() (sources []LogSource) { //nolint
 	jobPath := l.URI.JoinPath(
 		"applications",
 		l.AppID,
@@ -62,17 +61,17 @@ func (l *S3LogConsumer) listLogSources() (sources []logSource) {
 	)
 	streams := []string{"stdout", "stderr"}
 	for _, stream := range streams {
-		sources = append(sources, logSource{
+		sources = append(sources, LogSource{
 			Name:   "SPARK_DRIVER",
 			Stream: stream,
 			URI:    jobPath.JoinPath("SPARK_DRIVER", stream+".gz"),
 		})
 	}
 
-	executorLogsBasePath := jobPath.JoinPath("SPARK_EXECUTOR/")
+	executorLogsURI := jobPath.JoinPath("SPARK_EXECUTOR/")
 	objs, err := l.S3cli.ListObjectsV2(l.Ctx, &s3.ListObjectsV2Input{
 		Bucket:    &l.URI.Host,
-		Prefix:    aws.String(strings.TrimPrefix(executorLogsBasePath.Path, "/")),
+		Prefix:    aws.String(strings.TrimPrefix(executorLogsURI.Path, "/")),
 		Delimiter: aws.String("/"),
 	})
 	if err != nil {
@@ -83,10 +82,10 @@ func (l *S3LogConsumer) listLogSources() (sources []logSource) {
 		prefixSegments := strings.Split(prefix, "/")
 		id := prefixSegments[len(prefixSegments)-1]
 		for _, stream := range streams {
-			sources = append(sources, logSource{
+			sources = append(sources, LogSource{
 				Name:   fmt.Sprintf("SPARK_EXECUTOR(%s)", id),
 				Stream: stream,
-				URI:    jobPath.JoinPath("SPARK_EXECUTOR", id, stream+".gz"),
+				URI:    executorLogsURI.JoinPath(id, stream+".gz"),
 			})
 		}
 	}
@@ -94,7 +93,7 @@ func (l *S3LogConsumer) listLogSources() (sources []logSource) {
 	return sources
 }
 
-func (l *S3LogConsumer) readLogs(source logSource) []LogLine {
+func (l *S3LogConsumer) readLogs(source LogSource) []LogLine {
 	logStream, err := l.S3cli.GetObject(l.Ctx, &s3.GetObjectInput{
 		Bucket: &source.URI.Host,
 		Key:    aws.String(strings.TrimPrefix(source.URI.Path, "/")),
@@ -124,9 +123,8 @@ func (l *S3LogConsumer) readLogs(source logSource) []LogLine {
 	lines := []LogLine{}
 	for scanner.Scan() {
 		lines = append(lines, LogLine{
-			WorkerType: source.Name,
-			Stream:     source.Stream,
-			Message:    strings.TrimSpace(scanner.Text()),
+			Message: strings.TrimSpace(scanner.Text()),
+			Source:  source,
 		})
 	}
 	l.state[stateKey] = logState{
