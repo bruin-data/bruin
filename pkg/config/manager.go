@@ -388,6 +388,7 @@ func LoadOrCreateWithoutPathAbsolutization(fs afero.Fs, path string) (*Config, e
 	return &config, ensureConfigIsInGitignore(fs, path)
 }
 
+// nolint maintidx
 func (c *Config) AddConnection(environmentName, name, connType string, creds map[string]interface{}) error {
 	// Check if the environment exists
 	env, exists := c.Environments[environmentName]
