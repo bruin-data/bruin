@@ -158,9 +158,9 @@ materialization:
 columns:
     - name: col1
       type: int
-      upstreams: // [!code ++]
-        - table: xyz // [!code ++]
-          column: col1 // [!code ++]
+      upstreams:       # [!code ++]
+        - table: xyz   # [!code ++]
+          column: col1 # [!code ++]
 
 @bruin """
 

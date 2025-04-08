@@ -47,7 +47,7 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	conn, exists := op.connections[connID]
 
 	if !exists {
-		return fmt.Errorf("aws connection not found for '%s", connID)
+		return fmt.Errorf("aws connection not found for '%s'", connID)
 	}
 
 	params := parseParams(asset.Parameters)
