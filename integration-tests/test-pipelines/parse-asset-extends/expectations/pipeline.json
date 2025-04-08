@@ -25,6 +25,7 @@
         "incremental_key": "",
         "time_granularity": ""
       },
+      "interval_modifiers": null,
       "upstreams": [],
       "image": "",
       "instance": "",

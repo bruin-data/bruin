@@ -22,6 +22,7 @@
             "connection": "",
             "tags": [],
             "materialization": null,
+            "interval_modifiers": null,
             "upstreams": [],
             "image": "",
             "instance": "",
@@ -58,6 +59,7 @@
             "connection": "",
             "tags": [],
             "materialization": null,
+            "interval_modifiers": null,
             "upstreams": [],
             "image": "",
             "instance": "",
@@ -97,6 +99,7 @@
                 "tag2:value2"
             ],
             "materialization": null,
+            "interval_modifiers": null,
             "upstreams": [
                 {
                     "type": "asset",

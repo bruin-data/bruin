@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
@@ -601,31 +602,101 @@ func (s AthenaConfig) MarshalJSON() ([]byte, error) {
 }
 
 type Asset struct {
-	ID              string             `json:"id" yaml:"-" mapstructure:"-"`
-	URI             string             `json:"uri" yaml:"uri,omitempty" mapstructure:"uri"`
-	Name            string             `json:"name" yaml:"name,omitempty" mapstructure:"name"`
-	Type            AssetType          `json:"type" yaml:"type,omitempty" mapstructure:"type"`
-	Description     string             `json:"description" yaml:"description,omitempty" mapstructure:"description"`
-	Connection      string             `json:"connection" yaml:"connection,omitempty" mapstructure:"connection"`
-	Tags            EmptyStringArray   `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
-	Materialization Materialization    `json:"materialization" yaml:"materialization,omitempty" mapstructure:"materialization"`
-	Upstreams       []Upstream         `json:"upstreams" yaml:"depends,omitempty" mapstructure:"depends"`
-	Image           string             `json:"image" yaml:"image,omitempty" mapstructure:"image"`
-	Instance        string             `json:"instance" yaml:"instance,omitempty" mapstructure:"instance"`
-	Owner           string             `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
-	ExecutableFile  ExecutableFile     `json:"executable_file" yaml:"-" mapstructure:"-"`
-	DefinitionFile  TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
-	Parameters      EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
-	Secrets         []SecretMapping    `json:"secrets" yaml:"secrets,omitempty" mapstructure:"secrets"`
-	Extends         []string           `json:"extends" yaml:"extends,omitempty" mapstructure:"extends"`
-	Columns         []Column           `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
-	CustomChecks    []CustomCheck      `json:"custom_checks" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
-	Metadata        EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
-	Snowflake       SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
-	Athena          AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
+	ID                string             `json:"id" yaml:"-" mapstructure:"-"`
+	URI               string             `json:"uri" yaml:"uri,omitempty" mapstructure:"uri"`
+	Name              string             `json:"name" yaml:"name,omitempty" mapstructure:"name"`
+	Type              AssetType          `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	Description       string             `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	Connection        string             `json:"connection" yaml:"connection,omitempty" mapstructure:"connection"`
+	Tags              EmptyStringArray   `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
+	Materialization   Materialization    `json:"materialization" yaml:"materialization,omitempty" mapstructure:"materialization"`
+	Upstreams         []Upstream         `json:"upstreams" yaml:"depends,omitempty" mapstructure:"depends"`
+	Image             string             `json:"image" yaml:"image,omitempty" mapstructure:"image"`
+	Instance          string             `json:"instance" yaml:"instance,omitempty" mapstructure:"instance"`
+	Owner             string             `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
+	ExecutableFile    ExecutableFile     `json:"executable_file" yaml:"-" mapstructure:"-"`
+	DefinitionFile    TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
+	Parameters        EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
+	Secrets           []SecretMapping    `json:"secrets" yaml:"secrets,omitempty" mapstructure:"secrets"`
+	Extends           []string           `json:"extends" yaml:"extends,omitempty" mapstructure:"extends"`
+	Columns           []Column           `json:"columns" yaml:"columns,omitempty" mapstructure:"columns"`
+	CustomChecks      []CustomCheck      `json:"custom_checks" yaml:"custom_checks,omitempty" mapstructure:"custom_checks"`
+	Metadata          EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
+	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
+	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
+	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
 
 	upstream   []*Asset
 	downstream []*Asset
+}
+
+type TimeModifier struct {
+	Months      int `json:"months" yaml:"months,omitempty" mapstructure:"months"`
+	Days        int `json:"days" yaml:"days,omitempty" mapstructure:"days"`
+	Hours       int `json:"hours" yaml:"hours,omitempty" mapstructure:"hours"`
+	Minutes     int `json:"minutes" yaml:"minutes,omitempty" mapstructure:"minutes"`
+	Seconds     int `json:"seconds" yaml:"seconds,omitempty" mapstructure:"seconds"`
+	CronPeriods int `json:"cron_periods" yaml:"cron_periods,omitempty" mapstructure:"cron_periods"`
+}
+
+func (t *TimeModifier) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind != yaml.ScalarNode {
+		return fmt.Errorf("expected scalar node, got %v", value.Kind)
+	}
+
+	modifier := value.Value
+	if len(modifier) < 2 {
+		return fmt.Errorf("invalid time modifier format: %s", modifier)
+	}
+
+	suffix := modifier[len(modifier)-1]
+	numeric := modifier[:len(modifier)-1]
+
+	num, err := strconv.Atoi(numeric)
+	if err != nil {
+		return fmt.Errorf("invalid numeric portion %q in interval %q: %w", numeric, modifier, err)
+	}
+
+	switch suffix {
+	case 'h':
+		t.Hours = num
+	case 'm':
+		t.Minutes = num
+	case 's':
+		t.Seconds = num
+	case 'd':
+		t.Days = num
+	case 'M':
+		t.Months = num
+	default:
+		return fmt.Errorf("unknown interval suffix %q in %q; must be h, m, s, or M", suffix, modifier)
+	}
+
+	return nil
+}
+
+func (t TimeModifier) MarshalJSON() ([]byte, error) {
+	if t.Months == 0 && t.Days == 0 && t.Hours == 0 && t.Minutes == 0 && t.Seconds == 0 && t.CronPeriods == 0 {
+		return []byte("null" +
+			""), nil
+	}
+
+	type Alias TimeModifier
+	return json.Marshal(Alias(t))
+}
+
+type IntervalModifiers struct {
+	Start TimeModifier `json:"start" yaml:"start,omitempty" mapstructure:"start"`
+	End   TimeModifier `json:"end" yaml:"end,omitempty" mapstructure:"end"`
+}
+
+func (im IntervalModifiers) MarshalJSON() ([]byte, error) {
+	if (im.Start == TimeModifier{} && im.End == TimeModifier{}) {
+		return []byte("null"), nil
+	}
+
+	type Alias IntervalModifiers
+	return json.Marshal(Alias(im))
 }
 
 func (a *Asset) AddUpstream(asset *Asset) {
@@ -1687,4 +1758,13 @@ func (b *Builder) SetAssetColumnFromGlossary(asset *Asset, pathToPipeline string
 		}
 	}
 	return nil
+}
+
+func ModifyDate(t time.Time, modifier TimeModifier) time.Time {
+	t = t.AddDate(0, modifier.Months, modifier.Days).
+		Add(time.Duration(modifier.Hours) * time.Hour).
+		Add(time.Duration(modifier.Minutes) * time.Minute).
+		Add(time.Duration(modifier.Seconds) * time.Second)
+
+	return t
 }

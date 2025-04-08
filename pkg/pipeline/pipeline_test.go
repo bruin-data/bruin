@@ -13,8 +13,10 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/cmd"
+	"github.com/bruin-data/bruin/pkg/date"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/path"
@@ -1209,4 +1211,203 @@ func TestBuilder_SetAssetColumnFromGlossary(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestIntervalModifiers_ModifyDate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		modifier pipeline.TimeModifier
+		baseTime string
+		wantTime time.Time
+	}{
+		{
+			name: "microseconds timezone - add hours",
+			modifier: pipeline.TimeModifier{
+				Hours: 5,
+			},
+			baseTime: "2023-07-01T10:30:45.123456Z",
+			wantTime: time.Date(2023, 7, 1, 15, 30, 45, 123456000, time.UTC),
+		},
+		{
+			name: "milliseconds - add minutes",
+			modifier: pipeline.TimeModifier{
+				Minutes: 45,
+			},
+			baseTime: "2023-07-01 10:30:45.123",
+			wantTime: time.Date(2023, 7, 1, 11, 15, 45, 123000000, time.UTC),
+		},
+		{
+			name: "date only - add months",
+			modifier: pipeline.TimeModifier{
+				Months: 3,
+			},
+			baseTime: "2023-07-01",
+			wantTime: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "british format - add days",
+			modifier: pipeline.TimeModifier{
+				Days: 15,
+			},
+			baseTime: "02 Jan 2006",
+			wantTime: time.Date(2006, 1, 17, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "no seconds - add hours",
+			modifier: pipeline.TimeModifier{
+				Hours: 12,
+			},
+			baseTime: "2023-07-01T10:30",
+			wantTime: time.Date(2023, 7, 1, 22, 30, 0, 0, time.UTC),
+		},
+		{
+			name: "year end - add seconds",
+			modifier: pipeline.TimeModifier{
+				Seconds: 1,
+			},
+			baseTime: "2023-12-31 23:59:59",
+			wantTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "DST transition - add hours",
+			modifier: pipeline.TimeModifier{
+				Hours: 2,
+			},
+			baseTime: "2023-03-12 01:30:00",
+			wantTime: time.Date(2023, 3, 12, 3, 30, 0, 0, time.UTC),
+		},
+		{
+			name: "quarter end - add days",
+			modifier: pipeline.TimeModifier{
+				Days: 1,
+			},
+			baseTime: "2023-03-31T23:59:59.999999",
+			wantTime: time.Date(2023, 4, 1, 23, 59, 59, 999999000, time.UTC),
+		},
+		{
+			name: "formatted date with timezone - UTC timezone",
+			modifier: pipeline.TimeModifier{
+				Hours: 24,
+			},
+			baseTime: "31 Dec 2023 23:59:59.999Z",
+			wantTime: time.Date(2024, 1, 1, 23, 59, 59, 999000000, time.UTC),
+		},
+		{
+			name: "date time without seconds - add minutes",
+			modifier: pipeline.TimeModifier{
+				Minutes: 45,
+			},
+			baseTime: "2023-07-01T10:30",
+			wantTime: time.Date(2023, 7, 1, 11, 15, 0, 0, time.UTC),
+		},
+		{
+			name: "date time without seconds - subtract across hour",
+			modifier: pipeline.TimeModifier{
+				Minutes: -75,
+			},
+			baseTime: "2023-07-01T01:00",
+			wantTime: time.Date(2023, 6, 30, 23, 45, 0, 0, time.UTC),
+		},
+		{
+			name: "date time without seconds - add across day",
+			modifier: pipeline.TimeModifier{
+				Minutes: 180,
+			},
+			baseTime: "2023-07-01T23:00",
+			wantTime: time.Date(2023, 7, 2, 2, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "ISO format with timezone - UTC timezone",
+			modifier: pipeline.TimeModifier{
+				Hours: 12,
+			},
+			baseTime: "2023-07-01T22:30:45.500Z",
+			wantTime: time.Date(2023, 7, 2, 10, 30, 45, 500000000, time.UTC),
+		},
+		{
+			name: "milliseconds without timezone - add minutes",
+			modifier: pipeline.TimeModifier{
+				Minutes: 90,
+			},
+			baseTime: "2023-07-01 10:30:45.123",
+			wantTime: time.Date(2023, 7, 1, 12, 0, 45, 123000000, time.UTC),
+		},
+		{
+			name: "milliseconds without timezone - subtract across midnight",
+			modifier: pipeline.TimeModifier{
+				Hours: -3,
+			},
+			baseTime: "2023-07-01 01:30:45.999",
+			wantTime: time.Date(2023, 6, 30, 22, 30, 45, 999000000, time.UTC),
+		},
+		{
+			name: "milliseconds without timezone - month boundary",
+			modifier: pipeline.TimeModifier{
+				Hours: 48,
+			},
+			baseTime: "2023-07-31 23:30:45.500",
+			wantTime: time.Date(2023, 8, 2, 23, 30, 45, 500000000, time.UTC),
+		},
+		{
+			name: "date only format - leap year",
+			modifier: pipeline.TimeModifier{
+				Days: 1,
+			},
+			baseTime: "2024-02-28",
+			wantTime: time.Date(2024, 2, 29, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "date only format - non-leap year",
+			modifier: pipeline.TimeModifier{
+				Days: 1,
+			},
+			baseTime: "2023-02-28",
+			wantTime: time.Date(2023, 3, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "date only format - month with 31 days",
+			modifier: pipeline.TimeModifier{
+				Days: 1,
+			},
+			baseTime: "2023-08-31",
+			wantTime: time.Date(2023, 9, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "date only format - month with 30 days",
+			modifier: pipeline.TimeModifier{
+				Days: -1,
+			},
+			baseTime: "2023-10-01",
+			wantTime: time.Date(2023, 9, 30, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "date only format - new year's eve",
+			modifier: pipeline.TimeModifier{
+				Days: 1,
+			},
+			baseTime: "2023-12-31",
+			wantTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "date only format - quarter transition",
+			modifier: pipeline.TimeModifier{
+				Days: 1,
+			},
+			baseTime: "2023-09-30",
+			wantTime: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			baseTime, err := date.ParseTime(tt.baseTime)
+			require.NoError(t, err, "failed to parse base time")
+
+			gotTime := pipeline.ModifyDate(baseTime, tt.modifier)
+			assert.Equal(t, tt.wantTime, gotTime)
+		})
+	}
 }
