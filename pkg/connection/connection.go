@@ -23,6 +23,7 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/dynamodb"
 	"github.com/bruin-data/bruin/pkg/facebookads"
+	"github.com/bruin-data/bruin/pkg/frankfurter"
 	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/github"
 	"github.com/bruin-data/bruin/pkg/googleads"
@@ -94,6 +95,7 @@ type Manager struct {
 	Personio     map[string]*personio.Client
 	Kinesis      map[string]*kinesis.Client
 	Pipedrive    map[string]*pipedrive.Client
+	Frankfurter  map[string]*frankfurter.Client
 	mutex        sync.Mutex
 }
 
@@ -333,6 +335,11 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connPipedrive, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Pipedrive)...)
+
+	connFrankfurter, err := m.GetFrankfurterConnectionWithoutDefault(name)
+	if err == nil {
+		return connFrankfurter, nil
+	}
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -1134,6 +1141,25 @@ func (m *Manager) GetPipedriveConnectionWithoutDefault(name string) (*pipedrive.
 	db, ok := m.Pipedrive[name]
 	if !ok {
 		return nil, errors.Errorf("pipedrive connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetFrankfurterConnection(name string) (*frankfurter.Client, error) {
+	db, err := m.GetFrankfurterConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetFrankfurterConnectionWithoutDefault("frankfurter-default")
+}
+
+func (m *Manager) GetFrankfurterConnectionWithoutDefault(name string) (*frankfurter.Client, error) {
+	if m.Frankfurter == nil {
+		return nil, errors.New("no frankfurter connections found")
+	}
+	db, ok := m.Frankfurter[name]
+	if !ok {
+		return nil, errors.Errorf("frankfurter connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2108,6 +2134,23 @@ func (m *Manager) AddPipedriveConnectionFromConfig(connection *config.PipedriveC
 	return nil
 }
 
+func (m *Manager) AddFrankfurterConnectionFromConfig(connection *config.FrankfurterConnection) error {
+	m.mutex.Lock()
+	if m.Frankfurter == nil {
+		m.Frankfurter = make(map[string]*frankfurter.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := frankfurter.NewClient(frankfurter.Config{})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Frankfurter[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConnection) error {
 	m.mutex.Lock()
 	if m.Kinesis == nil {
@@ -2219,7 +2262,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.ApplovinMax, connectionManager.AddApplovinMaxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
-
+	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }

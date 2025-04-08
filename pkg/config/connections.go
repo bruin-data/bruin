@@ -567,3 +567,11 @@ type PipedriveConnection struct {
 func (c PipedriveConnection) GetName() string {
 	return c.Name
 }
+
+type FrankfurterConnection struct {
+	Name string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+}
+
+func (c FrankfurterConnection) GetName() string {
+	return c.Name
+}
