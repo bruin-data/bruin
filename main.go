@@ -14,7 +14,7 @@ import (
 var (
 	version      = "dev"
 	commit       = ""
-	TelemetryKey string
+	telemetryKey string
 )
 
 func main() {
@@ -27,10 +27,10 @@ func main() {
 
 	v.Version = version
 	v.Commit = commit
-	if TelemetryKey == "" {
-		TelemetryKey = os.Getenv("TELEMETRY_KEY")
+	if telemetryKey == "" {
+		telemetryKey = os.Getenv("TELEMETRY_KEY")
 	}
-	telemetry.TelemetryKey = TelemetryKey
+	telemetry.TelemetryKey = telemetryKey
 	telemetry.OptOut = optOut
 	telemetry.AppVersion = v.Version
 	client := telemetry.Init()
