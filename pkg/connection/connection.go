@@ -39,6 +39,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/notion"
 	"github.com/bruin-data/bruin/pkg/personio"
+	"github.com/bruin-data/bruin/pkg/pipedrive"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/shopify"
@@ -92,6 +93,7 @@ type Manager struct {
 	ApplovinMax  map[string]*applovinmax.Client
 	Personio     map[string]*personio.Client
 	Kinesis      map[string]*kinesis.Client
+	Pipedrive    map[string]*pipedrive.Client
 	mutex        sync.Mutex
 }
 
@@ -325,6 +327,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connKinesis, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Kinesis)...)
+
+	connPipedrive, err := m.GetPipedriveConnectionWithoutDefault(name)
+	if err == nil {
+		return connPipedrive, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Pipedrive)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -1107,6 +1115,25 @@ func (m *Manager) GetKinesisConnectionWithoutDefault(name string) (*kinesis.Clie
 	db, ok := m.Kinesis[name]
 	if !ok {
 		return nil, errors.Errorf("kinesis connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetPipedriveConnection(name string) (*pipedrive.Client, error) {
+	db, err := m.GetPipedriveConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetPipedriveConnectionWithoutDefault("pipedrive-default")
+}
+
+func (m *Manager) GetPipedriveConnectionWithoutDefault(name string) (*pipedrive.Client, error) {
+	if m.Pipedrive == nil {
+		return nil, errors.New("no pipedrive connections found")
+	}
+	db, ok := m.Pipedrive[name]
+	if !ok {
+		return nil, errors.Errorf("pipedrive connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2062,6 +2089,25 @@ func (m *Manager) AddApplovinMaxConnectionFromConfig(connection *config.Applovin
 	return nil
 }
 
+func (m *Manager) AddPipedriveConnectionFromConfig(connection *config.PipedriveConnection) error {
+	m.mutex.Lock()
+	if m.Pipedrive == nil {
+		m.Pipedrive = make(map[string]*pipedrive.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := pipedrive.NewClient(pipedrive.Config{
+		APIToken: connection.APIToken,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Pipedrive[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConnection) error {
 	m.mutex.Lock()
 	if m.Kinesis == nil {
@@ -2172,6 +2218,8 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Personio, connectionManager.AddPersonioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.ApplovinMax, connectionManager.AddApplovinMaxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
+
 	wg.Wait()
 	return connectionManager, errList
 }
