@@ -18,6 +18,7 @@
       "connection": "",
       "tags": [],
       "materialization": null,
+      "interval_modifiers": null,
       "upstreams": [
         {
           "type": "asset",
@@ -61,6 +62,7 @@
       "connection": "",
       "tags": [],
       "materialization": null,
+      "interval_modifiers": null,
       "upstreams": [],
       "image": "",
       "instance": "",
@@ -96,6 +98,7 @@
       "connection": "",
       "tags": [],
       "materialization": null,
+      "interval_modifiers": null,
       "upstreams": [],
       "image": "",
       "instance": "",
@@ -138,6 +141,7 @@
         "incremental_key": "",
         "time_granularity": ""
       },
+      "interval_modifiers": null,
       "upstreams": [
         {
           "type": "asset",

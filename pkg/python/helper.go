@@ -8,7 +8,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
-func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs []string) []string {
+func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs []string) ([]string, error) {
 	if value, exists := asset.Parameters["incremental_key"]; exists && value != "" {
 		cmdArgs = append(cmdArgs, "--incremental-key", value)
 	}
@@ -68,14 +68,16 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 	if ctx.Value(pipeline.RunConfigStartDate) != nil {
 		startTimeInstance, okParse := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
 		if okParse {
-			cmdArgs = append(cmdArgs, "--interval-start", startTimeInstance.Format(time.RFC3339))
+			startTime := pipeline.ModifyDate(startTimeInstance, asset.IntervalModifiers.Start)
+			cmdArgs = append(cmdArgs, "--interval-start", startTime.Format(time.RFC3339))
 		}
 	}
 
 	if ctx.Value(pipeline.RunConfigEndDate) != nil {
 		endTimeInstance, okParse := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
 		if okParse {
-			cmdArgs = append(cmdArgs, "--interval-end", endTimeInstance.Format(time.RFC3339))
+			endTime := pipeline.ModifyDate(endTimeInstance, asset.IntervalModifiers.End)
+			cmdArgs = append(cmdArgs, "--interval-end", endTime.Format(time.RFC3339))
 		}
 	}
 
@@ -83,7 +85,7 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 	if fullRefresh != nil && fullRefresh.(bool) {
 		cmdArgs = append(cmdArgs, "--full-refresh")
 	}
-	return cmdArgs
+	return cmdArgs, nil
 }
 
 func AddExtraPackages(destURI, sourceURI string, extraPackages []string) []string {
