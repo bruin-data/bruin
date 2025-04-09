@@ -238,6 +238,22 @@
         "client_secret"
       ]
     },
+    "PipedriveConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type":"object",
+      "required": [
+        "name",
+        "api_token"
+      ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -489,6 +505,12 @@
         "kinesis": {
           "items": {
             "$ref": "#/$defs/KinesisConnection"
+          },
+          "type": "array"
+        },
+        "pipedrive": {
+          "items": {
+            "$ref": "#/$defs/PipedriveConnection"
           },
           "type": "array"
         }

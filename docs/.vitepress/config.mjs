@@ -189,6 +189,7 @@ export default withMermaid({
                             {text: "MySQL", link: "/ingestion/mysql"},
                             {text: "Notion", link: "/ingestion/notion"},
                             {text: "Personio", link: "/ingestion/personio"},
+                            {text: "Pipedrive", link: "/ingestion/pipedrive"},
                             {text: "SAP HANA", link: "/ingestion/sap_hana"},
                             {text: "S3", link: "/ingestion/s3"},
                             {text: "Shopify", link: "/ingestion/shopify"},

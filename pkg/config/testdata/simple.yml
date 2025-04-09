@@ -239,6 +239,9 @@ environments:
           access_key_id: "aws-access-key-id-123"
           secret_access_key: "aws-secret-access-key-123"
           region: "us-east-1"
+      pipedrive:
+        - name: "pipedrive-1"
+          api_token: "token-123"
 
   prod:
     connections:
