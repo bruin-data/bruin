@@ -187,7 +187,6 @@ func (f *WholeFileExtractor) ReextractQueriesFromSlice(content []string) ([]stri
 }
 
 func (f *WholeFileExtractor) CloneForAsset(ctx context.Context, t *pipeline.Asset) QueryExtractor {
-
 	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
 	if ok && applyModifiers {
 		return f
