@@ -61,6 +61,8 @@ const (
 	RunConfigFullRefresh          = RunConfig("full-refresh")
 	RunConfigStartDate            = RunConfig("start-date")
 	RunConfigEndDate              = RunConfig("end-date")
+	RunConfigPipelineName         = RunConfig("pipeline")
+	RunConfigRunID                = RunConfig("run-id")
 )
 
 var defaultMapping = map[string]string{

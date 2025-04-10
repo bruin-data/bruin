@@ -1,9 +1,13 @@
 package query
 
 import (
+	"context"
 	"regexp"
 	"strings"
+	"time"
 
+	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 )
@@ -16,6 +20,11 @@ type Query struct {
 type QueryResult struct {
 	Columns []string
 	Rows    [][]interface{}
+}
+
+type QueryExtractor interface {
+	ExtractQueriesFromString(filepath string) ([]*Query, error)
+	CloneForAsset(ctx context.Context, asset *pipeline.Asset) QueryExtractor
 }
 
 func (q Query) ToExplainQuery() string {
@@ -175,4 +184,19 @@ func (f *WholeFileExtractor) ReextractQueriesFromSlice(content []string) ([]stri
 	}
 
 	return allQueries, nil
+}
+
+func (f *WholeFileExtractor) CloneForAsset(ctx context.Context, t *pipeline.Asset) QueryExtractor {
+	startDate := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
+	endDate := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
+	pipelineName := ctx.Value(pipeline.RunConfigPipelineName).(string)
+	runID := ctx.Value(pipeline.RunConfigRunID).(string)
+	startDate = pipeline.ModifyDate(startDate, t.IntervalModifiers.Start)
+	endDate = pipeline.ModifyDate(endDate, t.IntervalModifiers.End)
+	newRenderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID)
+
+	return &WholeFileExtractor{
+		Renderer: newRenderer,
+		Fs:       f.Fs,
+	}
 }
