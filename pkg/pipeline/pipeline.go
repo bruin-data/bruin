@@ -59,6 +59,7 @@ const (
 	AssetTypeClickHouseSeed       = AssetType("clickhouse.seed")
 	AssetTypeEMRServerlessSpark   = AssetType("emr_serverless.spark")
 	RunConfigFullRefresh          = RunConfig("full-refresh")
+	RunConfigApplyIntervalModifiers = RunConfig("apply-interval-modifiers")
 	RunConfigStartDate            = RunConfig("start-date")
 	RunConfigEndDate              = RunConfig("end-date")
 	RunConfigPipelineName         = RunConfig("pipeline")

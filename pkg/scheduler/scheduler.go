@@ -141,6 +141,7 @@ type RunConfig struct {
 	ExpUseWingetForUv bool     `json:"expUseWingetForUv"`
 	ConfigFilePath    string   `json:"configFilePath"`
 	SensorMode        string   `json:"sensorMode"`
+	ApplyIntervalModifiers bool   `json:"applyIntervalModifiers"`
 }
 
 type PipelineAssetState struct {

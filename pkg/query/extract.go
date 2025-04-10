@@ -187,6 +187,11 @@ func (f *WholeFileExtractor) ReextractQueriesFromSlice(content []string) ([]stri
 }
 
 func (f *WholeFileExtractor) CloneForAsset(ctx context.Context, t *pipeline.Asset) QueryExtractor {
+
+	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
+	if ok && applyModifiers {
+		return f
+	}
 	startDate := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
 	endDate := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
 	pipelineName := ctx.Value(pipeline.RunConfigPipelineName).(string)

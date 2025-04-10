@@ -126,6 +126,10 @@ func Run(isDebug *bool) *cli.Command {
 				EnvVars: []string{"BRUIN_FULL_REFRESH"},
 			},
 			&cli.BoolFlag{
+				Name:    "apply-interval-modifiers",
+				Usage:   "apply interval modifiers",
+			},
+			&cli.BoolFlag{
 				Name:  "use-pip",
 				Usage: "use pip for managing Python dependencies",
 			},
@@ -209,6 +213,7 @@ func Run(isDebug *bool) *cli.Command {
 				ExpUseWingetForUv: c.Bool("exp-use-winget-for-uv"),
 				ConfigFilePath:    c.String("config-file"),
 				SensorMode:        c.String("sensor-mode"),
+				ApplyIntervalModifiers: c.Bool("apply-interval-modifiers"),
 			}
 
 			var startDate, endDate time.Time
@@ -438,6 +443,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
 			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
 			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, runConfig.ExpUseWingetForUv) //nolint:staticcheck
 			runCtx = context.WithValue(runCtx, python.LocalIngestr, c.String("debug-ingestr-src"))
