@@ -297,26 +297,27 @@ type athena struct {
 }
 
 type taskDefinition struct {
-	Name            string            `yaml:"name"`
-	URI             string            `yaml:"uri"`
-	Description     string            `yaml:"description"`
-	Type            string            `yaml:"type"`
-	RunFile         string            `yaml:"run"`
-	Depends         depends           `yaml:"depends"`
-	Parameters      map[string]string `yaml:"parameters"`
-	Connections     map[string]string `yaml:"connections"`
-	Secrets         []secretMapping   `yaml:"secrets"`
-	Connection      string            `yaml:"connection"`
-	Image           string            `yaml:"image"`
-	Instance        string            `yaml:"instance"`
-	Materialization materialization   `yaml:"materialization"`
-	Owner           string            `yaml:"owner"`
-	Extends         []string          `yaml:"extends"`
-	Columns         []column          `yaml:"columns"`
-	CustomChecks    []customCheck     `yaml:"custom_checks"`
-	Tags            []string          `yaml:"tags"`
-	Snowflake       snowflake         `yaml:"snowflake"`
-	Athena          athena            `yaml:"athena"`
+	Name              string            `yaml:"name"`
+	URI               string            `yaml:"uri"`
+	Description       string            `yaml:"description"`
+	Type              string            `yaml:"type"`
+	RunFile           string            `yaml:"run"`
+	Depends           depends           `yaml:"depends"`
+	Parameters        map[string]string `yaml:"parameters"`
+	Connections       map[string]string `yaml:"connections"`
+	Secrets           []secretMapping   `yaml:"secrets"`
+	Connection        string            `yaml:"connection"`
+	Image             string            `yaml:"image"`
+	Instance          string            `yaml:"instance"`
+	Materialization   materialization   `yaml:"materialization"`
+	Owner             string            `yaml:"owner"`
+	Extends           []string          `yaml:"extends"`
+	Columns           []column          `yaml:"columns"`
+	CustomChecks      []customCheck     `yaml:"custom_checks"`
+	Tags              []string          `yaml:"tags"`
+	Snowflake         snowflake         `yaml:"snowflake"`
+	Athena            athena            `yaml:"athena"`
+	IntervalModifiers IntervalModifiers `yaml:"interval_modifiers"`
 }
 
 func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
@@ -463,26 +464,27 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 	}
 
 	task := Asset{
-		ID:              hash(definition.Name),
-		URI:             definition.URI,
-		Name:            definition.Name,
-		Description:     definition.Description,
-		Type:            AssetType(definition.Type),
-		Parameters:      definition.Parameters,
-		Connection:      definition.Connection,
-		Secrets:         make([]SecretMapping, len(definition.Secrets)),
-		Upstreams:       upstreams,
-		ExecutableFile:  ExecutableFile{},
-		Materialization: mat,
-		Image:           definition.Image,
-		Instance:        definition.Instance,
-		Owner:           definition.Owner,
-		Tags:            definition.Tags,
-		Extends:         definition.Extends,
-		Columns:         columns,
-		CustomChecks:    make([]CustomCheck, len(definition.CustomChecks)),
-		Snowflake:       SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},
-		Athena:          AthenaConfig{Location: definition.Athena.QueryResultsPath},
+		ID:                hash(definition.Name),
+		URI:               definition.URI,
+		Name:              definition.Name,
+		Description:       definition.Description,
+		Type:              AssetType(definition.Type),
+		Parameters:        definition.Parameters,
+		Connection:        definition.Connection,
+		Secrets:           make([]SecretMapping, len(definition.Secrets)),
+		Upstreams:         upstreams,
+		ExecutableFile:    ExecutableFile{},
+		Materialization:   mat,
+		Image:             definition.Image,
+		Instance:          definition.Instance,
+		Owner:             definition.Owner,
+		Tags:              definition.Tags,
+		Extends:           definition.Extends,
+		Columns:           columns,
+		CustomChecks:      make([]CustomCheck, len(definition.CustomChecks)),
+		Snowflake:         SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},
+		Athena:            AthenaConfig{Location: definition.Athena.QueryResultsPath},
+		IntervalModifiers: definition.IntervalModifiers,
 	}
 
 	for index, check := range definition.CustomChecks {
