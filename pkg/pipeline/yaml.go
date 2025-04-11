@@ -317,6 +317,7 @@ type taskDefinition struct {
 	Tags            []string          `yaml:"tags"`
 	Snowflake       snowflake         `yaml:"snowflake"`
 	Athena          athena            `yaml:"athena"`
+	IntervalModifiers IntervalModifiers `yaml:"interval_modifiers"`
 }
 
 func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
@@ -483,6 +484,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		CustomChecks:    make([]CustomCheck, len(definition.CustomChecks)),
 		Snowflake:       SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},
 		Athena:          AthenaConfig{Location: definition.Athena.QueryResultsPath},
+		IntervalModifiers: definition.IntervalModifiers,
 	}
 
 	for index, check := range definition.CustomChecks {
