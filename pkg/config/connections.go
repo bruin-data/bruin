@@ -23,6 +23,7 @@ type GoogleCloudPlatformConnection struct { //nolint:recvcheck
 	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
 	ProjectID          string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
 	Location           string `yaml:"location,omitempty" json:"location,omitempty" mapstructure:"location"`
+	PropertyID         string `yaml:"property_id,omitempty" json:"property_id" mapstructure:"property_id"`
 	rawCredentials     *google.Credentials
 }
 
