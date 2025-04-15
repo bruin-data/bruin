@@ -567,3 +567,13 @@ type PipedriveConnection struct {
 func (c PipedriveConnection) GetName() string {
 	return c.Name
 }
+
+type GoogleAnalyticsConnection struct {
+	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file" mapstructure:"service_account_file"`
+	PropertyID         string `yaml:"property_id,omitempty" json:"property_id" mapstructure:"property_id"`
+}
+
+func (c GoogleAnalyticsConnection) GetName() string {
+	return c.Name
+}
