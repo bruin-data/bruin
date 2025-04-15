@@ -58,6 +58,7 @@ const (
 	AssetTypeClickHouse             = AssetType("clickhouse.sql")
 	AssetTypeClickHouseSeed         = AssetType("clickhouse.seed")
 	AssetTypeEMRServerlessSpark     = AssetType("emr_serverless.spark")
+	AssetTypeEMRServerlessPyspark   = AssetType("emr_serverless.pyspark")
 	RunConfigFullRefresh            = RunConfig("full-refresh")
 	RunConfigApplyIntervalModifiers = RunConfig("apply-interval-modifiers")
 	RunConfigStartDate              = RunConfig("start-date")
