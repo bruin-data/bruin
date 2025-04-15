@@ -179,6 +179,7 @@ export default withMermaid({
                             {text: "Google Cloud Storage", link: "/ingestion/gcs.md"},
                             {text: "Google Sheets", link: "/ingestion/google_sheets.md"},
                             {text: "Google Ads", link: "/ingestion/google-ads.md"},
+                            {text: "Google Analytics", link: "/ingestion/google_analytics.md"},
                             {text: "Gorgias", link: "/ingestion/gorgias"},
                             {text: "Hubspot", link: "/ingestion/hubspot.md"},
                             {text: "Kafka", link: "/ingestion/kafka.md"},
