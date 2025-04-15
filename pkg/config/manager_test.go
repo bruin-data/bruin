@@ -388,6 +388,13 @@ func TestLoadFromFile(t *testing.T) {
 					APIToken: "token-123",
 				},
 			},
+			GoogleAnalytics: []GoogleAnalyticsConnection{
+				{
+					Name:               "googleanalytics-1",
+					ServiceAccountFile: "path/to/service_account.json",
+					PropertyID:         "12345",
+				},
+			},
 		},
 	}
 

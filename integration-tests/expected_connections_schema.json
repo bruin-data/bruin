@@ -254,6 +254,26 @@
         "api_token"
       ]
     },
+    "GoogleAnalyticsConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "service_account_file": {
+          "type": "string"
+        },
+        "property_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "service_account_file",
+        "property_id"
+      ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -511,6 +531,12 @@
         "pipedrive": {
           "items": {
             "$ref": "#/$defs/PipedriveConnection"
+          },
+          "type": "array"
+        },
+        "googleanalytics": {
+          "items": {
+            "$ref": "#/$defs/GoogleAnalyticsConnection"
           },
           "type": "array"
         }
