@@ -24,6 +24,7 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/dynamodb"
 	"github.com/bruin-data/bruin/pkg/facebookads"
+	"github.com/bruin-data/bruin/pkg/frankfurter"
 	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/github"
 	"github.com/bruin-data/bruin/pkg/googleads"
@@ -56,26 +57,25 @@ import (
 )
 
 type Manager struct {
-	BigQuery    map[string]*bigquery.Client
-	Snowflake   map[string]*snowflake.DB
-	Postgres    map[string]*postgres.Client
-	MsSQL       map[string]*mssql.DB
-	Databricks  map[string]*databricks.DB
-	Mongo       map[string]*mongo.DB
-	Mysql       map[string]*mysql.Client
-	Notion      map[string]*notion.Client
-	HANA        map[string]*hana.Client
-	Shopify     map[string]*shopify.Client
-	Gorgias     map[string]*gorgias.Client
-	Klaviyo     map[string]*klaviyo.Client
-	Adjust      map[string]*adjust.Client
-	Athena      map[string]*athena.DB
-	FacebookAds map[string]*facebookads.Client
-	Stripe      map[string]*stripe.Client
-	Appsflyer   map[string]*appsflyer.Client
-	Kafka       map[string]*kafka.Client
-	Airtable    map[string]*airtable.Client
-
+	BigQuery        map[string]*bigquery.Client
+	Snowflake       map[string]*snowflake.DB
+	Postgres        map[string]*postgres.Client
+	MsSQL           map[string]*mssql.DB
+	Databricks      map[string]*databricks.DB
+	Mongo           map[string]*mongo.DB
+	Mysql           map[string]*mysql.Client
+	Notion          map[string]*notion.Client
+	HANA            map[string]*hana.Client
+	Shopify         map[string]*shopify.Client
+	Gorgias         map[string]*gorgias.Client
+	Klaviyo         map[string]*klaviyo.Client
+	Adjust          map[string]*adjust.Client
+	Athena          map[string]*athena.DB
+	FacebookAds     map[string]*facebookads.Client
+	Stripe          map[string]*stripe.Client
+	Appsflyer       map[string]*appsflyer.Client
+	Kafka           map[string]*kafka.Client
+	Airtable        map[string]*airtable.Client
 	DuckDB          map[string]*duck.Client
 	Hubspot         map[string]*hubspot.Client
 	GoogleSheets    map[string]*gsheets.Client
@@ -96,6 +96,7 @@ type Manager struct {
 	Personio        map[string]*personio.Client
 	Kinesis         map[string]*kinesis.Client
 	Pipedrive       map[string]*pipedrive.Client
+	Frankfurter     map[string]*frankfurter.Client
 	GoogleAnalytics map[string]*googleanalytics.Client
 	AppLovin        map[string]*applovin.Client
 	mutex           sync.Mutex
@@ -349,6 +350,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connAppLovin, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.AppLovin)...)
+
+	connFrankfurter, err := m.GetFrankfurterConnectionWithoutDefault(name)
+	if err == nil {
+		return connFrankfurter, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Frankfurter)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -1188,6 +1195,25 @@ func (m *Manager) GetAppLovinConnectionWithoutDefault(name string) (*applovin.Cl
 	db, ok := m.AppLovin[name]
 	if !ok {
 		return nil, errors.Errorf("applovin connection not found for '%s'", name)
+	}
+	return db, nil
+}
+func (m *Manager) GetFrankfurterConnection(name string) (*frankfurter.Client, error) {
+	db, err := m.GetFrankfurterConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetFrankfurterConnectionWithoutDefault("frankfurter-default")
+}
+
+func (m *Manager) GetFrankfurterConnectionWithoutDefault(name string) (*frankfurter.Client, error) {
+	if m.Frankfurter == nil {
+		return nil, errors.New("no frankfurter connections found")
+	}
+	db, ok := m.Frankfurter[name]
+	if !ok {
+		return nil, errors.Errorf("frankfurter connection not found for '%s'", name)
+
 	}
 	return db, nil
 }
@@ -2202,6 +2228,24 @@ func (m *Manager) AddGoogleAnalyticsConnectionFromConfig(connection *config.Goog
 	return nil
 }
 
+func (m *Manager) AddFrankfurterConnectionFromConfig(connection *config.FrankfurterConnection) error {
+	m.mutex.Lock()
+	if m.Frankfurter == nil {
+		m.Frankfurter = make(map[string]*frankfurter.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := frankfurter.NewClient(frankfurter.Config{})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Frankfurter[connection.Name] = client
+	m.Frankfurter[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConnection) error {
 	m.mutex.Lock()
 	if m.Kinesis == nil {
@@ -2315,7 +2359,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleAnalytics, connectionManager.AddGoogleAnalyticsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
-
+	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }

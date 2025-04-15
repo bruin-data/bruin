@@ -586,3 +586,11 @@ type AppLovinConnection struct {
 func (c AppLovinConnection) GetName() string {
 	return c.Name
 }
+
+type FrankfurterConnection struct {
+	Name string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+}
+
+func (c FrankfurterConnection) GetName() string {
+	return c.Name
+}

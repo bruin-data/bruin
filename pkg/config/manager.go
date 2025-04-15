@@ -66,6 +66,7 @@ type Connections struct {
 	Pipedrive           []PipedriveConnection           `yaml:"pipedrive,omitempty" json:"pipedrive,omitempty" mapstructure:"pipedrive"`
 	GoogleAnalytics     []GoogleAnalyticsConnection     `yaml:"googleanalytics,omitempty" json:"googleanalytics,omitempty" mapstructure:"googleanalytics"`
 	AppLovin            []AppLovinConnection            `yaml:"applovin,omitempty" json:"applovin,omitempty" mapstructure:"applovin"`
+	Frankfurter         []FrankfurterConnection         `yaml:"frankfurter,omitempty" json:"frankfurter,omitempty" mapstructure:"frankfurter"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -710,6 +711,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.GoogleAnalytics = append(env.Connections.GoogleAnalytics, conn)
+	case "frankfurter":
+		var conn FrankfurterConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Frankfurter = append(env.Connections.Frankfurter, conn)
 	case "applovin":
 		var conn AppLovinConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -838,6 +846,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.GoogleAnalytics = removeConnection(env.Connections.GoogleAnalytics, connectionName)
 	case "applovin":
 		env.Connections.AppLovin = removeConnection(env.Connections.AppLovin, connectionName)
+	case "frankfurter":
+		env.Connections.Frankfurter = removeConnection(env.Connections.Frankfurter, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}

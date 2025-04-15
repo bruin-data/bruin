@@ -1,0 +1,9 @@
+name: public.frankfurter
+type: ingestr
+connection: postgres
+
+parameters:
+  source_connection: frankfurter
+  source_table: 'latest'
+
+  destination: duckdb
