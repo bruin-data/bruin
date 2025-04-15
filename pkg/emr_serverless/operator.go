@@ -39,6 +39,9 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 		ctx.Value(executor.KeyPrinter).(io.Writer), "", 0,
 	)
 	asset := ti.GetAsset()
+	if asset.Type == pipeline.AssetTypeEMRServerlessPyspark {
+		return fmt.Errorf("not implemented")
+	}
 	pipeline := ti.GetPipeline()
 	connID, err := pipeline.GetConnectionNameForAsset(asset)
 	if err != nil {
