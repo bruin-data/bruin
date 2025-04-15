@@ -242,6 +242,8 @@ environments:
       pipedrive:
         - name: "pipedrive-1"
           api_token: "token-123"
+      frankfurter:
+        - name: "frankfurter-1"
 
   prod:
     connections:

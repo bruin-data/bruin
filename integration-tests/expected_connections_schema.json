@@ -254,6 +254,18 @@
         "api_token"
       ]
     },
+    "FrankfurterConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -511,6 +523,12 @@
         "pipedrive": {
           "items": {
             "$ref": "#/$defs/PipedriveConnection"
+          },
+          "type": "array"
+        },
+        "frankfurter": {
+          "items": {
+            "$ref": "#/$defs/FrankfurterConnection"
           },
           "type": "array"
         }
