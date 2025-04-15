@@ -37,3 +37,4 @@ default_connections:
   gcs: "my-gcs"
   kinesis: "my-kinesis"
   pipedrive: "my-pipedrive"
+  googleanalytics: "my-googleanalytics"

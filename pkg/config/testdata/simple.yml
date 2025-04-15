@@ -242,6 +242,10 @@ environments:
       pipedrive:
         - name: "pipedrive-1"
           api_token: "token-123"
+      googleanalytics:
+        - name: "googleanalytics-1"
+          service_account_file: "path/to/service_account.json"
+          property_id: "12345"
 
   prod:
     connections:

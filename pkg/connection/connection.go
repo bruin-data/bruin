@@ -26,6 +26,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/github"
 	"github.com/bruin-data/bruin/pkg/googleads"
+	"github.com/bruin-data/bruin/pkg/googleanalytics"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/gsheets"
 	"github.com/bruin-data/bruin/pkg/hana"
@@ -74,27 +75,28 @@ type Manager struct {
 	Kafka       map[string]*kafka.Client
 	Airtable    map[string]*airtable.Client
 
-	DuckDB       map[string]*duck.Client
-	Hubspot      map[string]*hubspot.Client
-	GoogleSheets map[string]*gsheets.Client
-	Chess        map[string]*chess.Client
-	S3           map[string]*s3.Client
-	Slack        map[string]*slack.Client
-	Asana        map[string]*asana.Client
-	DynamoDB     map[string]*dynamodb.Client
-	Zendesk      map[string]*zendesk.Client
-	GoogleAds    map[string]*googleads.Client
-	TikTokAds    map[string]*tiktokads.Client
-	GitHub       map[string]*github.Client
-	AppStore     map[string]*appstore.Client
-	LinkedInAds  map[string]*linkedinads.Client
-	ClickHouse   map[string]*clickhouse.Client
-	GCS          map[string]*gcs.Client
-	ApplovinMax  map[string]*applovinmax.Client
-	Personio     map[string]*personio.Client
-	Kinesis      map[string]*kinesis.Client
-	Pipedrive    map[string]*pipedrive.Client
-	mutex        sync.Mutex
+	DuckDB          map[string]*duck.Client
+	Hubspot         map[string]*hubspot.Client
+	GoogleSheets    map[string]*gsheets.Client
+	Chess           map[string]*chess.Client
+	S3              map[string]*s3.Client
+	Slack           map[string]*slack.Client
+	Asana           map[string]*asana.Client
+	DynamoDB        map[string]*dynamodb.Client
+	Zendesk         map[string]*zendesk.Client
+	GoogleAds       map[string]*googleads.Client
+	TikTokAds       map[string]*tiktokads.Client
+	GitHub          map[string]*github.Client
+	AppStore        map[string]*appstore.Client
+	LinkedInAds     map[string]*linkedinads.Client
+	ClickHouse      map[string]*clickhouse.Client
+	GCS             map[string]*gcs.Client
+	ApplovinMax     map[string]*applovinmax.Client
+	Personio        map[string]*personio.Client
+	Kinesis         map[string]*kinesis.Client
+	Pipedrive       map[string]*pipedrive.Client
+	GoogleAnalytics map[string]*googleanalytics.Client
+	mutex           sync.Mutex
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
@@ -333,6 +335,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connPipedrive, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Pipedrive)...)
+
+	connGoogleAnalytics, err := m.GetGoogleAnalyticsConnectionWithoutDefault(name)
+	if err == nil {
+		return connGoogleAnalytics, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GoogleAnalytics)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -1138,6 +1146,24 @@ func (m *Manager) GetPipedriveConnectionWithoutDefault(name string) (*pipedrive.
 	return db, nil
 }
 
+func (m *Manager) GetGoogleAnalyticsConnection(name string) (*googleanalytics.Client, error) {
+	db, err := m.GetGoogleAnalyticsConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetGoogleAnalyticsConnectionWithoutDefault("googleanalytics-default")
+}
+
+func (m *Manager) GetGoogleAnalyticsConnectionWithoutDefault(name string) (*googleanalytics.Client, error) {
+	if m.GoogleAnalytics == nil {
+		return nil, errors.New("no googleanalytics connections found")
+	}
+	db, ok := m.GoogleAnalytics[name]
+	if !ok {
+		return nil, errors.Errorf("googleanalytics connection not found for '%s'", name)
+	}
+	return db, nil
+}
 func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatformConnection) error {
 	m.mutex.Lock()
 	if m.BigQuery == nil {
@@ -2108,6 +2134,26 @@ func (m *Manager) AddPipedriveConnectionFromConfig(connection *config.PipedriveC
 	return nil
 }
 
+func (m *Manager) AddGoogleAnalyticsConnectionFromConfig(connection *config.GoogleAnalyticsConnection) error {
+	m.mutex.Lock()
+	if m.GoogleAnalytics == nil {
+		m.GoogleAnalytics = make(map[string]*googleanalytics.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := googleanalytics.NewClient(googleanalytics.Config{
+		ServiceAccountFile: connection.ServiceAccountFile,
+		PropertyID:         connection.PropertyID,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.GoogleAnalytics[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConnection) error {
 	m.mutex.Lock()
 	if m.Kinesis == nil {
@@ -2219,6 +2265,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.ApplovinMax, connectionManager.AddApplovinMaxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.GoogleAnalytics, connectionManager.AddGoogleAnalyticsConnectionFromConfig, &wg, &errList, &mu)
 
 	wg.Wait()
 	return connectionManager, errList
