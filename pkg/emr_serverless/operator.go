@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/url"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -39,9 +40,6 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 		ctx.Value(executor.KeyPrinter).(io.Writer), "", 0,
 	)
 	asset := ti.GetAsset()
-	if asset.Type == pipeline.AssetTypeEMRServerlessPyspark {
-		return fmt.Errorf("not implemented")
-	}
 	pipeline := ti.GetPipeline()
 	connID, err := pipeline.GetConnectionNameForAsset(asset)
 	if err != nil {
@@ -143,18 +141,24 @@ type Job struct {
 }
 
 func (job Job) buildJobRunConfig() *emrserverless.StartJobRunInput {
+
+	driver := &types.JobDriverMemberSparkSubmit{
+		Value: types.SparkSubmit{
+			EntryPoint:          &job.params.Entrypoint,
+			EntryPointArguments: job.params.Args,
+		},
+	}
+
+	if job.params.Config != "" {
+		driver.Value.SparkSubmitParameters = &job.params.Config
+	}
+
 	cfg := &emrserverless.StartJobRunInput{
 		ApplicationId:           &job.params.ApplicationID,
 		Name:                    &job.asset.Name,
 		ExecutionRoleArn:        &job.params.ExecutionRole,
 		ExecutionTimeoutMinutes: aws.Int64(int64(job.params.Timeout.Minutes())),
-		JobDriver: &types.JobDriverMemberSparkSubmit{
-			Value: types.SparkSubmit{
-				EntryPoint:            &job.params.Entrypoint,
-				EntryPointArguments:   job.params.Args,
-				SparkSubmitParameters: &job.params.Config,
-			},
-		},
+		JobDriver:               driver,
 	}
 
 	if job.params.Logs != "" {
@@ -170,7 +174,45 @@ func (job Job) buildJobRunConfig() *emrserverless.StartJobRunInput {
 	return cfg
 }
 
-func (job Job) Run(ctx context.Context) (err error) { //nolint
+// parepareWorkspace sets up an s3 bucket for a pyspark job run.
+// calling this method modifies the job's params.
+func (job Job) prepareWorkspace(ctx context.Context) error {
+
+	scriptPath := job.asset.ExecutableFile.Path
+	fd, err := os.Open(scriptPath)
+	if err != nil {
+		return fmt.Errorf("error opening file %q: %w", scriptPath, err)
+	}
+	defer fd.Close()
+
+	workspace, err := url.Parse(job.asset.Parameters["workspace"])
+	if err != nil {
+		return fmt.Errorf("error parsing workspace URL: %w", err)
+	}
+
+	scriptURI := workspace.JoinPath(job.asset.Name + ".py")
+	_, err = job.s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: &workspace.Host,
+		Key:    aws.String(strings.TrimPrefix(scriptURI.Path, "/")),
+		Body:   fd,
+	})
+	if err != nil {
+		return fmt.Errorf("error uploading entrypoint %q: %w", workspace, err)
+	}
+
+	job.params.Entrypoint = scriptURI.String()
+
+	return nil
+}
+
+func (job Job) Run(ctx context.Context) error {
+
+	if job.asset.Type == pipeline.AssetTypeEMRServerlessPyspark {
+		err := job.prepareWorkspace(ctx)
+		if err != nil {
+			return fmt.Errorf("error preparing workspace: %w", err)
+		}
+	}
 
 	run, err := job.emrClient.StartJobRun(ctx, job.buildJobRunConfig())
 	if err != nil {

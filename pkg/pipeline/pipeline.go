@@ -509,6 +509,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeClickHouse:           "clickhouse",
 	AssetTypeClickHouseSeed:       "clickhouse",
 	AssetTypeEMRServerlessSpark:   "aws",
+	AssetTypeEMRServerlessPyspark: "aws",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
