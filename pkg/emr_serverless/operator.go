@@ -177,8 +177,9 @@ func (job Job) buildJobRunConfig() *emrserverless.StartJobRunInput {
 }
 
 type workspace struct {
-	EntrypointURI string
-	FilesURI      string
+	Entrypoint string
+	Files      string
+	Logs       string
 }
 
 // parepareWorkspace sets up an s3 bucket for a pyspark job run.
@@ -240,8 +241,9 @@ func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 	}
 
 	return &workspace{
-		EntrypointURI: scriptURI.String(),
-		FilesURI:      contextURI.String(),
+		Entrypoint: scriptURI.String(),
+		Files:      contextURI.String(),
+		Logs:       workspaceURI.JoinPath("logs").String(),
 	}, nil
 }
 
@@ -252,8 +254,14 @@ func (job Job) Run(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("error preparing workspace: %w", err)
 		}
-		job.params.Entrypoint = ws.EntrypointURI
-		job.params.Config += " --conf spark.submit.pyFiles=" + ws.FilesURI
+		job.params.Entrypoint = ws.Entrypoint
+		job.params.Config += " --conf spark.submit.pyFiles=" + ws.Files
+
+		// only use workspace for logs if the
+		// asset doesn't explicitly specify it
+		if job.params.Logs == "" {
+			job.params.Logs = ws.Logs
+		}
 	}
 
 	run, err := job.emrClient.StartJobRun(ctx, job.buildJobRunConfig())
