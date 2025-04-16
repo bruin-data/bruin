@@ -176,72 +176,84 @@ func (job Job) buildJobRunConfig() *emrserverless.StartJobRunInput {
 	return cfg
 }
 
+type workspace struct {
+	EntrypointURI string
+	FilesURI      string
+}
+
 // parepareWorkspace sets up an s3 bucket for a pyspark job run.
-// calling this method modifies the job's params.
-func (job Job) prepareWorkspace(ctx context.Context) error {
-	// todo(turtledev): return a workspace value instead of
-	// modifying the job's params directly. It should improve readability.
+func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
+
 	scriptPath := job.asset.ExecutableFile.Path
 	fd, err := os.Open(scriptPath)
 	if err != nil {
-		return fmt.Errorf("error opening file %q: %w", scriptPath, err)
+		return nil, fmt.Errorf("error opening file %q: %w", scriptPath, err)
 	}
 	defer fd.Close()
 
-	workspace, err := url.Parse(job.asset.Parameters["workspace"])
+	workspaceURI, err := url.Parse(job.asset.Parameters["workspace"])
 	if err != nil {
-		return fmt.Errorf("error parsing workspace URL: %w", err)
+		return nil, fmt.Errorf("error parsing workspace URL: %w", err)
 	}
 
-	scriptURI := workspace.JoinPath(job.asset.Name + ".py")
+	assetName := job.asset.Name
+	if !strings.HasSuffix(assetName, ".py") {
+		assetName += ".py"
+	}
+	scriptURI := workspaceURI.JoinPath(assetName)
+
 	_, err = job.s3Client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: &workspace.Host,
+		Bucket: &workspaceURI.Host,
 		Key:    aws.String(strings.TrimPrefix(scriptURI.Path, "/")),
 		Body:   fd,
 	})
 	if err != nil {
-		return fmt.Errorf("error uploading entrypoint %q: %w", scriptURI, err)
+		return nil, fmt.Errorf("error uploading entrypoint %q: %w", scriptURI, err)
 	}
 
 	scriptDir := filepath.Dir(scriptPath)
 	fd, err = os.CreateTemp("", "bruin-spark-context-*.zip")
 	if err != nil {
-		return fmt.Errorf("error creating temporary staging file %w", err)
+		return nil, fmt.Errorf("error creating temporary file %w", err)
 	}
+	defer os.Remove(fd.Name())
 	defer fd.Close()
+
 	zipper := zip.NewWriter(fd)
 	defer zipper.Close()
 
 	err = zipper.AddFS(os.DirFS(scriptDir))
 	if err != nil {
-		return fmt.Errorf("error packaging files: %w", err)
+		return nil, fmt.Errorf("error packaging files: %w", err)
 	}
 	zipper.Close()
 	fd.Seek(0, 0)
 
-	contextURI := workspace.JoinPath("context.zip")
+	contextURI := workspaceURI.JoinPath("context.zip")
 	_, err = job.s3Client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: &workspace.Host,
+		Bucket: &workspaceURI.Host,
 		Key:    aws.String(strings.TrimPrefix(contextURI.Path, "/")),
 		Body:   fd,
 	})
 	if err != nil {
-		return fmt.Errorf("error uploading context %q: %w", contextURI, err)
+		return nil, fmt.Errorf("error uploading context %q: %w", contextURI, err)
 	}
 
-	job.params.Entrypoint = scriptURI.String()
-	job.params.Config += "--conf spark.submit.pyFiles=" + contextURI.String()
-
-	return nil
+	return &workspace{
+		EntrypointURI: scriptURI.String(),
+		FilesURI:      contextURI.String(),
+	}, nil
 }
 
 func (job Job) Run(ctx context.Context) error {
 
 	if job.asset.Type == pipeline.AssetTypeEMRServerlessPyspark {
-		err := job.prepareWorkspace(ctx)
+		ws, err := job.prepareWorkspace(ctx)
 		if err != nil {
 			return fmt.Errorf("error preparing workspace: %w", err)
 		}
+		job.params.Entrypoint = ws.EntrypointURI
+		job.params.Config += " --conf spark.submit.pyFiles=" + ws.FilesURI
 	}
 
 	run, err := job.emrClient.StartJobRun(ctx, job.buildJobRunConfig())
