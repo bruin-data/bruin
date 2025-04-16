@@ -27,7 +27,7 @@ name: dashboard.hello
 type: duckdb.seed
 
 parameters:
-    path: seed.csv
+    path: hello.csv
 ```
 
 Example CSV:
