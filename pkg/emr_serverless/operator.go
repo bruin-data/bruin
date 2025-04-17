@@ -180,6 +180,7 @@ func (job Job) buildJobRunConfig() *emrserverless.StartJobRunInput {
 }
 
 type workspace struct {
+	Root       *url.URL
 	Entrypoint string
 	Files      string
 	Logs       string
@@ -249,10 +250,30 @@ func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 	}
 
 	return &workspace{
+		Root:       jobURI,
 		Entrypoint: scriptURI.String(),
 		Files:      contextURI.String(),
 		Logs:       workspaceURI.JoinPath("logs").String(),
 	}, nil
+}
+
+func (job Job) deleteWorkspace(ws *workspace) {
+
+	listArgs := &s3.ListObjectsV2Input{
+		Bucket: &ws.Root.Host,
+		Prefix: aws.String(strings.TrimPrefix(ws.Root.Path, "/")),
+	}
+	objs, err := job.s3Client.ListObjectsV2(context.Background(), listArgs)
+	if err != nil {
+		// todo: debug log
+		return
+	}
+	for _, obj := range objs.Contents {
+		job.s3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
+			Bucket: &ws.Root.Host,
+			Key:    obj.Key,
+		})
+	}
 }
 
 func (job Job) Run(ctx context.Context) (err error) {
@@ -270,6 +291,7 @@ func (job Job) Run(ctx context.Context) (err error) {
 		if job.params.Logs == "" {
 			job.params.Logs = ws.Logs
 		}
+		defer job.deleteWorkspace(ws)
 	}
 
 	run, err := job.emrClient.StartJobRun(ctx, job.buildJobRunConfig())
