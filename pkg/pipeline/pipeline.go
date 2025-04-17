@@ -105,6 +105,7 @@ var defaultMapping = map[string]string{
 	"tiktokads":             "tiktokads-default",
 	"appstore":              "appstore-default",
 	"gcs":                   "gcs-default",
+	"emr_serverless":        "emr_serverless-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}
@@ -508,8 +509,8 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeDuckDBSeed:           "duckdb",
 	AssetTypeClickHouse:           "clickhouse",
 	AssetTypeClickHouseSeed:       "clickhouse",
-	AssetTypeEMRServerlessSpark:   "aws",
-	AssetTypeEMRServerlessPyspark: "aws",
+	AssetTypeEMRServerlessSpark:   "emr_serverless",
+	AssetTypeEMRServerlessPyspark: "emr_serverless",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
