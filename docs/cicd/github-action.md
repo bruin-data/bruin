@@ -1,6 +1,6 @@
 # GitHub Actions
 
-The [`bruin-data/setup-bruin@main`](https://github.com/marketplace/actions/bruin-setup) action is used to set up the Bruin environment in your GitHub Actions workflow. This action ensures that all necessary dependencies and configurations are in place for your Bruin tasks to run smoothly.
+The [`bruin-data/setup-bruin@main`](https://github.com/marketplace/actions/setup-bruin) action is used to set up the Bruin environment in your GitHub Actions workflow. This action ensures that all necessary dependencies and configurations are in place for your Bruin tasks to run smoothly.
 
 ```yaml
 - uses: bruin-data/setup-bruin@main
