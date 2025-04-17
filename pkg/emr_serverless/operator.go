@@ -73,6 +73,7 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 		emrClient: emrserverless.NewFromConfig(cfg),
 		params:    params,
 		asset:     asset,
+		pipeline:  pipeline,
 		poll: &PollTimer{
 			BaseDuration: time.Second,
 
@@ -138,6 +139,7 @@ type Job struct {
 	emrClient *emrserverless.Client
 	s3Client  *s3.Client
 	asset     *pipeline.Asset
+	pipeline  *pipeline.Pipeline
 	params    *JobRunParams
 	poll      *PollTimer
 }
@@ -196,15 +198,16 @@ func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error parsing workspace URL: %w", err)
 	}
+	pipelineURI := workspaceURI.JoinPath(job.pipeline.Name)
 
 	assetName := job.asset.Name
 	if !strings.HasSuffix(assetName, ".py") {
 		assetName += ".py"
 	}
-	scriptURI := workspaceURI.JoinPath(assetName)
+	scriptURI := pipelineURI.JoinPath(assetName)
 
 	_, err = job.s3Client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: &workspaceURI.Host,
+		Bucket: &scriptURI.Host,
 		Key:    aws.String(strings.TrimPrefix(scriptURI.Path, "/")),
 		Body:   fd,
 	})
@@ -230,9 +233,9 @@ func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 	zipper.Close()
 	fd.Seek(0, 0)
 
-	contextURI := workspaceURI.JoinPath("context.zip")
+	contextURI := pipelineURI.JoinPath("context.zip")
 	_, err = job.s3Client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: &workspaceURI.Host,
+		Bucket: &contextURI.Host,
 		Key:    aws.String(strings.TrimPrefix(contextURI.Path, "/")),
 		Body:   fd,
 	})
