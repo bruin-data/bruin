@@ -527,16 +527,49 @@ var arnPattern = regexp.MustCompile(`^arn:[^:\n]*:[^:\n]*:[^:\n]*:[^:\n]*:(?:[^:
 
 func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
-	if asset.Type != pipeline.AssetTypeEMRServerlessSpark {
+
+	supportedTypes := []pipeline.AssetType{
+		pipeline.AssetTypeEMRServerlessPyspark,
+		pipeline.AssetTypeEMRServerlessSpark,
+	}
+	if !slices.Contains(supportedTypes, asset.Type) {
 		return issues, nil
+	}
+
+	extension := filepath.Ext(asset.ExecutableFile.Path)
+	if asset.Type == pipeline.AssetTypeEMRServerlessPyspark && extension != ".py" {
+		issues = append(issues, &Issue{
+			Task: asset,
+			Description: fmt.Sprintf(
+				"%s assets must be a python file",
+				pipeline.AssetTypeEMRServerlessPyspark,
+			),
+		})
+	}
+	if asset.Type == pipeline.AssetTypeEMRServerlessSpark && !slices.Contains([]string{".yaml", ".yml"}, extension) {
+		issues = append(issues, &Issue{
+			Task: asset,
+			Description: fmt.Sprintf(
+				"%s assets must be a yaml file",
+				pipeline.AssetTypeEMRServerlessSpark,
+			),
+		})
 	}
 
 	required := []string{
 		"application_id",
 		"execution_role",
-		"entrypoint",
 		"region",
 	}
+	prohibited := []string{}
+	if asset.Type == pipeline.AssetTypeEMRServerlessSpark {
+		required = append(required, "entrypoint")
+		prohibited = append(prohibited, "workspace")
+	} else {
+		required = append(required, "workspace")
+		prohibited = append(prohibited, "entrypoint")
+	}
+
 	for _, key := range required {
 		value := strings.TrimSpace(asset.Parameters[key])
 		if value == "" {
@@ -548,6 +581,17 @@ func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset
 			})
 		}
 	}
+	for _, key := range prohibited {
+		if _, exists := asset.Parameters[key]; exists {
+			issues = append(issues, &Issue{
+				Task: asset,
+				Description: fmt.Sprintf( //nolint
+					"prohibited field parameters.%s", key,
+				),
+			})
+		}
+	}
+
 	timeoutSpec := strings.TrimSpace(asset.Parameters["timeout"])
 	if timeoutSpec != "" {
 		timeout, err := time.ParseDuration(timeoutSpec)
