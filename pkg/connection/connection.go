@@ -22,6 +22,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/databricks"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/dynamodb"
+	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/github"
@@ -94,6 +95,7 @@ type Manager struct {
 	Personio     map[string]*personio.Client
 	Kinesis      map[string]*kinesis.Client
 	Pipedrive    map[string]*pipedrive.Client
+	EMRSeverless map[string]*emr_serverless.Client
 	mutex        sync.Mutex
 }
 
@@ -333,6 +335,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connPipedrive, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Pipedrive)...)
+
+	connEMRServerless, err := m.GetEMRServerlessConnectionWithoutDefault(name)
+	if err == nil {
+		return connEMRServerless, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.EMRSeverless)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -1134,6 +1142,25 @@ func (m *Manager) GetPipedriveConnectionWithoutDefault(name string) (*pipedrive.
 	db, ok := m.Pipedrive[name]
 	if !ok {
 		return nil, errors.Errorf("pipedrive connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetEMRServerlessConnection(name string) (*emr_serverless.Client, error) {
+	db, err := m.GetEMRServerlessConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetEMRServerlessConnectionWithoutDefault("emr_serverless-default")
+}
+
+func (m *Manager) GetEMRServerlessConnectionWithoutDefault(name string) (*emr_serverless.Client, error) {
+	if m.EMRSeverless == nil {
+		return nil, errors.New("no EMR Serverless connections found")
+	}
+	db, ok := m.EMRSeverless[name]
+	if !ok {
+		return nil, errors.Errorf("EMR Serverless connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2129,6 +2156,24 @@ func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConne
 	return nil
 }
 
+func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRServerlessConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.EMRSeverless == nil {
+		m.EMRSeverless = make(map[string]*emr_serverless.Client)
+	}
+	m.EMRSeverless[connection.Name] = &emr_serverless.Client{
+		Config: emr_serverless.Config{
+			AccessKey:     connection.AccessKey,
+			SecretKey:     connection.SecretKey,
+			ApplicationID: connection.ApplicationID,
+			ExecutionRole: connection.ExecutionRole,
+			Region:        connection.Region,
+		},
+	}
+	return nil
+}
+
 var envVarRegex = regexp.MustCompile(`\${([^}]+)}`)
 
 func processConnections[T any](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {
@@ -2219,6 +2264,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.ApplovinMax, connectionManager.AddApplovinMaxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)
 
 	wg.Wait()
 	return connectionManager, errList
