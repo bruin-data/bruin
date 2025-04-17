@@ -259,15 +259,21 @@ func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 
 func (job Job) deleteWorkspace(ws *workspace) {
 
+	// todo(turtledev)
+	//   * pagination
+	//   * debug logs for errors
+	//   * timeout for cleanup
+
 	listArgs := &s3.ListObjectsV2Input{
 		Bucket: &ws.Root.Host,
 		Prefix: aws.String(strings.TrimPrefix(ws.Root.Path, "/")),
 	}
+
 	objs, err := job.s3Client.ListObjectsV2(context.Background(), listArgs)
 	if err != nil {
-		// todo: debug log
 		return
 	}
+
 	for _, obj := range objs.Contents {
 		job.s3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
 			Bucket: &ws.Root.Host,
@@ -301,6 +307,7 @@ func (job Job) Run(ctx context.Context) (err error) {
 	job.logger.Printf("created job run: %s", *run.JobRunId)
 	defer func() { //nolint
 		if err != nil {
+			// todo(turtledev): timeout for cancellation
 			job.logger.Printf("error detected. cancelling job run.")
 			job.emrClient.CancelJobRun(context.Background(), &emrserverless.CancelJobRunInput{ //nolint
 				ApplicationId: &job.params.ApplicationID,

@@ -69,6 +69,8 @@ func (l *S3LogConsumer) listLogSources() (sources []LogSource) { //nolint
 	}
 
 	executorLogsURI := jobPath.JoinPath("SPARK_EXECUTOR/")
+
+	// todo(turtledev): pagination
 	objs, err := l.S3cli.ListObjectsV2(l.Ctx, &s3.ListObjectsV2Input{
 		Bucket:    &l.URI.Host,
 		Prefix:    aws.String(strings.TrimPrefix(executorLogsURI.Path, "/")),
