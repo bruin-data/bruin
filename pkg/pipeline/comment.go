@@ -59,6 +59,7 @@ func isEmbeddedYamlComment(file afero.File, prefixes []string) bool {
 		}
 
 		// find the first non-empty row, if it contains the prefix, return true
+		// what if it only has a prefix and no suffix? - Johannes
 		for _, prefix := range prefixes {
 			if strings.HasPrefix(strings.TrimSpace(rowText), prefix) {
 				return true
@@ -157,8 +158,9 @@ func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath st
 		return nil, errors.Wrapf(err, "failed to read file %s", filePath)
 	}
 
+	//should return an error if no comment rows are found - Johannes
 	if len(commentRows) == 0 {
-		return nil, nil
+		return nil, errors.Errorf("error creating asset from file '%s': no embedded YAML found in the comments", filePath)
 	}
 
 	absFilePath, err := filepath.Abs(filePath)

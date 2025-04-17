@@ -856,6 +856,48 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 				e2e.AssertByContains,
 			},
 		},
+		{
+			Name:    "parse-asset-empty-sql",
+			Command: binary,
+			Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-empty-sql-asset/assets/empty.sql")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				Contains: []string{"error creating asset from file", "integration-tests/test-pipelines/parse-empty-sql-asset/assets/empty.sql': no embedded YAML found in the comments"},
+				ExitCode: 1,
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "parse-asset-malformed-sql",
+			Command: binary,
+			Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-malformed-sql-asset/assets/malformed.sql")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				Contains: []string{"error creating asset from file", "integration-tests/test-pipelines/parse-malformed-sql-asset/assets/malformed.sql': error creating asset from file", "integration-tests/test-pipelines/parse-malformed-sql-asset/assets/malformed.sql': no embedded YAML found in the comments"},
+				ExitCode: 1,
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "parse-asset-missing-asset-yml",
+			Command: binary,
+			Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/parse-yml-without-asset-test/assets/unhappy.yaml")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				Contains: []string{"file", "test-pipelines/parse-yml-without-asset-test/assets/unhappy.yaml' does not end with 'asset.yml'"},
+				ExitCode: 1,
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
 	}
 }
 

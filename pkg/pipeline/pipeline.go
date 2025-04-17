@@ -1587,10 +1587,19 @@ func fileHasSuffix(arr []string, str string) bool {
 func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) (*Asset, error) {
 	isSeparateDefinitionFile := false
 	creator := b.commentTaskCreator
+	validYmlSuffix := false
 
 	if fileHasSuffix(b.config.TasksFileSuffixes, filePath) {
 		creator = b.yamlTaskCreator
 		isSeparateDefinitionFile = true
+		validYmlSuffix = true
+	}
+
+	//if YAML not configured correctly
+	for _, suffix := range []string{".yml", ".yaml"} {
+		if !validYmlSuffix && strings.HasSuffix(filePath, suffix) {
+			return nil, fmt.Errorf("file '%s' does not end with 'asset.yml'", filePath)
+		}
 	}
 
 	task, err := creator(filePath)
