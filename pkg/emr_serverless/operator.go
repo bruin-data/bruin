@@ -25,6 +25,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/google/uuid"
 )
 
 var terminalJobRunStates = []types.JobRunState{
@@ -187,24 +188,28 @@ type workspace struct {
 // parepareWorkspace sets up an s3 bucket for a pyspark job run.
 func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 
+	workspaceURI, err := url.Parse(job.asset.Parameters["workspace"])
+	if err != nil {
+		return nil, fmt.Errorf("error parsing workspace URL: %w", err)
+	}
+	jobID, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("error generating job ID: %w", err)
+	}
+	jobURI := workspaceURI.JoinPath(job.pipeline.Name, jobID.String())
+
 	scriptPath := job.asset.ExecutableFile.Path
 	fd, err := os.Open(scriptPath)
 	if err != nil {
 		return nil, fmt.Errorf("error opening file %q: %w", scriptPath, err)
 	}
+
 	defer fd.Close()
-
-	workspaceURI, err := url.Parse(job.asset.Parameters["workspace"])
-	if err != nil {
-		return nil, fmt.Errorf("error parsing workspace URL: %w", err)
-	}
-	pipelineURI := workspaceURI.JoinPath(job.pipeline.Name)
-
 	assetName := job.asset.Name
 	if !strings.HasSuffix(assetName, ".py") {
 		assetName += ".py"
 	}
-	scriptURI := pipelineURI.JoinPath(assetName)
+	scriptURI := jobURI.JoinPath(assetName)
 
 	_, err = job.s3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: &scriptURI.Host,
@@ -233,7 +238,7 @@ func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 	zipper.Close()
 	fd.Seek(0, 0)
 
-	contextURI := pipelineURI.JoinPath("context.zip")
+	contextURI := jobURI.JoinPath("context.zip")
 	_, err = job.s3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: &contextURI.Host,
 		Key:    aws.String(strings.TrimPrefix(contextURI.Path, "/")),
