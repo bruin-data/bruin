@@ -250,7 +250,7 @@ func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 	}, nil
 }
 
-func (job Job) Run(ctx context.Context) error {
+func (job Job) Run(ctx context.Context) (err error) {
 
 	if job.asset.Type == pipeline.AssetTypeEMRServerlessPyspark {
 		ws, err := job.prepareWorkspace(ctx)
