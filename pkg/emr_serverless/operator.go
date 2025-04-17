@@ -206,12 +206,8 @@ func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 	}
 
 	defer fd.Close()
-	assetName := job.asset.Name
-	if !strings.HasSuffix(assetName, ".py") {
-		assetName += ".py"
-	}
-	scriptURI := jobURI.JoinPath(assetName)
 
+	scriptURI := jobURI.JoinPath(job.asset.ExecutableFile.Name)
 	_, err = job.s3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: &scriptURI.Host,
 		Key:    aws.String(strings.TrimPrefix(scriptURI.Path, "/")),
