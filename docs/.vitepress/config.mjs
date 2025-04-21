@@ -145,7 +145,8 @@ export default withMermaid({
                             {text: "SQL", link: "/assets/sql"},
                             {text: "Seed", link: "/assets/seed"},
                             {text: "Ingestr", link: "/assets/ingestr"},
-                            {text: "Python Assets", link: "/assets/python"},
+                            {text: "Python", link: "/assets/python"},
+                            {text: "Sensor", link: "/assets/sensor"},
                         ]
                     },
                     {text: "Columns", link: "/assets/columns"},
