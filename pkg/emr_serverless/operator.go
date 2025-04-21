@@ -21,7 +21,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -34,8 +33,12 @@ var terminalJobRunStates = []types.JobRunState{
 	types.JobRunStateCancelled,
 }
 
+type connectionFetcher interface {
+	GetEMRServerlessConnection(name string) (*Client, error)
+}
+
 type BasicOperator struct {
-	connections map[string]config.AwsConnection
+	connection connectionFetcher
 }
 
 func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
@@ -48,16 +51,16 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	if err != nil {
 		return fmt.Errorf("error looking up connection name: %w", err)
 	}
-	conn, exists := op.connections[connID]
+	conn, err := op.connection.GetEMRServerlessConnection(connID)
 
-	if !exists {
-		return fmt.Errorf("aws connection not found for '%s'", connID)
+	if err != nil {
+		return fmt.Errorf("error fetching connection: %w", err)
 	}
 
-	params := parseParams(asset.Parameters)
+	params := parseParams(conn, asset.Parameters)
 	cfg, err := awsCfg.LoadDefaultConfig(
 		ctx,
-		awsCfg.WithRegion(params.Region),
+		awsCfg.WithRegion(conn.Region),
 		awsCfg.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(
 				conn.AccessKey, conn.SecretKey, "",
@@ -86,14 +89,10 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	return job.Run(ctx)
 }
 
-func NewBasicOperator(cfg *config.Config) (*BasicOperator, error) {
-	op := &BasicOperator{
-		connections: make(map[string]config.AwsConnection),
-	}
-	for _, conn := range cfg.SelectedEnvironment.Connections.AwsConnection {
-		op.connections[conn.Name] = conn
-	}
-	return op, nil
+func NewBasicOperator(conn connectionFetcher) (*BasicOperator, error) {
+	return &BasicOperator{
+		connection: conn,
+	}, nil
 }
 
 type JobRunParams struct {
@@ -107,32 +106,32 @@ type JobRunParams struct {
 	Logs          string
 }
 
-func parseParams(m map[string]string) *JobRunParams {
-	params := JobRunParams{
-		ApplicationID: m["application_id"],
-		ExecutionRole: m["execution_role"],
-		Entrypoint:    m["entrypoint"],
-		Config:        m["config"],
-		Region:        m["region"],
-		Logs:          m["logs"],
+func parseParams(cfg *Client, params map[string]string) *JobRunParams {
+	jobParams := JobRunParams{
+		ApplicationID: cfg.ApplicationID,
+		ExecutionRole: cfg.ExecutionRole,
+		Region:        cfg.Region,
+		Entrypoint:    params["entrypoint"],
+		Config:        params["config"],
+		Logs:          params["logs"],
 	}
 
-	if m["timeout"] != "" {
-		t, err := time.ParseDuration(m["timeout"])
+	if params["timeout"] != "" {
+		t, err := time.ParseDuration(params["timeout"])
 		if err == nil {
-			params.Timeout = t
+			jobParams.Timeout = t
 		}
 	}
-	if m["args"] != "" {
-		arglist := strings.Split(strings.TrimSpace(m["args"]), " ")
+	if params["args"] != "" {
+		arglist := strings.Split(strings.TrimSpace(params["args"]), " ")
 		for _, arg := range arglist {
 			arg = strings.TrimSpace(arg)
 			if arg != "" {
-				params.Args = append(params.Args, arg)
+				jobParams.Args = append(jobParams.Args, arg)
 			}
 		}
 	}
-	return &params
+	return &jobParams
 }
 
 type Job struct {

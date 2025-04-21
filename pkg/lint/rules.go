@@ -556,11 +556,7 @@ func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset
 		})
 	}
 
-	required := []string{
-		"application_id",
-		"execution_role",
-		"region",
-	}
+	required := []string{}
 	prohibited := []string{}
 	if asset.Type == pipeline.AssetTypeEMRServerlessSpark {
 		required = append(required, "entrypoint")

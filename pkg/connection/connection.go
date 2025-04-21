@@ -2162,21 +2162,24 @@ func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRSer
 	if m.EMRSeverless == nil {
 		m.EMRSeverless = make(map[string]*emr_serverless.Client)
 	}
-	m.EMRSeverless[connection.Name] = &emr_serverless.Client{
-		Config: emr_serverless.Config{
-			AccessKey:     connection.AccessKey,
-			SecretKey:     connection.SecretKey,
-			ApplicationID: connection.ApplicationID,
-			ExecutionRole: connection.ExecutionRole,
-			Region:        connection.Region,
-		},
+	client, err := emr_serverless.NewClient(emr_serverless.Config{
+		AccessKey:     connection.AccessKey,
+		SecretKey:     connection.SecretKey,
+		ApplicationID: connection.ApplicationID,
+		ExecutionRole: connection.ExecutionRole,
+		Region:        connection.Region,
+	})
+	if err != nil {
+		return err
 	}
+	m.EMRSeverless[connection.Name] = client
+
 	return nil
 }
 
 var envVarRegex = regexp.MustCompile(`\${([^}]+)}`)
 
-func processConnections[T any](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {
+func processConnections[T config.Named](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {
 	if connections == nil {
 		return
 	}
@@ -2210,7 +2213,7 @@ func processConnections[T any](connections []T, adder func(*T) error, wg *conc.W
 			err := adder(conn)
 			if err != nil {
 				mu.Lock()
-				*errList = append(*errList, errors.Wrapf(err, "failed to add connection '%v'", conn))
+				*errList = append(*errList, errors.Wrapf(err, "failed to add connection %q", (*conn).GetName()))
 				mu.Unlock()
 			}
 		})
