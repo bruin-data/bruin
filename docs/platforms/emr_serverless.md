@@ -28,36 +28,98 @@ In order to stream logs, one of the following conditions must be met:
 * Your EMR Serverless Application is pre-configured with an S3 Log Storage Location. 
 * `parameters.logs` or `parameters.workspace` is be specified and points to an S3 URI.
 
-## EMR Serverless Spark Asset
+## Asset Types
 
-After adding the `aws` connection to your `.bruin.yml` file, you need to create an asset configuration file. This file defines the configuration required for triggering your spark workloads. Here's an example:
+Bruin supports two different ways of defining a spark asset
+
+### Python Asset
+A fully managed option where bruin takes care of job setup, configuration, and execution. You only need to define the workload logic.
+
+* Supports only PySpark scripts.
+* Handles artifact deployment.
+* Automatic log configuration.
+* Concurrent-safe by default.
+* bundles internal dependencies and configures your job to use them.
+
+### YAML Asset
+A lightweight option that only supports triggering a job. 
+
+* Supports both PySpark scripts and JARs.
+* Users are responsible for:
+  * deploying their artifacts
+  * managing internal dependencies
+
+Choose the format that best fits your use case—use YAML when you want to integrate with pre-existing infrastructure, or use Python for a streamlined, fully-managed experience.
+
+
+## Python Example
+```bruin-python
+""" @bruin
+name: pyspark_job
+type: emr_serverless.pyspark
+connection: app_staging
+parameters:
+  workspace: s3://amzn-test-bucket/bruin-workspace/
+@bruin """
+
+from pyspark.sql import SparkSession
+
+if __name__ == "__main__":
+  spark_session = SparkSession.builder.appName("jobName").getOrCreate()
+  run_workload(spark_session)
+  spark_session.stop()
+
+def run_workload(session):
+  """
+    crunch some numbers
+  """
+  ...
+
+```
+
+
+This defines a pyspark asset that will be executed by the [EMR Serverless Application][emr-app] defined by the connection named `app_staging`. `s3://amzn-test-bucket/bruin-workspace/` is used as a working area that is used by bruin for uploading your job scripts, their dependencies and for storing logs.
+
+## YAML Example
+
 ```yaml
 name: spark_example_job
 type: emr_serverless.spark
+connection: app_staging
 parameters:
   entrypoint: s3://amzn-test-bucket/src/script.py
   config: --conf spark.executor.cores=1
-  application_id: emr_app_123
-  execution_role: arn:aws:iam::account_id_1:role/execution_role
-  region: ap-south-1
 ```
 
-This defines an asset that runs a spark job on `emr_app_123` [EMR Serverless Application](https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/emr-serverless.html) that is defined by the script at `s3://amzn-test-bucket/src/script.py`. The `arn:aws:iam::account_id_1:role/execution_role` defines the AWS permissions that are available to your spark job. 
+This defines an asset that runs a spark job on an [EMR Serverless Application][emr-app] defined by the connection named `app_staging`. The script at `s3://amzn-test-bucket/src/script.py` is configured as the [entrypoint](https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/jobs-spark.html#spark-params) of the job.
 
-
+> [!note]
+> YAML and Python assets require different `type` parameter. For YAML-style assets the type should be `emr_serverless.spark` while python assets need the type to be `emr_serverless.pyspark`.
 
 ## Asset Schema
 
 Here's the full schema of the `emr_serverless.spark` asset along with a brief explanation:
-```yaml
-name: spark_submit_test
-type: emr_serverless.spark
-connection: local-dev # optional, defaults to emr_serverless-default
 
+```yaml
+# required
+name: spark_submit_test
+
+# required, should be one of 
+#   - emr_serverless.spark    (yaml)
+#   - emr_serverless.pyspark  (python)
+type: emr_serverless.spark 
+
+# optional, defaults to emr_serverless-default
+connection: connection-name-example  
+
+# required
 parameters:
 
-  # path of the pyspark script or jar to run (required)
+  # path of the pyspark script or jar to run (required) [yaml only]
   entrypoint: s3://amzn-test-bucket/src/script.py   
+
+  # working area for bruin (required) [python only]
+  entrypoint: s3://amzn-test-bucket/bruin-workspace/   
 
   # path where logs are stored or should be stored (optional)
   logs: s3://amzn-test-bucket/logs
@@ -70,5 +132,7 @@ parameters:
 
   # timeout for the job, defaults to 0 which means no time limit (optional)
   timeout: 10m
-
 ```
+
+
+[emr-app]: https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/emr-serverless.html
