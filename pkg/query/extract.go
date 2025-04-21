@@ -25,6 +25,7 @@ type QueryResult struct {
 type QueryExtractor interface {
 	ExtractQueriesFromString(filepath string) ([]*Query, error)
 	CloneForAsset(ctx context.Context, asset *pipeline.Asset) QueryExtractor
+	ReextractQueriesFromSlice(content []string) ([]string, error)
 }
 
 func (q Query) ToExplainQuery() string {
