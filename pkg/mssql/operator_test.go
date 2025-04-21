@@ -24,6 +24,11 @@ func (m *mockExtractor) CloneForAsset(ctx context.Context, asset *pipeline.Asset
 	return m
 }
 
+func (m *mockExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
+	res := m.Called(content)
+	return res.Get(0).([]string), res.Error(1)
+}
+
 type mockMaterializer struct {
 	mock.Mock
 }
