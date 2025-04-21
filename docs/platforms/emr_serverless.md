@@ -78,7 +78,9 @@ def run_workload(session):
 ```
 
 
-This defines a pyspark asset that will be executed by the [EMR Serverless Application][emr-app] defined by the connection named `app_staging`. `s3://amzn-test-bucket/bruin-workspace/` is used as a working area that is used by bruin for uploading your job scripts, their dependencies and for storing logs.
+This defines a pyspark asset that will be executed by the EMR Serverless Application defined by the connection named `app_staging`. `s3://amzn-test-bucket/bruin-workspace/` is used as a working area that is used by bruin for uploading your job scripts, their dependencies and for storing logs.
+
+The `run_workload` function is there for demonstration. You can structure your pyspark scripts however you like.
 
 ## YAML Example
 
@@ -91,10 +93,12 @@ parameters:
   config: --conf spark.executor.cores=1
 ```
 
-This defines an asset that runs a spark job on an [EMR Serverless Application][emr-app] defined by the connection named `app_staging`. The script at `s3://amzn-test-bucket/src/script.py` is configured as the [entrypoint](https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/jobs-spark.html#spark-params) of the job.
+This defines an asset that runs a spark job on an EMR Serverless Application defined by the connection named `app_staging`. The script at `s3://amzn-test-bucket/src/script.py` is configured as the [entrypoint](https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/jobs-spark.html#spark-params) of the job.
 
 > [!note]
-> YAML and Python assets require different `type` parameter. For YAML-style assets the type should be `emr_serverless.spark` while python assets need the type to be `emr_serverless.pyspark`.
+> YAML and Python assets require different `type` parameter.
+> * YAML-style assets: `emr_serverless.spark` 
+> * Python assets:  `emr_serverless.pyspark`.
 
 ## Asset Schema
 
@@ -133,6 +137,8 @@ parameters:
   # timeout for the job, defaults to 0 which means no time limit (optional)
   timeout: 10m
 ```
+
+For more details on EMR Serverless applications, see [AWS Documentation][emr-app]
 
 
 [emr-app]: https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/emr-serverless.html
