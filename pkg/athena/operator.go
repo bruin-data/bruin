@@ -26,7 +26,6 @@ type Client interface {
 
 type queryExtractor interface {
 	ExtractQueriesFromString(content string) ([]*query.Query, error)
-	ExtractQueriesFromSlice(content []string) ([]*query.Query, error)
 	ReextractQueriesFromSlice(content []string) ([]string, error)
 }
 
