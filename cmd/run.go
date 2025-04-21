@@ -955,11 +955,10 @@ func setupExecutors(
 
 	for _, typ := range emrServerlessAssetTypes {
 		if s.WillRunTaskOfType(typ) {
-			emrServerlessOperator, err := emr_serverless.NewBasicOperator(config)
+			emrServerlessOperator, err := emr_serverless.NewBasicOperator(conn)
 			if err != nil {
 				return nil, err
 			}
-			mainExecutors[typ][scheduler.TaskInstanceTypeMain] = emrServerlessOperator
 			mainExecutors[typ][scheduler.TaskInstanceTypeMain] = emrServerlessOperator
 		}
 	}
