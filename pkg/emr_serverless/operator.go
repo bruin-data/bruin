@@ -185,7 +185,7 @@ type workspace struct {
 	Logs       string
 }
 
-// parepareWorkspace sets up an s3 bucket for a pyspark job run.
+// prepareWorkspace sets up an s3 bucket for a pyspark job run.
 func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 
 	workspaceURI, err := url.Parse(job.asset.Parameters["workspace"])
