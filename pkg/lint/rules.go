@@ -541,7 +541,7 @@ func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset
 		issues = append(issues, &Issue{
 			Task: asset,
 			Description: fmt.Sprintf(
-				"%s assets must be a python file",
+				"%s assets must be a Python file",
 				pipeline.AssetTypeEMRServerlessPyspark,
 			),
 		})
