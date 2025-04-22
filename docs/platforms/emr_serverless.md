@@ -41,7 +41,7 @@ A fully managed option where Bruin takes care of job setup, configuration, and e
 * Handles artifact deployment.
 * Automatic log configuration.
 * Concurrent-safe by default.
-* bundles internal dependencies and configures your job to use them.
+* Bundles internal dependencies and configures your job to use them.
 
 ### YAML Asset
 A lightweight option that only supports triggering a job. 
