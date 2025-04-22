@@ -11,6 +11,9 @@ import (
 // zip.AddFS() modified with support for filesystem prefix
 // and some spark specific adjustments.
 func packageContextWithPrefix(zw *zip.Writer, context fs.FS, prefix string) error {
+	// todo(turtledev): exclude assets from the packaged zip.
+	// this shouldn't create any issues in most cases, but
+	// adding this will fool-proof our implementation
 	return fs.WalkDir(context, ".", func(name string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
