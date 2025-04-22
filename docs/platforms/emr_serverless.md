@@ -30,7 +30,9 @@ In order to stream logs, one of the following conditions must be met:
 
 ## Asset Types
 
-Bruin supports two different ways of defining a spark asset
+Bruin supports two different ways of defining a Spark asset:
+- what we call a "managed" PySpark asset where Bruin takes care of delivering the code to the cluster as well
+- as an external asset defined with YAML where Bruin simply orchestrates
 
 ### Python Asset
 A fully managed option where Bruin takes care of job setup, configuration, and execution. You only need to define the workload logic.
