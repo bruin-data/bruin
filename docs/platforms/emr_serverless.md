@@ -103,15 +103,15 @@ acme_pipeline/
 └── pipeline.yml
 ```
 
-Let's say that `acme_pipeline/lib/core.py` stores some common routines used throughout your jobs. For this example, we'll create a function called `santise` that takes in a Spark DataFrame and santises it's columns (A common operation in Data Analytics).
+Let's say that `acme_pipeline/lib/core.py` stores some common routines used throughout your jobs. For this example, we'll create a function called `santise` that takes in a Spark DataFrame and sanitize it's columns (A common operation in Data Analytics).
 
 ::: code-group
 ```python [acme_pipeline/lib/core.py]
 from pyspark.sql import DataFrame
 
-def santise(df: DateFrame):
+def sanitize(df: DateFrame):
   """
-  santise a dataframe
+  sanitize a dataframe
   """
   ...
 ```
@@ -126,13 +126,13 @@ type: emr_serverless.pyspark
 connection: app_staging
 @bruin """
 
-from acme_pipeline.lib.core import sanitise
+from acme_pipeline.lib.core import sanitize
 from pyspark.sql import SparkSession
 
 if __name__ == "__main__":
   session = SparkSession.builder.appName("raw.transaction_std").getOrCreate()
   src = session.sparkContext.textFile("s3://acme/data/transactions").toDF()
-  santise(src)
+  sanitize(src)
   session.stop()
 
 ```
