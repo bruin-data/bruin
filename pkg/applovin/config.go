@@ -8,7 +8,6 @@ type Config struct {
 	APIKey string
 }
 
-
 func (c *Config) GetIngestrURI() string {
 	// applovin://?api_key=<your_api_key>
 	baseURL := "applovin://"
