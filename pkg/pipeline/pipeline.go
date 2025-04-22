@@ -58,6 +58,7 @@ const (
 	AssetTypeClickHouse             = AssetType("clickhouse.sql")
 	AssetTypeClickHouseSeed         = AssetType("clickhouse.seed")
 	AssetTypeEMRServerlessSpark     = AssetType("emr_serverless.spark")
+	AssetTypeEMRServerlessPyspark   = AssetType("emr_serverless.pyspark")
 	RunConfigFullRefresh            = RunConfig("full-refresh")
 	RunConfigApplyIntervalModifiers = RunConfig("apply-interval-modifiers")
 	RunConfigStartDate              = RunConfig("start-date")
@@ -104,6 +105,7 @@ var defaultMapping = map[string]string{
 	"tiktokads":             "tiktokads-default",
 	"appstore":              "appstore-default",
 	"gcs":                   "gcs-default",
+	"emr_serverless":        "emr_serverless-default",
 	"googleanalytics":       "googleanalytics-default",
 	"applovin":              "applovin-default",
 }
@@ -509,7 +511,8 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeDuckDBSeed:           "duckdb",
 	AssetTypeClickHouse:           "clickhouse",
 	AssetTypeClickHouseSeed:       "clickhouse",
-	AssetTypeEMRServerlessSpark:   "aws",
+	AssetTypeEMRServerlessSpark:   "emr_serverless",
+	AssetTypeEMRServerlessPyspark: "emr_serverless",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{

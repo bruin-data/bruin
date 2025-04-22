@@ -23,6 +23,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/databricks"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/dynamodb"
+	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/github"
@@ -56,26 +57,25 @@ import (
 )
 
 type Manager struct {
-	BigQuery    map[string]*bigquery.Client
-	Snowflake   map[string]*snowflake.DB
-	Postgres    map[string]*postgres.Client
-	MsSQL       map[string]*mssql.DB
-	Databricks  map[string]*databricks.DB
-	Mongo       map[string]*mongo.DB
-	Mysql       map[string]*mysql.Client
-	Notion      map[string]*notion.Client
-	HANA        map[string]*hana.Client
-	Shopify     map[string]*shopify.Client
-	Gorgias     map[string]*gorgias.Client
-	Klaviyo     map[string]*klaviyo.Client
-	Adjust      map[string]*adjust.Client
-	Athena      map[string]*athena.DB
-	FacebookAds map[string]*facebookads.Client
-	Stripe      map[string]*stripe.Client
-	Appsflyer   map[string]*appsflyer.Client
-	Kafka       map[string]*kafka.Client
-	Airtable    map[string]*airtable.Client
-
+	BigQuery        map[string]*bigquery.Client
+	Snowflake       map[string]*snowflake.DB
+	Postgres        map[string]*postgres.Client
+	MsSQL           map[string]*mssql.DB
+	Databricks      map[string]*databricks.DB
+	Mongo           map[string]*mongo.DB
+	Mysql           map[string]*mysql.Client
+	Notion          map[string]*notion.Client
+	HANA            map[string]*hana.Client
+	Shopify         map[string]*shopify.Client
+	Gorgias         map[string]*gorgias.Client
+	Klaviyo         map[string]*klaviyo.Client
+	Adjust          map[string]*adjust.Client
+	Athena          map[string]*athena.DB
+	FacebookAds     map[string]*facebookads.Client
+	Stripe          map[string]*stripe.Client
+	Appsflyer       map[string]*appsflyer.Client
+	Kafka           map[string]*kafka.Client
+	Airtable        map[string]*airtable.Client
 	DuckDB          map[string]*duck.Client
 	Hubspot         map[string]*hubspot.Client
 	GoogleSheets    map[string]*gsheets.Client
@@ -96,9 +96,11 @@ type Manager struct {
 	Personio        map[string]*personio.Client
 	Kinesis         map[string]*kinesis.Client
 	Pipedrive       map[string]*pipedrive.Client
+	EMRSeverless    map[string]*emr_serverless.Client
 	GoogleAnalytics map[string]*googleanalytics.Client
 	AppLovin        map[string]*applovin.Client
-	mutex           sync.Mutex
+
+	mutex sync.Mutex
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
@@ -337,6 +339,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connPipedrive, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Pipedrive)...)
+
+	connEMRServerless, err := m.GetEMRServerlessConnectionWithoutDefault(name)
+	if err == nil {
+		return connEMRServerless, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.EMRSeverless)...)
 
 	connGoogleAnalytics, err := m.GetGoogleAnalyticsConnectionWithoutDefault(name)
 	if err == nil {
@@ -1150,6 +1158,25 @@ func (m *Manager) GetPipedriveConnectionWithoutDefault(name string) (*pipedrive.
 	db, ok := m.Pipedrive[name]
 	if !ok {
 		return nil, errors.Errorf("pipedrive connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetEMRServerlessConnection(name string) (*emr_serverless.Client, error) {
+	db, err := m.GetEMRServerlessConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetEMRServerlessConnectionWithoutDefault("emr_serverless-default")
+}
+
+func (m *Manager) GetEMRServerlessConnectionWithoutDefault(name string) (*emr_serverless.Client, error) {
+	if m.EMRSeverless == nil {
+		return nil, errors.New("no EMR Serverless connections found")
+	}
+	db, ok := m.EMRSeverless[name]
+	if !ok {
+		return nil, errors.Errorf("EMR Serverless connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2223,9 +2250,31 @@ func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConne
 	return nil
 }
 
+func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRServerlessConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.EMRSeverless == nil {
+		m.EMRSeverless = make(map[string]*emr_serverless.Client)
+	}
+	client, err := emr_serverless.NewClient(emr_serverless.Config{
+		AccessKey:     connection.AccessKey,
+		SecretKey:     connection.SecretKey,
+		ApplicationID: connection.ApplicationID,
+		ExecutionRole: connection.ExecutionRole,
+		Region:        connection.Region,
+		Workspace:     connection.Workspace,
+	})
+	if err != nil {
+		return err
+	}
+	m.EMRSeverless[connection.Name] = client
+
+	return nil
+}
+
 var envVarRegex = regexp.MustCompile(`\${([^}]+)}`)
 
-func processConnections[T any](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {
+func processConnections[T config.Named](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {
 	if connections == nil {
 		return
 	}
@@ -2259,7 +2308,7 @@ func processConnections[T any](connections []T, adder func(*T) error, wg *conc.W
 			err := adder(conn)
 			if err != nil {
 				mu.Lock()
-				*errList = append(*errList, errors.Wrapf(err, "failed to add connection '%v'", conn))
+				*errList = append(*errList, errors.Wrapf(err, "failed to add connection %q", (*conn).GetName()))
 				mu.Unlock()
 			}
 		})
@@ -2313,6 +2362,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.ApplovinMax, connectionManager.AddApplovinMaxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleAnalytics, connectionManager.AddGoogleAnalyticsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
 

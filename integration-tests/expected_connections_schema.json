@@ -39,6 +39,22 @@
         "access_token"
       ]
     },
+    "AppLovinConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "AppStoreConnection": {
       "properties": {
         "name": {
@@ -65,6 +81,22 @@
         "issuer_id",
         "key_path",
         "key"
+      ]
+    },
+    "ApplovinMaxConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "AppsflyerConnection": {
@@ -216,62 +248,6 @@
         "database",
         "http_port",
         "secure"
-      ]
-    },
-    "PersonioConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "client_id": {
-          "type": "string"
-        },
-        "client_secret": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "client_id",
-        "client_secret"
-      ]
-    },
-    "PipedriveConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "api_token": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type":"object",
-      "required": [
-        "name",
-        "api_token"
-      ]
-    },
-    "GoogleAnalyticsConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "service_account_file": {
-          "type": "string"
-        },
-        "property_id": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "service_account_file",
-        "property_id"
       ]
     },
     "Connections": {
@@ -534,6 +510,12 @@
           },
           "type": "array"
         },
+        "emr_serverless": {
+          "items": {
+            "$ref": "#/$defs/EMRServerlessConnection"
+          },
+          "type": "array"
+        },
         "googleanalytics": {
           "items": {
             "$ref": "#/$defs/GoogleAnalyticsConnection"
@@ -625,6 +607,42 @@
         "access_key_id",
         "secret_access_key",
         "region"
+      ]
+    },
+    "EMRServerlessConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_key": {
+          "type": "string"
+        },
+        "secret_key": {
+          "type": "string"
+        },
+        "application_id": {
+          "type": "string"
+        },
+        "execution_role": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "workspace": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_key",
+        "secret_key",
+        "application_id",
+        "execution_role",
+        "region",
+        "workspace"
       ]
     },
     "FacebookAdsConnection": {
@@ -730,6 +748,26 @@
         "name",
         "customer_id",
         "dev_token"
+      ]
+    },
+    "GoogleAnalyticsConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "service_account_file": {
+          "type": "string"
+        },
+        "property_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "service_account_file",
+        "property_id"
       ]
     },
     "GoogleCloudPlatformConnection": {
@@ -883,6 +921,30 @@
         "name",
         "bootstrap_servers",
         "group_id"
+      ]
+    },
+    "KinesisConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_key_id": {
+          "type": "string"
+        },
+        "secret_access_key": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_key_id",
+        "secret_access_key",
+        "region"
       ]
     },
     "KlaviyoConnection": {
@@ -1046,6 +1108,42 @@
       "required": [
         "name",
         "api_key"
+      ]
+    },
+    "PersonioConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "client_id",
+        "client_secret"
+      ]
+    },
+    "PipedriveConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_token"
       ]
     },
     "PostgresConnection": {
@@ -1322,22 +1420,6 @@
         "advertiser_ids"
       ]
     },
-    "ApplovinMaxConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "api_key": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "api_key"
-      ]
-    },
     "ZendeskConnection": {
       "properties": {
         "name": {
@@ -1364,46 +1446,6 @@
         "email",
         "oauth_token",
         "sub_domain"
-      ]
-    },
-    "KinesisConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "access_key_id": {
-          "type": "string"
-        },
-        "secret_access_key": {
-          "type": "string"
-        },
-        "region": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "access_key_id",
-        "secret_access_key",
-        "region"
-      ]
-    },
-    "AppLovinConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "api_key": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "api_key"
       ]
     }
   }

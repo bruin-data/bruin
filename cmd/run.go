@@ -948,12 +948,19 @@ func setupExecutors(
 		}
 	}
 
-	if s.WillRunTaskOfType(pipeline.AssetTypeEMRServerlessSpark) {
-		emrServerlessOperator, err := emr_serverless.NewBasicOperator(config)
-		if err != nil {
-			return nil, err
+	emrServerlessAssetTypes := []pipeline.AssetType{
+		pipeline.AssetTypeEMRServerlessSpark,
+		pipeline.AssetTypeEMRServerlessPyspark,
+	}
+
+	for _, typ := range emrServerlessAssetTypes {
+		if s.WillRunTaskOfType(typ) {
+			emrServerlessOperator, err := emr_serverless.NewBasicOperator(conn)
+			if err != nil {
+				return nil, err
+			}
+			mainExecutors[typ][scheduler.TaskInstanceTypeMain] = emrServerlessOperator
 		}
-		mainExecutors[pipeline.AssetTypeEMRServerlessSpark][scheduler.TaskInstanceTypeMain] = emrServerlessOperator
 	}
 
 	return mainExecutors, nil

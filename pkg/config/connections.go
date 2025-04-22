@@ -568,6 +568,20 @@ func (c PipedriveConnection) GetName() string {
 	return c.Name
 }
 
+type EMRServerlessConnection struct {
+	Name          string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessKey     string `yaml:"access_key" json:"access_key" mapstructure:"access_key"`
+	SecretKey     string `yaml:"secret_key" json:"secret_key" mapstructure:"secret_key"`
+	ApplicationID string `yaml:"application_id" json:"application_id" mapstructure:"application_id"`
+	ExecutionRole string `yaml:"execution_role" json:"execution_role" mapstructure:"execution_role"`
+	Region        string `yaml:"region" json:"region" mapstructure:"region"`
+	Workspace     string `yaml:"workspace" json:"workspace" mapstructure:"workspace"`
+}
+
+func (c EMRServerlessConnection) GetName() string {
+	return c.Name
+}
+
 type GoogleAnalyticsConnection struct {
 	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file" mapstructure:"service_account_file"`
