@@ -1,5 +1,5 @@
 # Applovin
-[AppLovin](https://www.applovin.com/) Corporation is an American mobile technology company headquartered in Palo Alto, California. AppLovin enables developers of all sizes to market, monetize, analyze and publish their apps through its mobile advertising, marketing, and analytics platforms MAX, AppDiscovery, and SparkLabs.
+[AppLovin](https://www.applovin.com/) is a mobile technology company that allows developers of all sizes to market, monetize, analyze, and publish their apps through its mobile advertising, marketing, and analytics platforms — MAX, AppDiscovery, and SparkLabs.
 
 Bruin supports AppLovin as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from AppLovin into your data platform.
 
