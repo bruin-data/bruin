@@ -526,7 +526,7 @@ func (t *Asset) SetAssetNameFromPath(path string) {
 
 		var validComponents []string
 		for _, comp := range components {
-			if comp != "" && comp != "." {
+			if comp != "" && comp != "." && comp != ".." {
 				validComponents = append(validComponents, comp)
 			}
 		}
