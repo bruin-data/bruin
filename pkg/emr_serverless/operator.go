@@ -22,6 +22,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bruin-data/bruin/pkg/executor"
+	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/google/uuid"
@@ -221,7 +222,6 @@ func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 		return nil, fmt.Errorf("error uploading entrypoint %q: %w", scriptURI, err)
 	}
 
-	scriptDir := filepath.Dir(scriptPath)
 	fd, err = os.CreateTemp("", "bruin-spark-context-*.zip")
 	if err != nil {
 		return nil, fmt.Errorf("error creating temporary file %w", err)
@@ -232,7 +232,16 @@ func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 	zipper := zip.NewWriter(fd)
 	defer zipper.Close()
 
-	err = zipper.AddFS(os.DirFS(scriptDir))
+	pipelineRoot, err := path.GetPipelineRootFromTask(scriptPath, []string{"pipeline.yaml", "pipeline.yml"})
+	if err != nil {
+		return nil, fmt.Errorf("error finding pipeline root: %w", err)
+	}
+
+	err = packageContextWithPrefix(
+		zipper,
+		os.DirFS(pipelineRoot),
+		filepath.Base(pipelineRoot),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error packaging files: %w", err)
 	}
