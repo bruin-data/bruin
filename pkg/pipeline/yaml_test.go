@@ -334,32 +334,38 @@ func TestAsset_setAssetNameFromPath(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "simple path",
+			name:     "simple assets path",
+			path:     "assets/myschema/myasset.yml",
+			initial:  "",
+			expected: "myschema.myasset",
+		},
+		{
+			name:     "asset.yml extension",
+			path:     "assets/myschema/mytable.asset.yml",
+			initial:  "",
+			expected: "myschema.mytable",
+		},
+		{
+			name:     "sql extension",
+			path:     "assets/myschema/mytable.sql",
+			initial:  "",
+			expected: "myschema.mytable",
+		},
+		{
+			name:     "deep assets path",
+			path:     "project/assets/myschema/subfolder/myasset.yaml",
+			initial:  "",
+			expected: "myschema.subfolder.myasset",
+		},
+		{
+			name:     "path without assets folder",
 			path:     "folder/file.yaml",
 			initial:  "",
-			expected: "folder_file.yaml",
-		},
-		{
-			name:     "multiple folders",
-			path:     "project/subfolder/deep/file.yaml",
-			initial:  "",
-			expected: "project_subfolder_deep_file.yaml",
-		},
-		{
-			name:     "path with dots",
-			path:     "./folder/./file.yaml",
-			initial:  "",
-			expected: "folder_file.yaml",
-		},
-		{
-			name:     "absolute path",
-			path:     "/root/folder/file.yaml",
-			initial:  "",
-			expected: "root_folder_file.yaml",
+			expected: "",
 		},
 		{
 			name:     "existing name should not change",
-			path:     "folder/file.yaml",
+			path:     "assets/myschema/myasset.yml",
 			initial:  "existing_name",
 			expected: "existing_name",
 		},
@@ -371,7 +377,8 @@ func TestAsset_setAssetNameFromPath(t *testing.T) {
 				Name: tt.initial,
 				ID:   hash(tt.initial),
 			}
-			asset.SetAssetNameFromPath(tt.path)
+			err := asset.SetAssetNameFromPath(tt.path)
+			require.NoError(t, err)
 
 			if tt.initial != "" {
 				// If initial name exists, it shouldn't change

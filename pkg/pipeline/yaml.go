@@ -348,9 +348,12 @@ func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
 		}
 
 		if task.Name == "" {
-			task.SetAssetNameFromPath(filePath)
+			err := task.SetAssetNameFromPath(filePath)
+			if err != nil {
+				return nil, err
+			}
 		}
-
+		
 		executableFile := ExecutableFile{
 			Name:    filepath.Base(filePath),
 			Path:    filePath,
@@ -519,18 +522,48 @@ func hash(s string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(s)))[:64]
 }
 
-func (t *Asset) SetAssetNameFromPath(path string) {
+func (t *Asset) SetAssetNameFromPath(path string) error {
 	if t.Name == "" {
-		dir := filepath.Dir(path)
-		components := strings.Split(dir, string(filepath.Separator))
+		components := strings.Split(path, string(filepath.Separator))
+
+		assetsIdx := -1
+		for i, comp := range components {
+			if comp == "assets" {
+				assetsIdx = i
+				break
+			}
+		}
+
+		var relevantComponents []string
+		if assetsIdx != -1 && assetsIdx+1 < len(components) {
+			relevantComponents = components[assetsIdx+1 : len(components)-1]
+		} else {
+			return nil // no assets folder found
+		}
 
 		var validComponents []string
-		for _, comp := range components {
+		for _, comp := range relevantComponents {
 			if comp != "" && comp != "." && comp != ".." {
 				validComponents = append(validComponents, comp)
 			}
 		}
-		t.Name = strings.Join(append(validComponents, filepath.Base(path)), "_")
+		filename := filepath.Base(path)
+		name := filename
+
+		if strings.HasSuffix(name, ".asset.yml") || strings.HasSuffix(name, ".asset.yaml") {
+			name = strings.TrimSuffix(strings.TrimSuffix(name, ".yml"), ".asset")
+			name = strings.TrimSuffix(strings.TrimSuffix(name, ".yaml"), ".asset")
+		} else {
+			ext := filepath.Ext(name)
+			if ext != "" {
+				name = name[:len(name)-len(ext)]
+			}
+		}
+
+		validComponents = append(validComponents, name)
+
+		t.Name = strings.Join(validComponents, ".")
 		t.ID = hash(t.Name)
 	}
+	return nil
 }
