@@ -395,6 +395,11 @@ func TestLoadFromFile(t *testing.T) {
 					PropertyID:         "12345",
 				},
 			},
+			Frankfurter: []FrankfurterConnection{
+				{
+					Name: "frankfurter-1",
+				},
+			},
 			AppLovin: []AppLovinConnection{
 				{
 					Name:   "applovin-1",

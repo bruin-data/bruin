@@ -254,7 +254,6 @@
         "api_token"
       ]
     },
-<<<<<<< HEAD
     "GoogleAnalyticsConnection": {
       "properties": {
         "name": {
@@ -265,25 +264,27 @@
         },
         "property_id": {
           "type": "string"
-=======
-    "FrankfurterConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
->>>>>>> 2da66883 (added frankfurter as a source to Bruin)
         }
       },
       "additionalProperties": false,
       "type": "object",
       "required": [
-<<<<<<< HEAD
         "name",
         "service_account_file",
         "property_id"
-=======
-        "name"
->>>>>>> 2da66883 (added frankfurter as a source to Bruin)
       ]
+    },
+    "FrankfurterConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+        "required": [
+            "name"
+        ]
     },
     "Connections": {
       "properties": {
@@ -545,7 +546,6 @@
           },
           "type": "array"
         },
-<<<<<<< HEAD
         "googleanalytics": {
           "items": {
             "$ref": "#/$defs/GoogleAnalyticsConnection"
@@ -555,11 +555,12 @@
         "applovin": {
           "items": {
             "$ref": "#/$defs/AppLovinConnection"
-=======
+          },
+          "type": "array"
+        },
         "frankfurter": {
           "items": {
             "$ref": "#/$defs/FrankfurterConnection"
->>>>>>> 2da66883 (added frankfurter as a source to Bruin)
           },
           "type": "array"
         }
