@@ -12,21 +12,38 @@ environments:
   default:
     connections:
       emr_serverless:
+
+        # name of your connection
       - name: emr_serverless-default
+
+        # AWS credentials
         access_key: AWS_ACCESS_KEY_ID
         secret_key: AWS_SECRET_ACCESS_KEY
-        application_id: EMR_APPLICATION_ID
-        execution_role: IAM_ROLE_ARN
         region: eu-north-1
 
+        # name of your EMR application
+        application_id: EMR_APPLICATION_ID
+
+        # role assumed by your job. This determines
+        # what AWS resources your spark job can access.
+        execution_role: IAM_ROLE_ARN
+
+        # (Python assets only)
+        # declares working area used by pyspark jobs.
+        workspace: s3://your-bucket/optional-prefix/
+
 ```
+
 
 ## Logs
 Bruin supports log streaming for spark jobs. This is only supported for spark logs stored in [S3](https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/logging.html#jobs-log-storage-s3-buckets). Both `DRIVER` and `EXECUTOR` logs are streamed by default.
 
 In order to stream logs, one of the following conditions must be met:
 * Your EMR Serverless Application is pre-configured with an S3 Log Storage Location. 
-* `parameters.logs` or `parameters.workspace` is be specified and points to an S3 URI.
+* `parameters.logs` must be defined
+
+> [!NOTE]
+> Python assets stream logs out-of-the-box. You don't need to specify `parameters.logs` for them.
 
 ## Asset Types
 
@@ -43,18 +60,7 @@ A fully managed option where Bruin takes care of job setup, configuration, and e
 * Concurrent-safe by default.
 * Bundles internal dependencies and configures your job to use them.
 
-### YAML Asset
-A lightweight option that only supports triggering a job. 
-
-* Supports both PySpark scripts and JARs.
-* Users are responsible for:
-  * deploying their artifacts
-  * managing internal dependencies
-
-Choose the format that best fits your use case—use YAML when you want to integrate with pre-existing infrastructure, or use Python for a streamlined, fully-managed experience.
-
-
-## Python Example
+#### Example: Standalone script
 ```bruin-python
 """ @bruin
 name: pyspark_job
@@ -79,12 +85,34 @@ def run_workload(session):
 
 ```
 
-
 This defines a pyspark asset that will be executed by the EMR Serverless Application defined by the connection named `app_staging`. `s3://amzn-test-bucket/bruin-workspace/` is used as a working area that is used by bruin for uploading your job scripts, their dependencies and for storing logs.
 
 The `run_workload` function is there for demonstration. You can structure your pyspark scripts however you like.
 
-## YAML Example
+<!-- TODO: multi-module example -->
+
+#### Workspace
+Python assets require `workspace` to be configured in your `emr_serverless` connection. Workspace is a S3 path that is used by bruin as working storage for jobs that run on `emr_serverless`.
+
+Bruin uses this for:
+* Storing Logs
+* Staging your entrypoint file
+* Uploading bundled dependencies.
+
+![workspace diagram](media/pyspark-workspace.svg)
+
+### YAML Asset
+A lightweight option that only supports triggering a job. 
+
+* Supports both PySpark scripts and JARs.
+* Users are responsible for:
+  * deploying their artifacts
+  * managing internal dependencies
+
+Choose the format that best fits your use case—use YAML when you want to integrate with pre-existing infrastructure, or use Python for a streamlined, fully-managed experience.
+
+
+#### Example
 
 ```yaml
 name: spark_example_job
@@ -118,14 +146,11 @@ type: emr_serverless.spark
 # optional, defaults to emr_serverless-default
 connection: connection-name-example  
 
-# required
+# job specific configuration
 parameters:
 
   # path of the pyspark script or jar to run (required) [yaml only]
   entrypoint: s3://amzn-test-bucket/src/script.py   
-
-  # working area for bruin (required) [python only]
-  entrypoint: s3://amzn-test-bucket/bruin-workspace/   
 
   # path where logs are stored or should be stored (optional)
   logs: s3://amzn-test-bucket/logs
