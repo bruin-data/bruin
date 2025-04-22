@@ -15,6 +15,5 @@ func (c *Config) GetIngestrURI() string {
 	baseURL := "applovin://"
 	params := url.Values{}
 	params.Add("api_key", c.APIKey)
-	fmt.Println(baseURL + "?" + params.Encode())
 	return baseURL + "?" + params.Encode()
 }
