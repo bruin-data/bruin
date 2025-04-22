@@ -319,6 +319,8 @@ func TestUpstreams(t *testing.T) {
 }
 
 func TestAsset_setAssetNameFromPath(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		path     string
@@ -365,6 +367,7 @@ func TestAsset_setAssetNameFromPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			asset := &pipeline.Asset{
 				Name: tt.initial,
 				ID:   hash(tt.initial),
@@ -373,11 +376,9 @@ func TestAsset_setAssetNameFromPath(t *testing.T) {
 			require.NoError(t, err)
 
 			if tt.initial != "" {
-				// If initial name exists, it shouldn't change
 				require.Equal(t, tt.initial, asset.Name)
 				require.Equal(t, hash(tt.initial), asset.ID)
 			} else {
-				// If initial name is empty, it should be set based on the path
 				require.Equal(t, tt.expected, asset.Name)
 				require.Equal(t, hash(tt.expected), asset.ID)
 			}

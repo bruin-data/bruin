@@ -347,7 +347,6 @@ func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
 			return nil, err
 		}
 
-
 		executableFile := ExecutableFile{
 			Name:    filepath.Base(filePath),
 			Path:    filePath,
@@ -523,8 +522,8 @@ func hash(s string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(s)))[:64]
 }
 
-func (t *Asset) SetAssetNameFromPath(path string) error {
-	if t.Name == "" {
+func (a *Asset) SetAssetNameFromPath(path string) error {
+	if a.Name == "" {
 		components := strings.Split(path, string(filepath.Separator))
 
 		assetsIdx := -1
@@ -563,8 +562,8 @@ func (t *Asset) SetAssetNameFromPath(path string) error {
 
 		validComponents = append(validComponents, name)
 
-		t.Name = strings.Join(validComponents, ".")
-		t.ID = hash(t.Name)
+		a.Name = strings.Join(validComponents, ".")
+		a.ID = hash(a.Name)
 	}
 	return nil
 }
