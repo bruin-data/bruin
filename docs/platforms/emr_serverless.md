@@ -66,8 +66,6 @@ A fully managed option where Bruin takes care of job setup, configuration, and e
 name: pyspark_job
 type: emr_serverless.pyspark
 connection: app_staging
-parameters:
-  workspace: s3://amzn-test-bucket/bruin-workspace/
 @bruin """
 
 from pyspark.sql import SparkSession
@@ -89,7 +87,58 @@ This defines a pyspark asset that will be executed by the EMR Serverless Applica
 
 The `run_workload` function is there for demonstration. You can structure your pyspark scripts however you like.
 
-<!-- TODO: multi-module example -->
+#### Example: Multi-module script
+
+Advanced Spark users often package core logic into reusable libraries to improve consistency, reduce duplication, and streamline development across jobs. This approach ensures that shared transformations, validations, and business rules are implemented once and reused reliably.
+
+Bruin has seamless support for pyspark modules.
+
+For this example, let's assume this is how your bruin pipeline is structured:
+```
+acme_pipeline/
+├── assets
+│   └── main.py
+├── lib
+│   └── core.py
+└── pipeline.yml
+```
+
+Let's say that `acme_pipeline/lib/core.py` stores some common routines used throughout your jobs. For this example, we'll create a function called `santise` that takes in a Spark DataFrame and santises it's columns (A common operation in Data Analytics).
+
+::: code-group
+```python [acme_pipeline/lib/core.py]
+from pyspark.sql import DataFrame
+
+def santise(df: DateFrame):
+  """
+  santise a dataframe
+  """
+  ...
+```
+:::
+
+You can now import this package in your PySpark assets.
+::: code-group
+```bruin-python [acme_pipeline/assets/main.py]
+""" @bruin
+name: raw.transaction
+type: emr_serverless.pyspark
+connection: app_staging
+@bruin """
+
+from acme_pipeline.lib.core import sanitise
+from pyspark.sql import SparkSession
+
+if __name__ == "__main__":
+  session = SparkSession.builder.appName("raw.transaction_std").getOrCreate()
+  src = session.sparkContext.textFile("s3://acme/data/transactions").toDF()
+  santise(src)
+  session.stop()
+
+```
+:::
+
+Bruin internally sets the [`PYTHONPATH`](https://docs.python.org/3/using/cmdline.html#envvar-PYTHONPATH) to the root of your pipeline. So you'll always have to use the fully qualified package name to import any internal packages. 
 
 #### Workspace
 Python assets require `workspace` to be configured in your `emr_serverless` connection. Workspace is a S3 path that is used by bruin as working storage for jobs that run on `emr_serverless`.
