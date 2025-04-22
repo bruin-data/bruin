@@ -1411,6 +1411,7 @@ func NewBuilder(config BuilderConfig, yamlTaskCreator TaskCreator, commentTaskCr
 	b.mutators = []assetMutator{
 		b.fillGlossaryStuff,
 		b.setupDefaultsFromPipeline,
+		b.SetNameFromPath,
 	}
 
 	return b
