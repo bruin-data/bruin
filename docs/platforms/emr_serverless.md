@@ -83,7 +83,7 @@ def run_workload(session):
 
 ```
 
-This defines a pyspark asset that will be executed by the EMR Serverless Application defined by the connection named `app_staging`. `s3://amzn-test-bucket/bruin-workspace/` is used as a working area that is used by bruin for uploading your job scripts, their dependencies and for storing logs.
+This defines a pyspark asset that will be executed by the EMR Serverless Application defined by the connection named `app_staging`.
 
 The `run_workload` function is there for demonstration. You can structure your pyspark scripts however you like.
 
@@ -103,7 +103,7 @@ acme_pipeline/
 └── pipeline.yml
 ```
 
-Let's say that `acme_pipeline/lib/core.py` stores some common routines used throughout your jobs. For this example, we'll create a function called `santise` that takes in a Spark DataFrame and sanitize it's columns (A common operation in Data Analytics).
+Let's say that `acme_pipeline/lib/core.py` stores some common routines used throughout your jobs. For this example, we'll create a function called `sanitize` that takes in a Spark DataFrame and sanitize it's columns (A common operation in Data Analytics).
 
 ::: code-group
 ```python [acme_pipeline/lib/core.py]
