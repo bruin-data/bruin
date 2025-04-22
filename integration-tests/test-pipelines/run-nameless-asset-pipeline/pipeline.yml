@@ -1,0 +1,4 @@
+name: duckdb-example-pipeline
+
+default_connections:
+  duckdb: duckdb-run-nameless-asset

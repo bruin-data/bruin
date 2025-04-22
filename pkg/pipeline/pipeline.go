@@ -1411,6 +1411,7 @@ func NewBuilder(config BuilderConfig, yamlTaskCreator TaskCreator, commentTaskCr
 	b.mutators = []assetMutator{
 		b.fillGlossaryStuff,
 		b.setupDefaultsFromPipeline,
+		b.SetNameFromPath,
 	}
 
 	return b
@@ -1772,4 +1773,38 @@ func ModifyDate(t time.Time, modifier TimeModifier) time.Time {
 		Add(time.Duration(modifier.Seconds) * time.Second)
 
 	return t
+}
+
+func (b *Builder) SetNameFromPath(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
+	if foundPipeline == nil {
+		return asset, nil
+	}
+	if asset == nil {
+		return asset, nil
+	}
+
+	if asset.Name != "" {
+		return asset, nil
+	}
+	pipelinePath := foundPipeline.DefinitionFile.Path
+	baseFolder := filepath.Join(filepath.Dir(pipelinePath), "assets")
+	path, err := filepath.Rel(baseFolder, asset.DefinitionFile.Path)
+	if err != nil {
+		return nil, err
+	}
+
+	name := strings.ReplaceAll(path, string(filepath.Separator), ".")
+
+	switch {
+	case strings.HasSuffix(name, ".asset.yml"):
+		name = strings.TrimSuffix(name, ".asset.yml")
+	case strings.HasSuffix(name, ".asset.yaml"):
+		name = strings.TrimSuffix(name, ".asset.yaml")
+	default:
+		name = strings.TrimSuffix(name, filepath.Ext(name))
+	}
+
+	asset.Name = name
+	asset.ID = hash(name)
+	return asset, nil
 }
