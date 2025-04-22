@@ -99,6 +99,8 @@ type Manager struct {
 	EMRSeverless    map[string]*emr_serverless.Client
 	GoogleAnalytics map[string]*googleanalytics.Client
 	AppLovin        map[string]*applovin.Client
+
+	mutex *sync.Mutex
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
