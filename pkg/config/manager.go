@@ -65,6 +65,7 @@ type Connections struct {
 	Kinesis             []KinesisConnection             `yaml:"kinesis,omitempty" json:"kinesis,omitempty" mapstructure:"kinesis"`
 	Pipedrive           []PipedriveConnection           `yaml:"pipedrive,omitempty" json:"pipedrive,omitempty" mapstructure:"pipedrive"`
 	GoogleAnalytics     []GoogleAnalyticsConnection     `yaml:"googleanalytics,omitempty" json:"googleanalytics,omitempty" mapstructure:"googleanalytics"`
+	AppLovin            []AppLovinConnection            `yaml:"applovin,omitempty" json:"applovin,omitempty" mapstructure:"applovin"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -709,6 +710,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.GoogleAnalytics = append(env.Connections.GoogleAnalytics, conn)
+	case "applovin":
+		var conn AppLovinConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.AppLovin = append(env.Connections.AppLovin, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -828,6 +836,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Pipedrive = removeConnection(env.Connections.Pipedrive, connectionName)
 	case "googleanalytics":
 		env.Connections.GoogleAnalytics = removeConnection(env.Connections.GoogleAnalytics, connectionName)
+	case "applovin":
+		env.Connections.AppLovin = removeConnection(env.Connections.AppLovin, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -923,6 +933,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.GCS, source.GCS)
 	mergeConnectionList(&c.Personio, source.Personio)
 	mergeConnectionList(&c.GoogleAnalytics, source.GoogleAnalytics)
+	mergeConnectionList(&c.AppLovin, source.AppLovin)
 	c.buildConnectionKeyMap()
 	return nil
 }

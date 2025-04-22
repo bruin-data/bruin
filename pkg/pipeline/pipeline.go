@@ -105,6 +105,7 @@ var defaultMapping = map[string]string{
 	"appstore":              "appstore-default",
 	"gcs":                   "gcs-default",
 	"googleanalytics":       "googleanalytics-default",
+	"applovin":              "applovin-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}
