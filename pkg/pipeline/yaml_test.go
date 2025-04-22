@@ -1,6 +1,8 @@
 package pipeline_test
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,6 +13,10 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 )
+
+func hash(s string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(s)))[:64]
+}
 
 func TestCreateTaskFromYamlDefinition(t *testing.T) {
 	t.Parallel()
@@ -310,4 +316,64 @@ func TestUpstreams(t *testing.T) {
 
 	// Compare the expected and actual results
 	require.Equal(t, expected, got)
+}
+
+func TestAsset_setAssetNameFromPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		initial  string
+		expected string
+	}{
+		{
+			name:     "simple path",
+			path:     "folder/file.yaml",
+			initial:  "",
+			expected: "folder_file.yaml",
+		},
+		{
+			name:     "multiple folders",
+			path:     "project/subfolder/deep/file.yaml",
+			initial:  "",
+			expected: "project_subfolder_deep_file.yaml",
+		},
+		{
+			name:     "path with dots",
+			path:     "./folder/./file.yaml",
+			initial:  "",
+			expected: "folder_file.yaml",
+		},
+		{
+			name:     "absolute path",
+			path:     "/root/folder/file.yaml",
+			initial:  "",
+			expected: "root_folder_file.yaml",
+		},
+		{
+			name:     "existing name should not change",
+			path:     "folder/file.yaml",
+			initial:  "existing_name",
+			expected: "existing_name",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			asset := &pipeline.Asset{
+				Name: tt.initial,
+				ID:   hash(tt.initial),
+			}
+			asset.SetAssetNameFromPath(tt.path)
+
+			if tt.initial != "" {
+				// If initial name exists, it shouldn't change
+				require.Equal(t, tt.initial, asset.Name)
+				require.Equal(t, hash(tt.initial), asset.ID)
+			} else {
+				// If initial name is empty, it should be set based on the path
+				require.Equal(t, tt.expected, asset.Name)
+				require.Equal(t, hash(tt.expected), asset.ID)
+			}
+		})
+	}
 }

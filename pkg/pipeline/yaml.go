@@ -347,6 +347,10 @@ func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
 			return nil, err
 		}
 
+		if task.Name == "" {
+			task.SetAssetNameFromPath(filePath)
+		}
+
 		executableFile := ExecutableFile{
 			Name:    filepath.Base(filePath),
 			Path:    filePath,
@@ -513,4 +517,20 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 
 func hash(s string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(s)))[:64]
+}
+
+func (t *Asset) SetAssetNameFromPath(path string) {
+	if t.Name == "" {
+		dir := filepath.Dir(path)
+		components := strings.Split(dir, string(filepath.Separator))
+
+		var validComponents []string
+		for _, comp := range components {
+			if comp != "" && comp != "." {
+				validComponents = append(validComponents, comp)
+			}
+		}
+		t.Name = strings.Join(append(validComponents, filepath.Base(path)), "_")
+		t.ID = hash(t.Name)
+	}
 }
