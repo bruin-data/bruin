@@ -25,6 +25,7 @@ type QueryResult struct {
 type QueryExtractor interface {
 	ExtractQueriesFromString(filepath string) ([]*Query, error)
 	CloneForAsset(ctx context.Context, asset *pipeline.Asset) QueryExtractor
+	ReextractQueriesFromSlice(content []string) ([]string, error)
 }
 
 func (q Query) ToExplainQuery() string {
@@ -158,19 +159,6 @@ func (f *WholeFileExtractor) ExtractQueriesFromString(content string) ([]*Query,
 			Query: render,
 		},
 	}, nil
-}
-
-func (f *WholeFileExtractor) ExtractQueriesFromSlice(content []string) ([]*Query, error) {
-	var allQueries []*Query
-	for _, query := range content {
-		queries, err := f.ExtractQueriesFromString(query)
-		if err != nil {
-			return nil, err
-		}
-		allQueries = append(allQueries, queries...)
-	}
-
-	return allQueries, nil
 }
 
 func (f *WholeFileExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
