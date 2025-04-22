@@ -46,8 +46,7 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 		ctx.Value(executor.KeyPrinter).(io.Writer), "", 0,
 	)
 	asset := ti.GetAsset()
-	pipeline := ti.GetPipeline()
-	connID, err := pipeline.GetConnectionNameForAsset(asset)
+	connID, err := ti.GetPipeline().GetConnectionNameForAsset(asset)
 	if err != nil {
 		return fmt.Errorf("error looking up connection name: %w", err)
 	}
@@ -55,6 +54,10 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 
 	if err != nil {
 		return fmt.Errorf("error fetching connection: %w", err)
+	}
+
+	if asset.Type == pipeline.AssetTypeEMRServerlessPyspark && conn.Workspace == "" {
+		return fmt.Errorf("connection %q is missing field: workspace", connID)
 	}
 
 	params := parseParams(conn, asset.Parameters)
@@ -77,7 +80,7 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 		emrClient: emrserverless.NewFromConfig(cfg),
 		params:    params,
 		asset:     asset,
-		pipeline:  pipeline,
+		pipeline:  ti.GetPipeline(),
 		poll: &PollTimer{
 			BaseDuration: time.Second,
 
@@ -104,6 +107,7 @@ type JobRunParams struct {
 	Timeout       time.Duration
 	Region        string
 	Logs          string
+	Workspace     string
 }
 
 func parseParams(cfg *Client, params map[string]string) *JobRunParams {
@@ -114,6 +118,7 @@ func parseParams(cfg *Client, params map[string]string) *JobRunParams {
 		Entrypoint:    params["entrypoint"],
 		Config:        params["config"],
 		Logs:          params["logs"],
+		Workspace:     cfg.Workspace,
 	}
 
 	if params["timeout"] != "" {
@@ -188,7 +193,7 @@ type workspace struct {
 // prepareWorkspace sets up an s3 bucket for a pyspark job run.
 func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 
-	workspaceURI, err := url.Parse(job.asset.Parameters["workspace"])
+	workspaceURI, err := url.Parse(job.params.Workspace)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing workspace URL: %w", err)
 	}

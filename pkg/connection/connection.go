@@ -2168,6 +2168,7 @@ func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRSer
 		ApplicationID: connection.ApplicationID,
 		ExecutionRole: connection.ExecutionRole,
 		Region:        connection.Region,
+		Workspace:     connection.Workspace,
 	})
 	if err != nil {
 		return err

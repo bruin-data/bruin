@@ -560,9 +560,7 @@ func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset
 	prohibited := []string{}
 	if asset.Type == pipeline.AssetTypeEMRServerlessSpark {
 		required = append(required, "entrypoint")
-		prohibited = append(prohibited, "workspace")
 	} else {
-		required = append(required, "workspace")
 		prohibited = append(prohibited, "entrypoint")
 	}
 

@@ -242,6 +242,14 @@ environments:
       pipedrive:
         - name: "pipedrive-1"
           api_token: "token-123"
+      emr_serverless:
+        - name: emr_serverless-test
+          access_key: AKIAEXAMPLE
+          secret_key: SECRETKEYEXAMPLE
+          region: us-west-2
+          application_id: emr-app_123
+          execution_role: arn:aws:iam::123456789012:role/example_role
+          workspace: s3://amzn-test-bucket/bruin-workspace/
 
   prod:
     connections:
