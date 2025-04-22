@@ -45,7 +45,7 @@ Here we have defined two connections: one to a DuckDB file named "database.db" (
 
 ### Step 3: Create an asset file for data ingestion
 
-To ingest data from Frankfurter, create an ingestr asset with the file `assets/frankfurter.asset.yml`. This file defines the data flow from the source to the destination (learn more about [Bruin assets](../../assets/definition-schema.md)).
+To ingest data from Frankfurter, create an ingestr asset with the file `assets/frankfurter.asset.yml`. This file defines the data flow from the source to the destination.
 
 ```yaml
 name: dataset.frankfurter

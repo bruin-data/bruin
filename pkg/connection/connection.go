@@ -1213,7 +1213,6 @@ func (m *Manager) GetFrankfurterConnectionWithoutDefault(name string) (*frankfur
 	db, ok := m.Frankfurter[name]
 	if !ok {
 		return nil, errors.Errorf("frankfurter connection not found for '%s'", name)
-
 	}
 	return db, nil
 }
