@@ -33,7 +33,7 @@ In order to stream logs, one of the following conditions must be met:
 Bruin supports two different ways of defining a spark asset
 
 ### Python Asset
-A fully managed option where bruin takes care of job setup, configuration, and execution. You only need to define the workload logic.
+A fully managed option where Bruin takes care of job setup, configuration, and execution. You only need to define the workload logic.
 
 * Supports only PySpark scripts.
 * Handles artifact deployment.
