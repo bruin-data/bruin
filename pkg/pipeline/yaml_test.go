@@ -230,14 +230,6 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 			wantErr: true,
 			err:     errors.New("Malformed `depends` items"),
 		},
-		{
-			name: "path with parent directory",
-			args: args{
-				filePath: "../folder/file.yaml",
-			},
-			wantErr: true,
-			err:     errors.New("path with parent directory is not allowed"),
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

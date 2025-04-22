@@ -347,13 +347,7 @@ func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
 			return nil, err
 		}
 
-		if task.Name == "" {
-			err := task.SetAssetNameFromPath(filePath)
-			if err != nil {
-				return nil, err
-			}
-		}
-		
+
 		executableFile := ExecutableFile{
 			Name:    filepath.Base(filePath),
 			Path:    filePath,
@@ -376,6 +370,13 @@ func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
 			executableFile.Content = string(content)
 		}
 		task.ExecutableFile = executableFile
+
+		if task.Name == "" {
+			err := task.SetAssetNameFromPath(filePath)
+			if err != nil {
+				return nil, err
+			}
+		}
 
 		return task, nil
 	}
