@@ -269,7 +269,7 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to build asset: %v\n", err)
 					return cli.Exit("", 1)
 				}
-				task, err = DefaultPipelineBuilder.MutateAsset(c.Context, task, nil)
+				task, err = DefaultPipelineBuilder.MutateAsset(c.Context, task, pipelineInfo.Pipeline)
 				if err != nil {
 					errorPrinter.Printf("Failed to mutate asset: %v\n", err)
 					return cli.Exit("", 1)

@@ -362,6 +362,17 @@
           }
         ]
       }
+    },
+    "env-run-nameless-asset": {
+      "schema_prefix": "",
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-run-nameless-asset",
+            "path": "integration-tests/duckdb-files/run-nameless-asset.db"
+          }
+        ]
+      }
     }
   }
 }
