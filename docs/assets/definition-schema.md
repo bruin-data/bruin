@@ -73,6 +73,19 @@ The list of assets this asset depends on. This list determines the execution ord
 In other words, the asset will be executed only when all of the assets in the `depends` list have succeeded.
 - **Type:** `String[]`
 
+## `interval_modifiers`
+Controls how the processing window is adjusted by shifting the start and end times. Requires the `--apply-interval-modifiers` flag when running the pipeline.
+
+```yaml
+interval_modifiers:
+  start: -2h    # Shift start time back 2 hours
+  end: 1h       # Shift end time forward 1 hour
+```
+
+Supported time units: `s` (seconds), `m` (minutes), `h` (hours), `d` (days), `M` (months).
+See [interval modifiers](./interval-modifiers) for more details.
+- **Type:** `Object`
+
 ## `materialization`
 This option determines how the asset will be materialized. Refer to the docs on [materialization](./materialization) for more details.
 

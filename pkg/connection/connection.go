@@ -10,6 +10,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/adjust"
 	"github.com/bruin-data/bruin/pkg/airtable"
+	"github.com/bruin-data/bruin/pkg/applovin"
 	"github.com/bruin-data/bruin/pkg/applovinmax"
 	"github.com/bruin-data/bruin/pkg/appsflyer"
 	"github.com/bruin-data/bruin/pkg/appstore"
@@ -27,6 +28,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/github"
 	"github.com/bruin-data/bruin/pkg/googleads"
+	"github.com/bruin-data/bruin/pkg/googleanalytics"
 	"github.com/bruin-data/bruin/pkg/gorgias"
 	"github.com/bruin-data/bruin/pkg/gsheets"
 	"github.com/bruin-data/bruin/pkg/hana"
@@ -74,7 +76,6 @@ type Manager struct {
 	Appsflyer   map[string]*appsflyer.Client
 	Kafka       map[string]*kafka.Client
 	Airtable    map[string]*airtable.Client
-
 	DuckDB       map[string]*duck.Client
 	Hubspot      map[string]*hubspot.Client
 	GoogleSheets map[string]*gsheets.Client
@@ -96,7 +97,8 @@ type Manager struct {
 	Kinesis      map[string]*kinesis.Client
 	Pipedrive    map[string]*pipedrive.Client
 	EMRSeverless map[string]*emr_serverless.Client
-	mutex        sync.Mutex
+	GoogleAnalytics map[string]*googleanalytics.Client
+	AppLovin        map[string]*applovin.Client
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
@@ -341,6 +343,19 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connEMRServerless, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.EMRSeverless)...)
+
+	connGoogleAnalytics, err := m.GetGoogleAnalyticsConnectionWithoutDefault(name)
+	if err == nil {
+		return connGoogleAnalytics, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GoogleAnalytics)...)
+
+	connAppLovin, err := m.GetAppLovinConnectionWithoutDefault(name)
+	if err == nil {
+		return connAppLovin, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.AppLovin)...)
+
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -1146,6 +1161,7 @@ func (m *Manager) GetPipedriveConnectionWithoutDefault(name string) (*pipedrive.
 	return db, nil
 }
 
+
 func (m *Manager) GetEMRServerlessConnection(name string) (*emr_serverless.Client, error) {
 	db, err := m.GetEMRServerlessConnectionWithoutDefault(name)
 	if err == nil {
@@ -1161,6 +1177,44 @@ func (m *Manager) GetEMRServerlessConnectionWithoutDefault(name string) (*emr_se
 	db, ok := m.EMRSeverless[name]
 	if !ok {
 		return nil, errors.Errorf("EMR Serverless connection not found for '%s'", name)
+  }
+  return db, nil
+}
+
+func (m *Manager) GetGoogleAnalyticsConnection(name string) (*googleanalytics.Client, error) {
+	db, err := m.GetGoogleAnalyticsConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetGoogleAnalyticsConnectionWithoutDefault("googleanalytics-default")
+}
+
+func (m *Manager) GetGoogleAnalyticsConnectionWithoutDefault(name string) (*googleanalytics.Client, error) {
+	if m.GoogleAnalytics == nil {
+		return nil, errors.New("no googleanalytics connections found")
+	}
+	db, ok := m.GoogleAnalytics[name]
+	if !ok {
+		return nil, errors.Errorf("googleanalytics connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetAppLovinConnection(name string) (*applovin.Client, error) {
+	db, err := m.GetAppLovinConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetAppLovinConnectionWithoutDefault("applovin-default")
+}
+
+func (m *Manager) GetAppLovinConnectionWithoutDefault(name string) (*applovin.Client, error) {
+	if m.AppLovin == nil {
+		return nil, errors.New("no applovin connections found")
+	}
+	db, ok := m.AppLovin[name]
+	if !ok {
+		return nil, errors.Errorf("applovin connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2116,6 +2170,26 @@ func (m *Manager) AddApplovinMaxConnectionFromConfig(connection *config.Applovin
 	return nil
 }
 
+func (m *Manager) AddAppLovinConnectionFromConfig(connection *config.AppLovinConnection) error {
+	m.mutex.Lock()
+	if m.AppLovin == nil {
+		m.AppLovin = make(map[string]*applovin.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := applovin.NewClient(applovin.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.AppLovin[connection.Name] = client
+
+	return nil
+}
+
 func (m *Manager) AddPipedriveConnectionFromConfig(connection *config.PipedriveConnection) error {
 	m.mutex.Lock()
 	if m.Pipedrive == nil {
@@ -2132,6 +2206,26 @@ func (m *Manager) AddPipedriveConnectionFromConfig(connection *config.PipedriveC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Pipedrive[connection.Name] = client
+	return nil
+}
+
+func (m *Manager) AddGoogleAnalyticsConnectionFromConfig(connection *config.GoogleAnalyticsConnection) error {
+	m.mutex.Lock()
+	if m.GoogleAnalytics == nil {
+		m.GoogleAnalytics = make(map[string]*googleanalytics.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := googleanalytics.NewClient(googleanalytics.Config{
+		ServiceAccountFile: connection.ServiceAccountFile,
+		PropertyID:         connection.PropertyID,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.GoogleAnalytics[connection.Name] = client
 	return nil
 }
 
@@ -2269,6 +2363,8 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.GoogleAnalytics, connectionManager.AddGoogleAnalyticsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
 
 	wg.Wait()
 	return connectionManager, errList

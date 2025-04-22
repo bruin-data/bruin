@@ -254,6 +254,26 @@
         "api_token"
       ]
     },
+    "GoogleAnalyticsConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "service_account_file": {
+          "type": "string"
+        },
+        "property_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "service_account_file",
+        "property_id"
+      ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -511,6 +531,18 @@
         "pipedrive": {
           "items": {
             "$ref": "#/$defs/PipedriveConnection"
+          },
+          "type": "array"
+        },
+        "googleanalytics": {
+          "items": {
+            "$ref": "#/$defs/GoogleAnalyticsConnection"
+          },
+          "type": "array"
+        },
+        "applovin": {
+          "items": {
+            "$ref": "#/$defs/AppLovinConnection"
           },
           "type": "array"
         }
@@ -1356,6 +1388,22 @@
         "access_key_id",
         "secret_access_key",
         "region"
+      ]
+    },
+    "AppLovinConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     }
   }

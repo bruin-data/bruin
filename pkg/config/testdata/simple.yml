@@ -250,6 +250,13 @@ environments:
           application_id: emr-app_123
           execution_role: arn:aws:iam::123456789012:role/example_role
           workspace: s3://amzn-test-bucket/bruin-workspace/
+      googleanalytics:
+        - name: "googleanalytics-1"
+          service_account_file: "path/to/service_account.json"
+          property_id: "12345"
+      applovin:
+        - name: "applovin-1"
+          api_key: "key-123"
 
   prod:
     connections:

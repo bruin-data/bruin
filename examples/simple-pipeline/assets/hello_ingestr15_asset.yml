@@ -1,9 +1,9 @@
-name: public.kinesis
+name: public.googleanalytics
 type: ingestr
 connection: postgres
 
 parameters:
-  source_connection: kinesis
-  source_table: 'ingestr_test_stream'
+  source_connection: googleanalytics
+  source_table: 'custom:city,date:activeUsers,newUsers,checkouts'
 
   destination: postgres

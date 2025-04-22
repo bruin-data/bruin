@@ -397,6 +397,17 @@ func TestLoadFromFile(t *testing.T) {
 					ApplicationID: "emr-app_123",
 					ExecutionRole: "arn:aws:iam::123456789012:role/example_role",
 					Workspace:     "s3://amzn-test-bucket/bruin-workspace/",
+			GoogleAnalytics: []GoogleAnalyticsConnection{
+				{
+					Name:               "googleanalytics-1",
+					ServiceAccountFile: "path/to/service_account.json",
+					PropertyID:         "12345",
+				},
+			},
+			AppLovin: []AppLovinConnection{
+				{
+					Name:   "applovin-1",
+					APIKey: "key-123",
 				},
 			},
 		},
