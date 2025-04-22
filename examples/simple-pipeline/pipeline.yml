@@ -38,3 +38,4 @@ default_connections:
   kinesis: "my-kinesis"
   pipedrive: "my-pipedrive"
   googleanalytics: "my-googleanalytics"
+  applovin: "my-applovin"

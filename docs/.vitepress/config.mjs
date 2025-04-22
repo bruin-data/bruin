@@ -171,6 +171,7 @@ export default withMermaid({
                             {text: "Adjust", link: "/ingestion/adjust.md"},
                             {text: "Airtable", link: "/ingestion/airtable.md"},
                             {text: "AppStore", link: "/ingestion/appstore.md"},
+                            {text: "AppLovin", link: "/ingestion/applovin.md"},
                             {text: "AppLovin Max", link: "/ingestion/applovin_max.md"},
                             {text: "Asana", link: "/ingestion/asana.md"},
                             {text: "Chess", link: "/ingestion/chess.md"},

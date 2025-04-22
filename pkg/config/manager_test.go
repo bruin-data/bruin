@@ -395,6 +395,12 @@ func TestLoadFromFile(t *testing.T) {
 					PropertyID:         "12345",
 				},
 			},
+			AppLovin: []AppLovinConnection{
+				{
+					Name:   "applovin-1",
+					APIKey: "key-123",
+				},
+			},
 		},
 	}
 

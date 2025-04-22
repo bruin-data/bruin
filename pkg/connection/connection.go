@@ -10,6 +10,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/adjust"
 	"github.com/bruin-data/bruin/pkg/airtable"
+	"github.com/bruin-data/bruin/pkg/applovin"
 	"github.com/bruin-data/bruin/pkg/applovinmax"
 	"github.com/bruin-data/bruin/pkg/appsflyer"
 	"github.com/bruin-data/bruin/pkg/appstore"
@@ -96,6 +97,7 @@ type Manager struct {
 	Kinesis         map[string]*kinesis.Client
 	Pipedrive       map[string]*pipedrive.Client
 	GoogleAnalytics map[string]*googleanalytics.Client
+	AppLovin        map[string]*applovin.Client
 	mutex           sync.Mutex
 }
 
@@ -341,6 +343,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connGoogleAnalytics, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GoogleAnalytics)...)
+
+	connAppLovin, err := m.GetAppLovinConnectionWithoutDefault(name)
+	if err == nil {
+		return connAppLovin, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.AppLovin)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -1164,6 +1172,26 @@ func (m *Manager) GetGoogleAnalyticsConnectionWithoutDefault(name string) (*goog
 	}
 	return db, nil
 }
+
+func (m *Manager) GetAppLovinConnection(name string) (*applovin.Client, error) {
+	db, err := m.GetAppLovinConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetAppLovinConnectionWithoutDefault("applovin-default")
+}
+
+func (m *Manager) GetAppLovinConnectionWithoutDefault(name string) (*applovin.Client, error) {
+	if m.AppLovin == nil {
+		return nil, errors.New("no applovin connections found")
+	}
+	db, ok := m.AppLovin[name]
+	if !ok {
+		return nil, errors.Errorf("applovin connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
 func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatformConnection) error {
 	m.mutex.Lock()
 	if m.BigQuery == nil {
@@ -2115,6 +2143,26 @@ func (m *Manager) AddApplovinMaxConnectionFromConfig(connection *config.Applovin
 	return nil
 }
 
+func (m *Manager) AddAppLovinConnectionFromConfig(connection *config.AppLovinConnection) error {
+	m.mutex.Lock()
+	if m.AppLovin == nil {
+		m.AppLovin = make(map[string]*applovin.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := applovin.NewClient(applovin.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.AppLovin[connection.Name] = client
+
+	return nil
+}
+
 func (m *Manager) AddPipedriveConnectionFromConfig(connection *config.PipedriveConnection) error {
 	m.mutex.Lock()
 	if m.Pipedrive == nil {
@@ -2266,6 +2314,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleAnalytics, connectionManager.AddGoogleAnalyticsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
 
 	wg.Wait()
 	return connectionManager, errList

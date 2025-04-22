@@ -247,6 +247,9 @@ environments:
         - name: "googleanalytics-1"
           service_account_file: "path/to/service_account.json"
           property_id: "12345"
+      applovin:
+        - name: "applovin-1"
+          api_key: "key-123"
   prod:
     connections:
       google_cloud_platform:
