@@ -401,6 +401,14 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "key-123",
 				},
 			},
+			Salesforce: []SalesforceConnection{
+				{
+					Name:     "salesforce-1",
+					Username: "username-123",
+					Password: "password-123",
+					Token:    "token-123",
+				},
+			},
 		},
 	}
 
