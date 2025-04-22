@@ -1109,6 +1109,7 @@ type Pipeline struct {
 	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
 	Commit             string                 `json:"commit"`
 	Snapshot           string                 `json:"snapshot"`
+	Agent              bool                   `json:"agent" yaml:"agent" mapstructure:"agent"`
 	TasksByType        map[AssetType][]*Asset `json:"-"`
 	tasksByName        map[string]*Asset
 }
