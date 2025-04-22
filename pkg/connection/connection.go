@@ -57,46 +57,46 @@ import (
 )
 
 type Manager struct {
-	BigQuery    map[string]*bigquery.Client
-	Snowflake   map[string]*snowflake.DB
-	Postgres    map[string]*postgres.Client
-	MsSQL       map[string]*mssql.DB
-	Databricks  map[string]*databricks.DB
-	Mongo       map[string]*mongo.DB
-	Mysql       map[string]*mysql.Client
-	Notion      map[string]*notion.Client
-	HANA        map[string]*hana.Client
-	Shopify     map[string]*shopify.Client
-	Gorgias     map[string]*gorgias.Client
-	Klaviyo     map[string]*klaviyo.Client
-	Adjust      map[string]*adjust.Client
-	Athena      map[string]*athena.DB
-	FacebookAds map[string]*facebookads.Client
-	Stripe      map[string]*stripe.Client
-	Appsflyer   map[string]*appsflyer.Client
-	Kafka       map[string]*kafka.Client
-	Airtable    map[string]*airtable.Client
-	DuckDB       map[string]*duck.Client
-	Hubspot      map[string]*hubspot.Client
-	GoogleSheets map[string]*gsheets.Client
-	Chess        map[string]*chess.Client
-	S3           map[string]*s3.Client
-	Slack        map[string]*slack.Client
-	Asana        map[string]*asana.Client
-	DynamoDB     map[string]*dynamodb.Client
-	Zendesk      map[string]*zendesk.Client
-	GoogleAds    map[string]*googleads.Client
-	TikTokAds    map[string]*tiktokads.Client
-	GitHub       map[string]*github.Client
-	AppStore     map[string]*appstore.Client
-	LinkedInAds  map[string]*linkedinads.Client
-	ClickHouse   map[string]*clickhouse.Client
-	GCS          map[string]*gcs.Client
-	ApplovinMax  map[string]*applovinmax.Client
-	Personio     map[string]*personio.Client
-	Kinesis      map[string]*kinesis.Client
-	Pipedrive    map[string]*pipedrive.Client
-	EMRSeverless map[string]*emr_serverless.Client
+	BigQuery        map[string]*bigquery.Client
+	Snowflake       map[string]*snowflake.DB
+	Postgres        map[string]*postgres.Client
+	MsSQL           map[string]*mssql.DB
+	Databricks      map[string]*databricks.DB
+	Mongo           map[string]*mongo.DB
+	Mysql           map[string]*mysql.Client
+	Notion          map[string]*notion.Client
+	HANA            map[string]*hana.Client
+	Shopify         map[string]*shopify.Client
+	Gorgias         map[string]*gorgias.Client
+	Klaviyo         map[string]*klaviyo.Client
+	Adjust          map[string]*adjust.Client
+	Athena          map[string]*athena.DB
+	FacebookAds     map[string]*facebookads.Client
+	Stripe          map[string]*stripe.Client
+	Appsflyer       map[string]*appsflyer.Client
+	Kafka           map[string]*kafka.Client
+	Airtable        map[string]*airtable.Client
+	DuckDB          map[string]*duck.Client
+	Hubspot         map[string]*hubspot.Client
+	GoogleSheets    map[string]*gsheets.Client
+	Chess           map[string]*chess.Client
+	S3              map[string]*s3.Client
+	Slack           map[string]*slack.Client
+	Asana           map[string]*asana.Client
+	DynamoDB        map[string]*dynamodb.Client
+	Zendesk         map[string]*zendesk.Client
+	GoogleAds       map[string]*googleads.Client
+	TikTokAds       map[string]*tiktokads.Client
+	GitHub          map[string]*github.Client
+	AppStore        map[string]*appstore.Client
+	LinkedInAds     map[string]*linkedinads.Client
+	ClickHouse      map[string]*clickhouse.Client
+	GCS             map[string]*gcs.Client
+	ApplovinMax     map[string]*applovinmax.Client
+	Personio        map[string]*personio.Client
+	Kinesis         map[string]*kinesis.Client
+	Pipedrive       map[string]*pipedrive.Client
+	EMRSeverless    map[string]*emr_serverless.Client
 	GoogleAnalytics map[string]*googleanalytics.Client
 	AppLovin        map[string]*applovin.Client
 }
@@ -355,7 +355,6 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connAppLovin, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.AppLovin)...)
-
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -1161,7 +1160,6 @@ func (m *Manager) GetPipedriveConnectionWithoutDefault(name string) (*pipedrive.
 	return db, nil
 }
 
-
 func (m *Manager) GetEMRServerlessConnection(name string) (*emr_serverless.Client, error) {
 	db, err := m.GetEMRServerlessConnectionWithoutDefault(name)
 	if err == nil {
@@ -1177,8 +1175,8 @@ func (m *Manager) GetEMRServerlessConnectionWithoutDefault(name string) (*emr_se
 	db, ok := m.EMRSeverless[name]
 	if !ok {
 		return nil, errors.Errorf("EMR Serverless connection not found for '%s'", name)
-  }
-  return db, nil
+	}
+	return db, nil
 }
 
 func (m *Manager) GetGoogleAnalyticsConnection(name string) (*googleanalytics.Client, error) {

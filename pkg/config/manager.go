@@ -68,8 +68,8 @@ type Connections struct {
 	GoogleAnalytics     []GoogleAnalyticsConnection     `yaml:"googleanalytics,omitempty" json:"googleanalytics,omitempty" mapstructure:"googleanalytics"`
 	AppLovin            []AppLovinConnection            `yaml:"applovin,omitempty" json:"applovin,omitempty" mapstructure:"applovin"`
 
-	byKey               map[string]any
-	typeNameMap         map[string]string
+	byKey       map[string]any
+	typeNameMap map[string]string
 }
 
 func (c *Connections) ConnectionsSummaryList() map[string]string {
@@ -719,7 +719,7 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 			return fmt.Errorf("failed to decode credentials: %w", err)
 		}
 		conn.Name = name
-    env.Connections.GoogleAnalytics = append(env.Connections.GoogleAnalytics, conn)		
+		env.Connections.GoogleAnalytics = append(env.Connections.GoogleAnalytics, conn)
 	case "applovin":
 		var conn AppLovinConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {

@@ -568,7 +568,6 @@ func (c PipedriveConnection) GetName() string {
 	return c.Name
 }
 
-
 type EMRServerlessConnection struct {
 	Name          string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessKey     string `yaml:"access_key" json:"access_key" mapstructure:"access_key"`
