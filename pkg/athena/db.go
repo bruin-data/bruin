@@ -108,8 +108,9 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObject *query.Query) (*
 
 	// Initialize the QueryResult struct
 	result := &query.QueryResult{
-		Columns: []string{},
-		Rows:    [][]interface{}{},
+		Columns:     []string{},
+		Rows:        [][]interface{}{},
+		ColumnTypes: []string{},
 	}
 
 	// Retrieve column names (schema)
@@ -118,6 +119,16 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObject *query.Query) (*
 		return nil, fmt.Errorf("failed to retrieve column names: %w", err)
 	}
 	result.Columns = columns
+
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve column types: %w", err)
+	}
+	typeStrings := make([]string, len(columnTypes))
+	for i, ct := range columnTypes {
+		typeStrings[i] = ct.DatabaseTypeName()
+	}
+	result.ColumnTypes = typeStrings
 
 	// Fetch rows and add them to the result
 	for rows.Next() {

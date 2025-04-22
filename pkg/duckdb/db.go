@@ -109,8 +109,9 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 
 	// Initialize QueryResult
 	result := &query.QueryResult{
-		Columns: []string{},
-		Rows:    [][]interface{}{},
+		Columns:     []string{},
+		ColumnTypes: []string{},
+		Rows:        [][]interface{}{},
 	}
 
 	// Fetch column names and populate Columns slice
@@ -118,9 +119,17 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 	if err != nil {
 		return nil, err
 	}
-	result.Columns = cols // Add column names to the result
+	result.Columns = cols 
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, err
+	}
+	typeStrings := make([]string, len(columnTypes))
+	for i, ct := range columnTypes {
+		typeStrings[i] = ct.DatabaseTypeName()
+	}
+	result.ColumnTypes = typeStrings
 
-	// Fetch rows and populate Rows slice
 	for rows.Next() {
 		columns := make([]interface{}, len(cols))
 		columnPointers := make([]interface{}, len(cols))

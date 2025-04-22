@@ -164,7 +164,11 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	result := &query.QueryResult{
 		Columns: []string{},
 		Rows:    [][]interface{}{},
+		ColumnTypes: []string{},
 	}
+
+	// Add a ColumnTypes field to store the types
+	columnTypes := []string{}
 
 	for {
 		var values []bigquery.Value
@@ -186,10 +190,15 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	if rows.Schema != nil {
 		for _, field := range rows.Schema {
 			result.Columns = append(result.Columns, field.Name)
+			// Extract the type information from the schema
+			columnTypes = append(columnTypes, string(field.Type))
 		}
 	} else {
 		return nil, errors.New("schema information is not available")
 	}
+
+	// Store the column types in the result
+	result.ColumnTypes = columnTypes
 
 	return result, nil
 }

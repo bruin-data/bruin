@@ -95,10 +95,12 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		return nil, errors.New("field descriptions are not available")
 	}
 
-	// Extract column names
+	
 	columns := make([]string, len(fieldDescriptions))
+	columnTypes := make([]string, len(fieldDescriptions))
 	for i, field := range fieldDescriptions {
 		columns[i] = field.Name()
+		columnTypes[i] = field.DatabaseTypeName()
 	}
 
 	collectedRows := make([][]interface{}, 0)
@@ -110,7 +112,11 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		collectedRows = append(collectedRows, result.values)
 	}
 
-	return &query.QueryResult{Columns: columns, Rows: collectedRows}, nil
+	return &query.QueryResult{
+		Columns:     columns,
+		ColumnTypes: columnTypes,
+		Rows:        collectedRows,
+	}, nil
 }
 
 // Test runs a simple query (SELECT 1) to validate the connection.
