@@ -586,3 +586,14 @@ type AppLovinConnection struct {
 func (c AppLovinConnection) GetName() string {
 	return c.Name
 }
+
+type SalesforceConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Token    string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
+}
+
+func (c SalesforceConnection) GetName() string {
+	return c.Name
+}
