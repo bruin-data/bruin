@@ -1,6 +1,5 @@
 /* @bruin
 
-name: product_price_summary
 type: duckdb.sql
 materialization:
   type: table
