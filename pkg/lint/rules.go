@@ -550,7 +550,7 @@ func ValidateEMRServerlessAsset(ctx context.Context, p *pipeline.Pipeline, asset
 		issues = append(issues, &Issue{
 			Task: asset,
 			Description: fmt.Sprintf(
-				"%s assets must be a yaml file",
+				"%s assets must be a YAML file",
 				pipeline.AssetTypeEMRServerlessSpark,
 			),
 		})
