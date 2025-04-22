@@ -1,0 +1,6 @@
+
+type: ingestr
+parameters:
+  source_connection: chess-default
+  source_table: profiles
+  destination: duckdb
