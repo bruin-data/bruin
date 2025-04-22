@@ -1,7 +1,7 @@
 # AWS EMR Serverless Spark
 Amazon EMR (Elastic MapReduce) Serverless is a deployment option for Amazon EMR that provides a serverless runtime environment. This simplifies the operation of analytics applications that use the latest open-source frameworks, such as Apache Spark and Apache Hive. With EMR Serverless, you don’t have to configure, optimize, secure, or operate clusters to run applications with these frameworks.
 
-Bruin supports EMR Serverless as a data platform. You can use bruin to integrate your spark workloads into complex pipelines that use different data technologies, all without leaving your terminal. 
+Bruin supports EMR Serverless as a data platform. You can use Bruin to integrate your Spark workloads into complex pipelines that use different data technologies, all without leaving your terminal. 
 
 ## Connection
 
