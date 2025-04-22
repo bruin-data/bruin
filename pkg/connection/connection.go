@@ -100,7 +100,7 @@ type Manager struct {
 	GoogleAnalytics map[string]*googleanalytics.Client
 	AppLovin        map[string]*applovin.Client
 
-	mutex *sync.Mutex
+	mutex sync.Mutex
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
