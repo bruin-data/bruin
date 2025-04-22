@@ -598,6 +598,5 @@ type AppLovinConnection struct {
 }
 
 func (c AppLovinConnection) GetName() string {
-
 	return c.Name
 }

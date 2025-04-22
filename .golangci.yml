@@ -50,6 +50,7 @@ linters:
     - gocyclo
     - exportloopref
     - godox
+    - nonamedreturns
   presets:
     - bugs
     - comment

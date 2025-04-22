@@ -151,7 +151,6 @@ type Job struct {
 }
 
 func (job Job) buildJobRunConfig() *emrserverless.StartJobRunInput {
-
 	driver := &types.JobDriverMemberSparkSubmit{
 		Value: types.SparkSubmit{
 			EntryPoint:          &job.params.Entrypoint,
@@ -193,7 +192,6 @@ type workspace struct {
 
 // prepareWorkspace sets up an s3 bucket for a pyspark job run.
 func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
-
 	workspaceURI, err := url.Parse(job.params.Workspace)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing workspace URL: %w", err)
@@ -245,8 +243,14 @@ func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error packaging files: %w", err)
 	}
-	zipper.Close()
-	fd.Seek(0, 0)
+	err = zipper.Close()
+	if err != nil {
+		return nil, fmt.Errorf("error closing zip writer: %w", err)
+	}
+	_, err = fd.Seek(0, 0)
+	if err != nil {
+		return nil, fmt.Errorf("error rewinding file %q: %w", fd.Name(), err)
+	}
 
 	contextURI := jobURI.JoinPath("context.zip")
 	_, err = job.s3Client.PutObject(ctx, &s3.PutObjectInput{
@@ -267,7 +271,6 @@ func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 }
 
 func (job Job) deleteWorkspace(ws *workspace) {
-
 	// todo(turtledev)
 	//   * pagination
 	//   * debug logs for errors
@@ -284,7 +287,7 @@ func (job Job) deleteWorkspace(ws *workspace) {
 	}
 
 	for _, obj := range objs.Contents {
-		job.s3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
+		job.s3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{ //nolint
 			Bucket: &ws.Root.Host,
 			Key:    obj.Key,
 		})
@@ -292,7 +295,6 @@ func (job Job) deleteWorkspace(ws *workspace) {
 }
 
 func (job Job) Run(ctx context.Context) (err error) {
-
 	if job.asset.Type == pipeline.AssetTypeEMRServerlessPyspark {
 		ws, err := job.prepareWorkspace(ctx)
 		if err != nil {
@@ -306,7 +308,7 @@ func (job Job) Run(ctx context.Context) (err error) {
 		if job.params.Logs == "" {
 			job.params.Logs = ws.Logs
 		}
-		defer job.deleteWorkspace(ws)
+		defer job.deleteWorkspace(ws) //nolint
 	}
 
 	run, err := job.emrClient.StartJobRun(ctx, job.buildJobRunConfig())

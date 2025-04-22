@@ -40,7 +40,7 @@ type S3LogConsumer struct {
 	state map[string]logState
 }
 
-func (l *S3LogConsumer) Next() (lines []LogLine) { //nolint
+func (l *S3LogConsumer) Next() (lines []LogLine) {
 	l.once.Do(func() {
 		l.state = make(map[string]logState)
 	})
@@ -52,7 +52,7 @@ func (l *S3LogConsumer) Next() (lines []LogLine) { //nolint
 	return lines
 }
 
-func (l *S3LogConsumer) listLogSources() (sources []LogSource) { //nolint
+func (l *S3LogConsumer) listLogSources() (sources []LogSource) {
 	jobPath := l.URI.JoinPath(
 		"applications",
 		l.AppID,

@@ -1,4 +1,4 @@
-package emr_serverless
+package emr_serverless //nolint
 
 import (
 	"archive/zip"
@@ -18,7 +18,7 @@ func packageContextWithPrefix(zw *zip.Writer, context fs.FS, prefix string) erro
 		if d.IsDir() {
 			// spark will refuse to treat a directory as a package
 			// if it doesn't contain __init__.py
-			zw.CreateHeader(&zip.FileHeader{
+			zw.CreateHeader(&zip.FileHeader{ //nolint
 				Name: path.Join(prefix, name, "__init__.py"),
 			})
 			return nil
