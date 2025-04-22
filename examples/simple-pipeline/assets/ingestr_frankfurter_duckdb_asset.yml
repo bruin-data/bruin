@@ -1,6 +1,6 @@
 name: public.frankfurter
 type: ingestr
-connection: postgres
+connection: duckdb
 
 parameters:
   source_connection: frankfurter
