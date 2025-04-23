@@ -53,13 +53,13 @@ func AssertByOutputJSON(i *Task) error {
 				if !exists {
 					return fmt.Errorf(
 						"mismatch at path %v. Expected json: %v, but found: %v",
-						d.Path, d.NewValues, d.OldValues,
+						d.Path, d.OldValues, d.NewValues,
 					)
 				}
 			} else {
 				return fmt.Errorf(
 					"mismatch at path %v. Expected json: %v, but found: %v",
-					d.Path, d.NewValues, d.OldValues,
+					d.Path, d.OldValues, d.NewValues,
 				)
 			}
 		}
