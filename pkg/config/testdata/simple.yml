@@ -257,7 +257,11 @@ environments:
       applovin:
         - name: "applovin-1"
           api_key: "key-123"
-
+      salesforce:
+        - name: "salesforce-1"
+          username: "username-123"
+          password: "password-123"
+          token: "token-123"
   prod:
     connections:
       google_cloud_platform:

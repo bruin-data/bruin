@@ -45,6 +45,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipedrive"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/s3"
+	"github.com/bruin-data/bruin/pkg/salesforce"
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/slack"
 	"github.com/bruin-data/bruin/pkg/snowflake"
@@ -99,8 +100,8 @@ type Manager struct {
 	EMRSeverless    map[string]*emr_serverless.Client
 	GoogleAnalytics map[string]*googleanalytics.Client
 	AppLovin        map[string]*applovin.Client
-
-	mutex sync.Mutex
+	Salesforce      map[string]*salesforce.Client
+	mutex           sync.Mutex
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
@@ -357,6 +358,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connAppLovin, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.AppLovin)...)
+
+	connSalesforce, err := m.GetSalesforceConnectionWithoutDefault(name)
+	if err == nil {
+		return connSalesforce, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Salesforce)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -1215,6 +1222,25 @@ func (m *Manager) GetAppLovinConnectionWithoutDefault(name string) (*applovin.Cl
 	db, ok := m.AppLovin[name]
 	if !ok {
 		return nil, errors.Errorf("applovin connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetSalesforceConnection(name string) (*salesforce.Client, error) {
+	db, err := m.GetSalesforceConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetSalesforceConnectionWithoutDefault("salesforce-default")
+}
+
+func (m *Manager) GetSalesforceConnectionWithoutDefault(name string) (*salesforce.Client, error) {
+	if m.Salesforce == nil {
+		return nil, errors.New("no salesforce connections found")
+	}
+	db, ok := m.Salesforce[name]
+	if !ok {
+		return nil, errors.Errorf("salesforce connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2229,6 +2255,27 @@ func (m *Manager) AddGoogleAnalyticsConnectionFromConfig(connection *config.Goog
 	return nil
 }
 
+func (m *Manager) AddSalesforceConnectionFromConfig(connection *config.SalesforceConnection) error {
+	m.mutex.Lock()
+	if m.Salesforce == nil {
+		m.Salesforce = make(map[string]*salesforce.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := salesforce.NewClient(salesforce.Config{
+		Username: connection.Username,
+		Password: connection.Password,
+		Token:    connection.Token,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Salesforce[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConnection) error {
 	m.mutex.Lock()
 	if m.Kinesis == nil {
@@ -2365,6 +2412,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleAnalytics, connectionManager.AddGoogleAnalyticsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Salesforce, connectionManager.AddSalesforceConnectionFromConfig, &wg, &errList, &mu)
 
 	wg.Wait()
 	return connectionManager, errList

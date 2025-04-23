@@ -250,6 +250,30 @@
         "secure"
       ]
     },
+    "SalesforceConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "token": {  
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "token"
+      ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -525,6 +549,12 @@
         "applovin": {
           "items": {
             "$ref": "#/$defs/AppLovinConnection"
+          },
+          "type": "array"
+        },
+        "salesforce": {
+          "items": {
+            "$ref": "#/$defs/SalesforceConnection"
           },
           "type": "array"
         }
