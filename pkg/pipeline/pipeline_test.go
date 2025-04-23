@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -1410,4 +1411,105 @@ func TestIntervalModifiers_ModifyDate(t *testing.T) {
 			assert.Equal(t, tt.wantTime, gotTime)
 		})
 	}
+}
+
+func TestBuilder_SetNameFromPath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		pipelinePath  string
+		assetPath     string
+		initialName   string
+		expectedName  string
+		expectedError bool
+	}{
+		{
+			name:         "simple assets path",
+			pipelinePath: filepath.Join("project", "pipeline.yml"),
+			assetPath:    filepath.Join("project", "assets", "myschema", "myasset.yml"),
+			initialName:  "",
+			expectedName: "myschema.myasset",
+		},
+		{
+			name:         "asset.yml extension",
+			pipelinePath: filepath.Join("project", "pipeline.yml"),
+			assetPath:    filepath.Join("project", "assets", "myschema", "mytable.asset.yml"),
+			initialName:  "",
+			expectedName: "myschema.mytable",
+		},
+		{
+			name:         "sql extension",
+			pipelinePath: filepath.Join("project", "pipeline.yml"),
+			assetPath:    filepath.Join("project", "assets", "myschema", "mytable.sql"),
+			initialName:  "",
+			expectedName: "myschema.mytable",
+		},
+		{
+			name:         "deep assets path",
+			pipelinePath: filepath.Join("project", "pipeline.yml"),
+			assetPath:    filepath.Join("project", "assets", "myschema", "subfolder", "myasset.yaml"),
+			initialName:  "",
+			expectedName: "myschema.subfolder.myasset",
+		},
+		{
+			name:         "existing name should not change",
+			pipelinePath: filepath.Join("project", "pipeline.yml"),
+			assetPath:    filepath.Join("project", "assets", "myschema", "myasset.yml"),
+			initialName:  "existing_name",
+			expectedName: "existing_name",
+		},
+		{
+			name:         "python extension",
+			pipelinePath: filepath.Join("project", "pipeline.yml"),
+			assetPath:    filepath.Join("project", "assets", "myschema", "mytable.py"),
+			initialName:  "",
+			expectedName: "myschema.mytable",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Create a new builder
+			builder := &pipeline.Builder{}
+
+			// Create test pipeline and asset
+			p := &pipeline.Pipeline{
+				DefinitionFile: pipeline.DefinitionFile{
+					Path: tt.pipelinePath,
+				},
+			}
+
+			asset := &pipeline.Asset{
+				Name: tt.initialName,
+				DefinitionFile: pipeline.TaskDefinitionFile{
+					Path: tt.assetPath,
+				},
+			}
+
+			// Call the function being tested
+			result, err := builder.SetNameFromPath(context.Background(), asset, p)
+
+			if tt.expectedError {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+
+			if tt.initialName != "" {
+				assert.Equal(t, tt.initialName, result.Name)
+			} else {
+				assert.Equal(t, tt.expectedName, result.Name)
+				assert.Equal(t, hash(tt.expectedName), result.ID)
+			}
+		})
+	}
+}
+
+func hash(s string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(s)))[:64]
 }

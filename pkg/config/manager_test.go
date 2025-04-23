@@ -388,6 +388,17 @@ func TestLoadFromFile(t *testing.T) {
 					APIToken: "token-123",
 				},
 			},
+			EMRServerless: []EMRServerlessConnection{
+				{
+					Name:          "emr_serverless-test",
+					AccessKey:     "AKIAEXAMPLE",
+					SecretKey:     "SECRETKEYEXAMPLE",
+					Region:        "us-west-2",
+					ApplicationID: "emr-app_123",
+					ExecutionRole: "arn:aws:iam::123456789012:role/example_role",
+					Workspace:     "s3://amzn-test-bucket/bruin-workspace/",
+				},
+			},
 			GoogleAnalytics: []GoogleAnalyticsConnection{
 				{
 					Name:               "googleanalytics-1",
@@ -404,6 +415,14 @@ func TestLoadFromFile(t *testing.T) {
 				{
 					Name:   "applovin-1",
 					APIKey: "key-123",
+				},
+			},
+			Salesforce: []SalesforceConnection{
+				{
+					Name:     "salesforce-1",
+					Username: "username-123",
+					Password: "password-123",
+					Token:    "token-123",
 				},
 			},
 		},

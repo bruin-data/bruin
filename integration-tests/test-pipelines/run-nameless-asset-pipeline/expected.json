@@ -1,0 +1,44 @@
+{
+  "columns": [
+    {
+      "name": "provider_id"
+    },
+    {
+      "name": "provider_name"
+    },
+    {
+      "name": "delivery_speed"
+    },
+    {
+      "name": "service_areas"
+    }
+  ],
+  "rows": [
+    [
+      1,
+      "SwiftCourier",
+      "2-day",
+      "North America, Asia"
+    ],
+    [
+      2,
+      "GlobalFreight",
+      "Standard",
+      "Worldwide"
+    ],
+    [
+      3,
+      "BudgetShip",
+      "Economy",
+      "Europe, Africa"
+    ],
+    [
+      4,
+      "ApexLogistics",
+      "Overnight",
+      "North America"
+    ]
+  ],
+  "connectionName": "duckdb-run-nameless-asset",
+  "query": "SELECT * FROM test2.shipping_providers"
+}

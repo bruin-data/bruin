@@ -39,3 +39,4 @@ default_connections:
   pipedrive: "my-pipedrive"
   googleanalytics: "my-googleanalytics"
   applovin: "my-applovin"
+  salesforce: "my-salesforce"
