@@ -611,3 +611,12 @@ type SalesforceConnection struct {
 func (c SalesforceConnection) GetName() string {
 	return c.Name
 }
+
+type SQLiteConnection struct {
+	Name string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Path string `yaml:"path,omitempty" json:"path" mapstructure:"path"`
+}
+
+func (c SQLiteConnection) GetName() string {
+	return c.Name
+}
