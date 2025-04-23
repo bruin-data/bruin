@@ -381,7 +381,6 @@ func PatchAsset() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			
 			if c.Bool("convert") {
 				return convertToBruinAsset(assetPath)
 			}
