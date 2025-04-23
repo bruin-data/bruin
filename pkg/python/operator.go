@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/user"
@@ -108,6 +110,7 @@ func (o *LocalOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 }
 
 func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
+
 	repo, err := o.repoFinder.Repo(t.ExecutableFile.Path)
 	if err != nil {
 		return errors.Wrap(err, "failed to find repo to run Python")
@@ -139,11 +142,11 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		}
 	}
 
+	perAssetEnvVariables := o.setupEnvironmentVariables(ctx, t)
+
 	envVariables := make(map[string]string)
-	if o.envVariables != nil {
-		for k, v := range o.envVariables {
-			envVariables[k] = v
-		}
+	for k, v := range perAssetEnvVariables {
+		envVariables[k] = v
 	}
 	envVariables["BRUIN_ASSET"] = t.Name
 
@@ -184,4 +187,23 @@ func findPathToExecutable(alternatives []string) (string, error) {
 	}
 
 	return "", errors.New("no executable found for alternatives: " + strings.Join(alternatives, ", "))
+}
+
+func (o LocalOperator) setupEnvironmentVariables(ctx context.Context, t *pipeline.Asset) map[string]string {
+
+	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
+	if ok && applyModifiers {
+		return o.envVariables
+	}
+	startDate := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
+	endDate := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
+	pipelineName := ctx.Value(pipeline.RunConfigPipelineName).(string)
+	runID := ctx.Value(pipeline.RunConfigRunID).(string)
+	fullRefresh := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+
+	modifiedStartDate := pipeline.ModifyDate(startDate, t.IntervalModifiers.Start)
+	modifiedEndDate := pipeline.ModifyDate(endDate, t.IntervalModifiers.End)
+	envVars := jinja.PythonEnvVariables(&modifiedStartDate, &modifiedEndDate, pipelineName, runID, fullRefresh)
+
+	return envVars
 }
