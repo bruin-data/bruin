@@ -274,6 +274,18 @@
         "token"
       ]
     },
+    "FrankfurterConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+        "required": [
+            "name"
+        ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -549,6 +561,12 @@
         "applovin": {
           "items": {
             "$ref": "#/$defs/AppLovinConnection"
+          },
+          "type": "array"
+        },
+        "frankfurter": {
+          "items": {
+            "$ref": "#/$defs/FrankfurterConnection"
           },
           "type": "array"
         },
