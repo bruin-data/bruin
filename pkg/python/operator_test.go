@@ -233,6 +233,8 @@ func TestLocalOperator_RunTask(t *testing.T) {
 }
 
 func TestLocalOperator_setupEnvironmentVariables(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		ctx         context.Context
@@ -315,7 +317,7 @@ func TestLocalOperator_setupEnvironmentVariables(t *testing.T) {
 			},
 		},
 		{
-			name: "with apply modifiers false",
+			name: "with apply modifiers false 2",
 			ctx: func() context.Context {
 				ctx := context.Background()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
@@ -359,6 +361,8 @@ func TestLocalOperator_setupEnvironmentVariables(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			o := LocalOperator{
 				envVariables: tt.existingEnv,
 			}
