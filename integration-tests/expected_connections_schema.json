@@ -274,6 +274,19 @@
         "token"
       ]
     },
+    "SQLiteConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": ["name", "path"]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -555,6 +568,12 @@
         "salesforce": {
           "items": {
             "$ref": "#/$defs/SalesforceConnection"
+          },
+          "type": "array"
+        },
+        "sqlite": {
+          "items": {
+            "$ref": "#/$defs/SQLiteConnection"
           },
           "type": "array"
         }

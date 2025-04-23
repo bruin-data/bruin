@@ -420,6 +420,12 @@ func TestLoadFromFile(t *testing.T) {
 					Token:    "token-123",
 				},
 			},
+			SQLite: []SQLiteConnection{
+				{
+					Name: "sqlite-1",
+					Path: "C:\\path\\to\\sqlite.db",
+				},
+			},
 		},
 	}
 
