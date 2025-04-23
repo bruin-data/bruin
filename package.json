@@ -13,6 +13,6 @@
     "esbuild": "^0.25.0",
     "highlight.js": "^11.10.0",
     "markdown-it": "^14.1.0",
-    "vite": "^6.2.0"
+    "vite": "^6.2.6"
   }
 }
