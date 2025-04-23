@@ -128,6 +128,7 @@ func Run(isDebug *bool) *cli.Command {
 			&cli.BoolFlag{
 				Name:  "apply-interval-modifiers",
 				Usage: "apply interval modifiers",
+				DefaultText: "false",
 			},
 			&cli.BoolFlag{
 				Name:  "use-pip",

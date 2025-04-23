@@ -190,11 +190,12 @@ func findPathToExecutable(alternatives []string) (string, error) {
 }
 
 func (o LocalOperator) setupEnvironmentVariables(ctx context.Context, t *pipeline.Asset) map[string]string {
-
-	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
-	if ok && applyModifiers {
-		return o.envVariables
+	if val := ctx.Value(pipeline.RunConfigApplyIntervalModifiers); val != nil {
+		if applyModifiers, ok := val.(bool); ok && !applyModifiers {
+			return o.envVariables
+		}
 	}
+
 	startDate := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
 	endDate := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
 	pipelineName := ctx.Value(pipeline.RunConfigPipelineName).(string)
