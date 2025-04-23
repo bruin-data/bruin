@@ -258,6 +258,8 @@ environments:
       applovin:
         - name: "applovin-1"
           api_key: "key-123"
+      frankfurter:
+        - name: "frankfurter-1"
       salesforce:
         - name: "salesforce-1"
           username: "username-123"

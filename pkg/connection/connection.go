@@ -25,6 +25,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/dynamodb"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/facebookads"
+	"github.com/bruin-data/bruin/pkg/frankfurter"
 	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/github"
 	"github.com/bruin-data/bruin/pkg/googleads"
@@ -98,6 +99,7 @@ type Manager struct {
 	Personio        map[string]*personio.Client
 	Kinesis         map[string]*kinesis.Client
 	Pipedrive       map[string]*pipedrive.Client
+	Frankfurter     map[string]*frankfurter.Client
 	EMRSeverless    map[string]*emr_serverless.Client
 	GoogleAnalytics map[string]*googleanalytics.Client
 	AppLovin        map[string]*applovin.Client
@@ -361,12 +363,16 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.AppLovin)...)
 
+	connFrankfurter, err := m.GetFrankfurterConnectionWithoutDefault(name)
+	if err == nil {
+		return connFrankfurter, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Frankfurter)...)
 	connSalesforce, err := m.GetSalesforceConnectionWithoutDefault(name)
 	if err == nil {
 		return connSalesforce, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Salesforce)...)
-
 	connSQLite, err := m.GetSQLiteConnectionWithoutDefault(name)
 	if err == nil {
 		return connSQLite, nil
@@ -1230,6 +1236,24 @@ func (m *Manager) GetAppLovinConnectionWithoutDefault(name string) (*applovin.Cl
 	db, ok := m.AppLovin[name]
 	if !ok {
 		return nil, errors.Errorf("applovin connection not found for '%s'", name)
+	}
+	return db, nil
+}
+func (m *Manager) GetFrankfurterConnection(name string) (*frankfurter.Client, error) {
+	db, err := m.GetFrankfurterConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetFrankfurterConnectionWithoutDefault("frankfurter-default")
+}
+
+func (m *Manager) GetFrankfurterConnectionWithoutDefault(name string) (*frankfurter.Client, error) {
+	if m.Frankfurter == nil {
+		return nil, errors.New("no frankfurter connections found")
+	}
+	db, ok := m.Frankfurter[name]
+	if !ok {
+		return nil, errors.Errorf("frankfurter connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2321,7 +2345,6 @@ func (m *Manager) AddSQLiteConnectionFromConfig(connection *config.SQLiteConnect
 	m.SQLite[connection.Name] = client
 	return nil
 }
-
 func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConnection) error {
 	m.mutex.Lock()
 	if m.Kinesis == nil {
@@ -2340,6 +2363,24 @@ func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Kinesis[connection.Name] = client
+	return nil
+}
+
+func (m *Manager) AddFrankfurterConnectionFromConfig(connection *config.FrankfurterConnection) error {
+	m.mutex.Lock()
+	if m.Frankfurter == nil {
+		m.Frankfurter = make(map[string]*frankfurter.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := frankfurter.NewClient(frankfurter.Config{})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Frankfurter[connection.Name] = client
+	m.Frankfurter[connection.Name] = client
 	return nil
 }
 
@@ -2458,6 +2499,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleAnalytics, connectionManager.AddGoogleAnalyticsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Salesforce, connectionManager.AddSalesforceConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.SQLite, connectionManager.AddSQLiteConnectionFromConfig, &wg, &errList, &mu)
 

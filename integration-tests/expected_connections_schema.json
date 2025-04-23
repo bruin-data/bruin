@@ -274,18 +274,33 @@
         "token"
       ]
     },
-    "SQLiteConnection": {
+      "SQLiteConnection": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name","path"
+        ]
+      },
+    "FrankfurterConnection": {
       "properties": {
         "name": {
-          "type": "string"
-        },
-        "path": {
           "type": "string"
         }
       },
       "additionalProperties": false,
       "type": "object",
-      "required": ["name", "path"]
+        "required": [
+            "name"
+        ]
+
     },
     "Connections": {
       "properties": {
@@ -562,6 +577,12 @@
         "applovin": {
           "items": {
             "$ref": "#/$defs/AppLovinConnection"
+          },
+          "type": "array"
+        },
+        "frankfurter": {
+          "items": {
+            "$ref": "#/$defs/FrankfurterConnection"
           },
           "type": "array"
         },

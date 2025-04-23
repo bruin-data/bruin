@@ -67,6 +67,7 @@ type Connections struct {
 	EMRServerless       []EMRServerlessConnection       `yaml:"emr_serverless,omitempty" json:"emr_serverless,omitempty" mapstructure:"emr_serverless"`
 	GoogleAnalytics     []GoogleAnalyticsConnection     `yaml:"googleanalytics,omitempty" json:"googleanalytics,omitempty" mapstructure:"googleanalytics"`
 	AppLovin            []AppLovinConnection            `yaml:"applovin,omitempty" json:"applovin,omitempty" mapstructure:"applovin"`
+	Frankfurter         []FrankfurterConnection         `yaml:"frankfurter,omitempty" json:"frankfurter,omitempty" mapstructure:"frankfurter"`
 	Salesforce          []SalesforceConnection          `yaml:"salesforce,omitempty" json:"salesforce,omitempty" mapstructure:"salesforce"`
 	SQLite              []SQLiteConnection              `yaml:"sqlite,omitempty" json:"sqlite,omitempty" mapstructure:"sqlite"`
 	byKey               map[string]any
@@ -721,6 +722,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.GoogleAnalytics = append(env.Connections.GoogleAnalytics, conn)
+	case "frankfurter":
+		var conn FrankfurterConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Frankfurter = append(env.Connections.Frankfurter, conn)
 	case "applovin":
 		var conn AppLovinConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -865,6 +873,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.GoogleAnalytics = removeConnection(env.Connections.GoogleAnalytics, connectionName)
 	case "applovin":
 		env.Connections.AppLovin = removeConnection(env.Connections.AppLovin, connectionName)
+	case "frankfurter":
+		env.Connections.Frankfurter = removeConnection(env.Connections.Frankfurter, connectionName)
 	case "salesforce":
 		env.Connections.Salesforce = removeConnection(env.Connections.Salesforce, connectionName)
 	case "sqlite":

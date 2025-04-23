@@ -4,6 +4,7 @@
   "schedule": "",
   "start_date": "",
   "snapshot": "",
+  "agent": false,
   "definition_file": {
     "name": "pipeline.yml",
     "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\pipeline.yml"
