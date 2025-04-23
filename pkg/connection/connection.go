@@ -378,17 +378,20 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	if err == nil {
 		return connFrankfurter, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Frankfurter)...)
+	availableConnectionNames = append(availableConnectionNames, CollectSlice(maps.Keys(m.Frankfurter))...)
 	connSalesforce, err := m.GetSalesforceConnectionWithoutDefault(name)
 	if err == nil {
 		return connSalesforce, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Salesforce)...)
+
 	connSQLite, err := m.GetSQLiteConnectionWithoutDefault(name)
 	if err == nil {
 		return connSQLite, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.SQLite)...)
+	availableConnectionNames = append(availableConnectionNames, CollectSlice(maps.Keys(m.SQLite))...)
+
+	availableConnectionNames = append(availableConnectionNames, CollectSlice(maps.Keys(m.Salesforce))...)
+
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
