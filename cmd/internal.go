@@ -365,7 +365,7 @@ func PatchAsset() *cli.Command {
 			&cli.StringFlag{
 				Name:     "body",
 				Usage:    "the JSON object containing the patch body",
-				Required: true,
+				Required: false,
 			},
 			&cli.BoolFlag{
 				Name:        "convert",
