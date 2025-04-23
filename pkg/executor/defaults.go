@@ -173,4 +173,7 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 	pipeline.AssetTypeEMRServerlessSpark: {
 		scheduler.TaskInstanceTypeMain: NoOpOperator{},
 	},
+	pipeline.AssetTypeEMRServerlessPyspark: {
+		scheduler.TaskInstanceTypeMain: NoOpOperator{},
+	},
 }

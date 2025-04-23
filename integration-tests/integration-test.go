@@ -389,6 +389,39 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 				},
 			},
 		},
+		{
+			Name: "Run pipeline with nameless asset",
+			Steps: []e2e.Task{
+				{
+					Name:    "create the table",
+					Command: binary,
+					Args:    []string{"run", "--env", "env-run-nameless-asset", filepath.Join(currentFolder, "test-pipelines/run-nameless-asset-pipeline")},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "query the table",
+					Command: binary,
+					Args:    []string{"query", "--env", "env-run-nameless-asset", "--asset", filepath.Join(currentFolder, "test-pipelines/run-nameless-asset-pipeline/assets/test2/shipping_providers.sql"), "--query", "SELECT * FROM test2.shipping_providers", "--output", "json"},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+						Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/run-nameless-asset-pipeline/expected.json")),
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByOutputJSON,
+					},
+				},
+			},
+		},
 	}
 }
 

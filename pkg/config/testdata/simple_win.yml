@@ -243,6 +243,14 @@ environments:
       pipedrive:
         - name: "pipedrive-1"
           api_token: "token-123"
+      emr_serverless:
+        - name: emr_serverless-test
+          access_key: AKIAEXAMPLE
+          secret_key: SECRETKEYEXAMPLE
+          region: us-west-2
+          application_id: emr-app_123
+          execution_role: arn:aws:iam::123456789012:role/example_role
+          workspace: s3://amzn-test-bucket/bruin-workspace/
       googleanalytics:
         - name: "googleanalytics-1"
           service_account_file: "path/to/service_account.json"
@@ -255,6 +263,7 @@ environments:
           username: "username-123"
           password: "password-123"
           token: "token-123"
+
   prod:
     connections:
       google_cloud_platform:

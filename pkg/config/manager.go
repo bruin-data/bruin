@@ -64,6 +64,7 @@ type Connections struct {
 	Personio            []PersonioConnection            `yaml:"personio,omitempty" json:"personio,omitempty" mapstructure:"personio"`
 	Kinesis             []KinesisConnection             `yaml:"kinesis,omitempty" json:"kinesis,omitempty" mapstructure:"kinesis"`
 	Pipedrive           []PipedriveConnection           `yaml:"pipedrive,omitempty" json:"pipedrive,omitempty" mapstructure:"pipedrive"`
+	EMRServerless       []EMRServerlessConnection       `yaml:"emr_serverless,omitempty" json:"emr_serverless,omitempty" mapstructure:"emr_serverless"`
 	GoogleAnalytics     []GoogleAnalyticsConnection     `yaml:"googleanalytics,omitempty" json:"googleanalytics,omitempty" mapstructure:"googleanalytics"`
 	AppLovin            []AppLovinConnection            `yaml:"applovin,omitempty" json:"applovin,omitempty" mapstructure:"applovin"`
 	Salesforce          []SalesforceConnection          `yaml:"salesforce,omitempty" json:"salesforce,omitempty" mapstructure:"salesforce"`
@@ -704,6 +705,14 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Pipedrive = append(env.Connections.Pipedrive, conn)
+	case "emr_serverless":
+		var conn EMRServerlessConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.EMRServerless = append(env.Connections.EMRServerless, conn)
+
 	case "googleanalytics":
 		var conn GoogleAnalyticsConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -842,6 +851,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Kinesis = removeConnection(env.Connections.Kinesis, connectionName)
 	case "pipedrive":
 		env.Connections.Pipedrive = removeConnection(env.Connections.Pipedrive, connectionName)
+	case "emr_serverless":
+		env.Connections.EMRServerless = removeConnection(env.Connections.EMRServerless, connectionName)
 	case "googleanalytics":
 		env.Connections.GoogleAnalytics = removeConnection(env.Connections.GoogleAnalytics, connectionName)
 	case "applovin":
@@ -942,6 +953,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.LinkedInAds, source.LinkedInAds)
 	mergeConnectionList(&c.GCS, source.GCS)
 	mergeConnectionList(&c.Personio, source.Personio)
+	mergeConnectionList(&c.EMRServerless, source.EMRServerless)
 	mergeConnectionList(&c.GoogleAnalytics, source.GoogleAnalytics)
 	mergeConnectionList(&c.AppLovin, source.AppLovin)
 	mergeConnectionList(&c.Salesforce, source.Salesforce)

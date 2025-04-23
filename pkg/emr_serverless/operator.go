@@ -1,12 +1,15 @@
 package emr_serverless //nolint
 
 import (
+	"archive/zip"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/url"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -18,10 +21,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/executor"
+	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/google/uuid"
 )
 
 var terminalJobRunStates = []types.JobRunState{
@@ -30,8 +34,12 @@ var terminalJobRunStates = []types.JobRunState{
 	types.JobRunStateCancelled,
 }
 
+type connectionFetcher interface {
+	GetEMRServerlessConnection(name string) (*Client, error)
+}
+
 type BasicOperator struct {
-	connections map[string]config.AwsConnection
+	connection connectionFetcher
 }
 
 func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
@@ -39,21 +47,24 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 		ctx.Value(executor.KeyPrinter).(io.Writer), "", 0,
 	)
 	asset := ti.GetAsset()
-	pipeline := ti.GetPipeline()
-	connID, err := pipeline.GetConnectionNameForAsset(asset)
+	connID, err := ti.GetPipeline().GetConnectionNameForAsset(asset)
 	if err != nil {
 		return fmt.Errorf("error looking up connection name: %w", err)
 	}
-	conn, exists := op.connections[connID]
+	conn, err := op.connection.GetEMRServerlessConnection(connID)
 
-	if !exists {
-		return fmt.Errorf("aws connection not found for '%s'", connID)
+	if err != nil {
+		return fmt.Errorf("error fetching connection: %w", err)
 	}
 
-	params := parseParams(asset.Parameters)
+	if asset.Type == pipeline.AssetTypeEMRServerlessPyspark && conn.Workspace == "" {
+		return fmt.Errorf("connection %q is missing field: workspace", connID)
+	}
+
+	params := parseParams(conn, asset.Parameters)
 	cfg, err := awsCfg.LoadDefaultConfig(
 		ctx,
-		awsCfg.WithRegion(params.Region),
+		awsCfg.WithRegion(conn.Region),
 		awsCfg.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(
 				conn.AccessKey, conn.SecretKey, "",
@@ -70,6 +81,7 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 		emrClient: emrserverless.NewFromConfig(cfg),
 		params:    params,
 		asset:     asset,
+		pipeline:  ti.GetPipeline(),
 		poll: &PollTimer{
 			BaseDuration: time.Second,
 
@@ -81,14 +93,10 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	return job.Run(ctx)
 }
 
-func NewBasicOperator(cfg *config.Config) (*BasicOperator, error) {
-	op := &BasicOperator{
-		connections: make(map[string]config.AwsConnection),
-	}
-	for _, conn := range cfg.SelectedEnvironment.Connections.AwsConnection {
-		op.connections[conn.Name] = conn
-	}
-	return op, nil
+func NewBasicOperator(conn connectionFetcher) (*BasicOperator, error) {
+	return &BasicOperator{
+		connection: conn,
+	}, nil
 }
 
 type JobRunParams struct {
@@ -100,34 +108,36 @@ type JobRunParams struct {
 	Timeout       time.Duration
 	Region        string
 	Logs          string
+	Workspace     string
 }
 
-func parseParams(m map[string]string) *JobRunParams {
-	params := JobRunParams{
-		ApplicationID: m["application_id"],
-		ExecutionRole: m["execution_role"],
-		Entrypoint:    m["entrypoint"],
-		Config:        m["config"],
-		Region:        m["region"],
-		Logs:          m["logs"],
+func parseParams(cfg *Client, params map[string]string) *JobRunParams {
+	jobParams := JobRunParams{
+		ApplicationID: cfg.ApplicationID,
+		ExecutionRole: cfg.ExecutionRole,
+		Region:        cfg.Region,
+		Entrypoint:    params["entrypoint"],
+		Config:        params["config"],
+		Logs:          params["logs"],
+		Workspace:     cfg.Workspace,
 	}
 
-	if m["timeout"] != "" {
-		t, err := time.ParseDuration(m["timeout"])
+	if params["timeout"] != "" {
+		t, err := time.ParseDuration(params["timeout"])
 		if err == nil {
-			params.Timeout = t
+			jobParams.Timeout = t
 		}
 	}
-	if m["args"] != "" {
-		arglist := strings.Split(strings.TrimSpace(m["args"]), " ")
+	if params["args"] != "" {
+		arglist := strings.Split(strings.TrimSpace(params["args"]), " ")
 		for _, arg := range arglist {
 			arg = strings.TrimSpace(arg)
 			if arg != "" {
-				params.Args = append(params.Args, arg)
+				jobParams.Args = append(jobParams.Args, arg)
 			}
 		}
 	}
-	return &params
+	return &jobParams
 }
 
 type Job struct {
@@ -135,23 +145,29 @@ type Job struct {
 	emrClient *emrserverless.Client
 	s3Client  *s3.Client
 	asset     *pipeline.Asset
+	pipeline  *pipeline.Pipeline
 	params    *JobRunParams
 	poll      *PollTimer
 }
 
 func (job Job) buildJobRunConfig() *emrserverless.StartJobRunInput {
+	driver := &types.JobDriverMemberSparkSubmit{
+		Value: types.SparkSubmit{
+			EntryPoint:          &job.params.Entrypoint,
+			EntryPointArguments: job.params.Args,
+		},
+	}
+
+	if job.params.Config != "" {
+		driver.Value.SparkSubmitParameters = &job.params.Config
+	}
+
 	cfg := &emrserverless.StartJobRunInput{
 		ApplicationId:           &job.params.ApplicationID,
 		Name:                    &job.asset.Name,
 		ExecutionRoleArn:        &job.params.ExecutionRole,
 		ExecutionTimeoutMinutes: aws.Int64(int64(job.params.Timeout.Minutes())),
-		JobDriver: &types.JobDriverMemberSparkSubmit{
-			Value: types.SparkSubmit{
-				EntryPoint:            &job.params.Entrypoint,
-				EntryPointArguments:   job.params.Args,
-				SparkSubmitParameters: &job.params.Config,
-			},
-		},
+		JobDriver:               driver,
 	}
 
 	if job.params.Logs != "" {
@@ -167,7 +183,133 @@ func (job Job) buildJobRunConfig() *emrserverless.StartJobRunInput {
 	return cfg
 }
 
-func (job Job) Run(ctx context.Context) (err error) { //nolint
+type workspace struct {
+	Root       *url.URL
+	Entrypoint string
+	Files      string
+	Logs       string
+}
+
+// prepareWorkspace sets up an s3 bucket for a pyspark job run.
+func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
+	workspaceURI, err := url.Parse(job.params.Workspace)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing workspace URL: %w", err)
+	}
+	jobID, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("error generating job ID: %w", err)
+	}
+	jobURI := workspaceURI.JoinPath(job.pipeline.Name, jobID.String())
+
+	scriptPath := job.asset.ExecutableFile.Path
+	fd, err := os.Open(scriptPath)
+	if err != nil {
+		return nil, fmt.Errorf("error opening file %q: %w", scriptPath, err)
+	}
+
+	defer fd.Close()
+
+	scriptURI := jobURI.JoinPath(job.asset.ExecutableFile.Name)
+	_, err = job.s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: &scriptURI.Host,
+		Key:    aws.String(strings.TrimPrefix(scriptURI.Path, "/")),
+		Body:   fd,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error uploading entrypoint %q: %w", scriptURI, err)
+	}
+
+	fd, err = os.CreateTemp("", "bruin-spark-context-*.zip")
+	if err != nil {
+		return nil, fmt.Errorf("error creating temporary file %w", err)
+	}
+	defer os.Remove(fd.Name())
+	defer fd.Close()
+
+	zipper := zip.NewWriter(fd)
+	defer zipper.Close()
+
+	pipelineRoot, err := path.GetPipelineRootFromTask(scriptPath, []string{"pipeline.yaml", "pipeline.yml"})
+	if err != nil {
+		return nil, fmt.Errorf("error finding pipeline root: %w", err)
+	}
+
+	err = packageContextWithPrefix(
+		zipper,
+		os.DirFS(pipelineRoot),
+		filepath.Base(pipelineRoot),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error packaging files: %w", err)
+	}
+	err = zipper.Close()
+	if err != nil {
+		return nil, fmt.Errorf("error closing zip writer: %w", err)
+	}
+	_, err = fd.Seek(0, 0)
+	if err != nil {
+		return nil, fmt.Errorf("error rewinding file %q: %w", fd.Name(), err)
+	}
+
+	contextURI := jobURI.JoinPath("context.zip")
+	_, err = job.s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: &contextURI.Host,
+		Key:    aws.String(strings.TrimPrefix(contextURI.Path, "/")),
+		Body:   fd,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error uploading context %q: %w", contextURI, err)
+	}
+
+	return &workspace{
+		Root:       jobURI,
+		Entrypoint: scriptURI.String(),
+		Files:      contextURI.String(),
+		Logs:       workspaceURI.JoinPath("logs").String(),
+	}, nil
+}
+
+func (job Job) deleteWorkspace(ws *workspace) {
+	// todo(turtledev)
+	//   * pagination
+	//   * debug logs for errors
+	//   * timeout for cleanup
+
+	listArgs := &s3.ListObjectsV2Input{
+		Bucket: &ws.Root.Host,
+		Prefix: aws.String(strings.TrimPrefix(ws.Root.Path, "/")),
+	}
+
+	objs, err := job.s3Client.ListObjectsV2(context.Background(), listArgs)
+	if err != nil {
+		return
+	}
+
+	for _, obj := range objs.Contents {
+		job.s3Client.DeleteObject(context.Background(), &s3.DeleteObjectInput{ //nolint
+			Bucket: &ws.Root.Host,
+			Key:    obj.Key,
+		})
+	}
+}
+
+func (job Job) Run(ctx context.Context) (err error) {
+	if job.asset.Type == pipeline.AssetTypeEMRServerlessPyspark {
+		ws, err := job.prepareWorkspace(ctx)
+		if err != nil {
+			return fmt.Errorf("error preparing workspace: %w", err)
+		}
+		job.params.Entrypoint = ws.Entrypoint
+		job.params.Config += " --conf spark.submit.pyFiles=" + ws.Files
+
+		// only use workspace for logs if the
+		// asset doesn't explicitly specify it
+		if job.params.Logs == "" {
+			job.params.Logs = ws.Logs
+		}
+		defer job.deleteWorkspace(ws) //nolint
+	}
 
 	run, err := job.emrClient.StartJobRun(ctx, job.buildJobRunConfig())
 	if err != nil {
@@ -176,6 +318,7 @@ func (job Job) Run(ctx context.Context) (err error) { //nolint
 	job.logger.Printf("created job run: %s", *run.JobRunId)
 	defer func() { //nolint
 		if err != nil {
+			// todo(turtledev): timeout for cancellation
 			job.logger.Printf("error detected. cancelling job run.")
 			job.emrClient.CancelJobRun(context.Background(), &emrserverless.CancelJobRunInput{ //nolint
 				ApplicationId: &job.params.ApplicationID,

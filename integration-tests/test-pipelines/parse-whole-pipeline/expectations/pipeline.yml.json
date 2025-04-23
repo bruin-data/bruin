@@ -104,13 +104,13 @@
       "instance": "",
       "owner": "",
       "executable_file": {
-        "name": "chess_profiles.asset.yml",
-        "path": "__ASSETSDIR__chess_profiles.asset.yml",
+        "name": "chess_playground.profiles.asset.yml",
+        "path": "__ASSETSDIR__chess_playground_profiles.asset.yml",
         "content": ""
       },
       "definition_file": {
-        "name": "chess_profiles.asset.yml",
-        "path": "__ASSETSDIR__chess_profiles.asset.yml",
+        "name": "chess_playground.profiles.asset.yml",
+        "path": "__ASSETSDIR__chess_playground.profiles.asset.yml",
         "type": "yaml"
       },
       "parameters": {

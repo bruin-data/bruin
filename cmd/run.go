@@ -269,7 +269,7 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to build asset: %v\n", err)
 					return cli.Exit("", 1)
 				}
-				task, err = DefaultPipelineBuilder.MutateAsset(c.Context, task, nil)
+				task, err = DefaultPipelineBuilder.MutateAsset(c.Context, task, pipelineInfo.Pipeline)
 				if err != nil {
 					errorPrinter.Printf("Failed to mutate asset: %v\n", err)
 					return cli.Exit("", 1)
@@ -948,12 +948,19 @@ func setupExecutors(
 		}
 	}
 
-	if s.WillRunTaskOfType(pipeline.AssetTypeEMRServerlessSpark) {
-		emrServerlessOperator, err := emr_serverless.NewBasicOperator(config)
-		if err != nil {
-			return nil, err
+	emrServerlessAssetTypes := []pipeline.AssetType{
+		pipeline.AssetTypeEMRServerlessSpark,
+		pipeline.AssetTypeEMRServerlessPyspark,
+	}
+
+	for _, typ := range emrServerlessAssetTypes {
+		if s.WillRunTaskOfType(typ) {
+			emrServerlessOperator, err := emr_serverless.NewBasicOperator(conn)
+			if err != nil {
+				return nil, err
+			}
+			mainExecutors[typ][scheduler.TaskInstanceTypeMain] = emrServerlessOperator
 		}
-		mainExecutors[pipeline.AssetTypeEMRServerlessSpark][scheduler.TaskInstanceTypeMain] = emrServerlessOperator
 	}
 
 	return mainExecutors, nil
