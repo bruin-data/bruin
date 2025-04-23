@@ -52,7 +52,6 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 		return fmt.Errorf("error looking up connection name: %w", err)
 	}
 	conn, err := op.connection.GetEMRServerlessConnection(connID)
-
 	if err != nil {
 		return fmt.Errorf("error fetching connection: %w", err)
 	}
