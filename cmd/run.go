@@ -126,8 +126,8 @@ func Run(isDebug *bool) *cli.Command {
 				EnvVars: []string{"BRUIN_FULL_REFRESH"},
 			},
 			&cli.BoolFlag{
-				Name:  "apply-interval-modifiers",
-				Usage: "apply interval modifiers",
+				Name:        "apply-interval-modifiers",
+				Usage:       "apply interval modifiers",
 				DefaultText: "false",
 			},
 			&cli.BoolFlag{

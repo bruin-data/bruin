@@ -110,7 +110,6 @@ func (o *LocalOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 }
 
 func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
-
 	repo, err := o.repoFinder.Repo(t.ExecutableFile.Path)
 	if err != nil {
 		return errors.Wrap(err, "failed to find repo to run Python")
@@ -189,18 +188,36 @@ func findPathToExecutable(alternatives []string) (string, error) {
 	return "", errors.New("no executable found for alternatives: " + strings.Join(alternatives, ", "))
 }
 
-func (o LocalOperator) setupEnvironmentVariables(ctx context.Context, t *pipeline.Asset) map[string]string {
+func (o *LocalOperator) setupEnvironmentVariables(ctx context.Context, t *pipeline.Asset) map[string]string {
 	if val := ctx.Value(pipeline.RunConfigApplyIntervalModifiers); val != nil {
 		if applyModifiers, ok := val.(bool); ok && !applyModifiers {
 			return o.envVariables
 		}
 	}
 
-	startDate := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
-	endDate := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
-	pipelineName := ctx.Value(pipeline.RunConfigPipelineName).(string)
-	runID := ctx.Value(pipeline.RunConfigRunID).(string)
-	fullRefresh := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+	startDate, ok := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
+	if !ok {
+		return o.envVariables
+	}
+
+	endDate, ok := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
+	if !ok {
+		return o.envVariables
+	}
+
+	pipelineName, ok := ctx.Value(pipeline.RunConfigPipelineName).(string)
+	if !ok {
+		return o.envVariables
+	}
+
+	runID, ok := ctx.Value(pipeline.RunConfigRunID).(string)
+	if !ok {
+		return o.envVariables
+	}
+	fullRefresh, ok := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+	if !ok {
+		return o.envVariables
+	}
 
 	modifiedStartDate := pipeline.ModifyDate(startDate, t.IntervalModifiers.Start)
 	modifiedEndDate := pipeline.ModifyDate(endDate, t.IntervalModifiers.End)

@@ -237,14 +237,14 @@ func TestLocalOperator_setupEnvironmentVariables(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		ctx         context.Context
+		setupCtx    func() context.Context
 		asset       *pipeline.Asset
 		existingEnv map[string]string
 		expectedEnv map[string]string
 	}{
 		{
 			name: "with apply modifiers false",
-			ctx: func() context.Context {
+			setupCtx: func() context.Context {
 				ctx := context.Background()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
@@ -253,14 +253,14 @@ func TestLocalOperator_setupEnvironmentVariables(t *testing.T) {
 				ctx = context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, false)
 				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, true)
 				return ctx
-			}(),
+			},
 			asset:       &pipeline.Asset{},
 			existingEnv: map[string]string{"EXISTING": "value"},
 			expectedEnv: map[string]string{"EXISTING": "value"},
 		},
 		{
 			name: "with days modifier",
-			ctx: func() context.Context {
+			setupCtx: func() context.Context {
 				ctx := context.Background()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
@@ -268,7 +268,7 @@ func TestLocalOperator_setupEnvironmentVariables(t *testing.T) {
 				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
 				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, true)
 				return ctx
-			}(),
+			},
 			asset: &pipeline.Asset{
 				IntervalModifiers: pipeline.IntervalModifiers{
 					Start: pipeline.TimeModifier{Days: 1},
@@ -289,7 +289,7 @@ func TestLocalOperator_setupEnvironmentVariables(t *testing.T) {
 		},
 		{
 			name: "with hours modifier",
-			ctx: func() context.Context {
+			setupCtx: func() context.Context {
 				ctx := context.Background()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC))
@@ -297,7 +297,7 @@ func TestLocalOperator_setupEnvironmentVariables(t *testing.T) {
 				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
 				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, true)
 				return ctx
-			}(),
+			},
 			asset: &pipeline.Asset{
 				IntervalModifiers: pipeline.IntervalModifiers{
 					Start: pipeline.TimeModifier{Hours: 2},
@@ -318,7 +318,7 @@ func TestLocalOperator_setupEnvironmentVariables(t *testing.T) {
 		},
 		{
 			name: "with apply modifiers false 2",
-			ctx: func() context.Context {
+			setupCtx: func() context.Context {
 				ctx := context.Background()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
@@ -327,7 +327,7 @@ func TestLocalOperator_setupEnvironmentVariables(t *testing.T) {
 				ctx = context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, false)
 				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, true)
 				return ctx
-			}(),
+			},
 			asset: &pipeline.Asset{
 				IntervalModifiers: pipeline.IntervalModifiers{
 					Start: pipeline.TimeModifier{Days: 1},
@@ -367,7 +367,8 @@ func TestLocalOperator_setupEnvironmentVariables(t *testing.T) {
 				envVariables: tt.existingEnv,
 			}
 
-			result := o.setupEnvironmentVariables(tt.ctx, tt.asset)
+			ctx := tt.setupCtx()
+			result := o.setupEnvironmentVariables(ctx, tt.asset)
 
 			t.Logf("Test case: %s", tt.name)
 			t.Logf("Expected env: %+v", tt.expectedEnv)
