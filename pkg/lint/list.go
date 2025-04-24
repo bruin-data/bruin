@@ -2,6 +2,7 @@ package lint
 
 import (
 	"fmt"
+	"os"
 	"slices"
 
 	"github.com/bruin-data/bruin/pkg/git"
@@ -10,6 +11,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/samber/lo"
 	"github.com/spf13/afero"
+	"gopkg.in/yaml.v3"
 )
 
 type repoFinder interface {
@@ -206,28 +208,21 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 		},
 	}
 
-	spec := PolicySpecification{
-		Definitions: []*RuleDefinition{
-			{
-				Name:        "test-rule",
-				Description: "This is a test rule",
-				Criteria:    "false == true",
-			},
-		},
-		RuleSets: []RuleSet{
-			{
-				Name:     "default",
-				Selector: "pipeline",
-				Rules:    []string{"test-rule"},
-			},
-		},
+	// note: temporary.
+	fd, err := os.Open("policy.yml")
+	if err == nil {
+		defer fd.Close()
+		spec := PolicySpecification{}
+		err := yaml.NewDecoder(fd).Decode(&spec)
+		if err != nil {
+			return nil, fmt.Errorf("error reading policy file: %w", err)
+		}
+		policyRules, err := spec.Rules()
+		if err != nil {
+			return nil, fmt.Errorf("error reading policy: %w", err)
+		}
+		rules = append(rules, policyRules...)
 	}
-
-	policyRules, err := spec.Rules()
-	if err != nil {
-		return nil, fmt.Errorf("error reading policy: %w", err)
-	}
-	rules = append(rules, policyRules...)
 
 	if parser != nil {
 		rules = append(rules, UsedTableValidatorRule{

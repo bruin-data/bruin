@@ -21,14 +21,14 @@ var (
 )
 
 type validatorEnv struct {
-	Asset    *pipeline.Asset
-	Pipeline *pipeline.Pipeline
+	Asset    *pipeline.Asset    `expr:"asset"`
+	Pipeline *pipeline.Pipeline `expr:"pipeline"`
 }
 
 type RuleDefinition struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Criteria    string `json:"criteria"`
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
+	Criteria    string `yaml:"criteria"`
 
 	evalutor *vm.Program
 }
@@ -61,9 +61,9 @@ func (def *RuleDefinition) compile() error {
 }
 
 type RuleSet struct {
-	Name     string   `json:"name"`
-	Selector string   `json:"selector"`
-	Rules    []string `json:"rules"`
+	Name     string   `yaml:"name"`
+	Selector string   `yaml:"selector"`
+	Rules    []string `yaml:"rules"`
 }
 
 func (rs *RuleSet) validate() error {
@@ -78,8 +78,8 @@ func (rs *RuleSet) validate() error {
 }
 
 type PolicySpecification struct {
-	Definitions []*RuleDefinition `json:"define"`
-	RuleSets    []RuleSet         `json:"rulesets"`
+	Definitions []*RuleDefinition `yaml:"define"`
+	RuleSets    []RuleSet         `yaml:"rulesets"`
 
 	compiledRules map[string]*RuleDefinition
 }
