@@ -727,8 +727,7 @@ func setupExecutors(
 		Fs:       fs,
 		Renderer: renderer,
 	}
-	customCheckRunner := ansisql.NewCustomCheckOperator(conn, renderer)
-
+	customCheckRunner := ansisql.NewCustomCheckOperator(conn, wholeFileExtractor)
 	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery || s.WillRunTaskOfType(pipeline.AssetTypeBigquerySeed) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryTableSensor) {
 		bqOperator := bigquery.NewBasicOperator(conn, wholeFileExtractor, bigquery.NewMaterializer(fullRefresh))
 		bqCheckRunner, err := bigquery.NewColumnCheckOperator(conn)
