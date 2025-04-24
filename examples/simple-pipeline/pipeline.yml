@@ -41,3 +41,4 @@ default_connections:
   applovin: "my-applovin"
   salesforce: "my-salesforce"
   sqlite: "my-sqlite"
+  db2: "my-db2"

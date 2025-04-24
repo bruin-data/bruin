@@ -176,6 +176,7 @@ export default withMermaid({
                             {text: "AppLovin Max", link: "/ingestion/applovin_max.md"},
                             {text: "Asana", link: "/ingestion/asana.md"},
                             {text: "Chess", link: "/ingestion/chess.md"},
+                            {text: "DB2", link: "/ingestion/db2.md"},
                             {text: "DynamoDB", link: "/ingestion/dynamodb.md"},
                             {text: "Facebook", link: "/ingestion/facebook-ads.md"},
                             {text: "GitHub", link: "/ingestion/github.md"},
