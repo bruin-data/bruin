@@ -1239,6 +1239,7 @@ func (m *Manager) GetAppLovinConnectionWithoutDefault(name string) (*applovin.Cl
 	}
 	return db, nil
 }
+
 func (m *Manager) GetFrankfurterConnection(name string) (*frankfurter.Client, error) {
 	db, err := m.GetFrankfurterConnectionWithoutDefault(name)
 	if err == nil {
@@ -1388,11 +1389,22 @@ func (m *Manager) AddAthenaConnectionFromConfig(connection *config.AthenaConnect
 		m.Athena = make(map[string]*athena.DB)
 	}
 
+	if connection.Profile != "" {
+		if connection.AccessKey != "" || connection.SecretKey != "" {
+			return errors.New("access_key and secret_key cannot be provided when profile is specified, you need specify either profile or access_key and secret_key")
+		}
+		err := connection.LoadCredentialsFromProfile(context.Background())
+		if err != nil {
+			return err
+		}
+	}
+
 	m.Athena[connection.Name] = athena.NewDB(&athena.Config{
 		Region:          connection.Region,
 		OutputBucket:    connection.QueryResultsPath,
 		AccessID:        connection.AccessKey,
 		SecretAccessKey: connection.SecretKey,
+		SessionToken:    connection.SessionToken,
 		Database:        connection.Database,
 	})
 
