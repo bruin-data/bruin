@@ -142,7 +142,15 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					requirementsTxt: "",
 					asset:           task,
 					envVariables: map[string]string{
-						"BRUIN_ASSET": "my-asset",
+						"BRUIN_ASSET":           "my-asset",
+						"BRUIN_START_DATE":      "2024-01-01",
+						"BRUIN_START_DATETIME":  "2024-01-01T00:00:00",
+						"BRUIN_START_TIMESTAMP": "2024-01-01T00:00:00.000000Z",
+						"BRUIN_END_DATE":        "2024-01-01",
+						"BRUIN_END_DATETIME":    "2024-01-01T00:00:00",
+						"BRUIN_END_TIMESTAMP":   "2024-01-01T00:00:00.000000Z",
+						"BRUIN_PIPELINE":        "test-pipeline",
+						"BRUIN_RUN_ID":          "test-run",
 					},
 				}).
 					Return(assert.AnError)
@@ -172,9 +180,15 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					requirementsTxt: "",
 					asset:           assetWithSecrets,
 					envVariables: map[string]string{
-						"key1_injected": "value1",
-						"key2":          "value2",
-						"BRUIN_ASSET":   "my-asset",
+						"key1_injected":         "value1",
+						"key2":                  "value2",
+						"BRUIN_ASSET":           "my-asset",
+						"BRUIN_START_DATE":      "2024-01-01",
+						"BRUIN_START_DATETIME":  "2024-01-01T00:00:00",
+						"BRUIN_START_TIMESTAMP": "2024-01-01T00:00:00.000000Z",
+						"BRUIN_END_DATE":        "2024-01-01",
+						"BRUIN_END_DATETIME":    "2024-01-01T00:00:00",
+						"BRUIN_END_TIMESTAMP":   "2024-01-01T00:00:00.000000Z",
 					},
 				}).
 					Return(assert.AnError)
@@ -201,7 +215,13 @@ func TestLocalOperator_RunTask(t *testing.T) {
 					requirementsTxt: "/path/to/requirements.txt",
 					asset:           task,
 					envVariables: map[string]string{
-						"BRUIN_ASSET": "my-asset",
+						"BRUIN_ASSET":           "my-asset",
+						"BRUIN_START_DATE":      "2024-01-01",
+						"BRUIN_START_DATETIME":  "2024-01-01T00:00:00",
+						"BRUIN_START_TIMESTAMP": "2024-01-01T00:00:00.000000Z",
+						"BRUIN_END_DATE":        "2024-01-01",
+						"BRUIN_END_DATETIME":    "2024-01-01T00:00:00",
+						"BRUIN_END_TIMESTAMP":   "2024-01-01T00:00:00.000000Z",
 					},
 				}).Return(assert.AnError)
 			},
@@ -368,7 +388,11 @@ func TestLocalOperator_setupEnvironmentVariables(t *testing.T) {
 			}
 
 			ctx := tt.setupCtx()
-			result := o.setupEnvironmentVariables(ctx, tt.asset)
+			result, err := o.setupEnvironmentVariables(ctx, tt.asset)
+			if err != nil {
+				t.Errorf("error: %v", err)
+				return
+			}
 
 			t.Logf("Test case: %s", tt.name)
 			t.Logf("Expected env: %+v", tt.expectedEnv)

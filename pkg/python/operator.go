@@ -141,7 +141,10 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		}
 	}
 
-	perAssetEnvVariables := o.setupEnvironmentVariables(ctx, t)
+	perAssetEnvVariables, err := o.setupEnvironmentVariables(ctx, t)
+	if err != nil {
+		return errors.Wrap(err, "failed to setup environment variables")
+	}
 
 	envVariables := make(map[string]string)
 	for k, v := range perAssetEnvVariables {
@@ -188,40 +191,40 @@ func findPathToExecutable(alternatives []string) (string, error) {
 	return "", errors.New("no executable found for alternatives: " + strings.Join(alternatives, ", "))
 }
 
-func (o *LocalOperator) setupEnvironmentVariables(ctx context.Context, t *pipeline.Asset) map[string]string {
+func (o *LocalOperator) setupEnvironmentVariables(ctx context.Context, t *pipeline.Asset) (map[string]string, error) {
 	if val := ctx.Value(pipeline.RunConfigApplyIntervalModifiers); val != nil {
 		if applyModifiers, ok := val.(bool); !ok || !applyModifiers {
-			return o.envVariables
+			return o.envVariables, nil
 		}
 	}
 
 	startDate, ok := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
 	if !ok {
-		return o.envVariables
+		return nil, errors.New("start date is required - please provide a valid date")
 	}
 
 	endDate, ok := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
 	if !ok {
-		return o.envVariables
+		return nil, errors.New("end date is required - please provide a valid date")
 	}
 
 	pipelineName, ok := ctx.Value(pipeline.RunConfigPipelineName).(string)
 	if !ok {
-		return o.envVariables
+		return nil, errors.New("pipeline name is required - please provide a valid pipeline name")
 	}
 
 	runID, ok := ctx.Value(pipeline.RunConfigRunID).(string)
 	if !ok {
-		return o.envVariables
+		return nil, errors.New("run ID not found - please check if the run exists")
 	}
 	fullRefresh, ok := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
 	if !ok {
-		return o.envVariables
+		return nil, errors.New("invalid or missing full refresh setting - must be true or false")
 	}
 
 	modifiedStartDate := pipeline.ModifyDate(startDate, t.IntervalModifiers.Start)
 	modifiedEndDate := pipeline.ModifyDate(endDate, t.IntervalModifiers.End)
 	envVars := jinja.PythonEnvVariables(&modifiedStartDate, &modifiedEndDate, pipelineName, runID, fullRefresh)
 
-	return envVars
+	return envVars, nil
 }
