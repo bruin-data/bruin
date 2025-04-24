@@ -126,8 +126,9 @@ func Run(isDebug *bool) *cli.Command {
 				EnvVars: []string{"BRUIN_FULL_REFRESH"},
 			},
 			&cli.BoolFlag{
-				Name:  "apply-interval-modifiers",
-				Usage: "apply interval modifiers",
+				Name:        "apply-interval-modifiers",
+				Usage:       "apply interval modifiers",
+				DefaultText: "false",
 			},
 			&cli.BoolFlag{
 				Name:  "use-pip",
@@ -726,9 +727,7 @@ func setupExecutors(
 		Fs:       fs,
 		Renderer: renderer,
 	}
-
-	customCheckRunner := ansisql.NewCustomCheckOperator(conn, renderer)
-
+	customCheckRunner := ansisql.NewCustomCheckOperator(conn, wholeFileExtractor)
 	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery || s.WillRunTaskOfType(pipeline.AssetTypeBigquerySeed) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryTableSensor) {
 		bqOperator := bigquery.NewBasicOperator(conn, wholeFileExtractor, bigquery.NewMaterializer(fullRefresh))
 		bqCheckRunner, err := bigquery.NewColumnCheckOperator(conn)
@@ -737,7 +736,7 @@ func setupExecutors(
 		}
 
 		metadataPushOperator := bigquery.NewMetadataPushOperator(conn)
-		bqQuerySensor := bigquery.NewQuerySensor(conn, renderer, sensorMode)
+		bqQuerySensor := bigquery.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		bqTableSensor := bigquery.NewTableSensor(conn, sensorMode)
 
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeMain] = bqOperator
@@ -805,7 +804,7 @@ func setupExecutors(
 
 		sfCheckRunner := snowflake.NewColumnCheckOperator(conn)
 
-		sfQuerySensor := snowflake.NewQuerySensor(conn, renderer, 30)
+		sfQuerySensor := snowflake.NewQuerySensor(conn, wholeFileExtractor, 30)
 
 		sfMetadataPushOperator := snowflake.NewMetadataPushOperator(conn)
 

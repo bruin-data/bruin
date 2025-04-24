@@ -9,6 +9,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 )
 
 type connectionFetcher interface {
@@ -185,30 +186,30 @@ func (c *NegativeCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInst
 	}).Check(ctx, ti)
 }
 
-type renderer interface {
-	Render(query string) (string, error)
-}
-
 type CustomCheck struct {
-	conn     connectionFetcher
-	renderer renderer
+	conn      connectionFetcher
+	extractor query.QueryExtractor
 }
 
 func NewCustomCheck(conn connectionFetcher) *CustomCheck {
-	return &CustomCheck{conn: conn, renderer: jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")}
+	queryExtractor := query.WholeFileExtractor{
+		Fs:       afero.NewOsFs(),
+		Renderer: jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id"),
+	}
+	return &CustomCheck{conn: conn, extractor: &queryExtractor}
 }
 
 func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstance) error {
 	qq := ti.Check.Query
-	if c.renderer != nil {
-		rendered, err := c.renderer.Render(qq)
+	if c.extractor != nil {
+		extractor := c.extractor.CloneForAsset(ctx, ti.GetAsset())
+		qry, err := extractor.ExtractQueriesFromString(qq)
 		if err != nil {
 			return errors.Wrap(err, "failed to render custom check query")
 		}
 
-		qq = rendered
+		qq = qry[0].Query
 	}
-
 	return NewCountableQueryCheck(c.conn, ti.Check.Value, &query.Query{Query: qq}, ti.Check.Name, func(count int64) error {
 		return errors.Errorf("custom check '%s' has returned %d instead of the expected %d", ti.Check.Name, count, ti.Check.Value)
 	}).CustomCheck(ctx, ti)
@@ -250,9 +251,9 @@ type CustomCheckOperator struct {
 	checkRunner CustomCheckRunner
 }
 
-func NewCustomCheckOperator(manager connectionFetcher, r *jinja.Renderer) *CustomCheckOperator {
+func NewCustomCheckOperator(manager connectionFetcher, extractor query.QueryExtractor) *CustomCheckOperator {
 	return &CustomCheckOperator{
-		checkRunner: &CustomCheck{conn: manager, renderer: r},
+		checkRunner: &CustomCheck{conn: manager, extractor: extractor},
 	}
 }
 
