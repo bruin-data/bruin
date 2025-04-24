@@ -431,6 +431,16 @@ func TestLoadFromFile(t *testing.T) {
 					Path: "C:\\path\\to\\sqlite.db",
 				},
 			},
+			DB2: []DB2Connection{
+				{
+					Name:     "db2-default",
+					Username: "username-123",
+					Password: "password-123",
+					Host:     "host-123",
+					Port:     "1234",
+					Database: "dbname-123",
+				},
+			},
 		},
 	}
 
