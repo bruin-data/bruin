@@ -146,6 +146,9 @@
         "secret_access_key": {
           "type": "string"
         },
+        "session_token": {
+          "type": "string"
+        },
         "query_results_path": {
           "type": "string"
         },
@@ -153,6 +156,9 @@
           "type": "string"
         },
         "database": {
+          "type": "string"
+        },
+        "profile": {
           "type": "string"
         }
       },
@@ -162,6 +168,7 @@
         "name",
         "access_key_id",
         "secret_access_key",
+        "session_token",
         "query_results_path",
         "region"
       ]
