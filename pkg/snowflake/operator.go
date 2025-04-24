@@ -129,10 +129,6 @@ func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOpera
 	})
 }
 
-type renderer interface {
-	Render(query string) (string, error)
-}
-
 type QuerySensor struct {
 	connection     connectionFetcher
 	extractor      query.QueryExtractor
