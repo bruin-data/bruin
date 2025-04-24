@@ -1,6 +1,7 @@
 package lint
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/bruin-data/bruin/pkg/git"
@@ -204,6 +205,29 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			ApplicableLevels: []Level{LevelPipeline},
 		},
 	}
+
+	spec := PolicySpecification{
+		Definitions: []*RuleDefinition{
+			{
+				Name:        "test-rule",
+				Description: "This is a test rule",
+				Criteria:    "false == true",
+			},
+		},
+		RuleSets: []RuleSet{
+			{
+				Name:     "default",
+				Selector: "pipeline",
+				Rules:    []string{"test-rule"},
+			},
+		},
+	}
+
+	policyRules, err := spec.Rules()
+	if err != nil {
+		return nil, fmt.Errorf("error reading policy: %w", err)
+	}
+	rules = append(rules, policyRules...)
 
 	if parser != nil {
 		rules = append(rules, UsedTableValidatorRule{
