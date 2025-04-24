@@ -3,8 +3,10 @@ package lint
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 
+	"github.com/bmatcuk/doublestar"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
@@ -45,7 +47,7 @@ func (def *RuleDefinition) validate() error {
 	return nil
 }
 
-func (def *RuleDefinition) Compile() error {
+func (def *RuleDefinition) compile() error {
 	program, err := expr.Compile(
 		def.Criteria,
 		expr.AsBool(),
@@ -89,7 +91,7 @@ func (spec *PolicySpecification) init() error {
 		if err != nil {
 			return fmt.Errorf("invalid rule definition at index %d: %w", idx, err)
 		}
-		if err := def.Compile(); err != nil {
+		if err := def.compile(); err != nil {
 			return err
 		}
 		spec.compiledRules[def.Name] = def
@@ -132,7 +134,20 @@ func (spec *PolicySpecification) Rules() ([]Rule, error) {
 
 func newPolicyValidator(rs RuleSet, def *RuleDefinition) AssetValidator {
 	return func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-		// todo(turtledev): implement selector logic
+		if rs.Selector != "" {
+			// hack
+			root := strings.Replace(
+				asset.ExecutableFile.Path,
+				filepath.Dir(filepath.Dir(pipeline.DefinitionFile.Path)),
+				"",
+				1,
+			)
+			root = strings.TrimPrefix(root, "/")
+			matched, err := doublestar.Match(rs.Selector, root)
+			if err != nil || !matched {
+				return nil, nil
+			}
+		}
 
 		env := validatorEnv{asset, pipeline}
 		result, err := expr.Run(def.evalutor, env)

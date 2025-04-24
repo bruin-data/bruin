@@ -14,6 +14,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.64
 	github.com/aws/aws-sdk-go-v2/service/emrserverless v1.28.1
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.52.0
+	github.com/bmatcuk/doublestar v1.3.4
 	github.com/charmbracelet/bubbletea v1.1.2
 	github.com/databricks/databricks-sql-go v1.6.0
 	github.com/denisbrodbeck/machineid v1.0.1
