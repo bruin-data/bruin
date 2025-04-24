@@ -69,6 +69,7 @@ type Connections struct {
 	AppLovin            []AppLovinConnection            `yaml:"applovin,omitempty" json:"applovin,omitempty" mapstructure:"applovin"`
 	Frankfurter         []FrankfurterConnection         `yaml:"frankfurter,omitempty" json:"frankfurter,omitempty" mapstructure:"frankfurter"`
 	Salesforce          []SalesforceConnection          `yaml:"salesforce,omitempty" json:"salesforce,omitempty" mapstructure:"salesforce"`
+	SQLite              []SQLiteConnection              `yaml:"sqlite,omitempty" json:"sqlite,omitempty" mapstructure:"sqlite"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -742,6 +743,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Salesforce = append(env.Connections.Salesforce, conn)
+	case "sqlite":
+		var conn SQLiteConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.SQLite = append(env.Connections.SQLite, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -869,6 +877,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Frankfurter = removeConnection(env.Connections.Frankfurter, connectionName)
 	case "salesforce":
 		env.Connections.Salesforce = removeConnection(env.Connections.Salesforce, connectionName)
+	case "sqlite":
+		env.Connections.SQLite = removeConnection(env.Connections.SQLite, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -967,6 +977,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.GoogleAnalytics, source.GoogleAnalytics)
 	mergeConnectionList(&c.AppLovin, source.AppLovin)
 	mergeConnectionList(&c.Salesforce, source.Salesforce)
+	mergeConnectionList(&c.SQLite, source.SQLite)
 	c.buildConnectionKeyMap()
 	return nil
 }

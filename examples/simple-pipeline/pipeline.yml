@@ -40,3 +40,4 @@ default_connections:
   googleanalytics: "my-googleanalytics"
   applovin: "my-applovin"
   salesforce: "my-salesforce"
+  sqlite: "my-sqlite"

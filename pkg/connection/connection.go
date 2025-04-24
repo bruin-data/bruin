@@ -50,6 +50,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/slack"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/sqlite"
 	"github.com/bruin-data/bruin/pkg/stripe"
 	"github.com/bruin-data/bruin/pkg/tiktokads"
 	"github.com/bruin-data/bruin/pkg/zendesk"
@@ -103,6 +104,7 @@ type Manager struct {
 	GoogleAnalytics map[string]*googleanalytics.Client
 	AppLovin        map[string]*applovin.Client
 	Salesforce      map[string]*salesforce.Client
+	SQLite          map[string]*sqlite.Client
 	mutex           sync.Mutex
 }
 
@@ -371,6 +373,11 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connSalesforce, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Salesforce)...)
+	connSQLite, err := m.GetSQLiteConnectionWithoutDefault(name)
+	if err == nil {
+		return connSQLite, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.SQLite)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -1266,6 +1273,25 @@ func (m *Manager) GetSalesforceConnectionWithoutDefault(name string) (*salesforc
 	db, ok := m.Salesforce[name]
 	if !ok {
 		return nil, errors.Errorf("salesforce connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetSQLiteConnection(name string) (*sqlite.Client, error) {
+	db, err := m.GetSQLiteConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetSQLiteConnectionWithoutDefault("sqlite-default")
+}
+
+func (m *Manager) GetSQLiteConnectionWithoutDefault(name string) (*sqlite.Client, error) {
+	if m.SQLite == nil {
+		return nil, errors.New("no sqlite connections found")
+	}
+	db, ok := m.SQLite[name]
+	if !ok {
+		return nil, errors.Errorf("sqlite connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2301,6 +2327,24 @@ func (m *Manager) AddSalesforceConnectionFromConfig(connection *config.Salesforc
 	return nil
 }
 
+func (m *Manager) AddSQLiteConnectionFromConfig(connection *config.SQLiteConnection) error {
+	m.mutex.Lock()
+	if m.SQLite == nil {
+		m.SQLite = make(map[string]*sqlite.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := sqlite.NewClient(sqlite.Config{
+		Path: connection.Path,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.SQLite[connection.Name] = client
+	return nil
+}
 func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConnection) error {
 	m.mutex.Lock()
 	if m.Kinesis == nil {
@@ -2457,6 +2501,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Salesforce, connectionManager.AddSalesforceConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.SQLite, connectionManager.AddSQLiteConnectionFromConfig, &wg, &errList, &mu)
 
 	wg.Wait()
 	return connectionManager, errList

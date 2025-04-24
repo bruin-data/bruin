@@ -274,6 +274,21 @@
         "token"
       ]
     },
+      "SQLiteConnection": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name","path"
+        ]
+      },
     "FrankfurterConnection": {
       "properties": {
         "name": {
@@ -285,6 +300,7 @@
         "required": [
             "name"
         ]
+
     },
     "Connections": {
       "properties": {
@@ -573,6 +589,12 @@
         "salesforce": {
           "items": {
             "$ref": "#/$defs/SalesforceConnection"
+          },
+          "type": "array"
+        },
+        "sqlite": {
+          "items": {
+            "$ref": "#/$defs/SQLiteConnection"
           },
           "type": "array"
         }
