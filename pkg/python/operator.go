@@ -190,7 +190,7 @@ func findPathToExecutable(alternatives []string) (string, error) {
 
 func (o *LocalOperator) setupEnvironmentVariables(ctx context.Context, t *pipeline.Asset) map[string]string {
 	if val := ctx.Value(pipeline.RunConfigApplyIntervalModifiers); val != nil {
-		if applyModifiers, ok := val.(bool); ok && !applyModifiers {
+		if applyModifiers, ok := val.(bool); !ok || !applyModifiers {
 			return o.envVariables
 		}
 	}
