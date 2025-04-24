@@ -14,16 +14,22 @@ connections:
     athena:
         - name: "connection_name"
           region: "us-west-2"
-          database: "some_database" 
-          access_key: "XXXXXXXX"
-          secret_key: "YYYYYYYY"
-          query_results_path: "s3://some-bucket/some-path" 
+          database: "some_database"
+          access_key_id: "XXXXXXXX"
+          secret_access_key: "YYYYYYYY"
+          query_results_path: "s3://some-bucket/some-path"
+          session_token: "ZZZZZZZ" # optional
+          profile: "some_profile" # optional
 ```
+
+You have two ways to set credentials:
+- You can put your `access_key_id` and `secret_access_key`, as well as an optional `session_token` here directly.
+- Alternatively, you can put your `profile` here, and if you have your local AWS credentials in `~/.aws` configured, Bruin will use them.
 
 The field `database` is optional, if not provided, it will default to `default`.
 
 > [!WARNING]
-> The results of the materialization as well as any temporary tablesBruin needs to create will be stored at the location defined by `query_results_path`. This location must be writable and might be required to be empty at the beginning. 
+> The results of the materialization as well as any temporary tables Bruin needs to create will be stored at the location defined by `query_results_path`. This location must be writable and might be required to be empty at the beginning. 
 
 
 ## Athena Assets
