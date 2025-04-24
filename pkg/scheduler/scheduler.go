@@ -369,7 +369,6 @@ func (s *Scheduler) MarkCheckInstancesByID(checkID string, status TaskInstanceSt
 				return nil
 			}
 		}
-
 	}
 	return errors.New("cannot find check with the given ID")
 }
