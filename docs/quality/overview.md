@@ -1,6 +1,6 @@
 # Quality checks
 
-Quality checks are tests you can perform on your bruin assets after they run to verify that the asset's data satisfies your expectations. 
+Quality checks are tests you can perform on your Bruin assets after they run to verify that the asset's data satisfies your expectations. 
 
 You can use quality checks to ensure that your data is accurate, complete, and consistent. Quality checks are a powerful tool for ensuring that your data is reliable and trustworthy.
 

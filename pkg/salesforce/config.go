@@ -11,7 +11,7 @@ type Config struct {
 }
 
 func (c *Config) GetIngestrURI() string {
-	//salesforce://?username=<your_username>&password=<your_password>&token=<your_token>
+	// salesforce://?username=<your_username>&password=<your_password>&token=<your_token>
 	baseURL := "salesforce://"
 	params := url.Values{}
 	params.Add("username", c.Username)

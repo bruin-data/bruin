@@ -1,9 +1,12 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 
+	"github.com/aws/aws-sdk-go-v2/config"
 	"golang.org/x/oauth2/google"
 )
 
@@ -78,17 +81,80 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 	})
 }
 
-type AthenaConnection struct {
+type AthenaConnection struct { //nolint:recvcheck
 	Name             string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessKey        string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id"`
 	SecretKey        string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key"`
+	SessionToken     string `yaml:"session_token,omitempty" json:"session_token" mapstructure:"session_token"`
 	QueryResultsPath string `yaml:"query_results_path,omitempty" json:"query_results_path" mapstructure:"query_results_path"`
 	Region           string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
 	Database         string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
+	Profile          string `yaml:"profile,omitempty" json:"profile,omitempty" mapstructure:"profile"`
+
+	regionSetFromProfile bool
 }
 
 func (c AthenaConnection) GetName() string {
 	return c.Name
+}
+
+func (c *AthenaConnection) LoadCredentialsFromProfile(ctx context.Context) error {
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithSharedConfigProfile(c.Profile),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to load AWS credentials from profile %s: %w", c.Profile, err)
+	}
+	creds, err := cfg.Credentials.Retrieve(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve AWS credentials: %w", err)
+	}
+
+	c.AccessKey = creds.AccessKeyID
+	c.SecretKey = creds.SecretAccessKey
+	c.SessionToken = creds.SessionToken
+
+	if c.Region == "" {
+		c.Region = cfg.Region
+		c.regionSetFromProfile = true
+	}
+
+	return nil
+}
+
+func (c AthenaConnection) MarshalYAML() (interface{}, error) {
+	m := make(map[string]interface{})
+
+	if c.Name != "" {
+		m["name"] = c.Name
+	}
+
+	if c.QueryResultsPath != "" {
+		m["query_results_path"] = c.QueryResultsPath
+	}
+
+	if c.Database != "" {
+		m["database"] = c.Database
+	}
+
+	if c.Region != "" && !c.regionSetFromProfile {
+		m["region"] = c.Region
+	}
+
+	if c.Profile != "" {
+		m["profile"] = c.Profile
+		return m, nil
+	}
+
+	if c.AccessKey != "" {
+		m["access_key_id"] = c.AccessKey
+	}
+
+	if c.SecretKey != "" {
+		m["secret_access_key"] = c.SecretKey
+	}
+
+	return m, nil
 }
 
 type SynapseConnection struct {
@@ -617,5 +683,14 @@ type SalesforceConnection struct {
 }
 
 func (c SalesforceConnection) GetName() string {
+	return c.Name
+}
+
+type SQLiteConnection struct {
+	Name string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Path string `yaml:"path,omitempty" json:"path" mapstructure:"path"`
+}
+
+func (c SQLiteConnection) GetName() string {
 	return c.Name
 }
