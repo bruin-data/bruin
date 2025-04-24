@@ -110,14 +110,12 @@ type Manager struct {
 }
 
 func CollectSlice[T any](seq iter.Seq[T]) []T {
-	var out []T
+	out := make([]T, 0, 16) // preallocate capacity, as a starting point
 	for v := range seq {
 		out = append(out, v)
 	}
 	return out
 }
-
-
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
 	availableConnectionNames := make([]string, 0)
