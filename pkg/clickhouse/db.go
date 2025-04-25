@@ -95,7 +95,6 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		return nil, errors.New("field descriptions are not available")
 	}
 
-	
 	columns := make([]string, len(fieldDescriptions))
 	columnTypes := make([]string, len(fieldDescriptions))
 	for i, field := range fieldDescriptions {

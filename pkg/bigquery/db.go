@@ -162,8 +162,8 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	}
 
 	result := &query.QueryResult{
-		Columns: []string{},
-		Rows:    [][]interface{}{},
+		Columns:     []string{},
+		Rows:        [][]interface{}{},
 		ColumnTypes: []string{},
 	}
 

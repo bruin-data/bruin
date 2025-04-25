@@ -115,7 +115,6 @@ func Query() *cli.Command {
 						Rows     [][]interface{}     `json:"rows"`
 						ConnName string              `json:"connectionName"`
 						Query    string              `json:"query"`
-						
 					}
 
 					// Construct JSON response with structured columns
