@@ -390,7 +390,6 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 
 	availableConnectionNames = append(availableConnectionNames, CollectSlice(maps.Keys(m.Salesforce))...)
 
-
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
 
