@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -1130,8 +1131,8 @@ func (u UsedTableValidatorRule) Validate(p *pipeline.Pipeline) ([]*Issue, error)
 func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
-	dialect, ok := assetTypeDialectMap[asset.Type]
-	if !ok {
+	dialect, err := sqlparser.AssetTypeToDialect(asset.Type)
+	if err != nil {
 		return issues, nil
 	}
 
