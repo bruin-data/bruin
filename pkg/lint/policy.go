@@ -297,8 +297,8 @@ func loadPolicy(fs afero.Fs) (rules []Rule, err error) {
 
 func locatePolicy(fs afero.Fs) string {
 	names := []string{
-		"policies.yaml",
-		"policies.yml",
+		"policy.yaml",
+		"policy.yml",
 	}
 	for _, name := range names {
 		fi, err := fs.Stat(name)
