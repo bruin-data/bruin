@@ -9,6 +9,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 )
@@ -86,11 +87,18 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	if fieldDescriptions == nil {
 		return nil, errors.New("field descriptions are not available")
 	}
-
+    typeMap := pgtype.NewMap()
 	// Extract column names
 	columns := make([]string, len(fieldDescriptions))
+	columnTypes := make([]string, len(fieldDescriptions))
 	for i, field := range fieldDescriptions {
 		columns[i] = field.Name
+		dataType, ok := typeMap.TypeForOID(field.DataTypeOID)
+		if !ok {
+			columnTypes[i] = ""
+		} else {
+			columnTypes[i] = dataType.Name
+		}
 	}
 
 	// Collect rows
@@ -103,6 +111,7 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	result := &query.QueryResult{
 		Columns: columns,
 		Rows:    collectedRows,
+		ColumnTypes: columnTypes,
 	}
 	return result, nil
 }
