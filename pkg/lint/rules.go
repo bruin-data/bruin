@@ -1090,11 +1090,6 @@ func (g *GlossaryChecker) EnsureAssetEntitiesExistInGlossary(ctx context.Context
 	return issues, nil
 }
 
-var assetTypeDialectMap = map[pipeline.AssetType]string{
-	"bq.sql": "bigquery",
-	"sf.sql": "snowflake",
-}
-
 type sqlParser interface {
 	UsedTables(sql, dialect string) ([]string, error)
 }

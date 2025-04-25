@@ -344,7 +344,7 @@ func (r *ParseCommand) Run(ctx context.Context, assetPath string, lineage bool) 
 		Asset         *pipeline.Asset        `json:"asset"`
 		Pipeline      pipelineSummary        `json:"pipeline"`
 		Repo          *git.Repo              `json:"repo"`
-		LineageIssues []*lineageIssueSummary `json:"lineage_issues"`
+		LineageIssues []*lineageIssueSummary `json:"lineage_issues,omitempty"`
 	}{
 		Asset: asset,
 		Pipeline: pipelineSummary{
