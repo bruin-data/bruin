@@ -18,8 +18,9 @@ type Query struct {
 }
 
 type QueryResult struct {
-	Columns []string
-	Rows    [][]interface{}
+	Columns     []string
+	Rows        [][]interface{}
+	ColumnTypes []string
 }
 
 type QueryExtractor interface {
