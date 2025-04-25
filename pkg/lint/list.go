@@ -2,7 +2,6 @@ package lint
 
 import (
 	"fmt"
-	"os"
 	"slices"
 
 	"github.com/bruin-data/bruin/pkg/git"
@@ -11,7 +10,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/samber/lo"
 	"github.com/spf13/afero"
-	"gopkg.in/yaml.v3"
 )
 
 type repoFinder interface {
@@ -208,19 +206,11 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 		},
 	}
 
-	// note: temporary.
-	fd, err := os.Open("policy.yml")
-	if err == nil {
-		defer fd.Close()
-		spec := PolicySpecification{}
-		err := yaml.NewDecoder(fd).Decode(&spec)
-		if err != nil {
-			return nil, fmt.Errorf("error reading policy file: %w", err)
-		}
-		policyRules, err := spec.Rules()
-		if err != nil {
-			return nil, fmt.Errorf("error reading policy: %w", err)
-		}
+	policyRules, err := loadPolicy(fs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load policy: %w", err)
+	}
+	if len(policyRules) > 0 {
 		rules = append(rules, policyRules...)
 	}
 

@@ -3,7 +3,6 @@ package lint
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/bmatcuk/doublestar"
@@ -11,6 +10,8 @@ import (
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -61,9 +62,9 @@ func (def *RuleDefinition) compile() error {
 }
 
 type RuleSet struct {
-	Name     string   `yaml:"name"`
-	Selector string   `yaml:"selector"`
-	Rules    []string `yaml:"rules"`
+	Name     string           `yaml:"name"`
+	Selector []map[string]any `yaml:"selector"`
+	Rules    []string         `yaml:"rules"`
 }
 
 func (rs *RuleSet) validate() error {
@@ -125,7 +126,7 @@ func (spec *PolicySpecification) Rules() ([]Rule, error) {
 				Severity:         ValidatorSeverityCritical,
 				Validator:        CallFuncForEveryAsset(validator),
 				AssetValidator:   validator,
-				ApplicableLevels: []Level{LevelPipeline, LevelAsset},
+				ApplicableLevels: []Level{LevelAsset},
 			})
 		}
 	}
@@ -134,19 +135,14 @@ func (spec *PolicySpecification) Rules() ([]Rule, error) {
 
 func newPolicyValidator(rs RuleSet, def *RuleDefinition) AssetValidator {
 	return func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-		if rs.Selector != "" {
-			// hack
-			root := strings.Replace(
-				asset.ExecutableFile.Path,
-				filepath.Dir(filepath.Dir(pipeline.DefinitionFile.Path)),
-				"",
-				1,
-			)
-			root = strings.TrimPrefix(root, "/")
-			matched, err := doublestar.Match(rs.Selector, root)
-			if err != nil || !matched {
-				return nil, nil
-			}
+
+		match, err := doesSelectorMatch(rs.Selector, asset)
+		if err != nil {
+			return nil, fmt.Errorf("error matching selector: %w", err)
+		}
+
+		if !match {
+			return nil, nil
 		}
 
 		env := validatorEnv{asset, pipeline}
@@ -166,4 +162,69 @@ func newPolicyValidator(rs RuleSet, def *RuleDefinition) AssetValidator {
 			},
 		}, nil
 	}
+}
+
+func doesSelectorMatch(selectors []map[string]any, asset *pipeline.Asset) (bool, error) {
+	for _, sel := range selectors {
+		for key, val := range sel {
+			switch key {
+			case "path":
+				pattern, ok := val.(string)
+				if !ok {
+					return false, fmt.Errorf("invalid selector value for key %s: %v", key, val)
+				}
+				match, err := doublestar.Match(pattern, asset.ExecutableFile.Path)
+				if err != nil {
+					return false, fmt.Errorf("error matching path pattern %s: %w", pattern, err)
+				}
+				if !match {
+					return false, nil
+				}
+			}
+		}
+	}
+	return true, nil
+}
+
+func loadPolicy(fs afero.Fs) (rules []Rule, err error) {
+	policyFile := locatePolicy(fs)
+	if policyFile == "" {
+		return nil, nil
+	}
+	fd, err := fs.Open(policyFile)
+	if err != nil {
+		return nil, fmt.Errorf("error opening policy file: %w", err)
+	}
+	defer fd.Close()
+
+	spec := PolicySpecification{}
+	err = yaml.NewDecoder(fd).Decode(&spec)
+	if err != nil {
+		return nil, fmt.Errorf("error reading policy file: %w", err)
+	}
+
+	policyRules, err := spec.Rules()
+	if err != nil {
+		return nil, fmt.Errorf("error reading policy: %w", err)
+	}
+
+	rules = append(rules, policyRules...)
+	return
+}
+
+func locatePolicy(fs afero.Fs) string {
+	names := []string{
+		"policy.yaml",
+		"policy.yml",
+	}
+	for _, name := range names {
+		fi, err := fs.Stat(name)
+		if err != nil {
+			continue
+		}
+		if fi.Mode().IsRegular() {
+			return name
+		}
+	}
+	return ""
 }
