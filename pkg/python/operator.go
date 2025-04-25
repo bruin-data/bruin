@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/user"
@@ -139,11 +141,14 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		}
 	}
 
+	perAssetEnvVariables, err := o.setupEnvironmentVariables(ctx, t)
+	if err != nil {
+		return errors.Wrap(err, "failed to setup environment variables")
+	}
+
 	envVariables := make(map[string]string)
-	if o.envVariables != nil {
-		for k, v := range o.envVariables {
-			envVariables[k] = v
-		}
+	for k, v := range perAssetEnvVariables {
+		envVariables[k] = v
 	}
 	envVariables["BRUIN_ASSET"] = t.Name
 
@@ -184,4 +189,42 @@ func findPathToExecutable(alternatives []string) (string, error) {
 	}
 
 	return "", errors.New("no executable found for alternatives: " + strings.Join(alternatives, ", "))
+}
+
+func (o *LocalOperator) setupEnvironmentVariables(ctx context.Context, t *pipeline.Asset) (map[string]string, error) {
+	if val := ctx.Value(pipeline.RunConfigApplyIntervalModifiers); val != nil {
+		if applyModifiers, ok := val.(bool); !ok || !applyModifiers {
+			return o.envVariables, nil
+		}
+	}
+
+	startDate, ok := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
+	if !ok {
+		return nil, errors.New("start date is required - please provide a valid date")
+	}
+
+	endDate, ok := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
+	if !ok {
+		return nil, errors.New("end date is required - please provide a valid date")
+	}
+
+	pipelineName, ok := ctx.Value(pipeline.RunConfigPipelineName).(string)
+	if !ok {
+		return nil, errors.New("pipeline name is required - please provide a valid pipeline name")
+	}
+
+	runID, ok := ctx.Value(pipeline.RunConfigRunID).(string)
+	if !ok {
+		return nil, errors.New("run ID not found - please check if the run exists")
+	}
+	fullRefresh, ok := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+	if !ok {
+		return nil, errors.New("invalid or missing full refresh setting - must be true or false")
+	}
+
+	modifiedStartDate := pipeline.ModifyDate(startDate, t.IntervalModifiers.Start)
+	modifiedEndDate := pipeline.ModifyDate(endDate, t.IntervalModifiers.End)
+	envVars := jinja.PythonEnvVariables(&modifiedStartDate, &modifiedEndDate, pipelineName, runID, fullRefresh)
+
+	return envVars, nil
 }

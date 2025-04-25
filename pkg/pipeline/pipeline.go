@@ -58,6 +58,7 @@ const (
 	AssetTypeClickHouse             = AssetType("clickhouse.sql")
 	AssetTypeClickHouseSeed         = AssetType("clickhouse.seed")
 	AssetTypeEMRServerlessSpark     = AssetType("emr_serverless.spark")
+	AssetTypeEMRServerlessPyspark   = AssetType("emr_serverless.pyspark")
 	RunConfigFullRefresh            = RunConfig("full-refresh")
 	RunConfigApplyIntervalModifiers = RunConfig("apply-interval-modifiers")
 	RunConfigStartDate              = RunConfig("start-date")
@@ -104,8 +105,10 @@ var defaultMapping = map[string]string{
 	"tiktokads":             "tiktokads-default",
 	"appstore":              "appstore-default",
 	"gcs":                   "gcs-default",
+	"emr_serverless":        "emr_serverless-default",
 	"googleanalytics":       "googleanalytics-default",
 	"applovin":              "applovin-default",
+	"salesforce":            "salesforce-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}
@@ -509,7 +512,8 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeDuckDBSeed:           "duckdb",
 	AssetTypeClickHouse:           "clickhouse",
 	AssetTypeClickHouseSeed:       "clickhouse",
-	AssetTypeEMRServerlessSpark:   "aws",
+	AssetTypeEMRServerlessSpark:   "emr_serverless",
+	AssetTypeEMRServerlessPyspark: "emr_serverless",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -1105,6 +1109,7 @@ type Pipeline struct {
 	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
 	Commit             string                 `json:"commit"`
 	Snapshot           string                 `json:"snapshot"`
+	Agent              bool                   `json:"agent" yaml:"agent" mapstructure:"agent"`
 	TasksByType        map[AssetType][]*Asset `json:"-"`
 	tasksByName        map[string]*Asset
 }

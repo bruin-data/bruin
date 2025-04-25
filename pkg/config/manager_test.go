@@ -388,6 +388,17 @@ func TestLoadFromFile(t *testing.T) {
 					APIToken: "token-123",
 				},
 			},
+			EMRServerless: []EMRServerlessConnection{
+				{
+					Name:          "emr_serverless-test",
+					AccessKey:     "AKIAEXAMPLE",
+					SecretKey:     "SECRETKEYEXAMPLE",
+					Region:        "us-west-2",
+					ApplicationID: "emr-app_123",
+					ExecutionRole: "arn:aws:iam::123456789012:role/example_role",
+					Workspace:     "s3://amzn-test-bucket/bruin-workspace/",
+				},
+			},
 			GoogleAnalytics: []GoogleAnalyticsConnection{
 				{
 					Name:               "googleanalytics-1",
@@ -395,10 +406,39 @@ func TestLoadFromFile(t *testing.T) {
 					PropertyID:         "12345",
 				},
 			},
+			Frankfurter: []FrankfurterConnection{
+				{
+					Name: "frankfurter-1",
+				},
+			},
 			AppLovin: []AppLovinConnection{
 				{
 					Name:   "applovin-1",
 					APIKey: "key-123",
+				},
+			},
+			Salesforce: []SalesforceConnection{
+				{
+					Name:     "salesforce-1",
+					Username: "username-123",
+					Password: "password-123",
+					Token:    "token-123",
+				},
+			},
+			SQLite: []SQLiteConnection{
+				{
+					Name: "sqlite-1",
+					Path: "C:\\path\\to\\sqlite.db",
+				},
+			},
+			DB2: []DB2Connection{
+				{
+					Name:     "db2-default",
+					Username: "username-123",
+					Password: "password-123",
+					Host:     "host-123",
+					Port:     "1234",
+					Database: "dbname-123",
 				},
 			},
 		},

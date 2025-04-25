@@ -3,6 +3,7 @@
   "name": "integration_test",
   "schedule": "",
   "start_date": "",
+  "agent" : false,
   "definition_file": {
     "name": "pipeline.yml",
     "path": "integration-tests/test-pipelines/parse-default-option/pipeline.yml"

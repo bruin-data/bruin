@@ -21,9 +21,12 @@ import (
 	"github.com/bruin-data/bruin/pkg/clickhouse"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
+	"github.com/bruin-data/bruin/pkg/db2"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/dynamodb"
+	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/facebookads"
+	"github.com/bruin-data/bruin/pkg/frankfurter"
 	"github.com/bruin-data/bruin/pkg/gcs"
 	"github.com/bruin-data/bruin/pkg/github"
 	"github.com/bruin-data/bruin/pkg/googleads"
@@ -44,9 +47,11 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipedrive"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/s3"
+	"github.com/bruin-data/bruin/pkg/salesforce"
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/slack"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/sqlite"
 	"github.com/bruin-data/bruin/pkg/stripe"
 	"github.com/bruin-data/bruin/pkg/tiktokads"
 	"github.com/bruin-data/bruin/pkg/zendesk"
@@ -56,26 +61,25 @@ import (
 )
 
 type Manager struct {
-	BigQuery    map[string]*bigquery.Client
-	Snowflake   map[string]*snowflake.DB
-	Postgres    map[string]*postgres.Client
-	MsSQL       map[string]*mssql.DB
-	Databricks  map[string]*databricks.DB
-	Mongo       map[string]*mongo.DB
-	Mysql       map[string]*mysql.Client
-	Notion      map[string]*notion.Client
-	HANA        map[string]*hana.Client
-	Shopify     map[string]*shopify.Client
-	Gorgias     map[string]*gorgias.Client
-	Klaviyo     map[string]*klaviyo.Client
-	Adjust      map[string]*adjust.Client
-	Athena      map[string]*athena.DB
-	FacebookAds map[string]*facebookads.Client
-	Stripe      map[string]*stripe.Client
-	Appsflyer   map[string]*appsflyer.Client
-	Kafka       map[string]*kafka.Client
-	Airtable    map[string]*airtable.Client
-
+	BigQuery        map[string]*bigquery.Client
+	Snowflake       map[string]*snowflake.DB
+	Postgres        map[string]*postgres.Client
+	MsSQL           map[string]*mssql.DB
+	Databricks      map[string]*databricks.DB
+	Mongo           map[string]*mongo.DB
+	Mysql           map[string]*mysql.Client
+	Notion          map[string]*notion.Client
+	HANA            map[string]*hana.Client
+	Shopify         map[string]*shopify.Client
+	Gorgias         map[string]*gorgias.Client
+	Klaviyo         map[string]*klaviyo.Client
+	Adjust          map[string]*adjust.Client
+	Athena          map[string]*athena.DB
+	FacebookAds     map[string]*facebookads.Client
+	Stripe          map[string]*stripe.Client
+	Appsflyer       map[string]*appsflyer.Client
+	Kafka           map[string]*kafka.Client
+	Airtable        map[string]*airtable.Client
 	DuckDB          map[string]*duck.Client
 	Hubspot         map[string]*hubspot.Client
 	GoogleSheets    map[string]*gsheets.Client
@@ -96,8 +100,13 @@ type Manager struct {
 	Personio        map[string]*personio.Client
 	Kinesis         map[string]*kinesis.Client
 	Pipedrive       map[string]*pipedrive.Client
+	Frankfurter     map[string]*frankfurter.Client
+	EMRSeverless    map[string]*emr_serverless.Client
 	GoogleAnalytics map[string]*googleanalytics.Client
 	AppLovin        map[string]*applovin.Client
+	Salesforce      map[string]*salesforce.Client
+	SQLite          map[string]*sqlite.Client
+	DB2             map[string]*db2.Client
 	mutex           sync.Mutex
 }
 
@@ -338,6 +347,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Pipedrive)...)
 
+	connEMRServerless, err := m.GetEMRServerlessConnectionWithoutDefault(name)
+	if err == nil {
+		return connEMRServerless, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.EMRSeverless)...)
+
 	connGoogleAnalytics, err := m.GetGoogleAnalyticsConnectionWithoutDefault(name)
 	if err == nil {
 		return connGoogleAnalytics, nil
@@ -349,6 +364,28 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connAppLovin, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.AppLovin)...)
+
+	connFrankfurter, err := m.GetFrankfurterConnectionWithoutDefault(name)
+	if err == nil {
+		return connFrankfurter, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Frankfurter)...)
+	connSalesforce, err := m.GetSalesforceConnectionWithoutDefault(name)
+	if err == nil {
+		return connSalesforce, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Salesforce)...)
+	connSQLite, err := m.GetSQLiteConnectionWithoutDefault(name)
+	if err == nil {
+		return connSQLite, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.SQLite)...)
+
+	connDB2, err := m.GetDB2ConnectionWithoutDefault(name)
+	if err == nil {
+		return connDB2, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.DB2)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -1154,6 +1191,25 @@ func (m *Manager) GetPipedriveConnectionWithoutDefault(name string) (*pipedrive.
 	return db, nil
 }
 
+func (m *Manager) GetEMRServerlessConnection(name string) (*emr_serverless.Client, error) {
+	db, err := m.GetEMRServerlessConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetEMRServerlessConnectionWithoutDefault("emr_serverless-default")
+}
+
+func (m *Manager) GetEMRServerlessConnectionWithoutDefault(name string) (*emr_serverless.Client, error) {
+	if m.EMRSeverless == nil {
+		return nil, errors.New("no EMR Serverless connections found")
+	}
+	db, ok := m.EMRSeverless[name]
+	if !ok {
+		return nil, errors.Errorf("EMR Serverless connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
 func (m *Manager) GetGoogleAnalyticsConnection(name string) (*googleanalytics.Client, error) {
 	db, err := m.GetGoogleAnalyticsConnectionWithoutDefault(name)
 	if err == nil {
@@ -1188,6 +1244,82 @@ func (m *Manager) GetAppLovinConnectionWithoutDefault(name string) (*applovin.Cl
 	db, ok := m.AppLovin[name]
 	if !ok {
 		return nil, errors.Errorf("applovin connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetFrankfurterConnection(name string) (*frankfurter.Client, error) {
+	db, err := m.GetFrankfurterConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetFrankfurterConnectionWithoutDefault("frankfurter-default")
+}
+
+func (m *Manager) GetFrankfurterConnectionWithoutDefault(name string) (*frankfurter.Client, error) {
+	if m.Frankfurter == nil {
+		return nil, errors.New("no frankfurter connections found")
+	}
+	db, ok := m.Frankfurter[name]
+	if !ok {
+		return nil, errors.Errorf("frankfurter connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetSalesforceConnection(name string) (*salesforce.Client, error) {
+	db, err := m.GetSalesforceConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetSalesforceConnectionWithoutDefault("salesforce-default")
+}
+
+func (m *Manager) GetSalesforceConnectionWithoutDefault(name string) (*salesforce.Client, error) {
+	if m.Salesforce == nil {
+		return nil, errors.New("no salesforce connections found")
+	}
+	db, ok := m.Salesforce[name]
+	if !ok {
+		return nil, errors.Errorf("salesforce connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetSQLiteConnection(name string) (*sqlite.Client, error) {
+	db, err := m.GetSQLiteConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetSQLiteConnectionWithoutDefault("sqlite-default")
+}
+
+func (m *Manager) GetSQLiteConnectionWithoutDefault(name string) (*sqlite.Client, error) {
+	if m.SQLite == nil {
+		return nil, errors.New("no sqlite connections found")
+	}
+	db, ok := m.SQLite[name]
+	if !ok {
+		return nil, errors.Errorf("sqlite connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetDB2Connection(name string) (*db2.Client, error) {
+	db, err := m.GetDB2ConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetDB2ConnectionWithoutDefault("db2-default")
+}
+
+func (m *Manager) GetDB2ConnectionWithoutDefault(name string) (*db2.Client, error) {
+	if m.DB2 == nil {
+		return nil, errors.New("no db2 connections found")
+	}
+	db, ok := m.DB2[name]
+	if !ok {
+		return nil, errors.Errorf("db2 connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -1284,11 +1416,22 @@ func (m *Manager) AddAthenaConnectionFromConfig(connection *config.AthenaConnect
 		m.Athena = make(map[string]*athena.DB)
 	}
 
+	if connection.Profile != "" {
+		if connection.AccessKey != "" || connection.SecretKey != "" {
+			return errors.New("access_key and secret_key cannot be provided when profile is specified, you need specify either profile or access_key and secret_key")
+		}
+		err := connection.LoadCredentialsFromProfile(context.Background())
+		if err != nil {
+			return err
+		}
+	}
+
 	m.Athena[connection.Name] = athena.NewDB(&athena.Config{
 		Region:          connection.Region,
 		OutputBucket:    connection.QueryResultsPath,
 		AccessID:        connection.AccessKey,
 		SecretAccessKey: connection.SecretKey,
+		SessionToken:    connection.SessionToken,
 		Database:        connection.Database,
 	})
 
@@ -2202,6 +2345,46 @@ func (m *Manager) AddGoogleAnalyticsConnectionFromConfig(connection *config.Goog
 	return nil
 }
 
+func (m *Manager) AddSalesforceConnectionFromConfig(connection *config.SalesforceConnection) error {
+	m.mutex.Lock()
+	if m.Salesforce == nil {
+		m.Salesforce = make(map[string]*salesforce.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := salesforce.NewClient(salesforce.Config{
+		Username: connection.Username,
+		Password: connection.Password,
+		Token:    connection.Token,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Salesforce[connection.Name] = client
+	return nil
+}
+
+func (m *Manager) AddSQLiteConnectionFromConfig(connection *config.SQLiteConnection) error {
+	m.mutex.Lock()
+	if m.SQLite == nil {
+		m.SQLite = make(map[string]*sqlite.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := sqlite.NewClient(sqlite.Config{
+		Path: connection.Path,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.SQLite[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConnection) error {
 	m.mutex.Lock()
 	if m.Kinesis == nil {
@@ -2223,9 +2406,72 @@ func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConne
 	return nil
 }
 
+func (m *Manager) AddDB2ConnectionFromConfig(connection *config.DB2Connection) error {
+	m.mutex.Lock()
+	if m.DB2 == nil {
+		m.DB2 = make(map[string]*db2.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := db2.NewClient(db2.Config{
+		Username: connection.Username,
+		Password: connection.Password,
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Database: connection.Database,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.DB2[connection.Name] = client
+	return nil
+}
+
+func (m *Manager) AddFrankfurterConnectionFromConfig(connection *config.FrankfurterConnection) error {
+	m.mutex.Lock()
+	if m.Frankfurter == nil {
+		m.Frankfurter = make(map[string]*frankfurter.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := frankfurter.NewClient(frankfurter.Config{})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Frankfurter[connection.Name] = client
+	m.Frankfurter[connection.Name] = client
+	return nil
+}
+
+func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRServerlessConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.EMRSeverless == nil {
+		m.EMRSeverless = make(map[string]*emr_serverless.Client)
+	}
+	client, err := emr_serverless.NewClient(emr_serverless.Config{
+		AccessKey:     connection.AccessKey,
+		SecretKey:     connection.SecretKey,
+		ApplicationID: connection.ApplicationID,
+		ExecutionRole: connection.ExecutionRole,
+		Region:        connection.Region,
+		Workspace:     connection.Workspace,
+	})
+	if err != nil {
+		return err
+	}
+	m.EMRSeverless[connection.Name] = client
+
+	return nil
+}
+
 var envVarRegex = regexp.MustCompile(`\${([^}]+)}`)
 
-func processConnections[T any](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {
+func processConnections[T config.Named](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {
 	if connections == nil {
 		return
 	}
@@ -2259,7 +2505,7 @@ func processConnections[T any](connections []T, adder func(*T) error, wg *conc.W
 			err := adder(conn)
 			if err != nil {
 				mu.Lock()
-				*errList = append(*errList, errors.Wrapf(err, "failed to add connection '%v'", conn))
+				*errList = append(*errList, errors.Wrapf(err, "failed to add connection %q", (*conn).GetName()))
 				mu.Unlock()
 			}
 		})
@@ -2313,8 +2559,13 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.ApplovinMax, connectionManager.AddApplovinMaxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleAnalytics, connectionManager.AddGoogleAnalyticsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Frankfurter, connectionManager.AddFrankfurterConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Salesforce, connectionManager.AddSalesforceConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.SQLite, connectionManager.AddSQLiteConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.DB2, connectionManager.AddDB2ConnectionFromConfig, &wg, &errList, &mu)
 
 	wg.Wait()
 	return connectionManager, errList

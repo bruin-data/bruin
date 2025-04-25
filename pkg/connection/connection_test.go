@@ -312,6 +312,31 @@ func TestManager_AddHANAConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	assert.NotNil(t, res)
 }
 
+func Test_AddEMRServerlessConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{}
+	res, err := m.GetEMRServerlessConnection("test")
+	require.Error(t, err)
+	assert.Nil(t, res)
+
+	cfg := &config.EMRServerlessConnection{
+		Name:          "test",
+		AccessKey:     "AKIAEXAMPLE",
+		SecretKey:     "SECRETKEYEXAMPLE",
+		ApplicationID: "application-id",
+		ExecutionRole: "execution-role",
+		Region:        "us-east-1",
+	}
+
+	err = m.AddEMRServerlessConnectionFromConfig(cfg)
+	require.NoError(t, err)
+
+	res, err = m.GetEMRServerlessConnection("test")
+	require.NoError(t, err)
+	assert.NotNil(t, res)
+}
+
 func TestNewManagerFromConfig(t *testing.T) {
 	t.Parallel()
 
