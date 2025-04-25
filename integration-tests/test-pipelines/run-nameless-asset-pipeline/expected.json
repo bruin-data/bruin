@@ -1,16 +1,20 @@
 {
   "columns": [
     {
-      "name": "provider_id"
+      "name": "provider_id",
+      "type": "INTEGER"
     },
     {
-      "name": "provider_name"
+      "name": "provider_name",
+      "type": "VARCHAR"
     },
     {
-      "name": "delivery_speed"
+      "name": "delivery_speed",
+      "type": "VARCHAR"
     },
     {
-      "name": "service_areas"
+      "name": "service_areas",
+      "type": "VARCHAR"
     }
   ],
   "rows": [
