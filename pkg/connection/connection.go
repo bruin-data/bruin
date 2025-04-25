@@ -2384,6 +2384,7 @@ func (m *Manager) AddSQLiteConnectionFromConfig(connection *config.SQLiteConnect
 	m.SQLite[connection.Name] = client
 	return nil
 }
+
 func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConnection) error {
 	m.mutex.Lock()
 	if m.Kinesis == nil {
