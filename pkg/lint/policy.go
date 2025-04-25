@@ -3,9 +3,9 @@ package lint
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
-	"github.com/bmatcuk/doublestar"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
@@ -224,7 +224,7 @@ func newPolicyValidator(def *RuleDefinition) AssetValidator {
 
 func withSelector(selector []map[string]any, validator AssetValidator) AssetValidator {
 	return func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-		match, err := doesSelectorMatch(selector, asset)
+		match, err := doesSelectorMatch(selector, asset, pipeline)
 		if err != nil {
 			return nil, fmt.Errorf("error matching selector: %w", err)
 		}
@@ -237,22 +237,32 @@ func withSelector(selector []map[string]any, validator AssetValidator) AssetVali
 	}
 }
 
-func doesSelectorMatch(selectors []map[string]any, asset *pipeline.Asset) (bool, error) {
+func doesSelectorMatch(selectors []map[string]any, asset *pipeline.Asset, pipeline *pipeline.Pipeline) (bool, error) {
 	for _, sel := range selectors {
 		for key, val := range sel {
+			pattern, ok := val.(string)
+			if !ok {
+				return false, fmt.Errorf("invalid selector value for key %s: %v", key, val)
+			}
+			var subject string
 			switch key {
+			case "pipeline":
+				subject = pipeline.Name
+			case "asset":
+				subject = asset.Name
 			case "path":
-				pattern, ok := val.(string)
-				if !ok {
-					return false, fmt.Errorf("invalid selector value for key %s: %v", key, val)
-				}
-				match, err := doublestar.Match(pattern, asset.ExecutableFile.Path)
-				if err != nil {
-					return false, fmt.Errorf("error matching path pattern %s: %w", pattern, err)
-				}
-				if !match {
-					return false, nil
-				}
+				subject = asset.ExecutableFile.Path
+			case "tag":
+				subject = strings.Join(asset.Tags, " ")
+			default:
+				return false, fmt.Errorf("unknown selector key: %s", key)
+			}
+			match, err := regexp.MatchString(pattern, subject)
+			if err != nil {
+				return false, fmt.Errorf("error matching %s: %w", key, err)
+			}
+			if !match {
+				return false, nil
 			}
 		}
 	}
