@@ -144,6 +144,10 @@ func Run(isDebug *bool) *cli.Command {
 				Usage:   "pick the assets with the given tag",
 			},
 			&cli.StringFlag{
+				Name:  "single-check",
+				Usage: "runs a single column or custom check by ID",
+			},
+			&cli.StringFlag{
 				Name:    "exclude-tag",
 				Aliases: []string{"x"},
 				Usage:   "exclude the assets with given tag",
@@ -224,7 +228,6 @@ func Run(isDebug *bool) *cli.Command {
 			if err != nil {
 				return err
 			}
-
 			repoRoot, err := git.FindRepoFromPath(inputPath)
 			if err != nil {
 				errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
@@ -305,7 +308,7 @@ func Run(isDebug *bool) *cli.Command {
 				errorPrinter.Printf("Failed to add the run state folder to .gitignore: %v\n", err)
 				return cli.Exit("", 1)
 			}
-
+			singleCheckID := c.String("single-check")
 			filter := &Filter{
 				IncludeTag:        runConfig.Tag,
 				OnlyTaskTypes:     runConfig.Only,
@@ -313,6 +316,7 @@ func Run(isDebug *bool) *cli.Command {
 				PushMetaData:      runConfig.PushMetadata,
 				SingleTask:        task,
 				ExcludeTag:        runConfig.ExcludeTag,
+				singleCheckID:     singleCheckID,
 			}
 			var pipelineState *scheduler.PipelineState
 			if c.Bool("continue") {
@@ -1077,6 +1081,19 @@ type Filter struct {
 	PushMetaData      bool
 	SingleTask        *pipeline.Asset
 	ExcludeTag        string
+	singleCheckID     string
+}
+
+func SkipAllTasksIfSingleCheck(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
+	if f.singleCheckID == "" {
+		return nil
+	}
+	s.MarkAll(scheduler.Skipped)
+	err := s.MarkCheckInstancesByID(f.singleCheckID, scheduler.Pending)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func HandleSingleTask(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
@@ -1173,6 +1190,7 @@ func ApplyAllFilters(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *
 		HandleIncludeTags,
 		HandleExcludeTags,
 		FilterTaskTypes,
+		SkipAllTasksIfSingleCheck,
 	}
 
 	for _, filterFunc := range funcs {
