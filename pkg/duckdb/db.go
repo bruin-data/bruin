@@ -119,7 +119,7 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 	if err != nil {
 		return nil, err
 	}
-	result.Columns = cols 
+	result.Columns = cols
 	columnTypes, err := rows.ColumnTypes()
 	if err != nil {
 		return nil, err

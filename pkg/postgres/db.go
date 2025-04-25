@@ -87,7 +87,7 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	if fieldDescriptions == nil {
 		return nil, errors.New("field descriptions are not available")
 	}
-    typeMap := pgtype.NewMap()
+	typeMap := pgtype.NewMap()
 	// Extract column names
 	columns := make([]string, len(fieldDescriptions))
 	columnTypes := make([]string, len(fieldDescriptions))
@@ -109,8 +109,8 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		return nil, errors.Wrap(err, "failed to collect row values")
 	}
 	result := &query.QueryResult{
-		Columns: columns,
-		Rows:    collectedRows,
+		Columns:     columns,
+		Rows:        collectedRows,
 		ColumnTypes: columnTypes,
 	}
 	return result, nil

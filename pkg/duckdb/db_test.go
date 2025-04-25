@@ -118,16 +118,21 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			name: "simple select with schema query is handled",
 			mockConnection: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery("SELECT 1, 2, 3").
-					WillReturnRows(sqlmock.NewRows([]string{"one", "two", "three"}).
-						AddRow(1, 2, 3),
+					WillReturnRows(
+						sqlmock.NewRowsWithColumnDefinition(
+							sqlmock.NewColumn("one").OfType("BIGINT", int64(1)),
+							sqlmock.NewColumn("two").OfType("BIGINT", int64(2)),
+							sqlmock.NewColumn("three").OfType("BIGINT", int64(3)),
+						).AddRow(1, 2, 3),
 					)
 			},
 			query: query.Query{
 				Query: "SELECT 1, 2, 3",
 			},
 			want: &query.QueryResult{
-				Columns: []string{"one", "two", "three"}, // Adjusted to match actual behavior
-				Rows:    [][]interface{}{{int64(1), int64(2), int64(3)}},
+				Columns:     []string{"one", "two", "three"},
+				Rows:        [][]interface{}{{int64(1), int64(2), int64(3)}},
+				ColumnTypes: []string{"BIGINT", "BIGINT", "BIGINT"},
 			},
 			wantErr: false,
 		},
@@ -135,20 +140,24 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			name: "multi-row select with schema query is handled",
 			mockConnection: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery("SELECT 1, 2, 3").
-					WillReturnRows(sqlmock.NewRows([]string{"one", "two", "three"}).
-						AddRow(1, 2, 3).
-						AddRow(4, 5, 6),
+					WillReturnRows(
+						sqlmock.NewRowsWithColumnDefinition(
+							sqlmock.NewColumn("one").OfType("BIGINT", int64(1)),
+							sqlmock.NewColumn("two").OfType("BIGINT", int64(2)),
+							sqlmock.NewColumn("three").OfType("BIGINT", int64(3)),
+						).AddRow(1, 2, 3).AddRow(4, 5, 6),
 					)
 			},
 			query: query.Query{
 				Query: "SELECT 1, 2, 3",
 			},
 			want: &query.QueryResult{
-				Columns: []string{"one", "two", "three"}, // Adjusted to match actual behavior
+				Columns: []string{"one", "two", "three"},
 				Rows: [][]interface{}{
 					{int64(1), int64(2), int64(3)},
 					{int64(4), int64(5), int64(6)},
 				},
+				ColumnTypes: []string{"BIGINT", "BIGINT", "BIGINT"},
 			},
 			wantErr: false,
 		},
