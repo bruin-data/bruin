@@ -21,6 +21,66 @@ var (
 	errNoRules       = errors.New("No rules specified")
 )
 
+var builtinRules = map[string]AssetValidator{
+	"asset_name_is_lowercase": func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+		if strings.ToLower(asset.Name) == asset.Name {
+			return nil, nil
+		}
+
+		return []*Issue{
+			{
+				Task:        asset,
+				Description: "Asset name must be lowercase",
+			},
+		}, nil
+	},
+	"asset_name_is_schema_dot_table": func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+		if strings.Count(asset.Name, ".") == 1 {
+			return nil, nil
+		}
+
+		return []*Issue{
+			{
+				Task:        asset,
+				Description: "Asset name must be of the form {schema}.{table}",
+			},
+		}, nil
+	},
+	"asset_has_description": func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+		if strings.TrimSpace(asset.Description) != "" {
+			return nil, nil
+		}
+		return []*Issue{
+			{
+				Task:        asset,
+				Description: "Asset must have a description",
+			},
+		}, nil
+	},
+	"asset_has_owner": func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+		if strings.TrimSpace(asset.Owner) != "" {
+			return nil, nil
+		}
+		return []*Issue{
+			{
+				Task:        asset,
+				Description: "Asset must have an owner",
+			},
+		}, nil
+	},
+	"asset_has_columns": func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+		if len(asset.Columns) > 0 {
+			return nil, nil
+		}
+		return []*Issue{
+			{
+				Task:        asset,
+				Description: "Asset must have columns",
+			},
+		}, nil
+	},
+}
+
 type validatorEnv struct {
 	Asset    *pipeline.Asset    `expr:"asset"`
 	Pipeline *pipeline.Pipeline `expr:"pipeline"`
@@ -114,14 +174,13 @@ func (spec *PolicySpecification) Rules() ([]Rule, error) {
 		}
 
 		for _, ruleName := range ruleSet.Rules {
-			def, ok := spec.compiledRules[ruleName]
-			if !ok {
-				// todo(turtledev): add context to this error
-				return nil, fmt.Errorf("rule %s not found in definitions", ruleName)
+			validator, found := spec.getValidator(ruleName)
+			if !found {
+				return nil, fmt.Errorf("no such rule: %s", ruleName)
 			}
-			validator := newPolicyValidator(ruleSet, def)
+			validator = withSelector(ruleSet.Selector, validator)
 			rules = append(rules, &SimpleRule{
-				Identifier:       fmt.Sprintf("policy:%s:%s", ruleSet.Name, def.Name),
+				Identifier:       fmt.Sprintf("policy:%s:%s", ruleSet.Name, ruleName),
 				Fast:             true,
 				Severity:         ValidatorSeverityCritical,
 				Validator:        CallFuncForEveryAsset(validator),
@@ -133,18 +192,17 @@ func (spec *PolicySpecification) Rules() ([]Rule, error) {
 	return rules, nil
 }
 
-func newPolicyValidator(rs RuleSet, def *RuleDefinition) AssetValidator {
+func (spec *PolicySpecification) getValidator(name string) (AssetValidator, bool) {
+	def, found := spec.compiledRules[name]
+	if found {
+		return newPolicyValidator(def), true
+	}
+	validator, found := builtinRules[name]
+	return validator, found
+}
+
+func newPolicyValidator(def *RuleDefinition) AssetValidator {
 	return func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-
-		match, err := doesSelectorMatch(rs.Selector, asset)
-		if err != nil {
-			return nil, fmt.Errorf("error matching selector: %w", err)
-		}
-
-		if !match {
-			return nil, nil
-		}
-
 		env := validatorEnv{asset, pipeline}
 		result, err := expr.Run(def.evalutor, env)
 		if err != nil {
@@ -161,6 +219,21 @@ func newPolicyValidator(rs RuleSet, def *RuleDefinition) AssetValidator {
 				Description: def.Description,
 			},
 		}, nil
+	}
+}
+
+func withSelector(selector []map[string]any, validator AssetValidator) AssetValidator {
+	return func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+		match, err := doesSelectorMatch(selector, asset)
+		if err != nil {
+			return nil, fmt.Errorf("error matching selector: %w", err)
+		}
+
+		if !match {
+			return nil, nil
+		}
+
+		return validator(ctx, pipeline, asset)
 	}
 }
 
@@ -214,8 +287,8 @@ func loadPolicy(fs afero.Fs) (rules []Rule, err error) {
 
 func locatePolicy(fs afero.Fs) string {
 	names := []string{
-		"policy.yaml",
-		"policy.yml",
+		"policies.yaml",
+		"policies.yml",
 	}
 	for _, name := range names {
 		fi, err := fs.Stat(name)
