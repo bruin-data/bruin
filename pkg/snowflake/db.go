@@ -177,7 +177,6 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 	}
 	result.Columns = cols
 
-	
 	columnTypes, err := rows.ColumnTypes()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to retrieve column types")
