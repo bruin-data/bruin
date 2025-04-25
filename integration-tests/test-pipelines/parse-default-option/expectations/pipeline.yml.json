@@ -246,6 +246,7 @@
         "SecretKey": "KEY2",
         "InjectedKey": "INJECTED2"
       }
-    ]
+    ],
+    "interval_modifiers": null
   }
 }

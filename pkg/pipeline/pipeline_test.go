@@ -1513,3 +1513,74 @@ func TestBuilder_SetNameFromPath(t *testing.T) {
 func hash(s string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(s)))[:64]
 }
+
+func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		asset         *pipeline.Asset
+		foundPipeline *pipeline.Pipeline
+		want          *pipeline.Asset
+	}{
+		{
+			name: "should set interval modifiers from pipeline defaults",
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+			},
+			foundPipeline: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{
+					IntervalModifiers: pipeline.IntervalModifiers{
+						Start: pipeline.TimeModifier{Days: 1},
+						End:   pipeline.TimeModifier{Days: -1},
+					},
+				},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Parameters: pipeline.EmptyStringMap{},
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{Days: 1},
+					End:   pipeline.TimeModifier{Days: -1},
+				},
+			},
+		},
+		{
+			name: "should not override existing interval modifiers",
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{Hours: 2},
+					End:   pipeline.TimeModifier{Hours: -2},
+				},
+			},
+			foundPipeline: &pipeline.Pipeline{
+				DefaultValues: &pipeline.DefaultValues{
+					IntervalModifiers: pipeline.IntervalModifiers{
+						Start: pipeline.TimeModifier{Days: 1},
+						End:   pipeline.TimeModifier{Days: -1},
+					},
+				},
+			},
+			want: &pipeline.Asset{
+				Name:       "test-asset",
+				Parameters: pipeline.EmptyStringMap{},
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{Hours: 2},
+					End:   pipeline.TimeModifier{Hours: -2},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			builder := &pipeline.Builder{}
+			got, err := builder.SetupDefaultsFromPipeline(context.Background(), tt.asset, tt.foundPipeline)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
