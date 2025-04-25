@@ -199,3 +199,24 @@ func CurrentCommit(path string) (string, error) {
 
 	return hash, nil
 }
+
+// FindRepoInSubtree finds the git repository in the subtree specified
+// by path. In contrast to FindRepoFromPath, this functions decends down
+// into a directory, and returns the first repository it finds.
+func FindRepoInSubtree(root string) (*Repo, error) {
+	var gitPath string
+	filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if !d.IsDir() {
+			return nil
+		}
+		if filepath.Base(path) == ".git" {
+			gitPath = path
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	if gitPath == "" {
+		return nil, fmt.Errorf("no git repository found in %s", root)
+	}
+	return &Repo{Path: filepath.Dir(gitPath)}, nil
+}

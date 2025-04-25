@@ -3,9 +3,12 @@ package lint
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
@@ -270,7 +273,18 @@ func doesSelectorMatch(selectors []map[string]any, asset *pipeline.Asset, pipeli
 }
 
 func loadPolicy(fs afero.Fs) (rules []Rule, err error) {
-	policyFile := locatePolicy(fs)
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("error obtaining working directory: %w", err)
+	}
+
+	repo, err := git.FindRepoInSubtree(wd)
+	if err != nil {
+		return nil, fmt.Errorf("loadPolicy: %w", err)
+	}
+
+	policyFile := locatePolicy(fs, repo.Path)
 	if policyFile == "" {
 		return nil, nil
 	}
@@ -295,18 +309,19 @@ func loadPolicy(fs afero.Fs) (rules []Rule, err error) {
 	return
 }
 
-func locatePolicy(fs afero.Fs) string {
+func locatePolicy(fs afero.Fs, repo string) string {
 	names := []string{
 		"policy.yaml",
 		"policy.yml",
 	}
 	for _, name := range names {
-		fi, err := fs.Stat(name)
+		fileName := filepath.Join(repo, name)
+		fi, err := fs.Stat(fileName)
 		if err != nil {
 			continue
 		}
 		if fi.Mode().IsRegular() {
-			return name
+			return fileName
 		}
 	}
 	return ""
