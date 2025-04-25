@@ -15,6 +15,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
 	"github.com/robfig/cron/v3"
 	"github.com/spf13/afero"
@@ -1089,11 +1090,6 @@ func (g *GlossaryChecker) EnsureAssetEntitiesExistInGlossary(ctx context.Context
 	return issues, nil
 }
 
-var assetTypeDialectMap = map[pipeline.AssetType]string{
-	"bq.sql": "bigquery",
-	"sf.sql": "snowflake",
-}
-
 type sqlParser interface {
 	UsedTables(sql, dialect string) ([]string, error)
 }
@@ -1130,9 +1126,9 @@ func (u UsedTableValidatorRule) Validate(p *pipeline.Pipeline) ([]*Issue, error)
 func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
-	dialect, ok := assetTypeDialectMap[asset.Type]
-	if !ok {
-		return issues, nil
+	dialect, err := sqlparser.AssetTypeToDialect(asset.Type)
+	if err != nil {
+		return issues, nil //nolint:nilerr
 	}
 
 	if asset.Materialization.Type == "" {

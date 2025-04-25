@@ -185,7 +185,7 @@ var (
 	}
 )
 
-func TestApplyFilters(t *testing.T) {
+func TestApplyFilters(t *testing.T) { //nolint
 	t.Parallel() // Enable parallel execution for the top-level test
 	tests := []struct {
 		name            string
@@ -1004,6 +1004,83 @@ func TestApplyFilters(t *testing.T) {
 				SingleTask:        task8,
 			},
 			expectedPending: []string{"Task7", "Task6", "Task5"},
+		},
+		{
+			name: "Skip all tasks except single column check",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{
+						Name: "Task1",
+						Type: pipeline.AssetTypeBigqueryQuery,
+						Columns: []pipeline.Column{
+							{
+								Name: "Column1",
+								Checks: []pipeline.ColumnCheck{
+									{ID: "check-123", Name: "Check1"},
+								},
+							},
+						},
+					},
+					{
+						Name: "Task2",
+						Type: pipeline.AssetTypePython,
+					},
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				singleCheckID: "check-123",
+			},
+			expectedPending: []string{"Task1:Column1:Check1"},
+			expectError:     false,
+		},
+		{
+			name: "Skip all tasks except single custom check",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{
+						Name: "Task1",
+						Type: pipeline.AssetTypeBigqueryQuery,
+						CustomChecks: []pipeline.CustomCheck{
+							{ID: "custom-123", Name: "CustomCheck1"},
+						},
+					},
+					{
+						Name: "Task2",
+						Type: pipeline.AssetTypePython,
+					},
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				singleCheckID: "custom-123",
+			},
+			expectedPending: []string{"Task1:custom-check:customcheck1"},
+			expectError:     false,
+		},
+		{
+			name: "Skip all tasks with non-existent check ID",
+			pipeline: &pipeline.Pipeline{
+				Name: "TestPipeline",
+				Assets: []*pipeline.Asset{
+					{
+						Name: "Task1",
+						Type: pipeline.AssetTypeBigqueryQuery,
+						CustomChecks: []pipeline.CustomCheck{
+							{ID: "custom-123", Name: "CustomCheck1"},
+						},
+					},
+				},
+				MetadataPush: pipeline.MetadataPush{Global: false, BigQuery: false},
+			},
+			filter: &Filter{
+				singleCheckID: "non-existent-id",
+			},
+			expectedPending: []string{},
+			expectError:     true,
+			expectedError:   "cannot find check with the given ID",
 		},
 	}
 
