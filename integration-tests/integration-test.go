@@ -433,10 +433,12 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
+				Contains: []string{"Successfully validated 1 assets across 1 pipeline"},
 			},
 			WorkingDir: currentFolder,
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
+				e2e.AssertByContains,
 			},
 		},
 		{
@@ -446,10 +448,12 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
+				Contains: []string{"Successfully validated 1 assets across 1 pipeline"},
 			},
 			WorkingDir: currentFolder,
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
+				e2e.AssertByContains,
 			},
 		},
 		{
@@ -459,10 +463,12 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
+				Contains: []string{"Successfully validated 1 assets across 1 pipeline"},
 			},
 			WorkingDir: currentFolder,
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
+				e2e.AssertByContains,
 			},
 		},
 		{
