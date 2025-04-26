@@ -280,6 +280,9 @@ func loadPolicy(fs afero.Fs) (rules []Rule, err error) {
 	}
 
 	repo, err := git.FindRepoInSubtree(wd)
+	if err == git.ErrNoGitRepoFound {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("loadPolicy: %w", err)
 	}
