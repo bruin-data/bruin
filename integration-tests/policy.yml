@@ -1,0 +1,10 @@
+rulesets:
+  - name: builtin_policies
+    selector:
+      - path: .*/builtin-policies/.*
+    rules:
+      - asset_name_is_lowercase
+      - asset_name_is_schema_dot_table
+      - asset_has_description
+      - asset_has_owner
+      - asset_has_columns

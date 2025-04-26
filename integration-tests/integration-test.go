@@ -427,6 +427,19 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 func getTasks(binary string, currentFolder string) []e2e.Task {
 	return []e2e.Task{
 		{
+			Name:    "builtin-policies",
+			Command: binary,
+			Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/builtin-policies")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+			},
+			WorkingDir: currentFolder,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+			},
+		},
+		{
 			Name:          "parse-whole-pipeline",
 			Command:       binary,
 			Args:          []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "test-pipelines/parse-whole-pipeline")},
