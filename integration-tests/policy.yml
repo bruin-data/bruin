@@ -1,3 +1,8 @@
+define:
+  - name: asset_has_three_columns
+    description: "Asset should have three columns"
+    criteria: len(asset.Columns) == 3
+
 rulesets:
   - name: builtin_policies
     selector:
@@ -8,3 +13,8 @@ rulesets:
       - asset_has_description
       - asset_has_owner
       - asset_has_columns
+  - name: cutom_policy
+    selector:
+      - path: .*/custom-policies/.*
+    rules:
+      - asset_has_three_columns
