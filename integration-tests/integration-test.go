@@ -99,12 +99,12 @@ var (
 )
 
 func main() {
-	path, err := os.Getwd()
+	wd, err := os.Getwd()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	currentFolder = filepath.Join(path, "integration-tests")
+	currentFolder = filepath.Join(wd, "integration-tests")
 
 	if runtime.GOOS == "windows" {
 		out, err := exec.Command("mv", "bin/bruin", "bin/bruin.exe").Output()
@@ -118,7 +118,6 @@ func main() {
 	if runtime.GOOS == "windows" {
 		executable = "bruin.exe"
 	}
-	wd, _ := os.Getwd()
 	binary := filepath.Join(wd, "bin", executable)
 
 	includeIngestr := os.Getenv("INCLUDE_INGESTR") == "1"
