@@ -466,6 +466,21 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
+			Name:    "policy-non-compliance",
+			Command: binary,
+			Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/policies-non-compliant")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 1,
+				Output:   "Checked 1 pipeline and found 3 issues",
+			},
+			WorkingDir: currentFolder,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
 			Name:          "parse-whole-pipeline",
 			Command:       binary,
 			Args:          []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "test-pipelines/parse-whole-pipeline")},

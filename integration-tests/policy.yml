@@ -29,6 +29,7 @@ rulesets:
   - name: select_asset
     selector:
       - asset: .*\.primary
+      - path: .*/policies-selector/.*
     rules:
       - asset_name_contains_public
 
@@ -43,3 +44,21 @@ rulesets:
       - tag: test
     rules:
       - asset_has_sql_tag
+
+  - name: fail_case_1
+    selector:
+      - asset: "^non_compliant.primary$"
+    rules:
+      - asset_has_three_columns
+  
+  - name: fail_case_2
+    selector:
+      - asset: "^non_compliant.secondary$"
+    rules:
+      - asset_name_contains_public
+    
+  - name: fail_case_3
+    selector:
+      - asset: "^non_compliant.tertiary$"
+    rules:
+      - asset_has_owner
