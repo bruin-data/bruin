@@ -429,7 +429,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "builtin-policies",
 			Command: binary,
-			Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/builtin-policies")},
+			Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/policies-builtin")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
@@ -442,7 +442,20 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:    "custom-policies",
 			Command: binary,
-			Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/custom-policies")},
+			Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/policies-custom")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+			},
+			WorkingDir: currentFolder,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+			},
+		},
+		{
+			Name:    "policy-selector",
+			Command: binary,
+			Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/policies-selector")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
