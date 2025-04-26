@@ -2,7 +2,7 @@
 name: non_compliant.tertiary
 type: bq.sql
 description: |
-    This pipeline demonstrates the use of custom policies
+    This pipeline demonstrates the use of non-compliant assets
 columns:
     - name: name
       type: string

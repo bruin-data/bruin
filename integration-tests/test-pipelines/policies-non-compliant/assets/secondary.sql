@@ -2,7 +2,7 @@
 name: non_compliant.secondary
 type: bq.sql
 description: |
-    This pipeline demonstrates the use of custom policies
+    This pipeline demonstrates the use of non-compliant assets
 owner: engineering@getbruin.com
 columns:
     - name: name
