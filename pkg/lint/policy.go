@@ -258,6 +258,8 @@ func doesSelectorMatch(selectors []map[string]any, asset *pipeline.Asset, pipeli
 			default:
 				return false, fmt.Errorf("unknown selector key: %s", key)
 			}
+
+			pattern = addBoundaryAnchors(pattern)
 			match, err := regexp.MatchString(pattern, subject)
 			if err != nil {
 				return false, fmt.Errorf("error matching %s: %w", key, err)
@@ -268,6 +270,16 @@ func doesSelectorMatch(selectors []map[string]any, asset *pipeline.Asset, pipeli
 		}
 	}
 	return true, nil
+}
+
+func addBoundaryAnchors(pattern string) string {
+	if !strings.HasPrefix(pattern, "^") {
+		pattern = "^" + pattern
+	}
+	if !strings.HasPrefix(pattern, "$") {
+		pattern += "$"
+	}
+	return pattern
 }
 
 func loadPolicy(fs afero.Fs) (rules []Rule, err error) {
