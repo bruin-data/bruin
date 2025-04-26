@@ -333,7 +333,7 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 				{
 					Name:    "query the initial table",
 					Command: binary,
-					Args:    []string{"query", "--env", "env-time-materialization", "--asset", filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql"), "--query", "SELECT * FROM PRODUCTS; ", "--output", "json"},
+					Args:    []string{"query", "--env", "env-time-materialization", "--asset", filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql"), "--query", "SELECT * FROM PRODUCTS;", "--output", "json"},
 					Env:     []string{},
 
 					Expected: e2e.Output{

@@ -1115,9 +1115,10 @@ type Pipeline struct {
 }
 
 type DefaultValues struct {
-	Type       string            `json:"type" yaml:"type" mapstructure:"type"`
-	Parameters map[string]string `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
-	Secrets    []secretMapping   `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
+	Type              string            `json:"type" yaml:"type" mapstructure:"type"`
+	Parameters        map[string]string `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
+	Secrets           []secretMapping   `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
+	IntervalModifiers IntervalModifiers `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
 }
 
 func (p *Pipeline) GetCompatibilityHash() string {
@@ -1415,7 +1416,7 @@ func NewBuilder(config BuilderConfig, yamlTaskCreator TaskCreator, commentTaskCr
 
 	b.mutators = []assetMutator{
 		b.fillGlossaryStuff,
-		b.setupDefaultsFromPipeline,
+		b.SetupDefaultsFromPipeline,
 		b.SetNameFromPath,
 	}
 
@@ -1641,7 +1642,7 @@ func (b *Builder) MutateAsset(ctx context.Context, task *Asset, foundPipeline *P
 	return task, nil
 }
 
-func (b *Builder) setupDefaultsFromPipeline(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
+func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
 	if foundPipeline == nil {
 		return asset, nil
 	}
@@ -1678,6 +1679,12 @@ func (b *Builder) setupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 		if !existingSecrets[secretMap.SecretKey] {
 			asset.Secrets = append(asset.Secrets, secretMap)
 		}
+	}
+	if (asset.IntervalModifiers.Start == TimeModifier{}) {
+		asset.IntervalModifiers.Start = foundPipeline.DefaultValues.IntervalModifiers.Start
+	}
+	if (asset.IntervalModifiers.End == TimeModifier{}) {
+		asset.IntervalModifiers.End = foundPipeline.DefaultValues.IntervalModifiers.End
 	}
 
 	return asset, nil

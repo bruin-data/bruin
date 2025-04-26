@@ -1,19 +1,26 @@
 {
     "columns": [
         {
-            "name": "product_id"
+            "name": "product_id",
+            "type":"INTEGER"
+
         },
         {
-            "name": "product_name"
+            "name": "product_name",
+            "type":"VARCHAR"
         },
         {
-            "name": "price"
+            "name": "price",
+            "type":"DECIMAL(5,2)"
         },
         {
-            "name": "stock"
+            "name": "stock",
+            "type": "INTEGER"
+
         },
         {
-            "name": "dt"
+            "name": "dt",
+            "type": "DATE"
         }
     ],
     "rows": [
