@@ -98,7 +98,6 @@ type RuleDefinition struct {
 }
 
 func (def *RuleDefinition) validate() error {
-
 	if strings.TrimSpace(def.Name) == "" {
 		return errEmptyName
 	}
@@ -170,7 +169,6 @@ func (spec *PolicySpecification) Rules() ([]Rule, error) {
 
 	rules := []Rule{}
 	for idx, ruleSet := range spec.RuleSets {
-
 		err := ruleSet.validate()
 		if err != nil {
 			return nil, fmt.Errorf("invalid ruleset at index %d: %w", idx, err)
@@ -273,14 +271,13 @@ func doesSelectorMatch(selectors []map[string]any, asset *pipeline.Asset, pipeli
 }
 
 func loadPolicy(fs afero.Fs) (rules []Rule, err error) {
-
 	wd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("error obtaining working directory: %w", err)
 	}
 
 	repo, err := git.FindRepoInSubtree(wd)
-	if err == git.ErrNoGitRepoFound {
+	if errors.Is(err, git.ErrNoGitRepoFound) {
 		return nil, nil
 	}
 	if err != nil {
@@ -309,7 +306,7 @@ func loadPolicy(fs afero.Fs) (rules []Rule, err error) {
 	}
 
 	rules = append(rules, policyRules...)
-	return
+	return rules, nil
 }
 
 func locatePolicy(fs afero.Fs, repo string) string {

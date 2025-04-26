@@ -8,7 +8,9 @@ import (
 )
 
 func TestPolicyRuleDefinition(t *testing.T) {
+	t.Parallel()
 	t.Run("rule definition must have a name", func(t *testing.T) {
+		t.Parallel()
 		spec := &lint.PolicySpecification{
 			Definitions: []*lint.RuleDefinition{
 				{
@@ -22,6 +24,7 @@ func TestPolicyRuleDefinition(t *testing.T) {
 		assert.Error(t, err)
 	})
 	t.Run("rule definition must have a description", func(t *testing.T) {
+		t.Parallel()
 		spec := &lint.PolicySpecification{
 			Definitions: []*lint.RuleDefinition{
 				{
@@ -35,6 +38,7 @@ func TestPolicyRuleDefinition(t *testing.T) {
 	})
 
 	t.Run("rule definition must have criteria", func(t *testing.T) {
+		t.Parallel()
 		spec := &lint.PolicySpecification{
 			Definitions: []*lint.RuleDefinition{
 				{
@@ -49,7 +53,9 @@ func TestPolicyRuleDefinition(t *testing.T) {
 }
 
 func TestPolicyRuleSet(t *testing.T) {
+	t.Parallel()
 	t.Run("ruleset must have a name", func(t *testing.T) {
+		t.Parallel()
 		spec := &lint.PolicySpecification{
 			RuleSets: []lint.RuleSet{
 				{},
@@ -59,6 +65,7 @@ func TestPolicyRuleSet(t *testing.T) {
 		assert.Error(t, err)
 	})
 	t.Run("ruleset must specify rules", func(t *testing.T) {
+		t.Parallel()
 		spec := &lint.PolicySpecification{
 			RuleSets: []lint.RuleSet{
 				{
