@@ -1,14 +1,14 @@
 # Policies
 
-Bruin supports **linting** to verify that data transformation jobs follow best practices and conventions. In addition to built-in lint rules, Bruin also allows users to define **custom lint rules** using a `policy.yml` file.
+Bruin supports **policies** to verify that data transformation jobs follow best practices and organisation wide conventions. In addition to built-in lint rules, Bruin also allows users to define **custom lint rules** using a `policy.yml` file.
 
 This document explains how to define, configure, and use custom linting policies.
 
 ## Quick Start
 
-1. Create a `policy.yml` file.
+1. Create a `policy.yml` file in your project root.
 2. Define custom rules under `define` (optional if only using built-in rules).
-3. Group rules into `rulesets`, specifying which jobs they should apply to using selectors.
+3. Group rules into `rulesets`, specifying which assets they should apply to using selectors.
 
 Example:
 
@@ -28,35 +28,43 @@ rulesets:
       - asset_has_description
 ```
 
-> 🚀 That's it! Bruin will now lint your jobs according to these policies.
+> 🚀 That's it! Bruin will now lint your assets according to these policies.
+
+To verify that your assets satsify your policies, you can run:
+```sh
+$ bruin validate /path/to/pipelines
+```
+
+> [!tip]
+> `bruin run` normally runs lint before pipeline execution. So you can rest assured that any non-compliant assets will get stopped in it's tracks.
 
 ## Defining Rulesets
 
-A **ruleset** groups one or more rules together and specifies which jobs they apply to, based on selectors.
+A **ruleset** groups one or more rules together and specifies which assets they apply to, based on selectors.
 
 Each ruleset must include:
 - **name**: A unique name for the ruleset.
-- **selector** (optional): One or more predicates to select the applicable jobs.
+- **selector** (optional): One or more predicates to select the applicable assets.
 - **rules**: List of rule names (built-in or custom) to apply.
 
-If a **selector** is not specified, the ruleset applies to **all jobs**.
+If a **selector** is not specified, the ruleset applies to **all assets**.
 
 ### Selector Predicates
 
-Selectors determine which jobs a ruleset should apply to. Supported predicates are:
+Selectors determine which assets a ruleset should apply to. Supported predicates are:
 
 | Predicate | Description |
 | :--- | :--- |
-| `path` | Regex match against the assets's path. |
-| `asset` | Regex match against the asset's name. |
-| `pipeline` | Regex match against the pipeline name. |
-| `tag` | Regex match against asset tags. |
+| `path` | path of the asset |
+| `asset` | name of the asset |
+| `pipeline` | name of the pipeline |
+| `tag` | asset tags |
 
 Each predicate is a regex string.
 
-> If multiple selectors are specified within a ruleset, **all selectors must match** for the ruleset to apply to a job.
+> If multiple selectors are specified within a ruleset, **all selectors must match** for the ruleset to apply
 
-If no selectors are defined for a ruleset, **the ruleset applies to all jobs**.
+If no selectors are defined for a ruleset, **the ruleset applies to all assets**.
 
 ### Example
 
@@ -72,10 +80,12 @@ rulesets:
 ```
 
 In this example:
-- `production` applies **only** to jobs that match both:
+- `production` applies **only** to assets that match both:
   - path regex `.*/production/.*`
   - and have a tag matching `critical`.
 
+> [!note]
+> Currently `policies` are only applied to `assets`. Support for `pipeline` level policies will be added in a future version.
 ## Defining Custom Rules
 
 Custom lint rules are defined inside the `define` section of `policy.yml`.
@@ -94,6 +104,15 @@ define:
     description: every asset should have an owner
     criteria: asset.Owner != ""
 ```
+
+### Variables
+
+`criteria` has the following variables available for use in your expressions:
+| Name | Description |
+| ---  | --- |
+| `asset` | The asset selected via selector |
+| `pipeline` | The pipeline the asset belongs to |
+
 
 
 ## Built-in Rules
