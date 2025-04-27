@@ -279,7 +279,7 @@ func TestModifyExtractor(t *testing.T) {
 
 			extractor := modifyExtractor(tt.args.ctx, tt.args.task)
 			qry, err := extractor.ExtractQueriesFromString(tt.args.query)
-			require.Error(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.wantQuery, qry[0].Query)
 		})
 	}
