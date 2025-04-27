@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"testing"
-
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"testing"
+	"time"
 )
 
 type mockBuilder struct {
@@ -123,6 +123,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				},
 			},
 			setup: func(f *fields) {
+
 				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
 					Return([]*query.Query{{Query: "some query"}}, nil)
 
@@ -197,8 +198,12 @@ func TestRenderCommand_Run(t *testing.T) {
 				builder: f.builder,
 				writer:  f.writer,
 			}
+			ctx := make(map[string]any, 3)
+			ctx["startDate"] = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+			ctx["endDate"] = time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)
+			ctx["applyModifiers"] = false
 
-			tt.wantErr(t, render.Run(tt.args.task, nil))
+			tt.wantErr(t, render.Run(tt.args.task, ctx))
 			f.extractor.AssertExpectations(t)
 			f.bqMaterializer.AssertExpectations(t)
 			f.builder.AssertExpectations(t)
