@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockBuilder struct {
@@ -27,7 +27,6 @@ func (m *mockBuilder) CreateAssetFromFile(path string, foundPipeline *pipeline.P
 
 type mockExtractor struct {
 	mock.Mock
-	renderer *jinja.Renderer
 }
 
 func (m *mockExtractor) ExtractQueriesFromString(content string) ([]*query.Query, error) {
@@ -111,7 +110,6 @@ func TestRenderCommand_Run(t *testing.T) {
 				},
 			},
 			setup: func(f *fields) {
-
 				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
 					Return(nil, assert.AnError)
 			},
@@ -129,7 +127,6 @@ func TestRenderCommand_Run(t *testing.T) {
 				},
 			},
 			setup: func(f *fields) {
-
 				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
 					Return([]*query.Query{{Query: "some query"}}, nil)
 
@@ -216,22 +213,19 @@ func TestRenderCommand_Run(t *testing.T) {
 			f.writer.AssertExpectations(t)
 		})
 	}
-
 }
-
 func TestModifyExtractor(t *testing.T) {
 	t.Parallel()
-
 	type args struct {
-		task *pipeline.Asset
-		ctx  map[string]any
-		query  string
+		task  *pipeline.Asset
+		ctx   map[string]any
+		query string
 	}
 
 	tests := []struct {
-		name     string
-		args     args
-		wantErr  assert.ErrorAssertionFunc
+		name      string
+		args      args
+		wantErr   assert.ErrorAssertionFunc
 		wantQuery string
 	}{
 		{
@@ -253,7 +247,7 @@ func TestModifyExtractor(t *testing.T) {
 				},
 				query: "SELECT * FROM asset1 WHERE date(timestamp_col) = '{{ start_date }}'",
 			},
-			wantErr:  assert.NoError,
+			wantErr:   assert.NoError,
 			wantQuery: "SELECT * FROM asset1 WHERE date(timestamp_col) = '2024-01-02'",
 		},
 		{
@@ -275,7 +269,7 @@ func TestModifyExtractor(t *testing.T) {
 				},
 				query: "SELECT * FROM asset1 WHERE date(timestamp_col) = '{{ start_date }}'",
 			},
-			wantErr:  assert.NoError,
+			wantErr:   assert.NoError,
 			wantQuery: "SELECT * FROM asset1 WHERE date(timestamp_col) = '2024-01-01'",
 		},
 	}
@@ -284,10 +278,9 @@ func TestModifyExtractor(t *testing.T) {
 			t.Parallel()
 
 			extractor := modifyExtractor(tt.args.ctx, tt.args.task)
-			query, err := extractor.ExtractQueriesFromString(tt.args.query)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.wantQuery, query[0].Query)
-		
+			qry, err := extractor.ExtractQueriesFromString(tt.args.query)
+			require.Error(t, err)
+			assert.Equal(t, tt.wantQuery, qry[0].Query)
 		})
 	}
 }
