@@ -199,7 +199,7 @@ func Render() *cli.Command {
 			ctx := make(map[string]any, 3)
 			ctx["startDate"] = startDate
 			ctx["endDate"] = endDate
-			ctx["applyModiifiers"] = c.Bool("applyModifiers")
+			ctx["applyModifiers"] = c.Bool("applyModifiers")
 
 			return r.Run(asset, ctx)
 		},

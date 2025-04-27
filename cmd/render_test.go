@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"fmt"
+	"testing"
+	"time"
+
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"testing"
-	"time"
 )
 
 type mockBuilder struct {
@@ -24,6 +27,7 @@ func (m *mockBuilder) CreateAssetFromFile(path string, foundPipeline *pipeline.P
 
 type mockExtractor struct {
 	mock.Mock
+	renderer *jinja.Renderer
 }
 
 func (m *mockExtractor) ExtractQueriesFromString(content string) ([]*query.Query, error) {
@@ -40,6 +44,7 @@ type mockMaterializer struct {
 }
 
 func (m *mockMaterializer) Render(task *pipeline.Asset, query string) (string, error) {
+	fmt.Print("I entered here")
 	res := m.Called(task, query)
 	return res.String(0), res.Error(1)
 }
@@ -106,6 +111,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				},
 			},
 			setup: func(f *fields) {
+
 				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
 					Return(nil, assert.AnError)
 			},
@@ -208,6 +214,80 @@ func TestRenderCommand_Run(t *testing.T) {
 			f.bqMaterializer.AssertExpectations(t)
 			f.builder.AssertExpectations(t)
 			f.writer.AssertExpectations(t)
+		})
+	}
+
+}
+
+func TestModifyExtractor(t *testing.T) {
+	t.Parallel()
+
+	type args struct {
+		task *pipeline.Asset
+		ctx  map[string]any
+		query  string
+	}
+
+	tests := []struct {
+		name     string
+		args     args
+		wantErr  assert.ErrorAssertionFunc
+		wantQuery string
+	}{
+		{
+			name: "test modifying extractor",
+			args: args{
+				task: &pipeline.Asset{
+					Name:           "Asset1",
+					Type:           pipeline.AssetTypeBigqueryQuery,
+					ExecutableFile: pipeline.ExecutableFile{},
+					IntervalModifiers: pipeline.IntervalModifiers{
+						Start: pipeline.TimeModifier{Days: 1},
+						End:   pipeline.TimeModifier{Days: 0},
+					},
+				},
+				ctx: map[string]any{
+					"startDate":      time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+					"endDate":        time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
+					"applyModifiers": true,
+				},
+				query: "SELECT * FROM asset1 WHERE date(timestamp_col) = '{{ start_date }}'",
+			},
+			wantErr:  assert.NoError,
+			wantQuery: "SELECT * FROM asset1 WHERE date(timestamp_col) = '2024-01-02'",
+		},
+		{
+			name: "test modifying extractor with no modifiers",
+			args: args{
+				task: &pipeline.Asset{
+					Name:           "Asset1",
+					Type:           pipeline.AssetTypeBigqueryQuery,
+					ExecutableFile: pipeline.ExecutableFile{},
+					IntervalModifiers: pipeline.IntervalModifiers{
+						Start: pipeline.TimeModifier{Days: 0},
+						End:   pipeline.TimeModifier{Days: 0},
+					},
+				},
+				ctx: map[string]any{
+					"startDate":      time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+					"endDate":        time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
+					"applyModifiers": true,
+				},
+				query: "SELECT * FROM asset1 WHERE date(timestamp_col) = '{{ start_date }}'",
+			},
+			wantErr:  assert.NoError,
+			wantQuery: "SELECT * FROM asset1 WHERE date(timestamp_col) = '2024-01-01'",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			extractor := modifyExtractor(tt.args.ctx, tt.args.task)
+			query, err := extractor.ExtractQueriesFromString(tt.args.query)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantQuery, query[0].Query)
+		
 		})
 	}
 }
