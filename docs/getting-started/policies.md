@@ -93,8 +93,7 @@ Custom lint rules are defined inside the `define` section of `policy.yml`.
 Each rule must include:
 - **name**: A unique name for the rule.
 - **description**: A human-readable description of the rule.
-- **criteria**: An [Expr](https://expr-lang.org/) expression that evaluates to a boolean.  
-  If the result is `false`, the rule is considered violated.
+- **criteria**: An [expr](https://expr-lang.org/) boolean expression. If the expression evalutes to `true` then the asset passes validation.
 
 ### Example
 
@@ -110,9 +109,12 @@ define:
 `criteria` has the following variables available for use in your expressions:
 | Name | Description |
 | ---  | --- |
-| `asset` | The asset selected via selector |
-| `pipeline` | The pipeline the asset belongs to |
+| [asset](https://github.com/bruin-data/bruin-vscode/blob/1726eda362f29bf95f5ffc6b50addf8b63f2128b/schemas/yaml-assets-schema.json) | The asset selected via selector |
+| [pipeline](https://github.com/bruin-data/bruin-vscode/blob/1726eda362f29bf95f5ffc6b50addf8b63f2128b/schemas/pipeline-schema.json) | The pipeline the asset belongs to |
 
+> [!tip]
+> The variables above link to their [JSON Schema](https://json-schema.org/). You can use those as a reference for what fields are available on each variable and
+> what their types are.
 
 
 ## Built-in Rules
