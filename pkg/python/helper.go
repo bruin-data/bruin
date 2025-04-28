@@ -70,7 +70,6 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 	}
 
 	if ctx.Value(pipeline.RunConfigStartDate) != nil {
-
 		startTimeInstance, okParse := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
 		if okParse {
 			applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
