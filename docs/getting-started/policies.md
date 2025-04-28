@@ -7,17 +7,12 @@ This document explains how to define, configure, and use custom linting policies
 ## Quick Start
 
 1. Create a `policy.yml` file in your project root.
-2. Define custom rules under `define` (optional if only using built-in rules).
+2. Define custom rules under `custom_rules` (optional if only using built-in rules).
 3. Group rules into `rulesets`, specifying which assets they should apply to using selectors.
 
 Example:
 
 ```yaml
-define:
-  - name: asset_has_owner
-    description: every asset should have an owner
-    criteria: asset.Owner != ""
-
 rulesets:
   - name: ruleset_1
     selector:
@@ -38,7 +33,7 @@ $ bruin validate /path/to/pipelines
 > [!tip]
 > `bruin run` normally runs lint before pipeline execution. So you can rest assured that any non-compliant assets will get stopped in it's tracks.
 
-## Defining Rulesets
+## Rulesets
 
 A **ruleset** groups one or more rules together and specifies which assets they apply to, based on selectors.
 
@@ -86,9 +81,9 @@ In this example:
 
 > [!note]
 > Currently `policies` are only applied to `assets`. Support for `pipeline` level policies will be added in a future version.
-## Defining Custom Rules
+## Custom Rules
 
-Custom lint rules are defined inside the `define` section of `policy.yml`.
+Custom lint rules are defined inside the `custom_rules` section of `policy.yml`.
 
 Each rule must include:
 - **name**: A unique name for the rule.
@@ -98,7 +93,7 @@ Each rule must include:
 ### Example
 
 ```yaml
-define:
+custom_rules:
   - name: asset_has_owner
     description: every asset should have an owner
     criteria: asset.Owner != ""
@@ -134,7 +129,7 @@ You can directly reference these rules in `rulesets[*].rules`.
 ## Full Example
 
 ```yaml
-define:
+custom_rules:
   - name: asset_has_owner
     description: every asset should have an owner
     criteria: asset.Owner != ""

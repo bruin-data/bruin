@@ -141,7 +141,7 @@ func (rs *RuleSet) validate() error {
 }
 
 type PolicySpecification struct {
-	Definitions []*RuleDefinition `yaml:"define"`
+	Definitions []*RuleDefinition `yaml:"custom_rules"`
 	RuleSets    []RuleSet         `yaml:"rulesets"`
 
 	compiledRules map[string]*RuleDefinition

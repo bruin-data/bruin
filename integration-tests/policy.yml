@@ -1,4 +1,4 @@
-define:
+custom_rules:
   - name: asset_has_three_columns
     description: "Asset should have three columns"
     criteria: len(asset.Columns) == 3
