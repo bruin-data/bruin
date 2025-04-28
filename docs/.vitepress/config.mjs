@@ -149,9 +149,9 @@ export default withMermaid({
                             {text: "Sensor", link: "/assets/sensor"},
                         ]
                     },
-                    {text: "Adjusting Scheduled Runs", link: "/assets/interval-modifiers"},
                     {text: "Columns", link: "/assets/columns"},
                     {text: "Credentials", link: "/getting-started/credentials"},
+                    {text: "Interval Modifiers", link: "/assets/interval-modifiers"},
                     {text: "Materialization", link: "/assets/materialization"},
                     {
                         text: " Jinja Templating",

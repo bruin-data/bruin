@@ -69,7 +69,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 	q.Query = materialized
 	if t.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
-		renderedQueries, err := o.extractor.ExtractQueriesFromString(materialized)
+		renderedQueries, err := extractor.ExtractQueriesFromString(materialized)
 		if err != nil {
 			return errors.Wrap(err, "cannot re-extract/render materialized query for time_interval strategy")
 		}
