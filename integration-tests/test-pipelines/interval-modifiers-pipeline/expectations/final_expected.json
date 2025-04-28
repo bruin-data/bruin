@@ -1,0 +1,50 @@
+{
+  "columns": [
+    {
+      "name": "product_id",
+      "type": "INTEGER"
+    },
+    {
+      "name": "product_name",
+      "type": "VARCHAR"
+    },
+    {
+      "name": "stock",
+      "type": "INTEGER"
+    },
+    {
+      "name": "price",
+      "type": "DECIMAL(12,2)"
+    },
+    {
+      "name": "dt",
+      "type": "TIMESTAMP"
+    }
+  ],
+  "rows": [
+    [
+      1,
+      "Laptop",
+      50,
+      {
+        "Width": 12,
+        "Scale": 2,
+        "Value": 79900
+      },
+      "2025-04-02T08:00:00Z"
+    ],
+    [
+      2,
+      "Smartphone",
+      40,
+      {
+        "Width": 12,
+        "Scale": 2,
+        "Value": 59900
+      },
+      "2025-04-02T09:00:00Z"
+    ]
+  ],
+  "connectionName": "duckdb-interval-modifiers",
+  "query": "SELECT * FROM products"
+}
