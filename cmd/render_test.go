@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -43,7 +42,6 @@ type mockMaterializer struct {
 }
 
 func (m *mockMaterializer) Render(task *pipeline.Asset, query string) (string, error) {
-	fmt.Print("I entered here")
 	res := m.Called(task, query)
 	return res.String(0), res.Error(1)
 }
