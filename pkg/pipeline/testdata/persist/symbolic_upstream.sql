@@ -3,8 +3,12 @@ name: some-sql-task
 type: bq.sql
 
 materialization:
-    type: table
-    
+  type: table
+
+depends:
+  - uri: upstream.id
+    mode: symbolic
+
 @bruin */
 
 select *
