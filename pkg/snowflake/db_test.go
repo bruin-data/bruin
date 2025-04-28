@@ -267,6 +267,7 @@ func TestDB_SelectWithSchema(t *testing.T) {
 					{"jane", "doe", int64(30)},
 					{"joe", "doe", int64(28)},
 				},
+				ColumnTypes: []string{"", "", ""},
 			},
 		},
 		{
