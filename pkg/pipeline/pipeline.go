@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -979,8 +978,6 @@ func (a *Asset) FormatContent() ([]byte, error) {
 	}
 
 	yamlConfig := buf.Bytes()
-
-	yaml.NewEncoder(os.Stdout).Encode(a.Upstreams)
 
 	keysToAddSpace := []string{"custom_checks", "depends", "columns", "materialization", "secrets", "parameters"}
 	for _, key := range keysToAddSpace {
