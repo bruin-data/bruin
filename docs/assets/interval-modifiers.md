@@ -16,6 +16,19 @@ interval_modifiers:
   end: 1h       # Shift end time forward 1 hour
 ```
 
+## Pipeline-Level Defaults
+
+You can set default interval modifiers at the pipeline level that will apply to all assets unless explicitly overridden. Define these in your pipeline's `default` section:
+
+```yaml
+default:
+  interval_modifiers:
+    start: 2h    # Default 2-hour shift for all assets
+    end: 2h      # Default 2-hour shift for all assets
+```
+
+Individual assets can override these defaults by specifying their own `interval_modifiers`. If an asset doesn't specify interval modifiers, it will inherit the pipeline defaults.
+
 ### Examples:
 - `start: -2h` → shift start time back 2 hours
 - `end: -1h` →  shift end time back 1 hour
