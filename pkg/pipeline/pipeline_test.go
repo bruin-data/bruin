@@ -872,6 +872,11 @@ func TestAsset_Persist(t *testing.T) {
 			assetPath:    path.AbsPathForTests(t, "testdata/persist/big.sql"),
 			expectedPath: path.AbsPathForTests(t, "testdata/persist/big.expected.sql"),
 		},
+		{
+			name:         "symbolic upstreams are not lost",
+			assetPath:    path.AbsPathForTests(t, "testdata/persist/symbolic_upstream.sql"),
+			expectedPath: path.AbsPathForTests(t, "testdata/persist/symbolic_upstream.expected.sql"),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

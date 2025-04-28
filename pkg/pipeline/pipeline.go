@@ -574,17 +574,23 @@ type Upstream struct {
 }
 
 func (u Upstream) MarshalYAML() (interface{}, error) {
-	if u.Type == "" || u.Type == "asset" {
+	isAsset := u.Type == "" || u.Type == "asset"
+	if u.Mode == UpstreamModeFull && isAsset {
 		return u.Value, nil
 	}
 
-	if strings.ToLower(u.Type) == "uri" {
-		return map[string]string{
-			"uri": u.Value,
-		}, nil
+	val := map[string]any{}
+	id := "uri"
+	if isAsset {
+		id = "asset"
+	}
+	val[id] = u.Value
+
+	if u.Mode == UpstreamModeSymbolic {
+		val["mode"] = u.Mode.String()
 	}
 
-	return nil, nil
+	return val, nil
 }
 
 type SnowflakeConfig struct {

@@ -4,7 +4,7 @@ type: bq.sql
 
 materialization:
     type: table
-
+    
 @bruin */
 
 select *
