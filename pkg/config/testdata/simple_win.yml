@@ -268,6 +268,13 @@ environments:
       sqlite:
         - name: "sqlite-1"
           path: "C:\\path\\to\\sqlite.db"
+      db2:
+        - name: "db2-default"
+          username: "username-123"
+          password: "password-123"
+          host: "host-123"
+          port: "1234"
+          database: "dbname-123"
       oracle:
         - name: "oracle-1"
           username: "username-123"

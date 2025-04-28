@@ -352,6 +352,27 @@ func (s *Scheduler) MarkPendingInstancesByType(instanceType TaskInstanceType, st
 	}
 }
 
+func (s *Scheduler) MarkCheckInstancesByID(checkID string, status TaskInstanceStatus) error {
+	for _, instance := range s.taskInstances {
+		columnCheck, ok := instance.(*ColumnCheckInstance)
+		if ok {
+			if columnCheck.Check.ID == checkID {
+				s.MarkTaskInstance(instance, status, false)
+				return nil
+			}
+		}
+		customCheck, ok := instance.(*CustomCheckInstance)
+
+		if ok {
+			if customCheck.Check.ID == checkID {
+				s.MarkTaskInstance(instance, status, false)
+				return nil
+			}
+		}
+	}
+	return errors.New("cannot find check with the given ID")
+}
+
 func (s *Scheduler) MarkByTag(tag string, status TaskInstanceStatus, downstream bool) {
 	for _, instance := range s.taskInstances {
 		asset := instance.GetAsset()

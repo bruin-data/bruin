@@ -605,9 +605,17 @@
           },
           "type": "array"
         },
+
         "oracle": {
           "items": {
             "$ref": "#/$defs/OracleConnection"
+          },
+          "type": "array"
+        },
+
+        "db2": {
+          "items": {
+            "$ref": "#/$defs/DB2Connection"
           },
           "type": "array"
         }
@@ -1529,6 +1537,38 @@
         "email",
         "oauth_token",
         "sub_domain"
+      ]
+    },
+    "DB2Connection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "database"
       ]
     },
     "OracleConnection": {

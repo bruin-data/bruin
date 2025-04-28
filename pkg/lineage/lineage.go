@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bruin-data/bruin/pkg/dialect"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
@@ -111,7 +110,7 @@ func (p *LineageExtractor) parseLineage(foundPipeline *pipeline.Pipeline, asset 
 		return nil, errors.New("invalid arguments: asset and pipeline cannot be nil")
 	}
 
-	dialect, err := dialect.GetDialectByAssetType(string(asset.Type))
+	dialect, err := sqlparser.AssetTypeToDialect(asset.Type)
 	if err != nil {
 		return nil, nil //nolint:nilerr
 	}

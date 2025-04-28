@@ -70,6 +70,7 @@ type Connections struct {
 	Frankfurter         []FrankfurterConnection         `yaml:"frankfurter,omitempty" json:"frankfurter,omitempty" mapstructure:"frankfurter"`
 	Salesforce          []SalesforceConnection          `yaml:"salesforce,omitempty" json:"salesforce,omitempty" mapstructure:"salesforce"`
 	SQLite              []SQLiteConnection              `yaml:"sqlite,omitempty" json:"sqlite,omitempty" mapstructure:"sqlite"`
+	DB2                 []DB2Connection                 `yaml:"db2,omitempty" json:"db2,omitempty" mapstructure:"db2"`
 	Oracle              []OracleConnection              `yaml:"oracle,omitempty" json:"oracle,omitempty" mapstructure:"oracle"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
@@ -751,6 +752,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.SQLite = append(env.Connections.SQLite, conn)
+	case "db2":
+		var conn DB2Connection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.DB2 = append(env.Connections.DB2, conn)
 	case "oracle":
 		var conn OracleConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -887,6 +895,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Salesforce = removeConnection(env.Connections.Salesforce, connectionName)
 	case "sqlite":
 		env.Connections.SQLite = removeConnection(env.Connections.SQLite, connectionName)
+	case "db2":
+		env.Connections.DB2 = removeConnection(env.Connections.DB2, connectionName)
 	case "oracle":
 		env.Connections.Oracle = removeConnection(env.Connections.Oracle, connectionName)
 	default:
@@ -988,6 +998,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.AppLovin, source.AppLovin)
 	mergeConnectionList(&c.Salesforce, source.Salesforce)
 	mergeConnectionList(&c.SQLite, source.SQLite)
+	mergeConnectionList(&c.DB2, source.DB2)
 	mergeConnectionList(&c.Oracle, source.Oracle)
 	c.buildConnectionKeyMap()
 	return nil

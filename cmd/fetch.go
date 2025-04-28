@@ -120,7 +120,10 @@ func Query() *cli.Command {
 					// Construct JSON response with structured columns
 					jsonCols := make([]map[string]string, len(result.Columns))
 					for i, colName := range result.Columns {
-						jsonCols[i] = map[string]string{"name": colName}
+						jsonCols[i] = map[string]string{
+							"name": colName,
+							"type": result.ColumnTypes[i],
+						}
 					}
 
 					// Prepare the final output struct

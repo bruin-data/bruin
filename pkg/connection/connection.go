@@ -21,6 +21,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/clickhouse"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
+	"github.com/bruin-data/bruin/pkg/db2"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/dynamodb"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
@@ -106,6 +107,7 @@ type Manager struct {
 	AppLovin        map[string]*applovin.Client
 	Salesforce      map[string]*salesforce.Client
 	SQLite          map[string]*sqlite.Client
+	DB2             map[string]*db2.Client
 	Oracle          map[string]*oracle.Client
 	mutex           sync.Mutex
 }
@@ -380,6 +382,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connSQLite, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.SQLite)...)
+
+	connDB2, err := m.GetDB2ConnectionWithoutDefault(name)
+	if err == nil {
+		return connDB2, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.DB2)...)
 
 	connOracle, err := m.GetOracleConnectionWithoutDefault(name)
 	if err == nil {
@@ -1320,6 +1328,25 @@ func (m *Manager) GetOracleConnectionWithoutDefault(name string) (*oracle.Client
 	db, ok := m.Oracle[name]
 	if !ok {
 		return nil, errors.Errorf("oracle connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetDB2Connection(name string) (*db2.Client, error) {
+	db, err := m.GetDB2ConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetDB2ConnectionWithoutDefault("db2-default")
+}
+
+func (m *Manager) GetDB2ConnectionWithoutDefault(name string) (*db2.Client, error) {
+	if m.DB2 == nil {
+		return nil, errors.New("no db2 connections found")
+	}
+	db, ok := m.DB2[name]
+	if !ok {
+		return nil, errors.Errorf("db2 connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2385,6 +2412,7 @@ func (m *Manager) AddSQLiteConnectionFromConfig(connection *config.SQLiteConnect
 	return nil
 }
 
+
 func (m *Manager) AddOracleConnectionFromConfig(connection *config.OracleConnection) error {
 	m.mutex.Lock()
 	if m.Oracle == nil {
@@ -2426,6 +2454,29 @@ func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Kinesis[connection.Name] = client
+	return nil
+}
+
+func (m *Manager) AddDB2ConnectionFromConfig(connection *config.DB2Connection) error {
+	m.mutex.Lock()
+	if m.DB2 == nil {
+		m.DB2 = make(map[string]*db2.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := db2.NewClient(db2.Config{
+		Username: connection.Username,
+		Password: connection.Password,
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Database: connection.Database,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.DB2[connection.Name] = client
 	return nil
 }
 
@@ -2566,6 +2617,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Salesforce, connectionManager.AddSalesforceConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.SQLite, connectionManager.AddSQLiteConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Oracle, connectionManager.AddOracleConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.DB2, connectionManager.AddDB2ConnectionFromConfig, &wg, &errList, &mu)
 
 	wg.Wait()
 	return connectionManager, errList

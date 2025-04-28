@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/internal/data"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pythonsrc"
 	"github.com/kluctl/go-embed-python/embed_util"
 	"github.com/kluctl/go-embed-python/python"
@@ -285,4 +286,25 @@ type QueryConfig struct {
 	Name   string `json:"name"`
 	Query  string `json:"query"`
 	Schema Schema `json:"schema"`
+}
+
+var assetTypeDialectMap = map[pipeline.AssetType]string{
+	pipeline.AssetTypeBigqueryQuery:   "bigquery",
+	pipeline.AssetTypeSnowflakeQuery:  "snowflake",
+	pipeline.AssetTypePostgresQuery:   "postgres",
+	pipeline.AssetTypeRedshiftQuery:   "redshift",
+	pipeline.AssetTypeAthenaQuery:     "athena",
+	pipeline.AssetTypeClickHouse:      "clickhouse",
+	pipeline.AssetTypeDatabricksQuery: "databricks",
+	pipeline.AssetTypeMsSQLQuery:      "tsql",
+	pipeline.AssetTypeSynapseQuery:    "tsql",
+	pipeline.AssetTypeDuckDBQuery:     "duckdb",
+}
+
+func AssetTypeToDialect(assetType pipeline.AssetType) (string, error) {
+	dialect, ok := assetTypeDialectMap[assetType]
+	if !ok {
+		return "", fmt.Errorf("unsupported asset type %s", assetType)
+	}
+	return dialect, nil
 }

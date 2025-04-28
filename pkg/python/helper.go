@@ -57,6 +57,10 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 		cmdArgs = append(cmdArgs, "--sql-exclude-columns", value)
 	}
 
+	if value, exists := asset.Parameters["staging_bucket"]; exists && value != "" {
+		cmdArgs = append(cmdArgs, "--staging-bucket", value)
+	}
+
 	// Handle primary keys
 	primaryKeys := asset.ColumnNamesWithPrimaryKey()
 	if len(primaryKeys) > 0 {
