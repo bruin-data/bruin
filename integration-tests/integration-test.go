@@ -99,12 +99,12 @@ var (
 )
 
 func main() {
-	path, err := os.Getwd()
+	wd, err := os.Getwd()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	currentFolder = filepath.Join(path, "integration-tests")
+	currentFolder = filepath.Join(wd, "integration-tests")
 
 	if runtime.GOOS == "windows" {
 		out, err := exec.Command("mv", "bin/bruin", "bin/bruin.exe").Output()
@@ -118,7 +118,6 @@ func main() {
 	if runtime.GOOS == "windows" {
 		executable = "bruin.exe"
 	}
-	wd, _ := os.Getwd()
 	binary := filepath.Join(wd, "bin", executable)
 
 	includeIngestr := os.Getenv("INCLUDE_INGESTR") == "1"
@@ -460,6 +459,66 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 
 func getTasks(binary string, currentFolder string) []e2e.Task {
 	return []e2e.Task{
+		{
+			Name:    "builtin-policies",
+			Command: binary,
+			Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/policies-builtin")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Successfully validated 1 assets across 1 pipeline"},
+			},
+			WorkingDir: currentFolder,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "custom-policies",
+			Command: binary,
+			Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/policies-custom")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Successfully validated 1 assets across 1 pipeline"},
+			},
+			WorkingDir: currentFolder,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "policy-selector",
+			Command: binary,
+			Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/policies-selector")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Successfully validated 1 assets across 1 pipeline"},
+			},
+			WorkingDir: currentFolder,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "policy-non-compliance",
+			Command: binary,
+			Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/policies-non-compliant")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 1,
+				Output:   "Checked 1 pipeline and found 3 issues",
+			},
+			WorkingDir: currentFolder,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
 		{
 			Name:          "parse-whole-pipeline",
 			Command:       binary,
