@@ -63,7 +63,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	if t.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
-		materializedQueries, err = o.extractor.ReextractQueriesFromSlice(materializedQueries)
+		materializedQueries, err = extractor.ReextractQueriesFromSlice(materializedQueries)
 		if err != nil {
 			return err
 		}
