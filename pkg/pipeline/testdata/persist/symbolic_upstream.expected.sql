@@ -8,7 +8,13 @@ materialization:
 
 depends:
   - mode: symbolic
-    uri: upstream.id
+    uri: upstream.a
+  - uri: upstream.b
+  - uri: upstream.c
+  - upstream.d
+  - asset: upstream.e
+    mode: symbolic
+  - upstream.f
 
 @bruin */
 

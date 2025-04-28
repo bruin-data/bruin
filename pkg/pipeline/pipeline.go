@@ -576,7 +576,13 @@ type Upstream struct {
 
 func (u Upstream) MarshalYAML() (interface{}, error) {
 	if u.Type == "" || u.Type == "asset" {
-		return u.Value, nil
+		if u.Mode == UpstreamModeFull {
+			return u.Value, nil
+		}
+		return map[string]any{
+			"asset": u.Value,
+			"mode":  u.Mode.String(),
+		}, nil
 	}
 
 	if strings.ToLower(u.Type) == "uri" {

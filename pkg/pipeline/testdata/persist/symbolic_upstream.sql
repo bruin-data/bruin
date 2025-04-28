@@ -6,8 +6,20 @@ materialization:
   type: table
 
 depends:
-  - uri: upstream.id
+  - uri: upstream.a
     mode: symbolic
+
+  - uri: upstream.b
+
+  - uri: upstream.c
+    mode: full
+
+  - asset: upstream.d
+
+  - asset: upstream.e
+    mode: symbolic
+
+  - upstream.f
 
 @bruin */
 
