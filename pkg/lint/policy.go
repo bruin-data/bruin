@@ -276,7 +276,7 @@ func addBoundaryAnchors(pattern string) string {
 	if !strings.HasPrefix(pattern, "^") {
 		pattern = "^" + pattern
 	}
-	if !strings.HasPrefix(pattern, "$") {
+	if !strings.HasSuffix(pattern, "$") {
 		pattern += "$"
 	}
 	return pattern
