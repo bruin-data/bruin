@@ -2412,7 +2412,6 @@ func (m *Manager) AddSQLiteConnectionFromConfig(connection *config.SQLiteConnect
 	return nil
 }
 
-
 func (m *Manager) AddOracleConnectionFromConfig(connection *config.OracleConnection) error {
 	m.mutex.Lock()
 	if m.Oracle == nil {
