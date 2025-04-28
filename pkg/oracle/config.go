@@ -21,6 +21,5 @@ func (c *Config) GetIngestrURI() string {
 		Host:   fmt.Sprintf("%s:%s", c.Host, c.Port),
 		Path:   c.DBName,
 	}
-	fmt.Println(url.String())
 	return url.String()
 }
