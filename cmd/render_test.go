@@ -204,7 +204,7 @@ func TestRenderCommand_Run(t *testing.T) {
 			ctx := make(map[string]any, 3)
 			ctx["startDate"] = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 			ctx["endDate"] = time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)
-			ctx["applyModifiers"] = false
+			ctx["apply-interval-modifiers"] = false
 
 			tt.wantErr(t, render.Run(tt.args.task, ctx))
 			f.extractor.AssertExpectations(t)
@@ -241,9 +241,9 @@ func TestModifyExtractor(t *testing.T) {
 					},
 				},
 				ctx: map[string]any{
-					"startDate":      time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-					"endDate":        time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
-					"applyModifiers": true,
+					"startDate":                time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+					"endDate":                  time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
+					"apply-interval-modifiers": true,
 				},
 				query: "SELECT * FROM asset1 WHERE date(timestamp_col) = '{{ start_date }}'",
 			},
@@ -263,9 +263,9 @@ func TestModifyExtractor(t *testing.T) {
 					},
 				},
 				ctx: map[string]any{
-					"startDate":      time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-					"endDate":        time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
-					"applyModifiers": true,
+					"startDate":                time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+					"endDate":                  time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
+					"apply-interval-modifiers": true,
 				},
 				query: "SELECT * FROM asset1 WHERE date(timestamp_col) = '{{ start_date }}'",
 			},

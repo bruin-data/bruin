@@ -57,7 +57,7 @@ func Render() *cli.Command {
 				Usage:   "the path to the .bruin.yml file",
 			},
 			&cli.BoolFlag{
-				Name:  "apply-interval-mpodifiers",
+				Name:  "apply-interval-modifiers",
 				Usage: "applies interval modifiers if flag is given",
 			},
 		},
@@ -199,7 +199,7 @@ func Render() *cli.Command {
 			ctx := make(map[string]any, 3)
 			ctx["startDate"] = startDate
 			ctx["endDate"] = endDate
-			ctx["applyModifiers"] = c.Bool("applyModifiers")
+			ctx["applyModifiers"] = c.Bool("apply-interval-modifiers")
 
 			return r.Run(asset, ctx)
 		},
@@ -236,7 +236,7 @@ func (r *RenderCommand) Run(task *pipeline.Asset, ctx map[string]any) error {
 		return errors.New("failed to find the asset: asset cannot be nil")
 	}
 	extractor := r.extractor
-	applyModifiers := ctx["applyModifiers"]
+	applyModifiers := ctx["apply-interval-modifiers"]
 	if applyModifiers.(bool) {
 		extractor = modifyExtractor(ctx, task)
 	}
