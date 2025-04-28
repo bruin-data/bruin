@@ -422,6 +422,39 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 				},
 			},
 		},
+		{
+			Name: "interval modifiers",
+			Steps: []e2e.Task{
+				{
+					Name:    "interval-modifiers",
+					Command: binary,
+					Args:    []string{"run", "--apply-interval-modifiers", "-env", "env-interval-modifiers", "--start-date", "2025-04-02T09:30:00.000Z", "--end-date", "2025-04-02T11:30:00.000Z", filepath.Join(currentFolder, "test-pipelines/interval-modifiers-pipeline/assets/products.sql")},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "query the table",
+					Command: binary,
+					Args:    []string{"query", "--env", "env-interval-modifiers", "--asset", filepath.Join(currentFolder, "test-pipelines/interval-modifiers-pipeline/assets/products.sql"), "--query", "SELECT * FROM products", "--output", "json"},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+						Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/interval-modifiers-pipeline/expectations/final_expected.json")),
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByOutputJSON,
+					},
+				},
+			},
+		},
 	}
 }
 
