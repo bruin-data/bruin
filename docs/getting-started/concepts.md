@@ -128,6 +128,9 @@ default:
   secrets:
     - key: KEY1
       inject_as: INJECTED1
+  interval_modifiers:
+      start: 2h
+      end: 2h
 ```
 
 For more detail, Please check the example from the template [here](https://github.com/bruin-data/bruin/blob/main/templates/chess/pipeline.yml).
