@@ -707,3 +707,16 @@ type DB2Connection struct {
 func (c DB2Connection) GetName() string {
 	return c.Name
 }
+
+type OracleConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port     string `yaml:"port,omitempty" json:"port" mapstructure:"port"`
+	DBName   string `yaml:"dbname,omitempty" json:"dbname" mapstructure:"dbname"`
+}
+
+func (c OracleConnection) GetName() string {
+	return c.Name
+}

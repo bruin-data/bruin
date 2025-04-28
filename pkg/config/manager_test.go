@@ -441,6 +441,16 @@ func TestLoadFromFile(t *testing.T) {
 					Database: "dbname-123",
 				},
 			},
+			Oracle: []OracleConnection{
+				{
+					Name:     "oracle-1",
+					Username: "username-123",
+					Password: "password-123",
+					Host:     "host-123",
+					Port:     "1234",
+					DBName:   "dbname-123",
+				},
+			},
 		},
 	}
 

@@ -275,6 +275,13 @@ environments:
           host: "host-123"
           port: "1234"
           database: "dbname-123"
+      oracle:
+        - name: "oracle-1"
+          username: "username-123"
+          password: "password-123"
+          host: "host-123"
+          port: "1234"
+          dbname: "dbname-123"
 
   prod:
     connections:
