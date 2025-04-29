@@ -382,7 +382,7 @@ func PatchAsset() *cli.Command {
 			}
 
 			if c.Bool("convert") {
-				return convertToBruinAsset(assetPath)
+				return convertToBruinAsset(afero.NewOsFs(), assetPath)
 			}
 
 			asset, err := DefaultPipelineBuilder.CreateAssetFromFile(assetPath, nil)
@@ -419,9 +419,7 @@ func PatchAsset() *cli.Command {
 	}
 }
 
-func convertToBruinAsset(filePath string) error {
-	fs := afero.NewOsFs()
-
+func convertToBruinAsset(fs afero.Fs, filePath string) error {
 	// Check if file exists
 	exists, err := afero.Exists(fs, filePath)
 	if err != nil {
@@ -451,7 +449,7 @@ func convertToBruinAsset(filePath string) error {
 	case ".py":
 		bruinHeader = fmt.Sprintf("\"\"\" @bruin\nname: %s\n@bruin \"\"\"\n\n", assetName)
 	default:
-		return nil // we don't support other file types yet
+		return nil // unsupported file types
 	}
 	newContent := bruinHeader + string(content)
 	err = afero.WriteFile(fs, filePath, []byte(newContent), 0644)

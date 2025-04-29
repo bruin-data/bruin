@@ -2,8 +2,13 @@ package cmd
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/spf13/afero"
 )
 
 func BenchmarkInternalParsePipeline(b *testing.B) {
@@ -79,5 +84,101 @@ func BenchmarkInternalParseAssetWithoutColumnLineage(b *testing.B) {
 		if time.Since(start) > 100*time.Millisecond {
 			b.Fatalf("Benchmark took longer than 100ms")
 		}
+	}
+}
+
+
+func TestConvertToBruinAsset(t *testing.T) {
+	// Create a builder instance for asset verification
+	builder := DefaultPipelineBuilder
+
+	tests := []struct {
+		name        string
+		fileContent string
+		filePath    string
+		wantErr     bool
+		wantContent string
+		wantAsset   bool // new field to indicate if we expect a valid asset
+	}{
+		{
+			name:        "convert SQL file",
+			fileContent: "SELECT * FROM table;",
+			filePath:    "test.sql",
+			wantErr:     false,
+			wantContent: "/* @bruin\nname: test\n@bruin */\n\nSELECT * FROM table;",
+			wantAsset:   true,
+		},
+		{
+			name:        "convert Python file",
+			fileContent: "print('hello')",
+			filePath:    "test.py",
+			wantErr:     false,
+			wantContent: "\"\"\" @bruin\nname: test\n@bruin \"\"\"\n\nprint('hello')",
+			wantAsset:   true,
+		},
+		{
+			name:        "unsupported file type",
+			fileContent: "some content",
+			filePath:    "test.txt",
+			wantErr:     false, // function returns nil for unsupported types
+			wantContent: "some content",
+			wantAsset:   false,
+		},
+		{
+			name:        "file with spaces in name",
+			fileContent: "SELECT * FROM table;",
+			filePath:    "my test.sql",
+			wantErr:     false,
+			wantContent: "/* @bruin\nname: my test\n@bruin */\n\nSELECT * FROM table;",
+			wantAsset:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+
+			fullPath := filepath.Join(tmpDir, tt.filePath)
+			err := os.WriteFile(fullPath, []byte(tt.fileContent), 0644)
+			if err != nil {
+				t.Fatalf("Failed to create test file: %v", err)
+			}
+			fs := afero.NewOsFs()
+			err = convertToBruinAsset(fs, fullPath)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("convertToBruinAsset() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr {
+				content, err := os.ReadFile(fullPath)
+				if err != nil {
+					t.Fatalf("Failed to read result file: %v", err)
+				}
+				if got := string(content); got != tt.wantContent {
+					t.Errorf("convertToBruinAsset() = %v, want %v", got, tt.wantContent)
+				}
+
+				// Verify the file can be parsed as an asset
+				asset, err := builder.CreateAssetFromFile(fullPath, nil)
+				if tt.wantAsset {
+					if err != nil {
+						t.Errorf("Failed to create asset from converted file: %v", err)
+					}
+					if asset == nil {
+						t.Error("Expected asset to be created, but got nil")
+					} else {
+						// Verify asset properties
+						expectedName := strings.TrimSuffix(filepath.Base(tt.filePath), filepath.Ext(tt.filePath))
+						if asset.Name != expectedName {
+							t.Errorf("Asset name = %v, want %v", asset.Name, expectedName)
+						}
+					}
+				} else {
+					if asset != nil {
+						t.Error("Expected no asset to be created, but got one")
+					}
+				}
+			}
+		})
 	}
 }
