@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -373,7 +374,13 @@ func PatchAsset() *cli.Command {
 			&cli.StringFlag{
 				Name:     "body",
 				Usage:    "the JSON object containing the patch body",
-				Required: true,
+				Required: false,
+			},
+			&cli.BoolFlag{
+				Name:        "convert",
+				Usage:       "convert a SQL or Python file into a Bruin asset",
+				Required:    false,
+				DefaultText: "false",
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -381,6 +388,10 @@ func PatchAsset() *cli.Command {
 			if assetPath == "" {
 				printErrorJSON(errors.New("empty asset path given, you must provide an existing asset path"))
 				return cli.Exit("", 1)
+			}
+
+			if c.Bool("convert") {
+				return convertToBruinAsset(afero.NewOsFs(), assetPath)
 			}
 
 			asset, err := DefaultPipelineBuilder.CreateAssetFromFile(assetPath, nil)
@@ -415,4 +426,46 @@ func PatchAsset() *cli.Command {
 			return nil
 		},
 	}
+}
+
+func convertToBruinAsset(fs afero.Fs, filePath string) error {
+	// Check if file exists
+	exists, err := afero.Exists(fs, filePath)
+	if err != nil {
+		printErrorJSON(errors2.Wrap(err, "failed to check if file exists"))
+		return cli.Exit("", 1)
+	}
+	if !exists {
+		printErrorJSON(errors.New("file does not exist"))
+		return cli.Exit("", 1)
+	}
+
+	content, err := afero.ReadFile(fs, filePath)
+	if err != nil {
+		printErrorJSON(errors2.Wrap(err, "failed to read file"))
+		return cli.Exit("", 1)
+	}
+
+	fileName := filepath.Base(filePath)
+	assetName := strings.TrimSuffix(fileName, filepath.Ext(fileName))
+
+	var bruinHeader string
+	ext := strings.ToLower(filepath.Ext(filePath))
+
+	switch ext {
+	case ".sql":
+		bruinHeader = fmt.Sprintf("/* @bruin\nname: %s\n@bruin */\n\n", assetName)
+	case ".py":
+		bruinHeader = fmt.Sprintf("\"\"\" @bruin\nname: %s\n@bruin \"\"\"\n\n", assetName)
+	default:
+		return nil // unsupported file types
+	}
+	newContent := bruinHeader + string(content)
+	err = afero.WriteFile(fs, filePath, []byte(newContent), 0644)
+	if err != nil {
+		printErrorJSON(errors2.Wrap(err, "failed to write file"))
+		return cli.Exit("", 1)
+	}
+
+	return nil
 }
