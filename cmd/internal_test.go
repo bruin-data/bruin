@@ -87,9 +87,8 @@ func BenchmarkInternalParseAssetWithoutColumnLineage(b *testing.B) {
 	}
 }
 
-
 func TestConvertToBruinAsset(t *testing.T) {
-	// Create a builder instance for asset verification
+	t.Parallel()
 	builder := DefaultPipelineBuilder
 
 	tests := []struct {
@@ -98,7 +97,7 @@ func TestConvertToBruinAsset(t *testing.T) {
 		filePath    string
 		wantErr     bool
 		wantContent string
-		wantAsset   bool // new field to indicate if we expect a valid asset
+		wantAsset   bool
 	}{
 		{
 			name:        "convert SQL file",
@@ -136,6 +135,7 @@ func TestConvertToBruinAsset(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			tmpDir := t.TempDir()
 
 			fullPath := filepath.Join(tmpDir, tt.filePath)
@@ -149,7 +149,7 @@ func TestConvertToBruinAsset(t *testing.T) {
 				t.Errorf("convertToBruinAsset() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !tt.wantErr {
+			if !tt.wantErr { //nolint
 				content, err := os.ReadFile(fullPath)
 				if err != nil {
 					t.Fatalf("Failed to read result file: %v", err)
@@ -173,7 +173,7 @@ func TestConvertToBruinAsset(t *testing.T) {
 							t.Errorf("Asset name = %v, want %v", asset.Name, expectedName)
 						}
 					}
-				} else {
+				} else { //nolint
 					if asset != nil {
 						t.Error("Expected no asset to be created, but got one")
 					}
