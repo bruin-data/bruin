@@ -40,7 +40,8 @@
             "id": "6d0edf3e6836006758d1213e7927cf9530d9dcdf9dcccc6638bee257dd73e857",
             "name": "not_null",
             "value": null,
-            "blocking": true
+            "blocking": true,
+            "description": ""
           }
         ],
         "upstreams": []
@@ -57,7 +58,8 @@
             "id": "3a6115e7ac5dffc8f0c0c6cb8ea427296f7656167d574e5cefde62a37535222f",
             "name": "not_null",
             "value": null,
-            "blocking": true
+            "blocking": true,
+            "description": ""
           },
           {
             "id": "5d4569e858cbc6f56cf8ca9d934b743f4fa3b9b870d24f99dab7a390b1bb5168",
@@ -68,7 +70,8 @@
               "Facebook",
               "Instagram"
             ],
-            "blocking": true
+            "blocking": true,
+            "description": ""
           }
         ],
         "upstreams": []
@@ -85,7 +88,8 @@
             "id": "d625425165fba6cc0d5c0ecf233d6d719b3bcadba8845f31396ce94acf051d60",
             "name": "not_null",
             "value": null,
-            "blocking": true
+            "blocking": true,
+            "description": ""
           }
         ],
         "upstreams": []
