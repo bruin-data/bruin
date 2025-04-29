@@ -33,6 +33,12 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+type ModifierInfo struct {
+	StartDate      time.Time
+	EndDate        time.Time
+	ApplyModifiers bool
+}
+
 func Render() *cli.Command {
 	return &cli.Command{
 		Name:      "render",
@@ -55,6 +61,10 @@ func Render() *cli.Command {
 				Name:    "config-file",
 				EnvVars: []string{"BRUIN_CONFIG_FILE"},
 				Usage:   "the path to the .bruin.yml file",
+			},
+			&cli.BoolFlag{
+				Name:  "apply-interval-modifiers",
+				Usage: "applies interval modifiers if flag is given",
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -192,8 +202,13 @@ func Render() *cli.Command {
 				writer:  os.Stdout,
 				output:  c.String("output"),
 			}
+			modifierInfo := ModifierInfo{
+				StartDate:      startDate,
+				EndDate:        endDate,
+				ApplyModifiers: c.Bool("apply-interval-modifiers"),
+			}
 
-			return r.Run(asset, pl)
+			return r.Run(asset, modifierInfo)
 		},
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
@@ -221,14 +236,18 @@ type RenderCommand struct {
 	writer io.Writer
 }
 
-func (r *RenderCommand) Run(task *pipeline.Asset, foundPipeline *pipeline.Pipeline) error {
+func (r *RenderCommand) Run(task *pipeline.Asset, modifierInfo ModifierInfo) error {
 	defer RecoverFromPanic()
 	var err error
 	if task == nil {
 		return errors.New("failed to find the asset: asset cannot be nil")
 	}
-
-	queries, err := r.extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
+	extractor := r.extractor
+	applyModifiers := modifierInfo.ApplyModifiers
+	if applyModifiers {
+		extractor = modifyExtractor(modifierInfo, task)
+	}
+	queries, err := extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
 	if err != nil {
 		r.printErrorOrJSON(err.Error())
 		return cli.Exit("", 1)
@@ -246,6 +265,7 @@ func (r *RenderCommand) Run(task *pipeline.Asset, foundPipeline *pipeline.Pipeli
 		qq.Query = materialized
 		if task.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
 			var rextractedQueries []*query.Query
+
 			rextractedQueries, err = r.extractor.ExtractQueriesFromString(materialized)
 			if err != nil {
 				r.printErrorOrJSON(err.Error())
@@ -328,4 +348,15 @@ func getPipelineDefinitionFullPath(pipelinePath string) (string, error) {
 		}
 	}
 	return "", errors.Errorf("no pipeline definition file found in '%s'. Supported files: %v", pipelinePath, pipelineDefinitionFiles)
+}
+
+func modifyExtractor(ctx ModifierInfo, t *pipeline.Asset) queryExtractor {
+	newStartDate := pipeline.ModifyDate(ctx.StartDate, t.IntervalModifiers.Start)
+	newEnddate := pipeline.ModifyDate(ctx.EndDate, t.IntervalModifiers.End)
+	newRenderer := jinja.NewRendererWithStartEndDates(&newStartDate, &newEnddate, "your-pipeline-name", "your-run-id")
+
+	return &query.WholeFileExtractor{
+		Renderer: newRenderer,
+		Fs:       fs,
+	}
 }
