@@ -98,10 +98,7 @@ func Query() *cli.Command {
 					return handleError(c.String("output"), errors.Wrap(err, "failed to start SQL parser"))
 				}
 
-				queryStr, err = addLimitToQuery(queryStr, c.Int64("limit"), conn, parser)
-				if err != nil {
-					return handleError(c.String("output"), errors.Wrap(err, "failed to add limit to query"))
-				}
+				queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn, parser)
 			}
 			if querier, ok := conn.(interface {
 				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
@@ -339,18 +336,22 @@ type Limiter interface {
 	Limit(query string, limit int64) string
 }
 
-func addLimitToQuery(query string, limit int64, conn interface{}, parser *sqlparser.SQLParser) (string, error) {
-	limitedQuery, err := parser.AddLimit(query, int(limit))
-	if err != nil {
+func addLimitToQuery(query string, limit int64, conn interface{}, parser *sqlparser.SQLParser) string {
+	var err error
+	var limitedQuery string
+	if parser != nil {
+		limitedQuery, err = parser.AddLimit(query, int(limit))
+	}
+	if err != nil || parser == nil {
 		l, ok := conn.(Limiter)
 		if ok {
-			return l.Limit(query, limit), nil
+			return l.Limit(query, limit)
 		} else {
 			query = strings.TrimRight(query, "; \n\t")
-			return fmt.Sprintf("SELECT * FROM (\n%s\n) as t LIMIT %d", query, limit), nil
+			return fmt.Sprintf("SELECT * FROM (\n%s\n) as t LIMIT %d", query, limit)
 		}
 	}
-	return limitedQuery, nil
+	return limitedQuery
 }
 
 func printTable(columnNames []string, rows [][]interface{}) {

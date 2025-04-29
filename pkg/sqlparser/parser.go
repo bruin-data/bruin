@@ -309,7 +309,6 @@ func AssetTypeToDialect(assetType pipeline.AssetType) (string, error) {
 	return dialect, nil
 }
 
-
 func (s *SQLParser) AddLimit(sql string, limit int) (string, error) {
 	err := s.Start()
 	if err != nil {
