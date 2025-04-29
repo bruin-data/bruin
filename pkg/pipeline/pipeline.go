@@ -438,18 +438,20 @@ func (ccv *ColumnCheckValue) ToString() string {
 }
 
 type ColumnCheck struct {
-	ID       string           `json:"id" yaml:"-" mapstructure:"-"`
-	Name     string           `json:"name" yaml:"name,omitempty" mapstructure:"name"`
-	Value    ColumnCheckValue `json:"value" yaml:"value,omitempty" mapstructure:"value"`
-	Blocking DefaultTrueBool  `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
+	ID          string           `json:"id" yaml:"-" mapstructure:"-"`
+	Name        string           `json:"name" yaml:"name,omitempty" mapstructure:"name"`
+	Value       ColumnCheckValue `json:"value" yaml:"value,omitempty" mapstructure:"value"`
+	Blocking    DefaultTrueBool  `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
+	Description string           `json:"description" yaml:"description,omitempty" mapstructure:"description"`
 }
 
-func NewColumnCheck(assetName, columnName, name string, value ColumnCheckValue, blocking *bool) ColumnCheck {
+func NewColumnCheck(assetName, columnName, name string, value ColumnCheckValue, blocking *bool, description string) ColumnCheck {
 	return ColumnCheck{
-		ID:       hash(fmt.Sprintf("%s-%s-%s", assetName, columnName, name)),
-		Name:     strings.TrimSpace(name),
-		Value:    value,
-		Blocking: DefaultTrueBool{Value: blocking},
+		ID:          hash(fmt.Sprintf("%s-%s-%s", assetName, columnName, name)),
+		Name:        strings.TrimSpace(name),
+		Value:       value,
+		Blocking:    DefaultTrueBool{Value: blocking},
+		Description: description,
 	}
 }
 
