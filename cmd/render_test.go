@@ -199,12 +199,15 @@ func TestRenderCommand_Run(t *testing.T) {
 				builder: f.builder,
 				writer:  f.writer,
 			}
-			ctx := make(map[string]any, 3)
-			ctx["startDate"] = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-			ctx["endDate"] = time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)
-			ctx["apply-interval-modifiers"] = false
 
-			tt.wantErr(t, render.Run(tt.args.task, ctx))
+			// Create an instance of ExecutionParameters
+			params := ModifierInfo{
+				StartDate:      time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+				EndDate:        time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
+				ApplyModifiers: false,
+			}
+
+			tt.wantErr(t, render.Run(tt.args.task, params))
 			f.extractor.AssertExpectations(t)
 			f.bqMaterializer.AssertExpectations(t)
 			f.builder.AssertExpectations(t)
@@ -215,9 +218,9 @@ func TestRenderCommand_Run(t *testing.T) {
 func TestModifyExtractor(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		task  *pipeline.Asset
-		ctx   map[string]any
-		query string
+		task   *pipeline.Asset
+		params ModifierInfo
+		query  string
 	}
 
 	tests := []struct {
@@ -238,10 +241,10 @@ func TestModifyExtractor(t *testing.T) {
 						End:   pipeline.TimeModifier{Days: 0},
 					},
 				},
-				ctx: map[string]any{
-					"startDate":                time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-					"endDate":                  time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
-					"apply-interval-modifiers": true,
+				params: ModifierInfo{
+					StartDate:      time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+					EndDate:        time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
+					ApplyModifiers: true,
 				},
 				query: "SELECT * FROM asset1 WHERE date(timestamp_col) = '{{ start_date }}'",
 			},
@@ -260,10 +263,10 @@ func TestModifyExtractor(t *testing.T) {
 						End:   pipeline.TimeModifier{Days: 0},
 					},
 				},
-				ctx: map[string]any{
-					"startDate":                time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-					"endDate":                  time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
-					"apply-interval-modifiers": true,
+				params: ModifierInfo{
+					StartDate:      time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+					EndDate:        time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
+					ApplyModifiers: true,
 				},
 				query: "SELECT * FROM asset1 WHERE date(timestamp_col) = '{{ start_date }}'",
 			},
@@ -275,7 +278,7 @@ func TestModifyExtractor(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			extractor := modifyExtractor(tt.args.ctx, tt.args.task)
+			extractor := modifyExtractor(tt.args.params, tt.args.task)
 			qry, err := extractor.ExtractQueriesFromString(tt.args.query)
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantQuery, qry[0].Query)

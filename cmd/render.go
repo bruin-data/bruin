@@ -33,6 +33,12 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+type ModifierInfo struct {
+	StartDate      time.Time
+	EndDate        time.Time
+	ApplyModifiers bool
+}
+
 func Render() *cli.Command {
 	return &cli.Command{
 		Name:      "render",
@@ -196,12 +202,13 @@ func Render() *cli.Command {
 				writer:  os.Stdout,
 				output:  c.String("output"),
 			}
-			ctx := make(map[string]any, 3)
-			ctx["startDate"] = startDate
-			ctx["endDate"] = endDate
-			ctx["applyModifiers"] = c.Bool("apply-interval-modifiers")
+			modifierInfo := ModifierInfo{
+				StartDate:      startDate,
+				EndDate:        endDate,
+				ApplyModifiers: c.Bool("apply-interval-modifiers"),
+			}
 
-			return r.Run(asset, ctx)
+			return r.Run(asset, modifierInfo)
 		},
 		Before: telemetry.BeforeCommand,
 		After:  telemetry.AfterCommand,
@@ -229,16 +236,16 @@ type RenderCommand struct {
 	writer io.Writer
 }
 
-func (r *RenderCommand) Run(task *pipeline.Asset, ctx map[string]any) error {
+func (r *RenderCommand) Run(task *pipeline.Asset, modifierInfo ModifierInfo) error {
 	defer RecoverFromPanic()
 	var err error
 	if task == nil {
 		return errors.New("failed to find the asset: asset cannot be nil")
 	}
 	extractor := r.extractor
-	applyModifiers := ctx["apply-interval-modifiers"]
-	if applyModifiers.(bool) {
-		extractor = modifyExtractor(ctx, task)
+	applyModifiers := modifierInfo.ApplyModifiers
+	if applyModifiers {
+		extractor = modifyExtractor(modifierInfo, task)
 	}
 	queries, err := extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
 	if err != nil {
@@ -343,9 +350,9 @@ func getPipelineDefinitionFullPath(pipelinePath string) (string, error) {
 	return "", errors.Errorf("no pipeline definition file found in '%s'. Supported files: %v", pipelinePath, pipelineDefinitionFiles)
 }
 
-func modifyExtractor(ctx map[string]any, t *pipeline.Asset) queryExtractor {
-	newStartDate := pipeline.ModifyDate(ctx["startDate"].(time.Time), t.IntervalModifiers.Start)
-	newEnddate := pipeline.ModifyDate(ctx["endDate"].(time.Time), t.IntervalModifiers.End)
+func modifyExtractor(ctx ModifierInfo, t *pipeline.Asset) queryExtractor {
+	newStartDate := pipeline.ModifyDate(ctx.StartDate, t.IntervalModifiers.Start)
+	newEnddate := pipeline.ModifyDate(ctx.EndDate, t.IntervalModifiers.End)
 	newRenderer := jinja.NewRendererWithStartEndDates(&newStartDate, &newEnddate, "your-pipeline-name", "your-run-id")
 
 	return &query.WholeFileExtractor{
