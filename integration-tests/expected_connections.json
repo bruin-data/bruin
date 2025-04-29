@@ -373,6 +373,17 @@
           }
         ]
       }
+    },
+    "env-interval-modifiers": {
+      "schema_prefix": "",
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-interval-modifiers",
+            "path": "integration-tests/duckdb-files/interval-modifiers.db"
+          }
+        ]
+      }
     }
   }
 }

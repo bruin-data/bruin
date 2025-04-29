@@ -1,9 +1,12 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 
+	"github.com/aws/aws-sdk-go-v2/config"
 	"golang.org/x/oauth2/google"
 )
 
@@ -78,17 +81,80 @@ func (c GoogleCloudPlatformConnection) MarshalJSON() ([]byte, error) {
 	})
 }
 
-type AthenaConnection struct {
+type AthenaConnection struct { //nolint:recvcheck
 	Name             string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessKey        string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id"`
 	SecretKey        string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key"`
+	SessionToken     string `yaml:"session_token,omitempty" json:"session_token" mapstructure:"session_token"`
 	QueryResultsPath string `yaml:"query_results_path,omitempty" json:"query_results_path" mapstructure:"query_results_path"`
 	Region           string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
 	Database         string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
+	Profile          string `yaml:"profile,omitempty" json:"profile,omitempty" mapstructure:"profile"`
+
+	regionSetFromProfile bool
 }
 
 func (c AthenaConnection) GetName() string {
 	return c.Name
+}
+
+func (c *AthenaConnection) LoadCredentialsFromProfile(ctx context.Context) error {
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithSharedConfigProfile(c.Profile),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to load AWS credentials from profile %s: %w", c.Profile, err)
+	}
+	creds, err := cfg.Credentials.Retrieve(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve AWS credentials: %w", err)
+	}
+
+	c.AccessKey = creds.AccessKeyID
+	c.SecretKey = creds.SecretAccessKey
+	c.SessionToken = creds.SessionToken
+
+	if c.Region == "" {
+		c.Region = cfg.Region
+		c.regionSetFromProfile = true
+	}
+
+	return nil
+}
+
+func (c AthenaConnection) MarshalYAML() (interface{}, error) {
+	m := make(map[string]interface{})
+
+	if c.Name != "" {
+		m["name"] = c.Name
+	}
+
+	if c.QueryResultsPath != "" {
+		m["query_results_path"] = c.QueryResultsPath
+	}
+
+	if c.Database != "" {
+		m["database"] = c.Database
+	}
+
+	if c.Region != "" && !c.regionSetFromProfile {
+		m["region"] = c.Region
+	}
+
+	if c.Profile != "" {
+		m["profile"] = c.Profile
+		return m, nil
+	}
+
+	if c.AccessKey != "" {
+		m["access_key_id"] = c.AccessKey
+	}
+
+	if c.SecretKey != "" {
+		m["secret_access_key"] = c.SecretKey
+	}
+
+	return m, nil
 }
 
 type SynapseConnection struct {
@@ -568,6 +634,20 @@ func (c PipedriveConnection) GetName() string {
 	return c.Name
 }
 
+type EMRServerlessConnection struct {
+	Name          string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessKey     string `yaml:"access_key" json:"access_key" mapstructure:"access_key"`
+	SecretKey     string `yaml:"secret_key" json:"secret_key" mapstructure:"secret_key"`
+	ApplicationID string `yaml:"application_id" json:"application_id" mapstructure:"application_id"`
+	ExecutionRole string `yaml:"execution_role" json:"execution_role" mapstructure:"execution_role"`
+	Region        string `yaml:"region" json:"region" mapstructure:"region"`
+	Workspace     string `yaml:"workspace" json:"workspace" mapstructure:"workspace"`
+}
+
+func (c EMRServerlessConnection) GetName() string {
+	return c.Name
+}
+
 type GoogleAnalyticsConnection struct {
 	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file" mapstructure:"service_account_file"`
@@ -584,5 +664,59 @@ type AppLovinConnection struct {
 }
 
 func (c AppLovinConnection) GetName() string {
+	return c.Name
+}
+
+type FrankfurterConnection struct {
+	Name string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+}
+
+func (c FrankfurterConnection) GetName() string {
+	return c.Name
+}
+
+type SalesforceConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Token    string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
+}
+
+func (c SalesforceConnection) GetName() string {
+	return c.Name
+}
+
+type SQLiteConnection struct {
+	Name string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Path string `yaml:"path,omitempty" json:"path" mapstructure:"path"`
+}
+
+func (c SQLiteConnection) GetName() string {
+	return c.Name
+}
+
+type DB2Connection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port     string `yaml:"port,omitempty" json:"port" mapstructure:"port"`
+	Database string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+}
+
+func (c DB2Connection) GetName() string {
+	return c.Name
+}
+
+type OracleConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port     string `yaml:"port,omitempty" json:"port" mapstructure:"port"`
+	DBName   string `yaml:"dbname,omitempty" json:"dbname" mapstructure:"dbname"`
+}
+
+func (c OracleConnection) GetName() string {
 	return c.Name
 }

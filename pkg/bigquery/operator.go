@@ -67,7 +67,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 	q.Query = materialized
 	if t.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
-		renderedQueries, err := o.extractor.ExtractQueriesFromString(materialized)
+		renderedQueries, err := extractor.ExtractQueriesFromString(materialized)
 		if err != nil {
 			return errors.Wrap(err, "cannot re-extract/render materialized query for time_interval strategy")
 		}
@@ -178,20 +178,16 @@ func (o *MetadataPushOperator) Run(ctx context.Context, ti scheduler.TaskInstanc
 	return nil
 }
 
-type renderer interface {
-	Render(query string) (string, error)
-}
-
 type QuerySensor struct {
 	connection connectionFetcher
-	renderer   renderer
+	extractor  query.QueryExtractor
 	sensorMode string
 }
 
-func NewQuerySensor(conn connectionFetcher, renderer renderer, sensorMode string) *QuerySensor {
+func NewQuerySensor(conn connectionFetcher, extractor query.QueryExtractor, sensorMode string) *QuerySensor {
 	return &QuerySensor{
 		connection: conn,
-		renderer:   renderer,
+		extractor:  extractor,
 		sensorMode: sensorMode,
 	}
 }
@@ -208,8 +204,9 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	if !ok {
 		return errors.New("query sensor requires a parameter named 'query'")
 	}
+	extractor := o.extractor.CloneForAsset(ctx, t)
 
-	qq, err := o.renderer.Render(qq)
+	qry, err := extractor.ExtractQueriesFromString(qq)
 	if err != nil {
 		return errors.Wrap(err, "failed to render query sensor query")
 	}
@@ -223,7 +220,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return err
 	}
 
-	trimmedQuery := helpers.TrimToLength(qq, 50)
+	trimmedQuery := helpers.TrimToLength(qry[0].Query, 50)
 	printer, printerExists := ctx.Value(executor.KeyPrinter).(io.Writer)
 	if printerExists {
 		fmt.Fprintln(printer, "Poking:", trimmedQuery)
@@ -235,7 +232,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		case <-timeout:
 			return errors.New("Sensor timed out after 24 hours")
 		default:
-			res, err := conn.Select(ctx, &query.Query{Query: qq})
+			res, err := conn.Select(ctx, qry[0])
 			if err != nil {
 				return err
 			}

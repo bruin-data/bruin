@@ -126,8 +126,9 @@ func Run(isDebug *bool) *cli.Command {
 				EnvVars: []string{"BRUIN_FULL_REFRESH"},
 			},
 			&cli.BoolFlag{
-				Name:  "apply-interval-modifiers",
-				Usage: "apply interval modifiers",
+				Name:        "apply-interval-modifiers",
+				Usage:       "apply interval modifiers",
+				DefaultText: "false",
 			},
 			&cli.BoolFlag{
 				Name:  "use-pip",
@@ -141,6 +142,10 @@ func Run(isDebug *bool) *cli.Command {
 				Name:    "tag",
 				Aliases: []string{"t"},
 				Usage:   "pick the assets with the given tag",
+			},
+			&cli.StringFlag{
+				Name:  "single-check",
+				Usage: "runs a single column or custom check by ID",
 			},
 			&cli.StringFlag{
 				Name:    "exclude-tag",
@@ -223,7 +228,6 @@ func Run(isDebug *bool) *cli.Command {
 			if err != nil {
 				return err
 			}
-
 			repoRoot, err := git.FindRepoFromPath(inputPath)
 			if err != nil {
 				errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
@@ -304,7 +308,7 @@ func Run(isDebug *bool) *cli.Command {
 				errorPrinter.Printf("Failed to add the run state folder to .gitignore: %v\n", err)
 				return cli.Exit("", 1)
 			}
-
+			singleCheckID := c.String("single-check")
 			filter := &Filter{
 				IncludeTag:        runConfig.Tag,
 				OnlyTaskTypes:     runConfig.Only,
@@ -312,6 +316,7 @@ func Run(isDebug *bool) *cli.Command {
 				PushMetaData:      runConfig.PushMetadata,
 				SingleTask:        task,
 				ExcludeTag:        runConfig.ExcludeTag,
+				singleCheckID:     singleCheckID,
 			}
 			var pipelineState *scheduler.PipelineState
 			if c.Bool("continue") {
@@ -726,9 +731,7 @@ func setupExecutors(
 		Fs:       fs,
 		Renderer: renderer,
 	}
-
-	customCheckRunner := ansisql.NewCustomCheckOperator(conn, renderer)
-
+	customCheckRunner := ansisql.NewCustomCheckOperator(conn, wholeFileExtractor)
 	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery || s.WillRunTaskOfType(pipeline.AssetTypeBigquerySeed) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryTableSensor) {
 		bqOperator := bigquery.NewBasicOperator(conn, wholeFileExtractor, bigquery.NewMaterializer(fullRefresh))
 		bqCheckRunner, err := bigquery.NewColumnCheckOperator(conn)
@@ -737,7 +740,7 @@ func setupExecutors(
 		}
 
 		metadataPushOperator := bigquery.NewMetadataPushOperator(conn)
-		bqQuerySensor := bigquery.NewQuerySensor(conn, renderer, sensorMode)
+		bqQuerySensor := bigquery.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		bqTableSensor := bigquery.NewTableSensor(conn, sensorMode)
 
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeMain] = bqOperator
@@ -805,7 +808,7 @@ func setupExecutors(
 
 		sfCheckRunner := snowflake.NewColumnCheckOperator(conn)
 
-		sfQuerySensor := snowflake.NewQuerySensor(conn, renderer, 30)
+		sfQuerySensor := snowflake.NewQuerySensor(conn, wholeFileExtractor, 30)
 
 		sfMetadataPushOperator := snowflake.NewMetadataPushOperator(conn)
 
@@ -948,12 +951,19 @@ func setupExecutors(
 		}
 	}
 
-	if s.WillRunTaskOfType(pipeline.AssetTypeEMRServerlessSpark) {
-		emrServerlessOperator, err := emr_serverless.NewBasicOperator(config)
-		if err != nil {
-			return nil, err
+	emrServerlessAssetTypes := []pipeline.AssetType{
+		pipeline.AssetTypeEMRServerlessSpark,
+		pipeline.AssetTypeEMRServerlessPyspark,
+	}
+
+	for _, typ := range emrServerlessAssetTypes {
+		if s.WillRunTaskOfType(typ) {
+			emrServerlessOperator, err := emr_serverless.NewBasicOperator(conn)
+			if err != nil {
+				return nil, err
+			}
+			mainExecutors[typ][scheduler.TaskInstanceTypeMain] = emrServerlessOperator
 		}
-		mainExecutors[pipeline.AssetTypeEMRServerlessSpark][scheduler.TaskInstanceTypeMain] = emrServerlessOperator
 	}
 
 	return mainExecutors, nil
@@ -1071,6 +1081,19 @@ type Filter struct {
 	PushMetaData      bool
 	SingleTask        *pipeline.Asset
 	ExcludeTag        string
+	singleCheckID     string
+}
+
+func SkipAllTasksIfSingleCheck(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
+	if f.singleCheckID == "" {
+		return nil
+	}
+	s.MarkAll(scheduler.Skipped)
+	err := s.MarkCheckInstancesByID(f.singleCheckID, scheduler.Pending)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func HandleSingleTask(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *pipeline.Pipeline) error {
@@ -1167,6 +1190,7 @@ func ApplyAllFilters(ctx context.Context, f *Filter, s *scheduler.Scheduler, p *
 		HandleIncludeTags,
 		HandleExcludeTags,
 		FilterTaskTypes,
+		SkipAllTasksIfSingleCheck,
 	}
 
 	for _, filterFunc := range funcs {

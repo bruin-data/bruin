@@ -310,22 +310,29 @@ func (r *ParseCommand) Run(ctx context.Context, assetPath string, lineage bool) 
 		return cli.Exit("", 1)
 	}
 
+	type lineageIssueSummary struct {
+		Asset string `json:"name"`
+		Error string `json:"error"`
+	}
+
+	lineageIssues := make([]*lineageIssueSummary, 0)
+
 	if lineage {
 		panics := lineageWg.WaitAndRecover()
 		if panics != nil {
 			return cli.Exit("", 1)
 		}
 
-		issues := &lineagepackage.LineageError{
-			Issues:   make([]*lineagepackage.LineageIssue, 0),
-			Pipeline: foundPipeline,
-		}
-
 		processedAssets := make(map[string]bool)
 		lineageExtractor := lineagepackage.NewLineageExtractor(sqlParser)
-		errIssues := lineageExtractor.ColumnLineage(foundPipeline, asset, processedAssets)
-		if errIssues != nil {
-			issues.Issues = append(issues.Issues, errIssues.Issues...)
+		lineageErrors := lineageExtractor.ColumnLineage(foundPipeline, asset, processedAssets)
+		if lineageErrors != nil {
+			for _, issue := range lineageErrors.Issues {
+				lineageIssues = append(lineageIssues, &lineageIssueSummary{
+					Asset: issue.Task.Name,
+					Error: issue.Description,
+				})
+			}
 		}
 	}
 
@@ -335,16 +342,18 @@ func (r *ParseCommand) Run(ctx context.Context, assetPath string, lineage bool) 
 	}
 
 	js, err := json.Marshal(struct {
-		Asset    *pipeline.Asset `json:"asset"`
-		Pipeline pipelineSummary `json:"pipeline"`
-		Repo     *git.Repo       `json:"repo"`
+		Asset         *pipeline.Asset        `json:"asset"`
+		Pipeline      pipelineSummary        `json:"pipeline"`
+		Repo          *git.Repo              `json:"repo"`
+		LineageIssues []*lineageIssueSummary `json:"lineage_issues,omitempty"`
 	}{
 		Asset: asset,
 		Pipeline: pipelineSummary{
 			Name:     foundPipeline.Name,
 			Schedule: foundPipeline.Schedule,
 		},
-		Repo: repoRoot,
+		LineageIssues: lineageIssues,
+		Repo:          repoRoot,
 	})
 	if err != nil {
 		printErrorJSON(err)

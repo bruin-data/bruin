@@ -16,12 +16,13 @@ import (
 
 type MockColumnType struct {
 	ColumnName string
+	TypeName   string
 }
 
 func (m MockColumnType) Name() string             { return m.ColumnName }
 func (m MockColumnType) Nullable() bool           { return false }
 func (m MockColumnType) ScanType() reflect.Type   { return nil }
-func (m MockColumnType) DatabaseTypeName() string { return "" }
+func (m MockColumnType) DatabaseTypeName() string { return m.TypeName }
 
 type MockRows struct {
 	index     *int
@@ -226,12 +227,16 @@ func TestClient_SelectWithSchema(t *testing.T) {
 					{1, "John Doe"},
 					{2, "Jane Doe"},
 				},
+				ColumnTypes: []string{"BIGINT", "VARCHAR"},
 			},
 			setupMock: func(conn *MockConn) {
 				rows := MockRows{
 					index: new(int),
 					rows:  [][]any{{1, "John Doe"}, {2, "Jane Doe"}},
-					types: []MockColumnType{{ColumnName: "id"}, {ColumnName: "name"}},
+					types: []MockColumnType{
+						{ColumnName: "id", TypeName: "BIGINT"},
+						{ColumnName: "name", TypeName: "VARCHAR"},
+					},
 				}
 
 				conn.On("Query", mock.Anything, "SELECT * FROM table").Return(rows, nil)
@@ -241,14 +246,18 @@ func TestClient_SelectWithSchema(t *testing.T) {
 			name:  "test select empty rows with schema",
 			query: "SELECT * FROM table",
 			expected: &query.QueryResult{
-				Columns: []string{"id", "name"},
-				Rows:    [][]interface{}{},
+				Columns:     []string{"id", "name"},
+				Rows:        [][]interface{}{},
+				ColumnTypes: []string{"BIGINT", "VARCHAR"},
 			},
 			setupMock: func(conn *MockConn) {
 				rows := MockRows{
 					index: new(int),
 					rows:  nil,
-					types: []MockColumnType{{ColumnName: "id"}, {ColumnName: "name"}},
+					types: []MockColumnType{
+						{ColumnName: "id", TypeName: "BIGINT"},
+						{ColumnName: "name", TypeName: "VARCHAR"},
+					},
 				}
 
 				conn.On("Query", mock.Anything, "SELECT * FROM table").Return(rows, nil)

@@ -18,8 +18,9 @@ type Query struct {
 }
 
 type QueryResult struct {
-	Columns []string
-	Rows    [][]interface{}
+	Columns     []string
+	Rows        [][]interface{}
+	ColumnTypes []string
 }
 
 type QueryExtractor interface {
@@ -176,7 +177,7 @@ func (f *WholeFileExtractor) ReextractQueriesFromSlice(content []string) ([]stri
 
 func (f *WholeFileExtractor) CloneForAsset(ctx context.Context, t *pipeline.Asset) QueryExtractor {
 	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
-	if ok && applyModifiers {
+	if !ok || !applyModifiers {
 		return f
 	}
 	startDate := ctx.Value(pipeline.RunConfigStartDate).(time.Time)

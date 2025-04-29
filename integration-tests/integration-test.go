@@ -99,12 +99,12 @@ var (
 )
 
 func main() {
-	path, err := os.Getwd()
+	wd, err := os.Getwd()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	currentFolder = filepath.Join(path, "integration-tests")
+	currentFolder = filepath.Join(wd, "integration-tests")
 
 	if runtime.GOOS == "windows" {
 		out, err := exec.Command("mv", "bin/bruin", "bin/bruin.exe").Output()
@@ -118,7 +118,6 @@ func main() {
 	if runtime.GOOS == "windows" {
 		executable = "bruin.exe"
 	}
-	wd, _ := os.Getwd()
 	binary := filepath.Join(wd, "bin", executable)
 
 	includeIngestr := os.Getenv("INCLUDE_INGESTR") == "1"
@@ -334,7 +333,7 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 				{
 					Name:    "query the initial table",
 					Command: binary,
-					Args:    []string{"query", "--env", "env-time-materialization", "--asset", filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql"), "--query", "SELECT * FROM PRODUCTS; ", "--output", "json"},
+					Args:    []string{"query", "--env", "env-time-materialization", "--asset", filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql"), "--query", "SELECT * FROM PRODUCTS;", "--output", "json"},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -422,11 +421,104 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 				},
 			},
 		},
+		{
+			Name: "interval modifiers",
+			Steps: []e2e.Task{
+				{
+					Name:    "interval-modifiers",
+					Command: binary,
+					Args:    []string{"run", "--apply-interval-modifiers", "-env", "env-interval-modifiers", "--start-date", "2025-04-02T09:30:00.000Z", "--end-date", "2025-04-02T11:30:00.000Z", filepath.Join(currentFolder, "test-pipelines/interval-modifiers-pipeline/assets/products.sql")},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "query the table",
+					Command: binary,
+					Args:    []string{"query", "--env", "env-interval-modifiers", "--asset", filepath.Join(currentFolder, "test-pipelines/interval-modifiers-pipeline/assets/products.sql"), "--query", "SELECT * FROM products", "--output", "json"},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+						Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/interval-modifiers-pipeline/expectations/final_expected.json")),
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByOutputJSON,
+					},
+				},
+			},
+		},
 	}
 }
 
 func getTasks(binary string, currentFolder string) []e2e.Task {
 	return []e2e.Task{
+		{
+			Name:    "builtin-policies",
+			Command: binary,
+			Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/policies-builtin")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Successfully validated 1 assets across 1 pipeline"},
+			},
+			WorkingDir: currentFolder,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "custom-policies",
+			Command: binary,
+			Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/policies-custom")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Successfully validated 1 assets across 1 pipeline"},
+			},
+			WorkingDir: currentFolder,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "policy-selector",
+			Command: binary,
+			Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/policies-selector")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Successfully validated 1 assets across 1 pipeline"},
+			},
+			WorkingDir: currentFolder,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "policy-non-compliance",
+			Command: binary,
+			Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/policies-non-compliant")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 1,
+				Output:   "Checked 1 pipeline and found 3 issues",
+			},
+			WorkingDir: currentFolder,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
 		{
 			Name:          "parse-whole-pipeline",
 			Command:       binary,

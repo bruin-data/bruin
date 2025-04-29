@@ -58,6 +58,7 @@ const (
 	AssetTypeClickHouse             = AssetType("clickhouse.sql")
 	AssetTypeClickHouseSeed         = AssetType("clickhouse.seed")
 	AssetTypeEMRServerlessSpark     = AssetType("emr_serverless.spark")
+	AssetTypeEMRServerlessPyspark   = AssetType("emr_serverless.pyspark")
 	RunConfigFullRefresh            = RunConfig("full-refresh")
 	RunConfigApplyIntervalModifiers = RunConfig("apply-interval-modifiers")
 	RunConfigStartDate              = RunConfig("start-date")
@@ -104,8 +105,11 @@ var defaultMapping = map[string]string{
 	"tiktokads":             "tiktokads-default",
 	"appstore":              "appstore-default",
 	"gcs":                   "gcs-default",
+	"emr_serverless":        "emr_serverless-default",
 	"googleanalytics":       "googleanalytics-default",
 	"applovin":              "applovin-default",
+	"salesforce":            "salesforce-default",
+	"oracle":                "oracle-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}
@@ -509,7 +513,8 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeDuckDBSeed:           "duckdb",
 	AssetTypeClickHouse:           "clickhouse",
 	AssetTypeClickHouseSeed:       "clickhouse",
-	AssetTypeEMRServerlessSpark:   "aws",
+	AssetTypeEMRServerlessSpark:   "emr_serverless",
+	AssetTypeEMRServerlessPyspark: "emr_serverless",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -569,17 +574,23 @@ type Upstream struct {
 }
 
 func (u Upstream) MarshalYAML() (interface{}, error) {
-	if u.Type == "" || u.Type == "asset" {
+	isAsset := u.Type == "" || u.Type == "asset"
+	if u.Mode == UpstreamModeFull && isAsset {
 		return u.Value, nil
 	}
 
-	if strings.ToLower(u.Type) == "uri" {
-		return map[string]string{
-			"uri": u.Value,
-		}, nil
+	val := map[string]any{}
+	id := "uri"
+	if isAsset {
+		id = "asset"
+	}
+	val[id] = u.Value
+
+	if u.Mode == UpstreamModeSymbolic {
+		val["mode"] = u.Mode.String()
 	}
 
-	return nil, nil
+	return val, nil
 }
 
 type SnowflakeConfig struct {
@@ -1105,14 +1116,16 @@ type Pipeline struct {
 	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
 	Commit             string                 `json:"commit"`
 	Snapshot           string                 `json:"snapshot"`
+	Agent              bool                   `json:"agent" yaml:"agent" mapstructure:"agent"`
 	TasksByType        map[AssetType][]*Asset `json:"-"`
 	tasksByName        map[string]*Asset
 }
 
 type DefaultValues struct {
-	Type       string            `json:"type" yaml:"type" mapstructure:"type"`
-	Parameters map[string]string `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
-	Secrets    []secretMapping   `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
+	Type              string            `json:"type" yaml:"type" mapstructure:"type"`
+	Parameters        map[string]string `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
+	Secrets           []secretMapping   `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
+	IntervalModifiers IntervalModifiers `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
 }
 
 func (p *Pipeline) GetCompatibilityHash() string {
@@ -1410,7 +1423,7 @@ func NewBuilder(config BuilderConfig, yamlTaskCreator TaskCreator, commentTaskCr
 
 	b.mutators = []assetMutator{
 		b.fillGlossaryStuff,
-		b.setupDefaultsFromPipeline,
+		b.SetupDefaultsFromPipeline,
 		b.SetNameFromPath,
 	}
 
@@ -1636,7 +1649,7 @@ func (b *Builder) MutateAsset(ctx context.Context, task *Asset, foundPipeline *P
 	return task, nil
 }
 
-func (b *Builder) setupDefaultsFromPipeline(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
+func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
 	if foundPipeline == nil {
 		return asset, nil
 	}
@@ -1673,6 +1686,12 @@ func (b *Builder) setupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 		if !existingSecrets[secretMap.SecretKey] {
 			asset.Secrets = append(asset.Secrets, secretMap)
 		}
+	}
+	if (asset.IntervalModifiers.Start == TimeModifier{}) {
+		asset.IntervalModifiers.Start = foundPipeline.DefaultValues.IntervalModifiers.Start
+	}
+	if (asset.IntervalModifiers.End == TimeModifier{}) {
+		asset.IntervalModifiers.End = foundPipeline.DefaultValues.IntervalModifiers.End
 	}
 
 	return asset, nil

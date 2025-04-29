@@ -11,6 +11,7 @@ type Config struct {
 	Region          string
 	AccessID        string
 	SecretAccessKey string
+	SessionToken    string
 	Database        string
 }
 
@@ -21,9 +22,13 @@ func (c *Config) ToDBConnectionURI() (string, error) {
 		return "", err
 	}
 
+	if c.SessionToken != "" {
+		conf.SetSessionToken(c.SessionToken)
+	}
+
 	conf.SetDB(c.Database)
 	if err != nil {
-		log.Fatalf("Failed to create Athena config: %v", err)
+		log.Fatalf("Failed to set database on Athena connection: %v", err)
 		return "", err
 	}
 
@@ -31,5 +36,9 @@ func (c *Config) ToDBConnectionURI() (string, error) {
 }
 
 func (c *Config) GetIngestrURI() string {
-	return "athena://?bucket=" + c.OutputBucket + "&access_key_id=" + c.AccessID + "&secret_access_key=" + c.SecretAccessKey + "&region_name=" + c.Region
+	str := "athena://?bucket=" + c.OutputBucket + "&access_key_id=" + c.AccessID + "&secret_access_key=" + c.SecretAccessKey + "&region_name=" + c.Region
+	if c.SessionToken != "" {
+		str += "&session_token=" + c.SessionToken
+	}
+	return str
 }

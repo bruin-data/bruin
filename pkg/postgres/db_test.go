@@ -135,11 +135,12 @@ func TestClient_SelectWithSchema(t *testing.T) {
 					{1, "John Doe"},
 					{2, "Jane Doe"},
 				},
+				ColumnTypes: []string{"int8", "varchar"},
 			},
 			setupMock: func(mock pgxmock.PgxPoolIface) {
 				rows := pgxmock.NewRowsWithColumnDefinition(
-					pgconn.FieldDescription{Name: "id"},
-					pgconn.FieldDescription{Name: "name"},
+					pgconn.FieldDescription{Name: "id", DataTypeOID: 20},     // BIGINT
+					pgconn.FieldDescription{Name: "name", DataTypeOID: 1043}, // VARCHAR
 				).AddRow(1, "John Doe").AddRow(2, "Jane Doe")
 				mock.ExpectQuery("SELECT \\* FROM table").WillReturnRows(rows)
 			},
@@ -148,13 +149,14 @@ func TestClient_SelectWithSchema(t *testing.T) {
 			name:  "test select empty rows with schema",
 			query: "SELECT * FROM table",
 			expected: &query.QueryResult{
-				Columns: []string{"id", "name"},
-				Rows:    [][]interface{}{},
+				Columns:     []string{"id", "name"},
+				Rows:        [][]interface{}{},
+				ColumnTypes: []string{"int8", "varchar"},
 			},
 			setupMock: func(mock pgxmock.PgxPoolIface) {
 				rows := pgxmock.NewRowsWithColumnDefinition(
-					pgconn.FieldDescription{Name: "id"},
-					pgconn.FieldDescription{Name: "name"},
+					pgconn.FieldDescription{Name: "id", DataTypeOID: 20},     // BIGINT
+					pgconn.FieldDescription{Name: "name", DataTypeOID: 1043}, // VARCHAR
 				)
 				mock.ExpectQuery("SELECT \\* FROM table").WillReturnRows(rows)
 			},

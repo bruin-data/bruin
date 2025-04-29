@@ -129,20 +129,16 @@ func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOpera
 	})
 }
 
-type renderer interface {
-	Render(query string) (string, error)
-}
-
 type QuerySensor struct {
 	connection     connectionFetcher
-	renderer       renderer
+	extractor      query.QueryExtractor
 	secondsToSleep int64
 }
 
-func NewQuerySensor(conn connectionFetcher, renderer renderer, secondsToSleep int64) *QuerySensor {
+func NewQuerySensor(conn connectionFetcher, extractor query.QueryExtractor, secondsToSleep int64) *QuerySensor {
 	return &QuerySensor{
 		connection:     conn,
-		renderer:       renderer,
+		extractor:      extractor,
 		secondsToSleep: secondsToSleep,
 	}
 }
@@ -156,8 +152,8 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	if !ok {
 		return errors.New("query sensor requires a parameter named 'query'")
 	}
-
-	qq, err := o.renderer.Render(qq)
+	extractor := o.extractor.CloneForAsset(ctx, t)
+	qry, err := extractor.ExtractQueriesFromString(qq)
 	if err != nil {
 		return errors.Wrap(err, "failed to render query sensor query")
 	}
@@ -173,7 +169,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	}
 
 	for {
-		res, err := conn.Select(ctx, &query.Query{Query: qq})
+		res, err := conn.Select(ctx, qry[0])
 		if err != nil {
 			return err
 		}

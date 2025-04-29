@@ -17,6 +17,7 @@ require (
 	github.com/charmbracelet/bubbletea v1.1.2
 	github.com/databricks/databricks-sql-go v1.6.0
 	github.com/denisbrodbeck/machineid v1.0.1
+	github.com/expr-lang/expr v1.17.2
 	github.com/fatih/color v1.16.0
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/go-viper/mapstructure/v2 v2.1.0

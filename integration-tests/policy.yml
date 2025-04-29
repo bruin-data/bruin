@@ -1,0 +1,64 @@
+custom_rules:
+  - name: asset_has_three_columns
+    description: "Asset should have three columns"
+    criteria: len(asset.Columns) == 3
+  - name: asset_name_contains_public
+    description: "Asset name should contain the word public"
+    criteria: indexOf(asset.Name, "public") != -1
+  - name: asset_has_sql_tag
+    description: "Asset should have sql tag"
+    criteria: "'sql' in asset.Tags"
+
+rulesets:
+  - name: builtin_policies
+    selector:
+      - path: .*/builtin-policies/.*
+    rules:
+      - asset_name_is_lowercase
+      - asset_name_is_schema_dot_table
+      - asset_has_description
+      - asset_has_owner
+      - asset_has_columns
+
+  - name: cutom_policy
+    selector:
+      - path: .*/custom-policies/.*
+    rules:
+      - asset_has_three_columns
+
+  - name: select_asset
+    selector:
+      - asset: .*\.primary
+      - path: .*/policies-selector/.*
+    rules:
+      - asset_name_contains_public
+
+  - name: select_pipeline
+    selector:
+      - pipeline: policy-selector
+    rules:
+      - asset_has_description
+    
+  - name: select_by_tag
+    selector:
+      - tag: test
+    rules:
+      - asset_has_sql_tag
+
+  - name: fail_case_1
+    selector:
+      - asset: "^non_compliant.primary$"
+    rules:
+      - asset_has_three_columns
+  
+  - name: fail_case_2
+    selector:
+      - asset: "^non_compliant.secondary$"
+    rules:
+      - asset_name_contains_public
+    
+  - name: fail_case_3
+    selector:
+      - asset: "^non_compliant.tertiary$"
+    rules:
+      - asset_has_owner
