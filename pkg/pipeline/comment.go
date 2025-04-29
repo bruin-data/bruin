@@ -338,7 +338,7 @@ func handleColumnEntry(columnFields []string, task *Asset, value string) error {
 		checks := strings.Split(value, ",")
 		for _, check := range checks {
 			task.Columns[columnIndex].Checks = append(task.Columns[columnIndex].Checks, NewColumnCheck(
-				task.Name, columnName, strings.TrimSpace(check), ColumnCheckValue{}, &trueValue,
+				task.Name, columnName, strings.TrimSpace(check), ColumnCheckValue{}, &trueValue, "",
 			))
 		}
 	case "type":

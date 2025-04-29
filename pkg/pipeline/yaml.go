@@ -254,9 +254,10 @@ func (a *columnCheckValue) UnmarshalYAML(value *yaml.Node) error {
 }
 
 type columnCheck struct {
-	Name     string           `yaml:"name"`
-	Value    columnCheckValue `yaml:"value"`
-	Blocking *bool            `yaml:"blocking"`
+	Name        string           `yaml:"name"`
+	Value       columnCheckValue `yaml:"value"`
+	Blocking    *bool            `yaml:"blocking"`
+	Description string           `yaml:"description,omitempty"`
 }
 
 type columnUpstream struct {
@@ -407,7 +408,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 
 			seenTests[test.Name] = true
 
-			tests = append(tests, NewColumnCheck(definition.Name, column.Name, test.Name, ColumnCheckValue(test.Value), test.Blocking))
+			tests = append(tests, NewColumnCheck(definition.Name, column.Name, test.Name, ColumnCheckValue(test.Value), test.Blocking, test.Description))
 		}
 
 		var entityDefinition *EntityAttribute

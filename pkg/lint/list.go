@@ -1,6 +1,7 @@
 package lint
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/bruin-data/bruin/pkg/git"
@@ -203,6 +204,14 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			Validator:        yamlFileValidator.WarnRegularYamlFilesInRepo,
 			ApplicableLevels: []Level{LevelPipeline},
 		},
+	}
+
+	policyRules, err := loadPolicy(fs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load policy: %w", err)
+	}
+	if len(policyRules) > 0 {
+		rules = append(rules, policyRules...)
 	}
 
 	if parser != nil {

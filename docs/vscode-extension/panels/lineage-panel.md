@@ -19,6 +19,15 @@ The Lineage Panel is located at the bottom of the VSCode interface, near the ter
 
 ![Bruin Lineage Panel](../../public/vscode-extension/panels/lineage-panel/lineage-panel-with-options.gif)
 
+- **Pipeline Lineage View** (New)  
+    - A new **PipelineLineage** component has been added.
+    - Navigation controls are now available in the expanded panel at the top right:
+        - A **radio button** allows you to switch between `Asset View` and `Pipeline View`.
+        - Selecting **Pipeline View** displays the data pipeline flow for the current asset.
+        - In the **Pipeline View**, a button labeled **Asset View** appears in the top right. Clicking it switches back to showing the asset lineage for the current file.
+    - This allows users to easily toggle between seeing an individual asset's lineage and its broader pipeline context.
+
+![Bruin Lineage Panel](../../public/vscode-extension/panels/lineage-panel/pipeline-lineage-view.gif)
 
 
  

@@ -362,6 +362,28 @@
           }
         ]
       }
+    },
+    "env-run-nameless-asset": {
+      "schema_prefix": "",
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-run-nameless-asset",
+            "path": "integration-tests/duckdb-files/run-nameless-asset.db"
+          }
+        ]
+      }
+    },
+    "env-interval-modifiers": {
+      "schema_prefix": "",
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-interval-modifiers",
+            "path": "integration-tests/duckdb-files/interval-modifiers.db"
+          }
+        ]
+      }
     }
   }
 }

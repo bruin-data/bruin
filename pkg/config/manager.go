@@ -64,7 +64,14 @@ type Connections struct {
 	Personio            []PersonioConnection            `yaml:"personio,omitempty" json:"personio,omitempty" mapstructure:"personio"`
 	Kinesis             []KinesisConnection             `yaml:"kinesis,omitempty" json:"kinesis,omitempty" mapstructure:"kinesis"`
 	Pipedrive           []PipedriveConnection           `yaml:"pipedrive,omitempty" json:"pipedrive,omitempty" mapstructure:"pipedrive"`
+	EMRServerless       []EMRServerlessConnection       `yaml:"emr_serverless,omitempty" json:"emr_serverless,omitempty" mapstructure:"emr_serverless"`
 	GoogleAnalytics     []GoogleAnalyticsConnection     `yaml:"googleanalytics,omitempty" json:"googleanalytics,omitempty" mapstructure:"googleanalytics"`
+	AppLovin            []AppLovinConnection            `yaml:"applovin,omitempty" json:"applovin,omitempty" mapstructure:"applovin"`
+	Frankfurter         []FrankfurterConnection         `yaml:"frankfurter,omitempty" json:"frankfurter,omitempty" mapstructure:"frankfurter"`
+	Salesforce          []SalesforceConnection          `yaml:"salesforce,omitempty" json:"salesforce,omitempty" mapstructure:"salesforce"`
+	SQLite              []SQLiteConnection              `yaml:"sqlite,omitempty" json:"sqlite,omitempty" mapstructure:"sqlite"`
+	DB2                 []DB2Connection                 `yaml:"db2,omitempty" json:"db2,omitempty" mapstructure:"db2"`
+	Oracle              []OracleConnection              `yaml:"oracle,omitempty" json:"oracle,omitempty" mapstructure:"oracle"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -702,6 +709,14 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Pipedrive = append(env.Connections.Pipedrive, conn)
+	case "emr_serverless":
+		var conn EMRServerlessConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.EMRServerless = append(env.Connections.EMRServerless, conn)
+
 	case "googleanalytics":
 		var conn GoogleAnalyticsConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -709,6 +724,48 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.GoogleAnalytics = append(env.Connections.GoogleAnalytics, conn)
+	case "frankfurter":
+		var conn FrankfurterConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Frankfurter = append(env.Connections.Frankfurter, conn)
+	case "applovin":
+		var conn AppLovinConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.AppLovin = append(env.Connections.AppLovin, conn)
+	case "salesforce":
+		var conn SalesforceConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Salesforce = append(env.Connections.Salesforce, conn)
+	case "sqlite":
+		var conn SQLiteConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.SQLite = append(env.Connections.SQLite, conn)
+	case "db2":
+		var conn DB2Connection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.DB2 = append(env.Connections.DB2, conn)
+	case "oracle":
+		var conn OracleConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Oracle = append(env.Connections.Oracle, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -826,8 +883,22 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Kinesis = removeConnection(env.Connections.Kinesis, connectionName)
 	case "pipedrive":
 		env.Connections.Pipedrive = removeConnection(env.Connections.Pipedrive, connectionName)
+	case "emr_serverless":
+		env.Connections.EMRServerless = removeConnection(env.Connections.EMRServerless, connectionName)
 	case "googleanalytics":
 		env.Connections.GoogleAnalytics = removeConnection(env.Connections.GoogleAnalytics, connectionName)
+	case "applovin":
+		env.Connections.AppLovin = removeConnection(env.Connections.AppLovin, connectionName)
+	case "frankfurter":
+		env.Connections.Frankfurter = removeConnection(env.Connections.Frankfurter, connectionName)
+	case "salesforce":
+		env.Connections.Salesforce = removeConnection(env.Connections.Salesforce, connectionName)
+	case "sqlite":
+		env.Connections.SQLite = removeConnection(env.Connections.SQLite, connectionName)
+	case "db2":
+		env.Connections.DB2 = removeConnection(env.Connections.DB2, connectionName)
+	case "oracle":
+		env.Connections.Oracle = removeConnection(env.Connections.Oracle, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -922,7 +993,13 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.LinkedInAds, source.LinkedInAds)
 	mergeConnectionList(&c.GCS, source.GCS)
 	mergeConnectionList(&c.Personio, source.Personio)
+	mergeConnectionList(&c.EMRServerless, source.EMRServerless)
 	mergeConnectionList(&c.GoogleAnalytics, source.GoogleAnalytics)
+	mergeConnectionList(&c.AppLovin, source.AppLovin)
+	mergeConnectionList(&c.Salesforce, source.Salesforce)
+	mergeConnectionList(&c.SQLite, source.SQLite)
+	mergeConnectionList(&c.DB2, source.DB2)
+	mergeConnectionList(&c.Oracle, source.Oracle)
 	c.buildConnectionKeyMap()
 	return nil
 }

@@ -18,13 +18,15 @@ type Query struct {
 }
 
 type QueryResult struct {
-	Columns []string
-	Rows    [][]interface{}
+	Columns     []string
+	Rows        [][]interface{}
+	ColumnTypes []string
 }
 
 type QueryExtractor interface {
 	ExtractQueriesFromString(filepath string) ([]*Query, error)
 	CloneForAsset(ctx context.Context, asset *pipeline.Asset) QueryExtractor
+	ReextractQueriesFromSlice(content []string) ([]string, error)
 }
 
 func (q Query) ToExplainQuery() string {
@@ -160,19 +162,6 @@ func (f *WholeFileExtractor) ExtractQueriesFromString(content string) ([]*Query,
 	}, nil
 }
 
-func (f *WholeFileExtractor) ExtractQueriesFromSlice(content []string) ([]*Query, error) {
-	var allQueries []*Query
-	for _, query := range content {
-		queries, err := f.ExtractQueriesFromString(query)
-		if err != nil {
-			return nil, err
-		}
-		allQueries = append(allQueries, queries...)
-	}
-
-	return allQueries, nil
-}
-
 func (f *WholeFileExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
 	allQueries := make([]string, 0, len(content))
 	for _, query := range content {
@@ -188,7 +177,7 @@ func (f *WholeFileExtractor) ReextractQueriesFromSlice(content []string) ([]stri
 
 func (f *WholeFileExtractor) CloneForAsset(ctx context.Context, t *pipeline.Asset) QueryExtractor {
 	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
-	if ok && applyModifiers {
+	if !ok || !applyModifiers {
 		return f
 	}
 	startDate := ctx.Value(pipeline.RunConfigStartDate).(time.Time)

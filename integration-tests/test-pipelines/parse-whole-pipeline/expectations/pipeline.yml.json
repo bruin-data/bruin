@@ -3,6 +3,7 @@
   "name": "integration_test",
   "schedule": "",
   "start_date": "",
+  "agent" : false,
   "definition_file": {
     "name": "pipeline.yml",
     "path": "__PIPELINEDIR__pipeline.yml"
@@ -104,13 +105,13 @@
       "instance": "",
       "owner": "",
       "executable_file": {
-        "name": "chess_profiles.asset.yml",
-        "path": "__ASSETSDIR__chess_profiles.asset.yml",
+        "name": "chess_playground.profiles.asset.yml",
+        "path": "__ASSETSDIR__chess_playground_profiles.asset.yml",
         "content": ""
       },
       "definition_file": {
-        "name": "chess_profiles.asset.yml",
-        "path": "__ASSETSDIR__chess_profiles.asset.yml",
+        "name": "chess_playground.profiles.asset.yml",
+        "path": "__ASSETSDIR__chess_playground.profiles.asset.yml",
         "type": "yaml"
       },
       "parameters": {
@@ -184,7 +185,8 @@
               "id": "df9255080865c27b164a7de36a0a26bcc00345dddd66849d96aa96a2c68266ea",
               "name": "positive",
               "value": null,
-              "blocking": true
+              "blocking": true,
+              "description": ""
             }
           ],
           "upstreams": []

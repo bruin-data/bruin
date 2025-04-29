@@ -114,12 +114,16 @@ func Query() *cli.Command {
 						Columns  []map[string]string `json:"columns"`
 						Rows     [][]interface{}     `json:"rows"`
 						ConnName string              `json:"connectionName"`
+						Query    string              `json:"query"`
 					}
 
 					// Construct JSON response with structured columns
 					jsonCols := make([]map[string]string, len(result.Columns))
 					for i, colName := range result.Columns {
-						jsonCols[i] = map[string]string{"name": colName}
+						jsonCols[i] = map[string]string{
+							"name": colName,
+							"type": result.ColumnTypes[i],
+						}
 					}
 
 					// Prepare the final output struct
@@ -127,6 +131,7 @@ func Query() *cli.Command {
 						Columns:  jsonCols,
 						Rows:     result.Rows,
 						ConnName: connName,
+						Query:    queryStr,
 					}
 
 					jsonData, err := json.Marshal(finalOutput)

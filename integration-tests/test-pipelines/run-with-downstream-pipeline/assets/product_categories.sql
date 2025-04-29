@@ -1,5 +1,5 @@
 /* @bruin
-name: product_categories
+
 type: duckdb.sql
 materialization:
   type: table

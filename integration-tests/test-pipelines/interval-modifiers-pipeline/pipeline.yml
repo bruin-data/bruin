@@ -1,0 +1,5 @@
+name: interval-modifiers-pipeline
+
+default_connections:
+  duckdb: "duckdb-interval-modifiers"
+

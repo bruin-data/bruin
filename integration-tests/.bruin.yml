@@ -168,3 +168,18 @@ environments:
       duckdb:
         - name: "duckdb-query-export"
           path: "duckdb-files/env-query-export.db"
+
+
+  env-run-nameless-asset:
+    connections:
+      duckdb:
+        - name: "duckdb-run-nameless-asset"
+          path: "duckdb-files/run-nameless-asset.db"
+
+
+
+  env-interval-modifiers:
+    connections:
+      duckdb:
+        - name: "duckdb-interval-modifiers"
+          path: "duckdb-files/interval-modifiers.db"

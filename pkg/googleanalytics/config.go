@@ -10,7 +10,7 @@ type Config struct {
 }
 
 func (c *Config) GetIngestrURI() string {
-	//googleanalytics://?credentials_path=/path/to/service/account.json&property_id=<property_id>
+	// googleanalytics://?credentials_path=/path/to/service/account.json&property_id=<property_id>
 	baseURL := "googleanalytics://"
 	params := url.Values{}
 	params.Add("credentials_path", c.ServiceAccountFile)

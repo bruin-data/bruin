@@ -58,6 +58,7 @@ const (
 	AssetTypeClickHouse             = AssetType("clickhouse.sql")
 	AssetTypeClickHouseSeed         = AssetType("clickhouse.seed")
 	AssetTypeEMRServerlessSpark     = AssetType("emr_serverless.spark")
+	AssetTypeEMRServerlessPyspark   = AssetType("emr_serverless.pyspark")
 	RunConfigFullRefresh            = RunConfig("full-refresh")
 	RunConfigApplyIntervalModifiers = RunConfig("apply-interval-modifiers")
 	RunConfigStartDate              = RunConfig("start-date")
@@ -104,7 +105,11 @@ var defaultMapping = map[string]string{
 	"tiktokads":             "tiktokads-default",
 	"appstore":              "appstore-default",
 	"gcs":                   "gcs-default",
+	"emr_serverless":        "emr_serverless-default",
 	"googleanalytics":       "googleanalytics-default",
+	"applovin":              "applovin-default",
+	"salesforce":            "salesforce-default",
+	"oracle":                "oracle-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}
@@ -433,18 +438,20 @@ func (ccv *ColumnCheckValue) ToString() string {
 }
 
 type ColumnCheck struct {
-	ID       string           `json:"id" yaml:"-" mapstructure:"-"`
-	Name     string           `json:"name" yaml:"name,omitempty" mapstructure:"name"`
-	Value    ColumnCheckValue `json:"value" yaml:"value,omitempty" mapstructure:"value"`
-	Blocking DefaultTrueBool  `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
+	ID          string           `json:"id" yaml:"-" mapstructure:"-"`
+	Name        string           `json:"name" yaml:"name,omitempty" mapstructure:"name"`
+	Value       ColumnCheckValue `json:"value" yaml:"value,omitempty" mapstructure:"value"`
+	Blocking    DefaultTrueBool  `json:"blocking" yaml:"blocking,omitempty" mapstructure:"blocking"`
+	Description string           `json:"description" yaml:"description,omitempty" mapstructure:"description"`
 }
 
-func NewColumnCheck(assetName, columnName, name string, value ColumnCheckValue, blocking *bool) ColumnCheck {
+func NewColumnCheck(assetName, columnName, name string, value ColumnCheckValue, blocking *bool, description string) ColumnCheck {
 	return ColumnCheck{
-		ID:       hash(fmt.Sprintf("%s-%s-%s", assetName, columnName, name)),
-		Name:     strings.TrimSpace(name),
-		Value:    value,
-		Blocking: DefaultTrueBool{Value: blocking},
+		ID:          hash(fmt.Sprintf("%s-%s-%s", assetName, columnName, name)),
+		Name:        strings.TrimSpace(name),
+		Value:       value,
+		Blocking:    DefaultTrueBool{Value: blocking},
+		Description: description,
 	}
 }
 
@@ -508,7 +515,8 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeDuckDBSeed:           "duckdb",
 	AssetTypeClickHouse:           "clickhouse",
 	AssetTypeClickHouseSeed:       "clickhouse",
-	AssetTypeEMRServerlessSpark:   "aws",
+	AssetTypeEMRServerlessSpark:   "emr_serverless",
+	AssetTypeEMRServerlessPyspark: "emr_serverless",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -568,17 +576,23 @@ type Upstream struct {
 }
 
 func (u Upstream) MarshalYAML() (interface{}, error) {
-	if u.Type == "" || u.Type == "asset" {
+	isAsset := u.Type == "" || u.Type == "asset"
+	if u.Mode == UpstreamModeFull && isAsset {
 		return u.Value, nil
 	}
 
-	if strings.ToLower(u.Type) == "uri" {
-		return map[string]string{
-			"uri": u.Value,
-		}, nil
+	val := map[string]any{}
+	id := "uri"
+	if isAsset {
+		id = "asset"
+	}
+	val[id] = u.Value
+
+	if u.Mode == UpstreamModeSymbolic {
+		val["mode"] = u.Mode.String()
 	}
 
-	return nil, nil
+	return val, nil
 }
 
 type SnowflakeConfig struct {
@@ -1104,14 +1118,16 @@ type Pipeline struct {
 	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
 	Commit             string                 `json:"commit"`
 	Snapshot           string                 `json:"snapshot"`
+	Agent              bool                   `json:"agent" yaml:"agent" mapstructure:"agent"`
 	TasksByType        map[AssetType][]*Asset `json:"-"`
 	tasksByName        map[string]*Asset
 }
 
 type DefaultValues struct {
-	Type       string            `json:"type" yaml:"type" mapstructure:"type"`
-	Parameters map[string]string `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
-	Secrets    []secretMapping   `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
+	Type              string            `json:"type" yaml:"type" mapstructure:"type"`
+	Parameters        map[string]string `json:"parameters" yaml:"parameters" mapstructure:"parameters"`
+	Secrets           []secretMapping   `json:"secrets" yaml:"secrets" mapstructure:"secrets"`
+	IntervalModifiers IntervalModifiers `json:"interval_modifiers" yaml:"interval_modifiers" mapstructure:"interval_modifiers"`
 }
 
 func (p *Pipeline) GetCompatibilityHash() string {
@@ -1409,7 +1425,8 @@ func NewBuilder(config BuilderConfig, yamlTaskCreator TaskCreator, commentTaskCr
 
 	b.mutators = []assetMutator{
 		b.fillGlossaryStuff,
-		b.setupDefaultsFromPipeline,
+		b.SetupDefaultsFromPipeline,
+		b.SetNameFromPath,
 	}
 
 	return b
@@ -1643,7 +1660,7 @@ func (b *Builder) MutateAsset(ctx context.Context, task *Asset, foundPipeline *P
 	return task, nil
 }
 
-func (b *Builder) setupDefaultsFromPipeline(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
+func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
 	if foundPipeline == nil {
 		return asset, nil
 	}
@@ -1680,6 +1697,12 @@ func (b *Builder) setupDefaultsFromPipeline(ctx context.Context, asset *Asset, f
 		if !existingSecrets[secretMap.SecretKey] {
 			asset.Secrets = append(asset.Secrets, secretMap)
 		}
+	}
+	if (asset.IntervalModifiers.Start == TimeModifier{}) {
+		asset.IntervalModifiers.Start = foundPipeline.DefaultValues.IntervalModifiers.Start
+	}
+	if (asset.IntervalModifiers.End == TimeModifier{}) {
+		asset.IntervalModifiers.End = foundPipeline.DefaultValues.IntervalModifiers.End
 	}
 
 	return asset, nil
@@ -1780,4 +1803,38 @@ func ModifyDate(t time.Time, modifier TimeModifier) time.Time {
 		Add(time.Duration(modifier.Seconds) * time.Second)
 
 	return t
+}
+
+func (b *Builder) SetNameFromPath(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
+	if foundPipeline == nil {
+		return asset, nil
+	}
+	if asset == nil {
+		return asset, nil
+	}
+
+	if asset.Name != "" {
+		return asset, nil
+	}
+	pipelinePath := foundPipeline.DefinitionFile.Path
+	baseFolder := filepath.Join(filepath.Dir(pipelinePath), "assets")
+	path, err := filepath.Rel(baseFolder, asset.DefinitionFile.Path)
+	if err != nil {
+		return nil, err
+	}
+
+	name := strings.ReplaceAll(path, string(filepath.Separator), ".")
+
+	switch {
+	case strings.HasSuffix(name, ".asset.yml"):
+		name = strings.TrimSuffix(name, ".asset.yml")
+	case strings.HasSuffix(name, ".asset.yaml"):
+		name = strings.TrimSuffix(name, ".asset.yaml")
+	default:
+		name = strings.TrimSuffix(name, filepath.Ext(name))
+	}
+
+	asset.Name = name
+	asset.ID = hash(name)
+	return asset, nil
 }

@@ -64,6 +64,7 @@ export default withMermaid({
                         link: "/getting-started/features",
                         items: [
                             {text: "Glossary", link: "/getting-started/glossary"},
+                            {text: "Policies", link: "/getting-started/policies"},
                             {text: "Developer Environments", link: "/getting-started/devenv"}
                         ]
                     },
@@ -145,11 +146,13 @@ export default withMermaid({
                             {text: "SQL", link: "/assets/sql"},
                             {text: "Seed", link: "/assets/seed"},
                             {text: "Ingestr", link: "/assets/ingestr"},
-                            {text: "Python Assets", link: "/assets/python"},
+                            {text: "Python", link: "/assets/python"},
+                            {text: "Sensor", link: "/assets/sensor"},
                         ]
                     },
                     {text: "Columns", link: "/assets/columns"},
                     {text: "Credentials", link: "/getting-started/credentials"},
+                    {text: "Interval Modifiers", link: "/assets/interval-modifiers"},
                     {text: "Materialization", link: "/assets/materialization"},
                     {
                         text: " Jinja Templating",
@@ -170,9 +173,11 @@ export default withMermaid({
                             {text: "Adjust", link: "/ingestion/adjust.md"},
                             {text: "Airtable", link: "/ingestion/airtable.md"},
                             {text: "AppStore", link: "/ingestion/appstore.md"},
+                            {text: "AppLovin", link: "/ingestion/applovin.md"},
                             {text: "AppLovin Max", link: "/ingestion/applovin_max.md"},
                             {text: "Asana", link: "/ingestion/asana.md"},
                             {text: "Chess", link: "/ingestion/chess.md"},
+                            {text: "DB2", link: "/ingestion/db2.md"},
                             {text: "DynamoDB", link: "/ingestion/dynamodb.md"},
                             {text: "Facebook", link: "/ingestion/facebook-ads.md"},
                             {text: "GitHub", link: "/ingestion/github.md"},
@@ -191,11 +196,13 @@ export default withMermaid({
                             {text: "Notion", link: "/ingestion/notion"},
                             {text: "Personio", link: "/ingestion/personio"},
                             {text: "Pipedrive", link: "/ingestion/pipedrive"},
+                            {text: "Salesforce", link: "/ingestion/salesforce"},
                             {text: "SAP HANA", link: "/ingestion/sap_hana"},
                             {text: "S3", link: "/ingestion/s3"},
                             {text: "Shopify", link: "/ingestion/shopify"},
                             {text: "Stripe", link: "/ingestion/stripe.md"},
                             {text: "Slack", link: "/ingestion/slack.md"},
+                            {text: "SQLite", link: "/ingestion/sqlite"},
                             {text: "TikTok Ads", link: "/ingestion/tiktokads.md"},
                             {text: "Zendesk", link: "/ingestion/zendesk.md"},
                         ],
