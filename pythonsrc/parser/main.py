@@ -285,3 +285,15 @@ def replace_table_references(
                 table.name = new_table_name
 
     return parsed.sql()
+
+
+def add_limit(query: str, limit_value: int) -> dict:
+    try:
+        parsed = parse_one(query)
+        if parsed is None:
+            return {"error": "cannot parse query"}
+    except Exception as e:
+        return {"error": "cannot parse query"}
+
+    limited_query = parsed.limit(limit_value).sql()
+    return {"query": limited_query}

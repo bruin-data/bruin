@@ -112,7 +112,8 @@ func TestValidateFlags(t *testing.T) {
 				if strings.Contains(tt.name, "mssql") {
 					conn = &MockMSSQLDB{}
 				}
-				limitedQuery := addLimitToQuery(tt.query, tt.limit, conn)
+				limitedQuery, err := addLimitToQuery(tt.query, tt.limit, conn, nil)
+				require.NoError(t, err)
 				assert.Equal(t, tt.limitedQuery, limitedQuery)
 			}
 		})
@@ -198,8 +199,9 @@ func TestAddLimitToQuery(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := addLimitToQuery(tt.query, tt.limit, tt.conn)
+			result, err := addLimitToQuery(tt.query, tt.limit, tt.conn, nil)
 			assert.Equal(t, tt.expected, result)
+			assert.NoError(t, err)
 		})
 	}
 }

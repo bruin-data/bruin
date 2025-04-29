@@ -18,6 +18,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
@@ -86,7 +87,21 @@ func Query() *cli.Command {
 				return handleError(c.String("output"), err)
 			}
 			if c.IsSet("limit") {
-				queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn)
+				parser, err := sqlparser.NewSQLParser(false)
+				if err != nil {
+					return handleError(c.String("output"), errors.Wrap(err, "failed to initialize SQL parser"))
+				}
+				defer parser.Close()
+
+				err = parser.Start()
+				if err != nil {
+					return handleError(c.String("output"), errors.Wrap(err, "failed to start SQL parser"))
+				}
+
+				queryStr, err = addLimitToQuery(queryStr, c.Int64("limit"), conn, parser)
+				if err != nil {
+					return handleError(c.String("output"), errors.Wrap(err, "failed to add limit to query"))
+				}
 			}
 			if querier, ok := conn.(interface {
 				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
@@ -324,15 +339,18 @@ type Limiter interface {
 	Limit(query string, limit int64) string
 }
 
-func addLimitToQuery(query string, limit int64, conn interface{}) string {
-	l, ok := conn.(Limiter)
-	if ok {
-		return l.Limit(query, limit)
-	} else {
-		query = strings.TrimRight(query, "; \n\t")
-
-		return fmt.Sprintf("SELECT * FROM (\n%s\n) as t LIMIT %d", query, limit)
+func addLimitToQuery(query string, limit int64, conn interface{}, parser *sqlparser.SQLParser) (string, error) {
+	limitedQuery, err := parser.AddLimit(query, int(limit))
+	if err != nil {
+		l, ok := conn.(Limiter)
+		if ok {
+			return l.Limit(query, limit), nil
+		} else {
+			query = strings.TrimRight(query, "; \n\t")
+			return fmt.Sprintf("SELECT * FROM (\n%s\n) as t LIMIT %d", query, limit), nil
+		}
 	}
+	return limitedQuery, nil
 }
 
 func printTable(columnNames []string, rows [][]interface{}) {
