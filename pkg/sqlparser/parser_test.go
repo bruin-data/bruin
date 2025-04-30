@@ -830,3 +830,48 @@ func TestSqlParser_RenameTables(t *testing.T) {
 	s.Close()
 	require.NoError(t, err)
 }
+
+func TestSqlParser_AddLimit(t *testing.T) { //nolint
+	tests := []struct {
+		name     string
+		query    string
+		limit    int
+		expected string
+		wantErr  bool
+	}{
+		{
+			name:     "complex query with joins",
+			query:    "SELECT a.*, b.name FROM table_a AS a JOIN table_b AS b ON a.id = b.id",
+			limit:    15,
+			expected: "SELECT a.*, b.name FROM table_a AS a JOIN table_b AS b ON a.id = b.id LIMIT 15",
+		},
+		{
+			name:    "invalid SQL query",
+			query:   "SELECT * FROM",
+			limit:   10,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s, err := NewSQLParser(true)
+			require.NoError(t, err)
+			defer func() {
+				s.Close()
+			}()
+
+			err = s.Start()
+			require.NoError(t, err)
+
+			got, err := s.AddLimit(tt.query, tt.limit)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.expected, got)
+			}
+		})
+	}
+}

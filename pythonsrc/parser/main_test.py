@@ -2,7 +2,7 @@ import pytest
 from sqlglot import parse_one
 from sqlglot.optimizer import optimize
 
-from .main import get_column_lineage, extract_non_selected_columns, Column, get_tables
+from .main import get_column_lineage, extract_non_selected_columns, Column, get_tables, add_limit
 
 SCHEMA = {
     "orders": {
@@ -1865,3 +1865,167 @@ def test_get_tables():
     query = """CREATE TABLE public.example AS SELECT 1 AS id, 'Spain' AS country, 'Juan' AS name UNION ALL SELECT 2 AS id, 'Germany' AS country, 'Markus' AS name UNION ALL SELECT 3 AS id, 'France' AS country, 'Antoine' AS name UNION ALL SELECT 4 AS id, 'Poland' AS country, 'Franciszek' AS name"""
     expected = {"tables": ["public.example"]}
     assert get_tables(query, dialect) == expected
+
+
+def test_add_limit():
+    query = """
+    SELECT DISTINCT product_id, product_name, price, stock, created_at
+    FROM test.products
+    ORDER BY created_at DESC
+    LIMIT 1000;
+    """
+    expected_query = """
+    SELECT DISTINCT product_id, product_name, price, stock, created_at
+    FROM test.products
+    ORDER BY created_at DESC
+    LIMIT 10;
+    """
+    
+    result = add_limit(query, 10)
+    assert "query" in result
+    assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
+
+
+def test_add_limit_no_existing_limit():
+    query = """
+    SELECT product_id, product_name
+    FROM test.products
+    """
+    expected_query = """
+    SELECT product_id, product_name
+    FROM test.products
+    LIMIT 10
+    """
+    
+    result = add_limit(query, 10)
+    assert "query" in result
+    assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
+
+
+def test_add_limit_replace_existing_limit():
+    query = """
+    SELECT product_id, product_name
+    FROM test.products
+    LIMIT 50
+    """
+    expected_query = """
+    SELECT product_id, product_name
+    FROM test.products
+    LIMIT 10
+    """
+    
+    result = add_limit(query, 10)
+    assert "query" in result
+    assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
+
+
+def test_add_limit_with_order_by():
+    query = """
+    SELECT product_id, product_name
+    FROM test.products
+    ORDER BY product_name
+    """
+    expected_query = """
+    SELECT product_id, product_name
+    FROM test.products
+    ORDER BY product_name
+    LIMIT 10
+    """
+    
+    result = add_limit(query, 10)
+    assert "query" in result
+    assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
+
+
+def test_add_limit_with_group_by():
+    query = """
+    SELECT product_name, COUNT(*)
+    FROM test.products
+    GROUP BY product_name
+    """
+    expected_query = """
+    SELECT product_name, COUNT(*)
+    FROM test.products
+    GROUP BY product_name
+    LIMIT 10
+    """
+    
+    result = add_limit(query, 10)
+    assert "query" in result
+    assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
+
+
+def test_add_limit_with_semicolon():
+    query = """
+    SELECT product_id, product_name
+    FROM test.products
+    LIMIT 50;
+    """
+    expected_query = """
+    SELECT product_id, product_name
+    FROM test.products
+    LIMIT 10;
+    """
+    
+    result = add_limit(query, 10)
+    assert "query" in result
+    assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
+
+
+def test_add_limit_without_semicolon():
+    query = """
+    SELECT product_id, product_name
+    FROM test.products
+    LIMIT 50
+    """
+    expected_query = """
+    SELECT product_id, product_name
+    FROM test.products
+    LIMIT 10
+    """
+    
+    result = add_limit(query, 10)
+    assert "query" in result
+    assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
+
+
+def test_add_limit_nested_query():
+    query = """
+    SELECT * FROM (
+        SELECT product_id, product_name
+        FROM test.products
+        LIMIT 50
+    ) AS subquery
+    """
+    expected_query = """
+    SELECT * FROM (
+        SELECT product_id, product_name
+        FROM test.products
+        LIMIT 50
+    ) AS subquery
+    LIMIT 10
+    """
+    
+    result = add_limit(query, 10)
+    assert "query" in result
+    assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
+
+
+def test_add_limit_nested_query_no_existing_limit():
+    query = """
+    SELECT * FROM (
+        SELECT product_id, product_name
+        FROM test.products
+    ) AS subquery
+    """
+    expected_query = """
+    SELECT * FROM (
+        SELECT product_id, product_name
+        FROM test.products
+    ) AS subquery
+    LIMIT 10
+    """
+    
+    result = add_limit(query, 10)
+    assert "query" in result
+    assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()

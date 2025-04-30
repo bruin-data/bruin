@@ -308,3 +308,38 @@ func AssetTypeToDialect(assetType pipeline.AssetType) (string, error) {
 	}
 	return dialect, nil
 }
+
+func (s *SQLParser) AddLimit(sql string, limit int) (string, error) {
+	err := s.Start()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to start sql parser")
+	}
+
+	command := parserCommand{
+		Command: "add-limit",
+		Contents: map[string]interface{}{
+			"query": sql,
+			"limit": limit,
+		},
+	}
+
+	responsePayload, err := s.sendCommand(&command)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to send command")
+	}
+
+	var resp struct {
+		Query string `json:"query"`
+		Error string `json:"error"`
+	}
+	err = json.Unmarshal([]byte(responsePayload), &resp)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to unmarshal response")
+	}
+
+	if resp.Error != "" {
+		return "", errors.New(resp.Error)
+	}
+
+	return resp.Query, nil
+}
