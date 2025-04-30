@@ -1615,6 +1615,7 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 		if errors.As(err, &ParseError{}) {
 			return nil, err
 		}
+		
 		return nil, errors.Wrapf(err, "error creating asset from file '%s'", filePath)
 	}
 

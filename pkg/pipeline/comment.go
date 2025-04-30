@@ -59,7 +59,6 @@ func isEmbeddedYamlComment(file afero.File, prefixes []string) bool {
 		}
 
 		// find the first non-empty row, if it contains the prefix, return true
-		// what if it only has a prefix and no suffix? - Johannes
 		for _, prefix := range prefixes {
 			if strings.HasPrefix(strings.TrimSpace(rowText), prefix) {
 				return true
@@ -75,9 +74,8 @@ func isEmbeddedYamlComment(file afero.File, prefixes []string) bool {
 
 func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 	rows, commentRowEnd := readUntilComments(file, possiblePrefixesForCommentBlocks, possibleSuffixesForCommentBlocks)
-
 	if rows == "" {
-		return nil, &ParseError{"failed to parse comment formatted task in file" + filePath}
+		return nil, &ParseError{"no embedded YAML found in the comments"}
 	}
 
 	task, err := ConvertYamlToTask([]byte(rows))

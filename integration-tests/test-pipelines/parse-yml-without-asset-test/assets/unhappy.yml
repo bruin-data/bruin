@@ -1,3 +1,0 @@
-name: public.googleanalytics
-type: ingestr
-connection: postgres

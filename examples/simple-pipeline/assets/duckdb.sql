@@ -1,4 +1,4 @@
-/* @bruin
+/* 
 name: sources_view
 type: duckdb.sql
 materialization:
