@@ -24,75 +24,31 @@ var (
 	errNoRules       = errors.New("No rules specified")
 )
 
-var builtinRules = map[string]AssetValidator{
-	"asset_name_is_lowercase": func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-		if strings.ToLower(asset.Name) == asset.Name {
-			return nil, nil
-		}
-
-		return []*Issue{
-			{
-				Task:        asset,
-				Description: "Asset name must be lowercase",
-			},
-		}, nil
-	},
-	"asset_name_is_schema_dot_table": func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-		if strings.Count(asset.Name, ".") == 1 {
-			return nil, nil
-		}
-
-		return []*Issue{
-			{
-				Task:        asset,
-				Description: "Asset name must be of the form {schema}.{table}",
-			},
-		}, nil
-	},
-	"asset_has_description": func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-		if strings.TrimSpace(asset.Description) != "" {
-			return nil, nil
-		}
-		return []*Issue{
-			{
-				Task:        asset,
-				Description: "Asset must have a description",
-			},
-		}, nil
-	},
-	"asset_has_owner": func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-		if strings.TrimSpace(asset.Owner) != "" {
-			return nil, nil
-		}
-		return []*Issue{
-			{
-				Task:        asset,
-				Description: "Asset must have an owner",
-			},
-		}, nil
-	},
-	"asset_has_columns": func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-		if len(asset.Columns) > 0 {
-			return nil, nil
-		}
-		return []*Issue{
-			{
-				Task:        asset,
-				Description: "Asset must have columns",
-			},
-		}, nil
-	},
-}
-
-type validatorEnv struct {
+type assetValidatorEnv struct {
 	Asset    *pipeline.Asset    `expr:"asset"`
 	Pipeline *pipeline.Pipeline `expr:"pipeline"`
 }
 
+type pipelineValidatorEnv struct {
+	Pipeline *pipeline.Pipeline `expr:"pipeline"`
+}
+
+type RuleTarget string
+
+var (
+	RuleTargetAsset    = RuleTarget("asset")
+	RuleTargetPipeline = RuleTarget("asset")
+)
+
+// todo: set default
+// func (rt *RuleTarget) UnmarshalYAML(value *yaml.Node) error {
+// }
+
 type RuleDefinition struct {
-	Name        string `yaml:"name"`
-	Description string `yaml:"description"`
-	Criteria    string `yaml:"criteria"`
+	Name        string     `yaml:"name"`
+	Description string     `yaml:"description"`
+	Criteria    string     `yaml:"criteria"`
+	RuleTarget  RuleTarget `yaml:"target"`
 
 	evalutor *vm.Program
 }
@@ -111,10 +67,14 @@ func (def *RuleDefinition) validate() error {
 }
 
 func (def *RuleDefinition) compile() error {
+	var env any = assetValidatorEnv{}
+	if def.RuleTarget == RuleTargetPipeline {
+		env = pipelineValidatorEnv{}
+	}
 	program, err := expr.Compile(
 		def.Criteria,
 		expr.AsBool(),
-		expr.Env(validatorEnv{}),
+		expr.Env(env),
 	)
 	if err != nil {
 		return fmt.Errorf("error compiling rule: %s: %w", def.Name, err)
@@ -204,7 +164,7 @@ func (spec *PolicySpecification) getValidator(name string) (AssetValidator, bool
 
 func newPolicyValidator(def *RuleDefinition) AssetValidator {
 	return func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-		env := validatorEnv{asset, pipeline}
+		env := assetValidatorEnv{asset, pipeline}
 		result, err := expr.Run(def.evalutor, env)
 		if err != nil {
 			return nil, fmt.Errorf("error evaluating rule %s: %w", def.Name, err)
