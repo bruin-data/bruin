@@ -75,8 +75,9 @@ func isEmbeddedYamlComment(file afero.File, prefixes []string) bool {
 
 func commentedYamlToTask(file afero.File, filePath string) (*Asset, error) {
 	rows, commentRowEnd := readUntilComments(file, possiblePrefixesForCommentBlocks, possibleSuffixesForCommentBlocks)
+
 	if rows == "" {
-		return nil, &ParseError{"no embedded YAML found in the comments"}
+		return nil, &ParseError{"failed to parse comment formatted task in file" + filePath}
 	}
 
 	task, err := ConvertYamlToTask([]byte(rows))
@@ -158,14 +159,13 @@ func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath st
 		return nil, errors.Wrapf(err, "failed to read file %s", filePath)
 	}
 
-	//should return an error if no comment rows are found - Johannes
-	if len(commentRows) == 0 {
-		return nil, errors.Errorf("error creating asset from file '%s': no embedded YAML found in the comments", filePath)
-	}
-
 	absFilePath, err := filepath.Abs(filePath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get absolute path for file %s", filePath)
+	}
+
+	if len(commentRows) == 0 {
+		return nil, &ParseError{"failed to parse comment formatted task in file" + filePath}
 	}
 
 	task, err := commentRowsToTask(commentRows)
