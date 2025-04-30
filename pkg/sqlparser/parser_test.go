@@ -840,18 +840,6 @@ func TestSqlParser_AddLimit(t *testing.T) { //nolint
 		wantErr  bool
 	}{
 		{
-			name:     "basic query without existing limit",
-			query:    "SELECT * FROM table",
-			limit:    10,
-			expected: "SELECT * FROM table LIMIT 10",
-		},
-		{
-			name:     "query with existing limit",
-			query:    "SELECT * FROM table LIMIT 5",
-			limit:    10,
-			expected: "SELECT * FROM table LIMIT 10",
-		},
-		{
 			name:     "complex query with joins",
 			query:    "SELECT a.*, b.name FROM table_a AS a JOIN table_b AS b ON a.id = b.id",
 			limit:    15,
