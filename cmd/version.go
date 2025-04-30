@@ -53,7 +53,6 @@ func VersionCmd(commit string) *cli.Command {
 				return nil
 			}
 
-			fmt.Printf("Telemetry opt out: %t, Telemetry Key (%s)\n", telemetry.OptOut, strings.Repeat("X", len(telemetry.TelemetryKey)))
 			fmt.Printf("Current: %s (%s)\n", c.App.Version, commit)
 			fmt.Println("Latest: " + latest)
 			return nil
