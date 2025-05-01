@@ -15,7 +15,7 @@ func validatorsFromAssetValidator(av AssetValidator) validators {
 }
 
 var builtinRules = map[string]validators{
-	"asset_name_is_lowercase": validatorsFromAssetValidator(
+	"asset-name-is-lowercase": validatorsFromAssetValidator(
 		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			if strings.ToLower(asset.Name) == asset.Name {
 				return nil, nil
@@ -29,7 +29,7 @@ var builtinRules = map[string]validators{
 			}, nil
 		},
 	),
-	"asset_name_is_schema_dot_table": validatorsFromAssetValidator(
+	"asset-name-is-schema-dot-table": validatorsFromAssetValidator(
 		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			if strings.Count(asset.Name, ".") == 1 {
 				return nil, nil
@@ -43,7 +43,7 @@ var builtinRules = map[string]validators{
 			}, nil
 		},
 	),
-	"asset_has_description": validatorsFromAssetValidator(
+	"asset-has-description": validatorsFromAssetValidator(
 		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			if strings.TrimSpace(asset.Description) != "" {
 				return nil, nil
@@ -56,7 +56,7 @@ var builtinRules = map[string]validators{
 			}, nil
 		},
 	),
-	"asset_has_owner": validatorsFromAssetValidator(
+	"asset-has-owner": validatorsFromAssetValidator(
 		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			if strings.TrimSpace(asset.Owner) != "" {
 				return nil, nil
@@ -69,7 +69,7 @@ var builtinRules = map[string]validators{
 			}, nil
 		},
 	),
-	"asset_has_columns": validatorsFromAssetValidator(
+	"asset-has-columns": validatorsFromAssetValidator(
 		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			if len(asset.Columns) > 0 {
 				return nil, nil

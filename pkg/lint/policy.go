@@ -134,6 +134,12 @@ func (spec *PolicySpecification) init() error {
 		if err != nil {
 			return fmt.Errorf("invalid rule definition at index %d: %w", idx, err)
 		}
+		if spec.compiledRules[def.Name] != nil {
+			return fmt.Errorf("duplicate rule: %s", def.Name)
+		}
+		if _, exists := builtinRules[def.Name]; exists {
+			return fmt.Errorf("rule is builtin: %s", def.Name)
+		}
 		if err := def.compile(); err != nil {
 			return err
 		}

@@ -50,6 +50,45 @@ func TestPolicyRuleDefinition(t *testing.T) {
 		_, err := spec.Rules()
 		assert.Error(t, err)
 	})
+	t.Run("every rule must have a unique name", func(t *testing.T) {
+		t.Parallel()
+		spec := &lint.PolicySpecification{
+			Definitions: []*lint.RuleDefinition{
+				{
+					Name:        "unique-rule",
+					Description: "I am unique",
+					Criteria:    "true",
+				},
+				{
+					Name:        "unique-rule",
+					Description: "I am unique",
+					Criteria:    "true",
+				},
+			},
+		}
+		_, err := spec.Rules()
+		assert.Error(t, err)
+	})
+
+	t.Run("custom rules cannot shadow builtin rules", func(t *testing.T) {
+		t.Parallel()
+		spec := &lint.PolicySpecification{
+			Definitions: []*lint.RuleDefinition{
+				{
+					Name:        "unique-rule",
+					Description: "I am unique",
+					Criteria:    "true",
+				},
+				{
+					Name:        "asset-has-description",
+					Description: "I am unique",
+					Criteria:    "true",
+				},
+			},
+		}
+		_, err := spec.Rules()
+		assert.Error(t, err)
+	})
 }
 
 func TestPolicyRuleSet(t *testing.T) {
