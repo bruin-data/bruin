@@ -37,7 +37,7 @@ type RuleTarget string
 
 var (
 	RuleTargetAsset    = RuleTarget("asset")
-	RuleTargetPipeline = RuleTarget("asset")
+	RuleTargetPipeline = RuleTarget("pipeline")
 )
 
 // todo: set default
