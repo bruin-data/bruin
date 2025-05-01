@@ -175,8 +175,10 @@ func (spec *PolicySpecification) Rules() ([]Rule, error) {
 func (spec *PolicySpecification) getValidators(name string) (validators, bool) {
 	def, found := spec.compiledRules[name]
 	if !found {
-		return validators{}, false
+		validators, found := builtinRules[name]
+		return validators, found
 	}
+
 	v := validators{}
 
 	switch def.RuleTarget {
