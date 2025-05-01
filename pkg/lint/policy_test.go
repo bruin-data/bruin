@@ -1,6 +1,7 @@
 package lint_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/lint"
@@ -88,6 +89,63 @@ func TestPolicyRuleDefinition(t *testing.T) {
 		}
 		_, err := spec.Rules()
 		assert.Error(t, err)
+	})
+	t.Run("rule name must only be alpha-numeric and dash", func(t *testing.T) {
+		t.Parallel()
+		invalidNames := []string{
+			"rule one",
+			"rule.two",
+			"rule?three",
+			"rule/four",
+		}
+		for _, invalid := range invalidNames {
+			spec := &lint.PolicySpecification{
+				RuleSets: []lint.RuleSet{
+					{
+						Name:  fmt.Sprintf("ruleset-%s", invalid),
+						Rules: []string{invalid},
+					},
+				},
+				Definitions: []*lint.RuleDefinition{
+					{
+						Name:        invalid,
+						Description: "unit test",
+						Criteria:    "true",
+					},
+				},
+			}
+			_, err := spec.Rules()
+			assert.Error(t, err)
+		}
+	})
+
+	t.Run("ruleset name must only be alpha-numeric and dash", func(t *testing.T) {
+		t.Parallel()
+		invalidNames := []string{
+			"rule set one",
+			"rule.set.two",
+			"rule?set?three",
+			"rule/set/four",
+		}
+		for _, invalid := range invalidNames {
+			spec := &lint.PolicySpecification{
+				RuleSets: []lint.RuleSet{
+					{
+						Name:  fmt.Sprintf("ruleset-%s", invalid),
+						Rules: []string{"placeholder"},
+					},
+				},
+				Definitions: []*lint.RuleDefinition{
+					{
+						Name:        "placeholder",
+						Description: "unit test",
+						Criteria:    "true",
+					},
+				},
+			}
+			_, err := spec.Rules()
+			assert.Error(t, err)
+		}
 	})
 }
 

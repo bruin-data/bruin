@@ -24,7 +24,10 @@ var (
 	errEmptyCriteria = errors.New("Criteria is empty")
 	errNoRules       = errors.New("No rules specified")
 	errNoSuchTarget  = errors.New("No such target")
+	errBadName       = errors.New("Only alphanumeric characters and dash allowed")
 )
+
+var validRulePattern = regexp.MustCompile(`^[A-Za-z0-9\-]+$`)
 
 type assetValidatorEnv struct {
 	Asset    *pipeline.Asset    `expr:"asset"`
@@ -70,6 +73,9 @@ func (def *RuleDefinition) validate() error {
 	if strings.TrimSpace(def.Name) == "" {
 		return errEmptyName
 	}
+	if !validRulePattern.MatchString(def.Name) {
+		return errBadName
+	}
 	if strings.TrimSpace(def.Description) == "" {
 		return errEmptyDesc
 	}
@@ -112,6 +118,9 @@ type RuleSet struct {
 func (rs *RuleSet) validate() error {
 	if strings.TrimSpace(rs.Name) == "" {
 		return errEmptyName
+	}
+	if !validRulePattern.MatchString(rs.Name) {
+		return errBadName
 	}
 	if len(rs.Rules) == 0 {
 		return errNoRules
