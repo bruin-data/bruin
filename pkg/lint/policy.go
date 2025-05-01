@@ -159,6 +159,7 @@ func (spec *PolicySpecification) Rules() ([]Rule, error) {
 			if !found {
 				return nil, fmt.Errorf("no such rule: %s", ruleName)
 			}
+			validators = withSelector(ruleSet.Selector, validators)
 			rules = append(rules, &SimpleRule{
 				Identifier:     fmt.Sprintf("policy:%s:%s", ruleSet.Name, ruleName),
 				Fast:           true,
@@ -231,22 +232,39 @@ func pipelineValidatorFromRuleDef(def *RuleDefinition) PipelineValidator {
 	}
 }
 
-func withSelector(selector []map[string]any, validator AssetValidator) AssetValidator {
-	return func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-		match, err := doesSelectorMatch(selector, asset, pipeline)
-		if err != nil {
-			return nil, fmt.Errorf("error matching selector: %w", err)
-		}
+func withSelector(selector []map[string]any, downstream validators) validators {
+	return validators{
+		Pipeline: func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+			match, err := doesSelectorMatch(selector, pipeline, nil)
+			if err != nil {
+				return nil, fmt.Errorf("error matching selector: %w", err)
+			}
 
-		if !match {
-			return nil, nil
-		}
+			if !match {
+				return nil, nil
+			}
 
-		return validator(ctx, pipeline, asset)
+			return downstream.Pipeline(pipeline)
+		},
+		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+			if downstream.Asset == nil {
+				return nil, nil
+			}
+			match, err := doesSelectorMatch(selector, pipeline, asset)
+			if err != nil {
+				return nil, fmt.Errorf("error matching selector: %w", err)
+			}
+
+			if !match {
+				return nil, nil
+			}
+			return downstream.Asset(ctx, pipeline, asset)
+		},
 	}
+
 }
 
-func doesSelectorMatch(selectors []map[string]any, asset *pipeline.Asset, pipeline *pipeline.Pipeline) (bool, error) {
+func doesSelectorMatch(selectors []map[string]any, pipeline *pipeline.Pipeline, asset *pipeline.Asset) (bool, error) {
 	for _, sel := range selectors {
 		for key, val := range sel {
 			pattern, ok := val.(string)
