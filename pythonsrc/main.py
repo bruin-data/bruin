@@ -2,7 +2,7 @@ import json
 import sys
 import logging
 import os
-from parser.main import get_column_lineage, get_tables
+from parser.main import get_column_lineage, get_tables, add_limit
 
 from pathlib import Path
 
@@ -50,6 +50,10 @@ def main():
                 result = replace_table_references(
                     c["query"], c["dialect"], c["table_mapping"]
                 )
+            elif cmd["command"] == "add-limit":
+                logging.info("got add-limit command")
+                c = cmd["contents"]
+                result = add_limit(c["query"], c["limit"])
             elif cmd["command"] == "exit":
                 logging.info("got exit command amx")
                 break
