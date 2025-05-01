@@ -267,6 +267,10 @@ func withSelector(selector []map[string]any, downstream validators) validators {
 func doesSelectorMatch(selectors []map[string]any, pipeline *pipeline.Pipeline, asset *pipeline.Asset) (bool, error) {
 	for _, sel := range selectors {
 		for key, val := range sel {
+			if asset == nil && slices.Contains([]string{"asset", "tag"}, key) {
+				continue
+			}
+
 			pattern, ok := val.(string)
 			if !ok {
 				return false, fmt.Errorf("invalid selector value for key %s: %v", key, val)
@@ -278,7 +282,11 @@ func doesSelectorMatch(selectors []map[string]any, pipeline *pipeline.Pipeline, 
 			case "asset":
 				subject = asset.Name
 			case "path":
-				subject = asset.ExecutableFile.Path
+				if asset == nil {
+					subject = pipeline.DefinitionFile.Path
+				} else {
+					subject = asset.ExecutableFile.Path
+				}
 			case "tag":
 				subject = strings.Join(asset.Tags, " ")
 			default:
