@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/git"
@@ -22,6 +23,7 @@ var (
 	errEmptyDesc     = errors.New("Description is empty")
 	errEmptyCriteria = errors.New("Criteria is empty")
 	errNoRules       = errors.New("No rules specified")
+	errNoSuchTarget  = errors.New("No such target")
 )
 
 type assetValidatorEnv struct {
@@ -33,6 +35,11 @@ type pipelineValidatorEnv struct {
 	Pipeline *pipeline.Pipeline `expr:"pipeline"`
 }
 
+type validators struct {
+	Pipeline PipelineValidator
+	Asset    AssetValidator
+}
+
 type RuleTarget string
 
 var (
@@ -40,9 +47,15 @@ var (
 	RuleTargetPipeline = RuleTarget("pipeline")
 )
 
-// todo: set default
-// func (rt *RuleTarget) UnmarshalYAML(value *yaml.Node) error {
-// }
+func (target RuleTarget) Valid() bool {
+	return slices.Contains(
+		[]RuleTarget{
+			RuleTargetAsset,
+			RuleTargetPipeline,
+		},
+		target,
+	)
+}
 
 type RuleDefinition struct {
 	Name        string     `yaml:"name"`
@@ -63,6 +76,13 @@ func (def *RuleDefinition) validate() error {
 	if strings.TrimSpace(def.Criteria) == "" {
 		return errEmptyCriteria
 	}
+	if def.RuleTarget == "" {
+		def.RuleTarget = RuleTargetAsset
+	}
+	if !def.RuleTarget.Valid() {
+		return errNoSuchTarget
+	}
+
 	return nil
 }
 
@@ -135,34 +155,42 @@ func (spec *PolicySpecification) Rules() ([]Rule, error) {
 		}
 
 		for _, ruleName := range ruleSet.Rules {
-			validator, found := spec.getValidator(ruleName)
+			validators, found := spec.getValidators(ruleName)
 			if !found {
 				return nil, fmt.Errorf("no such rule: %s", ruleName)
 			}
-			validator = withSelector(ruleSet.Selector, validator)
 			rules = append(rules, &SimpleRule{
-				Identifier:       fmt.Sprintf("policy:%s:%s", ruleSet.Name, ruleName),
-				Fast:             true,
-				Severity:         ValidatorSeverityCritical,
-				Validator:        CallFuncForEveryAsset(validator),
-				AssetValidator:   validator,
-				ApplicableLevels: []Level{LevelAsset},
+				Identifier:     fmt.Sprintf("policy:%s:%s", ruleSet.Name, ruleName),
+				Fast:           true,
+				Severity:       ValidatorSeverityCritical,
+				Validator:      validators.Pipeline,
+				AssetValidator: validators.Asset,
 			})
 		}
 	}
 	return rules, nil
 }
 
-func (spec *PolicySpecification) getValidator(name string) (AssetValidator, bool) {
+func (spec *PolicySpecification) getValidators(name string) (validators, bool) {
 	def, found := spec.compiledRules[name]
-	if found {
-		return newPolicyValidator(def), true
+	if !found {
+		return validators{}, false
 	}
-	validator, found := builtinRules[name]
-	return validator, found
+	v := validators{}
+
+	switch def.RuleTarget {
+	case RuleTargetAsset:
+		assetValidator := assetValidatorFromRuleDef(def)
+		v.Asset = assetValidator
+		v.Pipeline = CallFuncForEveryAsset(assetValidator)
+	case RuleTargetPipeline:
+		v.Pipeline = pipelineValidatorFromRuleDef(def)
+	}
+
+	return v, true
 }
 
-func newPolicyValidator(def *RuleDefinition) AssetValidator {
+func assetValidatorFromRuleDef(def *RuleDefinition) AssetValidator {
 	return func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 		env := assetValidatorEnv{asset, pipeline}
 		result, err := expr.Run(def.evalutor, env)
@@ -177,6 +205,26 @@ func newPolicyValidator(def *RuleDefinition) AssetValidator {
 		return []*Issue{
 			{
 				Task:        asset,
+				Description: def.Description,
+			},
+		}, nil
+	}
+}
+
+func pipelineValidatorFromRuleDef(def *RuleDefinition) PipelineValidator {
+	return func(pipe *pipeline.Pipeline) ([]*Issue, error) {
+		env := pipelineValidatorEnv{pipe}
+		result, err := expr.Run(def.evalutor, env)
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating rule %s: %w", def.Name, err)
+		}
+
+		if result.(bool) {
+			return nil, nil
+		}
+
+		return []*Issue{
+			{
 				Description: def.Description,
 			},
 		}, nil
