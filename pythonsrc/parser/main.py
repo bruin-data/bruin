@@ -292,7 +292,7 @@ def add_limit(query: str, limit_value: int) -> dict:
         parsed = parse_one(query)
         if parsed is None:
             return {"error": "cannot parse query"}
-    except Exception as e:
+    except Exception:
         return {"error": "cannot parse query"}
 
     limited_query = parsed.limit(limit_value).sql()

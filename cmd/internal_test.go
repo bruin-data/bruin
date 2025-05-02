@@ -139,7 +139,7 @@ func TestConvertToBruinAsset(t *testing.T) {
 			tmpDir := t.TempDir()
 
 			fullPath := filepath.Join(tmpDir, tt.filePath)
-			err := os.WriteFile(fullPath, []byte(tt.fileContent), 0644)
+			err := os.WriteFile(fullPath, []byte(tt.fileContent), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to create test file: %v", err)
 			}

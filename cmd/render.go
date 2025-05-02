@@ -27,7 +27,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/synapse"
-	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
@@ -210,8 +209,6 @@ func Render() *cli.Command {
 
 			return r.Run(asset, modifierInfo)
 		},
-		Before: telemetry.BeforeCommand,
-		After:  telemetry.AfterCommand,
 	}
 }
 
