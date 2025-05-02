@@ -48,18 +48,23 @@ If a **selector** is not specified, the ruleset applies to **all assets**.
 
 Selectors determine which assets a ruleset should apply to. Supported predicates are:
 
-| Predicate | Description |
-| :--- | :--- |
-| `path` | path of the asset |
-| `asset` | name of the asset |
-| `pipeline` | name of the pipeline |
-| `tag` | asset tags |
+| Predicate | Target | Description |
+| :--- | :--- | :--- |
+| `path` | `asset`, `pipeline` | path of the asset/pipeline |
+| `pipeline` | `asset`, `pipeline` | name of the pipeline |
+| `asset` | `asset` | name of the asset |
+| `tag` | `asset` | asset tags |
 
 Each predicate is a regex string.
 
 > If multiple selectors are specified within a ruleset, **all selectors must match** for the ruleset to apply
 
-If no selectors are defined for a ruleset, **the ruleset applies to all assets**.
+If no selectors are defined for a ruleset, **the ruleset applies to all assets/pipelines**. Some selectors only work with certain
+rule targets. For instance `tag` selector only works for rules that [target](#targets) assets. Pipeline level rules will just ignore
+this selector. 
+
+> [!NOTE]
+> If your ruleset only contains asset selectors, but uses `pipeline` rules, then those pipeline rules will apply to all pipelines. Make sure to define a `pipeline` or `path` selector if you don't intend for that to happen.
 
 ### Example
 
@@ -79,8 +84,6 @@ In this example:
   - path regex `.*/production/.*`
   - and have a tag matching `critical`.
 
-> [!note]
-> Currently `policies` are only applied to `assets`. Support for `pipeline` level policies will be added in a future version.
 ## Custom Rules
 
 Custom lint rules are defined inside the `custom_rules` section of `policy.yml`.
@@ -99,13 +102,40 @@ custom_rules:
     criteria: asset.Owner != ""
 ```
 
+### Targets
+
+Custom rules can have an optional `target` attribute that defines what resource the rule acts on. Valid values are:
+- `asset` (default)
+- `pipeline`
+
+**Example**
+```yaml
+custom_rules:
+
+  - name: pipline-must-have-prefix-acme
+    description: Pipeline names must start with the prefix 'acme'
+    criteria: pipeline.Name startsWith 'acme'
+    target: pipeline
+
+  - name: asset-name-must-be-layer-dot-schema-dot-table
+    description: Asset names must be of the form {layer}.{schema}.{table}
+    criteria: len(split(asset.Name, '.')) == 3
+    target: asset # optional
+
+ruleset:
+  - name: std
+    rules:
+      - pipeline-must-have-prefix-acme
+      - asset-name-must-be-layer-dot-schema-dot-table
+```
+
 ### Variables
 
 `criteria` has the following variables available for use in your expressions:
-| Name | Description |
-| ---  | --- |
-| [asset](https://github.com/bruin-data/bruin-vscode/blob/1726eda362f29bf95f5ffc6b50addf8b63f2128b/schemas/yaml-assets-schema.json) | The asset selected via selector |
-| [pipeline](https://github.com/bruin-data/bruin-vscode/blob/1726eda362f29bf95f5ffc6b50addf8b63f2128b/schemas/pipeline-schema.json) | The pipeline the asset belongs to |
+| Name | Target | 
+| ---  | --- | 
+| [asset](https://github.com/bruin-data/bruin-vscode/blob/1726eda362f29bf95f5ffc6b50addf8b63f2128b/schemas/yaml-assets-schema.json) | `asset` | 
+| [pipeline](https://github.com/bruin-data/bruin-vscode/blob/1726eda362f29bf95f5ffc6b50addf8b63f2128b/schemas/pipeline-schema.json) | `asset`, `pipeline` |
 
 > [!tip]
 > The variables above link to their [JSON Schema](https://json-schema.org/). You can use those as a reference for what fields are available on each variable and
@@ -116,13 +146,13 @@ custom_rules:
 
 Bruin provides a set of built-in lint rules that are ready to use without requiring a definition.
 
-| Rule | Description |
-| :--- | :--- |
-| `asset-name-is-lowercase` | Asset names must be in lowercase. |
-| `asset-name-is-schema-dot-table` | Asset names must follow the format `schema.table`. |
-| `asset-has-description` | Assets must have a description. |
-| `asset-has-owner` | Assets must have an owner assigned. |
-| `asset-has-columns` | Assets must define their columns. |
+| Rule | Target | Description |
+| :--- | :--- | :--- |
+| `asset-name-is-lowercase` | `asset` | Asset names must be in lowercase. |
+| `asset-name-is-schema-dot-table`  | `asset` | Asset names must follow the format `schema.table`. |
+| `asset-has-description` | `asset` | Assets must have a description. |
+| `asset-has-owner` | `asset` | Assets must have an owner assigned. |
+| `asset-has-columns` | `asset` | Assets must define their columns. |
 
 You can directly reference these rules in `rulesets[*].rules`.
 
