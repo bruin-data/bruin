@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
+	"go.uber.org/zap"
 )
 
 type jinjaRenderedMaterializer struct {
@@ -147,75 +148,7 @@ func Lint(isDebug *bool) *cli.Command {
 
 			logger.Debugf("successfully loaded %d rules", len(rules))
 
-			renderer := jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")
-
-			if len(cm.SelectedEnvironment.Connections.GoogleCloudPlatform) > 0 {
-				rules = append(rules, &lint.QueryValidatorRule{
-					Identifier:  "bigquery-validator",
-					TaskType:    pipeline.AssetTypeBigqueryQuery,
-					Connections: connectionManager,
-					Extractor: &query.WholeFileExtractor{
-						Fs:       fs,
-						Renderer: renderer,
-					},
-					Materializer: jinjaRenderedMaterializer{
-						materializer: bigquery.NewMaterializer(false),
-						renderer:     renderer,
-					},
-					WorkerCount: 32,
-					Logger:      logger,
-				})
-			} else {
-				logger.Debug("no GCP connections found, skipping BigQuery validation")
-			}
-
-			if len(cm.SelectedEnvironment.Connections.Snowflake) > 0 {
-				rules = append(rules, &lint.QueryValidatorRule{
-					Identifier:  "snowflake-validator",
-					TaskType:    pipeline.AssetTypeSnowflakeQuery,
-					Connections: connectionManager,
-					Extractor: &query.FileQuerySplitterExtractor{
-						Fs:       fs,
-						Renderer: renderer,
-					},
-					WorkerCount: 32,
-					Logger:      logger,
-				})
-			} else {
-				logger.Debug("no Snowflake connections found, skipping Snowflake validation")
-			}
-
-			if len(cm.SelectedEnvironment.Connections.RedShift) > 0 {
-				rules = append(rules, &lint.QueryValidatorRule{
-					Identifier:  "redshift-validator",
-					TaskType:    pipeline.AssetTypeRedshiftQuery,
-					Connections: connectionManager,
-					Extractor: &query.FileQuerySplitterExtractor{
-						Fs:       fs,
-						Renderer: renderer,
-					},
-					WorkerCount: 32,
-					Logger:      logger,
-				})
-			} else {
-				logger.Debug("no Redshift connections found, skipping Redshift validation")
-			}
-
-			if len(cm.SelectedEnvironment.Connections.Postgres) > 0 {
-				rules = append(rules, &lint.QueryValidatorRule{
-					Identifier:  "postgres-validator",
-					TaskType:    pipeline.AssetTypePostgresQuery,
-					Connections: connectionManager,
-					Extractor: &query.FileQuerySplitterExtractor{
-						Fs:       fs,
-						Renderer: renderer,
-					},
-					WorkerCount: 32,
-					Logger:      logger,
-				})
-			} else {
-				logger.Debug("no Postgres connections found, skipping Postgres validation")
-			}
+			rules = append(rules, queryValidatorRules(logger, cm, connectionManager)...)
 
 			var result *lint.PipelineAnalysisResult
 			var errr error
@@ -378,4 +311,77 @@ func flattenErrors(err error) []string {
 	foundErrors = append(foundErrors, err.Error())
 
 	return foundErrors
+}
+
+func queryValidatorRules(logger *zap.SugaredLogger, cfg *config.Config, connectionManager *connection.Manager) []lint.Rule {
+	rules := []lint.Rule{}
+	renderer := jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")
+	if len(cfg.SelectedEnvironment.Connections.GoogleCloudPlatform) > 0 {
+		rules = append(rules, &lint.QueryValidatorRule{
+			Identifier:  "bigquery-validator",
+			TaskType:    pipeline.AssetTypeBigqueryQuery,
+			Connections: connectionManager,
+			Extractor: &query.WholeFileExtractor{
+				Fs:       fs,
+				Renderer: renderer,
+			},
+			Materializer: jinjaRenderedMaterializer{
+				materializer: bigquery.NewMaterializer(false),
+				renderer:     renderer,
+			},
+			WorkerCount: 32,
+			Logger:      logger,
+		})
+	} else {
+		logger.Debug("no GCP connections found, skipping BigQuery validation")
+	}
+	if len(cfg.SelectedEnvironment.Connections.Snowflake) > 0 {
+		rules = append(rules, &lint.QueryValidatorRule{
+			Identifier:  "snowflake-validator",
+			TaskType:    pipeline.AssetTypeSnowflakeQuery,
+			Connections: connectionManager,
+			Extractor: &query.FileQuerySplitterExtractor{
+				Fs:       fs,
+				Renderer: renderer,
+			},
+			WorkerCount: 32,
+			Logger:      logger,
+		})
+	} else {
+		logger.Debug("no Snowflake connections found, skipping Snowflake validation")
+	}
+
+	if len(cfg.SelectedEnvironment.Connections.RedShift) > 0 {
+		rules = append(rules, &lint.QueryValidatorRule{
+			Identifier:  "redshift-validator",
+			TaskType:    pipeline.AssetTypeRedshiftQuery,
+			Connections: connectionManager,
+			Extractor: &query.FileQuerySplitterExtractor{
+				Fs:       fs,
+				Renderer: renderer,
+			},
+			WorkerCount: 32,
+			Logger:      logger,
+		})
+	} else {
+		logger.Debug("no Redshift connections found, skipping Redshift validation")
+	}
+
+	if len(cfg.SelectedEnvironment.Connections.Postgres) > 0 {
+		rules = append(rules, &lint.QueryValidatorRule{
+			Identifier:  "postgres-validator",
+			TaskType:    pipeline.AssetTypePostgresQuery,
+			Connections: connectionManager,
+			Extractor: &query.FileQuerySplitterExtractor{
+				Fs:       fs,
+				Renderer: renderer,
+			},
+			WorkerCount: 32,
+			Logger:      logger,
+		})
+	} else {
+		logger.Debug("no Postgres connections found, skipping Postgres validation")
+	}
+
+	return rules
 }

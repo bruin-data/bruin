@@ -1,64 +1,68 @@
 custom_rules:
-  - name: asset_has_three_columns
+  - name: asset-has-three-columns
     description: "Asset should have three columns"
     criteria: len(asset.Columns) == 3
-  - name: asset_name_contains_public
+  - name: asset-name-contains-public
     description: "Asset name should contain the word public"
     criteria: indexOf(asset.Name, "public") != -1
-  - name: asset_has_sql_tag
+  - name: asset-has-sql-tag
     description: "Asset should have sql tag"
     criteria: "'sql' in asset.Tags"
 
 rulesets:
-  - name: builtin_policies
+  - name: builtin-policies
     selector:
       - path: .*/builtin-policies/.*
     rules:
-      - asset_name_is_lowercase
-      - asset_name_is_schema_dot_table
-      - asset_has_description
-      - asset_has_owner
-      - asset_has_columns
+      - asset-name-is-lowercase
+      - asset-name-is-schema-dot-table
+      - asset-has-description
+      - asset-has-owner
+      - asset-has-columns
 
-  - name: cutom_policy
+  - name: cutom-policy
     selector:
       - path: .*/custom-policies/.*
     rules:
-      - asset_has_three_columns
+      - asset-has-three-columns
 
-  - name: select_asset
+  - name: select-asset
     selector:
       - asset: .*\.primary
       - path: .*/policies-selector/.*
     rules:
-      - asset_name_contains_public
+      - asset-name-contains-public
 
-  - name: select_pipeline
+  - name: select-pipeline
     selector:
       - pipeline: policy-selector
     rules:
-      - asset_has_description
+      - asset-has-description
     
-  - name: select_by_tag
+  - name: select-by-tag
     selector:
+      - pipeline: policy-selector
       - tag: test
     rules:
-      - asset_has_sql_tag
+      - asset-has-sql-tag
 
-  - name: fail_case_1
+  - name: fail-case-1
     selector:
-      - asset: "^non_compliant.primary$"
+      - pipeline: non-compliant-policies 
+      - asset: "^non-compliant.primary$"
     rules:
-      - asset_has_three_columns
+      - asset-has-three-columns
   
-  - name: fail_case_2
+  - name: fail-case-2
     selector:
-      - asset: "^non_compliant.secondary$"
+      - pipeline: non-compliant-policies 
+      - asset: "^non-compliant.secondary$"
     rules:
-      - asset_name_contains_public
+      - asset-name-contains-public
     
-  - name: fail_case_3
+  - name: fail-case-3
     selector:
-      - asset: "^non_compliant.tertiary$"
+      - pipeline: non-compliant-policies 
+      - asset: "^non-compliant.tertiary$"
     rules:
-      - asset_has_owner
+      - asset-has-owner

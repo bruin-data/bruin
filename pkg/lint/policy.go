@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/git"
@@ -22,77 +23,48 @@ var (
 	errEmptyDesc     = errors.New("Description is empty")
 	errEmptyCriteria = errors.New("Criteria is empty")
 	errNoRules       = errors.New("No rules specified")
+	errNoSuchTarget  = errors.New("No such target")
+	errBadName       = errors.New("Only alphanumeric characters and dash allowed")
 )
 
-var builtinRules = map[string]AssetValidator{
-	"asset_name_is_lowercase": func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-		if strings.ToLower(asset.Name) == asset.Name {
-			return nil, nil
-		}
+var validRulePattern = regexp.MustCompile(`^[A-Za-z0-9\-]+$`)
 
-		return []*Issue{
-			{
-				Task:        asset,
-				Description: "Asset name must be lowercase",
-			},
-		}, nil
-	},
-	"asset_name_is_schema_dot_table": func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-		if strings.Count(asset.Name, ".") == 1 {
-			return nil, nil
-		}
-
-		return []*Issue{
-			{
-				Task:        asset,
-				Description: "Asset name must be of the form {schema}.{table}",
-			},
-		}, nil
-	},
-	"asset_has_description": func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-		if strings.TrimSpace(asset.Description) != "" {
-			return nil, nil
-		}
-		return []*Issue{
-			{
-				Task:        asset,
-				Description: "Asset must have a description",
-			},
-		}, nil
-	},
-	"asset_has_owner": func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-		if strings.TrimSpace(asset.Owner) != "" {
-			return nil, nil
-		}
-		return []*Issue{
-			{
-				Task:        asset,
-				Description: "Asset must have an owner",
-			},
-		}, nil
-	},
-	"asset_has_columns": func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-		if len(asset.Columns) > 0 {
-			return nil, nil
-		}
-		return []*Issue{
-			{
-				Task:        asset,
-				Description: "Asset must have columns",
-			},
-		}, nil
-	},
-}
-
-type validatorEnv struct {
+type assetValidatorEnv struct {
 	Asset    *pipeline.Asset    `expr:"asset"`
 	Pipeline *pipeline.Pipeline `expr:"pipeline"`
 }
 
+type pipelineValidatorEnv struct {
+	Pipeline *pipeline.Pipeline `expr:"pipeline"`
+}
+
+type validators struct {
+	Pipeline PipelineValidator
+	Asset    AssetValidator
+}
+
+type RuleTarget string
+
+var (
+	RuleTargetAsset    = RuleTarget("asset")
+	RuleTargetPipeline = RuleTarget("pipeline")
+)
+
+func (target RuleTarget) Valid() bool {
+	return slices.Contains(
+		[]RuleTarget{
+			RuleTargetAsset,
+			RuleTargetPipeline,
+		},
+		target,
+	)
+}
+
 type RuleDefinition struct {
-	Name        string `yaml:"name"`
-	Description string `yaml:"description"`
-	Criteria    string `yaml:"criteria"`
+	Name        string     `yaml:"name"`
+	Description string     `yaml:"description"`
+	Criteria    string     `yaml:"criteria"`
+	RuleTarget  RuleTarget `yaml:"target"`
 
 	evalutor *vm.Program
 }
@@ -101,20 +73,34 @@ func (def *RuleDefinition) validate() error {
 	if strings.TrimSpace(def.Name) == "" {
 		return errEmptyName
 	}
+	if !validRulePattern.MatchString(def.Name) {
+		return errBadName
+	}
 	if strings.TrimSpace(def.Description) == "" {
 		return errEmptyDesc
 	}
 	if strings.TrimSpace(def.Criteria) == "" {
 		return errEmptyCriteria
 	}
+	if def.RuleTarget == "" {
+		def.RuleTarget = RuleTargetAsset
+	}
+	if !def.RuleTarget.Valid() {
+		return errNoSuchTarget
+	}
+
 	return nil
 }
 
 func (def *RuleDefinition) compile() error {
+	var env any = assetValidatorEnv{}
+	if def.RuleTarget == RuleTargetPipeline {
+		env = pipelineValidatorEnv{}
+	}
 	program, err := expr.Compile(
 		def.Criteria,
 		expr.AsBool(),
-		expr.Env(validatorEnv{}),
+		expr.Env(env),
 	)
 	if err != nil {
 		return fmt.Errorf("error compiling rule: %s: %w", def.Name, err)
@@ -132,6 +118,9 @@ type RuleSet struct {
 func (rs *RuleSet) validate() error {
 	if strings.TrimSpace(rs.Name) == "" {
 		return errEmptyName
+	}
+	if !validRulePattern.MatchString(rs.Name) {
+		return errBadName
 	}
 	if len(rs.Rules) == 0 {
 		return errNoRules
@@ -154,6 +143,12 @@ func (spec *PolicySpecification) init() error {
 		if err != nil {
 			return fmt.Errorf("invalid rule definition at index %d: %w", idx, err)
 		}
+		if spec.compiledRules[def.Name] != nil {
+			return fmt.Errorf("duplicate rule: %s", def.Name)
+		}
+		if _, exists := builtinRules[def.Name]; exists {
+			return fmt.Errorf("rule is builtin: %s", def.Name)
+		}
 		if err := def.compile(); err != nil {
 			return err
 		}
@@ -175,36 +170,47 @@ func (spec *PolicySpecification) Rules() ([]Rule, error) {
 		}
 
 		for _, ruleName := range ruleSet.Rules {
-			validator, found := spec.getValidator(ruleName)
+			validators, found := spec.getValidators(ruleName)
 			if !found {
 				return nil, fmt.Errorf("no such rule: %s", ruleName)
 			}
-			validator = withSelector(ruleSet.Selector, validator)
+			validators = withSelector(ruleSet.Selector, validators)
 			rules = append(rules, &SimpleRule{
-				Identifier:       fmt.Sprintf("policy:%s:%s", ruleSet.Name, ruleName),
-				Fast:             true,
-				Severity:         ValidatorSeverityCritical,
-				Validator:        CallFuncForEveryAsset(validator),
-				AssetValidator:   validator,
-				ApplicableLevels: []Level{LevelAsset},
+				Identifier:     fmt.Sprintf("policy:%s:%s", ruleSet.Name, ruleName),
+				Fast:           true,
+				Severity:       ValidatorSeverityCritical,
+				Validator:      validators.Pipeline,
+				AssetValidator: validators.Asset,
 			})
 		}
 	}
 	return rules, nil
 }
 
-func (spec *PolicySpecification) getValidator(name string) (AssetValidator, bool) {
+func (spec *PolicySpecification) getValidators(name string) (validators, bool) {
 	def, found := spec.compiledRules[name]
-	if found {
-		return newPolicyValidator(def), true
+	if !found {
+		validators, found := builtinRules[name]
+		return validators, found
 	}
-	validator, found := builtinRules[name]
-	return validator, found
+
+	v := validators{}
+
+	switch def.RuleTarget {
+	case RuleTargetAsset:
+		assetValidator := assetValidatorFromRuleDef(def)
+		v.Asset = assetValidator
+		v.Pipeline = CallFuncForEveryAsset(assetValidator)
+	case RuleTargetPipeline:
+		v.Pipeline = pipelineValidatorFromRuleDef(def)
+	}
+
+	return v, true
 }
 
-func newPolicyValidator(def *RuleDefinition) AssetValidator {
+func assetValidatorFromRuleDef(def *RuleDefinition) AssetValidator {
 	return func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-		env := validatorEnv{asset, pipeline}
+		env := assetValidatorEnv{asset, pipeline}
 		result, err := expr.Run(def.evalutor, env)
 		if err != nil {
 			return nil, fmt.Errorf("error evaluating rule %s: %w", def.Name, err)
@@ -223,24 +229,64 @@ func newPolicyValidator(def *RuleDefinition) AssetValidator {
 	}
 }
 
-func withSelector(selector []map[string]any, validator AssetValidator) AssetValidator {
-	return func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-		match, err := doesSelectorMatch(selector, asset, pipeline)
+func pipelineValidatorFromRuleDef(def *RuleDefinition) PipelineValidator {
+	return func(pipe *pipeline.Pipeline) ([]*Issue, error) {
+		env := pipelineValidatorEnv{pipe}
+		result, err := expr.Run(def.evalutor, env)
 		if err != nil {
-			return nil, fmt.Errorf("error matching selector: %w", err)
+			return nil, fmt.Errorf("error evaluating rule %s: %w", def.Name, err)
 		}
 
-		if !match {
+		if result.(bool) {
 			return nil, nil
 		}
 
-		return validator(ctx, pipeline, asset)
+		return []*Issue{
+			{
+				Description: def.Description,
+			},
+		}, nil
 	}
 }
 
-func doesSelectorMatch(selectors []map[string]any, asset *pipeline.Asset, pipeline *pipeline.Pipeline) (bool, error) {
+func withSelector(selector []map[string]any, downstream validators) validators {
+	return validators{
+		Pipeline: func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+			match, err := doesSelectorMatch(selector, pipeline, nil)
+			if err != nil {
+				return nil, fmt.Errorf("error matching selector: %w", err)
+			}
+
+			if !match {
+				return nil, nil
+			}
+
+			return downstream.Pipeline(pipeline)
+		},
+		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+			if downstream.Asset == nil {
+				return nil, nil
+			}
+			match, err := doesSelectorMatch(selector, pipeline, asset)
+			if err != nil {
+				return nil, fmt.Errorf("error matching selector: %w", err)
+			}
+
+			if !match {
+				return nil, nil
+			}
+			return downstream.Asset(ctx, pipeline, asset)
+		},
+	}
+}
+
+func doesSelectorMatch(selectors []map[string]any, pipeline *pipeline.Pipeline, asset *pipeline.Asset) (bool, error) {
 	for _, sel := range selectors {
 		for key, val := range sel {
+			if asset == nil && slices.Contains([]string{"asset", "tag"}, key) {
+				continue
+			}
+
 			pattern, ok := val.(string)
 			if !ok {
 				return false, fmt.Errorf("invalid selector value for key %s: %v", key, val)
@@ -252,7 +298,11 @@ func doesSelectorMatch(selectors []map[string]any, asset *pipeline.Asset, pipeli
 			case "asset":
 				subject = asset.Name
 			case "path":
-				subject = asset.ExecutableFile.Path
+				if asset == nil {
+					subject = pipeline.DefinitionFile.Path
+				} else {
+					subject = asset.ExecutableFile.Path
+				}
 			case "tag":
 				subject = strings.Join(asset.Tags, " ")
 			default:
