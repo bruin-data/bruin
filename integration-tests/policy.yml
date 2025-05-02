@@ -12,17 +12,18 @@ custom_rules:
 rulesets:
   - name: builtin-policies
     selector:
-      - path: .*/builtin-policies/.*
+      - path: .*/policies-builtin/.*
     rules:
       - asset-name-is-lowercase
       - asset-name-is-schema-dot-table
       - asset-has-description
       - asset-has-owner
       - asset-has-columns
+      - asset-has-primary-key
 
   - name: cutom-policy
     selector:
-      - path: .*/custom-policies/.*
+      - path: .*/policies-custom/.*
     rules:
       - asset-has-three-columns
 

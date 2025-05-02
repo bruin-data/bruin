@@ -14,6 +14,10 @@ func validatorsFromAssetValidator(av AssetValidator) validators {
 	}
 }
 
+const (
+	msgPrimaryKeyMustBeSet = "Asset must have atleast one primary key"
+)
+
 var builtinRules = map[string]validators{
 	"asset-name-is-lowercase": validatorsFromAssetValidator(
 		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -80,6 +84,34 @@ var builtinRules = map[string]validators{
 					Description: "Asset must have columns",
 				},
 			}, nil
+		},
+	),
+	"asset-has-primary-key": validatorsFromAssetValidator(
+		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+			if len(asset.Columns) == 0 {
+				return []*Issue{
+					{
+						Task:        asset,
+						Description: msgPrimaryKeyMustBeSet,
+					},
+				}, nil
+			}
+			var primaryKeyFound bool
+			for _, col := range asset.Columns {
+				if col.PrimaryKey {
+					primaryKeyFound = true
+					break
+				}
+			}
+			if !primaryKeyFound {
+				return []*Issue{
+					{
+						Task:        asset,
+						Description: msgPrimaryKeyMustBeSet,
+					},
+				}, nil
+			}
+			return nil, nil
 		},
 	),
 }

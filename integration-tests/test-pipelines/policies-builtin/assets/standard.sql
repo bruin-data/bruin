@@ -7,6 +7,7 @@ owner: engineering@getbruin.com
 columns:
     - name: msg
       type: string
+      primary_key: true
 @bruin */
 
 select "I'm the standard" as msg
