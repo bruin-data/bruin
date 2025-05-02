@@ -22,6 +22,7 @@ rulesets:
       - asset-has-primary-key
       - asset-has-checks
       - column-has-description
+      - column-has-type
 
   - name: cutom-policy
     selector:

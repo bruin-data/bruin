@@ -144,4 +144,21 @@ var builtinRules = map[string]validators{
 			return nil, nil
 		},
 	),
+	"column-has-type": validatorsFromAssetValidator(
+		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+			for _, col := range asset.Columns {
+				if strings.TrimSpace(col.Type) != "" {
+					continue
+				}
+
+				return []*Issue{
+					{
+						Task:        asset,
+						Description: "Columns must have a type",
+					},
+				}, nil
+			}
+			return nil, nil
+		},
+	),
 }
