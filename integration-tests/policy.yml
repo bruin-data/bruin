@@ -23,6 +23,7 @@ rulesets:
       - asset-has-checks
       - column-has-description
       - column-has-type
+      - column-name-is-snake-case
 
   - name: cutom-policy
     selector:

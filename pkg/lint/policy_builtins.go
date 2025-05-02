@@ -2,6 +2,7 @@ package lint
 
 import (
 	"context"
+	"regexp"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -16,6 +17,10 @@ func validatorsFromAssetValidator(av AssetValidator) validators {
 
 const (
 	msgPrimaryKeyMustBeSet = "Asset must have atleast one primary key"
+)
+
+var (
+	snakeCasePattern = regexp.MustCompile("^[a-z]+(_[a-z]+)*$")
 )
 
 var builtinRules = map[string]validators{
@@ -155,6 +160,23 @@ var builtinRules = map[string]validators{
 					{
 						Task:        asset,
 						Description: "Columns must have a type",
+					},
+				}, nil
+			}
+			return nil, nil
+		},
+	),
+	"column-name-is-snake-case": validatorsFromAssetValidator(
+		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+			for _, col := range asset.Columns {
+				if snakeCasePattern.MatchString(col.Name) {
+					continue
+				}
+
+				return []*Issue{
+					{
+						Task:        asset,
+						Description: "Column names must be in snake_case",
 					},
 				}, nil
 			}
