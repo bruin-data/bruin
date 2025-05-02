@@ -215,6 +215,7 @@ func TestRenderCommand_Run(t *testing.T) {
 		})
 	}
 }
+
 func TestModifyExtractor(t *testing.T) {
 	t.Parallel()
 	type args struct {

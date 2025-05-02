@@ -37,7 +37,6 @@ func Query() *cli.Command {
 		Name:   "query",
 		Usage:  "Execute a query on a specified connection and retrieve results",
 		Before: telemetry.BeforeCommand,
-		After:  telemetry.AfterCommand,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "connection",

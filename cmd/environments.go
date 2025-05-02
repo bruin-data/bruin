@@ -8,7 +8,6 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
-	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
@@ -21,8 +20,6 @@ func Environments(isDebug *bool) *cli.Command {
 		Subcommands: []*cli.Command{
 			ListEnvironments(isDebug),
 		},
-		Before: telemetry.BeforeCommand,
-		After:  telemetry.AfterCommand,
 	}
 }
 
