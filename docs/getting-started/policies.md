@@ -90,7 +90,7 @@ rulesets:
 
 In this example:
 - `production` applies **only** to resources that match both:
-  - path regex `.*/production/.*`
+  - path regex `.*/prod/.*`
   - and have a tag matching `critical`.
 
 ## Custom Rules
