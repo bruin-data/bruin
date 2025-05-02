@@ -21,6 +21,7 @@ const (
 
 var (
 	snakeCasePattern = regexp.MustCompile("^[a-z]+(_[a-z]+)*$")
+	camelCasePattern = regexp.MustCompile("^[a-z]+(?:[A-Z][a-z0-9])*$")
 )
 
 var builtinRules = map[string]validators{
@@ -177,6 +178,23 @@ var builtinRules = map[string]validators{
 					{
 						Task:        asset,
 						Description: "Column names must be in snake_case",
+					},
+				}, nil
+			}
+			return nil, nil
+		},
+	),
+	"column-name-is-camel-case": validatorsFromAssetValidator(
+		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+			for _, col := range asset.Columns {
+				if camelCasePattern.MatchString(col.Name) {
+					continue
+				}
+
+				return []*Issue{
+					{
+						Task:        asset,
+						Description: "Column names must be in camelCase",
 					},
 				}, nil
 			}

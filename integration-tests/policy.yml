@@ -13,6 +13,7 @@ rulesets:
   - name: builtin-policies
     selector:
       - path: .*/policies-builtin/.*
+      - asset: public.standard
     rules:
       - asset-name-is-lowercase
       - asset-name-is-schema-dot-table
@@ -24,6 +25,13 @@ rulesets:
       - column-has-description
       - column-has-type
       - column-name-is-snake-case
+
+  - name: builtin-policies-alternative
+    selector:
+      - path: .*/policies-builtin/.*
+      - asset: public.alternative
+    rules:
+      - column-name-is-camel-case
 
   - name: cutom-policy
     selector:
