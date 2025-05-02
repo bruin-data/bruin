@@ -114,4 +114,22 @@ var builtinRules = map[string]validators{
 			return nil, nil
 		},
 	),
+
+	"column-has-description": validatorsFromAssetValidator(
+		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+			for _, col := range asset.Columns {
+				if strings.TrimSpace(col.Description) != "" {
+					continue
+				}
+
+				return []*Issue{
+					{
+						Task:        asset,
+						Description: "Columns must have a description",
+					},
+				}, nil
+			}
+			return nil, nil
+		},
+	),
 }

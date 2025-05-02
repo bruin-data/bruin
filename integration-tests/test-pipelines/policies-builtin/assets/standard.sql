@@ -8,6 +8,7 @@ columns:
     - name: msg
       type: string
       primary_key: true
+      description: The contents of the message
 @bruin */
 
 select "I'm the standard" as msg
