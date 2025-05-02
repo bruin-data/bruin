@@ -14,13 +14,13 @@ Example:
 
 ```yaml
 rulesets:
-  - name: ruleset_1
+  - name: ruleset-1
     selector:
       - path: .*/foo/.*
     rules:
-      - asset_has_owner
-      - asset_name_is_lowercase
-      - asset_has_description
+      - asset-has-owner
+      - asset-name-is-lowercase
+      - asset-has-description
 ```
 
 > 🚀 That's it! Bruin will now lint your assets according to these policies.
@@ -70,8 +70,8 @@ rulesets:
       - path: .*/prod/.*
       - tag: critical
     rules:
-      - asset_has_owner
-      - asset_name_is_lowercase
+      - asset-has-owner
+      - asset-name-is-lowercase
 ```
 
 In this example:
@@ -94,7 +94,7 @@ Each rule must include:
 
 ```yaml
 custom_rules:
-  - name: asset_has_owner
+  - name: asset-has-owner
     description: every asset should have an owner
     criteria: asset.Owner != ""
 ```
@@ -118,11 +118,11 @@ Bruin provides a set of built-in lint rules that are ready to use without requir
 
 | Rule | Description |
 | :--- | :--- |
-| `asset_name_is_lowercase` | Asset names must be in lowercase. |
-| `asset_name_is_schema_dot_table` | Asset names must follow the format `schema.table`. |
-| `asset_has_description` | Assets must have a description. |
-| `asset_has_owner` | Assets must have an owner assigned. |
-| `asset_has_columns` | Assets must define their columns. |
+| `asset-name-is-lowercase` | Asset names must be in lowercase. |
+| `asset-name-is-schema-dot-table` | Asset names must follow the format `schema.table`. |
+| `asset-has-description` | Assets must have a description. |
+| `asset-has-owner` | Assets must have an owner assigned. |
+| `asset-has-columns` | Assets must define their columns. |
 
 You can directly reference these rules in `rulesets[*].rules`.
 
@@ -130,7 +130,7 @@ You can directly reference these rules in `rulesets[*].rules`.
 
 ```yaml
 custom_rules:
-  - name: asset_has_owner
+  - name: asset-has-owner
     description: every asset should have an owner
     criteria: asset.Owner != ""
 
@@ -140,15 +140,15 @@ rulesets:
       - path: .*/production/.*
       - tag: critical
     rules:
-      - asset_has_owner
-      - asset_name_is_lowercase
-      - asset_has_description
+      - asset-has-owner
+      - asset-name-is-lowercase
+      - asset-has-description
   - name: staging
     selector:
       - asset: stage.*
       - pipeline: staging
     rules:
-      - asset_name_is_lowercase
+      - asset-name-is-lowercase
 ```
 
 
