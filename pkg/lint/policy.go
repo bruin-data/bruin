@@ -278,7 +278,6 @@ func withSelector(selector []map[string]any, downstream validators) validators {
 			return downstream.Asset(ctx, pipeline, asset)
 		},
 	}
-
 }
 
 func doesSelectorMatch(selectors []map[string]any, pipeline *pipeline.Pipeline, asset *pipeline.Asset) (bool, error) {

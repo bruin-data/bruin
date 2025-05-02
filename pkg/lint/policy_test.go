@@ -1,7 +1,6 @@
 package lint_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/lint"
@@ -102,7 +101,7 @@ func TestPolicyRuleDefinition(t *testing.T) {
 			spec := &lint.PolicySpecification{
 				RuleSets: []lint.RuleSet{
 					{
-						Name:  fmt.Sprintf("ruleset-%s", invalid),
+						Name:  "ruleset-" + invalid,
 						Rules: []string{invalid},
 					},
 				},
@@ -131,7 +130,7 @@ func TestPolicyRuleDefinition(t *testing.T) {
 			spec := &lint.PolicySpecification{
 				RuleSets: []lint.RuleSet{
 					{
-						Name:  fmt.Sprintf("ruleset-%s", invalid),
+						Name:  "ruleset-" + invalid,
 						Rules: []string{"placeholder"},
 					},
 				},
