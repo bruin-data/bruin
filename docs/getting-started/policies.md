@@ -23,9 +23,10 @@ rulesets:
       - asset_has_description
 ```
 
-> 🚀 That's it! Bruin will now lint your assets according to these policies.
+🚀 That's it! Bruin will now lint your assets according to these policies.
 
-To verify that your assets satsify your policies, you can run:
+To verify that your assets satisfy your policies, you can run:
+
 ```sh
 $ bruin validate /path/to/pipelines
 ```
@@ -57,7 +58,9 @@ Selectors determine which assets a ruleset should apply to. Supported predicates
 
 Each predicate is a regex string.
 
-> If multiple selectors are specified within a ruleset, **all selectors must match** for the ruleset to apply
+::: info
+If multiple selectors are specified within a ruleset, **all selectors must match** for the ruleset to apply
+:::
 
 If no selectors are defined for a ruleset, **the ruleset applies to all assets**.
 
@@ -81,6 +84,7 @@ In this example:
 
 > [!note]
 > Currently `policies` are only applied to `assets`. Support for `pipeline` level policies will be added in a future version.
+
 ## Custom Rules
 
 Custom lint rules are defined inside the `custom_rules` section of `policy.yml`.
@@ -104,13 +108,14 @@ custom_rules:
 `criteria` has the following variables available for use in your expressions:
 | Name | Description |
 | ---  | --- |
-| [asset](https://github.com/bruin-data/bruin-vscode/blob/1726eda362f29bf95f5ffc6b50addf8b63f2128b/schemas/yaml-assets-schema.json) | The asset selected via selector |
-| [pipeline](https://github.com/bruin-data/bruin-vscode/blob/1726eda362f29bf95f5ffc6b50addf8b63f2128b/schemas/pipeline-schema.json) | The pipeline the asset belongs to |
+| [asset](https://github.com/bruin-data/bruin/blob/f9c7d0083d2f53538102e77126e55f9dfc8840a5/pkg/pipeline/pipeline.go#L622-L645) | The asset selected via selector |
+| [pipeline](https://github.com/bruin-data/bruin/blob/f9c7d0083d2f53538102e77126e55f9dfc8840a5/pkg/pipeline/pipeline.go#L1106-L1121) | The pipeline the asset belongs to |
 
-> [!tip]
-> The variables above link to their [JSON Schema](https://json-schema.org/). You can use those as a reference for what fields are available on each variable and
-> what their types are.
+::: warning
+The variables exposed here are direct Go structs, therefore it is recommended to check the latest version of these given structs. 
 
+In the future we will create dedicated schemas for custom rules with standards around them.
+:::
 
 ## Built-in Rules
 
