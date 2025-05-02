@@ -4,6 +4,8 @@ Bruin supports **policies** to verify that data transformation jobs follow best 
 
 This document explains how to define, configure, and use custom linting policies.
 
+> [!NOTE]
+> For the purpose of this document, a `resource` means either an `asset` or a `pipeline`.
 ## Quick Start
 
 1. Create a `policy.yml` file in your project root.
@@ -23,34 +25,34 @@ rulesets:
       - asset-has-description
 ```
 
-> 🚀 That's it! Bruin will now lint your assets according to these policies.
+> 🚀 That's it! Bruin will now lint your resources according to these policies.
 
-To verify that your assets satsify your policies, you can run:
+To verify that your resources satsify your policies, you can run:
 ```sh
 $ bruin validate /path/to/pipelines
 ```
 
 > [!tip]
-> `bruin run` normally runs lint before pipeline execution. So you can rest assured that any non-compliant assets will get stopped in it's tracks.
+> `bruin run` normally runs lint before pipeline execution. So you can rest assured that any non-compliant resources will get stopped in it's tracks.
 
 ## Rulesets
 
-A **ruleset** groups one or more rules together and specifies which assets they apply to, based on selectors.
+A **ruleset** groups one or more rules together and specifies which resources they apply to, based on selectors.
 
 Each ruleset must include:
 - **name**: A unique name for the ruleset.
-- **selector** (optional): One or more predicates to select the applicable assets.
+- **selector** (optional): One or more predicates to select the applicable resources.
 - **rules**: List of rule names (built-in or custom) to apply.
 
-If a **selector** is not specified, the ruleset applies to **all assets**.
+If a **selector** is not specified, the ruleset applies to **all resources**.
 
->[!note]
+>[!NOTE]
 > Names be must alphanumeric or use dashes (`-`). This applies to both `rulesets` and `rules`.
 
 
 ### Selector Predicates
 
-Selectors determine which assets a ruleset should apply to. Supported predicates are:
+Selectors determine which resources a ruleset should apply to. Supported predicates are:
 
 | Predicate | Target | Description |
 | :--- | :--- | :--- |
@@ -63,11 +65,11 @@ Each predicate is a regex string.
 
 > If multiple selectors are specified within a ruleset, **all selectors must match** for the ruleset to apply
 
-If no selectors are defined for a ruleset, **the ruleset applies to all assets/pipelines**. Some selectors only work with certain
+If no selectors are defined for a ruleset, **the ruleset applies to all resources**. Some selectors only work with certain
 rule targets. For instance `tag` selector only works for rules that [target](#targets) assets. Pipeline level rules will just ignore
 this selector. 
 
-> [!NOTE]
+> [!TIP]
 > If your ruleset only contains asset selectors, but uses `pipeline` rules, then those pipeline rules will apply to all pipelines. Make sure to define a `pipeline` or `path` selector if you don't intend for that to happen.
 
 ### Example
@@ -84,7 +86,7 @@ rulesets:
 ```
 
 In this example:
-- `production` applies **only** to assets that match both:
+- `production` applies **only** to resources that match both:
   - path regex `.*/production/.*`
   - and have a tag matching `critical`.
 
@@ -95,7 +97,7 @@ Custom lint rules are defined inside the `custom_rules` section of `policy.yml`.
 Each rule must include:
 - **name**: A unique name for the rule. 
 - **description**: A human-readable description of the rule.
-- **criteria**: An [expr](https://expr-lang.org/) boolean expression. If the expression evalutes to `true` then the asset passes validation.
+- **criteria**: An [expr](https://expr-lang.org/) boolean expression. If the expression evalutes to `true` then the resource passes validation.
 
 ### Example
 
