@@ -8,7 +8,7 @@ This document explains how to define, configure, and use custom linting policies
 
 1. Create a `policy.yml` file in your project root.
 2. Define custom rules under `custom_rules` (optional if only using built-in rules).
-3. Group rules into `rulesets`, specifying which assets they should apply to using selectors.
+3. Group rules into `rulesets`, specifying which resource they should apply to using selectors.
 
 Example:
 
@@ -43,6 +43,10 @@ Each ruleset must include:
 - **rules**: List of rule names (built-in or custom) to apply.
 
 If a **selector** is not specified, the ruleset applies to **all assets**.
+
+>[!note]
+> Names be must alphanumeric or use dashes (`-`). This applies to both `rulesets` and `rules`.
+
 
 ### Selector Predicates
 
@@ -89,7 +93,7 @@ In this example:
 Custom lint rules are defined inside the `custom_rules` section of `policy.yml`.
 
 Each rule must include:
-- **name**: A unique name for the rule.
+- **name**: A unique name for the rule. 
 - **description**: A human-readable description of the rule.
 - **criteria**: An [expr](https://expr-lang.org/) boolean expression. If the expression evalutes to `true` then the asset passes validation.
 
