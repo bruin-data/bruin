@@ -163,7 +163,7 @@ func singleLineCommentsToTask(scanner *bufio.Scanner, commentMarker, filePath st
 	}
 
 	if len(commentRows) == 0 {
-		return nil, &ParseError{"failed to parse comment formatted task in file" + filePath}
+		return nil, nil // &ParseError{"failed to parse comment formatted task in file" + filePath}
 	}
 
 	task, err := commentRowsToTask(commentRows)
