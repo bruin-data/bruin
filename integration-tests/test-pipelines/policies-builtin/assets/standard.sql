@@ -9,6 +9,10 @@ columns:
       type: string
       primary_key: true
       description: The contents of the message
+
+custom_checks:
+    - name: proof of concept
+      query: select true
 @bruin */
 
 select "I'm the standard" as msg

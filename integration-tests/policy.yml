@@ -20,6 +20,7 @@ rulesets:
       - asset-has-owner
       - asset-has-columns
       - asset-has-primary-key
+      - asset-has-checks
       - column-has-description
 
   - name: cutom-policy

@@ -114,7 +114,19 @@ var builtinRules = map[string]validators{
 			return nil, nil
 		},
 	),
-
+	"asset-has-checks": validatorsFromAssetValidator(
+		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+			if len(asset.CustomChecks) == 0 {
+				return []*Issue{
+					{
+						Task:        asset,
+						Description: "Asset must have a custom check",
+					},
+				}, nil
+			}
+			return nil, nil
+		},
+	),
 	"column-has-description": validatorsFromAssetValidator(
 		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			for _, col := range asset.Columns {
