@@ -25,9 +25,10 @@ rulesets:
       - asset-has-description
 ```
 
-> 🚀 That's it! Bruin will now lint your resources according to these policies.
+🚀 That's it! Bruin will now lint your assets according to these policies.
 
-To verify that your resources satsify your policies, you can run:
+To verify that your assets satisfy your policies, you can run:
+
 ```sh
 $ bruin validate /path/to/pipelines
 ```
@@ -63,7 +64,9 @@ Selectors determine which resources a ruleset should apply to. Supported predica
 
 Each predicate is a regex string.
 
-> If multiple selectors are specified within a ruleset, **all selectors must match** for the ruleset to apply
+::: info
+If multiple selectors are specified within a ruleset, **all selectors must match** for the ruleset to apply
+:::
 
 If no selectors are defined for a ruleset, **the ruleset applies to all resources**. Some selectors only work with certain
 rule targets. For instance `tag` selector only works for rules that [target](#targets) assets. Pipeline level rules will just ignore
@@ -138,15 +141,17 @@ ruleset:
 ### Variables
 
 `criteria` has the following variables available for use in your expressions:
+
 | Name | Target | 
 | ---  | --- | 
-| [asset](https://github.com/bruin-data/bruin-vscode/blob/1726eda362f29bf95f5ffc6b50addf8b63f2128b/schemas/yaml-assets-schema.json) | `asset` | 
-| [pipeline](https://github.com/bruin-data/bruin-vscode/blob/1726eda362f29bf95f5ffc6b50addf8b63f2128b/schemas/pipeline-schema.json) | `asset`, `pipeline` |
+| [asset](https://github.com/bruin-data/bruin/blob/f9c7d0083d2f53538102e77126e55f9dfc8840a5/pkg/pipeline/pipeline.go#L622-L645) | `asset` | 
+| [pipeline](https://github.com/bruin-data/bruin/blob/f9c7d0083d2f53538102e77126e55f9dfc8840a5/pkg/pipeline/pipeline.go#L1106-L1121) | `asset`, `pipeline` |
 
-> [!tip]
-> The variables above link to their [JSON Schema](https://json-schema.org/). You can use those as a reference for what fields are available on each variable and
-> what their types are.
+::: warning
+The variables exposed here are direct Go structs, therefore it is recommended to check the latest version of these given structs. 
 
+In the future we will create dedicated schemas for custom rules with standards around them.
+:::
 
 ## Built-in Rules
 
