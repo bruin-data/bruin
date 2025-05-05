@@ -68,20 +68,20 @@ rulesets:
   - name: fail-case-1
     selector:
       - pipeline: non-compliant-policies 
-      - asset: "^non-compliant.primary$"
+      - asset: "^non_compliant.primary$"
     rules:
       - asset-has-three-columns
   
   - name: fail-case-2
     selector:
       - pipeline: non-compliant-policies 
-      - asset: "^non-compliant.secondary$"
+      - asset: "^non_compliant.secondary$"
     rules:
       - asset-name-contains-public
     
   - name: fail-case-3
     selector:
       - pipeline: non-compliant-policies 
-      - asset: "^non-compliant.tertiary$"
+      - asset: "^non_compliant.tertiary$"
     rules:
       - asset-has-owner
