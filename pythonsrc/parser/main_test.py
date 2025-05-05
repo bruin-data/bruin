@@ -2,7 +2,13 @@ import pytest
 from sqlglot import parse_one
 from sqlglot.optimizer import optimize
 
-from .main import get_column_lineage, extract_non_selected_columns, Column, get_tables, add_limit
+from .main import (
+    get_column_lineage,
+    extract_non_selected_columns,
+    Column,
+    get_tables,
+    add_limit,
+)
 
 SCHEMA = {
     "orders": {
@@ -1880,7 +1886,7 @@ def test_add_limit():
     ORDER BY created_at DESC
     LIMIT 10;
     """
-    
+
     result = add_limit(query, 10)
     assert "query" in result
     assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
@@ -1896,7 +1902,7 @@ def test_add_limit_no_existing_limit():
     FROM test.products
     LIMIT 10
     """
-    
+
     result = add_limit(query, 10)
     assert "query" in result
     assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
@@ -1913,7 +1919,7 @@ def test_add_limit_replace_existing_limit():
     FROM test.products
     LIMIT 10
     """
-    
+
     result = add_limit(query, 10)
     assert "query" in result
     assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
@@ -1931,7 +1937,7 @@ def test_add_limit_with_order_by():
     ORDER BY product_name
     LIMIT 10
     """
-    
+
     result = add_limit(query, 10)
     assert "query" in result
     assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
@@ -1949,7 +1955,7 @@ def test_add_limit_with_group_by():
     GROUP BY product_name
     LIMIT 10
     """
-    
+
     result = add_limit(query, 10)
     assert "query" in result
     assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
@@ -1966,7 +1972,7 @@ def test_add_limit_with_semicolon():
     FROM test.products
     LIMIT 10;
     """
-    
+
     result = add_limit(query, 10)
     assert "query" in result
     assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
@@ -1983,7 +1989,7 @@ def test_add_limit_without_semicolon():
     FROM test.products
     LIMIT 10
     """
-    
+
     result = add_limit(query, 10)
     assert "query" in result
     assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
@@ -2005,7 +2011,7 @@ def test_add_limit_nested_query():
     ) AS subquery
     LIMIT 10
     """
-    
+
     result = add_limit(query, 10)
     assert "query" in result
     assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
@@ -2025,7 +2031,7 @@ def test_add_limit_nested_query_no_existing_limit():
     ) AS subquery
     LIMIT 10
     """
-    
+
     result = add_limit(query, 10)
     assert "query" in result
     assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()

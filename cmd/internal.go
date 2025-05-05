@@ -461,7 +461,7 @@ func convertToBruinAsset(fs afero.Fs, filePath string) error {
 		return nil // unsupported file types
 	}
 	newContent := bruinHeader + string(content)
-	err = afero.WriteFile(fs, filePath, []byte(newContent), 0644)
+	err = afero.WriteFile(fs, filePath, []byte(newContent), 0o644)
 	if err != nil {
 		printErrorJSON(errors2.Wrap(err, "failed to write file"))
 		return cli.Exit("", 1)
