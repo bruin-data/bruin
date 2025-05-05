@@ -5,3 +5,6 @@ retries: 3
 notifications:
   slack:
     - channel: pipelines
+    
+metadata_push:
+  bigquery: true

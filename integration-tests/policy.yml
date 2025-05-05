@@ -30,6 +30,7 @@ rulesets:
       - pipeline-has-notifications
       - pipeline-has-retries
       - pipeline-has-start-date
+      - pipeline-has-metadata-push
 
   # note(turtledev): temporarily disabled
   # - name: builtin-policies-alternative

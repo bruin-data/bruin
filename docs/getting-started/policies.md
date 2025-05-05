@@ -251,6 +251,11 @@ Bruin provides a set of built-in lint rules that are ready to use without requir
       <td><code>pipeline</code></td>
       <td>Pipeline must have a `start_date`</td>
     </tr>
+    <tr>
+      <td><code>pipeline-has-metadata-push</code></td>
+      <td><code>pipeline</code></td>
+      <td>Pipeline must push it's metadata</td>
+    </tr>
   </tbody>
 </table>
 

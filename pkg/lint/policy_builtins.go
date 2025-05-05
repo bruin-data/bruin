@@ -435,4 +435,17 @@ var builtinRules = map[string]validators{
 
 		},
 	},
+	"pipeline-has-metadata-push": {
+		Pipeline: func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+			if pipeline.MetadataPush.HasAnyEnabled() {
+				return nil, nil
+			}
+
+			return []*Issue{
+				{
+					Description: "Pipeline must have metadata push enabled",
+				},
+			}, nil
+		},
+	},
 }
