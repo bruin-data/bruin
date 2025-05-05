@@ -157,8 +157,6 @@ In the future we will create dedicated schemas for custom rules with standards a
 
 Bruin provides a set of built-in lint rules that are ready to use without requiring a definition.
 
-Here is your markdown table converted to an HTML table:
-
 <table>
   <thead>
     <tr>
