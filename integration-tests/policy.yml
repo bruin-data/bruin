@@ -12,7 +12,7 @@ custom_rules:
 rulesets:
   - name: builtin-policies
     selector:
-      - path: .*/policies-builtin/.*standard.sql
+      - path: .*/policies-builtin/.*
       - asset: public.standard
     rules:
       - asset-name-is-lowercase
@@ -23,6 +23,7 @@ rulesets:
       - asset-has-primary-key
       - asset-has-checks
       - asset-has-tags
+      - asset-has-no-cross-pipeline-dependencies
       - column-has-description
       - column-has-type
       - column-name-is-snake-case

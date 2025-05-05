@@ -379,4 +379,21 @@ var builtinRules = map[string]validators{
 			return issues, nil
 		},
 	),
+	"asset-has-no-cross-pipeline-dependencies": validatorsFromAssetValidator(
+		func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+			for _, upstream := range asset.Upstreams {
+				if upstream.Type != "uri" {
+					continue
+				}
+
+				return []*Issue{
+					{
+						Task:        asset,
+						Description: "Asset must not have a cross pipeline dependency",
+					},
+				}, nil
+			}
+			return nil, nil
+		},
+	),
 }

@@ -12,6 +12,9 @@ columns:
 tags:
   - layer:raw
 
+depends:
+  - uri: somewhere://only.we/know
+
 custom_checks:
     - name: proof of concept
       query: select true
