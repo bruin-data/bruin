@@ -397,7 +397,7 @@ var builtinRules = map[string]validators{
 			}
 			return []*Issue{
 				{
-					Description: "Pipeline must have notification",
+					Description: "Pipeline must have at least one notification set up",
 				},
 			}, nil
 		},
