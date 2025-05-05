@@ -318,8 +318,9 @@ func doesSelectorMatch(selectors []map[string]any, pipeline *pipeline.Pipeline, 
 			default:
 				return false, fmt.Errorf("unknown selector key: %s", key)
 			}
-
-			pattern = addBoundaryAnchors(pattern)
+			if key != "tag" {
+				pattern = addBoundaryAnchors(pattern)
+			}
 			match, err := regexp.MatchString(pattern, subject)
 			if err != nil {
 				return false, fmt.Errorf("error matching %s: %w", key, err)
