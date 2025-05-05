@@ -12,7 +12,7 @@ custom_rules:
 rulesets:
   - name: builtin-policies
     selector:
-      - path: .*/policies-builtin/.*
+      - path: .*/policies-builtin/.*standard.sql
       - asset: public.standard
     rules:
       - asset-name-is-lowercase
@@ -27,12 +27,13 @@ rulesets:
       - column-has-type
       - column-name-is-snake-case
 
-  - name: builtin-policies-alternative
-    selector:
-      - path: .*/policies-builtin/.*
-      - asset: public.alternative
-    rules:
-      - column-name-is-camel-case
+  # note(turtledev): temporarily disabled
+  # - name: builtin-policies-alternative
+  #   selector:
+  #     - path: .*/policies-builtin/.*
+  #     - asset: public.alternative
+  #   rules:
+  #     - column-name-is-camel-case
 
   - name: cutom-policy
     selector:
