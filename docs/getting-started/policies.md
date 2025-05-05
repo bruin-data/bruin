@@ -246,6 +246,11 @@ Bruin provides a set of built-in lint rules that are ready to use without requir
       <td><code>pipeline</code></td>
       <td>Pipeline must have retries > 0</td>
     </tr>
+    <tr>
+      <td><code>pipeline-has-start-date</code></td>
+      <td><code>pipeline</code></td>
+      <td>Pipeline must have a `start_date`</td>
+    </tr>
   </tbody>
 </table>
 

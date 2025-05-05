@@ -422,4 +422,17 @@ var builtinRules = map[string]validators{
 			}, nil
 		},
 	},
+	"pipeline-has-start-date": {
+		Pipeline: func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+			if strings.TrimSpace(pipeline.StartDate) != "" {
+				return nil, nil
+			}
+			return []*Issue{
+				{
+					Description: "Pipeline must have a start date",
+				},
+			}, nil
+
+		},
+	},
 }
