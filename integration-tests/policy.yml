@@ -12,17 +12,32 @@ custom_rules:
 rulesets:
   - name: builtin-policies
     selector:
-      - path: .*/builtin-policies/.*
+      - path: .*/policies-builtin/.*standard.sql
+      - asset: public.standard
     rules:
       - asset-name-is-lowercase
       - asset-name-is-schema-dot-table
       - asset-has-description
       - asset-has-owner
       - asset-has-columns
+      - asset-has-primary-key
+      - asset-has-checks
+      - asset-has-tags
+      - column-has-description
+      - column-has-type
+      - column-name-is-snake-case
+
+  # note(turtledev): temporarily disabled
+  # - name: builtin-policies-alternative
+  #   selector:
+  #     - path: .*/policies-builtin/.*
+  #     - asset: public.alternative
+  #   rules:
+  #     - column-name-is-camel-case
 
   - name: cutom-policy
     selector:
-      - path: .*/custom-policies/.*
+      - path: .*/policies-custom/.*
     rules:
       - asset-has-three-columns
 

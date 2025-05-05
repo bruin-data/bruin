@@ -157,13 +157,85 @@ In the future we will create dedicated schemas for custom rules with standards a
 
 Bruin provides a set of built-in lint rules that are ready to use without requiring a definition.
 
-| Rule | Target | Description |
-| :--- | :--- | :--- |
-| `asset-name-is-lowercase` | `asset` | Asset names must be in lowercase. |
-| `asset-name-is-schema-dot-table`  | `asset` | Asset names must follow the format `schema.table`. |
-| `asset-has-description` | `asset` | Assets must have a description. |
-| `asset-has-owner` | `asset` | Assets must have an owner assigned. |
-| `asset-has-columns` | `asset` | Assets must define their columns. |
+Here is your markdown table converted to an HTML table:
+
+<table>
+  <thead>
+    <tr>
+      <th width="45%">Rule</th>
+      <th>Target</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>asset-name-is-lowercase</code></td>
+      <td><code>asset</code></td>
+      <td>Asset names must be in lowercase.</td>
+    </tr>
+    <tr>
+      <td><code>asset-name-is-schema-dot-table</code></td>
+      <td><code>asset</code></td>
+      <td>Asset names must follow the format <code>schema.table</code>.</td>
+    </tr>
+    <tr>
+      <td><code>asset-has-description</code></td>
+      <td><code>asset</code></td>
+      <td>Assets must have a description.</td>
+    </tr>
+    <tr>
+      <td><code>asset-has-owner</code></td>
+      <td><code>asset</code></td>
+      <td>Assets must have an owner assigned.</td>
+    </tr>
+    <tr>
+      <td><code>asset-has-columns</code></td>
+      <td><code>asset</code></td>
+      <td>Assets must define their columns.</td>
+    </tr>
+    <tr>
+      <td><code>asset-has-primary-key</code></td>
+      <td><code>asset</code></td>
+      <td>Assets must define at least one column as a primary key.</td>
+    </tr>
+    <tr>
+      <td><code>asset-has-checks</code></td>
+      <td><code>asset</code></td>
+      <td>Asset must have at least one custom check.</td>
+    </tr>
+    <tr>
+      <td><code>asset-has-tags</code></td>
+      <td><code>asset</code></td>
+      <td>Asset must have at least one tag.</td>
+    </tr>
+    <tr>
+      <td><code>column-has-description</code></td>
+      <td><code>asset</code></td>
+      <td>All columns declared by Asset must have description.</td>
+    </tr>
+    <tr>
+      <td><code>column-name-is-snake-case</code></td>
+      <td><code>asset</code></td>
+      <td>Column names must be in <code>snake_case</code>.</td>
+    </tr>
+    <tr>
+      <td><code>column-name-is-camel-case</code></td>
+      <td><code>asset</code></td>
+      <td>Column names must be in <code>camelCase</code>.</td>
+    </tr>
+    <tr>
+      <td><code>column-type-is-valid-for-platform</code></td>
+      <td><code>asset</code></td>
+      <td>Ensure that column types declared by asset are valid types in the relevant platform (BigQuery and Snowflake only).</td>
+    </tr>
+    <tr>
+      <td><code>description-must-not-be-placeholder</code></td>
+      <td><code>asset</code></td>
+      <td><code>asset</code> and <code>column</code> descriptions must not contain placeholder strings</td>
+    </tr>
+  </tbody>
+</table>
+
 
 You can directly reference these rules in `rulesets[*].rules`.
 
