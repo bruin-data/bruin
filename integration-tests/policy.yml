@@ -32,13 +32,12 @@ rulesets:
       - pipeline-has-start-date
       - pipeline-has-metadata-push
 
-  # note(turtledev): temporarily disabled
-  # - name: builtin-policies-alternative
-  #   selector:
-  #     - path: .*/policies-builtin/.*
-  #     - asset: public.alternative
-  #   rules:
-  #     - column-name-is-camel-case
+  - name: builtin-policies-alternative
+    selector:
+      - path: .*/policies-builtin/.*
+      - asset: public.alternative
+    rules:
+      - column-name-is-camel-case
 
   - name: cutom-policy
     selector:

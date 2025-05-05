@@ -14,7 +14,7 @@ const (
 
 var (
 	snakeCasePattern = regexp.MustCompile("^[a-z]+(_[a-z]+)*$")
-	camelCasePattern = regexp.MustCompile("^[a-z]+(?:[A-Z][a-z0-9])*$")
+	camelCasePattern = regexp.MustCompile("^[a-z]+(?:[A-Z][a-z0-9]+)*$")
 )
 
 var validBigQueryTypes = map[string]struct{}{
