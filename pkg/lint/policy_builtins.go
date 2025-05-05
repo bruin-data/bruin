@@ -342,11 +342,10 @@ var builtinRules = map[string]validators{
 			return issues, nil
 		},
 	),
-	"disallow-placeholder-descriptions": validatorsFromAssetValidator(
+	"description-must-not-be-placeholder": validatorsFromAssetValidator(
 		func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			var issues []*Issue
 
-			// Check asset description
 			lowerAssetDesc := strings.ToLower(strings.TrimSpace(asset.Description))
 			if lowerAssetDesc != "" {
 				for _, placeholder := range placeholderDescriptions {
@@ -355,17 +354,14 @@ var builtinRules = map[string]validators{
 							Task:        asset,
 							Description: "Asset description appears to contain placeholder text: '" + placeholder + "'",
 						})
-						// Found one, no need to check others for this description
 						break
 					}
 				}
 			}
 
-			// Check column descriptions
 			for _, col := range asset.Columns {
 				lowerColDesc := strings.ToLower(strings.TrimSpace(col.Description))
 				if lowerColDesc == "" {
-					// Let column-has-description handle empty descriptions
 					continue
 				}
 
@@ -375,7 +371,6 @@ var builtinRules = map[string]validators{
 							Task:        asset,
 							Description: "Column '" + col.Name + "' description appears to contain placeholder text: '" + placeholder + "'",
 						})
-						// Found one, no need to check others for this column's description
 						break
 					}
 				}
