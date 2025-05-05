@@ -410,7 +410,7 @@ var builtinRules = map[string]validators{
 
 			return []*Issue{
 				{
-					Description: "Pipeline must have retry greater than zero",
+					Description: "Pipeline must have `retries` set to a value greater than zero",
 				},
 			}, nil
 		},
