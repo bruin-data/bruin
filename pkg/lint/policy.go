@@ -276,9 +276,6 @@ func withSelector(selector []map[string]any, downstream validators) validators {
 	}
 	if downstream.Asset != nil {
 		middleware.Asset = func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			if downstream.Asset == nil {
-				return nil, nil
-			}
 			match, err := doesSelectorMatch(selector, pipeline, asset)
 			if err != nil {
 				return nil, fmt.Errorf("error matching selector: %w", err)
