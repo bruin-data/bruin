@@ -133,6 +133,19 @@ var builtinRules = map[string]validators{
 			return nil, nil
 		},
 	),
+	"asset-has-tags": validatorsFromAssetValidator(
+		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+			if len(asset.Tags) == 0 {
+				return []*Issue{
+					{
+						Task:        asset,
+						Description: "Asset must have tags",
+					},
+				}, nil
+			}
+			return nil, nil
+		},
+	),
 	"column-has-description": validatorsFromAssetValidator(
 		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			for _, col := range asset.Columns {
@@ -143,7 +156,7 @@ var builtinRules = map[string]validators{
 				return []*Issue{
 					{
 						Task:        asset,
-						Description: "Columns must have a description",
+						Description: "Column must have a description",
 					},
 				}, nil
 			}
@@ -160,7 +173,7 @@ var builtinRules = map[string]validators{
 				return []*Issue{
 					{
 						Task:        asset,
-						Description: "Columns must have a type",
+						Description: "Column must have a type",
 					},
 				}, nil
 			}

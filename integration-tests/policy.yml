@@ -22,6 +22,7 @@ rulesets:
       - asset-has-columns
       - asset-has-primary-key
       - asset-has-checks
+      - asset-has-tags
       - column-has-description
       - column-has-type
       - column-name-is-snake-case
