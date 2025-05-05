@@ -1,4 +1,4 @@
-# Google Analyticss
+# Google Analytics
 [Google Analytics](https://marketingplatform.google.com/about/analytics/) is an analytics service that helps you measure traffic and engagement across various platforms, like websites and apps.
 
 ingestr supports Google Analytics as a source.
