@@ -236,6 +236,11 @@ Bruin provides a set of built-in lint rules that are ready to use without requir
       <td><code>asset</code></td>
       <td>Assets must not depend on assets in other pipelines.</td>
     </tr>
+    <tr>
+      <td><code>pipeline-has-notifications</code></td>
+      <td><code>pipeline</code></td>
+      <td>Pipeline must declare at least one notification channel</td>
+    </tr>
   </tbody>
 </table>
 

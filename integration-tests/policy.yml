@@ -27,6 +27,7 @@ rulesets:
       - column-has-description
       - column-has-type
       - column-name-is-snake-case
+      - pipeline-has-notifications
 
   # note(turtledev): temporarily disabled
   # - name: builtin-policies-alternative

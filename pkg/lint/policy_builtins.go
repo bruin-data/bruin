@@ -396,4 +396,17 @@ var builtinRules = map[string]validators{
 			return nil, nil
 		},
 	),
+	"pipeline-has-notifications": {
+		Pipeline: func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+			notifs := pipeline.Notifications
+			if len(notifs.Discord) > 0 || len(notifs.MSTeams) > 0 || len(notifs.Slack) > 0 {
+				return nil, nil
+			}
+			return []*Issue{
+				{
+					Description: "Pipeline must have notification",
+				},
+			}, nil
+		},
+	},
 }
