@@ -199,7 +199,7 @@ Bruin provides a set of built-in lint rules that are ready to use without requir
     <tr>
       <td><code>asset-has-checks</code></td>
       <td><code>asset</code></td>
-      <td>Asset must have at least one custom check.</td>
+      <td>Asset must have at least one check (<code>column</code> or <code>custom_checks</code>).</td>
     </tr>
     <tr>
       <td><code>asset-has-tags</code></td>

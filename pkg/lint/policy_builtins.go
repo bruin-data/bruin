@@ -195,11 +195,11 @@ var builtinRules = map[string]validators{
 	},
 	"asset-has-checks": {
 		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			if len(asset.CustomChecks) == 0 {
+			if asset.CheckCount() == 0 {
 				return []*Issue{
 					{
 						Task:        asset,
-						Description: "Asset must have a custom check",
+						Description: "Asset must have atleast one check",
 					},
 				}, nil
 			}
