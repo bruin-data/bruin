@@ -409,4 +409,17 @@ var builtinRules = map[string]validators{
 			}, nil
 		},
 	},
+	"pipeline-has-retries": {
+		Pipeline: func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+			if pipeline.Retries > 0 {
+				return nil, nil
+			}
+
+			return []*Issue{
+				{
+					Description: "Pipeline must have retry greater than zero",
+				},
+			}, nil
+		},
+	},
 }

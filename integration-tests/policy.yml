@@ -28,6 +28,7 @@ rulesets:
       - column-has-type
       - column-name-is-snake-case
       - pipeline-has-notifications
+      - pipeline-has-retries
 
   # note(turtledev): temporarily disabled
   # - name: builtin-policies-alternative
