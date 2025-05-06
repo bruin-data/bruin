@@ -278,6 +278,10 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to mutate asset: %v\n", err)
 					return cli.Exit("", 1)
 				}
+				if task == nil {
+					errorPrinter.Printf("Failed to create asset from file '%s'\n", inputPath)
+					return cli.Exit("", 1)
+				}
 			}
 
 			// handle log files
@@ -290,12 +294,7 @@ func Run(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
 
 				if pipelineInfo.RunningForAnAsset {
-					if task != nil {
-						infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
-					} else {
-						infoPrinter.Printf("Failed to build asset for '%s'\n", inputPath)
-						return cli.Exit("", 1)
-					}
+					infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
 				}
 				executionStartLog = "Starting the pipeline execution..."
 			}
@@ -351,9 +350,7 @@ func Run(isDebug *bool) *cli.Command {
 			if !runConfig.NoLogFile {
 				logFileName := fmt.Sprintf("%s__%s", runID, foundPipeline.Name)
 				if pipelineInfo.RunningForAnAsset {
-					if task != nil {
-						logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, task.Name)
-					}
+					logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, task.Name)
 				}
 
 				logPath, err := filepath.Abs(fmt.Sprintf("%s/%s/%s.log", repoRoot.Path, LogsFolder, logFileName))
@@ -546,6 +543,7 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 
 	if runningForAnAsset {
 		task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath, foundPipeline)
+
 		if err != nil {
 			errorPrinter.Printf("Failed to build asset: %v. Are you sure you used the correct path?\n", err.Error())
 			return &PipelineInfo{
