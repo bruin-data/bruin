@@ -278,6 +278,10 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to mutate asset: %v\n", err)
 					return cli.Exit("", 1)
 				}
+				if task == nil {
+					errorPrinter.Printf("Failed to create asset from file '%s'\n", inputPath)
+					return cli.Exit("", 1)
+				}
 			}
 
 			// handle log files
@@ -539,6 +543,7 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 
 	if runningForAnAsset {
 		task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath, foundPipeline)
+
 		if err != nil {
 			errorPrinter.Printf("Failed to build asset: %v. Are you sure you used the correct path?\n", err.Error())
 			return &PipelineInfo{
