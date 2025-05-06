@@ -1,0 +1,6 @@
+name: frankfurter.exchange_rates
+
+parameters:
+  source_table: exchange_rates
+  start_date: "2025-03-24"
+  end_date: "2025-03-28"
