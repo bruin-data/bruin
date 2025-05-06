@@ -287,6 +287,8 @@ func Run(isDebug *bool) *cli.Command {
 			}
 			executionStartLog := "Starting execution..."
 			if !c.Bool("minimal-logs") {
+				infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
+
 				if pipelineInfo.RunningForAnAsset {
 					if task != nil {
 						infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
@@ -295,8 +297,6 @@ func Run(isDebug *bool) *cli.Command {
 						return cli.Exit("", 1)
 					}
 				}
-
-				infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
 				executionStartLog = "Starting the pipeline execution..."
 			}
 
