@@ -290,6 +290,9 @@ func Run(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
 
 				if pipelineInfo.RunningForAnAsset {
+					//if task != nil {
+					//	infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
+					//}
 					infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
 				}
 				executionStartLog = "Starting the pipeline execution..."
@@ -346,7 +349,9 @@ func Run(isDebug *bool) *cli.Command {
 			if !runConfig.NoLogFile {
 				logFileName := fmt.Sprintf("%s__%s", runID, foundPipeline.Name)
 				if pipelineInfo.RunningForAnAsset {
-					logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, task.Name)
+					if task != nil {
+						logFileName = fmt.Sprintf("%s__%s__%s", runID, foundPipeline.Name, task.Name)
+					}
 				}
 
 				logPath, err := filepath.Abs(fmt.Sprintf("%s/%s/%s.log", repoRoot.Path, LogsFolder, logFileName))
