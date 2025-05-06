@@ -290,10 +290,9 @@ func Run(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
 
 				if pipelineInfo.RunningForAnAsset {
-					//if task != nil {
-					//	infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
-					//}
-					infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
+					if task != nil {
+						infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
+					}
 				}
 				executionStartLog = "Starting the pipeline execution..."
 			}
