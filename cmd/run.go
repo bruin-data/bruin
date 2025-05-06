@@ -287,7 +287,6 @@ func Run(isDebug *bool) *cli.Command {
 			}
 			executionStartLog := "Starting execution..."
 			if !c.Bool("minimal-logs") {
-
 				if pipelineInfo.RunningForAnAsset {
 					if task != nil {
 						infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
