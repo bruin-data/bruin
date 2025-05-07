@@ -1000,6 +1000,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.SQLite, source.SQLite)
 	mergeConnectionList(&c.DB2, source.DB2)
 	mergeConnectionList(&c.Oracle, source.Oracle)
+	mergeConnectionList(&c.Frankfurter, source.Frankfurter)
 	c.buildConnectionKeyMap()
 	return nil
 }
