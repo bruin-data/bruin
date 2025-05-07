@@ -168,7 +168,15 @@ func (l *Linter) LintAsset(rootPath string, pipelineDefinitionFileName []string,
 		return nil, fmt.Errorf("failed to load policy: %w", err)
 	}
 	if len(policyRules) > 0 {
-		rules = slices.Concat([]Rule{}, rules, policyRules)
+		assetRules := []Rule{}
+
+		// suboptimal, but works.
+		for _, rule := range policyRules {
+			if slices.Contains(rule.GetApplicableLevels(), LevelAsset) {
+				assetRules = append(assetRules, rule)
+			}
+		}
+		rules = slices.Concat([]Rule{}, rules, assetRules)
 	}
 
 	// now the actual validation starts
