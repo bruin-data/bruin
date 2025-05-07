@@ -9,6 +9,7 @@ columns:
     type: string
     primary_key: true
     description: The contents of the message
+
 tags:
   - layer:raw
 

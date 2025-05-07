@@ -85,3 +85,9 @@ rulesets:
       - asset: "^non_compliant.tertiary$"
     rules:
       - asset-has-owner
+  
+  - name: validate-single-asset
+    selector:
+      - pipeline: policies-validate-single-asset
+    rules:
+      - asset-name-contains-public

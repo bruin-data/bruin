@@ -162,8 +162,25 @@ func (l *Linter) LintAsset(rootPath string, pipelineDefinitionFileName []string,
 		Issues:   make(map[Rule][]*Issue),
 	}
 
+	rules := l.rules
+	policyRules, err := loadPolicy(assetPipeline.DefinitionFile.Path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load policy: %w", err)
+	}
+	if len(policyRules) > 0 {
+		assetRules := []Rule{}
+
+		// suboptimal, but works.
+		for _, rule := range policyRules {
+			if slices.Contains(rule.GetApplicableLevels(), LevelAsset) {
+				assetRules = append(assetRules, rule)
+			}
+		}
+		rules = slices.Concat([]Rule{}, rules, assetRules)
+	}
+
 	// now the actual validation starts
-	for _, rule := range l.rules {
+	for _, rule := range rules {
 		issues, err := rule.ValidateAsset(context.TODO(), assetPipeline, asset)
 		if err != nil {
 			return nil, err
@@ -330,6 +347,14 @@ func RunLintRulesOnPipeline(p *pipeline.Pipeline, rules []Rule) (*PipelineIssues
 		}
 		ctx = context.Background()
 	)
+
+	policyRules, err := loadPolicy(p.DefinitionFile.Path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load policy: %w", err)
+	}
+	if len(policyRules) > 0 {
+		rules = slices.Concat([]Rule{}, rules, policyRules)
+	}
 
 	for _, rule := range rules {
 		levels := rule.GetApplicableLevels()
