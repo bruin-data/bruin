@@ -451,6 +451,12 @@ func TestLoadFromFile(t *testing.T) {
 					DBName:   "dbname-123",
 				},
 			},
+			Phantombuster: []PhantombusterConnection{
+				{
+					Name:   "phantombuster-1",
+					APIKey: "api-key-123",
+				},
+			},
 		},
 	}
 

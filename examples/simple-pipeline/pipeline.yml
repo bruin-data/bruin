@@ -42,3 +42,5 @@ default_connections:
   salesforce: "my-salesforce"
   sqlite: "my-sqlite"
   db2: "my-db2"
+  phantombuster: "my-phantombuster"
+  
