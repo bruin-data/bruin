@@ -1,3 +1,3 @@
-name: frankfurter.currency_list
+name: frankfurter.currencies
 parameters:
   source_table: currencies
