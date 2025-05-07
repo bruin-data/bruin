@@ -343,7 +343,6 @@ func addBoundaryAnchors(pattern string) string {
 }
 
 func loadPolicy(path string) (rules []Rule, err error) {
-
 	repo, err := git.FindRepoFromPath(path)
 	if errors.Is(err, git.ErrNoGitRepoFound) {
 		return nil, nil
