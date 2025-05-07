@@ -282,6 +282,9 @@ environments:
           host: "host-123"
           port: "1234"
           dbname: "dbname-123"
+      phantombuster:
+        - name: "phantombuster-1"
+          api_key: "api-key-123"
 
   prod:
     connections:

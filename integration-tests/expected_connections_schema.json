@@ -309,6 +309,23 @@
         ]
 
     },
+    "PhantombusterConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [ 
+        "name",
+        "api_key"
+      ]
+    },
+
     "Connections": {
       "properties": {
         "aws": {
@@ -616,6 +633,12 @@
         "db2": {
           "items": {
             "$ref": "#/$defs/DB2Connection"
+          },
+          "type": "array"
+        },
+        "phantombuster": {
+          "items": {
+            "$ref": "#/$defs/PhantombusterConnection"
           },
           "type": "array"
         }
