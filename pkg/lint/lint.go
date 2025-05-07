@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 
@@ -322,19 +323,35 @@ func (l *Linter) LintPipeline(p *pipeline.Pipeline) (*PipelineIssues, error) {
 }
 
 func RunLintRulesOnPipeline(p *pipeline.Pipeline, rules []Rule) (*PipelineIssues, error) {
-	pipelineResult := &PipelineIssues{
-		Pipeline: p,
-		Issues:   make(map[Rule][]*Issue),
-	}
+	var (
+		pipelineResult = &PipelineIssues{
+			Pipeline: p,
+			Issues:   make(map[Rule][]*Issue),
+		}
+		ctx = context.Background()
+	)
 
 	for _, rule := range rules {
-		issues, err := rule.Validate(p)
-		if err != nil {
-			return nil, err
+		levels := rule.GetApplicableLevels()
+		if slices.Contains(levels, LevelPipeline) {
+			issues, err := rule.Validate(p)
+			if err != nil {
+				return nil, err
+			}
+			if len(issues) > 0 {
+				pipelineResult.Issues[rule] = issues
+			}
 		}
-
-		if len(issues) > 0 {
-			pipelineResult.Issues[rule] = issues
+		if slices.Contains(levels, LevelAsset) {
+			for _, asset := range p.Assets {
+				issues, err := rule.ValidateAsset(ctx, p, asset)
+				if err != nil {
+					return nil, err
+				}
+				if len(issues) > 0 {
+					pipelineResult.Issues[rule] = issues
+				}
+			}
 		}
 	}
 

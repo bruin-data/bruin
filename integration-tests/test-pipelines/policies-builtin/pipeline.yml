@@ -1,3 +1,10 @@
 name: builtin-policies
 schedule: hourly
 start_date: "1970-01-01"
+retries: 3
+notifications:
+  slack:
+    - channel: pipelines
+    
+metadata_push:
+  bigquery: true

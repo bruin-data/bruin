@@ -8,20 +8,13 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
-func validatorsFromAssetValidator(av AssetValidator) validators {
-	return validators{
-		Pipeline: CallFuncForEveryAsset(av),
-		Asset:    av,
-	}
-}
-
 const (
 	msgPrimaryKeyMustBeSet = "Asset must have atleast one primary key"
 )
 
 var (
 	snakeCasePattern = regexp.MustCompile("^[a-z]+(_[a-z]+)*$")
-	camelCasePattern = regexp.MustCompile("^[a-z]+(?:[A-Z][a-z0-9])*$")
+	camelCasePattern = regexp.MustCompile("^[a-z]+(?:[A-Z][a-z0-9]+)*$")
 )
 
 var validBigQueryTypes = map[string]struct{}{
@@ -105,8 +98,8 @@ var placeholderDescriptions = []string{
 }
 
 var builtinRules = map[string]validators{
-	"asset-name-is-lowercase": validatorsFromAssetValidator(
-		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	"asset-name-is-lowercase": {
+		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			if strings.ToLower(asset.Name) == asset.Name {
 				return nil, nil
 			}
@@ -118,9 +111,9 @@ var builtinRules = map[string]validators{
 				},
 			}, nil
 		},
-	),
-	"asset-name-is-schema-dot-table": validatorsFromAssetValidator(
-		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	},
+	"asset-name-is-schema-dot-table": {
+		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			if strings.Count(asset.Name, ".") == 1 {
 				return nil, nil
 			}
@@ -132,9 +125,9 @@ var builtinRules = map[string]validators{
 				},
 			}, nil
 		},
-	),
-	"asset-has-description": validatorsFromAssetValidator(
-		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	},
+	"asset-has-description": {
+		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			if strings.TrimSpace(asset.Description) != "" {
 				return nil, nil
 			}
@@ -145,9 +138,9 @@ var builtinRules = map[string]validators{
 				},
 			}, nil
 		},
-	),
-	"asset-has-owner": validatorsFromAssetValidator(
-		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	},
+	"asset-has-owner": {
+		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			if strings.TrimSpace(asset.Owner) != "" {
 				return nil, nil
 			}
@@ -158,9 +151,9 @@ var builtinRules = map[string]validators{
 				},
 			}, nil
 		},
-	),
-	"asset-has-columns": validatorsFromAssetValidator(
-		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	},
+	"asset-has-columns": {
+		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			if len(asset.Columns) > 0 {
 				return nil, nil
 			}
@@ -171,9 +164,9 @@ var builtinRules = map[string]validators{
 				},
 			}, nil
 		},
-	),
-	"asset-has-primary-key": validatorsFromAssetValidator(
-		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	},
+	"asset-has-primary-key": {
+		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			if len(asset.Columns) == 0 {
 				return []*Issue{
 					{
@@ -199,22 +192,22 @@ var builtinRules = map[string]validators{
 			}
 			return nil, nil
 		},
-	),
-	"asset-has-checks": validatorsFromAssetValidator(
-		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			if len(asset.CustomChecks) == 0 {
+	},
+	"asset-has-checks": {
+		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+			if asset.CheckCount() == 0 {
 				return []*Issue{
 					{
 						Task:        asset,
-						Description: "Asset must have a custom check",
+						Description: "Asset must have atleast one check",
 					},
 				}, nil
 			}
 			return nil, nil
 		},
-	),
-	"asset-has-tags": validatorsFromAssetValidator(
-		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	},
+	"asset-has-tags": {
+		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			if len(asset.Tags) == 0 {
 				return []*Issue{
 					{
@@ -225,9 +218,9 @@ var builtinRules = map[string]validators{
 			}
 			return nil, nil
 		},
-	),
-	"column-has-description": validatorsFromAssetValidator(
-		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	},
+	"column-has-description": {
+		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			for _, col := range asset.Columns {
 				if strings.TrimSpace(col.Description) != "" {
 					continue
@@ -242,9 +235,9 @@ var builtinRules = map[string]validators{
 			}
 			return nil, nil
 		},
-	),
-	"column-has-type": validatorsFromAssetValidator(
-		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	},
+	"column-has-type": {
+		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			for _, col := range asset.Columns {
 				if strings.TrimSpace(col.Type) != "" {
 					continue
@@ -259,9 +252,9 @@ var builtinRules = map[string]validators{
 			}
 			return nil, nil
 		},
-	),
-	"column-name-is-snake-case": validatorsFromAssetValidator(
-		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	},
+	"column-name-is-snake-case": {
+		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			for _, col := range asset.Columns {
 				if snakeCasePattern.MatchString(col.Name) {
 					continue
@@ -276,9 +269,9 @@ var builtinRules = map[string]validators{
 			}
 			return nil, nil
 		},
-	),
-	"column-name-is-camel-case": validatorsFromAssetValidator(
-		func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	},
+	"column-name-is-camel-case": {
+		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			for _, col := range asset.Columns {
 				if camelCasePattern.MatchString(col.Name) {
 					continue
@@ -293,9 +286,9 @@ var builtinRules = map[string]validators{
 			}
 			return nil, nil
 		},
-	),
-	"column-type-is-valid-for-platform": validatorsFromAssetValidator(
-		func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	},
+	"column-type-is-valid-for-platform": {
+		Asset: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			var validTypes map[string]struct{}
 			var platformName string
 
@@ -341,9 +334,9 @@ var builtinRules = map[string]validators{
 
 			return issues, nil
 		},
-	),
-	"description-must-not-be-placeholder": validatorsFromAssetValidator(
-		func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	},
+	"description-must-not-be-placeholder": {
+		Asset: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			var issues []*Issue
 
 			lowerAssetDesc := strings.ToLower(strings.TrimSpace(asset.Description))
@@ -378,5 +371,74 @@ var builtinRules = map[string]validators{
 
 			return issues, nil
 		},
-	),
+	},
+	"asset-has-no-cross-pipeline-dependencies": {
+		Asset: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+			for _, upstream := range asset.Upstreams {
+				if upstream.Type != "uri" {
+					continue
+				}
+
+				return []*Issue{
+					{
+						Task:        asset,
+						Description: "Asset must not have a cross pipeline dependency",
+					},
+				}, nil
+			}
+			return nil, nil
+		},
+	},
+	"pipeline-has-notifications": {
+		Pipeline: func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+			notifs := pipeline.Notifications
+			if len(notifs.Discord) > 0 || len(notifs.MSTeams) > 0 || len(notifs.Slack) > 0 {
+				return nil, nil
+			}
+			return []*Issue{
+				{
+					Description: "Pipeline must have at least one notification set up",
+				},
+			}, nil
+		},
+	},
+	"pipeline-has-retries": {
+		Pipeline: func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+			if pipeline.Retries > 0 {
+				return nil, nil
+			}
+
+			return []*Issue{
+				{
+					Description: "Pipeline must have `retries` set to a value greater than zero",
+				},
+			}, nil
+		},
+	},
+	"pipeline-has-start-date": {
+		Pipeline: func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+			if strings.TrimSpace(pipeline.StartDate) != "" {
+				return nil, nil
+			}
+			return []*Issue{
+				{
+					Description: "Pipeline must have a start date",
+				},
+			}, nil
+
+		},
+	},
+	"pipeline-has-metadata-push": {
+		Pipeline: func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+			if pipeline.MetadataPush.HasAnyEnabled() {
+				return nil, nil
+			}
+
+			return []*Issue{
+				{
+					Description: "Pipeline must have metadata push enabled",
+				},
+			}, nil
+		},
+	},
 }
