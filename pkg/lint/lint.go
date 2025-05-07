@@ -331,6 +331,14 @@ func RunLintRulesOnPipeline(p *pipeline.Pipeline, rules []Rule) (*PipelineIssues
 		ctx = context.Background()
 	)
 
+	policyRules, err := loadPolicy(p.DefinitionFile.Path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load policy: %w", err)
+	}
+	if len(policyRules) > 0 {
+		rules = slices.Concat([]Rule{}, rules, policyRules)
+	}
+
 	for _, rule := range rules {
 		levels := rule.GetApplicableLevels()
 		if slices.Contains(levels, LevelPipeline) {

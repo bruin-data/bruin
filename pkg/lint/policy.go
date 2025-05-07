@@ -14,7 +14,6 @@ import (
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
 	"github.com/pkg/errors"
-	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 )
 
@@ -343,13 +342,9 @@ func addBoundaryAnchors(pattern string) string {
 	return pattern
 }
 
-func loadPolicy(fs afero.Fs) (rules []Rule, err error) {
-	wd, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("error obtaining working directory: %w", err)
-	}
+func loadPolicy(path string) (rules []Rule, err error) {
 
-	repo, err := git.FindRepoInSubtree(wd)
+	repo, err := git.FindRepoFromPath(path)
 	if errors.Is(err, git.ErrNoGitRepoFound) {
 		return nil, nil
 	}
@@ -357,11 +352,11 @@ func loadPolicy(fs afero.Fs) (rules []Rule, err error) {
 		return nil, fmt.Errorf("loadPolicy: %w", err)
 	}
 
-	policyFile := locatePolicy(fs, repo.Path)
+	policyFile := locatePolicy(repo.Path)
 	if policyFile == "" {
 		return nil, nil
 	}
-	fd, err := fs.Open(policyFile)
+	fd, err := os.Open(policyFile)
 	if err != nil {
 		return nil, fmt.Errorf("error opening policy file: %w", err)
 	}
@@ -382,14 +377,14 @@ func loadPolicy(fs afero.Fs) (rules []Rule, err error) {
 	return rules, nil
 }
 
-func locatePolicy(fs afero.Fs, repo string) string {
+func locatePolicy(repo string) string {
 	names := []string{
 		"policy.yaml",
 		"policy.yml",
 	}
 	for _, name := range names {
 		fileName := filepath.Join(repo, name)
-		fi, err := fs.Stat(fileName)
+		fi, err := os.Stat(fileName)
 		if err != nil {
 			continue
 		}
