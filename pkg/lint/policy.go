@@ -43,6 +43,16 @@ type validators struct {
 	Asset    AssetValidator
 }
 
+func (v validators) GetApplicableLevels() (levels []Level) {
+	if v.Asset != nil {
+		levels = append(levels, LevelAsset)
+	}
+	if v.Pipeline != nil {
+		levels = append(levels, LevelPipeline)
+	}
+	return levels
+}
+
 type RuleTarget string
 
 var (
@@ -176,11 +186,12 @@ func (spec *PolicySpecification) Rules() ([]Rule, error) {
 			}
 			validators = withSelector(ruleSet.Selector, validators)
 			rules = append(rules, &SimpleRule{
-				Identifier:     fmt.Sprintf("policy:%s:%s", ruleSet.Name, ruleName),
-				Fast:           true,
-				Severity:       ValidatorSeverityCritical,
-				Validator:      validators.Pipeline,
-				AssetValidator: validators.Asset,
+				Identifier:       fmt.Sprintf("policy:%s:%s", ruleSet.Name, ruleName),
+				Fast:             true,
+				Severity:         ValidatorSeverityCritical,
+				Validator:        validators.Pipeline,
+				AssetValidator:   validators.Asset,
+				ApplicableLevels: validators.GetApplicableLevels(),
 			})
 		}
 	}
@@ -198,9 +209,7 @@ func (spec *PolicySpecification) getValidators(name string) (validators, bool) {
 
 	switch def.RuleTarget {
 	case RuleTargetAsset:
-		assetValidator := assetValidatorFromRuleDef(def)
-		v.Asset = assetValidator
-		v.Pipeline = CallFuncForEveryAsset(assetValidator)
+		v.Asset = assetValidatorFromRuleDef(def)
 	case RuleTargetPipeline:
 		v.Pipeline = pipelineValidatorFromRuleDef(def)
 	}
@@ -250,8 +259,9 @@ func pipelineValidatorFromRuleDef(def *RuleDefinition) PipelineValidator {
 }
 
 func withSelector(selector []map[string]any, downstream validators) validators {
-	return validators{
-		Pipeline: func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+	middleware := validators{}
+	if downstream.Pipeline != nil {
+		middleware.Pipeline = func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
 			match, err := doesSelectorMatch(selector, pipeline, nil)
 			if err != nil {
 				return nil, fmt.Errorf("error matching selector: %w", err)
@@ -262,11 +272,10 @@ func withSelector(selector []map[string]any, downstream validators) validators {
 			}
 
 			return downstream.Pipeline(pipeline)
-		},
-		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			if downstream.Asset == nil {
-				return nil, nil
-			}
+		}
+	}
+	if downstream.Asset != nil {
+		middleware.Asset = func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			match, err := doesSelectorMatch(selector, pipeline, asset)
 			if err != nil {
 				return nil, fmt.Errorf("error matching selector: %w", err)
@@ -276,8 +285,9 @@ func withSelector(selector []map[string]any, downstream validators) validators {
 				return nil, nil
 			}
 			return downstream.Asset(ctx, pipeline, asset)
-		},
+		}
 	}
+	return middleware
 }
 
 func doesSelectorMatch(selectors []map[string]any, pipeline *pipeline.Pipeline, asset *pipeline.Asset) (bool, error) {
@@ -308,8 +318,9 @@ func doesSelectorMatch(selectors []map[string]any, pipeline *pipeline.Pipeline, 
 			default:
 				return false, fmt.Errorf("unknown selector key: %s", key)
 			}
-
-			pattern = addBoundaryAnchors(pattern)
+			if key != "tag" {
+				pattern = addBoundaryAnchors(pattern)
+			}
 			match, err := regexp.MatchString(pattern, subject)
 			if err != nil {
 				return false, fmt.Errorf("error matching %s: %w", key, err)

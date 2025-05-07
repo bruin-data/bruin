@@ -199,7 +199,7 @@ Bruin provides a set of built-in lint rules that are ready to use without requir
     <tr>
       <td><code>asset-has-checks</code></td>
       <td><code>asset</code></td>
-      <td>Asset must have at least one custom check.</td>
+      <td>Asset must have at least one check (<code>column</code> or <code>custom_checks</code>).</td>
     </tr>
     <tr>
       <td><code>asset-has-tags</code></td>
@@ -230,6 +230,31 @@ Bruin provides a set of built-in lint rules that are ready to use without requir
       <td><code>description-must-not-be-placeholder</code></td>
       <td><code>asset</code></td>
       <td><code>asset</code> and <code>column</code> descriptions must not contain placeholder strings</td>
+    </tr>
+    <tr>
+      <td><code>asset-has-no-cross-pipeline-dependencies</code></td>
+      <td><code>asset</code></td>
+      <td>Assets must not depend on assets in other pipelines.</td>
+    </tr>
+    <tr>
+      <td><code>pipeline-has-notifications</code></td>
+      <td><code>pipeline</code></td>
+      <td>Pipeline must declare at least one notification channel</td>
+    </tr>
+    <tr>
+      <td><code>pipeline-has-retries</code></td>
+      <td><code>pipeline</code></td>
+      <td>Pipeline must have retries > 0</td>
+    </tr>
+    <tr>
+      <td><code>pipeline-has-start-date</code></td>
+      <td><code>pipeline</code></td>
+      <td>Pipeline must have a `start_date`</td>
+    </tr>
+    <tr>
+      <td><code>pipeline-has-metadata-push</code></td>
+      <td><code>pipeline</code></td>
+      <td>Pipeline must push it's metadata</td>
     </tr>
   </tbody>
 </table>

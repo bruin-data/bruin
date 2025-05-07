@@ -28,13 +28,15 @@ func TestLinter_Lint(t *testing.T) {
 	t.Parallel()
 
 	errorRule := &SimpleRule{
-		Identifier: "errorRule",
-		Validator:  func(p *pipeline.Pipeline) ([]*Issue, error) { return nil, errors.New("first rule failed") },
+		Identifier:       "errorRule",
+		Validator:        func(p *pipeline.Pipeline) ([]*Issue, error) { return nil, errors.New("first rule failed") },
+		ApplicableLevels: []Level{LevelPipeline},
 	}
 
 	successRule := &SimpleRule{
-		Identifier: "successRule",
-		Validator:  func(p *pipeline.Pipeline) ([]*Issue, error) { return nil, nil },
+		Identifier:       "successRule",
+		Validator:        func(p *pipeline.Pipeline) ([]*Issue, error) { return nil, nil },
+		ApplicableLevels: []Level{LevelPipeline},
 	}
 
 	type fields struct {

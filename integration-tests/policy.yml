@@ -12,7 +12,7 @@ custom_rules:
 rulesets:
   - name: builtin-policies
     selector:
-      - path: .*/policies-builtin/.*standard.sql
+      - path: .*/policies-builtin/.*
       - asset: public.standard
     rules:
       - asset-name-is-lowercase
@@ -23,17 +23,21 @@ rulesets:
       - asset-has-primary-key
       - asset-has-checks
       - asset-has-tags
+      - asset-has-no-cross-pipeline-dependencies
       - column-has-description
       - column-has-type
       - column-name-is-snake-case
+      - pipeline-has-notifications
+      - pipeline-has-retries
+      - pipeline-has-start-date
+      - pipeline-has-metadata-push
 
-  # note(turtledev): temporarily disabled
-  # - name: builtin-policies-alternative
-  #   selector:
-  #     - path: .*/policies-builtin/.*
-  #     - asset: public.alternative
-  #   rules:
-  #     - column-name-is-camel-case
+  - name: builtin-policies-alternative
+    selector:
+      - path: .*/policies-builtin/.*
+      - asset: public.alternative
+    rules:
+      - column-name-is-camel-case
 
   - name: cutom-policy
     selector:
@@ -64,20 +68,20 @@ rulesets:
   - name: fail-case-1
     selector:
       - pipeline: non-compliant-policies 
-      - asset: "^non-compliant.primary$"
+      - asset: "^non_compliant.primary$"
     rules:
       - asset-has-three-columns
   
   - name: fail-case-2
     selector:
       - pipeline: non-compliant-policies 
-      - asset: "^non-compliant.secondary$"
+      - asset: "^non_compliant.secondary$"
     rules:
       - asset-name-contains-public
     
   - name: fail-case-3
     selector:
       - pipeline: non-compliant-policies 
-      - asset: "^non-compliant.tertiary$"
+      - asset: "^non_compliant.tertiary$"
     rules:
       - asset-has-owner
