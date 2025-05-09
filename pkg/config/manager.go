@@ -1011,6 +1011,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.DB2, source.DB2)
 	mergeConnectionList(&c.Oracle, source.Oracle)
 	mergeConnectionList(&c.Phantombuster, source.Phantombuster)
+	mergeConnectionList(&c.Frankfurter, source.Frankfurter)
 	c.buildConnectionKeyMap()
 	return nil
 }
