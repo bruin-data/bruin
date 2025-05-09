@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -35,6 +36,12 @@ var terminalJobRunStates = []types.JobRunState{
 }
 
 type connectionFetcher interface {
+
+	// TODO(turtledev): we add these so that we can leverage
+	// athena checks, We should find a way to clean this up.
+	GetAthenaConnectionWithoutDefault(name string) (athena.Client, error)
+	GetConnection(name string) (interface{}, error)
+
 	GetEMRServerlessConnection(name string) (*Client, error)
 }
 
