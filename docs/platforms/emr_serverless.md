@@ -179,6 +179,58 @@ This defines an asset that runs a spark job on an EMR Serverless Application def
 > * YAML-style assets: `emr_serverless.spark` 
 > * Python assets:  `emr_serverless.pyspark`.
 
+## Quality Checks
+[Quality checks](/quality/overview.md) for EMR Serverless are powered via [AWS Athena](/platforms/athena.md). 
+
+> [!WARNING]
+> Bruin currently requires a few extra steps in order to be able to run quality checks for your EMR Serverless Assets.
+> Future versions of Bruin will automate this process for you. 
+
+### Prerequisites
+* Configure an [athena connection](/platforms/athena.html#connection) in your `bruin.yml`.
+* Set `parameters.athena_connection` to the name of your Athena connection.
+* Create an `athena` table on top of your data with the same name as your Asset's name.
+
+### Example
+
+To illustrate quality checks, we're going to write a simple pyspark script that writes static data as CSV to a bucket in S3.
+
+::: code-group
+```bruin-python [users.py]
+""" @bruin
+name: raw.users
+type: emr_serverless.pyspark
+connection: emr-stage
+parameters:
+  athena_connection: athena-stage
+columns:
+  - name: id
+    type: integer
+  - name: name
+    type: string
+  - name: age
+    type: integer
+@bruin """
+
+from pyspark.sql import SparkSession
+
+USERS = [
+  (1, "Alice", 29),
+  (2, "Bob", 31),
+  (3, "Cathy", 25),
+  (4, "David", 35),
+  (5, "Eva", 28),
+]
+
+if __name__ == "__main__":
+  spark_session = SparkSession.builder.appName("users").getOrCreate()
+  df = spark.createDataFrame(USERS, ["id", "name", "age"])
+  df.write.csv("output", header=True, mode="overwrite")
+  spark.stop()
+```
+:::
+
+
 ## Asset Schema
 
 Here's the full schema of the `emr_serverless.spark` asset along with a brief explanation:
