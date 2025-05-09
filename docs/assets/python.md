@@ -94,7 +94,7 @@ The following environment variables are available in every Python asset executio
 
 
 
-## Materialization - Beta
+## Materialization
 
 Bruin runs regular Python scripts by default; however, quite often teams need to load data into a destination from their Python scripts. Bruin supports materializing the data returned by a Python script into a data warehouse.
 
@@ -122,7 +122,7 @@ columns:
 
 import pandas as pd
 
-def materialize():
+def materialize(**kwargs):
     items = 100000
     df = pd.DataFrame({
         'col1': range(items),
