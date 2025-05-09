@@ -964,10 +964,14 @@ func setupExecutors(
 	for _, typ := range emrServerlessAssetTypes {
 		if s.WillRunTaskOfType(typ) {
 			emrServerlessOperator, err := emr_serverless.NewBasicOperator(conn)
+			emrCheckRunner := emr_serverless.NewColumnCheckOperator(conn)
 			if err != nil {
 				return nil, err
 			}
 			mainExecutors[typ][scheduler.TaskInstanceTypeMain] = emrServerlessOperator
+			mainExecutors[typ][scheduler.TaskInstanceTypeColumnCheck] = emrCheckRunner
+			// todo(turtledev): test custom check runner
+			// mainExecutors[typ][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		}
 	}
 
