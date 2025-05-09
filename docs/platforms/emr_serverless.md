@@ -45,13 +45,13 @@ In order to stream logs, one of the following conditions must be met:
 > [!NOTE]
 > Python assets stream logs out-of-the-box. You don't need to specify `parameters.logs` for them.
 
-## Asset Types
+## EMR Serverless Assets
 
 Bruin supports two different ways of defining a Spark asset:
 - what we call a "managed" PySpark asset where Bruin takes care of delivering the code to the cluster as well
 - as an external asset defined with YAML where Bruin simply orchestrates
 
-### Python Asset
+### `emr_serverless.pyspark`
 A fully managed option where Bruin takes care of job setup, configuration, and execution. You only need to define the workload logic.
 
 * Supports only PySpark scripts.
@@ -150,7 +150,7 @@ Bruin uses this for:
 
 ![workspace diagram](media/pyspark-workspace.svg)
 
-### YAML Asset
+### `emr_serverless.spark`
 A lightweight option that only supports triggering a job. 
 
 * Supports both PySpark scripts and JARs.
