@@ -13,11 +13,14 @@ import (
 type CheckRunner interface {
 	Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error
 }
+type CustomCheckRunner interface {
+	Check(ctx context.Context, ti *scheduler.CustomCheckInstance) error
+}
 
-type checkBuilder func(conn connectionFetcher) CheckRunner
+type builder[T any] func(conn connectionFetcher) T
 
 type ColumnCheckOperator struct {
-	checks map[string]checkBuilder
+	checks map[string]builder[CheckRunner]
 	conn   connectionFetcher
 }
 
@@ -39,7 +42,7 @@ func (o *ColumnCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance
 func NewColumnCheckOperator(conn connectionFetcher) *ColumnCheckOperator {
 	return &ColumnCheckOperator{
 		conn: conn,
-		checks: map[string]checkBuilder{
+		checks: map[string]builder[CheckRunner]{
 			"not_null":        func(c connectionFetcher) CheckRunner { return ansisql.NewNotNullCheck(c) },
 			"unique":          func(c connectionFetcher) CheckRunner { return ansisql.NewUniqueCheck(c) },
 			"positive":        func(c connectionFetcher) CheckRunner { return ansisql.NewPositiveCheck(c) },
@@ -47,6 +50,29 @@ func NewColumnCheckOperator(conn connectionFetcher) *ColumnCheckOperator {
 			"negative":        func(c connectionFetcher) CheckRunner { return ansisql.NewNegativeCheck(c) },
 			"accepted_values": func(c connectionFetcher) CheckRunner { return athena.NewAcceptedValuesCheck(c) },
 			"pattern":         func(c connectionFetcher) CheckRunner { return athena.NewPatternCheck(c) },
+		},
+	}
+}
+
+type CustomCheckOperator struct {
+	conn    connectionFetcher
+	builder builder[CustomCheckRunner]
+}
+
+func (o *CustomCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	instance, ok := ti.(*scheduler.CustomCheckInstance)
+	if !ok {
+		return errors.New("cannot run a non-custom check instance")
+	}
+	conn := newConnectionRemapper(o.conn, ti)
+	return o.builder(conn).Check(ctx, instance)
+}
+
+func NewCustomCheckOperator(conn connectionFetcher) *CustomCheckOperator {
+	return &CustomCheckOperator{
+		conn: conn,
+		builder: func(c connectionFetcher) CustomCheckRunner {
+			return ansisql.NewCustomCheck(c)
 		},
 	}
 }
