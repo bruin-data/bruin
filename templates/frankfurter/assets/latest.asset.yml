@@ -1,3 +1,0 @@
-name: frankfurter.latest_rates
-parameters:
-  source_table: latest
