@@ -45,6 +45,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/notion"
 	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/personio"
+	"github.com/bruin-data/bruin/pkg/phantombuster"
 	"github.com/bruin-data/bruin/pkg/pipedrive"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/s3"
@@ -109,6 +110,7 @@ type Manager struct {
 	SQLite          map[string]*sqlite.Client
 	DB2             map[string]*db2.Client
 	Oracle          map[string]*oracle.Client
+	Phantombuster   map[string]*phantombuster.Client
 	mutex           sync.Mutex
 }
 
@@ -394,6 +396,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connOracle, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Oracle)...)
+
+	connPhantombuster, err := m.GetPhantombusterConnectionWithoutDefault(name)
+	if err == nil {
+		return connPhantombuster, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Phantombuster)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -1328,6 +1336,25 @@ func (m *Manager) GetOracleConnectionWithoutDefault(name string) (*oracle.Client
 	db, ok := m.Oracle[name]
 	if !ok {
 		return nil, errors.Errorf("oracle connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetPhantombusterConnection(name string) (*phantombuster.Client, error) {
+	db, err := m.GetPhantombusterConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetPhantombusterConnectionWithoutDefault("phantombuster-default")
+}
+
+func (m *Manager) GetPhantombusterConnectionWithoutDefault(name string) (*phantombuster.Client, error) {
+	if m.Phantombuster == nil {
+		return nil, errors.New("no phantombuster connections found")
+	}
+	db, ok := m.Phantombuster[name]
+	if !ok {
+		return nil, errors.Errorf("phantombuster connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2479,6 +2506,25 @@ func (m *Manager) AddDB2ConnectionFromConfig(connection *config.DB2Connection) e
 	return nil
 }
 
+func (m *Manager) AddPhantombusterConnectionFromConfig(connection *config.PhantombusterConnection) error {
+	m.mutex.Lock()
+	if m.Phantombuster == nil {
+		m.Phantombuster = make(map[string]*phantombuster.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := phantombuster.NewClient(phantombuster.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Phantombuster[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddFrankfurterConnectionFromConfig(connection *config.FrankfurterConnection) error {
 	m.mutex.Lock()
 	if m.Frankfurter == nil {
@@ -2617,7 +2663,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.SQLite, connectionManager.AddSQLiteConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Oracle, connectionManager.AddOracleConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.DB2, connectionManager.AddDB2ConnectionFromConfig, &wg, &errList, &mu)
-
+	processConnections(cm.SelectedEnvironment.Connections.Phantombuster, connectionManager.AddPhantombusterConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }
