@@ -13,7 +13,7 @@ import (
 )
 
 type checksConnectionFetcher interface {
-	GetConnection(string) (interface{}, error)
+	GetConnection(name string) (interface{}, error)
 }
 
 type AcceptedValuesCheck struct {

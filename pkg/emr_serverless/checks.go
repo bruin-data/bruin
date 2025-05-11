@@ -1,4 +1,4 @@
-package emr_serverless
+package emr_serverless //nolint
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 type CheckRunner interface {
 	Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error
 }
+
 type CustomCheckRunner interface {
 	Check(ctx context.Context, ti *scheduler.CustomCheckInstance) error
 }
