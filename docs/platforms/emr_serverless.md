@@ -397,6 +397,10 @@ parameters:
   # path where logs are stored or should be stored (optional)
   logs: s3://amzn-test-bucket/logs
 
+  # name of your athena connection (optional, defaults to "athena-default")
+  # used for quality checks
+  athena_connection: athena-conn
+
   # args to pass to the entrypoint (optional)
   args: arg1 arg2
 
