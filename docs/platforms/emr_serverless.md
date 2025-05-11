@@ -197,7 +197,7 @@ To demonstrate quality checks, we're going to write a simple pyspark script that
 
 #### Initial Setup
 
-We're going to start by creating a pipeline called `quality-checks-example`. We first run bruin to create the skeleton structure.
+We're going to start by creating a pipeline called `quality-checks-example`. We first run `bruin init` to create the skeleton structure.
 ```sh
 bruin init default quality-checks-example
 ```
@@ -284,8 +284,11 @@ STORED AS TEXTFILE
 LOCATION 's3://acme/user/list' 
 ```
 
+> [!TIP]
+> For more information on creating Athena tables, see [Create tables in Athena](https://docs.aws.amazon.com/athena/latest/ug/creating-tables.html) and [Use SerDe](https://docs.aws.amazon.com/athena/latest/ug/serde-reference.html) in the AWS Athena Documentation.
+
 Next, update your `bruin.yml` file with an athena connection.
-::: code-block
+
 ```yaml [bruin.yml]
 environments:
   default:
@@ -299,7 +302,7 @@ environments:
         execution_role: IAM_ROLE_ARN
         workspace: s3://acme/bruin-pyspark-workspace/
       athena:                                           # [!code ++]
-      - name:  athena-qc                                # [!code ++]
+      - name: quality-tests                             # [!code ++]
         access_key_id: AWS_ACCESS_KEY_ID                # [!code ++]
         secret_access_key: AWS_SECRET_ACCESS_KEY        # [!code ++]
         region: eu-north-1                              # [!code ++]
@@ -322,9 +325,9 @@ columns:              # [!code ++]
 custom_checks: # [!code ++] 
   - name: users are adults # [!code ++]
     query: SELECT count(*) from users where age < 18 # [!code ++]
-    value: 1 # [!code ++]
+    value: 0 # [!code ++]
 parameters: # [!code ++]
-  athena_connection: athena-qc # [!code ++]
+  athena_connection: quality-tests # [!code ++]
 @bruin """
 
 from pyspark.sql import SparkSession
