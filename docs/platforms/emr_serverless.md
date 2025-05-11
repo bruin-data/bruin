@@ -193,27 +193,26 @@ This defines an asset that runs a spark job on an EMR Serverless Application def
 
 ### Example
 
-To illustrate quality checks, we're going to write a simple pyspark script that writes static data as CSV to a bucket in S3.
+To demonstrate quality checks, we're going to write a simple pyspark script that writes static data as CSV to a bucket in S3.
 
+#### Initial Setup
+
+We're going to start by creating a pipeline called `quality-checks-example`. We first run bruin to create the skeleton structure.
+```sh
+bruin init default quality-checks-example
+```
+
+Now we'll add the pyspark asset.
 ::: code-group
-```bruin-python [users.py]
+```bruin-python [quality-checks-example/assets/users.py]
 """ @bruin
-name: raw.users
+name: users
 type: emr_serverless.pyspark
-connection: emr-stage
-parameters:
-  athena_connection: athena-stage
-columns:
-  - name: id
-    type: integer
-  - name: name
-    type: string
-  - name: age
-    type: integer
 @bruin """
 
 from pyspark.sql import SparkSession
 
+SCHEMA = ["id", "name", "age"]
 USERS = [
   (1, "Alice", 29),
   (2, "Bob", 31),
@@ -224,12 +223,154 @@ USERS = [
 
 if __name__ == "__main__":
   spark_session = SparkSession.builder.appName("users").getOrCreate()
-  df = spark.createDataFrame(USERS, ["id", "name", "age"])
-  df.write.csv("output", header=True, mode="overwrite")
+  df = spark.createDataFrame(USERS, SCHEMA)
+  df.write.csv("s3://acme/user/list", mode="overwrite")
   spark.stop()
 ```
 :::
 
+Next let's setup the `bruin.yml` file with the credentials necessary to run our job.
+::: code-group
+```yaml [bruin.yml]
+environments:
+  default:
+    connections:
+      emr_serverless:
+      - name: emr_serverless-default
+        access_key: AWS_ACCESS_KEY_ID
+        secret_key: AWS_SECRET_ACCESS_KEY
+        region: eu-north-1
+        application_id: EMR_APPLICATION_ID
+        execution_role: IAM_ROLE_ARN
+        workspace: s3://acme/bruin-pyspark-workspace/
+```
+:::
+
+We can now run the pipeline to verify that it works
+```sh
+bruin run ./quality-checks-example
+```
+
+::: info Output
+<pre><b>Analyzed the pipeline &apos;quality-checks-example&apos; with 1 assets.</b>
+
+<span style="color:#3465A4"><b>Pipeline: quality-checks-example</b></span>
+<span style="color:#4E9A06">  No issues found</span>
+
+<span style="color:#4E9A06"><b>✓ Successfully validated 1 assets across 1 pipeline, all good.</b></span>
+
+<b>Starting the pipeline execution...</b>
+<span style="color:#8D8F8A">[2025-05-11 18:10:00]</span> <span style="color:#C4A000">Running:  users</span>
+<span style="color:#8D8F8A">[2025-05-11 18:10:00]</span> <span style="color:#C4A000">... output omitted for brevity ...</span>
+<span style="color:#8D8F8A">[2025-05-11 18:10:05]</span> <span style="color:#C4A000">Finished: users</span>
+
+<span style="color:#4E9A06"><b>Executed 1 tasks in 5s</b></span>
+</pre>
+:::
+
+#### Enabling quality checks
+
+In order to run quality checks, we need to:
+1. Create an Athena table in our AWS account.
+2. Configure an `athena` connection in our `bruin.yml` file.
+
+To start, let's first create our Athena table. Go to your AWS Athena console and run the following DDL Query to create a table over the data our pyspark job created.
+```sql
+CREATE EXTERNAL TABLE users (id int, name string, age int)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+STORED AS TEXTFILE
+LOCATION 's3://acme/user/list' 
+```
+
+Next, update your `bruin.yml` file with an athena connection.
+::: code-block
+```yaml [bruin.yml]
+environments:
+  default:
+    connections:
+      emr_serverless:
+      - name: emr_serverless-default
+        access_key: AWS_ACCESS_KEY_ID
+        secret_key: AWS_SECRET_ACCESS_KEY
+        region: eu-north-1
+        application_id: EMR_APPLICATION_ID
+        execution_role: IAM_ROLE_ARN
+        workspace: s3://acme/bruin-pyspark-workspace/
+      athena:                                           # [!code ++]
+      - name:  athena-qc                                # [!code ++]
+        access_key_id: AWS_ACCESS_KEY_ID                # [!code ++]
+        secret_access_key: AWS_SECRET_ACCESS_KEY        # [!code ++]
+        region: eu-north-1                              # [!code ++]
+        query_results_path: "s3://acme/athena-output/"  # [!code ++]
+
+```
+
+Now we can update our assets to define some quality checks. For this example, we're going to add one column and one custom check.
+
+::: code-group
+```bruin-python [quality-checks-example/assets/users.py]
+""" @bruin
+name: users
+type: emr_serverless.pyspark
+columns:              # [!code ++]
+  - name: id          # [!code ++]
+    type: integer     # [!code ++]
+    checks:           # [!code ++]
+      - non_negative  # [!code ++]
+custom_checks: # [!code ++] 
+  - name: users are adults # [!code ++]
+    query: SELECT count(*) from users where age < 18 # [!code ++]
+    value: 1 # [!code ++]
+parameters: # [!code ++]
+  athena_connection: athena-qc # [!code ++]
+@bruin """
+
+from pyspark.sql import SparkSession
+
+SCHEMA = ["id", "name", "age"]
+USERS = [
+  (1, "Alice", 29),
+  (2, "Bob", 31),
+  (3, "Cathy", 25),
+  (4, "David", 35),
+  (5, "Eva", 28),
+]
+
+if __name__ == "__main__":
+  spark_session = SparkSession.builder.appName("users").getOrCreate()
+  df = spark.createDataFrame(USERS, SCHEMA)
+  df.write.csv("s3://acme/user/list", mode="overwrite")
+  spark.stop()
+```
+:::
+
+Now when we run our bruin pipeline again, our quality checks should run after our Asset run finishes.
+```sh
+bruin run ./quality-checks-example
+```
+
+::: info Output
+<pre><b>Analyzed the pipeline &apos;quality-checks-example&apos; with 1 assets.</b>
+
+<span style="color:#3465A4"><b>Pipeline: quality-checks-example</b></span>
+<span style="color:#4E9A06">  No issues found</span>
+
+<span style="color:#4E9A06"><b>✓ Successfully validated 1 assets across 1 pipeline, all good.</b></span>
+
+<b>Starting the pipeline execution...</b>
+<span style="color:#8D8F8A">[2025-05-11 18:20:36]</span> <span style="color:#3465A4">Running:  users</span>
+<span style="color:#8D8F8A">[2025-05-11 18:20:36]</span> <span style="color:#3465A4">... output omitted for brevity ...</span>
+<span style="color:#8D8F8A">[2025-05-11 18:21:01]</span> <span style="color:#3465A4">Finished: users</span>
+<span style="color:#8D8F8A">[2025-05-11 18:21:02]</span> <span style="color:#75507B">Running:  users:id:non_negative</span>
+<span style="color:#8D8F8A">[2025-05-11 18:21:02]</span> <span style="color:#C4A000">Running:  users:custom-check:users_are_adults</span>
+<span style="color:#8D8F8A">[2025-05-11 18:21:06]</span> <span style="color:#75507B">Finished: users:id:non_negative</span>
+<span style="color:#8D8F8A">[2025-05-11 18:21:06]</span> <span style="color:#C4A000">Finished: users:custom-check:users_are_adults</span>
+
+<span style="color:#4E9A06"><b>Executed 3 tasks in 30s</b></span>
+</pre>
+:::
 
 ## Asset Schema
 
