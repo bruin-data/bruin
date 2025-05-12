@@ -64,7 +64,7 @@ SELECT
     currency_name,
     currency_code,
     base_currency,
-    TO_CHAR(date, 'YYYY-MM-DD') AS date,
+    date,
     rate,
     rate_lag_1d,
     rate_lag_7d,
