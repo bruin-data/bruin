@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/athena"
@@ -85,14 +84,11 @@ type connectionRemapper struct {
 }
 
 func (cr *connectionRemapper) GetConnection(string) (interface{}, error) {
-	asset := cr.ti.GetAsset()
-	connectionName := asset.Parameters["athena_connection"]
-	if strings.TrimSpace(connectionName) == "" {
-		connectionName = cmp.Or(
-			cr.ti.GetPipeline().DefaultConnections["athena"],
-			"athena-default",
-		)
-	}
+	connectionName := cmp.Or(
+		cr.ti.GetAsset().Parameters["athena_connection"],
+		cr.ti.GetPipeline().DefaultConnections["athena"],
+		"athena-default",
+	)
 	return cr.connectionFetcher.GetConnection(connectionName)
 }
 
