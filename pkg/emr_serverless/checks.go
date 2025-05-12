@@ -1,6 +1,7 @@
 package emr_serverless //nolint
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"strings"
@@ -87,7 +88,10 @@ func (cr *connectionRemapper) GetConnection(string) (interface{}, error) {
 	asset := cr.ti.GetAsset()
 	connectionName := asset.Parameters["athena_connection"]
 	if strings.TrimSpace(connectionName) == "" {
-		connectionName = "athena-default"
+		connectionName = cmp.Or(
+			cr.ti.GetPipeline().DefaultConnections["athena"],
+			"athena-default",
+		)
 	}
 	return cr.connectionFetcher.GetConnection(connectionName)
 }
