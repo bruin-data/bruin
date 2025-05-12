@@ -10,61 +10,58 @@ description: This query joins currency code to currency name and displays the ex
 
 depends:
   - frankfurter.rates
-  - frankfurter.currencies
+
 
 @bruin*/
 
-WITH target_dates AS (
-    SELECT CURRENT_DATE AS ref_date, 'today' AS label
-    UNION ALL SELECT CURRENT_DATE - INTERVAL 1 DAY, 'yesterday'
-    UNION ALL SELECT CURRENT_DATE - INTERVAL 7 DAY, 'week_ago'
-    UNION ALL SELECT CURRENT_DATE - INTERVAL 30 DAY, 'month_ago'
+WITH dates AS (
+    SELECT CAST(unnest(generate_series(CURRENT_DATE - 31, CURRENT_DATE, INTERVAL '1 day')) AS DATE) AS date
 ),
-rates AS (
+codes AS (
+    SELECT DISTINCT currency_name FROM frankfurter.rates
+),
+all_days AS (
+    SELECT c.currency_name, d.date
+    FROM codes c
+    CROSS JOIN dates d
+),
+filled_rates AS (
+    SELECT
+        a.currency_name,
+        a.date,
+        (
+            SELECT r.rate
+            FROM frankfurter.rates r
+            WHERE r.currency_name = a.currency_name
+              AND CAST(r.date AS DATE) <= a.date
+            ORDER BY CAST(r.date AS DATE) DESC
+            LIMIT 1
+        ) AS rate
+    FROM all_days a
+),
+with_lags AS (
     SELECT
         currency_name,
-        CAST(date AS DATE) AS date,
-        rate
-    FROM frankfurter.rates
-    WHERE CAST(date AS DATE) >= CURRENT_DATE - INTERVAL 40 DAY
-),
-closest_rates AS (
-    SELECT
-        td.label,
-        r.currency_name,
-        r.rate,
-        r.date,
-        ROW_NUMBER() OVER (
-            PARTITION BY r.currency_name, td.label
-            ORDER BY td.ref_date - r.date
-        ) AS rn
-    FROM target_dates td
-    JOIN rates r
-        ON r.date <= td.ref_date
-),
-joined AS (
-    SELECT
-        cr.label,
-        cr.currency_name AS code,
-        c.currency_name AS full_name,
-        cr.rate,
-        cr.date,
-        cr.rn
-    FROM closest_rates cr
-    LEFT JOIN frankfurter.currencies c
-        ON cr.currency_name = c.currency_code
+        date,
+        rate,
+        LAG(rate, 1) OVER (PARTITION BY currency_name ORDER BY date) AS rate_lag_1d,
+        LAG(rate, 7) OVER (PARTITION BY currency_name ORDER BY date) AS rate_lag_7d,
+        LAG(rate, 30) OVER (PARTITION BY currency_name ORDER BY date) AS rate_lag_30d
+    FROM filled_rates
 )
-SELECT
-    code AS "Currency Code",
-    full_name AS "Currency Name",
-    'EUR' AS "Base Currency",
-    MAX(CASE WHEN label = 'today' THEN rate END) AS current_rate,
-    MAX(CASE WHEN label = 'yesterday' THEN rate END) AS "Rate: Yesterday",
-    MAX(CASE WHEN label = 'week_ago' THEN rate END) AS "Rate: 7 Days Ago",
-    MAX(CASE WHEN label = 'month_ago' THEN rate END) AS "Rate: 30 Days Ago",
-FROM joined
-WHERE rn = 1
-GROUP BY code, full_name
-ORDER BY code;
+SELECT 
+    currency_name,
+    TO_CHAR(date, 'YYYY-MM-DD') AS date,
+    rate,
+    rate_lag_1d,
+    rate_lag_7d,
+    rate_lag_30d
+FROM with_lags
+WHERE date = CURRENT_DATE
+ORDER BY currency_name, date;
+
+
+
+
 
 
