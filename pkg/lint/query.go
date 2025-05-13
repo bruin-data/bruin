@@ -87,11 +87,7 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 		// this has to be the case until we find a nicer solution for no-dry-run databases
 		// remember that BigQuery or others that support dry-run already return a single query as part of the queryExtractor implementations
 		// which means the only scenario where there are multiple queries returned is the no-dry-run databases
-		issues = append(issues, &Issue{
-			Task:        asset,
-			Description: fmt.Sprintf("Validating multiple queries in a single asset is not supported: '%s'", asset.ExecutableFile.Path),
-		})
-
+		q.Logger.Warnf("Found %d queries in file '%s', we cannot validate script assets, skipping query validation", len(queries), asset.ExecutableFile.Path)
 		return issues, nil
 	}
 
