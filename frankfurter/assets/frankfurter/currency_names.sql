@@ -1,6 +1,6 @@
 /*@bruin
 
-name: frankfurter.currency_names
+name: currency_names
 type: duckdb.sql
 materialization:
    type: table
@@ -16,4 +16,4 @@ SELECT
     currency_code,
     currency_name
 FROM 
-    frankfurter.currencies;
+    frankfurter_raw.currencies;

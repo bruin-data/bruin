@@ -1,6 +1,6 @@
 /*@bruin
 
-name: frankfurter.daily_rates
+name: daily_rates
 type: duckdb.sql
 materialization:
    type: table
@@ -18,7 +18,7 @@ WITH dates AS (
 ),
 codes AS (
     SELECT DISTINCT currency_code, base_currency
-    FROM frankfurter.rates
+    FROM frankfurter_raw.rates
 ),
 all_days AS (
     SELECT c.currency_code, c.base_currency, d.date
@@ -32,7 +32,7 @@ filled_rates AS (
         a.date,
         (
             SELECT r.rate
-            FROM frankfurter.rates r
+            FROM frankfurter_raw.rates r
             WHERE r.currency_code = a.currency_code
               AND CAST(r.date AS DATE) <= a.date
             ORDER BY CAST(r.date AS DATE) DESC
