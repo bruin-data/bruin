@@ -4,7 +4,7 @@ This pipeline is a simple example of a Bruin pipeline. It demonstrates how to us
 
 The pipeline includes three sample assets already:
 - `rates.asset.yml`: An ingestr asset which transfers exchange rate data from source to DuckDB.
-- `currencies.asset.yml`: An ingestr asset which copies the list of available currencies.
+- `currencies.asset.yml`: An ingestr asset which transfers the list of available currencies from source to DuckDB.
 - `currency_performance.sql`: An SQL-asset which shows the latest exchange rates as well as each currency's performance over the past 30 days. 
 
 ## Setup
