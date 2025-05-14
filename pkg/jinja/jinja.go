@@ -45,6 +45,7 @@ func PythonEnvVariables(startDate, endDate *time.Time, pipelineName, runID strin
 		"BRUIN_RUN_ID":          runID,
 		"BRUIN_PIPELINE":        pipelineName,
 		"BRUIN_FULL_REFRESH":    "",
+		"PYTHONUNBUFFERED":      "1",
 	}
 
 	if fullRefresh {
