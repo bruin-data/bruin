@@ -181,3 +181,16 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 
 	return strings.Join(queries, ";\n") + ";", nil
 }
+
+func BuildCreateTableQuery(asset *pipeline.Asset, query string) (string, error) {
+	columnDefs := make([]string, 0, len(asset.Columns))
+	for _, column := range asset.Columns {
+		columnDefs = append(columnDefs, fmt.Sprintf("`%s` %s", column.Name, column.Type))
+	}
+
+	q := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n  %s\n)",
+		asset.Name,
+		strings.Join(columnDefs, ",\n  "))
+
+	return q, nil
+}
