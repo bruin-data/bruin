@@ -44,6 +44,8 @@ func Query() *cli.Command {
 				Usage:    "the name of the connection to use",
 				Required: false,
 			},
+			startDateFlag,
+			endDateFlag,
 			&cli.StringFlag{
 				Name:     "query",
 				Aliases:  []string{"q"},
@@ -202,31 +204,72 @@ func validateFlags(connection, query, asset, environment string) error {
 func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, string, error) {
 	assetPath := c.String("asset")
 	queryStr := c.String("query")
+	env := c.String("env")
+	connectionName := c.String("connection")
+	s := c.String("start-date")
+	e := c.String("end-date")
+	logger := makeLogger(false)
+	startDate, endDate, err := ParseDate(s, e, logger)
+	if err != nil {
+		return "", nil, "", err
+	}
+	extractor := &query.WholeFileExtractor{
+		Fs:       fs,
+		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id"),
+	}
 
 	// Direct query mode (no asset path)
 	if assetPath == "" {
-		return prepareDirectQuery(c, fs)
+		conn, err := getConnectionFromConfig(connectionName, fs)
+		if err != nil {
+			return "", nil, "", err
+		}
+		queryStr, err = extractQuery(queryStr, extractor)
+		if err != nil {
+			return "", nil, "", err
+		}
+		return connectionName, conn, queryStr, nil
 	}
-
 	// Auto-detect mode (both asset path and query)
 	if queryStr != "" {
-		return prepareAutoDetectQuery(c, fs)
+		pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs)
+		if err != nil {
+			return "", nil, "", errors.Wrap(err, "failed to get pipeline info")
+		}
+
+		connName, conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
+		if err != nil {
+			return "", nil, "", err
+		}
+
+		queryStr, err = extractQuery(queryStr, extractor)
+		if err != nil {
+			return "", nil, "", err
+		}
+
+		return connName, conn, queryStr, nil
 	}
-
 	// Asset query mode (only asset path)
-	return prepareAssetQuery(c, fs)
-}
-
-func prepareDirectQuery(c *cli.Context, fs afero.Fs) (string, interface{}, string, error) {
-	connectionName := c.String("connection")
-	queryStr := c.String("query")
-
-	conn, err := getConnectionFromConfig(connectionName, fs)
+	pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs)
+	if err != nil {
+		return "", nil, "", errors.Wrap(err, "failed to get pipeline info")
+	}
+	// Verify that the asset is a SQL asset
+	if !pipelineInfo.Asset.IsSQLAsset() {
+		return "", nil, "", errors.Errorf("asset '%s' is not a SQL asset (type: %s). Only SQL assets can be queried",
+			assetPath,
+			pipelineInfo.Asset.Type)
+	}
+	queryStr, err = extractQuery(pipelineInfo.Asset.ExecutableFile.Content, extractor)
+	if err != nil {
+		return "", nil, "", err
+	}
+	connName, conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
 	if err != nil {
 		return "", nil, "", err
 	}
 
-	return connectionName, conn, queryStr, nil
+	return connName, conn, queryStr, nil
 }
 
 func getConnectionFromConfig(connectionName string, fs afero.Fs) (interface{}, error) {
@@ -254,45 +297,9 @@ func getConnectionFromConfig(connectionName string, fs afero.Fs) (interface{}, e
 	return conn, nil
 }
 
-func prepareAssetQuery(c *cli.Context, fs afero.Fs) (string, interface{}, string, error) {
-	assetPath := c.String("asset")
-	env := c.String("env")
-
-	pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs)
-	if err != nil {
-		return "", nil, "", errors.Wrap(err, "failed to get pipeline info")
-	}
-
-	// Verify that the asset is a SQL asset
-	if !pipelineInfo.Asset.IsSQLAsset() {
-		return "", nil, "", errors.Errorf("asset '%s' is not a SQL asset (type: %s). Only SQL assets can be queried",
-			assetPath,
-			pipelineInfo.Asset.Type)
-	}
-
-	queryStr, err := extractQueryFromAsset(pipelineInfo.Asset, fs)
-	if err != nil {
-		return "", nil, "", err
-	}
-
-	connName, conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
-	if err != nil {
-		return "", nil, "", err
-	}
-
-	return connName, conn, queryStr, nil
-}
-
-func extractQueryFromAsset(asset *pipeline.Asset, fs afero.Fs) (string, error) {
-	startDate := time.Now()
-	endDate := time.Now()
-	extractor := &query.WholeFileExtractor{
-		Fs:       fs,
-		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id"),
-	}
-
+func extractQuery(content string, extractor *query.WholeFileExtractor) (string, error) {
 	// Extract the query from the asset
-	queries, err := extractor.ExtractQueriesFromString(asset.ExecutableFile.Content)
+	queries, err := extractor.ExtractQueriesFromString(content)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to extract query")
 	}
@@ -437,24 +444,6 @@ func GetPipelineAndAsset(ctx context.Context, inputPath string, fs afero.Fs) (*p
 		Asset:    task,
 		Config:   cm,
 	}, nil
-}
-
-func prepareAutoDetectQuery(c *cli.Context, fs afero.Fs) (string, interface{}, string, error) {
-	assetPath := c.String("asset")
-	queryStr := c.String("query")
-	env := c.String("env")
-
-	pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs)
-	if err != nil {
-		return "", nil, "", errors.Wrap(err, "failed to get pipeline info")
-	}
-
-	connName, conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
-	if err != nil {
-		return "", nil, "", err
-	}
-
-	return connName, conn, queryStr, nil
 }
 
 func exportResultsToCSV(results *query.QueryResult, inputPath string) (string, error) {
