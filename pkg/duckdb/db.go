@@ -3,9 +3,12 @@ package duck
 import (
 	"context"
 	"database/sql"
-
+	"fmt"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	_ "github.com/marcboeker/go-duckdb"
+	"github.com/pkg/errors"
+	"strings"
 )
 
 type Client struct {
@@ -146,4 +149,38 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 	}
 
 	return result, nil
+}
+
+func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	return c.EnsureSchemaExists(ctx, c, asset)
+}
+
+func (c *Client) EnsureSchemaExists(ctx context.Context, conn DuckDBClient, asset *pipeline.Asset) error {
+	tableComponents := strings.Split(asset.Name, ".")
+	var schemaName string
+	switch len(tableComponents) {
+	case 2:
+		schemaName = tableComponents[0]
+	default:
+		return nil
+	}
+
+	checkSchemaQuery := query.Query{
+		Query: fmt.Sprintf("SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name = '%s'", schemaName),
+	}
+	result, err := conn.Select(ctx, &checkSchemaQuery)
+	if err != nil {
+		return err
+	}
+
+	if len(result) == 0 || result[0][0].(int64) == 0 {
+		createQuery := query.Query{
+			Query: "CREATE SCHEMA IF NOT EXISTS " + schemaName,
+		}
+		if err := conn.RunQueryWithoutResult(ctx, &createQuery); err != nil {
+			return errors.Wrapf(err, "failed to create or ensure database: %s", schemaName)
+		}
+	}
+
+	return nil
 }
