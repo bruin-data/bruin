@@ -334,7 +334,6 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 
 type DDLOperator struct {
 	connection connectionFetcher
-	materializer materializer
 }
 
 func NewDDLOperator(conn connectionFetcher) *DDLOperator {
@@ -348,8 +347,6 @@ func (ddl *DDLOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 }
 
 func (ddl *DDLOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
-
-
 	materialized, err := BuildCreateTableQuery(t, "")
 	if err != nil {
 		return err
@@ -361,6 +358,17 @@ func (ddl *DDLOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	conn, err := ddl.connection.GetBqConnection(connName)
 	if err != nil {
 		return err
+	}
+
+	if err := conn.CreateDataSetIfNotExist(t, ctx); err != nil {
+		return err
+	}
+	if ctx.Value(pipeline.RunConfigFullRefresh).(bool) {
+		err = conn.DropTableOnMismatch(ctx, t.Name, t)
+		if err != nil {
+			return errors.Wrapf(err, "failed to check for mismatches for table '%s'", t.Name)
+		}
+		
 	}
 	return conn.RunQueryWithoutResult(ctx, &query.Query{Query: materialized})
 }
