@@ -349,6 +349,18 @@ if __name__ == "__main__":
 ```
 :::
 
+::: tip
+If all your Assets share the same `type` and `parameters.athena_connection`, you can set them as [defaults](/getting-started/concepts.html#defaults) in your `pipeline.yml` to avoid repeating them for each Asset.
+
+
+```yaml 
+name: my-pipeline
+default:
+  type: emr_serverless.pyspark
+  parameters:
+    athena_connection: quality-checks
+```
+:::
 Now when we run our bruin pipeline again, our quality checks should run after our Asset run finishes.
 ```sh
 bruin run ./quality-checks-example
