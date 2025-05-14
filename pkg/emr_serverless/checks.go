@@ -18,7 +18,7 @@ type CustomCheckRunner interface {
 	Check(ctx context.Context, ti *scheduler.CustomCheckInstance) error
 }
 
-type builder[T any] func(conn connectionFetcher) T
+type builder[T any] func(conn *connectionRemapper) T
 
 type ColumnCheckOperator struct {
 	checks map[string]builder[CheckRunner]
@@ -44,13 +44,13 @@ func NewColumnCheckOperator(conn connectionFetcher) *ColumnCheckOperator {
 	return &ColumnCheckOperator{
 		conn: conn,
 		checks: map[string]builder[CheckRunner]{
-			"not_null":        func(c connectionFetcher) CheckRunner { return ansisql.NewNotNullCheck(c) },
-			"unique":          func(c connectionFetcher) CheckRunner { return ansisql.NewUniqueCheck(c) },
-			"positive":        func(c connectionFetcher) CheckRunner { return ansisql.NewPositiveCheck(c) },
-			"non_negative":    func(c connectionFetcher) CheckRunner { return ansisql.NewNonNegativeCheck(c) },
-			"negative":        func(c connectionFetcher) CheckRunner { return ansisql.NewNegativeCheck(c) },
-			"accepted_values": func(c connectionFetcher) CheckRunner { return athena.NewAcceptedValuesCheck(c) },
-			"pattern":         func(c connectionFetcher) CheckRunner { return athena.NewPatternCheck(c) },
+			"not_null":        func(c *connectionRemapper) CheckRunner { return ansisql.NewNotNullCheck(c) },
+			"unique":          func(c *connectionRemapper) CheckRunner { return ansisql.NewUniqueCheck(c) },
+			"positive":        func(c *connectionRemapper) CheckRunner { return ansisql.NewPositiveCheck(c) },
+			"non_negative":    func(c *connectionRemapper) CheckRunner { return ansisql.NewNonNegativeCheck(c) },
+			"negative":        func(c *connectionRemapper) CheckRunner { return ansisql.NewNegativeCheck(c) },
+			"accepted_values": func(c *connectionRemapper) CheckRunner { return athena.NewAcceptedValuesCheck(c) },
+			"pattern":         func(c *connectionRemapper) CheckRunner { return athena.NewPatternCheck(c) },
 		},
 	}
 }
@@ -72,7 +72,7 @@ func (o *CustomCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance
 func NewCustomCheckOperator(conn connectionFetcher) *CustomCheckOperator {
 	return &CustomCheckOperator{
 		conn: conn,
-		builder: func(c connectionFetcher) CustomCheckRunner {
+		builder: func(c *connectionRemapper) CustomCheckRunner {
 			return ansisql.NewCustomCheck(c)
 		},
 	}
@@ -84,12 +84,11 @@ type connectionRemapper struct {
 }
 
 func (cr *connectionRemapper) GetConnection(string) (interface{}, error) {
-	connectionName := cmp.Or(
+	name := cmp.Or(
 		cr.ti.GetAsset().Parameters["athena_connection"],
 		cr.ti.GetPipeline().DefaultConnections["athena"],
-		"athena-default",
 	)
-	return cr.connectionFetcher.GetConnection(connectionName)
+	return cr.connectionFetcher.GetAthenaConnection(name)
 }
 
 func newConnectionRemapper(conn connectionFetcher, ti scheduler.TaskInstance) *connectionRemapper {
