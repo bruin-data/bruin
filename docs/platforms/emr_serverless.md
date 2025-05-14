@@ -45,13 +45,13 @@ In order to stream logs, one of the following conditions must be met:
 > [!NOTE]
 > Python assets stream logs out-of-the-box. You don't need to specify `parameters.logs` for them.
 
-## Asset Types
+## EMR Serverless Assets
 
 Bruin supports two different ways of defining a Spark asset:
 - what we call a "managed" PySpark asset where Bruin takes care of delivering the code to the cluster as well
 - as an external asset defined with YAML where Bruin simply orchestrates
 
-### Python Asset
+### `emr_serverless.pyspark`
 A fully managed option where Bruin takes care of job setup, configuration, and execution. You only need to define the workload logic.
 
 * Supports only PySpark scripts.
@@ -150,7 +150,7 @@ Bruin uses this for:
 
 ![workspace diagram](media/pyspark-workspace.svg)
 
-### YAML Asset
+### `emr_serverless.spark`
 A lightweight option that only supports triggering a job. 
 
 * Supports both PySpark scripts and JARs.
@@ -179,6 +179,214 @@ This defines an asset that runs a spark job on an EMR Serverless Application def
 > * YAML-style assets: `emr_serverless.spark` 
 > * Python assets:  `emr_serverless.pyspark`.
 
+## Quality Checks
+[Quality checks](/quality/overview.md) for EMR Serverless are powered via [AWS Athena](/platforms/athena.md). 
+
+> [!WARNING]
+> Bruin currently requires a few extra steps in order to be able to run quality checks for your EMR Serverless Assets.
+> Future versions of Bruin will automate this process for you. 
+
+### Prerequisites
+* Configure an [athena connection](/platforms/athena.html#connection) in your `bruin.yml`.
+* Set `parameters.athena_connection` to the name of your Athena connection.
+* Create an `athena` table on top of your data with the same name as your Asset's name.
+
+### Example
+
+To demonstrate quality checks, we're going to write a simple pyspark script that writes static data as CSV to a bucket in S3.
+
+#### Initial Setup
+
+We're going to start by creating a pipeline called `quality-checks-example`. We first run `bruin init` to create the skeleton structure.
+```sh
+bruin init default quality-checks-example
+```
+
+Now we'll add the pyspark asset.
+::: code-group
+```bruin-python [quality-checks-example/assets/users.py]
+""" @bruin
+name: users
+type: emr_serverless.pyspark
+@bruin """
+
+from pyspark.sql import SparkSession
+
+SCHEMA = ["id", "name", "age"]
+USERS = [
+  (1, "Alice", 29),
+  (2, "Bob", 31),
+  (3, "Cathy", 25),
+  (4, "David", 35),
+  (5, "Eva", 28),
+]
+
+if __name__ == "__main__":
+  spark_session = SparkSession.builder.appName("users").getOrCreate()
+  df = spark.createDataFrame(USERS, SCHEMA)
+  df.write.csv("s3://acme/user/list", mode="overwrite")
+  spark.stop()
+```
+:::
+
+Next let's setup the `bruin.yml` file with the credentials necessary to run our job.
+::: code-group
+```yaml [bruin.yml]
+environments:
+  default:
+    connections:
+      emr_serverless:
+      - name: emr_serverless-default
+        access_key: AWS_ACCESS_KEY_ID
+        secret_key: AWS_SECRET_ACCESS_KEY
+        region: eu-north-1
+        application_id: EMR_APPLICATION_ID
+        execution_role: IAM_ROLE_ARN
+        workspace: s3://acme/bruin-pyspark-workspace/
+```
+:::
+
+We can now run the pipeline to verify that it works
+```sh
+bruin run ./quality-checks-example
+```
+
+::: info Output
+<pre><b>Analyzed the pipeline &apos;quality-checks-example&apos; with 1 assets.</b>
+
+<span style="color:#3465A4"><b>Pipeline: quality-checks-example</b></span>
+<span style="color:#4E9A06">  No issues found</span>
+
+<span style="color:#4E9A06"><b>✓ Successfully validated 1 assets across 1 pipeline, all good.</b></span>
+
+<b>Starting the pipeline execution...</b>
+<span style="color:#8D8F8A">[2025-05-11 18:10:00]</span> <span style="color:#C4A000">Running:  users</span>
+<span style="color:#8D8F8A">[2025-05-11 18:10:00]</span> <span style="color:#C4A000">... output omitted for brevity ...</span>
+<span style="color:#8D8F8A">[2025-05-11 18:10:05]</span> <span style="color:#C4A000">Finished: users</span>
+
+<span style="color:#4E9A06"><b>Executed 1 tasks in 5s</b></span>
+</pre>
+:::
+
+#### Enabling quality checks
+
+In order to run quality checks, we need to:
+1. Create an Athena table in our AWS account.
+2. Configure an `athena` connection in our `bruin.yml` file.
+
+To start, let's first create our Athena table. Go to your AWS Athena console and run the following DDL Query to create a table over the data our pyspark job created.
+```sql
+CREATE EXTERNAL TABLE users (id int, name string, age int)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+STORED AS TEXTFILE
+LOCATION 's3://acme/user/list' 
+```
+
+> [!TIP]
+> For more information on creating Athena tables, see [Create tables in Athena](https://docs.aws.amazon.com/athena/latest/ug/creating-tables.html) and [Use SerDe](https://docs.aws.amazon.com/athena/latest/ug/serde-reference.html) in the AWS Athena Documentation.
+
+Next, update your `bruin.yml` file with an athena connection.
+
+```yaml [bruin.yml]
+environments:
+  default:
+    connections:
+      emr_serverless:
+      - name: emr_serverless-default
+        access_key: AWS_ACCESS_KEY_ID
+        secret_key: AWS_SECRET_ACCESS_KEY
+        region: eu-north-1
+        application_id: EMR_APPLICATION_ID
+        execution_role: IAM_ROLE_ARN
+        workspace: s3://acme/bruin-pyspark-workspace/
+      athena:                                           # [!code ++]
+      - name: quality-tests                             # [!code ++]
+        access_key_id: AWS_ACCESS_KEY_ID                # [!code ++]
+        secret_access_key: AWS_SECRET_ACCESS_KEY        # [!code ++]
+        region: eu-north-1                              # [!code ++]
+        query_results_path: "s3://acme/athena-output/"  # [!code ++]
+
+```
+
+Now we can update our assets to define some quality checks. For this example, we're going to add one column and one custom check.
+
+::: code-group
+```bruin-python [quality-checks-example/assets/users.py]
+""" @bruin
+name: users
+type: emr_serverless.pyspark
+columns:              # [!code ++]
+  - name: id          # [!code ++]
+    type: integer     # [!code ++]
+    checks:           # [!code ++]
+      - non_negative  # [!code ++]
+custom_checks: # [!code ++] 
+  - name: users are adults # [!code ++]
+    query: SELECT count(*) from users where age < 18 # [!code ++]
+    value: 0 # [!code ++]
+parameters: # [!code ++]
+  athena_connection: quality-tests # [!code ++]
+@bruin """
+
+from pyspark.sql import SparkSession
+
+SCHEMA = ["id", "name", "age"]
+USERS = [
+  (1, "Alice", 29),
+  (2, "Bob", 31),
+  (3, "Cathy", 25),
+  (4, "David", 35),
+  (5, "Eva", 28),
+]
+
+if __name__ == "__main__":
+  spark_session = SparkSession.builder.appName("users").getOrCreate()
+  df = spark.createDataFrame(USERS, SCHEMA)
+  df.write.csv("s3://acme/user/list", mode="overwrite")
+  spark.stop()
+```
+:::
+
+::: tip
+If all your Assets share the same `type` and `parameters.athena_connection`, you can set them as [defaults](/getting-started/concepts.html#defaults) in your `pipeline.yml` to avoid repeating them for each Asset.
+
+
+```yaml 
+name: my-pipeline
+default:
+  type: emr_serverless.pyspark
+  parameters:
+    athena_connection: quality-checks
+```
+:::
+Now when we run our bruin pipeline again, our quality checks should run after our Asset run finishes.
+```sh
+bruin run ./quality-checks-example
+```
+
+::: info Output
+<pre><b>Analyzed the pipeline &apos;quality-checks-example&apos; with 1 assets.</b>
+
+<span style="color:#3465A4"><b>Pipeline: quality-checks-example</b></span>
+<span style="color:#4E9A06">  No issues found</span>
+
+<span style="color:#4E9A06"><b>✓ Successfully validated 1 assets across 1 pipeline, all good.</b></span>
+
+<b>Starting the pipeline execution...</b>
+<span style="color:#8D8F8A">[2025-05-11 18:20:36]</span> <span style="color:#3465A4">Running:  users</span>
+<span style="color:#8D8F8A">[2025-05-11 18:20:36]</span> <span style="color:#3465A4">... output omitted for brevity ...</span>
+<span style="color:#8D8F8A">[2025-05-11 18:21:01]</span> <span style="color:#3465A4">Finished: users</span>
+<span style="color:#8D8F8A">[2025-05-11 18:21:02]</span> <span style="color:#75507B">Running:  users:id:non_negative</span>
+<span style="color:#8D8F8A">[2025-05-11 18:21:02]</span> <span style="color:#C4A000">Running:  users:custom-check:users_are_adults</span>
+<span style="color:#8D8F8A">[2025-05-11 18:21:06]</span> <span style="color:#75507B">Finished: users:id:non_negative</span>
+<span style="color:#8D8F8A">[2025-05-11 18:21:06]</span> <span style="color:#C4A000">Finished: users:custom-check:users_are_adults</span>
+
+<span style="color:#4E9A06"><b>Executed 3 tasks in 30s</b></span>
+</pre>
+:::
+
 ## Asset Schema
 
 Here's the full schema of the `emr_serverless.spark` asset along with a brief explanation:
@@ -203,6 +411,10 @@ parameters:
 
   # path where logs are stored or should be stored (optional)
   logs: s3://amzn-test-bucket/logs
+
+  # name of your athena connection (optional, defaults to "athena-default")
+  # used for quality checks
+  athena_connection: athena-conn
 
   # args to pass to the entrypoint (optional)
   args: arg1 arg2
