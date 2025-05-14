@@ -325,6 +325,44 @@
         "api_key"
       ]
     },
+    "ElasticsearchConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "secure": {
+          "type": "string",
+          "default": "true"
+        },
+        "verify_certs": {
+          "type": "string",
+          "default": "true"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "secure",
+        "verify_certs"
+      ]
+    },
 
     "Connections": {
       "properties": {
@@ -639,6 +677,12 @@
         "phantombuster": {
           "items": {
             "$ref": "#/$defs/PhantombusterConnection"
+          },
+          "type": "array"
+        },
+        "elasticsearch": {
+          "items": {
+            "$ref": "#/$defs/ElasticsearchConnection"
           },
           "type": "array"
         }
