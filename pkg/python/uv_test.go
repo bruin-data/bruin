@@ -117,6 +117,40 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 			},
 			wantErr: assert.Error,
 		},
+		{
+			name: "inline requirements are passed with --with flags",
+			fields: func() *fields {
+				cmd := new(mockCmd)
+				cmd.On("Run", mock.Anything, repo, &CommandInstance{
+					Name: "~/.bruin/uv",
+					Args: []string{
+						"run",
+						"--python", "3.11",
+						"--with", "numpy",
+						"--with", "pandas",
+						"--module", module,
+					},
+				}).Return(assert.AnError)
+
+				inst := new(mockUvInstaller)
+				inst.On("EnsureUvInstalled", mock.Anything).Return("~/.bruin/uv", nil)
+
+				return &fields{
+					cmd:         cmd,
+					uvInstaller: inst,
+				}
+			},
+			execCtx: &executionContext{
+				repo:            repo,
+				module:          module,
+				requirementsTxt: "",
+				asset: &pipeline.Asset{
+					Image:        "",
+					Requirements: []string{"numpy", "pandas"},
+				},
+			},
+			wantErr: assert.Error,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -2,6 +2,7 @@ package pipeline_test
 
 import (
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -332,4 +333,26 @@ func TestUpstreams(t *testing.T) {
 
 	// Compare the expected and actual results
 	require.Equal(t, expected, got)
+}
+
+func TestConvertYamlToTaskParsesRequirementsField(t *testing.T) {
+	yamlContent := `
+name: hello-world
+uri: test_asset.py
+type: python
+requirements:
+  - numpy
+  - pandas
+  - matplotlib
+`
+
+	task, err := pipeline.ConvertYamlToTask([]byte(yamlContent))
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	expected := []string{"numpy", "pandas", "matplotlib"}
+	if !reflect.DeepEqual(task.Requirements, expected) {
+		t.Errorf("expected requirements %v, got %v", expected, task.Requirements)
+	}
 }
