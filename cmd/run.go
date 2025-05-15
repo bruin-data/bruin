@@ -775,6 +775,8 @@ func setupExecutors(
 		mainExecutors[pipeline.AssetTypeBigqueryDDL][scheduler.TaskInstanceTypeMetadataPush] = metadataPushOperator
 
 		mainExecutors[pipeline.AssetTypeBigquerySeed][scheduler.TaskInstanceTypeMain] = seedOperator
+		mainExecutors[pipeline.AssetTypeBigquerySeed][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner
+		mainExecutors[pipeline.AssetTypeBigquerySeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		mainExecutors[pipeline.AssetTypeBigquerySeed][scheduler.TaskInstanceTypeMetadataPush] = metadataPushOperator
 		// we set the Python runners to run the checks on BigQuery assuming that there won't be many usecases where a user has both BQ and Snowflake
 		if estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery {
