@@ -457,6 +457,17 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "api-key-123",
 				},
 			},
+			Elasticsearch: []ElasticsearchConnection{
+				{
+					Name:        "elasticsearch-1",
+					Username:    "username-123",
+					Password:    "password-123",
+					Host:        "host-123",
+					Port:        9200,
+					Secure:      "true",
+					VerifyCerts: "true",
+				},
+			},
 		},
 	}
 

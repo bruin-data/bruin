@@ -24,6 +24,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/db2"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/dynamodb"
+	"github.com/bruin-data/bruin/pkg/elasticsearch"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/frankfurter"
@@ -111,6 +112,7 @@ type Manager struct {
 	DB2             map[string]*db2.Client
 	Oracle          map[string]*oracle.Client
 	Phantombuster   map[string]*phantombuster.Client
+	Elasticsearch   map[string]*elasticsearch.Client
 	mutex           sync.Mutex
 }
 
@@ -402,6 +404,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connPhantombuster, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Phantombuster)...)
+
+	connElasticsearch, err := m.GetElasticsearchConnectionWithoutDefault(name)
+	if err == nil {
+		return connElasticsearch, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Elasticsearch)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -1355,6 +1363,25 @@ func (m *Manager) GetPhantombusterConnectionWithoutDefault(name string) (*phanto
 	db, ok := m.Phantombuster[name]
 	if !ok {
 		return nil, errors.Errorf("phantombuster connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetElasticsearchConnection(name string) (*elasticsearch.Client, error) {
+	db, err := m.GetElasticsearchConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetElasticsearchConnectionWithoutDefault("elasticsearch-default")
+}
+
+func (m *Manager) GetElasticsearchConnectionWithoutDefault(name string) (*elasticsearch.Client, error) {
+	if m.Elasticsearch == nil {
+		return nil, errors.New("no elasticsearch connections found")
+	}
+	db, ok := m.Elasticsearch[name]
+	if !ok {
+		return nil, errors.Errorf("elasticsearch connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2525,6 +2552,30 @@ func (m *Manager) AddPhantombusterConnectionFromConfig(connection *config.Phanto
 	return nil
 }
 
+func (m *Manager) AddElasticsearchConnectionFromConfig(connection *config.ElasticsearchConnection) error {
+	m.mutex.Lock()
+	if m.Elasticsearch == nil {
+		m.Elasticsearch = make(map[string]*elasticsearch.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := elasticsearch.NewClient(elasticsearch.Config{
+		Username:    connection.Username,
+		Password:    connection.Password,
+		Host:        connection.Host,
+		Port:        connection.Port,
+		Secure:      connection.Secure,
+		VerifyCerts: connection.VerifyCerts,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Elasticsearch[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddFrankfurterConnectionFromConfig(connection *config.FrankfurterConnection) error {
 	m.mutex.Lock()
 	if m.Frankfurter == nil {
@@ -2664,6 +2715,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Oracle, connectionManager.AddOracleConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.DB2, connectionManager.AddDB2ConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Phantombuster, connectionManager.AddPhantombusterConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Elasticsearch, connectionManager.AddElasticsearchConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }
