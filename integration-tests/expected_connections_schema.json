@@ -343,12 +343,10 @@
           "type": "integer"
         },
         "secure": {
-          "type": "string",
-          "default": "true"
+          "type": "string"
         },
         "verify_certs": {
-          "type": "string",
-          "default": "true"
+          "type": "string"
         }
       },
       "additionalProperties": false,

@@ -735,7 +735,7 @@ type ElasticsearchConnection struct {
 	Username    string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
 	Password    string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
 	Host        string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
-	Port        int    `yaml:"port,omitempty" json:"port" mapstructure:"port" jsonschema:"default=5432"`
+	Port        int    `yaml:"port,omitempty" json:"port" mapstructure:"port"`
 	Secure      string `yaml:"secure,omitempty" json:"secure" mapstructure:"secure" default:"true"`
 	VerifyCerts string `yaml:"verify_certs,omitempty" json:"verify_certs" mapstructure:"verify_certs" default:"true"`
 }

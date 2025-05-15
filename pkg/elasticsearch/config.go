@@ -15,7 +15,7 @@ type Config struct {
 }
 
 func (c *Config) GetIngestrURI() string {
-	//elasticsearch://elastic:changeme@localhost:9200?secure=false&verify_certs=false
+	// elasticsearch://elastic:changeme@localhost:9200?secure=false&verify_certs=false
 
 	u := &url.URL{
 		Scheme: "elasticsearch",
@@ -39,6 +39,5 @@ func (c *Config) GetIngestrURI() string {
 		"verify_certs": {c.VerifyCerts},
 	}.Encode()
 
-	fmt.Println(u.String())
 	return u.String()
 }
