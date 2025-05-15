@@ -25,7 +25,7 @@ type QueryResult struct {
 
 type QueryExtractor interface {
 	ExtractQueriesFromString(filepath string) ([]*Query, error)
-	CloneForAsset(ctx context.Context, asset *pipeline.Asset) QueryExtractor
+	CloneForAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) QueryExtractor
 	ReextractQueriesFromSlice(content []string) ([]string, error)
 }
 
@@ -175,7 +175,7 @@ func (f *WholeFileExtractor) ReextractQueriesFromSlice(content []string) ([]stri
 	return allQueries, nil
 }
 
-func (f *WholeFileExtractor) CloneForAsset(ctx context.Context, t *pipeline.Asset) QueryExtractor {
+func (f *WholeFileExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) QueryExtractor {
 	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
 	if !ok || !applyModifiers {
 		return f
@@ -186,7 +186,7 @@ func (f *WholeFileExtractor) CloneForAsset(ctx context.Context, t *pipeline.Asse
 	runID := ctx.Value(pipeline.RunConfigRunID).(string)
 	startDate = pipeline.ModifyDate(startDate, t.IntervalModifiers.Start)
 	endDate = pipeline.ModifyDate(endDate, t.IntervalModifiers.End)
-	newRenderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID)
+	newRenderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID, p.Variables)
 
 	return &WholeFileExtractor{
 		Renderer: newRenderer,
