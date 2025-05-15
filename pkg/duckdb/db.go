@@ -3,17 +3,19 @@ package duck
 import (
 	"context"
 	"database/sql"
-	"fmt"
+	//"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	_ "github.com/marcboeker/go-duckdb"
-	"github.com/pkg/errors"
+	"log"
 	"strings"
+	"sync"
 )
 
 type Client struct {
-	connection connection
-	config     DuckDBConfig
+	connection  connection
+	config      DuckDBConfig
+	schemaCache *sync.Map
 }
 
 type DuckDBConfig interface {
@@ -34,7 +36,7 @@ func NewClient(c DuckDBConfig) (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{connection: conn, config: c}, nil
+	return &Client{connection: conn, config: c, schemaCache: &sync.Map{}}, nil
 }
 
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
@@ -152,35 +154,29 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 }
 
 func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
-	return c.EnsureSchemaExists(ctx, c, asset)
-}
-
-func (c *Client) EnsureSchemaExists(ctx context.Context, conn DuckDBClient, asset *pipeline.Asset) error {
 	tableComponents := strings.Split(asset.Name, ".")
 	var schemaName string
 	switch len(tableComponents) {
 	case 2:
-		schemaName = tableComponents[0]
+		schemaName = strings.ToLower(tableComponents[0])
 	default:
 		return nil
 	}
 
-	checkSchemaQuery := query.Query{
-		Query: fmt.Sprintf("SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name = '%s'", schemaName),
-	}
-	result, err := conn.Select(ctx, &checkSchemaQuery)
-	if err != nil {
-		return err
+	// Check the cache for the database
+	if _, exists := c.schemaCache.Load(schemaName); exists {
+		return nil
 	}
 
-	if len(result) == 0 || result[0][0].(int64) == 0 {
-		createQuery := query.Query{
-			Query: "CREATE SCHEMA IF NOT EXISTS " + schemaName,
-		}
-		if err := conn.RunQueryWithoutResult(ctx, &createQuery); err != nil {
-			return errors.Wrapf(err, "failed to create or ensure database: %s", schemaName)
-		}
+	log.Printf("Create schema name: %s", schemaName)
+
+	createQuery := query.Query{
+		Query: "CREATE SCHEMA IF NOT EXISTS " + schemaName,
 	}
+	if err := c.RunQueryWithoutResult(ctx, &createQuery); err != nil {
+		return err
+	}
+	c.schemaCache.Store(schemaName, true)
 
 	return nil
 }
