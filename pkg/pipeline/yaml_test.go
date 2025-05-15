@@ -224,6 +224,28 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 			wantErr: true,
 			err:     errors.New("Malformed `depends` items"),
 		},
+		{
+			name: "requirements field is parsed correctly",
+			args: args{
+				filePath: filepath.Join("testdata", "yaml", "task-with-requirements", "task.yml"),
+			},
+			want: &pipeline.Asset{
+				ID:   "afa27b44d43b02a9fea41d13cedc2e4016cfcf87c5dbf990e593669aa8ce286d",
+				Name: "hello-world",
+				URI:  "test_asset.py",
+				Type: "python",
+				ExecutableFile: pipeline.ExecutableFile{
+					Name:    "task.yml",
+					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "task-with-requirements", "task.yml")),
+					Content: mustRead(t, filepath.Join("testdata", "yaml", "task-with-requirements", "task.yml")),
+				},
+				Requirements: []string{"numpy", "pandas"},
+				Secrets:      []pipeline.SecretMapping{},
+				Upstreams:    []pipeline.Upstream{},
+				Columns:      []pipeline.Column{},
+				CustomChecks: []pipeline.CustomCheck{},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

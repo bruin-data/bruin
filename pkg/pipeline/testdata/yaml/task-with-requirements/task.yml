@@ -1,0 +1,6 @@
+name: hello-world
+uri: test_asset.py
+type: python
+requirements:
+  - numpy
+  - pandas
