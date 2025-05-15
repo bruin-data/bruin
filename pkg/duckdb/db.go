@@ -3,18 +3,16 @@ package duck
 import (
 	"context"
 	"database/sql"
-	"strings"
-	"sync"
-
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	_ "github.com/marcboeker/go-duckdb"
 )
 
 type Client struct {
-	connection  connection
-	config      DuckDBConfig
-	schemaCache *sync.Map
+	connection    connection
+	config        DuckDBConfig
+	schemaCreator *ansisql.SchemaCreator
 }
 
 type DuckDBConfig interface {
@@ -35,7 +33,7 @@ func NewClient(c DuckDBConfig) (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{connection: conn, config: c, schemaCache: &sync.Map{}}, nil
+	return &Client{connection: conn, config: c, schemaCreator: ansisql.NewSchemaCreator()}, nil
 }
 
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
@@ -153,27 +151,5 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 }
 
 func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
-	tableComponents := strings.Split(asset.Name, ".")
-	var schemaName string
-	switch len(tableComponents) {
-	case 2:
-		schemaName = strings.ToLower(tableComponents[0])
-	default:
-		return nil
-	}
-
-	// Check the cache for the database
-	if _, exists := c.schemaCache.Load(schemaName); exists {
-		return nil
-	}
-
-	createQuery := query.Query{
-		Query: "CREATE SCHEMA IF NOT EXISTS " + schemaName,
-	}
-	if err := c.RunQueryWithoutResult(ctx, &createQuery); err != nil {
-		return err
-	}
-	c.schemaCache.Store(schemaName, true)
-
-	return nil
+	return c.schemaCreator.CreateSchemaIfNotExist(ctx, c, asset)
 }
