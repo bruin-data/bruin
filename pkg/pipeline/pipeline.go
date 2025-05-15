@@ -256,6 +256,7 @@ func (n Notifications) MarshalJSON() ([]byte, error) {
 }
 
 type MaterializationType string
+type DDLStrategy string
 
 const (
 	MaterializationTypeNone  MaterializationType = ""
@@ -277,8 +278,7 @@ const (
 	MaterializationStrategyTimeInterval     MaterializationStrategy        = "time_interval"
 	MaterializationTimeGranularityDate      MaterializationTimeGranularity = "date"
 	MaterializationTimeGranularityTimestamp MaterializationTimeGranularity = "timestamp"
-	MaterializationStrategyCreateTable      MaterializationStrategy        = "create_table"
-	
+	MaterializationStrategyCreateTable      DDLStrategy                    = "create_table"
 )
 
 var AllAvailableMaterializationStrategies = []MaterializationStrategy{

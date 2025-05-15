@@ -368,9 +368,6 @@ func (ddl *DDLOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		if err != nil {
 			return errors.Wrapf(err, "failed to check for mismatches for table '%s'", t.Name)
 		}
-		
 	}
 	return conn.RunQueryWithoutResult(ctx, &query.Query{Query: materialized})
 }
-
-

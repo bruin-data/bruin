@@ -953,10 +953,10 @@ func EnsureDDLAssetsMaterializationIsCorrect(ctx context.Context, p *pipeline.Pi
 		return issues, nil
 	}
 
-	if asset.Materialization.Type != pipeline.MaterializationTypeNone {
+	if asset.Materialization.Type == pipeline.MaterializationTypeView {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: "BigQuery DDL asset cannot have a materialization type",
+			Description: "BigQuery DDL asset does not support materialization type view",
 		})
 	}
 	if asset.Materialization.Strategy != pipeline.MaterializationStrategyNone {
