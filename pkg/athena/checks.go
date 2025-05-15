@@ -12,8 +12,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+type checksConnectionFetcher interface {
+	GetConnection(name string) (interface{}, error)
+}
+
 type AcceptedValuesCheck struct {
-	conn connectionFetcher
+	conn checksConnectionFetcher
 }
 
 func (c *AcceptedValuesCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
@@ -48,8 +52,12 @@ func (c *AcceptedValuesCheck) Check(ctx context.Context, ti *scheduler.ColumnChe
 	}).Check(ctx, ti)
 }
 
+func NewAcceptedValuesCheck(conn checksConnectionFetcher) *AcceptedValuesCheck {
+	return &AcceptedValuesCheck{conn: conn}
+}
+
 type PatternCheck struct {
-	conn connectionFetcher
+	conn checksConnectionFetcher
 }
 
 func (c *PatternCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
@@ -67,4 +75,8 @@ func (c *PatternCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInsta
 	return ansisql.NewCountableQueryCheck(c.conn, 0, &query.Query{Query: qq}, "pattern", func(count int64) error {
 		return errors.Errorf("column %s has %d values that don't satisfy the pattern %s", ti.Column.Name, count, *ti.Check.Value.String)
 	}).Check(ctx, ti)
+}
+
+func NewPatternCheck(conn checksConnectionFetcher) *PatternCheck {
+	return &PatternCheck{conn: conn}
 }
