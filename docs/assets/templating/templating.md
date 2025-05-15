@@ -11,10 +11,16 @@ SELECT * FROM my_table WHERE dt BETWEEN '{{ start_date }}' AND '{{ end_date }}'
 Since `start_date` and `end_date` parameters are automatically passed to your assets by Bruin, this allows the same SQL asset definition to be used both as your regular execution, e.g. daily or hourly, as well as backfilling a longer period of time.
 
 You can do more complex stuff such as looping over a list of values, or using conditional logic. Here's an example of a SQL asset that loops over a list of user IDs:
+::: tip Example
+`pipeline.yaml`
+```yaml 
+name: sql-pipeline
+variables:
+    days: [1, 3, 7, 15, 30, 90]
+```
 
-```sql
-{% set days = [1, 3, 7, 15, 30, 90] %}
-
+`asset.sql`
+```sql 
 SELECT
     conversion_date,
     cohort_id,
@@ -25,6 +31,7 @@ SELECT
 FROM user_cohorts
 GROUP BY 1,2
 ```
+:::
 
 This will render into the following SQL query:
 
@@ -43,7 +50,26 @@ GROUP BY 1,2
 ```
 You can read more about [Jinja here](https://jinja.palletsprojects.com/en/3.1.x/).
 
-## Available variables
+## Adding variables
+You can add your variables in your `pipeline.yml` file. We support all YAML data types to give you the
+maximum flexiblity in your variable configuration. 
+
+::: code-group Example
+```yaml [pipeline.yml]
+name: var-pipeline
+variables:
+  users: ["jhon", "nick"]
+  tags:
+    team: data
+    tenant: customer
+  env: production
+```
+:::
+
+::: warning
+Be careful when choosing variable names. If they're the same name as [builtin](#builtin-variables) variables, they will be ignored.
+:::
+## Builtin variables
 
 Bruin injects various variables by default:
 | Variable | Description | Example |
