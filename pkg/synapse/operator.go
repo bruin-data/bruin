@@ -15,12 +15,6 @@ type materializer interface {
 	Render(task *pipeline.Asset, query string) ([]string, error)
 }
 
-type queryExtractor interface {
-	ExtractQueriesFromString(content string) ([]*query.Query, error)
-	ReextractQueriesFromSlice(content []string) ([]string, error)
-	CloneForAsset(ctx context.Context, asset *pipeline.Asset) query.QueryExtractor
-}
-
 type connectionFetcher interface {
 	GetMsConnection(name string) (mssql.MsClient, error)
 	GetConnection(name string) (interface{}, error)

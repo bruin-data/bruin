@@ -19,11 +19,6 @@ type MsClient interface {
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 }
 
-type queryExtractor interface {
-	ExtractQueriesFromString(content string) ([]*query.Query, error)
-	CloneForAsset(ctx context.Context, asset *pipeline.Asset) query.QueryExtractor
-}
-
 type connectionFetcher interface {
 	GetMsConnection(name string) (MsClient, error)
 	GetConnection(name string) (interface{}, error)

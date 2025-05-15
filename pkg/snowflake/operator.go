@@ -19,11 +19,6 @@ type materializer interface {
 	IsFullRefresh() bool
 }
 
-type queryExtractor interface {
-	ExtractQueriesFromString(content string) ([]*query.Query, error)
-	CloneForAsset(ctx context.Context, asset *pipeline.Asset) query.QueryExtractor
-}
-
 type SfClient interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
