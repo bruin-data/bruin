@@ -23,6 +23,7 @@ type DuckDBClient interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
+	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error
 }
 
 type connectionFetcher interface {
@@ -88,6 +89,11 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	conn, err := o.connection.GetDuckDBConnection(connName)
+	if err != nil {
+		return err
+	}
+
+	err = conn.CreateSchemaIfNotExist(ctx, t)
 	if err != nil {
 		return err
 	}
