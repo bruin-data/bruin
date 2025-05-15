@@ -3,11 +3,12 @@ package duck
 import (
 	"context"
 	"database/sql"
-	"github.com/bruin-data/bruin/pkg/pipeline"
-	"github.com/bruin-data/bruin/pkg/query"
-	_ "github.com/marcboeker/go-duckdb"
 	"strings"
 	"sync"
+
+	_ "github.com/marcboeker/go-duckdb"
+	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/query"
 )
 
 type Client struct {
