@@ -3,11 +3,9 @@ package duck
 import (
 	"context"
 	"database/sql"
-	//"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	_ "github.com/marcboeker/go-duckdb"
-	"log"
 	"strings"
 	"sync"
 )
@@ -167,8 +165,6 @@ func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Ass
 	if _, exists := c.schemaCache.Load(schemaName); exists {
 		return nil
 	}
-
-	log.Printf("Create schema name: %s", schemaName)
 
 	createQuery := query.Query{
 		Query: "CREATE SCHEMA IF NOT EXISTS " + schemaName,
