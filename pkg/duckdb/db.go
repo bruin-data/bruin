@@ -6,9 +6,9 @@ import (
 	"strings"
 	"sync"
 
-	_ "github.com/marcboeker/go-duckdb"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	_ "github.com/marcboeker/go-duckdb"
 )
 
 type Client struct {
