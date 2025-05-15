@@ -731,7 +731,7 @@ func setupExecutors(
 		}
 	}
 
-	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID)
+	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID, nil)
 	wholeFileExtractor := &query.WholeFileExtractor{
 		Fs:       fs,
 		Renderer: renderer,

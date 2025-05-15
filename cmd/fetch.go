@@ -214,8 +214,9 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 		return "", nil, "", err
 	}
 	extractor := &query.WholeFileExtractor{
-		Fs:       fs,
-		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id"),
+		Fs: fs,
+		// note: we don't support variables for now
+		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id", nil),
 	}
 
 	// Direct query mode (no asset path)

@@ -183,7 +183,7 @@ func Render() *cli.Command {
 			r := RenderCommand{
 				extractor: &query.WholeFileExtractor{
 					Fs:       fs,
-					Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id"),
+					Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id", pl.Variables),
 				},
 				materializers: map[pipeline.AssetType]queryMaterializer{
 					pipeline.AssetTypeBigqueryQuery:   bigquery.NewMaterializer(fullRefresh),
@@ -207,7 +207,7 @@ func Render() *cli.Command {
 				ApplyModifiers: c.Bool("apply-interval-modifiers"),
 			}
 
-			return r.Run(asset, modifierInfo)
+			return r.Run(pl, asset, modifierInfo)
 		},
 	}
 }
@@ -233,7 +233,7 @@ type RenderCommand struct {
 	writer io.Writer
 }
 
-func (r *RenderCommand) Run(task *pipeline.Asset, modifierInfo ModifierInfo) error {
+func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifierInfo ModifierInfo) error {
 	defer RecoverFromPanic()
 	var err error
 	if task == nil {
@@ -242,7 +242,7 @@ func (r *RenderCommand) Run(task *pipeline.Asset, modifierInfo ModifierInfo) err
 	extractor := r.extractor
 	applyModifiers := modifierInfo.ApplyModifiers
 	if applyModifiers {
-		extractor = modifyExtractor(modifierInfo, task)
+		extractor = modifyExtractor(modifierInfo, pl, task)
 	}
 	queries, err := extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
 	if err != nil {
@@ -347,10 +347,10 @@ func getPipelineDefinitionFullPath(pipelinePath string) (string, error) {
 	return "", errors.Errorf("no pipeline definition file found in '%s'. Supported files: %v", pipelinePath, pipelineDefinitionFiles)
 }
 
-func modifyExtractor(ctx ModifierInfo, t *pipeline.Asset) queryExtractor {
+func modifyExtractor(ctx ModifierInfo, p *pipeline.Pipeline, t *pipeline.Asset) queryExtractor {
 	newStartDate := pipeline.ModifyDate(ctx.StartDate, t.IntervalModifiers.Start)
 	newEnddate := pipeline.ModifyDate(ctx.EndDate, t.IntervalModifiers.End)
-	newRenderer := jinja.NewRendererWithStartEndDates(&newStartDate, &newEnddate, "your-pipeline-name", "your-run-id")
+	newRenderer := jinja.NewRendererWithStartEndDates(&newStartDate, &newEnddate, "your-pipeline-name", "your-run-id", p.Variables)
 
 	return &query.WholeFileExtractor{
 		Renderer: newRenderer,
