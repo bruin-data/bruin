@@ -73,6 +73,7 @@ type Connections struct {
 	DB2                 []DB2Connection                 `yaml:"db2,omitempty" json:"db2,omitempty" mapstructure:"db2"`
 	Oracle              []OracleConnection              `yaml:"oracle,omitempty" json:"oracle,omitempty" mapstructure:"oracle"`
 	Phantombuster       []PhantombusterConnection       `yaml:"phantombuster,omitempty" json:"phantombuster,omitempty" mapstructure:"phantombuster"`
+	Elasticsearch       []ElasticsearchConnection       `yaml:"elasticsearch,omitempty" json:"elasticsearch,omitempty" mapstructure:"elasticsearch"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -774,6 +775,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Phantombuster = append(env.Connections.Phantombuster, conn)
+	case "elasticsearch":
+		var conn ElasticsearchConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Elasticsearch = append(env.Connections.Elasticsearch, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -909,6 +917,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Oracle = removeConnection(env.Connections.Oracle, connectionName)
 	case "phantombuster":
 		env.Connections.Phantombuster = removeConnection(env.Connections.Phantombuster, connectionName)
+	case "elasticsearch":
+		env.Connections.Elasticsearch = removeConnection(env.Connections.Elasticsearch, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1012,6 +1022,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Oracle, source.Oracle)
 	mergeConnectionList(&c.Phantombuster, source.Phantombuster)
 	mergeConnectionList(&c.Frankfurter, source.Frankfurter)
+	mergeConnectionList(&c.Elasticsearch, source.Elasticsearch)
 	c.buildConnectionKeyMap()
 	return nil
 }

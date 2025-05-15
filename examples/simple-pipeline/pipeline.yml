@@ -43,4 +43,5 @@ default_connections:
   sqlite: "my-sqlite"
   db2: "my-db2"
   phantombuster: "my-phantombuster"
+  elasticsearch: "my-elasticsearch"
   
