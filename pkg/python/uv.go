@@ -213,6 +213,12 @@ func (u *UvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *
 		flags = append(flags, "--with-requirements", execCtx.requirementsTxt)
 	}
 
+	for _, pkg := range execCtx.asset.Requirements {
+		if pkg != "" {
+			flags = append(flags, "--with", pkg)
+		}
+	}
+
 	flags = append(flags, "--module", execCtx.module)
 
 	noDependencyCommand := &CommandInstance{
