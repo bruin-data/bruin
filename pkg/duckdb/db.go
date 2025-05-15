@@ -3,6 +3,7 @@ package duck
 import (
 	"context"
 	"database/sql"
+
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
