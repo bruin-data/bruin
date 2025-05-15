@@ -1,6 +1,1 @@
 name: frankfurter-template
-default:
-  type: ingestr
-  parameters:
-    source_connection: frankfurter-default
-    destination: duckdb
