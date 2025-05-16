@@ -103,6 +103,16 @@ func EnrichContextWithAssetName(ctx *exec.Context, assetName string) *Renderer {
 	}
 }
 
+func EnrichContext(ctx *exec.Context, data map[string]any) *Renderer {
+	newCtx := exec.NewContext(data)
+	ctx.Update(newCtx)
+
+	return &Renderer{
+		context:         ctx,
+		queryRenderLock: &sync.Mutex{},
+	}
+}
+
 func NewRendererWithYesterday(pipelineName, runID string) *Renderer {
 	yesterday := time.Now().AddDate(0, 0, -1)
 	startDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
