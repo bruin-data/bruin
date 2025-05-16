@@ -14,11 +14,6 @@ type materializer interface {
 	Render(task *pipeline.Asset, query string) (string, error)
 }
 
-type queryExtractor interface {
-	ExtractQueriesFromString(content string) ([]*query.Query, error)
-	CloneForAsset(ctx context.Context, asset *pipeline.Asset) query.QueryExtractor
-}
-
 type DuckDBClient interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
@@ -33,11 +28,11 @@ type connectionFetcher interface {
 
 type BasicOperator struct {
 	connection   connectionFetcher
-	extractor    queryExtractor
+	extractor    query.QueryExtractor
 	materializer materializer
 }
 
-func NewBasicOperator(conn connectionFetcher, extractor queryExtractor, materializer materializer) *BasicOperator {
+func NewBasicOperator(conn connectionFetcher, extractor query.QueryExtractor, materializer materializer) *BasicOperator {
 	return &BasicOperator{
 		connection:   conn,
 		extractor:    extractor,
@@ -50,7 +45,7 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 }
 
 func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
-	extractor := o.extractor.CloneForAsset(ctx, t)
+	extractor := o.extractor.CloneForAsset(ctx, p, t)
 	queries, err := extractor.ExtractQueriesFromString(t.ExecutableFile.Content)
 	if err != nil {
 		return errors.Wrap(err, "cannot extract queries from the task file")

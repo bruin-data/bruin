@@ -9,6 +9,7 @@
     "path": "__PIPELINEDIR__pipeline.yml"
   },
   "default_connections": {},
+  "variables": null,
   "assets": [
     {
       "id": "17c2f1111545c0e72ea13a3a07fb3d5a4d96074d128ed10c1c03cc477401d61a",

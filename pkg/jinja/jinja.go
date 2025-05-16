@@ -55,8 +55,8 @@ func PythonEnvVariables(startDate, endDate *time.Time, pipelineName, runID strin
 	return vars
 }
 
-func NewRendererWithStartEndDates(startDate, endDate *time.Time, pipelineName, runID string) *Renderer {
-	ctx := exec.NewContext(map[string]any{
+func NewRendererWithStartEndDates(startDate, endDate *time.Time, pipelineName, runID string, vars Context) *Renderer {
+	ctx := map[string]any{
 		"start_date":        startDate.Format("2006-01-02"),
 		"start_date_nodash": startDate.Format("20060102"),
 		"start_datetime":    startDate.Format("2006-01-02T15:04:05"),
@@ -67,10 +67,17 @@ func NewRendererWithStartEndDates(startDate, endDate *time.Time, pipelineName, r
 		"end_timestamp":     endDate.Format("2006-01-02T15:04:05.000000Z07:00"),
 		"pipeline":          pipelineName,
 		"run_id":            runID,
-	})
+	}
+	for k, v := range vars {
+		// don't override existing variables
+		if _, ok := ctx[k]; ok {
+			continue
+		}
+		ctx[k] = v
+	}
 
 	return &Renderer{
-		context:         ctx,
+		context:         exec.NewContext(ctx),
 		queryRenderLock: &sync.Mutex{},
 	}
 }
@@ -79,7 +86,7 @@ func NewRendererWithYesterday(pipelineName, runID string) *Renderer {
 	yesterday := time.Now().AddDate(0, 0, -1)
 	startDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
 	endDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
-	return NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID)
+	return NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID, nil)
 }
 
 func (r *Renderer) Render(query string) (string, error) {

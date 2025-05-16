@@ -202,7 +202,7 @@ func NewCustomCheck(conn connectionFetcher) *CustomCheck {
 func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstance) error {
 	qq := ti.Check.Query
 	if c.extractor != nil {
-		extractor := c.extractor.CloneForAsset(ctx, ti.GetAsset())
+		extractor := c.extractor.CloneForAsset(ctx, ti.Pipeline, ti.Asset)
 		qry, err := extractor.ExtractQueriesFromString(qq)
 		if err != nil {
 			return errors.Wrap(err, "failed to render custom check query")

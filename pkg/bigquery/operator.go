@@ -20,11 +20,6 @@ type materializer interface {
 	IsFullRefresh() bool
 }
 
-type queryExtractor interface {
-	ExtractQueriesFromString(filepath string) ([]*query.Query, error)
-	CloneForAsset(ctx context.Context, asset *pipeline.Asset) query.QueryExtractor
-}
-
 type connectionFetcher interface {
 	GetBqConnection(name string) (DB, error)
 	GetConnection(name string) (interface{}, error)
@@ -32,11 +27,11 @@ type connectionFetcher interface {
 
 type BasicOperator struct {
 	connection   connectionFetcher
-	extractor    queryExtractor
+	extractor    query.QueryExtractor
 	materializer materializer
 }
 
-func NewBasicOperator(conn connectionFetcher, extractor queryExtractor, materializer materializer) *BasicOperator {
+func NewBasicOperator(conn connectionFetcher, extractor query.QueryExtractor, materializer materializer) *BasicOperator {
 	return &BasicOperator{
 		connection:   conn,
 		extractor:    extractor,
@@ -49,7 +44,7 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 }
 
 func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
-	extractor := o.extractor.CloneForAsset(ctx, t)
+	extractor := o.extractor.CloneForAsset(ctx, p, t)
 	queries, err := extractor.ExtractQueriesFromString(t.ExecutableFile.Content)
 	if err != nil {
 		return errors.Wrap(err, "cannot extract queries from the task file")
@@ -204,7 +199,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	if !ok {
 		return errors.New("query sensor requires a parameter named 'query'")
 	}
-	extractor := o.extractor.CloneForAsset(ctx, t)
+	extractor := o.extractor.CloneForAsset(ctx, p, t)
 
 	qry, err := extractor.ExtractQueriesFromString(qq)
 	if err != nil {
