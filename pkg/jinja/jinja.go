@@ -16,6 +16,10 @@ type Renderer struct {
 	queryRenderLock *sync.Mutex
 }
 
+func (r *Renderer) GetContext() *exec.Context {
+	return r.context
+}
+
 func init() { //nolint: gochecknoinits
 	gonja.DefaultConfig.StrictUndefined = true
 }
@@ -68,6 +72,30 @@ func NewRendererWithStartEndDates(startDate, endDate *time.Time, pipelineName, r
 		"pipeline":          pipelineName,
 		"run_id":            runID,
 	})
+
+	return &Renderer{
+		context:         ctx,
+		queryRenderLock: &sync.Mutex{},
+	}
+}
+
+func NewRendererWithAssetName(assetName string) *Renderer {
+	ctx := exec.NewContext(map[string]any{
+		"this": assetName,
+	})
+
+	return &Renderer{
+		context:         ctx,
+		queryRenderLock: &sync.Mutex{},
+	}
+}
+
+func EnrichContextWithAssetName(ctx *exec.Context, assetName string) *Renderer {
+	newCtx := exec.NewContext(map[string]any{
+		"this": assetName,
+	})
+
+	ctx.Update(newCtx)
 
 	return &Renderer{
 		context:         ctx,
