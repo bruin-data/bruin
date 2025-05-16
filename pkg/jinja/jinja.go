@@ -1,11 +1,13 @@
 package jinja
 
 import (
+	"context"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/nikolalohinski/gonja/v2"
 	"github.com/nikolalohinski/gonja/v2/exec"
 	"github.com/pkg/errors"
@@ -56,7 +58,14 @@ func PythonEnvVariables(startDate, endDate *time.Time, pipelineName, runID strin
 }
 
 func NewRendererWithStartEndDates(startDate, endDate *time.Time, pipelineName, runID string) *Renderer {
-	ctx := exec.NewContext(map[string]any{
+	return &Renderer{
+		context:         exec.NewContext(defaultContext(startDate, endDate, pipelineName, runID)),
+		queryRenderLock: &sync.Mutex{},
+	}
+}
+
+func defaultContext(startDate, endDate *time.Time, pipelineName, runID string) map[string]any {
+	return map[string]any{
 		"start_date":        startDate.Format("2006-01-02"),
 		"start_date_nodash": startDate.Format("20060102"),
 		"start_datetime":    startDate.Format("2006-01-02T15:04:05"),
@@ -67,11 +76,6 @@ func NewRendererWithStartEndDates(startDate, endDate *time.Time, pipelineName, r
 		"end_timestamp":     endDate.Format("2006-01-02T15:04:05.000000Z07:00"),
 		"pipeline":          pipelineName,
 		"run_id":            runID,
-	})
-
-	return &Renderer{
-		context:         ctx,
-		queryRenderLock: &sync.Mutex{},
 	}
 }
 
@@ -112,6 +116,32 @@ func (r *Renderer) Render(query string) (string, error) {
 	return out, nil
 }
 
+func (r *Renderer) CloneForAsset(ctx context.Context, asset *pipeline.Asset) RendererInterface { //nolint:ireturn
+	startDate, ok := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
+	if !ok {
+		return r
+	}
+
+	endDate, ok := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
+	if !ok {
+		return r
+	}
+
+	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
+	if ok && applyModifiers {
+		startDate = pipeline.ModifyDate(startDate, asset.IntervalModifiers.Start)
+		endDate = pipeline.ModifyDate(endDate, asset.IntervalModifiers.End)
+	}
+
+	jinjaContext := defaultContext(&startDate, &endDate, ctx.Value(pipeline.RunConfigPipelineName).(string), ctx.Value(pipeline.RunConfigRunID).(string))
+	jinjaContext["this"] = asset.Name
+
+	return &Renderer{
+		context:         exec.NewContext(jinjaContext),
+		queryRenderLock: &sync.Mutex{},
+	}
+}
+
 func findRenderErrorType(err error) string {
 	message := err.Error()
 	errorBits := strings.Split(message, ": ")
@@ -143,4 +173,10 @@ func findParserErrorType(err error) string {
 	}
 
 	return ""
+}
+
+// this ugly interface is needed to avoid circular dependencies and the ability to create different renderer instances per asset.
+type RendererInterface interface {
+	Render(query string) (string, error)
+	CloneForAsset(ctx context.Context, asset *pipeline.Asset) RendererInterface
 }
