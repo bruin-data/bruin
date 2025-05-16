@@ -255,8 +255,10 @@ func (n Notifications) MarshalJSON() ([]byte, error) {
 	})
 }
 
-type MaterializationType string
-type DDLStrategy string
+type (
+	MaterializationType string
+	DDLStrategy         string
+)
 
 const (
 	MaterializationTypeNone  MaterializationType = ""

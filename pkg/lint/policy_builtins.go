@@ -425,7 +425,6 @@ var builtinRules = map[string]validators{
 					Description: "Pipeline must have a start date",
 				},
 			}, nil
-
 		},
 	},
 	"pipeline-has-metadata-push": {
