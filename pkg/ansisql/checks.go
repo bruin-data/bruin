@@ -191,6 +191,10 @@ type CustomCheck struct {
 	extractor query.QueryExtractor
 }
 
+func (c *CustomCheck) GetExtractor() query.QueryExtractor {
+	return c.extractor
+}
+
 func NewCustomCheck(conn connectionFetcher) *CustomCheck {
 	queryExtractor := query.WholeFileExtractor{
 		Fs:       afero.NewOsFs(),
@@ -199,10 +203,56 @@ func NewCustomCheck(conn connectionFetcher) *CustomCheck {
 	return &CustomCheck{conn: conn, extractor: &queryExtractor}
 }
 
+func EnrichRendererWithAssetName(extractor *query.QueryExtractor, assetName string) error {
+
+	if extractor == nil {
+		return errors.New("extractor is nil")
+	}
+
+	wholeFileExtractor, ok := (*extractor).(*query.WholeFileExtractor)
+	if !ok {
+		return errors.New("extractor is not of type *WholeFileExtractor")
+	}
+
+	jinjaRenderer, ok := wholeFileExtractor.Renderer.(*jinja.Renderer)
+	if !ok {
+		return errors.New("renderer is not of type *jinja.Renderer")
+	}
+
+	ctx := jinjaRenderer.GetContext()
+	wholeFileExtractor.Renderer = jinja.EnrichContextWithAssetName(ctx, assetName)
+
+	return nil
+}
+
+func EnrichRenderer(extractor *query.QueryExtractor, data map[string]any) error {
+
+	if extractor == nil {
+		return errors.New("extractor is nil")
+	}
+
+	wholeFileExtractor, ok := (*extractor).(*query.WholeFileExtractor)
+	if !ok {
+		return errors.New("extractor is not of type *WholeFileExtractor")
+	}
+
+	jinjaRenderer, ok := wholeFileExtractor.Renderer.(*jinja.Renderer)
+	if !ok {
+		return errors.New("renderer is not of type *jinja.Renderer")
+	}
+
+	ctx := jinjaRenderer.GetContext()
+	wholeFileExtractor.Renderer = jinja.EnrichContext(ctx, data)
+
+	return nil
+}
+
 func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstance) error {
 	qq := ti.Check.Query
 	if c.extractor != nil {
 		extractor := c.extractor.CloneForAsset(ctx, ti.GetAsset())
+		//err := EnrichRendererWithAssetName(&extractor, ti.GetAsset().Name)
+		err := EnrichRenderer(&extractor, map[string]any{"this": ti.GetAsset().Name})
 		qry, err := extractor.ExtractQueriesFromString(qq)
 		if err != nil {
 			return errors.Wrap(err, "failed to render custom check query")
