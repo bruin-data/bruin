@@ -313,6 +313,320 @@ func TestMaterializer_Render(t *testing.T) {
 				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}';\n" +
 				"COMMIT TRANSACTION;$",
 		},
+	{
+		name: "scd2_no_primary_key",
+		task: &pipeline.Asset{
+			Name: "my.asset",
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategySCD2,
+			},
+			Columns: []pipeline.Column{
+				{Name: "id"},
+				{Name: "event_name"},
+				{Name: "ts"},
+			},
+		},
+		query:   "SELECT id, event_name, ts from source_table",
+		wantErr: true,
+	},
+	{
+		name: "scd2_reserved_column_name_is_current",
+		task: &pipeline.Asset{
+			Name: "my.asset",
+			Materialization: pipeline.Materialization{
+				Type:       pipeline.MaterializationTypeTable,
+				Strategy:   pipeline.MaterializationStrategySCD2,
+			},
+			Columns: []pipeline.Column{
+				{Name: "id", PrimaryKey: true},
+				{Name: "is_current"},
+			},
+		},
+		query:   "SELECT id, is_current from source_table",
+		wantErr: true,
+	},
+	{
+		name: "scd2_reserved_column_name_valid_from",
+		task: &pipeline.Asset{
+			Name: "my.asset",
+			Materialization: pipeline.Materialization{
+				Type:       pipeline.MaterializationTypeTable,
+				Strategy:   pipeline.MaterializationStrategySCD2,
+			},
+			Columns: []pipeline.Column{
+				{Name: "id", PrimaryKey: true},
+				{Name: "valid_from"},
+			},
+		},
+		query:   "SELECT id, valid_from from source_table",
+		wantErr: true,
+	},
+	{
+		name: "scd2_reserved_column_name_valid_until",
+		task: &pipeline.Asset{
+			Name: "my.asset",
+			Materialization: pipeline.Materialization{
+				Type:       pipeline.MaterializationTypeTable,
+				Strategy:   pipeline.MaterializationStrategySCD2,
+			},
+			Columns: []pipeline.Column{
+				{Name: "id", PrimaryKey: true},
+				{Name: "valid_until"},
+			},
+		},
+		query:   "SELECT id, valid_until from source_table",
+		wantErr: true,
+	},
+	{
+		name: "scd2_full_refresh_with_incremental_key", // dim_input
+		task: &pipeline.Asset{
+			Name: "my.asset",
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategySCD2,
+				IncrementalKey: "ts",
+			},
+			Columns: []pipeline.Column{
+				{Name: "id", PrimaryKey: true},
+				{Name: "event_name"},
+				{Name: "ts"},
+			},
+		},
+		query: "SELECT id, event_name, ts from source_table",
+		want: "^CREATE TABLE `my.asset`\n" +
+			"PARTITION BY DATE(valid_from)\n" +
+			"CLUSTER BY is_current, id AS\n" +
+			"SELECT id, event_name, ts as valid_from, TIMESTAMP\\('9999-12-31'\\) as valid_until, TRUE as is_current\n" +
+			"FROM source_table$"
+	},
+	{
+		name: "scd2_table_exists_with_incremental_key", // dim_input
+		task: &pipeline.Asset{
+			Name: "my.asset",
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategySCD2,
+				IncrementalKey: "ts",
+			},
+			Columns: []pipeline.Column{
+				{Name: "id", PrimaryKey: true},
+				{Name: "event_name"},
+				{Name: "ts"},
+			},
+		},
+		query: "SELECT id, event_name, ts from source_table",
+		want: "^MERGE INTO `my.asset` AS target\n" +
+			"USING \\(\n" +
+			"  SELECT id, event_name, ts from source_table\n" +
+			"\\) AS source\n" +
+			"ON target.id = source.id AND target.is_current = TRUE\n" +
+			"\n" +
+			"WHEN MATCHED AND \\(\n" +
+			"    target.valid_from < source.ts\n" +
+			"\\) THEN\n" +
+			"  UPDATE SET\n" +
+			"    target.valid_until = source.ts,\n" +
+			"    target.is_current = FALSE\n" +
+			"\n" +
+			"WHEN NOT MATCHED BY TARGET THEN\n" +
+			"  INSERT (id, event_name, valid_from, valid_until, is_current)\n" +
+			"  VALUES (source.id, source.event_name, source.ts, TIMESTAMP\\('9999-12-31'\\), TRUE)$"
+	},
+	{
+		name: "scd2_multiple_primary_keys_with_incremental_key",
+		task: &pipeline.Asset{
+			Name: "my.asset",
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategySCD2,
+				IncrementalKey: "ts",
+			},
+			Columns: []pipeline.Column{
+				{Name: "user_id", PrimaryKey: true},
+				{Name: "event_type", PrimaryKey: true},
+				{Name: "col1"},
+				{Name: "col2"},
+				{Name: "ts"},
+			},
+		},
+		query: "SELECT id, event_type, col1, col2, ts from source_table",
+		want: "^MERGE INTO `my.asset` AS target\n" +
+			"USING \\(\n" +
+			"  SELECT id, event_type, col1, col2, ts from source_table\n" +
+			"\\) AS source\n" +
+			"ON target.id = source.id AND target.event_type = source.event_type AND target.is_current = TRUE\n" +
+			"\n" +
+			"WHEN MATCHED AND \\(\n" +
+			"    target.col1 != source.col1 OR\n" +
+			"    target.col2 != source.col2 OR\n" +
+			"    target.ts < source.ts\n" +
+			"\\) THEN\n" +
+			"  UPDATE SET\n" +
+			"    target.valid_until = source.ts,\n" +
+			"    target.is_current = FALSE\n" +
+			"\n" +
+			"WHEN NOT MATCHED BY TARGET THEN\n" +
+			"  INSERT (id, event_type, col1, col2, valid_from, valid_until, is_current)\n" +
+			"  VALUES (source.id, source.event_type, source.col1, source.col2, source.ts, TIMESTAMP\\('9999-12-31'\\), TRUE)$"
+	{
+		name: "scd2_multiple_primary_keys_with_incremental_key_and_deletion_tracking",
+		task: &pipeline.Asset{
+			Name: "my.asset",
+			Materialization: pipeline.Materialization{
+				Type:                 pipeline.MaterializationTypeTable,
+				Strategy:             pipeline.MaterializationStrategySCD2,
+				IncrementalKey:       "ts",
+				TrackSourceDeletions: true,
+			},
+			Columns: []pipeline.Column{
+				{Name: "user_id", PrimaryKey: true},
+				{Name: "event_type", PrimaryKey: true},
+				{Name: "col1"},
+				{Name: "col2"},
+				{Name: "ts"},
+			},
+		},
+		query: "SELECT id, event_type, col1, col2, ts from source_table",
+		want: "^MERGE INTO `my.asset` AS target\n" +
+			"USING \\(\n" +
+			"  SELECT id, event_type, col1, col2, ts from source_table\n" +
+			"\\) AS source\n" +
+			"ON target.id = source.id AND target.event_type = source.event_type AND target.is_current = TRUE\n" +
+			"\n" +
+			"WHEN MATCHED AND \\(\n" +
+			"    target.col1 != source.col1 OR\n" +
+			"    target.col2 != source.col2 OR\n" +
+			"    target.ts < source.ts\n" +
+			"\\) THEN\n" +
+			"  UPDATE SET\n" +
+			"    target.valid_until = source.ts,\n" +
+			"    target.is_current = FALSE\n" +
+			"\n" +
+			"WHEN NOT MATCHED BY TARGET THEN\n" +
+			"  INSERT (id, event_type, col1, col2, valid_from, valid_until, is_current)\n" +
+			"  VALUES (source.id, source.event_type, source.col1, source.col2, source.ts, TIMESTAMP\\('9999-12-31'\\), TRUE)\n" +
+			"\n" +
+			"WHEN NOT MATCHED BY SOURCE AND target.is_current = TRUE THEN\n" +
+			"  UPDATE SET\n" +
+			"    target.valid_until = CURRENT_TIMESTAMP(),\n" +
+			"    target.is_current = FALSE$"
+	},
+	{
+		name: "scd2_with_custom_column_names_and_incremental_key",
+		task: &pipeline.Asset{
+			Name: "my.asset",
+			Materialization: pipeline.Materialization{
+				Type:             pipeline.MaterializationTypeTable,
+				Strategy:         pipeline.MaterializationStrategySCD2,
+				IncrementalKey:   "ts",
+				ValidFromName:    "start_time",
+				ValidUntilName:   "end_time",
+				IsCurrentName:    "is_active",
+			},
+			Columns: []pipeline.Column{
+				{Name: "id", PrimaryKey: true},
+				{Name: "col1"},
+				{Name: "col2"},
+				{Name: "ts"},
+			},
+		},
+		query: "SELECT id, col1, col2, ts from source_table",
+		want: "^MERGE INTO `my.asset` AS target\n" +
+			"USING \\(\n" +
+			"  SELECT id, col1, col2, ts from source_table\n" +
+			"\\) AS source\n" +
+			"ON target.id = source.id AND target.is_active = TRUE\n" +
+			"\n" +
+			"WHEN MATCHED AND \\(\n" +
+			"    target.col1 != source.col1 OR\n" +
+			"    target.col2 != source.col2 OR\n" +
+			"    target.ts < source.ts\n" +
+			"\\) THEN\n" +
+			"  UPDATE SET\n" +
+			"    target.end_time = source.ts,\n" +
+			"    target.is_active = FALSE\n" +
+			"\n" +
+			"WHEN NOT MATCHED BY TARGET THEN\n" +
+			"  INSERT (id, col1, col2, start_time, end_time, is_active)\n" +
+			"  VALUES (source.id, source.col1, source.col2, source.ts, TIMESTAMP\\('9999-12-31'\\), TRUE)$"
+	},
+	{
+		name: "scd2_with_custom_column_names_no_incremental_key",
+		task: &pipeline.Asset{
+			Name: "my.asset",
+			Materialization: pipeline.Materialization{
+				Type:             pipeline.MaterializationTypeTable,
+				Strategy:         pipeline.MaterializationStrategySCD2,
+				ValidFromName:    "start_time",
+				ValidUntilName:   "end_time",
+				IsCurrentName:    "is_active",
+			},
+			Columns: []pipeline.Column{
+				{Name: "id", PrimaryKey: true},
+				{Name: "col1"},
+				{Name: "col2"},
+				{Name: "col3"},
+			},
+		},
+		query: "SELECT id, col1, col2, col3 from source_table",
+		want: "^MERGE INTO `my.asset` AS target\n" +
+			"USING \\(\n" +
+			"  SELECT id, col1, col2, col3 from source_table\n" +
+			"\\) AS source\n" +
+			"ON target.id = source.id AND target.is_active = TRUE\n" +
+			"\n" +
+			"WHEN MATCHED AND \\(\n" +
+			"    target.col1 != source.col1 OR\n" +
+			"    target.col2 != source.col2 OR\n" +
+			"    target.col3 != source.col3\n" +
+			"\\) THEN\n" +
+			"  UPDATE SET\n" +
+			"    target.end_time = CURRENT_TIMESTAMP(),\n" +
+			"    target.is_active = FALSE\n" +
+			"\n" +
+			"WHEN NOT MATCHED BY TARGET THEN\n" +
+			"  INSERT (id, col1, col2, col3, start_time, end_time, is_active)\n" +
+			"  VALUES (source.id, source.col1, source.col2, source.col3, CURRENT_TIMESTAMP(), TIMESTAMP\\('9999-12-31'\\), TRUE)$"
+	},
+	{
+		name: "scd2_no_incremental_key",
+		task: &pipeline.Asset{
+			Name: "my.asset",
+			Materialization: pipeline.Materialization{
+				Type:     pipeline.MaterializationTypeTable,
+				Strategy: pipeline.MaterializationStrategySCD2,
+			},
+			Columns: []pipeline.Column{
+				{Name: "id", PrimaryKey: true},
+				{Name: "col1"},
+				{Name: "col2"},
+				{Name: "col3"},
+				{Name: "col4"},
+			},
+		},
+		query: "SELECT id, event_name, value from source_table",
+		want: "^MERGE INTO `my.asset` AS target\n" +
+			"USING \\(\n" +
+			"  SELECT id, col1, col2, col3, col4 from source_table\n" +
+			"\\) AS source\n" +
+			"ON target.id = source.id AND target.is_current = TRUE\n" +
+			"\n" +
+			"WHEN MATCHED AND \\(\n" +
+			"    target.col1 != source.col1 OR\n" +
+			"    target.col2 != source.col2 OR\n" +
+			"    target.col3 != source.col3 OR\n" +
+			"    target.col4 != source.col4\n" +
+			"\\) THEN\n" +
+			"  UPDATE SET\n" +
+			"    target.valid_until = CURRENT_TIMESTAMP(),\n" +
+			"    target.is_current = FALSE\n" +
+			"\n" +
+			"WHEN NOT MATCHED BY TARGET THEN\n" +
+			"  INSERT (id, col1, col2, col3, col4, valid_from, valid_until, is_current)\n" +
+			"  VALUES (source.id, source.col1, source.col2, source.col3, source.col4, CURRENT_TIMESTAMP(), TIMESTAMP\\('9999-12-31'\\), TRUE)$"
+	},
+
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
