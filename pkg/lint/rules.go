@@ -1198,3 +1198,20 @@ func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.P
 
 	return issues, nil
 }
+
+func ValidateVariables(p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	if p.Variables == nil {
+		return issues, nil
+	}
+
+	err := p.Variables.Validate()
+	if err != nil {
+		issues = append(issues, &Issue{
+			Description: err.Error(),
+		})
+	}
+
+	return issues, nil
+}

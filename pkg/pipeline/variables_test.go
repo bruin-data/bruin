@@ -30,6 +30,17 @@ func TestVariables(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must have a default value")
 	})
+	t.Run("Should return no error if schema is valid", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"user": map[string]any{
+				"type":    "string",
+				"default": "Jhon Doe",
+			},
+		}
+		err := vars.Validate()
+		require.NoError(t, err)
+	})
 	t.Run("Should use default values to contruct the variables", func(t *testing.T) {
 		t.Parallel()
 		vars := pipeline.Variables{
