@@ -10,7 +10,7 @@ import (
 
 func TestVariables(t *testing.T) {
 	t.Parallel()
-	t.Run("Should return an error if the variables are not valid JSONSchema", func(t *testing.T) {
+	t.Run("Should return an error if the variables are not valid JSONSchema object", func(t *testing.T) {
 		t.Parallel()
 		vars := pipeline.Variables{
 			"user": "foo",
@@ -51,6 +51,39 @@ func TestVariables(t *testing.T) {
 		assert.Equal(t, vars.Value(), map[string]any{
 			"user":   "foo",
 			"age":    42,
+			"active": true,
+		})
+	})
+	t.Run("Should handle nested variables", func(t *testing.T) {
+		t.Parallel()
+		vars := pipeline.Variables{
+			"user": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"name": map[string]any{
+						"type": "string",
+					},
+					"age": map[string]any{
+						"type": "number",
+					},
+				},
+				"default": map[string]any{
+					"name": "foo",
+					"age":  42,
+				},
+			},
+			"active": map[string]any{
+				"type":    "boolean",
+				"default": true,
+			},
+		}
+		err := vars.Validate()
+		require.NoError(t, err)
+		assert.Equal(t, vars.Value(), map[string]any{
+			"user": map[string]any{
+				"name": "foo",
+				"age":  42,
+			},
 			"active": true,
 		})
 	})

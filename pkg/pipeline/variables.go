@@ -16,6 +16,9 @@ func varSchemaLoader() *gojsonschema.SchemaLoader {
 type Variables map[string]any
 
 func (v Variables) Validate() error {
+	// TODO(turtledev):
+	// - validate the the defaults actually satisfy the schema
+	// - make "properties" a required field for object types
 	schema := map[string]any{
 		"type":       "object",
 		"properties": v,
