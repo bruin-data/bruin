@@ -67,13 +67,7 @@ func NewRendererWithStartEndDates(startDate, endDate *time.Time, pipelineName, r
 		"end_timestamp":     endDate.Format("2006-01-02T15:04:05.000000Z07:00"),
 		"pipeline":          pipelineName,
 		"run_id":            runID,
-	}
-	for k, v := range vars {
-		// don't override existing variables
-		if _, ok := ctx[k]; ok {
-			continue
-		}
-		ctx[k] = v
+		"var":               vars,
 	}
 
 	return &Renderer{

@@ -44,5 +44,4 @@ func (v Variables) Value() map[string]any {
 		}
 	}
 	return values
-
 }
