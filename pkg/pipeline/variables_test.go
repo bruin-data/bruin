@@ -13,7 +13,9 @@ func TestVariables(t *testing.T) {
 	t.Run("Should return an error if the variables are not valid JSONSchema object", func(t *testing.T) {
 		t.Parallel()
 		vars := pipeline.Variables{
-			"user": "foo",
+			"user": {
+				"type": "complex",
+			},
 		}
 		err := vars.Validate()
 		require.Error(t, err)

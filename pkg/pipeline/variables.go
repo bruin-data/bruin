@@ -13,7 +13,7 @@ func varSchemaLoader() *gojsonschema.SchemaLoader {
 	return loader
 }
 
-type Variables map[string]any
+type Variables map[string]map[string]any
 
 func (v Variables) Validate() error {
 	// TODO(turtledev):
@@ -29,10 +29,7 @@ func (v Variables) Validate() error {
 		return fmt.Errorf("invalid variables schema: %w", err)
 	}
 	for key, value := range v {
-		if _, ok := value.(map[string]any); !ok {
-			return fmt.Errorf("invalid variable %q: must be an object", key)
-		}
-		if _, ok := value.(map[string]any)["default"]; !ok {
+		if _, ok := value["default"]; !ok {
 			return fmt.Errorf("invalid variable %q: must have a default value", key)
 		}
 	}
@@ -42,10 +39,8 @@ func (v Variables) Validate() error {
 func (v Variables) Value() map[string]any {
 	values := make(map[string]any)
 	for key, value := range v {
-		if valueMap, ok := value.(map[string]any); ok {
-			if defaultValue, ok := valueMap["default"]; ok {
-				values[key] = defaultValue
-			}
+		if defaultValue, ok := value["default"]; ok {
+			values[key] = defaultValue
 		}
 	}
 	return values
