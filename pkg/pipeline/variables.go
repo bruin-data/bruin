@@ -25,9 +25,26 @@ func (v Variables) Validate() error {
 	if err != nil {
 		return fmt.Errorf("invalid variables schema: %w", err)
 	}
+	for key, value := range v {
+		if _, ok := value.(map[string]any); !ok {
+			return fmt.Errorf("invalid variable %q: must be an object", key)
+		}
+		if _, ok := value.(map[string]any)["default"]; !ok {
+			return fmt.Errorf("invalid variable %q: must have a default value", key)
+		}
+	}
 	return nil
 }
 
 func (v Variables) Value() map[string]any {
-	return v
+	values := make(map[string]any)
+	for key, value := range v {
+		if valueMap, ok := value.(map[string]any); ok {
+			if defaultValue, ok := valueMap["default"]; ok {
+				values[key] = defaultValue
+			}
+		}
+	}
+	return values
+
 }

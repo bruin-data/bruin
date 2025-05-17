@@ -28,7 +28,7 @@ func TestVariables(t *testing.T) {
 		}
 		err := vars.Validate()
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "variables must have a default value")
+		assert.Contains(t, err.Error(), "must have a default value")
 	})
 	t.Run("Should use default values to contruct the variables", func(t *testing.T) {
 		t.Parallel()
