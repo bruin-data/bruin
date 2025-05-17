@@ -186,7 +186,7 @@ func (f *WholeFileExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipe
 	runID := ctx.Value(pipeline.RunConfigRunID).(string)
 	startDate = pipeline.ModifyDate(startDate, t.IntervalModifiers.Start)
 	endDate = pipeline.ModifyDate(endDate, t.IntervalModifiers.End)
-	newRenderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID, p.Variables)
+	newRenderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID, p.Variables.Value())
 
 	return &WholeFileExtractor{
 		Renderer: newRenderer,

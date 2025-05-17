@@ -183,7 +183,7 @@ func Render() *cli.Command {
 			r := RenderCommand{
 				extractor: &query.WholeFileExtractor{
 					Fs:       fs,
-					Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id", pl.Variables),
+					Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id", pl.Variables.Value()),
 				},
 				materializers: map[pipeline.AssetType]queryMaterializer{
 					pipeline.AssetTypeBigqueryQuery:   bigquery.NewMaterializer(fullRefresh),
@@ -350,7 +350,7 @@ func getPipelineDefinitionFullPath(pipelinePath string) (string, error) {
 func modifyExtractor(ctx ModifierInfo, p *pipeline.Pipeline, t *pipeline.Asset) queryExtractor {
 	newStartDate := pipeline.ModifyDate(ctx.StartDate, t.IntervalModifiers.Start)
 	newEnddate := pipeline.ModifyDate(ctx.EndDate, t.IntervalModifiers.End)
-	newRenderer := jinja.NewRendererWithStartEndDates(&newStartDate, &newEnddate, "your-pipeline-name", "your-run-id", p.Variables)
+	newRenderer := jinja.NewRendererWithStartEndDates(&newStartDate, &newEnddate, "your-pipeline-name", "your-run-id", p.Variables.Value())
 
 	return &query.WholeFileExtractor{
 		Renderer: newRenderer,
