@@ -19,12 +19,7 @@ func (v Variables) Validate() error {
 	// TODO(turtledev):
 	// - validate the the defaults actually satisfy the schema
 	// - make "properties" a required field for object types
-	schema := map[string]any{
-		"type":       "object",
-		"properties": v,
-	}
-
-	_, err := varSchemaLoader().Compile(gojsonschema.NewGoLoader(schema))
+	_, err := varSchemaLoader().Compile(gojsonschema.NewGoLoader(v.Schema()))
 	if err != nil {
 		return fmt.Errorf("invalid variables schema: %w", err)
 	}
@@ -44,4 +39,12 @@ func (v Variables) Value() map[string]any {
 		}
 	}
 	return values
+}
+
+func (v Variables) Schema() any {
+	return map[string]any{
+		"$schema":    "https://json-schema.org/draft-07/schema",
+		"type":       "object",
+		"properties": v,
+	}
 }
