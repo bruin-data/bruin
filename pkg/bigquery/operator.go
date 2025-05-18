@@ -331,3 +331,43 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 	}
 }
+
+type DDLOperator struct {
+	connection connectionFetcher
+}
+
+func NewDDLOperator(conn connectionFetcher) *DDLOperator {
+	return &DDLOperator{
+		connection: conn,
+	}
+}
+
+func (ddl *DDLOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	return ddl.RunTask(ctx, ti.GetPipeline(), ti.GetAsset())
+}
+
+func (ddl *DDLOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
+	materialized, err := BuildCreateTableQuery(t, "")
+	if err != nil {
+		return err
+	}
+	connName, err := p.GetConnectionNameForAsset(t)
+	if err != nil {
+		return err
+	}
+	conn, err := ddl.connection.GetBqConnection(connName)
+	if err != nil {
+		return err
+	}
+
+	if err := conn.CreateDataSetIfNotExist(t, ctx); err != nil {
+		return err
+	}
+	if ctx.Value(pipeline.RunConfigFullRefresh).(bool) {
+		err = conn.DropTableOnMismatch(ctx, t.Name, t)
+		if err != nil {
+			return errors.Wrapf(err, "failed to check for mismatches for table '%s'", t.Name)
+		}
+	}
+	return conn.RunQueryWithoutResult(ctx, &query.Query{Query: materialized})
+}

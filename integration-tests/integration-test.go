@@ -123,6 +123,11 @@ func main() {
 	includeIngestr := os.Getenv("INCLUDE_INGESTR") == "1"
 	runIntegrationTests(binary, currentFolder, includeIngestr)
 	runIntegrationWorkflow(binary, currentFolder)
+
+	// Check if .bruin.cloud.yml file exists and run cloud integration tests if it does
+	if _, err := os.Stat(filepath.Join(currentFolder, ".bruin.cloud.yml")); err == nil {
+		runCloudIntegrationTests(binary, currentFolder)
+	}
 }
 
 func runIntegrationWorkflow(binary string, currentFolder string) {
@@ -1024,4 +1029,41 @@ func GetTempFile(tempdir string, filename string) string {
 	}
 
 	return tempfile.Name()
+}
+
+func getCloudTasks(binary string, currentFolder string) []e2e.Task {
+	configFlags := []string{"--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml")}
+
+	tasks := []e2e.Task{
+		{
+			Name:    "[bigquery] query 'select 1'",
+			Command: binary,
+			Args:    []string{"query", "--env", "bq-select", "--connection", "gcp", "--query", "SELECT 1", "--output", "json"},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Output:   `{"columns":[{"name":"f0_","type":"INTEGER"}],"rows":[[1]],"connectionName":"gcp","query":"SELECT 1"}`,
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByOutputJSON,
+			},
+		},
+	}
+
+	for i := range tasks {
+		tasks[i].Args = append(tasks[i].Args, configFlags...)
+	}
+
+	return tasks
+}
+
+func runCloudIntegrationTests(binary string, currentFolder string) {
+	tests := getCloudTasks(binary, currentFolder)
+	for _, test := range tests {
+		if err := test.Run(); err != nil {
+			fmt.Printf("%s Assert error: %v\n", test.Name, err)
+			os.Exit(1)
+		}
+	}
 }

@@ -454,7 +454,7 @@ func convertToBruinAsset(fs afero.Fs, filePath string) error {
 
 	switch ext {
 	case ".sql":
-		bruinHeader = fmt.Sprintf("/* @bruin\nname: %s\n@bruin */\n\n", assetName)
+		bruinHeader = fmt.Sprintf("/* @bruin\nname: %s\ntype: bq.sql\n@bruin */\n\n", assetName)
 	case ".py":
 		bruinHeader = fmt.Sprintf("\"\"\" @bruin\nname: %s\n@bruin \"\"\"\n\n", assetName)
 	default:
