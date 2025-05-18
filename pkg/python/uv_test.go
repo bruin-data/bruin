@@ -151,6 +151,75 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 			},
 			wantErr: assert.Error,
 		},
+		{
+			name: "requirements file is resolved relative to the .py file location",
+			fields: func() *fields {
+				cmd := new(mockCmd)
+				cmd.On("Run", mock.Anything, repo, &CommandInstance{
+					Name: "~/.bruin/uv",
+					Args: []string{
+						"run",
+						"--python", "3.11",
+						"--with-requirements", "/abs/path/to/requirements.txt",
+						"--module", module,
+					},
+				}).Return(assert.AnError)
+
+				inst := new(mockUvInstaller)
+				inst.On("EnsureUvInstalled", mock.Anything).Return("~/.bruin/uv", nil)
+
+				return &fields{
+					cmd:         cmd,
+					uvInstaller: inst,
+				}
+			},
+			execCtx: &executionContext{
+				repo:   repo,
+				module: module,
+				asset: &pipeline.Asset{
+					ExecutableFile: pipeline.ExecutableFile{
+						Path: "/abs/path/to/test_asset.py",
+					},
+					RequirementsFile: "./requirements.txt",
+				},
+			},
+			wantErr: assert.Error,
+		},
+		{
+			name: "resolves requirements.txt from another folder",
+			fields: func() *fields {
+				cmd := new(mockCmd)
+				expectedPath := "/abs/path/to/my-second-pipeline/assets/pythonsample/requirements.txt"
+				cmd.On("Run", mock.Anything, repo, &CommandInstance{
+					Name: "~/.bruin/uv",
+					Args: []string{
+						"run",
+						"--python", "3.11",
+						"--with-requirements", expectedPath,
+						"--module", module,
+					},
+				}).Return(assert.AnError)
+
+				inst := new(mockUvInstaller)
+				inst.On("EnsureUvInstalled", mock.Anything).Return("~/.bruin/uv", nil)
+
+				return &fields{
+					cmd:         cmd,
+					uvInstaller: inst,
+				}
+			},
+			execCtx: &executionContext{
+				repo:   repo,
+				module: module,
+				asset: &pipeline.Asset{
+					ExecutableFile: pipeline.ExecutableFile{
+						Path: "/abs/path/to/my-third-pipeline/assets/pythonsample/test_asset.py",
+					},
+					RequirementsFile: "../../../my-second-pipeline/assets/pythonsample/requirements.txt",
+				},
+			},
+			wantErr: assert.Error,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

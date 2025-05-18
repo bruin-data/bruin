@@ -213,7 +213,7 @@ func (u *UvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *
 		flags = append(flags, "--with-requirements", execCtx.requirementsTxt)
 	}
 
-	// Resolve relative requirements file path for YAML file
+	// Resolve a relative requirements file path for YAML file
 	if execCtx.asset.RequirementsFile != "" && !filepath.IsAbs(execCtx.asset.RequirementsFile) {
 		execDir := filepath.Dir(execCtx.asset.ExecutableFile.Path)
 		execCtx.asset.RequirementsFile = filepath.Join(execDir, execCtx.asset.RequirementsFile)
