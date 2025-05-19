@@ -109,7 +109,12 @@ export default withMermaid({
                             {text: "Configuration", link: "/vscode-extension/configuration"},
                             {text: "Panels Overview", link: "/vscode-extension/panel-overview",
                                 items: [
-                                    {text: "Side Panel", link: "/vscode-extension/panels/side-panel"},
+                                    {text: "Side Panel", 
+                                        link: "/vscode-extension/panels/side-panel/side-panel",
+                                        items: [
+                                            {text: "Tabs", link: "/vscode-extension/panels/side-panel/tabs"},
+                                            {text: "Editor Experience", link: "/vscode-extension/panels/side-panel/editor-experience"},
+                                        ]},
                                     {text: "Lineage", link: "/vscode-extension/panels/lineage-panel"},
                                     {text: "Query Preview", link: "/vscode-extension/panels/query-preview"},
                                 ],
