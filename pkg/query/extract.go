@@ -170,9 +170,9 @@ func (f *WholeFileExtractor) ReextractQueriesFromSlice(content []string) ([]stri
 	return allQueries, nil
 }
 
-func (f *WholeFileExtractor) CloneForAsset(ctx context.Context, t *pipeline.Asset) QueryExtractor {
+func (f *WholeFileExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) QueryExtractor {
 	return &WholeFileExtractor{
-		Renderer: f.Renderer.CloneForAsset(ctx, t),
+		Renderer: f.Renderer.CloneForAsset(ctx, p, t),
 		Fs:       f.Fs,
 	}
 }
