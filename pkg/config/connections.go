@@ -729,3 +729,30 @@ type PhantombusterConnection struct {
 func (c PhantombusterConnection) GetName() string {
 	return c.Name
 }
+
+type ElasticsearchConnection struct {
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username    string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password    string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host        string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port        int    `yaml:"port,omitempty" json:"port" mapstructure:"port"`
+	Secure      string `yaml:"secure,omitempty" json:"secure" mapstructure:"secure" default:"true"`
+	VerifyCerts string `yaml:"verify_certs,omitempty" json:"verify_certs" mapstructure:"verify_certs" default:"true"`
+}
+
+func (c ElasticsearchConnection) GetName() string {
+	return c.Name
+}
+
+type SpannerConnection struct {
+	Name              string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	ProjectID         string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
+	InstanceID        string `yaml:"instance_id,omitempty" json:"instance_id" mapstructure:"instance_id"`
+	Database          string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	CredentialsBase64 string `yaml:"credentials_base64,omitempty" json:"credentials_base64" mapstructure:"credentials_base64"`
+	CredentialsPath   string `yaml:"credentials_path,omitempty" json:"credentials_path" mapstructure:"credentials_path"`
+}
+
+func (c SpannerConnection) GetName() string {
+	return c.Name
+}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -79,16 +78,12 @@ func (q Query) String() string {
 
 var queryCommentRegex = regexp.MustCompile(`(?m)(?s)\/\*.*?\*\/|(^|\s)--.*?\n`)
 
-type renderer interface {
-	Render(query string) (string, error)
-}
-
 // FileQuerySplitterExtractor is a regular file extractor, but it splits the queries in the given file into multiple
 // instances. For usecases that require EXPLAIN statements, such as validating Snowflake queries, it is not possible
-// to EXPLAIN a multi-query string directly, therefore we have to split them.
+// to use a single query with multiple statements, so we need to split them into multiple queries.
 type FileQuerySplitterExtractor struct {
 	Fs       afero.Fs
-	Renderer renderer
+	Renderer jinja.RendererInterface
 }
 
 func (f FileQuerySplitterExtractor) ExtractQueriesFromString(content string) ([]*Query, error) {
@@ -146,7 +141,7 @@ func splitQueries(fileContent string) []*Query {
 // for cases where the whole file content can be treated as a single query, such as validating GoogleCloudPlatform queries via dry-run.
 type WholeFileExtractor struct {
 	Fs       afero.Fs
-	Renderer renderer
+	Renderer jinja.RendererInterface
 }
 
 func (f *WholeFileExtractor) ExtractQueriesFromString(content string) ([]*Query, error) {
@@ -175,21 +170,9 @@ func (f *WholeFileExtractor) ReextractQueriesFromSlice(content []string) ([]stri
 	return allQueries, nil
 }
 
-func (f *WholeFileExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) QueryExtractor {
-	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
-	if !ok || !applyModifiers {
-		return f
-	}
-	startDate := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
-	endDate := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
-	pipelineName := ctx.Value(pipeline.RunConfigPipelineName).(string)
-	runID := ctx.Value(pipeline.RunConfigRunID).(string)
-	startDate = pipeline.ModifyDate(startDate, t.IntervalModifiers.Start)
-	endDate = pipeline.ModifyDate(endDate, t.IntervalModifiers.End)
-	newRenderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID, p.Variables.Value())
-
+func (f *WholeFileExtractor) CloneForAsset(ctx context.Context, t *pipeline.Asset) QueryExtractor {
 	return &WholeFileExtractor{
-		Renderer: newRenderer,
+		Renderer: f.Renderer.CloneForAsset(ctx, t),
 		Fs:       f.Fs,
 	}
 }

@@ -94,7 +94,7 @@ func TestValidateFlags(t *testing.T) {
 			t.Parallel()
 
 			// First validate the flags
-			err := validateFlags(tt.connection, tt.query, tt.asset, tt.environment)
+			err := validateFlags(tt.connection, tt.query, tt.asset)
 
 			if tt.expectError {
 				require.Error(t, err)

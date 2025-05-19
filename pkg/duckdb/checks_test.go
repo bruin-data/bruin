@@ -41,6 +41,11 @@ func (m *mockQuerierWithResult) SelectWithSchema(ctx context.Context, queryObjec
 	return get.(*query.QueryResult), args.Error(1)
 }
 
+func (m *mockQuerierWithResult) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	args := m.Called(ctx, asset)
+	return args.Error(0)
+}
+
 type mockConnectionFetcher struct {
 	mock.Mock
 }

@@ -875,6 +875,19 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 
 		switch asset.Materialization.Strategy {
 		case pipeline.MaterializationStrategyNone:
+		case pipeline.MaterializationStrategyDDL:
+			if asset.Materialization.Type == pipeline.MaterializationTypeView {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "DDL strategy is not allowed on a view",
+				})
+			}
+			if asset.ExecutableFile.Content != "" {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "DDL strategy builds the table, from bruin metadata and does not accept a custom query",
+				})
+			}
 		case pipeline.MaterializationStrategyCreateReplace:
 		case pipeline.MaterializationStrategyAppend:
 			return issues, nil

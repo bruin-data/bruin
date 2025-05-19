@@ -459,6 +459,7 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, config.EnvironmentContextKey, cm.SelectedEnvironment)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigPipelineName, foundPipeline.Name)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, runID)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 
 			exeCtx, cancel := signal.NotifyContext(runCtx, syscall.SIGINT, syscall.SIGTERM)
 			defer cancel()
@@ -543,7 +544,6 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 
 	if runningForAnAsset {
 		task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath, foundPipeline)
-
 		if err != nil {
 			errorPrinter.Printf("Failed to build asset: %v. Are you sure you used the correct path?\n", err.Error())
 			return &PipelineInfo{
@@ -736,7 +736,7 @@ func setupExecutors(
 		Fs:       fs,
 		Renderer: renderer,
 	}
-	customCheckRunner := ansisql.NewCustomCheckOperator(conn, wholeFileExtractor)
+	customCheckRunner := ansisql.NewCustomCheckOperator(conn, renderer)
 	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery || s.WillRunTaskOfType(pipeline.AssetTypeBigquerySeed) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryTableSensor) {
 		bqOperator := bigquery.NewBasicOperator(conn, wholeFileExtractor, bigquery.NewMaterializer(fullRefresh))
 		bqCheckRunner, err := bigquery.NewColumnCheckOperator(conn)

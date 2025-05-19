@@ -76,10 +76,15 @@ func Query() *cli.Command {
 				Name:  "export",
 				Usage: "export results to a CSV file ",
 			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Usage:   "the path to the .bruin.yml file",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			fs := afero.NewOsFs()
-			if err := validateCliFlags(c); err != nil {
+			if err := validateFlags(c.String("connection"), c.String("query"), c.String("asset")); err != nil {
 				return handleError(c.String("output"), err)
 			}
 
@@ -163,27 +168,17 @@ func Query() *cli.Command {
 	}
 }
 
-func validateCliFlags(c *cli.Context) error {
-	return validateFlags(
-		c.String("connection"),
-		c.String("query"),
-		c.String("asset"),
-		c.String("environment"),
-	)
-}
-
-func validateFlags(connection, query, asset, environment string) error {
+func validateFlags(connection, query, asset string) error {
 	hasConnection := connection != ""
 	hasQuery := query != ""
 	hasAsset := asset != ""
-	hasEnvironment := environment != ""
 
 	switch {
 	case hasConnection:
 		if !(hasConnection && hasQuery) {
 			return errors.New("direct query mode requires both --connection and --query flags")
 		}
-		if hasAsset || hasEnvironment {
+		if hasAsset {
 			return errors.New("direct query mode (--connection and --query) cannot be combined with asset mode (--asset and --environment)")
 		}
 		return nil
@@ -204,7 +199,7 @@ func validateFlags(connection, query, asset, environment string) error {
 func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, string, error) {
 	assetPath := c.String("asset")
 	queryStr := c.String("query")
-	env := c.String("env")
+	env := c.String("environment")
 	connectionName := c.String("connection")
 	s := c.String("start-date")
 	e := c.String("end-date")
@@ -221,7 +216,7 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 
 	// Direct query mode (no asset path)
 	if assetPath == "" {
-		conn, err := getConnectionFromConfig(connectionName, fs)
+		conn, err := getConnectionFromConfig(env, connectionName, fs, c.String("config-file"))
 		if err != nil {
 			return "", nil, "", err
 		}
@@ -233,7 +228,7 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 	}
 	// Auto-detect mode (both asset path and query)
 	if queryStr != "" {
-		pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs)
+		pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs, c.String("config-file"))
 		if err != nil {
 			return "", nil, "", errors.Wrap(err, "failed to get pipeline info")
 		}
@@ -251,7 +246,7 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 		return connName, conn, queryStr, nil
 	}
 	// Asset query mode (only asset path)
-	pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs)
+	pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs, c.String("config-file"))
 	if err != nil {
 		return "", nil, "", errors.Wrap(err, "failed to get pipeline info")
 	}
@@ -273,16 +268,25 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 	return connName, conn, queryStr, nil
 }
 
-func getConnectionFromConfig(connectionName string, fs afero.Fs) (interface{}, error) {
+func getConnectionFromConfig(env string, connectionName string, fs afero.Fs, configFilePath string) (interface{}, error) {
 	repoRoot, err := git.FindRepoFromPath(".")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find the git repository root")
 	}
 
-	configFilePath := filepath.Join(repoRoot.Path, ".bruin.yml")
+	if configFilePath == "" {
+		configFilePath = filepath.Join(repoRoot.Path, ".bruin.yml")
+	}
 	cm, err := config.LoadOrCreate(fs, configFilePath)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load or create config")
+	}
+
+	if env != "" {
+		err := cm.SelectEnvironment(env)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to use the environment '%s'", env)
+		}
 	}
 
 	manager, errs := connection.NewManagerFromConfig(cm)
@@ -402,7 +406,7 @@ func handleError(output string, err error) error {
 	return cli.Exit("", 1)
 }
 
-func GetPipelineAndAsset(ctx context.Context, inputPath string, fs afero.Fs) (*ppInfo, error) {
+func GetPipelineAndAsset(ctx context.Context, inputPath string, fs afero.Fs, configFilePath string) (*ppInfo, error) {
 	repoRoot, err := git.FindRepoFromPath(inputPath)
 	if err != nil {
 		errorPrinter.Printf("Failed to find the git repository root: %v\n", err)
@@ -419,7 +423,9 @@ func GetPipelineAndAsset(ctx context.Context, inputPath string, fs afero.Fs) (*p
 		errorPrinter.Printf("Failed to find the pipeline this task belongs to: '%s'\n", inputPath)
 		return nil, err
 	}
-	configFilePath := path2.Join(repoRoot.Path, ".bruin.yml")
+	if configFilePath == "" {
+		configFilePath = path2.Join(repoRoot.Path, ".bruin.yml")
+	}
 	cm, err := config.LoadOrCreate(fs, configFilePath)
 	if err != nil {
 		errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)

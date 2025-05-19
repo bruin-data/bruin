@@ -325,7 +325,74 @@
         "api_key"
       ]
     },
-
+    "ElasticsearchConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "secure": {
+          "type": "string"
+        },
+        "verify_certs": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "secure",
+        "verify_certs"
+      ]
+    },
+    "SpannerConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "instance_id": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        },
+        "credentials_path": {
+          "type": "string"
+        },
+        "credentials_base64": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "project_id",
+        "instance_id",
+        "database",
+        "credentials_base64",
+        "credentials_path"
+      ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -639,6 +706,18 @@
         "phantombuster": {
           "items": {
             "$ref": "#/$defs/PhantombusterConnection"
+          },
+          "type": "array"
+        },
+        "elasticsearch": {
+          "items": {
+            "$ref": "#/$defs/ElasticsearchConnection"
+          },
+          "type": "array"
+        },
+        "spanner": {
+          "items": {
+            "$ref": "#/$defs/SpannerConnection"
           },
           "type": "array"
         }

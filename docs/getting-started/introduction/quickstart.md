@@ -181,7 +181,7 @@ columns: // [!code ++]
       - name: positive // [!code ++]
 
 # you can also define custom checks 
-custom_checks: // [!code ++]  
+custom_checks:
   - name: row count is greater than zero // [!code ++]  
     description: this check ensures that the table is not empty // [!code ++]  
     query: SELECT count(*) > 1 FROM dataset.player_count // [!code ++]  

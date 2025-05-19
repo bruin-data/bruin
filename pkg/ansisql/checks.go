@@ -9,7 +9,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
-	"github.com/spf13/afero"
 )
 
 type connectionFetcher interface {
@@ -187,28 +186,27 @@ func (c *NegativeCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInst
 }
 
 type CustomCheck struct {
-	conn      connectionFetcher
-	extractor query.QueryExtractor
+	conn     connectionFetcher
+	renderer jinja.RendererInterface
 }
 
 func NewCustomCheck(conn connectionFetcher) *CustomCheck {
-	queryExtractor := query.WholeFileExtractor{
-		Fs:       afero.NewOsFs(),
-		Renderer: jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id"),
-	}
-	return &CustomCheck{conn: conn, extractor: &queryExtractor}
+	// TODO: this needs to use an actual renderer instead of the yesterday, since this `NewRendererWithYesterday` does not honor
+	// the parameters passed to the `bruin run` command.
+	return &CustomCheck{conn: conn, renderer: jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")}
 }
 
 func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstance) error {
 	qq := ti.Check.Query
-	if c.extractor != nil {
-		extractor := c.extractor.CloneForAsset(ctx, ti.Pipeline, ti.Asset)
-		qry, err := extractor.ExtractQueriesFromString(qq)
+	if c.renderer != nil {
+		r := c.renderer.CloneForAsset(ctx, ti.GetAsset())
+		qry, err := r.Render(qq)
+
 		if err != nil {
 			return errors.Wrap(err, "failed to render custom check query")
 		}
 
-		qq = qry[0].Query
+		qq = qry
 	}
 	return NewCountableQueryCheck(c.conn, ti.Check.Value, &query.Query{Query: qq}, ti.Check.Name, func(count int64) error {
 		return errors.Errorf("custom check '%s' has returned %d instead of the expected %d", ti.Check.Name, count, ti.Check.Value)
@@ -251,9 +249,9 @@ type CustomCheckOperator struct {
 	checkRunner CustomCheckRunner
 }
 
-func NewCustomCheckOperator(manager connectionFetcher, extractor query.QueryExtractor) *CustomCheckOperator {
+func NewCustomCheckOperator(manager connectionFetcher, r jinja.RendererInterface) *CustomCheckOperator {
 	return &CustomCheckOperator{
-		checkRunner: &CustomCheck{conn: manager, extractor: extractor},
+		checkRunner: &CustomCheck{conn: manager, renderer: r},
 	}
 }
 
