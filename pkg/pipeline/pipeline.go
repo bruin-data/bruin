@@ -37,7 +37,6 @@ const (
 	AssetTypeBigqueryQuerySensor    = AssetType("bq.sensor.query")
 	AssetTypeBigquerySource         = AssetType("bq.source")
 	AssetTypeBigquerySeed           = AssetType("bq.seed")
-	AssetTypeBigqueryDDL            = AssetType("bq.ddl")
 	AssetTypeDuckDBQuery            = AssetType("duckdb.sql")
 	AssetTypeDuckDBSeed             = AssetType("duckdb.seed")
 	AssetTypeEmpty                  = AssetType("empty")
@@ -257,7 +256,6 @@ func (n Notifications) MarshalJSON() ([]byte, error) {
 
 type (
 	MaterializationType string
-	DDLStrategy         string
 )
 
 const (
@@ -278,9 +276,9 @@ const (
 	MaterializationStrategyAppend           MaterializationStrategy        = "append"
 	MaterializationStrategyMerge            MaterializationStrategy        = "merge"
 	MaterializationStrategyTimeInterval     MaterializationStrategy        = "time_interval"
+	MaterializationStrategyDDL              MaterializationStrategy        = "ddl"
 	MaterializationTimeGranularityDate      MaterializationTimeGranularity = "date"
 	MaterializationTimeGranularityTimestamp MaterializationTimeGranularity = "timestamp"
-	MaterializationStrategyCreateTable      DDLStrategy                    = "create_table"
 )
 
 var AllAvailableMaterializationStrategies = []MaterializationStrategy{
@@ -289,6 +287,7 @@ var AllAvailableMaterializationStrategies = []MaterializationStrategy{
 	MaterializationStrategyAppend,
 	MaterializationStrategyMerge,
 	MaterializationStrategyTimeInterval,
+	MaterializationStrategyDDL,
 }
 
 type Materialization struct {
@@ -500,7 +499,6 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeBigquerySeed:         "google_cloud_platform",
 	AssetTypeBigquerySource:       "google_cloud_platform",
 	AssetTypeBigqueryQuerySensor:  "google_cloud_platform",
-	AssetTypeBigqueryDDL:          "google_cloud_platform",
 	AssetTypeSnowflakeQuery:       "snowflake",
 	AssetTypeSnowflakeQuerySensor: "snowflake",
 	AssetTypeSnowflakeSeed:        "snowflake",
@@ -1125,6 +1123,7 @@ type Pipeline struct {
 	Commit             string                 `json:"commit"`
 	Snapshot           string                 `json:"snapshot"`
 	Agent              bool                   `json:"agent" yaml:"agent" mapstructure:"agent"`
+	Variables          Variables              `json:"variables" yaml:"variables" mapstructure:"variables"`
 	TasksByType        map[AssetType][]*Asset `json:"-"`
 	tasksByName        map[string]*Asset
 }

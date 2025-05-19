@@ -134,13 +134,6 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			ApplicableLevels: []Level{LevelPipeline},
 		},
 		&SimpleRule{
-			Identifier:       "valid-bigquery-ddl-materialization",
-			Fast:             true,
-			Severity:         ValidatorSeverityCritical,
-			AssetValidator:   EnsureDDLAssetsMaterializationIsCorrect,
-			ApplicableLevels: []Level{LevelAsset},
-		},
-		&SimpleRule{
 			Identifier:       "valid-entity-references",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
@@ -194,6 +187,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			Fast:             false,
 			Severity:         ValidatorSeverityWarning,
 			Validator:        yamlFileValidator.WarnRegularYamlFilesInRepo,
+			ApplicableLevels: []Level{LevelPipeline},
+		},
+		&SimpleRule{
+			Identifier:       "valid-variables",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			Validator:        ValidateVariables,
 			ApplicableLevels: []Level{LevelPipeline},
 		},
 	}

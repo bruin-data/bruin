@@ -361,7 +361,38 @@
         "verify_certs"
       ]
     },
-
+    "SpannerConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "instance_id": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        },
+        "credentials_path": {
+          "type": "string"
+        },
+        "credentials_base64": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "project_id",
+        "instance_id",
+        "database",
+        "credentials_base64",
+        "credentials_path"
+      ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -681,6 +712,12 @@
         "elasticsearch": {
           "items": {
             "$ref": "#/$defs/ElasticsearchConnection"
+          },
+          "type": "array"
+        },
+        "spanner": {
+          "items": {
+            "$ref": "#/$defs/SpannerConnection"
           },
           "type": "array"
         }

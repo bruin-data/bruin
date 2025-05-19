@@ -743,3 +743,16 @@ type ElasticsearchConnection struct {
 func (c ElasticsearchConnection) GetName() string {
 	return c.Name
 }
+
+type SpannerConnection struct {
+	Name              string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	ProjectID         string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
+	InstanceID        string `yaml:"instance_id,omitempty" json:"instance_id" mapstructure:"instance_id"`
+	Database          string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	CredentialsBase64 string `yaml:"credentials_base64,omitempty" json:"credentials_base64" mapstructure:"credentials_base64"`
+	CredentialsPath   string `yaml:"credentials_path,omitempty" json:"credentials_path" mapstructure:"credentials_path"`
+}
+
+func (c SpannerConnection) GetName() string {
+	return c.Name
+}

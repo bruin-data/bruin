@@ -875,6 +875,19 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 
 		switch asset.Materialization.Strategy {
 		case pipeline.MaterializationStrategyNone:
+		case pipeline.MaterializationStrategyDDL:
+			if asset.Materialization.Type == pipeline.MaterializationTypeView {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "DDL strategy is not allowed on a view",
+				})
+			}
+			if asset.ExecutableFile.Content != "" {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "DDL strategy builds the table, from bruin metadata and does not accept a custom query",
+				})
+			}
 		case pipeline.MaterializationStrategyCreateReplace:
 		case pipeline.MaterializationStrategyAppend:
 			return issues, nil
@@ -940,29 +953,6 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 					pipeline.MaterializationTypeTable,
 				},
 			),
-		})
-	}
-
-	return issues, nil
-}
-
-func EnsureDDLAssetsMaterializationIsCorrect(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
-
-	if asset.Type != pipeline.AssetTypeBigqueryDDL {
-		return issues, nil
-	}
-
-	if asset.Materialization.Type == pipeline.MaterializationTypeView {
-		issues = append(issues, &Issue{
-			Task:        asset,
-			Description: "BigQuery DDL asset does not support materialization type view",
-		})
-	}
-	if asset.Materialization.Strategy != pipeline.MaterializationStrategyNone {
-		issues = append(issues, &Issue{
-			Task:        asset,
-			Description: "BigQuery DDL asset cannot have a materialization strategy",
 		})
 	}
 
@@ -1216,6 +1206,23 @@ func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.P
 		issues = append(issues, &Issue{
 			Task:        asset,
 			Description: fmt.Sprintf("Table '%s' is used in the query but not referenced in the 'depends' array.", actualReferenceName),
+		})
+	}
+
+	return issues, nil
+}
+
+func ValidateVariables(p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	if p.Variables == nil {
+		return issues, nil
+	}
+
+	err := p.Variables.Validate()
+	if err != nil {
+		issues = append(issues, &Issue{
+			Description: err.Error(),
 		})
 	}
 

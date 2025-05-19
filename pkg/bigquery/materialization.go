@@ -23,6 +23,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
 		pipeline.MaterializationStrategyMerge:         mergeMaterializer,
 		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
+		pipeline.MaterializationStrategyDDL:           BuildDDLQuery,
 	},
 }
 
@@ -182,14 +183,21 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	return strings.Join(queries, ";\n") + ";", nil
 }
 
-func BuildCreateTableQuery(asset *pipeline.Asset, query string) (string, error) {
+func BuildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	columnDefs := make([]string, 0, len(asset.Columns))
-	for _, column := range asset.Columns {
-		columnDefs = append(columnDefs, fmt.Sprintf("`%s` %s", column.Name, column.Type))
+	for _, col := range asset.Columns {
+		def := fmt.Sprintf("%s %s", col.Name, col.Type)
+
+		if col.Description != "" {
+			def += fmt.Sprintf(` OPTIONS(description=%q)`, col.Description) // %q escapes "
+		}
+		columnDefs = append(columnDefs, def)
 	}
+
 	q := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n  %s\n)",
 		asset.Name,
-		strings.Join(columnDefs, ",\n  "))
+		strings.Join(columnDefs, ",\n  "),
+	)
 
 	if asset.Materialization.PartitionBy != "" {
 		q += "\nPARTITION BY " + asset.Materialization.PartitionBy

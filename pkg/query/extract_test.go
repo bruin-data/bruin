@@ -25,7 +25,8 @@ func (m *mockNoOpRenderer) Render(template string) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
-func (m *mockNoOpRenderer) CloneForAsset(ctx context.Context, asset *pipeline.Asset) jinja.RendererInterface { //nolint:ireturn
+//nolint:ireturn // returning an interface here is intentional
+func (m *mockNoOpRenderer) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) jinja.RendererInterface {
 	args := m.Called(ctx, asset)
 	return args.Get(0).(jinja.RendererInterface)
 }
