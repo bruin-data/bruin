@@ -999,6 +999,18 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 				e2e.AssertByContains,
 			},
 		},
+		{
+			Name:    "test-render-this",
+			Command: binary,
+			Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/render-this-pipeline")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+			},
+		},
 	}
 }
 
