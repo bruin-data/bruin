@@ -43,7 +43,7 @@ func TestVariables(t *testing.T) {
 		err := vars.Validate()
 		require.NoError(t, err)
 	})
-	t.Run("Should use default values to contruct the variables", func(t *testing.T) {
+	t.Run("Should use default values to construct the variables", func(t *testing.T) {
 		t.Parallel()
 		vars := pipeline.Variables{
 			"user": map[string]any{
@@ -61,11 +61,12 @@ func TestVariables(t *testing.T) {
 		}
 		err := vars.Validate()
 		require.NoError(t, err)
-		assert.Equal(t, vars.Value(), map[string]any{
+		expect := map[string]any{
 			"user":   "foo",
 			"age":    42,
 			"active": true,
-		})
+		}
+		assert.Equal(t, expect, vars.Value())
 	})
 	t.Run("Should handle nested variables", func(t *testing.T) {
 		t.Parallel()
@@ -92,12 +93,13 @@ func TestVariables(t *testing.T) {
 		}
 		err := vars.Validate()
 		require.NoError(t, err)
-		assert.Equal(t, vars.Value(), map[string]any{
+		expect := map[string]any{
 			"user": map[string]any{
 				"name": "foo",
 				"age":  42,
 			},
 			"active": true,
-		})
+		}
+		assert.Equal(t, expect, vars.Value())
 	})
 }

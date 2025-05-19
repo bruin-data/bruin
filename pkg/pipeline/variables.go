@@ -17,7 +17,7 @@ type Variables map[string]map[string]any
 
 func (v Variables) Validate() error {
 	// TODO(turtledev):
-	// - validate the the defaults actually satisfy the schema
+	// - validate the defaults actually satisfy the schema
 	// - make "properties" a required field for object types
 	_, err := varSchemaLoader().Compile(gojsonschema.NewGoLoader(v.Schema()))
 	if err != nil {
