@@ -62,7 +62,7 @@ func (m *mockMaterializer) IsFullRefresh() bool {
 	return res.Bool(0)
 }
 
-func (m *mockMaterializer) LogIfFullRefreshAndDDL(writer io.Writer, asset *pipeline.Asset) error {
+func (m *mockMaterializer) LogIfFullRefreshAndDDL(writer interface {} , asset *pipeline.Asset) error {
 	return nil
 }
 func TestBasicOperator_RunTask(t *testing.T) {
@@ -151,6 +151,9 @@ func TestBasicOperator_RunTask(t *testing.T) {
 
 				f.m.On("Render", mock.Anything, "select * from users").
 					Return("select * from users", nil)
+					
+				f.m.On("LogIfFullRefreshAndDDL", mock.Anything, mock.Anything).
+					Return(nil)
 
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).
 					Return(errors.New("failed to run query"))
@@ -176,6 +179,8 @@ func TestBasicOperator_RunTask(t *testing.T) {
 
 				f.m.On("Render", mock.Anything, "select * from users").
 					Return("select * from users", nil)
+				f.m.On("LogIfFullRefreshAndDDL", mock.Anything, mock.Anything).
+					Return(nil)
 
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).
 					Return(nil)

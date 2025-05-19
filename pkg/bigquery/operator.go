@@ -18,7 +18,7 @@ import (
 type materializer interface {
 	Render(task *pipeline.Asset, query string) (string, error)
 	IsFullRefresh() bool
-	LogIfFullRefreshAndDDL(writer io.Writer, asset *pipeline.Asset) error
+	LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error
 }
 
 type queryExtractor interface {
@@ -66,7 +66,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
-	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
+	writer := ctx.Value(executor.KeyPrinter)
 	err = o.materializer.LogIfFullRefreshAndDDL(writer, t)
 	if err != nil {
 		return err
