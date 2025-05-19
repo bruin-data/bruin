@@ -167,13 +167,15 @@ func BuildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 		}
 		columnDefs = append(columnDefs, def)
 	}
+	clusterByClause := ""
+	if len(asset.Materialization.ClusterBy) > 0 {
+		clusterByClause = "CLUSTER BY (" + strings.Join(asset.Materialization.ClusterBy, ", ") + ") "
+	}
 	ddl := fmt.Sprintf(
-		"CREATE TABLE IF NOT EXISTS %s (\n  %s\n)",
+		"CREATE TABLE IF NOT EXISTS %s %s (\n  %s\n)",
 		asset.Name,
+		clusterByClause,
 		strings.Join(columnDefs, ",\n  "),
 	)
-	if len(asset.Materialization.ClusterBy) > 0 {
-		ddl += "\nCLUSTER BY (" + strings.Join(asset.Materialization.ClusterBy, ", ") + ")"
-	}
 	return ddl, nil
 }
