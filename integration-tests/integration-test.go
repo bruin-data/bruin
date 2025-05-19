@@ -1014,6 +1014,20 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 				e2e.AssertByContains,
 			},
 		},
+		{
+			Name:    "test-render-template-this",
+			Command: binary,
+			Args:    []string{"run", "--env", "env-render-template-this", filepath.Join(currentFolder, "test-pipelines/render-template-this-pipeline")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Successfully validated 2 assets", "Executed 4 tasks", "Finished: render_this.my_asset_2"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
 	}
 }
 
