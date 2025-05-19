@@ -1123,6 +1123,7 @@ type Pipeline struct {
 	Commit             string                 `json:"commit"`
 	Snapshot           string                 `json:"snapshot"`
 	Agent              bool                   `json:"agent" yaml:"agent" mapstructure:"agent"`
+	Variables          Variables              `json:"variables" yaml:"variables" mapstructure:"variables"`
 	TasksByType        map[AssetType][]*Asset `json:"-"`
 	tasksByName        map[string]*Asset
 }
