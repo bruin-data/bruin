@@ -37,7 +37,6 @@ const (
 	AssetTypeBigqueryQuerySensor    = AssetType("bq.sensor.query")
 	AssetTypeBigquerySource         = AssetType("bq.source")
 	AssetTypeBigquerySeed           = AssetType("bq.seed")
-	AssetTypeBigqueryDDL            = AssetType("bq.ddl")
 	AssetTypeDuckDBQuery            = AssetType("duckdb.sql")
 	AssetTypeDuckDBSeed             = AssetType("duckdb.seed")
 	AssetTypeEmpty                  = AssetType("empty")
@@ -257,7 +256,6 @@ func (n Notifications) MarshalJSON() ([]byte, error) {
 
 type (
 	MaterializationType string
-	DDLStrategy         string
 )
 
 const (
@@ -280,7 +278,6 @@ const (
 	MaterializationStrategyTimeInterval     MaterializationStrategy        = "time_interval"
 	MaterializationTimeGranularityDate      MaterializationTimeGranularity = "date"
 	MaterializationTimeGranularityTimestamp MaterializationTimeGranularity = "timestamp"
-	MaterializationStrategyCreateTable      DDLStrategy                    = "create_table"
 )
 
 var AllAvailableMaterializationStrategies = []MaterializationStrategy{
@@ -500,7 +497,6 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeBigquerySeed:         "google_cloud_platform",
 	AssetTypeBigquerySource:       "google_cloud_platform",
 	AssetTypeBigqueryQuerySensor:  "google_cloud_platform",
-	AssetTypeBigqueryDDL:          "google_cloud_platform",
 	AssetTypeSnowflakeQuery:       "snowflake",
 	AssetTypeSnowflakeQuerySensor: "snowflake",
 	AssetTypeSnowflakeSeed:        "snowflake",
