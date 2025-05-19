@@ -331,3 +331,88 @@ func TestMaterializer_Render(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildDDLQuery(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		asset   *pipeline.Asset
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "basic table creation",
+			asset: &pipeline.Asset{
+				Name: "my_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+					{Name: "name", Type: "STRING", Description: "The name of the person"},
+				},
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_table (\n  id INT64,\n  name STRING OPTIONS(description=\"The name of the person\")\n)",
+		},
+		{
+			name: "table with partitioning",
+			asset: &pipeline.Asset{
+				Name: "my_partitioned_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+					{Name: "timestamp", Type: "TIMESTAMP", Description: "Event timestamp"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					PartitionBy: "timestamp",
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_partitioned_table (\n  id INT64,\n  timestamp TIMESTAMP OPTIONS(description=\"Event timestamp\")\n)\nPARTITION BY timestamp",
+		},
+		{
+			name: "table with clustering",
+			asset: &pipeline.Asset{
+				Name: "my_clustered_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+					{Name: "category", Type: "STRING", Description: "Category of the item"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:      pipeline.MaterializationTypeTable,
+					ClusterBy: []string{"category"},
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_clustered_table (\n  id INT64,\n  category STRING OPTIONS(description=\"Category of the item\")\n)\nCLUSTER BY category",
+		},
+		{
+			name: "table with partitioning and clustering",
+			asset: &pipeline.Asset{
+				Name: "my_partitioned_clustered_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+					{Name: "timestamp", Type: "TIMESTAMP", Description: "Event timestamp"},
+					{Name: "category", Type: "STRING", Description: "Category of the item"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					PartitionBy: "timestamp",
+					ClusterBy:   []string{"category"},
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_partitioned_clustered_table (\n  id INT64,\n  timestamp TIMESTAMP OPTIONS(description=\"Event timestamp\"),\n  category STRING OPTIONS(description=\"Category of the item\")\n)\nPARTITION BY timestamp\nCLUSTER BY category",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := BuildDDLQuery(tt.asset, "")
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}

@@ -276,6 +276,7 @@ const (
 	MaterializationStrategyAppend           MaterializationStrategy        = "append"
 	MaterializationStrategyMerge            MaterializationStrategy        = "merge"
 	MaterializationStrategyTimeInterval     MaterializationStrategy        = "time_interval"
+	MaterializationStrategyDDL              MaterializationStrategy        = "ddl"
 	MaterializationTimeGranularityDate      MaterializationTimeGranularity = "date"
 	MaterializationTimeGranularityTimestamp MaterializationTimeGranularity = "timestamp"
 )
@@ -286,6 +287,7 @@ var AllAvailableMaterializationStrategies = []MaterializationStrategy{
 	MaterializationStrategyAppend,
 	MaterializationStrategyMerge,
 	MaterializationStrategyTimeInterval,
+	MaterializationStrategyDDL,
 }
 
 type Materialization struct {
