@@ -2,7 +2,10 @@ package pipeline
 
 import (
 	"fmt"
+	"io"
 	"regexp"
+
+	"github.com/pkg/errors"
 )
 
 type (
@@ -23,7 +26,9 @@ func (m *Materializer) Render(asset *Asset, query string) (string, error) {
 
 	strategy := mat.Strategy
 	if m.FullRefresh && mat.Type == MaterializationTypeTable {
-		strategy = MaterializationStrategyCreateReplace
+		if mat.Strategy != MaterializationStrategyDDL {
+			strategy = MaterializationStrategyCreateReplace
+		}
 	}
 
 	if matFunc, ok := m.MaterializationMap[mat.Type][strategy]; ok {
@@ -47,4 +52,25 @@ func removeComments(query string) string {
 
 func (m *Materializer) IsFullRefresh() bool {
 	return m.FullRefresh
+}
+
+func (m *Materializer) LogIfFullRefreshAndDDL(writer interface{}, asset *Asset) error {
+	if !m.FullRefresh {
+		return nil
+	}
+
+	if asset.Materialization.Strategy != MaterializationStrategyDDL {
+		return nil
+	}
+	if writer == nil {
+		return errors.New("no writer found in context, please create an issue for this: https://github.com/bruin-data/bruin/issues")
+	}
+	message := "Full refresh detected, but DDL strategy is in use — table will NOT be dropped or recreated.\n"
+	writerObj, ok := writer.(io.Writer)
+	if !ok {
+		return errors.New("writer is not an io.Writer")
+	}
+	_, _ = writerObj.Write([]byte(message))
+
+	return nil
 }
