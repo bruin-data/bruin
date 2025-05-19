@@ -23,6 +23,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
 		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
+		pipeline.MaterializationStrategyDDL:           BuildDDLQuery,
 	},
 }
 
@@ -153,4 +154,26 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	}
 
 	return strings.Join(queries, ";\n") + ";", nil
+}
+
+func BuildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
+	var columnDefs []string
+	columnDefs = make([]string, 0, len(asset.Columns))
+	for _, col := range asset.Columns {
+		def := fmt.Sprintf("%s %s", col.Name, col.Type)
+		if col.Description != "" {
+			desc := strings.ReplaceAll(col.Description, `'`, `''`)
+			def += fmt.Sprintf(" COMMENT '%s'", desc)
+		}
+		columnDefs = append(columnDefs, def)
+	}
+	ddl := fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s (\n  %s\n)",
+		asset.Name,
+		strings.Join(columnDefs, ",\n  "),
+	)
+	if len(asset.Materialization.ClusterBy) > 0 {
+		ddl += "\nCLUSTER BY (" + strings.Join(asset.Materialization.ClusterBy, ", ") + ")"
+	}
+	return ddl, nil
 }
