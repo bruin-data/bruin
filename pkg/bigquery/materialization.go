@@ -23,7 +23,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
 		pipeline.MaterializationStrategyMerge:         mergeMaterializer,
 		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
-		pipeline.MaterializationStrategyDDL:   BuildDDLQuery,
+		pipeline.MaterializationStrategyDDL:           BuildDDLQuery,
 	},
 }
 
@@ -183,10 +183,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	return strings.Join(queries, ";\n") + ";", nil
 }
 
-
-
 func BuildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
-
 	columnDefs := make([]string, 0, len(asset.Columns))
 	for _, col := range asset.Columns {
 		def := fmt.Sprintf("%s %s", col.Name, col.Type)
@@ -211,4 +208,3 @@ func BuildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 
 	return q, nil
 }
-

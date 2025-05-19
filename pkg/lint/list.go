@@ -71,13 +71,6 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			ApplicableLevels: []Level{LevelPipeline},
 		},
 		&SimpleRule{
-			Identifier:       "valid-ddl-strategy",
-			Fast:             true,
-			Severity:         ValidatorSeverityCritical,
-			AssetValidator:   EnsureDDLStrategyIsUsedCorrectly,
-			ApplicableLevels: []Level{LevelAsset},
-		},
-		&SimpleRule{
 			Identifier:       "valid-task-type",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,

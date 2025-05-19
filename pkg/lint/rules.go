@@ -463,21 +463,6 @@ func ValidatePythonAssetMaterialization(ctx context.Context, p *pipeline.Pipelin
 func EnsureDDLStrategyIsUsedCorrectly(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
-	if asset.Materialization.Strategy != pipeline.MaterializationStrategyDDL {
-		return issues, nil
-	}
-	if asset.Materialization.Type == pipeline.MaterializationTypeView {
-		issues = append(issues, &Issue{
-			Task:        asset,
-			Description: "DDL strategy is not allowed on a view",
-		})
-	}
-	if asset.ExecutableFile.Content != "" {
-		issues = append(issues, &Issue{
-			Task:        asset,
-			Description: "DDL strategy builds the table, from bruin metadata and does not accept a custom query",
-		})
-	}
 	return issues, nil
 }
 
@@ -896,6 +881,19 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 
 		switch asset.Materialization.Strategy {
 		case pipeline.MaterializationStrategyNone:
+		case pipeline.MaterializationStrategyDDL:
+			if asset.Materialization.Type == pipeline.MaterializationTypeView {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "DDL strategy is not allowed on a view",
+				})
+			}
+			if asset.ExecutableFile.Content != "" {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "DDL strategy builds the table, from bruin metadata and does not accept a custom query",
+				})
+			}
 		case pipeline.MaterializationStrategyCreateReplace:
 		case pipeline.MaterializationStrategyAppend:
 			return issues, nil
