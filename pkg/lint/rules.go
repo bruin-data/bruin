@@ -946,29 +946,6 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 	return issues, nil
 }
 
-func EnsureDDLAssetsMaterializationIsCorrect(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-	issues := make([]*Issue, 0)
-
-	if asset.Type != pipeline.AssetTypeBigqueryDDL {
-		return issues, nil
-	}
-
-	if asset.Materialization.Type == pipeline.MaterializationTypeView {
-		issues = append(issues, &Issue{
-			Task:        asset,
-			Description: "BigQuery DDL asset does not support materialization type view",
-		})
-	}
-	if asset.Materialization.Strategy != pipeline.MaterializationStrategyNone {
-		issues = append(issues, &Issue{
-			Task:        asset,
-			Description: "BigQuery DDL asset cannot have a materialization strategy",
-		})
-	}
-
-	return issues, nil
-}
-
 func EnsureSnowflakeSensorHasQueryParameterForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if asset.Type != pipeline.AssetTypeSnowflakeQuerySensor {

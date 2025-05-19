@@ -737,7 +737,7 @@ func setupExecutors(
 		Renderer: renderer,
 	}
 	customCheckRunner := ansisql.NewCustomCheckOperator(conn, renderer)
-	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery || s.WillRunTaskOfType(pipeline.AssetTypeBigquerySeed) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryTableSensor) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryDDL) {
+	if s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuery) || estimateCustomCheckType == pipeline.AssetTypeBigqueryQuery || s.WillRunTaskOfType(pipeline.AssetTypeBigquerySeed) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeBigqueryTableSensor) {
 		bqOperator := bigquery.NewBasicOperator(conn, wholeFileExtractor, bigquery.NewMaterializer(fullRefresh))
 		bqCheckRunner, err := bigquery.NewColumnCheckOperator(conn)
 		if err != nil {
@@ -747,7 +747,6 @@ func setupExecutors(
 		metadataPushOperator := bigquery.NewMetadataPushOperator(conn)
 		bqQuerySensor := bigquery.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		bqTableSensor := bigquery.NewTableSensor(conn, sensorMode)
-		bqDDLOperator := bigquery.NewDDLOperator(conn)
 
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeMain] = bqOperator
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner
@@ -767,11 +766,6 @@ func setupExecutors(
 		mainExecutors[pipeline.AssetTypeBigqueryQuerySensor][scheduler.TaskInstanceTypeMetadataPush] = metadataPushOperator
 		mainExecutors[pipeline.AssetTypeBigqueryQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner
 		mainExecutors[pipeline.AssetTypeBigqueryQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
-
-		mainExecutors[pipeline.AssetTypeBigqueryDDL][scheduler.TaskInstanceTypeMain] = bqDDLOperator
-		mainExecutors[pipeline.AssetTypeBigqueryDDL][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner
-		mainExecutors[pipeline.AssetTypeBigqueryDDL][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
-		mainExecutors[pipeline.AssetTypeBigqueryDDL][scheduler.TaskInstanceTypeMetadataPush] = metadataPushOperator
 
 		mainExecutors[pipeline.AssetTypeBigquerySeed][scheduler.TaskInstanceTypeMain] = seedOperator
 		mainExecutors[pipeline.AssetTypeBigquerySeed][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner
