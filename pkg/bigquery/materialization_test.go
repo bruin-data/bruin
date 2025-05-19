@@ -345,13 +345,13 @@ func TestBuildDDLQuery(t *testing.T) {
 				Name: "my_table",
 				Columns: []pipeline.Column{
 					{Name: "id", Type: "INT64"},
-					{Name: "name", Type: "STRING"},
+					{Name: "name", Type: "STRING", Description: "The name of the person"},
 				},
 				Materialization: pipeline.Materialization{
 					Type: pipeline.MaterializationTypeTable,
 				},
 			},
-			want: "CREATE TABLE IF NOT EXISTS my_table (\n  `id` INT64,\n  `name` STRING\n)",
+			want: "CREATE TABLE IF NOT EXISTS my_table (\n  id INT64,\n  name STRING OPTIONS(description=\"The name of the person\")\n)",
 		},
 		{
 			name: "table with partitioning",
@@ -359,14 +359,14 @@ func TestBuildDDLQuery(t *testing.T) {
 				Name: "my_partitioned_table",
 				Columns: []pipeline.Column{
 					{Name: "id", Type: "INT64"},
-					{Name: "timestamp", Type: "TIMESTAMP"},
+					{Name: "timestamp", Type: "TIMESTAMP", Description: "Event timestamp"},
 				},
 				Materialization: pipeline.Materialization{
 					Type:        pipeline.MaterializationTypeTable,
 					PartitionBy: "timestamp",
 				},
 			},
-			want: "CREATE TABLE IF NOT EXISTS my_partitioned_table (\n  `id` INT64,\n  `timestamp` TIMESTAMP\n)\nPARTITION BY timestamp",
+			want: "CREATE TABLE IF NOT EXISTS my_partitioned_table (\n  id INT64,\n  timestamp TIMESTAMP OPTIONS(description=\"Event timestamp\")\n)\nPARTITION BY timestamp",
 		},
 		{
 			name: "table with clustering",
@@ -374,14 +374,14 @@ func TestBuildDDLQuery(t *testing.T) {
 				Name: "my_clustered_table",
 				Columns: []pipeline.Column{
 					{Name: "id", Type: "INT64"},
-					{Name: "category", Type: "STRING"},
+					{Name: "category", Type: "STRING", Description: "Category of the item"},
 				},
 				Materialization: pipeline.Materialization{
 					Type:      pipeline.MaterializationTypeTable,
 					ClusterBy: []string{"category"},
 				},
 			},
-			want: "CREATE TABLE IF NOT EXISTS my_clustered_table (\n  `id` INT64,\n  `category` STRING\n)\nCLUSTER BY category",
+			want: "CREATE TABLE IF NOT EXISTS my_clustered_table (\n  id INT64,\n  category STRING OPTIONS(description=\"Category of the item\")\n)\nCLUSTER BY category",
 		},
 		{
 			name: "table with partitioning and clustering",
@@ -389,8 +389,8 @@ func TestBuildDDLQuery(t *testing.T) {
 				Name: "my_partitioned_clustered_table",
 				Columns: []pipeline.Column{
 					{Name: "id", Type: "INT64"},
-					{Name: "timestamp", Type: "TIMESTAMP"},
-					{Name: "category", Type: "STRING"},
+					{Name: "timestamp", Type: "TIMESTAMP", Description: "Event timestamp"},
+					{Name: "category", Type: "STRING", Description: "Category of the item"},
 				},
 				Materialization: pipeline.Materialization{
 					Type:        pipeline.MaterializationTypeTable,
@@ -398,7 +398,7 @@ func TestBuildDDLQuery(t *testing.T) {
 					ClusterBy:   []string{"category"},
 				},
 			},
-			want: "CREATE TABLE IF NOT EXISTS my_partitioned_clustered_table (\n  `id` INT64,\n  `timestamp` TIMESTAMP,\n  `category` STRING\n)\nPARTITION BY timestamp\nCLUSTER BY category",
+			want: "CREATE TABLE IF NOT EXISTS my_partitioned_clustered_table (\n  id INT64,\n  timestamp TIMESTAMP OPTIONS(description=\"Event timestamp\"),\n  category STRING OPTIONS(description=\"Category of the item\")\n)\nPARTITION BY timestamp\nCLUSTER BY category",
 		},
 	}
 
