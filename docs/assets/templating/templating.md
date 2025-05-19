@@ -10,21 +10,31 @@ SELECT * FROM my_table WHERE dt BETWEEN '{{ start_date }}' AND '{{ end_date }}'
 
 Since `start_date` and `end_date` parameters are automatically passed to your assets by Bruin, this allows the same SQL asset definition to be used both as your regular execution, e.g. daily or hourly, as well as backfilling a longer period of time.
 
-You can do more complex stuff such as looping over a list of values, or using conditional logic. Here's an example of a SQL asset that loops over a list of user IDs:
+You can do more complex stuff such as looping over a list of values, or using conditional logic. Here's an example of a SQL asset that loops over a list of days and dynamically generates column names.
+::: tip Example
+`pipeline.yaml`
+```yaml 
+name: sql-pipeline
+variables:
+  days:
+    type: array
+    default: [1, 3, 7, 15, 30, 90]
+```
 
-```sql
-{% set days = [1, 3, 7, 15, 30, 90] %}
-
+`asset.sql`
+```sql 
 SELECT
     conversion_date,
     cohort_id,
-    {% for day_n in days %}
-    SUM(IFF(days_since_install < {{ day_n }}, revenue, 0)) AS revenue_{{ day_n }}_days
+    {% for day_n in var.days %}
+    SUM(IFF(days_since_install < {{ day_n }}, revenue, 0)) 
+    AS revenue_{{ day_n }}_days
     {% if not loop.last %},{% endif %}
     {% endfor %}
 FROM user_cohorts
 GROUP BY 1,2
 ```
+:::
 
 This will render into the following SQL query:
 
@@ -43,7 +53,41 @@ GROUP BY 1,2
 ```
 You can read more about [Jinja here](https://jinja.palletsprojects.com/en/3.1.x/).
 
-## Available variables
+## Adding variables
+
+You can add variables in your `pipeline.yml` file. We support all YAML data types to give you the
+maximum flexiblity in your variable configuration. `variables` are declared as [JSON Schema object](https://json-schema.org/draft-07/draft-handrews-json-schema-01#rfc.section.4.2.1). Here's a comprehensive example:
+
+::: code-group 
+```yaml [pipeline.yml]
+name: var-pipeline
+variables:
+  users:
+    type: array
+    items:
+      type: string
+    default: ["jhon", "nick"]
+  env:
+    type: string
+    default: dev
+  tags:
+    type: object
+    properties:
+      team:
+        type: string
+      tenant:
+        type: string
+    default:
+      team: data
+      tenant: acme
+```
+:::
+All user defined variables are accessibe via `var` namespace. For example, if you define a variable called `src` it will be available as  <code>&lbrace;&lbrace; var.src &rbrace;&rbrace;</code> in your Assets.
+
+Additionally all top level variables must define a `default` value. This will be used to render your assets in absence of values supplied on the commandline.
+
+
+## Builtin variables
 
 Bruin injects various variables by default:
 | Variable | Description | Example |

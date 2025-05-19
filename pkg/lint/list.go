@@ -189,6 +189,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			Validator:        yamlFileValidator.WarnRegularYamlFilesInRepo,
 			ApplicableLevels: []Level{LevelPipeline},
 		},
+		&SimpleRule{
+			Identifier:       "valid-variables",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			Validator:        ValidateVariables,
+			ApplicableLevels: []Level{LevelPipeline},
+		},
 	}
 
 	if parser != nil {

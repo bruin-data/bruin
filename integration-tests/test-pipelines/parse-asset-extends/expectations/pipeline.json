@@ -9,6 +9,7 @@
     "path": "integration-tests/test-pipelines/parse-asset-extends/pipeline.yml"
   },
   "default_connections": {},
+  "variables": null,
   "assets": [
     {
       "id": "aff64e4fd520bd185cb01adab98d2d20060f621c62d5cad5204712cfa2294ef7",

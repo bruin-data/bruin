@@ -57,9 +57,11 @@ func PythonEnvVariables(startDate, endDate *time.Time, pipelineName, runID strin
 	return vars
 }
 
-func NewRendererWithStartEndDates(startDate, endDate *time.Time, pipelineName, runID string) *Renderer {
+func NewRendererWithStartEndDates(startDate, endDate *time.Time, pipelineName, runID string, vars Context) *Renderer {
+	ctx := defaultContext(startDate, endDate, pipelineName, runID)
+	ctx["var"] = vars
 	return &Renderer{
-		context:         exec.NewContext(defaultContext(startDate, endDate, pipelineName, runID)),
+		context:         exec.NewContext(ctx),
 		queryRenderLock: &sync.Mutex{},
 	}
 }
@@ -83,7 +85,7 @@ func NewRendererWithYesterday(pipelineName, runID string) *Renderer {
 	yesterday := time.Now().AddDate(0, 0, -1)
 	startDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
 	endDate := time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 23, 59, 59, 999999999, time.UTC)
-	return NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID)
+	return NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID, nil)
 }
 
 func (r *Renderer) Render(query string) (string, error) {
@@ -117,7 +119,7 @@ func (r *Renderer) Render(query string) (string, error) {
 }
 
 //nolint:ireturn // returning an interface here is intentional
-func (r *Renderer) CloneForAsset(ctx context.Context, asset *pipeline.Asset) RendererInterface {
+func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, asset *pipeline.Asset) RendererInterface {
 	startDate, ok := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
 	if !ok {
 		return r
@@ -136,6 +138,7 @@ func (r *Renderer) CloneForAsset(ctx context.Context, asset *pipeline.Asset) Ren
 
 	jinjaContext := defaultContext(&startDate, &endDate, ctx.Value(pipeline.RunConfigPipelineName).(string), ctx.Value(pipeline.RunConfigRunID).(string))
 	jinjaContext["this"] = asset.Name
+	jinjaContext["var"] = pipe.Variables.Value()
 
 	return &Renderer{
 		context:         exec.NewContext(jinjaContext),
@@ -179,5 +182,5 @@ func findParserErrorType(err error) string {
 // this ugly interface is needed to avoid circular dependencies and the ability to create different renderer instances per asset.
 type RendererInterface interface {
 	Render(query string) (string, error)
-	CloneForAsset(ctx context.Context, asset *pipeline.Asset) RendererInterface
+	CloneForAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) RendererInterface
 }
