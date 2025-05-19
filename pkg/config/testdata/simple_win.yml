@@ -293,6 +293,13 @@ environments:
           port: 9200
           secure: "true"
           verify_certs: "true"
+      spanner:
+        - name: "spanner-1"
+          project_id: "project-id-123"
+          instance_id: "instance-id-123"
+          database: "database-id-123"
+          credentials_path: "path/to/service_account.json"
+          
   prod:
     connections:
       google_cloud_platform:

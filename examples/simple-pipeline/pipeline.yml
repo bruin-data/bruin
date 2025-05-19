@@ -44,4 +44,5 @@ default_connections:
   db2: "my-db2"
   phantombuster: "my-phantombuster"
   elasticsearch: "my-elasticsearch"
+  spanner: "my-spanner"
   
