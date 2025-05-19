@@ -116,7 +116,7 @@ func (r *Renderer) Render(query string) (string, error) {
 	return out, nil
 }
 
-func (r *Renderer) CloneForAsset(ctx context.Context, asset *pipeline.Asset) RendererInterface { //nolint:ireturn
+func (r *Renderer) CloneForAsset(ctx context.Context, asset *pipeline.Asset) RendererInterface { //nolint
 	startDate, ok := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
 	if !ok {
 		return r
