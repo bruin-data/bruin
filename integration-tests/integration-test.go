@@ -1000,9 +1000,9 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
-			Name:    "test-render-this",
+			Name:    "test-render-template-this",
 			Command: binary,
-			Args:    []string{"run", filepath.Join(currentFolder, "test-pipelines/render-this-pipeline")},
+			Args:    []string{"run", "--env", "env-render-template-this", filepath.Join(currentFolder, "test-pipelines/render-template-this-pipeline")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,

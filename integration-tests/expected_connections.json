@@ -384,6 +384,17 @@
           }
         ]
       }
+    },
+    "env-render-template-this": {
+      "schema_prefix": "",
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-render-template-this",
+            "path": "integration-tests/duckdb-files/render-template-this.db.db"
+          }
+        ]
+      }
     }
   }
 }
