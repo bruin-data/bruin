@@ -1,10 +1,9 @@
-# Side Panel
 
-The Side Panel in the Bruin VSCode extension gives you a comprehensive view of the current asset's details and includes four tabs for easy navigation.
 
-## Tabs Overview
+# Tabs Overview
+These tabs give you direct access to view and manage details of the currently open Bruin asset.
 
-### 1. Asset Details
+## 1. Asset Details
 This tab provides a comprehensive view of your asset, allowing you to manage key information and execute actions directly from the UI.
 
 - **Pipeline & Asset Name**: Displays the current pipeline and asset names. The asset name can be updated from the UI.
@@ -17,9 +16,9 @@ This tab provides a comprehensive view of your asset, allowing you to manage key
     - *Note*: The time is specified in `UTC`.
 - **SQL Preview**: Displays a preview of the SQL query related to the asset for quick inspection.
 
-![Bruin Side Panel](../../public/vscode-extension/panels/side-panel/asset-details-tab-new.gif)
+![Bruin Side Panel](../../../public/vscode-extension/panels/side-panel/asset-details-tab-new.gif)
 
-### 2. Columns
+## 2. Columns
 - Lists the columns associated with the asset.
 - *Each column shows*:
   - **Name**: The name of the column.
@@ -34,12 +33,12 @@ This tab provides a comprehensive view of your asset, allowing you to manage key
   - **Add or Remove Columns**: Easily insert new columns or delete existing ones.
   - **Manage Quality Checks**: Add or remove quality checks.
 
-![Bruin Columns Tab](../../public/vscode-extension/panels/side-panel/manage-columns.gif)
+![Bruin Columns Tab](../../../public/vscode-extension/panels/side-panel/manage-columns.gif)
 
-### 3. Settings
+## 3. Settings
 The Settings tab has two main sections:
 
-#### a. Bruin CLI Management
+### a. Bruin CLI Management
 - **Install & Update**: Easily install or update the Bruin CLI directly from the UI.
 - **Quick Documentation Access**: A dedicated button redirects you to the Bruin documentation for reference.
 - **Version Details & Debugging**: A chevron down arrow expands to reveal:
@@ -48,9 +47,9 @@ The Settings tab has two main sections:
   - VS Code extension version
   - These details can be copied for debugging purposes.
 
-![Bruin Settings Tab](../../public/vscode-extension/panels/side-panel/settings-tab.png)
+![Bruin Settings Tab](../../../public/vscode-extension/panels/side-panel/settings-tab.png)
 
-#### b. Connection Management
+### b. Connection Management
 - You can manage your connections, including:
   - **Add Connection**: Add new connections by entering the required credentials. If the connection name already exists in the same environment, an error will be displayed.
   - **Duplicate Connection**:  If some connections share similar credentials, it's easier to duplicate and modify them as needed. This is fully supported.
@@ -58,5 +57,5 @@ The Settings tab has two main sections:
   - **Delete Connection**: Delete existing connections.  
   - **Test Connection**: This allows you to test your connection directly from the UI. Unsupported connections will display a message indicating they cannot be tested.
 
-![Bruin Connections Manager](../../public/vscode-extension/panels/side-panel/manage-connections.gif)
+![Bruin Connections Manager](../../../public/vscode-extension/panels/side-panel/manage-connections.gif)
 
