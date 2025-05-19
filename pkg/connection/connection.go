@@ -2013,8 +2013,8 @@ func (m *Manager) AddSpannerConnectionFromConfig(connection *config.SpannerConne
 	}
 
 	client, err := spanner.NewClient(spanner.Config{
-		ProjectId:         connection.ProjectId,
-		InstanceId:        connection.InstanceId,
+		ProjectID:         connection.ProjectID,
+		InstanceID:        connection.InstanceID,
 		Database:          connection.Database,
 		CredentialsPath:   connection.CredentialsPath,
 		CredentialsBase64: connection.CredentialsBase64,
