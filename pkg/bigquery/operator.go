@@ -18,6 +18,7 @@ import (
 type materializer interface {
 	Render(task *pipeline.Asset, query string) (string, error)
 	IsFullRefresh() bool
+	LogIfFullRefreshAndDDL(writer io.Writer, asset *pipeline.Asset) error
 }
 
 type queryExtractor interface {
@@ -64,6 +65,11 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	materialized, err := o.materializer.Render(t, q.String())
 	if err != nil {
 		return err
+	}
+	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
+	o.materializer.LogIfFullRefreshAndDDL(writer, t)
+	if writer == nil {
+		return errors.New("no writer found in context, please create an issue for this: https://github.com/bruin-data/bruin/issues")
 	}
 	q.Query = materialized
 	if t.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
