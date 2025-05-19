@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -12,6 +13,7 @@ import (
 
 type materializer interface {
 	Render(task *pipeline.Asset, query string) (string, error)
+	LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error
 }
 
 type queryExtractor interface {
@@ -65,6 +67,11 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	}
 
 	q := queries[0]
+	writer := ctx.Value(executor.KeyPrinter)
+	err = o.materializer.LogIfFullRefreshAndDDL(writer, t)
+	if err != nil {
+		return err
+	}
 	materialized, err := o.materializer.Render(t, q.String())
 	if err != nil {
 		return err
