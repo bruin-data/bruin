@@ -67,9 +67,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
-	o.materializer.LogIfFullRefreshAndDDL(writer, t)
-	if writer == nil {
-		return errors.New("no writer found in context, please create an issue for this: https://github.com/bruin-data/bruin/issues")
+	err = o.materializer.LogIfFullRefreshAndDDL(writer, t)
+	if err != nil {
+		return err
 	}
 	q.Query = materialized
 	if t.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
