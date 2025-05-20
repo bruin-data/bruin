@@ -42,13 +42,3 @@ filled_rates AS (
 )
 SELECT * FROM filled_rates
 ORDER BY currency_code, date;
-
-
-
-
-
-
-
-
-
-

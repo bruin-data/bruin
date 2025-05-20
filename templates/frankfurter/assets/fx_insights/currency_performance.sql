@@ -45,19 +45,3 @@ SELECT
 FROM with_names
 WHERE date = CURRENT_DATE
 ORDER BY currency_code, date;
-
-
-
-
-    
-
-
-
-
-
-
-
-
-
-
-
