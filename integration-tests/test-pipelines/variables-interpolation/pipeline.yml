@@ -1,0 +1,12 @@
+name: variables-pipeline
+variables:
+  users:
+    type: array
+    items:
+      type: string
+    default:
+      - jhon
+      - erik
+  env:
+    type: string
+    default: dev

@@ -74,6 +74,7 @@ type Connections struct {
 	Oracle              []OracleConnection              `yaml:"oracle,omitempty" json:"oracle,omitempty" mapstructure:"oracle"`
 	Phantombuster       []PhantombusterConnection       `yaml:"phantombuster,omitempty" json:"phantombuster,omitempty" mapstructure:"phantombuster"`
 	Elasticsearch       []ElasticsearchConnection       `yaml:"elasticsearch,omitempty" json:"elasticsearch,omitempty" mapstructure:"elasticsearch"`
+	Spanner             []SpannerConnection             `yaml:"spanner,omitempty" json:"spanner,omitempty" mapstructure:"spanner"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -782,6 +783,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Elasticsearch = append(env.Connections.Elasticsearch, conn)
+	case "spanner":
+		var conn SpannerConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Spanner = append(env.Connections.Spanner, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -919,6 +927,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Phantombuster = removeConnection(env.Connections.Phantombuster, connectionName)
 	case "elasticsearch":
 		env.Connections.Elasticsearch = removeConnection(env.Connections.Elasticsearch, connectionName)
+	case "spanner":
+		env.Connections.Spanner = removeConnection(env.Connections.Spanner, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1023,6 +1033,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Phantombuster, source.Phantombuster)
 	mergeConnectionList(&c.Frankfurter, source.Frankfurter)
 	mergeConnectionList(&c.Elasticsearch, source.Elasticsearch)
+	mergeConnectionList(&c.Spanner, source.Spanner)
 	c.buildConnectionKeyMap()
 	return nil
 }

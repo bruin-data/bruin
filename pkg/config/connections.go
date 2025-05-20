@@ -234,9 +234,9 @@ type PostgresConnection struct {
 	Host         string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
 	Port         int    `yaml:"port,omitempty" json:"port" mapstructure:"port" jsonschema:"default=5432"`
 	Database     string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
-	Schema       string `yaml:"schema,omitempty" json:"schema" mapstructure:"schema"`
-	PoolMaxConns int    `yaml:"pool_max_conns,omitempty" json:"pool_max_conns" mapstructure:"pool_max_conns" default:"10"`
-	SslMode      string `yaml:"ssl_mode,omitempty" json:"ssl_mode" mapstructure:"ssl_mode" default:"disable"`
+	Schema       string `yaml:"schema,omitempty" json:"schema,omitempty" mapstructure:"schema"`
+	PoolMaxConns int    `yaml:"pool_max_conns,omitempty" json:"pool_max_conns,omitempty" mapstructure:"pool_max_conns" default:"10"`
+	SslMode      string `yaml:"ssl_mode,omitempty" json:"ssl_mode,omitempty" mapstructure:"ssl_mode" default:"allow"`
 }
 
 func (c PostgresConnection) GetName() string {
@@ -741,5 +741,18 @@ type ElasticsearchConnection struct {
 }
 
 func (c ElasticsearchConnection) GetName() string {
+	return c.Name
+}
+
+type SpannerConnection struct {
+	Name              string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	ProjectID         string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
+	InstanceID        string `yaml:"instance_id,omitempty" json:"instance_id" mapstructure:"instance_id"`
+	Database          string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	CredentialsBase64 string `yaml:"credentials_base64,omitempty" json:"credentials_base64" mapstructure:"credentials_base64"`
+	CredentialsPath   string `yaml:"credentials_path,omitempty" json:"credentials_path" mapstructure:"credentials_path"`
+}
+
+func (c SpannerConnection) GetName() string {
 	return c.Name
 }

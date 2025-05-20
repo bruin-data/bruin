@@ -207,7 +207,7 @@ func TestRenderCommand_Run(t *testing.T) {
 				ApplyModifiers: false,
 			}
 
-			tt.wantErr(t, render.Run(tt.args.task, params))
+			tt.wantErr(t, render.Run(&pipeline.Pipeline{}, tt.args.task, params))
 			f.extractor.AssertExpectations(t)
 			f.bqMaterializer.AssertExpectations(t)
 			f.builder.AssertExpectations(t)
@@ -279,7 +279,7 @@ func TestModifyExtractor(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			extractor := modifyExtractor(tt.args.params, tt.args.task)
+			extractor := modifyExtractor(tt.args.params, &pipeline.Pipeline{}, tt.args.task)
 			qry, err := extractor.ExtractQueriesFromString(tt.args.query)
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantQuery, qry[0].Query)

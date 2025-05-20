@@ -468,6 +468,15 @@ func TestLoadFromFile(t *testing.T) {
 					VerifyCerts: "true",
 				},
 			},
+			Spanner: []SpannerConnection{
+				{
+					Name:            "spanner-1",
+					ProjectID:       "project-id-123",
+					InstanceID:      "instance-id-123",
+					Database:        "database-id-123",
+					CredentialsPath: "path/to/service_account.json",
+				},
+			},
 		},
 	}
 

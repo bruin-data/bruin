@@ -24,7 +24,7 @@ type QueryResult struct {
 
 type QueryExtractor interface {
 	ExtractQueriesFromString(filepath string) ([]*Query, error)
-	CloneForAsset(ctx context.Context, asset *pipeline.Asset) QueryExtractor
+	CloneForAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) QueryExtractor
 	ReextractQueriesFromSlice(content []string) ([]string, error)
 }
 
@@ -170,9 +170,9 @@ func (f *WholeFileExtractor) ReextractQueriesFromSlice(content []string) ([]stri
 	return allQueries, nil
 }
 
-func (f *WholeFileExtractor) CloneForAsset(ctx context.Context, t *pipeline.Asset) QueryExtractor {
+func (f *WholeFileExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) QueryExtractor {
 	return &WholeFileExtractor{
-		Renderer: f.Renderer.CloneForAsset(ctx, t),
+		Renderer: f.Renderer.CloneForAsset(ctx, p, t),
 		Fs:       f.Fs,
 	}
 }
