@@ -235,9 +235,39 @@ func TestMaterializer_Render(t *testing.T) {
 				"COMMIT;$",
 		},
 		{
-			name: "basic table creation",
+			name: "empty table",
 			task: &pipeline.Asset{
-				Name: "my_table",
+				Name: "empty_table",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{},
+			},
+			want: "CREATE TABLE IF NOT EXISTS empty_table \\(\n" +
+				"\n" +
+				"\\)",
+		},
+		{
+			name: "table with one column",
+			task: &pipeline.Asset{
+				Name: "one_col_table",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS one_col_table \\(\n" +
+				"id INT64\n" +
+				"\\)",
+		},
+		{
+			name: "table with two columns",
+			task: &pipeline.Asset{
+				Name: "two_col_table",
 				Materialization: pipeline.Materialization{
 					Type:     pipeline.MaterializationTypeTable,
 					Strategy: pipeline.MaterializationStrategyDDL,
@@ -247,7 +277,7 @@ func TestMaterializer_Render(t *testing.T) {
 					{Name: "name", Type: "STRING", Description: "The name of the person"},
 				},
 			},
-			want: "CREATE TABLE IF NOT EXISTS my_table \\(\n" +
+			want: "CREATE TABLE IF NOT EXISTS two_col_table \\(\n" +
 				"id INT64,\n" +
 				"name STRING COMMENT 'The name of the person'\n" +
 				"\\)",
@@ -285,8 +315,28 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			want: "CREATE TABLE IF NOT EXISTS my_primary_key_table \\(\n" +
-				"id INT64 PRIMARY KEY,\n" +
-				"category STRING COMMENT 'Category of the item'\n" +
+				"id INT64,\n" +
+				"category STRING COMMENT 'Category of the item',\n" +
+				"primary key \\(id\\)\n" +
+				"\\)",
+		},
+		{
+			name: "table with composite primary key",
+			task: &pipeline.Asset{
+				Name: "my_composite_primary_key_table",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64", PrimaryKey: true},
+					{Name: "category", Type: "STRING", Description: "Category of the item", PrimaryKey: true},
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_composite_primary_key_table \\(\n" +
+				"id INT64,\n" +
+				"category STRING COMMENT 'Category of the item',\n" +
+				"primary key \\(id, category\\)\n" +
 				"\\)",
 		},
 	}
