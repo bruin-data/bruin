@@ -185,13 +185,23 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 
 func BuildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	columnDefs := make([]string, 0, len(asset.Columns))
+	primaryKeys := []string{}
+
 	for _, col := range asset.Columns {
 		def := fmt.Sprintf("%s %s", col.Name, col.Type)
 
 		if col.Description != "" {
-			def += fmt.Sprintf(` OPTIONS(description=%q)`, col.Description) // %q escapes "
+			def += fmt.Sprintf(` OPTIONS(description=%q)`, col.Description)
+		}
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, col.Name)
 		}
 		columnDefs = append(columnDefs, def)
+	}
+
+	if len(primaryKeys) > 0 {
+		primaryKeyClause := fmt.Sprintf("PRIMARY KEY (%s) NOT ENFORCED", strings.Join(primaryKeys, ", "))
+		columnDefs = append(columnDefs, primaryKeyClause)
 	}
 
 	q := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n  %s\n)",
