@@ -426,10 +426,9 @@ func TestBuildDDLQuery(t *testing.T) {
 				},
 				Materialization: pipeline.Materialization{
 					Type: pipeline.MaterializationTypeTable,
-					
 				},
 			},
-			want:  "CREATE TABLE IF NOT EXISTS my_table_with_multiple_pks (\n  id INT64,\n  category STRING,\n  name STRING OPTIONS(description=\"The name of the person\"),\n  PRIMARY KEY (id, category) NOT ENFORCED\n)",
+			want: "CREATE TABLE IF NOT EXISTS my_table_with_multiple_pks (\n  id INT64,\n  category STRING,\n  name STRING OPTIONS(description=\"The name of the person\"),\n  PRIMARY KEY (id, category) NOT ENFORCED\n)",
 		},
 	}
 
