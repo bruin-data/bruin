@@ -116,6 +116,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	columnDefs := make([]string, 0, len(asset.Columns))
 	primaryKeys := []string{}
+	columnComments := []string{}
 
 	for _, col := range asset.Columns {
 		def := fmt.Sprintf("%s %s", col.Name, col.Type)
@@ -123,17 +124,26 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 		if col.PrimaryKey {
 			primaryKeys = append(primaryKeys, col.Name)
 		}
+
 		columnDefs = append(columnDefs, def)
+
+		if col.Description != "" {
+			comment := fmt.Sprintf("COMMENT ON COLUMN %s.%s IS %q;", asset.Name, col.Name, col.Description)
+			columnComments = append(columnComments, comment)
+		}
 	}
+
 	if len(primaryKeys) > 0 {
 		primaryKeyClause := fmt.Sprintf("PRIMARY KEY (%s)", strings.Join(primaryKeys, ", "))
 		columnDefs = append(columnDefs, primaryKeyClause)
 	}
 
-	q := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n  %s\n)",
-		asset.Name,
-		strings.Join(columnDefs, ",\n  "),
-	)
+	createTableStmt := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n  %s\n)", asset.Name, strings.Join(columnDefs, ",\n  "))
 
-	return q, nil
+	// Only append comments if there are any
+	if len(columnComments) > 0 {
+		createTableStmt += ";\n" + strings.Join(columnComments, "\n")
+	}
+
+	return createTableStmt, nil
 }
