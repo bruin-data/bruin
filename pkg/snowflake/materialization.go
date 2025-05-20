@@ -175,7 +175,9 @@ func BuildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 		clusterByClause = "CLUSTER BY (" + strings.Join(asset.Materialization.ClusterBy, ", ") + ") "
 	}
 	ddl := fmt.Sprintf(
-		"CREATE TABLE IF NOT EXISTS %s %s(\n%s\n)",
+		"CREATE TABLE IF NOT EXISTS %s %s(\n"+
+			"%s\n"+
+			")",
 		asset.Name,
 		clusterByClause,
 		strings.Join(columnDefs, ",\n"),
