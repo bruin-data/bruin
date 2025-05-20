@@ -1,4 +1,0 @@
-name: frankfurter.rates
-
-parameters:
-  source_table: exchange_rates
