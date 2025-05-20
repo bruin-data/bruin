@@ -39,7 +39,7 @@ func (m *mockMaterializer) Render(t *pipeline.Asset, query string) (string, erro
 }
 
 func (m *mockMaterializer) LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error {
-	return nil 
+	return nil
 }
 
 func TestBasicOperator_RunTask(t *testing.T) {

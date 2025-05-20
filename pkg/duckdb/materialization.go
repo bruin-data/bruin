@@ -30,7 +30,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
 		pipeline.MaterializationStrategyMerge:         errorMaterializer, // not supported yet,
 		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
-		pipeline.MaterializationStrategyDDL:           BuildDDLQuery,
+		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
 	},
 }
 
@@ -113,11 +113,21 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	return strings.Join(queries, ";\n") + ";", nil
 }
 
-func BuildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
+func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	columnDefs := make([]string, 0, len(asset.Columns))
+	primaryKeys := []string{}
+
 	for _, col := range asset.Columns {
 		def := fmt.Sprintf("%s %s", col.Name, col.Type)
+
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, col.Name)
+		}
 		columnDefs = append(columnDefs, def)
+	}
+	if len(primaryKeys) > 0 {
+		primaryKeyClause := fmt.Sprintf("PRIMARY KEY (%s)", strings.Join(primaryKeys, ", "))
+		columnDefs = append(columnDefs, primaryKeyClause)
 	}
 
 	q := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n  %s\n)",
