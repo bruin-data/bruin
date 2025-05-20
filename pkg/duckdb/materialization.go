@@ -128,7 +128,7 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 		columnDefs = append(columnDefs, def)
 
 		if col.Description != "" {
-			comment := fmt.Sprintf("COMMENT ON COLUMN %s.%s IS %q;", asset.Name, col.Name, col.Description)
+			comment := fmt.Sprintf("COMMENT ON COLUMN %s.%s IS '%s';", asset.Name, col.Name, strings.ReplaceAll(col.Description, "'", "''"))
 			columnComments = append(columnComments, comment)
 		}
 	}
@@ -140,7 +140,6 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 
 	createTableStmt := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n  %s\n)", asset.Name, strings.Join(columnDefs, ",\n  "))
 
-	// Only append comments if there are any
 	if len(columnComments) > 0 {
 		createTableStmt += ";\n" + strings.Join(columnComments, "\n")
 	}

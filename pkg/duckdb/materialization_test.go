@@ -301,8 +301,8 @@ func TestBuildDDLQuery(t *testing.T) {
 				},
 			},
 			want: "CREATE TABLE IF NOT EXISTS my_table_with_comments (\n  id INT64,\n  name STRING\n);\n" +
-				"COMMENT ON COLUMN my_table_with_comments.id IS \"Identifier for the record\";\n" +
-				"COMMENT ON COLUMN my_table_with_comments.name IS \"Name of the person\";",
+				"COMMENT ON COLUMN my_table_with_comments.id IS 'Identifier for the record';\n" +
+				"COMMENT ON COLUMN my_table_with_comments.name IS 'Name of the person';",
 		},
 	}
 
