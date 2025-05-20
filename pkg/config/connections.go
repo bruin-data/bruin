@@ -244,15 +244,14 @@ func (c PostgresConnection) GetName() string {
 }
 
 type RedshiftConnection struct {
-	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	Username     string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password     string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
-	Host         string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
-	Port         int    `yaml:"port,omitempty" json:"port" mapstructure:"port" jsonschema:"default=5439"`
-	Database     string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
-	Schema       string `yaml:"schema,omitempty" json:"schema" mapstructure:"schema"`
-	PoolMaxConns int    `yaml:"pool_max_conns,omitempty" json:"pool_max_conns" mapstructure:"pool_max_conns" default:"10"`
-	SslMode      string `yaml:"ssl_mode,omitempty" json:"ssl_mode" mapstructure:"ssl_mode" default:"disable"`
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port,omitempty" json:"port" mapstructure:"port" jsonschema:"default=5439"`
+	Database string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	Schema   string `yaml:"schema,omitempty" json:"schema" mapstructure:"schema"`
+	SslMode  string `yaml:"ssl_mode,omitempty" json:"ssl_mode,omitempty" mapstructure:"ssl_mode" default:"allow"`
 }
 
 func (c RedshiftConnection) GetName() string {
