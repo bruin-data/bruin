@@ -401,6 +401,36 @@ func TestBuildDDLQuery(t *testing.T) {
 			},
 			want: "CREATE TABLE IF NOT EXISTS my_partitioned_clustered_table (\n  id INT64,\n  timestamp TIMESTAMP OPTIONS(description=\"Event timestamp\"),\n  category STRING OPTIONS(description=\"Category of the item\")\n)\nPARTITION BY timestamp\nCLUSTER BY category",
 		},
+		{
+			name: "table with primary key",
+			asset: &pipeline.Asset{
+				Name: "my_table_with_pk",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64", PrimaryKey: true},
+					{Name: "name", Type: "STRING", Description: "The name of the person"},
+				},
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_table_with_pk (\n  id INT64,\n  name STRING OPTIONS(description=\"The name of the person\"),\n  PRIMARY KEY (id) NOT ENFORCED\n)",
+		},
+		{
+			name: "table with multiple primary keys",
+			asset: &pipeline.Asset{
+				Name: "my_table_with_multiple_pks",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64", PrimaryKey: true},
+					{Name: "category", Type: "STRING", PrimaryKey: true},
+					{Name: "name", Type: "STRING", Description: "The name of the person"},
+				},
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+					
+				},
+			},
+			want:  "CREATE TABLE IF NOT EXISTS my_table_with_multiple_pks (\n  id INT64,\n  category STRING,\n  name STRING OPTIONS(description=\"The name of the person\"),\n  PRIMARY KEY (id, category) NOT ENFORCED\n)",
+		},
 	}
 
 	for _, tt := range tests {
