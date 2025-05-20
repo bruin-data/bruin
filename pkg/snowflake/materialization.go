@@ -157,8 +157,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 }
 
 func BuildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
-	var columnDefs []string
-	columnDefs = make([]string, 0, len(asset.Columns))
+	columnDefs := make([]string, 0, len(asset.Columns))
 	for _, col := range asset.Columns {
 		def := fmt.Sprintf("%s %s", col.Name, col.Type)
 		if col.PrimaryKey {
