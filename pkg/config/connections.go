@@ -262,13 +262,13 @@ type SnowflakeConnection struct {
 	Name           string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Account        string `yaml:"account,omitempty" json:"account" mapstructure:"account"`
 	Username       string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password       string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password       string `yaml:"password,omitempty" json:"password,omitempty" jsonschema:"oneof_required=password" mapstructure:"password"`
 	Region         string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
-	Role           string `yaml:"role,omitempty" json:"role" mapstructure:"role"`
-	Database       string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
-	Schema         string `yaml:"schema,omitempty" json:"schema" mapstructure:"schema"`
-	Warehouse      string `yaml:"warehouse,omitempty" json:"warehouse" mapstructure:"warehouse"`
-	PrivateKeyPath string `yaml:"private_key_path,omitempty" json:"private_key_path" mapstructure:"private_key_path"`
+	Role           string `yaml:"role,omitempty" json:"role,omitempty" mapstructure:"role"`
+	Database       string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
+	Schema         string `yaml:"schema,omitempty" json:"schema,omitempty" mapstructure:"schema"`
+	Warehouse      string `yaml:"warehouse,omitempty" json:"warehouse,omitempty" mapstructure:"warehouse"`
+	PrivateKeyPath string `yaml:"private_key_path,omitempty" json:"private_key_path,omitempty" jsonschema:"oneof_required=private_key" mapstructure:"private_key_path"`
 }
 
 func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
