@@ -1602,14 +1602,13 @@ func (m *Manager) addPgLikeConnectionFromConfig(connection *config.PostgresConne
 	var err error
 	if redshift {
 		client, err = postgres.NewClient(context.TODO(), postgres.RedShiftConfig{
-			Username:     connection.Username,
-			Password:     connection.Password,
-			Host:         connection.Host,
-			Port:         connection.Port,
-			Database:     connection.Database,
-			Schema:       connection.Schema,
-			PoolMaxConns: poolMaxConns,
-			SslMode:      connection.SslMode,
+			Username: connection.Username,
+			Password: connection.Password,
+			Host:     connection.Host,
+			Port:     connection.Port,
+			Database: connection.Database,
+			Schema:   connection.Schema,
+			SslMode:  connection.SslMode,
 		})
 	} else {
 		client, err = postgres.NewClient(context.TODO(), postgres.Config{
