@@ -1,6 +1,6 @@
 /*@bruin
 
-name: currency_performance
+name: frankfurter.currency_performance
 type: duckdb.sql
 materialization:
    type: table
@@ -8,8 +8,8 @@ materialization:
 description: This query retrieves the exchange rates from daily_rates for all currencies and joins currency_names to each currency code for better readability. Finally, it presents the exchange rates for the current date and compares them with the rates from the previous day, 7 days ago and 30 days ago. 
 
 depends:
-  - currency_names
-  - daily_rates
+  - frankfurter.currency_names
+  - frankfurter.daily_rates
 
 @bruin*/
 
@@ -23,14 +23,14 @@ with_lags AS (
         LAG(rate, 1) OVER (PARTITION BY currency_code ORDER BY date) AS rate_lag_1d,
         LAG(rate, 7) OVER (PARTITION BY currency_code ORDER BY date) AS rate_lag_7d,
         LAG(rate, 30) OVER (PARTITION BY currency_code ORDER BY date) AS rate_lag_30d
-    FROM daily_rates
+    FROM frankfurter.daily_rates
 ),
 with_names AS (
     SELECT 
         wl.*,
         fc.currency_name
     FROM with_lags wl
-    LEFT JOIN currency_names fc
+    LEFT JOIN frankfurter.currency_names fc
     USING (currency_code)
 )
 SELECT 

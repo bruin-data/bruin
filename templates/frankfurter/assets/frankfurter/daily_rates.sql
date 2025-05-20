@@ -1,6 +1,6 @@
 /*@bruin
 
-name: daily_rates
+name: frankfurter.daily_rates
 type: duckdb.sql
 materialization:
    type: table

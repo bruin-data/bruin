@@ -1,6 +1,6 @@
 /*@bruin
 
-name: currency_names
+name: frankfurter.currency_names
 type: duckdb.sql
 materialization:
    type: table
