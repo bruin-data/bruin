@@ -248,3 +248,74 @@ COMMIT;`,
 		})
 	}
 }
+
+func TestBuildDDLQuery(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		asset   *pipeline.Asset
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "basic table creation",
+			asset: &pipeline.Asset{
+				Name: "my_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+					{Name: "name", Type: "STRING"},
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_table (\n  id INT64,\n  name STRING\n)",
+		},
+		{
+			name: "table with primary key",
+			asset: &pipeline.Asset{
+				Name: "my_table_with_pk",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64", PrimaryKey: true},
+					{Name: "name", Type: "STRING"},
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_table_with_pk (\n  id INT64,\n  name STRING,\n  PRIMARY KEY (id)\n)",
+		},
+		{
+			name: "table with multiple primary keys",
+			asset: &pipeline.Asset{
+				Name: "my_table_with_multiple_pks",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64", PrimaryKey: true},
+					{Name: "category", Type: "STRING", PrimaryKey: true},
+					{Name: "name", Type: "STRING"},
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_table_with_multiple_pks (\n  id INT64,\n  category STRING,\n  name STRING,\n  PRIMARY KEY (id, category)\n)",
+		},
+		{
+			name: "table with column comments",
+			asset: &pipeline.Asset{
+				Name: "my_table_with_comments",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64", Description: "Identifier for the record"},
+					{Name: "name", Type: "STRING", Description: "Name of the person"},
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_table_with_comments (\n  id INT64,\n  name STRING\n);\n" +
+				"COMMENT ON COLUMN my_table_with_comments.id IS \"Identifier for the record\";\n" +
+				"COMMENT ON COLUMN my_table_with_comments.name IS \"Name of the person\";",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := buildDDLQuery(tt.asset, "")
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}
