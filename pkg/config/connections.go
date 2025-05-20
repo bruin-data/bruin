@@ -640,7 +640,7 @@ type EMRServerlessConnection struct {
 	ApplicationID string `yaml:"application_id" json:"application_id" mapstructure:"application_id"`
 	ExecutionRole string `yaml:"execution_role" json:"execution_role" mapstructure:"execution_role"`
 	Region        string `yaml:"region" json:"region" mapstructure:"region"`
-	Workspace     string `yaml:"workspace" json:"workspace" mapstructure:"workspace"`
+	Workspace     string `yaml:"workspace" json:"workspace,omitempty" mapstructure:"workspace"`
 }
 
 func (c EMRServerlessConnection) GetName() string {
