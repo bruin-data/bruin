@@ -234,6 +234,61 @@ func TestMaterializer_Render(t *testing.T) {
 				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}';\n" +
 				"COMMIT;$",
 		},
+		{
+			name: "basic table creation",
+			task: &pipeline.Asset{
+				Name: "my_table",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+					{Name: "name", Type: "STRING", Description: "The name of the person"},
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_table \\(\n" +
+				"id INT64,\n" +
+				"name STRING COMMENT 'The name of the person'\n" +
+				"\\)",
+		},
+		{
+			name: "table with clustering",
+			task: &pipeline.Asset{
+				Name: "my_clustered_table",
+				Materialization: pipeline.Materialization{
+					Type:      pipeline.MaterializationTypeTable,
+					Strategy:  pipeline.MaterializationStrategyDDL,
+					ClusterBy: []string{"category"},
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+					{Name: "category", Type: "STRING", Description: "Category of the item"},
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_clustered_table CLUSTER BY \\(category\\) \\(\n" +
+				"id INT64,\n" +
+				"category STRING COMMENT 'Category of the item'\n" +
+				"\\)",
+		},
+		{
+			name: "table with primary key",
+			task: &pipeline.Asset{
+				Name: "my_primary_key_table",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64", PrimaryKey: true},
+					{Name: "category", Type: "STRING", Description: "Category of the item", PrimaryKey: false},
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_primary_key_table \\(\n" +
+				"id INT64 PRIMARY KEY,\n" +
+				"category STRING COMMENT 'Category of the item'\n" +
+				"\\)",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
