@@ -161,6 +161,8 @@ func BuildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	columnDefs = make([]string, 0, len(asset.Columns))
 	for _, col := range asset.Columns {
 		def := fmt.Sprintf("%s %s", col.Name, col.Type)
+
+		if col.PrimaryKey // assign primary key
 		if col.Description != "" {
 			desc := strings.ReplaceAll(col.Description, `'`, `''`)
 			def += fmt.Sprintf(" COMMENT '%s'", desc)
@@ -177,5 +179,6 @@ func BuildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 		clusterByClause,
 		strings.Join(columnDefs, ",\n  "),
 	)
+
 	return ddl, nil
 }
