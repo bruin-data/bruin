@@ -234,9 +234,9 @@ type PostgresConnection struct {
 	Host         string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
 	Port         int    `yaml:"port,omitempty" json:"port" mapstructure:"port" jsonschema:"default=5432"`
 	Database     string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
-	Schema       string `yaml:"schema,omitempty" json:"schema" mapstructure:"schema"`
-	PoolMaxConns int    `yaml:"pool_max_conns,omitempty" json:"pool_max_conns" mapstructure:"pool_max_conns" default:"10"`
-	SslMode      string `yaml:"ssl_mode,omitempty" json:"ssl_mode" mapstructure:"ssl_mode" default:"disable"`
+	Schema       string `yaml:"schema,omitempty" json:"schema,omitempty" mapstructure:"schema"`
+	PoolMaxConns int    `yaml:"pool_max_conns,omitempty" json:"pool_max_conns,omitempty" mapstructure:"pool_max_conns" default:"10"`
+	SslMode      string `yaml:"ssl_mode,omitempty" json:"ssl_mode,omitempty" mapstructure:"ssl_mode" default:"allow"`
 }
 
 func (c PostgresConnection) GetName() string {
