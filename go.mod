@@ -43,6 +43,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/uber/athenadriver v1.1.15
 	github.com/urfave/cli/v2 v2.27.1
+	github.com/xeipuuv/gojsonschema v1.2.0
 	github.com/xlab/treeprint v1.2.0
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.27.0
@@ -172,6 +173,8 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/uber-go/tally v3.3.17+incompatible // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
+	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
+	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xrash/smetrics v0.0.0-20240312152122-5f08fbb34913 // indirect
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
