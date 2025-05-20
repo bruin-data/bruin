@@ -104,7 +104,7 @@ func TestConvertToBruinAsset(t *testing.T) {
 			fileContent: "SELECT * FROM table;",
 			filePath:    "test.sql",
 			wantErr:     false,
-			wantContent: "/* @bruin\nname: test\n@bruin */\n\nSELECT * FROM table;",
+			wantContent: "/* @bruin\nname: test\ntype: bq.sql\n@bruin */\n\nSELECT * FROM table;",
 			wantAsset:   true,
 		},
 		{
@@ -128,7 +128,7 @@ func TestConvertToBruinAsset(t *testing.T) {
 			fileContent: "SELECT * FROM table;",
 			filePath:    "my test.sql",
 			wantErr:     false,
-			wantContent: "/* @bruin\nname: my test\n@bruin */\n\nSELECT * FROM table;",
+			wantContent: "/* @bruin\nname: my test\ntype: bq.sql\n@bruin */\n\nSELECT * FROM table;",
 			wantAsset:   true,
 		},
 	}

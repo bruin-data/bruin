@@ -1,8 +1,11 @@
 package query
 
 import (
+	"context"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -22,16 +25,22 @@ func (m *mockNoOpRenderer) Render(template string) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
+//nolint:ireturn // returning an interface here is intentional
+func (m *mockNoOpRenderer) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) jinja.RendererInterface {
+	args := m.Called(ctx, asset)
+	return args.Get(0).(jinja.RendererInterface)
+}
+
 func TestFileExtractor_ExtractQueriesFromString(t *testing.T) {
 	t.Parallel()
 
-	noOpRenderer := func(mr renderer) {
+	noOpRenderer := func(mr jinja.RendererInterface) {
 		mr.(*mockNoOpRenderer).On("Render", mock.Anything).Return("default", nil)
 	}
 
 	tests := []struct {
 		name          string
-		setupRenderer func(mr renderer)
+		setupRenderer func(mr jinja.RendererInterface)
 		content       string
 		want          []*Query
 		wantErr       bool
@@ -55,7 +64,7 @@ func TestFileExtractor_ExtractQueriesFromString(t *testing.T) {
 		{
 			name:    "single query, rendered properly",
 			content: "select * from users-{{ds}};",
-			setupRenderer: func(mr renderer) {
+			setupRenderer: func(mr jinja.RendererInterface) {
 				mr.(*mockNoOpRenderer).
 					On("Render", mock.Anything).
 					Return("select * from users-2022-01-01", nil)
@@ -187,13 +196,13 @@ set min_level_req = 22;
 func TestWholeFileExtractor_ExtractQueriesFromString(t *testing.T) {
 	t.Parallel()
 
-	noOpRenderer := func(mr renderer) {
+	noOpRenderer := func(mr jinja.RendererInterface) {
 		mr.(*mockNoOpRenderer).On("Render", mock.Anything).Return("default", nil)
 	}
 
 	tests := []struct {
 		name          string
-		setupRenderer func(mr renderer)
+		setupRenderer func(mr jinja.RendererInterface)
 		content       string
 		want          []*Query
 		wantErr       bool
@@ -221,7 +230,7 @@ func TestWholeFileExtractor_ExtractQueriesFromString(t *testing.T) {
 		{
 			name:    "single query, rendered properly",
 			content: "select * from users-{{ds}};",
-			setupRenderer: func(mr renderer) {
+			setupRenderer: func(mr jinja.RendererInterface) {
 				mr.(*mockNoOpRenderer).
 					On("Render", mock.Anything).
 					Return("select * from users-2022-01-01", nil)

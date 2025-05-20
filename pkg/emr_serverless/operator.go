@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -35,6 +36,7 @@ var terminalJobRunStates = []types.JobRunState{
 }
 
 type connectionFetcher interface {
+	GetAthenaConnection(name string) (athena.Client, error)
 	GetEMRServerlessConnection(name string) (*Client, error)
 }
 

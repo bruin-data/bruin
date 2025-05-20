@@ -254,7 +254,9 @@ func (n Notifications) MarshalJSON() ([]byte, error) {
 	})
 }
 
-type MaterializationType string
+type (
+	MaterializationType string
+)
 
 const (
 	MaterializationTypeNone  MaterializationType = ""
@@ -274,6 +276,7 @@ const (
 	MaterializationStrategyAppend           MaterializationStrategy        = "append"
 	MaterializationStrategyMerge            MaterializationStrategy        = "merge"
 	MaterializationStrategyTimeInterval     MaterializationStrategy        = "time_interval"
+	MaterializationStrategyDDL              MaterializationStrategy        = "ddl"
 	MaterializationTimeGranularityDate      MaterializationTimeGranularity = "date"
 	MaterializationTimeGranularityTimestamp MaterializationTimeGranularity = "timestamp"
 )
@@ -284,6 +287,7 @@ var AllAvailableMaterializationStrategies = []MaterializationStrategy{
 	MaterializationStrategyAppend,
 	MaterializationStrategyMerge,
 	MaterializationStrategyTimeInterval,
+	MaterializationStrategyDDL,
 }
 
 type Materialization struct {
@@ -1119,6 +1123,7 @@ type Pipeline struct {
 	Commit             string                 `json:"commit"`
 	Snapshot           string                 `json:"snapshot"`
 	Agent              bool                   `json:"agent" yaml:"agent" mapstructure:"agent"`
+	Variables          Variables              `json:"variables" yaml:"variables" mapstructure:"variables"`
 	TasksByType        map[AssetType][]*Asset `json:"-"`
 	tasksByName        map[string]*Asset
 }

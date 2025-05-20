@@ -4,13 +4,16 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	_ "github.com/marcboeker/go-duckdb"
 )
 
 type Client struct {
-	connection connection
-	config     DuckDBConfig
+	connection    connection
+	config        DuckDBConfig
+	schemaCreator *ansisql.SchemaCreator
 }
 
 type DuckDBConfig interface {
@@ -31,7 +34,7 @@ func NewClient(c DuckDBConfig) (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{connection: conn, config: c}, nil
+	return &Client{connection: conn, config: c, schemaCreator: ansisql.NewSchemaCreator()}, nil
 }
 
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
@@ -146,4 +149,8 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 	}
 
 	return result, nil
+}
+
+func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
+	return c.schemaCreator.CreateSchemaIfNotExist(ctx, c, asset)
 }

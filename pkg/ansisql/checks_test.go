@@ -8,7 +8,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -279,11 +278,7 @@ func TestCustomCheck(t *testing.T) {
 
 			conn := new(mockConnectionFetcher)
 			conn.On("GetConnection", "test").Return(q, nil)
-			extractor := query.WholeFileExtractor{
-				Fs:       afero.NewOsFs(),
-				Renderer: jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id"),
-			}
-			n := &CustomCheck{conn: conn, extractor: &extractor}
+			n := &CustomCheck{conn: conn, renderer: jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")}
 
 			testInstance := &scheduler.CustomCheckInstance{
 				AssetInstance: &scheduler.AssetInstance{

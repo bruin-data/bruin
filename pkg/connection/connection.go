@@ -24,6 +24,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/db2"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/dynamodb"
+	"github.com/bruin-data/bruin/pkg/elasticsearch"
 	"github.com/bruin-data/bruin/pkg/emr_serverless"
 	"github.com/bruin-data/bruin/pkg/facebookads"
 	"github.com/bruin-data/bruin/pkg/frankfurter"
@@ -53,6 +54,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/slack"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/spanner"
 	"github.com/bruin-data/bruin/pkg/sqlite"
 	"github.com/bruin-data/bruin/pkg/stripe"
 	"github.com/bruin-data/bruin/pkg/tiktokads"
@@ -111,6 +113,8 @@ type Manager struct {
 	DB2             map[string]*db2.Client
 	Oracle          map[string]*oracle.Client
 	Phantombuster   map[string]*phantombuster.Client
+	Elasticsearch   map[string]*elasticsearch.Client
+	Spanner         map[string]*spanner.Client
 	mutex           sync.Mutex
 }
 
@@ -402,6 +406,18 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connPhantombuster, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Phantombuster)...)
+
+	connElasticsearch, err := m.GetElasticsearchConnectionWithoutDefault(name)
+	if err == nil {
+		return connElasticsearch, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Elasticsearch)...)
+
+	connSpanner, err := m.GetSpannerConnectionWithoutDefault(name)
+	if err == nil {
+		return connSpanner, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Spanner)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -702,6 +718,28 @@ func (m *Manager) GetKlaviyoConnectionWithoutDefault(name string) (*klaviyo.Clie
 	db, ok := m.Klaviyo[name]
 	if !ok {
 		return nil, errors.Errorf("klaviyo connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetSpannerConnection(name string) (*spanner.Client, error) {
+	db, err := m.GetSpannerConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetSpannerConnectionWithoutDefault("spanner-default")
+}
+
+func (m *Manager) GetSpannerConnectionWithoutDefault(name string) (*spanner.Client, error) {
+	if m.Spanner == nil {
+		return nil, errors.New("no spanner connections found")
+	}
+
+	db, ok := m.Spanner[name]
+	if !ok {
+		return nil, errors.Errorf("spanner connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -1359,6 +1397,25 @@ func (m *Manager) GetPhantombusterConnectionWithoutDefault(name string) (*phanto
 	return db, nil
 }
 
+func (m *Manager) GetElasticsearchConnection(name string) (*elasticsearch.Client, error) {
+	db, err := m.GetElasticsearchConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetElasticsearchConnectionWithoutDefault("elasticsearch-default")
+}
+
+func (m *Manager) GetElasticsearchConnectionWithoutDefault(name string) (*elasticsearch.Client, error) {
+	if m.Elasticsearch == nil {
+		return nil, errors.New("no elasticsearch connections found")
+	}
+	db, ok := m.Elasticsearch[name]
+	if !ok {
+		return nil, errors.Errorf("elasticsearch connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
 func (m *Manager) GetDB2Connection(name string) (*db2.Client, error) {
 	db, err := m.GetDB2ConnectionWithoutDefault(name)
 	if err == nil {
@@ -1944,6 +2001,35 @@ func (m *Manager) AddGoogleSheetsConnectionFromConfig(connection *config.GoogleS
 	return nil
 }
 
+func (m *Manager) AddSpannerConnectionFromConfig(connection *config.SpannerConnection) error {
+	m.mutex.Lock()
+	if m.Spanner == nil {
+		m.Spanner = make(map[string]*spanner.Client)
+	}
+	m.mutex.Unlock()
+
+	if len(connection.CredentialsPath) == 0 && len(connection.CredentialsBase64) == 0 {
+		return errors.New("credentials are required: provide either credentials_path of service account json or credentials_base64 of service account json")
+	}
+
+	client, err := spanner.NewClient(spanner.Config{
+		ProjectID:         connection.ProjectID,
+		InstanceID:        connection.InstanceID,
+		Database:          connection.Database,
+		CredentialsPath:   connection.CredentialsPath,
+		CredentialsBase64: connection.CredentialsBase64,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Spanner[connection.Name] = client
+
+	return nil
+}
+
 func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnection) error {
 	m.mutex.Lock()
 	if m.Kafka == nil {
@@ -2525,6 +2611,30 @@ func (m *Manager) AddPhantombusterConnectionFromConfig(connection *config.Phanto
 	return nil
 }
 
+func (m *Manager) AddElasticsearchConnectionFromConfig(connection *config.ElasticsearchConnection) error {
+	m.mutex.Lock()
+	if m.Elasticsearch == nil {
+		m.Elasticsearch = make(map[string]*elasticsearch.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := elasticsearch.NewClient(elasticsearch.Config{
+		Username:    connection.Username,
+		Password:    connection.Password,
+		Host:        connection.Host,
+		Port:        connection.Port,
+		Secure:      connection.Secure,
+		VerifyCerts: connection.VerifyCerts,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Elasticsearch[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddFrankfurterConnectionFromConfig(connection *config.FrankfurterConnection) error {
 	m.mutex.Lock()
 	if m.Frankfurter == nil {
@@ -2664,6 +2774,8 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Oracle, connectionManager.AddOracleConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.DB2, connectionManager.AddDB2ConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Phantombuster, connectionManager.AddPhantombusterConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Elasticsearch, connectionManager.AddElasticsearchConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Spanner, connectionManager.AddSpannerConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }

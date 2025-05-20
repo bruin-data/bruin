@@ -20,7 +20,7 @@ func (m *mockExtractor) ExtractQueriesFromString(content string) ([]*query.Query
 	return res.Get(0).([]*query.Query), res.Error(1)
 }
 
-func (m *mockExtractor) CloneForAsset(ctx context.Context, asset *pipeline.Asset) query.QueryExtractor {
+func (m *mockExtractor) CloneForAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) query.QueryExtractor {
 	return m
 }
 
@@ -199,6 +199,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			mat := new(mockMaterializer)
 			conn := new(mockConnectionFetcher)
 			conn.On("GetDuckDBConnection", mock.Anything).Return(client, nil)
+			client.On("CreateSchemaIfNotExist", mock.Anything, mock.Anything).Return(nil)
 
 			if tt.setup != nil {
 				tt.setup(&fields{
