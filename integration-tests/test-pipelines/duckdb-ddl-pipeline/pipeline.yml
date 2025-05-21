@@ -1,0 +1,4 @@
+name: integration_test
+
+default_connections:
+  duckdb: "duckdb-ddl"

@@ -465,6 +465,20 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 func getTasks(binary string, currentFolder string) []e2e.Task {
 	return []e2e.Task{
 		{
+			Name:    "test-ddl-duckdb",
+			Command: binary,
+			Args:    []string{"run", "--env", "env-duckdb-ddl", filepath.Join(currentFolder, "test-pipelines/duckdb-ddl-pipeline")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Successfully validated 1 assets", "Executed ", "Finished: my_schema.products"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
 			Name:    "builtin-policies",
 			Command: binary,
 			Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/policies-builtin")},
