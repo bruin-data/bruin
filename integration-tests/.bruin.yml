@@ -1,195 +1,195 @@
 default_environment: default
 environments:
-    default:
-        connections:
-            duckdb:
-                - name: "duckdb-default"
-                  path: "duckdb-files/duckdb.db"
-            chess:
-                - name: "chess-default"
-                  players:
-                      - "MagnusCarlsen"
-                      - "Hikaru"
-            generic:
-                - name: KEY1
-                  value: value1
-    env-run-with-filters:
-        connections:
-            duckdb:
-                - name: "duckdb-run-with-filters"
-                  path: "duckdb-files/run-with-filters.db"
-            chess:
-                - name: "chess-run-with-filters"
-                  players:
-                      - "MagnusCarlsen"
-                      - "Hikaru"
-            generic:
-                - name: KEY1
-                  value: value1
-    env-run-with-tags:
-        connections:
-            duckdb:
-                - name: "duckdb-run-with-tags"
-                  path: "duckdb-files/run-with-tags.db"
-            chess:
-                - name: "chess-run-with-tags"
-                  players:
-                      - "MagnusCarlsen"
-                      - "Hikaru"
-            generic:
-                - name: KEY1
-                  value: value1
-    env-run-main-with-filters:
-        connections:
-            duckdb:
-                - name: "duckdb-run-main-with-filters"
-                  path: "duckdb-files/run-main-with-filters.db"
-            chess:
-                - name: "chess-run-main-with-filters"
-                  players:
-                      - "MagnusCarlsen"
-                      - "Hikaru"
-            generic:
-                - name: KEY1
-                  value: value1
+  default:
+    connections:
+      duckdb:
+        - name: "duckdb-default"
+          path: "duckdb-files/duckdb.db"
+      chess:
+        - name: "chess-default"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
+      generic:
+        - name: KEY1
+          value: value1
+  env-run-with-filters:
+    connections:
+      duckdb:
+        - name: "duckdb-run-with-filters"
+          path: "duckdb-files/run-with-filters.db"
+      chess:
+        - name: "chess-run-with-filters"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
+      generic:
+        - name: KEY1
+          value: value1
+  env-run-with-tags:
+    connections:
+      duckdb:
+        - name: "duckdb-run-with-tags"
+          path: "duckdb-files/run-with-tags.db"
+      chess:
+        - name: "chess-run-with-tags"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
+      generic:
+        - name: KEY1
+          value: value1
+  env-run-main-with-filters:
+    connections:
+      duckdb:
+        - name: "duckdb-run-main-with-filters"
+          path: "duckdb-files/run-main-with-filters.db"
+      chess:
+        - name: "chess-run-main-with-filters"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
+      generic:
+        - name: KEY1
+          value: value1
 
-    env-run-with-downstream:
-        connections:
-            duckdb:
-                - name: "duckdb-run-with-downstream"
-                  path: "duckdb-files/run-with-downstream.db"
-            chess:
-                - name: "chess-run-with-downstream"
-                  players:
-                      - "MagnusCarlsen"
-                      - "Hikaru"
-            generic:
-                - name: KEY1
-                  value: value1
-    env-run-main-with-downstream:
-        connections:
-            duckdb:
-                - name: "duckdb-run-main-with-downstream"
-                  path: "duckdb-files/run-main-with-downstream.db"
-            chess:
-                - name: "chess-run-main-with-downstream"
-                  players:
-                      - "MagnusCarlsen"
-                      - "Hikaru"
-            generic:
-                - name: KEY1
-                  value: value1
-    env-push-metadata:
-        connections:
-            duckdb:
-                - name: "duckdb-push-metadata"
-                  path: "duckdb-files/push-metadata.db"
-    env-run-use-uv:
-        connections:
-            duckdb:
-                - name: "duckdb-env-run-use-uv"
-                  path: "duckdb-files/env-run-use-uv.db"
-            chess:
-                - name: "chess-run-use-uv"
-                  players:
-                      - "MagnusCarlsen"
-                      - "Hikaru"
-            generic:
-                - name: KEY1
-                  value: value1
-    env-run-default-option:
-        connections:
-            duckdb:
-                - name: "duckdb-env-run-default-option"
-                  path: "duckdb-files/env-run-default-option.db"
-            chess:
-                - name: "chess-run-default-option"
-                  players:
-                      - "MagnusCarlsen"
-                      - "Hikaru"
-            generic:
-                - name: KEY1
-                  value: value1
-                - name: KEY2
-                  value: value2
-    env-run-malformed-sql:
-        connections:
-            duckdb:
-                - name: "duckdb-run-malformed-sql"
-                  path: "duckdb-files/run-malformed-sql.db"
-            chess:
-                - name: "chess-run-malformed-sql"
-                  players:
-                      - "MagnusCarlsen"
-                      - "Hikaru"
-            generic:
-                - name: KEY1
-                  value: value1
-    env-run-seed-data:
-        connections:
-            duckdb:
-                - name: "duckdb-run-seed-data"
-                  path: "duckdb-files/run-seed-data.db"
-    env-ingestr:
-        connections:
-            duckdb:
-                - name: "duckdb-ingestr"
-                  path: "duckdb-files/ingestr.db"
-            chess:
-                - name: "chess-ingestr"
-                  players:
-                      - "MagnusCarlsen"
-                      - "Hikaru"
-    env-run-python-materialization:
-        connections:
-            duckdb:
-                - name: "duckdb-run-python-materialization"
-                  path: "duckdb-files/run-python-materialization.db"
+  env-run-with-downstream:
+    connections:
+      duckdb:
+        - name: "duckdb-run-with-downstream"
+          path: "duckdb-files/run-with-downstream.db"
+      chess:
+        - name: "chess-run-with-downstream"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
+      generic:
+        - name: KEY1
+          value: value1
+  env-run-main-with-downstream:
+    connections:
+      duckdb:
+        - name: "duckdb-run-main-with-downstream"
+          path: "duckdb-files/run-main-with-downstream.db"
+      chess:
+        - name: "chess-run-main-with-downstream"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
+      generic:
+        - name: KEY1
+          value: value1
+  env-push-metadata:
+    connections:
+      duckdb:
+        - name: "duckdb-push-metadata"
+          path: "duckdb-files/push-metadata.db"
+  env-run-use-uv:
+    connections:
+      duckdb:
+        - name: "duckdb-env-run-use-uv"
+          path: "duckdb-files/env-run-use-uv.db"
+      chess:
+        - name: "chess-run-use-uv"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
+      generic:
+        - name: KEY1
+          value: value1
+  env-run-default-option:
+    connections:
+      duckdb:
+        - name: "duckdb-env-run-default-option"
+          path: "duckdb-files/env-run-default-option.db"
+      chess:
+        - name: "chess-run-default-option"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
+      generic:
+        - name: KEY1
+          value: value1
+        - name: KEY2
+          value: value2
+  env-run-malformed-sql:
+    connections:
+      duckdb:
+        - name: "duckdb-run-malformed-sql"
+          path: "duckdb-files/run-malformed-sql.db"
+      chess:
+        - name: "chess-run-malformed-sql"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
+      generic:
+        - name: KEY1
+          value: value1
+  env-run-seed-data:
+    connections:
+      duckdb:
+        - name: "duckdb-run-seed-data"
+          path: "duckdb-files/run-seed-data.db"
+  env-ingestr:
+    connections:
+      duckdb:
+        - name: "duckdb-ingestr"
+          path: "duckdb-files/ingestr.db"
+      chess:
+        - name: "chess-ingestr"
+          players:
+            - "MagnusCarlsen"
+            - "Hikaru"
+  env-run-python-materialization:
+    connections:
+      duckdb:
+        - name: "duckdb-run-python-materialization"
+          path: "duckdb-files/run-python-materialization.db"
 
-    env-query-asset:
-        connections:
-            duckdb:
-                - name: "duckdb-query-asset"
-                  path: "duckdb-files/query-asset.db"
-    env-time-materialization:
-        connections:
-            duckdb:
-                - name: "duckdb-time-materialization"
-                  path: "duckdb-files/time-materialization.db"
+  env-query-asset:
+    connections:
+      duckdb:
+        - name: "duckdb-query-asset"
+          path: "duckdb-files/query-asset.db"
+  env-time-materialization:
+    connections:
+      duckdb:
+        - name: "duckdb-time-materialization"
+          path: "duckdb-files/time-materialization.db"
 
-    env-run-non-wait-symbolic:
-        connections:
-            duckdb:
-                - name: "duckdb-env-run-non-wait-symbolic"
-                  path: "duckdb-files/env-run-non-wait-symbolic.db"
+  env-run-non-wait-symbolic:
+    connections:
+      duckdb:
+        - name: "duckdb-env-run-non-wait-symbolic"
+          path: "duckdb-files/env-run-non-wait-symbolic.db"
 
-    env-query-export:
-        connections:
-            duckdb:
-                - name: "duckdb-query-export"
-                  path: "duckdb-files/env-query-export.db"
+  env-query-export:
+    connections:
+      duckdb:
+        - name: "duckdb-query-export"
+          path: "duckdb-files/env-query-export.db"
 
 
-    env-run-nameless-asset:
-        connections:
-            duckdb:
-                - name: "duckdb-run-nameless-asset"
-                  path: "duckdb-files/run-nameless-asset.db"
+  env-run-nameless-asset:
+    connections:
+      duckdb:
+        - name: "duckdb-run-nameless-asset"
+          path: "duckdb-files/run-nameless-asset.db"
 
-    env-interval-modifiers:
-        connections:
-            duckdb:
-                - name: "duckdb-interval-modifiers"
-                  path: "duckdb-files/interval-modifiers.db"
+  env-interval-modifiers:
+    connections:
+      duckdb:
+        - name: "duckdb-interval-modifiers"
+          path: "duckdb-files/interval-modifiers.db"
 
-    env-render-template-this:
-        connections:
-            duckdb:
-                - name: "duckdb-render-template-this"
-                  path: "duckdb-files/render-template-this.db"
+  env-render-template-this:
+    connections:
+      duckdb:
+        - name: "duckdb-render-template-this"
+          path: "duckdb-files/render-template-this.db"
 
-    env-duckdb-ddl:
-        connections:
-          duckdb:
-            - name: "duckdb-ddl"
-              path: "duckdb-files/duckdb-ddl.db"
+  env-duckdb-ddl:
+    connections:
+      duckdb:
+        - name: "duckdb-ddl"
+          path: "duckdb-files/duckdb-ddl.db"
