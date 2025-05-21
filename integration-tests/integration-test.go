@@ -1035,7 +1035,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Successfully validated 2 assets", "Executed ", "Finished: my_schema.table_check"},
+				Contains: []string{"Successfully validated 2 assets", "Executed 8 tasks", "Finished: my_schema.table_check"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
