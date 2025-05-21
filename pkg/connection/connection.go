@@ -1564,22 +1564,16 @@ func (m *Manager) addRedshiftConnectionFromConfig(connection *config.RedshiftCon
 	}
 	m.mutex.Unlock()
 
-	poolMaxConns := connection.PoolMaxConns
-	if connection.PoolMaxConns == 0 {
-		poolMaxConns = 10
-	}
-
 	var client *postgres.Client
 	var err error
 	client, err = postgres.NewClient(context.TODO(), postgres.RedShiftConfig{
-		Username:     connection.Username,
-		Password:     connection.Password,
-		Host:         connection.Host,
-		Port:         connection.Port,
-		Database:     connection.Database,
-		Schema:       connection.Schema,
-		PoolMaxConns: poolMaxConns,
-		SslMode:      connection.SslMode,
+		Username: connection.Username,
+		Password: connection.Password,
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Database: connection.Database,
+		Schema:   connection.Schema,
+		SslMode:  connection.SslMode,
 	})
 	if err != nil {
 		return err
@@ -1608,14 +1602,13 @@ func (m *Manager) addPgLikeConnectionFromConfig(connection *config.PostgresConne
 	var err error
 	if redshift {
 		client, err = postgres.NewClient(context.TODO(), postgres.RedShiftConfig{
-			Username:     connection.Username,
-			Password:     connection.Password,
-			Host:         connection.Host,
-			Port:         connection.Port,
-			Database:     connection.Database,
-			Schema:       connection.Schema,
-			PoolMaxConns: poolMaxConns,
-			SslMode:      connection.SslMode,
+			Username: connection.Username,
+			Password: connection.Password,
+			Host:     connection.Host,
+			Port:     connection.Port,
+			Database: connection.Database,
+			Schema:   connection.Schema,
+			SslMode:  connection.SslMode,
 		})
 	} else {
 		client, err = postgres.NewClient(context.TODO(), postgres.Config{
