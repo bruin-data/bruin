@@ -215,6 +215,151 @@ COMMIT;`,
 				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}';\n" +
 				"COMMIT;$",
 		},
+		//{
+		//	name: "empty table",
+		//	task: &pipeline.Asset{
+		//		Name: "empty_table",
+		//		Materialization: pipeline.Materialization{
+		//			Type:     pipeline.MaterializationTypeTable,
+		//			Strategy: pipeline.MaterializationStrategyDDL,
+		//		},
+		//		Columns: []pipeline.Column{},
+		//	},
+		//	want: "CREATE TABLE IF NOT EXISTS one_col_table \\(\n" +
+		//		"\n" +
+		//		"\\)",
+		//},
+		{
+			name: "table with one column",
+			task: &pipeline.Asset{
+				Name: "one_col_table",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS one_col_table \\(\n" +
+				"id INT64\n" +
+				"\\)",
+		},
+		{
+			name: "table with two columns",
+			task: &pipeline.Asset{
+				Name: "two_col_table",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+					{Name: "name", Type: "STRING", Description: "The name of the person"},
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS two_col_table \\(\n" +
+				"id INT64,\n" +
+				"name STRING\n" +
+				"\\)",
+		},
+		//{
+		//	name: "table with clustering",
+		//	task: &pipeline.Asset{
+		//		Name: "my_clustered_table",
+		//		Materialization: pipeline.Materialization{
+		//			Type:      pipeline.MaterializationTypeTable,
+		//			Strategy:  pipeline.MaterializationStrategyDDL,
+		//			ClusterBy: []string{"category"},
+		//		},
+		//		Columns: []pipeline.Column{
+		//			{Name: "id", Type: "INT64"},
+		//			{Name: "category", Type: "STRING", Description: "Category of the item"},
+		//		},
+		//	},
+		//	want: "CREATE TABLE IF NOT EXISTS my_clustered_table CLUSTER BY \\(category\\) \\(\n" +
+		//		"id INT64,\n" +
+		//		"category STRING COMMENT 'Category of the item'\n" +
+		//		"\\)",
+		//},
+		{
+			name: "table with primary key",
+			task: &pipeline.Asset{
+				Name: "my_primary_key_table",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64", PrimaryKey: true},
+					{Name: "category", Type: "STRING", Description: "Category of the item", PrimaryKey: false},
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_primary_key_table \\(\n" +
+				"id INT64,\n" +
+				"category STRING,\n" +
+				"primary key \\(id\\)\n" +
+				"\\)",
+		},
+		{
+			name: "table with composite primary key",
+			task: &pipeline.Asset{
+				Name: "my_composite_primary_key_table",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64", PrimaryKey: true},
+					{Name: "category", Type: "STRING", Description: "Category of the item", PrimaryKey: true},
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_composite_primary_key_table \\(\n" +
+				"id INT64,\n" +
+				"category STRING,\n" +
+				"primary key \\(id, category\\)\n" +
+				"\\)",
+		},
+		{
+			name: "table with partitioning",
+			task: &pipeline.Asset{
+				Name: "my_partitioned_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+					{Name: "timestamp", Type: "TIMESTAMP", Description: "Event timestamp"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyDDL,
+					PartitionBy: "timestamp",
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_partitioned_table \\(\n" +
+				"id INT64,\n" +
+				"timestamp TIMESTAMP\n" +
+				"\\)" +
+				"\nPARTITION BY \\(timestamp\\)",
+		},
+		{
+			name: "table with 2 partitioning",
+			task: &pipeline.Asset{
+				Name: "my_partitioned_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+					{Name: "timestamp", Type: "TIMESTAMP", Description: "Event timestamp"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyDDL,
+					PartitionBy: "timestamp",
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_partitioned_table \\(\n" +
+				"id INT64,\n" +
+				"timestamp TIMESTAMP\n" +
+				"\\)" +
+				"\nPARTITION BY \\(timestamp\\)",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
