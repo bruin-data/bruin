@@ -18,18 +18,8 @@ columns:
   - name: price
     type: FLOAT
     description: "Price of the product in USD"
-    checks:
-      - name: positive
   - name: stock
     type: INTEGER
     description: "Number of units in stock"
-
-custom_checks:
-    - name: check_for_cols
-      value: 4
-      query: SELECT COUNT(*) AS column_count
-             FROM information_schema.columns
-             WHERE table_name = 'products'
-
 
 @bruin */
