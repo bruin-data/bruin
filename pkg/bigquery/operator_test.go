@@ -65,6 +65,7 @@ func (m *mockMaterializer) IsFullRefresh() bool {
 func (m *mockMaterializer) LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error {
 	return nil
 }
+
 func TestBasicOperator_RunTask(t *testing.T) {
 	t.Parallel()
 
