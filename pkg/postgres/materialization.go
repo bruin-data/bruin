@@ -156,36 +156,69 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 
 func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	columnDefs := make([]string, 0, len(asset.Columns))
-	primaryKeys := make([]string, 0)
+	primaryKeys := []string{}
+
 	for _, col := range asset.Columns {
 		def := fmt.Sprintf("%s %s", col.Name, col.Type)
+
 		if col.PrimaryKey {
 			primaryKeys = append(primaryKeys, col.Name)
 		}
-		if col.Description != "" {
-			desc := strings.ReplaceAll(col.Description, `'`, `''`)
-			comments = append(comments, fmt.Sprintf("COMMENT ON COLUMN %s.%s IS '%s';", asset.Name, col.Name, desc))
-			def += fmt.Sprintf(" COMMENT '%s'", desc)
-		}
 		columnDefs = append(columnDefs, def)
 	}
-	clusterByClause := ""
-	if len(asset.Materialization.ClusterBy) > 0 {
-		clusterByClause = "CLUSTER BY (" + strings.Join(asset.Materialization.ClusterBy, ", ") + ") "
-	}
-	primaryKeyClause := ""
+
 	if len(primaryKeys) > 0 {
-		primaryKeyClause = fmt.Sprintf(",\nprimary key (%s)", strings.Join(primaryKeys, ", "))
+		primaryKeyClause := fmt.Sprintf("PRIMARY KEY (%s)", strings.Join(primaryKeys, ", "))
+		columnDefs = append(columnDefs, primaryKeyClause)
 	}
-	ddl := fmt.Sprintf(
-		"CREATE TABLE IF NOT EXISTS %s %s(\n"+
-			"%s%s\n"+
-			")",
+
+	q := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n  %s\n)",
 		asset.Name,
-		clusterByClause,
-		strings.Join(columnDefs, ",\n"),
-		primaryKeyClause,
+		strings.Join(columnDefs, ",\n  "),
 	)
 
-	return ddl, nil
+	if asset.Materialization.PartitionBy != "" {
+		q += "\n-- PARTITION BY " + asset.Materialization.PartitionBy // Commented out as PostgreSQL requires extensions for partitioning
+	}
+	if len(asset.Materialization.ClusterBy) > 0 {
+		q += "\n-- CLUSTER BY " + strings.Join(asset.Materialization.ClusterBy, ", ") // Commented out as PostgreSQL does not support this natively
+	}
+
+	return q, nil
 }
+
+//func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
+//	columnDefs := make([]string, 0, len(asset.Columns))
+//	primaryKeys := []string{}
+//
+//	for _, col := range asset.Columns {
+//		def := fmt.Sprintf("%s %s", col.Name, col.Type)
+//
+//		if col.Description != "" {
+//			def += fmt.Sprintf(` OPTIONS(description=%q)`, col.Description)
+//		}
+//		if col.PrimaryKey {
+//			primaryKeys = append(primaryKeys, col.Name)
+//		}
+//		columnDefs = append(columnDefs, def)
+//	}
+//
+//	if len(primaryKeys) > 0 {
+//		primaryKeyClause := fmt.Sprintf("PRIMARY KEY (%s) NOT ENFORCED", strings.Join(primaryKeys, ", "))
+//		columnDefs = append(columnDefs, primaryKeyClause)
+//	}
+//
+//	q := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n  %s\n)",
+//		asset.Name,
+//		strings.Join(columnDefs, ",\n  "),
+//	)
+//
+//	if asset.Materialization.PartitionBy != "" {
+//		q += "\nPARTITION BY " + asset.Materialization.PartitionBy
+//	}
+//	if len(asset.Materialization.ClusterBy) > 0 {
+//		q += "\nCLUSTER BY " + strings.Join(asset.Materialization.ClusterBy, ", ")
+//	}
+//
+//	return q, nil
+//}
