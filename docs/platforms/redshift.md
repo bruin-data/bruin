@@ -15,7 +15,7 @@ Mind that, despite the connection being at all effects a Postgres connection, th
           host: "redshift-cluster-1.xxxxxxxxx.eu-north-1.redshift.amazonaws.com"
           port: 5439
           database: "dev"
-          ssl_mode: "allow"
+          ssl_mode: "allow" # optional
 ```
 
 > [!NOTE]

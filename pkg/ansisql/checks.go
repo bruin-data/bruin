@@ -201,7 +201,6 @@ func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstan
 	if c.renderer != nil {
 		r := c.renderer.CloneForAsset(ctx, ti.GetPipeline(), ti.GetAsset())
 		qry, err := r.Render(qq)
-
 		if err != nil {
 			return errors.Wrap(err, "failed to render custom check query")
 		}

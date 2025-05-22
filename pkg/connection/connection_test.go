@@ -120,14 +120,13 @@ func TestManager_AddRedshiftConnectionFromConfig(t *testing.T) {
 	assert.Nil(t, res)
 
 	configuration := &config.RedshiftConnection{
-		Name:         "test",
-		Host:         "somehost",
-		Username:     "user",
-		Password:     "pass",
-		Database:     "db",
-		Port:         15432,
-		SslMode:      "disable",
-		PoolMaxConns: 10,
+		Name:     "test",
+		Host:     "somehost",
+		Username: "user",
+		Password: "pass",
+		Database: "db",
+		Port:     15432,
+		SslMode:  "disable",
 	}
 
 	err = m.AddRedshiftConnectionFromConfig(configuration)
