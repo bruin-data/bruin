@@ -299,6 +299,9 @@ environments:
           instance_id: "instance-id-123"
           database: "database-id-123"
           credentials_path: "path/to/service_account.json"
+      attio:
+        - name: "attio-1"
+          api_key: "api-key-123"
           
   prod:
     connections:
