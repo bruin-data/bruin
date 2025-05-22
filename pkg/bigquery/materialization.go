@@ -24,6 +24,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyMerge:         mergeMaterializer,
 		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:           BuildDDLQuery,
+		pipeline.MaterializationStrategySCD2:          buildSCD2Query,
 	},
 }
 
@@ -217,4 +218,60 @@ func BuildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	}
 
 	return q, nil
+}
+
+func buildSCD2Query(asset *pipeline.Asset, query string) (string, error) {
+	primaryKeys := []string{}
+	joinConds := make([]string, 0, 4)
+	insertCols := make([]string, 0, len(asset.Columns)+3)
+	insertValues := make([]string, 0, len(insertCols))
+	for _, col := range asset.Columns {
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, col.Name)
+			joinConds = append(joinConds, fmt.Sprintf("target.%s = source.%s", col.Name, col.Name))
+		}
+
+		if col.Name == "is_current" || col.Name == "valid_from" || col.Name == "valid_until" {
+			return "", fmt.Errorf("column name %s is reserved for SCD2 and cannot be used", col.Name)
+		}
+		if asset.Materialization.IncrementalKey != col.Name {
+			insertValues = append(insertValues, fmt.Sprintf("source.%s", col.Name))
+			insertCols = append(insertCols, col.Name)
+		}
+	}
+	insertCols = append(insertCols, "valid_from", "valid_until", "is_current")
+	insertValues = append(insertValues, fmt.Sprintf("source.%s", asset.Materialization.IncrementalKey))
+	insertValues = append(insertValues, "TIMESTAMP('9999-12-31')")
+	insertValues = append(insertValues, "TRUE")
+	insertClause := fmt.Sprintf("  INSERT (%s)\n  VALUES (%s)", strings.Join(insertCols, ", "), strings.Join(insertValues, ", "))
+	joinConds = append(joinConds, "target.is_current = TRUE")
+	joinCondition := strings.Join(joinConds, " AND ")
+	updateClause := fmt.Sprintf("  UPDATE SET\n    target.valid_until = source.%s,\n    target.is_current = FALSE\n", asset.Materialization.IncrementalKey)
+	if len(primaryKeys) == 0 {
+		return "", fmt.Errorf(
+			"materialization strategy %s requires the `primary_key` field to be set on at least one column",
+			asset.Materialization.Strategy,
+		)
+	}
+	tbl := fmt.Sprintf("`%s`", asset.Name)
+	queryStr := fmt.Sprintf(
+		"MERGE INTO %s AS target\n"+
+			"USING (\n"+
+			"  %s\n"+
+			") AS source\n"+
+			"ON %s\n"+
+			"\n"+
+			"WHEN MATCHED AND (\ntarget.valid_from < source.%s\n) THEN \n"+
+			"%s\n"+
+			"\n"+
+			"WHEN NOT MATCHED BY TARGET THEN \n"+
+			"%s\n",
+		tbl,
+		strings.TrimSpace(query),
+		joinCondition,
+		asset.Materialization.IncrementalKey,
+		updateClause,
+		insertClause,
+	)
+	return queryStr, nil
 }
