@@ -215,20 +215,20 @@ COMMIT;`,
 				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}';\n" +
 				"COMMIT;$",
 		},
-		//{
-		//	name: "empty table",
-		//	task: &pipeline.Asset{
-		//		Name: "empty_table",
-		//		Materialization: pipeline.Materialization{
-		//			Type:     pipeline.MaterializationTypeTable,
-		//			Strategy: pipeline.MaterializationStrategyDDL,
-		//		},
-		//		Columns: []pipeline.Column{},
-		//	},
-		//	want: "CREATE TABLE IF NOT EXISTS one_col_table \\(\n" +
-		//		"\n" +
-		//		"\\)",
-		//},
+		{
+			name: "empty table",
+			task: &pipeline.Asset{
+				Name: "empty_table",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{},
+			},
+			want: "CREATE TABLE IF NOT EXISTS empty_table \\(\n" +
+				"\n" +
+				"\\)",
+		},
 		{
 			name: "table with one column",
 			task: &pipeline.Asset{
@@ -263,25 +263,6 @@ COMMIT;`,
 				"name STRING\n" +
 				"\\)",
 		},
-		//{
-		//	name: "table with clustering",
-		//	task: &pipeline.Asset{
-		//		Name: "my_clustered_table",
-		//		Materialization: pipeline.Materialization{
-		//			Type:      pipeline.MaterializationTypeTable,
-		//			Strategy:  pipeline.MaterializationStrategyDDL,
-		//			ClusterBy: []string{"category"},
-		//		},
-		//		Columns: []pipeline.Column{
-		//			{Name: "id", Type: "INT64"},
-		//			{Name: "category", Type: "STRING", Description: "Category of the item"},
-		//		},
-		//	},
-		//	want: "CREATE TABLE IF NOT EXISTS my_clustered_table CLUSTER BY \\(category\\) \\(\n" +
-		//		"id INT64,\n" +
-		//		"category STRING COMMENT 'Category of the item'\n" +
-		//		"\\)",
-		//},
 		{
 			name: "table with primary key",
 			task: &pipeline.Asset{
