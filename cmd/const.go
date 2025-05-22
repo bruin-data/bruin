@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -34,3 +36,9 @@ var (
 
 	DefaultPipelineBuilder = pipeline.NewBuilder(builderConfig, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, DefaultGlossaryReader)
 )
+
+func variableOverridesMutator(variables []string) pipeline.PipelineMutator {
+	return func(ctx context.Context, p *pipeline.Pipeline) (*pipeline.Pipeline, error) {
+		panic("pipeline variable overrides mutator not implemented")
+	}
+}

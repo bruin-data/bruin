@@ -187,6 +187,10 @@ func Run(isDebug *bool) *cli.Command {
 				Usage:  "skip initial pipeline analysis logs for this run",
 				Hidden: true,
 			},
+			&cli.StringSliceFlag{
+				Name:  "var",
+				Usage: "override pipeline variables with custom values",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			defer func() {
@@ -259,6 +263,10 @@ func Run(isDebug *bool) *cli.Command {
 					asset.PrefixUpstreams(cm.SelectedEnvironment.SchemaPrefix)
 					return asset, nil
 				})
+			}
+
+			if vars := c.StringSlice("var"); len(vars) > 0 {
+				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
 			}
 
 			pipelineInfo, err := GetPipeline(c.Context, inputPath, runConfig, logger)

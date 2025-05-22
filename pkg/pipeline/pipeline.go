@@ -1391,16 +1391,17 @@ type glossaryReader interface {
 	GetEntities(pathToPipeline string) ([]*glossary.Entity, error)
 }
 
-type assetMutator func(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error)
-type pipelineMutator func(ctx context.Context, pipeline *Pipeline) (*Pipeline, error)
+type AssetMutator func(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error)
+
+type PipelineMutator func(ctx context.Context, pipeline *Pipeline) (*Pipeline, error)
 
 type Builder struct {
 	config             BuilderConfig
 	yamlTaskCreator    TaskCreator
 	commentTaskCreator TaskCreator
 	fs                 afero.Fs
-	assetMutators      []assetMutator
-	pipelineMutators   []pipelineMutator
+	assetMutators      []AssetMutator
+	pipelineMutators   []PipelineMutator
 
 	GlossaryReader glossaryReader
 }
@@ -1409,11 +1410,11 @@ func (b *Builder) SetGlossaryReader(reader glossaryReader) {
 	b.GlossaryReader = reader
 }
 
-func (b *Builder) AddAssetMutator(m assetMutator) {
+func (b *Builder) AddAssetMutator(m AssetMutator) {
 	b.assetMutators = append(b.assetMutators, m)
 }
 
-func (b *Builder) AddPipelineMutator(m pipelineMutator) {
+func (b *Builder) AddPipelineMutator(m PipelineMutator) {
 	b.pipelineMutators = append(b.pipelineMutators, m)
 }
 
@@ -1434,7 +1435,7 @@ func NewBuilder(config BuilderConfig, yamlTaskCreator TaskCreator, commentTaskCr
 		GlossaryReader:     gr,
 	}
 
-	b.assetMutators = []assetMutator{
+	b.assetMutators = []AssetMutator{
 		b.fillGlossaryStuff,
 		b.SetupDefaultsFromPipeline,
 		b.SetNameFromPath,
