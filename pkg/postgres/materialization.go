@@ -178,9 +178,5 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 		strings.Join(columnDefs, ",\n"),
 	)
 
-	if asset.Materialization.PartitionBy != "" {
-		q += "\nPARTITION BY (" + asset.Materialization.PartitionBy + ")"
-	}
-
 	return q, nil
 }

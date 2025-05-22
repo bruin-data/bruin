@@ -337,28 +337,7 @@ COMMIT;`,
 			want: "CREATE TABLE IF NOT EXISTS my_partitioned_table \\(\n" +
 				"id INT64,\n" +
 				"timestamp TIMESTAMP\n" +
-				"\\)" +
-				"\nPARTITION BY \\(timestamp\\)",
-		},
-		{
-			name: "table with 2 partitioning",
-			task: &pipeline.Asset{
-				Name: "my_partitioned_table",
-				Columns: []pipeline.Column{
-					{Name: "id", Type: "INT64"},
-					{Name: "timestamp", Type: "TIMESTAMP", Description: "Event timestamp"},
-				},
-				Materialization: pipeline.Materialization{
-					Type:        pipeline.MaterializationTypeTable,
-					Strategy:    pipeline.MaterializationStrategyDDL,
-					PartitionBy: "timestamp",
-				},
-			},
-			want: "CREATE TABLE IF NOT EXISTS my_partitioned_table \\(\n" +
-				"id INT64,\n" +
-				"timestamp TIMESTAMP\n" +
-				"\\)" +
-				"\nPARTITION BY \\(timestamp\\)",
+				"\\)",
 		},
 	}
 	for _, tt := range tests {
