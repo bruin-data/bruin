@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
@@ -43,14 +44,24 @@ func variableOverridesMutator(variables []string) pipeline.PipelineMutator {
 	return func(ctx context.Context, p *pipeline.Pipeline) (*pipeline.Pipeline, error) {
 		var overrides = map[string]any{}
 		for _, variable := range variables {
-			var v map[string]any
-			err := json.Unmarshal([]byte(variable), &v)
-			if err != nil {
-				return nil, fmt.Errorf("invalid variable %q: %w", variable, err)
+			var composite map[string]any
+			err := json.Unmarshal([]byte(variable), &composite)
+			if err == nil {
+				for k, v := range composite {
+					overrides[k] = v
+				}
+				continue
 			}
-			for k, v := range v {
-				overrides[k] = v
+			segments := strings.SplitN(variable, "=", 2)
+			if len(segments) != 2 {
+				return nil, fmt.Errorf("invalid variable override %q", variable)
 			}
+			key := strings.TrimSpace(segments[0])
+			var value any
+			if err := json.Unmarshal([]byte(segments[1]), &value); err != nil {
+				return nil, fmt.Errorf("invalid variable override %q: %w", variable, err)
+			}
+			overrides[key] = value
 		}
 		err := p.Variables.Merge(overrides)
 		if err != nil {
