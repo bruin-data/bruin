@@ -238,6 +238,25 @@ func TestMaterializer_Render(t *testing.T) {
 				"INSERT INTO my.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
 			},
 		},
+		{
+			name: "table with two columns",
+			task: &pipeline.Asset{
+				Name: "two_col_table",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+					{Name: "name", Type: "STRING", Description: "The name of the person"},
+				},
+			},
+			want: []string{"CREATE TABLE IF NOT EXISTS two_col_table \\(\n" +
+				"id INT64,\n" +
+				"name STRING COMMENT 'The name of the person'\n" +
+				"\\)",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
