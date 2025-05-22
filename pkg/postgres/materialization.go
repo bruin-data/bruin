@@ -157,6 +157,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	columnDefs := make([]string, 0, len(asset.Columns))
 	primaryKeys := []string{}
+	columnComments := []string{}
 
 	for _, col := range asset.Columns {
 		def := fmt.Sprintf("%s %s", col.Name, col.Type)
@@ -165,6 +166,11 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 			primaryKeys = append(primaryKeys, col.Name)
 		}
 		columnDefs = append(columnDefs, def)
+
+		if col.Description != "" {
+			comment := fmt.Sprintf("COMMENT ON COLUMN %s.%s IS '%s';", asset.Name, col.Name, strings.ReplaceAll(col.Description, "'", "''"))
+			columnComments = append(columnComments, comment)
+		}
 	}
 
 	if len(primaryKeys) > 0 {
@@ -177,6 +183,10 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 		asset.Name,
 		strings.Join(columnDefs, ",\n"),
 	)
+
+	if len(columnComments) > 0 {
+		q += ";\n" + strings.Join(columnComments, "\n")
+	}
 
 	return q, nil
 }
