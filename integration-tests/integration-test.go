@@ -459,6 +459,109 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 				},
 			},
 		},
+		{
+			Name: "run pipeline with variables",
+			Steps: []e2e.Task{
+				{
+					Name:    "run pipeline",
+					Command: binary,
+					Args: []string{
+						"run",
+						filepath.Join(currentFolder, "test-pipelines/variables-interpolation"),
+					},
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "validate output",
+					Command: "duckdb",
+					Args: []string{
+						"-csv",
+						"-noheader",
+						filepath.Join(currentFolder, "duckdb-files/variables.db"),
+						`SELECT name FROM public.users`,
+					},
+					Expected: e2e.Output{
+						ExitCode: 0,
+						Output:   "jhon\nerik\n",
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByOutputString,
+					},
+				},
+				{
+					Name:    "run pipeline with json override",
+					Command: binary,
+					Args: []string{
+						"run",
+						"--var", `{"users": ["mark", "nicholas"]}`,
+						filepath.Join(currentFolder, "test-pipelines/variables-interpolation"),
+					},
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "validate output",
+					Command: "duckdb",
+					Args: []string{
+						"-csv",
+						"-noheader",
+						filepath.Join(currentFolder, "duckdb-files/variables.db"),
+						`SELECT name FROM public.users`,
+					},
+					Expected: e2e.Output{
+						ExitCode: 0,
+						Output:   "mark\nnicholas\n",
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByOutputString,
+					},
+				},
+				{
+					Name:    "run pipeline with key=value override",
+					Command: binary,
+					Args: []string{
+						"run",
+						"--var", `users=["tanaka", "yamaguchi"]`,
+						filepath.Join(currentFolder, "test-pipelines/variables-interpolation"),
+					},
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "validate output",
+					Command: "duckdb",
+					Args: []string{
+						"-csv",
+						"-noheader",
+						filepath.Join(currentFolder, "duckdb-files/variables.db"),
+						`SELECT name FROM public.users`,
+					},
+					Expected: e2e.Output{
+						ExitCode: 0,
+						Output:   "tanaka\nyamaguchi\n",
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByOutputString,
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -560,7 +663,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			SkipJSONNodes: []string{`"path"`, `"extends"`, `"commit"`, `"snapshot"`},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"SELECT * FROM dev.users WHERE \nuser_id = 'jhon' OR user_id = 'erik'"},
+				Contains: []string{"CREATE TABLE public.users", "SELECT 'jhon' as name", "SELECT 'erik' as name"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -578,7 +681,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			SkipJSONNodes: []string{`"path"`, `"extends"`, `"commit"`, `"snapshot"`},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"SELECT * FROM dev.users WHERE \nuser_id = 'mark' OR user_id = 'nicholas'"},
+				Contains: []string{"CREATE TABLE public.users", "SELECT 'mark' as name", "SELECT 'nicholas' as name"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -596,7 +699,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			SkipJSONNodes: []string{`"path"`, `"extends"`, `"commit"`, `"snapshot"`},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"SELECT * FROM dev.users WHERE \nuser_id = 'mark' OR user_id = 'nicholas'"},
+				Contains: []string{"CREATE TABLE public.users", "SELECT 'mark' as name", "SELECT 'nicholas' as name"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
