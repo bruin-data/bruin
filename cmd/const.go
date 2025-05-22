@@ -45,6 +45,8 @@ func variableOverridesMutator(variables []string) pipeline.PipelineMutator {
 		var overrides = map[string]any{}
 		for _, variable := range variables {
 			var composite map[string]any
+			variable = strings.TrimSpace(variable)
+
 			err := json.Unmarshal([]byte(variable), &composite)
 			if err == nil {
 				for k, v := range composite {
@@ -52,14 +54,21 @@ func variableOverridesMutator(variables []string) pipeline.PipelineMutator {
 				}
 				continue
 			}
+
+			// this is a heuristic to detect if the variable is a JSON object
+			if strings.HasPrefix(variable, "{") {
+				return nil, fmt.Errorf("invalid variable override %q: %w", variable, err)
+			}
+
 			segments := strings.SplitN(variable, "=", 2)
 			if len(segments) != 2 {
-				return nil, fmt.Errorf("invalid variable override %q", variable)
+				return nil, fmt.Errorf("invalid variable override key %q: variable must of form key=value", variable)
 			}
+
 			key := strings.TrimSpace(segments[0])
 			var value any
 			if err := json.Unmarshal([]byte(segments[1]), &value); err != nil {
-				return nil, fmt.Errorf("invalid variable override %q: %w", variable, err)
+				return nil, fmt.Errorf("invalid variable override value %q: %w", variable, err)
 			}
 			overrides[key] = value
 		}
