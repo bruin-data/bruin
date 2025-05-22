@@ -16,6 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/appstore"
 	"github.com/bruin-data/bruin/pkg/asana"
 	"github.com/bruin-data/bruin/pkg/athena"
+	"github.com/bruin-data/bruin/pkg/attio"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/chess"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
@@ -115,6 +116,7 @@ type Manager struct {
 	Phantombuster   map[string]*phantombuster.Client
 	Elasticsearch   map[string]*elasticsearch.Client
 	Spanner         map[string]*spanner.Client
+	Attio           map[string]*attio.Client
 	mutex           sync.Mutex
 }
 
@@ -418,6 +420,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connSpanner, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Spanner)...)
+
+	connAttio, err := m.GetAttioConnectionWithoutDefault(name)
+	if err == nil {
+		return connAttio, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Attio)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -745,6 +753,27 @@ func (m *Manager) GetSpannerConnectionWithoutDefault(name string) (*spanner.Clie
 	return db, nil
 }
 
+func (m *Manager) GetAttioConnection(name string) (*attio.Client, error) {
+	db, err := m.GetAttioConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetAttioConnectionWithoutDefault("attio-default")
+}
+
+func (m *Manager) GetAttioConnectionWithoutDefault(name string) (*attio.Client, error) {
+	if m.Attio == nil {
+		return nil, errors.New("no attio connections found")
+	}
+
+	db, ok := m.Attio[name]
+	if !ok {
+		return nil, errors.Errorf("attio connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
 func (m *Manager) GetAdjustConnection(name string) (*adjust.Client, error) {
 	db, err := m.GetAdjustConnectionWithoutDefault(name)
 	if err == nil {
@@ -2604,6 +2633,25 @@ func (m *Manager) AddPhantombusterConnectionFromConfig(connection *config.Phanto
 	return nil
 }
 
+func (m *Manager) AddAttioConnectionFromConfig(connection *config.AttioConnection) error {
+	m.mutex.Lock()
+	if m.Attio == nil {
+		m.Attio = make(map[string]*attio.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := attio.NewClient(attio.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Attio[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddElasticsearchConnectionFromConfig(connection *config.ElasticsearchConnection) error {
 	m.mutex.Lock()
 	if m.Elasticsearch == nil {
@@ -2769,6 +2817,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Phantombuster, connectionManager.AddPhantombusterConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Elasticsearch, connectionManager.AddElasticsearchConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Spanner, connectionManager.AddSpannerConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Attio, connectionManager.AddAttioConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }
