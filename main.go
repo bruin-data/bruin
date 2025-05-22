@@ -74,6 +74,7 @@ func main() {
 			cmd.Query(),
 			versionCommand,
 		},
+		DisableSliceFlagSeparator: true,
 	}
 
 	err := app.Run(os.Args)

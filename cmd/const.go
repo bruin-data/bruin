@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
@@ -39,6 +41,21 @@ var (
 
 func variableOverridesMutator(variables []string) pipeline.PipelineMutator {
 	return func(ctx context.Context, p *pipeline.Pipeline) (*pipeline.Pipeline, error) {
-		panic("pipeline variable overrides mutator not implemented")
+		var overrides = map[string]any{}
+		for _, variable := range variables {
+			var v map[string]any
+			err := json.Unmarshal([]byte(variable), &v)
+			if err != nil {
+				return nil, fmt.Errorf("invalid variable %q: %w", variable, err)
+			}
+			for k, v := range v {
+				overrides[k] = v
+			}
+		}
+		err := p.Variables.Merge(overrides)
+		if err != nil {
+			return nil, fmt.Errorf("invalid variable overrides: %w", err)
+		}
+		return p, nil
 	}
 }
