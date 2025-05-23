@@ -381,8 +381,11 @@ func updateExistingColumn(existingCol *pipeline.Column, upstreamCol *pipeline.Co
 		existingCol.EntityAttribute = upstreamCol.EntityAttribute
 	}
 
+	if existingCol.PrimaryKey == false {
+		existingCol.PrimaryKey = upstreamCol.PrimaryKey
+	}
+
 	existingCol.UpdateOnMerge = upstreamCol.UpdateOnMerge
-	existingCol.PrimaryKey = false
 }
 
 func (p *LineageExtractor) updateAssetColumn(asset *pipeline.Asset, col *pipeline.Column) {
