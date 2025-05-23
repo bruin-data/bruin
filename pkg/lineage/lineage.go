@@ -347,6 +347,10 @@ func validateInputs(asset *pipeline.Asset, colName string) error {
 func (p *LineageExtractor) handleUpstreamColumns(asset *pipeline.Asset, upstreamCol *pipeline.Column) error {
 	existingCol := asset.GetColumnWithName(upstreamCol.Name)
 
+	if upstreamCol.Type == "UNKNOWN" {
+		upstreamCol.Type = ""
+	}
+
 	if existingCol == nil {
 		asset.Columns = append(asset.Columns, *upstreamCol)
 		return nil
