@@ -172,12 +172,6 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string, location string
 }
 
 func buildDDLQuery(asset *pipeline.Asset, query string, location string) ([]string, error) {
-	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
-
-	var partitionBy string
-	if asset.Materialization.PartitionBy != "" {
-		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", asset.Materialization.PartitionBy)
-	}
 
 	columnDefs := make([]string, 0, len(asset.Columns))
 	for _, col := range asset.Columns {
@@ -189,20 +183,33 @@ func buildDDLQuery(asset *pipeline.Asset, query string, location string) ([]stri
 		columnDefs = append(columnDefs, def)
 	}
 
-	queries := []string{
-		fmt.Sprintf(
-			"CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS (\n"+
-				"%s\n"+
-				")",
-			tempTableName,
-			location,
-			tempTableName,
-			partitionBy,
-			strings.Join(columnDefs, ",\n"),
-		),
-		"DROP TABLE IF EXISTS " + asset.Name,
-		fmt.Sprintf("ALTER TABLE %s RENAME TO %s", tempTableName, asset.Name),
+	//PARTITIONED BY col.Name datatype
+	//PARTITIONED BY product_id INT
+
+	partitionBy := ""
+	if asset.Materialization.PartitionBy != "" {
+		partitionBy = fmt.Sprintf("PARTITIONED BY '%s' \n", asset.Materialization.PartitionBy)
 	}
 
-	return queries, nil
+	clusterBy := ""
+	if asset.Materialization.ClusterBy != nil {
+		clusterBy = fmt.Sprintf("CLUSTERED BY ('%s')\n", strings.Join(asset.Materialization.ClusterBy, ", "))
+	}
+
+	ddlQuery := fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s (\n"+
+			"%s\n"+
+			")\n"+
+			"%s"+
+			"%s"+
+			"WITH (table_type='ICEBERG', is_external=false, location='%s/%s')",
+		asset.Name,
+		strings.Join(columnDefs, ",\n"),
+		partitionBy,
+		clusterBy,
+		location,
+		asset.Name,
+	)
+
+	return []string{ddlQuery}, nil
 }
