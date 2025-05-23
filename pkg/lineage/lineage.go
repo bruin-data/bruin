@@ -381,7 +381,7 @@ func updateExistingColumn(existingCol *pipeline.Column, upstreamCol *pipeline.Co
 		existingCol.EntityAttribute = upstreamCol.EntityAttribute
 	}
 
-	if existingCol.PrimaryKey == false {
+	if !existingCol.PrimaryKey {
 		existingCol.PrimaryKey = upstreamCol.PrimaryKey
 	}
 
