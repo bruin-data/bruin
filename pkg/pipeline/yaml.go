@@ -319,6 +319,7 @@ type taskDefinition struct {
 	Snowflake         snowflake         `yaml:"snowflake"`
 	Athena            athena            `yaml:"athena"`
 	IntervalModifiers IntervalModifiers `yaml:"interval_modifiers"`
+	Requirements      interface{}       `yaml:"requirements,omitempty"`
 }
 
 func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
@@ -486,6 +487,19 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Snowflake:         SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},
 		Athena:            AthenaConfig{Location: definition.Athena.QueryResultsPath},
 		IntervalModifiers: definition.IntervalModifiers,
+	}
+
+	// Handle 'requirements', which can be a string (file-based requirements) or
+	// a list of strings (inline packages)
+	switch req := definition.Requirements.(type) {
+	case string:
+		task.RequirementsFile = req
+	case []interface{}:
+		for _, r := range req {
+			if str, ok := r.(string); ok && str != "" {
+				task.Requirements = append(task.Requirements, str)
+			}
+		}
 	}
 
 	for index, check := range definition.CustomChecks {

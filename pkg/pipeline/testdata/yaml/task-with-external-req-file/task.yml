@@ -1,0 +1,4 @@
+name: hello-world
+type: python
+uri: test_asset.py
+requirements: ../../../shared/requirements.txt
