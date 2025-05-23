@@ -48,3 +48,13 @@ func (v Variables) Schema() any {
 		"properties": v,
 	}
 }
+
+func (v Variables) Merge(other map[string]any) error {
+	for key, value := range other {
+		if _, ok := v[key]; !ok {
+			return fmt.Errorf("no such variable %q", key)
+		}
+		v[key]["default"] = value
+	}
+	return nil
+}

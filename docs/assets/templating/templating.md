@@ -86,6 +86,20 @@ All user defined variables are accessibe via `var` namespace. For example, if yo
 
 Additionally all top level variables must define a `default` value. This will be used to render your assets in absence of values supplied on the commandline.
 
+## Overriding Variables
+
+You can override variables defined in your `pipeline.yml` file during a `bruin run` execution by using the `--var` flag. This allows you to dynamically adjust variable values without modifying the pipeline configuration file.
+
+Bruin supports two different syntax for overriding variables:
+```sh
+# key value form; value must be valid JSON
+$ bruin run --var key=value
+
+# json form
+$ bruin run --var '{"key": "value"}'
+```
+
+The `--var` flag can be specified multiple times. However beware that if you specify the same key multiple times, the latter one will overwrite the previous one.
 
 ## Builtin variables
 

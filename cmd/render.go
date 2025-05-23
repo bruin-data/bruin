@@ -65,9 +65,17 @@ func Render() *cli.Command {
 				Name:  "apply-interval-modifiers",
 				Usage: "applies interval modifiers if flag is given",
 			},
+			&cli.StringSliceFlag{
+				Name:  "var",
+				Usage: "override pipeline variables with custom values",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			fullRefresh := c.Bool("full-refresh")
+
+			if vars := c.StringSlice("var"); len(vars) > 0 {
+				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
+			}
 
 			startDate, err := date.ParseTime(c.String("start-date"))
 			if err != nil {
@@ -128,6 +136,12 @@ func Render() *cli.Command {
 			pl, err := pipeline.PipelineFromPath(pipelineDefinitionFullPath, fs)
 			if err != nil {
 				printError(err, c.String("output"), "Failed to read the pipeline definition file:")
+				return cli.Exit("", 1)
+			}
+
+			pl, err = DefaultPipelineBuilder.MutatePipeline(c.Context, pl)
+			if err != nil {
+				printError(err, c.String("output"), "Failed to mutate the pipeline:")
 				return cli.Exit("", 1)
 			}
 

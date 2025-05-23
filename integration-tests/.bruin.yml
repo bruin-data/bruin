@@ -5,6 +5,8 @@ environments:
       duckdb:
         - name: "duckdb-default"
           path: "duckdb-files/duckdb.db"
+        - name: "duckdb-variables"
+          path: "duckdb-files/variables.db"
       chess:
         - name: "chess-default"
           players:
