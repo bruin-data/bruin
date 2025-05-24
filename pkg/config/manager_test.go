@@ -476,6 +476,12 @@ func TestLoadFromFile(t *testing.T) {
 					CredentialsPath: "path/to/service_account.json",
 				},
 			},
+			Attio: []AttioConnection{
+				{
+					Name:   "attio-1",
+					APIKey: "api-key-123",
+				},
+			},
 		},
 	}
 

@@ -582,6 +582,12 @@
             "$ref": "#/$defs/SpannerConnection"
           },
           "type": "array"
+        },
+        "attio": {
+          "items": {
+            "$ref": "#/$defs/AttioConnection"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -1701,6 +1707,19 @@
         "oauth_token",
         "sub_domain"
       ]
+    },
+    "AttioConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": ["name", "api_key"] 
     }
   }
 }

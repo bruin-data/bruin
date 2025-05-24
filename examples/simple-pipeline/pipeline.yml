@@ -45,4 +45,5 @@ default_connections:
   phantombuster: "my-phantombuster"
   elasticsearch: "my-elasticsearch"
   spanner: "my-spanner"
+  attio: "my-attio"
   
