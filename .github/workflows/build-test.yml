@@ -75,7 +75,7 @@ jobs:
         uses: Cyberboss/install-winget@v1
       - name: install duckdb (windows)
         if: matrix.platform == 'windows-latest'
-        run: winget install DuckDB.cli
+        run: winget install --accept-package-agreements DuckDB.cli 
       - name: install duckdb
         uses: opt-nc/setup-duckdb-action@v1.0.11
         if: matrix.platform == 'ubuntu-latest'
