@@ -612,7 +612,7 @@ func GetAdvancedSQLTestCase() []TestCase {
 							},
 							{
 								Name:          "report_generated_at",
-								Type:          "UNKNOWN",
+								Type:          "",
 								Upstreams:     []*pipeline.UpstreamColumn{},
 								Checks:        make([]pipeline.ColumnCheck, 0),
 								UpdateOnMerge: false,
