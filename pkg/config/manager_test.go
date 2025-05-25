@@ -65,14 +65,13 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			RedShift: []RedshiftConnection{
 				{
-					Name:         "conn4",
-					Host:         "someredshift",
-					Username:     "rsuser",
-					Password:     "rspass",
-					Database:     "rsdb",
-					Port:         5433,
-					PoolMaxConns: 4,
-					SslMode:      "disable",
+					Name:     "conn4",
+					Host:     "someredshift",
+					Username: "rsuser",
+					Password: "rspass",
+					Database: "rsdb",
+					Port:     5433,
+					SslMode:  "disable",
 				},
 			},
 			MsSQL: []MsSQLConnection{
@@ -466,6 +465,15 @@ func TestLoadFromFile(t *testing.T) {
 					Port:        9200,
 					Secure:      "true",
 					VerifyCerts: "true",
+				},
+			},
+			Spanner: []SpannerConnection{
+				{
+					Name:            "spanner-1",
+					ProjectID:       "project-id-123",
+					InstanceID:      "instance-id-123",
+					Database:        "database-id-123",
+					CredentialsPath: "path/to/service_account.json",
 				},
 			},
 		},

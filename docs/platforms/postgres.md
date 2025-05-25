@@ -14,7 +14,7 @@ In order to have set up a Postgres connection, you need to add a configuration i
           host: "pghost.somedomain.com"
           port: 5432
           database: "dev"
-          ssl_mode: "allow"
+          ssl_mode: "allow" # optional
           schema: "schema_name" # optional
           pool_max_conns: 5 # optional
 ```

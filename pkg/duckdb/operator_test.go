@@ -20,7 +20,7 @@ func (m *mockExtractor) ExtractQueriesFromString(content string) ([]*query.Query
 	return res.Get(0).([]*query.Query), res.Error(1)
 }
 
-func (m *mockExtractor) CloneForAsset(ctx context.Context, asset *pipeline.Asset) query.QueryExtractor {
+func (m *mockExtractor) CloneForAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) query.QueryExtractor {
 	return m
 }
 
@@ -36,6 +36,10 @@ type mockMaterializer struct {
 func (m *mockMaterializer) Render(t *pipeline.Asset, query string) (string, error) {
 	res := m.Called(t, query)
 	return res.Get(0).(string), res.Error(1)
+}
+
+func (m *mockMaterializer) LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error {
+	return nil
 }
 
 func TestBasicOperator_RunTask(t *testing.T) {

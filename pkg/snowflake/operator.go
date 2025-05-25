@@ -17,11 +17,7 @@ import (
 type materializer interface {
 	Render(task *pipeline.Asset, query string) (string, error)
 	IsFullRefresh() bool
-}
-
-type queryExtractor interface {
-	ExtractQueriesFromString(content string) ([]*query.Query, error)
-	CloneForAsset(ctx context.Context, asset *pipeline.Asset) query.QueryExtractor
+	LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error
 }
 
 type SfClient interface {
@@ -41,11 +37,11 @@ type connectionFetcher interface {
 
 type BasicOperator struct {
 	connection   connectionFetcher
-	extractor    queryExtractor
+	extractor    query.QueryExtractor
 	materializer materializer
 }
 
-func NewBasicOperator(conn connectionFetcher, extractor queryExtractor, materializer materializer) *BasicOperator {
+func NewBasicOperator(conn connectionFetcher, extractor query.QueryExtractor, materializer materializer) *BasicOperator {
 	return &BasicOperator{
 		connection:   conn,
 		extractor:    extractor,
@@ -58,7 +54,7 @@ func (o BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 }
 
 func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) error {
-	extractor := o.extractor.CloneForAsset(ctx, t)
+	extractor := o.extractor.CloneForAsset(ctx, p, t)
 	queries, err := extractor.ExtractQueriesFromString(t.ExecutableFile.Content)
 	if err != nil {
 		return errors.Wrap(err, "cannot extract queries from the task file")
@@ -77,7 +73,11 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
-
+	writer := ctx.Value(executor.KeyPrinter)
+	err = o.materializer.LogIfFullRefreshAndDDL(writer, t)
+	if err != nil {
+		return err
+	}
 	q.Query = materialized
 	if t.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
 		renderedQueries, err := o.extractor.ExtractQueriesFromString(materialized)
@@ -152,7 +152,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	if !ok {
 		return errors.New("query sensor requires a parameter named 'query'")
 	}
-	extractor := o.extractor.CloneForAsset(ctx, t)
+	extractor := o.extractor.CloneForAsset(ctx, p, t)
 	qry, err := extractor.ExtractQueriesFromString(qq)
 	if err != nil {
 		return errors.Wrap(err, "failed to render query sensor query")

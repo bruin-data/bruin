@@ -553,6 +553,21 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
+			Name:          "render-variables",
+			Command:       binary,
+			Args:          []string{"render", filepath.Join(currentFolder, "test-pipelines/variables-interpolation/assets/users.sql")},
+			Env:           []string{},
+			SkipJSONNodes: []string{`"path"`, `"extends"`, `"commit"`, `"snapshot"`},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"SELECT * FROM dev.users WHERE \nuser_id = 'jhon' OR user_id = 'erik'"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
 			Name:    "run-with-tags",
 			Command: binary,
 			Args:    []string{"run", "--env", "env-run-with-tags", "--tag", "include", "--exclude-tag", "exclude", "--start-date", "2024-01-01", "--end-date", "2024-12-31", filepath.Join(currentFolder, "test-pipelines/run-with-tags-pipeline")},
@@ -993,6 +1008,20 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Expected: e2e.Output{
 				ExitCode: 1,
 				Contains: []string{"Running:  example", "Finished: example", "Catalog Error: Table with name my does not exist!", "Failed: my-other-asset"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "test-render-template-this",
+			Command: binary,
+			Args:    []string{"run", "--env", "env-render-template-this", filepath.Join(currentFolder, "test-pipelines/render-template-this-pipeline")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Successfully validated 2 assets", "Executed 4 tasks", "Finished: render_this.my_asset_2"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
