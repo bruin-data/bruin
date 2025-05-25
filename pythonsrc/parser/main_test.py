@@ -1842,8 +1842,8 @@ ORDER BY 1, 2, 3
 )
 def test_get_column_lineage(query, schema, expected, expected_non_selected, dialect):
     result = get_column_lineage(query, schema, dialect)
-    assert expected == result["columns"]
-    assert expected_non_selected == result["non_selected_columns"]
+    assert result["columns"] == expected
+    assert result["non_selected_columns"] == expected_non_selected
 
 
 @pytest.mark.parametrize(
