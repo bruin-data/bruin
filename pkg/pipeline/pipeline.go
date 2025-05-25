@@ -647,6 +647,8 @@ type Asset struct {
 	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
+	Requirements      []string           `json:"requirements,omitempty" yaml:"requirements,omitempty" mapstructure:"requirements"`
+	RequirementsFile  string             `json:"requirements_file,omitempty" yaml:"-" mapstructure:"-"`
 
 	upstream   []*Asset
 	downstream []*Asset
