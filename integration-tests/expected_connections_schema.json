@@ -1426,6 +1426,12 @@
         },
         "secret_access_key": {
           "type": "string"
+        },
+        "endpoint_url": {
+          "type": "string"
+        },
+        "layout": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
@@ -1435,7 +1441,9 @@
         "bucket_name",
         "path_to_file",
         "access_key_id",
-        "secret_access_key"
+        "secret_access_key",
+        "endpoint_url",
+        "layout"
       ]
     },
     "SQLiteConnection": {

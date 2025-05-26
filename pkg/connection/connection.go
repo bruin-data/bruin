@@ -2168,6 +2168,8 @@ func (m *Manager) AddS3ConnectionFromConfig(connection *config.S3Connection) err
 		PathToFile:      connection.PathToFile,
 		AccessKeyID:     connection.AccessKeyID,
 		SecretAccessKey: connection.SecretAccessKey,
+		EndpointURL:     connection.EndpointURL,
+		Layout:          connection.Layout,
 	})
 	if err != nil {
 		return err
