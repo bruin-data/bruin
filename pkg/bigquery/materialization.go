@@ -96,7 +96,7 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 	}
 
 	foundCol := asset.GetColumnWithName(mat.IncrementalKey)
-	if foundCol == nil {
+	if foundCol == nil || foundCol.Type == "" || foundCol.Type == "UNKNOWN" {
 		return buildIncrementalQueryWithoutTempVariable(asset, query)
 	}
 
