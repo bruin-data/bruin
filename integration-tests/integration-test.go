@@ -484,6 +484,7 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 						"--connection", "duckdb-variables",
 						"--query", `SELECT name FROM public.users`,
 					},
+					WorkingDir: currentFolder,
 					Expected: e2e.Output{
 						ExitCode: 0,
 						Output:   "┌──────┐\n│ NAME │\n├──────┤\n│ jhon │\n│ erik │\n└──────┘\n",
@@ -516,6 +517,7 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 						"--connection", "duckdb-variables",
 						"--query", `SELECT name FROM public.users`,
 					},
+					WorkingDir: currentFolder,
 					Expected: e2e.Output{
 						ExitCode: 0,
 						Output:   "┌──────────┐\n│ NAME     │\n├──────────┤\n│ mark     │\n│ nicholas │\n└──────────┘\n",
@@ -548,6 +550,7 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 						"--connection", "duckdb-variables",
 						"--query", `SELECT name FROM public.users`,
 					},
+					WorkingDir: currentFolder,
 					Expected: e2e.Output{
 						ExitCode: 0,
 						Output:   "┌───────────┐\n│ NAME      │\n├───────────┤\n│ tanaka    │\n│ yamaguchi │\n└───────────┘\n",
