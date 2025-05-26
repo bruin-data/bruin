@@ -477,17 +477,16 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 					},
 				},
 				{
-					Name:    "validate output",
-					Command: "duckdb",
+					Name:    "validate output (run pipeline)",
+					Command: binary,
 					Args: []string{
-						"-csv",
-						"-noheader",
-						filepath.Join(currentFolder, "duckdb-files/variables.db"),
-						`SELECT name FROM public.users`,
+						"query",
+						"--connection", "duckdb-variables",
+						"--query", `SELECT name FROM public.users`,
 					},
 					Expected: e2e.Output{
 						ExitCode: 0,
-						Output:   "jhon\nerik\n",
+						Output:   "┌──────┐\n│ NAME │\n├──────┤\n│ jhon │\n│ erik │\n└──────┘\n",
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
@@ -510,17 +509,16 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 					},
 				},
 				{
-					Name:    "validate output",
-					Command: "duckdb",
+					Name:    "validate output (run pipeline with json override)",
+					Command: binary,
 					Args: []string{
-						"-csv",
-						"-noheader",
-						filepath.Join(currentFolder, "duckdb-files/variables.db"),
-						`SELECT name FROM public.users`,
+						"query",
+						"--connection", "duckdb-variables",
+						"--query", `SELECT name FROM public.users`,
 					},
 					Expected: e2e.Output{
 						ExitCode: 0,
-						Output:   "mark\nnicholas\n",
+						Output:   "┌──────────┐\n│ NAME     │\n├──────────┤\n│ mark     │\n│ nicholas │\n└──────────┘\n",
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
@@ -543,17 +541,16 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 					},
 				},
 				{
-					Name:    "validate output",
-					Command: "duckdb",
+					Name:    "validate output (run pipeline with key=value override)",
+					Command: binary,
 					Args: []string{
-						"-csv",
-						"-noheader",
-						filepath.Join(currentFolder, "duckdb-files/variables.db"),
-						`SELECT name FROM public.users`,
+						"query",
+						"--connection", "duckdb-variables",
+						"--query", `SELECT name FROM public.users`,
 					},
 					Expected: e2e.Output{
 						ExitCode: 0,
-						Output:   "tanaka\nyamaguchi\n",
+						Output:   "┌───────────┐\n│ NAME      │\n├───────────┤\n│ tanaka    │\n│ yamaguchi │\n└───────────┘\n",
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
