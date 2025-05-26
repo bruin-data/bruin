@@ -287,9 +287,9 @@ def replace_table_references(
     return parsed.sql()
 
 
-def add_limit(query: str, limit_value: int) -> dict:
+def add_limit(query: str, limit_value: int, dialect: str = None) -> dict:
     try:
-        parsed = parse_one(query)
+        parsed = parse_one(query, dialect=dialect)
         if parsed is None:
             return {"error": "cannot parse query"}
     except Exception:

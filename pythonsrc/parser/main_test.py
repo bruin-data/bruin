@@ -1887,7 +1887,7 @@ def test_add_limit():
     LIMIT 10;
     """
 
-    result = add_limit(query, 10)
+    result = add_limit(query, 10, dialect="bigquery")
     assert "query" in result
     assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
 
@@ -1903,7 +1903,7 @@ def test_add_limit_no_existing_limit():
     LIMIT 10
     """
 
-    result = add_limit(query, 10)
+    result = add_limit(query, 10, dialect="bigquery")
     assert "query" in result
     assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
 
@@ -1920,7 +1920,7 @@ def test_add_limit_replace_existing_limit():
     LIMIT 10
     """
 
-    result = add_limit(query, 10)
+    result = add_limit(query, 10, dialect="bigquery")
     assert "query" in result
     assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
 
@@ -1938,7 +1938,7 @@ def test_add_limit_with_order_by():
     LIMIT 10
     """
 
-    result = add_limit(query, 10)
+    result = add_limit(query, 10, dialect="bigquery")
     assert "query" in result
     assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
 
@@ -1956,7 +1956,7 @@ def test_add_limit_with_group_by():
     LIMIT 10
     """
 
-    result = add_limit(query, 10)
+    result = add_limit(query, 10, dialect="bigquery")
     assert "query" in result
     assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
 
@@ -1973,7 +1973,7 @@ def test_add_limit_with_semicolon():
     LIMIT 10;
     """
 
-    result = add_limit(query, 10)
+    result = add_limit(query, 10, dialect="bigquery")
     assert "query" in result
     assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
 
@@ -1990,7 +1990,7 @@ def test_add_limit_without_semicolon():
     LIMIT 10
     """
 
-    result = add_limit(query, 10)
+    result = add_limit(query, 10, dialect="bigquery")
     assert "query" in result
     assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
 
@@ -2012,7 +2012,7 @@ def test_add_limit_nested_query():
     LIMIT 10
     """
 
-    result = add_limit(query, 10)
+    result = add_limit(query, 10, dialect="bigquery")
     assert "query" in result
     assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
 
@@ -2032,6 +2032,21 @@ def test_add_limit_nested_query_no_existing_limit():
     LIMIT 10
     """
 
-    result = add_limit(query, 10)
+    result = add_limit(query, 10, dialect="bigquery")
+    assert "query" in result
+    assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
+
+
+def test_add_limit_with_convert_timezone():
+    query = """
+    SELECT CONVERT_TIMEZONE('CET', '2025-05-20T00:00:00Z')
+    LIMIT 100
+    """
+    expected_query = """
+    SELECT CONVERT_TIMEZONE('CET', '2025-05-20T00:00:00Z')
+    LIMIT 10
+    """
+
+    result = add_limit(query, 10, dialect="snowflake")
     assert "query" in result
     assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
