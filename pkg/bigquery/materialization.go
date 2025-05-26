@@ -263,7 +263,6 @@ func buildSCD2Query(asset *pipeline.Asset, query string) (string, error) {
 			"\n"+
 			"WHEN MATCHED AND (\ntarget.valid_from < source.%s\n) THEN \n"+
 			"%s\n"+
-			"\n"+
 			"WHEN NOT MATCHED BY TARGET THEN \n"+
 			"%s\n",
 		tbl,
