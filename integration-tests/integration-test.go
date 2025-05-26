@@ -459,6 +459,109 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 				},
 			},
 		},
+		{
+			Name: "run pipeline with variables",
+			Steps: []e2e.Task{
+				{
+					Name:    "run pipeline",
+					Command: binary,
+					Args: []string{
+						"run",
+						filepath.Join(currentFolder, "test-pipelines/variables-interpolation"),
+					},
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "validate output (run pipeline)",
+					Command: binary,
+					Args: []string{
+						"query",
+						"--connection", "duckdb-variables",
+						"--query", `SELECT name FROM public.users`,
+					},
+					WorkingDir: currentFolder,
+					Expected: e2e.Output{
+						ExitCode: 0,
+						Output:   "┌──────┐\n│ NAME │\n├──────┤\n│ jhon │\n│ erik │\n└──────┘\n",
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByOutputString,
+					},
+				},
+				{
+					Name:    "run pipeline with json override",
+					Command: binary,
+					Args: []string{
+						"run",
+						"--var", `{"users": ["mark", "nicholas"]}`,
+						filepath.Join(currentFolder, "test-pipelines/variables-interpolation"),
+					},
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "validate output (run pipeline with json override)",
+					Command: binary,
+					Args: []string{
+						"query",
+						"--connection", "duckdb-variables",
+						"--query", `SELECT name FROM public.users`,
+					},
+					WorkingDir: currentFolder,
+					Expected: e2e.Output{
+						ExitCode: 0,
+						Output:   "┌──────────┐\n│ NAME     │\n├──────────┤\n│ mark     │\n│ nicholas │\n└──────────┘\n",
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByOutputString,
+					},
+				},
+				{
+					Name:    "run pipeline with key=value override",
+					Command: binary,
+					Args: []string{
+						"run",
+						"--var", `users=["tanaka", "yamaguchi"]`,
+						filepath.Join(currentFolder, "test-pipelines/variables-interpolation"),
+					},
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "validate output (run pipeline with key=value override)",
+					Command: binary,
+					Args: []string{
+						"query",
+						"--connection", "duckdb-variables",
+						"--query", `SELECT name FROM public.users`,
+					},
+					WorkingDir: currentFolder,
+					Expected: e2e.Output{
+						ExitCode: 0,
+						Output:   "┌───────────┐\n│ NAME      │\n├───────────┤\n│ tanaka    │\n│ yamaguchi │\n└───────────┘\n",
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByOutputString,
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -560,7 +663,43 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			SkipJSONNodes: []string{`"path"`, `"extends"`, `"commit"`, `"snapshot"`},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"SELECT * FROM dev.users WHERE \nuser_id = 'jhon' OR user_id = 'erik'"},
+				Contains: []string{"CREATE TABLE public.users", "SELECT 'jhon' as name", "SELECT 'erik' as name"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "render-variables-override-json",
+			Command: binary,
+			Args: []string{
+				"render",
+				"--var", `{"users": ["mark", "nicholas"]}`,
+				filepath.Join(currentFolder, "test-pipelines/variables-interpolation/assets/users.sql")},
+			Env:           []string{},
+			SkipJSONNodes: []string{`"path"`, `"extends"`, `"commit"`, `"snapshot"`},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"CREATE TABLE public.users", "SELECT 'mark' as name", "SELECT 'nicholas' as name"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "render-variables-override-key-val",
+			Command: binary,
+			Args: []string{
+				"render",
+				"--var", `users=["mark", "nicholas"]`,
+				filepath.Join(currentFolder, "test-pipelines/variables-interpolation/assets/users.sql")},
+			Env:           []string{},
+			SkipJSONNodes: []string{`"path"`, `"extends"`, `"commit"`, `"snapshot"`},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"CREATE TABLE public.users", "SELECT 'mark' as name", "SELECT 'nicholas' as name"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
