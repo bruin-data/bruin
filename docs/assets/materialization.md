@@ -66,7 +66,7 @@ Define the columns that will be used for the clustering of the resulting table. 
 ### `materialization > incremental_key`
 
 This is the column of the table that will be used for incremental updates of the table.
-- **Type:** `String[]`
+- **Type:** `String`
 - **Default:** `[]`
 
 ## Strategies
