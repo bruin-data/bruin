@@ -102,9 +102,9 @@ func Query() *cli.Command {
 				if err != nil {
 					return handleError(c.String("output"), errors.Wrap(err, "failed to initialize SQL parser"))
 				}
-				defer parser.Close()
+				defer parser.Close(context.Background())
 
-				err = parser.Start()
+				err = parser.Start(context.Background())
 				if err != nil {
 					return handleError(c.String("output"), errors.Wrap(err, "failed to start SQL parser"))
 				}

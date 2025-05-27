@@ -2,6 +2,7 @@ package sqlparser
 
 import (
 	"bufio"
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -69,7 +70,7 @@ func NewSQLParser(randomize bool) (*SQLParser, error) {
 	}, nil
 }
 
-func (s *SQLParser) Start() error {
+func (s *SQLParser) Start(ctx context.Context) error {
 	s.startMutex.Lock()
 	defer s.startMutex.Unlock()
 	if s.started {
@@ -98,7 +99,15 @@ func (s *SQLParser) Start() error {
 		return err
 	}
 
-	_, err = s.sendCommand(&parserCommand{
+	go func() {
+		<-ctx.Done()
+		err := s.cmd.Process.Kill()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	_, err = s.sendCommand(ctx, &parserCommand{
 		Command: "init",
 	})
 	if err != nil {
@@ -141,7 +150,9 @@ func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage,
 		},
 	}
 
-	resp, err := s.sendCommand(&command)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+	resp, err := s.sendCommand(ctx, &command)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +167,7 @@ func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage,
 }
 
 func (s *SQLParser) UsedTables(sql, dialect string) ([]string, error) {
-	err := s.Start()
+	err := s.Start(context.Background())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to start sql parser")
 	}
@@ -169,7 +180,7 @@ func (s *SQLParser) UsedTables(sql, dialect string) ([]string, error) {
 		},
 	}
 
-	resp, err := s.sendCommand(&command)
+	resp, err := s.sendCommand(context.Background(), &command)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to send command")
 	}
@@ -193,7 +204,7 @@ func (s *SQLParser) UsedTables(sql, dialect string) ([]string, error) {
 }
 
 func (s *SQLParser) RenameTables(sql string, dialect string, tableMapping map[string]string) (string, error) {
-	err := s.Start()
+	err := s.Start(context.Background())
 	if err != nil {
 		return "", errors.Wrap(err, "failed to start sql parser")
 	}
@@ -207,7 +218,7 @@ func (s *SQLParser) RenameTables(sql string, dialect string, tableMapping map[st
 		},
 	}
 
-	responsePayload, err := s.sendCommand(&command)
+	responsePayload, err := s.sendCommand(context.Background(), &command)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to send command")
 	}
@@ -228,7 +239,7 @@ func (s *SQLParser) RenameTables(sql string, dialect string, tableMapping map[st
 	return resp.Query, nil
 }
 
-func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
+func (s *SQLParser) sendCommand(ctx context.Context, pc *parserCommand) (string, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -238,21 +249,28 @@ func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
 	}
 
 	jsonCommand = append(jsonCommand, '\n')
-
-	_, err = s.stdin.Write(jsonCommand)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to write command to stdin")
+	done := make(chan struct{})
+	var resp string
+	go func() {
+		defer close(done)
+		_, err = s.stdin.Write(jsonCommand)
+		if err != nil {
+			return
+		}
+		reader := bufio.NewReader(s.stdout)
+		resp, err = reader.ReadString(byte('\n'))
+	}()
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case <-done:
+		return resp, err
 	}
-
-	reader := bufio.NewReader(s.stdout)
-
-	resp, err := reader.ReadString(byte('\n'))
-	return resp, err
 }
 
-func (s *SQLParser) Close() error {
+func (s *SQLParser) Close(ctx context.Context) error {
 	if s.stdin != nil {
-		_, err := s.sendCommand(&parserCommand{
+		_, err := s.sendCommand(ctx, &parserCommand{
 			Command: "exit",
 		})
 		if err != nil {
@@ -310,7 +328,7 @@ func AssetTypeToDialect(assetType pipeline.AssetType) (string, error) {
 }
 
 func (s *SQLParser) AddLimit(sql string, limit int, dialect string) (string, error) {
-	err := s.Start()
+	err := s.Start(context.Background())
 	if err != nil {
 		return "", errors.Wrap(err, "failed to start sql parser")
 	}
@@ -324,7 +342,7 @@ func (s *SQLParser) AddLimit(sql string, limit int, dialect string) (string, err
 		},
 	}
 
-	responsePayload, err := s.sendCommand(&command)
+	responsePayload, err := s.sendCommand(context.Background(), &command)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to send command")
 	}
