@@ -14,6 +14,10 @@
         {
           "name": "duckdb-default",
           "path": "integration-tests/duckdb-files/duckdb.db"
+        },
+        {
+          "name": "duckdb-variables",
+          "path": "variables.db"
         }
       ],
       "chess": [
@@ -41,6 +45,10 @@
           {
             "name": "duckdb-default",
             "path": "integration-tests/duckdb-files/duckdb.db"
+          },
+          {
+            "name": "duckdb-variables",
+            "path": "variables.db"
           }
         ],
         "chess": [
