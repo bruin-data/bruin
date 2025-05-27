@@ -341,6 +341,30 @@ func TestMaterializer_Render(t *testing.T) {
 				"\nPARTITION BY timestamp",
 			},
 		},
+		{
+			name: "table with composite partition key",
+			task: &pipeline.Asset{
+				Name: "my_composite_partitioned_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64", PrimaryKey: true},
+					{Name: "timestamp", Type: "TIMESTAMP", Description: "Event timestamp"},
+					{Name: "location", Type: "STRING"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyDDL,
+					PartitionBy: "timestamp, location",
+				},
+			},
+			want: []string{"CREATE TABLE IF NOT EXISTS my_composite_partitioned_table (\n" +
+				"id INT64,\n" +
+				"timestamp TIMESTAMP COMMENT 'Event timestamp',\n" +
+				"location STRING\n" +
+				")" +
+				"\nPRIMARY KEY (id)" +
+				"\nPARTITION BY (timestamp, location)",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -162,7 +162,7 @@ func buildDDLQuery(asset *pipeline.Asset, query string) ([]string, error) {
 
 	partitionBy := ""
 	if asset.Materialization.PartitionBy != "" {
-		partitionBy = fmt.Sprintf("\nPARTITION BY %s", asset.Materialization.PartitionBy)
+		partitionBy = fmt.Sprintf("\nPARTITION BY (%s)", asset.Materialization.PartitionBy)
 	}
 
 	ddl := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n"+
