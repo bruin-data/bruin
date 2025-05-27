@@ -65,14 +65,13 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			RedShift: []RedshiftConnection{
 				{
-					Name:         "conn4",
-					Host:         "someredshift",
-					Username:     "rsuser",
-					Password:     "rspass",
-					Database:     "rsdb",
-					Port:         5433,
-					PoolMaxConns: 4,
-					SslMode:      "disable",
+					Name:     "conn4",
+					Host:     "someredshift",
+					Username: "rsuser",
+					Password: "rspass",
+					Database: "rsdb",
+					Port:     5433,
+					SslMode:  "disable",
 				},
 			},
 			MsSQL: []MsSQLConnection{

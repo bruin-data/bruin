@@ -23,6 +23,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
 		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
+		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
 	},
 }
 
@@ -153,4 +154,39 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	}
 
 	return strings.Join(queries, ";\n") + ";", nil
+}
+
+func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
+	columnDefs := make([]string, 0, len(asset.Columns))
+	primaryKeys := make([]string, 0)
+	for _, col := range asset.Columns {
+		def := fmt.Sprintf("%s %s", col.Name, col.Type)
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, col.Name)
+		}
+		if col.Description != "" {
+			desc := strings.ReplaceAll(col.Description, `'`, `''`)
+			def += fmt.Sprintf(" COMMENT '%s'", desc)
+		}
+		columnDefs = append(columnDefs, def)
+	}
+	clusterByClause := ""
+	if len(asset.Materialization.ClusterBy) > 0 {
+		clusterByClause = "CLUSTER BY (" + strings.Join(asset.Materialization.ClusterBy, ", ") + ") "
+	}
+	primaryKeyClause := ""
+	if len(primaryKeys) > 0 {
+		primaryKeyClause = fmt.Sprintf(",\nprimary key (%s)", strings.Join(primaryKeys, ", "))
+	}
+	ddl := fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s %s(\n"+
+			"%s%s\n"+
+			")",
+		asset.Name,
+		clusterByClause,
+		strings.Join(columnDefs, ",\n"),
+		primaryKeyClause,
+	)
+
+	return ddl, nil
 }

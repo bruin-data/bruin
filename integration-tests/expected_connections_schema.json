@@ -257,142 +257,6 @@
         "secure"
       ]
     },
-    "SalesforceConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "username": {
-          "type": "string"
-        },
-        "password": {
-          "type": "string"
-        },
-        "token": {  
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "username",
-        "password",
-        "token"
-      ]
-    },
-      "SQLiteConnection": {
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "path": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "name","path"
-        ]
-      },
-    "FrankfurterConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-        "required": [
-            "name"
-        ]
-
-    },
-    "PhantombusterConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "api_key": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [ 
-        "name",
-        "api_key"
-      ]
-    },
-    "ElasticsearchConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "username": {
-          "type": "string"
-        },
-        "password": {
-          "type": "string"
-        },
-        "host": {
-          "type": "string"
-        },
-        "port": {
-          "type": "integer"
-        },
-        "secure": {
-          "type": "string"
-        },
-        "verify_certs": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "username",
-        "password",
-        "host",
-        "port",
-        "secure",
-        "verify_certs"
-      ]
-    },
-    "SpannerConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "project_id": {
-          "type": "string"
-        },
-        "instance_id": {
-          "type": "string"
-        },
-        "database": {
-          "type": "string"
-        },
-        "credentials_path": {
-          "type": "string"
-        },
-        "credentials_base64": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "project_id",
-        "instance_id",
-        "database",
-        "credentials_base64",
-        "credentials_path"
-      ]
-    },
     "Connections": {
       "properties": {
         "aws": {
@@ -689,17 +553,15 @@
           },
           "type": "array"
         },
-
-        "oracle": {
-          "items": {
-            "$ref": "#/$defs/OracleConnection"
-          },
-          "type": "array"
-        },
-
         "db2": {
           "items": {
             "$ref": "#/$defs/DB2Connection"
+          },
+          "type": "array"
+        },
+        "oracle": {
+          "items": {
+            "$ref": "#/$defs/OracleConnection"
           },
           "type": "array"
         },
@@ -724,6 +586,38 @@
       },
       "additionalProperties": false,
       "type": "object"
+    },
+    "DB2Connection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "database"
+      ]
     },
     "DatabricksConnection": {
       "properties": {
@@ -834,8 +728,43 @@
         "secret_key",
         "application_id",
         "execution_role",
-        "region",
-        "workspace"
+        "region"
+      ]
+    },
+    "ElasticsearchConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "secure": {
+          "type": "string"
+        },
+        "verify_certs": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "secure",
+        "verify_certs"
       ]
     },
     "FacebookAdsConnection": {
@@ -856,6 +785,18 @@
         "name",
         "access_token",
         "account_id"
+      ]
+    },
+    "FrankfurterConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
       ]
     },
     "GCSConnection": {
@@ -1303,6 +1244,38 @@
         "api_key"
       ]
     },
+    "OracleConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "string"
+        },
+        "dbname": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "host",
+        "port",
+        "dbname"
+      ]
+    },
     "PersonioConnection": {
       "properties": {
         "name": {
@@ -1321,6 +1294,22 @@
         "name",
         "client_id",
         "client_secret"
+      ]
+    },
+    "PhantombusterConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
       ]
     },
     "PipedriveConnection": {
@@ -1378,10 +1367,7 @@
         "password",
         "host",
         "port",
-        "database",
-        "schema",
-        "pool_max_conns",
-        "ssl_mode"
+        "database"
       ]
     },
     "RedshiftConnection": {
@@ -1408,9 +1394,6 @@
         "schema": {
           "type": "string"
         },
-        "pool_max_conns": {
-          "type": "integer"
-        },
         "ssl_mode": {
           "type": "string"
         }
@@ -1424,9 +1407,7 @@
         "host",
         "port",
         "database",
-        "schema",
-        "pool_max_conns",
-        "ssl_mode"
+        "schema"
       ]
     },
     "S3Connection": {
@@ -1445,6 +1426,12 @@
         },
         "secret_access_key": {
           "type": "string"
+        },
+        "endpoint_url": {
+          "type": "string"
+        },
+        "layout": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
@@ -1454,7 +1441,49 @@
         "bucket_name",
         "path_to_file",
         "access_key_id",
-        "secret_access_key"
+        "secret_access_key",
+        "endpoint_url",
+        "layout"
+      ]
+    },
+    "SQLiteConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "path"
+      ]
+    },
+    "SalesforceConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "token"
       ]
     },
     "ShopifyConnection": {
@@ -1494,6 +1523,20 @@
       ]
     },
     "SnowflakeConnection": {
+      "oneOf": [
+        {
+          "required": [
+            "password"
+          ],
+          "title": "password"
+        },
+        {
+          "required": [
+            "private_key_path"
+          ],
+          "title": "private_key"
+        }
+      ],
       "properties": {
         "name": {
           "type": "string"
@@ -1532,13 +1575,39 @@
         "name",
         "account",
         "username",
-        "password",
-        "region",
-        "role",
+        "region"
+      ]
+    },
+    "SpannerConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "instance_id": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        },
+        "credentials_base64": {
+          "type": "string"
+        },
+        "credentials_path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "project_id",
+        "instance_id",
         "database",
-        "schema",
-        "warehouse",
-        "private_key_path"
+        "credentials_base64",
+        "credentials_path"
       ]
     },
     "StripeConnection": {
@@ -1639,70 +1708,6 @@
         "email",
         "oauth_token",
         "sub_domain"
-      ]
-    },
-    "DB2Connection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "username": {
-          "type": "string"
-        },
-        "password": {
-          "type": "string"
-        },
-        "host": {
-          "type": "string"
-        },
-        "port": {
-          "type": "string"
-        },
-        "database": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "username",
-        "password",
-        "host",
-        "port",
-        "database"
-      ]
-    },
-    "OracleConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "username": {
-          "type": "string"
-        },
-        "password": {
-          "type": "string"
-        },
-        "host": {
-          "type": "string"
-        },
-        "port": {
-          "type": "string"
-        },
-        "dbname": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "username",
-        "password",
-        "host",
-        "port",
-        "dbname"
       ]
     }
   }

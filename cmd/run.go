@@ -187,6 +187,10 @@ func Run(isDebug *bool) *cli.Command {
 				Usage:  "skip initial pipeline analysis logs for this run",
 				Hidden: true,
 			},
+			&cli.StringSliceFlag{
+				Name:  "var",
+				Usage: "override pipeline variables with custom values",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			defer func() {
@@ -254,11 +258,15 @@ func Run(isDebug *bool) *cli.Command {
 				// execution will be built under prefixed schemas. This requires not just modifying the queries,
 				// but also modifying the asset names so that quality checks actually run against the tables in the new schema.
 				// Since we change the asset names, we need to also prefix the upstream since their names would be changed as well.
-				DefaultPipelineBuilder.AddMutator(func(ctx context.Context, asset *pipeline.Asset, foundPipeline *pipeline.Pipeline) (*pipeline.Asset, error) {
+				DefaultPipelineBuilder.AddAssetMutator(func(ctx context.Context, asset *pipeline.Asset, foundPipeline *pipeline.Pipeline) (*pipeline.Asset, error) {
 					asset.PrefixSchema(cm.SelectedEnvironment.SchemaPrefix)
 					asset.PrefixUpstreams(cm.SelectedEnvironment.SchemaPrefix)
 					return asset, nil
 				})
+			}
+
+			if vars := c.StringSlice("var"); len(vars) > 0 {
+				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
 			}
 
 			pipelineInfo, err := GetPipeline(c.Context, inputPath, runConfig, logger)
@@ -746,7 +754,7 @@ func setupExecutors(
 
 		metadataPushOperator := bigquery.NewMetadataPushOperator(conn)
 		bqQuerySensor := bigquery.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
-		bqTableSensor := bigquery.NewTableSensor(conn, sensorMode)
+		bqTableSensor := bigquery.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeMain] = bqOperator
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner

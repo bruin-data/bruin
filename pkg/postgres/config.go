@@ -55,25 +55,23 @@ func (c Config) GetDatabase() string {
 }
 
 type RedShiftConfig struct {
-	Username     string
-	Password     string
-	Host         string
-	Port         int
-	Database     string
-	Schema       string
-	PoolMaxConns int
-	SslMode      string
+	Username string
+	Password string
+	Host     string
+	Port     int
+	Database string
+	Schema   string
+	SslMode  string
 }
 
 // ToDBConnectionURI returns a connection URI to be used with the pgx package.
 func (c RedShiftConfig) ToDBConnectionURI() string {
-	connectionURI := fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s&pool_max_conns=%d",
+	connectionURI := fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s",
 		url.PathEscape(c.Username),
 		url.PathEscape(c.Password),
 		net.JoinHostPort(c.Host, strconv.Itoa(c.Port)),
 		c.Database,
 		c.SslMode,
-		c.PoolMaxConns,
 	)
 	if c.Schema != "" {
 		connectionURI += "&search_path=" + c.Schema

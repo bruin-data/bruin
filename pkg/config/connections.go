@@ -234,9 +234,9 @@ type PostgresConnection struct {
 	Host         string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
 	Port         int    `yaml:"port,omitempty" json:"port" mapstructure:"port" jsonschema:"default=5432"`
 	Database     string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
-	Schema       string `yaml:"schema,omitempty" json:"schema" mapstructure:"schema"`
-	PoolMaxConns int    `yaml:"pool_max_conns,omitempty" json:"pool_max_conns" mapstructure:"pool_max_conns" default:"10"`
-	SslMode      string `yaml:"ssl_mode,omitempty" json:"ssl_mode" mapstructure:"ssl_mode" default:"disable"`
+	Schema       string `yaml:"schema,omitempty" json:"schema,omitempty" mapstructure:"schema"`
+	PoolMaxConns int    `yaml:"pool_max_conns,omitempty" json:"pool_max_conns,omitempty" mapstructure:"pool_max_conns" default:"10"`
+	SslMode      string `yaml:"ssl_mode,omitempty" json:"ssl_mode,omitempty" mapstructure:"ssl_mode" default:"allow"`
 }
 
 func (c PostgresConnection) GetName() string {
@@ -244,15 +244,14 @@ func (c PostgresConnection) GetName() string {
 }
 
 type RedshiftConnection struct {
-	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	Username     string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password     string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
-	Host         string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
-	Port         int    `yaml:"port,omitempty" json:"port" mapstructure:"port" jsonschema:"default=5439"`
-	Database     string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
-	Schema       string `yaml:"schema,omitempty" json:"schema" mapstructure:"schema"`
-	PoolMaxConns int    `yaml:"pool_max_conns,omitempty" json:"pool_max_conns" mapstructure:"pool_max_conns" default:"10"`
-	SslMode      string `yaml:"ssl_mode,omitempty" json:"ssl_mode" mapstructure:"ssl_mode" default:"disable"`
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host     string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port,omitempty" json:"port" mapstructure:"port" jsonschema:"default=5439"`
+	Database string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	Schema   string `yaml:"schema,omitempty" json:"schema" mapstructure:"schema"`
+	SslMode  string `yaml:"ssl_mode,omitempty" json:"ssl_mode,omitempty" mapstructure:"ssl_mode" default:"allow"`
 }
 
 func (c RedshiftConnection) GetName() string {
@@ -263,13 +262,13 @@ type SnowflakeConnection struct {
 	Name           string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Account        string `yaml:"account,omitempty" json:"account" mapstructure:"account"`
 	Username       string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password       string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Password       string `yaml:"password,omitempty" json:"password,omitempty" jsonschema:"oneof_required=password" mapstructure:"password"`
 	Region         string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
-	Role           string `yaml:"role,omitempty" json:"role" mapstructure:"role"`
-	Database       string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
-	Schema         string `yaml:"schema,omitempty" json:"schema" mapstructure:"schema"`
-	Warehouse      string `yaml:"warehouse,omitempty" json:"warehouse" mapstructure:"warehouse"`
-	PrivateKeyPath string `yaml:"private_key_path,omitempty" json:"private_key_path" mapstructure:"private_key_path"`
+	Role           string `yaml:"role,omitempty" json:"role,omitempty" mapstructure:"role"`
+	Database       string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
+	Schema         string `yaml:"schema,omitempty" json:"schema,omitempty" mapstructure:"schema"`
+	Warehouse      string `yaml:"warehouse,omitempty" json:"warehouse,omitempty" mapstructure:"warehouse"`
+	PrivateKeyPath string `yaml:"private_key_path,omitempty" json:"private_key_path,omitempty" jsonschema:"oneof_required=private_key" mapstructure:"private_key_path"`
 }
 
 func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
@@ -489,6 +488,8 @@ type S3Connection struct {
 	PathToFile      string `yaml:"path_to_file,omitempty" json:"path_to_file" mapstructure:"path_to_file"`
 	AccessKeyID     string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id"`
 	SecretAccessKey string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key"`
+	EndpointURL     string `yaml:"endpoint_url,omitempty" json:"endpoint_url" mapstructure:"endpoint_url"`
+	Layout          string `yaml:"layout,omitempty" json:"layout" mapstructure:"layout"`
 }
 
 func (c S3Connection) GetName() string {
@@ -641,7 +642,7 @@ type EMRServerlessConnection struct {
 	ApplicationID string `yaml:"application_id" json:"application_id" mapstructure:"application_id"`
 	ExecutionRole string `yaml:"execution_role" json:"execution_role" mapstructure:"execution_role"`
 	Region        string `yaml:"region" json:"region" mapstructure:"region"`
-	Workspace     string `yaml:"workspace" json:"workspace" mapstructure:"workspace"`
+	Workspace     string `yaml:"workspace" json:"workspace,omitempty" mapstructure:"workspace"`
 }
 
 func (c EMRServerlessConnection) GetName() string {
