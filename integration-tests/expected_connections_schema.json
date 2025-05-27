@@ -1579,6 +1579,16 @@
       ]
     },
     "SpannerConnection": {
+      "oneOf": [
+    {
+      "required": ["service_account_json"],
+      "title": "service_account_json"
+    },
+    {
+      "required": ["service_account_json_file_path"],
+      "title": "service_account_json_file_path"
+    }
+    ],
       "properties": {
         "name": {
           "type": "string"
@@ -1592,10 +1602,10 @@
         "database": {
           "type": "string"
         },
-        "credentials_base64": {
+        "service_account_json_file_path": {
           "type": "string"
         },
-        "credentials_path": {
+        "service_account_json": {
           "type": "string"
         }
       },
@@ -1605,9 +1615,7 @@
         "name",
         "project_id",
         "instance_id",
-        "database",
-        "credentials_base64",
-        "credentials_path"
+        "database"
       ]
     },
     "StripeConnection": {
