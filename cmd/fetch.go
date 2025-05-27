@@ -208,10 +208,18 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 	if err != nil {
 		return "", nil, "", err
 	}
+	pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs, c.String("config-file"))
+	if err != nil {
+		return "", nil, "", err
+	}
+	var pipelineName string
+	if pipelineInfo != nil && pipelineInfo.Pipeline != nil {
+		pipelineName = pipelineInfo.Pipeline.Name
+	}
 	extractor := &query.WholeFileExtractor{
 		Fs: fs,
 		// note: we don't support variables for now
-		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id", nil),
+		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, "your-run-id", nil),
 	}
 
 	// Direct query mode (no asset path)
@@ -246,7 +254,7 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 		return connName, conn, queryStr, nil
 	}
 	// Asset query mode (only asset path)
-	pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs, c.String("config-file"))
+	pipelineInfo, err = GetPipelineAndAsset(c.Context, assetPath, fs, c.String("config-file"))
 	if err != nil {
 		return "", nil, "", errors.Wrap(err, "failed to get pipeline info")
 	}
