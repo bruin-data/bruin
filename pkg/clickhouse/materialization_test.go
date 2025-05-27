@@ -338,7 +338,7 @@ func TestMaterializer_Render(t *testing.T) {
 				"timestamp TIMESTAMP COMMENT 'Event timestamp'\n" +
 				")" +
 				"\nPRIMARY KEY (id)" +
-				"\nPARTITION BY timestamp",
+				"\nPARTITION BY (timestamp)",
 			},
 		},
 		{
