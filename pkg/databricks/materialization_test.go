@@ -262,6 +262,103 @@ func TestMaterializer_Render(t *testing.T) {
 				"INSERT INTO my.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
 			},
 		},
+		{
+			name: "empty table",
+			task: &pipeline.Asset{
+				Name: "empty_table",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{},
+			},
+			want: []string{"CREATE TABLE IF NOT EXISTS empty_table \\(\n" +
+				"\n" +
+				"\\)",
+			},
+		},
+		{
+			name: "table with one column",
+			task: &pipeline.Asset{
+				Name: "one_col_table",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+				},
+			},
+			want: []string{
+				"CREATE TABLE IF NOT EXISTS one_col_table \\(\n" +
+					"id INT64\n" +
+					"\\)",
+			},
+		},
+		{
+			name: "table with two columns",
+			task: &pipeline.Asset{
+				Name: "two_col_table",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyDDL,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+					{Name: "name", Type: "STRING", Description: "The name of the person"},
+				},
+			},
+			want: []string{"CREATE TABLE IF NOT EXISTS two_col_table \\(\n" +
+				"id INT64,\n" +
+				"name STRING COMMENT \\'The name of the person\\'\n" +
+				"\\)",
+			},
+		},
+		{
+			name: "table with partitioning",
+			task: &pipeline.Asset{
+				Name: "my_partitioned_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64", PrimaryKey: true},
+					{Name: "timestamp", Type: "TIMESTAMP", Description: "Event timestamp"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyDDL,
+					PartitionBy: "timestamp",
+				},
+			},
+			want: []string{"CREATE TABLE IF NOT EXISTS my_partitioned_table \\(\n" +
+				"id INT64,\n" +
+				"timestamp TIMESTAMP COMMENT 'Event timestamp'\n" +
+				"\\)" +
+				"\nPARTITIONED BY \\(timestamp\\)",
+			},
+		},
+		{
+			name: "table with composite partitioning key",
+			task: &pipeline.Asset{
+				Name: "my_composite_partitioned_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64", PrimaryKey: true},
+					{Name: "timestamp", Type: "TIMESTAMP", Description: "Event timestamp"},
+					{Name: "location", Type: "STRING"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyDDL,
+					PartitionBy: "timestamp, location",
+				},
+			},
+			want: []string{
+				"CREATE TABLE IF NOT EXISTS my_composite_partitioned_table \\(\n" +
+					"id INT64,\n" +
+					"timestamp TIMESTAMP COMMENT 'Event timestamp',\n" +
+					"location STRING\n" +
+					"\\)" +
+					"\nPARTITIONED BY \\(timestamp, location\\)",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
