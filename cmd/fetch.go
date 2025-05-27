@@ -88,9 +88,14 @@ func Query() *cli.Command {
 				return handleError(c.String("output"), err)
 			}
 
-			connName, conn, queryStr, err := prepareQueryExecution(c, fs)
+			connName, conn, queryStr, assetType, err := prepareQueryExecution(c, fs)
 			if err != nil {
 				return handleError(c.String("output"), err)
+			}
+
+			dialect, err := sqlparser.AssetTypeToDialect(assetType)
+			if err != nil {
+				dialect = ""
 			}
 			if c.IsSet("limit") {
 				parser, err := sqlparser.NewSQLParser(false)
@@ -104,7 +109,7 @@ func Query() *cli.Command {
 					return handleError(c.String("output"), errors.Wrap(err, "failed to start SQL parser"))
 				}
 
-				queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn, parser)
+				queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn, parser, dialect)
 			}
 			if querier, ok := conn.(interface {
 				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
@@ -196,7 +201,7 @@ func validateFlags(connection, query, asset string) error {
 	}
 }
 
-func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, string, error) {
+func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, string, pipeline.AssetType, error) {
 	assetPath := c.String("asset")
 	queryStr := c.String("query")
 	env := c.String("environment")
@@ -206,7 +211,7 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 	logger := makeLogger(false)
 	startDate, endDate, err := ParseDate(s, e, logger)
 	if err != nil {
-		return "", nil, "", err
+		return "", nil, "", "", err
 	}
 	extractor := &query.WholeFileExtractor{
 		Fs: fs,
@@ -218,54 +223,54 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 	if assetPath == "" {
 		conn, err := getConnectionFromConfig(env, connectionName, fs, c.String("config-file"))
 		if err != nil {
-			return "", nil, "", err
+			return "", nil, "", "", err
 		}
 		queryStr, err = extractQuery(queryStr, extractor)
 		if err != nil {
-			return "", nil, "", err
+			return "", nil, "", "", err
 		}
-		return connectionName, conn, queryStr, nil
+		return connectionName, conn, queryStr, "", nil
 	}
 	// Auto-detect mode (both asset path and query)
 	if queryStr != "" {
 		pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs, c.String("config-file"))
 		if err != nil {
-			return "", nil, "", errors.Wrap(err, "failed to get pipeline info")
+			return "", nil, "", "", errors.Wrap(err, "failed to get pipeline info")
 		}
 
 		connName, conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
 		if err != nil {
-			return "", nil, "", err
+			return "", nil, "", "", err
 		}
 
 		queryStr, err = extractQuery(queryStr, extractor)
 		if err != nil {
-			return "", nil, "", err
+			return "", nil, "", "", err
 		}
 
-		return connName, conn, queryStr, nil
+		return connName, conn, queryStr, pipelineInfo.Asset.Type, nil
 	}
 	// Asset query mode (only asset path)
 	pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs, c.String("config-file"))
 	if err != nil {
-		return "", nil, "", errors.Wrap(err, "failed to get pipeline info")
+		return "", nil, "", "", errors.Wrap(err, "failed to get pipeline info")
 	}
 	// Verify that the asset is a SQL asset
 	if !pipelineInfo.Asset.IsSQLAsset() {
-		return "", nil, "", errors.Errorf("asset '%s' is not a SQL asset (type: %s). Only SQL assets can be queried",
+		return "", nil, "", "", errors.Errorf("asset '%s' is not a SQL asset (type: %s). Only SQL assets can be queried",
 			assetPath,
 			pipelineInfo.Asset.Type)
 	}
 	queryStr, err = extractQuery(pipelineInfo.Asset.ExecutableFile.Content, extractor)
 	if err != nil {
-		return "", nil, "", err
+		return "", nil, "", "", err
 	}
 	connName, conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
 	if err != nil {
-		return "", nil, "", err
+		return "", nil, "", "", err
 	}
 
-	return connName, conn, queryStr, nil
+	return connName, conn, queryStr, pipelineInfo.Asset.Type, nil
 }
 
 func getConnectionFromConfig(env string, connectionName string, fs afero.Fs, configFilePath string) (interface{}, error) {
@@ -347,11 +352,11 @@ type Limiter interface {
 	Limit(query string, limit int64) string
 }
 
-func addLimitToQuery(query string, limit int64, conn interface{}, parser *sqlparser.SQLParser) string {
+func addLimitToQuery(query string, limit int64, conn interface{}, parser *sqlparser.SQLParser, dialect string) string {
 	var err error
 	var limitedQuery string
 	if parser != nil {
-		limitedQuery, err = parser.AddLimit(query, int(limit))
+		limitedQuery, err = parser.AddLimit(query, int(limit), dialect)
 	}
 	if err != nil || parser == nil {
 		l, ok := conn.(Limiter)
