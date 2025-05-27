@@ -1,5 +1,5 @@
 # Klaviyo
-[Klaviyo](https://www.Klaviyo.com/) is a marketing automation platform that helps businesses build and manage digital relationships with their customers by connecting through personalized email and enhancing customer loyality.
+[Klaviyo](https://www.Klaviyo.com/) is a marketing automation platform that helps businesses build and manage digital relationships with their customers by connecting through personalized email and enhancing customer loyalty.
 
 Bruin supports Klaviyo as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Klaviyo into your data warehouse.
 

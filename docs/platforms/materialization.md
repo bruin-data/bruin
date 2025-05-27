@@ -1,6 +1,6 @@
 # Materialization
 
-Materialization is the idea taking a simple `SELECT` query, and applying the necessary logic to materialize the results into a table or view. This is a common pattern in data engineering, where you have a query that is expensive to run, and you want to store the results in a table for faster access.
+Materialization is the idea of taking a simple `SELECT` query, and applying the necessary logic to materialize the results into a table or view. This is a common pattern in data engineering, where you have a query that is expensive to run, and you want to store the results in a table for faster access.
 
 Bruin supports various materialization strategies catered to different use cases.
 

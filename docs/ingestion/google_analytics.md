@@ -21,7 +21,7 @@ Follow the steps below to correctly set up Google Analytics as a data source and
 
 ### Step 2: Create an asset file for data ingestion
 To ingest data from Google Analytics, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., gAnalytics_ingestion.yml) inside the assets folder and add the following content:
-s
+
 ```yaml
 name: public.googleanalyticss
 type: ingestr
@@ -34,7 +34,7 @@ parameters:
   destination: postgres
 ```
 - `name`: The name of the asset.
-- `type`: Specifies the asset’s type. Set this to `ingestr` to use the ingestr data pipeline. For Pipedrive, it will be always `ingestr`.
+- `type`: Specifies the asset’s type. Set this to `ingestr` to use the ingestr data pipeline. For Google Analytics, it will be always `ingestr`.
 - `connection`: This is the destination connection, which defines where the data should be stored. For example: `postgres` indicates that the ingested data will be stored in a Postgres database.
 - `source_connection`: The name of the Google Analytics connection defined in .bruin.yml.
 - `source_table`: The name of the data table in Google Analytics to ingest data from.
