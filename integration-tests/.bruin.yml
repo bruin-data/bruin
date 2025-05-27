@@ -189,3 +189,9 @@ environments:
       duckdb:
         - name: "duckdb-render-template-this"
           path: "duckdb-files/render-template-this.db"
+
+  env-duckdb-ddl:
+    connections:
+      duckdb:
+        - name: "duckdb-ddl"
+          path: "duckdb-files/duckdb-ddl.db"

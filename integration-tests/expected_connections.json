@@ -399,7 +399,18 @@
         "duckdb": [
           {
             "name": "duckdb-render-template-this",
-            "path": "integration-tests/duckdb-files/render-template-this.db.db"
+            "path": "integration-tests/duckdb-files/render-template-this.db"
+          }
+        ]
+      }
+    },
+    "env-duckdb-ddl": {
+      "schema_prefix": "",
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-ddl",
+            "path": "integration-tests/duckdb-files/duckdb-ddl.db"
           }
         ]
       }
