@@ -76,9 +76,6 @@ join marketing.attribution as a
 
 ### `bq.sensor.table`
 
-> [!DANGER]
-> BigQuery sensors are not supported yet in Bruin CLI, and they only work on Bruin Cloud.
-
 Sensors are a special type of assets that are used to wait on certain external signals.
 
 
@@ -90,7 +87,6 @@ type: string
 parameters:
     table: string
 ```
-
 **Parameters**:
 - `table`: `project-id.dataset_id.table_id` format, requires all of the identifiers as a full name.
 
@@ -105,9 +101,6 @@ parameters:
 ```
 
 ### `bq.sensor.query`
-
-> [!DANGER]
-> BigQuery sensors are not supported yet in Bruin CLI, and they only work on Bruin Cloud.
 
 Checks if a query returns any results in BigQuery, runs every 5 minutes until this query returns any results.
 

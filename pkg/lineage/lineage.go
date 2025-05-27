@@ -347,6 +347,10 @@ func validateInputs(asset *pipeline.Asset, colName string) error {
 func (p *LineageExtractor) handleUpstreamColumns(asset *pipeline.Asset, upstreamCol *pipeline.Column) error {
 	existingCol := asset.GetColumnWithName(upstreamCol.Name)
 
+	if upstreamCol.Type == "UNKNOWN" {
+		upstreamCol.Type = ""
+	}
+
 	if existingCol == nil {
 		asset.Columns = append(asset.Columns, *upstreamCol)
 		return nil
@@ -381,8 +385,11 @@ func updateExistingColumn(existingCol *pipeline.Column, upstreamCol *pipeline.Co
 		existingCol.EntityAttribute = upstreamCol.EntityAttribute
 	}
 
+	if !existingCol.PrimaryKey {
+		existingCol.PrimaryKey = upstreamCol.PrimaryKey
+	}
+
 	existingCol.UpdateOnMerge = upstreamCol.UpdateOnMerge
-	existingCol.PrimaryKey = false
 }
 
 func (p *LineageExtractor) updateAssetColumn(asset *pipeline.Asset, col *pipeline.Column) {
