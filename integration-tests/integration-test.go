@@ -1167,6 +1167,20 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 				e2e.AssertByContains,
 			},
 		},
+		{
+			Name:    "test-ddl-duckdb",
+			Command: binary,
+			Args:    []string{"run", "--env", "env-duckdb-ddl", filepath.Join(currentFolder, "test-pipelines/duckdb-ddl-pipeline")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Successfully validated 2 assets", "Executed 8 tasks", "Finished: my_schema.table_check"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
 	}
 }
 

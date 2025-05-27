@@ -213,6 +213,7 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 	if err != nil {
 		return "", nil, "", "", err
 	}
+
 	extractor := &query.WholeFileExtractor{
 		Fs: fs,
 		// note: we don't support variables for now
@@ -231,11 +232,18 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 		}
 		return connectionName, conn, queryStr, "", nil
 	}
-	// Auto-detect mode (both asset path and query)
+
 	if queryStr != "" {
 		pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs, c.String("config-file"))
 		if err != nil {
 			return "", nil, "", "", errors.Wrap(err, "failed to get pipeline info")
+		}
+
+		// Auto-detect mode (both asset path and query)
+		extractor = &query.WholeFileExtractor{
+			Fs: fs,
+			// note: we don't support variables for now
+			Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineInfo.Pipeline.Name, "your-run-id", nil),
 		}
 
 		connName, conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
@@ -254,6 +262,11 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 	pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs, c.String("config-file"))
 	if err != nil {
 		return "", nil, "", "", errors.Wrap(err, "failed to get pipeline info")
+	}
+	extractor = &query.WholeFileExtractor{
+		Fs: fs,
+		// note: we don't support variables for now
+		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineInfo.Pipeline.Name, "your-run-id", nil),
 	}
 	// Verify that the asset is a SQL asset
 	if !pipelineInfo.Asset.IsSQLAsset() {
