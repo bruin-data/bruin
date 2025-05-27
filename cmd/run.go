@@ -433,7 +433,7 @@ func Run(isDebug *bool) *cli.Command {
 				}
 
 				go func() {
-					err := parser.Start()
+					err := parser.Start(context.Background())
 					if err != nil {
 						printError(err, c.String("output"), "Could not start sql parser")
 					}

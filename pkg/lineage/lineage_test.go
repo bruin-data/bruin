@@ -1,6 +1,7 @@
 package lineage
 
 import (
+	"context"
 	"log"
 	"os"
 	"testing"
@@ -27,7 +28,7 @@ func SetupSQLParser() error {
 		if err != nil {
 			return err
 		}
-		err = sqlParser.Start()
+		err = sqlParser.Start(context.Background())
 		if err != nil {
 			return err
 		}

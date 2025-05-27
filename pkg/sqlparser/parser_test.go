@@ -1,6 +1,7 @@
 package sqlparser
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,7 +10,7 @@ import (
 func TestGetLineageForRunner(t *testing.T) {
 	lineage, err := NewSQLParser(true)
 	require.NoError(t, err)
-	require.NoError(t, lineage.Start())
+	require.NoError(t, lineage.Start(context.Background()))
 
 	tests := []struct {
 		name    string
@@ -638,7 +639,7 @@ func TestSqlParser_GetTables(t *testing.T) {
 	s, err := NewSQLParser(true)
 	require.NoError(t, err)
 
-	err = s.Start()
+	err = s.Start(context.Background())
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -773,7 +774,7 @@ COMMIT;`,
 	})
 
 	// wg.Wait()
-	s.Close()
+	s.Close(context.Background())
 	require.NoError(t, err)
 }
 
@@ -781,7 +782,7 @@ func TestSqlParser_RenameTables(t *testing.T) {
 	s, err := NewSQLParser(true)
 	require.NoError(t, err)
 
-	err = s.Start()
+	err = s.Start(context.Background())
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -827,7 +828,7 @@ func TestSqlParser_RenameTables(t *testing.T) {
 	})
 
 	// wg.Wait()
-	s.Close()
+	s.Close(context.Background())
 	require.NoError(t, err)
 }
 
@@ -883,10 +884,10 @@ func TestSqlParser_AddLimit(t *testing.T) { //nolint
 			s, err := NewSQLParser(true)
 			require.NoError(t, err)
 			defer func() {
-				s.Close()
+				s.Close(context.Background())
 			}()
 
-			err = s.Start()
+			err = s.Start(context.Background())
 			require.NoError(t, err)
 
 			got, err := s.AddLimit(tt.query, tt.limit, tt.dialect)
