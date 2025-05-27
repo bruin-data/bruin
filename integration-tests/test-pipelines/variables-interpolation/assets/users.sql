@@ -1,9 +1,10 @@
 /* @bruin
-name: user_info
-type: bq.sql
+name: public.users
+type: duckdb.sql
+connection: duckdb-variables
+materialization:
+  type: table
 @bruin */
-
-SELECT * FROM {{ var.env }}.users WHERE 
 {% for user in var.users -%}
-  user_id = '{{ user }}'{% if not loop.last %} OR {% endif -%}
+  SELECT '{{ user }}' as name {% if not loop.last %} UNION ALL {% endif -%}
 {%- endfor -%};
