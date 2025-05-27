@@ -89,6 +89,9 @@ func Query() *cli.Command {
 			}
 
 			connName, conn, queryStr, task, err := prepareQueryExecution(c, fs)
+			if err != nil {
+				return handleError(c.String("output"), err)
+			}
 
 			dialect, err := sqlparser.AssetTypeToDialect(task.Type)
 			if err != nil {
