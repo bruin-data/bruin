@@ -865,7 +865,14 @@ func TestSqlParser_AddLimit(t *testing.T) { //nolint
 			name:     "query with existing limit",
 			query:    "SELECT id, name FROM users LIMIT 20",
 			limit:    5,
-			dialect:  "snowflake",
+			dialect:  "bigquery",
+			expected: "SELECT id, name FROM users LIMIT 5",
+		},
+		{
+			name:     "query with empty dialect",
+			query:    "SELECT id, name FROM users LIMIT 20",
+			limit:    5,
+			dialect:  "",
 			expected: "SELECT id, name FROM users LIMIT 5",
 		},
 	}

@@ -295,5 +295,5 @@ def add_limit(query: str, limit_value: int, dialect: str = None) -> dict:
     except Exception:
         return {"error": "cannot parse query"}
 
-    limited_query = parsed.limit(limit_value).sql()
+    limited_query = parsed.limit(limit_value).sql(dialect=dialect)
     return {"query": limited_query}
