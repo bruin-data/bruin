@@ -143,8 +143,8 @@ Bruin internally sets the [`PYTHONPATH`](https://docs.python.org/3/using/cmdline
 #### Workspace
 Python assets require `workspace` to be configured in your `emr_serverless` connection. Workspace is a S3 path that is used by Bruin as working storage for jobs that run on `emr_serverless`.
 
-Bruin uses this S3 path for several purposes:
-* Storing logs.
+Bruin uses this S3 path for:
+* Storing Logs.
 * Staging your entrypoint file.
 * Uploading bundled dependencies.
 

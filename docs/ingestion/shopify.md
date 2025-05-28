@@ -8,6 +8,7 @@ In order to set up Shopify connection, you need to add a configuration item in t
 Follow the steps below to correctly set up Shopify as a data source and run ingestion:
 
 ### Step 1: Add a connection to .bruin.yml file
+To ingest data from Shopify, you need to create an [asset configuration](/assets/ingestr#asset-structure) file. This file defines the data flow from the source to the destination. Create a YAML file (e.g., shopify_ingestion.yml) inside the assets folder and add the following content:
 
 ```yaml
    connections:
