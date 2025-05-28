@@ -3,7 +3,7 @@
 This pipeline is a simple example of a Bruin pipeline. It demonstrates how to use the `bruin` CLI to build and run a pipeline.
 This video shows the template in action:
 
-<video width="720" controls>
+<video width="685" height="auto" controls poster="../tutorials/tutorial-media/bruin-templates-tutorial.png">
   <source src="../tutorials/tutorial-media/bruin-templates-tutorial.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
