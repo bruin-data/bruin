@@ -21,4 +21,4 @@ columns:
 
 `blocking` is `true` by default.
 
-If any of the checks fails, the asset will be marked as failed and any of the downstream assets will not be executed
+If any of the checks fails, the asset will be marked as failed and any of the downstream assets will not be executed.

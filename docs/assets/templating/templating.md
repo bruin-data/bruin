@@ -82,7 +82,7 @@ variables:
       tenant: acme
 ```
 :::
-All user-defined variables are accessible via the `var` namespace. For example, if you define a variable called `src`, it will be available as `{{ var.src }}` in your Assets.
+All user-defined variables are accessible via the `var` namespace. For example, if you define a variable called `src`, it will be available as <code>&lbrace;&lbrace; var.src &rbrace;&rbrace;</code> in your assets.
 
 Additionally all top level variables must define a `default` value. This will be used to render your assets in absence of values supplied on the commandline.
 
