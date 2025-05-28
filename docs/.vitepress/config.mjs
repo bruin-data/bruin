@@ -208,6 +208,7 @@ export default withMermaid({
                             {text: "S3", link: "/ingestion/s3"},
                             {text: "Shopify", link: "/ingestion/shopify"},
                             {text: "Spanner", link: "/ingestion/spanner.md"},
+                            {text: "Solidgate", link: "/ingestion/solidgate"},
                             {text: "Stripe", link: "/ingestion/stripe.md"},
                             {text: "Slack", link: "/ingestion/slack.md"},
                             {text: "SQLite", link: "/ingestion/sqlite"},
