@@ -8,7 +8,7 @@ Bruin considers assets unique; however, asset names often do not fulfill the uni
 
 However, even if they have assets with the same name, in reality they have separate tables in their data warehouse.
 
-In order to uniquely identify where the individual assets contain, Bruin has a concept of a URI. A URI is a unique identifier for an asset, and it is expected to be unique across all pipelines and repos of the customer.
+In order to uniquely identify what the individual assets contain or where they are located, Bruin has a concept of a URI. A URI is a unique identifier for an asset, and it is expected to be unique across all pipelines and repos of the customer.
 
 
 > [!WARNING]
@@ -50,7 +50,7 @@ depends:
 The new `uri` key in the `depends` array allows you to define a dependency on an asset that lives in a different pipeline. This allows you to define cross-pipeline dependencies without having to know what pipeline or repo the asset lives in.
 
 > [!INFO]
-> Bruin required `depends` to be a string array previously, whereas now it can accept an object with the `uri` key as well.
+> Bruin previously required `depends` to be a string array, whereas now it can also accept an object with the `uri` key.
 
 
 ## How it works?
@@ -74,15 +74,15 @@ This approach has a couple of advantages:
 ## Dependencies with different schemas
 
 When the upstream and downstream both have the same schedule, it's easy to determine when does the downstream need to run. 
-E.g if both every 5 minutes, then if downstream has a data interval from `2025-10-11 15:30:00`to `2025-10-11 15:35:00`,
+E.g., if both run every 5 minutes, then if downstream has a data interval from `2025-10-11 15:30:00`to `2025-10-11 15:35:00`,
 then the upstream should have a successful run for the same interval.
 
 In the case of mixed schedules it's a bit more complicated but still possible.
 Imagine we have a downstream that runs every 5 minutes and we have a run with the data interval  `2025-10-11 15:30:00`to `2025-10-11 15:35:00`.
 This downstream has an external dependency that runs every 2 minutes.
 
-The in order to run the downstream we will wait until the upstream has successful runs with data intervals covering fully the downstream data interval.
-For example for the aforementioned `2025-10-11 15:30:00`to `2025-10-11 15:35:00`, we would need downstream to have for example.
+Then, in order to run the downstream, we will wait until the upstream has successful runs with data intervals covering fully the downstream data interval.
+For example for the aforementioned `2025-10-11 15:30:00`to `2025-10-11 15:35:00`, we would need the downstream to have, for example:
 
  * `2025-10-11 15:30:00`to `2025-10-11 15:32:00`
  * `2025-10-11 15:32:00`to `2025-10-11 15:34:00`

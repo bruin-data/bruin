@@ -49,7 +49,7 @@ Assets that are defined as YAML files have to have file names as `<name>.asset.y
 :::
 
 ## `name`
-The name of the asset, used for many things including dependencies, materialiation and more. Corresponds to the `schema.table` convention.
+The name of the asset, used for many things including dependencies, materialization and more. Corresponds to the `schema.table` convention.
 Must consist of letters and dot `.` character.
 - **Type:** `String`
 

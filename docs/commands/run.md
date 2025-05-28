@@ -47,7 +47,7 @@ table td:first-child {
 
 ### Continue from the last failed asset
 
-If you want to continue from the last failed task, you can use the `--continue` flag. This will run the pipeline/asset from the last failed task. Bruin will automatically retrive all the flags used in the last run. 
+If you want to continue from the last failed task, you can use the `--continue` flag. This will run the pipeline/asset from the last failed task. Bruin will automatically retrieve all the flags used in the last run. 
 
 ```bash
 bruin run --continue 

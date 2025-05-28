@@ -32,7 +32,7 @@ parameters:
   source_connection: my_notion
   source_table: 'd8ee2d159ac34cfc85827ba5a0a8ae71'
 
-  destination: postgress
+  destination: postgres
 ```
 
 - `name`: The name of the asset.

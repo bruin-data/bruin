@@ -5,7 +5,7 @@ Bruin supports Slack as a source for [Ingestr assets](/assets/ingestr), and you 
 
 In order to set up Slack connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file. You need the `api_key`. For details on how to obtain these credentials, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/slack#setup-guide).
 
-Follow the steps below to correctly set up slack as a data source and run ingestion:
+Follow the steps below to correctly set up Slack as a data source and run ingestion:
 
 ### Step 1: Add a connection to .bruin.yml file
 
@@ -35,10 +35,10 @@ parameters:
 ```
 
 - name: The name of the asset.
-- type: Specifies the type of the asset. It will be always ingestr type for slack.
+- type: Specifies the type of the asset. It will be always ingestr type for Slack.
 - connection: This is the destination connection.
-- source_connection: The name of the slack connection defined in .bruin.yml.
-- source_table: The name of the data table in slack you want to ingest.
+- source_connection: The name of the Slack connection defined in .bruin.yml.
+- source_table: The name of the data table in Slack you want to ingest.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```

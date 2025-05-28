@@ -22,7 +22,7 @@ To connect to DynamoDB, you need to add a configuration item to the connections 
           
 ```
 
-* `access_key_id`: Identifes an IAM account.
+* `access_key_id`: Identifies an IAM account.
 * `secret_access_key`: Password for the IAM account.
 * `region`: AWS region in which your DynamoDB table exists.
 
