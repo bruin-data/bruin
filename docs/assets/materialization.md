@@ -49,6 +49,7 @@ The strategy used for the materialization, can be one of the following:
 - `delete+insert`: incrementally update the table by only refreshing a certain partition.
 - `append`: only append the new data to the table, never overwrite.
 - `merge`: merge the existing records with the new records, requires a primary key to be set.
+- `DDL`: create a new table using a DDL (Data Definition Language) statement.
 
 ### `materialization > partition_by`
 Define the column that will be used for the partitioning of the resulting table. This is used to instruct the data warehouse to set the column for the partition key.
@@ -260,4 +261,48 @@ The strategy will:
 2. Delete existing records within the specified time interval
 3. Insert new records from the query given in the asset
 
+### `DDL`
+
+The `DDL` strategy is used to create a new table using a Data Definition Language (DDL) statement. This is useful when you want to create a new table with a specific schema and structure and ensure that this table is only created once. It does not run any query to populate the table; it only creates the structure.
+
+The strategy supports the following configurations:
+- `partition_by`: The column used for partitioning the table. This is useful for optimizing query performance and managing large datasets.
+- `cluster_by`: The columns used for clustering the table. This is useful for optimizing query performance on specific columns.
+
+Here's an example of an asset with `DDL` materialization:
+
+```bruin-sql
+/* @bruin
+name: dashboard.products
+type: bq.sql
+
+materialization:
+  type: table
+  strategy: ddl
+  partition_by: product_category
+
+columns:
+  - name: product_id
+    type: INTEGER
+    description: "Unique identifier for the product"
+    primary_key: true
+  - name: product_category
+    type: VARCHAR
+    description: "Category of the product"
+  - name: product_name
+    type: VARCHAR
+    description: "Name of the product"
+  - name: price
+    type: FLOAT
+    description: "Price of the product in USD"
+  - name: stock
+    type: INTEGER
+    description: "Number of units in stock"
+@bruin */
+
+```
+
+This strategy will:
+- Create a new empty table with the name `dashboard.products`
+- Use the provided schema to define the column names, column types as well as optional primary key constraints and descriptions.
 
