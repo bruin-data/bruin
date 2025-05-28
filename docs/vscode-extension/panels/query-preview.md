@@ -1,5 +1,5 @@
 # Query Preview Panel
-The Query Preview Panel is located at the bottom of the VSCode interface, near the `Lineage` Panel. It offers a visual representation of the query output, displayed as a table.
+The Query Preview Panel is located at the bottom of the VS Code interface, near the `Lineage` Panel. It offers a visual representation of the query output, displayed as a table.
 
 ## Functionality
 - **Display Query Output**  

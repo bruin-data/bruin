@@ -3,9 +3,7 @@
 Bruin supports Snowflake as a data platform. 
 
 ## Connection
-In order to have set up a Snowflake connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema.
-
-In order to have set up a Snowflake connection, you need to add a configuration item to `connections` in the `.bruin.yml` file.
+In order to set up a Snowflake connection, you need to add a configuration item to `connections` in the `.bruin.yml` file.
 
 There's 2 different ways to fill it in
 
@@ -119,7 +117,7 @@ parameters:
 ```
 
 ### `sf.seed`
-`sf.seed` are a special type of assets that are used to represent are CSV-files that contain data that is prepared outside of your pipeline that will be loaded into your snowflake database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the snowflake database.
+`sf.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your Snowflake database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the Snowflake database.
 
 You can define seed assets in a file ending with `.yaml`:
 ```yaml
@@ -136,7 +134,7 @@ parameters:
 
 ####  Examples: Load csv into a Snowflake database
 
-The examples below show how load a csv into a snowflake database.
+The examples below show how to load a CSV into a Snowflake database.
 ```yaml
 name: dashboard.hello
 type: sf.seed

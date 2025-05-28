@@ -135,7 +135,7 @@ parameters:
 ```
 
 ### `bq.seed`
-`bq.seed` are a special type of assets that are used to represent are CSV-files that contain data that is prepared outside of your pipeline that will be loaded into your bigquery database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the bigquery database.
+`bq.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your BigQuery database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the BigQuery database.
 
 You can define seed assets in a file ending with `.yaml`:
 ```yaml
@@ -152,7 +152,7 @@ parameters:
 
 ####  Examples: Load csv into a BigQuery database
 
-The examples below show how load a csv into a bigquery database.
+The examples below show how to load a CSV into a BigQuery database.
 ```yaml
 name: dashboard.hello
 type: bq.seed
