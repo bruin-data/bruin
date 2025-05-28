@@ -110,6 +110,7 @@ var defaultMapping = map[string]string{
 	"applovin":              "applovin-default",
 	"salesforce":            "salesforce-default",
 	"oracle":                "oracle-default",
+	"solidgate":             "solidgate-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}
