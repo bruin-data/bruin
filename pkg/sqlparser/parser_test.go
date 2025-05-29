@@ -1,6 +1,8 @@
 package sqlparser
 
 import (
+	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -895,6 +897,113 @@ func TestSqlParser_AddLimit(t *testing.T) { //nolint
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestGetMissingDependenciesForAsset(t *testing.T) {
+	tests := []struct {
+		name          string
+		asset         *pipeline.Asset
+		pipeline      *pipeline.Pipeline
+		renderer      jinja.RendererInterface
+		expectedDeps  []string
+		expectedError bool
+	}{
+		{
+			name: "asset with no missing dependencies",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				Materialization: pipeline.Materialization{
+					Type: "table",
+				},
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "table1"},
+					{Type: "asset", Value: "table2"},
+				},
+				ExecutableFile: pipeline.ExecutableFile{
+					Content: "SELECT * FROM table1 JOIN table2",
+				},
+			},
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{Name: "table1"},
+					{Name: "table2"},
+				},
+			},
+			expectedDeps:  []string{},
+			expectedError: false,
+		},
+		{
+			name: "asset with missing dependencies",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				Materialization: pipeline.Materialization{
+					Type: "table",
+				},
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "raw.table1"},
+				},
+				ExecutableFile: pipeline.ExecutableFile{
+					Content: "SELECT * FROM raw.table1 JOIN raw.table2 JOIN raw.table3",
+				},
+			},
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{Name: "raw.table1"},
+					{Name: "raw.table2"},
+					{Name: "raw.table3"},
+				},
+			},
+			expectedDeps:  []string{"raw.table2", "raw.table3"},
+			expectedError: false,
+		},
+		{
+			name: "asset with external table references",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				Materialization: pipeline.Materialization{
+					Type: "table",
+				},
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "table1"},
+				},
+				ExecutableFile: pipeline.ExecutableFile{
+					Content: "SELECT * FROM table1 JOIN project.dataset.table",
+				},
+			},
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{Name: "table1"},
+				},
+			},
+			expectedDeps:  []string{},
+			expectedError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s, err := NewSQLParser(true)
+			require.NoError(t, err)
+			defer func() {
+				s.Close()
+			}()
+
+			err = s.Start()
+			require.NoError(t, err)
+
+			got, err := s.GetMissingDependenciesForAsset(tt.asset, tt.pipeline, jinja.NewRendererWithYesterday("test", "test"))
+			if tt.expectedError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.ElementsMatch(t, tt.expectedDeps, got)
 			}
 		})
 	}
