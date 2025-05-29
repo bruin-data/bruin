@@ -2184,13 +2184,12 @@ func TestUsedTableValidatorRule_ValidateAsset(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			renderer := new(mockRenderer)
 			parser := new(mockSQLParser)
 			if tt.setup != nil {
 				tt.setup(parser)
 			}
 
-			u := UsedTableValidatorRule{renderer, parser}
+			u := UsedTableValidatorRule{jinja.NewRendererWithYesterday("test", "test"), parser}
 			got, err := u.ValidateAsset(context.Background(), pp, tt.asset)
 			if !tt.wantErr(t, err) {
 				return
