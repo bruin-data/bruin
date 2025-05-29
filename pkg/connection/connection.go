@@ -774,6 +774,7 @@ func (m *Manager) GetSolidgateConnectionWithoutDefault(name string) (*solidgate.
 
 	return db, nil
 }
+
 func (m *Manager) GetAdjustConnection(name string) (*adjust.Client, error) {
 	db, err := m.GetAdjustConnectionWithoutDefault(name)
 	if err == nil {
