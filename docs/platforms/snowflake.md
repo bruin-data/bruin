@@ -83,8 +83,6 @@ join marketing.attribution as a
 
 ### `sf.sensor.query`
 
-> [!DANGER]
-> BigQuery sensors are not supported yet in Bruin CLI, and they only work on Bruin Cloud.
 
 Checks if a query returns any results in Snowflake, runs every 5 minutes until this query returns any results.
 
