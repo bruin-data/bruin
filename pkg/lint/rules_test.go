@@ -2091,20 +2091,6 @@ func (m *mockSQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pi
 	return args.Get(0).([]string), args.Error(1)
 }
 
-type mockRenderer struct {
-	mock.Mock
-}
-
-func (m *mockRenderer) Render(query string) (string, error) {
-	args := m.Called(query)
-	return args.Get(0).(string), args.Error(1)
-}
-
-func (m *mockRenderer) CloneForAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) jinja.RendererInterface {
-	args := m.Called(ctx, pipeline, asset)
-	return args.Get(0).(*mockRenderer)
-}
-
 func TestUsedTableValidatorRule_ValidateAsset(t *testing.T) {
 	t.Parallel()
 

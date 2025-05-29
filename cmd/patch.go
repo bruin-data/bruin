@@ -76,7 +76,7 @@ func Patch() *cli.Command {
 
 					ctx := context.Background()
 
-					if isPathReferencingAsset(inputPath) {
+					if isPathReferencingAsset(inputPath) { //nolint
 						pipelinePath, err := path.GetPipelineRootFromTask(inputPath, []string{".bruin.yml", "pipeline.yml"}) // TODO: use shared constant
 						if err != nil {
 							printErrorForOutput(output, fmt.Errorf("failed to find the pipeline this asset belongs to: '%s': %w", inputPath, err))

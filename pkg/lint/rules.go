@@ -1140,9 +1140,9 @@ func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.P
 	if err != nil {
 		issues = append(issues, &Issue{
 			Task:        asset,
-			Description: fmt.Sprintf("failed to get missing dependencies: %s", err.Error()),
+			Description: "failed to get missing dependencies: " + err.Error(),
 		})
-		return issues, nil
+		return issues, nil //nolint
 	}
 
 	if len(missingDeps) == 0 {

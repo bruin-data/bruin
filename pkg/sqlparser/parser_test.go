@@ -903,6 +903,8 @@ func TestSqlParser_AddLimit(t *testing.T) { //nolint
 }
 
 func TestGetMissingDependenciesForAsset(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name          string
 		asset         *pipeline.Asset
