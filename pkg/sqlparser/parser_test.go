@@ -1,10 +1,10 @@
 package sqlparser
 
 import (
-	"github.com/bruin-data/bruin/pkg/jinja"
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/require"
 )
 
