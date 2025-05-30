@@ -897,7 +897,7 @@ func setupExecutors(
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeIngestr) || estimateCustomCheckType == pipeline.AssetTypeIngestr {
-		ingestrOperator, err := ingestr.NewBasicOperator(conn)
+		ingestrOperator, err := ingestr.NewBasicOperator(conn, renderer)
 		if err != nil {
 			return nil, err
 		}

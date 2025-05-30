@@ -1842,8 +1842,8 @@ ORDER BY 1, 2, 3
 )
 def test_get_column_lineage(query, schema, expected, expected_non_selected, dialect):
     result = get_column_lineage(query, schema, dialect)
-    assert expected == result["columns"]
-    assert expected_non_selected == result["non_selected_columns"]
+    assert result["columns"] == expected
+    assert result["non_selected_columns"] == expected_non_selected
 
 
 @pytest.mark.parametrize(
@@ -2048,7 +2048,5 @@ def test_add_limit_with_convert_timezone():
     """
 
     result = add_limit(query, 10, dialect="snowflake")
-    print(f"result: {result}")
-
-
- 
+    assert "query" in result
+    assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()

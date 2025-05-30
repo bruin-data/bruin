@@ -3,7 +3,7 @@
 Bruin supports Clickhouse as both a source and a destination.
 
 ## Connection
-In order to have set up a Clickhouse connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema:
+In order to set up a Clickhouse connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema:
 
 ```yaml
 connections:
@@ -93,7 +93,7 @@ ORDER BY average_rating DESC;
 
 
 ### `clickhouse.seed`
-`clickhouse.seed` are a special type of assets that are used to represent are CSV-files that contain data that is prepared outside of your pipeline that will be loaded into your clickhouse database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the clickhouse database.
+`clickhouse.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your Clickhouse database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the Clickhouse database.
 
 You can define seed assets in a file ending with `.yaml`:
 ```yaml
@@ -110,7 +110,7 @@ parameters:
 
 ####  Examples: Load csv into a Clickhouse database
 
-The examples below show how to load a csv into a clickhouse database:
+The examples below show how to load a CSV into a Clickhouse database:
 ```yaml
 name: dashboard.hello
 type: clickhouse.seed
