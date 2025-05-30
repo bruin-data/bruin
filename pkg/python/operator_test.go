@@ -259,6 +259,7 @@ func TestLocalOperator_setupEnvironmentVariables(t *testing.T) {
 		name        string
 		setupCtx    func() context.Context
 		asset       *pipeline.Asset
+		pipeline    *pipeline.Pipeline
 		existingEnv map[string]string
 		expectedEnv map[string]string
 	}{
@@ -379,6 +380,10 @@ func TestLocalOperator_setupEnvironmentVariables(t *testing.T) {
 		},
 	}
 
+	defaultPipeline := &pipeline.Pipeline{
+		Name: "test-pipeline",
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -388,7 +393,11 @@ func TestLocalOperator_setupEnvironmentVariables(t *testing.T) {
 			}
 
 			ctx := tt.setupCtx()
-			result, err := o.setupEnvironmentVariables(ctx, tt.asset)
+			p := tt.pipeline
+			if p == nil {
+				p = defaultPipeline
+			}
+			result, err := o.setupEnvironmentVariables(ctx, p, tt.asset)
 			if err != nil {
 				t.Errorf("error: %v", err)
 				return

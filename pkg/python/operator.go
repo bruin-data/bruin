@@ -2,6 +2,7 @@ package python
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -141,7 +142,7 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		}
 	}
 
-	perAssetEnvVariables, err := o.setupEnvironmentVariables(ctx, t)
+	perAssetEnvVariables, err := o.setupEnvironmentVariables(ctx, p, t)
 	if err != nil {
 		return errors.Wrap(err, "failed to setup environment variables")
 	}
@@ -191,13 +192,27 @@ func findPathToExecutable(alternatives []string) (string, error) {
 	return "", errors.New("no executable found for alternatives: " + strings.Join(alternatives, ", "))
 }
 
-func (o *LocalOperator) setupEnvironmentVariables(ctx context.Context, t *pipeline.Asset) (map[string]string, error) {
+func (o *LocalOperator) setupEnvironmentVariables(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) (map[string]string, error) {
+
+	env, err := o.envMutateIntervals(ctx, t)
+	if err != nil {
+		return nil, err
+	}
+
+	env, err = o.envInjectVariables(env, p.Variables.Value())
+	if err != nil {
+		return nil, err
+	}
+
+	return env, nil
+}
+
+func (o *LocalOperator) envMutateIntervals(ctx context.Context, t *pipeline.Asset) (map[string]string, error) {
 	if val := ctx.Value(pipeline.RunConfigApplyIntervalModifiers); val != nil {
 		if applyModifiers, ok := val.(bool); !ok || !applyModifiers {
 			return o.envVariables, nil
 		}
 	}
-
 	startDate, ok := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
 	if !ok {
 		return nil, errors.New("start date is required - please provide a valid date")
@@ -224,7 +239,18 @@ func (o *LocalOperator) setupEnvironmentVariables(ctx context.Context, t *pipeli
 
 	modifiedStartDate := pipeline.ModifyDate(startDate, t.IntervalModifiers.Start)
 	modifiedEndDate := pipeline.ModifyDate(endDate, t.IntervalModifiers.End)
-	envVars := jinja.PythonEnvVariables(&modifiedStartDate, &modifiedEndDate, pipelineName, runID, fullRefresh)
 
-	return envVars, nil
+	return jinja.PythonEnvVariables(&modifiedStartDate, &modifiedEndDate, pipelineName, runID, fullRefresh), nil
+}
+
+func (o *LocalOperator) envInjectVariables(env map[string]string, variables map[string]any) (map[string]string, error) {
+	if len(variables) == 0 {
+		return env, nil
+	}
+	doc, err := json.Marshal(variables)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling variables to JSON: %w", err)
+	}
+	env["BRUIN_VARIABLES"] = string(doc)
+	return env, nil
 }
