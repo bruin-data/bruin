@@ -263,11 +263,14 @@ The strategy will:
 
 ### `DDL`
 
-The `DDL` strategy is used to create a new table using a Data Definition Language (DDL) statement. This is useful when you want to create a new table with a specific schema and structure and ensure that this table is only created once. It does not run any query to populate the table; it only creates the structure.
+The `DDL` (Data Definition Language) strategy is used to create a new table using the information provided in the 
+embedded YAML section of the asset. This is useful when you want to create a new table with a specific schema and structure
+and ensure that this table is only created once.
 
-The strategy supports the following configurations:
-- `partition_by`: The column used for partitioning the table. This is useful for optimizing query performance and managing large datasets.
-- `cluster_by`: The columns used for clustering the table. This is useful for optimizing query performance on specific columns.
+You can define the table columns in the columns fields of the asset.
+
+Note: this strategy does not run any query to populate the table. For this reason, you should not include any query after
+the embedded YAML section.
 
 Here's an example of an asset with `DDL` materialization:
 
@@ -305,4 +308,9 @@ columns:
 This strategy will:
 - Create a new empty table with the name `dashboard.products`
 - Use the provided schema to define the column names, column types as well as optional primary key constraints and descriptions.
+
+The strategy also supports partitioning and clustering for data warehouses that support these features. You can specify
+in the materialization definition with the following keys:
+- `partition_by`
+- `cluster_by`
 
