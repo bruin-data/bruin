@@ -1923,6 +1923,18 @@ def test_get_tables():
     expected = {"tables": ["public.example"]}
     assert get_tables(query, dialect) == expected
 
+    query = """
+    with my_cte as (
+    select
+        COUNTRY_CODE,
+        COUNTRY_NAME
+    from `raw.my_cte`
+)
+SELECT * from my_cte
+    """
+    expected = {"tables": ["raw.my_cte"]}
+    assert get_tables(query, dialect) == expected
+
 
 def test_add_limit():
     query = """

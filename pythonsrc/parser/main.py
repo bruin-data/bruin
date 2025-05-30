@@ -67,20 +67,30 @@ def extract_tables(parsed):
     def extract_table_references(stmt, cte_names):
         """Extract table references, excluding CTEs"""
         table_refs = []
-
+        
         # Find all table references
         for table in stmt.find_all(exp.Table):
             # Get the actual table name (not the alias)
             actual_table_name = table.name
-
-            # Skip if the actual table name is a CTE
-            if actual_table_name in cte_names:
+            
+            # Check if this is a CTE reference
+            # A table reference is a CTE if:
+            # 1. The table name matches a CTE name, AND
+            # 2. It doesn't have a schema/database prefix (CTEs are referenced without schema)
+            is_cte_reference = (
+                actual_table_name in cte_names and 
+                not table.db and  # No schema/database prefix
+                not table.catalog  # No catalog prefix
+            )
+            
+            # Skip if it's a CTE reference
+            if is_cte_reference:
                 continue
-
+            
             # Keep all table references, including different aliases for the same table
             # This is important for self-joins and extract_non_selected_columns
             table_refs.append(table)
-
+        
         return table_refs
 
     # Get all CTE names first
