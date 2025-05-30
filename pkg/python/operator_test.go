@@ -378,6 +378,37 @@ func TestLocalOperator_setupEnvironmentVariables(t *testing.T) {
 				"BRUIN_FULL_REFRESH":    "1",
 			},
 		},
+		{
+			setupCtx: func() context.Context {
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigPipelineName, "test-pipeline")
+				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
+				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, false)
+				return ctx
+			},
+			name: "with variables",
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+			},
+			pipeline: &pipeline.Pipeline{
+				Name: "test-pipeline",
+				Variables: pipeline.Variables{
+					"env": map[string]any{
+						"type":    "string",
+						"default": "dev",
+					},
+					"users": map[string]any{
+						"type":    "list",
+						"default": []any{"alice", "bob", "charlie"},
+					},
+				},
+			},
+			expectedEnv: map[string]string{
+				"BRUIN_VARIABLES": `{"env":"dev","users":["alice","bob","charlie"]}`,
+			},
+		},
 	}
 
 	defaultPipeline := &pipeline.Pipeline{
