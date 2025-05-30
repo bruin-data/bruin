@@ -267,10 +267,8 @@ The `DDL` (Data Definition Language) strategy is used to create a new table usin
 embedded YAML section of the asset. This is useful when you want to create a new table with a specific schema and structure
 and ensure that this table is only created once.
 
-You can define the table columns in the columns fields of the asset.
-
-Note: this strategy does not run any query to populate the table. For this reason, you should not include any query after
-the embedded YAML section.
+The `DDL` strategy defines the table structure via column definitions in the columns field of the asset. 
+For this reason, you should not include any query after the embedded YAML section.
 
 Here's an example of an asset with `DDL` materialization:
 
