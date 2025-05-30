@@ -1,6 +1,6 @@
 # Lineage Panel
 
-The Lineage Panel is located at the bottom of the VSCode interface, near the terminal tab. It provides a visual representation of the current asset's lineage.
+The Lineage Panel is located at the bottom of the VS Code interface, near the terminal tab. It provides a visual representation of the current asset's lineage.
 
 ## Functionality
 - **Display Asset Lineage**

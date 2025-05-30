@@ -1,6 +1,6 @@
 # Materialization
 
-Materialization is the idea taking a simple `SELECT` query, and applying the necessary logic to materialize the results into a table or view. This is a common pattern in data engineering, where you have a query that is expensive to run, and you want to store the results in a table for faster access.
+Materialization is the idea of taking a simple `SELECT` query, and applying the necessary logic to materialize the results into a table or view.
 
 Bruin supports various materialization strategies catered to different use cases.
 
@@ -66,7 +66,7 @@ Define the columns that will be used for the clustering of the resulting table. 
 ### `materialization > incremental_key`
 
 This is the column of the table that will be used for incremental updates of the table.
-- **Type:** `String[]`
+- **Type:** `String`
 - **Default:** `[]`
 
 ## Strategies

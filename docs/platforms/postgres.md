@@ -3,7 +3,7 @@
 Bruin supports PostgreSQL as a data platform.
 
 ## Connection
-In order to have set up a Postgres connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema.
+In order to set up a PostgreSQL connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema.
 
 ```yaml
     connections:
@@ -72,7 +72,7 @@ join marketing.attribution as a
 ```
 
 ### `pg.seed`
-`pg.seed` are a special type of assets that are used to represent are CSV-files that contain data that is prepared outside of your pipeline that will be loaded into your postgres database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the postgres database.
+`pg.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your PostgreSQL database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the PostgreSQL database.
 
 You can define seed assets in a file ending with `.yaml`:
 ```yaml
@@ -89,7 +89,7 @@ parameters:
 
 ####  Examples: Load csv into a Postgres database
 
-The examples below show how load a csv into a postgres database.
+The examples below show how to load a CSV into a PostgreSQL database.
 ```yaml
 name: dashboard.hello
 type: pg.seed

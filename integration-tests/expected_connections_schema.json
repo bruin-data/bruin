@@ -582,6 +582,12 @@
             "$ref": "#/$defs/SpannerConnection"
           },
           "type": "array"
+        },
+        "solidgate": {
+          "items": {
+            "$ref": "#/$defs/SolidgateConnection"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -1426,6 +1432,12 @@
         },
         "secret_access_key": {
           "type": "string"
+        },
+        "endpoint_url": {
+          "type": "string"
+        },
+        "layout": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
@@ -1435,7 +1447,9 @@
         "bucket_name",
         "path_to_file",
         "access_key_id",
-        "secret_access_key"
+        "secret_access_key",
+        "endpoint_url",
+        "layout"
       ]
     },
     "SQLiteConnection": {
@@ -1600,6 +1614,26 @@
         "database",
         "credentials_base64",
         "credentials_path"
+      ]
+    },
+    "SolidgateConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "secret_key": {
+          "type": "string"
+        },
+        "public_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "public_key",
+        "secret_key"
       ]
     },
     "StripeConnection": {

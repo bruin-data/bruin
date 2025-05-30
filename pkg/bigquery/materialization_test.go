@@ -154,6 +154,46 @@ func TestMaterializer_Render(t *testing.T) {
 				"COMMIT TRANSACTION;$",
 		},
 		{
+			name: "delete+insert with empty column type",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey: "dt",
+				},
+				Columns: []pipeline.Column{
+					{Name: "somekey", Type: ""},
+				},
+			},
+			query: "SELECT 1",
+			want: "^BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n;\n" +
+				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
+				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
+				"COMMIT TRANSACTION;$",
+		},
+		{
+			name: "delete+insert with UNKNOWN column type",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey: "dt",
+				},
+				Columns: []pipeline.Column{
+					{Name: "somekey", Type: "UNKNOWN"},
+				},
+			},
+			query: "SELECT 1",
+			want: "^BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n;\n" +
+				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
+				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
+				"COMMIT TRANSACTION;$",
+		},
+		{
 			name: "delete+insert builds a proper transaction where columns are defined",
 			task: &pipeline.Asset{
 				Name: "my.asset",

@@ -261,12 +261,14 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 type TableSensor struct {
 	connection connectionFetcher
 	sensorMode string
+	extractor  query.QueryExtractor
 }
 
-func NewTableSensor(conn connectionFetcher, sensorMode string) *TableSensor {
+func NewTableSensor(conn connectionFetcher, sensorMode string, extractor query.QueryExtractor) *TableSensor {
 	return &TableSensor{
 		connection: conn,
 		sensorMode: sensorMode,
+		extractor:  extractor,
 	}
 }
 
@@ -296,7 +298,11 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if err != nil {
 		return err
 	}
-
+	extractedQueries, err := ts.extractor.ExtractQueriesFromString(qq)
+	if err != nil {
+		return err
+	}
+	extractedQuery := extractedQueries[0]
 	printer, printerExists := ctx.Value(executor.KeyPrinter).(io.Writer)
 	if printerExists {
 		fmt.Fprintln(printer, "Poking:", tableName)
@@ -308,7 +314,7 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		case <-timeout:
 			return errors.New("Sensor timed out after 24 hours")
 		default:
-			res, err := conn.Select(ctx, &query.Query{Query: qq})
+			res, err := conn.Select(ctx, extractedQuery)
 			if err != nil {
 				return err
 			}

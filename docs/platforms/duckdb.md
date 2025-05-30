@@ -60,7 +60,7 @@ FROM events.customers
 
 
 ### `duckdb.seed`
-`duckdb.seed` are a special type of assets that are used to represent are CSV-files that contain data that is prepared outside of your pipeline that will be loaded into your duckdb database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the duckdb database.
+`duckdb.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your DuckDB database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the DuckDB database.
 
 You can define seed assets in a file ending with `.yaml`:
 ```yaml
@@ -77,7 +77,7 @@ parameters:
 
 ####  Examples: Load csv into a Duckdb database
 
-The examples below show how load a csv into a duckdb database.
+The examples below show how to load a CSV into a DuckDB database.
 ```yaml
 name: dashboard.hello
 type: duckdb.seed

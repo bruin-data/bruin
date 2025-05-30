@@ -68,6 +68,10 @@ func Lint(isDebug *bool) *cli.Command {
 				EnvVars: []string{"BRUIN_CONFIG_FILE"},
 				Usage:   "the path to the .bruin.yml file",
 			},
+			&cli.StringSliceFlag{
+				Name:  "var",
+				Usage: "override pipeline variables with custom values",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			// if the output is JSON then we intend to discard all the nicer pretty-print statements
@@ -76,6 +80,10 @@ func Lint(isDebug *bool) *cli.Command {
 				color.Output = io.Discard
 			} else {
 				fmt.Println()
+			}
+
+			if vars := c.StringSlice("var"); len(vars) > 0 {
+				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
 			}
 
 			logger := makeLogger(*isDebug)

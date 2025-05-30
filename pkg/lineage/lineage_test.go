@@ -36,8 +36,15 @@ func SetupSQLParser() error {
 	return nil
 }
 
-func getBasicLineageTestCase() []TestCase {
-	return []TestCase{
+func TestParseLineageRecursively(t *testing.T) { //nolint
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		pipeline *pipeline.Pipeline
+		after    *pipeline.Pipeline
+		want     error
+	}{
 		{
 			name: "successful recursive lineage parsing",
 			pipeline: &pipeline.Pipeline{
@@ -524,11 +531,6 @@ func getBasicLineageTestCase() []TestCase {
 			},
 			want: nil,
 		},
-	}
-}
-
-func GetAdvancedSQLTestCase() []TestCase {
-	return []TestCase{
 		{
 			name: "advanced SQL functions and aggregations",
 			pipeline: &pipeline.Pipeline{
@@ -612,7 +614,7 @@ func GetAdvancedSQLTestCase() []TestCase {
 							},
 							{
 								Name:          "report_generated_at",
-								Type:          "UNKNOWN",
+								Type:          "",
 								Upstreams:     []*pipeline.UpstreamColumn{},
 								Checks:        make([]pipeline.ColumnCheck, 0),
 								UpdateOnMerge: false,
@@ -734,7 +736,6 @@ func GetAdvancedSQLTestCase() []TestCase {
 			},
 			want: nil,
 		},
-
 		{
 			name: "postgres specific syntax",
 			pipeline: &pipeline.Pipeline{
@@ -872,28 +873,25 @@ func GetAdvancedSQLTestCase() []TestCase {
 			want: nil,
 		},
 	}
-}
-
-func TestParseLineageRecursively(t *testing.T) {
-	t.Parallel()
-
-	tests := append(getBasicLineageTestCase(), GetAdvancedSQLTestCase()...)
-
-	for _, tt := range tests {
-		runSingleLineageTest(t, tt.pipeline, tt.after, tt.want)
-	}
-}
-
-func runSingleLineageTest(t *testing.T, p, after *pipeline.Pipeline, want error) {
-	t.Helper()
 
 	extractor := NewLineageExtractor(SQLParser)
-	for _, asset := range p.Assets {
-		err := extractor.ColumnLineage(p, asset, make(map[string]bool))
-		assertLineageError(t, err, want)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			for _, asset := range tt.pipeline.Assets {
+				err := extractor.ColumnLineage(tt.pipeline, asset, make(map[string]bool))
+				assertLineageError(t, err, tt.want)
 
-		assertColumns(t, asset.Columns, after.GetAssetByName(asset.Name).Columns)
-		assertAssetExists(t, after, asset)
+				if tt.want == nil {
+					if len(err.Issues) > 0 {
+						t.Errorf("assertLineageError() error = %v, want nil", err)
+					}
+				}
+
+				assertColumns(t, asset.Columns, tt.after.GetAssetByName(asset.Name).Columns)
+				assertAssetExists(t, tt.after, asset)
+			}
+		})
 	}
 }
 
@@ -985,13 +983,6 @@ func assertColumns(t *testing.T, got, want []pipeline.Column) {
 			t.Errorf("Column %s checks mismatch: got %d, want %d", col.Name, len(col.Checks), len(wantCol.Checks))
 		}
 	}
-}
-
-type TestCase struct {
-	name     string
-	pipeline *pipeline.Pipeline
-	after    *pipeline.Pipeline
-	want     error
 }
 
 func TestAddColumnToAsset(t *testing.T) {

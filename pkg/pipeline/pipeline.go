@@ -110,6 +110,7 @@ var defaultMapping = map[string]string{
 	"applovin":              "applovin-default",
 	"salesforce":            "salesforce-default",
 	"oracle":                "oracle-default",
+	"solidgate":             "solidgate-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}
@@ -1391,14 +1392,17 @@ type glossaryReader interface {
 	GetEntities(pathToPipeline string) ([]*glossary.Entity, error)
 }
 
-type assetMutator func(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error)
+type AssetMutator func(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error)
+
+type PipelineMutator func(ctx context.Context, pipeline *Pipeline) (*Pipeline, error)
 
 type Builder struct {
 	config             BuilderConfig
 	yamlTaskCreator    TaskCreator
 	commentTaskCreator TaskCreator
 	fs                 afero.Fs
-	mutators           []assetMutator
+	assetMutators      []AssetMutator
+	pipelineMutators   []PipelineMutator
 
 	GlossaryReader glossaryReader
 }
@@ -1407,8 +1411,12 @@ func (b *Builder) SetGlossaryReader(reader glossaryReader) {
 	b.GlossaryReader = reader
 }
 
-func (b *Builder) AddMutator(m assetMutator) {
-	b.mutators = append(b.mutators, m)
+func (b *Builder) AddAssetMutator(m AssetMutator) {
+	b.assetMutators = append(b.assetMutators, m)
+}
+
+func (b *Builder) AddPipelineMutator(m PipelineMutator) {
+	b.pipelineMutators = append(b.pipelineMutators, m)
 }
 
 type ParseError struct {
@@ -1428,7 +1436,7 @@ func NewBuilder(config BuilderConfig, yamlTaskCreator TaskCreator, commentTaskCr
 		GlossaryReader:     gr,
 	}
 
-	b.mutators = []assetMutator{
+	b.assetMutators = []AssetMutator{
 		b.fillGlossaryStuff,
 		b.SetupDefaultsFromPipeline,
 		b.SetNameFromPath,
@@ -1594,6 +1602,13 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 		}
 	}
 
+	if config.isMutate {
+		pipeline, err = b.MutatePipeline(ctx, pipeline)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return pipeline, nil
 }
 
@@ -1645,7 +1660,7 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 }
 
 func (b *Builder) MutateAsset(ctx context.Context, task *Asset, foundPipeline *Pipeline) (*Asset, error) {
-	for _, mutator := range b.mutators {
+	for _, mutator := range b.assetMutators {
 		var err error
 		task, err = mutator(ctx, task, foundPipeline)
 		if err != nil {
@@ -1654,6 +1669,18 @@ func (b *Builder) MutateAsset(ctx context.Context, task *Asset, foundPipeline *P
 	}
 
 	return task, nil
+}
+
+func (b *Builder) MutatePipeline(ctx context.Context, pipeline *Pipeline) (*Pipeline, error) {
+	for _, mutator := range b.pipelineMutators {
+		var err error
+		pipeline, err = mutator(ctx, pipeline)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return pipeline, nil
 }
 
 func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {

@@ -3,7 +3,7 @@
 
 Bruin supports AppLovin as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from AppLovin into your data platform.
 
-To set up a AppLovin connection, you must add a configuration item in the `.bruin.yml` and `asset` file. You need `api_key` that is report key. You can generate a report key from your [analytics dashboard](https://dash.applovin.com/login#keys).
+To set up an AppLovin connection, you must add a configuration item in the `.bruin.yml` and `asset` file. You need `api_key` that is report key. You can generate a report key from your [analytics dashboard](https://dash.applovin.com/login#keys).
 
 Follow the steps below to set up AppLovin correctly as a data source and run ingestion.
 ### Step 1: Add a connection to the .bruin.yml file

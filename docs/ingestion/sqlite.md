@@ -1,8 +1,6 @@
 # SQLite
 SQLite is a C-language library that implements a small, fast, self-contained, high-reliability, full-featured, SQL database engine.
 
-ingestr supports SQLite as a source.
-
 Bruin supports SQLite as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from SQLite into your data warehouse. 
 
 In order to set up SQLite connection, you need to add a configuration item in the `.bruin.yml` file and in `asset` file.

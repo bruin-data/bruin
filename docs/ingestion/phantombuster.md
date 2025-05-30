@@ -1,5 +1,5 @@
 # PhantomBuster
-[PhantomBuster](https://phantombuster.com/) is a cloud-based data automation and web scraping platform that allows users to extract data from websites, automate action.
+[PhantomBuster](https://phantombuster.com/) is a cloud-based data automation and web scraping platform that allows users to extract data from websites, automate actions.
 
 Bruin supports PhantomBuster as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from PhantomBuster into your data warehouse.
 
