@@ -3,10 +3,10 @@ package lint
 import (
 	"context"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/logger"
 	"sync"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 )

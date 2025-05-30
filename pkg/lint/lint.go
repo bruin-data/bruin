@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/logger"
 	"os"
 	"slices"
 	"sort"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/pkg/errors"

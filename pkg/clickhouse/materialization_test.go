@@ -238,9 +238,10 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 				Columns: []pipeline.Column{},
 			},
-			want: []string{"CREATE TABLE IF NOT EXISTS empty_table (\n" +
-				"\n" +
-				")",
+			want: []string{
+				"CREATE TABLE IF NOT EXISTS empty_table (\n" +
+					"\n" +
+					")",
 			},
 		},
 		{
@@ -255,9 +256,10 @@ func TestMaterializer_Render(t *testing.T) {
 					{Name: "id", Type: "INT64"},
 				},
 			},
-			want: []string{"CREATE TABLE IF NOT EXISTS one_col_table (\n" +
-				"id INT64\n" +
-				")",
+			want: []string{
+				"CREATE TABLE IF NOT EXISTS one_col_table (\n" +
+					"id INT64\n" +
+					")",
 			},
 		},
 		{
@@ -273,10 +275,11 @@ func TestMaterializer_Render(t *testing.T) {
 					{Name: "name", Type: "STRING", Description: "The name of the person"},
 				},
 			},
-			want: []string{"CREATE TABLE IF NOT EXISTS two_col_table (\n" +
-				"id INT64,\n" +
-				"name STRING COMMENT 'The name of the person'\n" +
-				")",
+			want: []string{
+				"CREATE TABLE IF NOT EXISTS two_col_table (\n" +
+					"id INT64,\n" +
+					"name STRING COMMENT 'The name of the person'\n" +
+					")",
 			},
 		},
 		{
@@ -292,11 +295,12 @@ func TestMaterializer_Render(t *testing.T) {
 					{Name: "category", Type: "STRING", Description: "Category of the item", PrimaryKey: false},
 				},
 			},
-			want: []string{"CREATE TABLE IF NOT EXISTS my_primary_key_table (\n" +
-				"id INT64,\n" +
-				"category STRING COMMENT 'Category of the item'\n" +
-				")" +
-				"\nPRIMARY KEY (id)",
+			want: []string{
+				"CREATE TABLE IF NOT EXISTS my_primary_key_table (\n" +
+					"id INT64,\n" +
+					"category STRING COMMENT 'Category of the item'\n" +
+					")" +
+					"\nPRIMARY KEY (id)",
 			},
 		},
 		{
@@ -312,11 +316,12 @@ func TestMaterializer_Render(t *testing.T) {
 					{Name: "category", Type: "STRING", Description: "Category of the item", PrimaryKey: true},
 				},
 			},
-			want: []string{"CREATE TABLE IF NOT EXISTS my_composite_primary_key_table (\n" +
-				"id INT64,\n" +
-				"category STRING COMMENT 'Category of the item'\n" +
-				")\n" +
-				"PRIMARY KEY (id, category)",
+			want: []string{
+				"CREATE TABLE IF NOT EXISTS my_composite_primary_key_table (\n" +
+					"id INT64,\n" +
+					"category STRING COMMENT 'Category of the item'\n" +
+					")\n" +
+					"PRIMARY KEY (id, category)",
 			},
 		},
 		{
@@ -333,12 +338,13 @@ func TestMaterializer_Render(t *testing.T) {
 					PartitionBy: "timestamp",
 				},
 			},
-			want: []string{"CREATE TABLE IF NOT EXISTS my_partitioned_table (\n" +
-				"id INT64,\n" +
-				"timestamp TIMESTAMP COMMENT 'Event timestamp'\n" +
-				")" +
-				"\nPRIMARY KEY (id)" +
-				"\nPARTITION BY (timestamp)",
+			want: []string{
+				"CREATE TABLE IF NOT EXISTS my_partitioned_table (\n" +
+					"id INT64,\n" +
+					"timestamp TIMESTAMP COMMENT 'Event timestamp'\n" +
+					")" +
+					"\nPRIMARY KEY (id)" +
+					"\nPARTITION BY (timestamp)",
 			},
 		},
 		{
@@ -356,13 +362,14 @@ func TestMaterializer_Render(t *testing.T) {
 					PartitionBy: "timestamp, location",
 				},
 			},
-			want: []string{"CREATE TABLE IF NOT EXISTS my_composite_partitioned_table (\n" +
-				"id INT64,\n" +
-				"timestamp TIMESTAMP COMMENT 'Event timestamp',\n" +
-				"location STRING\n" +
-				")" +
-				"\nPRIMARY KEY (id)" +
-				"\nPARTITION BY (timestamp, location)",
+			want: []string{
+				"CREATE TABLE IF NOT EXISTS my_composite_partitioned_table (\n" +
+					"id INT64,\n" +
+					"timestamp TIMESTAMP COMMENT 'Event timestamp',\n" +
+					"location STRING\n" +
+					")" +
+					"\nPRIMARY KEY (id)" +
+					"\nPARTITION BY (timestamp, location)",
 			},
 		},
 	}

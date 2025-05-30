@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/logger"
 	"io"
 	"os"
 	path2 "path"
@@ -14,6 +13,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
+	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"

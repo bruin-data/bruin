@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/bruin-data/bruin/pkg/logger"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/helpers"
+	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/version"
 	"github.com/google/uuid"

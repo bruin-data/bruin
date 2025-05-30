@@ -3,7 +3,6 @@ package python
 import (
 	"context"
 	"fmt"
-	logger2 "github.com/bruin-data/bruin/pkg/logger"
 	"os/exec"
 	"strings"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
+	logger2 "github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/user"
