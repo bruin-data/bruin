@@ -12,8 +12,8 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -92,7 +92,7 @@ type CommandInstance struct {
 }
 
 func (l *CommandRunner) Run(ctx context.Context, repo *git.Repo, command *CommandInstance) error {
-	log := ctx.Value(executor.ContextLogger).(*zap.SugaredLogger)
+	log := ctx.Value(executor.ContextLogger).(logger.Logger)
 	log.Debugf(
 		"%s %s",
 		command.Name,
