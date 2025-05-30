@@ -85,8 +85,8 @@ func (job Job) buildJobRunConfig() *emrserverless.StartJobRunInput {
 
 	submitParams := job.params.Config
 	for key, val := range job.env {
-		submitParams += fmt.Sprintf(" --conf 'spark.executorEnv.%s=%s'", key, val)
-		submitParams += fmt.Sprintf(" --conf 'spark.emr-serverless.driverEnv.%s=%s'", key, val)
+		submitParams += fmt.Sprintf(` --conf spark.executorEnv.%s="%s"`, key, val)
+		submitParams += fmt.Sprintf(` --conf spark.emr-serverless.driverEnv.%s="%s"`, key, val)
 	}
 
 	if submitParams != "" {
