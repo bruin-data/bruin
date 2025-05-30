@@ -22,6 +22,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bruin-data/bruin/pkg/athena"
+	"github.com/bruin-data/bruin/pkg/env"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -42,6 +43,7 @@ type connectionFetcher interface {
 
 type BasicOperator struct {
 	connection connectionFetcher
+	env        map[string]string
 }
 
 func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
@@ -76,6 +78,11 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 		return fmt.Errorf("error loading aws config: %w", err)
 	}
 
+	env, err := env.SetupVariables(ctx, ti.GetPipeline(), asset, cloneEnv(op.env))
+	if err != nil {
+		return fmt.Errorf("error setting up environment variables: %w", err)
+	}
+
 	job := Job{
 		logger:    logger,
 		s3Client:  s3.NewFromConfig(cfg),
@@ -89,14 +96,16 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 			// maximum backoff: 32 seconds
 			MaxRetry: 5,
 		},
+		env: env,
 	}
 
 	return job.Run(ctx)
 }
 
-func NewBasicOperator(conn connectionFetcher) (*BasicOperator, error) {
+func NewBasicOperator(conn connectionFetcher, env map[string]string) (*BasicOperator, error) {
 	return &BasicOperator{
 		connection: conn,
+		env:        env,
 	}, nil
 }
 
@@ -149,6 +158,7 @@ type Job struct {
 	pipeline  *pipeline.Pipeline
 	params    *JobRunParams
 	poll      *PollTimer
+	env       map[string]string
 }
 
 func (job Job) buildJobRunConfig() *emrserverless.StartJobRunInput {
@@ -159,8 +169,14 @@ func (job Job) buildJobRunConfig() *emrserverless.StartJobRunInput {
 		},
 	}
 
-	if job.params.Config != "" {
-		driver.Value.SparkSubmitParameters = &job.params.Config
+	submitParams := job.params.Config
+	for key, val := range job.env {
+		submitParams += fmt.Sprintf(" --conf spark.executorEnv.%s='%s'", key, val)
+		submitParams += fmt.Sprintf(" --conf spark.emr-serverless.driverEnv.%s='%s'", key, val)
+	}
+
+	if submitParams != "" {
+		driver.Value.SparkSubmitParameters = &submitParams
 	}
 
 	cfg := &emrserverless.StartJobRunInput{
@@ -426,4 +442,12 @@ func (job Job) resolveLogURI(ctx context.Context, run *emrserverless.StartJobRun
 	}
 
 	return ""
+}
+
+func cloneEnv(env map[string]string) map[string]string {
+	clone := make(map[string]string, len(env))
+	for k, v := range env {
+		clone[k] = v
+	}
+	return clone
 }

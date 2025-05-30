@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/env"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/assert"
@@ -428,7 +429,7 @@ func TestLocalOperator_setupEnvironmentVariables(t *testing.T) {
 			if p == nil {
 				p = defaultPipeline
 			}
-			result, err := SetupEnvironmentVariables(ctx, p, tt.asset, o.envVariables)
+			result, err := env.SetupVariables(ctx, p, tt.asset, o.envVariables)
 			if err != nil {
 				t.Errorf("error: %v", err)
 				return
