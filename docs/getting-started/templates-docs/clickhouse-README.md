@@ -31,7 +31,7 @@ environments:
 
 ## Running the pipeline
 
-bruin CLI can run the whole pipeline or any task with the downstreams:
+Bruin CLI can run the whole pipeline or any task with the downstreams:
 
 ```shell
 

@@ -48,7 +48,7 @@ Custom Table Format:
 `custom:<dimensions>:<metrics>[:<filter_name,filter_values>]`
 Parameters:
 `dimensions`(required): A comma-separated list of dimensions to retrieve.
-`metrics(required): A comma-separated list of metrics to retrieve.
+`metrics` (required): A comma-separated list of metrics to retrieve.
 `filters (optional): Filters are specified in the format <filter_name=filter_values>.
 `filter_name`: The name of the filter (e.g. campaign_ids).
 `filter_values`: A comma-separated list of one or more values associated with the filter name (e.g., camp_id123,camp_id456). Only the IN filter type is supported. Learn more about filters [here](https://business-api.tiktok.com/portal/docs?id=1751443975608321).

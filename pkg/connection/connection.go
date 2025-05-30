@@ -54,6 +54,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/slack"
 	"github.com/bruin-data/bruin/pkg/snowflake"
+	"github.com/bruin-data/bruin/pkg/solidgate"
 	"github.com/bruin-data/bruin/pkg/spanner"
 	"github.com/bruin-data/bruin/pkg/sqlite"
 	"github.com/bruin-data/bruin/pkg/stripe"
@@ -115,6 +116,7 @@ type Manager struct {
 	Phantombuster   map[string]*phantombuster.Client
 	Elasticsearch   map[string]*elasticsearch.Client
 	Spanner         map[string]*spanner.Client
+	Solidgate       map[string]*solidgate.Client
 	mutex           sync.Mutex
 }
 
@@ -418,6 +420,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connSpanner, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Spanner)...)
+
+	connSolidgate, err := m.GetSolidgateConnectionWithoutDefault(name)
+	if err == nil {
+		return connSolidgate, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Solidgate)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -740,6 +748,28 @@ func (m *Manager) GetSpannerConnectionWithoutDefault(name string) (*spanner.Clie
 	db, ok := m.Spanner[name]
 	if !ok {
 		return nil, errors.Errorf("spanner connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetSolidgateConnection(name string) (*solidgate.Client, error) {
+	db, err := m.GetSolidgateConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetSolidgateConnectionWithoutDefault("solidgate-default")
+}
+
+func (m *Manager) GetSolidgateConnectionWithoutDefault(name string) (*solidgate.Client, error) {
+	if m.Solidgate == nil {
+		return nil, errors.New("no solidgate connections found")
+	}
+
+	db, ok := m.Solidgate[name]
+	if !ok {
+		return nil, errors.Errorf("solidgate connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -2023,6 +2053,28 @@ func (m *Manager) AddSpannerConnectionFromConfig(connection *config.SpannerConne
 	return nil
 }
 
+func (m *Manager) AddSolidgateConnectionFromConfig(connection *config.SolidgateConnection) error {
+	m.mutex.Lock()
+	if m.Solidgate == nil {
+		m.Solidgate = make(map[string]*solidgate.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := solidgate.NewClient(solidgate.Config{
+		SecretKey: connection.SecretKey,
+		PublicKey: connection.PublicKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Solidgate[connection.Name] = client
+
+	return nil
+}
+
 func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnection) error {
 	m.mutex.Lock()
 	if m.Kafka == nil {
@@ -2168,6 +2220,8 @@ func (m *Manager) AddS3ConnectionFromConfig(connection *config.S3Connection) err
 		PathToFile:      connection.PathToFile,
 		AccessKeyID:     connection.AccessKeyID,
 		SecretAccessKey: connection.SecretAccessKey,
+		EndpointURL:     connection.EndpointURL,
+		Layout:          connection.Layout,
 	})
 	if err != nil {
 		return err
@@ -2769,6 +2823,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Phantombuster, connectionManager.AddPhantombusterConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Elasticsearch, connectionManager.AddElasticsearchConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Spanner, connectionManager.AddSpannerConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Solidgate, connectionManager.AddSolidgateConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }

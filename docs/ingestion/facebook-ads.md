@@ -3,7 +3,7 @@ Facebook Ads is the advertising platform that helps users to create targeted ads
 
 Bruin supports Facebook Ads as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from Facebook Ads into your data warehouse.
 
-In order to set up Facebook Ads connection, you need to add a configuration item in the `.bruin.yml` file and `asset` file. You need `access_token` and `accound_id`. For details on how to obtain these credentials, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/facebook_ads#grab-credentials)
+In order to set up Facebook Ads connection, you need to add a configuration item in the `.bruin.yml` file and `asset` file. You need `access_token` and `account_id`. For details on how to obtain these credentials, please refer [here](https://dlthub.com/docs/dlt-ecosystem/verified-sources/facebook_ads#grab-credentials)
 
 Follow the steps below to correctly set up Facebook Ads as a data source and run ingestion.
 

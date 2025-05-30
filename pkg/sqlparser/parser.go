@@ -309,7 +309,7 @@ func AssetTypeToDialect(assetType pipeline.AssetType) (string, error) {
 	return dialect, nil
 }
 
-func (s *SQLParser) AddLimit(sql string, limit int) (string, error) {
+func (s *SQLParser) AddLimit(sql string, limit int, dialect string) (string, error) {
 	err := s.Start()
 	if err != nil {
 		return "", errors.Wrap(err, "failed to start sql parser")
@@ -318,8 +318,9 @@ func (s *SQLParser) AddLimit(sql string, limit int) (string, error) {
 	command := parserCommand{
 		Command: "add-limit",
 		Contents: map[string]interface{}{
-			"query": sql,
-			"limit": limit,
+			"query":   sql,
+			"limit":   limit,
+			"dialect": dialect,
 		},
 	}
 

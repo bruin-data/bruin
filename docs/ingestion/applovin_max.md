@@ -3,7 +3,7 @@
 
 Bruin supports AppLovin Max as a source for [Ingestr assets](/assets/ingestr), and you can use it to ingest data from AppLovin Max into your data platform.
 
-To set up a AppLovin Max connection, you must add a configuration item in the `.bruin.yml` and `asset` file. You need `api_key` that is report key and `application`. For details on how to obtain these credentials, please refer [here](https://developers.applovin.com/en/max/max-dashboard/account/account-info/#keys)
+To set up an AppLovin Max connection, you must add a configuration item in the `.bruin.yml` and `asset` file. You need `api_key` that is report key and `application`. For details on how to obtain these credentials, please refer [here](https://developers.applovin.com/en/max/max-dashboard/account/account-info/#keys)
 
 Follow the steps below to set up AppLovin Max correctly as a data source and run ingestion.
 ### Step 1: Add a connection to the .bruin.yml file

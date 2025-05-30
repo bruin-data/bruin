@@ -56,7 +56,7 @@ You can read more about [Jinja here](https://jinja.palletsprojects.com/en/3.1.x/
 ## Adding variables
 
 You can add variables in your `pipeline.yml` file. We support all YAML data types to give you the
-maximum flexiblity in your variable configuration. `variables` are declared as [JSON Schema object](https://json-schema.org/draft-07/draft-handrews-json-schema-01#rfc.section.4.2.1). Here's a comprehensive example:
+maximum flexibility in your variable configuration. `variables` are declared as [JSON Schema object](https://json-schema.org/draft-07/draft-handrews-json-schema-01#rfc.section.4.2.1). Here's a comprehensive example:
 
 ::: code-group 
 ```yaml [pipeline.yml]
@@ -82,10 +82,24 @@ variables:
       tenant: acme
 ```
 :::
-All user defined variables are accessibe via `var` namespace. For example, if you define a variable called `src` it will be available as  <code>&lbrace;&lbrace; var.src &rbrace;&rbrace;</code> in your Assets.
+All user-defined variables are accessible via the `var` namespace. For example, if you define a variable called `src`, it will be available as <code>&lbrace;&lbrace; var.src &rbrace;&rbrace;</code> in your assets.
 
 Additionally all top level variables must define a `default` value. This will be used to render your assets in absence of values supplied on the commandline.
 
+## Overriding Variables
+
+You can override variables defined in your `pipeline.yml` file during a `bruin run` execution by using the `--var` flag. This allows you to dynamically adjust variable values without modifying the pipeline configuration file.
+
+Bruin supports two different syntax for overriding variables:
+```sh
+# key value form; value must be valid JSON
+$ bruin run --var key=value
+
+# json form
+$ bruin run --var '{"key": "value"}'
+```
+
+The `--var` flag can be specified multiple times. However, beware that if you specify the same key multiple times, the latter one will overwrite the previous one.
 
 ## Builtin variables
 

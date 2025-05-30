@@ -131,10 +131,33 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
     result = []
     errors = []
 
+    from sqlglot.optimizer.annotate_types import annotate_types
+    from sqlglot.optimizer.merge_subqueries import merge_subqueries
+    from sqlglot.optimizer.qualify import qualify
+    from sqlglot.optimizer.unnest_subqueries import unnest_subqueries
+
+    nested_schema = schema_dict_to_schema_object(schema)
     try:
-        nested_schema = schema_dict_to_schema_object(schema)
         try:
-            optimized = optimize(parsed, nested_schema, dialect=dialect)
+            optimized = optimize(
+                parsed,
+                nested_schema,
+                dialect=dialect,
+                rules=(
+                    qualify,
+                    # normalize,
+                    unnest_subqueries,
+                    # pushdown_predicates,
+                    # optimize_joins,
+                    # eliminate_subqueries,
+                    merge_subqueries,
+                    # eliminate_joins,
+                    # eliminate_ctes,
+                    annotate_types,
+                    # canonicalize,
+                    # simplify,
+                ),
+            )
         except Exception:
             # try again without dialect, this solves some issues
             try:
@@ -163,9 +186,16 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
             "errors": [],
         }
 
+    scope = build_scope(optimized)
     for col in cols:
         try:
-            ll = lineage.lineage(col["name"], optimized, schema, dialect=dialect)
+            ll = lineage.lineage(
+                col["name"],
+                optimized,
+                schema,
+                dialect=dialect,
+                scope=scope,
+            )
             cl = []
             leaves: list[Node] = []
 
@@ -184,7 +214,7 @@ def get_column_lineage(query: str, schema: dict, dialect: str):
                     if isinstance(ds.expression, exp.Table):
                         cl.append(
                             {
-                                "column": ds.name.split(".")[-1],
+                                "column": ds.name.split(".")[-1].strip('"'),
                                 "table": merge_parts(ds.expression),
                             }
                         )
@@ -287,13 +317,13 @@ def replace_table_references(
     return parsed.sql()
 
 
-def add_limit(query: str, limit_value: int) -> dict:
+def add_limit(query: str, limit_value: int, dialect: str = None) -> dict:
     try:
-        parsed = parse_one(query)
+        parsed = parse_one(query, dialect=dialect)
         if parsed is None:
             return {"error": "cannot parse query"}
     except Exception:
         return {"error": "cannot parse query"}
 
-    limited_query = parsed.limit(limit_value).sql()
+    limited_query = parsed.limit(limit_value).sql(dialect=dialect)
     return {"query": limited_query}

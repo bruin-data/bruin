@@ -488,6 +488,8 @@ type S3Connection struct {
 	PathToFile      string `yaml:"path_to_file,omitempty" json:"path_to_file" mapstructure:"path_to_file"`
 	AccessKeyID     string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id"`
 	SecretAccessKey string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key"`
+	EndpointURL     string `yaml:"endpoint_url,omitempty" json:"endpoint_url" mapstructure:"endpoint_url"`
+	Layout          string `yaml:"layout,omitempty" json:"layout" mapstructure:"layout"`
 }
 
 func (c S3Connection) GetName() string {
@@ -753,5 +755,15 @@ type SpannerConnection struct {
 }
 
 func (c SpannerConnection) GetName() string {
+	return c.Name
+}
+
+type SolidgateConnection struct {
+	Name      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	PublicKey string `yaml:"public_key,omitempty" json:"public_key" mapstructure:"public_key"`
+	SecretKey string `yaml:"secret_key,omitempty" json:"secret_key" mapstructure:"secret_key"`
+}
+
+func (c SolidgateConnection) GetName() string {
 	return c.Name
 }
