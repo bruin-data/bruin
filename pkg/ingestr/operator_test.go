@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/stretchr/testify/mock"
@@ -251,6 +252,36 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 				"--full-refresh",
 			},
 		},
+		{
+			name:        "source table is rendered as a jinja field",
+			fullRefresh: false,
+			asset: &pipeline.Asset{
+				Name:       "asset-name",
+				Connection: "bq",
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "date", PrimaryKey: true},
+					{Name: "name"},
+					{Name: "updated_at"},
+				},
+				Parameters: map[string]string{
+					"source_connection": "sf",
+					"source_table":      "bucket/{{ end_datetime | date_format('%Y-%m-%d')}}",
+					"destination":       "bigquery",
+				},
+			},
+			want: []string{
+				"ingest",
+				"--source-uri", "snowflake://uri-here",
+				"--source-table", "bucket/2025-01-02",
+				"--dest-uri", "bigquery://uri-here",
+				"--dest-table", "asset-name",
+				"--yes",
+				"--progress", "log",
+				"--primary-key", "id",
+				"--primary-key", "date",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -259,10 +290,14 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 			runner := new(mockRunner)
 			runner.On("RunIngestr", mock.Anything, tt.want, tt.extraPackages, repo).Return(nil)
 
+			startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+			endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
+
 			o := &BasicOperator{
-				conn:   &fetcher,
-				finder: finder,
-				runner: runner,
+				conn:          &fetcher,
+				finder:        finder,
+				runner:        runner,
+				jinjaRenderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "ingestr-test", "ingestr-test", nil),
 			}
 
 			ti := scheduler.AssetInstance{
@@ -308,9 +343,10 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand_IntervalStartAndEnd(t
 	}, []string{"pyodbc==5.1.0"}, repo).Return(nil)
 
 	o := &BasicOperator{
-		conn:   &fetcher,
-		finder: finder,
-		runner: runner,
+		conn:          &fetcher,
+		finder:        finder,
+		runner:        runner,
+		jinjaRenderer: jinja.NewRendererWithYesterday("ingestr-test", "ingestr-test"),
 	}
 
 	ti := scheduler.AssetInstance{

@@ -2048,7 +2048,5 @@ def test_add_limit_with_convert_timezone():
     """
 
     result = add_limit(query, 10, dialect="snowflake")
-    print(f"result: {result}")
-
-
- 
+    assert "query" in result
+    assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()
