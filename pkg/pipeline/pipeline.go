@@ -724,6 +724,18 @@ func (im IntervalModifiers) MarshalJSON() ([]byte, error) {
 
 func (a *Asset) AddUpstream(asset *Asset) {
 	a.upstream = append(a.upstream, asset)
+
+	for _, u := range a.Upstreams {
+		if strings.EqualFold(u.Value, asset.Name) {
+			return
+		}
+	}
+
+	a.Upstreams = append(a.Upstreams, Upstream{
+		Type:  "asset",
+		Value: asset.Name,
+		Mode:  UpstreamModeFull,
+	})
 }
 
 func (a *Asset) PrefixSchema(prefix string) {
