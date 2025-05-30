@@ -358,11 +358,6 @@ func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeli
 		return []string{}, nil //nolint:nilerr
 	}
 
-	// todo: do we really need this?
-	if asset.Materialization.Type == "" {
-		return []string{}, nil
-	}
-
 	renderedQ, err := renderer.Render(asset.ExecutableFile.Content)
 	if err != nil {
 		return []string{}, errors.New("failed to render the query before parsing the SQL")

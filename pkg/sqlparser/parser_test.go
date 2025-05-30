@@ -918,9 +918,6 @@ func TestGetMissingDependenciesForAsset(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "test_asset",
 				Type: pipeline.AssetTypeBigqueryQuery,
-				Materialization: pipeline.Materialization{
-					Type: "table",
-				},
 				Upstreams: []pipeline.Upstream{
 					{Type: "asset", Value: "table1"},
 					{Type: "asset", Value: "table2"},
@@ -943,9 +940,6 @@ func TestGetMissingDependenciesForAsset(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "test_asset",
 				Type: pipeline.AssetTypeBigqueryQuery,
-				Materialization: pipeline.Materialization{
-					Type: "table",
-				},
 				Upstreams: []pipeline.Upstream{
 					{Type: "asset", Value: "raw.table1"},
 				},
@@ -968,9 +962,6 @@ func TestGetMissingDependenciesForAsset(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "test_asset",
 				Type: pipeline.AssetTypeBigqueryQuery,
-				Materialization: pipeline.Materialization{
-					Type: "table",
-				},
 				Upstreams: []pipeline.Upstream{
 					{Type: "asset", Value: "table1"},
 				},
@@ -984,6 +975,27 @@ func TestGetMissingDependenciesForAsset(t *testing.T) {
 				},
 			},
 			expectedDeps:  []string{},
+			expectedError: false,
+		},
+		{
+			name: "asset with multiple queries",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "table1"},
+				},
+				ExecutableFile: pipeline.ExecutableFile{
+					Content: "SELECT * FROM table1 JOIN project.dataset.table; SELECT * FROM table2",
+				},
+			},
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{Name: "table1"},
+					{Name: "table2"},
+				},
+			},
+			expectedDeps:  []string{"table2"},
 			expectedError: false,
 		},
 	}

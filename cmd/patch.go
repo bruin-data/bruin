@@ -28,6 +28,11 @@ func updateAssetDependencies(ctx context.Context, asset *pipeline.Asset, p *pipe
 		if foundMissingUpstream == nil {
 			continue
 		}
+
+		if foundMissingUpstream.Name == asset.Name {
+			continue
+		}
+
 		asset.AddUpstream(foundMissingUpstream)
 	}
 
@@ -71,7 +76,6 @@ func Patch() *cli.Command {
 						return cli.Exit("", 1)
 					}
 
-					// TODO: this needs to be configurable
 					jinjaRenderer := jinja.NewRendererWithYesterday("test-pipeline", "test-run-id")
 
 					ctx := context.Background()
