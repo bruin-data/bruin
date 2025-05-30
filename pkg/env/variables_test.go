@@ -181,7 +181,7 @@ func TestSetupVariables(t *testing.T) {
 				"BRUIN_END_TIMESTAMP":   "2024-01-02T00:00:00.000000Z",
 				"BRUIN_PIPELINE":        "test-pipeline",
 				"BRUIN_RUN_ID":          "test-run",
-				"BRUIN_VARIABLES":       `{"env":"dev","users":["alice","bob","charlie"]}`,
+				"BRUIN_VARS":            `{"env":"dev","users":["alice","bob","charlie"]}`,
 			},
 		},
 	}

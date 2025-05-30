@@ -71,6 +71,6 @@ func envInjectVariables(env map[string]string, variables map[string]any) (map[st
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling variables to JSON: %w", err)
 	}
-	env["BRUIN_VARIABLES"] = string(doc)
+	env["BRUIN_VARS"] = string(doc)
 	return env, nil
 }
