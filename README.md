@@ -40,3 +40,48 @@ Join our Slack community [here](https://join.slack.com/t/bruindatacommunity/shar
 
 Take a look at our quickstart guide [here](https://bruin-data.github.io/bruin/getting-started/introduction/quickstart.html).
 
+## Supported Sources and Destinations
+| Source | Destination |
+|---|---|
+| adjust | athena |
+| airtable | bigquery |
+| applovin | clickhouse |
+| applovin_max | databricks |
+| appsflyer | duckdb |
+| appstore | emr_serverless |
+| asana | mssql |
+| athena | postgres |
+| chess | redshift |
+| db2 | snowflake |
+| dynamodb | synapse |
+| elasticsearch |  |
+| facebook-ads |  |
+| frankfurter |  |
+| gcs |  |
+| github |  |
+| google-ads |  |
+| google_analytics |  |
+| google_sheets |  |
+| gorgias |  |
+| hubspot |  |
+| kafka |  |
+| kinesis |  |
+| klaviyo |  |
+| linkedinads |  |
+| mongo |  |
+| mysql |  |
+| notion |  |
+| personio |  |
+| phantombuster |  |
+| pipedrive |  |
+| s3 |  |
+| salesforce |  |
+| sap_hana |  |
+| shopify |  |
+| slack |  |
+| solidgate |  |
+| spanner |  |
+| sqlite |  |
+| stripe |  |
+| tiktokads |  |
+| zendesk |  |
