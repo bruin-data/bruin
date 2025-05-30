@@ -142,7 +142,7 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		}
 	}
 
-	perAssetEnvVariables, err := o.setupEnvironmentVariables(ctx, p, t)
+	perAssetEnvVariables, err := SetupEnvironmentVariables(ctx, p, t, o.envVariables)
 	if err != nil {
 		return errors.Wrap(err, "failed to setup environment variables")
 	}
@@ -192,14 +192,13 @@ func findPathToExecutable(alternatives []string) (string, error) {
 	return "", errors.New("no executable found for alternatives: " + strings.Join(alternatives, ", "))
 }
 
-func (o *LocalOperator) setupEnvironmentVariables(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) (map[string]string, error) {
-
-	env, err := o.envMutateIntervals(ctx, t)
+func SetupEnvironmentVariables(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset, env map[string]string) (map[string]string, error) {
+	env, err := envMutateIntervals(ctx, t, env)
 	if err != nil {
 		return nil, err
 	}
 
-	env, err = o.envInjectVariables(env, p.Variables.Value())
+	env, err = envInjectVariables(env, p.Variables.Value())
 	if err != nil {
 		return nil, err
 	}
@@ -207,10 +206,10 @@ func (o *LocalOperator) setupEnvironmentVariables(ctx context.Context, p *pipeli
 	return env, nil
 }
 
-func (o *LocalOperator) envMutateIntervals(ctx context.Context, t *pipeline.Asset) (map[string]string, error) {
+func envMutateIntervals(ctx context.Context, t *pipeline.Asset, env map[string]string) (map[string]string, error) {
 	if val := ctx.Value(pipeline.RunConfigApplyIntervalModifiers); val != nil {
 		if applyModifiers, ok := val.(bool); !ok || !applyModifiers {
-			return o.envVariables, nil
+			return env, nil
 		}
 	}
 	startDate, ok := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
@@ -243,7 +242,7 @@ func (o *LocalOperator) envMutateIntervals(ctx context.Context, t *pipeline.Asse
 	return jinja.PythonEnvVariables(&modifiedStartDate, &modifiedEndDate, pipelineName, runID, fullRefresh), nil
 }
 
-func (o *LocalOperator) envInjectVariables(env map[string]string, variables map[string]any) (map[string]string, error) {
+func envInjectVariables(env map[string]string, variables map[string]any) (map[string]string, error) {
 	if len(variables) == 0 {
 		return env, nil
 	}

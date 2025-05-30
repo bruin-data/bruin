@@ -428,7 +428,7 @@ func TestLocalOperator_setupEnvironmentVariables(t *testing.T) {
 			if p == nil {
 				p = defaultPipeline
 			}
-			result, err := o.setupEnvironmentVariables(ctx, p, tt.asset)
+			result, err := SetupEnvironmentVariables(ctx, p, tt.asset, o.envVariables)
 			if err != nil {
 				t.Errorf("error: %v", err)
 				return
