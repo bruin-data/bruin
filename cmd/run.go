@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/logger"
 	"io"
 	"log"
 	"os"
@@ -515,7 +516,7 @@ func ReadState(fs afero.Fs, statePath string, filter *Filter) (*scheduler.Pipeli
 	return pipelineState, nil
 }
 
-func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.RunConfig, logger *zap.SugaredLogger) (*PipelineInfo, error) {
+func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.RunConfig, log logger.Logger) (*PipelineInfo, error) {
 	pipelinePath := inputPath
 	runningForAnAsset := isPathReferencingAsset(inputPath)
 	if runningForAnAsset && runConfig.Tag != "" {
@@ -587,7 +588,7 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 	}, nil
 }
 
-func ParseDate(startDateStr, endDateStr string, logger *zap.SugaredLogger) (time.Time, time.Time, error) {
+func ParseDate(startDateStr, endDateStr string, logger logger.Logger) (time.Time, time.Time, error) {
 	startDate, err := date.ParseTime(startDateStr)
 	logger.Debug("given start date: ", startDate)
 	if err != nil {
@@ -611,7 +612,7 @@ func ParseDate(startDateStr, endDateStr string, logger *zap.SugaredLogger) (time
 	return startDate, endDate, nil
 }
 
-func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger *zap.SugaredLogger) (time.Time, time.Time, string, error) {
+func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger logger.Logger) (time.Time, time.Time, string, error) {
 	if inputPath == "" {
 		inputPath = "."
 	}
@@ -624,7 +625,7 @@ func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger 
 	return startDate, endDate, inputPath, nil
 }
 
-func CheckLint(foundPipeline *pipeline.Pipeline, pipelinePath string, logger *zap.SugaredLogger, parser *sqlparser.SQLParser) error {
+func CheckLint(foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, parser *sqlparser.SQLParser) error {
 	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, parser, true)
 	if err != nil {
 		errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)

@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/logger"
 	"io"
 	"os"
 	"sync"
@@ -11,7 +12,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/fatih/color"
-	"go.uber.org/zap"
 )
 
 var (
@@ -49,7 +49,7 @@ type Concurrent struct {
 }
 
 func NewConcurrent(
-	logger *zap.SugaredLogger,
+	logger logger.Logger,
 	taskTypeMap map[pipeline.AssetType]Config,
 	workerCount int, formatOpts FormattingOptions,
 ) (*Concurrent, error) {
@@ -86,7 +86,7 @@ func (c Concurrent) Start(ctx context.Context, input chan scheduler.TaskInstance
 type worker struct {
 	id         string
 	executor   *Sequential
-	logger     *zap.SugaredLogger
+	logger     logger.Logger
 	printer    *color.Color
 	printLock  *sync.Mutex
 	formatOpts FormattingOptions

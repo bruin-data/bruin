@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/bruin-data/bruin/pkg/logger"
 	"os"
 	"slices"
 	"sort"
@@ -13,7 +14,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
-	"go.uber.org/zap"
 )
 
 type (
@@ -82,10 +82,10 @@ type Linter struct {
 	findPipelines pipelineFinder
 	builder       pipelineBuilder
 	rules         []Rule
-	logger        *zap.SugaredLogger
+	logger        logger.Logger
 }
 
-func NewLinter(findPipelines pipelineFinder, builder pipelineBuilder, rules []Rule, logger *zap.SugaredLogger) *Linter {
+func NewLinter(findPipelines pipelineFinder, builder pipelineBuilder, rules []Rule, logger logger.Logger) *Linter {
 	return &Linter{
 		findPipelines: findPipelines,
 		builder:       builder,
