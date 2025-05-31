@@ -30,6 +30,65 @@ func BenchmarkInternalParsePipeline(b *testing.B) {
 	}
 }
 
+func TestConvertToBruinAssetNoName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		fileContent    string
+		filePath       string
+		expectedHeader string
+	}{
+		{
+			name:           "convert SQL file without name",
+			fileContent:    "SELECT 1;",
+			filePath:       "test_no_name.sql",
+			expectedHeader: "/* @bruin\ntype: bq.sql\n@bruin */\n\n",
+		},
+		{
+			name:           "convert Python file without name",
+			fileContent:    "print(\"hello world\")",
+			filePath:       "test_no_name.py",
+			expectedHeader: "\"\"\" @bruin\n@bruin \"\"\"\n\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			fs := afero.NewMemMapFs()
+
+			// Create dummy file in memory
+			err := afero.WriteFile(fs, tt.filePath, []byte(tt.fileContent), 0o644)
+			if err != nil {
+				t.Fatalf("Failed to create test file in memory: %v", err)
+			}
+
+			// Call convertToBruinAsset
+			err = convertToBruinAsset(fs, tt.filePath)
+			if err != nil {
+				t.Fatalf("convertToBruinAsset() error = %v", err)
+			}
+
+			// Read modified file content
+			content, err := afero.ReadFile(fs, tt.filePath)
+			if err != nil {
+				t.Fatalf("Failed to read result file from memory: %v", err)
+			}
+
+			// Assert header
+			if !strings.HasPrefix(string(content), tt.expectedHeader) {
+				t.Errorf("convertToBruinAsset() header = %q, want %q", string(content), tt.expectedHeader+tt.fileContent)
+			}
+
+			// Assert that "name:" is not in the header
+			if strings.Contains(string(content[:len(tt.expectedHeader)]), "name:") {
+				t.Errorf("convertToBruinAsset() header contains 'name:', which is not expected. Header: %q", string(content[:len(tt.expectedHeader)]))
+			}
+		})
+	}
+}
+
 func BenchmarkInternalParseAsset(b *testing.B) {
 	r := ParseCommand{
 		builder:      DefaultPipelineBuilder,
