@@ -139,7 +139,7 @@ func (r *ParseCommand) ParsePipeline(ctx context.Context, assetPath string, line
 		return cli.Exit("", 1)
 	}
 
-	pipelinePath, err := path.GetPipelineRootFromTask(assetPath, pipelineDefinitionFiles)
+	pipelinePath, err := path.GetPipelineRootFromTask(assetPath, PipelineDefinitionFiles)
 	if err != nil {
 		printErrorJSON(err)
 		return cli.Exit("", 1)
@@ -262,7 +262,7 @@ func (r *ParseCommand) Run(ctx context.Context, assetPath string, lineage bool) 
 		return cli.Exit("", 1)
 	}
 
-	pipelinePath, err := path.GetPipelineRootFromTask(absoluteAssetPath, pipelineDefinitionFiles)
+	pipelinePath, err := path.GetPipelineRootFromTask(absoluteAssetPath, PipelineDefinitionFiles)
 	if err != nil {
 		printErrorJSON(err)
 		return cli.Exit("", 1)

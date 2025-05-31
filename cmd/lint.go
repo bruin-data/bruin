@@ -96,7 +96,7 @@ func Lint(isDebug *bool) *cli.Command {
 			asset := ""
 			if isPathReferencingAsset(repoOrAsset) {
 				asset = repoOrAsset
-				pipelineRootFromAsset, err := path.GetPipelineRootFromTask(repoOrAsset, pipelineDefinitionFiles)
+				pipelineRootFromAsset, err := path.GetPipelineRootFromTask(repoOrAsset, PipelineDefinitionFiles)
 				if err != nil {
 					printError(err, c.String("output"), "Failed to find the pipeline root for the given asset")
 					return cli.Exit("", 1)
@@ -163,12 +163,12 @@ func Lint(isDebug *bool) *cli.Command {
 				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
 				logger.Debugf("running %d rules for pipeline validation", len(rules))
 				infoPrinter.Printf("Validating pipelines in '%s' for '%s' environment...\n", rootPath, cm.SelectedEnvironmentName)
-				result, errr = linter.Lint(rootPath, pipelineDefinitionFiles, c)
+				result, errr = linter.Lint(rootPath, PipelineDefinitionFiles, c)
 			} else {
 				rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
 				logger.Debugf("running %d rules for asset-only validation", len(rules))
 				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
-				result, errr = linter.LintAsset(rootPath, pipelineDefinitionFiles, asset, c)
+				result, errr = linter.LintAsset(rootPath, PipelineDefinitionFiles, asset, c)
 			}
 
 			printer := lint.Printer{RootCheckPath: rootPath}
