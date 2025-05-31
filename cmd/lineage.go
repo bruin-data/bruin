@@ -57,7 +57,7 @@ func (r *LineageCommand) Run(ctx context.Context, assetPath string, fullLineage 
 		return cli.Exit("", 1)
 	}
 
-	pipelinePath, err := path.GetPipelineRootFromTask(assetPath, pipelineDefinitionFiles)
+	pipelinePath, err := path.GetPipelineRootFromTask(assetPath, PipelineDefinitionFiles)
 	if err != nil {
 		r.errorPrinter.Printf("Failed to find the pipeline this task belongs to: '%s'\n", assetPath)
 		return cli.Exit("", 1)

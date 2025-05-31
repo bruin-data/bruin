@@ -529,7 +529,7 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 	runDownstreamTasks := false
 
 	if runningForAnAsset {
-		pipelinePath, err = path.GetPipelineRootFromTask(inputPath, pipelineDefinitionFiles)
+		pipelinePath, err = path.GetPipelineRootFromTask(inputPath, PipelineDefinitionFiles)
 		if err != nil {
 			errorPrinter.Printf("Failed to find the pipeline this task belongs to: '%s'\n", inputPath)
 			return &PipelineInfo{
@@ -989,7 +989,7 @@ func SetupExecutors(
 
 func isPathReferencingAsset(p string) bool {
 	// Check if the path matches any of the pipeline definition file names
-	for _, pipelineDefinitionfile := range pipelineDefinitionFiles {
+	for _, pipelineDefinitionfile := range PipelineDefinitionFiles {
 		if strings.HasSuffix(p, pipelineDefinitionfile) {
 			return false
 		}
