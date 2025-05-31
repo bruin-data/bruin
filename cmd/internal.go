@@ -454,9 +454,9 @@ func convertToBruinAsset(fs afero.Fs, filePath string) error {
 
 	switch ext {
 	case ".sql":
-		bruinHeader = fmt.Sprintf("/* @bruin\nname: %s\ntype: bq.sql\n@bruin */\n\n", assetName)
+		bruinHeader = fmt.Sprintf("/* @bruin\ntype: bq.sql\n@bruin */\n\n")
 	case ".py":
-		bruinHeader = fmt.Sprintf("\"\"\" @bruin\nname: %s\n@bruin \"\"\"\n\n", assetName)
+		bruinHeader = fmt.Sprintf("\"\"\" @bruin\n@bruin \"\"\"\n\n")
 	default:
 		return nil // unsupported file types
 	}
