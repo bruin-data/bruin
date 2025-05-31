@@ -2,101 +2,119 @@
 
 ## Description
 
-The `bruin patch fill-asset-dependencies` command is a utility designed to automatically populate the `dependencies` field in Bruin asset metadata files (e.g., `image.yaml`, `video.yaml`, `material.yaml`). This command is crucial for maintaining accurate and up-to-date dependency tracking within the Bruin asset pipeline. **This command directly modifies Bruin asset files by updating their `dependencies` field.**
+The `bruin patch fill-asset-dependencies` command is a utility designed to automatically populate the `depends` field in Bruin asset definition files (typically `.sql` files with accompanying `.yaml` metadata or header blocks). These assets represent dbt-like models or SQL transformations within a Bruin data pipeline.
+
+This command analyzes the SQL content of your assets to identify upstream dependencies (e.g., references to other models or sources) that are not explicitly declared in the `depends` field. It helps maintain an accurate and up-to-date dependency graph for your data pipeline, which is crucial for correct execution order and understanding data lineage.
+
+**This command directly modifies Bruin asset files (or their corresponding metadata) by updating the `depends` field.**
 
 ## Usage
 
 ```bash
-bruin patch fill-asset-dependencies [options] <asset_path>
+bruin patch fill-asset-dependencies [options] <asset_path_or_pipeline_dir>
 ```
 
 ## Arguments
 
--   `<asset_path>`: (Required) The path to a Bruin asset file or a directory containing Bruin asset files. If a directory is provided, the command will recursively search for asset files to process.
+-   `<asset_path_or_pipeline_dir>`: (Required) The path to a single Bruin asset file (e.g., `models/my_model.sql`) or a directory containing multiple Bruin assets (e.g., `models/`). If a directory is provided, the command will recursively search for asset files to process, effectively operating on all assets in that part of the pipeline.
 
 ## Options
 
--   `--dry-run`: (Optional) If set, the command will simulate the changes without actually modifying any Bruin asset files. This is useful for previewing the potential updates.
--   `--verbose`: (Optional) Enables verbose logging, providing more detailed information about the process.
+-   `--dry-run`: (Optional) If set, the command will simulate the changes without actually modifying any asset files. It will print the proposed changes to standard output. This is useful for previewing the potential updates.
+-   `--verbose`: (Optional) Enables verbose logging, providing more detailed information about the process, such as which files are being scanned and which dependencies are found.
+-   `--output <format>`: (Optional) Specifies the output format for the summary of changes.
+    *   `plain`: (Default) Outputs a human-readable summary.
+    *   `json`: Outputs the summary in JSON format, suitable for programmatic consumption.
 -   `--help`: (Optional) Displays help information for the command.
 
 ## Behavior
 
 The command performs the following actions:
 
-1.  **Asset Discovery**: It identifies Bruin asset files (typically `.yaml` files representing assets like images, materials, models, etc.) within the given `<asset_path>`.
-2.  **Dependency Analysis**: For each discovered Bruin asset, it analyzes the asset's content and its relationships with other files to determine its dependencies. This can involve:
-    *   Parsing shader files (e.g., `.glsl`, `.hlsl`) for `#include` directives or texture lookups.
-    *   Checking material files for texture asset references.
-    *   Inspecting model files for linked skeletons, animations, or material assets.
-    *   Analyzing scene files for references to other assets.
-3.  **Metadata Update**: It updates the `dependencies` field in the Bruin asset's metadata file with the list of identified dependencies.
-    *   If the `dependencies` field does not exist, it will be created.
-    *   Existing dependencies that are no longer valid (e.g., a texture is no longer referenced by a material) will be removed.
-    *   New dependencies will be added.
-4.  **Output**: The command will output a summary of the changes made, including the number of Bruin asset files processed and any errors encountered.
+1.  **Asset Discovery**: It identifies Bruin assets within the given `<asset_path_or_pipeline_dir>`. Assets are typically SQL files (e.g., `my_model.sql`) that may have a corresponding YAML file (e.g., `my_model.yaml`) or a YAML header block within the SQL file itself for metadata.
+2.  **SQL Dependency Analysis**: For each discovered asset, it parses the SQL content to find references to other assets (models) or data sources. This typically involves looking for:
+    *   `ref('model_name')` function calls.
+    *   `source('source_name', 'table_name')` function calls.
+    *   Direct table names that correspond to other models in the pipeline.
+3.  **Metadata Update**: It compares the discovered dependencies against the existing `depends` list in the asset's metadata.
+    *   If the `depends` field does not exist, it will be created.
+    *   Missing dependencies found in the SQL are added to the `depends` list.
+    *   The command typically does not remove existing entries from `depends` unless they are clearly invalid or a specific option for cleanup is provided (behavior may vary based on implementation).
+4.  **Output**: The command outputs a summary of the changes made (or proposed, if `--dry-run` is used), formatted according to the `--output` flag. This includes the number of assets processed, assets updated, and any errors encountered.
 
 ## Example
 
-### Example 1: Process a single Bruin asset file
+### Example 1: Process a single SQL asset file
 
-Suppose you have a material asset `assets/materials/character_skin.material.yaml` that uses a texture `assets/textures/character_albedo.image.yaml`.
+Suppose you have an asset `models/core/dim_users.sql` with the following content:
+
+```sql
+-- models/core/dim_users.sql
+SELECT
+    id,
+    name,
+    email,
+    created_at
+FROM {{ ref('stg_users') }}
+LEFT JOIN {{ ref('stg_user_profiles') }} USING (id)
+```
+
+And its metadata (either in a YAML header or `dim_users.yaml`) is:
+```yaml
+name: dim_users
+type: model
+# 'depends' field is missing or incomplete
+```
 
 Running the command:
 ```bash
-bruin patch fill-asset-dependencies assets/materials/character_skin.material.yaml
+bruin patch fill-asset-dependencies models/core/dim_users.sql
 ```
 
-This will analyze `assets/materials/character_skin.material.yaml`. If the dependency on `assets/textures/character_albedo.image.yaml` is found (e.g., by parsing the material file content), the command will ensure that the `dependencies` field in `character_skin.material.yaml` is updated to include a reference to `character_albedo.image.yaml`.
+This will analyze `models/core/dim_users.sql`, identify `stg_users` and `stg_user_profiles` as dependencies from the `ref()` calls. The command will then update its metadata:
 
-**Before:** `assets/materials/character_skin.material.yaml`
+**After:** (metadata for `dim_users.sql`)
 ```yaml
-type: material
-shader: "shaders/standard_lit.glsl"
-# dependencies field might be missing or outdated
+name: dim_users
+type: model
+depends:
+  - "stg_users"
+  - "stg_user_profiles"
 ```
 
-**After:** `assets/materials/character_skin.material.yaml`
-```yaml
-type: material
-shader: "shaders/standard_lit.glsl"
-dependencies:
-  - "assets/textures/character_albedo.image.yaml"
-  # Other dependencies might also be listed here
-```
-
-### Example 2: Process all Bruin assets in a directory
+### Example 2: Process all assets in a pipeline directory
 
 ```bash
-bruin patch fill-asset-dependencies assets/environments/forest/
+bruin patch fill-asset-dependencies models/staging/ --output json
 ```
 
-This will recursively find and process all Bruin asset metadata files within the `assets/environments/forest/` directory, updating their `dependencies` fields as needed.
+This will recursively find and process all Bruin SQL assets within the `models/staging/` directory. It will update the `depends` field for any asset where the declared dependencies do not match the ones found by parsing the SQL. The summary of operations will be printed in JSON format.
 
-### Example 3: Dry run to preview changes for multiple assets
+### Example 3: Dry run to preview changes for an entire pipeline
 
 ```bash
-bruin patch fill-asset-dependencies --dry-run assets/props/ assets/vehicles/
+bruin patch fill-asset-dependencies --dry-run .
 ```
 
-This will show what changes would be made to asset dependencies in both the `assets/props/` and `assets/vehicles/` directories without actually modifying the files. This is useful for verifying the detected dependencies across a larger set of assets.
-
+This will scan all assets from the current directory downwards, showing what changes would be made to their `depends` fields without actually modifying the files. This is useful for a full pipeline audit.
 
 ## Error Handling
 
--   If a Bruin asset file is malformed or cannot be parsed, an error message will be displayed, and the command will skip that file.
--   If the command encounters any issues accessing files or directories (e.g., permission errors), appropriate error messages will be provided.
+-   If an asset's SQL file is malformed or cannot be parsed, an error message will be displayed, and the command will skip that file.
+-   If metadata files are present but malformed, errors will be reported.
+-   If the command encounters issues accessing files or directories (e.g., permission errors), appropriate error messages will be provided.
 
 ## Related Commands
 
--   `bruin validate-assets`: (TODO: Link to this command's documentation once created) - For validating the integrity and correctness of asset files.
--   `bruin list-unused-assets`: (TODO: Link to this command's documentation once created) - For identifying assets that are no longer referenced by any other assets.
+-   `bruin validate`: For validating the entire Bruin pipeline, including dependencies.
+-   `bruin run`: For executing the Bruin pipeline, respecting the dependency order.
+-   `bruin graph`: For visualizing the pipeline's dependency graph.
 
 ## Best Practices
 
--   Run this command regularly, especially after making changes that affect asset relationships (e.g., assigning new textures to a material, modifying shader includes, adding models to a scene).
--   Integrate this command into your automated asset processing workflows (e.g., as part of a pre-commit hook or a CI/CD pipeline).
--   Use the `--dry-run` option to review changes before applying them, particularly when working with a large number of assets or making significant structural changes to your project.
--   Ensure that your Bruin asset metadata files are writable by the user or process running the command.
--   Version control your asset files. This allows you to track changes made by this command and revert them if necessary.
+-   Run this command after making changes to your SQL models, especially when adding or removing `ref()` or `source()` calls.
+-   Consider integrating this command into your pre-commit hooks or CI/CD pipeline to ensure `depends` fields are kept up-to-date automatically.
+-   Use the `--dry-run` option to review changes before applying them, particularly when running on a large number of assets or an entire pipeline.
+-   Ensure that your asset files (SQL and any accompanying YAML) are writable by the user or process running the command.
+-   Maintain clear and consistent naming conventions for your assets, as this aids in the accuracy of dependency detection.
 ```
