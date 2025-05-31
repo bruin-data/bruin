@@ -340,13 +340,11 @@ func (l *Linter) LintPipeline(p *pipeline.Pipeline) (*PipelineIssues, error) {
 }
 
 func RunLintRulesOnPipeline(p *pipeline.Pipeline, rules []Rule) (*PipelineIssues, error) {
-	var (
-		pipelineResult = &PipelineIssues{
-			Pipeline: p,
-			Issues:   make(map[Rule][]*Issue),
-		}
-		ctx = context.Background()
-	)
+	pipelineResult := &PipelineIssues{
+		Pipeline: p,
+		Issues:   make(map[Rule][]*Issue),
+	}
+	ctx := context.Background()
 
 	policyRules, err := loadPolicy(p.DefinitionFile.Path)
 	if err != nil {
@@ -364,17 +362,16 @@ func RunLintRulesOnPipeline(p *pipeline.Pipeline, rules []Rule) (*PipelineIssues
 				return nil, err
 			}
 			if len(issues) > 0 {
-				pipelineResult.Issues[rule] = issues
+				pipelineResult.Issues[rule] = append(pipelineResult.Issues[rule], issues...)
 			}
-		}
-		if slices.Contains(levels, LevelAsset) {
+		} else if slices.Contains(levels, LevelAsset) {
 			for _, asset := range p.Assets {
 				issues, err := rule.ValidateAsset(ctx, p, asset)
 				if err != nil {
 					return nil, err
 				}
 				if len(issues) > 0 {
-					pipelineResult.Issues[rule] = issues
+					pipelineResult.Issues[rule] = append(pipelineResult.Issues[rule], issues...)
 				}
 			}
 		}
