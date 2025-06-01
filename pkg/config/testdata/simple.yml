@@ -299,6 +299,12 @@ environments:
           instance_id: "instance-id-123"
           database: "database-id-123"
           service_account_json: "{\"key1\": \"value1\"}"
+        - name: "spanner-2"
+          project_id: "project-id-123"
+          instance_id: "instance-id-123"
+          database: "database-id-123"
+          service_account_file: "/path/to/service_account.json"
+          
   prod:
     connections:
       google_cloud_platform:

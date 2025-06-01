@@ -746,12 +746,12 @@ func (c ElasticsearchConnection) GetName() string {
 }
 
 type SpannerConnection struct {
-	Name                       string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	ProjectID                  string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
-	InstanceID                 string `yaml:"instance_id,omitempty" json:"instance_id" mapstructure:"instance_id"`
-	Database                   string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
-	ServiceAccountJSON         string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" jsonschema:"oneof_required=service_account_json,oneof_required=service_account_json_file_path" mapstructure:"service_account_json"`
-	ServiceAccountJSONFilePath string `yaml:"service_account_json_file_path,omitempty" json:"service_account_json_file_path,omitempty" jsonschema:"oneof_required=service_account_json_file_path" mapstructure:"service_account_json_file_path"`
+	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	ProjectID          string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
+	InstanceID         string `yaml:"instance_id,omitempty" json:"instance_id" mapstructure:"instance_id"`
+	Database           string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
+	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
 }
 
 func (c SpannerConnection) GetName() string {

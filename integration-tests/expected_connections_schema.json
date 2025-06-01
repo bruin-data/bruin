@@ -1579,16 +1579,6 @@
       ]
     },
     "SpannerConnection": {
-      "oneOf": [
-    {
-      "required": ["service_account_json"],
-      "title": "service_account_json"
-    },
-    {
-      "required": ["service_account_json_file_path"],
-      "title": "service_account_json_file_path"
-    }
-    ],
       "properties": {
         "name": {
           "type": "string"
@@ -1602,7 +1592,7 @@
         "database": {
           "type": "string"
         },
-        "service_account_json_file_path": {
+        "service_account_file": {
           "type": "string"
         },
         "service_account_json": {

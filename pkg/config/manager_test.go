@@ -475,6 +475,13 @@ func TestLoadFromFile(t *testing.T) {
 					Database:           "database-id-123",
 					ServiceAccountJSON: "{\"key1\": \"value1\"}",
 				},
+				{
+					Name:               "spanner-2",
+					ProjectID:          "project-id-123",
+					InstanceID:         "instance-id-123",
+					Database:           "database-id-123",
+					ServiceAccountFile: "/path/to/service_account.json",
+				},
 			},
 		},
 	}
