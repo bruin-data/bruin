@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
-	"go.uber.org/zap"
 )
 
 type VersionInfo struct {
@@ -59,7 +59,7 @@ func VersionCmd(commit string) *cli.Command {
 	}
 }
 
-func fetchLatestVersion(timeout time.Duration, logger *zap.SugaredLogger) string {
+func fetchLatestVersion(timeout time.Duration, logger logger.Logger) string {
 	httpClient := &http.Client{
 		Timeout: timeout,
 	}

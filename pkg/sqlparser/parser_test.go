@@ -3,6 +3,8 @@ package sqlparser
 import (
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/stretchr/testify/require"
 )
 
@@ -836,6 +838,7 @@ func TestSqlParser_AddLimit(t *testing.T) { //nolint
 		name     string
 		query    string
 		limit    int
+		dialect  string
 		expected string
 		wantErr  bool
 	}{
@@ -843,13 +846,36 @@ func TestSqlParser_AddLimit(t *testing.T) { //nolint
 			name:     "complex query with joins",
 			query:    "SELECT a.*, b.name FROM table_a AS a JOIN table_b AS b ON a.id = b.id",
 			limit:    15,
+			dialect:  "snowflake",
 			expected: "SELECT a.*, b.name FROM table_a AS a JOIN table_b AS b ON a.id = b.id LIMIT 15",
 		},
 		{
 			name:    "invalid SQL query",
 			query:   "SELECT * FROM",
 			limit:   10,
+			dialect: "snowflake",
 			wantErr: true,
+		},
+		{
+			name:     "simple query with convert timezone",
+			query:    "SELECT CONVERT_TIMEZONE('CET', '2025-05-20T00:00:00Z')",
+			limit:    10,
+			dialect:  "snowflake",
+			expected: "SELECT CONVERT_TIMEZONE('CET', '2025-05-20T00:00:00Z') LIMIT 10",
+		},
+		{
+			name:     "query with existing limit",
+			query:    "SELECT id, name FROM users LIMIT 20",
+			limit:    5,
+			dialect:  "bigquery",
+			expected: "SELECT id, name FROM users LIMIT 5",
+		},
+		{
+			name:     "query with empty dialect",
+			query:    "SELECT id, name FROM users LIMIT 20",
+			limit:    5,
+			dialect:  "",
+			expected: "SELECT id, name FROM users LIMIT 5",
 		},
 	}
 
@@ -865,12 +891,133 @@ func TestSqlParser_AddLimit(t *testing.T) { //nolint
 			err = s.Start()
 			require.NoError(t, err)
 
-			got, err := s.AddLimit(tt.query, tt.limit)
+			got, err := s.AddLimit(tt.query, tt.limit, tt.dialect)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestGetMissingDependenciesForAsset(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		asset         *pipeline.Asset
+		pipeline      *pipeline.Pipeline
+		renderer      jinja.RendererInterface
+		expectedDeps  []string
+		expectedError bool
+	}{
+		{
+			name: "asset with no missing dependencies",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "table1"},
+					{Type: "asset", Value: "table2"},
+				},
+				ExecutableFile: pipeline.ExecutableFile{
+					Content: "SELECT * FROM table1 JOIN table2",
+				},
+			},
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{Name: "table1"},
+					{Name: "table2"},
+				},
+			},
+			expectedDeps:  []string{},
+			expectedError: false,
+		},
+		{
+			name: "asset with missing dependencies",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "raw.table1"},
+				},
+				ExecutableFile: pipeline.ExecutableFile{
+					Content: "SELECT * FROM raw.table1 JOIN raw.table2 JOIN raw.table3",
+				},
+			},
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{Name: "raw.table1"},
+					{Name: "raw.table2"},
+					{Name: "raw.table3"},
+				},
+			},
+			expectedDeps:  []string{"raw.table2", "raw.table3"},
+			expectedError: false,
+		},
+		{
+			name: "asset with external table references",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "table1"},
+				},
+				ExecutableFile: pipeline.ExecutableFile{
+					Content: "SELECT * FROM table1 JOIN project.dataset.table",
+				},
+			},
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{Name: "table1"},
+				},
+			},
+			expectedDeps:  []string{},
+			expectedError: false,
+		},
+		{
+			name: "asset with multiple queries",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				Upstreams: []pipeline.Upstream{
+					{Type: "asset", Value: "table1"},
+				},
+				ExecutableFile: pipeline.ExecutableFile{
+					Content: "SELECT * FROM table1 JOIN project.dataset.table; SELECT * FROM table2",
+				},
+			},
+			pipeline: &pipeline.Pipeline{
+				Assets: []*pipeline.Asset{
+					{Name: "table1"},
+					{Name: "table2"},
+				},
+			},
+			expectedDeps:  []string{"table2"},
+			expectedError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s, err := NewSQLParser(true)
+			require.NoError(t, err)
+			defer func() {
+				s.Close()
+			}()
+
+			err = s.Start()
+			require.NoError(t, err)
+
+			got, err := s.GetMissingDependenciesForAsset(tt.asset, tt.pipeline, jinja.NewRendererWithYesterday("test", "test"))
+			if tt.expectedError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.ElementsMatch(t, tt.expectedDeps, got)
 			}
 		})
 	}

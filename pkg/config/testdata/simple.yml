@@ -304,7 +304,11 @@ environments:
           instance_id: "instance-id-123"
           database: "database-id-123"
           service_account_file: "/path/to/service_account.json"
-          
+      solidgate:
+        - name: "solidgate-1"
+          secret_key: "secret-key-123"
+          public_key: "public-key-123"
+
   prod:
     connections:
       google_cloud_platform:

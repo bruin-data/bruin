@@ -483,6 +483,13 @@ func TestLoadFromFile(t *testing.T) {
 					ServiceAccountFile: "/path/to/service_account.json",
 				},
 			},
+			Solidgate: []SolidgateConnection{
+				{
+					Name:      "solidgate-1",
+					SecretKey: "secret-key-123",
+					PublicKey: "public-key-123",
+				},
+			},
 		},
 	}
 

@@ -13,6 +13,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
+	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -21,7 +22,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
-	"go.uber.org/zap"
 )
 
 type jinjaRenderedMaterializer struct {
@@ -68,6 +68,10 @@ func Lint(isDebug *bool) *cli.Command {
 				EnvVars: []string{"BRUIN_CONFIG_FILE"},
 				Usage:   "the path to the .bruin.yml file",
 			},
+			&cli.StringSliceFlag{
+				Name:  "var",
+				Usage: "override pipeline variables with custom values",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			// if the output is JSON then we intend to discard all the nicer pretty-print statements
@@ -76,6 +80,10 @@ func Lint(isDebug *bool) *cli.Command {
 				color.Output = io.Discard
 			} else {
 				fmt.Println()
+			}
+
+			if vars := c.StringSlice("var"); len(vars) > 0 {
+				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
 			}
 
 			logger := makeLogger(*isDebug)
@@ -310,7 +318,7 @@ func flattenErrors(err error) []string {
 	return foundErrors
 }
 
-func queryValidatorRules(logger *zap.SugaredLogger, cfg *config.Config, connectionManager *connection.Manager) []lint.Rule {
+func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionManager *connection.Manager) []lint.Rule {
 	rules := []lint.Rule{}
 	renderer := jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")
 	if len(cfg.SelectedEnvironment.Connections.GoogleCloudPlatform) > 0 {

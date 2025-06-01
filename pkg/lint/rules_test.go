@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/glossary"
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/spf13/afero"
@@ -2085,13 +2086,9 @@ func (m *mockSQLParser) UsedTables(sql, dialect string) ([]string, error) {
 	return args.Get(0).([]string), args.Error(1)
 }
 
-type mockRenderer struct {
-	mock.Mock
-}
-
-func (m *mockRenderer) Render(query string) (string, error) {
-	args := m.Called(query)
-	return args.Get(0).(string), args.Error(1)
+func (m *mockSQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeline *pipeline.Pipeline, renderer jinja.RendererInterface) ([]string, error) {
+	args := m.Called(asset, pipeline, renderer)
+	return args.Get(0).([]string), args.Error(1)
 }
 
 func TestUsedTableValidatorRule_ValidateAsset(t *testing.T) {
@@ -2116,129 +2113,56 @@ func TestUsedTableValidatorRule_ValidateAsset(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		setup   func(m *mockRenderer, p *mockSQLParser)
+		setup   func(p *mockSQLParser)
 		asset   *pipeline.Asset
 		want    []string
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
-			name: "irrelevant assets are ignored",
-			asset: &pipeline.Asset{
-				Type: pipeline.AssetTypePython,
-			},
-			want:    []string{},
-			wantErr: assert.NoError,
-		},
-		{
-			name: "assets that do not have materialization are ignored",
-			asset: &pipeline.Asset{
-				Type: pipeline.AssetTypeBigqueryQuery,
-			},
-			want:    []string{},
-			wantErr: assert.NoError,
-		},
-		{
-			name: "render fails",
+			name: "error returned from missing deps",
 			asset: &pipeline.Asset{
 				Type:            pipeline.AssetTypeBigqueryQuery,
 				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable},
 				ExecutableFile:  pipeline.ExecutableFile{Content: "SELECT 1"},
 			},
-			setup: func(m *mockRenderer, p *mockSQLParser) {
-				m.On("Render", "SELECT 1").Return("", errors.New("something failed"))
+			setup: func(p *mockSQLParser) {
+				p.On("GetMissingDependenciesForAsset", mock.Anything, mock.Anything, mock.Anything).Return([]string{}, errors.New("Failed to render the query before parsing the SQL"))
 			},
-			want:    []string{"Failed to render the query before parsing the SQL"},
+			want:    []string{"failed to get missing dependencies: Failed to render the query before parsing the SQL"},
 			wantErr: assert.NoError,
 		},
 		{
-			name: "query parsing fails but ignored",
+			name: "no missing dependencies, no error",
 			asset: &pipeline.Asset{
 				Type:            pipeline.AssetTypeBigqueryQuery,
 				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable},
-				ExecutableFile:  pipeline.ExecutableFile{Content: "SELECT 1"},
-			},
-			setup: func(m *mockRenderer, p *mockSQLParser) {
-				m.On("Render", "SELECT 1").Return("materialized select", nil)
-				p.On("UsedTables", "materialized select", "bigquery").Return([]string{}, errors.New("something failed"))
-			},
-			want:    []string{},
-			wantErr: assert.NoError,
-		},
-		{
-			name: "query parsing succeeds but returns no tables",
-			asset: &pipeline.Asset{
-				Type:            pipeline.AssetTypeBigqueryQuery,
-				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable},
-				ExecutableFile:  pipeline.ExecutableFile{Content: "SELECT 1"},
-			},
-			setup: func(m *mockRenderer, p *mockSQLParser) {
-				m.On("Render", "SELECT 1").Return("materialized select", nil)
-				p.On("UsedTables", "materialized select", "bigquery").Return([]string{}, nil)
-			},
-			want:    []string{},
-			wantErr: assert.NoError,
-		},
-		{
-			name: "query parsing succeeds, missing tables are caught",
-			asset: &pipeline.Asset{
-				Type:            pipeline.AssetTypeBigqueryQuery,
-				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable},
-				ExecutableFile:  pipeline.ExecutableFile{Content: "SELECT 1"},
+				ExecutableFile:  pipeline.ExecutableFile{Content: "SELECT * FROM asset1 JOIN asset2"},
 				Upstreams: []pipeline.Upstream{
-					{
-						Type:  "asset",
-						Value: "asset1",
-					},
-					{
-						Type:  "uri",
-						Value: "some://other.upstream",
-					},
-					{
-						Type:  "asset",
-						Value: "asset2",
-					},
+					{Type: "asset", Value: "asset1"},
+					{Type: "asset", Value: "asset2"},
 				},
 			},
-			setup: func(m *mockRenderer, p *mockSQLParser) {
-				m.On("Render", "SELECT 1").Return("materialized select", nil)
-				p.On("UsedTables", "materialized select", "bigquery").Return([]string{
-					"asset1", "asset2", "asset3", "asset4", "some.asset-that-doesnt-exist", "some.other.asset",
-				}, nil)
+			setup: func(p *mockSQLParser) {
+				p.On("GetMissingDependenciesForAsset", mock.Anything, mock.Anything, mock.Anything).Return([]string{}, nil)
 			},
-			want: []string{
-				"Table 'asset3' is used in the query but not referenced in the 'depends' array.",
-				"Table 'asset4' is used in the query but not referenced in the 'depends' array.",
-			},
+			want:    []string{},
 			wantErr: assert.NoError,
 		},
 		{
-			name: "query parsing succeeds, all is good",
+			name: "some missing dependencies, no error",
 			asset: &pipeline.Asset{
 				Type:            pipeline.AssetTypeBigqueryQuery,
 				Materialization: pipeline.Materialization{Type: pipeline.MaterializationTypeTable},
-				ExecutableFile:  pipeline.ExecutableFile{Content: "SELECT 1"},
+				ExecutableFile:  pipeline.ExecutableFile{Content: "SELECT * FROM asset1 JOIN asset2"},
 				Upstreams: []pipeline.Upstream{
-					{
-						Type:  "asset",
-						Value: "asset1",
-					},
-					{
-						Type:  "uri",
-						Value: "some://other.upstream",
-					},
-					{
-						Type:  "asset",
-						Value: "asset2",
-					},
+					{Type: "asset", Value: "asset1"},
+					{Type: "asset", Value: "asset2"},
 				},
 			},
-			setup: func(m *mockRenderer, p *mockSQLParser) {
-				m.On("Render", "SELECT 1").Return("materialized select", nil)
-				p.On("UsedTables", "materialized select", "bigquery").Return([]string{
-					"asset1", "asset2", "some.asset-that-doesnt-exist", "some.other.asset",
-				}, nil)
+			setup: func(p *mockSQLParser) {
+				p.On("GetMissingDependenciesForAsset", mock.Anything, mock.Anything, mock.Anything).Return([]string{"asset3"}, nil)
 			},
-			want:    []string{},
+			want:    []string{"There are some tables that are referenced in the query but not included in the 'depends' list."},
 			wantErr: assert.NoError,
 		},
 	}
@@ -2246,13 +2170,12 @@ func TestUsedTableValidatorRule_ValidateAsset(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			renderer := new(mockRenderer)
 			parser := new(mockSQLParser)
 			if tt.setup != nil {
-				tt.setup(renderer, parser)
+				tt.setup(parser)
 			}
 
-			u := UsedTableValidatorRule{renderer, parser}
+			u := UsedTableValidatorRule{jinja.NewRendererWithYesterday("test", "test"), parser}
 			got, err := u.ValidateAsset(context.Background(), pp, tt.asset)
 			if !tt.wantErr(t, err) {
 				return

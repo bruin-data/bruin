@@ -582,6 +582,12 @@
             "$ref": "#/$defs/SpannerConnection"
           },
           "type": "array"
+        },
+        "solidgate": {
+          "items": {
+            "$ref": "#/$defs/SolidgateConnection"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -1606,6 +1612,26 @@
         "project_id",
         "instance_id",
         "database"
+      ]
+    },
+    "SolidgateConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "secret_key": {
+          "type": "string"
+        },
+        "public_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "public_key",
+        "secret_key"
       ]
     },
     "StripeConnection": {
