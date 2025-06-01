@@ -74,7 +74,7 @@ type Connections struct {
 	Oracle              []OracleConnection              `yaml:"oracle,omitempty" json:"oracle,omitempty" mapstructure:"oracle"`
 	Phantombuster       []PhantombusterConnection       `yaml:"phantombuster,omitempty" json:"phantombuster,omitempty" mapstructure:"phantombuster"`
 	Elasticsearch       []ElasticsearchConnection       `yaml:"elasticsearch,omitempty" json:"elasticsearch,omitempty" mapstructure:"elasticsearch"`
-	Spanner             []SpannerConnection             `yaml:"spanner,omitempty" json:"spanner,omitempty" mapstructure:"spanner"`
+	Spanner             []SpannerConnection             `yaml:"gcp_spanner,omitempty" json:"gcp_spanner,omitempty" mapstructure:"gcp_spanner"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
