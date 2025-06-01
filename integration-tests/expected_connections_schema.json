@@ -577,7 +577,7 @@
           },
           "type": "array"
         },
-        "spanner": {
+        "gcp_spanner": {
           "items": {
             "$ref": "#/$defs/SpannerConnection"
           },
@@ -1598,10 +1598,10 @@
         "database": {
           "type": "string"
         },
-        "credentials_base64": {
+        "service_account_file": {
           "type": "string"
         },
-        "credentials_path": {
+        "service_account_json": {
           "type": "string"
         }
       },
@@ -1611,9 +1611,7 @@
         "name",
         "project_id",
         "instance_id",
-        "database",
-        "credentials_base64",
-        "credentials_path"
+        "database"
       ]
     },
     "SolidgateConnection": {
