@@ -47,20 +47,59 @@ def extract_non_selected_columns(parsed: exp.Select) -> list[Column]:
 
 
 def extract_tables(parsed):
-    root = build_scope(parsed)
-    if root is None:
-        return list(parsed.find_all(exp.Table))
+    def get_cte_names(parsed_stmt):
+        """Get all CTE names from the parsed statement"""
+        cte_names = set()
 
-    tables = []
-    for scope in root.traverse():
-        for alias, (node, source) in scope.selected_sources.items():
-            if isinstance(source, exp.Table):
-                tables.append(source)
+        # Handle different statement types
+        if isinstance(parsed_stmt, exp.Create):
+            # For CREATE TABLE statements, look in the expression part
+            if parsed_stmt.expression:
+                for cte in parsed_stmt.expression.find_all(exp.CTE):
+                    cte_names.add(cte.alias_or_name)
+        else:
+            # For regular SELECT statements
+            for cte in parsed_stmt.find_all(exp.CTE):
+                cte_names.add(cte.alias_or_name)
 
-    if len(tables) == 0:
-        tables = list(parsed.find_all(exp.Table))
+        return cte_names
 
-    return tables
+    def extract_table_references(stmt, cte_names):
+        """Extract table references, excluding CTEs"""
+        table_refs = []
+        
+        # Find all table references
+        for table in stmt.find_all(exp.Table):
+            # Get the actual table name (not the alias)
+            actual_table_name = table.name
+            
+            # Check if this is a CTE reference
+            # A table reference is a CTE if:
+            # 1. The table name matches a CTE name, AND
+            # 2. It doesn't have a schema/database prefix (CTEs are referenced without schema)
+            is_cte_reference = (
+                actual_table_name in cte_names and 
+                not table.db and  # No schema/database prefix
+                not table.catalog  # No catalog prefix
+            )
+            
+            # Skip if it's a CTE reference
+            if is_cte_reference:
+                continue
+            
+            # Keep all table references, including different aliases for the same table
+            # This is important for self-joins and extract_non_selected_columns
+            table_refs.append(table)
+        
+        return table_refs
+
+    # Get all CTE names first
+    cte_names = get_cte_names(parsed)
+
+    # Extract table references
+    table_refs = extract_table_references(parsed, cte_names)
+
+    return table_refs
 
 
 def extract_columns(parsed):

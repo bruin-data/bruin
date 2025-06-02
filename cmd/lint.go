@@ -13,6 +13,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
+	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -21,7 +22,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
-	"go.uber.org/zap"
 )
 
 type jinjaRenderedMaterializer struct {
@@ -318,7 +318,7 @@ func flattenErrors(err error) []string {
 	return foundErrors
 }
 
-func queryValidatorRules(logger *zap.SugaredLogger, cfg *config.Config, connectionManager *connection.Manager) []lint.Rule {
+func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionManager *connection.Manager) []lint.Rule {
 	rules := []lint.Rule{}
 	renderer := jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")
 	if len(cfg.SelectedEnvironment.Connections.GoogleCloudPlatform) > 0 {

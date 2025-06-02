@@ -293,17 +293,22 @@ environments:
           port: 9200
           secure: "true"
           verify_certs: "true"
-      spanner:
+      gcp_spanner:
         - name: "spanner-1"
           project_id: "project-id-123"
           instance_id: "instance-id-123"
           database: "database-id-123"
-          credentials_path: "path/to/service_account.json"
+          service_account_json: "{\"key1\": \"value1\"}"
+        - name: "spanner-2"
+          project_id: "project-id-123"
+          instance_id: "instance-id-123"
+          database: "database-id-123"
+          service_account_file: "/path/to/service_account.json"
       solidgate:
         - name: "solidgate-1"
           secret_key: "secret-key-123"
           public_key: "public-key-123"
-          
+
   prod:
     connections:
       google_cloud_platform:
