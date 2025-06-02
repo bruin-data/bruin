@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -53,8 +54,9 @@ func ParseAsset() *cli.Command {
 				builder:      DefaultPipelineBuilder,
 				errorPrinter: errorPrinter,
 			}
-
-			return r.Run(c.Context, c.Args().Get(0), c.Bool("column-lineage"))
+			ctx, cancel := context.WithTimeout(c.Context, 1*time.Minute)
+			defer cancel()
+			return r.Run(ctx, c.Args().Get(0), c.Bool("column-lineage"))
 		},
 	}
 }
@@ -84,8 +86,9 @@ func ParsePipeline() *cli.Command {
 				builder:      DefaultPipelineBuilder,
 				errorPrinter: errorPrinter,
 			}
-
-			return r.ParsePipeline(c.Context, c.Args().Get(0), c.Bool("column-lineage"), c.Bool("exp-slim-response"))
+			ctx, cancel := context.WithTimeout(c.Context, 1*time.Minute)
+			defer cancel()
+			return r.ParsePipeline(ctx, c.Args().Get(0), c.Bool("column-lineage"), c.Bool("exp-slim-response"))
 		},
 	}
 }
@@ -125,8 +128,7 @@ func (r *ParseCommand) ParsePipeline(ctx context.Context, assetPath string, line
 				printErrorJSON(err)
 				panic(err)
 			}
-
-			err = sqlParser.Start()
+			err = sqlParser.Start(ctx)
 			if err != nil {
 				printErrorJSON(err)
 				panic(err)
@@ -163,7 +165,7 @@ func (r *ParseCommand) ParsePipeline(ctx context.Context, assetPath string, line
 			Pipeline: foundPipeline,
 		}
 
-		defer sqlParser.Close()
+		defer sqlParser.Close(ctx)
 		processedAssets := make(map[string]bool)
 		lineage := lineagepackage.NewLineageExtractor(sqlParser)
 		for _, asset := range foundPipeline.Assets {
@@ -242,8 +244,7 @@ func (r *ParseCommand) Run(ctx context.Context, assetPath string, lineage bool) 
 				printErrorJSON(err)
 				panic(err)
 			}
-
-			err = sqlParser.Start()
+			err = sqlParser.Start(ctx)
 			if err != nil {
 				printErrorJSON(err)
 				panic(err)
