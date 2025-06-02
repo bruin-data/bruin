@@ -11,7 +11,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/env"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
-	"github.com/bruin-data/bruin/pkg/jinja"
 	logger2 "github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
