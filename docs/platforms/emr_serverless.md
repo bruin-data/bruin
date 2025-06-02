@@ -387,6 +387,17 @@ bruin run ./quality-checks-example
 </pre>
 :::
 
+## Variables
+
+Both built-in variables (e.g., `BRUIN_START_DATE`, `BRUIN_RUN_ID`) and any user-defined variables (from your `pipeline.yml`) are accessible directly as environment variables within the execution environment of your PySpark jobs.
+
+For `emr_serverless` assets, these environment variables can be accessed using `os.environ` in your PySpark scripts, similar to regular Python assets.
+
+Refer to the [Python assets documentation](/assets/python.md#environment-variables) for more information.
+
+::: tip
+These variables are available in both `pyspark` and `spark` assets. So you can leverage the power of variables regardless of which asset kind you utilize.
+:::
 ## Asset Schema
 
 Here's the full schema of the `emr_serverless.spark` asset along with a brief explanation:
