@@ -1,4 +1,4 @@
-package emr_serverless
+package emr_serverless //nolint
 
 import (
 	"testing"
@@ -118,5 +118,4 @@ func TestBuildJobRunConf(t *testing.T) {
 			assert.Equal(t, tc.Expected, actual)
 		})
 	}
-
 }
