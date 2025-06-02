@@ -261,9 +261,9 @@ func buildSCD2Query(asset *pipeline.Asset, query string) (string, error) {
 			") AS source\n"+
 			"ON %s\n"+
 			"\n"+
-			"WHEN MATCHED AND (\ntarget.valid_from < source.%s\n) THEN \n"+
+			"WHEN MATCHED AND (\ntarget.valid_from < source.%s\n) THEN\n"+
 			"%s\n"+
-			"WHEN NOT MATCHED BY TARGET THEN \n"+
+			"WHEN NOT MATCHED BY TARGET THEN\n"+
 			"%s\n",
 		tbl,
 		strings.TrimSpace(query),
