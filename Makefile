@@ -11,7 +11,7 @@ CURRENT_DIR=$(pwd)
 TELEMETRY_KEY=""
 FILES := $(wildcard *.yml *.txt *.py)
 
-.PHONY: all clean test build tools format pre-commit tools-update
+.PHONY: all clean test build build-no-duckdb tools format pre-commit tools-update
 all: clean deps test build
 
 deps: tools
@@ -21,6 +21,10 @@ deps: tools
 build: deps
 	@echo "$(OK_COLOR)==> Building the application...$(NO_COLOR)"
 	@CGO_ENABLED=1 go build -v -tags="no_duckdb_arrow" -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0)) -X main.telemetryKey=$(TELEMETRY_KEY)" -o "$(BUILD_DIR)/$(NAME)" "$(BUILD_SRC)"
+
+build-no-duckdb: deps
+	@echo "$(OK_COLOR)==> Building the application without DuckDB support...$(NO_COLOR)"
+	@CGO_ENABLED=0 go build -v -tags="bruin_no_duckdb" -ldflags="-s -w -X main.Version=$(or $(tag), dev-$(shell git describe --tags --abbrev=0)) -X main.telemetryKey=$(TELEMETRY_KEY)" -o "$(BUILD_DIR)/$(NAME)-no-duckdb" "$(BUILD_SRC)"
 
 integration-test: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists

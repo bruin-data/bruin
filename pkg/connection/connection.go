@@ -2031,16 +2031,16 @@ func (m *Manager) AddSpannerConnectionFromConfig(connection *config.SpannerConne
 	}
 	m.mutex.Unlock()
 
-	if len(connection.CredentialsPath) == 0 && len(connection.CredentialsBase64) == 0 {
-		return errors.New("credentials are required: provide either credentials_path of service account json or credentials_base64 of service account json")
+	if len(connection.ServiceAccountJSON) == 0 && len(connection.ServiceAccountFile) == 0 {
+		return errors.New("credentials are required: provide either service account file or service account json")
 	}
 
 	client, err := spanner.NewClient(spanner.Config{
-		ProjectID:         connection.ProjectID,
-		InstanceID:        connection.InstanceID,
-		Database:          connection.Database,
-		CredentialsPath:   connection.CredentialsPath,
-		CredentialsBase64: connection.CredentialsBase64,
+		ProjectID:          connection.ProjectID,
+		InstanceID:         connection.InstanceID,
+		Database:           connection.Database,
+		ServiceAccountJSON: connection.ServiceAccountJSON,
+		ServiceAccountFile: connection.ServiceAccountFile,
 	})
 	if err != nil {
 		return err

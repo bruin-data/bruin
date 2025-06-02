@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/helpers"
+	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/version"
 	"github.com/google/uuid"
@@ -295,7 +296,7 @@ func (i InstancesByType) AddDownstreamByType(instanceType TaskInstanceType, down
 }
 
 type Scheduler struct {
-	logger           *zap.SugaredLogger
+	logger           logger.Logger
 	taskScheduleLock sync.Mutex
 	pipeline         *pipeline.Pipeline
 
@@ -461,7 +462,7 @@ func (s *Scheduler) FindMajorityOfTypes(defaultIfNone pipeline.AssetType) pipeli
 	return s.pipeline.GetMajorityAssetTypesFromSQLAssets(defaultIfNone)
 }
 
-func NewScheduler(logger *zap.SugaredLogger, p *pipeline.Pipeline, runID string) *Scheduler {
+func NewScheduler(logger logger.Logger, p *pipeline.Pipeline, runID string) *Scheduler {
 	instances := make([]TaskInstance, 0)
 	for _, task := range p.Assets {
 		parentID := uuid.New().String()

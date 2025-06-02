@@ -2,6 +2,12 @@
 
 We simplify the creation of pipelines through the use of **templates**. Templates provide a starting point with predefined structures, configurations, and connections to help you quickly set up and standardize your pipelines.
 
+
+<video width="685" height="auto" controls poster="./tutorials/tutorial-media/bruin-templates-tutorial.png">
+  <source src="./tutorials/tutorial-media/bruin-templates-tutorial.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
 ## What are templates?
 
 Templates in Bruin are blueprints for initializing new pipelines. They:

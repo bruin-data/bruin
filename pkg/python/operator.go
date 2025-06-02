@@ -11,6 +11,8 @@ import (
 	"github.com/bruin-data/bruin/pkg/env"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/jinja"
+	logger2 "github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/bruin-data/bruin/pkg/user"
@@ -114,10 +116,15 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		return errors.Wrap(err, "failed to find repo to run Python")
 	}
 
-	logger := zap.NewNop().Sugar()
-	if ctx.Value(executor.ContextLogger) != nil {
-		logger = ctx.Value(executor.ContextLogger).(*zap.SugaredLogger)
+	var ctxWithLogger context.Context
+	if ctx.Value(executor.ContextLogger) == nil {
+		logger := zap.NewNop().Sugar()
+		ctxWithLogger = context.WithValue(ctx, executor.ContextLogger, logger)
+	} else {
+		ctxWithLogger = ctx
 	}
+
+	logger := ctxWithLogger.Value(executor.ContextLogger).(logger2.Logger)
 
 	logger.Debugf("running Python asset %s in repo %s", t.Name, repo.Path)
 
