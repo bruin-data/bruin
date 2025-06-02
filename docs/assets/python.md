@@ -133,6 +133,10 @@ print("users:", vars["users"])  # users: ['jhon', 'nick']
 ```
 :::
 
+::: tip
+You can override the value of variables at runtime using `--var` [flag](/assets/templating/templating#overriding-variables).
+:::
+
 
 ## Materialization
 
