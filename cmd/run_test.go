@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 )
@@ -1273,7 +1274,7 @@ func TestCheckLintFunc(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			logger := zaptest.NewLogger(t).Sugar()
-			err := CheckLint(tt.foundPipeline, tt.pipelinePath, logger, nil)
+			err := CheckLint(tt.foundPipeline, tt.pipelinePath, logger, nil, &cli.Context{})
 			require.NoError(t, err, "Expected no error but got one")
 		})
 	}

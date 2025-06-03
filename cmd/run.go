@@ -228,6 +228,14 @@ func Run(isDebug *bool) *cli.Command {
 
 			var startDate, endDate time.Time
 
+			if c.Bool("no-color") {
+				successPrinter = plainPrinter
+				errorPrinter = plainPrinter
+				warningPrinter = plainPrinter
+				infoPrinter = plainPrinter
+				faint = plain
+			}
+
 			var err error
 			startDate, endDate, inputPath, err := ValidateRunConfig(runConfig, c.Args().Get(0), logger)
 			if err != nil {
@@ -310,7 +318,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			shouldValidate := !pipelineInfo.RunningForAnAsset && !c.Bool("no-validation")
 			if shouldValidate {
-				if err := CheckLint(pipelineInfo.Pipeline, inputPath, logger, nil); err != nil {
+				if err := CheckLint(pipelineInfo.Pipeline, inputPath, logger, nil, c); err != nil {
 					return err
 				}
 			}
@@ -450,7 +458,6 @@ func Run(isDebug *bool) *cli.Command {
 				DoNotLogTimestamp: c.Bool("no-timestamp"),
 				NoColor:           c.Bool("no-color"),
 			}
-
 			ex, err := executor.NewConcurrent(logger, mainExecutors, c.Int("workers"), formatOpts)
 			if err != nil {
 				errorPrinter.Printf("Failed to create executor: %v\n", err)
@@ -625,18 +632,25 @@ func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger 
 	return startDate, endDate, inputPath, nil
 }
 
-func CheckLint(foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, parser *sqlparser.SQLParser) error {
+func CheckLint(foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, parser *sqlparser.SQLParser, ctx *cli.Context) error {
 	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, parser, true)
 	if err != nil {
 		errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
 		return err
+	}
+	if ctx.Bool("no-color") {
+		successPrinter = plainPrinter
+		errorPrinter = plainPrinter
+		warningPrinter = plainPrinter
+		infoPrinter = plainPrinter
+		faint = plain
 	}
 
 	rules = lint.FilterRulesBySpeed(rules, true)
 
 	linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
 	res, err := linter.LintPipelines([]*pipeline.Pipeline{foundPipeline})
-	err = reportLintErrors(res, err, lint.Printer{RootCheckPath: pipelinePath}, "")
+	err = reportLintErrors(res, err, lint.Printer{RootCheckPath: pipelinePath}, "", ctx.Bool("no-color"))
 	if err != nil {
 		return err
 	}
