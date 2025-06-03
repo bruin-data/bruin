@@ -75,7 +75,7 @@ type Connections struct {
 	Phantombuster       []PhantombusterConnection       `yaml:"phantombuster,omitempty" json:"phantombuster,omitempty" mapstructure:"phantombuster"`
 	Elasticsearch       []ElasticsearchConnection       `yaml:"elasticsearch,omitempty" json:"elasticsearch,omitempty" mapstructure:"elasticsearch"`
 	Solidgate           []SolidgateConnection           `yaml:"solidgate,omitempty" json:"solidgate,omitempty" mapstructure:"solidgate"`
-	Spanner             []SpannerConnection             `yaml:"gcp_spanner,omitempty" json:"gcp_spanner,omitempty" mapstructure:"gcp_spanner"`
+	GCPSpanner          []GCPSpannerConnection          `yaml:"gcp_spanner,omitempty" json:"gcp_spanner,omitempty" mapstructure:"gcp_spanner"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -784,13 +784,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Elasticsearch = append(env.Connections.Elasticsearch, conn)
-	case "spanner":
-		var conn SpannerConnection
+	case "gcp_spanner":
+		var conn GCPSpannerConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
 			return fmt.Errorf("failed to decode credentials: %w", err)
 		}
 		conn.Name = name
-		env.Connections.Spanner = append(env.Connections.Spanner, conn)
+		env.Connections.GCPSpanner = append(env.Connections.GCPSpanner, conn)
 	case "solidgate":
 		var conn SolidgateConnection
 		err := mapstructure.Decode(creds, &conn)
@@ -936,8 +936,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Phantombuster = removeConnection(env.Connections.Phantombuster, connectionName)
 	case "elasticsearch":
 		env.Connections.Elasticsearch = removeConnection(env.Connections.Elasticsearch, connectionName)
-	case "spanner":
-		env.Connections.Spanner = removeConnection(env.Connections.Spanner, connectionName)
+	case "gcp_spanner":
+		env.Connections.GCPSpanner = removeConnection(env.Connections.GCPSpanner, connectionName)
 	case "solidgate":
 		env.Connections.Solidgate = removeConnection(env.Connections.Solidgate, connectionName)
 	default:
@@ -1044,7 +1044,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Phantombuster, source.Phantombuster)
 	mergeConnectionList(&c.Frankfurter, source.Frankfurter)
 	mergeConnectionList(&c.Elasticsearch, source.Elasticsearch)
-	mergeConnectionList(&c.Spanner, source.Spanner)
+	mergeConnectionList(&c.GCPSpanner, source.GCPSpanner)
 	mergeConnectionList(&c.Solidgate, source.Solidgate)
 
 	c.buildConnectionKeyMap()

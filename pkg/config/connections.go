@@ -745,7 +745,7 @@ func (c ElasticsearchConnection) GetName() string {
 	return c.Name
 }
 
-type SpannerConnection struct {
+type GCPSpannerConnection struct {
 	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	ProjectID          string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
 	InstanceID         string `yaml:"instance_id,omitempty" json:"instance_id" mapstructure:"instance_id"`
@@ -754,7 +754,7 @@ type SpannerConnection struct {
 	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
 }
 
-func (c SpannerConnection) GetName() string {
+func (c GCPSpannerConnection) GetName() string {
 	return c.Name
 }
 

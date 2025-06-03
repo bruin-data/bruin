@@ -579,7 +579,7 @@
         },
         "gcp_spanner": {
           "items": {
-            "$ref": "#/$defs/SpannerConnection"
+            "$ref": "#/$defs/GCPSpannerConnection"
           },
           "type": "array"
         },
@@ -1584,7 +1584,7 @@
         "region"
       ]
     },
-    "SpannerConnection": {
+    "GCPSpannerConnection": {
       "properties": {
         "name": {
           "type": "string"

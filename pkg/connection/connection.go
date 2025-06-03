@@ -115,7 +115,7 @@ type Manager struct {
 	Oracle          map[string]*oracle.Client
 	Phantombuster   map[string]*phantombuster.Client
 	Elasticsearch   map[string]*elasticsearch.Client
-	Spanner         map[string]*spanner.Client
+	GCPSpanner      map[string]*spanner.Client
 	Solidgate       map[string]*solidgate.Client
 	mutex           sync.Mutex
 }
@@ -415,11 +415,11 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Elasticsearch)...)
 
-	connSpanner, err := m.GetSpannerConnectionWithoutDefault(name)
+	connGCPSpanner, err := m.GetGCPSpannerConnectionWithoutDefault(name)
 	if err == nil {
-		return connSpanner, nil
+		return connGCPSpanner, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Spanner)...)
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GCPSpanner)...)
 
 	connSolidgate, err := m.GetSolidgateConnectionWithoutDefault(name)
 	if err == nil {
@@ -731,23 +731,23 @@ func (m *Manager) GetKlaviyoConnectionWithoutDefault(name string) (*klaviyo.Clie
 	return db, nil
 }
 
-func (m *Manager) GetSpannerConnection(name string) (*spanner.Client, error) {
-	db, err := m.GetSpannerConnectionWithoutDefault(name)
+func (m *Manager) GetGCPSpannerConnection(name string) (*spanner.Client, error) {
+	db, err := m.GetGCPSpannerConnectionWithoutDefault(name)
 	if err == nil {
 		return db, nil
 	}
 
-	return m.GetSpannerConnectionWithoutDefault("spanner-default")
+	return m.GetGCPSpannerConnectionWithoutDefault("gcp-spanner-default")
 }
 
-func (m *Manager) GetSpannerConnectionWithoutDefault(name string) (*spanner.Client, error) {
-	if m.Spanner == nil {
-		return nil, errors.New("no spanner connections found")
+func (m *Manager) GetGCPSpannerConnectionWithoutDefault(name string) (*spanner.Client, error) {
+	if m.GCPSpanner == nil {
+		return nil, errors.New("no gcp spanner connections found")
 	}
 
-	db, ok := m.Spanner[name]
+	db, ok := m.GCPSpanner[name]
 	if !ok {
-		return nil, errors.Errorf("spanner connection not found for '%s'", name)
+		return nil, errors.Errorf("gcp spanner connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -2024,10 +2024,10 @@ func (m *Manager) AddGoogleSheetsConnectionFromConfig(connection *config.GoogleS
 	return nil
 }
 
-func (m *Manager) AddSpannerConnectionFromConfig(connection *config.SpannerConnection) error {
+func (m *Manager) AddGCPSpannerConnectionFromConfig(connection *config.GCPSpannerConnection) error {
 	m.mutex.Lock()
-	if m.Spanner == nil {
-		m.Spanner = make(map[string]*spanner.Client)
+	if m.GCPSpanner == nil {
+		m.GCPSpanner = make(map[string]*spanner.Client)
 	}
 	m.mutex.Unlock()
 
@@ -2048,7 +2048,7 @@ func (m *Manager) AddSpannerConnectionFromConfig(connection *config.SpannerConne
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	m.Spanner[connection.Name] = client
+	m.GCPSpanner[connection.Name] = client
 
 	return nil
 }
@@ -2822,7 +2822,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.DB2, connectionManager.AddDB2ConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Phantombuster, connectionManager.AddPhantombusterConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Elasticsearch, connectionManager.AddElasticsearchConnectionFromConfig, &wg, &errList, &mu)
-	processConnections(cm.SelectedEnvironment.Connections.Spanner, connectionManager.AddSpannerConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.GCPSpanner, connectionManager.AddGCPSpannerConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Solidgate, connectionManager.AddSolidgateConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList

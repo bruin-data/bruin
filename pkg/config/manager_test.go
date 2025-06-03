@@ -467,7 +467,7 @@ func TestLoadFromFile(t *testing.T) {
 					VerifyCerts: "true",
 				},
 			},
-			Spanner: []SpannerConnection{
+			GCPSpanner: []GCPSpannerConnection{
 				{
 					Name:               "spanner-1",
 					ProjectID:          "project-id-123",
