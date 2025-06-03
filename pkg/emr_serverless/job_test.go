@@ -67,7 +67,7 @@ func TestBuildJobRunConf(t *testing.T) {
 					Value: types.SparkSubmit{
 						EntryPoint: aws.String("main.py"),
 						SparkSubmitParameters: aws.String(
-							` --conf spark.executorEnv.env="dev" --conf spark.emr-serverless.driverEnv.env="dev"`,
+							` --conf spark.executorEnv.env=dev --conf spark.emr-serverless.driverEnv.env=dev`,
 						),
 					},
 				},
@@ -98,7 +98,7 @@ func TestBuildJobRunConf(t *testing.T) {
 					Value: types.SparkSubmit{
 						EntryPoint: aws.String("main.py"),
 						SparkSubmitParameters: aws.String(
-							`--conf spark.executor.cores=1 --conf spark.executorEnv.env="dev" --conf spark.emr-serverless.driverEnv.env="dev"`,
+							`--conf spark.executor.cores=1 --conf spark.executorEnv.env=dev --conf spark.emr-serverless.driverEnv.env=dev`,
 						),
 					},
 				},
