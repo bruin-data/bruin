@@ -166,5 +166,6 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string, location string
 		fmt.Sprintf(`INSERT INTO %s %s`,
 			asset.Name, query),
 	}
+
 	return queries, nil
 }
