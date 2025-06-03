@@ -189,8 +189,9 @@ func Run(isDebug *bool) *cli.Command {
 				Hidden: true,
 			},
 			&cli.StringSliceFlag{
-				Name:  "var",
-				Usage: "override pipeline variables with custom values",
+				Name:    "var",
+				Usage:   "override pipeline variables with custom values",
+				EnvVars: []string{"BRUIN_VARS"},
 			},
 		},
 		Action: func(c *cli.Context) error {

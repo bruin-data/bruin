@@ -740,6 +740,23 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
+			Name:    "python-variable-injection-with-env-override",
+			Command: binary,
+			Args: []string{
+				"run",
+				filepath.Join(currentFolder, "test-pipelines/variables-interpolation/assets/load.py"),
+			},
+			Env: []string{`BRUIN_VARS={"env":"prod","users":["james","kirk"]}`},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"env: prod", "users: james,kirk"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
 			Name:    "run-with-tags",
 			Command: binary,
 			Args:    []string{"run", "--env", "env-run-with-tags", "--tag", "include", "--exclude-tag", "exclude", "--start-date", "2024-01-01", "--end-date", "2024-12-31", filepath.Join(currentFolder, "test-pipelines/run-with-tags-pipeline")},
