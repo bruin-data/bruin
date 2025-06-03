@@ -186,9 +186,9 @@ func buildDDLQuery(asset *pipeline.Asset, query string) ([]string, error) {
 		partitionBy = fmt.Sprintf("\nPARTITIONED BY (%s)", asset.Materialization.PartitionBy)
 	}
 
-	clusterBy := ""
+	clusterByClause := ""
 	if asset.Materialization.ClusterBy != nil {
-		clusterBy = fmt.Sprintf("\nCLUSTER BY (%s)", asset.Materialization.ClusterBy)
+		clusterByClause = "\nCLUSTER BY (" + strings.Join(asset.Materialization.ClusterBy, ", ") + ")"
 	}
 
 	ddl := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n"+
@@ -198,7 +198,7 @@ func buildDDLQuery(asset *pipeline.Asset, query string) ([]string, error) {
 		asset.Name,
 		strings.Join(columnDefs, ",\n"),
 		partitionBy,
-		clusterBy,
+		clusterByClause,
 	)
 
 	return []string{ddl}, nil

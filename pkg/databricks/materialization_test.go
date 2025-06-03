@@ -315,6 +315,27 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 		},
 		{
+			name: "table with clustering",
+			task: &pipeline.Asset{
+				Name: "my_clustered_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+					{Name: "timestamp", Type: "TIMESTAMP", Description: "Event timestamp"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:      pipeline.MaterializationTypeTable,
+					Strategy:  pipeline.MaterializationStrategyDDL,
+					ClusterBy: []string{"timestamp, id"},
+				},
+			},
+			want: []string{"CREATE TABLE IF NOT EXISTS my_clustered_table \\(\n" +
+				"id INT64,\n" +
+				"timestamp TIMESTAMP COMMENT 'Event timestamp'\n" +
+				"\\)" +
+				"\nCLUSTER BY \\(timestamp, id\\)",
+			},
+		},
+		{
 			name: "table with partitioning",
 			task: &pipeline.Asset{
 				Name: "my_partitioned_table",
