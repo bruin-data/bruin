@@ -53,6 +53,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/salesforce"
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/slack"
+	"github.com/bruin-data/bruin/pkg/smartsheet"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/solidgate"
 	"github.com/bruin-data/bruin/pkg/spanner"
@@ -117,6 +118,7 @@ type Manager struct {
 	Elasticsearch   map[string]*elasticsearch.Client
 	Spanner         map[string]*spanner.Client
 	Solidgate       map[string]*solidgate.Client
+	Smartsheet      map[string]*smartsheet.Client
 	mutex           sync.Mutex
 }
 
@@ -426,6 +428,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connSolidgate, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Solidgate)...)
+
+	connSmartsheet, err := m.GetSmartsheetConnectionWithoutDefault(name)
+	if err == nil {
+		return connSmartsheet, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Smartsheet)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -770,6 +778,28 @@ func (m *Manager) GetSolidgateConnectionWithoutDefault(name string) (*solidgate.
 	db, ok := m.Solidgate[name]
 	if !ok {
 		return nil, errors.Errorf("solidgate connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetSmartsheetConnection(name string) (*smartsheet.Client, error) {
+	db, err := m.GetSmartsheetConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetSmartsheetConnectionWithoutDefault("smartsheet-default")
+}
+
+func (m *Manager) GetSmartsheetConnectionWithoutDefault(name string) (*smartsheet.Client, error) {
+	if m.Smartsheet == nil {
+		return nil, errors.New("no smartsheet connections found")
+	}
+
+	db, ok := m.Smartsheet[name]
+	if !ok {
+		return nil, errors.Errorf("smartsheet connection not found for '%s'", name)
 	}
 
 	return db, nil
@@ -2075,6 +2105,27 @@ func (m *Manager) AddSolidgateConnectionFromConfig(connection *config.SolidgateC
 	return nil
 }
 
+func (m *Manager) AddSmartsheetConnectionFromConfig(connection *config.SmartsheetConnection) error {
+	m.mutex.Lock()
+	if m.Smartsheet == nil {
+		m.Smartsheet = make(map[string]*smartsheet.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := smartsheet.NewClient(smartsheet.Config{
+		AccessToken: connection.AccessToken,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Smartsheet[connection.Name] = client
+
+	return nil
+}
+
 func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnection) error {
 	m.mutex.Lock()
 	if m.Kafka == nil {
@@ -2824,6 +2875,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Elasticsearch, connectionManager.AddElasticsearchConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Spanner, connectionManager.AddSpannerConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Solidgate, connectionManager.AddSolidgateConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Smartsheet, connectionManager.AddSmartsheetConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }

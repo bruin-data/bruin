@@ -208,6 +208,7 @@ export default withMermaid({
                             {text: "SAP HANA", link: "/ingestion/sap_hana"},
                             {text: "S3", link: "/ingestion/s3"},
                             {text: "Shopify", link: "/ingestion/shopify"},
+                            {text: "Smartsheet", link: "/ingestion/smartsheet"},
                             {text: "Solidgate", link: "/ingestion/solidgate"},
                             {text: "Stripe", link: "/ingestion/stripe.md"},
                             {text: "Slack", link: "/ingestion/slack.md"},
