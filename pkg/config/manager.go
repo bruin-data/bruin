@@ -76,6 +76,7 @@ type Connections struct {
 	Elasticsearch       []ElasticsearchConnection       `yaml:"elasticsearch,omitempty" json:"elasticsearch,omitempty" mapstructure:"elasticsearch"`
 	Solidgate           []SolidgateConnection           `yaml:"solidgate,omitempty" json:"solidgate,omitempty" mapstructure:"solidgate"`
 	Spanner             []SpannerConnection             `yaml:"gcp_spanner,omitempty" json:"gcp_spanner,omitempty" mapstructure:"gcp_spanner"`
+	Smartsheet          []SmartsheetConnection          `yaml:"smartsheet,omitempty" json:"smartsheet,omitempty" mapstructure:"smartsheet"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -799,6 +800,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Solidgate = append(env.Connections.Solidgate, conn)
+	case "smartsheet":
+		var conn SmartsheetConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Smartsheet = append(env.Connections.Smartsheet, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -940,6 +948,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Spanner = removeConnection(env.Connections.Spanner, connectionName)
 	case "solidgate":
 		env.Connections.Solidgate = removeConnection(env.Connections.Solidgate, connectionName)
+	case "smartsheet":
+		env.Connections.Smartsheet = removeConnection(env.Connections.Smartsheet, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1046,6 +1056,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Elasticsearch, source.Elasticsearch)
 	mergeConnectionList(&c.Spanner, source.Spanner)
 	mergeConnectionList(&c.Solidgate, source.Solidgate)
+	mergeConnectionList(&c.Smartsheet, source.Smartsheet)
 
 	c.buildConnectionKeyMap()
 	return nil
