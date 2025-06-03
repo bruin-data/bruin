@@ -204,8 +204,8 @@
           },
           "type": "array",
           "default": [
-            "MagnusCarlsen",
-            "HikaruNakamura",
+            "erik",
+            "vadimer2Nakamura",
             "ArjunErigaisi"
           ]
         }
