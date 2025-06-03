@@ -185,20 +185,21 @@ func buildDDLQuery(asset *pipeline.Asset, query string, location string) ([]stri
 
 	partitionedBy := ""
 	if asset.Materialization.PartitionBy != "" {
-		partitionedBy = fmt.Sprintf("PARTITIONED BY (%s)", asset.Materialization.PartitionBy)
+		partitionedBy = fmt.Sprintf("\nPARTITIONED BY (%s)", asset.Materialization.PartitionBy)
 	}
 
 	ddlQuery := fmt.Sprintf(
 		"CREATE TABLE IF NOT EXISTS %s (\n"+
 			"%s\n"+
-			")\n"+
-			"%s\n"+
-			"LOCATION '%s'\n"+
-			"TBLPROPERTIES('table_type'='ICEBERG')",
+			")"+
+			"%s"+
+			"\nLOCATION '%s/%s'"+
+			"\nTBLPROPERTIES('table_type'='ICEBERG')",
 		asset.Name,
 		strings.Join(columnDefs, ",\n"),
 		partitionedBy,
 		location,
+		asset.Name,
 	)
 
 	return []string{ddlQuery}, nil
