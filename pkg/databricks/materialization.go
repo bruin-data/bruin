@@ -172,6 +172,9 @@ func buildDDLQuery(asset *pipeline.Asset, query string) ([]string, error) {
 
 	for _, col := range asset.Columns {
 		def := fmt.Sprintf("%s %s", col.Name, col.Type)
+		if col.PrimaryKey {
+			def += " PRIMARY KEY"
+		}
 		if col.Description != "" {
 			def += fmt.Sprintf(" COMMENT '%s'", col.Description)
 		}
@@ -183,12 +186,19 @@ func buildDDLQuery(asset *pipeline.Asset, query string) ([]string, error) {
 		partitionBy = fmt.Sprintf("\nPARTITIONED BY (%s)", asset.Materialization.PartitionBy)
 	}
 
+	clusterBy := ""
+	if asset.Materialization.ClusterBy != nil {
+		clusterBy = fmt.Sprintf("\nCLUSTER BY (%s)", asset.Materialization.ClusterBy)
+	}
+
 	ddl := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n"+
 		"%s\n"+
-		")%s",
+		")%s"+
+		"%s",
 		asset.Name,
 		strings.Join(columnDefs, ",\n"),
 		partitionBy,
+		clusterBy,
 	)
 
 	return []string{ddl}, nil

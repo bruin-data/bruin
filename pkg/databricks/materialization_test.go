@@ -305,12 +305,12 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 				Columns: []pipeline.Column{
 					{Name: "id", Type: "INT64"},
-					{Name: "name", Type: "STRING", Description: "The name of the person"},
+					{Name: "name", Type: "STRING", Description: "The name of the person", PrimaryKey: true},
 				},
 			},
 			want: []string{"CREATE TABLE IF NOT EXISTS two_col_table \\(\n" +
 				"id INT64,\n" +
-				"name STRING COMMENT \\'The name of the person\\'\n" +
+				"name STRING PRIMARY KEY COMMENT \\'The name of the person\\'\n" +
 				"\\)",
 			},
 		},
@@ -329,7 +329,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			want: []string{"CREATE TABLE IF NOT EXISTS my_partitioned_table \\(\n" +
-				"id INT64,\n" +
+				"id INT64 PRIMARY KEY,\n" +
 				"timestamp TIMESTAMP COMMENT 'Event timestamp'\n" +
 				"\\)" +
 				"\nPARTITIONED BY \\(timestamp\\)",
@@ -340,7 +340,7 @@ func TestMaterializer_Render(t *testing.T) {
 			task: &pipeline.Asset{
 				Name: "my_composite_partitioned_table",
 				Columns: []pipeline.Column{
-					{Name: "id", Type: "INT64", PrimaryKey: true},
+					{Name: "id", Type: "INT64"},
 					{Name: "timestamp", Type: "TIMESTAMP", Description: "Event timestamp"},
 					{Name: "location", Type: "STRING"},
 				},
@@ -350,6 +350,7 @@ func TestMaterializer_Render(t *testing.T) {
 					PartitionBy: "timestamp, location",
 				},
 			},
+			fullRefresh: true,
 			want: []string{
 				"CREATE TABLE IF NOT EXISTS my_composite_partitioned_table \\(\n" +
 					"id INT64,\n" +
