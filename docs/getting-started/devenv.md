@@ -27,8 +27,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "MagnusCarlsen"
-            - "Hikaru"
+            - "erik"
+            - "vadimer2"
 
   production:
     connections:
@@ -85,8 +85,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "MagnusCarlsen"
-            - "Hikaru"
+            - "erik"
+            - "vadimer2"
 
   production:
     connections:
