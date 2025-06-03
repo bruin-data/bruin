@@ -309,6 +309,7 @@ func TestMaterializer_Render(t *testing.T) {
 					PartitionBy: "timestamp",
 				},
 			},
+			fullRefresh: true,
 			want: []string{
 				"CREATE TABLE IF NOT EXISTS my_partitioned_table (\n" +
 					"id INT64,\n" +
