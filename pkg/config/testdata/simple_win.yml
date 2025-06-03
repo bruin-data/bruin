@@ -293,7 +293,7 @@ environments:
           port: 9200
           secure: "true"
           verify_certs: "true"
-      gcp_spanner:
+      spanner:
         - name: "spanner-1"
           project_id: "project-id-123"
           instance_id: "instance-id-123"

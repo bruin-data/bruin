@@ -577,7 +577,7 @@
           },
           "type": "array"
         },
-        "gcp_spanner": {
+        "spanner": {
           "items": {
             "$ref": "#/$defs/SpannerConnection"
           },

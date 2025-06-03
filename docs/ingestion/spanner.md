@@ -11,7 +11,7 @@ Follow the steps below to correctly set up GCP Spanner as a data source and run 
 To connect to GCP Spanner, you need to add a configuration item to the connections section of the `.bruin.yml` file. This configuration must comply with the following schema:
 ```yaml
     connections:
-      gcp_spanner:
+      spanner:
         - name: "my-spanner"
           project_id: "project_123"
           instance_id: "instance_123"
@@ -54,4 +54,3 @@ bruin run assets/gcp_spanner_ingestion.yml
 As a result of this command, Bruin will ingest data from the given GCP Spanner table into your Postgres database.
 
 <img alt="Spanner" src="./media/spanner_ingestion.png">
-
