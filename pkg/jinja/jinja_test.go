@@ -202,6 +202,12 @@ group by 1`,
 			},
 			want: "2024-03-15T00:00:00.000000Z",
 		},
+		{
+			name:  "reverse range",
+			query: "{% for i in range(10, 1, -2) %}{{i}}-{%endfor%}",
+			args:  Context{},
+			want:  "10-8-6-4-2-",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
