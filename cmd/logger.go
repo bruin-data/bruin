@@ -1,11 +1,12 @@
 package cmd
 
 import (
+	"github.com/bruin-data/bruin/pkg/logger"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-func makeLogger(isDebug bool) *zap.SugaredLogger {
+func makeLogger(isDebug bool) logger.Logger {
 	config := zap.Config{
 		Level:       zap.NewAtomicLevelAt(zap.InfoLevel),
 		Development: false,

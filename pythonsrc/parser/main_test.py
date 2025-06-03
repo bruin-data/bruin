@@ -105,10 +105,13 @@ test_cases_non_selected_columns = [
         ],
     },
     {
-        "name": "CTE with cross ",
+        "name": "CTE with cross",
         "dialect": "bigquery",
         "query": """
-	   SELECT t1.col1, t2.col2 				FROM table1 t1 				JOIN table2 t2 ON t1.id = t2.id
+            SELECT t1.col1, t2.col2 				
+            FROM table1 t1 				
+            JOIN table2 t2 
+                ON t1.id = t2.id
 	""",
         "schema": {
             "table1": {"id": "str", "col1": "int64"},
@@ -132,6 +135,54 @@ test_cases_non_selected_columns = [
         "expected": [
             Column(name="emp_id", table="employees"),
             Column(name="emp_id", table="salaries"),
+        ],
+    },
+    {
+        "name": "complex CTEs with aliases",
+        "dialect": "snowflake",
+        "query": """
+WITH ufd AS (
+    SELECT
+        user_id,
+        MIN(date_utc) as my_date_col
+    FROM fact.some_daily_metrics
+    GROUP BY 1
+),
+user_retention AS (
+    SELECT
+        d.user_id,
+        MAX(CASE WHEN DATEDIFF(day, f.my_date_col, d.date_utc) = 1 THEN 1 ELSE 0 END) as some_day1_metric,
+    FROM fact.some_daily_metrics d
+    INNER JOIN ufd f ON d.user_id = f.user_id
+    GROUP BY 1
+)
+SELECT
+    d.user_id, 
+    DATEDIFF(day, MAX(d.date_utc), CURRENT_DATE()) as recency,
+    COUNT(DISTINCT d.date_utc) as active_days, 
+    MIN_BY(d.first_device_type, d.first_activity_timestamp) as first_device_type, 
+    AVG(NULLIF(d.estimated_session_duration, 0)) as avg_session_duration, 
+    SUM(d.event_start) as total_event_start, 
+    MAX(r.some_day1_metric) as some_day1_metric, 
+    case when sum(d.event_start) > 0 then 'Player' else 'Visitor' end as user_type, 
+FROM fact.some_daily_metrics d
+LEFT JOIN user_retention r ON d.user_id = r.user_id
+GROUP BY 1
+	""",
+        "schema": {
+            "fact": {
+                "some_daily_metrics": {
+                    "user_id": "STRING",
+                    "date_utc": "DATE",
+                    "first_device_type": "STRING",
+                    "first_activity_timestamp": "TIMESTAMP",
+                    "estimated_session_duration": "INT64",
+                    "event_start": "INT64",
+                }
+            }
+        },
+        "expected": [
+            Column(name="USER_ID", table="FACT.SOME_DAILY_METRICS"),
         ],
     },
     {
@@ -1842,8 +1893,8 @@ ORDER BY 1, 2, 3
 )
 def test_get_column_lineage(query, schema, expected, expected_non_selected, dialect):
     result = get_column_lineage(query, schema, dialect)
-    assert expected == result["columns"]
-    assert expected_non_selected == result["non_selected_columns"]
+    assert result["columns"] == expected
+    assert result["non_selected_columns"] == expected_non_selected
 
 
 @pytest.mark.parametrize(
@@ -1855,7 +1906,7 @@ def test_get_column_lineage(query, schema, expected, expected_non_selected, dial
     ids=[tc["name"] for tc in test_cases_non_selected_columns],
 )
 def test_extract_non_select_column(query, schema, expected, dialect):
-    parsed = parse_one(query, dialect=dialect)
+    parsed = parse_one(query, read=dialect)
     optimized = optimize(parsed, schema, dialect=dialect)
     result = extract_non_selected_columns(optimized)
     assert result == expected
@@ -1870,6 +1921,18 @@ def test_get_tables():
 
     query = """CREATE TABLE public.example AS SELECT 1 AS id, 'Spain' AS country, 'Juan' AS name UNION ALL SELECT 2 AS id, 'Germany' AS country, 'Markus' AS name UNION ALL SELECT 3 AS id, 'France' AS country, 'Antoine' AS name UNION ALL SELECT 4 AS id, 'Poland' AS country, 'Franciszek' AS name"""
     expected = {"tables": ["public.example"]}
+    assert get_tables(query, dialect) == expected
+
+    query = """
+    with my_cte as (
+    select
+        COUNTRY_CODE,
+        COUNTRY_NAME
+    from `raw.my_cte`
+)
+SELECT * from my_cte
+    """
+    expected = {"tables": ["raw.my_cte"]}
     assert get_tables(query, dialect) == expected
 
 
@@ -2048,7 +2111,5 @@ def test_add_limit_with_convert_timezone():
     """
 
     result = add_limit(query, 10, dialect="snowflake")
-    print(f"result: {result}")
-
-
- 
+    assert "query" in result
+    assert parse_one(result["query"]).sql() == parse_one(expected_query).sql()

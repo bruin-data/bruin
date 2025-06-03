@@ -23,8 +23,8 @@ environments:
             chess:
                 - name: "chess-connection"
                   players:
-                      - "MagnusCarlsen"
-                      - "Hikaru"
+                      - "erik"
+                      - "vadimer2"
 ```
 
 You can simply switch the environment using the `--environment` flag, e.g.:
@@ -32,7 +32,7 @@ You can simply switch the environment using the `--environment` flag, e.g.:
 
 ## Running the pipeline
 
-bruin CLI can run the whole pipeline or any task with the downstreams:
+Bruin CLI can run the whole pipeline or any task with the downstreams:
 
 ```shell
 bruin run ./chess/pipeline.yml
@@ -57,4 +57,4 @@ Executed 1 tasks in 103ms
 
 You can optionally pass a `--downstream` flag to run the task with all of its downstreams.
 
-That's it, good luc
+That's it, good luck!

@@ -1,6 +1,6 @@
 # Materialization
 
-Materialization is the idea taking a simple `SELECT` query, and applying the necessary logic to materialize the results into a table or view. This is a common pattern in data engineering, where you have a query that is expensive to run, and you want to store the results in a table for faster access.
+Materialization is the idea of taking a simple `SELECT` query, and applying the necessary logic to materialize the results into a table or view.
 
 Bruin supports various materialization strategies catered to different use cases.
 
@@ -49,6 +49,7 @@ The strategy used for the materialization, can be one of the following:
 - `delete+insert`: incrementally update the table by only refreshing a certain partition.
 - `append`: only append the new data to the table, never overwrite.
 - `merge`: merge the existing records with the new records, requires a primary key to be set.
+- `DDL`: create a new table using a DDL (Data Definition Language) statement.
 
 ### `materialization > partition_by`
 Define the column that will be used for the partitioning of the resulting table. This is used to instruct the data warehouse to set the column for the partition key.
@@ -260,4 +261,54 @@ The strategy will:
 2. Delete existing records within the specified time interval
 3. Insert new records from the query given in the asset
 
+### `DDL`
+
+The `DDL` (Data Definition Language) strategy is used to create a new table using the information provided in the 
+embedded YAML section of the asset. This is useful when you want to create a new table with a specific schema and structure
+and ensure that this table is only created once.
+
+The `DDL` strategy defines the table structure via column definitions in the columns field of the asset. 
+For this reason, you should not include any query after the embedded YAML section.
+
+Here's an example of an asset with `DDL` materialization:
+
+```bruin-sql
+/* @bruin
+name: dashboard.products
+type: bq.sql
+
+materialization:
+  type: table
+  strategy: ddl
+  partition_by: product_category
+
+columns:
+  - name: product_id
+    type: INTEGER
+    description: "Unique identifier for the product"
+    primary_key: true
+  - name: product_category
+    type: VARCHAR
+    description: "Category of the product"
+  - name: product_name
+    type: VARCHAR
+    description: "Name of the product"
+  - name: price
+    type: FLOAT
+    description: "Price of the product in USD"
+  - name: stock
+    type: INTEGER
+    description: "Number of units in stock"
+@bruin */
+
+```
+
+This strategy will:
+- Create a new empty table with the name `dashboard.products`
+- Use the provided schema to define the column names, column types as well as optional primary key constraints and descriptions.
+
+The strategy also supports partitioning and clustering for data warehouses that support these features. You can specify
+in the materialization definition with the following keys:
+- `partition_by`
+- `cluster_by`
 

@@ -469,11 +469,25 @@ func TestLoadFromFile(t *testing.T) {
 			},
 			Spanner: []SpannerConnection{
 				{
-					Name:            "spanner-1",
-					ProjectID:       "project-id-123",
-					InstanceID:      "instance-id-123",
-					Database:        "database-id-123",
-					CredentialsPath: "path/to/service_account.json",
+					Name:               "spanner-1",
+					ProjectID:          "project-id-123",
+					InstanceID:         "instance-id-123",
+					Database:           "database-id-123",
+					ServiceAccountJSON: "{\"key1\": \"value1\"}",
+				},
+				{
+					Name:               "spanner-2",
+					ProjectID:          "project-id-123",
+					InstanceID:         "instance-id-123",
+					Database:           "database-id-123",
+					ServiceAccountFile: "/path/to/service_account.json",
+				},
+			},
+			Solidgate: []SolidgateConnection{
+				{
+					Name:      "solidgate-1",
+					SecretKey: "secret-key-123",
+					PublicKey: "public-key-123",
 				},
 			},
 		},

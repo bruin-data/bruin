@@ -72,6 +72,7 @@ func main() {
 			cmd.Environments(&isDebug),
 			cmd.Connections(),
 			cmd.Query(),
+			cmd.Patch(),
 			versionCommand,
 		},
 		DisableSliceFlagSeparator: true,

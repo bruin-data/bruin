@@ -53,7 +53,7 @@ def main():
             elif cmd["command"] == "add-limit":
                 logging.info("got add-limit command")
                 c = cmd["contents"]
-                result = add_limit(c["query"], c["limit"],c["dialect"])
+                result = add_limit(c["query"], c["limit"], c["dialect"])
             elif cmd["command"] == "exit":
                 logging.info("got exit command amx")
                 break

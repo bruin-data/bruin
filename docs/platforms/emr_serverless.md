@@ -5,7 +5,7 @@ Bruin supports EMR Serverless as a data platform. You can use Bruin to integrate
 
 ## Connection
 
-In order to use bruin to run spark jobs in EMR Serverless, you need to define an `emr_serverless` connection in your `.bruin.yml` file. Here's a sample `.bruin.yml` with the required fields defined.
+In order to use Bruin to run Spark jobs in EMR Serverless, you need to define an `emr_serverless` connection in your `.bruin.yml` file. Here's a sample `.bruin.yml` with the required fields defined.
 
 ```yaml 
 environments:
@@ -93,7 +93,7 @@ Advanced Spark users often package core logic into reusable libraries to improve
 
 Bruin has seamless support for pyspark modules.
 
-For this example, let's assume this is how your bruin pipeline is structured:
+For this example, let's assume this is how your Bruin pipeline is structured:
 ```
 acme_pipeline/
 ├── assets
@@ -103,13 +103,13 @@ acme_pipeline/
 └── pipeline.yml
 ```
 
-Let's say that `acme_pipeline/lib/core.py` stores some common routines used throughout your jobs. For this example, we'll create a function called `sanitize` that takes in a Spark DataFrame and sanitize it's columns (A common operation in Data Analytics).
+Let's say that `acme_pipeline/lib/core.py` stores some common routines used throughout your jobs. For this example, we'll create a function called `sanitize` that takes in a Spark DataFrame and sanitize its columns (A common operation in Data Analytics).
 
 ::: code-group
 ```python [acme_pipeline/lib/core.py]
 from pyspark.sql import DataFrame
 
-def sanitize(df: DateFrame):
+def sanitize(df: DataFrame):
   """
   sanitize a dataframe
   """
@@ -141,11 +141,11 @@ if __name__ == "__main__":
 Bruin internally sets the [`PYTHONPATH`](https://docs.python.org/3/using/cmdline.html#envvar-PYTHONPATH) to the root of your pipeline. So you'll always have to use the fully qualified package name to import any internal packages. 
 
 #### Workspace
-Python assets require `workspace` to be configured in your `emr_serverless` connection. Workspace is a S3 path that is used by bruin as working storage for jobs that run on `emr_serverless`.
+Python assets require `workspace` to be configured in your `emr_serverless` connection. Workspace is a S3 path that is used by Bruin as working storage for jobs that run on `emr_serverless`.
 
-Bruin uses this for:
-* Storing Logs
-* Staging your entrypoint file
+Bruin uses this S3 path for:
+* Storing Logs.
+* Staging your entrypoint file.
 * Uploading bundled dependencies.
 
 ![workspace diagram](media/pyspark-workspace.svg)
@@ -350,7 +350,7 @@ if __name__ == "__main__":
 :::
 
 ::: tip
-If all your Assets share the same `type` and `parameters.athena_connection`, you can set them as [defaults](/getting-started/concepts.html#defaults) in your `pipeline.yml` to avoid repeating them for each Asset.
+If all your assets share the same `type` and `parameters.athena_connection`, you can set them as [defaults](/getting-started/concepts.html#defaults) in your `pipeline.yml` to avoid repeating them for each asset.
 
 
 ```yaml 
@@ -361,7 +361,7 @@ default:
     athena_connection: quality-checks
 ```
 :::
-Now when we run our bruin pipeline again, our quality checks should run after our Asset run finishes.
+Now when we run our Bruin pipeline again, our quality checks should run after our Asset run finishes.
 ```sh
 bruin run ./quality-checks-example
 ```
@@ -387,6 +387,17 @@ bruin run ./quality-checks-example
 </pre>
 :::
 
+## Variables
+
+Both built-in variables (e.g., `BRUIN_START_DATE`, `BRUIN_RUN_ID`) and any user-defined variables (from your `pipeline.yml`) are accessible directly as environment variables within the execution environment of your PySpark jobs.
+
+For `emr_serverless` assets, these environment variables can be accessed using `os.environ` in your PySpark scripts, similar to regular Python assets.
+
+Refer to the [Python assets documentation](/assets/python.md#environment-variables) for more information.
+
+::: tip
+These variables are available in both `pyspark` and `spark` assets. So you can leverage the power of variables regardless of which asset kind you utilize.
+:::
 ## Asset Schema
 
 Here's the full schema of the `emr_serverless.spark` asset along with a brief explanation:

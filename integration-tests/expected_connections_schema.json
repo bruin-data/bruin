@@ -204,8 +204,8 @@
           },
           "type": "array",
           "default": [
-            "MagnusCarlsen",
-            "HikaruNakamura",
+            "erik",
+            "vadimer2Nakamura",
             "ArjunErigaisi"
           ]
         }
@@ -577,9 +577,15 @@
           },
           "type": "array"
         },
-        "spanner": {
+        "gcp_spanner": {
           "items": {
             "$ref": "#/$defs/SpannerConnection"
+          },
+          "type": "array"
+        },
+        "solidgate": {
+          "items": {
+            "$ref": "#/$defs/SolidgateConnection"
           },
           "type": "array"
         }
@@ -1592,10 +1598,10 @@
         "database": {
           "type": "string"
         },
-        "credentials_base64": {
+        "service_account_file": {
           "type": "string"
         },
-        "credentials_path": {
+        "service_account_json": {
           "type": "string"
         }
       },
@@ -1605,9 +1611,27 @@
         "name",
         "project_id",
         "instance_id",
-        "database",
-        "credentials_base64",
-        "credentials_path"
+        "database"
+      ]
+    },
+    "SolidgateConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "secret_key": {
+          "type": "string"
+        },
+        "public_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "public_key",
+        "secret_key"
       ]
     },
     "StripeConnection": {

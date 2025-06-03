@@ -467,7 +467,7 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 					Command: binary,
 					Args: []string{
 						"run",
-						filepath.Join(currentFolder, "test-pipelines/variables-interpolation"),
+						filepath.Join(currentFolder, "test-pipelines/variables-interpolation/assets/users.sql"),
 					},
 					Expected: e2e.Output{
 						ExitCode: 0,
@@ -500,7 +500,7 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 					Args: []string{
 						"run",
 						"--var", `{"users": ["mark", "nicholas"]}`,
-						filepath.Join(currentFolder, "test-pipelines/variables-interpolation"),
+						filepath.Join(currentFolder, "test-pipelines/variables-interpolation/assets/users.sql"),
 					},
 					Expected: e2e.Output{
 						ExitCode: 0,
@@ -533,7 +533,7 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 					Args: []string{
 						"run",
 						"--var", `users=["tanaka", "yamaguchi"]`,
-						filepath.Join(currentFolder, "test-pipelines/variables-interpolation"),
+						filepath.Join(currentFolder, "test-pipelines/variables-interpolation/assets/users.sql"),
 					},
 					Expected: e2e.Output{
 						ExitCode: 0,
@@ -700,6 +700,39 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Expected: e2e.Output{
 				ExitCode: 0,
 				Contains: []string{"CREATE TABLE public.users", "SELECT 'mark' as name", "SELECT 'nicholas' as name"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "python-variable-injection",
+			Command: binary,
+			Args: []string{
+				"run",
+				filepath.Join(currentFolder, "test-pipelines/variables-interpolation/assets/load.py"),
+			},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"env: dev", "users: jhon,erik"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "python-variable-injection-with-override",
+			Command: binary,
+			Args: []string{
+				"run",
+				"--var", `env="prod"`, `--var`, `{"users": ["sakamoto", "shin"]}`,
+				filepath.Join(currentFolder, "test-pipelines/variables-interpolation/assets/load.py"),
+			},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"env: prod", "users: sakamoto,shin"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -1161,6 +1194,20 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Expected: e2e.Output{
 				ExitCode: 0,
 				Contains: []string{"Successfully validated 2 assets", "Executed 4 tasks", "Finished: render_this.my_asset_2"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "test-ddl-duckdb",
+			Command: binary,
+			Args:    []string{"run", "--env", "env-duckdb-ddl", filepath.Join(currentFolder, "test-pipelines/duckdb-ddl-pipeline")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{"Successfully validated 2 assets", "Executed 8 tasks", "Finished: my_schema.table_check"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,

@@ -1,6 +1,6 @@
 # Policies
 
-Bruin supports **policies** to verify that data transformation jobs follow best practices and organisation wide conventions. In addition to built-in lint rules, Bruin also allows users to define **custom lint rules** using a `policy.yml` file.
+Bruin supports **policies** to verify that data transformation jobs follow best practices and organization-wide conventions. In addition to built-in lint rules, Bruin also allows users to define **custom lint rules** using a `policy.yml` file.
 
 This document explains how to define, configure, and use custom linting policies.
 

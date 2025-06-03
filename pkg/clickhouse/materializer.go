@@ -25,7 +25,9 @@ func (m *Materializer) Render(asset *pipeline.Asset, query string) ([]string, er
 
 	strategy := mat.Strategy
 	if m.fullRefresh && mat.Type == pipeline.MaterializationTypeTable {
-		strategy = pipeline.MaterializationStrategyCreateReplace
+		if mat.Strategy != pipeline.MaterializationStrategyDDL {
+			strategy = pipeline.MaterializationStrategyCreateReplace
+		}
 	}
 
 	query = strings.TrimSuffix(strings.TrimSpace(query), ";")

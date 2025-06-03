@@ -1,3 +1,5 @@
+//go:build !bruin_no_duckdb
+
 package duck
 
 import (

@@ -69,7 +69,7 @@ join marketing.attribution as a
 ```
 
 ### `databricks.seed`
-`databricks.seed` are a special type of assets that are used to represent are CSV-files that contain data that is prepared outside of your pipeline that will be loaded into your databricks database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the databricks database.
+`databricks.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your Databricks database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the Databricks database.
 
 You can define seed assets in a file ending with `.yaml`:
 ```yaml
@@ -86,7 +86,7 @@ parameters:
 
 ####  Examples: Load csv into a Databricks database
 
-The examples below show how load a csv into a databricks database.
+The examples below show how to load a CSV into a Databricks database.
 ```yaml
 name: dashboard.hello
 type: databricks.seed

@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/afero"
 )
 
-var pipelineDefinitionFiles = []string{"pipeline.yml", "pipeline.yaml"}
+var PipelineDefinitionFiles = []string{"pipeline.yml", "pipeline.yaml"}
 
 var (
 	fs = afero.NewCacheOnReadFs(afero.NewOsFs(), afero.NewMemMapFs(), 0)
@@ -28,7 +28,7 @@ var (
 	assetsDirectoryNames = []string{"tasks", "assets"}
 
 	builderConfig = pipeline.BuilderConfig{
-		PipelineFileName:    pipelineDefinitionFiles,
+		PipelineFileName:    PipelineDefinitionFiles,
 		TasksDirectoryNames: assetsDirectoryNames,
 		TasksFileSuffixes:   []string{"task.yml", "task.yaml", "asset.yml", "asset.yaml"},
 	}
@@ -43,7 +43,7 @@ var (
 
 func variableOverridesMutator(variables []string) pipeline.PipelineMutator {
 	return func(ctx context.Context, p *pipeline.Pipeline) (*pipeline.Pipeline, error) {
-		var overrides = map[string]any{}
+		overrides := map[string]any{}
 		for _, variable := range variables {
 			parsed, err := parseVariable(variable)
 			if err != nil {

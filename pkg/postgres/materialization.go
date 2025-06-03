@@ -30,6 +30,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
 		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
+		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
 	},
 }
 
@@ -151,4 +152,41 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	}
 
 	return strings.Join(queries, ";\n") + ";", nil
+}
+
+func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
+	columnDefs := make([]string, 0, len(asset.Columns))
+	primaryKeys := []string{}
+	columnComments := []string{}
+
+	for _, col := range asset.Columns {
+		def := fmt.Sprintf("%s %s", col.Name, col.Type)
+
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, col.Name)
+		}
+		columnDefs = append(columnDefs, def)
+
+		if col.Description != "" {
+			comment := fmt.Sprintf("COMMENT ON COLUMN %s.%s IS '%s';", asset.Name, col.Name, strings.ReplaceAll(col.Description, "'", "''"))
+			columnComments = append(columnComments, comment)
+		}
+	}
+
+	if len(primaryKeys) > 0 {
+		primaryKeyClause := fmt.Sprintf("primary key (%s)", strings.Join(primaryKeys, ", "))
+		columnDefs = append(columnDefs, primaryKeyClause)
+	}
+
+	q := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (\n"+
+		"%s\n)",
+		asset.Name,
+		strings.Join(columnDefs, ",\n"),
+	)
+
+	if len(columnComments) > 0 {
+		q += ";\n" + strings.Join(columnComments, "\n")
+	}
+
+	return q, nil
 }
