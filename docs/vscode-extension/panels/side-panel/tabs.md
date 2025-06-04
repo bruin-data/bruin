@@ -87,7 +87,35 @@ The Materialization tab allows you to configure how your asset is materialized i
 
 ![Materialization Tab](../../../public/vscode-extension/panels/side-panel/materialization-tab.gif)
 
-## 4. Settings
+## 4. Custom Checks
+The Custom Checks tab allows you to manage custom checks for your assets directly from the UI.
+
+### How to Use:
+
+1. **Add a Custom Check**:
+   - Click the "Add Check" button.
+   - Enter the details for your custom check:
+     - **Name**: Provide a descriptive name.
+     - **Value**: Set the expected value or threshold.
+     - **Description**: Add a brief description of the check.
+     - **Query**: Input the SQL query for validation.
+
+2. **Edit a Custom Check**:
+   - Click the edit icon (pencil) next to the check you wish to modify.
+   - Make your changes in the provided fields.
+   - Save your changes by clicking the save icon (checkmark), or cancel by clicking the cancel icon (cross).
+
+3. **Delete a Custom Check**:
+   - Click the delete icon (trash can) next to the check you want to remove.
+   - Confirm the deletion in the dialog that appears.
+
+4. **View Custom Checks**:
+   - All custom checks are displayed in a table, showing their name, value, description, and query.
+   - SQL queries are syntax-highlighted for clarity.
+
+![Custom Checks Tab](../../../public/vscode-extension/panels/side-panel/custom-checks-tab.gif)
+
+## 5. Settings
 The Settings tab has two main sections:
 
 ### a. Bruin CLI Management
