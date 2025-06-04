@@ -1,7 +1,6 @@
 package bigquery
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"testing"
@@ -127,6 +126,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 				f.e.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{
 						{Query: "query 1"},
+						{Query: "query 2"},
 					}, nil)
 			},
 			args: args{
@@ -136,12 +136,11 @@ func TestBasicOperator_RunTask(t *testing.T) {
 						Content: "some content",
 					},
 					Materialization: pipeline.Materialization{
-						Type:     pipeline.MaterializationTypeTable,
-						Strategy: pipeline.MaterializationStrategyDDL,
+						Type: pipeline.MaterializationTypeTable,
 					},
 				},
 			},
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name: "query returned an error",
@@ -150,12 +149,12 @@ func TestBasicOperator_RunTask(t *testing.T) {
 					Return([]*query.Query{
 						{Query: "select * from users"},
 					}, nil)
-				f.m.On("IsFullRefresh").Return(true)
+
 				f.m.On("Render", mock.Anything, "select * from users").
 					Return("select * from users", nil)
 
-				//f.m.On("LogIfFullRefreshAndDDL", mock.Anything, mock.Anything).
-				//	Return(nil)
+				f.m.On("LogIfFullRefreshAndDDL", mock.Anything, mock.Anything).
+					Return(nil)
 
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).
 					Return(errors.New("failed to run query"))
@@ -166,10 +165,6 @@ func TestBasicOperator_RunTask(t *testing.T) {
 					ExecutableFile: pipeline.ExecutableFile{
 						Path:    "test-file.sql",
 						Content: "some content",
-					},
-					Materialization: pipeline.Materialization{
-						Type:     pipeline.MaterializationTypeTable,
-						Strategy: pipeline.MaterializationStrategyDDL,
 					},
 				},
 			},
@@ -443,34 +438,4 @@ func TestBasicOperator_RunTask_WithRenderer(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestLogIfFullRefreshAndDDL(t *testing.T) {
-	t.Parallel()
-
-	// Mock writer
-	var writerMock bytes.Buffer
-
-	// Create a materializer with FullRefresh set to true
-	materializer := &pipeline.Materializer{
-		FullRefresh: true,
-	}
-
-	// Create a test asset with DDL strategy
-	asset := &pipeline.Asset{
-		Materialization: pipeline.Materialization{
-			Type:     pipeline.MaterializationTypeTable,
-			Strategy: pipeline.MaterializationStrategyDDL,
-		},
-	}
-
-	// Call the method
-	err := materializer.LogIfFullRefreshAndDDL(&writerMock, asset)
-
-	// Assert no error
-	assert.NoError(t, err)
-
-	// Assert the correct message was written
-	expectedMessage := "Full refresh detected, but DDL strategy is in use — table will NOT be dropped or recreated.\n"
-	assert.Equal(t, expectedMessage, writerMock.String())
 }
