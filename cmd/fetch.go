@@ -58,10 +58,11 @@ func Query() *cli.Command {
 				Usage:   "limit the number of rows returned",
 			},
 			&cli.StringFlag{
-				Name:    "output",
-				Aliases: []string{"o"},
-				Value:   "plain",
-				Usage:   "the output type, possible values are: plain, json, csv",
+				Name:        "output",
+				Aliases:     []string{"o"},
+				DefaultText: "plain",
+				Value:       "plain",
+				Usage:       "the output type, possible values are: plain, json, csv",
 			},
 			&cli.StringFlag{
 				Name:  "asset",
@@ -181,7 +182,7 @@ func Query() *cli.Command {
 						}
 					}
 				default:
-					printTable(result.Columns, result.Rows)
+					fmt.Printf("Invalid output type: %s\n", output)
 				}
 			} else {
 				fmt.Printf("Connection type %s does not support querying.\n", c.String("connection"))
