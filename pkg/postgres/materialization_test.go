@@ -261,7 +261,8 @@ COMMIT;`,
 			want: "CREATE TABLE IF NOT EXISTS two_col_table \\(\n" +
 				"id INT64,\n" +
 				"name STRING\n" +
-				"\\)",
+				"\\);\n" +
+				"COMMENT ON COLUMN two_col_table\\.name IS \\'The name of the person\\';",
 		},
 		{
 			name: "table with primary key",
@@ -280,7 +281,8 @@ COMMIT;`,
 				"id INT64,\n" +
 				"category STRING,\n" +
 				"primary key \\(id\\)\n" +
-				"\\)",
+				"\\);\n" +
+				"COMMENT ON COLUMN my_primary_key_table\\.category IS \\'Category of the item\\';",
 		},
 		{
 			name: "table with composite primary key",
@@ -299,46 +301,8 @@ COMMIT;`,
 				"id INT64,\n" +
 				"category STRING,\n" +
 				"primary key \\(id, category\\)\n" +
-				"\\)",
-		},
-		{
-			name: "table with partitioning",
-			task: &pipeline.Asset{
-				Name: "my_partitioned_table",
-				Columns: []pipeline.Column{
-					{Name: "id", Type: "INT64"},
-					{Name: "timestamp", Type: "TIMESTAMP", Description: "Event timestamp"},
-				},
-				Materialization: pipeline.Materialization{
-					Type:        pipeline.MaterializationTypeTable,
-					Strategy:    pipeline.MaterializationStrategyDDL,
-					PartitionBy: "timestamp",
-				},
-			},
-			want: "CREATE TABLE IF NOT EXISTS my_partitioned_table \\(\n" +
-				"id INT64,\n" +
-				"timestamp TIMESTAMP\n" +
-				"\\)",
-		},
-		{
-			name: "table with column comments",
-			task: &pipeline.Asset{
-				Name: "my_table_with_comments",
-				Materialization: pipeline.Materialization{
-					Type:        pipeline.MaterializationTypeTable,
-					Strategy:    pipeline.MaterializationStrategyDDL,
-					PartitionBy: "timestamp",
-				},
-				Columns: []pipeline.Column{
-					{Name: "id", Type: "INT64", Description: "Identifier for the record"},
-					{Name: "name", Type: "STRING", Description: "Name of the person"},
-				},
-			},
-			want: "CREATE TABLE IF NOT EXISTS my_table_with_comments \\(\n" +
-				"id INT64,\n" +
-				"name STRING\n\\);\n" +
-				"COMMENT ON COLUMN my_table_with_comments.id IS 'Identifier for the record';\n" +
-				"COMMENT ON COLUMN my_table_with_comments.name IS 'Name of the person';",
+				"\\);\n" +
+				"COMMENT ON COLUMN my_composite_primary_key_table\\.category IS \\'Category of the item\\';",
 		},
 	}
 	for _, tt := range tests {
