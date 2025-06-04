@@ -24,8 +24,8 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyMerge:         mergeMaterializer,
 		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
-		pipeline.MaterializationStrategySCD2ByTime:    buildSCD2QueryByTime,
 		pipeline.MaterializationStrategySCD2ByColumn:  buildSCD2ByColumnQuery,
+		pipeline.MaterializationStrategySCD2ByTime:    buildSCD2QueryByTime,
 	},
 }
 
@@ -222,6 +222,7 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
+	query = strings.TrimRight(query, ";")
 	primaryKeys := []string{}
 	joinConds := make([]string, 0, 4)
 	insertCols := make([]string, 0, len(asset.Columns)+3)
@@ -287,6 +288,7 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error) {
+	query = strings.TrimRight(query, ";")
 	primaryKeys := []string{}
 	joinConds := make([]string, 0, 4)
 	insertCols := make([]string, 0, len(asset.Columns)+3)
