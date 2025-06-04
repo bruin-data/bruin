@@ -19,7 +19,7 @@ You can see the "Data Platforms" on the left sidebar to see supported types.
 The `parameters` key in the configuration defines the parameters for the seed asset. The `path` parameter is the path to the CSV file that will be loaded into the data platform. path is relative to the asset definition file.
 
 ##  Examples
-The examples below show how load a csv into a Duckdb & bigquery database.
+The examples below show how to load a CSV into a DuckDB & BigQuery database.
 
 ### Simplest: Load csv into a Duckdb
 ```yaml
@@ -37,4 +37,4 @@ Y,LinkedIn,SDE,2024-01-01
 B,LinkedIn,SDE 2,2024-01-01
 ```
 
-This operation will load the csv into a table called `seed.raw` in the Duckdb database.
+This operation will load the CSV into a table called `seed.raw` in the DuckDB database.

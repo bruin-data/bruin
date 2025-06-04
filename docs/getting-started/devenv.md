@@ -27,8 +27,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "MagnusCarlsen"
-            - "Hikaru"
+            - "erik"
+            - "vadimer2"
 
   production:
     connections:
@@ -85,8 +85,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "MagnusCarlsen"
-            - "Hikaru"
+            - "erik"
+            - "vadimer2"
 
   production:
     connections:
@@ -134,8 +134,8 @@ flowchart LR
 
 
 When you run this asset in a schema-prefixed environments, Bruin will do a few things:
-- First of all, it will analyze if the query, and identify the used tables. 
-  - In this example, it will identify `chess.players` is found.
+- First of all, it will analyze the query and identify the used tables. 
+  - In this example, it will identify that `chess.players` is found.
 - In parallel, it will gather a list of available schemas and tables within the given database.
 - It will check which of the referenced schemas and tables exist with the prefix.
 - For each table that has a copy in a prefixed schema, Bruin will rewrite the query and the asset to use the prefixed schema names instead.

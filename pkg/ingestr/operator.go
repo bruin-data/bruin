@@ -26,10 +26,15 @@ type ingestrRunner interface {
 	RunIngestr(ctx context.Context, args, extraPackages []string, repo *git.Repo) error
 }
 
+type renderer interface {
+	Render(query string) (string, error)
+}
+
 type BasicOperator struct {
-	conn   connectionFetcher
-	runner ingestrRunner
-	finder repoFinder
+	conn          connectionFetcher
+	runner        ingestrRunner
+	finder        repoFinder
+	jinjaRenderer renderer
 }
 
 type SeedOperator struct {
@@ -42,13 +47,13 @@ type pipelineConnection interface {
 	GetIngestrURI() (string, error)
 }
 
-func NewBasicOperator(conn *connection.Manager) (*BasicOperator, error) {
+func NewBasicOperator(conn *connection.Manager, j renderer) (*BasicOperator, error) {
 	uvRunner := &python.UvPythonRunner{
 		UvInstaller: &python.UvChecker{},
 		Cmd:         &python.CommandRunner{},
 	}
 
-	return &BasicOperator{conn: conn, runner: uvRunner, finder: &git.RepoFinder{}}, nil
+	return &BasicOperator{conn: conn, runner: uvRunner, finder: &git.RepoFinder{}, jinjaRenderer: j}, nil
 }
 
 func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
@@ -79,6 +84,11 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	sourceTable, ok := ti.GetAsset().Parameters["source_table"]
 	if !ok {
 		return errors.New("source table not configured")
+	}
+
+	sourceTable, err = o.jinjaRenderer.Render(sourceTable)
+	if err != nil {
+		return errors.Wrap(err, "failed to render jinja for source_table parameter")
 	}
 
 	destConnectionName, err := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())

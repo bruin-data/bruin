@@ -54,7 +54,7 @@ group by customer_id;
 ```
 
 ### `synapse.seed`
-`synapse.seed` are a special type of assets that are used to represent are CSV-files that contain data that is prepared outside of your pipeline that will be loaded into your synapse database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the synapse database.
+`synapse.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your Synapse database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the Synapse database.
 
 You can define seed assets in a file ending with `.yaml`:
 ```yaml
@@ -71,7 +71,7 @@ parameters:
 
 ####  Examples: Load csv into a Synapse database
 
-The examples below show how load a csv into a synapse database.
+The examples below show how to load a CSV into a Synapse database.
 ```yaml
 name: dashboard.hello
 type: synapse.seed

@@ -10,10 +10,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/bruin-data/bruin/internal/data"
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pythonsrc"
 	"github.com/kluctl/go-embed-python/embed_util"
@@ -309,7 +311,7 @@ func AssetTypeToDialect(assetType pipeline.AssetType) (string, error) {
 	return dialect, nil
 }
 
-func (s *SQLParser) AddLimit(sql string, limit int) (string, error) {
+func (s *SQLParser) AddLimit(sql string, limit int, dialect string) (string, error) {
 	err := s.Start()
 	if err != nil {
 		return "", errors.Wrap(err, "failed to start sql parser")
@@ -318,8 +320,9 @@ func (s *SQLParser) AddLimit(sql string, limit int) (string, error) {
 	command := parserCommand{
 		Command: "add-limit",
 		Contents: map[string]interface{}{
-			"query": sql,
-			"limit": limit,
+			"query":   sql,
+			"limit":   limit,
+			"dialect": dialect,
 		},
 	}
 
@@ -342,4 +345,72 @@ func (s *SQLParser) AddLimit(sql string, limit int) (string, error) {
 	}
 
 	return resp.Query, nil
+}
+
+func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeline *pipeline.Pipeline, renderer jinja.RendererInterface) ([]string, error) {
+	err := s.Start()
+	if err != nil {
+		return []string{}, errors.Wrap(err, "failed to start sql parser")
+	}
+
+	dialect, err := AssetTypeToDialect(asset.Type)
+	if err != nil {
+		return []string{}, nil //nolint:nilerr
+	}
+
+	renderedQ, err := renderer.Render(asset.ExecutableFile.Content)
+	if err != nil {
+		return []string{}, errors.New("failed to render the query before parsing the SQL")
+	}
+
+	tables, err := s.UsedTables(renderedQ, dialect)
+	if err != nil {
+		return []string{}, errors.Wrap(err, "failed to get used tables")
+	}
+
+	if len(tables) == 0 && len(asset.Upstreams) == 0 {
+		return []string{}, nil
+	}
+
+	pipelineAssetNames := make(map[string]bool, len(pipeline.Assets))
+	for _, a := range pipeline.Assets {
+		pipelineAssetNames[strings.ToLower(a.Name)] = true
+	}
+
+	usedTableNameMap := make(map[string]string, len(tables))
+	for _, table := range tables {
+		usedTableNameMap[strings.ToLower(table)] = table
+	}
+
+	depsNameMap := make(map[string]string, len(asset.Upstreams))
+	for _, upstream := range asset.Upstreams {
+		if upstream.Type != "asset" {
+			continue
+		}
+
+		depsNameMap[strings.ToLower(upstream.Value)] = upstream.Value
+	}
+
+	missingDependencies := make([]string, 0)
+	for usedTable, actualReferenceName := range usedTableNameMap {
+		// if the used table contains a full name with multiple dots treat it as an absolute reference, ignore it
+		if strings.Count(usedTable, ".") > 1 {
+			continue
+		}
+
+		// if the table is in the dependency list already, move on
+		if _, ok := depsNameMap[usedTable]; ok {
+			continue
+		}
+
+		// report this issue only if there's an asset with the same name, otherwise ignore
+		if _, ok := pipelineAssetNames[usedTable]; !ok {
+			continue
+		}
+
+		// otherwise, report the issue
+		missingDependencies = append(missingDependencies, actualReferenceName)
+	}
+
+	return missingDependencies, nil
 }

@@ -5,11 +5,13 @@ environments:
       duckdb:
         - name: "duckdb-default"
           path: "duckdb-files/duckdb.db"
+        - name: "duckdb-variables"
+          path: "duckdb-files/variables.db"
       chess:
         - name: "chess-default"
           players:
-            - "MagnusCarlsen"
-            - "Hikaru"
+            - "erik"
+            - "vadimer2"
       generic:
         - name: KEY1
           value: value1
@@ -21,8 +23,8 @@ environments:
       chess:
         - name: "chess-run-with-filters"
           players:
-            - "MagnusCarlsen"
-            - "Hikaru"
+            - "erik"
+            - "vadimer2"
       generic:
         - name: KEY1
           value: value1
@@ -34,8 +36,8 @@ environments:
       chess:
         - name: "chess-run-with-tags"
           players:
-            - "MagnusCarlsen"
-            - "Hikaru"
+            - "erik"
+            - "vadimer2"
       generic:
         - name: KEY1
           value: value1
@@ -47,8 +49,8 @@ environments:
       chess:
         - name: "chess-run-main-with-filters"
           players:
-            - "MagnusCarlsen"
-            - "Hikaru"
+            - "erik"
+            - "vadimer2"
       generic:
         - name: KEY1
           value: value1
@@ -61,8 +63,8 @@ environments:
       chess:
         - name: "chess-run-with-downstream"
           players:
-            - "MagnusCarlsen"
-            - "Hikaru"
+            - "erik"
+            - "vadimer2"
       generic:
         - name: KEY1
           value: value1
@@ -74,8 +76,8 @@ environments:
       chess:
         - name: "chess-run-main-with-downstream"
           players:
-            - "MagnusCarlsen"
-            - "Hikaru"
+            - "erik"
+            - "vadimer2"
       generic:
         - name: KEY1
           value: value1
@@ -92,8 +94,8 @@ environments:
       chess:
         - name: "chess-run-use-uv"
           players:
-            - "MagnusCarlsen"
-            - "Hikaru"
+            - "erik"
+            - "vadimer2"
       generic:
         - name: KEY1
           value: value1
@@ -105,8 +107,8 @@ environments:
       chess:
         - name: "chess-run-default-option"
           players:
-            - "MagnusCarlsen"
-            - "Hikaru"
+            - "erik"
+            - "vadimer2"
       generic:
         - name: KEY1
           value: value1
@@ -120,8 +122,8 @@ environments:
       chess:
         - name: "chess-run-malformed-sql"
           players:
-            - "MagnusCarlsen"
-            - "Hikaru"
+            - "erik"
+            - "vadimer2"
       generic:
         - name: KEY1
           value: value1
@@ -138,8 +140,8 @@ environments:
       chess:
         - name: "chess-ingestr"
           players:
-            - "MagnusCarlsen"
-            - "Hikaru"
+            - "erik"
+            - "vadimer2"
   env-run-python-materialization:
     connections:
       duckdb:
@@ -187,3 +189,9 @@ environments:
       duckdb:
         - name: "duckdb-render-template-this"
           path: "duckdb-files/render-template-this.db"
+
+  env-duckdb-ddl:
+    connections:
+      duckdb:
+        - name: "duckdb-ddl"
+          path: "duckdb-files/duckdb-ddl.db"

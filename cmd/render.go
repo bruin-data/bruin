@@ -65,9 +65,17 @@ func Render() *cli.Command {
 				Name:  "apply-interval-modifiers",
 				Usage: "applies interval modifiers if flag is given",
 			},
+			&cli.StringSliceFlag{
+				Name:  "var",
+				Usage: "override pipeline variables with custom values",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			fullRefresh := c.Bool("full-refresh")
+
+			if vars := c.StringSlice("var"); len(vars) > 0 {
+				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
+			}
 
 			startDate, err := date.ParseTime(c.String("start-date"))
 			if err != nil {
@@ -113,7 +121,7 @@ func Render() *cli.Command {
 				}
 				return cli.Exit("", 1)
 			}
-			pipelinePath, err := path.GetPipelineRootFromTask(inputPath, pipelineDefinitionFiles)
+			pipelinePath, err := path.GetPipelineRootFromTask(inputPath, PipelineDefinitionFiles)
 			if err != nil {
 				printError(err, c.String("output"), "Failed to get the pipeline path:")
 				return cli.Exit("", 1)
@@ -128,6 +136,12 @@ func Render() *cli.Command {
 			pl, err := pipeline.PipelineFromPath(pipelineDefinitionFullPath, fs)
 			if err != nil {
 				printError(err, c.String("output"), "Failed to read the pipeline definition file:")
+				return cli.Exit("", 1)
+			}
+
+			pl, err = DefaultPipelineBuilder.MutatePipeline(c.Context, pl)
+			if err != nil {
+				printError(err, c.String("output"), "Failed to mutate the pipeline:")
 				return cli.Exit("", 1)
 			}
 
@@ -183,7 +197,7 @@ func Render() *cli.Command {
 			r := RenderCommand{
 				extractor: &query.WholeFileExtractor{
 					Fs:       fs,
-					Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "your-pipeline-name", "your-run-id", pl.Variables.Value()),
+					Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, pl.Name, "your-run-id", pl.Variables.Value()),
 				},
 				materializers: map[pipeline.AssetType]queryMaterializer{
 					pipeline.AssetTypeBigqueryQuery:   bigquery.NewMaterializer(fullRefresh),
@@ -337,20 +351,20 @@ func (r *RenderCommand) printErrorOrJsonf(msg string, args ...interface{}) {
 }
 
 func getPipelineDefinitionFullPath(pipelinePath string) (string, error) {
-	for _, pipelineDefinitionfile := range pipelineDefinitionFiles {
+	for _, pipelineDefinitionfile := range PipelineDefinitionFiles {
 		fullPath := filepath.Join(pipelinePath, pipelineDefinitionfile)
 		if _, err := os.Stat(fullPath); err == nil {
 			// File exists, return the full path
 			return fullPath, nil
 		}
 	}
-	return "", errors.Errorf("no pipeline definition file found in '%s'. Supported files: %v", pipelinePath, pipelineDefinitionFiles)
+	return "", errors.Errorf("no pipeline definition file found in '%s'. Supported files: %v", pipelinePath, PipelineDefinitionFiles)
 }
 
 func modifyExtractor(ctx ModifierInfo, p *pipeline.Pipeline, t *pipeline.Asset) queryExtractor {
 	newStartDate := pipeline.ModifyDate(ctx.StartDate, t.IntervalModifiers.Start)
 	newEnddate := pipeline.ModifyDate(ctx.EndDate, t.IntervalModifiers.End)
-	newRenderer := jinja.NewRendererWithStartEndDates(&newStartDate, &newEnddate, "your-pipeline-name", "your-run-id", p.Variables.Value())
+	newRenderer := jinja.NewRendererWithStartEndDates(&newStartDate, &newEnddate, p.Name, "your-run-id", p.Variables.Value())
 
 	return &query.WholeFileExtractor{
 		Renderer: newRenderer,

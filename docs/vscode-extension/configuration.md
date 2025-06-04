@@ -1,6 +1,6 @@
 ## Configuration
 
-You can configure the Bruin VSCode extension to suit your preferences, adjusting settings for folding behavior and the default path separator.
+You can configure the Bruin VS Code extension to suit your preferences, adjusting settings for folding behavior and the default path separator.
 
 ### Folding Behavior
 
@@ -18,7 +18,7 @@ Set your preferred path separator in the extension settings under `Bruin > Path 
 
 To access and modify the Bruin extension settings:
 
-1. Open Visual Studio Code.
+1. Open VS Code.
 2. Click the **Settings** gear icon in the lower-left corner.
 3. In the search bar, type "Bruin" to filter the Bruin extension settings.
 4. Adjust the settings for **Default Folding State** and **Path Separator** as needed.

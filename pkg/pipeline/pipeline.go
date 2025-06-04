@@ -110,6 +110,8 @@ var defaultMapping = map[string]string{
 	"applovin":              "applovin-default",
 	"salesforce":            "salesforce-default",
 	"oracle":                "oracle-default",
+	"solidgate":             "solidgate-default",
+	"smartsheet":            "smartsheet-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}
@@ -623,7 +625,7 @@ func (s AthenaConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s)
 }
 
-type Asset struct {
+type Asset struct { //nolint:recvcheck
 	ID                string             `json:"id" yaml:"-" mapstructure:"-"`
 	URI               string             `json:"uri" yaml:"uri,omitempty" mapstructure:"uri"`
 	Name              string             `json:"name" yaml:"name,omitempty" mapstructure:"name"`
@@ -723,6 +725,18 @@ func (im IntervalModifiers) MarshalJSON() ([]byte, error) {
 
 func (a *Asset) AddUpstream(asset *Asset) {
 	a.upstream = append(a.upstream, asset)
+
+	for _, u := range a.Upstreams {
+		if strings.EqualFold(u.Value, asset.Name) {
+			return
+		}
+	}
+
+	a.Upstreams = append(a.Upstreams, Upstream{
+		Type:  "asset",
+		Value: asset.Name,
+		Mode:  UpstreamModeFull,
+	})
 }
 
 func (a *Asset) PrefixSchema(prefix string) {
@@ -758,6 +772,7 @@ func (a *Asset) PrefixUpstreams(prefix string) {
 func (a *Asset) removeRedundanciesBeforePersisting() {
 	a.clearDuplicateUpstreams()
 	a.removeExtraSpacesAtLineEndingsInTextContent()
+	a.removeNameIfItCanBeInferredFromPath()
 
 	// python assets don't require a type anymore
 	if a.Type == AssetTypePython && strings.HasSuffix(a.ExecutableFile.Path, ".py") {
@@ -823,6 +838,17 @@ func (a *Asset) removeExtraSpacesAtLineEndingsInTextContent() {
 	for i := range a.CustomChecks {
 		a.CustomChecks[i].Description = ClearSpacesAtLineEndings(a.CustomChecks[i].Description)
 		a.CustomChecks[i].Query = ClearSpacesAtLineEndings(a.CustomChecks[i].Query)
+	}
+}
+
+func (a *Asset) removeNameIfItCanBeInferredFromPath() {
+	potentialName, err := a.GetNameIfItWasSetFromItsPath(nil)
+	if err != nil {
+		return
+	}
+
+	if potentialName == a.Name {
+		a.Name = ""
 	}
 }
 
@@ -947,11 +973,40 @@ func (a *Asset) EnrichFromEntityAttributes(entities []*glossary.Entity) error {
 	return nil
 }
 
-func (a *Asset) Persist(fs afero.Fs) error {
-	if a == nil {
-		return errors.New("failed to build an asset, therefore cannot persist it")
+func (a *Asset) GetNameIfItWasSetFromItsPath(foundPipeline *Pipeline) (string, error) {
+	var err error
+	var baseFolder string
+	if foundPipeline != nil {
+		pipelinePath := foundPipeline.DefinitionFile.Path
+		baseFolder = filepath.Join(filepath.Dir(pipelinePath), "assets")
+	} else {
+		pipelinePath, err := path.GetPipelineRootFromTask(a.DefinitionFile.Path, []string{"pipeline.yml", "pipeline.yaml"})
+		if err != nil {
+			return "", err
+		}
+		baseFolder = filepath.Join(pipelinePath, "assets")
 	}
 
+	relativePath, err := filepath.Rel(baseFolder, a.DefinitionFile.Path)
+	if err != nil {
+		return "", err
+	}
+
+	name := strings.ReplaceAll(relativePath, string(filepath.Separator), ".")
+
+	switch {
+	case strings.HasSuffix(name, ".asset.yml"):
+		name = strings.TrimSuffix(name, ".asset.yml")
+	case strings.HasSuffix(name, ".asset.yaml"):
+		name = strings.TrimSuffix(name, ".asset.yaml")
+	default:
+		name = strings.TrimSuffix(name, filepath.Ext(name))
+	}
+
+	return name, nil
+}
+
+func (a Asset) Persist(fs afero.Fs) error {
 	// Reuse the logic from PersistWithoutWriting
 	content, err := a.FormatContent()
 	if err != nil {
@@ -1391,14 +1446,17 @@ type glossaryReader interface {
 	GetEntities(pathToPipeline string) ([]*glossary.Entity, error)
 }
 
-type assetMutator func(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error)
+type AssetMutator func(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error)
+
+type PipelineMutator func(ctx context.Context, pipeline *Pipeline) (*Pipeline, error)
 
 type Builder struct {
 	config             BuilderConfig
 	yamlTaskCreator    TaskCreator
 	commentTaskCreator TaskCreator
 	fs                 afero.Fs
-	mutators           []assetMutator
+	assetMutators      []AssetMutator
+	pipelineMutators   []PipelineMutator
 
 	GlossaryReader glossaryReader
 }
@@ -1407,8 +1465,12 @@ func (b *Builder) SetGlossaryReader(reader glossaryReader) {
 	b.GlossaryReader = reader
 }
 
-func (b *Builder) AddMutator(m assetMutator) {
-	b.mutators = append(b.mutators, m)
+func (b *Builder) AddAssetMutator(m AssetMutator) {
+	b.assetMutators = append(b.assetMutators, m)
+}
+
+func (b *Builder) AddPipelineMutator(m PipelineMutator) {
+	b.pipelineMutators = append(b.pipelineMutators, m)
 }
 
 type ParseError struct {
@@ -1428,7 +1490,7 @@ func NewBuilder(config BuilderConfig, yamlTaskCreator TaskCreator, commentTaskCr
 		GlossaryReader:     gr,
 	}
 
-	b.mutators = []assetMutator{
+	b.assetMutators = []AssetMutator{
 		b.fillGlossaryStuff,
 		b.SetupDefaultsFromPipeline,
 		b.SetNameFromPath,
@@ -1594,6 +1656,13 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 		}
 	}
 
+	if config.isMutate {
+		pipeline, err = b.MutatePipeline(ctx, pipeline)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return pipeline, nil
 }
 
@@ -1645,7 +1714,7 @@ func (b *Builder) CreateAssetFromFile(filePath string, foundPipeline *Pipeline) 
 }
 
 func (b *Builder) MutateAsset(ctx context.Context, task *Asset, foundPipeline *Pipeline) (*Asset, error) {
-	for _, mutator := range b.mutators {
+	for _, mutator := range b.assetMutators {
 		var err error
 		task, err = mutator(ctx, task, foundPipeline)
 		if err != nil {
@@ -1654,6 +1723,18 @@ func (b *Builder) MutateAsset(ctx context.Context, task *Asset, foundPipeline *P
 	}
 
 	return task, nil
+}
+
+func (b *Builder) MutatePipeline(ctx context.Context, pipeline *Pipeline) (*Pipeline, error) {
+	for _, mutator := range b.pipelineMutators {
+		var err error
+		pipeline, err = mutator(ctx, pipeline)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return pipeline, nil
 }
 
 func (b *Builder) SetupDefaultsFromPipeline(ctx context.Context, asset *Asset, foundPipeline *Pipeline) (*Asset, error) {
@@ -1812,22 +1893,10 @@ func (b *Builder) SetNameFromPath(ctx context.Context, asset *Asset, foundPipeli
 	if asset.Name != "" {
 		return asset, nil
 	}
-	pipelinePath := foundPipeline.DefinitionFile.Path
-	baseFolder := filepath.Join(filepath.Dir(pipelinePath), "assets")
-	path, err := filepath.Rel(baseFolder, asset.DefinitionFile.Path)
+
+	name, err := asset.GetNameIfItWasSetFromItsPath(foundPipeline)
 	if err != nil {
-		return nil, err
-	}
-
-	name := strings.ReplaceAll(path, string(filepath.Separator), ".")
-
-	switch {
-	case strings.HasSuffix(name, ".asset.yml"):
-		name = strings.TrimSuffix(name, ".asset.yml")
-	case strings.HasSuffix(name, ".asset.yaml"):
-		name = strings.TrimSuffix(name, ".asset.yaml")
-	default:
-		name = strings.TrimSuffix(name, filepath.Ext(name))
+		return asset, errors.Wrap(err, "error getting asset name")
 	}
 
 	asset.Name = name

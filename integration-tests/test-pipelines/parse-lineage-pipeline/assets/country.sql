@@ -9,6 +9,7 @@ depends:
 columns:
   - name: id
     type: integer
+    primary_key: true
     
 @bruin */
 

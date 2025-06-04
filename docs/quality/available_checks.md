@@ -4,8 +4,8 @@ Bruin provides the following checks to validate assets, ensuring that asset data
 
 - [**Accepted Values**](#accepted-values)
 - [**Negative**](#negative)
-- [**Non-negative**](#non-negative)
-- [**Not Null**](#not-null)
+- [**Non-Negative**](#non-negative)
+- [**Not-Null**](#not-null)
 - [**Pattern**](#pattern)
 - [**Positive**](#positive)
 - [**Unique**](#unique)
@@ -35,7 +35,7 @@ columns:
     checks:
       - name: negative
 ```
-## Non negative
+## Non-Negative
 This check will verify that the values of the column are all non negative (positive or zero)
 ```yaml
 columns:
@@ -46,7 +46,7 @@ columns:
       - name: non_negative
 ```
 
-## Not Null
+## Not-Null
 This check will verify that none of the values of the checked column are null.
 ```yaml
 columns:

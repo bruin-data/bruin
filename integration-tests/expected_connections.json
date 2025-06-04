@@ -14,14 +14,18 @@
         {
           "name": "duckdb-default",
           "path": "integration-tests/duckdb-files/duckdb.db"
+        },
+        {
+          "name": "duckdb-variables",
+          "path": "variables.db"
         }
       ],
       "chess": [
         {
           "name": "chess-default",
           "players": [
-            "MagnusCarlsen",
-            "Hikaru"
+            "erik",
+            "vadimer2"
           ]
         }
       ]
@@ -41,14 +45,18 @@
           {
             "name": "duckdb-default",
             "path": "integration-tests/duckdb-files/duckdb.db"
+          },
+          {
+            "name": "duckdb-variables",
+            "path": "variables.db"
           }
         ],
         "chess": [
           {
             "name": "chess-default",
             "players": [
-              "MagnusCarlsen",
-              "Hikaru"
+              "erik",
+              "vadimer2"
             ]
           }
         ]
@@ -67,8 +75,8 @@
           {
             "name": "chess-ingestr",
             "players": [
-              "MagnusCarlsen",
-              "Hikaru"
+              "erik",
+              "vadimer2"
             ]
           }
         ]
@@ -119,8 +127,8 @@
           {
             "name": "chess-run-default-option",
             "players": [
-              "MagnusCarlsen",
-              "Hikaru"
+              "erik",
+              "vadimer2"
             ]
           }
         ]
@@ -145,8 +153,8 @@
           {
             "name": "chess-run-main-with-downstream",
             "players": [
-              "MagnusCarlsen",
-              "Hikaru"
+              "erik",
+              "vadimer2"
             ]
           }
         ]
@@ -171,8 +179,8 @@
           {
             "name": "chess-run-main-with-filters",
             "players": [
-              "MagnusCarlsen",
-              "Hikaru"
+              "erik",
+              "vadimer2"
             ]
           }
         ]
@@ -197,8 +205,8 @@
           {
             "name": "chess-run-malformed-sql",
             "players": [
-              "MagnusCarlsen",
-              "Hikaru"
+              "erik",
+              "vadimer2"
             ]
           }
         ]
@@ -245,8 +253,8 @@
           {
             "name": "chess-run-use-uv",
             "players": [
-              "MagnusCarlsen",
-              "Hikaru"
+              "erik",
+              "vadimer2"
             ]
           }
         ]
@@ -271,8 +279,8 @@
           {
             "name": "chess-run-with-downstream",
             "players": [
-              "MagnusCarlsen",
-              "Hikaru"
+              "erik",
+              "vadimer2"
             ]
           }
         ]
@@ -297,8 +305,8 @@
           {
             "name": "chess-run-with-filters",
             "players": [
-              "MagnusCarlsen",
-              "Hikaru"
+              "erik",
+              "vadimer2"
             ]
           }
         ]
@@ -323,8 +331,8 @@
           {
             "name": "chess-run-with-tags",
             "players": [
-              "MagnusCarlsen",
-              "Hikaru"
+              "erik",
+              "vadimer2"
             ]
           }
         ]
@@ -391,7 +399,18 @@
         "duckdb": [
           {
             "name": "duckdb-render-template-this",
-            "path": "integration-tests/duckdb-files/render-template-this.db.db"
+            "path": "integration-tests/duckdb-files/render-template-this.db"
+          }
+        ]
+      }
+    },
+    "env-duckdb-ddl": {
+      "schema_prefix": "",
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-ddl",
+            "path": "integration-tests/duckdb-files/duckdb-ddl.db"
           }
         ]
       }

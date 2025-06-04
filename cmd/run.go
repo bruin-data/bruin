@@ -31,6 +31,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/ingestr"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
+	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -187,6 +188,11 @@ func Run(isDebug *bool) *cli.Command {
 				Usage:  "skip initial pipeline analysis logs for this run",
 				Hidden: true,
 			},
+			&cli.StringSliceFlag{
+				Name:    "var",
+				Usage:   "override pipeline variables with custom values",
+				EnvVars: []string{"BRUIN_VARS"},
+			},
 		},
 		Action: func(c *cli.Context) error {
 			defer func() {
@@ -254,11 +260,15 @@ func Run(isDebug *bool) *cli.Command {
 				// execution will be built under prefixed schemas. This requires not just modifying the queries,
 				// but also modifying the asset names so that quality checks actually run against the tables in the new schema.
 				// Since we change the asset names, we need to also prefix the upstream since their names would be changed as well.
-				DefaultPipelineBuilder.AddMutator(func(ctx context.Context, asset *pipeline.Asset, foundPipeline *pipeline.Pipeline) (*pipeline.Asset, error) {
+				DefaultPipelineBuilder.AddAssetMutator(func(ctx context.Context, asset *pipeline.Asset, foundPipeline *pipeline.Pipeline) (*pipeline.Asset, error) {
 					asset.PrefixSchema(cm.SelectedEnvironment.SchemaPrefix)
 					asset.PrefixUpstreams(cm.SelectedEnvironment.SchemaPrefix)
 					return asset, nil
 				})
+			}
+
+			if vars := c.StringSlice("var"); len(vars) > 0 {
+				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
 			}
 
 			pipelineInfo, err := GetPipeline(c.Context, inputPath, runConfig, logger)
@@ -432,7 +442,7 @@ func Run(isDebug *bool) *cli.Command {
 				}()
 			}
 
-			mainExecutors, err := setupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode, parser)
+			mainExecutors, err := SetupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode, parser)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -507,7 +517,7 @@ func ReadState(fs afero.Fs, statePath string, filter *Filter) (*scheduler.Pipeli
 	return pipelineState, nil
 }
 
-func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.RunConfig, logger *zap.SugaredLogger) (*PipelineInfo, error) {
+func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.RunConfig, log logger.Logger) (*PipelineInfo, error) {
 	pipelinePath := inputPath
 	runningForAnAsset := isPathReferencingAsset(inputPath)
 	if runningForAnAsset && runConfig.Tag != "" {
@@ -520,7 +530,7 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 	runDownstreamTasks := false
 
 	if runningForAnAsset {
-		pipelinePath, err = path.GetPipelineRootFromTask(inputPath, pipelineDefinitionFiles)
+		pipelinePath, err = path.GetPipelineRootFromTask(inputPath, PipelineDefinitionFiles)
 		if err != nil {
 			errorPrinter.Printf("Failed to find the pipeline this task belongs to: '%s'\n", inputPath)
 			return &PipelineInfo{
@@ -579,7 +589,7 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 	}, nil
 }
 
-func ParseDate(startDateStr, endDateStr string, logger *zap.SugaredLogger) (time.Time, time.Time, error) {
+func ParseDate(startDateStr, endDateStr string, logger logger.Logger) (time.Time, time.Time, error) {
 	startDate, err := date.ParseTime(startDateStr)
 	logger.Debug("given start date: ", startDate)
 	if err != nil {
@@ -603,7 +613,7 @@ func ParseDate(startDateStr, endDateStr string, logger *zap.SugaredLogger) (time
 	return startDate, endDate, nil
 }
 
-func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger *zap.SugaredLogger) (time.Time, time.Time, string, error) {
+func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger logger.Logger) (time.Time, time.Time, string, error) {
 	if inputPath == "" {
 		inputPath = "."
 	}
@@ -616,7 +626,7 @@ func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger 
 	return startDate, endDate, inputPath, nil
 }
 
-func CheckLint(foundPipeline *pipeline.Pipeline, pipelinePath string, logger *zap.SugaredLogger, parser *sqlparser.SQLParser) error {
+func CheckLint(foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, parser *sqlparser.SQLParser) error {
 	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, parser, true)
 	if err != nil {
 		errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
@@ -698,7 +708,7 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	}
 }
 
-func setupExecutors(
+func SetupExecutors(
 	s *scheduler.Scheduler,
 	config *config.Config,
 	conn *connection.Manager,
@@ -722,8 +732,8 @@ func setupExecutors(
 		return nil, err
 	}
 
+	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh)
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
-		jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh)
 		if usePipForPython {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinjaVariables)
 		} else {
@@ -746,7 +756,7 @@ func setupExecutors(
 
 		metadataPushOperator := bigquery.NewMetadataPushOperator(conn)
 		bqQuerySensor := bigquery.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
-		bqTableSensor := bigquery.NewTableSensor(conn, sensorMode)
+		bqTableSensor := bigquery.NewTableSensor(conn, sensorMode, wholeFileExtractor)
 
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeMain] = bqOperator
 		mainExecutors[pipeline.AssetTypeBigqueryQuery][scheduler.TaskInstanceTypeColumnCheck] = bqCheckRunner
@@ -889,7 +899,7 @@ func setupExecutors(
 	}
 
 	if s.WillRunTaskOfType(pipeline.AssetTypeIngestr) || estimateCustomCheckType == pipeline.AssetTypeIngestr {
-		ingestrOperator, err := ingestr.NewBasicOperator(conn)
+		ingestrOperator, err := ingestr.NewBasicOperator(conn, renderer)
 		if err != nil {
 			return nil, err
 		}
@@ -963,7 +973,7 @@ func setupExecutors(
 
 	for _, typ := range emrServerlessAssetTypes {
 		if s.WillRunTaskOfType(typ) {
-			emrServerlessOperator, err := emr_serverless.NewBasicOperator(conn)
+			emrServerlessOperator, err := emr_serverless.NewBasicOperator(conn, jinjaVariables)
 			emrCheckRunner := emr_serverless.NewColumnCheckOperator(conn)
 			emrCustomCheckRunner := emr_serverless.NewCustomCheckOperator(conn)
 			if err != nil {
@@ -980,7 +990,7 @@ func setupExecutors(
 
 func isPathReferencingAsset(p string) bool {
 	// Check if the path matches any of the pipeline definition file names
-	for _, pipelineDefinitionfile := range pipelineDefinitionFiles {
+	for _, pipelineDefinitionfile := range PipelineDefinitionFiles {
 		if strings.HasSuffix(p, pipelineDefinitionfile) {
 			return false
 		}

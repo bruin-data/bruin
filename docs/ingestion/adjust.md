@@ -18,7 +18,7 @@ To connect to Adjust, you need to add a configuration item to the connections se
           api_key: "abc123"
 ```
 - `api_key`: The API key for the Adjust account.
-- `lookback_days`: Optional. The number of days to go back than the given start date for data. Defaults to 30 days. To know more about it, please refer [here](https://bruin-data.github.io/ingestr/supported-sources/adjust.html#lookback-days)
+- `lookback_days`: Optional. The number of days to go back from the given start date for data. Defaults to 30 days. To know more about it, please refer [here](https://bruin-data.github.io/ingestr/supported-sources/adjust.html#lookback-days)
 
 ### Step 2: Create an asset file for data ingestion
 

@@ -450,7 +450,7 @@ func (c GoogleSheetsConnection) GetName() string {
 
 type ChessConnection struct {
 	Name    string   `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	Players []string `yaml:"players,omitempty" json:"players" mapstructure:"players" jsonschema:"default=MagnusCarlsen,default=HikaruNakamura,default=ArjunErigaisi"`
+	Players []string `yaml:"players,omitempty" json:"players" mapstructure:"players" jsonschema:"default=erik,default=vadimer2Nakamura,default=ArjunErigaisi"`
 }
 
 func (c ChessConnection) GetName() string {
@@ -488,6 +488,8 @@ type S3Connection struct {
 	PathToFile      string `yaml:"path_to_file,omitempty" json:"path_to_file" mapstructure:"path_to_file"`
 	AccessKeyID     string `yaml:"access_key_id,omitempty" json:"access_key_id" mapstructure:"access_key_id"`
 	SecretAccessKey string `yaml:"secret_access_key,omitempty" json:"secret_access_key" mapstructure:"secret_access_key"`
+	EndpointURL     string `yaml:"endpoint_url,omitempty" json:"endpoint_url" mapstructure:"endpoint_url"`
+	Layout          string `yaml:"layout,omitempty" json:"layout" mapstructure:"layout"`
 }
 
 func (c S3Connection) GetName() string {
@@ -744,15 +746,34 @@ func (c ElasticsearchConnection) GetName() string {
 }
 
 type SpannerConnection struct {
-	Name              string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	ProjectID         string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
-	InstanceID        string `yaml:"instance_id,omitempty" json:"instance_id" mapstructure:"instance_id"`
-	Database          string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
-	CredentialsBase64 string `yaml:"credentials_base64,omitempty" json:"credentials_base64" mapstructure:"credentials_base64"`
-	CredentialsPath   string `yaml:"credentials_path,omitempty" json:"credentials_path" mapstructure:"credentials_path"`
+	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	ProjectID          string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
+	InstanceID         string `yaml:"instance_id,omitempty" json:"instance_id" mapstructure:"instance_id"`
+	Database           string `yaml:"database,omitempty" json:"database" mapstructure:"database"`
+	ServiceAccountJSON string `yaml:"service_account_json,omitempty" json:"service_account_json,omitempty" mapstructure:"service_account_json"`
+	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file,omitempty" mapstructure:"service_account_file"`
 }
 
 func (c SpannerConnection) GetName() string {
+	return c.Name
+}
+
+type SolidgateConnection struct {
+	Name      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	PublicKey string `yaml:"public_key,omitempty" json:"public_key" mapstructure:"public_key"`
+	SecretKey string `yaml:"secret_key,omitempty" json:"secret_key" mapstructure:"secret_key"`
+}
+
+func (c SolidgateConnection) GetName() string {
+	return c.Name
+}
+
+type SmartsheetConnection struct {
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+}
+
+func (c SmartsheetConnection) GetName() string {
 	return c.Name
 }
 

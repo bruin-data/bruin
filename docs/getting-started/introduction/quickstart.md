@@ -77,8 +77,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "MagnusCarlsen"
-            - "Hikaru"
+            - "erik"
+            - "vadimer2"
 
 ```
 You can run this asset either via the Bruin VS Code extension, or in the terminal:

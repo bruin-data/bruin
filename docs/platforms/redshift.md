@@ -3,7 +3,7 @@
 Bruin supports AWS Redshift as a data platform, which means you can use Bruin to build tables and views in your Redshift data warehouse.
 
 ## Connection
-In order to have set up a Redshift connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema
+In order to set up a Redshift connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema
 Mind that, despite the connection being at all effects a Postgres connection, the default `port` field of Amazon Redshift is `5439`.
 
 ```yaml
@@ -24,11 +24,11 @@ Mind that, despite the connection being at all effects a Postgres connection, th
 
 ### Making Redshift publicly accessible
 
-Before the connection works properly, you need to ensure that the Redshift cluster can be access from the outside. In order to do that you must mark the configuration option in your redshift cluster
+Before the connection works properly, you need to ensure that the Redshift cluster can be accessed from the outside. In order to do that you must mark the configuration option in your Redshift cluster
 
 ![Make publicly available](/publicly-accessible.png)
 
-In addition to this, you must configure the inbound rules of the security group your redshift cluster belongs to, to accept inbound connections. In the example below we enabled access for all origins but you can set more restrictive rules for this.
+In addition to this, you must configure the inbound rules of the security group your Redshift cluster belongs to, to accept inbound connections. In the example below we enabled access for all origins but you can set more restrictive rules for this.
 
 ![Inbound Rules](/inbound-rules.png)
 
@@ -79,7 +79,7 @@ commit transaction;
 
 
 ### `rs.seed`
-`rs.seed` are a special type of assets that are used to represent are CSV-files that contain data that is prepared outside of your pipeline that will be loaded into your redshift database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the redshift database.
+`rs.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your Redshift database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the Redshift database.
 
 You can define seed assets in a file ending with `.yaml`:
 ```yaml
@@ -96,7 +96,7 @@ parameters:
 
 ####  Examples: Load csv into a Redshift database
 
-The examples below show how load a csv into a redshift database.
+The examples below show how to load a CSV into a Redshift database.
 ```yaml
 name: dashboard.hello
 type: rs.seed

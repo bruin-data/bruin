@@ -2,7 +2,7 @@
 
 Sensor assets are a special type of asset that allows you to wait until a certain external event has occurred.
 
-The most common usecase of a sensor is when a piece of data is being produced by external systems, and you want to wait until that data is available before you start processing it. For example, you may want to wait until a file is available in a certain location, or until a certain database table has been populated with data.
+The most common use case of a sensor is when a piece of data is being produced by external systems, and you want to wait until that data is available before you start processing it.
 
 Sensors are implemented on a per-platform basis, therefore some platforms may have more sensors than others.
 
@@ -28,7 +28,7 @@ Sensors are a crucial part of integrating Bruin with external systems, and we ar
 
 ### Poking Interval
 
-Sensor work as a poking mechanism, they will check the status of the external event every few minutes until the event has occurred.
+Sensors work as a poking mechanism, they will check the status of the external event every few minutes until the event has occurred.
 
 You can control how often the poking occurs via the `poke_interval` parameter, value being in seconds.
 

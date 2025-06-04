@@ -7,7 +7,7 @@ Bruin supports Microsoft SQL Server as a data platform.
 
 
 ## Connection
-In order to have set up a SQL Server connection on Bruin, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema.
+In order to set up a SQL Server connection in Bruin, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema.
 
 ```yaml
     connections:
@@ -55,7 +55,7 @@ order by order_year, order_month;
 ```
 
 ### `ms.seed`
-`ms.seed` are a special type of assets that are used to represent are CSV-files that contain data that is prepared outside of your pipeline that will be loaded into your mssql database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the mssql database.
+`ms.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your MSSQL database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the MSSQL database.
 
 You can define seed assets in a file ending with `.yaml`:
 ```yaml
@@ -72,7 +72,7 @@ parameters:
 
 ####  Examples: Load csv into a MSSQL database
 
-The examples below show how load a csv into a mssql database.
+The examples below show how to load a CSV into an MSSQL database.
 ```yaml
 name: dashboard.hello
 type: ms.seed

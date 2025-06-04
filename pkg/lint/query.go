@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
-	"go.uber.org/zap"
 )
 
 type queryValidator interface {
@@ -35,7 +35,7 @@ type QueryValidatorRule struct {
 	Extractor    queryExtractor
 	Materializer materializer
 	WorkerCount  int
-	Logger       *zap.SugaredLogger
+	Logger       logger.Logger
 }
 
 func (q *QueryValidatorRule) Name() string {

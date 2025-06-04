@@ -204,8 +204,8 @@
           },
           "type": "array",
           "default": [
-            "MagnusCarlsen",
-            "HikaruNakamura",
+            "erik",
+            "vadimer2Nakamura",
             "ArjunErigaisi"
           ]
         }
@@ -583,9 +583,21 @@
           },
           "type": "array"
         },
+<<<<<<< HEAD
         "attio": {
           "items": {
             "$ref": "#/$defs/AttioConnection"
+=======
+        "solidgate": {
+          "items": {
+            "$ref": "#/$defs/SolidgateConnection"
+          },
+          "type": "array"
+        },
+        "smartsheet": {
+          "items": {
+            "$ref": "#/$defs/SmartsheetConnection"
+>>>>>>> main
           },
           "type": "array"
         }
@@ -1432,6 +1444,12 @@
         },
         "secret_access_key": {
           "type": "string"
+        },
+        "endpoint_url": {
+          "type": "string"
+        },
+        "layout": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
@@ -1441,7 +1459,9 @@
         "bucket_name",
         "path_to_file",
         "access_key_id",
-        "secret_access_key"
+        "secret_access_key",
+        "endpoint_url",
+        "layout"
       ]
     },
     "SQLiteConnection": {
@@ -1590,10 +1610,10 @@
         "database": {
           "type": "string"
         },
-        "credentials_base64": {
+        "service_account_file": {
           "type": "string"
         },
-        "credentials_path": {
+        "service_account_json": {
           "type": "string"
         }
       },
@@ -1603,9 +1623,43 @@
         "name",
         "project_id",
         "instance_id",
-        "database",
-        "credentials_base64",
-        "credentials_path"
+        "database"
+      ]
+    },
+    "SolidgateConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "secret_key": {
+          "type": "string"
+        },
+        "public_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "public_key",
+        "secret_key"
+      ]
+    },
+    "SmartsheetConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token"
       ]
     },
     "StripeConnection": {

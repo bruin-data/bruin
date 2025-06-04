@@ -3,7 +3,7 @@
 
 Bruin supports Appsflyer as a source, and you can use it to ingest data from Appsflyer into your data warehouse.
 
-In order to have set up Appsflyer connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema. For more information on how to get these credentials check the Appsflyer section in [Ingestr documentation](https://bruin-data.github.io/ingestr/getting-started/quickstart.html)
+In order to set up an Appsflyer connection, you need to add a configuration item to `connections` in the `.bruin.yml` file complying with the following schema. For more information on how to get these credentials check the Appsflyer section in [Ingestr documentation](https://bruin-data.github.io/ingestr/getting-started/quickstart.html)
 
 
 ```yaml

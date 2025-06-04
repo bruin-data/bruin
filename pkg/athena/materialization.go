@@ -28,6 +28,7 @@ var matMap = AssetMaterializationMap{
 		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
 		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
+		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
 	},
 }
 
@@ -168,4 +169,37 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string, location string
 	}
 
 	return queries, nil
+}
+
+func buildDDLQuery(asset *pipeline.Asset, query string, location string) ([]string, error) {
+	columnDefs := make([]string, 0, len(asset.Columns))
+	for _, col := range asset.Columns {
+		def := fmt.Sprintf("%s %s", col.Name, col.Type)
+		if col.Description != "" {
+			desc := strings.ReplaceAll(col.Description, `'`, `''`)
+			def += fmt.Sprintf(" COMMENT '%s'", desc)
+		}
+		columnDefs = append(columnDefs, def)
+	}
+
+	partitionedBy := ""
+	if asset.Materialization.PartitionBy != "" {
+		partitionedBy = fmt.Sprintf("\nPARTITIONED BY (%s)", asset.Materialization.PartitionBy)
+	}
+
+	ddlQuery := fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s (\n"+
+			"%s\n"+
+			")"+
+			"%s"+
+			"\nLOCATION '%s/%s'"+
+			"\nTBLPROPERTIES('table_type'='ICEBERG')",
+		asset.Name,
+		strings.Join(columnDefs, ",\n"),
+		partitionedBy,
+		location,
+		asset.Name,
+	)
+
+	return []string{ddlQuery}, nil
 }
