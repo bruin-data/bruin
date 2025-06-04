@@ -2,10 +2,11 @@ package clickhouse
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/pkg/errors"
+	"io"
+	"strings"
 )
 
 // The other packages all use a materializer that renders the query to a single string. Due to the quirks of athena
@@ -64,4 +65,25 @@ func (r *Renderer) Render(asset *pipeline.Asset, query string) (string, error) {
 
 	result := strings.Join(queries, ";")
 	return result, nil
+}
+
+func (m *Materializer) LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error {
+	if !m.fullRefresh {
+		return nil
+	}
+
+	if asset.Materialization.Strategy != pipeline.MaterializationStrategyDDL {
+		return nil
+	}
+	if writer == nil {
+		return errors.New("no writer found in context, please create an issue for this: https://github.com/bruin-data/bruin/issues")
+	}
+	message := "Full refresh detected, but DDL strategy is in use — table will NOT be dropped or recreated.\n"
+	writerObj, ok := writer.(io.Writer)
+	if !ok {
+		return errors.New("writer is not an io.Writer")
+	}
+	_, _ = writerObj.Write([]byte(message))
+
+	return nil
 }
