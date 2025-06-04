@@ -1,6 +1,7 @@
 package clickhouse
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
@@ -36,6 +37,10 @@ type mockMaterializer struct {
 func (m *mockMaterializer) Render(t *pipeline.Asset, query string) ([]string, error) {
 	res := m.Called(t, query)
 	return res.Get(0).([]string), res.Error(1)
+}
+
+func (m *mockMaterializer) LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error {
+	return nil
 }
 
 func TestBasicOperator_RunTask(t *testing.T) {
@@ -165,7 +170,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "query successfully executed with materialization",
+			name: "query returned an error with materialization",
 			setup: func(f *fields) {
 				f.e.On("ExtractQueriesFromString", "some query").
 					Return([]*query.Query{
@@ -185,9 +190,42 @@ func TestBasicOperator_RunTask(t *testing.T) {
 						Path:    "test-file.sql",
 						Content: "some query",
 					},
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyDDL,
+					},
 				},
 			},
 			wantErr: false,
+		},
+		{
+			name: "query unsuccessful  with materialization",
+			setup: func(f *fields) {
+				f.e.On("ExtractQueriesFromString", "some query").
+					Return([]*query.Query{
+						{Query: "select * from users"},
+					}, nil)
+
+				f.m.On("Render", mock.Anything, "select * from users").
+					Return([]string{"CREATE TABLE x AS select * from users"}, nil)
+
+				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "CREATE TABLE x AS select * from users"}).
+					Return(nil)
+			},
+			args: args{
+				t: &pipeline.Asset{
+					Type: pipeline.AssetTypePostgresQuery,
+					ExecutableFile: pipeline.ExecutableFile{
+						Path:    "test-file.sql",
+						Content: "some query",
+					},
+					Materialization: pipeline.Materialization{
+						Type:     pipeline.MaterializationTypeTable,
+						Strategy: pipeline.MaterializationStrategyDDL,
+					},
+				},
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -222,4 +260,32 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLogIfFullRefreshAndDDL(t *testing.T) {
+	t.Parallel()
+
+	// Mock writer
+	var writerMock bytes.Buffer
+
+	// Create a materializer with FullRefresh set to true
+	materializer := NewMaterializer(true)
+
+	// Create a test asset with DDL strategy
+	asset := &pipeline.Asset{
+		Materialization: pipeline.Materialization{
+			Type:     pipeline.MaterializationTypeTable,
+			Strategy: pipeline.MaterializationStrategyDDL,
+		},
+	}
+
+	// Call the method
+	err := materializer.LogIfFullRefreshAndDDL(&writerMock, asset)
+
+	// Assert no error
+	assert.NoError(t, err)
+
+	// Assert the correct message was written
+	expectedMessage := "Full refresh detected, but DDL strategy is in use — table will NOT be dropped or recreated.\n"
+	assert.Equal(t, expectedMessage, writerMock.String())
 }
