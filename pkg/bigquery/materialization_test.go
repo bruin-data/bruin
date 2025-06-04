@@ -476,7 +476,7 @@ func TestBuildDDLQuery(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := BuildDDLQuery(tt.asset, "")
+			got, err := buildDDLQuery(tt.asset, "")
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -501,13 +501,178 @@ func TestBuildSCD2Query(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
-					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategySCD2,
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
 				},
 				Columns: []pipeline.Column{
 					{Name: "id"},
 					{Name: "event_name"},
-					{Name: "ts"},
+					{Name: "ts", Type: "TIMESTAMP"},
+				},
+			},
+			query:   "SELECT id, event_name, ts from source_table",
+			wantErr: true,
+		},
+		{
+			name: "scd2_reserved_column_name_is_current",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "_is_current"},
+					{Name: "ts", Type: "TIMESTAMP"},
+				},
+			},
+			query:   "SELECT id, _is_current from source_table",
+			wantErr: true,
+		},
+		{
+			name: "scd2_reserved_column_name_valid_from",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "_valid_from"},
+					{Name: "ts", Type: "TIMESTAMP"},
+				},
+			},
+			query:   "SELECT id, _valid_from from source_table",
+			wantErr: true,
+		},
+		{
+			name: "scd2_reserved_column_name_valid_until",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "_valid_until"},
+					{Name: "ts", Type: "TIMESTAMP"},
+				},
+			},
+			query:   "SELECT id, _valid_until from source_table",
+			wantErr: true,
+		},
+		{
+			name: "scd2_table_exists_with_incremental_key", // dim_input
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "event_name"},
+					{Name: "ts", Type: "Date"},
+				},
+			},
+			query: "SELECT id, event_name, ts from source_table",
+			want: "MERGE INTO `my.asset` AS target\n" +
+				"USING (\n" +
+				"  SELECT id, event_name, ts from source_table\n" +
+				") AS source\n" +
+				"ON target.id = source.id AND target._is_current = TRUE\n" +
+				"\n" +
+				"WHEN MATCHED AND (\n" +
+				"target._valid_from < source.ts\n" +
+				") THEN\n" +
+				"  UPDATE SET\n" +
+				"    target._valid_until = source.ts,\n" +
+				"    target._is_current = FALSE\n" +
+				"\n" +
+				"WHEN NOT MATCHED BY TARGET THEN\n" +
+				"  INSERT (id, event_name, _valid_from, _valid_until, _is_current)\n" +
+				"  VALUES (source.id, source.event_name, source.ts, TIMESTAMP('9999-12-31'), TRUE)",
+		},
+		{
+			name: "scd2_multiple_primary_keys_with_incremental_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "event_type", PrimaryKey: true},
+					{Name: "col1"},
+					{Name: "col2"},
+					{Name: "ts", Type: "DATE"},
+				},
+			},
+			query: "SELECT id, event_type, col1, col2, ts from source_table",
+			want: "MERGE INTO `my.asset` AS target\n" +
+				"USING (\n" +
+				"  SELECT id, event_type, col1, col2, ts from source_table\n" +
+				") AS source\n" +
+				"ON target.id = source.id AND target.event_type = source.event_type AND target._is_current = TRUE\n" +
+				"\n" +
+				"WHEN MATCHED AND (\n" +
+				"target._valid_from < source.ts\n" +
+				") THEN\n" +
+				"  UPDATE SET\n" +
+				"    target._valid_until = source.ts,\n" +
+				"    target._is_current = FALSE\n" +
+				"\n" +
+				"WHEN NOT MATCHED BY TARGET THEN\n" +
+				"  INSERT (id, event_type, col1, col2, _valid_from, _valid_until, _is_current)\n" +
+				"  VALUES (source.id, source.event_type, source.col1, source.col2, source.ts, TIMESTAMP('9999-12-31'), TRUE)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := buildSCD2QueryByTime(tt.asset, tt.query)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, strings.TrimSpace(tt.want), got)
+			}
+		})
+	}
+}
+
+func TestBuildSCD2ByColumnQuery(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		asset   *pipeline.Asset
+		query   string
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "scd2_no_primary_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id"},
+					{Name: "event_name"},
+					{Name: "ts", Type: "date"},
 				},
 			},
 			query:   "SELECT id, event_name, ts from source_table",
@@ -519,14 +684,14 @@ func TestBuildSCD2Query(t *testing.T) {
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
 					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategySCD2,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
 				},
 				Columns: []pipeline.Column{
 					{Name: "id", PrimaryKey: true},
-					{Name: "is_current"},
+					{Name: "_is_current"},
 				},
 			},
-			query:   "SELECT id, is_current from source_table",
+			query:   "SELECT id, _is_current from source_table",
 			wantErr: true,
 		},
 		{
@@ -535,14 +700,14 @@ func TestBuildSCD2Query(t *testing.T) {
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
 					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategySCD2,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
 				},
 				Columns: []pipeline.Column{
 					{Name: "id", PrimaryKey: true},
-					{Name: "valid_from"},
+					{Name: "_valid_from"},
 				},
 			},
-			query:   "SELECT id, valid_from from source_table",
+			query:   "SELECT id, _valid_from from source_table",
 			wantErr: true,
 		},
 		{
@@ -551,83 +716,15 @@ func TestBuildSCD2Query(t *testing.T) {
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
 					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategySCD2,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
 				},
 				Columns: []pipeline.Column{
 					{Name: "id", PrimaryKey: true},
-					{Name: "valid_until"},
+					{Name: "_valid_until"},
 				},
 			},
-			query:   "SELECT id, valid_until from source_table",
+			query:   "SELECT id, _valid_until from source_table",
 			wantErr: true,
-		},
-		{
-			name: "scd2_table_exists_with_incremental_key", // dim_input
-			asset: &pipeline.Asset{
-				Name: "my.asset",
-				Materialization: pipeline.Materialization{
-					Type:           pipeline.MaterializationTypeTable,
-					Strategy:       pipeline.MaterializationStrategySCD2,
-					IncrementalKey: "ts",
-				},
-				Columns: []pipeline.Column{
-					{Name: "id", PrimaryKey: true},
-					{Name: "event_name"},
-					{Name: "ts"},
-				},
-			},
-			query: "SELECT id, event_name, ts from source_table",
-			want: "MERGE INTO `my.asset` AS target\n" +
-				"USING (\n" +
-				"  SELECT id, event_name, ts from source_table\n" +
-				") AS source\n" +
-				"ON target.id = source.id AND target.is_current = TRUE\n" +
-				"\n" +
-				"WHEN MATCHED AND (\n" +
-				"target.valid_from < source.ts\n" +
-				") THEN\n" +
-				"  UPDATE SET\n" +
-				"    target.valid_until = source.ts,\n" +
-				"    target.is_current = FALSE\n" +
-				"\n" +
-				"WHEN NOT MATCHED BY TARGET THEN\n" +
-				"  INSERT (id, event_name, valid_from, valid_until, is_current)\n" +
-				"  VALUES (source.id, source.event_name, source.ts, TIMESTAMP('9999-12-31'), TRUE)",
-		},
-		{
-			name: "scd2_multiple_primary_keys_with_incremental_key",
-			asset: &pipeline.Asset{
-				Name: "my.asset",
-				Materialization: pipeline.Materialization{
-					Type:           pipeline.MaterializationTypeTable,
-					Strategy:       pipeline.MaterializationStrategySCD2,
-					IncrementalKey: "ts",
-				},
-				Columns: []pipeline.Column{
-					{Name: "id", PrimaryKey: true},
-					{Name: "event_type", PrimaryKey: true},
-					{Name: "col1"},
-					{Name: "col2"},
-					{Name: "ts"},
-				},
-			},
-			query: "SELECT id, event_type, col1, col2, ts from source_table",
-			want: "MERGE INTO `my.asset` AS target\n" +
-				"USING (\n" +
-				"  SELECT id, event_type, col1, col2, ts from source_table\n" +
-				") AS source\n" +
-				"ON target.id = source.id AND target.event_type = source.event_type AND target.is_current = TRUE\n" +
-				"\n" +
-				"WHEN MATCHED AND (\n" +
-				"target.valid_from < source.ts\n" +
-				") THEN\n" +
-				"  UPDATE SET\n" +
-				"    target.valid_until = source.ts,\n" +
-				"    target.is_current = FALSE\n" +
-				"\n" +
-				"WHEN NOT MATCHED BY TARGET THEN\n" +
-				"  INSERT (id, event_type, col1, col2, valid_from, valid_until, is_current)\n" +
-				"  VALUES (source.id, source.event_type, source.col1, source.col2, source.ts, TIMESTAMP('9999-12-31'), TRUE)",
 		},
 		{
 			name: "scd2_no_incremental_key",
@@ -635,7 +732,7 @@ func TestBuildSCD2Query(t *testing.T) {
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
 					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategySCD2,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
 				},
 				Columns: []pipeline.Column{
 					{Name: "id", PrimaryKey: true},
@@ -645,12 +742,12 @@ func TestBuildSCD2Query(t *testing.T) {
 					{Name: "col4"},
 				},
 			},
-			query: "SELECT id, event_name, value from source_table",
+			query: "SELECT id, col1, col2, col3, col4 from source_table",
 			want: "MERGE INTO `my.asset` AS target\n" +
 				"USING (\n" +
 				"  SELECT id, col1, col2, col3, col4 from source_table\n" +
 				") AS source\n" +
-				"ON target.id = source.id AND target.is_current = TRUE\n" +
+				"ON target.id = source.id AND target._is_current = TRUE\n" +
 				"\n" +
 				"WHEN MATCHED AND (\n" +
 				"    target.col1 != source.col1 OR\n" +
@@ -659,11 +756,11 @@ func TestBuildSCD2Query(t *testing.T) {
 				"    target.col4 != source.col4\n" +
 				") THEN\n" +
 				"  UPDATE SET\n" +
-				"    target.valid_until = CURRENT_TIMESTAMP(),\n" +
-				"    target.is_current = FALSE\n" +
+				"    target._valid_until = CURRENT_TIMESTAMP(),\n" +
+				"    target._is_current = FALSE\n" +
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
-				"  INSERT (id, col1, col2, col3, col4, valid_from, valid_until, is_current)\n" +
+				"  INSERT (id, col1, col2, col3, col4, _valid_from, _valid_until, _is_current)\n" +
 				"  VALUES (source.id, source.col1, source.col2, source.col3, source.col4, CURRENT_TIMESTAMP(), TIMESTAMP('9999-12-31'), TRUE)",
 		},
 	}
@@ -671,12 +768,12 @@ func TestBuildSCD2Query(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := buildSCD2Query(tt.asset, tt.query)
+			got, err := buildSCD2ByColumnQuery(tt.asset, tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, strings.TrimSpace(tt.want), strings.TrimSpace(got))
+				assert.Equal(t, strings.TrimSpace(tt.want), got)
 			}
 		})
 	}
