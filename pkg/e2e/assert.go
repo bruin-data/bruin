@@ -1,9 +1,12 @@
 package e2e
 
 import (
+	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/scheduler"
@@ -188,5 +191,50 @@ func AssertByQueryResultCSV(i *Task) error {
 		}
 	}
 
+	return nil
+}
+
+func AssertByCSV(i *Task) error {
+	if i.Expected.CSVFile == "" {
+		return errors.New("Expected.CSVFile path is required for AssertByCSV")
+	}
+
+	// 1. Read the expected CSV file
+	expectedBytes, err := os.ReadFile(i.Expected.CSVFile)
+	if err != nil {
+		return fmt.Errorf("failed to read expected CSV file: %s: %w", i.Expected.CSVFile, err)
+	}
+	expected := string(expectedBytes)
+
+	// 2. Normalize line endings to \n for both actual and expected
+	expected = strings.ReplaceAll(expected, "\r\n", "\n")
+	expected = strings.TrimSpace(expected)
+	actual := strings.ReplaceAll(i.Actual.Output, "\r\n", "\n")
+	actual = strings.TrimSpace(actual)
+
+	expectedRecords, err := csv.NewReader(strings.NewReader(expected)).ReadAll()
+	if err != nil {
+		return errors.New("failed to parse expected CSV")
+	}
+	actualRecords, err := csv.NewReader(strings.NewReader(actual)).ReadAll()
+	if err != nil {
+		return errors.New("failed to parse actual CSV")
+	}
+	var expectedBuf, actualBuf bytes.Buffer
+	err = csv.NewWriter(&expectedBuf).WriteAll(expectedRecords)
+	if err != nil {
+		return errors.New("failed to parse expected CSV")
+	}
+	err = csv.NewWriter(&actualBuf).WriteAll(actualRecords)
+	if err != nil {
+		return err
+	}
+	expected = strings.TrimSpace(expectedBuf.String())
+	actual = strings.TrimSpace(actualBuf.String())
+
+	// 4. Compare
+	if actual != expected {
+		return fmt.Errorf("CSV output mismatch:\nexpected:\n%s\n\ngot:\n%s", expected, actual)
+	}
 	return nil
 }

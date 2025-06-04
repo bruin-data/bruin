@@ -30,6 +30,7 @@ type Output struct {
 	Output   string
 	Error    string
 	Contains []string
+	CSVFile  string
 }
 
 func (s *Task) Run() error {
