@@ -77,21 +77,65 @@ image: python:3.11
 print('hello world')
 ```
 
-## Environment variables
+## Environment Variables
 Bruin introduces a set of environment variables by default to every Python asset.
+
+### Builtin
 
 The following environment variables are available in every Python asset execution:
 
-* `BRUIN_START_DATE`: The start date of the pipeline run in `YYYY-MM-DD` format (e.g. `2024-01-15`)
-* `BRUIN_START_DATETIME`: The start date and time of the pipeline run in `YYYY-MM-DDThh:mm:ss` format (e.g. `2024-01-15T13:45:30`)
-* `BRUIN_START_TIMESTAMP`: The start timestamp of the pipeline run in RFC3339 format with timezone (e.g. `2024-01-15T13:45:30.000000Z07:00`)
-* `BRUIN_END_DATE`: The end date of the pipeline run in `YYYY-MM-DD` format (e.g. `2024-01-15`)
-* `BRUIN_END_DATETIME`: The end date and time of the pipeline run in `YYYY-MM-DDThh:mm:ss` format (e.g. `2024-01-15T13:45:30`) 
-* `BRUIN_END_TIMESTAMP`: The end timestamp of the pipeline run in RFC3339 format with timezone (e.g. `2024-01-15T13:45:30.000000Z07:00`)
-* `BRUIN_RUN_ID`: The unique identifier for the pipeline run
-* `BRUIN_PIPELINE`: The name of the pipeline being executed
-* `BRUIN_FULL_REFRESH`: Set to `1` when the pipeline is running with the `--full-refresh` flag, empty otherwise
+| Environment Variable  | Description                                                                                                |
+| :-------------------- | :--------------------------------------------------------------------------------------------------------- |
+| `BRUIN_START_DATE`    | The start date of the pipeline run in `YYYY-MM-DD` format (e.g. `2024-01-15`)                             |
+| `BRUIN_START_DATETIME`| The start date and time of the pipeline run in `YYYY-MM-DDThh:mm:ss` format (e.g. `2024-01-15T13:45:30`)      |
+| `BRUIN_START_TIMESTAMP`| The start timestamp of the pipeline run in RFC3339 format with timezone (e.g. `2024-01-15T13:45:30.000000Z07:00`) |
+| `BRUIN_END_DATE`      | The end date of the pipeline run in `YYYY-MM-DD` format (e.g. `2024-01-15`)                               |
+| `BRUIN_END_DATETIME`  | The end date and time of the pipeline run in `YYYY-MM-DDThh:mm:ss` format (e.g. `2024-01-15T13:45:30`)        |
+| `BRUIN_END_TIMESTAMP` | The end timestamp of the pipeline run in RFC3339 format with timezone (e.g. `2024-01-15T13:45:30.000000Z07:00`)   |
+| `BRUIN_RUN_ID`        | The unique identifier for the pipeline run                                                                 |
+| `BRUIN_PIPELINE`      | The name of the pipeline being executed                                                                    |
+| `BRUIN_FULL_REFRESH`  | Set to `1` when the pipeline is running with the `--full-refresh` flag, empty otherwise                    |
 
+### Pipeline
+
+<!--TODO: update variables reference to point to dedicated docs section, once it's ready -->
+Bruin supports user-defined variables at a pipeline level. These become available as a JSON document in your python asset as `BRUIN_VARS`. See [variables](/assets/templating/templating#adding-variables) for more information on how to define variables for your assets.
+
+Here's a short example:
+::: code-group
+```yaml [pipeline.yml]
+name: pipeline-with-variables
+variables:
+  env:
+    type: string
+    default: dev
+  users:
+    type: array
+    items:
+      type: string
+    default: ["jhon", "nick"]
+```
+:::
+
+::: code-group
+```bruin-python [asset.py]
+""" @bruin
+name: inspect_env
+@bruin """
+
+import os
+import json
+
+vars = json.loads(os.environ.get("BRUIN_VARS"))
+
+print("env:", vars["env"])      # env: dev
+print("users:", vars["users"])  # users: ['jhon', 'nick']
+```
+:::
+
+::: tip
+You can override the value of variables at runtime using `--var` [flag](/assets/templating/templating#overriding-variables).
+:::
 
 
 ## Materialization

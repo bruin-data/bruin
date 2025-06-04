@@ -450,7 +450,7 @@ func (c GoogleSheetsConnection) GetName() string {
 
 type ChessConnection struct {
 	Name    string   `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	Players []string `yaml:"players,omitempty" json:"players" mapstructure:"players" jsonschema:"default=MagnusCarlsen,default=HikaruNakamura,default=ArjunErigaisi"`
+	Players []string `yaml:"players,omitempty" json:"players" mapstructure:"players" jsonschema:"default=erik,default=vadimer2Nakamura,default=ArjunErigaisi"`
 }
 
 func (c ChessConnection) GetName() string {
@@ -765,5 +765,23 @@ type SolidgateConnection struct {
 }
 
 func (c SolidgateConnection) GetName() string {
+	return c.Name
+}
+
+type SmartsheetConnection struct {
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+}
+
+func (c SmartsheetConnection) GetName() string {
+	return c.Name
+}
+
+type AttioConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c AttioConnection) GetName() string {
 	return c.Name
 }

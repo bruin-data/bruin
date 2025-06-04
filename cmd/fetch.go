@@ -455,7 +455,7 @@ func GetPipelineAndAsset(ctx context.Context, inputPath string, fs afero.Fs, con
 		errorPrinter.Printf("Please provide a valid asset path\n")
 		return nil, err
 	}
-	pipelinePath, err := path.GetPipelineRootFromTask(inputPath, pipelineDefinitionFiles)
+	pipelinePath, err := path.GetPipelineRootFromTask(inputPath, PipelineDefinitionFiles)
 	if err != nil {
 		errorPrinter.Printf("Failed to find the pipeline this task belongs to: '%s'\n", inputPath)
 		return nil, err

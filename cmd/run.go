@@ -189,8 +189,9 @@ func Run(isDebug *bool) *cli.Command {
 				Hidden: true,
 			},
 			&cli.StringSliceFlag{
-				Name:  "var",
-				Usage: "override pipeline variables with custom values",
+				Name:    "var",
+				Usage:   "override pipeline variables with custom values",
+				EnvVars: []string{"BRUIN_VARS"},
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -529,7 +530,7 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 	runDownstreamTasks := false
 
 	if runningForAnAsset {
-		pipelinePath, err = path.GetPipelineRootFromTask(inputPath, pipelineDefinitionFiles)
+		pipelinePath, err = path.GetPipelineRootFromTask(inputPath, PipelineDefinitionFiles)
 		if err != nil {
 			errorPrinter.Printf("Failed to find the pipeline this task belongs to: '%s'\n", inputPath)
 			return &PipelineInfo{
@@ -731,8 +732,8 @@ func SetupExecutors(
 		return nil, err
 	}
 
+	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh)
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
-		jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh)
 		if usePipForPython {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinjaVariables)
 		} else {
@@ -972,7 +973,7 @@ func SetupExecutors(
 
 	for _, typ := range emrServerlessAssetTypes {
 		if s.WillRunTaskOfType(typ) {
-			emrServerlessOperator, err := emr_serverless.NewBasicOperator(conn)
+			emrServerlessOperator, err := emr_serverless.NewBasicOperator(conn, jinjaVariables)
 			emrCheckRunner := emr_serverless.NewColumnCheckOperator(conn)
 			emrCustomCheckRunner := emr_serverless.NewCustomCheckOperator(conn)
 			if err != nil {
@@ -989,7 +990,7 @@ func SetupExecutors(
 
 func isPathReferencingAsset(p string) bool {
 	// Check if the path matches any of the pipeline definition file names
-	for _, pipelineDefinitionfile := range pipelineDefinitionFiles {
+	for _, pipelineDefinitionfile := range PipelineDefinitionFiles {
 		if strings.HasSuffix(p, pipelineDefinitionfile) {
 			return false
 		}

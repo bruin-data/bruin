@@ -16,6 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/appstore"
 	"github.com/bruin-data/bruin/pkg/asana"
 	"github.com/bruin-data/bruin/pkg/athena"
+	"github.com/bruin-data/bruin/pkg/attio"
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/chess"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
@@ -53,6 +54,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/salesforce"
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/slack"
+	"github.com/bruin-data/bruin/pkg/smartsheet"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/solidgate"
 	"github.com/bruin-data/bruin/pkg/spanner"
@@ -117,6 +119,8 @@ type Manager struct {
 	Elasticsearch   map[string]*elasticsearch.Client
 	Spanner         map[string]*spanner.Client
 	Solidgate       map[string]*solidgate.Client
+	Smartsheet      map[string]*smartsheet.Client
+	Attio           map[string]*attio.Client
 	mutex           sync.Mutex
 }
 
@@ -426,6 +430,18 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connSolidgate, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Solidgate)...)
+
+	connSmartsheet, err := m.GetSmartsheetConnectionWithoutDefault(name)
+	if err == nil {
+		return connSmartsheet, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Smartsheet)...)
+
+	connAttio, err := m.GetAttioConnectionWithoutDefault(name)
+	if err == nil {
+		return connAttio, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Attio)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -775,6 +791,49 @@ func (m *Manager) GetSolidgateConnectionWithoutDefault(name string) (*solidgate.
 	return db, nil
 }
 
+func (m *Manager) GetSmartsheetConnection(name string) (*smartsheet.Client, error) {
+	db, err := m.GetSmartsheetConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetSmartsheetConnectionWithoutDefault("smartsheet-default")
+}
+
+func (m *Manager) GetSmartsheetConnectionWithoutDefault(name string) (*smartsheet.Client, error) {
+	if m.Smartsheet == nil {
+		return nil, errors.New("no smartsheet connections found")
+	}
+
+	db, ok := m.Smartsheet[name]
+	if !ok {
+		return nil, errors.Errorf("smartsheet connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
+
+func (m *Manager) GetAttioConnection(name string) (*attio.Client, error) {
+	db, err := m.GetAttioConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetAttioConnectionWithoutDefault("attio-default")
+}
+
+func (m *Manager) GetAttioConnectionWithoutDefault(name string) (*attio.Client, error) {
+	if m.Attio == nil {
+		return nil, errors.New("no attio connections found")
+	}
+
+	db, ok := m.Attio[name]
+	if !ok {
+		return nil, errors.Errorf("attio connection not found for '%s'", name)
+	}
+
+	return db, nil
+}
 func (m *Manager) GetAdjustConnection(name string) (*adjust.Client, error) {
 	db, err := m.GetAdjustConnectionWithoutDefault(name)
 	if err == nil {
@@ -2075,6 +2134,27 @@ func (m *Manager) AddSolidgateConnectionFromConfig(connection *config.SolidgateC
 	return nil
 }
 
+func (m *Manager) AddSmartsheetConnectionFromConfig(connection *config.SmartsheetConnection) error {
+	m.mutex.Lock()
+	if m.Smartsheet == nil {
+		m.Smartsheet = make(map[string]*smartsheet.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := smartsheet.NewClient(smartsheet.Config{
+		AccessToken: connection.AccessToken,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Smartsheet[connection.Name] = client
+
+	return nil
+}
+
 func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnection) error {
 	m.mutex.Lock()
 	if m.Kafka == nil {
@@ -2658,6 +2738,25 @@ func (m *Manager) AddPhantombusterConnectionFromConfig(connection *config.Phanto
 	return nil
 }
 
+func (m *Manager) AddAttioConnectionFromConfig(connection *config.AttioConnection) error {
+	m.mutex.Lock()
+	if m.Attio == nil {
+		m.Attio = make(map[string]*attio.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := attio.NewClient(attio.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Attio[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddElasticsearchConnectionFromConfig(connection *config.ElasticsearchConnection) error {
 	m.mutex.Lock()
 	if m.Elasticsearch == nil {
@@ -2824,6 +2923,8 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Elasticsearch, connectionManager.AddElasticsearchConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Spanner, connectionManager.AddSpannerConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Solidgate, connectionManager.AddSolidgateConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Smartsheet, connectionManager.AddSmartsheetConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Attio, connectionManager.AddAttioConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }

@@ -204,8 +204,8 @@
           },
           "type": "array",
           "default": [
-            "MagnusCarlsen",
-            "HikaruNakamura",
+            "erik",
+            "vadimer2Nakamura",
             "ArjunErigaisi"
           ]
         }
@@ -577,15 +577,28 @@
           },
           "type": "array"
         },
-        "gcp_spanner": {
+        "spanner": {
           "items": {
             "$ref": "#/$defs/SpannerConnection"
           },
           "type": "array"
         },
+        "attio": {
+          "items": {
+            "$ref": "#/$defs/AttioConnection"
+          },
+          "type": "array"
+        },
+
         "solidgate": {
           "items": {
             "$ref": "#/$defs/SolidgateConnection"
+          },
+          "type": "array"
+        },
+        "smartsheet": {
+          "items": {
+            "$ref": "#/$defs/SmartsheetConnection"
           },
           "type": "array"
         }
@@ -1634,6 +1647,22 @@
         "secret_key"
       ]
     },
+    "SmartsheetConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token"
+      ]
+    },
     "StripeConnection": {
       "properties": {
         "name": {
@@ -1733,6 +1762,19 @@
         "oauth_token",
         "sub_domain"
       ]
+    },
+    "AttioConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": ["name", "api_key"] 
     }
   }
 }

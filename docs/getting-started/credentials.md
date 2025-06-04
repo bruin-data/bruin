@@ -20,8 +20,8 @@ environments:
       chess:
         - name: "chess-default"
           players:
-            - "MagnusCarlsen"
-            - "Hikaru"
+            - "erik"
+            - "vadimer2"
 
   another_environment:
     connections:

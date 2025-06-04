@@ -490,6 +490,18 @@ func TestLoadFromFile(t *testing.T) {
 					PublicKey: "public-key-123",
 				},
 			},
+			Smartsheet: []SmartsheetConnection{
+				{
+					Name:        "smartsheet-1",
+					AccessToken: "access-token-123",
+				},
+			},
+			Attio: []AttioConnection{
+				{
+					Name:   "attio-1",
+					APIKey: "api-key-123",
+				},
+			},
 		},
 	}
 
