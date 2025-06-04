@@ -61,7 +61,8 @@ func Query() *cli.Command {
 				Name:        "output",
 				Aliases:     []string{"o"},
 				DefaultText: "plain",
-				Usage:       "the output type, possible values are: plain, json",
+				Value:       "plain",
+				Usage:       "the output type, possible values are: plain, json, csv",
 			},
 			&cli.StringFlag{
 				Name:  "asset",
@@ -132,7 +133,10 @@ func Query() *cli.Command {
 					return handleSuccess(c.String("output"), successMessage)
 				}
 				output := c.String("output")
-				if output == "json" {
+				switch output {
+				case "plain":
+					printTable(result.Columns, result.Rows)
+				case "json":
 					type jsonResponse struct {
 						Columns  []map[string]string `json:"columns"`
 						Rows     [][]interface{}     `json:"rows"`
@@ -162,8 +166,23 @@ func Query() *cli.Command {
 						return handleError(output, errors.Wrap(err, "failed to marshal result to JSON"))
 					}
 					fmt.Println(string(jsonData))
-				} else {
-					printTable(result.Columns, result.Rows)
+				case "csv":
+					writer := csv.NewWriter(os.Stdout)
+					defer writer.Flush()
+					if err = writer.Write(result.Columns); err != nil {
+						return handleError(output, errors.Wrap(err, "failed to write CSV header"))
+					}
+					for _, row := range result.Rows {
+						rowStrings := make([]string, len(row))
+						for i, val := range row {
+							rowStrings[i] = fmt.Sprintf("%v", val)
+						}
+						if err = writer.Write(rowStrings); err != nil {
+							return handleError(output, errors.Wrap(err, "failed to write CSV row"))
+						}
+					}
+				default:
+					fmt.Printf("Invalid output type: %s\n", output)
 				}
 			} else {
 				fmt.Printf("Connection type %s does not support querying.\n", c.String("connection"))
