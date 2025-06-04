@@ -13,6 +13,10 @@ By using templates, teams can focus on their pipeline logic rather than worrying
 
 Watch the video below to see how to use templates in action:
 
-<a href="https://www.youtube.com/watch?v=8RuVoSCNHQI">
-  <img src="../tutorials/tutorial-media/bruin-templates-tutorial.png" width="480" alt="Watch the video"/>
-</a>
+<iframe width="685" height="385"
+src="https://www.youtube.com/watch?v=8RuVoSCNHQI"
+title="YouTube video player"
+frameborder="0"
+allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+allowfullscreen>
+</iframe>
