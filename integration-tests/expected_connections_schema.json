@@ -583,11 +583,13 @@
           },
           "type": "array"
         },
-<<<<<<< HEAD
         "attio": {
           "items": {
             "$ref": "#/$defs/AttioConnection"
-=======
+          },
+          "type": "array"
+        },
+
         "solidgate": {
           "items": {
             "$ref": "#/$defs/SolidgateConnection"
@@ -597,7 +599,6 @@
         "smartsheet": {
           "items": {
             "$ref": "#/$defs/SmartsheetConnection"
->>>>>>> main
           },
           "type": "array"
         }
