@@ -496,6 +496,12 @@ func TestLoadFromFile(t *testing.T) {
 					AccessToken: "access-token-123",
 				},
 			},
+			Attio: []AttioConnection{
+				{
+					Name:   "attio-1",
+					APIKey: "api-key-123",
+				},
+			},
 		},
 	}
 

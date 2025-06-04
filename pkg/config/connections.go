@@ -776,3 +776,12 @@ type SmartsheetConnection struct {
 func (c SmartsheetConnection) GetName() string {
 	return c.Name
 }
+
+type AttioConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c AttioConnection) GetName() string {
+	return c.Name
+}

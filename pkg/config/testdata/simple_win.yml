@@ -311,7 +311,9 @@ environments:
       smartsheet:
         - name: "smartsheet-1"
           access_token: "access-token-123"
-
+      attio:
+        - name: "attio-1"
+          api_key: "api-key-123"
 
   prod:
     connections:
