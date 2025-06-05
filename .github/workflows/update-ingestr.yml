@@ -22,30 +22,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          function semver_or_die() {
-              local version
-              version="${1#v}"  # Remove 'v' prefix if present
-              if [[ ! ${version} =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                  printf >&2 'Error : %s is not a valid semver.\n' "$version"
-                  exit 1
-              fi
-          }
-
           function version_gt() { 
               local v1="${1#v}" v2="${2#v}"
               test "$(echo "$v1 $v2" | tr " " "\n" | sort -V | head -n 1)" != "$v1"
-          }
-          function version_le() { 
-              local v1="${1#v}" v2="${2#v}"
-              test "$(echo "$v1 $v2" | tr " " "\n" | sort -V | head -n 1)" == "$v1"
-          }
-          function version_lt() { 
-              local v1="${1#v}" v2="${2#v}"
-              test "$(echo "$v1 $v2" | tr " " "\n" | sort -rV | head -n 1)" != "$v1"
-          }
-          function version_ge() { 
-              local v1="${1#v}" v2="${2#v}"
-              test "$(echo "$v1 $v2" | tr " " "\n" | sort -rV | head -n 1)" == "$v1"
           }
 
           latest=$(curl -s "https://api.github.com/repos/bruin-data/ingestr/tags" | jq -r '.[0].name')
@@ -64,8 +43,18 @@ jobs:
           fi
           # echo "Script completed"
 
+      - name: Check if branch exists
+        id: check-branch-exists
+        run: |
+            if [[ -n $(git ls-remote --heads origin update-ingestr-${{ steps.check.outputs.version }}) ]]; then
+                echo "exists=true" >> $GITHUB_OUTPUT
+            else
+                echo "exists=false" >> $GITHUB_OUTPUT          
+            fi
+        shell: bash
+
       - name: Create Pull Request
-        if: steps.check.outputs.new == 'true'
+        if: steps.check.outputs.new == 'true' && steps.check-branch-exists.outputs.exists == 'false'
         uses: peter-evans/create-pull-request@v7.0.8
         with:
           branch: update-ingestr-${{ steps.check.outputs.version }}
@@ -74,4 +63,3 @@ jobs:
           body: "Automated update of ingestr to v${{ steps.check.outputs.version }}"
           delete-branch: true
           labels: automated-update
-
