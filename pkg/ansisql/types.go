@@ -1,5 +1,7 @@
 package ansisql
 
+import "fmt"
+
 type DBDatabase struct {
 	Name    string
 	Schemas []*DBSchema
@@ -42,3 +44,15 @@ type DBColumnType struct {
 	Precision int
 	Scale     int
 }
+
+type TableSummaryResult struct {
+	RowCount    int64
+}
+
+func (tsr *TableSummaryResult) String() string {
+	if tsr == nil {
+		return "<nil summary>"
+	}
+	return fmt.Sprintf("RowCount: %d", tsr.RowCount)
+}
+

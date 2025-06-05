@@ -5,6 +5,7 @@ package duck
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -155,4 +156,25 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 
 func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
 	return c.schemaCreator.CreateSchemaIfNotExist(ctx, c, asset)
+}
+
+func (c *Client) GetTableSummary(ctx context.Context, tableName string) (*ansisql.TableSummaryResult, error) {
+	query := fmt.Sprintf("SELECT COUNT(*) as row_count FROM %s", tableName)
+	
+	rows, err := c.connection.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute count query: %w", err)
+	}
+	defer rows.Close()
+
+	var rowCount int64
+	if rows.Next() {
+		if err := rows.Scan(&rowCount); err != nil {
+			return nil, fmt.Errorf("failed to scan row count: %w", err)
+		}
+	}
+
+	return &ansisql.TableSummaryResult{
+		RowCount: rowCount,
+	}, nil
 }

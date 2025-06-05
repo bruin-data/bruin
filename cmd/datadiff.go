@@ -6,33 +6,18 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/sourcegraph/conc"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
 )
 
-// TableSummaryResult is a placeholder for the result of GetTableSummary.
-// Replace this with the actual structure when available.
-type TableSummaryResult struct {
-	// Example fields, adjust as necessary
-	RowCount    int64
-	Schema      string // Or a more complex type like map[string]string
-	LastUpdated string // Example: time.Time or string
-}
-
-// String provides a string representation of TableSummaryResult for printing.
-func (tsr *TableSummaryResult) String() string {
-	if tsr == nil {
-		return "<nil summary>"
-	}
-	return fmt.Sprintf("RowCount: %d, Schema: %s, LastUpdated: %s", tsr.RowCount, tsr.Schema, tsr.LastUpdated)
-}
-
 // TableSummarizer defines an interface for connections that can provide table summaries.
 type TableSummarizer interface {
-	GetTableSummary(ctx context.Context, tableName string) (*TableSummaryResult, error)
+	GetTableSummary(ctx context.Context, tableName string) (*ansisql.TableSummaryResult, error)
 }
 
 // DataDiffCmd defines the 'data-diff' command.
@@ -106,21 +91,49 @@ func DataDiffCmd() *cli.Command {
 			ctx := context.Background()
 
 			if summarizer, ok := conn.(TableSummarizer); ok {
-				fmt.Printf("\nFetching summary for table '%s':\n", table1)
-				summary1, err := summarizer.GetTableSummary(ctx, table1)
-				if err != nil {
-					fmt.Printf("  Error getting summary for %s: %v\n", table1, err)
-				} else {
-					fmt.Printf("  Summary for %s: %s\n", table1, summary1.String())
+				var summary1, summary2 *ansisql.TableSummaryResult
+				var err1, err2 error
+				var group conc.WaitGroup
+
+				group.Go(func() {
+					summary1, err1 = summarizer.GetTableSummary(ctx, table1)
+				})
+
+				group.Go(func() {
+					summary2, err2 = summarizer.GetTableSummary(ctx, table2)
+				})
+
+				group.Wait()
+
+				if err1 != nil {
+					fmt.Printf("  Error getting summary for %s: %v\n", table1, err1)
+				}
+				if err2 != nil {
+					fmt.Printf("  Error getting summary for %s: %v\n", table2, err2)
 				}
 
-				fmt.Printf("\nFetching summary for table '%s':\n", table2)
-				summary2, err := summarizer.GetTableSummary(ctx, table2)
-				if err != nil {
-					fmt.Printf("  Error getting summary for %s: %v\n", table2, err)
+				if summary1 != nil && summary2 != nil {
+					fmt.Printf("\nComparing table summaries:\n")
+					fmt.Printf("Table 1 (%s): %s\n", table1, summary1)
+					fmt.Printf("Table 2 (%s): %s\n", table2, summary2)
+
+					rowCountDiff := summary1.RowCount - summary2.RowCount
+					if rowCountDiff != 0 {
+						errorPrinter.Printf("\nRow count difference: %d rows\n", rowCountDiff)
+						if rowCountDiff > 0 {
+							errorPrinter.Printf("Table 1 has %d more rows than Table 2\n", rowCountDiff)
+						} else {
+							errorPrinter.Printf("Table 2 has %d more rows than Table 1\n", -rowCountDiff)
+						}
+						return fmt.Errorf("Tables '%s' and '%s' have different row counts", table1, table2)
+					} else {
+						fmt.Printf("\nTables have the same number of rows\n")
+					}
 				} else {
-					fmt.Printf("  Summary for %s: %s\n", table2, summary2.String())
+					errorPrinter.Printf("\nUnable to compare summaries - one or both summaries could not be fetched or are nil\n")
+					return errors.New("failed to compare table summaries due to missing data")
 				}
+
 			} else {
 				fmt.Printf("\nConnection type %T does not support GetTableSummary.\n", conn)
 			}
