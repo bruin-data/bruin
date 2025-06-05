@@ -73,6 +73,7 @@ func main() {
 			cmd.Connections(),
 			cmd.Query(),
 			cmd.Patch(),
+			cmd.DataDiffCmd(),
 			versionCommand,
 		},
 		DisableSliceFlagSeparator: true,
