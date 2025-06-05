@@ -1904,8 +1904,6 @@ func (b *Builder) SetNameFromPath(ctx context.Context, asset *Asset, foundPipeli
 	return asset, nil
 }
 
-
-
 func (t TimeModifier) MarshalYAML() (interface{}, error) {
 	switch {
 	case t.Days != 0 && t.Months == 0 && t.Hours == 0 && t.Minutes == 0 && t.Seconds == 0 && t.CronPeriods == 0:
