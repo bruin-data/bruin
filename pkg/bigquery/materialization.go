@@ -146,17 +146,16 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 		if mat.PartitionBy != "" {
 			partitionClause = "PARTITION BY " + mat.PartitionBy
 		}
-	
+
 		clusterByClause := ""
 		if len(mat.ClusterBy) > 0 {
 			clusterByClause = "CLUSTER BY " + strings.Join(mat.ClusterBy, ", ")
 		}
-	
+
 		return fmt.Sprintf("CREATE OR REPLACE TABLE %s %s %s AS\n%s", asset.Name, partitionClause, clusterByClause, query), nil
 	}
 
 }
-
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error) {
 	if asset.Materialization.IncrementalKey == "" {
 		return "", errors.New("incremental_key is required for time_interval strategy")
@@ -362,7 +361,6 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 	return queryStr, nil
 }
 
-
 func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, error) {
 	if asset.Materialization.IncrementalKey == "" {
 		return "", errors.New("incremental_key is required for SCD2 strategy")
@@ -374,7 +372,7 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 	}
 	tbl := fmt.Sprintf("`%s`", asset.Name)
 	stmt := fmt.Sprintf(
-`CREATE OR REPLACE TABLE %s
+		`CREATE OR REPLACE TABLE %s
 PARTITION BY DATE(_valid_from)
 CLUSTER BY _is_current, %s AS
 SELECT
@@ -385,10 +383,10 @@ SELECT
 FROM (
 %s
 ) AS src;`,
-		tbl,   
-		primaryKeys[0],  
-		asset.Materialization.IncrementalKey,        
-		strings.TrimSpace(query), 
+		tbl,
+		primaryKeys[0],
+		asset.Materialization.IncrementalKey,
+		strings.TrimSpace(query),
 	)
 
 	return strings.TrimSpace(stmt), nil
@@ -400,7 +398,7 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 	}
 	tbl := fmt.Sprintf("`%s`", asset.Name)
 	stmt := fmt.Sprintf(
-`DECLARE run_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP();
+		`DECLARE run_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP();
 
 CREATE OR REPLACE TABLE %s
 PARTITION BY DATE(valid_from)
@@ -413,9 +411,9 @@ SELECT
 FROM (
 %s
 ) AS src;`,
-		tbl,          
-		primaryKeys[0],          
-		strings.TrimSpace(query), 
+		tbl,
+		primaryKeys[0],
+		strings.TrimSpace(query),
 	)
 
 	return strings.TrimSpace(stmt), nil
