@@ -148,7 +148,7 @@ type trackingFs struct {
 	closed *bool
 }
 
-func (fsys *trackingFs) Open(name string) (afero.File, error) {
+func (fsys *trackingFs) Open(name string) (afero.File, error) { //nolint:ireturn
 	f, err := fsys.Fs.Open(name)
 	if err != nil {
 		return nil, err
