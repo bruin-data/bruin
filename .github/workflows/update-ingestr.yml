@@ -21,22 +21,52 @@ jobs:
         id: check
         run: |
           set -euo pipefail
-          latest=$(curl -fsSL https://api.github.com/repos/bruin-data/ingestr/releases/latest | jq -r .tag_name)
+
+          function semver_or_die() {
+              local version
+              version="${1#v}"  # Remove 'v' prefix if present
+              if [[ ! ${version} =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                  printf >&2 'Error : %s is not a valid semver.\n' "$version"
+                  exit 1
+              fi
+          }
+
+          function version_gt() { 
+              local v1="${1#v}" v2="${2#v}"
+              test "$(echo "$v1 $v2" | tr " " "\n" | sort -V | head -n 1)" != "$v1"
+          }
+          function version_le() { 
+              local v1="${1#v}" v2="${2#v}"
+              test "$(echo "$v1 $v2" | tr " " "\n" | sort -V | head -n 1)" == "$v1"
+          }
+          function version_lt() { 
+              local v1="${1#v}" v2="${2#v}"
+              test "$(echo "$v1 $v2" | tr " " "\n" | sort -rV | head -n 1)" != "$v1"
+          }
+          function version_ge() { 
+              local v1="${1#v}" v2="${2#v}"
+              test "$(echo "$v1 $v2" | tr " " "\n" | sort -rV | head -n 1)" == "$v1"
+          }
+
+          latest=$(curl -s "https://api.github.com/repos/bruin-data/ingestr/tags" | jq -r '.[0].name')
           latest=${latest#v}
           current=$(grep -oE 'ingestrVersion\s*=\s*"[^"]+"' pkg/python/uv.go | cut -d '"' -f2)
+
           echo "current=$current"
           echo "latest=$latest"
-          if [ "$latest" != "$current" ]; then
-            echo "new=true" >> "$GITHUB_OUTPUT"
-            echo "version=$latest" >> "$GITHUB_OUTPUT"
-            sed -i -E "s/(ingestrVersion\s*=\s*")[^"]+(\")/\1$latest\2/" pkg/python/uv.go
+
+          if version_gt "$latest" "$current"; then
+              echo "new=true" >> "$GITHUB_OUTPUT"
+              echo "version=$latest" >> "$GITHUB_OUTPUT"
+              sed -i -E "s/(ingestrVersion\s*=\s*")[^"]+(\")/\1$latest\2/" pkg/python/uv.go
           else
-            echo "new=false" >> "$GITHUB_OUTPUT"
+              echo "new=false" >> "$GITHUB_OUTPUT"
           fi
+          # echo "Script completed"
 
       - name: Create Pull Request
         if: steps.check.outputs.new == 'true'
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v7.0.8
         with:
           branch: update-ingestr-${{ steps.check.outputs.version }}
           commit-message: "chore: bump ingestr to v${{ steps.check.outputs.version }}"
