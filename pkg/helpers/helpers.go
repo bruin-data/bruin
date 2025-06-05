@@ -119,6 +119,7 @@ func ReadJSONToFile(fs afero.Fs, filename string, v interface{}) error {
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
 	decoder := json.NewDecoder(file)
 	err = decoder.Decode(v)

@@ -128,6 +128,56 @@ func TestReadJSONToFile(t *testing.T) {
 	assert.Equal(t, expectedData, actualData, "Data read from file should match expected data")
 }
 
+// trackingFile wraps an afero.File and records when Close is called.
+type trackingFile struct {
+	afero.File
+	closed *bool
+}
+
+func (f *trackingFile) Close() error {
+	err := f.File.Close()
+	if err == nil {
+		*f.closed = true
+	}
+	return err
+}
+
+// trackingFs is an afero filesystem that tracks file closes.
+type trackingFs struct {
+	afero.Fs
+	closed *bool
+}
+
+func (fsys *trackingFs) Open(name string) (afero.File, error) { //nolint:ireturn
+	f, err := fsys.Fs.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	return &trackingFile{File: f, closed: fsys.closed}, nil
+}
+
+func TestReadJSONToFileClosesFile(t *testing.T) {
+	t.Parallel()
+
+	data := map[string]int{"foo": 1}
+	buf, err := json.MarshalIndent(data, "", "  ")
+	require.NoError(t, err)
+
+	baseFs := afero.NewMemMapFs()
+	const filename = "input.json"
+	err = afero.WriteFile(baseFs, filename, buf, 0o644)
+	require.NoError(t, err)
+
+	closed := false
+	fs := &trackingFs{Fs: baseFs, closed: &closed}
+
+	var out map[string]int
+	err = ReadJSONToFile(fs, filename, &out)
+	require.NoError(t, err)
+	assert.Equal(t, data, out)
+	assert.True(t, closed, "file should be closed after ReadJSONToFile")
+}
+
 func TestGetLatestFileInDir(t *testing.T) {
 	t.Parallel()
 
