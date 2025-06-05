@@ -1290,6 +1290,98 @@ func getCloudTasks(binary string, currentFolder string) []e2e.Task {
 	return tasks
 }
 
+func getCloudWorkflows(binary string, currentFolder string, tempdir string) []e2e.Workflow {
+	return []e2e.Workflow{
+		{
+			Name: "scd2_by_column",
+			Steps: []e2e.Task{
+				{
+					Name:    "restore asset to initial state",
+					Command: "cp",
+					Args:    []string{filepath.Join(currentFolder, "resources/products.sql"), filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql")},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "create the table",
+					Command: binary,
+					Args:    []string{"run", "--full-refresh", "--env", "env-time-materialization", filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline")},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "query the initial table",
+					Command: binary,
+					Args:    []string{"query", "--env", "env-time-materialization", "--asset", filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql"), "--query", "SELECT * FROM PRODUCTS;", "--output", "json"},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+						Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/expectations/initial_expected.json")),
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByOutputJSON,
+					},
+				},
+				{
+					Name:    "copy products_updated.sql to products.sql",
+					Command: "cp",
+					Args:    []string{filepath.Join(currentFolder, "resources/products_updated.sql"), filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql")},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "update table with time materialization",
+					Command: binary,
+					Args:    []string{"run", "--start-date", "2025-03-01", "--end-date", "2025-03-31", "--env", "env-time-materialization", filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql")},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "query the updated table with time materialization",
+					Command: binary,
+					Args:    []string{"query", "--env", "env-time-materialization", "--asset", filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql"), "--query", "SELECT * FROM PRODUCTS;", "--output", "json"},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+						Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/expectations/final_expected.json")),
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByOutputJSON,
+					},
+				},
+			},
+		},
+	}
+}
+
 func runCloudIntegrationTests(binary string, currentFolder string) {
 	tests := getCloudTasks(binary, currentFolder)
 	for _, test := range tests {
