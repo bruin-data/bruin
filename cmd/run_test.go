@@ -1104,7 +1104,7 @@ func TestApplyFilters(t *testing.T) { //nolint
 				taskNames := []string{}
 				for _, task := range markedTasks {
 					taskNames = append(taskNames, task.GetHumanID()) // Use HumanID for accurate matching
-					print(task.GetHumanID())
+					t.Log(task.GetHumanID())
 				}
 
 				// Check if each expected task is present in the marked tasks
