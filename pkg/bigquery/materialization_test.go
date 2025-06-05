@@ -490,11 +490,12 @@ func TestBuildDDLQuery(t *testing.T) {
 func TestBuildSCD2Query(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name    string
-		asset   *pipeline.Asset
-		query   string
-		want    string
-		wantErr bool
+		name        string
+		asset       *pipeline.Asset
+		query       string
+		want        string
+		wantErr     bool
+		fullRefresh bool
 	}{
 		{
 			name: "scd2_no_primary_key",
@@ -511,8 +512,9 @@ func TestBuildSCD2Query(t *testing.T) {
 					{Name: "ts", Type: "TIMESTAMP"},
 				},
 			},
-			query:   "SELECT id, event_name, ts from source_table",
-			wantErr: true,
+			query:       "SELECT id, event_name, ts from source_table",
+			wantErr:     true,
+			fullRefresh: false,
 		},
 		{
 			name: "scd2_reserved_column_name_is_current",
@@ -529,8 +531,9 @@ func TestBuildSCD2Query(t *testing.T) {
 					{Name: "ts", Type: "TIMESTAMP"},
 				},
 			},
-			query:   "SELECT id, _is_current from source_table",
-			wantErr: true,
+			query:       "SELECT id, _is_current from source_table",
+			wantErr:     true,
+			fullRefresh: false,
 		},
 		{
 			name: "scd2_reserved_column_name_valid_from",
@@ -547,8 +550,9 @@ func TestBuildSCD2Query(t *testing.T) {
 					{Name: "ts", Type: "TIMESTAMP"},
 				},
 			},
-			query:   "SELECT id, _valid_from from source_table",
-			wantErr: true,
+			query:       "SELECT id, _valid_from from source_table",
+			wantErr:     true,
+			fullRefresh: false,
 		},
 		{
 			name: "scd2_reserved_column_name_valid_until",
@@ -565,8 +569,9 @@ func TestBuildSCD2Query(t *testing.T) {
 					{Name: "ts", Type: "TIMESTAMP"},
 				},
 			},
-			query:   "SELECT id, _valid_until from source_table",
-			wantErr: true,
+			query:       "SELECT id, _valid_until from source_table",
+			wantErr:     true,
+			fullRefresh: false,
 		},
 		{
 			name: "scd2_table_exists_with_incremental_key", // dim_input
@@ -636,17 +641,47 @@ func TestBuildSCD2Query(t *testing.T) {
 				"  INSERT (id, event_type, col1, col2, _valid_from, _valid_until, _is_current)\n" +
 				"  VALUES (source.id, source.event_type, source.col1, source.col2, source.ts, TIMESTAMP('9999-12-31'), TRUE)",
 		},
+		{
+			name: "scd2_full_refresh_with_incremental_key", // dim_input
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "event_name"},
+					{Name: "ts", Type: "DATE"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, event_name, ts from source_table",
+			want: "CREATE OR REPLACE TABLE `my.asset`\n" +
+				"PARTITION BY DATE(_valid_from)\n" +
+				"CLUSTER BY _is_current, id AS\n" +
+				"SELECT\n" +
+				"  ts AS _valid_from,\n" +
+				"  src.*,\n" +
+				"  TIMESTAMP('9999-12-31') AS _valid_until,\n" +
+				"  TRUE AS _is_current\n" +
+				"FROM (\n" +
+				"SELECT id, event_name, ts from source_table\n" +
+				") AS src;",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := buildSCD2QueryByTime(tt.asset, tt.query)
+			m := NewMaterializer(tt.fullRefresh)
+			render, err := m.Render(tt.asset, tt.query)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, strings.TrimSpace(tt.want), got)
+				assert.Equal(t, strings.TrimSpace(tt.want), render)
 			}
 		})
 	}
