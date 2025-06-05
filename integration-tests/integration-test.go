@@ -127,6 +127,7 @@ func main() {
 	// Check if .bruin.cloud.yml file exists and run cloud integration tests if it does
 	if _, err := os.Stat(filepath.Join(currentFolder, ".bruin.cloud.yml")); err == nil {
 		runCloudIntegrationTests(binary, currentFolder)
+		runCloudWorkflows(binary, currentFolder)
 	}
 }
 
@@ -1298,7 +1299,7 @@ func getCloudWorkflows(binary string, currentFolder string, tempdir string) []e2
 				{
 					Name:    "restore asset to initial state",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "resources/products.sql"), filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql")},
+					Args:    []string{filepath.Join(currentFolder, "bigquery-integration-tests/resources/menu_original.sql"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-column-pipeline/assets/menu.sql")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -1311,7 +1312,7 @@ func getCloudWorkflows(binary string, currentFolder string, tempdir string) []e2
 				{
 					Name:    "create the table",
 					Command: binary,
-					Args:    []string{"run", "--full-refresh", "--env", "env-time-materialization", filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline")},
+					Args:    []string{"run", "--full-refresh", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-column-pipeline")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -1324,22 +1325,22 @@ func getCloudWorkflows(binary string, currentFolder string, tempdir string) []e2
 				{
 					Name:    "query the initial table",
 					Command: binary,
-					Args:    []string{"query", "--env", "env-time-materialization", "--asset", filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql"), "--query", "SELECT * FROM PRODUCTS;", "--output", "json"},
+					Args:    []string{"query", "--asset", filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-column-pipeline/assets/menu.sql"), "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--query", "SELECT ID, Name, Price, _valid_until, _is_current FROM test.menu;", "--output", "csv"},
 					Env:     []string{},
 
 					Expected: e2e.Output{
 						ExitCode: 0,
-						Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/expectations/initial_expected.json")),
+						CSVFile:  filepath.Join(currentFolder, "bigquery-integration-tests/expected_initial.csv"),
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
-						e2e.AssertByOutputJSON,
+						e2e.AssertByCSV,
 					},
 				},
 				{
-					Name:    "copy products_updated.sql to products.sql",
+					Name:    "copy menu_updated.sql to menu.sql",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "resources/products_updated.sql"), filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql")},
+					Args:    []string{filepath.Join(currentFolder, "bigquery-integration-tests/resources/menu_updated.sql"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-column-pipeline/assets/menu.sql")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -1350,9 +1351,9 @@ func getCloudWorkflows(binary string, currentFolder string, tempdir string) []e2
 					},
 				},
 				{
-					Name:    "update table with time materialization",
+					Name:    "update table with scd2_by_column materialization",
 					Command: binary,
-					Args:    []string{"run", "--start-date", "2025-03-01", "--end-date", "2025-03-31", "--env", "env-time-materialization", filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql")},
+					Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-column-pipeline/assets/menu.sql")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -1363,18 +1364,18 @@ func getCloudWorkflows(binary string, currentFolder string, tempdir string) []e2
 					},
 				},
 				{
-					Name:    "query the updated table with time materialization",
+					Name:    "query the scd2_by_column materialized table",
 					Command: binary,
-					Args:    []string{"query", "--env", "env-time-materialization", "--asset", filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/assets/products.sql"), "--query", "SELECT * FROM PRODUCTS;", "--output", "json"},
+					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price,_is_current FROM test.menu;", "--output", "csv"},
 					Env:     []string{},
 
 					Expected: e2e.Output{
 						ExitCode: 0,
-						Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/time-materialization-pipeline/expectations/final_expected.json")),
+						CSVFile:  filepath.Join(currentFolder, "bigquery-integration-tests/final_expected.csv"),
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
-						e2e.AssertByOutputJSON,
+						e2e.AssertByCSV,
 					},
 				},
 			},
@@ -1387,6 +1388,24 @@ func runCloudIntegrationTests(binary string, currentFolder string) {
 	for _, test := range tests {
 		if err := test.Run(); err != nil {
 			fmt.Printf("%s Assert error: %v\n", test.Name, err)
+			os.Exit(1)
+		}
+	}
+}
+
+func runCloudWorkflows(binary string, currentFolder string) {
+	tempdir, err := os.MkdirTemp(os.TempDir(), "bruin-test")
+	if err != nil {
+		fmt.Println("Failed to create temporary directory:", err)
+		os.Exit(1)
+	}
+
+	workflows := getCloudWorkflows(binary, currentFolder, tempdir)
+
+	for _, workflow := range workflows {
+		err := workflow.Run()
+		if err != nil {
+			fmt.Printf("Assert error: %v\n", err)
 			os.Exit(1)
 		}
 	}
