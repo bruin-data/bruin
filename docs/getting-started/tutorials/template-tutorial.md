@@ -14,9 +14,7 @@ By using templates, teams can focus on their pipeline logic rather than worrying
 Watch the video below to see how to use templates in action:
 
 <iframe width="685" height="385"
-src="https://www.youtube.com/watch?v=8RuVoSCNHQI"
-title="YouTube video player"
+src="https://www.youtube.com/embed/8RuVoSCNHQI"
 frameborder="0"
-allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
 allowfullscreen>
 </iframe>
