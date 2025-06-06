@@ -207,8 +207,14 @@ func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstan
 
 		qq = qry
 	}
-	return NewCountableQueryCheck(c.conn, ti.Check.Value, &query.Query{Query: qq}, ti.Check.Name, func(count int64) error {
-		return errors.Errorf("custom check '%s' has returned %d instead of the expected %d", ti.Check.Name, count, ti.Check.Value)
+	expected := ti.Check.Value
+	if ti.Check.Count != nil {
+		expected = *ti.Check.Count
+		qq = fmt.Sprintf("SELECT count(*) FROM (%s) AS t", qq)
+	}
+
+	return NewCountableQueryCheck(c.conn, expected, &query.Query{Query: qq}, ti.Check.Name, func(count int64) error {
+		return errors.Errorf("custom check '%s' has returned %d instead of the expected %d", ti.Check.Name, count, expected)
 	}).CustomCheck(ctx, ti)
 }
 
