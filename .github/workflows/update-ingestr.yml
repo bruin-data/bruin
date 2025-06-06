@@ -1,0 +1,65 @@
+name: Update Ingestr Version
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for latest ingestr release
+        id: check
+        run: |
+          set -euo pipefail
+
+          function version_gt() { 
+              local v1="${1#v}" v2="${2#v}"
+              test "$(echo "$v1 $v2" | tr " " "\n" | sort -V | head -n 1)" != "$v1"
+          }
+
+          latest=$(curl -s "https://api.github.com/repos/bruin-data/ingestr/tags" | jq -r '.[0].name')
+          latest=${latest#v}
+          current=$(grep -oE 'ingestrVersion\s*=\s*"[^"]+"' pkg/python/uv.go | cut -d '"' -f2)
+
+          echo "current=$current"
+          echo "latest=$latest"
+
+          if version_gt "$latest" "$current"; then
+              echo "new=true" >> "$GITHUB_OUTPUT"
+              echo "version=$latest" >> "$GITHUB_OUTPUT"
+              sed -i -E "s/(ingestrVersion\s*=\s*")[^"]+(\")/\1$latest\2/" pkg/python/uv.go
+          else
+              echo "new=false" >> "$GITHUB_OUTPUT"
+          fi
+          # echo "Script completed"
+
+      - name: Check if branch exists
+        id: check-branch-exists
+        run: |
+            if [[ -n $(git ls-remote --heads origin update-ingestr-${{ steps.check.outputs.version }}) ]]; then
+                echo "exists=true" >> $GITHUB_OUTPUT
+            else
+                echo "exists=false" >> $GITHUB_OUTPUT          
+            fi
+        shell: bash
+
+      - name: Create Pull Request
+        if: steps.check.outputs.new == 'true' && steps.check-branch-exists.outputs.exists == 'false'
+        uses: peter-evans/create-pull-request@v7.0.8
+        with:
+          branch: update-ingestr-${{ steps.check.outputs.version }}
+          commit-message: "chore: bump ingestr to v${{ steps.check.outputs.version }}"
+          title: "chore: bump ingestr to v${{ steps.check.outputs.version }}"
+          body: "Automated update of ingestr to v${{ steps.check.outputs.version }}"
+          delete-branch: true
+          labels: automated-update
