@@ -286,6 +286,7 @@ type customCheck struct {
 	Description string `yaml:"description"`
 	Query       string `yaml:"query"`
 	Value       int64  `yaml:"value"`
+	Count       *int64 `yaml:"count"`
 	Blocking    *bool  `yaml:"blocking"`
 }
 
@@ -496,6 +497,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			Description: check.Description,
 			Query:       check.Query,
 			Value:       check.Value,
+			Count:       check.Count,
 			Blocking:    DefaultTrueBool{Value: check.Blocking},
 		}
 	}
