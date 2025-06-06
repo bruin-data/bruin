@@ -81,6 +81,7 @@ export default withMermaid({
                             { text: "chess", link: "/getting-started/templates-docs/chess-README.md" },
                             { text: "duckdb", link: "/getting-started/templates-docs/duckdb-README.md" },
                             { text: "firebase", link: "/getting-started/templates-docs/firebase-README.md" },
+                            { text: "frankfurter", link: "/getting-started/templates-docs/frankfurter-README.md" },
                             { text: "gorgias", link: "/getting-started/templates-docs/gorgias-README.md" },
                             { text: "gsheet-bigquery", link: "/getting-started/templates-docs/gsheet-bigquery-README.md" },
                             { text: "gsheet-duckdb", link: "/getting-started/templates-docs/gsheet-duckdb-README.md" },
@@ -97,6 +98,7 @@ export default withMermaid({
                            items: [
                               {text: "Your First Pipeline", link: "/getting-started/tutorials/first-tutorial"},
                               { text: "Load Notion to PostgreSQL", link: "/getting-started/tutorials/load-notion-postgres" },
+                               { text: "Using Templates", link: "/getting-started/tutorials/template-tutorial" },
                           ],
 
                      },
