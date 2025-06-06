@@ -272,9 +272,10 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 				Columns: []pipeline.Column{},
 			},
-			want: []string{"CREATE TABLE IF NOT EXISTS empty_table \\(\n" +
-				"\n" +
-				"\\)",
+			want: []string{
+				"CREATE TABLE IF NOT EXISTS empty_table \\(\n" +
+					"\n" +
+					"\\)",
 			},
 		},
 		{
@@ -308,10 +309,11 @@ func TestMaterializer_Render(t *testing.T) {
 					{Name: "name", Type: "STRING", Description: "The name of the person", PrimaryKey: true},
 				},
 			},
-			want: []string{"CREATE TABLE IF NOT EXISTS two_col_table \\(\n" +
-				"id INT64,\n" +
-				"name STRING PRIMARY KEY COMMENT \\'The name of the person\\'\n" +
-				"\\)",
+			want: []string{
+				"CREATE TABLE IF NOT EXISTS two_col_table \\(\n" +
+					"id INT64,\n" +
+					"name STRING PRIMARY KEY COMMENT \\'The name of the person\\'\n" +
+					"\\)",
 			},
 		},
 		{
@@ -328,11 +330,12 @@ func TestMaterializer_Render(t *testing.T) {
 					ClusterBy: []string{"timestamp, id"},
 				},
 			},
-			want: []string{"CREATE TABLE IF NOT EXISTS my_clustered_table \\(\n" +
-				"id INT64,\n" +
-				"timestamp TIMESTAMP COMMENT 'Event timestamp'\n" +
-				"\\)" +
-				"\nCLUSTER BY \\(timestamp, id\\)",
+			want: []string{
+				"CREATE TABLE IF NOT EXISTS my_clustered_table \\(\n" +
+					"id INT64,\n" +
+					"timestamp TIMESTAMP COMMENT 'Event timestamp'\n" +
+					"\\)" +
+					"\nCLUSTER BY \\(timestamp, id\\)",
 			},
 		},
 		{
@@ -349,11 +352,12 @@ func TestMaterializer_Render(t *testing.T) {
 					PartitionBy: "timestamp",
 				},
 			},
-			want: []string{"CREATE TABLE IF NOT EXISTS my_partitioned_table \\(\n" +
-				"id INT64 PRIMARY KEY,\n" +
-				"timestamp TIMESTAMP COMMENT 'Event timestamp'\n" +
-				"\\)" +
-				"\nPARTITIONED BY \\(timestamp\\)",
+			want: []string{
+				"CREATE TABLE IF NOT EXISTS my_partitioned_table \\(\n" +
+					"id INT64 PRIMARY KEY,\n" +
+					"timestamp TIMESTAMP COMMENT 'Event timestamp'\n" +
+					"\\)" +
+					"\nPARTITIONED BY \\(timestamp\\)",
 			},
 		},
 		{

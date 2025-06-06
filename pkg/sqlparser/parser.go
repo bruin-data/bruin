@@ -393,6 +393,10 @@ func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeli
 
 	missingDependencies := make([]string, 0)
 	for usedTable, actualReferenceName := range usedTableNameMap {
+		if usedTable == asset.Name || actualReferenceName == asset.Name {
+			continue
+		}
+
 		// if the used table contains a full name with multiple dots treat it as an absolute reference, ignore it
 		if strings.Count(usedTable, ".") > 1 {
 			continue

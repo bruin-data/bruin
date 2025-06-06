@@ -248,11 +248,12 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 				Columns: []pipeline.Column{},
 			},
-			want: []string{"CREATE TABLE IF NOT EXISTS empty_table (\n" +
-				"\n" +
-				")\n" +
-				"LOCATION 's3://bucket/empty_table'\n" +
-				"TBLPROPERTIES('table_type'='ICEBERG')",
+			want: []string{
+				"CREATE TABLE IF NOT EXISTS empty_table (\n" +
+					"\n" +
+					")\n" +
+					"LOCATION 's3://bucket/empty_table'\n" +
+					"TBLPROPERTIES('table_type'='ICEBERG')",
 			},
 		},
 		{
@@ -267,11 +268,12 @@ func TestMaterializer_Render(t *testing.T) {
 					{Name: "id", Type: "INT64"},
 				},
 			},
-			want: []string{"CREATE TABLE IF NOT EXISTS one_col_table (\n" +
-				"id INT64\n" +
-				")\n" +
-				"LOCATION 's3://bucket/one_col_table'\n" +
-				"TBLPROPERTIES('table_type'='ICEBERG')",
+			want: []string{
+				"CREATE TABLE IF NOT EXISTS one_col_table (\n" +
+					"id INT64\n" +
+					")\n" +
+					"LOCATION 's3://bucket/one_col_table'\n" +
+					"TBLPROPERTIES('table_type'='ICEBERG')",
 			},
 		},
 		{
@@ -287,12 +289,13 @@ func TestMaterializer_Render(t *testing.T) {
 					{Name: "name", Type: "STRING", Description: "The name of the person"},
 				},
 			},
-			want: []string{"CREATE TABLE IF NOT EXISTS two_col_table (\n" +
-				"id INT64,\n" +
-				"name STRING COMMENT 'The name of the person'\n" +
-				")\n" +
-				"LOCATION 's3://bucket/two_col_table'\n" +
-				"TBLPROPERTIES('table_type'='ICEBERG')",
+			want: []string{
+				"CREATE TABLE IF NOT EXISTS two_col_table (\n" +
+					"id INT64,\n" +
+					"name STRING COMMENT 'The name of the person'\n" +
+					")\n" +
+					"LOCATION 's3://bucket/two_col_table'\n" +
+					"TBLPROPERTIES('table_type'='ICEBERG')",
 			},
 		},
 		{

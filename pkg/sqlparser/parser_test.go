@@ -998,6 +998,19 @@ func TestGetMissingDependenciesForAsset(t *testing.T) {
 			expectedDeps:  []string{"table2"},
 			expectedError: false,
 		},
+		{
+			name: "asset name itself is not reported",
+			asset: &pipeline.Asset{
+				Name: "test_asset",
+				Type: pipeline.AssetTypeBigqueryQuery,
+				ExecutableFile: pipeline.ExecutableFile{
+					Content: "create table test_asset as select 1",
+				},
+			},
+			pipeline:      &pipeline.Pipeline{Assets: []*pipeline.Asset{{Name: "test_asset"}}},
+			expectedDeps:  []string{},
+			expectedError: false,
+		},
 	}
 
 	for _, tt := range tests {
