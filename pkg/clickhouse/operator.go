@@ -2,8 +2,8 @@ package clickhouse
 
 import (
 	"context"
-	"github.com/bruin-data/bruin/pkg/executor"
 
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
