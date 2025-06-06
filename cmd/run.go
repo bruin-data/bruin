@@ -603,7 +603,7 @@ func ParseDate(startDateStr, endDateStr string, logger logger.Logger) (time.Time
 	endDate, err := date.ParseTime(endDateStr)
 	logger.Debug("given end date: ", endDate)
 	if err != nil {
-		errorPrinter.Printf("Please give a valid end date: bruin run --start-date <start date>)\n")
+		errorPrinter.Printf("Please give a valid end date: bruin run --end-date <end date>)\n")
 		errorPrinter.Printf("A valid start date can be in the YYYY-MM-DD or YYYY-MM-DD HH:MM:SS formats. \n")
 		errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
 		errorPrinter.Printf("    e.g. %s  \n", time.Now().AddDate(0, 0, -1).Format("2006-01-02 15:04:05"))
