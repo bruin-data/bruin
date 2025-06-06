@@ -9,6 +9,7 @@ import (
 )
 
 func TestLogIfFullRefreshAndDDL(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name         string
 		fullRefresh  bool
@@ -54,6 +55,7 @@ func TestLogIfFullRefreshAndDDL(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			mat := pipeline.Materialization{Strategy: tc.strategy}
 			asset := &pipeline.Asset{Materialization: mat}
 			m := &Materializer{fullRefresh: tc.fullRefresh}
