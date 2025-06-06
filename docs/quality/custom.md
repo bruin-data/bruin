@@ -35,6 +35,8 @@ There are a few fields to configure the check behavior:
 - `description`: optional, add a longer description if needed using Markdown.
 - `value`: optional, a value to compare the quality check output
   - if not given, Bruin will try to match the query output to be integer zero.
+- `count`: optional, expected number of rows returned by the query. When set,
+  Bruin will automatically wrap the query with `SELECT count(*) FROM (<query>)`.
 - `blocking`: optional, whether the test should block running downstreams, default `true`.
 
 ## Examples:
@@ -47,11 +49,11 @@ type: duckdb.sql
 materialization:
   type: table
 
-custom_checks:  
-  - name: row count is greater than zero    
+custom_checks:
+  - name: row count is greater than zero
     query: SELECT count(*) > 1 FROM dataset.player_count
-    value: 1  
-   
+    value: 1
+
 @bruin */
 
 SELECT name, count(*)
@@ -67,12 +69,12 @@ type: duckdb.sql
 materialization:
   type: table
 
-custom_checks:  
-  - name: row count is greater than zero    
+custom_checks:
+  - name: row count is greater than zero
     query: SELECT count(*) > 1 FROM dataset.player_count
     value: 1
-    blocking: false  
-   
+    blocking: false
+
 @bruin */
 
 SELECT name, count(*)
@@ -91,11 +93,31 @@ type: duckdb.sql
 materialization:
   type: table
 
-custom_checks:  
-  - name: row count is equal to 15    
+custom_checks:
+  - name: row count is equal to 15
     query: SELECT count(*)  FROM dataset.player_count
     value: 15
-   
+
+@bruin */
+
+SELECT name, count(*)
+FROM dataset.players
+GROUP BY 1
+```
+
+### Count-based check
+```bruin-sql
+/* @bruin
+name: dataset.player_stats
+type: duckdb.sql
+materialization:
+  type: table
+
+custom_checks:
+  - name: exactly 15 rows returned
+    query: SELECT * FROM dataset.player_count
+    count: 15
+
 @bruin */
 
 SELECT name, count(*)
