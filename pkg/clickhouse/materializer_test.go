@@ -26,7 +26,7 @@ func TestLogIfFullRefreshAndDDL(t *testing.T) {
 		{
 			name:        "strategy not DDL",
 			fullRefresh: true,
-			strategy:    "not_ddl",
+			strategy:    pipeline.MaterializationStrategyCreateReplace,
 			writer:      &bytes.Buffer{},
 		},
 		{
