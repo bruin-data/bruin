@@ -1903,3 +1903,22 @@ func (b *Builder) SetNameFromPath(ctx context.Context, asset *Asset, foundPipeli
 	asset.ID = hash(name)
 	return asset, nil
 }
+
+func (t TimeModifier) MarshalYAML() (interface{}, error) {
+	switch {
+	case t.Days != 0 && t.Months == 0 && t.Hours == 0 && t.Minutes == 0 && t.Seconds == 0 && t.CronPeriods == 0:
+		return fmt.Sprintf("%dd", t.Days), nil
+	case t.Months != 0 && t.Days == 0 && t.Hours == 0 && t.Minutes == 0 && t.Seconds == 0 && t.CronPeriods == 0:
+		return fmt.Sprintf("%dM", t.Months), nil
+	case t.Hours != 0 && t.Days == 0 && t.Months == 0 && t.Minutes == 0 && t.Seconds == 0 && t.CronPeriods == 0:
+		return fmt.Sprintf("%dh", t.Hours), nil
+	case t.Minutes != 0 && t.Days == 0 && t.Months == 0 && t.Hours == 0 && t.Seconds == 0 && t.CronPeriods == 0:
+		return fmt.Sprintf("%dm", t.Minutes), nil
+	case t.Seconds != 0 && t.Days == 0 && t.Months == 0 && t.Hours == 0 && t.Minutes == 0 && t.CronPeriods == 0:
+		return fmt.Sprintf("%ds", t.Seconds), nil
+	default:
+		// fallback to struct/object form
+		type Alias TimeModifier
+		return Alias(t), nil
+	}
+}
