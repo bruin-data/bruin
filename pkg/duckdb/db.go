@@ -6,8 +6,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	_ "github.com/marcboeker/go-duckdb"
@@ -158,23 +160,86 @@ func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Ass
 	return c.schemaCreator.CreateSchemaIfNotExist(ctx, c, asset)
 }
 
-func (c *Client) GetTableSummary(ctx context.Context, tableName string) (*ansisql.TableSummaryResult, error) {
-	query := fmt.Sprintf("SELECT COUNT(*) as row_count FROM %s", tableName)
-	
-	rows, err := c.connection.QueryContext(ctx, query)
+func (c *Client) GetTableSummary(ctx context.Context, tableName string) (*diff.TableSummaryResult, error) {
+	// Get row count
+	countQuery := fmt.Sprintf("SELECT COUNT(*) as row_count FROM %s", tableName)
+	rows, err := c.connection.QueryContext(ctx, countQuery)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute count query: %w", err)
+		return nil, fmt.Errorf("failed to execute count query for table '%s': %w", tableName, err)
 	}
-	defer rows.Close()
+	// It's important to close rows, but deferring here might be too early if schemaRows.Close() fails later.
+	// We will close it explicitly after use.
 
 	var rowCount int64
 	if rows.Next() {
 		if err := rows.Scan(&rowCount); err != nil {
-			return nil, fmt.Errorf("failed to scan row count: %w", err)
+			rows.Close() // Close before returning
+			return nil, fmt.Errorf("failed to scan row count for table '%s': %w", tableName, err)
 		}
 	}
+	if err = rows.Err(); err != nil {
+		rows.Close() // Close before returning
+		return nil, fmt.Errorf("error after iterating rows for count query on table '%s': %w", tableName, err)
+	}
+	rows.Close() // Explicitly close rows after we are done with them
 
-	return &ansisql.TableSummaryResult{
+	// Get table schema using PRAGMA table_info
+	schemaQuery := fmt.Sprintf("PRAGMA table_info('%s')", tableName)
+	schemaRows, err := c.connection.QueryContext(ctx, schemaQuery)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute PRAGMA table_info for table '%s': %w", tableName, err)
+	}
+	defer schemaRows.Close() // Defer close for schemaRows
+
+	var columns []*diff.Column
+	for schemaRows.Next() {
+		var (
+			cid       int
+			name      string
+			colType   string
+			notNull   bool
+			dfltValue sql.NullString
+			pk        bool
+		)
+
+		if err := schemaRows.Scan(&cid, &name, &colType, &notNull, &dfltValue, &pk); err != nil {
+			return nil, fmt.Errorf("failed to scan PRAGMA table_info result for table '%s': %w", tableName, err)
+		}
+
+		var stats diff.ColumnStatistics
+		switch strings.ToLower(colType) {
+		case "integer", "bigint", "tinyint", "smallint", "double", "float", "decimal", "numeric", "real":
+			stats = &diff.NumericalStatistics{}
+		case "varchar", "char", "text", "string":
+			stats = &diff.StringStatistics{}
+		case "boolean":
+			stats = &diff.BooleanStatistics{}
+		case "date", "time", "timestamp", "datetime":
+			stats = &diff.DateTimeStatistics{}
+		default:
+			stats = &diff.UnknownStatistics{}
+		}
+
+		columns = append(columns, &diff.Column{
+			Name:       name,
+			Type:       colType,
+			Nullable:   !notNull,
+			PrimaryKey: pk,
+			Unique:     pk,
+			Stats:      stats,
+		})
+	}
+	if err = schemaRows.Err(); err != nil {
+		return nil, fmt.Errorf("error after iterating PRAGMA table_info results for table '%s': %w", tableName, err)
+	}
+
+	dbTable := &diff.Table{
+		Name:    tableName,
+		Columns: columns,
+	}
+
+	return &diff.TableSummaryResult{
 		RowCount: rowCount,
+		Table:    dbTable,
 	}, nil
 }

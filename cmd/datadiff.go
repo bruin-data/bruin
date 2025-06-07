@@ -4,12 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"path/filepath"
 
-	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
+	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/fatih/color"
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/sourcegraph/conc"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
@@ -17,7 +21,93 @@ import (
 
 // TableSummarizer defines an interface for connections that can provide table summaries.
 type TableSummarizer interface {
-	GetTableSummary(ctx context.Context, tableName string) (*ansisql.TableSummaryResult, error)
+	GetTableSummary(ctx context.Context, tableName string) (*diff.TableSummaryResult, error)
+}
+
+// TypeDifference represents a difference in column types between two tables.
+type TypeDifference struct {
+	Table1Type string
+	Table2Type string
+}
+
+// NullabilityDifference represents a difference in nullability between two tables.
+type NullabilityDifference struct {
+	Table1Nullable bool
+	Table2Nullable bool
+}
+
+// UniquenessDifference represents a difference in uniqueness constraints between two tables.
+type UniquenessDifference struct {
+	Table1Unique bool
+	Table2Unique bool
+}
+
+// ColumnDifference represents differences for a column that exists in both tables.
+type ColumnDifference struct {
+	ColumnName            string
+	TypeDifference        *TypeDifference
+	NullabilityDifference *NullabilityDifference
+	UniquenessDifference  *UniquenessDifference
+}
+
+// MissingColumn represents a column that exists in only one table.
+type MissingColumn struct {
+	ColumnName  string
+	Type        string
+	Nullable    bool
+	PrimaryKey  bool
+	Unique      bool
+	TableName   string // The table where this column exists
+	MissingFrom string // The table where this column is missing
+}
+
+// SchemaComparisonResult holds the detailed results of a table schema comparison.
+type SchemaComparisonResult struct {
+	Table1 *diff.TableSummaryResult
+	Table2 *diff.TableSummaryResult
+
+	SamePropertiesCount      int                // Columns with identical properties in both tables
+	DifferentPropertiesCount int                // Columns present in both tables but with different properties
+	InTable1OnlyCount        int                // Columns present in table1 but not in table2
+	InTable2OnlyCount        int                // Columns present in table2 but not in table1
+	ColumnDifferences        []ColumnDifference // Structured differences for columns present in both tables
+	MissingColumns           []MissingColumn    // Columns missing from one of the tables
+	HasSchemaDifferences     bool               // True if DifferentPropertiesCount, InTable1OnlyCount, or InTable2OnlyCount > 0
+	RowCountDiff             int64              // Difference in row count between the two tables
+	HasRowCountDifference    bool               // True if RowCountDiff != 0
+}
+
+func (c *SchemaComparisonResult) GetSummaryTable() string {
+	t := table.NewWriter()
+	t.SetRowPainter(func(row table.Row) text.Colors {
+		if len(row) == 0 {
+			return text.Colors{}
+		}
+		if row[0] == "Row Count" {
+			if c.RowCountDiff != 0 {
+				return text.Colors{text.FgRed}
+			} else {
+				return text.Colors{text.FgGreen}
+			}
+		}
+		if row[0] == "Columns" {
+			if row[3] != 0 {
+				return text.Colors{text.FgRed}
+			} else {
+				return text.Colors{text.FgGreen}
+			}
+		}
+		return text.Colors{}
+	})
+
+	t.AppendHeader(table.Row{"", c.Table1.Table.Name, c.Table2.Table.Name, "Diff"})
+	if c.RowCountDiff != 0 {
+		t.AppendRow(table.Row{"Row Count", c.Table1.RowCount, c.Table2.RowCount, c.RowCountDiff})
+	} else {
+		t.AppendRow(table.Row{"Row Count", c.Table1.RowCount, c.Table2.RowCount, 0})
+	}
+	t.AppendRow(table.Row{"Columns", len(c.Table1.Table.Columns), len(c.Table2.Table.Columns), len(c.Table1.Table.Columns) - len(c.Table2.Table.Columns)})
+	return t.Render()
 }
 
 // DataDiffCmd defines the 'data-diff' command.
@@ -84,14 +174,9 @@ func DataDiffCmd() *cli.Command {
 				return fmt.Errorf("failed to get connection '%s': %w", connectionName, err)
 			}
 
-			fmt.Printf("Successfully fetched connection: %s (Type: %T)\n", connectionName, conn)
-			fmt.Printf("Table 1: %s\n", table1)
-			fmt.Printf("Table 2: %s\n", table2)
-
-			ctx := context.Background()
-
+			ctx := c.Context
 			if summarizer, ok := conn.(TableSummarizer); ok {
-				var summary1, summary2 *ansisql.TableSummaryResult
+				var summary1, summary2 *diff.TableSummaryResult
 				var err1, err2 error
 				var group conc.WaitGroup
 
@@ -106,31 +191,19 @@ func DataDiffCmd() *cli.Command {
 				group.Wait()
 
 				if err1 != nil {
-					fmt.Printf("  Error getting summary for %s: %v\n", table1, err1)
+					errorPrinter.Printf("error getting summary for '%s':\n\n%v", table1, err1)
+					return cli.Exit("", 1)
 				}
 				if err2 != nil {
-					fmt.Printf("  Error getting summary for %s: %v\n", table2, err2)
+					errorPrinter.Printf("error getting summary for '%s':\n\n%v", table2, err2)
+					return cli.Exit("", 1)
 				}
 
 				if summary1 != nil && summary2 != nil {
-					fmt.Printf("\nComparing table summaries:\n")
-					fmt.Printf("Table 1 (%s): %s\n", table1, summary1)
-					fmt.Printf("Table 2 (%s): %s\n", table2, summary2)
-
-					rowCountDiff := summary1.RowCount - summary2.RowCount
-					if rowCountDiff != 0 {
-						errorPrinter.Printf("\nRow count difference: %d rows\n", rowCountDiff)
-						if rowCountDiff > 0 {
-							errorPrinter.Printf("Table 1 has %d more rows than Table 2\n", rowCountDiff)
-						} else {
-							errorPrinter.Printf("Table 2 has %d more rows than Table 1\n", -rowCountDiff)
-						}
-						return fmt.Errorf("Tables '%s' and '%s' have different row counts", table1, table2)
-					} else {
-						fmt.Printf("\nTables have the same number of rows\n")
-					}
+					schemaComparison := compareTableSchemas(summary1, summary2, table1, table2)
+					printSchemaComparisonOutput(schemaComparison, table1, table2, summary1.Table, summary2.Table, c.App.Writer)
 				} else {
-					errorPrinter.Printf("\nUnable to compare summaries - one or both summaries could not be fetched or are nil\n")
+					fmt.Fprintf(c.App.ErrWriter, "\nUnable to compare summaries - one or both summaries could not be fetched or are nil\n")
 					return errors.New("failed to compare table summaries due to missing data")
 				}
 
@@ -141,4 +214,191 @@ func DataDiffCmd() *cli.Command {
 			return nil
 		},
 	}
+}
+
+func printSchemaComparisonOutput(schemaComparison SchemaComparisonResult, table1Name, table2Name string, t1Schema, t2Schema *diff.Table, errOut io.Writer) {
+	fmt.Fprintf(errOut, schemaComparison.GetSummaryTable()+"\n")
+	redPrinter := color.New(color.FgRed)
+	greenPrinter := color.New(color.FgGreen)
+
+	var overallSchemaMessage string
+
+	if schemaComparison.HasSchemaDifferences {
+		summaryPoints := []string{}
+		if schemaComparison.SamePropertiesCount > 0 {
+			summaryPoints = append(summaryPoints, fmt.Sprintf("%d columns have matching schemas", schemaComparison.SamePropertiesCount))
+		}
+		if schemaComparison.DifferentPropertiesCount > 0 {
+			summaryPoints = append(summaryPoints, fmt.Sprintf("%d columns have schema differences", schemaComparison.DifferentPropertiesCount))
+		}
+		if schemaComparison.InTable1OnlyCount > 0 {
+			summaryPoints = append(summaryPoints, fmt.Sprintf("%d columns from '%s' are missing in '%s'", schemaComparison.InTable1OnlyCount, table1Name, table2Name))
+		}
+		if schemaComparison.InTable2OnlyCount > 0 {
+			summaryPoints = append(summaryPoints, fmt.Sprintf("%d columns from '%s' are extra (not in '%s')", schemaComparison.InTable2OnlyCount, table2Name, table1Name))
+		}
+
+		if len(summaryPoints) > 0 {
+			overallSchemaMessage = fmt.Sprintf("\n\nSchema Comparison:\n")
+			for _, point := range summaryPoints {
+				overallSchemaMessage += fmt.Sprintf("  - %s\n", point)
+			}
+			fmt.Fprintf(errOut, "\n%s\n", overallSchemaMessage)
+		} else {
+			// This case should ideally be covered if HasSchemaDifferences is true due to nil/empty table scenarios handled in compareTableSchemas
+			overallSchemaMessage = "Schema differences detected."
+			fmt.Fprintf(errOut, "\n%s\n", overallSchemaMessage)
+		}
+
+		if len(schemaComparison.ColumnDifferences) > 0 {
+			fmt.Fprintf(errOut, "  Column Differences:\n")
+			for _, diff := range schemaComparison.ColumnDifferences {
+				fmt.Fprintf(errOut, "    - Column '%s':\n", diff.ColumnName)
+				if diff.TypeDifference != nil {
+					fmt.Fprintf(errOut, "      - Type: '%s' in %s vs '%s' in %s\n", diff.TypeDifference.Table1Type, table1Name, diff.TypeDifference.Table2Type, table2Name)
+				}
+				if diff.NullabilityDifference != nil {
+					fmt.Fprintf(errOut, "      - Nullability: %t in %s vs %t in %s\n", diff.NullabilityDifference.Table1Nullable, table1Name, diff.NullabilityDifference.Table2Nullable, table2Name)
+				}
+				if diff.UniquenessDifference != nil {
+					fmt.Fprintf(errOut, "      - Uniqueness: %t in %s vs %t in %s\n", diff.UniquenessDifference.Table1Unique, table1Name, diff.UniquenessDifference.Table2Unique, table2Name)
+				}
+			}
+		}
+
+		if len(schemaComparison.MissingColumns) > 0 {
+			fmt.Fprintf(errOut, "Missing Columns:\n")
+			for _, missing := range schemaComparison.MissingColumns {
+				fmt.Fprintf(errOut, "  - %s\n", missing.ColumnName)
+				fmt.Fprintf(errOut, "    - exists in %s\n", missing.TableName)
+				fmt.Fprintln(errOut, redPrinter.Sprintf("    - missing from '%s'", missing.MissingFrom))
+			}
+		}
+	} else { // No schema differences
+		if t1Schema != nil && t2Schema != nil {
+			// Both tables are non-nil and have no schema differences
+			if schemaComparison.SamePropertiesCount == 0 && len(t1Schema.Columns) == 0 && len(t2Schema.Columns) == 0 {
+				overallSchemaMessage = greenPrinter.Sprintf("Tables '%s' and '%s' both have no columns and are considered schema-identical.", table1Name, table2Name)
+			} else {
+				overallSchemaMessage = greenPrinter.Sprintf("Tables '%s' and '%s' have the same schema with %d columns.", table1Name, table2Name, schemaComparison.SamePropertiesCount)
+			}
+		} else if t1Schema == nil && t2Schema == nil {
+			overallSchemaMessage = fmt.Sprintf("Schemas for '%s' and '%s' are both nil (e.g., tables might not exist or failed to fetch).", table1Name, table2Name)
+		} else {
+			if t1Schema == nil && t2Schema != nil && len(t2Schema.Columns) == 0 {
+				overallSchemaMessage = fmt.Sprintf("Schema for '%s' is nil, and '%s' has no columns. Schemas considered identical.", table1Name, table2Name)
+			} else if t2Schema == nil && t1Schema != nil && len(t1Schema.Columns) == 0 {
+				overallSchemaMessage = fmt.Sprintf("Schema for '%s' is nil, and '%s' has no columns. Schemas considered identical.", table2Name, table1Name)
+			} else {
+				// Fallback, should be covered by previous conditions
+				overallSchemaMessage = "Table schemas are considered identical."
+			}
+		}
+		fmt.Printf("\n%s\n", overallSchemaMessage) // Standard output for no differences
+	}
+}
+
+func compareTableSchemas(summary1, summary2 *diff.TableSummaryResult, t1Name, t2Name string) SchemaComparisonResult {
+	res := SchemaComparisonResult{
+		Table1: summary1,
+		Table2: summary2,
+	}
+
+	if summary1 == nil || summary2 == nil {
+		return res
+	}
+
+	if summary1.Table == nil || summary2.Table == nil {
+		return res
+	}
+
+	res.RowCountDiff = summary1.RowCount - summary2.RowCount
+	res.HasRowCountDifference = res.RowCountDiff != 0
+
+	t1 := summary1.Table
+	t2 := summary2.Table
+
+	table1Columns := make(map[string]*diff.Column)
+	for _, col := range t1.Columns {
+		table1Columns[col.Name] = col
+	}
+
+	table2Columns := make(map[string]*diff.Column)
+	for _, col := range t2.Columns {
+		table2Columns[col.Name] = col
+	}
+
+	processedColsT2 := make(map[string]bool) // Tracks columns from t2 that are matched
+
+	// Iterate through columns of table 1
+	for _, col1 := range t1.Columns {
+		col2, existsInT2 := table2Columns[col1.Name]
+		if existsInT2 {
+			processedColsT2[col1.Name] = true
+			columnIsDifferent := false
+			colDiff := ColumnDifference{
+				ColumnName: col1.Name,
+			}
+
+			if col1.Type != col2.Type {
+				colDiff.TypeDifference = &TypeDifference{
+					Table1Type: col1.Type,
+					Table2Type: col2.Type,
+				}
+				columnIsDifferent = true
+			}
+			if col1.Nullable != col2.Nullable {
+				colDiff.NullabilityDifference = &NullabilityDifference{
+					Table1Nullable: col1.Nullable,
+					Table2Nullable: col2.Nullable,
+				}
+				columnIsDifferent = true
+			}
+			if col1.Unique != col2.Unique {
+				colDiff.UniquenessDifference = &UniquenessDifference{
+					Table1Unique: col1.Unique,
+					Table2Unique: col2.Unique,
+				}
+				columnIsDifferent = true
+			}
+
+			if columnIsDifferent {
+				res.DifferentPropertiesCount++
+				res.ColumnDifferences = append(res.ColumnDifferences, colDiff)
+			} else {
+				res.SamePropertiesCount++
+			}
+		} else {
+			// Column from t1 does not exist in t2
+			res.InTable1OnlyCount++
+			res.MissingColumns = append(res.MissingColumns, MissingColumn{
+				ColumnName:  col1.Name,
+				Type:        col1.Type,
+				Nullable:    col1.Nullable,
+				PrimaryKey:  col1.PrimaryKey,
+				Unique:      col1.Unique,
+				TableName:   t1Name,
+				MissingFrom: t2Name,
+			})
+		}
+	}
+
+	// Identify columns that are only in table 2 (extra in t2)
+	for _, col2 := range t2.Columns {
+		if _, foundAndProcessed := processedColsT2[col2.Name]; !foundAndProcessed {
+			res.InTable2OnlyCount++
+			res.MissingColumns = append(res.MissingColumns, MissingColumn{
+				ColumnName:  col2.Name,
+				Type:        col2.Type,
+				Nullable:    col2.Nullable,
+				PrimaryKey:  col2.PrimaryKey,
+				Unique:      col2.Unique,
+				TableName:   t2Name,
+				MissingFrom: t1Name,
+			})
+		}
+	}
+
+	res.HasSchemaDifferences = res.DifferentPropertiesCount > 0 || res.InTable1OnlyCount > 0 || res.InTable2OnlyCount > 0
+	return res
 }

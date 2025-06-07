@@ -46,13 +46,17 @@ type DBColumnType struct {
 }
 
 type TableSummaryResult struct {
-	RowCount    int64
+	RowCount int64
+	Table    *DBTable
 }
 
 func (tsr *TableSummaryResult) String() string {
 	if tsr == nil {
 		return "<nil summary>"
 	}
-	return fmt.Sprintf("RowCount: %d", tsr.RowCount)
+	tableName := "<nil>"
+	if tsr.Table != nil {
+		tableName = tsr.Table.Name
+	}
+	return fmt.Sprintf("Table: %s, RowCount: %d", tableName, tsr.RowCount)
 }
-
