@@ -26,6 +26,7 @@ var (
 	faint        = color.New(color.Faint).SprintFunc()
 	whitePrinter = color.New(color.FgWhite, color.Faint).SprintfFunc()
 	plainColor   = color.New()
+	plainPrinter = color.New().SprintfFunc()
 )
 
 type contextKey int
@@ -99,6 +100,7 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 		timestampStr := whitePrinter("[%s]", time.Now().Format(timeFormat))
 		if w.formatOpts.NoColor {
 			w.printer = plainColor
+			timestampStr = plainPrinter("[%s]", time.Now().Format(timeFormat))
 		}
 		if w.formatOpts.DoNotLogTimestamp {
 			fmt.Printf("%s\n", w.printer.Sprintf("Running:  %s", task.GetHumanID()))
@@ -133,6 +135,9 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 			fmt.Printf("%s\n", w.printer.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
 		} else {
 			timestampStr = whitePrinter("[%s]", time.Now().Format(timeFormat))
+			if w.formatOpts.NoColor {
+				timestampStr = plainPrinter("[%s]", time.Now().Format(timeFormat))
+			}
 			fmt.Printf("%s %s\n", timestampStr, w.printer.Sprintf("%s: %s %s", res, task.GetHumanID(), faint(durationString)))
 		}
 		w.printLock.Unlock()

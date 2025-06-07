@@ -186,8 +186,8 @@ func Lint(isDebug *bool) *cli.Command {
 				}
 				return nil
 			}
-
-			err = reportLintErrors(result, err, printer, asset)
+			noColor := false
+			err = reportLintErrors(result, err, printer, asset, noColor)
 			if err != nil {
 				printError(err, c.String("output"), "An error occurred")
 				return cli.Exit("", 1)
@@ -197,7 +197,7 @@ func Lint(isDebug *bool) *cli.Command {
 	}
 }
 
-func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer lint.Printer, asset string) error {
+func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer lint.Printer, asset string, noColor bool) error {
 	if err != nil {
 		errorPrinter.Println("\nAn error occurred while linting asset:")
 
@@ -209,7 +209,7 @@ func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer li
 		return err
 	}
 
-	printer.PrintIssues(result)
+	printer.PrintIssues(result, noColor)
 
 	// prepare the final message
 	errorCount := result.ErrorCount()

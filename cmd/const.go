@@ -24,6 +24,8 @@ var (
 	errorPrinter   = color.New(color.FgRed, color.Bold)
 	warningPrinter = color.New(color.FgYellow, color.Bold)
 	successPrinter = color.New(color.FgGreen, color.Bold)
+	plainPrinter   = color.New()
+	plain          = color.New().SprintFunc()
 
 	assetsDirectoryNames = []string{"tasks", "assets"}
 

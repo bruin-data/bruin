@@ -29,11 +29,12 @@ var (
 	taskNamePrinter = color.New(color.FgWhite, color.Bold)
 	issuePrinter    = color.New(color.FgRed)
 	warningPrinter  = color.New(color.FgYellow)
+	plainPrinter    = color.New()
 )
 
-func (l *Printer) PrintIssues(analysis *PipelineAnalysisResult) {
+func (l *Printer) PrintIssues(analysis *PipelineAnalysisResult, noColor bool) {
 	for _, pipelineIssues := range analysis.Pipelines {
-		l.printPipelineSummary(pipelineIssues)
+		l.printPipelineSummary(pipelineIssues, noColor)
 	}
 }
 
@@ -47,9 +48,12 @@ func (l *Printer) PrintJSON(analysis *PipelineAnalysisResult) error {
 	return nil
 }
 
-func (l *Printer) printPipelineSummary(pipelineIssues *PipelineIssues) {
+func (l *Printer) printPipelineSummary(pipelineIssues *PipelineIssues, noColor bool) {
 	successPrinter.Println()
-
+	if noColor {
+		pipelinePrinter = plainPrinter
+		successPrinter = plainPrinter
+	}
 	pipelineDirectory := l.relativePipelinePath(pipelineIssues.Pipeline)
 	pipelinePrinter.Printf("Pipeline: %s %s\n", pipelineIssues.Pipeline.Name, faint(fmt.Sprintf("(%s)", pipelineDirectory)))
 
