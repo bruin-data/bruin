@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -14,6 +15,7 @@ import (
 
 type materializer interface {
 	Render(task *pipeline.Asset, query, location string) ([]string, error)
+	LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error
 }
 
 type Client interface {
@@ -61,7 +63,11 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if len(queries) > 1 && t.Materialization.Type != pipeline.MaterializationTypeNone {
 		return errors.New("cannot enable materialization for tasks with multiple queries")
 	}
-
+	writer := ctx.Value(executor.KeyPrinter)
+	err = o.materializer.LogIfFullRefreshAndDDL(writer, t)
+	if err != nil {
+		return err
+	}
 	connName, err := p.GetConnectionNameForAsset(t)
 	if err != nil {
 		return err
