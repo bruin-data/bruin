@@ -302,7 +302,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1;",
 			want: "MERGE my\\.asset target\n" +
-				"USING \\(SELECT 1\\) source ON target\\.dt = source\\.dt AND target\\.event_type = source\\.event_type\n" +
+				"USING \\(SELECT 1\\) source ON target\\.dt = source.dt AND target\\.event_type = source\\.event_type\n" +
 				"WHEN MATCHED THEN UPDATE SET target\\.value = source\\.value\n" +
 				"WHEN NOT MATCHED THEN INSERT\\(dt, event_type, value, value2\\) VALUES\\(dt, event_type, value, value2\\);",
 		},
@@ -591,20 +591,34 @@ func TestBuildSCD2Query(t *testing.T) {
 			query: "SELECT id, event_name, ts from source_table",
 			want: "MERGE INTO `my.asset` AS target\n" +
 				"USING (\n" +
-				"  SELECT id, event_name, ts from source_table\n" +
+				"  WITH s1 AS (\n" +
+				"    SELECT id, event_name, ts from source_table\n" +
+				"  )\n" +
+				"  SELECT *, TRUE AS _is_current\n" +
+				"  FROM   s1\n" +
+				"  UNION ALL\n" +
+				"  SELECT s1.*, FALSE AS _is_current\n" +
+				"  FROM   s1\n" +
+				"  JOIN   `my.asset` AS t1 USING (id)\n" +
+				"  WHERE  t1._valid_from < CAST (s1.ts AS TIMESTAMP)\n" +
 				") AS source\n" +
-				"ON target.id = source.id AND target._is_current = TRUE\n" +
+				"ON  target.id = source.id AND target._is_current = source._is_current\n" +
 				"\n" +
 				"WHEN MATCHED AND (\n" +
-				"target._valid_from < source.ts\n" +
+				"  target._valid_from < CAST (source.ts AS TIMESTAMP)\n" +
 				") THEN\n" +
 				"  UPDATE SET\n" +
-				"    target._valid_until = source.ts,\n" +
-				"    target._is_current = FALSE\n" +
+				"    target._valid_until = CAST (source.ts AS TIMESTAMP),\n" +
+				"    target._is_current  = FALSE\n" +
+				"\n" +
+				"WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN\n" +
+				"  UPDATE SET \n" +
+				"    target._valid_until = CURRENT_TIMESTAMP(),\n" +
+				"    target._is_current  = FALSE\n" +
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
-				"  INSERT (id, event_name, _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.id, source.event_name, source.ts, TIMESTAMP('9999-12-31'), TRUE)",
+				"  INSERT (id, event_name, ts, _valid_from, _valid_until, _is_current)\n" +
+				"  VALUES (source.id, source.event_name, source.ts, CAST(source.ts AS TIMESTAMP), TIMESTAMP('9999-12-31'), TRUE);",
 		},
 		{
 			name: "scd2_multiple_primary_keys_with_incremental_key",
@@ -626,20 +640,34 @@ func TestBuildSCD2Query(t *testing.T) {
 			query: "SELECT id, event_type, col1, col2, ts from source_table",
 			want: "MERGE INTO `my.asset` AS target\n" +
 				"USING (\n" +
-				"  SELECT id, event_type, col1, col2, ts from source_table\n" +
+				"  WITH s1 AS (\n" +
+				"    SELECT id, event_type, col1, col2, ts from source_table\n" +
+				"  )\n" +
+				"  SELECT *, TRUE AS _is_current\n" +
+				"  FROM   s1\n" +
+				"  UNION ALL\n" +
+				"  SELECT s1.*, FALSE AS _is_current\n" +
+				"  FROM   s1\n" +
+				"  JOIN   `my.asset` AS t1 USING (id, event_type)\n" +
+				"  WHERE  t1._valid_from < CAST (s1.ts AS TIMESTAMP)\n" +
 				") AS source\n" +
-				"ON target.id = source.id AND target.event_type = source.event_type AND target._is_current = TRUE\n" +
+				"ON  target.id = source.id AND target.event_type = source.event_type AND target._is_current = source._is_current\n" +
 				"\n" +
 				"WHEN MATCHED AND (\n" +
-				"target._valid_from < source.ts\n" +
+				"  target._valid_from < CAST (source.ts AS TIMESTAMP)\n" +
 				") THEN\n" +
 				"  UPDATE SET\n" +
-				"    target._valid_until = source.ts,\n" +
-				"    target._is_current = FALSE\n" +
+				"    target._valid_until = CAST (source.ts AS TIMESTAMP),\n" +
+				"    target._is_current  = FALSE\n" +
+				"\n" +
+				"WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN\n" +
+				"  UPDATE SET \n" +
+				"    target._valid_until = CURRENT_TIMESTAMP(),\n" +
+				"    target._is_current  = FALSE\n" +
 				"\n" +
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
-				"  INSERT (id, event_type, col1, col2, _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.id, source.event_type, source.col1, source.col2, source.ts, TIMESTAMP('9999-12-31'), TRUE)",
+				"  INSERT (id, event_type, col1, col2, ts, _valid_from, _valid_until, _is_current)\n" +
+				"  VALUES (source.id, source.event_type, source.col1, source.col2, source.ts, CAST(source.ts AS TIMESTAMP), TIMESTAMP('9999-12-31'), TRUE);",
 		},
 		{
 			name: "scd2_full_refresh_with_incremental_key", // dim_input
@@ -662,7 +690,7 @@ func TestBuildSCD2Query(t *testing.T) {
 				"PARTITION BY DATE(_valid_from)\n" +
 				"CLUSTER BY _is_current, id AS\n" +
 				"SELECT\n" +
-				"  ts AS _valid_from,\n" +
+				"  CAST (ts AS TIMESTAMP) AS _valid_from,\n" +
 				"  src.*,\n" +
 				"  TIMESTAMP('9999-12-31') AS _valid_until,\n" +
 				"  TRUE AS _is_current\n" +
@@ -780,23 +808,35 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			query: "SELECT id, col1, col2, col3, col4 from source_table",
 			want: "MERGE INTO `my.asset` AS target\n" +
 				"USING (\n" +
-				"  SELECT id, col1, col2, col3, col4 from source_table\n" +
+				"  WITH s1 AS (\n" +
+				"    SELECT id, col1, col2, col3, col4 from source_table\n" +
+				"  )\n" +
+				"  SELECT *, TRUE AS _is_current\n" +
+				"  FROM   s1\n" +
+				"  UNION ALL\n" +
+				"  SELECT s1.*, FALSE AS _is_current\n" +
+				"  FROM   s1\n" +
+				"  JOIN   `my.asset` AS t1 USING (id)\n" +
+				"  WHERE  t1.col1 != s1.col1 OR t1.col2 != s1.col2 OR t1.col3 != s1.col3 OR t1.col4 != s1.col4\n" +
 				") AS source\n" +
-				"ON target.id = source.id AND target._is_current = TRUE\n" +
+				"ON  target.id = source.id AND target._is_current = source._is_current\n" +
 				"\n" +
 				"WHEN MATCHED AND (\n" +
-				"    target.col1 != source.col1 OR\n" +
-				"    target.col2 != source.col2 OR\n" +
-				"    target.col3 != source.col3 OR\n" +
-				"    target.col4 != source.col4\n" +
+				"    target.col1 != source.col1 OR target.col2 != source.col2 OR target.col3 != source.col3 OR target.col4 != source.col4\n" +
 				") THEN\n" +
 				"  UPDATE SET\n" +
 				"    target._valid_until = CURRENT_TIMESTAMP(),\n" +
-				"    target._is_current = FALSE\n" +
+				"    target._is_current  = FALSE\n" +
 				"\n" +
+				"WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN\n" +
+				"  UPDATE SET \n" +
+				"    target._valid_until = CURRENT_TIMESTAMP(),\n" +
+				"    target._is_current  = FALSE\n" +
+				"\n\n" +
+
 				"WHEN NOT MATCHED BY TARGET THEN\n" +
 				"  INSERT (id, col1, col2, col3, col4, _valid_from, _valid_until, _is_current)\n" +
-				"  VALUES (source.id, source.col1, source.col2, source.col3, source.col4, CURRENT_TIMESTAMP(), TIMESTAMP('9999-12-31'), TRUE)",
+				"  VALUES (source.id, source.col1, source.col2, source.col3, source.col4, CURRENT_TIMESTAMP(), TIMESTAMP('9999-12-31'), TRUE);",
 		},
 	}
 

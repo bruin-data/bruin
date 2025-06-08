@@ -1291,15 +1291,102 @@ func getCloudTasks(binary string, currentFolder string) []e2e.Task {
 	return tasks
 }
 
+// nolint
 func getCloudWorkflows(binary string, currentFolder string, tempdir string) []e2e.Workflow {
-	return []e2e.Workflow{
+	return []e2e.Workflow{{
+		Name: "scd2_by_column",
+		Steps: []e2e.Task{
+			{
+				Name:    "restore asset to initial state",
+				Command: "cp",
+				Args:    []string{filepath.Join(currentFolder, "bigquery-integration-tests/resources/menu_original.sql"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-column-pipeline/assets/menu.sql")},
+				Env:     []string{},
+
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
+			},
+			{
+				Name:    "create the table",
+				Command: binary,
+				Args:    []string{"run", "--full-refresh", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-column-pipeline")},
+				Env:     []string{},
+
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
+			},
+			{
+				Name:    "query the initial table",
+				Command: binary,
+				Args:    []string{"query", "--asset", filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-column-pipeline/assets/menu.sql"), "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
+				Env:     []string{},
+
+				Expected: e2e.Output{
+					ExitCode: 0,
+					CSVFile:  filepath.Join(currentFolder, "bigquery-integration-tests/expected_initial.csv"),
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByCSV,
+				},
+			},
+			{
+				Name:    "copy menu_updated.sql to menu.sql",
+				Command: "cp",
+				Args:    []string{filepath.Join(currentFolder, "bigquery-integration-tests/resources/menu_updated.sql"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-column-pipeline/assets/menu.sql")},
+				Env:     []string{},
+
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
+			},
+			{
+				Name:    "update table with scd2_by_column materialization",
+				Command: binary,
+				Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-column-pipeline/assets/menu.sql")},
+				Env:     []string{},
+
+				Expected: e2e.Output{
+					ExitCode: 0,
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+				},
+			},
+			{
+				Name:    "query the scd2_by_column materialized table",
+				Command: binary,
+				Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price,_is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
+				Env:     []string{},
+
+				Expected: e2e.Output{
+					ExitCode: 0,
+					CSVFile:  filepath.Join(currentFolder, "bigquery-integration-tests/final_expected.csv"),
+				},
+				Asserts: []func(*e2e.Task) error{
+					e2e.AssertByExitCode,
+					e2e.AssertByCSV,
+				},
+			},
+		},
+	},
 		{
-			Name: "scd2_by_column",
+			Name: "scd2_by_time",
 			Steps: []e2e.Task{
 				{
 					Name:    "restore asset to initial state",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "bigquery-integration-tests/resources/menu_original.sql"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-column-pipeline/assets/menu.sql")},
+					Args:    []string{filepath.Join(currentFolder, "bigquery-integration-tests/resources/products_original.sql"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-time-pipeline/assets/products.sql")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -1312,7 +1399,7 @@ func getCloudWorkflows(binary string, currentFolder string, tempdir string) []e2
 				{
 					Name:    "create the table",
 					Command: binary,
-					Args:    []string{"run", "--full-refresh", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-column-pipeline")},
+					Args:    []string{"run", "--full-refresh", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-time-pipeline")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -1325,12 +1412,12 @@ func getCloudWorkflows(binary string, currentFolder string, tempdir string) []e2
 				{
 					Name:    "query the initial table",
 					Command: binary,
-					Args:    []string{"query", "--asset", filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-column-pipeline/assets/menu.sql"), "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--query", "SELECT ID, Name, Price, _valid_until, _is_current FROM test.menu;", "--output", "csv"},
+					Args:    []string{"query", "--asset", filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-time-pipeline/assets/products.sql"), "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--query", "SELECT  product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 					Env:     []string{},
 
 					Expected: e2e.Output{
 						ExitCode: 0,
-						CSVFile:  filepath.Join(currentFolder, "bigquery-integration-tests/expected_initial.csv"),
+						CSVFile:  filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-time-pipeline/expectations/scd2_time_initial_expected.csv"),
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
@@ -1338,9 +1425,9 @@ func getCloudWorkflows(binary string, currentFolder string, tempdir string) []e2
 					},
 				},
 				{
-					Name:    "copy menu_updated.sql to menu.sql",
+					Name:    "copy products_updated.sql to products.sql",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "bigquery-integration-tests/resources/menu_updated.sql"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-column-pipeline/assets/menu.sql")},
+					Args:    []string{filepath.Join(currentFolder, "bigquery-integration-tests/resources/products_updated.sql"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-time-pipeline/assets/products.sql")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -1351,9 +1438,9 @@ func getCloudWorkflows(binary string, currentFolder string, tempdir string) []e2
 					},
 				},
 				{
-					Name:    "update table with scd2_by_column materialization",
+					Name:    "update table with scd2_by_time materialization",
 					Command: binary,
-					Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-column-pipeline/assets/menu.sql")},
+					Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-time-pipeline/assets/products.sql")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -1364,14 +1451,14 @@ func getCloudWorkflows(binary string, currentFolder string, tempdir string) []e2
 					},
 				},
 				{
-					Name:    "query the scd2_by_column materialized table",
+					Name:    "query the scd2_by_time materialized table",
 					Command: binary,
-					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price,_is_current FROM test.menu;", "--output", "csv"},
+					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 					Env:     []string{},
 
 					Expected: e2e.Output{
 						ExitCode: 0,
-						CSVFile:  filepath.Join(currentFolder, "bigquery-integration-tests/final_expected.csv"),
+						CSVFile:  filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-time-pipeline/expectations/scd2_time_final_expected.csv"),
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
