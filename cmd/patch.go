@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/pkg/errors"
-
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -15,8 +13,15 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
+)
+
+const (
+	fillStatusUpdated = "updated"
+	fillStatusSkipped = "skipped"
+	fillStatusFailed  = "failed"
 )
 
 func updateAssetDependencies(ctx context.Context, asset *pipeline.Asset, p *pipeline.Pipeline, sp *sqlparser.SQLParser, renderer *jinja.Renderer) error {
@@ -50,34 +55,34 @@ func updateAssetDependencies(ctx context.Context, asset *pipeline.Asset, p *pipe
 	return nil
 }
 
-// Returns: status ("updated", "skipped", "failed"), error
+// Returns: status ("updated", "skipped", "failed").
 func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, fullRefresh bool) (string, error) {
 	// If not full-refresh and asset already has columns, skip
 	if !fullRefresh && len(pp.Asset.Columns) > 0 {
-		return "skipped", nil
+		return fillStatusSkipped, nil
 	}
 	_, conn, err := getConnectionFromPipelineInfo(pp, environment)
 	if err != nil {
-		return "failed", fmt.Errorf("failed to get connection for asset '%s': %w", pp.Asset.Name, err)
+		return fillStatusFailed, fmt.Errorf("failed to get connection for asset '%s': %w", pp.Asset.Name, err)
 	}
 	if !pp.Asset.IsSQLAsset() {
-		return "skipped", nil
+		return fillStatusSkipped, nil
 	}
 	querier, ok := conn.(interface {
 		SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
 	})
 	if !ok {
-		return "failed", fmt.Errorf("connection for asset '%s' does not support schema introspection", pp.Asset.Name)
+		return fillStatusFailed, fmt.Errorf("connection for asset '%s' does not support schema introspection", pp.Asset.Name)
 	}
 	tableName := pp.Asset.Name
 	queryStr := fmt.Sprintf("SELECT * FROM %s LIMIT 0", tableName)
 	q := &query.Query{Query: queryStr}
 	result, err := querier.SelectWithSchema(context.Background(), q)
 	if err != nil {
-		return "failed", fmt.Errorf("failed to query columns for asset '%s': %w", pp.Asset.Name, err)
+		return fillStatusFailed, fmt.Errorf("failed to query columns for asset '%s': %w", pp.Asset.Name, err)
 	}
 	if len(result.Columns) == 0 {
-		return "failed", fmt.Errorf("no columns found for asset '%s' (table may not exist)", pp.Asset.Name)
+		return fillStatusFailed, fmt.Errorf("no columns found for asset '%s' (table may not exist)", pp.Asset.Name)
 	}
 	columns := make([]pipeline.Column, len(result.Columns))
 	for i, colName := range result.Columns {
@@ -92,9 +97,9 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, fullRefresh 
 	pp.Asset.Columns = columns
 	err = pp.Asset.Persist(fs)
 	if err != nil {
-		return "failed", fmt.Errorf("failed to persist asset '%s': %w", pp.Asset.Name, err)
+		return fillStatusFailed, fmt.Errorf("failed to persist asset '%s': %w", pp.Asset.Name, err)
 	}
-	return "updated", nil
+	return fillStatusUpdated, nil
 }
 
 func Patch() *cli.Command {
@@ -207,11 +212,11 @@ func Patch() *cli.Command {
 							status, err := fillColumnsFromDB(pp, afero.NewOsFs(), "", false)
 							processedAssets++
 							switch status {
-							case "updated":
+							case fillStatusUpdated:
 								updatedAssets = append(updatedAssets, asset.Name)
-							case "skipped":
+							case fillStatusSkipped:
 								skippedAssets = append(skippedAssets, asset.Name)
-							case "failed":
+							case fillStatusFailed:
 								failedAssets[asset.Name] = err
 							}
 						}
@@ -300,7 +305,7 @@ func Patch() *cli.Command {
 					ctx := context.Background()
 					fullRefresh := c.Bool("full-refresh")
 
-					if isPathReferencingAsset(inputPath) {
+					if isPathReferencingAsset(inputPath) { //nolint:nestif
 						// Single asset
 						pp, err := GetPipelineAndAsset(ctx, inputPath, fs, "")
 						if err != nil {
@@ -346,11 +351,11 @@ func Patch() *cli.Command {
 							status, err := fillColumnsFromDB(pp, fs, environment, fullRefresh)
 							processedAssets++
 							switch status {
-							case "updated":
+							case fillStatusUpdated:
 								updatedAssets = append(updatedAssets, asset.Name)
-							case "skipped":
+							case fillStatusSkipped:
 								skippedAssets = append(skippedAssets, asset.Name)
-							case "failed":
+							case fillStatusFailed:
 								failedAssets[asset.Name] = err
 							}
 						}
