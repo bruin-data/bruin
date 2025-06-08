@@ -2519,7 +2519,6 @@ func TestValidateCustomCheckQueryDryRun(t *testing.T) {
 		validator := ValidateCustomCheckQueryDryRun(cm)
 		issues, err := validator(context.Background(), p.Pipeline, assetWithValidCheck)
 		require.NoError(t, err)
-		assert.Len(t, issues, 0)
-
+		assert.Empty(t, issues)
 	})
 }
