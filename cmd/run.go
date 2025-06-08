@@ -249,6 +249,10 @@ func Run(isDebug *bool) *cli.Command {
 				errorPrinter.Printf("Failed to load the config file at '%s': %v\n", configFilePath, err)
 				return cli.Exit("", 1)
 			}
+			err = switchEnvironment(runConfig.Environment, runConfig.Force, cm, os.Stdin)
+			if err != nil {
+				return err
+			}
 			if cm.SelectedEnvironment.SchemaPrefix != "" {
 				// schema prefix implies a developer environment being configured where different assets within this
 				// execution will be built under prefixed schemas. This requires not just modifying the queries,
@@ -302,11 +306,6 @@ func Run(isDebug *bool) *cli.Command {
 				}
 				executionStartLog = "Starting the pipeline execution..."
 			}
-			err = switchEnvironment(runConfig.Environment, runConfig.Force, cm, os.Stdin)
-			if err != nil {
-				return err
-			}
-
 			connectionManager, errs := connection.NewManagerFromConfig(cm)
 			if len(errs) > 0 {
 				printErrors(errs, runConfig.Output, "Failed to register connections")
