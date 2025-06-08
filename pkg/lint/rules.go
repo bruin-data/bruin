@@ -1063,10 +1063,7 @@ func ValidateCustomCheckQueryDryRun(connections connectionManager) AssetValidato
 			}
 			validatorInstance, ok := validator.(queryValidator)
 			if !ok {
-				issues = append(issues, &Issue{
-					Task:        asset,
-					Description: fmt.Sprintf("Query validator '%s' is not a valid instance for custom check '%s'", connName, check.Name),
-				})
+				// Just skip if the validator does not implement queryValidator
 				continue
 			}
 			q := &query.Query{Query: check.Query}
