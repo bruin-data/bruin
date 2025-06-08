@@ -250,6 +250,12 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
+			connectionManager, errs := connection.NewManagerFromConfig(cm)
+			if len(errs) > 0 {
+				printErrors(errs, runConfig.Output, "Failed to register connections")
+				return cli.Exit("", 1)
+			}
+
 			err = switchEnvironment(runConfig.Environment, runConfig.Force, cm, os.Stdin)
 			if err != nil {
 				return err
@@ -311,7 +317,7 @@ func Run(isDebug *bool) *cli.Command {
 
 			shouldValidate := !pipelineInfo.RunningForAnAsset && !c.Bool("no-validation")
 			if shouldValidate {
-				if err := CheckLint(pipelineInfo.Pipeline, inputPath, logger, nil); err != nil {
+				if err := CheckLint(pipelineInfo.Pipeline, inputPath, logger, nil, connectionManager); err != nil {
 					return err
 				}
 			}
@@ -387,12 +393,6 @@ func Run(isDebug *bool) *cli.Command {
 
 			if filter.PushMetaData {
 				foundPipeline.MetadataPush.Global = true
-			}
-
-			connectionManager, errs := connection.NewManagerFromConfig(cm)
-			if len(errs) > 0 {
-				printErrors(errs, runConfig.Output, "Failed to register connections")
-				return cli.Exit("", 1)
 			}
 
 			s := scheduler.NewScheduler(logger, foundPipeline, runID)
@@ -626,8 +626,8 @@ func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger 
 	return startDate, endDate, inputPath, nil
 }
 
-func CheckLint(foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, parser *sqlparser.SQLParser) error {
-	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, parser, true)
+func CheckLint(foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, parser *sqlparser.SQLParser, connectionManager *connection.Manager) error {
+	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, parser, true, connectionManager)
 	if err != nil {
 		errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
 		return err

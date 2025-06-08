@@ -15,7 +15,7 @@ type repoFinder interface {
 	Repo(path string) (*git.Repo, error)
 }
 
-func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlparser.SQLParser, cacheFoundGlossary bool) ([]Rule, error) {
+func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlparser.SQLParser, cacheFoundGlossary bool, connectionManager connectionManager) ([]Rule, error) {
 	gr := GlossaryChecker{
 		gr: &glossary.GlossaryReader{
 			RepoFinder: finder,
@@ -70,6 +70,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			Validator:        EnsurePipelineNameIsValid,
 			ApplicableLevels: []Level{LevelPipeline},
 		},
+
 		&SimpleRule{
 			Identifier:       "valid-task-type",
 			Fast:             true,
@@ -195,6 +196,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			Severity:         ValidatorSeverityCritical,
 			Validator:        ValidateVariables,
 			ApplicableLevels: []Level{LevelPipeline},
+		},
+		&SimpleRule{
+			Identifier:       "custom-check-query-dry-run",
+			Fast:             false,
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   ValidateCustomCheckQueryDryRun(connectionManager),
+			ApplicableLevels: []Level{LevelAsset},
 		},
 	}
 

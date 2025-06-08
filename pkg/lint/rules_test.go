@@ -13,6 +13,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -2413,4 +2414,112 @@ func TestWarnRegularYamlFiles_WarnRegularYamlFilesInRepo(t *testing.T) {
 			assert.Equalf(t, tt.want, got, "WarnRegularYamlFilesInRepo(%v)", tt.p)
 		})
 	}
+}
+
+type fakeQueryValidator struct {
+	isValid bool
+	err     error
+}
+
+func (f *fakeQueryValidator) IsValid(ctx context.Context, q *query.Query) (bool, error) {
+	return f.isValid, f.err
+}
+
+type fakeConnectionManager struct {
+	validator interface{}
+	err       error
+}
+
+func (f *fakeConnectionManager) GetConnection(name string) (interface{}, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.validator, nil
+}
+
+type testPipeline struct {
+	*pipeline.Pipeline
+}
+
+func (tp *testPipeline) GetConnectionNameForAsset(asset *pipeline.Asset) (string, error) {
+	return "conn", nil
+}
+
+func TestValidateCustomCheckQueryDryRun(t *testing.T) {
+	t.Parallel()
+
+	assetWithValidCheck := &pipeline.Asset{
+		Name: "asset1",
+		Type: "bq.sql",
+		CustomChecks: []pipeline.CustomCheck{
+			{Name: "check1", Query: "SELECT 1"},
+		},
+	}
+	assetWithInvalidCheck := &pipeline.Asset{
+		Name: "asset2",
+		Type: "bq.sql",
+		CustomChecks: []pipeline.CustomCheck{
+			{Name: "check2", Query: "SELECT * FROM non_existing_table"},
+		},
+	}
+	assetWithEmptyCheck := &pipeline.Asset{
+		Name: "asset3",
+		Type: "bq.sql",
+		CustomChecks: []pipeline.CustomCheck{
+			{Name: "check3", Query: ""},
+		},
+	}
+
+	basePipeline := &pipeline.Pipeline{
+		Assets: []*pipeline.Asset{assetWithValidCheck, assetWithInvalidCheck, assetWithEmptyCheck},
+	}
+	p := &testPipeline{Pipeline: basePipeline}
+
+	t.Run("valid custom check query", func(t *testing.T) {
+		t.Parallel()
+		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: true}}
+		validator := ValidateCustomCheckQueryDryRun(cm)
+		issues, err := validator(context.Background(), p.Pipeline, assetWithValidCheck)
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	t.Run("invalid custom check query", func(t *testing.T) {
+		t.Parallel()
+		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: false}}
+		validator := ValidateCustomCheckQueryDryRun(cm)
+		issues, err := validator(context.Background(), p.Pipeline, assetWithInvalidCheck)
+		require.NoError(t, err)
+		assert.Len(t, issues, 1)
+		assert.Contains(t, issues[0].Description, "Custom check query is invalid")
+	})
+
+	t.Run("custom check with empty query", func(t *testing.T) {
+		t.Parallel()
+		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: true}}
+		validator := ValidateCustomCheckQueryDryRun(cm)
+		issues, err := validator(context.Background(), p.Pipeline, assetWithEmptyCheck)
+		require.NoError(t, err)
+		assert.Empty(t, issues)
+	})
+
+	t.Run("connection error", func(t *testing.T) {
+		t.Parallel()
+		cm := &fakeConnectionManager{err: errors.New("connection error")}
+		validator := ValidateCustomCheckQueryDryRun(cm)
+		issues, err := validator(context.Background(), p.Pipeline, assetWithValidCheck)
+		require.NoError(t, err)
+		assert.Len(t, issues, 1)
+		assert.Contains(t, issues[0].Description, "Cannot get connection")
+	})
+
+	t.Run("validator type assertion fails", func(t *testing.T) {
+		t.Parallel()
+		cm := &fakeConnectionManager{validator: struct{}{}}
+		validator := ValidateCustomCheckQueryDryRun(cm)
+		issues, err := validator(context.Background(), p.Pipeline, assetWithValidCheck)
+		require.NoError(t, err)
+		assert.Len(t, issues, 1)
+		assert.Contains(t, issues[0].Description, "is not a valid instance")
+	})
 }
