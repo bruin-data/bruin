@@ -1,0 +1,4 @@
+name: custom-check-count-false-pipeline
+
+default_connections:
+  duckdb: duckdb-custom-check-count-false
