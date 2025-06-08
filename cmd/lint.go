@@ -68,6 +68,10 @@ func Lint(isDebug *bool) *cli.Command {
 				EnvVars: []string{"BRUIN_CONFIG_FILE"},
 				Usage:   "the path to the .bruin.yml file",
 			},
+			&cli.StringFlag{
+				Name:  "exclude-tag",
+				Usage: "exclude assets with the given tag from the validation",
+			},
 			&cli.StringSliceFlag{
 				Name:  "var",
 				Usage: "override pipeline variables with custom values",
