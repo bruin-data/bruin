@@ -149,18 +149,18 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 }
 
 func (r *Renderer) RenderAsset(asset *pipeline.Asset) (*pipeline.Asset, error) {
-	copy, err := deepCopy(asset)
+	clone, err := deepCopy(asset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deep copy asset '%s': %w", asset.Name, err)
 	}
-	for key, val := range copy.Parameters {
+	for key, val := range clone.Parameters {
 		rendered, err := r.Render(val)
 		if err != nil {
-			return nil, fmt.Errorf("failed to render parameter '%s' for asset '%s': %w", key, copy.Name, err)
+			return nil, fmt.Errorf("failed to render parameter '%s' for asset '%s': %w", key, clone.Name, err)
 		}
-		copy.Parameters[key] = rendered
+		clone.Parameters[key] = rendered
 	}
-	return copy, nil
+	return clone, nil
 }
 
 func findRenderErrorType(err error) string {
@@ -208,6 +208,6 @@ func deepCopy(src *pipeline.Asset) (*pipeline.Asset, error) {
 	if err != nil {
 		return nil, err
 	}
-	copy := &pipeline.Asset{}
-	return copy, json.Unmarshal(b, copy)
+	clone := &pipeline.Asset{}
+	return clone, json.Unmarshal(b, clone)
 }
