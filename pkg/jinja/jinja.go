@@ -199,6 +199,7 @@ func findParserErrorType(err error) string {
 // this ugly interface is needed to avoid circular dependencies and the ability to create different renderer instances per asset.
 type RendererInterface interface {
 	Render(query string) (string, error)
+	RenderAsset(asset *pipeline.Asset) (*pipeline.Asset, error)
 	CloneForAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) RendererInterface
 }
 
