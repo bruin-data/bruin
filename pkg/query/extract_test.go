@@ -31,6 +31,14 @@ func (m *mockNoOpRenderer) CloneForAsset(ctx context.Context, p *pipeline.Pipeli
 	return args.Get(0).(jinja.RendererInterface)
 }
 
+func (m *mockNoOpRenderer) RenderAsset(t *pipeline.Asset) (*pipeline.Asset, error) {
+	args := m.Called(t)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*pipeline.Asset), args.Error(1)
+}
+
 func TestFileExtractor_ExtractQueriesFromString(t *testing.T) {
 	t.Parallel()
 
