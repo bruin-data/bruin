@@ -9,6 +9,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/connection"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
@@ -28,6 +29,7 @@ type ingestrRunner interface {
 
 type renderer interface {
 	Render(query string) (string, error)
+	RenderAsset(asset *pipeline.Asset) (*pipeline.Asset, error)
 }
 
 type BasicOperator struct {
@@ -38,9 +40,10 @@ type BasicOperator struct {
 }
 
 type SeedOperator struct {
-	conn   connectionFetcher
-	runner ingestrRunner
-	finder repoFinder
+	conn     connectionFetcher
+	runner   ingestrRunner
+	finder   repoFinder
+	renderer renderer
 }
 
 type pipelineConnection interface {
@@ -59,8 +62,13 @@ func NewBasicOperator(conn *connection.Manager, j renderer) (*BasicOperator, err
 func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	var extraPackages []string
 
+	asset, err := o.jinjaRenderer.RenderAsset(ti.GetAsset())
+	if err != nil {
+		return fmt.Errorf("failed to render asset: %w", err)
+	}
+
 	// Source connection
-	sourceConnectionName, ok := ti.GetAsset().Parameters["source_connection"]
+	sourceConnectionName, ok := asset.Parameters["source_connection"]
 	if !ok {
 		return errors.New("source connection not configured")
 	}
@@ -77,21 +85,16 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 	// some connection types can be shared among sources, therefore inferring source URI from the connection type is not
 	// always feasible. In the case of GSheets, we have to reuse the same GCP credentials, but change the prefix with gsheets://
-	if ti.GetAsset().Parameters["source"] == "gsheets" {
+	if asset.Parameters["source"] == "gsheets" {
 		sourceURI = strings.ReplaceAll(sourceURI, "bigquery://", "gsheets://")
 	}
 
-	sourceTable, ok := ti.GetAsset().Parameters["source_table"]
+	sourceTable, ok := asset.Parameters["source_table"]
 	if !ok {
 		return errors.New("source table not configured")
 	}
 
-	sourceTable, err = o.jinjaRenderer.Render(sourceTable)
-	if err != nil {
-		return errors.Wrap(err, "failed to render jinja for source_table parameter")
-	}
-
-	destConnectionName, err := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
+	destConnectionName, err := ti.GetPipeline().GetConnectionNameForAsset(asset)
 	if err != nil {
 		return err
 	}
@@ -106,11 +109,11 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return errors.New("could not get the source uri")
 	}
 
-	destTable := ti.GetAsset().Name
+	destTable := asset.Name
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
 
-	cmdArgs, err := python.ConsolidatedParameters(ctx, ti.GetAsset(), []string{
+	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, []string{
 		"ingest",
 		"--source-uri",
 		sourceURI,
@@ -128,7 +131,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return err
 	}
 
-	path := ti.GetAsset().ExecutableFile.Path
+	path := asset.ExecutableFile.Path
 	repo, err := o.finder.Repo(path)
 	if err != nil {
 		return errors.Wrap(err, "failed to find repo to run Ingestr")
@@ -159,14 +162,20 @@ func NewSeedOperator(conn *connection.Manager) (*SeedOperator, error) {
 func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	var extraPackages []string
 	// Source connection
-	sourceConnectionPath, ok := ti.GetAsset().Parameters["path"]
+
+	asset, err := o.renderer.RenderAsset(ti.GetAsset())
+	if err != nil {
+		return fmt.Errorf("failed to render asset: %w", err)
+	}
+
+	sourceConnectionPath, ok := asset.Parameters["path"]
 	if !ok {
 		return errors.New("source connection not configured")
 	}
 
-	sourceURI := "csv://" + filepath.Join(filepath.Dir(ti.GetAsset().ExecutableFile.Path), sourceConnectionPath)
+	sourceURI := "csv://" + filepath.Join(filepath.Dir(asset.ExecutableFile.Path), sourceConnectionPath)
 
-	destConnectionName, err := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
+	destConnectionName, err := ti.GetPipeline().GetConnectionNameForAsset(asset)
 	if err != nil {
 		return err
 	}
@@ -181,11 +190,11 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return errors.New("could not get the source uri")
 	}
 
-	destTable := ti.GetAsset().Name
+	destTable := asset.Name
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
 
-	cmdArgs, err := python.ConsolidatedParameters(ctx, ti.GetAsset(), []string{
+	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, []string{
 		"ingest",
 		"--source-uri",
 		sourceURI,
@@ -203,12 +212,12 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return err
 	}
 
-	columns := columnHints(ti.GetAsset().Columns)
+	columns := columnHints(asset.Columns)
 	if columns != "" {
 		cmdArgs = append(cmdArgs, "--columns", columns)
 	}
 
-	path := ti.GetAsset().ExecutableFile.Path
+	path := asset.ExecutableFile.Path
 	repo, err := o.finder.Repo(path)
 	if err != nil {
 		return errors.Wrap(err, "failed to find repo to run Ingestr")

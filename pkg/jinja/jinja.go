@@ -2,6 +2,8 @@ package jinja
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 	"sync"
@@ -146,6 +148,21 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 	}
 }
 
+func (r *Renderer) RenderAsset(asset *pipeline.Asset) (*pipeline.Asset, error) {
+	copy, err := deepCopy(asset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deep copy asset '%s': %w", asset.Name, err)
+	}
+	for key, val := range copy.Parameters {
+		rendered, err := r.Render(val)
+		if err != nil {
+			return nil, fmt.Errorf("failed to render parameter '%s' for asset '%s': %w", key, copy.Name, err)
+		}
+		copy.Parameters[key] = rendered
+	}
+	return copy, nil
+}
+
 func findRenderErrorType(err error) string {
 	message := err.Error()
 	errorBits := strings.Split(message, ": ")
@@ -183,4 +200,13 @@ func findParserErrorType(err error) string {
 type RendererInterface interface {
 	Render(query string) (string, error)
 	CloneForAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) RendererInterface
+}
+
+func deepCopy(src *pipeline.Asset) (*pipeline.Asset, error) {
+	b, err := json.Marshal(src)
+	if err != nil {
+		return nil, err
+	}
+	copy := &pipeline.Asset{}
+	return copy, json.Unmarshal(b, copy)
 }
