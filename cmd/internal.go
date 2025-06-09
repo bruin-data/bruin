@@ -118,7 +118,7 @@ func (r *ParseCommand) ParsePipeline(ctx context.Context, assetPath string, line
 	var sqlParser *sqlparser.SQLParser
 
 	if lineage {
-		lineageWg.Go(func() {
+		lineageWg.Go(func() { //nolint:contextcheck
 			var err error
 			sqlParser, err = sqlparser.NewSQLParser(false)
 			if err != nil {
@@ -235,7 +235,7 @@ func (r *ParseCommand) Run(ctx context.Context, assetPath string, lineage bool) 
 	var sqlParser *sqlparser.SQLParser
 
 	if lineage {
-		lineageWg.Go(func() {
+		lineageWg.Go(func() { //nolint:contextcheck
 			var err error
 			sqlParser, err = sqlparser.NewSQLParser(false)
 			if err != nil {

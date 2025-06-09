@@ -2,6 +2,7 @@ package sqlparser
 
 import (
 	"bufio"
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -23,6 +24,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var ErrTimedOut = errors.New("python process timed out")
+
 type SQLParser struct {
 	ep          *python.EmbeddedPython
 	sqlglotDir  *embed_util.EmbeddedFiles
@@ -35,6 +38,7 @@ type SQLParser struct {
 	mutex  sync.Mutex
 
 	startMutex sync.Mutex
+	timeout    time.Duration
 }
 
 func NewSQLParser(randomize bool) (*SQLParser, error) {
@@ -68,6 +72,7 @@ func NewSQLParser(randomize bool) (*SQLParser, error) {
 		ep:          ep,
 		sqlglotDir:  sqlglotDir,
 		rendererSrc: rendererSrc,
+		timeout:     150 * time.Second,
 	}, nil
 }
 
@@ -134,6 +139,10 @@ type Lineage struct {
 }
 
 func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage, error) {
+	if err := s.Start(); err != nil {
+		return nil, errors.Wrap(err, "failed to start sql parser")
+	}
+
 	command := parserCommand{
 		Command: "lineage",
 		Contents: map[string]interface{}{
@@ -143,7 +152,7 @@ func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage,
 		},
 	}
 
-	resp, err := s.sendCommand(&command)
+	resp, err := s.sendWithRetry(&command)
 	if err != nil {
 		return nil, err
 	}
@@ -158,8 +167,7 @@ func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage,
 }
 
 func (s *SQLParser) UsedTables(sql, dialect string) ([]string, error) {
-	err := s.Start()
-	if err != nil {
+	if err := s.Start(); err != nil {
 		return nil, errors.Wrap(err, "failed to start sql parser")
 	}
 
@@ -171,7 +179,7 @@ func (s *SQLParser) UsedTables(sql, dialect string) ([]string, error) {
 		},
 	}
 
-	resp, err := s.sendCommand(&command)
+	resp, err := s.sendWithRetry(&command)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to send command")
 	}
@@ -195,8 +203,7 @@ func (s *SQLParser) UsedTables(sql, dialect string) ([]string, error) {
 }
 
 func (s *SQLParser) RenameTables(sql string, dialect string, tableMapping map[string]string) (string, error) {
-	err := s.Start()
-	if err != nil {
+	if err := s.Start(); err != nil {
 		return "", errors.Wrap(err, "failed to start sql parser")
 	}
 
@@ -209,7 +216,7 @@ func (s *SQLParser) RenameTables(sql string, dialect string, tableMapping map[st
 		},
 	}
 
-	responsePayload, err := s.sendCommand(&command)
+	responsePayload, err := s.sendWithRetry(&command)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to send command")
 	}
@@ -247,9 +254,49 @@ func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
 	}
 
 	reader := bufio.NewReader(s.stdout)
+	respCh := make(chan struct {
+		resp string
+		err  error
+	}, 1)
 
-	resp, err := reader.ReadString(byte('\n'))
-	return resp, err
+	// Use a context to cancel the goroutine if timeout occurs
+	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
+	defer cancel()
+
+	go func() {
+		resp, err := reader.ReadString('\n')
+		select {
+		case respCh <- struct {
+			resp string
+			err  error
+		}{resp, err}:
+		case <-ctx.Done():
+		}
+	}()
+
+	select {
+	case result := <-respCh:
+		return result.resp, result.err
+	case <-ctx.Done():
+		if s.stdout != nil {
+			_ = s.stdout.Close()
+		}
+		if s.stdin != nil {
+			_ = s.stdin.Close()
+		}
+		if s.cmd != nil && s.cmd.Process != nil {
+			_ = s.cmd.Process.Kill()
+		}
+
+		s.started = false
+
+		go func() {
+			// this goroutine runs AFTER the mutex is released
+			_ = s.Restart()
+		}()
+
+		return "", ErrTimedOut
+	}
 }
 
 func (s *SQLParser) Close() error {
@@ -312,8 +359,7 @@ func AssetTypeToDialect(assetType pipeline.AssetType) (string, error) {
 }
 
 func (s *SQLParser) AddLimit(sql string, limit int, dialect string) (string, error) {
-	err := s.Start()
-	if err != nil {
+	if err := s.Start(); err != nil {
 		return "", errors.Wrap(err, "failed to start sql parser")
 	}
 
@@ -326,7 +372,7 @@ func (s *SQLParser) AddLimit(sql string, limit int, dialect string) (string, err
 		},
 	}
 
-	responsePayload, err := s.sendCommand(&command)
+	responsePayload, err := s.sendWithRetry(&command)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to send command")
 	}
@@ -417,4 +463,26 @@ func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeli
 	}
 
 	return missingDependencies, nil
+}
+
+func (s *SQLParser) Restart() error {
+	s.Close()
+	s.started = false
+	return s.Start()
+}
+
+func (s *SQLParser) sendWithRetry(cmd *parserCommand) (string, error) {
+	resp, err := s.sendCommand(cmd)
+	if err == nil {
+		return resp, nil
+	}
+	if !errors.Is(err, ErrTimedOut) && !errors.Is(err, os.ErrClosed) {
+		return "", err
+	}
+
+	// Interpreter has just died: make sure it (re)starts.
+	if startErr := s.Start(); startErr != nil {
+		return "", startErr
+	}
+	return s.sendCommand(cmd)
 }

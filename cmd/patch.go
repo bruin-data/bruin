@@ -14,7 +14,7 @@ import (
 )
 
 func updateAssetDependencies(ctx context.Context, asset *pipeline.Asset, p *pipeline.Pipeline, sp *sqlparser.SQLParser, renderer *jinja.Renderer) error {
-	missingDeps, err := sp.GetMissingDependenciesForAsset(asset, p, renderer.CloneForAsset(ctx, p, asset))
+	missingDeps, err := sp.GetMissingDependenciesForAsset(asset, p, renderer.CloneForAsset(ctx, p, asset)) //nolint:contextcheck
 	if err != nil {
 		return fmt.Errorf("failed to get missing dependencies for asset '%s': %w", asset.Name, err)
 	}
