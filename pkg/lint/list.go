@@ -215,7 +215,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 	return rules, nil
 }
 
-func GetCustomCheckQueryDryRunRule(connectionManager connectionManager) *SimpleRule { 
+func GetCustomCheckQueryDryRunRule(connectionManager connectionManager) *SimpleRule {
 	return &SimpleRule{
 		Identifier:       "custom-check-query-dry-run",
 		Fast:             false,
