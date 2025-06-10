@@ -39,6 +39,7 @@ const (
 	AssetTypeBigquerySeed           = AssetType("bq.seed")
 	AssetTypeDuckDBQuery            = AssetType("duckdb.sql")
 	AssetTypeDuckDBSeed             = AssetType("duckdb.seed")
+	AssetTypeDuckDBQuerySensor      = AssetType("duckdb.sensor.query")
 	AssetTypeEmpty                  = AssetType("empty")
 	AssetTypePostgresQuery          = AssetType("pg.sql")
 	AssetTypePostgresSeed           = AssetType("pg.seed")
@@ -523,6 +524,7 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeAthenaSQLSensor:      "athena",
 	AssetTypeDuckDBQuery:          "duckdb",
 	AssetTypeDuckDBSeed:           "duckdb",
+	AssetTypeDuckDBQuerySensor:    "duckdb",
 	AssetTypeClickHouse:           "clickhouse",
 	AssetTypeClickHouseSeed:       "clickhouse",
 	AssetTypeEMRServerlessSpark:   "emr_serverless",
