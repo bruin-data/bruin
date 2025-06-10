@@ -249,6 +249,117 @@ COMMIT;`,
 	}
 }
 
+func TestBuildMergeQuery(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		asset       *pipeline.Asset
+		sourceQuery string
+		wantSQL     string
+		wantErrMsg  string
+	}{
+		{
+			name: "Single Primary Key",
+			asset: &pipeline.Asset{
+				Name: "test_table_single_pk",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER", PrimaryKey: true},
+					{Name: "value", Type: "VARCHAR"},
+				},
+			},
+			sourceQuery: "SELECT id, value FROM source_table",
+			wantSQL: `CREATE OR REPLACE TABLE test_table_single_pk AS
+SELECT * FROM ( SELECT id, value FROM source_table ) AS src_all
+UNION ALL
+SELECT dt.*
+FROM test_table_single_pk dt
+LEFT JOIN ( SELECT id, value FROM source_table ) src ON dt.id = src.id
+WHERE src.id IS NULL`,
+		},
+		{
+			name: "Composite Primary Key",
+			asset: &pipeline.Asset{
+				Name: "test_table_composite_pk",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "key_part1", Type: "INTEGER", PrimaryKey: true},
+					{Name: "key_part2", Type: "VARCHAR", PrimaryKey: true},
+					{Name: "data", Type: "VARCHAR"},
+				},
+			},
+			sourceQuery: "SELECT key_part1, key_part2, data FROM another_source",
+			wantSQL: `CREATE OR REPLACE TABLE test_table_composite_pk AS
+SELECT * FROM ( SELECT key_part1, key_part2, data FROM another_source ) AS src_all
+UNION ALL
+SELECT dt.*
+FROM test_table_composite_pk dt
+LEFT JOIN ( SELECT key_part1, key_part2, data FROM another_source ) src ON dt.key_part1 = src.key_part1 AND dt.key_part2 = src.key_part2
+WHERE src.key_part1 IS NULL`,
+		},
+		{
+			name: "No Primary Key",
+			asset: &pipeline.Asset{
+				Name: "test_table_no_pk",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER"},
+					{Name: "value", Type: "VARCHAR"},
+				},
+			},
+			sourceQuery: "SELECT id, value FROM source_table_no_pk",
+			wantErrMsg:  "PrimaryKey is required for merge strategy, but no column was marked as PrimaryKey in asset 'test_table_no_pk'",
+		},
+		{
+			name: "Source Query with Semicolon",
+			asset: &pipeline.Asset{
+				Name: "test_table_semicolon_query",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER", PrimaryKey: true},
+					{Name: "value", Type: "VARCHAR"},
+				},
+			},
+			sourceQuery: "SELECT id, value FROM source_semicolon;",
+			wantSQL: `CREATE OR REPLACE TABLE test_table_semicolon_query AS
+SELECT * FROM ( SELECT id, value FROM source_semicolon ) AS src_all
+UNION ALL
+SELECT dt.*
+FROM test_table_semicolon_query dt
+LEFT JOIN ( SELECT id, value FROM source_semicolon ) src ON dt.id = src.id
+WHERE src.id IS NULL`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			gotSQL, err := buildMergeQuery(tt.asset, tt.sourceQuery)
+
+			if tt.wantErrMsg != "" {
+				require.Error(t, err)
+				assert.Equal(t, tt.wantErrMsg, err.Error())
+				assert.Empty(t, gotSQL)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.wantSQL, gotSQL)
+			}
+		})
+	}
+}
+
 func TestBuildDDLQuery(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
