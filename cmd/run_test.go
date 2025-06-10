@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/spf13/afero"
@@ -1273,7 +1275,40 @@ func TestCheckLintFunc(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			logger := zaptest.NewLogger(t).Sugar()
-			err := CheckLint(tt.foundPipeline, tt.pipelinePath, logger, nil)
+			defaultEnv := &config.Environment{
+				Connections: &config.Connections{
+					GoogleCloudPlatform: []config.GoogleCloudPlatformConnection{
+						{
+							Name:               "conn1",
+							ServiceAccountJSON: "bla-bla",
+						},
+					},
+				},
+			}
+			cfg := &config.Config{
+				Environments: map[string]config.Environment{
+					"default": {
+						Connections: &config.Connections{
+							Snowflake: []config.SnowflakeConnection{
+								{
+									Name:      "dummy",
+									Account:   "dummy-account",
+									Username:  "dummy-username",
+									Password:  "dummy-password",
+									Database:  "dummy-database",
+									Schema:    "dummy-schema",
+									Warehouse: "dummy-warehouse",
+								},
+							},
+						},
+					},
+				},
+				SelectedEnvironmentName: "default",
+				DefaultEnvironmentName:  "snowflake-default",
+				SelectedEnvironment:     defaultEnv,
+			}
+			connectionManager, _ := connection.NewManagerFromConfig(cfg)
+			err := CheckLint(tt.foundPipeline, tt.pipelinePath, logger, nil, connectionManager)
 			require.NoError(t, err, "Expected no error but got one")
 		})
 	}
