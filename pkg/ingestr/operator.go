@@ -150,13 +150,18 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
 }
 
-func NewSeedOperator(conn *connection.Manager) (*SeedOperator, error) {
+func NewSeedOperator(conn *connection.Manager, renderer renderer) (*SeedOperator, error) {
 	uvRunner := &python.UvPythonRunner{
 		UvInstaller: &python.UvChecker{},
 		Cmd:         &python.CommandRunner{},
 	}
 
-	return &SeedOperator{conn: conn, runner: uvRunner, finder: &git.RepoFinder{}}, nil
+	return &SeedOperator{
+		conn:     conn,
+		runner:   uvRunner,
+		finder:   &git.RepoFinder{},
+		renderer: renderer,
+	}, nil
 }
 
 func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {

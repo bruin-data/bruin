@@ -723,7 +723,9 @@ func SetupExecutors(
 	// this should go away once we incorporate URIs into the assets
 	estimateCustomCheckType := s.FindMajorityOfTypes(pipeline.AssetTypeBigqueryQuery)
 
-	seedOperator, err := ingestr.NewSeedOperator(conn)
+	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID, nil)
+	seedOperator, err := ingestr.NewSeedOperator(conn, renderer)
+
 	if err != nil {
 		return nil, err
 	}
@@ -737,7 +739,6 @@ func SetupExecutors(
 		}
 	}
 
-	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID, nil)
 	wholeFileExtractor := &query.WholeFileExtractor{
 		Fs:       fs,
 		Renderer: renderer,
