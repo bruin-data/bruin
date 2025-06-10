@@ -42,8 +42,10 @@ const (
 	AssetTypeEmpty                  = AssetType("empty")
 	AssetTypePostgresQuery          = AssetType("pg.sql")
 	AssetTypePostgresSeed           = AssetType("pg.seed")
+	AssetTypePostgresQuerySensor    = AssetType("pg.sensor.query")
 	AssetTypeRedshiftQuery          = AssetType("rs.sql")
 	AssetTypeRedshiftSeed           = AssetType("rs.seed")
+	AssetTypeRedshiftQuerySensor    = AssetType("rs.sensor.query")
 	AssetTypeAthenaQuery            = AssetType("athena.sql")
 	AssetTypeAthenaSQLSensor        = AssetType("athena.sensor.query")
 	AssetTypeAthenaSeed             = AssetType("athena.seed")
@@ -506,8 +508,10 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeSnowflakeSeed:        "snowflake",
 	AssetTypePostgresQuery:        "postgres",
 	AssetTypePostgresSeed:         "postgres",
+	AssetTypePostgresQuerySensor:  "postgres",
 	AssetTypeRedshiftQuery:        "redshift",
 	AssetTypeRedshiftSeed:         "redshift",
+	AssetTypeRedshiftQuerySensor:  "redshift",
 	AssetTypeMsSQLQuery:           "mssql",
 	AssetTypeMsSQLSeed:            "mssql",
 	AssetTypeDatabricksQuery:      "databricks",
