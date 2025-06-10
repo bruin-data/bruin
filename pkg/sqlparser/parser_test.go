@@ -821,8 +821,6 @@ func TestSqlParser_RenameTables(t *testing.T) {
 	t.Run("blocking group", func(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
-
 				got, err := s.RenameTables(tt.query, "bigquery", tt.tableMappings)
 				if tt.wantErr {
 					require.Error(t, err)
