@@ -146,7 +146,7 @@ func Lint(isDebug *bool) *cli.Command {
 				printError(err, c.String("output"), "Could not initialize sql parser")
 			}
 
-			rules, err := lint.GetRules(fs, &git.RepoFinder{}, c.Bool("exclude-warnings"), parser, true)
+			rules, err := lint.GetRules(fs, &git.RepoFinder{}, c.Bool("exclude-warnings"), parser, true, connectionManager)
 			if err != nil {
 				printError(err, c.String("output"), "An error occurred while building the validation rules")
 
