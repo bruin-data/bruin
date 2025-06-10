@@ -73,6 +73,25 @@ join marketing.attribution as a
     using(user_id)
 ```
 
+### Table Options
+
+#### Requiring Partition Filters
+
+When defining a BigQuery asset, you can specify `bigquery.require_partition_filter: true` in the asset's YAML definition. This will ensure that the table is created with the `OPTIONS(require_partition_filter = TRUE)` BigQuery option. This option enforces that any query accessing the table must include a filter on the table's partitioning columns, which can help control costs and improve query performance.
+
+For example:
+```yaml
+name: my_dataset.my_partitioned_table
+type: bq.sql
+materialization:
+  type: table
+  partition_by: DATE(created_at)
+bigquery:
+  require_partition_filter: true
+```
+This will result in a `CREATE TABLE` statement that includes `PARTITION BY DATE(created_at) OPTIONS (require_partition_filter = TRUE)`.
+
+**Important:** When setting `bigquery.require_partition_filter: true`, you must also define `materialization.partition_by` to specify the partitioning column(s) for the table.
 
 ### `bq.sensor.table`
 

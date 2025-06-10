@@ -626,6 +626,18 @@ func (s AthenaConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s)
 }
 
+type BigqueryConfig struct {
+	RequirePartitionFilter bool `json:"require_partition_filter,omitempty" yaml:"require_partition_filter,omitempty" mapstructure:"require_partition_filter"`
+}
+
+func (s BigqueryConfig) MarshalJSON() ([]byte, error) {
+	if !s.RequirePartitionFilter { // Only marshal if true, or if other fields are added in the future
+		return []byte("null"), nil
+	}
+	type Alias BigqueryConfig
+	return json.Marshal(Alias(s))
+}
+
 type Asset struct { //nolint:recvcheck
 	ID                string             `json:"id" yaml:"-" mapstructure:"-"`
 	URI               string             `json:"uri" yaml:"uri,omitempty" mapstructure:"uri"`
@@ -649,6 +661,7 @@ type Asset struct { //nolint:recvcheck
 	Metadata          EmptyStringMap     `json:"metadata" yaml:"metadata,omitempty" mapstructure:"metadata"`
 	Snowflake         SnowflakeConfig    `json:"snowflake" yaml:"snowflake,omitempty" mapstructure:"snowflake"`
 	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
+	Bigquery          BigqueryConfig     `json:"bigquery,omitempty" yaml:"bigquery,omitempty" mapstructure:"bigquery"`
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
 
 	upstream   []*Asset

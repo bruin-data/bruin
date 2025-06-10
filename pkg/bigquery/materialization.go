@@ -133,6 +133,9 @@ func buildIncrementalQueryWithoutTempVariable(asset *pipeline.Asset, query strin
 }
 
 func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error) {
+	if asset.Bigquery.RequirePartitionFilter && asset.Materialization.PartitionBy == "" {
+		return "", errors.New("bigquery.require_partition_filter is true but materialization.partition_by is not set")
+	}
 	mat := asset.Materialization
 
 	partitionClause := ""
@@ -145,7 +148,24 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 		clusterByClause = "CLUSTER BY " + strings.Join(mat.ClusterBy, ", ")
 	}
 
-	return fmt.Sprintf("CREATE OR REPLACE TABLE %s %s %s AS\n%s", asset.Name, partitionClause, clusterByClause, query), nil
+	optionsClause := ""
+	if asset.Bigquery.RequirePartitionFilter {
+		optionsClause = "OPTIONS (require_partition_filter = TRUE)"
+	}
+
+	// Build the DDL parts
+	ddlParts := []string{asset.Name} // Start with table name
+	if partitionClause != "" {
+		ddlParts = append(ddlParts, partitionClause)
+	}
+	if clusterByClause != "" {
+		ddlParts = append(ddlParts, clusterByClause)
+	}
+	if optionsClause != "" {
+		ddlParts = append(ddlParts, optionsClause)
+	}
+
+	return fmt.Sprintf("CREATE OR REPLACE TABLE %s AS\n%s", strings.Join(ddlParts, " "), query), nil
 }
 
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -184,6 +204,9 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 }
 
 func BuildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
+	if asset.Bigquery.RequirePartitionFilter && asset.Materialization.PartitionBy == "" {
+		return "", errors.New("bigquery.require_partition_filter is true but materialization.partition_by is not set")
+	}
 	columnDefs := make([]string, 0, len(asset.Columns))
 	primaryKeys := []string{}
 
@@ -214,6 +237,17 @@ func BuildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	}
 	if len(asset.Materialization.ClusterBy) > 0 {
 		q += "\nCLUSTER BY " + strings.Join(asset.Materialization.ClusterBy, ", ")
+	}
+
+	tableOptions := []string{}
+	if asset.Bigquery.RequirePartitionFilter {
+		tableOptions = append(tableOptions, "require_partition_filter = TRUE")
+	}
+
+	// Add other table-level options here in the future if needed
+
+	if len(tableOptions) > 0 {
+		q += "\nOPTIONS (" + strings.Join(tableOptions, ", ") + ")"
 	}
 
 	return q, nil

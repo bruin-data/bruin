@@ -109,3 +109,15 @@ custom_checks:
         and date_trunc(StartDateDt, month) = "2024-06-01"
         and credits_spent = 1
 ```
+
+## Platform Specific Configurations
+
+Below are configurations that are specific to certain data platforms.
+
+### `bigquery` (BigQuery Specific)
+Platform-specific configurations for BigQuery assets.
+
+#### `require_partition_filter`
+- **Type:** `Boolean`
+- **Default:** `false`
+- If set to `true`, the BigQuery table will be created with the `OPTIONS(require_partition_filter = TRUE)`. This means that queries against this table must include a predicate filter (a `WHERE` clause) that filters on the partitioning column(s). **Note:** `materialization.partition_by` must be specified in the asset definition when `require_partition_filter` is true.

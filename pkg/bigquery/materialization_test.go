@@ -13,10 +13,10 @@ func TestMaterializer_Render(t *testing.T) {
 	tests := []struct {
 		name        string
 		task        *pipeline.Asset
-		query       string
-		want        string
-		wantErr     bool
-		fullRefresh bool
+		query           string
+		want            string
+		wantErr         bool
+		fullRefresh     bool
 	}{
 		{
 			name:  "no materialization, return raw query",
@@ -33,7 +33,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want:  "CREATE OR REPLACE VIEW my.asset AS\nSELECT 1",
+			want:  "CREATE OR REPLACE VIEW my\\.asset AS\nSELECT 1",
 		},
 		{
 			name: "materialize to a table, no partition or cluster, default to create+replace",
@@ -44,7 +44,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want:  "CREATE OR REPLACE TABLE my.asset   AS\nSELECT 1",
+			want:  "CREATE OR REPLACE TABLE my\\.asset AS\nSELECT 1",
 		},
 		{
 			name: "materialize to a table, no partition or cluster, full refresh results in create+replace",
@@ -57,7 +57,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			fullRefresh: true,
 			query:       "SELECT 1",
-			want:        "CREATE OR REPLACE TABLE my.asset   AS\nSELECT 1",
+			want:        "CREATE OR REPLACE TABLE my\\.asset AS\nSELECT 1",
 		},
 		{
 			name: "materialize to a table with partition, no cluster",
@@ -70,7 +70,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want:  "CREATE OR REPLACE TABLE my.asset PARTITION BY dt  AS\nSELECT 1",
+			want:  "CREATE OR REPLACE TABLE my\\.asset PARTITION BY dt AS\nSELECT 1",
 		},
 		{
 			name: "materialize to a table with partition and cluster, single field to cluster",
@@ -84,7 +84,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want:  "CREATE OR REPLACE TABLE my.asset PARTITION BY dt CLUSTER BY event_type AS\nSELECT 1",
+			want:  "CREATE OR REPLACE TABLE my\\.asset PARTITION BY dt CLUSTER BY event_type AS\nSELECT 1",
 		},
 		{
 			name: "materialize to a table with partition and cluster, multiple fields to cluster",
@@ -98,7 +98,7 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want:  "CREATE OR REPLACE TABLE my.asset PARTITION BY dt CLUSTER BY event_type, event_name AS\nSELECT 1",
+			want:  "CREATE OR REPLACE TABLE my\\.asset PARTITION BY dt CLUSTER BY event_type, event_name AS\nSELECT 1",
 		},
 		{
 			name: "materialize to a table with append",
@@ -110,7 +110,90 @@ func TestMaterializer_Render(t *testing.T) {
 				},
 			},
 			query: "SELECT 1",
-			want:  "INSERT INTO my.asset SELECT 1",
+			want:  "INSERT INTO my\\.asset SELECT 1",
+		},
+		{
+			name: "create replace with require_partition_filter",
+			task: &pipeline.Asset{
+				Name: "my_dataset.my_table",
+				Bigquery: pipeline.BigqueryConfig{
+					RequirePartitionFilter: true,
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					PartitionBy: "date_col", // ADDED
+				},
+			},
+			query:   "SELECT 1",
+			want:    "CREATE OR REPLACE TABLE my_dataset\\.my_table PARTITION BY date_col OPTIONS \\(require_partition_filter = TRUE\\) AS\nSELECT 1", // UPDATED
+			wantErr: false,
+		},
+		{
+			name: "create replace with require_partition_filter and cluster by",
+			task: &pipeline.Asset{
+				Name: "my_dataset.my_table",
+				Bigquery: pipeline.BigqueryConfig{
+					RequirePartitionFilter: true,
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					ClusterBy:   []string{"cluster_col"},
+					PartitionBy: "date_col", // ADDED
+				},
+			},
+			query:   "SELECT 1",
+			want:    "CREATE OR REPLACE TABLE my_dataset\\.my_table PARTITION BY date_col CLUSTER BY cluster_col OPTIONS \\(require_partition_filter = TRUE\\) AS\nSELECT 1", // UPDATED
+			wantErr: false,
+		},
+		{
+			name: "create replace with require_partition_filter, partition by, and cluster by",
+			task: &pipeline.Asset{
+				Name: "my_dataset.my_table",
+				Bigquery: pipeline.BigqueryConfig{
+					RequirePartitionFilter: true,
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					PartitionBy: "date_col",
+					ClusterBy:   []string{"cluster_col"},
+				},
+			},
+			query:   "SELECT 1",
+			want:    "CREATE OR REPLACE TABLE my_dataset\\.my_table PARTITION BY date_col CLUSTER BY cluster_col OPTIONS \\(require_partition_filter = TRUE\\) AS\nSELECT 1",
+			wantErr: false,
+		},
+		{
+			name: "create replace without require_partition_filter, with partition by and cluster by",
+			task: &pipeline.Asset{
+				Name: "my_dataset.my_table",
+				Bigquery: pipeline.BigqueryConfig{
+					RequirePartitionFilter: false,
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					PartitionBy: "date_col",
+					ClusterBy:   []string{"cluster_col"},
+				},
+			},
+			query:   "SELECT 1",
+			want:    "CREATE OR REPLACE TABLE my_dataset\\.my_table PARTITION BY date_col CLUSTER BY cluster_col AS\nSELECT 1",
+			wantErr: false,
+		},
+		{
+			name: "error when require_partition_filter is true and partition_by is missing for create replace",
+			task: &pipeline.Asset{
+				Name: "my_dataset.my_table",
+				Bigquery: pipeline.BigqueryConfig{
+					RequirePartitionFilter: true,
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyCreateReplace, // Explicitly use create/replace
+					PartitionBy: "",                                           // Empty PartitionBy
+				},
+			},
+			query:    "SELECT 1",
+			wantErr:  true,
 		},
 		{
 			name: "incremental strategies require the incremental_key to be set",
@@ -365,9 +448,11 @@ func TestMaterializer_Render(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
+				// Only assert Regexp if there is a want string, to avoid issues with error cases not setting it
+				if tt.want != "" {
+					assert.Regexp(t, tt.want, render)
+				}
 			}
-
-			assert.Regexp(t, tt.want, render)
 		})
 	}
 }
@@ -375,10 +460,10 @@ func TestMaterializer_Render(t *testing.T) {
 func TestBuildDDLQuery(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name    string
-		asset   *pipeline.Asset
-		want    string
-		wantErr bool
+		name     string
+		asset    *pipeline.Asset
+		want     string
+		wantErr  bool
 	}{
 		{
 			name: "basic table creation",
@@ -469,6 +554,120 @@ func TestBuildDDLQuery(t *testing.T) {
 				},
 			},
 			want: "CREATE TABLE IF NOT EXISTS my_table_with_multiple_pks (\n  id INT64,\n  category STRING,\n  name STRING OPTIONS(description=\"The name of the person\"),\n  PRIMARY KEY (id, category) NOT ENFORCED\n)",
+		},
+		{
+			name: "ddl with require_partition_filter",
+			asset: &pipeline.Asset{
+				Name: "my_dataset.my_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+					{Name: "date_col", Type: "DATE"},
+				},
+				Bigquery: pipeline.BigqueryConfig{
+					RequirePartitionFilter: true,
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					PartitionBy: "date_col",
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_dataset.my_table (\n  id INT64,\n  date_col DATE\n)\nPARTITION BY date_col\nOPTIONS (require_partition_filter = TRUE)",
+		},
+		{
+			name: "ddl with require_partition_filter and column options",
+			asset: &pipeline.Asset{
+				Name: "my_dataset.my_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64", Description: "Identifier"},
+					{Name: "date_col", Type: "DATE"},
+				},
+				Bigquery: pipeline.BigqueryConfig{
+					RequirePartitionFilter: true,
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					PartitionBy: "date_col",
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_dataset.my_table (\n  id INT64 OPTIONS(description=\"Identifier\"),\n  date_col DATE\n)\nPARTITION BY date_col\nOPTIONS (require_partition_filter = TRUE)",
+		},
+		{
+			name: "ddl with require_partition_filter and cluster by",
+			asset: &pipeline.Asset{
+				Name: "my_dataset.my_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+					{Name: "cluster_col", Type: "STRING"},
+					{Name: "date_col", Type: "DATE"},
+				},
+				Bigquery: pipeline.BigqueryConfig{
+					RequirePartitionFilter: true,
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					ClusterBy:   []string{"cluster_col"},
+					PartitionBy: "date_col",
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_dataset.my_table (\n  id INT64,\n  cluster_col STRING,\n  date_col DATE\n)\nPARTITION BY date_col\nCLUSTER BY cluster_col\nOPTIONS (require_partition_filter = TRUE)",
+		},
+		{
+			name: "ddl with require_partition_filter, partition by, cluster by, and column options",
+			asset: &pipeline.Asset{
+				Name: "my_dataset.my_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64", Description: "Identifier"},
+					{Name: "date_col", Type: "DATE"},
+					{Name: "cluster_col", Type: "STRING"},
+				},
+				Bigquery: pipeline.BigqueryConfig{
+					RequirePartitionFilter: true,
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					PartitionBy: "date_col",
+					ClusterBy:   []string{"cluster_col"},
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_dataset.my_table (\n  id INT64 OPTIONS(description=\"Identifier\"),\n  date_col DATE,\n  cluster_col STRING\n)\nPARTITION BY date_col\nCLUSTER BY cluster_col\nOPTIONS (require_partition_filter = TRUE)",
+		},
+		{
+			name: "ddl without require_partition_filter, with partition by and cluster by",
+			asset: &pipeline.Asset{
+				Name: "my_dataset.my_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+					{Name: "date_col", Type: "DATE"},
+					{Name: "cluster_col", Type: "STRING"},
+				},
+				Bigquery: pipeline.BigqueryConfig{
+					RequirePartitionFilter: false,
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					PartitionBy: "date_col",
+					ClusterBy:   []string{"cluster_col"},
+				},
+			},
+			want: "CREATE TABLE IF NOT EXISTS my_dataset.my_table (\n  id INT64,\n  date_col DATE,\n  cluster_col STRING\n)\nPARTITION BY date_col\nCLUSTER BY cluster_col",
+		},
+		{
+			name: "error in ddl when require_partition_filter is true and partition_by is missing",
+			asset: &pipeline.Asset{
+				Name: "my_dataset.my_table",
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INT64"},
+				},
+				Bigquery: pipeline.BigqueryConfig{
+					RequirePartitionFilter: true,
+				},
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategyDDL,
+					PartitionBy: "", // Explicitly empty
+				},
+			},
+			wantErr:  true,
 		},
 	}
 
