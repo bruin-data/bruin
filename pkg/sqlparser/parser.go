@@ -29,6 +29,7 @@ type SQLParser struct {
 	rendererSrc *embed_util.EmbeddedFiles
 	tmpDir      string
 	started     bool
+	randomize   bool
 
 	stdout io.ReadCloser
 	stdin  io.WriteCloser
@@ -70,6 +71,7 @@ func NewSQLParser(randomize bool) (*SQLParser, error) {
 		sqlglotDir:  sqlglotDir,
 		rendererSrc: rendererSrc,
 		tmpDir:      tmpDir,
+		randomize:   randomize,
 	}, nil
 }
 
@@ -277,6 +279,10 @@ func (s *SQLParser) Close() error {
 			timer.Stop()
 		}
 		s.cmd = nil
+	}
+
+	if !s.randomize {
+		return nil
 	}
 
 	files, err := filepath.Glob(s.tmpDir + "*")
