@@ -281,6 +281,10 @@ func (s *SQLParser) Close() error {
 		s.cmd = nil
 	}
 
+	_ = s.rendererSrc.Cleanup()
+	_ = s.sqlglotDir.Cleanup()
+	_ = s.ep.Cleanup()
+
 	return nil
 }
 

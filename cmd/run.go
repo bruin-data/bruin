@@ -429,6 +429,7 @@ func Run(isDebug *bool) *cli.Command {
 				if err != nil {
 					printError(err, c.String("output"), "Could not initialize sql parser")
 				}
+				defer parser.Close()
 
 				go func() {
 					err := parser.Start()
