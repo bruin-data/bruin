@@ -29,6 +29,7 @@ type DuckDBConfig interface {
 type connection interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 	ExecContext(ctx context.Context, sql string, arguments ...any) (sql.Result, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
 func NewClient(c DuckDBConfig) (*Client, error) {
@@ -209,13 +210,25 @@ func (c *Client) GetTableSummary(ctx context.Context, tableName string) (*diff.T
 		var stats diff.ColumnStatistics
 		switch strings.ToLower(colType) {
 		case "integer", "bigint", "tinyint", "smallint", "double", "float", "decimal", "numeric", "real":
-			stats = &diff.NumericalStatistics{}
+			stats, err = c.fetchNumericalStats(ctx, tableName, name)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch numerical stats for column '%s': %w", name, err)
+			}
 		case "varchar", "char", "text", "string":
-			stats = &diff.StringStatistics{}
+			stats, err = c.fetchStringStats(ctx, tableName, name)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch string stats for column '%s': %w", name, err)
+			}
 		case "boolean":
-			stats = &diff.BooleanStatistics{}
+			stats, err = c.fetchBooleanStats(ctx, tableName, name)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch boolean stats for column '%s': %w", name, err)
+			}
 		case "date", "time", "timestamp", "datetime":
-			stats = &diff.DateTimeStatistics{}
+			stats, err = c.fetchDateTimeStats(ctx, tableName, name)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch datetime stats for column '%s': %w", name, err)
+			}
 		default:
 			stats = &diff.UnknownStatistics{}
 		}
@@ -242,4 +255,118 @@ func (c *Client) GetTableSummary(ctx context.Context, tableName string) (*diff.T
 		RowCount: rowCount,
 		Table:    dbTable,
 	}, nil
+}
+
+func (c *Client) fetchNumericalStats(ctx context.Context, tableName, columnName string) (*diff.NumericalStatistics, error) {
+	stats := &diff.NumericalStatistics{}
+	query := fmt.Sprintf(`
+        SELECT 
+            MIN(%s) as min_val,
+            MAX(%s) as max_val,
+            AVG(%s) as avg_val,
+            SUM(%s) as sum_val,
+            COUNT(%s) as count_val,
+            COUNT(*) - COUNT(%s) as null_count,
+            STDDEV(%s) as stddev_val
+        FROM %s
+    `, columnName, columnName, columnName, columnName, columnName, columnName, columnName, tableName)
+
+	err := c.connection.QueryRowContext(ctx, query).Scan(
+		&stats.Min,
+		&stats.Max,
+		&stats.Avg,
+		&stats.Sum,
+		&stats.Count,
+		&stats.NullCount,
+		&stats.StdDev,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch numerical stats for column '%s': %w", columnName, err)
+	}
+
+	return stats, nil
+}
+
+func (c *Client) fetchStringStats(ctx context.Context, tableName, columnName string) (*diff.StringStatistics, error) {
+	stats := &diff.StringStatistics{}
+
+	// Get min length, max length, avg length
+	query := fmt.Sprintf(`
+        SELECT 
+            MIN(LENGTH(%s)) as min_len,
+            MAX(LENGTH(%s)) as max_len,
+            AVG(LENGTH(%s)) as avg_len,
+            COUNT(DISTINCT %s) as distinct_count,
+            COUNT(*) - COUNT(%s) as null_count,
+            COUNT(CASE WHEN %s = '' THEN 1 END) as empty_count
+        FROM %s
+    `, columnName, columnName, columnName, columnName, columnName, columnName, tableName)
+
+	err := c.connection.QueryRowContext(ctx, query).Scan(
+		&stats.MinLength,
+		&stats.MaxLength,
+		&stats.AvgLength,
+		&stats.DistinctCount,
+		&stats.NullCount,
+		&stats.EmptyCount,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch string stats for column '%s': %w", columnName, err)
+	}
+
+	return stats, nil
+}
+
+func (c *Client) fetchBooleanStats(ctx context.Context, tableName, columnName string) (*diff.BooleanStatistics, error) {
+	stats := &diff.BooleanStatistics{}
+
+	// Get true count and total count
+	query := fmt.Sprintf(`
+        SELECT 
+            COUNT(CASE WHEN %s = true THEN 1 END) as true_count,
+            COUNT(CASE WHEN %s = false THEN 1 END) as false_count,
+            COUNT(*) as total_count,
+            COUNT(*) - COUNT(%s) as null_count
+        FROM %s
+    `, columnName, columnName, columnName, tableName)
+
+	err := c.connection.QueryRowContext(ctx, query).Scan(
+		&stats.TrueCount,
+		&stats.FalseCount,
+		&stats.Count,
+		&stats.NullCount,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch boolean stats for column '%s': %w", columnName, err)
+	}
+
+	return stats, nil
+}
+
+func (c *Client) fetchDateTimeStats(ctx context.Context, tableName, columnName string) (*diff.DateTimeStatistics, error) {
+	stats := &diff.DateTimeStatistics{}
+
+	// Get min, max dates
+	query := fmt.Sprintf(`
+        SELECT 
+            MIN(%s) as min_date,
+            MAX(%s) as max_date,
+            COUNT(DISTINCT %s) as unique_count,
+            COUNT(*) as count_val,
+            COUNT(*) - COUNT(%s) as null_count
+        FROM %s
+    `, columnName, columnName, columnName, columnName, tableName)
+
+	err := c.connection.QueryRowContext(ctx, query).Scan(
+		&stats.EarliestDate,
+		&stats.LatestDate,
+		&stats.UniqueCount,
+		&stats.Count,
+		&stats.NullCount,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch datetime stats for column '%s': %w", columnName, err)
+	}
+
+	return stats, nil
 }

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
@@ -19,95 +21,46 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-// TableSummarizer defines an interface for connections that can provide table summaries.
-type TableSummarizer interface {
-	GetTableSummary(ctx context.Context, tableName string) (*diff.TableSummaryResult, error)
+// TableComparer defines an interface for connections that can compare tables.
+type TableComparer interface {
+	CompareTables(ctx context.Context, table1, table2 string) (*diff.SchemaComparisonResult, error)
 }
 
-// TypeDifference represents a difference in column types between two tables.
-type TypeDifference struct {
-	Table1Type string
-	Table2Type string
+func parseTableIdentifier(identifier string, defaultConnection string) (string, string, error) {
+	parts := strings.SplitN(identifier, ":", 2)
+	if len(parts) == 2 {
+		return parts[0], parts[1], nil
+	}
+	if defaultConnection != "" {
+		return defaultConnection, identifier, nil
+	}
+	return "", "", errors.New("connection not specified for table and no default connection is available")
 }
 
-// NullabilityDifference represents a difference in nullability between two tables.
-type NullabilityDifference struct {
-	Table1Nullable bool
-	Table2Nullable bool
-}
+func compareTables(ctx context.Context, summarizer1, summarizer2 diff.TableSummarizer, table1, table2 string) (*diff.SchemaComparisonResult, error) {
+	var summary1, summary2 *diff.TableSummaryResult
+	var err1, err2 error
+	var wg conc.WaitGroup
 
-// UniquenessDifference represents a difference in uniqueness constraints between two tables.
-type UniquenessDifference struct {
-	Table1Unique bool
-	Table2Unique bool
-}
-
-// ColumnDifference represents differences for a column that exists in both tables.
-type ColumnDifference struct {
-	ColumnName            string
-	TypeDifference        *TypeDifference
-	NullabilityDifference *NullabilityDifference
-	UniquenessDifference  *UniquenessDifference
-}
-
-// MissingColumn represents a column that exists in only one table.
-type MissingColumn struct {
-	ColumnName  string
-	Type        string
-	Nullable    bool
-	PrimaryKey  bool
-	Unique      bool
-	TableName   string // The table where this column exists
-	MissingFrom string // The table where this column is missing
-}
-
-// SchemaComparisonResult holds the detailed results of a table schema comparison.
-type SchemaComparisonResult struct {
-	Table1 *diff.TableSummaryResult
-	Table2 *diff.TableSummaryResult
-
-	SamePropertiesCount      int                // Columns with identical properties in both tables
-	DifferentPropertiesCount int                // Columns present in both tables but with different properties
-	InTable1OnlyCount        int                // Columns present in table1 but not in table2
-	InTable2OnlyCount        int                // Columns present in table2 but not in table1
-	ColumnDifferences        []ColumnDifference // Structured differences for columns present in both tables
-	MissingColumns           []MissingColumn    // Columns missing from one of the tables
-	HasSchemaDifferences     bool               // True if DifferentPropertiesCount, InTable1OnlyCount, or InTable2OnlyCount > 0
-	RowCountDiff             int64              // Difference in row count between the two tables
-	HasRowCountDifference    bool               // True if RowCountDiff != 0
-}
-
-func (c *SchemaComparisonResult) GetSummaryTable() string {
-	t := table.NewWriter()
-	t.SetRowPainter(func(row table.Row) text.Colors {
-		if len(row) == 0 {
-			return text.Colors{}
-		}
-		if row[0] == "Row Count" {
-			if c.RowCountDiff != 0 {
-				return text.Colors{text.FgRed}
-			} else {
-				return text.Colors{text.FgGreen}
-			}
-		}
-		if row[0] == "Columns" {
-			if row[3] != 0 {
-				return text.Colors{text.FgRed}
-			} else {
-				return text.Colors{text.FgGreen}
-			}
-		}
-		return text.Colors{}
+	wg.Go(func() {
+		summary1, err1 = summarizer1.GetTableSummary(ctx, table1)
 	})
 
-	t.AppendHeader(table.Row{"", c.Table1.Table.Name, c.Table2.Table.Name, "Diff"})
-	if c.RowCountDiff != 0 {
-		t.AppendRow(table.Row{"Row Count", c.Table1.RowCount, c.Table2.RowCount, c.RowCountDiff})
-	} else {
-		t.AppendRow(table.Row{"Row Count", c.Table1.RowCount, c.Table2.RowCount, 0})
+	wg.Go(func() {
+		summary2, err2 = summarizer2.GetTableSummary(ctx, table2)
+	})
+
+	wg.Wait()
+
+	if err1 != nil {
+		return nil, fmt.Errorf("failed to get summary for table '%s': %w", table1, err1)
 	}
-	t.AppendRow(table.Row{"Columns", len(c.Table1.Table.Columns), len(c.Table2.Table.Columns), len(c.Table1.Table.Columns) - len(c.Table2.Table.Columns)})
-	return t.Render()
+	if err2 != nil {
+		return nil, fmt.Errorf("failed to get summary for table '%s': %w", table2, err2)
+	}
+
+	result := diff.CompareTableSchemas(summary1, summary2, table1, table2)
+	return &result, nil
 }
 
 // DataDiffCmd defines the 'data-diff' command.
@@ -119,14 +72,14 @@ func DataDiffCmd() *cli.Command {
 	return &cli.Command{
 		Name:    "data-diff",
 		Aliases: []string{"diff"},
-		Usage:   "Compares data between two environments or sources. Requires two arguments: <table1> <table2>",
+		Usage:   "Compares data between two environments or sources. Table names can be provided as 'connection:table' or just 'table' if a default connection is set via --connection flag.",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "connection",
 				Aliases:     []string{"c"},
-				Usage:       "Name of the connection to use",
+				Usage:       "Name of the default connection to use, if not specified in the table argument (e.g. conn:table)",
 				Destination: &connectionName,
-				Required:    true,
+				Required:    false,
 			},
 			&cli.StringFlag{
 				Name:        "config-file",
@@ -139,8 +92,8 @@ func DataDiffCmd() *cli.Command {
 			if c.NArg() != 2 {
 				return errors.New("incorrect number of arguments, please provide two table names")
 			}
-			table1 := c.Args().Get(0)
-			table2 := c.Args().Get(1)
+			table1Identifier := c.Args().Get(0)
+			table2Identifier := c.Args().Get(1)
 
 			fs := afero.NewOsFs()
 
@@ -168,47 +121,51 @@ func DataDiffCmd() *cli.Command {
 				return fmt.Errorf("failed to create connection manager: %w", errs[0])
 			}
 
-			// Get the connection
-			conn, err := manager.GetConnection(connectionName)
+			conn1Name, table1Name, err := parseTableIdentifier(table1Identifier, connectionName)
 			if err != nil {
-				return fmt.Errorf("failed to get connection '%s': %w", connectionName, err)
+				return fmt.Errorf("invalid identifier for table 1: %w", err)
+			}
+
+			conn2Name, table2Name, err := parseTableIdentifier(table2Identifier, connectionName)
+			if err != nil {
+				return fmt.Errorf("invalid identifier for table 2: %w", err)
+			}
+
+			// Get the connection
+			conn1, err := manager.GetConnection(conn1Name)
+			if err != nil {
+				return fmt.Errorf("failed to get connection '%s': %w", conn1Name, err)
+			}
+
+			conn2, err := manager.GetConnection(conn2Name)
+			if err != nil {
+				return fmt.Errorf("failed to get connection '%s': %w", conn2Name, err)
 			}
 
 			ctx := c.Context
-			if summarizer, ok := conn.(TableSummarizer); ok {
-				var summary1, summary2 *diff.TableSummaryResult
-				var err1, err2 error
-				var group conc.WaitGroup
 
-				group.Go(func() {
-					summary1, err1 = summarizer.GetTableSummary(ctx, table1)
-				})
+			s1, ok1 := conn1.(diff.TableSummarizer)
+			s2, ok2 := conn2.(diff.TableSummarizer)
 
-				group.Go(func() {
-					summary2, err2 = summarizer.GetTableSummary(ctx, table2)
-				})
+			if !ok1 {
+				return fmt.Errorf("connection type %T for '%s' does not support table summarization", conn1, conn1Name)
+			}
 
-				group.Wait()
+			if !ok2 {
+				return fmt.Errorf("connection type %T for '%s' does not support table summarization", conn2, conn2Name)
+			}
 
-				if err1 != nil {
-					errorPrinter.Printf("error getting summary for '%s':\n\n%v", table1, err1)
-					return cli.Exit("", 1)
-				}
-				if err2 != nil {
-					errorPrinter.Printf("error getting summary for '%s':\n\n%v", table2, err2)
-					return cli.Exit("", 1)
-				}
+			schemaComparison, err := compareTables(ctx, s1, s2, table1Name, table2Name)
+			if err != nil {
+				errorPrinter.Printf("error comparing tables '%s' and '%s':\n\n%v", table1Identifier, table2Identifier, err)
+				return cli.Exit("", 1)
+			}
 
-				if summary1 != nil && summary2 != nil {
-					schemaComparison := compareTableSchemas(summary1, summary2, table1, table2)
-					printSchemaComparisonOutput(schemaComparison, table1, table2, summary1.Table, summary2.Table, c.App.Writer)
-				} else {
-					fmt.Fprintf(c.App.ErrWriter, "\nUnable to compare summaries - one or both summaries could not be fetched or are nil\n")
-					return errors.New("failed to compare table summaries due to missing data")
-				}
-
+			if schemaComparison != nil {
+				printSchemaComparisonOutput(*schemaComparison, table1Identifier, table2Identifier, c.App.Writer)
 			} else {
-				fmt.Printf("\nConnection type %T does not support GetTableSummary.\n", conn)
+				fmt.Fprintf(c.App.ErrWriter, "\nUnable to compare summaries - the comparison result is nil\n")
+				return errors.New("failed to compare table summaries due to missing data")
 			}
 
 			return nil
@@ -216,12 +173,24 @@ func DataDiffCmd() *cli.Command {
 	}
 }
 
-func printSchemaComparisonOutput(schemaComparison SchemaComparisonResult, table1Name, table2Name string, t1Schema, t2Schema *diff.Table, errOut io.Writer) {
+func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, table1Name, table2Name string, errOut io.Writer) {
 	fmt.Fprintf(errOut, schemaComparison.GetSummaryTable()+"\n")
 	redPrinter := color.New(color.FgRed)
 	greenPrinter := color.New(color.FgGreen)
 
 	var overallSchemaMessage string
+	t1Schema := schemaComparison.Table1.Table
+	t2Schema := schemaComparison.Table2.Table
+
+	if !schemaComparison.HasSchemaDifferences && !schemaComparison.HasRowCountDifference {
+		if schemaComparison.SamePropertiesCount == 0 && len(t1Schema.Columns) == 0 && len(t2Schema.Columns) == 0 {
+			overallSchemaMessage = fmt.Sprintf("Tables '%s' and '%s' both have no columns and are considered schema-identical.", table1Name, table2Name)
+		} else {
+			overallSchemaMessage = "Table schemas are considered identical."
+		}
+		greenPrinter.Fprintf(errOut, "\n%s\n", overallSchemaMessage)
+		return
+	}
 
 	if schemaComparison.HasSchemaDifferences {
 		summaryPoints := []string{}
@@ -274,131 +243,122 @@ func printSchemaComparisonOutput(schemaComparison SchemaComparisonResult, table1
 				fmt.Fprintln(errOut, redPrinter.Sprintf("    - missing from '%s'", missing.MissingFrom))
 			}
 		}
-	} else { // No schema differences
-		if t1Schema != nil && t2Schema != nil {
-			// Both tables are non-nil and have no schema differences
-			if schemaComparison.SamePropertiesCount == 0 && len(t1Schema.Columns) == 0 && len(t2Schema.Columns) == 0 {
-				overallSchemaMessage = greenPrinter.Sprintf("Tables '%s' and '%s' both have no columns and are considered schema-identical.", table1Name, table2Name)
-			} else {
-				overallSchemaMessage = greenPrinter.Sprintf("Tables '%s' and '%s' have the same schema with %d columns.", table1Name, table2Name, schemaComparison.SamePropertiesCount)
-			}
-		} else if t1Schema == nil && t2Schema == nil {
-			overallSchemaMessage = fmt.Sprintf("Schemas for '%s' and '%s' are both nil (e.g., tables might not exist or failed to fetch).", table1Name, table2Name)
-		} else {
-			if t1Schema == nil && t2Schema != nil && len(t2Schema.Columns) == 0 {
-				overallSchemaMessage = fmt.Sprintf("Schema for '%s' is nil, and '%s' has no columns. Schemas considered identical.", table1Name, table2Name)
-			} else if t2Schema == nil && t1Schema != nil && len(t1Schema.Columns) == 0 {
-				overallSchemaMessage = fmt.Sprintf("Schema for '%s' is nil, and '%s' has no columns. Schemas considered identical.", table2Name, table1Name)
-			} else {
-				// Fallback, should be covered by previous conditions
-				overallSchemaMessage = "Table schemas are considered identical."
+	}
+
+	t1Columns := make(map[string]*diff.Column)
+	for _, column := range t1Schema.Columns {
+		t1Columns[column.Name] = column
+	}
+
+	t2Columns := make(map[string]*diff.Column)
+	for _, column := range t2Schema.Columns {
+		t2Columns[column.Name] = column
+	}
+
+	if len(t1Schema.Columns) > 0 && len(t2Schema.Columns) > 0 {
+		fmt.Fprintf(errOut, "\n\nColumns that exist in both tables:\n")
+		for _, t1Column := range t1Schema.Columns {
+			if t2Column, ok := t2Columns[t1Column.Name]; ok {
+				if t1Column.Stats != nil && t2Column.Stats != nil {
+					fmt.Fprintf(errOut, "\n%s\n", t1Column.Name)
+					fmt.Fprintf(errOut, "%s\n", tableStatsToTable(t1Column.Stats, t2Column.Stats, table1Name, table2Name))
+				}
 			}
 		}
-		fmt.Printf("\n%s\n", overallSchemaMessage) // Standard output for no differences
 	}
 }
 
-func compareTableSchemas(summary1, summary2 *diff.TableSummaryResult, t1Name, t2Name string) SchemaComparisonResult {
-	res := SchemaComparisonResult{
-		Table1: summary1,
-		Table2: summary2,
-	}
+func tableStatsToTable(stats1 diff.ColumnStatistics, stats2 diff.ColumnStatistics, table1Name, table2Name string) string {
+	t := table.NewWriter()
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{Number: 1, Align: text.AlignLeft},
+		{Number: 2, Align: text.AlignRight},
+		{Number: 3, Align: text.AlignRight},
+		{Number: 4, Align: text.AlignRight},
+	})
 
-	if summary1 == nil || summary2 == nil {
-		return res
-	}
-
-	if summary1.Table == nil || summary2.Table == nil {
-		return res
-	}
-
-	res.RowCountDiff = summary1.RowCount - summary2.RowCount
-	res.HasRowCountDifference = res.RowCountDiff != 0
-
-	t1 := summary1.Table
-	t2 := summary2.Table
-
-	table1Columns := make(map[string]*diff.Column)
-	for _, col := range t1.Columns {
-		table1Columns[col.Name] = col
-	}
-
-	table2Columns := make(map[string]*diff.Column)
-	for _, col := range t2.Columns {
-		table2Columns[col.Name] = col
-	}
-
-	processedColsT2 := make(map[string]bool) // Tracks columns from t2 that are matched
-
-	// Iterate through columns of table 1
-	for _, col1 := range t1.Columns {
-		col2, existsInT2 := table2Columns[col1.Name]
-		if existsInT2 {
-			processedColsT2[col1.Name] = true
-			columnIsDifferent := false
-			colDiff := ColumnDifference{
-				ColumnName: col1.Name,
-			}
-
-			if col1.Type != col2.Type {
-				colDiff.TypeDifference = &TypeDifference{
-					Table1Type: col1.Type,
-					Table2Type: col2.Type,
-				}
-				columnIsDifferent = true
-			}
-			if col1.Nullable != col2.Nullable {
-				colDiff.NullabilityDifference = &NullabilityDifference{
-					Table1Nullable: col1.Nullable,
-					Table2Nullable: col2.Nullable,
-				}
-				columnIsDifferent = true
-			}
-			if col1.Unique != col2.Unique {
-				colDiff.UniquenessDifference = &UniquenessDifference{
-					Table1Unique: col1.Unique,
-					Table2Unique: col2.Unique,
-				}
-				columnIsDifferent = true
-			}
-
-			if columnIsDifferent {
-				res.DifferentPropertiesCount++
-				res.ColumnDifferences = append(res.ColumnDifferences, colDiff)
-			} else {
-				res.SamePropertiesCount++
-			}
-		} else {
-			// Column from t1 does not exist in t2
-			res.InTable1OnlyCount++
-			res.MissingColumns = append(res.MissingColumns, MissingColumn{
-				ColumnName:  col1.Name,
-				Type:        col1.Type,
-				Nullable:    col1.Nullable,
-				PrimaryKey:  col1.PrimaryKey,
-				Unique:      col1.Unique,
-				TableName:   t1Name,
-				MissingFrom: t2Name,
-			})
+	t.SetRowPainter(func(row table.Row) text.Colors {
+		if len(row) == 0 {
+			return text.Colors{}
 		}
-	}
-
-	// Identify columns that are only in table 2 (extra in t2)
-	for _, col2 := range t2.Columns {
-		if _, foundAndProcessed := processedColsT2[col2.Name]; !foundAndProcessed {
-			res.InTable2OnlyCount++
-			res.MissingColumns = append(res.MissingColumns, MissingColumn{
-				ColumnName:  col2.Name,
-				Type:        col2.Type,
-				Nullable:    col2.Nullable,
-				PrimaryKey:  col2.PrimaryKey,
-				Unique:      col2.Unique,
-				TableName:   t2Name,
-				MissingFrom: t1Name,
-			})
+		if len(row) != 4 {
+			return text.Colors{}
 		}
-	}
 
-	res.HasSchemaDifferences = res.DifferentPropertiesCount > 0 || res.InTable1OnlyCount > 0 || res.InTable2OnlyCount > 0
-	return res
+		diffStr := fmt.Sprintf("%v", row[3])
+		diffVal, _ := strconv.ParseFloat(diffStr, 64)
+		if diffVal != 0 {
+			return text.Colors{text.FgRed}
+		}
+		return text.Colors{text.FgGreen}
+	})
+
+	t.AppendHeader(table.Row{"", table1Name, table2Name, "Diff"})
+	switch stats1.Type() {
+	case "numerical":
+		numStats1 := stats1.(*diff.NumericalStatistics)
+		numStats2 := stats2.(*diff.NumericalStatistics)
+
+		if numStats1.Min != nil && numStats2.Min != nil {
+			t.AppendRow(table.Row{"Min", fmt.Sprintf("%.4g", *numStats1.Min), fmt.Sprintf("%.2g", *numStats2.Min), fmt.Sprintf("%.2g", *numStats1.Min-*numStats2.Min)})
+		}
+		if numStats1.Max != nil && numStats2.Max != nil {
+			t.AppendRow(table.Row{"Max", fmt.Sprintf("%.4g", *numStats1.Max), fmt.Sprintf("%.2g", *numStats2.Max), fmt.Sprintf("%.2g", *numStats1.Max-*numStats2.Max)})
+		}
+		if numStats1.Avg != nil && numStats2.Avg != nil {
+			t.AppendRow(table.Row{"Avg", fmt.Sprintf("%.4g", *numStats1.Avg), fmt.Sprintf("%.2g", *numStats2.Avg), fmt.Sprintf("%.2g", *numStats1.Avg-*numStats2.Avg)})
+		}
+		if numStats1.Sum != nil && numStats2.Sum != nil {
+			t.AppendRow(table.Row{"Sum", fmt.Sprintf("%.4g", *numStats1.Sum), fmt.Sprintf("%.2g", *numStats2.Sum), fmt.Sprintf("%.2g", *numStats1.Sum-*numStats2.Sum)})
+		}
+		t.AppendRow(table.Row{"Count", numStats1.Count, numStats2.Count, numStats1.Count - numStats2.Count})
+		t.AppendRow(table.Row{"Null Count", numStats1.NullCount, numStats2.NullCount, numStats1.NullCount - numStats2.NullCount})
+		if numStats1.StdDev != nil && numStats2.StdDev != nil {
+			t.AppendRow(table.Row{"StdDev", fmt.Sprintf("%.4g", *numStats1.StdDev), fmt.Sprintf("%.2g", *numStats2.StdDev), fmt.Sprintf("%.2g", *numStats1.StdDev-*numStats2.StdDev)})
+		}
+
+	case "string":
+		strStats1 := stats1.(*diff.StringStatistics)
+		strStats2 := stats2.(*diff.StringStatistics)
+		if strStats1 == nil || strStats2 == nil {
+			return ""
+		}
+
+		t.AppendRow(table.Row{"Distinct Count", strStats1.DistinctCount, strStats2.DistinctCount, strStats1.DistinctCount - strStats2.DistinctCount})
+		t.AppendRow(table.Row{"Max Length", strStats1.MaxLength, strStats2.MaxLength, strStats1.MaxLength - strStats2.MaxLength})
+		t.AppendRow(table.Row{"Min Length", strStats1.MinLength, strStats2.MinLength, strStats1.MinLength - strStats2.MinLength})
+		t.AppendRow(table.Row{"Avg Length", fmt.Sprintf("%.4g", strStats1.AvgLength), fmt.Sprintf("%.2g", strStats2.AvgLength), fmt.Sprintf("%.2g", strStats1.AvgLength-strStats2.AvgLength)})
+		t.AppendRow(table.Row{"Null Count", strStats1.NullCount, strStats2.NullCount, strStats1.NullCount - strStats2.NullCount})
+		t.AppendRow(table.Row{"Empty Count", strStats1.EmptyCount, strStats2.EmptyCount, strStats1.EmptyCount - strStats2.EmptyCount})
+
+	case "boolean":
+		boolStats1 := stats1.(*diff.BooleanStatistics)
+		boolStats2 := stats2.(*diff.BooleanStatistics)
+		if boolStats1 == nil || boolStats2 == nil {
+			return ""
+		}
+
+		t.AppendRow(table.Row{"True Count", boolStats1.TrueCount, boolStats2.TrueCount, boolStats1.TrueCount - boolStats2.TrueCount})
+		t.AppendRow(table.Row{"False Count", boolStats1.FalseCount, boolStats2.FalseCount, boolStats1.FalseCount - boolStats2.FalseCount})
+		t.AppendRow(table.Row{"Null Count", boolStats1.NullCount, boolStats2.NullCount, boolStats1.NullCount - boolStats2.NullCount})
+		t.AppendRow(table.Row{"Count", boolStats1.Count, boolStats2.Count, boolStats1.Count - boolStats2.Count})
+
+	case "datetime":
+		dtStats1 := stats1.(*diff.DateTimeStatistics)
+		dtStats2 := stats2.(*diff.DateTimeStatistics)
+		if dtStats1 == nil || dtStats2 == nil {
+			return ""
+		}
+
+		if dtStats1.EarliestDate != nil && dtStats2.EarliestDate != nil {
+			t.AppendRow(table.Row{"Earliest Date", *dtStats1.EarliestDate, *dtStats2.EarliestDate, ""})
+		}
+		if dtStats1.LatestDate != nil && dtStats2.LatestDate != nil {
+			t.AppendRow(table.Row{"Latest Date", *dtStats1.LatestDate, *dtStats2.LatestDate, ""})
+		}
+		t.AppendRow(table.Row{"Count", dtStats1.Count, dtStats2.Count, dtStats1.Count - dtStats2.Count})
+		t.AppendRow(table.Row{"Null Count", dtStats1.NullCount, dtStats2.NullCount, dtStats1.NullCount - dtStats2.NullCount})
+		t.AppendRow(table.Row{"Unique Count", dtStats1.UniqueCount, dtStats2.UniqueCount, dtStats1.UniqueCount - dtStats2.UniqueCount})
+	}
+	return t.Render()
 }
