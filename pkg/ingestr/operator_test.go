@@ -469,12 +469,12 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 				Name:       "asset-name",
 				Connection: "duck",
 				Parameters: map[string]string{
-					"path": "data/{{ var.source_file }}",
+					"path": "{{ var.source_file }}",
 				},
 			},
 			want: []string{
 				"ingest",
-				"--source-uri", "csv://data/staging.csv",
+				"--source-uri", "csv://staging.csv",
 				"--source-table", "seed.raw",
 				"--dest-uri", "duckdb:////some/path",
 				"--dest-table", "asset-name",
