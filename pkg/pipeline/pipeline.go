@@ -269,6 +269,7 @@ const (
 type (
 	MaterializationStrategy        string
 	MaterializationTimeGranularity string
+	ProfilingLevel                 string
 )
 
 const (
@@ -281,6 +282,11 @@ const (
 	MaterializationStrategyDDL              MaterializationStrategy        = "ddl"
 	MaterializationTimeGranularityDate      MaterializationTimeGranularity = "date"
 	MaterializationTimeGranularityTimestamp MaterializationTimeGranularity = "timestamp"
+
+	ProfilingBasic           ProfilingLevel = "basic"
+	ProfilingOff             ProfilingLevel = "off"
+	ProfilingSelectedColumns ProfilingLevel = "selected_columns"
+	ProfilingAllColumns      ProfilingLevel = "all_columns"
 )
 
 var AllAvailableMaterializationStrategies = []MaterializationStrategy{
@@ -478,6 +484,7 @@ type Column struct {
 	Description     string            `json:"description" yaml:"description,omitempty" mapstructure:"description"`
 	PrimaryKey      bool              `json:"primary_key" yaml:"primary_key,omitempty" mapstructure:"primary_key"`
 	UpdateOnMerge   bool              `json:"update_on_merge" yaml:"update_on_merge,omitempty" mapstructure:"update_on_merge"`
+	Profiling       bool              `json:"profiling" yaml:"profiling,omitempty" mapstructure:"profiling"`
 	Extends         string            `json:"-" yaml:"extends,omitempty" mapstructure:"extends"`
 	Checks          []ColumnCheck     `json:"checks" yaml:"checks,omitempty" mapstructure:"checks"`
 	Upstreams       []*UpstreamColumn `json:"upstreams" yaml:"-" mapstructure:"-"`
@@ -631,6 +638,7 @@ type Asset struct { //nolint:recvcheck
 	URI               string             `json:"uri" yaml:"uri,omitempty" mapstructure:"uri"`
 	Name              string             `json:"name" yaml:"name,omitempty" mapstructure:"name"`
 	Type              AssetType          `json:"type" yaml:"type,omitempty" mapstructure:"type"`
+	Profiling         ProfilingLevel     `json:"profiling" yaml:"profiling,omitempty" mapstructure:"profiling"`
 	Description       string             `json:"description" yaml:"description,omitempty" mapstructure:"description"`
 	Connection        string             `json:"connection" yaml:"connection,omitempty" mapstructure:"connection"`
 	Tags              EmptyStringArray   `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
