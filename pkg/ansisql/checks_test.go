@@ -2,6 +2,7 @@ package ansisql
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -296,6 +297,77 @@ func TestCustomCheck(t *testing.T) {
 				Check: &pipeline.CustomCheck{
 					Name:  "check1",
 					Value: 5,
+					Query: checkQuery,
+				},
+			}
+
+			tt.wantErr(t, n.Check(context.Background(), testInstance))
+			defer q.AssertExpectations(t)
+		})
+	}
+}
+
+func TestCustomCheckCount(t *testing.T) {
+	t.Parallel()
+
+	checkQuery := "SELECT {{ 1+2 }}"
+	rendered := "SELECT 3"
+	wrappedQuery := &query.Query{Query: fmt.Sprintf("SELECT count(*) FROM (%s) AS t", rendered)}
+
+	setupFunc := func(val [][]interface{}, err error) func(n *mockQuerierWithResult) {
+		return func(q *mockQuerierWithResult) {
+			q.On("Select", mock.Anything, wrappedQuery).
+				Return(val, err).
+				Once()
+		}
+	}
+
+	countVal := int64(5)
+
+	tests := []struct {
+		name    string
+		setup   func(n *mockQuerierWithResult)
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name:    "wrong count returned",
+			setup:   setupFunc([][]interface{}{{int64(3)}}, nil),
+			wantErr: assert.Error,
+		},
+		{
+			name:    "count matches",
+			setup:   setupFunc([][]interface{}{{countVal}}, nil),
+			wantErr: assert.NoError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			q := new(mockQuerierWithResult)
+			tt.setup(q)
+
+			conn := new(mockConnectionFetcher)
+			conn.On("GetConnection", "test").Return(q, nil)
+			n := &CustomCheck{conn: conn, renderer: jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")}
+
+			testInstance := &scheduler.CustomCheckInstance{
+				AssetInstance: &scheduler.AssetInstance{
+					Asset: &pipeline.Asset{
+						Name: "dataset.test_asset",
+						Type: pipeline.AssetTypeBigqueryQuery,
+					},
+					Pipeline: &pipeline.Pipeline{
+						Name: "test",
+						DefaultConnections: map[string]string{
+							"google_cloud_platform": "test",
+						},
+					},
+				},
+				Check: &pipeline.CustomCheck{
+					Name:  "check1",
+					Count: &countVal,
 					Query: checkQuery,
 				},
 			}

@@ -415,16 +415,39 @@
         ]
       }
     },
-    "env-validate-with-exclude-tag": {
+
+    "env-custom-check-count-false": {
       "schema_prefix": "",
       "connections": {
         "duckdb": [
           {
-            "name": "duckdb-validate-with-exclude-tag",
-            "path": "integration-tests/duckdb-files/validate-with-exclude-tag.db"
+            "name": "duckdb-custom-check-count-false",
+            "path": "integration-tests/duckdb-files/duckdb-custom-check-count-false.db"
           }
         ]
       }
-    }
+    },
+    "env-custom-check-count-true": {
+      "schema_prefix": "",
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-custom-check-count-true",
+            "path": "integration-tests/duckdb-files/duckdb-custom-check-count-true.db"
+          }
+        ]
+      }
+    },
+    "env-validate-with-exclude-tag": {
+        "schema_prefix": "",
+        "connections": {
+          "duckdb": [
+            {
+              "name": "duckdb-validate-with-exclude-tag",
+              "path": "integration-tests/duckdb-files/validate-with-exclude-tag.db"
+            }
+          ]
+        }
+      }
   }
 }

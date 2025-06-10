@@ -201,3 +201,16 @@ environments:
       duckdb:
         - name: "duckdb-validate-with-exclude-tag"
           path: "duckdb-files/validate-with-exclude-tag.db"
+
+  env-custom-check-count-false:
+    connections:
+      duckdb:
+        - name: "duckdb-custom-check-count-false"
+          path: "duckdb-files/duckdb-custom-check-count-false.db"
+
+  env-custom-check-count-true:
+    connections:
+      duckdb:
+        - name: "duckdb-custom-check-count-true"
+          path: "duckdb-files/duckdb-custom-check-count-true.db"
+
