@@ -1,0 +1,5 @@
+name: validate-with-exclude-tag
+
+default_connections:
+  duckdb: "duckdb-validate-with-exclude-tag"
+
