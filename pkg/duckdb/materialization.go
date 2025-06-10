@@ -53,35 +53,32 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 	if len(primaryKeyColumns) == 0 {
 		return "", fmt.Errorf("PrimaryKey is required for merge strategy, but no column was marked as PrimaryKey in asset '%s'", asset.Name)
 	}
-	primaryKeyColumnsString := strings.Join(primaryKeyColumns, ", ")
 
 	// Trim trailing semicolons from the input query to prevent SQL syntax errors
 	trimmedQuery := strings.TrimSuffix(query, ";")
 
-	// Construct join conditions
-	var joinConditions []string
-	for _, pkCol := range primaryKeyColumns {
-		joinConditions = append(joinConditions, fmt.Sprintf("dt.%s = src.%s", pkCol, pkCol))
-	}
-	joinConditionsString := strings.Join(joinConditions, " AND ")
+	// Create PK list for USING clause
+	pkListForUsing := strings.Join(primaryKeyColumns, ",")
 
 	// Select the first PK column for the NULL check
-	firstPkColumn := primaryKeyColumns[0]
+	firstPkColName := primaryKeyColumns[0]
 
-	// Construct the SQL query using LEFT JOIN ... IS NULL pattern
-	return fmt.Sprintf(`CREATE OR REPLACE TABLE %s AS
-SELECT * FROM ( %s ) AS src_all
+	// Construct the SQL query using CTE and USING clause
+	return fmt.Sprintf(`WITH source_data AS (
+  %s
+)
+CREATE OR REPLACE TABLE %s AS
+SELECT * FROM source_data
 UNION ALL
 SELECT dt.*
 FROM %s dt
-LEFT JOIN ( %s ) src ON %s
-WHERE src.%s IS NULL`,
-		asset.Name,           // 1. destination_table (CREATE OR REPLACE)
-		trimmedQuery,         // 2. source_query (for first part of UNION ALL, as src_all)
-		asset.Name,           // 3. destination_table (aliased as dt)
-		trimmedQuery,         // 4. source_query (for LEFT JOIN, as src)
-		joinConditionsString, // 5. join_conditions
-		firstPkColumn,        // 6. first_pk_col for WHERE src.{{first_pk_col}} IS NULL
+LEFT JOIN source_data USING(%s)
+WHERE source_data.%s IS NULL`,
+		trimmedQuery,   // 1. User's original query (source_data CTE)
+		asset.Name,     // 2. destination_table (CREATE OR REPLACE)
+		asset.Name,     // 3. destination_table (aliased as dt)
+		pkListForUsing, // 4. pk_list_for_using
+		firstPkColName, // 5. first_pk_col_name for WHERE source_data.{{first_pk_col_name}} IS NULL
 	), nil
 }
 

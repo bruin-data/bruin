@@ -180,7 +180,48 @@ COMMIT;`,
 				},
 			},
 			query:   "SELECT 1 as id, 'abc' as name",
-			wantErr: true,
+			wantErr: false,
+			// Note: The source query inside the CTE is indented by two spaces.
+			// The regex handles potential variations in line breaks and spacing around the query itself.
+			want: `^WITH source_data AS \(
+  SELECT 1 as id, 'abc' as name
+\)
+CREATE OR REPLACE TABLE my.asset AS
+SELECT \* FROM source_data
+UNION ALL
+SELECT dt.\*
+FROM my.asset dt
+LEFT JOIN source_data USING\(id\)
+WHERE source_data.id IS NULL$`,
+		},
+		{
+			name: "merge_with_composite_primary_keys",
+			task: &pipeline.Asset{
+				Name: "my_composite_asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "key_col1", Type: "VARCHAR", PrimaryKey: true},
+					{Name: "key_col2", Type: "INTEGER", PrimaryKey: true},
+					{Name: "data_col", Type: "VARCHAR"},
+				},
+			},
+			query: "SELECT 'val1' AS key_col1, 123 AS key_col2, 'some_data' AS data_col FROM source_table",
+			fullRefresh: false,
+			// Note: The source query inside the CTE is indented by two spaces.
+			want: `^WITH source_data AS \(
+  SELECT 'val1' AS key_col1, 123 AS key_col2, 'some_data' AS data_col FROM source_table
+\)
+CREATE OR REPLACE TABLE my_composite_asset AS
+SELECT \* FROM source_data
+UNION ALL
+SELECT dt.\*
+FROM my_composite_asset dt
+LEFT JOIN source_data USING\(key_col1,key_col2\)
+WHERE source_data.key_col1 IS NULL$`,
+			wantErr: false,
 		},
 		{
 			name: "time_interval_no_incremental_key",
@@ -272,13 +313,16 @@ func TestBuildMergeQuery(t *testing.T) {
 				},
 			},
 			sourceQuery: "SELECT id, value FROM source_table",
-			wantSQL: `CREATE OR REPLACE TABLE test_table_single_pk AS
-SELECT * FROM ( SELECT id, value FROM source_table ) AS src_all
+			wantSQL: `WITH source_data AS (
+  SELECT id, value FROM source_table
+)
+CREATE OR REPLACE TABLE test_table_single_pk AS
+SELECT * FROM source_data
 UNION ALL
 SELECT dt.*
 FROM test_table_single_pk dt
-LEFT JOIN ( SELECT id, value FROM source_table ) src ON dt.id = src.id
-WHERE src.id IS NULL`,
+LEFT JOIN source_data USING(id)
+WHERE source_data.id IS NULL`,
 		},
 		{
 			name: "Composite Primary Key",
@@ -295,13 +339,16 @@ WHERE src.id IS NULL`,
 				},
 			},
 			sourceQuery: "SELECT key_part1, key_part2, data FROM another_source",
-			wantSQL: `CREATE OR REPLACE TABLE test_table_composite_pk AS
-SELECT * FROM ( SELECT key_part1, key_part2, data FROM another_source ) AS src_all
+			wantSQL: `WITH source_data AS (
+  SELECT key_part1, key_part2, data FROM another_source
+)
+CREATE OR REPLACE TABLE test_table_composite_pk AS
+SELECT * FROM source_data
 UNION ALL
 SELECT dt.*
 FROM test_table_composite_pk dt
-LEFT JOIN ( SELECT key_part1, key_part2, data FROM another_source ) src ON dt.key_part1 = src.key_part1 AND dt.key_part2 = src.key_part2
-WHERE src.key_part1 IS NULL`,
+LEFT JOIN source_data USING(key_part1,key_part2)
+WHERE source_data.key_part1 IS NULL`,
 		},
 		{
 			name: "No Primary Key",
@@ -333,13 +380,16 @@ WHERE src.key_part1 IS NULL`,
 				},
 			},
 			sourceQuery: "SELECT id, value FROM source_semicolon;",
-			wantSQL: `CREATE OR REPLACE TABLE test_table_semicolon_query AS
-SELECT * FROM ( SELECT id, value FROM source_semicolon ) AS src_all
+			wantSQL: `WITH source_data AS (
+  SELECT id, value FROM source_semicolon
+)
+CREATE OR REPLACE TABLE test_table_semicolon_query AS
+SELECT * FROM source_data
 UNION ALL
 SELECT dt.*
 FROM test_table_semicolon_query dt
-LEFT JOIN ( SELECT id, value FROM source_semicolon ) src ON dt.id = src.id
-WHERE src.id IS NULL`,
+LEFT JOIN source_data USING(id)
+WHERE source_data.id IS NULL`,
 		},
 	}
 
