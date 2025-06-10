@@ -9,7 +9,11 @@ import (
 )
 
 func TestGetLineageForRunner(t *testing.T) {
+	t.Parallel()
+
 	lineage, err := NewSQLParser(true)
+	defer lineage.Close()
+
 	require.NoError(t, err)
 	require.NoError(t, lineage.Start())
 
@@ -620,8 +624,6 @@ GROUP BY 1`,
 	t.Run("blocking group", func(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
-
 				got, err := lineage.ColumnLineage(tt.sql, tt.dialect, tt.schema)
 				if tt.wantErr {
 					require.Error(t, err)
@@ -637,7 +639,11 @@ GROUP BY 1`,
 }
 
 func TestSqlParser_GetTables(t *testing.T) {
+	t.Parallel()
+
 	s, err := NewSQLParser(true)
+	defer s.Close()
+
 	require.NoError(t, err)
 
 	err = s.Start()
@@ -760,8 +766,6 @@ COMMIT;`,
 	t.Run("blocking group", func(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
-
 				got, err := s.UsedTables(tt.sql, "bigquery")
 				if tt.wantErr {
 					require.Error(t, err)
@@ -780,7 +784,10 @@ COMMIT;`,
 }
 
 func TestSqlParser_RenameTables(t *testing.T) {
+	t.Parallel()
+
 	s, err := NewSQLParser(true)
+	defer s.Close()
 	require.NoError(t, err)
 
 	err = s.Start()
@@ -834,6 +841,8 @@ func TestSqlParser_RenameTables(t *testing.T) {
 }
 
 func TestSqlParser_AddLimit(t *testing.T) { //nolint
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		query    string
@@ -879,19 +888,16 @@ func TestSqlParser_AddLimit(t *testing.T) { //nolint
 		},
 	}
 
+	parser, err := NewSQLParser(true)
+	require.NoError(t, err)
+
+	err = parser.Start()
+	require.NoError(t, err)
+	defer parser.Close()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			s, err := NewSQLParser(true)
-			require.NoError(t, err)
-			defer func() {
-				s.Close()
-			}()
-
-			err = s.Start()
-			require.NoError(t, err)
-
-			got, err := s.AddLimit(tt.query, tt.limit, tt.dialect)
+			got, err := parser.AddLimit(tt.query, tt.limit, tt.dialect)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -1013,19 +1019,16 @@ func TestGetMissingDependenciesForAsset(t *testing.T) {
 		},
 	}
 
+	parser, err := NewSQLParser(true)
+	require.NoError(t, err)
+	defer parser.Close()
+
+	err = parser.Start()
+	require.NoError(t, err)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			s, err := NewSQLParser(true)
-			require.NoError(t, err)
-			defer func() {
-				s.Close()
-			}()
-
-			err = s.Start()
-			require.NoError(t, err)
-
-			got, err := s.GetMissingDependenciesForAsset(tt.asset, tt.pipeline, jinja.NewRendererWithYesterday("test", "test"))
+			got, err := parser.GetMissingDependenciesForAsset(tt.asset, tt.pipeline, jinja.NewRendererWithYesterday("test", "test"))
 			if tt.expectedError {
 				require.Error(t, err)
 			} else {
