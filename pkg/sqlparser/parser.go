@@ -256,7 +256,7 @@ func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
 
 func (s *SQLParser) Close() error {
 	if s.stdin != nil {
-		s.sendCommand(&parserCommand{
+		s.sendCommand(&parserCommand{ //nolint
 			Command: "exit",
 		})
 		_ = s.stdin.Close()
