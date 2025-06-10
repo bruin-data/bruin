@@ -27,6 +27,7 @@ type SQLParser struct {
 	ep          *python.EmbeddedPython
 	sqlglotDir  *embed_util.EmbeddedFiles
 	rendererSrc *embed_util.EmbeddedFiles
+	tmpDir      string
 	started     bool
 
 	stdout io.ReadCloser
@@ -68,6 +69,7 @@ func NewSQLParser(randomize bool) (*SQLParser, error) {
 		ep:          ep,
 		sqlglotDir:  sqlglotDir,
 		rendererSrc: rendererSrc,
+		tmpDir:      tmpDir,
 	}, nil
 }
 
@@ -254,13 +256,9 @@ func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
 
 func (s *SQLParser) Close() error {
 	if s.stdin != nil {
-		_, err := s.sendCommand(&parserCommand{
+		s.sendCommand(&parserCommand{
 			Command: "exit",
 		})
-		if err != nil {
-			return errors.Wrap(err, "failed to send exit command")
-		}
-
 		_ = s.stdin.Close()
 		s.stdin = nil
 	}
@@ -281,9 +279,13 @@ func (s *SQLParser) Close() error {
 		s.cmd = nil
 	}
 
-	_ = s.rendererSrc.Cleanup()
-	_ = s.sqlglotDir.Cleanup()
-	_ = s.ep.Cleanup()
+	files, err := filepath.Glob(s.tmpDir + "*")
+	if err != nil {
+		return fmt.Errorf("failed to get temp files: %w", err)
+	}
+	for _, file := range files {
+		os.RemoveAll(file)
+	}
 
 	return nil
 }
