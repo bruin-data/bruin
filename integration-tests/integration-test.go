@@ -896,6 +896,20 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
+			Name:    "validate-with-exclude-tags",
+			Command: binary,
+			Args:    []string{"validate", "--exclude-tag", "exclude", filepath.Join(currentFolder, "test-pipelines/validate-with-exclude-tag")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{" Successfully validated 2 assets across 1 pipeline, all good."},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
 			Name:    "run-use-uv",
 			Command: binary,
 			Args:    []string{"run", "--env", "env-run-use-uv", "--use-uv", filepath.Join(currentFolder, "test-pipelines/run-use-uv-pipeline")},

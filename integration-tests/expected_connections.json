@@ -414,6 +414,17 @@
           }
         ]
       }
+    },
+    "env-validate-with-exclude-tag": {
+      "schema_prefix": "",
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-validate-with-exclude-tag",
+            "path": "integration-tests/duckdb-files/validate-with-exclude-tag.db"
+          }
+        ]
+      }
     }
   }
 }
