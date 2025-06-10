@@ -195,3 +195,9 @@ environments:
       duckdb:
         - name: "duckdb-ddl"
           path: "duckdb-files/duckdb-ddl.db"
+
+  env-validate-with-exclude-tag:
+    connections:
+      duckdb:
+        - name: "duckdb-validate-with-exclude-tag"
+          path: "duckdb-files/validate-with-exclude-tag.db"

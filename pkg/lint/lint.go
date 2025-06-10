@@ -97,16 +97,36 @@ func NewLinter(findPipelines pipelineFinder, builder pipelineBuilder, rules []Ru
 func (l *Linter) Lint(rootPath string, pipelineDefinitionFileName []string, c *cli.Context) (*PipelineAnalysisResult, error) {
 	pipelines, err := l.extractPipelinesFromPath(rootPath, pipelineDefinitionFileName)
 
-	assetStats := make(map[string]int)
-	for _, pipeline := range pipelines {
-		for _, asset := range pipeline.Assets {
-			_, ok := assetStats[string(asset.Type)]
-			if !ok {
-				assetStats[string(asset.Type)] = 0
-			}
-			assetStats[string(asset.Type)]++
-		}
+	excludeTag := ""
+	if c != nil {
+		excludeTag = c.String("exclude-tag")
 	}
+	assetStats := make(map[string]int)
+
+	for _, p := range pipelines {
+		filtered := make([]*pipeline.Asset, 0, len(p.Assets))
+		for _, a := range p.Assets {
+			skip := false
+			if excludeTag != "" {
+				for _, tag := range a.Tags {
+					if tag == excludeTag {
+						skip = true
+						break
+					}
+				}
+			}
+			if !skip {
+				filtered = append(filtered, a)
+				_, ok := assetStats[string(a.Type)]
+				if !ok {
+					assetStats[string(a.Type)] = 0
+				}
+				assetStats[string(a.Type)]++
+			}
+		}
+		p.Assets = filtered
+	}
+
 	telemetry.SendEventWithAssetStats("validate_assets", assetStats, c)
 
 	if err != nil {
