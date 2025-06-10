@@ -15,7 +15,7 @@ type repoFinder interface {
 	Repo(path string) (*git.Repo, error)
 }
 
-func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlparser.SQLParser, cacheFoundGlossary bool, connectionManager connectionManager) ([]Rule, error) {
+func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlparser.SQLParser, cacheFoundGlossary bool) ([]Rule, error) {
 	gr := GlossaryChecker{
 		gr: &glossary.GlossaryReader{
 			RepoFinder: finder,
@@ -197,13 +197,6 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			Validator:        ValidateVariables,
 			ApplicableLevels: []Level{LevelPipeline},
 		},
-		&SimpleRule{
-			Identifier:       "custom-check-query-dry-run",
-			Fast:             false,
-			Severity:         ValidatorSeverityCritical,
-			AssetValidator:   ValidateCustomCheckQueryDryRun(connectionManager),
-			ApplicableLevels: []Level{LevelAsset},
-		},
 	}
 
 	if parser != nil {
@@ -222,6 +215,15 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 	return rules, nil
 }
 
+func GetCustomCheckQueryDryRunRule(connectionManager connectionManager) *SimpleRule { 
+	return &SimpleRule{
+		Identifier:       "custom-check-query-dry-run",
+		Fast:             false,
+		Severity:         ValidatorSeverityCritical,
+		AssetValidator:   ValidateCustomCheckQueryDryRun(connectionManager),
+		ApplicableLevels: []Level{LevelAsset},
+	}
+}
 func FilterRulesByLevel(rules []Rule, level Level) []Rule {
 	filtered := make([]Rule, 0, len(rules))
 	for _, rule := range rules {
