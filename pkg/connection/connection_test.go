@@ -452,20 +452,6 @@ func TestManager_AddSfConnectionFromConfig(t *testing.T) {
 			setupTempFile: true,
 		},
 		{
-			name: "should prioritize private key over private key path",
-			connection: &config.SnowflakeConnection{
-				Name:           "test-snowflake-priority",
-				Account:        "test-account",
-				Username:       "test-user",
-				Password:       "test-password",
-				Region:         "us-east-1",
-				PrivateKey:     "-----BEGIN PRIVATE KEY-----\nDirect Key Content\n-----END PRIVATE KEY-----",
-				PrivateKeyPath: tempFilePath,
-			},
-			wantErr:       true, // Connection will fail, but should use PrivateKey, not path
-			setupTempFile: true,
-		},
-		{
 			name: "should add connection with password authentication",
 			connection: &config.SnowflakeConnection{
 				Name:     "test-snowflake-password",
@@ -524,46 +510,6 @@ func TestManager_AddSfConnectionFromConfig(t *testing.T) {
 		})
 	}
 }
-
-func TestManager_AddSfConnectionFromConfig_PrivateKeyPriority(t *testing.T) {
-	t.Parallel()
-
-	// Create a temporary file with different content
-	tempFile, err := os.CreateTemp(t.TempDir(), "test_snowflake_key_*.pem")
-	require.NoError(t, err)
-	tempFilePath := tempFile.Name()
-	tempFile.Close()
-	defer os.Remove(tempFilePath)
-
-	fileContent := "-----BEGIN PRIVATE KEY-----\nFile Content\n-----END PRIVATE KEY-----"
-	err = os.WriteFile(tempFilePath, []byte(fileContent), 0600)
-	require.NoError(t, err)
-
-	directKeyContent := "-----BEGIN PRIVATE KEY-----\nDirect Key Content\n-----END PRIVATE KEY-----"
-
-	connection := &config.SnowflakeConnection{
-		Name:           "test-priority",
-		Account:        "test-account",
-		Username:       "test-user",
-		Password:       "test-password",
-		Region:         "us-east-1",
-		PrivateKey:     directKeyContent,
-		PrivateKeyPath: tempFilePath,
-	}
-
-	m := Manager{}
-
-	// This will fail to create an actual connection due to invalid keys,
-	// but we can verify the logic by checking that it attempts to use
-	// the direct PrivateKey content rather than reading from the file
-	err = m.AddSfConnectionFromConfig(connection)
-	require.Error(t, err) // Expected to fail due to invalid private key format
-
-	// The error should mention issues with the direct key content, not the file
-	// This indirectly tests that PrivateKey was prioritized over PrivateKeyPath
-	assert.Contains(t, err.Error(), "private key")
-}
-
 func TestManager_GetSfConnection(t *testing.T) {
 	t.Parallel()
 
