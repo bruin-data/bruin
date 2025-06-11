@@ -258,6 +258,9 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 				require.NoError(t, err)
 			}
 
+			if got != nil {
+				got.ExecutableFile.Content = strings.ReplaceAll(got.ExecutableFile.Content, "\r\n", "\n")
+			}
 			require.Equal(t, tt.want, got)
 		})
 	}
