@@ -166,25 +166,28 @@ func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Ass
 	return c.schemaCreator.CreateSchemaIfNotExist(ctx, c, asset)
 }
 
-func (c *Client) GetTableSummary(ctx context.Context, tableName string) (*diff.TableSummaryResult, error) {
-	// Get row count
-	countQuery := "SELECT COUNT(*) as row_count FROM " + tableName
-	rows, err := c.connection.QueryContext(ctx, countQuery)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute count query for table '%s': %w", tableName, err)
-	}
-	// It's important to close rows, but deferring here might be too early if schemaRows.Close() fails later.
-	// We will close it explicitly after use.
-
+func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOnly bool) (*diff.TableSummaryResult, error) {
 	var rowCount int64
-	defer rows.Close()
-	if rows.Next() {
-		if err := rows.Scan(&rowCount); err != nil {
-			return nil, fmt.Errorf("failed to scan row count for table '%s': %w", tableName, err)
+	
+	// Get row count only if not in schema-only mode
+	if !schemaOnly {
+		countQuery := "SELECT COUNT(*) as row_count FROM " + tableName
+		rows, err := c.connection.QueryContext(ctx, countQuery)
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute count query for table '%s': %w", tableName, err)
 		}
-	}
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error after iterating rows for count query on table '%s': %w", tableName, err)
+		// It's important to close rows, but deferring here might be too early if schemaRows.Close() fails later.
+		// We will close it explicitly after use.
+
+		defer rows.Close()
+		if rows.Next() {
+			if err := rows.Scan(&rowCount); err != nil {
+				return nil, fmt.Errorf("failed to scan row count for table '%s': %w", tableName, err)
+			}
+		}
+		if err = rows.Err(); err != nil {
+			return nil, fmt.Errorf("error after iterating rows for count query on table '%s': %w", tableName, err)
+		}
 	}
 
 	// Get table schema using PRAGMA table_info
@@ -213,34 +216,39 @@ func (c *Client) GetTableSummary(ctx context.Context, tableName string) (*diff.T
 		normalizedType := c.typeMapper.MapType(colType)
 
 		var stats diff.ColumnStatistics
-		switch normalizedType {
-		case diff.CommonTypeNumeric:
-			stats, err = c.fetchNumericalStats(ctx, tableName, name)
-			if err != nil {
-				return nil, fmt.Errorf("failed to fetch numerical stats for column '%s': %w", name, err)
+		if schemaOnly {
+			// In schema-only mode, don't collect statistics
+			stats = nil
+		} else {
+			switch normalizedType {
+			case diff.CommonTypeNumeric:
+				stats, err = c.fetchNumericalStats(ctx, tableName, name)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch numerical stats for column '%s': %w", name, err)
+				}
+			case diff.CommonTypeString:
+				stats, err = c.fetchStringStats(ctx, tableName, name)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch string stats for column '%s': %w", name, err)
+				}
+			case diff.CommonTypeBoolean:
+				stats, err = c.fetchBooleanStats(ctx, tableName, name)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch boolean stats for column '%s': %w", name, err)
+				}
+			case diff.CommonTypeDateTime:
+				stats, err = c.fetchDateTimeStats(ctx, tableName, name)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch datetime stats for column '%s': %w", name, err)
+				}
+			case diff.CommonTypeJSON:
+				stats, err = c.fetchJSONStats(ctx, tableName, name)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch JSON stats for column '%s': %w", name, err)
+				}
+			case diff.CommonTypeBinary, diff.CommonTypeUnknown:
+				stats = &diff.UnknownStatistics{}
 			}
-		case diff.CommonTypeString:
-			stats, err = c.fetchStringStats(ctx, tableName, name)
-			if err != nil {
-				return nil, fmt.Errorf("failed to fetch string stats for column '%s': %w", name, err)
-			}
-		case diff.CommonTypeBoolean:
-			stats, err = c.fetchBooleanStats(ctx, tableName, name)
-			if err != nil {
-				return nil, fmt.Errorf("failed to fetch boolean stats for column '%s': %w", name, err)
-			}
-		case diff.CommonTypeDateTime:
-			stats, err = c.fetchDateTimeStats(ctx, tableName, name)
-			if err != nil {
-				return nil, fmt.Errorf("failed to fetch datetime stats for column '%s': %w", name, err)
-			}
-		case diff.CommonTypeJSON:
-			stats, err = c.fetchJSONStats(ctx, tableName, name)
-			if err != nil {
-				return nil, fmt.Errorf("failed to fetch JSON stats for column '%s': %w", name, err)
-			}
-		case diff.CommonTypeBinary, diff.CommonTypeUnknown:
-			stats = &diff.UnknownStatistics{}
 		}
 
 		columns = append(columns, &diff.Column{

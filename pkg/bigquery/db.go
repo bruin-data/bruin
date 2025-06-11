@@ -483,20 +483,23 @@ func (d *Client) BuildTableExistsQuery(tableName string) (string, error) {
 	return strings.TrimSpace(query), nil
 }
 
-func (d *Client) GetTableSummary(ctx context.Context, tableName string) (*diff.TableSummaryResult, error) {
-	// Get row count
-	countQuery := fmt.Sprintf("SELECT COUNT(*) as row_count FROM `%s`", tableName)
-	countResult, err := d.Select(ctx, &query.Query{Query: countQuery})
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute count query for table '%s': %w", tableName, err)
-	}
-
+func (d *Client) GetTableSummary(ctx context.Context, tableName string, schemaOnly bool) (*diff.TableSummaryResult, error) {
 	var rowCount int64
-	if len(countResult) > 0 && len(countResult[0]) > 0 {
-		if val, ok := countResult[0][0].(int64); ok {
-			rowCount = val
-		} else {
-			return nil, fmt.Errorf("unexpected row count type for table '%s'", tableName)
+	
+	// Get row count only if not in schema-only mode
+	if !schemaOnly {
+		countQuery := fmt.Sprintf("SELECT COUNT(*) as row_count FROM `%s`", tableName)
+		countResult, err := d.Select(ctx, &query.Query{Query: countQuery})
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute count query for table '%s': %w", tableName, err)
+		}
+
+		if len(countResult) > 0 && len(countResult[0]) > 0 {
+			if val, ok := countResult[0][0].(int64); ok {
+				rowCount = val
+			} else {
+				return nil, fmt.Errorf("unexpected row count type for table '%s'", tableName)
+			}
 		}
 	}
 
@@ -571,35 +574,40 @@ func (d *Client) GetTableSummary(ctx context.Context, tableName string) (*diff.T
 
 		// Collect statistics for this column
 		var stats diff.ColumnStatistics
-		switch normalizedType {
-		case diff.CommonTypeNumeric:
-			stats, err = d.fetchNumericalStats(ctx, tableName, columnName)
-			if err != nil {
-				return nil, fmt.Errorf("failed to fetch numerical stats for column '%s' (BigQuery type: %s, normalized: %s): %w", columnName, dataType, normalizedType, err)
+		if schemaOnly {
+			// In schema-only mode, don't collect statistics
+			stats = nil
+		} else {
+			switch normalizedType {
+			case diff.CommonTypeNumeric:
+				stats, err = d.fetchNumericalStats(ctx, tableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch numerical stats for column '%s' (BigQuery type: %s, normalized: %s): %w", columnName, dataType, normalizedType, err)
+				}
+			case diff.CommonTypeString:
+				stats, err = d.fetchStringStats(ctx, tableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch string stats for column '%s' (BigQuery type: %s, normalized: %s): %w", columnName, dataType, normalizedType, err)
+				}
+			case diff.CommonTypeBoolean:
+				stats, err = d.fetchBooleanStats(ctx, tableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch boolean stats for column '%s' (BigQuery type: %s, normalized: %s): %w", columnName, dataType, normalizedType, err)
+				}
+			case diff.CommonTypeDateTime:
+				stats, err = d.fetchDateTimeStats(ctx, tableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch datetime stats for column '%s' (BigQuery type: %s, normalized: %s): %w", columnName, dataType, normalizedType, err)
+				}
+			case diff.CommonTypeJSON:
+				stats, err = d.fetchJSONStats(ctx, tableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch JSON stats for column '%s' (BigQuery type: %s, normalized: %s): %w", columnName, dataType, normalizedType, err)
+				}
+			case diff.CommonTypeBinary, diff.CommonTypeUnknown:
+				fmt.Printf("Warning: Using unknown statistics for column '%s' with BigQuery type '%s'\n", columnName, dataType)
+				stats = &diff.UnknownStatistics{}
 			}
-		case diff.CommonTypeString:
-			stats, err = d.fetchStringStats(ctx, tableName, columnName)
-			if err != nil {
-				return nil, fmt.Errorf("failed to fetch string stats for column '%s' (BigQuery type: %s, normalized: %s): %w", columnName, dataType, normalizedType, err)
-			}
-		case diff.CommonTypeBoolean:
-			stats, err = d.fetchBooleanStats(ctx, tableName, columnName)
-			if err != nil {
-				return nil, fmt.Errorf("failed to fetch boolean stats for column '%s' (BigQuery type: %s, normalized: %s): %w", columnName, dataType, normalizedType, err)
-			}
-		case diff.CommonTypeDateTime:
-			stats, err = d.fetchDateTimeStats(ctx, tableName, columnName)
-			if err != nil {
-				return nil, fmt.Errorf("failed to fetch datetime stats for column '%s' (BigQuery type: %s, normalized: %s): %w", columnName, dataType, normalizedType, err)
-			}
-		case diff.CommonTypeJSON:
-			stats, err = d.fetchJSONStats(ctx, tableName, columnName)
-			if err != nil {
-				return nil, fmt.Errorf("failed to fetch JSON stats for column '%s' (BigQuery type: %s, normalized: %s): %w", columnName, dataType, normalizedType, err)
-			}
-		case diff.CommonTypeBinary, diff.CommonTypeUnknown:
-			fmt.Printf("Warning: Using unknown statistics for column '%s' with BigQuery type '%s'\n", columnName, dataType)
-			stats = &diff.UnknownStatistics{}
 		}
 
 		columns = append(columns, &diff.Column{

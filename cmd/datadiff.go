@@ -38,17 +38,17 @@ func parseTableIdentifier(identifier string, defaultConnection string) (string, 
 	return "", "", errors.New("connection not specified for table and no default connection is available")
 }
 
-func compareTables(ctx context.Context, summarizer1, summarizer2 diff.TableSummarizer, table1, table2 string) (*diff.SchemaComparisonResult, error) {
+func compareTables(ctx context.Context, summarizer1, summarizer2 diff.TableSummarizer, table1, table2 string, schemaOnly bool) (*diff.SchemaComparisonResult, error) {
 	var summary1, summary2 *diff.TableSummaryResult
 	var err1, err2 error
 	var wg conc.WaitGroup
 
 	wg.Go(func() {
-		summary1, err1 = summarizer1.GetTableSummary(ctx, table1)
+		summary1, err1 = summarizer1.GetTableSummary(ctx, table1, schemaOnly)
 	})
 
 	wg.Go(func() {
-		summary2, err2 = summarizer2.GetTableSummary(ctx, table2)
+		summary2, err2 = summarizer2.GetTableSummary(ctx, table2, schemaOnly)
 	})
 
 	wg.Wait()
@@ -70,6 +70,7 @@ func DataDiffCmd() *cli.Command {
 	// configFilePath is added to allow overriding the default .bruin.yml path, similar to other commands
 	var configFilePath string
 	var tolerance float64
+	var schemaOnly bool
 
 	return &cli.Command{
 		Name:    "data-diff",
@@ -95,6 +96,11 @@ func DataDiffCmd() *cli.Command {
 				Usage:       "Tolerance percentage for considering values equal (default: 0.001%). Values with percentage difference below this threshold are considered equal.",
 				Destination: &tolerance,
 				Value:       0.001,
+			},
+			&cli.BoolFlag{
+				Name:        "schema-only",
+				Usage:       "Compare only table schemas without analyzing row counts or column distributions",
+				Destination: &schemaOnly,
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -164,14 +170,14 @@ func DataDiffCmd() *cli.Command {
 				return fmt.Errorf("connection type %T for '%s' does not support table summarization", conn2, conn2Name)
 			}
 
-			schemaComparison, err := compareTables(ctx, s1, s2, table1Name, table2Name)
+			schemaComparison, err := compareTables(ctx, s1, s2, table1Name, table2Name, schemaOnly)
 			if err != nil {
 				errorPrinter.Printf("error comparing tables '%s' and '%s':\n\n%v", table1Identifier, table2Identifier, err)
 				return cli.Exit("", 1)
 			}
 
 			if schemaComparison != nil {
-				printSchemaComparisonOutput(*schemaComparison, table1Identifier, table2Identifier, tolerance, c.App.Writer)
+				printSchemaComparisonOutput(*schemaComparison, table1Identifier, table2Identifier, tolerance, schemaOnly, c.App.Writer)
 			} else {
 				fmt.Fprintf(c.App.ErrWriter, "\nUnable to compare summaries - the comparison result is nil\n")
 				return errors.New("failed to compare table summaries due to missing data")
@@ -182,7 +188,7 @@ func DataDiffCmd() *cli.Command {
 	}
 }
 
-func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, table1Name, table2Name string, tolerance float64, errOut io.Writer) {
+func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, table1Name, table2Name string, tolerance float64, schemaOnly bool, errOut io.Writer) {
 	fmt.Fprint(errOut, schemaComparison.GetSummaryTable()+"\n")
 
 	// Print column types comparison table
@@ -205,71 +211,46 @@ func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, t
 	}
 
 	if schemaComparison.HasSchemaDifferences {
-		summaryPoints := []string{}
-		if schemaComparison.SamePropertiesCount > 0 {
-			summaryPoints = append(summaryPoints, fmt.Sprintf("%d columns have matching schemas", schemaComparison.SamePropertiesCount))
-		}
-		if schemaComparison.DifferentPropertiesCount > 0 {
-			summaryPoints = append(summaryPoints, fmt.Sprintf("%d columns have schema differences", schemaComparison.DifferentPropertiesCount))
-		}
-		if schemaComparison.InTable1OnlyCount > 0 {
-			summaryPoints = append(summaryPoints, fmt.Sprintf("%d columns from '%s' are missing in '%s'", schemaComparison.InTable1OnlyCount, table1Name, table2Name))
-		}
-		if schemaComparison.InTable2OnlyCount > 0 {
-			summaryPoints = append(summaryPoints, fmt.Sprintf("%d columns from '%s' are extra (not in '%s')", schemaComparison.InTable2OnlyCount, table2Name, table1Name))
-		}
-
-		if len(summaryPoints) > 0 {
-			fmt.Fprintf(errOut, "\n%s\n", getSchemaComparisonTable(summaryPoints))
-		} else {
-			// This case should ideally be covered if HasSchemaDifferences is true due to nil/empty table scenarios handled in compareTableSchemas
-			overallSchemaMessage = "Schema differences detected."
-			fmt.Fprintf(errOut, "\n%s\n", overallSchemaMessage)
-		}
-
-		if len(schemaComparison.ColumnDifferences) > 0 {
-			fmt.Fprintf(errOut, "\n%s\n", getColumnDifferencesTable(schemaComparison.ColumnDifferences, table1Name, table2Name))
-		}
-
-		if len(schemaComparison.MissingColumns) > 0 {
-			fmt.Fprintf(errOut, "\n%s\n", getMissingColumnsTable(schemaComparison.MissingColumns))
-		}
+		errorPrinter.Fprintf(errOut, "\n%s\n", "Schema differences detected, see the table above.")
 	}
 
-	t1Columns := make(map[string]*diff.Column)
-	for _, column := range t1Schema.Columns {
-		t1Columns[column.Name] = column
-	}
+	// Skip detailed column statistics in schema-only mode
+	if !schemaOnly {
+		t1Columns := make(map[string]*diff.Column)
+		for _, column := range t1Schema.Columns {
+			t1Columns[column.Name] = column
+		}
 
-	t2Columns := make(map[string]*diff.Column)
-	for _, column := range t2Schema.Columns {
-		t2Columns[column.Name] = column
-	}
+		t2Columns := make(map[string]*diff.Column)
+		for _, column := range t2Schema.Columns {
+			t2Columns[column.Name] = column
+		}
 
-	if len(t1Schema.Columns) > 0 && len(t2Schema.Columns) > 0 {
-		fmt.Fprintf(errOut, "\n\nColumns that exist in both tables:\n")
-		someColumnsExist := false
-		for _, t1Column := range t1Schema.Columns {
-			if t2Column, ok := t2Columns[t1Column.Name]; ok {
-				if t1Column.Stats != nil && t2Column.Stats != nil {
-					var typeInfo string
-					if t1Column.Type == t2Column.Type {
-						// Same types - use faint color
-						faintPrinter := color.New(color.Faint)
-						typeInfo = faintPrinter.Sprintf(" (%s | %s)", t1Column.Type, t2Column.Type)
-					} else {
-						// Different types - use faint red color
-						faintRedPrinter := color.New(color.Faint, color.FgRed)
-						typeInfo = faintRedPrinter.Sprintf(" (%s | %s)", t1Column.Type, t2Column.Type)
+		if len(t1Schema.Columns) > 0 && len(t2Schema.Columns) > 0 {
+			fmt.Fprintf(errOut, "\n\nColumns that exist in both tables:\n")
+			someColumnsExist := false
+			for _, t1Column := range t1Schema.Columns {
+				if t2Column, ok := t2Columns[t1Column.Name]; ok {
+					if t1Column.Stats != nil && t2Column.Stats != nil {
+						var typeInfo string
+						if t1Column.Type == t2Column.Type {
+							// Same types - use faint color
+							faintPrinter := color.New(color.Faint)
+							typeInfo = faintPrinter.Sprintf(" (%s | %s)", t1Column.Type, t2Column.Type)
+						} else {
+							// Different types - use faint red color
+							faintRedPrinter := color.New(color.Faint, color.FgRed)
+							typeInfo = faintRedPrinter.Sprintf(" (%s | %s)", t1Column.Type, t2Column.Type)
+						}
+						fmt.Fprintf(errOut, "\n%s%s\n", t1Column.Name, typeInfo)
+						fmt.Fprintf(errOut, "%s\n", tableStatsToTable(t1Column.Stats, t2Column.Stats, table1Name, table2Name, tolerance))
+						someColumnsExist = true
 					}
-					fmt.Fprintf(errOut, "\n%s%s\n", t1Column.Name, typeInfo)
-					fmt.Fprintf(errOut, "%s\n", tableStatsToTable(t1Column.Stats, t2Column.Stats, table1Name, table2Name, tolerance))
-					someColumnsExist = true
 				}
 			}
-		}
-		if !someColumnsExist {
-			fmt.Fprintf(errOut, "No columns exist in both tables.\n")
+			if !someColumnsExist {
+				fmt.Fprintf(errOut, "No columns exist in both tables.\n")
+			}
 		}
 	}
 }
@@ -683,7 +664,6 @@ func getColumnTypesComparisonTable(schemaComparison diff.SchemaComparisonResult,
 		{Number: 3, Align: text.AlignLeft},
 		{Number: 4, Align: text.AlignLeft},
 	})
-	// t.Style().Options.SeparateRows = true
 
 	return t.Render()
 }
@@ -792,64 +772,4 @@ func formatBooleanValue(value bool) string {
 		return color.New(color.FgGreen).Sprint("true")
 	}
 	return color.New(color.FgRed).Sprint("false")
-}
-
-func getMissingColumnsTable(missingColumns []diff.MissingColumn) string {
-	l := list.NewWriter()
-	l.SetStyle(list.StyleConnectedRounded)
-
-	// Create color printers
-	columnPrinter := color.New(color.FgCyan, color.Bold)
-	faintPrinter := color.New(color.Faint)
-	redPrinter := color.New(color.FgRed)
-	yellowPrinter := color.New(color.FgYellow)
-
-	l.AppendItem(yellowPrinter.Sprint("Missing Columns") + ":")
-
-	for _, missing := range missingColumns {
-		// Create column header
-		columnHeader := columnPrinter.Sprintf("%s", missing.ColumnName)
-		l.Indent()
-		l.AppendItem(columnHeader)
-
-		// Add details as sub-items
-		l.Indent()
-		l.AppendItem("exists in " + faintPrinter.Sprint(missing.TableName))
-		l.AppendItem("missing from " + redPrinter.Sprintf("'%s'", missing.MissingFrom))
-		l.UnIndent()
-		l.UnIndent()
-	}
-
-	return l.Render()
-}
-
-func getSchemaComparisonTable(summaryPoints []string) string {
-	l := list.NewWriter()
-	l.SetStyle(list.StyleConnectedRounded)
-
-	// Create color printers
-	yellowPrinter := color.New(color.FgYellow)
-	bluePrinter := color.New(color.FgBlue)
-	redPrinter := color.New(color.FgRed)
-	greenPrinter := color.New(color.FgGreen)
-
-	l.AppendItem(yellowPrinter.Sprint("Schema Comparison") + ":")
-
-	for _, point := range summaryPoints {
-		l.Indent()
-		// Color code different types of information
-		switch {
-		case strings.Contains(point, "matching schemas"):
-			l.AppendItem(greenPrinter.Sprint(point))
-		case strings.Contains(point, "schema differences"):
-			l.AppendItem(redPrinter.Sprint(point))
-		case strings.Contains(point, "missing") || strings.Contains(point, "extra"):
-			l.AppendItem(redPrinter.Sprint(point))
-		default:
-			l.AppendItem(bluePrinter.Sprint(point))
-		}
-		l.UnIndent()
-	}
-
-	return l.Render()
 }

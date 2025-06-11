@@ -149,10 +149,8 @@ func CompareTableSchemas(summary1, summary2 *TableSummaryResult, t1Name, t2Name 
 					Table2NormalizedType: col2.NormalizedType,
 					IsComparable:         normalizedTypesMatch,
 				}
-				// Only consider it a schema difference if normalized types don't match
-				if !normalizedTypesMatch {
-					columnIsDifferent = true
-				}
+				
+				columnIsDifferent = true
 			}
 			if col1.Nullable != col2.Nullable {
 				colDiff.NullabilityDifference = &NullabilityDifference{
