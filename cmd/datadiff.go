@@ -14,6 +14,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/fatih/color"
+	"github.com/jedib0t/go-pretty/v6/list"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/sourcegraph/conc"
@@ -68,6 +69,7 @@ func DataDiffCmd() *cli.Command {
 	var connectionName string
 	// configFilePath is added to allow overriding the default .bruin.yml path, similar to other commands
 	var configFilePath string
+	var tolerance float64
 
 	return &cli.Command{
 		Name:    "data-diff",
@@ -86,6 +88,13 @@ func DataDiffCmd() *cli.Command {
 				EnvVars:     []string{"BRUIN_CONFIG_FILE"},
 				Usage:       "the path to the .bruin.yml file",
 				Destination: &configFilePath,
+			},
+			&cli.Float64Flag{
+				Name:        "tolerance",
+				Aliases:     []string{"t"},
+				Usage:       "Tolerance percentage for considering values equal (default: 0.001%). Values with percentage difference below this threshold are considered equal.",
+				Destination: &tolerance,
+				Value:       0.001,
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -162,7 +171,7 @@ func DataDiffCmd() *cli.Command {
 			}
 
 			if schemaComparison != nil {
-				printSchemaComparisonOutput(*schemaComparison, table1Identifier, table2Identifier, c.App.Writer)
+				printSchemaComparisonOutput(*schemaComparison, table1Identifier, table2Identifier, tolerance, c.App.Writer)
 			} else {
 				fmt.Fprintf(c.App.ErrWriter, "\nUnable to compare summaries - the comparison result is nil\n")
 				return errors.New("failed to compare table summaries due to missing data")
@@ -173,9 +182,12 @@ func DataDiffCmd() *cli.Command {
 	}
 }
 
-func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, table1Name, table2Name string, errOut io.Writer) {
-	fmt.Fprintf(errOut, schemaComparison.GetSummaryTable()+"\n")
-	redPrinter := color.New(color.FgRed)
+func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, table1Name, table2Name string, tolerance float64, errOut io.Writer) {
+	fmt.Fprint(errOut, schemaComparison.GetSummaryTable()+"\n")
+
+	// Print column types comparison table
+	fmt.Fprintf(errOut, "\n%s\n", getColumnTypesComparisonTable(schemaComparison, table1Name, table2Name))
+
 	greenPrinter := color.New(color.FgGreen)
 
 	var overallSchemaMessage string
@@ -208,11 +220,7 @@ func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, t
 		}
 
 		if len(summaryPoints) > 0 {
-			overallSchemaMessage = fmt.Sprintf("\n\nSchema Comparison:\n")
-			for _, point := range summaryPoints {
-				overallSchemaMessage += fmt.Sprintf("  - %s\n", point)
-			}
-			fmt.Fprintf(errOut, "\n%s\n", overallSchemaMessage)
+			fmt.Fprintf(errOut, "\n%s\n", getSchemaComparisonTable(summaryPoints))
 		} else {
 			// This case should ideally be covered if HasSchemaDifferences is true due to nil/empty table scenarios handled in compareTableSchemas
 			overallSchemaMessage = "Schema differences detected."
@@ -220,28 +228,11 @@ func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, t
 		}
 
 		if len(schemaComparison.ColumnDifferences) > 0 {
-			fmt.Fprintf(errOut, "  Column Differences:\n")
-			for _, diff := range schemaComparison.ColumnDifferences {
-				fmt.Fprintf(errOut, "    - Column '%s':\n", diff.ColumnName)
-				if diff.TypeDifference != nil {
-					fmt.Fprintf(errOut, "      - Type: '%s' in %s vs '%s' in %s\n", diff.TypeDifference.Table1Type, table1Name, diff.TypeDifference.Table2Type, table2Name)
-				}
-				if diff.NullabilityDifference != nil {
-					fmt.Fprintf(errOut, "      - Nullability: %t in %s vs %t in %s\n", diff.NullabilityDifference.Table1Nullable, table1Name, diff.NullabilityDifference.Table2Nullable, table2Name)
-				}
-				if diff.UniquenessDifference != nil {
-					fmt.Fprintf(errOut, "      - Uniqueness: %t in %s vs %t in %s\n", diff.UniquenessDifference.Table1Unique, table1Name, diff.UniquenessDifference.Table2Unique, table2Name)
-				}
-			}
+			fmt.Fprintf(errOut, "\n%s\n", getColumnDifferencesTable(schemaComparison.ColumnDifferences, table1Name, table2Name))
 		}
 
 		if len(schemaComparison.MissingColumns) > 0 {
-			fmt.Fprintf(errOut, "Missing Columns:\n")
-			for _, missing := range schemaComparison.MissingColumns {
-				fmt.Fprintf(errOut, "  - %s\n", missing.ColumnName)
-				fmt.Fprintf(errOut, "    - exists in %s\n", missing.TableName)
-				fmt.Fprintln(errOut, redPrinter.Sprintf("    - missing from '%s'", missing.MissingFrom))
-			}
+			fmt.Fprintf(errOut, "\n%s\n", getMissingColumnsTable(schemaComparison.MissingColumns))
 		}
 	}
 
@@ -260,61 +251,149 @@ func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, t
 		for _, t1Column := range t1Schema.Columns {
 			if t2Column, ok := t2Columns[t1Column.Name]; ok {
 				if t1Column.Stats != nil && t2Column.Stats != nil {
-					fmt.Fprintf(errOut, "\n%s\n", t1Column.Name)
-					fmt.Fprintf(errOut, "%s\n", tableStatsToTable(t1Column.Stats, t2Column.Stats, table1Name, table2Name))
+					var typeInfo string
+					if t1Column.Type == t2Column.Type {
+						// Same types - use faint color
+						faintPrinter := color.New(color.Faint)
+						typeInfo = faintPrinter.Sprintf(" (%s | %s)", t1Column.Type, t2Column.Type)
+					} else {
+						// Different types - use faint red color
+						faintRedPrinter := color.New(color.Faint, color.FgRed)
+						typeInfo = faintRedPrinter.Sprintf(" (%s | %s)", t1Column.Type, t2Column.Type)
+					}
+					fmt.Fprintf(errOut, "\n%s%s\n", t1Column.Name, typeInfo)
+					fmt.Fprintf(errOut, "%s\n", tableStatsToTable(t1Column.Stats, t2Column.Stats, table1Name, table2Name, tolerance))
 				}
 			}
 		}
 	}
 }
 
-func tableStatsToTable(stats1 diff.ColumnStatistics, stats2 diff.ColumnStatistics, table1Name, table2Name string) string {
+func calculatePercentageDiff(val1, val2, tolerance float64) string {
+	if val1 == val2 {
+		return "-"
+	}
+	if val2 == 0 {
+		return "∞%"
+	}
+	diffPercent := ((val1 - val2) / val2) * 100
+
+	// Check if the absolute percentage difference is within tolerance
+	if abs(diffPercent) <= tolerance {
+		return fmt.Sprintf("<%.3g%%", tolerance)
+	}
+
+	return fmt.Sprintf("%.1f%%", diffPercent)
+}
+
+func calculatePercentageDiffInt(val1, val2 int64, tolerance float64) string {
+	return calculatePercentageDiff(float64(val1), float64(val2), tolerance)
+}
+
+func abs(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+// formatDiffValue returns the actual formatted raw difference value,
+// showing "-" only for truly equal values.
+func formatDiffValue(rawDiff float64, percentageDiff string) string {
+	if percentageDiff == "-" {
+		return "-"
+	}
+	return fmt.Sprintf("%.4g", rawDiff)
+}
+
+func tableStatsToTable(stats1 diff.ColumnStatistics, stats2 diff.ColumnStatistics, table1Name, table2Name string, tolerance float64) string {
 	t := table.NewWriter()
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{Number: 1, Align: text.AlignLeft},
 		{Number: 2, Align: text.AlignRight},
 		{Number: 3, Align: text.AlignRight},
 		{Number: 4, Align: text.AlignRight},
+		{Number: 5, Align: text.AlignRight},
 	})
 
 	t.SetRowPainter(func(row table.Row) text.Colors {
 		if len(row) == 0 {
 			return text.Colors{}
 		}
-		if len(row) != 4 {
+		if len(row) != 5 {
 			return text.Colors{}
 		}
 
 		diffStr := fmt.Sprintf("%v", row[3])
 		diffVal, _ := strconv.ParseFloat(diffStr, 64)
-		if diffVal != 0 {
+		if diffVal > tolerance {
 			return text.Colors{text.FgRed}
 		}
 		return text.Colors{text.FgGreen}
 	})
 
-	t.AppendHeader(table.Row{"", table1Name, table2Name, "Diff"})
+	t.AppendHeader(table.Row{"", table1Name, table2Name, "Diff", "DIFF %"})
+
+	// Check if statistics types are compatible
+	if stats1.Type() != stats2.Type() {
+		t.AppendRow(table.Row{"Type Mismatch", fmt.Sprintf("(%s)", stats1.Type()), fmt.Sprintf("(%s)", stats2.Type()), "N/A", "N/A"})
+		return t.Render()
+	}
+
 	switch stats1.Type() {
 	case "numerical":
 		numStats1 := stats1.(*diff.NumericalStatistics)
 		numStats2 := stats2.(*diff.NumericalStatistics)
 
+		// General counts first
+		countDiff := numStats1.Count - numStats2.Count
+		countDiffPercent := calculatePercentageDiffInt(numStats1.Count, numStats2.Count, tolerance)
+		countDiffStr := formatDiffValue(float64(countDiff), countDiffPercent)
+		t.AppendRow(table.Row{"Count", numStats1.Count, numStats2.Count, countDiffStr, countDiffPercent})
+
+		nullDiff := numStats1.NullCount - numStats2.NullCount
+		nullDiffPercent := calculatePercentageDiffInt(numStats1.NullCount, numStats2.NullCount, tolerance)
+		nullDiffStr := formatDiffValue(float64(nullDiff), nullDiffPercent)
+		t.AppendRow(table.Row{"Null Count", numStats1.NullCount, numStats2.NullCount, nullDiffStr, nullDiffPercent})
+
+		// Calculate fill rates
+		fillRate1 := float64(numStats1.Count-numStats1.NullCount) / float64(numStats1.Count) * 100
+		fillRate2 := float64(numStats2.Count-numStats2.NullCount) / float64(numStats2.Count) * 100
+		fillRateDiff := fillRate1 - fillRate2
+		fillRateDiffPercent := calculatePercentageDiff(fillRate1, fillRate2, tolerance)
+		fillRateDiffStr := formatDiffValue(fillRateDiff, fillRateDiffPercent)
+		t.AppendRow(table.Row{"Fill Rate", fmt.Sprintf("%.6g%%", fillRate1), fmt.Sprintf("%.6g%%", fillRate2), fillRateDiffStr, fillRateDiffPercent})
+
+		// Descriptive statistics
 		if numStats1.Min != nil && numStats2.Min != nil {
-			t.AppendRow(table.Row{"Min", fmt.Sprintf("%.4g", *numStats1.Min), fmt.Sprintf("%.2g", *numStats2.Min), fmt.Sprintf("%.2g", *numStats1.Min-*numStats2.Min)})
+			diff := *numStats1.Min - *numStats2.Min
+			diffPercent := calculatePercentageDiff(*numStats1.Min, *numStats2.Min, tolerance)
+			diffStr := formatDiffValue(diff, diffPercent)
+			t.AppendRow(table.Row{"Min", fmt.Sprintf("%.4g", *numStats1.Min), fmt.Sprintf("%.4g", *numStats2.Min), diffStr, diffPercent})
 		}
 		if numStats1.Max != nil && numStats2.Max != nil {
-			t.AppendRow(table.Row{"Max", fmt.Sprintf("%.4g", *numStats1.Max), fmt.Sprintf("%.2g", *numStats2.Max), fmt.Sprintf("%.2g", *numStats1.Max-*numStats2.Max)})
+			diff := *numStats1.Max - *numStats2.Max
+			diffPercent := calculatePercentageDiff(*numStats1.Max, *numStats2.Max, tolerance)
+			diffStr := formatDiffValue(diff, diffPercent)
+			t.AppendRow(table.Row{"Max", fmt.Sprintf("%.4g", *numStats1.Max), fmt.Sprintf("%.4g", *numStats2.Max), diffStr, diffPercent})
 		}
 		if numStats1.Avg != nil && numStats2.Avg != nil {
-			t.AppendRow(table.Row{"Avg", fmt.Sprintf("%.4g", *numStats1.Avg), fmt.Sprintf("%.2g", *numStats2.Avg), fmt.Sprintf("%.2g", *numStats1.Avg-*numStats2.Avg)})
+			diff := *numStats1.Avg - *numStats2.Avg
+			diffPercent := calculatePercentageDiff(*numStats1.Avg, *numStats2.Avg, tolerance)
+			diffStr := formatDiffValue(diff, diffPercent)
+			t.AppendRow(table.Row{"Avg", fmt.Sprintf("%.4g", *numStats1.Avg), fmt.Sprintf("%.4g", *numStats2.Avg), diffStr, diffPercent})
 		}
 		if numStats1.Sum != nil && numStats2.Sum != nil {
-			t.AppendRow(table.Row{"Sum", fmt.Sprintf("%.4g", *numStats1.Sum), fmt.Sprintf("%.2g", *numStats2.Sum), fmt.Sprintf("%.2g", *numStats1.Sum-*numStats2.Sum)})
+			diff := *numStats1.Sum - *numStats2.Sum
+			diffPercent := calculatePercentageDiff(*numStats1.Sum, *numStats2.Sum, tolerance)
+			diffStr := formatDiffValue(diff, diffPercent)
+			t.AppendRow(table.Row{"Sum", fmt.Sprintf("%.4g", *numStats1.Sum), fmt.Sprintf("%.4g", *numStats2.Sum), diffStr, diffPercent})
 		}
-		t.AppendRow(table.Row{"Count", numStats1.Count, numStats2.Count, numStats1.Count - numStats2.Count})
-		t.AppendRow(table.Row{"Null Count", numStats1.NullCount, numStats2.NullCount, numStats1.NullCount - numStats2.NullCount})
 		if numStats1.StdDev != nil && numStats2.StdDev != nil {
-			t.AppendRow(table.Row{"StdDev", fmt.Sprintf("%.4g", *numStats1.StdDev), fmt.Sprintf("%.2g", *numStats2.StdDev), fmt.Sprintf("%.2g", *numStats1.StdDev-*numStats2.StdDev)})
+			stdDevDiff := *numStats1.StdDev - *numStats2.StdDev
+			stdDevDiffPercent := calculatePercentageDiff(*numStats1.StdDev, *numStats2.StdDev, tolerance)
+			stdDevDiffStr := formatDiffValue(stdDevDiff, stdDevDiffPercent)
+			t.AppendRow(table.Row{"StdDev", fmt.Sprintf("%.4g", *numStats1.StdDev), fmt.Sprintf("%.4g", *numStats2.StdDev), stdDevDiffStr, stdDevDiffPercent})
 		}
 
 	case "string":
@@ -324,12 +403,51 @@ func tableStatsToTable(stats1 diff.ColumnStatistics, stats2 diff.ColumnStatistic
 			return ""
 		}
 
-		t.AppendRow(table.Row{"Distinct Count", strStats1.DistinctCount, strStats2.DistinctCount, strStats1.DistinctCount - strStats2.DistinctCount})
-		t.AppendRow(table.Row{"Max Length", strStats1.MaxLength, strStats2.MaxLength, strStats1.MaxLength - strStats2.MaxLength})
-		t.AppendRow(table.Row{"Min Length", strStats1.MinLength, strStats2.MinLength, strStats1.MinLength - strStats2.MinLength})
-		t.AppendRow(table.Row{"Avg Length", fmt.Sprintf("%.4g", strStats1.AvgLength), fmt.Sprintf("%.2g", strStats2.AvgLength), fmt.Sprintf("%.2g", strStats1.AvgLength-strStats2.AvgLength)})
-		t.AppendRow(table.Row{"Null Count", strStats1.NullCount, strStats2.NullCount, strStats1.NullCount - strStats2.NullCount})
-		t.AppendRow(table.Row{"Empty Count", strStats1.EmptyCount, strStats2.EmptyCount, strStats1.EmptyCount - strStats2.EmptyCount})
+		// General counts first
+		countDiff := strStats1.Count - strStats2.Count
+		countDiffPercent := calculatePercentageDiffInt(strStats1.Count, strStats2.Count, tolerance)
+		countDiffStr := formatDiffValue(float64(countDiff), countDiffPercent)
+		t.AppendRow(table.Row{"Count", strStats1.Count, strStats2.Count, countDiffStr, countDiffPercent})
+
+		nullDiff := strStats1.NullCount - strStats2.NullCount
+		nullDiffPercent := calculatePercentageDiffInt(strStats1.NullCount, strStats2.NullCount, tolerance)
+		nullDiffStr := formatDiffValue(float64(nullDiff), nullDiffPercent)
+		t.AppendRow(table.Row{"Null Count", strStats1.NullCount, strStats2.NullCount, nullDiffStr, nullDiffPercent})
+
+		// Calculate fill rates using proper count
+		fillRate1 := float64(strStats1.Count-strStats1.NullCount) / float64(strStats1.Count) * 100
+		fillRate2 := float64(strStats2.Count-strStats2.NullCount) / float64(strStats2.Count) * 100
+		fillRateDiff := fillRate1 - fillRate2
+		fillRateDiffPercent := calculatePercentageDiff(fillRate1, fillRate2, tolerance)
+		fillRateDiffStr := formatDiffValue(fillRateDiff, fillRateDiffPercent)
+		t.AppendRow(table.Row{"Fill Rate", fmt.Sprintf("%.6g%%", fillRate1), fmt.Sprintf("%.6g%%", fillRate2), fillRateDiffStr, fillRateDiffPercent})
+
+		// Value-specific statistics
+		distinctDiff := strStats1.DistinctCount - strStats2.DistinctCount
+		distinctDiffPercent := calculatePercentageDiffInt(strStats1.DistinctCount, strStats2.DistinctCount, tolerance)
+		distinctDiffStr := formatDiffValue(float64(distinctDiff), distinctDiffPercent)
+		t.AppendRow(table.Row{"Distinct Count", strStats1.DistinctCount, strStats2.DistinctCount, distinctDiffStr, distinctDiffPercent})
+
+		emptyDiff := strStats1.EmptyCount - strStats2.EmptyCount
+		emptyDiffPercent := calculatePercentageDiffInt(strStats1.EmptyCount, strStats2.EmptyCount, tolerance)
+		emptyDiffStr := formatDiffValue(float64(emptyDiff), emptyDiffPercent)
+		t.AppendRow(table.Row{"Empty Count", strStats1.EmptyCount, strStats2.EmptyCount, emptyDiffStr, emptyDiffPercent})
+
+		// Length statistics
+		minLenDiff := strStats1.MinLength - strStats2.MinLength
+		minLenDiffPercent := calculatePercentageDiffInt(int64(strStats1.MinLength), int64(strStats2.MinLength), tolerance)
+		minLenDiffStr := formatDiffValue(float64(minLenDiff), minLenDiffPercent)
+		t.AppendRow(table.Row{"Min Length", strStats1.MinLength, strStats2.MinLength, minLenDiffStr, minLenDiffPercent})
+
+		maxLenDiff := strStats1.MaxLength - strStats2.MaxLength
+		maxLenDiffPercent := calculatePercentageDiffInt(int64(strStats1.MaxLength), int64(strStats2.MaxLength), tolerance)
+		maxLenDiffStr := formatDiffValue(float64(maxLenDiff), maxLenDiffPercent)
+		t.AppendRow(table.Row{"Max Length", strStats1.MaxLength, strStats2.MaxLength, maxLenDiffStr, maxLenDiffPercent})
+
+		avgLenDiff := strStats1.AvgLength - strStats2.AvgLength
+		avgLenDiffPercent := calculatePercentageDiff(strStats1.AvgLength, strStats2.AvgLength, tolerance)
+		avgLenDiffStr := formatDiffValue(avgLenDiff, avgLenDiffPercent)
+		t.AppendRow(table.Row{"Avg Length", fmt.Sprintf("%.4g", strStats1.AvgLength), fmt.Sprintf("%.4g", strStats2.AvgLength), avgLenDiffStr, avgLenDiffPercent})
 
 	case "boolean":
 		boolStats1 := stats1.(*diff.BooleanStatistics)
@@ -338,10 +456,35 @@ func tableStatsToTable(stats1 diff.ColumnStatistics, stats2 diff.ColumnStatistic
 			return ""
 		}
 
-		t.AppendRow(table.Row{"True Count", boolStats1.TrueCount, boolStats2.TrueCount, boolStats1.TrueCount - boolStats2.TrueCount})
-		t.AppendRow(table.Row{"False Count", boolStats1.FalseCount, boolStats2.FalseCount, boolStats1.FalseCount - boolStats2.FalseCount})
-		t.AppendRow(table.Row{"Null Count", boolStats1.NullCount, boolStats2.NullCount, boolStats1.NullCount - boolStats2.NullCount})
-		t.AppendRow(table.Row{"Count", boolStats1.Count, boolStats2.Count, boolStats1.Count - boolStats2.Count})
+		// General counts first
+		countDiff := boolStats1.Count - boolStats2.Count
+		countDiffPercent := calculatePercentageDiffInt(boolStats1.Count, boolStats2.Count, tolerance)
+		countDiffStr := formatDiffValue(float64(countDiff), countDiffPercent)
+		t.AppendRow(table.Row{"Count", boolStats1.Count, boolStats2.Count, countDiffStr, countDiffPercent})
+
+		nullDiff := boolStats1.NullCount - boolStats2.NullCount
+		nullDiffPercent := calculatePercentageDiffInt(boolStats1.NullCount, boolStats2.NullCount, tolerance)
+		nullDiffStr := formatDiffValue(float64(nullDiff), nullDiffPercent)
+		t.AppendRow(table.Row{"Null Count", boolStats1.NullCount, boolStats2.NullCount, nullDiffStr, nullDiffPercent})
+
+		// Calculate fill rates
+		fillRate1 := float64(boolStats1.Count-boolStats1.NullCount) / float64(boolStats1.Count) * 100
+		fillRate2 := float64(boolStats2.Count-boolStats2.NullCount) / float64(boolStats2.Count) * 100
+		fillRateDiff := fillRate1 - fillRate2
+		fillRateDiffPercent := calculatePercentageDiff(fillRate1, fillRate2, tolerance)
+		fillRateDiffStr := formatDiffValue(fillRateDiff, fillRateDiffPercent)
+		t.AppendRow(table.Row{"Fill Rate", fmt.Sprintf("%.6g%%", fillRate1), fmt.Sprintf("%.6g%%", fillRate2), fillRateDiffStr, fillRateDiffPercent})
+
+		// Value-specific statistics
+		trueDiff := boolStats1.TrueCount - boolStats2.TrueCount
+		trueDiffPercent := calculatePercentageDiffInt(boolStats1.TrueCount, boolStats2.TrueCount, tolerance)
+		trueDiffStr := formatDiffValue(float64(trueDiff), trueDiffPercent)
+		t.AppendRow(table.Row{"True Count", boolStats1.TrueCount, boolStats2.TrueCount, trueDiffStr, trueDiffPercent})
+
+		falseDiff := boolStats1.FalseCount - boolStats2.FalseCount
+		falseDiffPercent := calculatePercentageDiffInt(boolStats1.FalseCount, boolStats2.FalseCount, tolerance)
+		falseDiffStr := formatDiffValue(float64(falseDiff), falseDiffPercent)
+		t.AppendRow(table.Row{"False Count", boolStats1.FalseCount, boolStats2.FalseCount, falseDiffStr, falseDiffPercent})
 
 	case "datetime":
 		dtStats1 := stats1.(*diff.DateTimeStatistics)
@@ -350,15 +493,280 @@ func tableStatsToTable(stats1 diff.ColumnStatistics, stats2 diff.ColumnStatistic
 			return ""
 		}
 
+		// General counts first
+		countDiff := dtStats1.Count - dtStats2.Count
+		countDiffPercent := calculatePercentageDiffInt(dtStats1.Count, dtStats2.Count, tolerance)
+		countDiffStr := formatDiffValue(float64(countDiff), countDiffPercent)
+		t.AppendRow(table.Row{"Count", dtStats1.Count, dtStats2.Count, countDiffStr, countDiffPercent})
+
+		nullDiff := dtStats1.NullCount - dtStats2.NullCount
+		nullDiffPercent := calculatePercentageDiffInt(dtStats1.NullCount, dtStats2.NullCount, tolerance)
+		nullDiffStr := formatDiffValue(float64(nullDiff), nullDiffPercent)
+		t.AppendRow(table.Row{"Null Count", dtStats1.NullCount, dtStats2.NullCount, nullDiffStr, nullDiffPercent})
+
+		// Calculate fill rates
+		fillRate1 := float64(dtStats1.Count-dtStats1.NullCount) / float64(dtStats1.Count) * 100
+		fillRate2 := float64(dtStats2.Count-dtStats2.NullCount) / float64(dtStats2.Count) * 100
+		fillRateDiff := fillRate1 - fillRate2
+		fillRateDiffPercent := calculatePercentageDiff(fillRate1, fillRate2, tolerance)
+		fillRateDiffStr := formatDiffValue(fillRateDiff, fillRateDiffPercent)
+		t.AppendRow(table.Row{"Fill Rate", fmt.Sprintf("%.6g%%", fillRate1), fmt.Sprintf("%.6g%%", fillRate2), fillRateDiffStr, fillRateDiffPercent})
+
+		// Value-specific statistics
+		uniqueDiff := dtStats1.UniqueCount - dtStats2.UniqueCount
+		uniqueDiffPercent := calculatePercentageDiffInt(dtStats1.UniqueCount, dtStats2.UniqueCount, tolerance)
+		uniqueDiffStr := formatDiffValue(float64(uniqueDiff), uniqueDiffPercent)
+		t.AppendRow(table.Row{"Distinct Count", dtStats1.UniqueCount, dtStats2.UniqueCount, uniqueDiffStr, uniqueDiffPercent})
+
+		// Date range statistics
 		if dtStats1.EarliestDate != nil && dtStats2.EarliestDate != nil {
-			t.AppendRow(table.Row{"Earliest Date", *dtStats1.EarliestDate, *dtStats2.EarliestDate, ""})
+			t.AppendRow(table.Row{"Earliest Date", *dtStats1.EarliestDate, *dtStats2.EarliestDate, "-", "N/A"})
 		}
 		if dtStats1.LatestDate != nil && dtStats2.LatestDate != nil {
-			t.AppendRow(table.Row{"Latest Date", *dtStats1.LatestDate, *dtStats2.LatestDate, ""})
+			t.AppendRow(table.Row{"Latest Date", *dtStats1.LatestDate, *dtStats2.LatestDate, "-", "N/A"})
 		}
-		t.AppendRow(table.Row{"Count", dtStats1.Count, dtStats2.Count, dtStats1.Count - dtStats2.Count})
-		t.AppendRow(table.Row{"Null Count", dtStats1.NullCount, dtStats2.NullCount, dtStats1.NullCount - dtStats2.NullCount})
-		t.AppendRow(table.Row{"Unique Count", dtStats1.UniqueCount, dtStats2.UniqueCount, dtStats1.UniqueCount - dtStats2.UniqueCount})
+
+	case "json":
+		jsonStats1 := stats1.(*diff.JSONStatistics)
+		jsonStats2 := stats2.(*diff.JSONStatistics)
+		if jsonStats1 == nil || jsonStats2 == nil {
+			return ""
+		}
+
+		countDiff := jsonStats1.Count - jsonStats2.Count
+		countDiffPercent := calculatePercentageDiffInt(jsonStats1.Count, jsonStats2.Count, tolerance)
+		countDiffStr := formatDiffValue(float64(countDiff), countDiffPercent)
+		t.AppendRow(table.Row{"Count", jsonStats1.Count, jsonStats2.Count, countDiffStr, countDiffPercent})
+
+		nullDiff := jsonStats1.NullCount - jsonStats2.NullCount
+		nullDiffPercent := calculatePercentageDiffInt(jsonStats1.NullCount, jsonStats2.NullCount, tolerance)
+		nullDiffStr := formatDiffValue(float64(nullDiff), nullDiffPercent)
+		t.AppendRow(table.Row{"Null Count", jsonStats1.NullCount, jsonStats2.NullCount, nullDiffStr, nullDiffPercent})
+
+		// Calculate fill rates
+		fillRate1 := float64(jsonStats1.Count-jsonStats1.NullCount) / float64(jsonStats1.Count) * 100
+		fillRate2 := float64(jsonStats2.Count-jsonStats2.NullCount) / float64(jsonStats2.Count) * 100
+		fillRateDiff := fillRate1 - fillRate2
+		fillRateDiffPercent := calculatePercentageDiff(fillRate1, fillRate2, tolerance)
+		fillRateDiffStr := formatDiffValue(fillRateDiff, fillRateDiffPercent)
+		t.AppendRow(table.Row{"Fill Rate", fmt.Sprintf("%.6g%%", fillRate1), fmt.Sprintf("%.6g%%", fillRate2), fillRateDiffStr, fillRateDiffPercent})
 	}
 	return t.Render()
+}
+
+func getColumnTypesComparisonTable(schemaComparison diff.SchemaComparisonResult, table1Name, table2Name string) string {
+	t := table.NewWriter()
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{Number: 1, Align: text.AlignLeft},
+		{Number: 2, Align: text.AlignLeft},
+		{Number: 3, Align: text.AlignLeft},
+	})
+
+	t.AppendHeader(table.Row{"Column", table1Name, table2Name})
+
+	t1Schema := schemaComparison.Table1.Table
+	t2Schema := schemaComparison.Table2.Table
+
+	// Create maps for quick lookup
+	t1Columns := make(map[string]*diff.Column)
+	for _, column := range t1Schema.Columns {
+		t1Columns[column.Name] = column
+	}
+
+	t2Columns := make(map[string]*diff.Column)
+	for _, column := range t2Schema.Columns {
+		t2Columns[column.Name] = column
+	}
+
+	// Collect all unique column names
+	allColumnNames := make(map[string]bool)
+	for _, column := range t1Schema.Columns {
+		allColumnNames[column.Name] = true
+	}
+	for _, column := range t2Schema.Columns {
+		allColumnNames[column.Name] = true
+	}
+
+	// Convert to sorted slice for consistent ordering
+	columnNames := make([]string, 0, len(allColumnNames))
+	for name := range allColumnNames {
+		columnNames = append(columnNames, name)
+	}
+
+	// Sort column names alphabetically for consistent output
+	for i := 0; i < len(columnNames); i++ {
+		for j := i + 1; j < len(columnNames); j++ {
+			if columnNames[i] > columnNames[j] {
+				columnNames[i], columnNames[j] = columnNames[j], columnNames[i]
+			}
+		}
+	}
+
+	// Set row painter to highlight differences
+	t.SetRowPainter(func(row table.Row) text.Colors {
+		if len(row) >= 3 {
+			table1Type := fmt.Sprintf("%v", row[1])
+			table2Type := fmt.Sprintf("%v", row[2])
+
+			// If one is dash (missing) or types are different, highlight in red
+			if table1Type == "-" || table2Type == "-" || table1Type != table2Type {
+				return text.Colors{text.FgRed}
+			}
+			// If types match, highlight in green
+			return text.Colors{text.FgGreen}
+		}
+		return text.Colors{}
+	})
+
+	// Add rows for each column
+	for _, columnName := range columnNames {
+		t1Type := "-"
+		t2Type := "-"
+
+		if col, exists := t1Columns[columnName]; exists {
+			t1Type = col.Type
+		}
+		if col, exists := t2Columns[columnName]; exists {
+			t2Type = col.Type
+		}
+
+		t.AppendRow(table.Row{columnName, t1Type, t2Type})
+	}
+
+	return t.Render()
+}
+
+func getColumnDifferencesTable(columnDifferences []diff.ColumnDifference, table1Name, table2Name string) string {
+	l := list.NewWriter()
+	l.SetStyle(list.StyleConnectedRounded)
+
+	// Create color printers
+	columnPrinter := color.New(color.FgCyan, color.Bold)
+	faintPrinter := color.New(color.Faint)
+	redPrinter := color.New(color.FgRed)
+	greenPrinter := color.New(color.FgGreen)
+	yellowPrinter := color.New(color.FgYellow)
+
+	l.AppendItem(yellowPrinter.Sprint("Column Differences") + ":")
+
+	for _, diff := range columnDifferences {
+		// Create column header
+		columnHeader := columnPrinter.Sprintf("%s", diff.ColumnName)
+		l.Indent()
+		l.AppendItem(columnHeader)
+
+		// Add differences as sub-items
+		l.Indent()
+
+		if diff.TypeDifference != nil {
+			if diff.TypeDifference.IsComparable {
+				typeMsg := fmt.Sprintf("Type: %s in %s vs %s in %s %s",
+					greenPrinter.Sprintf("'%s'", diff.TypeDifference.Table1Type),
+					faintPrinter.Sprint(table1Name),
+					greenPrinter.Sprintf("'%s'", diff.TypeDifference.Table2Type),
+					faintPrinter.Sprint(table2Name),
+					faintPrinter.Sprintf("(both map to '%s' - comparable)", diff.TypeDifference.Table1NormalizedType))
+				l.AppendItem(typeMsg)
+			} else {
+				typeMsg := fmt.Sprintf("Type: %s (%s) in %s vs %s (%s) in %s",
+					redPrinter.Sprintf("'%s'", diff.TypeDifference.Table1Type),
+					faintPrinter.Sprint(diff.TypeDifference.Table1NormalizedType),
+					faintPrinter.Sprint(table1Name),
+					redPrinter.Sprintf("'%s'", diff.TypeDifference.Table2Type),
+					faintPrinter.Sprint(diff.TypeDifference.Table2NormalizedType),
+					faintPrinter.Sprint(table2Name))
+				l.AppendItem(typeMsg)
+			}
+		}
+
+		if diff.NullabilityDifference != nil {
+			nullabilityMsg := fmt.Sprintf("Nullability: %s in %s vs %s in %s",
+				formatBooleanValue(diff.NullabilityDifference.Table1Nullable),
+				faintPrinter.Sprint(table1Name),
+				formatBooleanValue(diff.NullabilityDifference.Table2Nullable),
+				faintPrinter.Sprint(table2Name))
+			l.AppendItem(nullabilityMsg)
+		}
+
+		if diff.UniquenessDifference != nil {
+			uniquenessMsg := fmt.Sprintf("Uniqueness: %s in %s vs %s in %s",
+				formatBooleanValue(diff.UniquenessDifference.Table1Unique),
+				faintPrinter.Sprint(table1Name),
+				formatBooleanValue(diff.UniquenessDifference.Table2Unique),
+				faintPrinter.Sprint(table2Name))
+			l.AppendItem(uniquenessMsg)
+		}
+
+		l.UnIndent()
+		l.UnIndent()
+	}
+
+	return l.Render()
+}
+
+func formatBooleanValue(value bool) string {
+	if value {
+		return color.New(color.FgGreen).Sprint("true")
+	}
+	return color.New(color.FgRed).Sprint("false")
+}
+
+func getMissingColumnsTable(missingColumns []diff.MissingColumn) string {
+	l := list.NewWriter()
+	l.SetStyle(list.StyleConnectedRounded)
+
+	// Create color printers
+	columnPrinter := color.New(color.FgCyan, color.Bold)
+	faintPrinter := color.New(color.Faint)
+	redPrinter := color.New(color.FgRed)
+	yellowPrinter := color.New(color.FgYellow)
+
+	l.AppendItem(yellowPrinter.Sprint("Missing Columns") + ":")
+
+	for _, missing := range missingColumns {
+		// Create column header
+		columnHeader := columnPrinter.Sprintf("%s", missing.ColumnName)
+		l.Indent()
+		l.AppendItem(columnHeader)
+
+		// Add details as sub-items
+		l.Indent()
+		l.AppendItem("exists in " + faintPrinter.Sprint(missing.TableName))
+		l.AppendItem("missing from " + redPrinter.Sprintf("'%s'", missing.MissingFrom))
+		l.UnIndent()
+		l.UnIndent()
+	}
+
+	return l.Render()
+}
+
+func getSchemaComparisonTable(summaryPoints []string) string {
+	l := list.NewWriter()
+	l.SetStyle(list.StyleConnectedRounded)
+
+	// Create color printers
+	yellowPrinter := color.New(color.FgYellow)
+	bluePrinter := color.New(color.FgBlue)
+	redPrinter := color.New(color.FgRed)
+	greenPrinter := color.New(color.FgGreen)
+
+	l.AppendItem(yellowPrinter.Sprint("Schema Comparison") + ":")
+
+	for _, point := range summaryPoints {
+		l.Indent()
+		// Color code different types of information
+		switch {
+		case strings.Contains(point, "matching schemas"):
+			l.AppendItem(greenPrinter.Sprint(point))
+		case strings.Contains(point, "schema differences"):
+			l.AppendItem(redPrinter.Sprint(point))
+		case strings.Contains(point, "missing") || strings.Contains(point, "extra"):
+			l.AppendItem(redPrinter.Sprint(point))
+		default:
+			l.AppendItem(bluePrinter.Sprint(point))
+		}
+		l.UnIndent()
+	}
+
+	return l.Render()
 }

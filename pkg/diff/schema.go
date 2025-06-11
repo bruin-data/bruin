@@ -7,8 +7,11 @@ import (
 
 // TypeDifference represents a difference in column types between two tables.
 type TypeDifference struct {
-	Table1Type string
-	Table2Type string
+	Table1Type           string
+	Table2Type           string
+	Table1NormalizedType CommonDataType
+	Table2NormalizedType CommonDataType
+	IsComparable         bool // True if normalized types are the same (e.g., both numeric)
 }
 
 // NullabilityDifference represents a difference in nullability between two tables.
@@ -71,7 +74,7 @@ func (c *SchemaComparisonResult) GetSummaryTable() string {
 				return text.Colors{text.FgGreen}
 			}
 		}
-		if row[0] == "Columns" {
+		if row[0] == "Column Count" {
 			if row[3] != 0 {
 				return text.Colors{text.FgRed}
 			} else {
@@ -87,7 +90,7 @@ func (c *SchemaComparisonResult) GetSummaryTable() string {
 	} else {
 		t.AppendRow(table.Row{"Row Count", c.Table1.RowCount, c.Table2.RowCount, 0})
 	}
-	t.AppendRow(table.Row{"Columns", len(c.Table1.Table.Columns), len(c.Table2.Table.Columns), len(c.Table1.Table.Columns) - len(c.Table2.Table.Columns)})
+	t.AppendRow(table.Row{"Column Count", len(c.Table1.Table.Columns), len(c.Table2.Table.Columns), len(c.Table1.Table.Columns) - len(c.Table2.Table.Columns)})
 	return t.Render()
 }
 
@@ -133,12 +136,22 @@ func CompareTableSchemas(summary1, summary2 *TableSummaryResult, t1Name, t2Name 
 				ColumnName: col1.Name,
 			}
 
-			if col1.Type != col2.Type {
+			// Check if types are different (considering both original and normalized types)
+			typesAreDifferent := col1.Type != col2.Type
+			normalizedTypesMatch := col1.NormalizedType == col2.NormalizedType
+
+			if typesAreDifferent {
 				colDiff.TypeDifference = &TypeDifference{
-					Table1Type: col1.Type,
-					Table2Type: col2.Type,
+					Table1Type:           col1.Type,
+					Table2Type:           col2.Type,
+					Table1NormalizedType: col1.NormalizedType,
+					Table2NormalizedType: col2.NormalizedType,
+					IsComparable:         normalizedTypesMatch,
 				}
-				columnIsDifferent = true
+				// Only consider it a schema difference if normalized types don't match
+				if !normalizedTypesMatch {
+					columnIsDifferent = true
+				}
 			}
 			if col1.Nullable != col2.Nullable {
 				colDiff.NullabilityDifference = &NullabilityDifference{

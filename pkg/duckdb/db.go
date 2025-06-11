@@ -6,7 +6,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
@@ -19,6 +18,7 @@ type Client struct {
 	connection    connection
 	config        DuckDBConfig
 	schemaCreator *ansisql.SchemaCreator
+	typeMapper    *diff.DatabaseTypeMapper
 }
 
 type DuckDBConfig interface {
@@ -40,7 +40,12 @@ func NewClient(c DuckDBConfig) (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{connection: conn, config: c, schemaCreator: ansisql.NewSchemaCreator()}, nil
+	return &Client{
+		connection:    conn,
+		config:        c,
+		schemaCreator: ansisql.NewSchemaCreator(),
+		typeMapper:    diff.NewDuckDBTypeMapper(),
+	}, nil
 }
 
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
@@ -163,7 +168,7 @@ func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Ass
 
 func (c *Client) GetTableSummary(ctx context.Context, tableName string) (*diff.TableSummaryResult, error) {
 	// Get row count
-	countQuery := fmt.Sprintf("SELECT COUNT(*) as row_count FROM %s", tableName)
+	countQuery := "SELECT COUNT(*) as row_count FROM " + tableName
 	rows, err := c.connection.QueryContext(ctx, countQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute count query for table '%s': %w", tableName, err)
@@ -172,17 +177,15 @@ func (c *Client) GetTableSummary(ctx context.Context, tableName string) (*diff.T
 	// We will close it explicitly after use.
 
 	var rowCount int64
+	defer rows.Close()
 	if rows.Next() {
 		if err := rows.Scan(&rowCount); err != nil {
-			rows.Close() // Close before returning
 			return nil, fmt.Errorf("failed to scan row count for table '%s': %w", tableName, err)
 		}
 	}
 	if err = rows.Err(); err != nil {
-		rows.Close() // Close before returning
 		return nil, fmt.Errorf("error after iterating rows for count query on table '%s': %w", tableName, err)
 	}
-	rows.Close() // Explicitly close rows after we are done with them
 
 	// Get table schema using PRAGMA table_info
 	schemaQuery := fmt.Sprintf("PRAGMA table_info('%s')", tableName)
@@ -207,39 +210,47 @@ func (c *Client) GetTableSummary(ctx context.Context, tableName string) (*diff.T
 			return nil, fmt.Errorf("failed to scan PRAGMA table_info result for table '%s': %w", tableName, err)
 		}
 
+		normalizedType := c.typeMapper.MapType(colType)
+
 		var stats diff.ColumnStatistics
-		switch strings.ToLower(colType) {
-		case "integer", "bigint", "tinyint", "smallint", "double", "float", "decimal", "numeric", "real":
+		switch normalizedType {
+		case diff.CommonTypeNumeric:
 			stats, err = c.fetchNumericalStats(ctx, tableName, name)
 			if err != nil {
 				return nil, fmt.Errorf("failed to fetch numerical stats for column '%s': %w", name, err)
 			}
-		case "varchar", "char", "text", "string":
+		case diff.CommonTypeString:
 			stats, err = c.fetchStringStats(ctx, tableName, name)
 			if err != nil {
 				return nil, fmt.Errorf("failed to fetch string stats for column '%s': %w", name, err)
 			}
-		case "boolean":
+		case diff.CommonTypeBoolean:
 			stats, err = c.fetchBooleanStats(ctx, tableName, name)
 			if err != nil {
 				return nil, fmt.Errorf("failed to fetch boolean stats for column '%s': %w", name, err)
 			}
-		case "date", "time", "timestamp", "datetime":
+		case diff.CommonTypeDateTime:
 			stats, err = c.fetchDateTimeStats(ctx, tableName, name)
 			if err != nil {
 				return nil, fmt.Errorf("failed to fetch datetime stats for column '%s': %w", name, err)
 			}
-		default:
+		case diff.CommonTypeJSON:
+			stats, err = c.fetchJSONStats(ctx, tableName, name)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch JSON stats for column '%s': %w", name, err)
+			}
+		case diff.CommonTypeBinary, diff.CommonTypeUnknown:
 			stats = &diff.UnknownStatistics{}
 		}
 
 		columns = append(columns, &diff.Column{
-			Name:       name,
-			Type:       colType,
-			Nullable:   !notNull,
-			PrimaryKey: pk,
-			Unique:     pk,
-			Stats:      stats,
+			Name:           name,
+			Type:           colType,
+			NormalizedType: normalizedType,
+			Nullable:       !notNull,
+			PrimaryKey:     pk,
+			Unique:         pk,
+			Stats:          stats,
 		})
 	}
 	if err = schemaRows.Err(); err != nil {
@@ -297,6 +308,7 @@ func (c *Client) fetchStringStats(ctx context.Context, tableName, columnName str
             MAX(LENGTH(%s)) as max_len,
             AVG(LENGTH(%s)) as avg_len,
             COUNT(DISTINCT %s) as distinct_count,
+            COUNT(*) as total_count,
             COUNT(*) - COUNT(%s) as null_count,
             COUNT(CASE WHEN %s = '' THEN 1 END) as empty_count
         FROM %s
@@ -307,6 +319,7 @@ func (c *Client) fetchStringStats(ctx context.Context, tableName, columnName str
 		&stats.MaxLength,
 		&stats.AvgLength,
 		&stats.DistinctCount,
+		&stats.Count,
 		&stats.NullCount,
 		&stats.EmptyCount,
 	)
@@ -366,6 +379,28 @@ func (c *Client) fetchDateTimeStats(ctx context.Context, tableName, columnName s
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch datetime stats for column '%s': %w", columnName, err)
+	}
+
+	return stats, nil
+}
+
+func (c *Client) fetchJSONStats(ctx context.Context, tableName, columnName string) (*diff.JSONStatistics, error) {
+	stats := &diff.JSONStatistics{}
+
+	// Get count and null count for JSON columns
+	query := fmt.Sprintf(`
+        SELECT 
+            COUNT(*) as count_val,
+            COUNT(*) - COUNT(%s) as null_count
+        FROM %s
+    `, columnName, tableName)
+
+	err := c.connection.QueryRowContext(ctx, query).Scan(
+		&stats.Count,
+		&stats.NullCount,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch JSON stats for column '%s': %w", columnName, err)
 	}
 
 	return stats, nil
