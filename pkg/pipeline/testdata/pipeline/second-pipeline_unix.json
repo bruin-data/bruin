@@ -50,7 +50,8 @@
             "custom_checks": [],
             "metadata": {},
             "snowflake": null,
-            "athena": null
+            "athena": null,
+            "bigquery": null
         },
         {
             "id": "a01e7580b118b5fbbdc1f7c8de6b8c377c684727e4e8ad574e9153a3dbd46dd1",
@@ -87,7 +88,8 @@
             "custom_checks": [],
             "metadata": {},
             "snowflake": null,
-            "athena": null
+            "athena": null,
+            "bigquery": null
         },
         {
             "id": "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
@@ -235,7 +237,8 @@
             ],
             "metadata": {},
             "snowflake": null,
-            "athena": null
+            "athena": null,
+            "bigquery": null
         }
     ],
     "notifications": {
