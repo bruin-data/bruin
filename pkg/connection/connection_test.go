@@ -2,6 +2,7 @@ package connection
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
@@ -411,6 +412,13 @@ func TestNewManagerFromConfig(t *testing.T) {
 func TestManager_AddSfConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
+	// Create a temporary file for tests that need it
+	tempFile, err := os.CreateTemp("", "test_private_key_*.pem")
+	require.NoError(t, err)
+	tempFilePath := tempFile.Name()
+	tempFile.Close()
+	defer os.Remove(tempFilePath)
+
 	tests := []struct {
 		name          string
 		connection    *config.SnowflakeConnection
@@ -438,7 +446,7 @@ func TestManager_AddSfConnectionFromConfig(t *testing.T) {
 				Username:       "test-user",
 				Password:       "test-password",
 				Region:         "us-east-1",
-				PrivateKeyPath: "/tmp/test_private_key.pem",
+				PrivateKeyPath: tempFilePath,
 			},
 			wantErr:       true, // Will fail due to missing file, but tests the logic
 			setupTempFile: true,
@@ -452,7 +460,7 @@ func TestManager_AddSfConnectionFromConfig(t *testing.T) {
 				Password:       "test-password",
 				Region:         "us-east-1",
 				PrivateKey:     "-----BEGIN PRIVATE KEY-----\nDirect Key Content\n-----END PRIVATE KEY-----",
-				PrivateKeyPath: "/tmp/test_private_key.pem",
+				PrivateKeyPath: tempFilePath,
 			},
 			wantErr:       true, // Connection will fail, but should use PrivateKey, not path
 			setupTempFile: true,
@@ -476,7 +484,7 @@ func TestManager_AddSfConnectionFromConfig(t *testing.T) {
 				Username:       "test-user",
 				Password:       "test-password",
 				Region:         "us-east-1",
-				PrivateKeyPath: "/nonexistent/path/key.pem",
+				PrivateKeyPath: filepath.Join(os.TempDir(), "nonexistent", "key.pem"),
 			},
 			wantErr: true,
 		},
@@ -521,11 +529,15 @@ func TestManager_AddSfConnectionFromConfig_PrivateKeyPriority(t *testing.T) {
 	t.Parallel()
 
 	// Create a temporary file with different content
-	tempFile := "/tmp/test_snowflake_key.pem"
-	fileContent := "-----BEGIN PRIVATE KEY-----\nFile Content\n-----END PRIVATE KEY-----"
-	err := os.WriteFile(tempFile, []byte(fileContent), 0600)
+	tempFile, err := os.CreateTemp("", "test_snowflake_key_*.pem")
 	require.NoError(t, err)
-	defer os.Remove(tempFile)
+	tempFilePath := tempFile.Name()
+	tempFile.Close()
+	defer os.Remove(tempFilePath)
+
+	fileContent := "-----BEGIN PRIVATE KEY-----\nFile Content\n-----END PRIVATE KEY-----"
+	err = os.WriteFile(tempFilePath, []byte(fileContent), 0600)
+	require.NoError(t, err)
 
 	directKeyContent := "-----BEGIN PRIVATE KEY-----\nDirect Key Content\n-----END PRIVATE KEY-----"
 
@@ -536,7 +548,7 @@ func TestManager_AddSfConnectionFromConfig_PrivateKeyPriority(t *testing.T) {
 		Password:       "test-password",
 		Region:         "us-east-1",
 		PrivateKey:     directKeyContent,
-		PrivateKeyPath: tempFile,
+		PrivateKeyPath: tempFilePath,
 	}
 
 	m := Manager{}
