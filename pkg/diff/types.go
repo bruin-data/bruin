@@ -303,6 +303,52 @@ func NewPostgresTypeMapper() *DatabaseTypeMapper {
 	return mapper
 }
 
+// NewSnowflakeTypeMapper provides Snowflake-specific type mapping.
+func NewSnowflakeTypeMapper() *DatabaseTypeMapper {
+	mapper := NewDatabaseTypeMapper()
+
+	// Numeric types in Snowflake
+	mapper.AddNumericTypes(
+		"number", "decimal", "numeric",
+		"int", "integer", "bigint", "smallint", "tinyint",
+		"byteint",
+		"float", "float4", "float8",
+		"double", "double precision",
+		"real",
+	)
+
+	// String types in Snowflake
+	mapper.AddStringTypes(
+		"varchar", "char", "character",
+		"string", "text",
+	)
+
+	// Boolean types in Snowflake
+	mapper.AddBooleanTypes(
+		"boolean", "bool",
+	)
+
+	// DateTime types in Snowflake
+	mapper.AddDateTimeTypes(
+		"date",
+		"datetime",
+		"time",
+		"timestamp", "timestamp_ltz", "timestamp_ntz", "timestamp_tz",
+	)
+
+	// Binary types in Snowflake
+	mapper.AddBinaryTypes(
+		"binary", "varbinary",
+	)
+
+	// JSON types in Snowflake
+	mapper.AddJSONTypes(
+		"variant", "object", "array",
+	)
+
+	return mapper
+}
+
 type Table struct {
 	Name    string
 	Columns []*Column
