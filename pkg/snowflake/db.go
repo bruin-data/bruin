@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -22,6 +23,8 @@ type DB struct {
 	conn          *sqlx.DB
 	config        *Config
 	schemaCreator *ansisql.SchemaCreator
+	dsn           string
+	mutex         sync.Mutex
 }
 
 func NewDB(c *Config) (*DB, error) {
@@ -32,16 +35,29 @@ func NewDB(c *Config) (*DB, error) {
 
 	gosnowflake.GetLogger().SetOutput(io.Discard)
 
-	db, err := sqlx.Connect("snowflake", dsn)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to connect to snowflake")
-	}
-
 	return &DB{
-		conn:          db,
 		config:        c,
 		schemaCreator: ansisql.NewSchemaCreator(),
+		dsn:           dsn,
+		mutex:         sync.Mutex{},
 	}, nil
+}
+
+func (db *DB) initializeDB() error {
+	db.mutex.Lock()
+	defer db.mutex.Unlock()
+
+	if db.conn != nil {
+		return nil
+	}
+
+	conn, err := sqlx.Open("snowflake", db.dsn)
+	if err != nil {
+		return errors.Wrapf(err, "failed to open snowflake connection")
+	}
+
+	db.conn = conn
+	return nil
 }
 
 func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
@@ -54,6 +70,9 @@ func (db *DB) GetIngestrURI() (string, error) {
 }
 
 func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
+	if err := db.initializeDB(); err != nil {
+		return nil, err
+	}
 	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create snowflake context")
@@ -103,6 +122,9 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 }
 
 func (db *DB) IsValid(ctx context.Context, query *query.Query) (bool, error) {
+	if err := db.initializeDB(); err != nil {
+		return false, err
+	}
 	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
 	if err != nil {
 		return false, errors.Wrap(err, "failed to create snowflake context")
@@ -147,6 +169,9 @@ func (db *DB) Ping(ctx context.Context) error {
 }
 
 func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+	if err := db.initializeDB(); err != nil {
+		return nil, err
+	}
 	// Prepare Snowflake context for the query execution
 	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
 	if err != nil {

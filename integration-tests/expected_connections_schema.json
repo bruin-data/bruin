@@ -1593,8 +1593,7 @@
       "required": [
         "name",
         "account",
-        "username",
-        "region"
+        "username"
       ]
     },
     "SpannerConnection": {
