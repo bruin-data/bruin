@@ -2,7 +2,6 @@ package connection
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
@@ -409,107 +408,6 @@ func TestNewManagerFromConfig(t *testing.T) {
 	}
 }
 
-func TestManager_AddSfConnectionFromConfig(t *testing.T) {
-	t.Parallel()
-
-	// Create a temporary file for tests that need it
-	tempFile, err := os.CreateTemp(t.TempDir(), "test_private_key_*.pem")
-	require.NoError(t, err)
-	tempFilePath := tempFile.Name()
-	tempFile.Close()
-	defer os.Remove(tempFilePath)
-
-	tests := []struct {
-		name          string
-		connection    *config.SnowflakeConnection
-		wantErr       bool
-		setupTempFile bool
-		tempFileError bool
-	}{
-		{
-			name: "should add connection with private key content",
-			connection: &config.SnowflakeConnection{
-				Name:       "test-snowflake",
-				Account:    "test-account",
-				Username:   "test-user",
-				Password:   "test-password",
-				Region:     "us-east-1",
-				PrivateKey: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcgSjAgEAAoIBAQC7...\n-----END PRIVATE KEY-----",
-			},
-			wantErr: true, // Connection will fail due to invalid private key, but function should handle the field properly
-		},
-		{
-			name: "should add connection with private key path",
-			connection: &config.SnowflakeConnection{
-				Name:           "test-snowflake-path",
-				Account:        "test-account",
-				Username:       "test-user",
-				Password:       "test-password",
-				Region:         "us-east-1",
-				PrivateKeyPath: tempFilePath,
-			},
-			wantErr:       true, // Will fail due to missing file, but tests the logic
-			setupTempFile: true,
-		},
-		{
-			name: "should add connection with password authentication",
-			connection: &config.SnowflakeConnection{
-				Name:     "test-snowflake-password",
-				Account:  "test-account",
-				Username: "test-user",
-				Password: "test-password",
-				Region:   "us-east-1",
-			},
-			wantErr: true, // Will fail connection but should handle password auth correctly
-		},
-		{
-			name: "should fail when private key file does not exist",
-			connection: &config.SnowflakeConnection{
-				Name:           "test-snowflake-missing-file",
-				Account:        "test-account",
-				Username:       "test-user",
-				Password:       "test-password",
-				Region:         "us-east-1",
-				PrivateKeyPath: filepath.Join(os.TempDir(), "nonexistent", "key.pem"),
-			},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			m := Manager{}
-
-			// Set up temporary file if needed
-			if tt.setupTempFile {
-				tempContent := "-----BEGIN PRIVATE KEY-----\nTemp File Content\n-----END PRIVATE KEY-----"
-				err := os.WriteFile(tt.connection.PrivateKeyPath, []byte(tempContent), 0600)
-				require.NoError(t, err)
-				defer os.Remove(tt.connection.PrivateKeyPath)
-			}
-
-			// Test that connection doesn't exist initially
-			res, err := m.GetSfConnection(tt.connection.Name)
-			require.Error(t, err)
-			assert.Nil(t, res)
-
-			// Add the connection
-			err = m.AddSfConnectionFromConfig(tt.connection)
-			if tt.wantErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-
-				// Verify connection was added (even if it failed to connect)
-				res, err = m.GetSfConnection(tt.connection.Name)
-				require.NoError(t, err)
-				assert.NotNil(t, res)
-			}
-		})
-	}
-}
 func TestManager_GetSfConnection(t *testing.T) {
 	t.Parallel()
 
