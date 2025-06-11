@@ -887,6 +887,7 @@ func SetupExecutors(
 		}
 	}
 
+	//nolint:dupl
 	if s.WillRunTaskOfType(pipeline.AssetTypeDatabricksQuery) || estimateCustomCheckType == pipeline.AssetTypeDatabricksQuery ||
 		s.WillRunTaskOfType(pipeline.AssetTypeDatabricksSeed) || s.WillRunTaskOfType(pipeline.AssetTypeDatabricksQuerySensor) {
 		databricksOperator := databricks.NewBasicOperator(conn, wholeFileExtractor, databricks.NewMaterializer(fullRefresh))
