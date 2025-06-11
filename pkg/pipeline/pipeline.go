@@ -112,6 +112,7 @@ var defaultMapping = map[string]string{
 	"oracle":                "oracle-default",
 	"solidgate":             "solidgate-default",
 	"smartsheet":            "smartsheet-default",
+	"sftp":                  "sftp-default",
 }
 
 var SupportedFileSuffixes = []string{"asset.yml", "asset.yaml", ".sql", ".py", "task.yml", "task.yaml"}
