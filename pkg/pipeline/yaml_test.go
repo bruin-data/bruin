@@ -9,6 +9,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -310,4 +311,43 @@ func TestUpstreams(t *testing.T) {
 
 	// Compare the expected and actual results
 	require.Equal(t, expected, got)
+}
+
+func TestConvertYamlToTask_ProfilingDefaults(t *testing.T) {
+	t.Parallel()
+
+	content := []byte(`
+name: profiling.default
+type: bq.sql
+run: hello.sql
+columns:
+  - name: col1
+`)
+
+	task, err := pipeline.ConvertYamlToTask(content)
+	require.NoError(t, err)
+
+	assert.Equal(t, pipeline.ProfilingBasic, task.Profiling)
+	require.Len(t, task.Columns, 1)
+	assert.False(t, task.Columns[0].Profiling)
+}
+
+func TestConvertYamlToTask_ProfilingAllColumnsDefault(t *testing.T) {
+	t.Parallel()
+
+	content := []byte(`
+name: profiling.all
+type: bq.sql
+profiling: all_columns
+run: hello.sql
+columns:
+  - name: col1
+`)
+
+	task, err := pipeline.ConvertYamlToTask(content)
+	require.NoError(t, err)
+
+	assert.Equal(t, pipeline.ProfilingAllColumns, task.Profiling)
+	require.Len(t, task.Columns, 1)
+	assert.True(t, task.Columns[0].Profiling)
 }

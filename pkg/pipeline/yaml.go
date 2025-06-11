@@ -273,6 +273,7 @@ type column struct {
 	Tests         []columnCheck    `yaml:"checks"`
 	PrimaryKey    bool             `yaml:"primary_key"`
 	UpdateOnMerge bool             `yaml:"update_on_merge"`
+	Profiling     *bool            `yaml:"profiling"`
 	Upstreams     []columnUpstream `yaml:"upstreams"`
 }
 
@@ -303,6 +304,7 @@ type taskDefinition struct {
 	URI               string            `yaml:"uri"`
 	Description       string            `yaml:"description"`
 	Type              string            `yaml:"type"`
+	Profiling         string            `yaml:"profiling"`
 	RunFile           string            `yaml:"run"`
 	Depends           depends           `yaml:"depends"`
 	Parameters        map[string]string `yaml:"parameters"`
@@ -392,6 +394,11 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		TimeGranularity: MaterializationTimeGranularity(strings.ToLower(definition.Materialization.TimeGranularity)),
 	}
 
+	profiling := ProfilingLevel(strings.ToLower(definition.Profiling))
+	if profiling == "" {
+		profiling = ProfilingBasic
+	}
+
 	columns := make([]Column, len(definition.Columns))
 	for index, column := range definition.Columns {
 		tests := make([]ColumnCheck, 0, len(column.Tests))
@@ -433,6 +440,13 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			}
 		}
 
+		colProfiling := false
+		if column.Profiling != nil {
+			colProfiling = *column.Profiling
+		} else if profiling == ProfilingAllColumns {
+			colProfiling = true
+		}
+
 		columns[index] = Column{
 			Name:            column.Name,
 			Type:            strings.TrimSpace(column.Type),
@@ -440,6 +454,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			Checks:          tests,
 			PrimaryKey:      column.PrimaryKey,
 			UpdateOnMerge:   column.UpdateOnMerge,
+			Profiling:       colProfiling,
 			EntityAttribute: entityDefinition,
 			Extends:         column.Extends,
 			Upstreams:       upstreamColumns,
@@ -471,6 +486,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Name:              definition.Name,
 		Description:       definition.Description,
 		Type:              AssetType(definition.Type),
+		Profiling:         profiling,
 		Parameters:        definition.Parameters,
 		Connection:        definition.Connection,
 		Secrets:           make([]SecretMapping, len(definition.Secrets)),

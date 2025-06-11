@@ -55,11 +55,16 @@ Must consist of letters and dot `.` character.
 
 ## `type`
 The type of the asset, determines how the execution will happen. Must be one of the types [here](https://github.com/bruin-data/bruin/blob/main/pkg/executor/defaults.go).
-- **Type:** `String` 
+- **Type:** `String`
+
+## `profiling`
+Controls how much automatic profiling Bruin will perform on this asset. Accepted values are `basic`, `off`, `selected_columns`, or `all_columns`.
+Defaults to `basic`.
+- **Type:** `String`
 
 ## `owner`
-The owner of the asset, has no functional implications on Bruin CLI as of today, allows documenting the ownership information. On [Bruin Cloud](https://getbruin.com), it is used to analyze ownership information, used in governance reports and ownership lineage.  
-- **Type:** `String` 
+The owner of the asset, has no functional implications on Bruin CLI as of today, allows documenting the ownership information. On [Bruin Cloud](https://getbruin.com), it is used to analyze ownership information, used in governance reports and ownership lineage.
+- **Type:** `String`
 
 ## `tags`
 As the name states, tags that are applied to the asset. These tags can then be used while running assets, e.g.:

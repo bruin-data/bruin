@@ -20,6 +20,7 @@ columns:
     type: integer
     description: "Just a number"
     primary_key: true
+    profiling: true
     checks:
       - name: unique
       - name: not_null
@@ -44,6 +45,7 @@ Each column will have the following keys:
 | `description`     | String  | no   | The description for the column                                                  |
 | `primary_key`     | Bool    | no   | Whether the column is a primary key                                             |
 | `update_on_merge` | Bool    | no   | Whether the column should be updated with [`merge`](./materialization.md#merge) |
+| `profiling`       | Bool    | no   | Whether the column should be profiled. Defaults to `true` when asset profiling is `all_columns`, otherwise `false` |
 | `checks`          | Check[] | no   | The quality checks defined for the column                                       |
 
 ### Quality Checks
