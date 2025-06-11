@@ -413,7 +413,7 @@ func TestManager_AddSfConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
 	// Create a temporary file for tests that need it
-	tempFile, err := os.CreateTemp("", "test_private_key_*.pem")
+	tempFile, err := os.CreateTemp(t.TempDir(), "test_private_key_*.pem")
 	require.NoError(t, err)
 	tempFilePath := tempFile.Name()
 	tempFile.Close()
@@ -529,7 +529,7 @@ func TestManager_AddSfConnectionFromConfig_PrivateKeyPriority(t *testing.T) {
 	t.Parallel()
 
 	// Create a temporary file with different content
-	tempFile, err := os.CreateTemp("", "test_snowflake_key_*.pem")
+	tempFile, err := os.CreateTemp(t.TempDir(), "test_snowflake_key_*.pem")
 	require.NoError(t, err)
 	tempFilePath := tempFile.Name()
 	tempFile.Close()
