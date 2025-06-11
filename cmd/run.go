@@ -1021,7 +1021,7 @@ func SetupExecutors(
 		if s.WillRunTaskOfType(typ) {
 			emrServerlessOperator, err := emr_serverless.NewBasicOperator(conn, jinjaVariables, renderer)
 			emrCheckRunner := emr_serverless.NewColumnCheckOperator(conn)
-			emrCustomCheckRunner := emr_serverless.NewCustomCheckOperator(conn)
+			emrCustomCheckRunner := emr_serverless.NewCustomCheckOperator(conn, renderer)
 			if err != nil {
 				return nil, err
 			}
