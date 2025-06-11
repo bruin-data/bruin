@@ -313,6 +313,7 @@ func formatDiffValue(rawDiff float64, percentageDiff string) string {
 
 func tableStatsToTable(stats1 diff.ColumnStatistics, stats2 diff.ColumnStatistics, table1Name, table2Name string, tolerance float64) string {
 	t := table.NewWriter()
+	t.SetStyle(table.StyleRounded)
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{Number: 1, Align: text.AlignLeft},
 		{Number: 2, Align: text.AlignRight},
@@ -561,13 +562,15 @@ func tableStatsToTable(stats1 diff.ColumnStatistics, stats2 diff.ColumnStatistic
 
 func getColumnTypesComparisonTable(schemaComparison diff.SchemaComparisonResult, table1Name, table2Name string) string {
 	t := table.NewWriter()
+	t.SetStyle(table.StyleRounded)
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{Number: 1, Align: text.AlignLeft},
 		{Number: 2, Align: text.AlignLeft},
 		{Number: 3, Align: text.AlignLeft},
+		{Number: 4, Align: text.AlignLeft},
 	})
 
-	t.AppendHeader(table.Row{"Column", table1Name, table2Name})
+	t.AppendHeader(table.Row{"COLUMN", "PROP", table1Name, table2Name})
 
 	t1Schema := schemaComparison.Table1.Table
 	t2Schema := schemaComparison.Table2.Table
@@ -598,47 +601,122 @@ func getColumnTypesComparisonTable(schemaComparison diff.SchemaComparisonResult,
 		columnNames = append(columnNames, name)
 	}
 
-	// Sort column names alphabetically for consistent output
-	for i := 0; i < len(columnNames); i++ {
-		for j := i + 1; j < len(columnNames); j++ {
-			if columnNames[i] > columnNames[j] {
-				columnNames[i], columnNames[j] = columnNames[j], columnNames[i]
-			}
-		}
-	}
-
 	// Set row painter to highlight differences
 	t.SetRowPainter(func(row table.Row) text.Colors {
-		if len(row) >= 3 {
-			table1Type := fmt.Sprintf("%v", row[1])
-			table2Type := fmt.Sprintf("%v", row[2])
+		if len(row) >= 4 {
+			table1Value := fmt.Sprintf("%v", row[2])
+			table2Value := fmt.Sprintf("%v", row[3])
 
-			// If one is dash (missing) or types are different, highlight in red
-			if table1Type == "-" || table2Type == "-" || table1Type != table2Type {
+			// If one is dash (missing) or values are different, highlight in red
+			if table1Value != table2Value {
 				return text.Colors{text.FgRed}
 			}
-			// If types match, highlight in green
+			// If values match, highlight in green
 			return text.Colors{text.FgGreen}
 		}
 		return text.Colors{}
 	})
 
-	// Add rows for each column
+	// Prepare all rows for sorting
+	type tableRow struct {
+		columnName string
+		prop       string
+		value1     string
+		value2     string
+	}
+	
+	var allRows []tableRow
+	
+	// Add rows for each column with detailed properties
 	for _, columnName := range columnNames {
-		t1Type := "-"
-		t2Type := "-"
-
+		var t1Col, t2Col *diff.Column
+		var t1Exists, t2Exists bool
+		
 		if col, exists := t1Columns[columnName]; exists {
-			t1Type = col.Type
+			t1Col = col
+			t1Exists = true
 		}
 		if col, exists := t2Columns[columnName]; exists {
-			t2Type = col.Type
+			t2Col = col
+			t2Exists = true
 		}
 
-		t.AppendRow(table.Row{columnName, t1Type, t2Type})
+		// Add three rows for each column
+		allRows = append(allRows, tableRow{
+			columnName: columnName,
+			prop:       "Type",
+			value1:     getColumnValue(t1Col, t1Exists, "type"),
+			value2:     getColumnValue(t2Col, t2Exists, "type"),
+		})
+		
+		allRows = append(allRows, tableRow{
+			columnName: columnName,
+			prop:       "Nullable",
+			value1:     getColumnValue(t1Col, t1Exists, "nullable"),
+			value2:     getColumnValue(t2Col, t2Exists, "nullable"),
+		})
+		
+		allRows = append(allRows, tableRow{
+			columnName: columnName,
+			prop:       "Constraints",
+			value1:     getColumnValue(t1Col, t1Exists, "constraints"),
+			value2:     getColumnValue(t2Col, t2Exists, "constraints"),
+		})
 	}
 
+	// Add all rows to table
+	lastColName := ""
+	for _, row := range allRows {
+		if lastColName == "" {
+			lastColName = row.columnName
+		} else if lastColName != row.columnName {
+			t.AppendSeparator()
+			lastColName = row.columnName
+		}
+		t.AppendRow(table.Row{row.columnName, row.prop, row.value1, row.value2})
+	}
+
+	// Enable auto-merge for column names
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{Number: 1, Align: text.AlignLeft, AutoMerge: true},
+		{Number: 2, Align: text.AlignLeft},
+		{Number: 3, Align: text.AlignLeft},
+		{Number: 4, Align: text.AlignLeft},
+	})
+	// t.Style().Options.SeparateRows = true
+
 	return t.Render()
+}
+
+// Helper function to get column values for different properties
+func getColumnValue(col *diff.Column, exists bool, property string) string {
+	if !exists || col == nil {
+		return "-"
+	}
+	
+	switch property {
+	case "type":
+		return col.Type
+	case "nullable":
+		if col.Nullable {
+			return "NULLABLE"
+		}
+		return "NOT NULL"
+	case "constraints":
+		var constraints []string
+		if col.PrimaryKey {
+			constraints = append(constraints, "PK")
+		}
+		if col.Unique {
+			constraints = append(constraints, "UNIQUE")
+		}
+		if len(constraints) == 0 {
+			return "-"
+		}
+		return strings.Join(constraints, ", ")
+	default:
+		return "-"
+	}
 }
 
 func getColumnDifferencesTable(columnDifferences []diff.ColumnDifference, table1Name, table2Name string) string {

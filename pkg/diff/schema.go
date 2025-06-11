@@ -63,6 +63,7 @@ type SchemaComparisonResult struct {
 
 func (c *SchemaComparisonResult) GetSummaryTable() string {
 	t := table.NewWriter()
+	t.SetStyle(table.StyleRounded)
 	t.SetRowPainter(func(row table.Row) text.Colors {
 		if len(row) == 0 {
 			return text.Colors{}
