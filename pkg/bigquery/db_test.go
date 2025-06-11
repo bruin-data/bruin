@@ -1372,3 +1372,92 @@ func TestBuildTableExistsQuery(t *testing.T) {
 		})
 	}
 }
+
+func TestClient_MaterializationTypeMatches(t *testing.T) {
+	t.Parallel()
+
+	projectID := "test-project"
+	dataset := "dataset"
+	table := "table"
+
+	makeClient := func(serverURL string) (*Client, error) {
+		client, err := bigquery.NewClient(
+			context.Background(),
+			projectID,
+			option.WithEndpoint(serverURL),
+			option.WithCredentials(&google.Credentials{
+				ProjectID:   projectID,
+				TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "some-token"}),
+			}),
+		)
+		if err != nil {
+			return nil, err
+		}
+		return &Client{client: client, config: &Config{ProjectID: projectID}}, nil
+	}
+
+	tests := []struct {
+		name       string
+		tableType  string
+		statusCode int
+		assetType  pipeline.MaterializationType
+		want       bool
+	}{
+		{
+			name:       "types match",
+			tableType:  "TABLE",
+			statusCode: http.StatusOK,
+			assetType:  pipeline.MaterializationTypeTable,
+			want:       true,
+		},
+		{
+			name:       "types mismatch",
+			tableType:  "TABLE",
+			statusCode: http.StatusOK,
+			assetType:  pipeline.MaterializationTypeView,
+			want:       false,
+		},
+		{
+			name:       "table not found",
+			tableType:  "",
+			statusCode: http.StatusNotFound,
+			assetType:  pipeline.MaterializationTypeTable,
+			want:       true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if !strings.HasPrefix(r.RequestURI, fmt.Sprintf("/projects/%s/datasets/%s/tables/%s", projectID, dataset, table)) {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+
+				w.WriteHeader(tt.statusCode)
+				if tt.statusCode == http.StatusOK {
+					resp, _ := json.Marshal(&bigquery2.Table{Type: tt.tableType})
+					_, _ = w.Write(resp)
+				} else {
+					resp, _ := json.Marshal(&googleapi.Error{Code: tt.statusCode})
+					_, _ = w.Write(resp)
+				}
+			}))
+			defer server.Close()
+
+			c, err := makeClient(server.URL)
+			require.NoError(t, err)
+
+			asset := &pipeline.Asset{
+				Name:            fmt.Sprintf("%s.%s", dataset, table),
+				Materialization: pipeline.Materialization{Type: tt.assetType},
+			}
+
+			got, err := c.MaterializationTypeMatches(context.Background(), asset)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
