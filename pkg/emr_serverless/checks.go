@@ -7,6 +7,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/athena"
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 )
 
@@ -69,11 +70,11 @@ func (o *CustomCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance
 	return o.builder(conn).Check(ctx, instance)
 }
 
-func NewCustomCheckOperator(conn connectionFetcher) *CustomCheckOperator {
+func NewCustomCheckOperator(conn connectionFetcher, renderer jinja.RendererInterface) *CustomCheckOperator {
 	return &CustomCheckOperator{
 		conn: conn,
 		builder: func(c *connectionRemapper) CustomCheckRunner {
-			return ansisql.NewCustomCheck(c, nil)
+			return ansisql.NewCustomCheck(c, renderer)
 		},
 	}
 }
