@@ -7,7 +7,6 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
-	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 )
@@ -217,12 +216,31 @@ func TestCreateTaskFromYamlDefinition(t *testing.T) {
 			},
 		},
 		{
-			name: "depends must be an array of strings",
+			name: "depends can be a single string",
 			args: args{
 				filePath: filepath.Join("testdata", "yaml", "random-structure", "task.yml"),
 			},
-			wantErr: true,
-			err:     errors.New("Malformed `depends` items"),
+			want: &pipeline.Asset{
+				ID:           "afa27b44d43b02a9fea41d13cedc2e4016cfcf87c5dbf990e593669aa8ce286d",
+				Name:         "hello-world",
+				Type:         "type1",
+				Secrets:      []pipeline.SecretMapping{},
+				Columns:      []pipeline.Column{},
+				CustomChecks: []pipeline.CustomCheck{},
+				ExecutableFile: pipeline.ExecutableFile{
+					Name:    "task.yml",
+					Path:    path.AbsPathForTests(t, filepath.Join("testdata", "yaml", "random-structure", "task.yml")),
+					Content: mustRead(t, filepath.Join("testdata", "yaml", "random-structure", "task.yml")) + "\n",
+				},
+				Upstreams: []pipeline.Upstream{
+					{
+						Type:    "asset",
+						Value:   "task1",
+						Columns: []pipeline.DependsColumn{},
+						Mode:    pipeline.UpstreamModeFull,
+					},
+				},
+			},
 		},
 	}
 	for _, tt := range tests {

@@ -102,14 +102,24 @@ type upstream struct {
 }
 
 func (a *depends) UnmarshalYAML(value *yaml.Node) error {
-	var multi []upstream
-	err := value.Decode(&multi)
-	if err != nil {
+	switch value.Kind {
+	case yaml.SequenceNode:
+		var multi []upstream
+		if err := value.Decode(&multi); err != nil {
+			return &ParseError{Msg: "Malformed `depends` items"}
+		}
+		*a = multi
+		return nil
+	case yaml.ScalarNode, yaml.MappingNode:
+		var single upstream
+		if err := value.Decode(&single); err != nil {
+			return &ParseError{Msg: "Malformed `depends` items"}
+		}
+		*a = []upstream{single}
+		return nil
+	default:
 		return &ParseError{Msg: "Malformed `depends` items"}
 	}
-	*a = multi
-
-	return nil
 }
 
 func (u *upstream) UnmarshalYAML(value *yaml.Node) error {
