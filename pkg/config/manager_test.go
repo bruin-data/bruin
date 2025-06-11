@@ -502,6 +502,15 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "api-key-123",
 				},
 			},
+			Sftp: []SFTPConnection{
+				{
+					Name:     "sftp-1",
+					Host:     "sftp-host",
+					Port:     22,
+					Username: "sftp-user",
+					Password: "sftp-password",
+				},
+			},
 		},
 	}
 
