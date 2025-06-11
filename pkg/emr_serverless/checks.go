@@ -73,7 +73,7 @@ func NewCustomCheckOperator(conn connectionFetcher) *CustomCheckOperator {
 	return &CustomCheckOperator{
 		conn: conn,
 		builder: func(c *connectionRemapper) CustomCheckRunner {
-			return ansisql.NewCustomCheck(c)
+			return ansisql.NewCustomCheck(c, nil)
 		},
 	}
 }
