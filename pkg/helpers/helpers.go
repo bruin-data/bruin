@@ -80,6 +80,10 @@ func CastResultToInteger(res [][]interface{}) (int64, error) {
 		}
 		return int64(v), nil
 	case uint:
+		if uint64(v) > math.MaxInt64 {
+			return 0, errors.Errorf("uint value %d overflows int64", v)
+		}
+		// #nosec G115: overflow is checked above
 		return int64(v), nil
 	case bool:
 		if v {
