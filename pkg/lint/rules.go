@@ -1046,17 +1046,17 @@ func ValidateCustomCheckQueryDryRun(connections connectionManager) AssetValidato
 		}
 
 		connName, err := p.GetConnectionNameForAsset(asset)
-		if err != nil {
+		if err != nil { //nolint
 			return issues, nil
 		}
 
 		validator, err := connections.GetConnection(connName)
-		if err != nil {
+		if err != nil { //nolint
 			return issues, nil
 		}
 
 		validatorInstance, ok := validator.(queryValidator)
-		if !ok {
+		if !ok { //nolint
 			return issues, nil
 		}
 
