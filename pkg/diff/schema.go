@@ -149,7 +149,7 @@ func CompareTableSchemas(summary1, summary2 *TableSummaryResult, t1Name, t2Name 
 					Table2NormalizedType: col2.NormalizedType,
 					IsComparable:         normalizedTypesMatch,
 				}
-				
+
 				columnIsDifferent = true
 			}
 			if col1.Nullable != col2.Nullable {

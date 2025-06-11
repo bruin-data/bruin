@@ -485,7 +485,7 @@ func (d *Client) BuildTableExistsQuery(tableName string) (string, error) {
 
 func (d *Client) GetTableSummary(ctx context.Context, tableName string, schemaOnly bool) (*diff.TableSummaryResult, error) {
 	var rowCount int64
-	
+
 	// Get row count only if not in schema-only mode
 	if !schemaOnly {
 		countQuery := fmt.Sprintf("SELECT COUNT(*) as row_count FROM `%s`", tableName)

@@ -214,7 +214,7 @@ func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, t
 		} else {
 			overallSchemaMessage = "Table schemas are considered identical."
 		}
-		
+
 		greenPrinter.Fprintf(errOut, "\n%s\n", overallSchemaMessage)
 		if schemaOnly {
 			return false // No differences found in schema-only mode
@@ -226,7 +226,7 @@ func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, t
 	}
 
 	// Skip detailed column statistics in schema-only mode
-	if !schemaOnly {
+	if !schemaOnly { //nolint:nestif
 		t1Columns := make(map[string]*diff.Column)
 		for _, column := range t1Schema.Columns {
 			t1Columns[column.Name] = column
@@ -256,7 +256,7 @@ func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, t
 						fmt.Fprintf(errOut, "\n%s%s\n", t1Column.Name, typeInfo)
 						fmt.Fprintf(errOut, "%s\n", tableStatsToTable(t1Column.Stats, t2Column.Stats, table1Name, table2Name, tolerance))
 						someColumnsExist = true
-						
+
 						// Check if this column has data differences beyond tolerance
 						if hasDataDifferences(t1Column.Stats, t2Column.Stats, tolerance) {
 							hasDifferences = true
@@ -268,32 +268,31 @@ func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, t
 				fmt.Fprintf(errOut, "No columns exist in both tables.\n")
 			}
 		}
-		
+
 		// If no schema differences but we're not in schema-only mode, check if only identical
 		if !schemaComparison.HasSchemaDifferences && !schemaComparison.HasRowCountDifference && !hasDifferences {
 			greenPrinter.Fprintf(errOut, "\n%s\n", overallSchemaMessage)
 		}
 	}
-	
+
 	// Return true if any differences were found
 	return hasDifferences
 }
 
-// hasDataDifferences checks if column statistics have differences beyond the tolerance
 func hasDataDifferences(stats1, stats2 diff.ColumnStatistics, tolerance float64) bool {
 	if stats1 == nil || stats2 == nil {
 		return false
 	}
-	
+
 	if stats1.Type() != stats2.Type() {
 		return true // Different stat types indicate data differences
 	}
-	
+
 	switch stats1.Type() {
 	case "numerical":
 		numStats1 := stats1.(*diff.NumericalStatistics)
 		numStats2 := stats2.(*diff.NumericalStatistics)
-		
+
 		// Check count differences
 		if hasSignificantDifference(float64(numStats1.Count), float64(numStats2.Count), tolerance) {
 			return true
@@ -308,11 +307,11 @@ func hasDataDifferences(stats1, stats2 diff.ColumnStatistics, tolerance float64)
 				return true
 			}
 		}
-		
+
 	case "string":
 		strStats1 := stats1.(*diff.StringStatistics)
 		strStats2 := stats2.(*diff.StringStatistics)
-		
+
 		if hasSignificantDifference(float64(strStats1.Count), float64(strStats2.Count), tolerance) {
 			return true
 		}
@@ -322,22 +321,22 @@ func hasDataDifferences(stats1, stats2 diff.ColumnStatistics, tolerance float64)
 		if hasSignificantDifference(float64(strStats1.DistinctCount), float64(strStats2.DistinctCount), tolerance) {
 			return true
 		}
-		
+
 	case "boolean":
 		boolStats1 := stats1.(*diff.BooleanStatistics)
 		boolStats2 := stats2.(*diff.BooleanStatistics)
-		
+
 		if hasSignificantDifference(float64(boolStats1.Count), float64(boolStats2.Count), tolerance) {
 			return true
 		}
 		if hasSignificantDifference(float64(boolStats1.TrueCount), float64(boolStats2.TrueCount), tolerance) {
 			return true
 		}
-		
+
 	case "datetime":
 		dtStats1 := stats1.(*diff.DateTimeStatistics)
 		dtStats2 := stats2.(*diff.DateTimeStatistics)
-		
+
 		if hasSignificantDifference(float64(dtStats1.Count), float64(dtStats2.Count), tolerance) {
 			return true
 		}
@@ -345,11 +344,10 @@ func hasDataDifferences(stats1, stats2 diff.ColumnStatistics, tolerance float64)
 			return true
 		}
 	}
-	
+
 	return false
 }
 
-// hasSignificantDifference checks if two values differ beyond the tolerance percentage
 func hasSignificantDifference(val1, val2, tolerance float64) bool {
 	if val1 == val2 {
 		return false
@@ -711,14 +709,14 @@ func getColumnTypesComparisonTable(schemaComparison diff.SchemaComparisonResult,
 		value1     string
 		value2     string
 	}
-	
-	var allRows []tableRow
-	
+
+	allRows := make([]tableRow, 0)
+
 	// Add rows for each column with detailed properties
 	for _, columnName := range columnNames {
 		var t1Col, t2Col *diff.Column
 		var t1Exists, t2Exists bool
-		
+
 		if col, exists := t1Columns[columnName]; exists {
 			t1Col = col
 			t1Exists = true
@@ -735,14 +733,14 @@ func getColumnTypesComparisonTable(schemaComparison diff.SchemaComparisonResult,
 			value1:     getColumnValue(t1Col, t1Exists, "type"),
 			value2:     getColumnValue(t2Col, t2Exists, "type"),
 		})
-		
+
 		allRows = append(allRows, tableRow{
 			columnName: columnName,
 			prop:       "Nullable",
 			value1:     getColumnValue(t1Col, t1Exists, "nullable"),
 			value2:     getColumnValue(t2Col, t2Exists, "nullable"),
 		})
-		
+
 		allRows = append(allRows, tableRow{
 			columnName: columnName,
 			prop:       "Constraints",
@@ -774,12 +772,11 @@ func getColumnTypesComparisonTable(schemaComparison diff.SchemaComparisonResult,
 	return t.Render()
 }
 
-// Helper function to get column values for different properties
 func getColumnValue(col *diff.Column, exists bool, property string) string {
 	if !exists || col == nil {
 		return "-"
 	}
-	
+
 	switch property {
 	case "type":
 		return col.Type
@@ -803,11 +800,4 @@ func getColumnValue(col *diff.Column, exists bool, property string) string {
 	default:
 		return "-"
 	}
-}
-
-func formatBooleanValue(value bool) string {
-	if value {
-		return color.New(color.FgGreen).Sprint("true")
-	}
-	return color.New(color.FgRed).Sprint("false")
 }

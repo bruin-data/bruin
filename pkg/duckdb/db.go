@@ -168,7 +168,7 @@ func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Ass
 
 func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOnly bool) (*diff.TableSummaryResult, error) {
 	var rowCount int64
-	
+
 	// Get row count only if not in schema-only mode
 	if !schemaOnly {
 		countQuery := "SELECT COUNT(*) as row_count FROM " + tableName
