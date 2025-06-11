@@ -887,9 +887,12 @@ func SetupExecutors(
 		}
 	}
 
-	if s.WillRunTaskOfType(pipeline.AssetTypeDatabricksQuery) || estimateCustomCheckType == pipeline.AssetTypeDatabricksQuery || s.WillRunTaskOfType(pipeline.AssetTypeDatabricksSeed) {
+	//nolint:dupl
+	if s.WillRunTaskOfType(pipeline.AssetTypeDatabricksQuery) || estimateCustomCheckType == pipeline.AssetTypeDatabricksQuery ||
+		s.WillRunTaskOfType(pipeline.AssetTypeDatabricksSeed) || s.WillRunTaskOfType(pipeline.AssetTypeDatabricksQuerySensor) {
 		databricksOperator := databricks.NewBasicOperator(conn, wholeFileExtractor, databricks.NewMaterializer(fullRefresh))
 		databricksCheckRunner := databricks.NewColumnCheckOperator(conn)
+		databricksQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 
 		mainExecutors[pipeline.AssetTypeDatabricksQuery][scheduler.TaskInstanceTypeMain] = databricksOperator
 		mainExecutors[pipeline.AssetTypeDatabricksQuery][scheduler.TaskInstanceTypeColumnCheck] = databricksCheckRunner
@@ -898,6 +901,10 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeDatabricksSeed][scheduler.TaskInstanceTypeMain] = seedOperator
 		mainExecutors[pipeline.AssetTypeDatabricksSeed][scheduler.TaskInstanceTypeColumnCheck] = databricksCheckRunner
 		mainExecutors[pipeline.AssetTypeDatabricksSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeDatabricksQuerySensor][scheduler.TaskInstanceTypeMain] = databricksQuerySensor
+		mainExecutors[pipeline.AssetTypeDatabricksQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = databricksCheckRunner
+		mainExecutors[pipeline.AssetTypeDatabricksQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		// we set the Python runners to run the checks on MsSQL
 		if estimateCustomCheckType == pipeline.AssetTypeDatabricksQuery {
