@@ -1040,32 +1040,31 @@ func EnsureBigQueryQuerySensorHasTableParameterForASingleAsset(ctx context.Conte
 func ValidateCustomCheckQueryDryRun(connections connectionManager) AssetValidator {
 	return func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 		var issues []*Issue
+
+		if len(asset.CustomChecks) == 0 {
+			return issues, nil
+		}
+
+		connName, err := p.GetConnectionNameForAsset(asset)
+		if err != nil { //nolint
+			return issues, nil
+		}
+
+		validator, err := connections.GetConnection(connName)
+		if err != nil { //nolint
+			return issues, nil
+		}
+
+		validatorInstance, ok := validator.(queryValidator)
+		if !ok { //nolint
+			return issues, nil
+		}
+
 		for _, check := range asset.CustomChecks {
 			if strings.TrimSpace(check.Query) == "" {
 				continue
 			}
-			// Get connection name for the asset
-			connName, err := p.GetConnectionNameForAsset(asset)
-			if err != nil {
-				issues = append(issues, &Issue{
-					Task:        asset,
-					Description: fmt.Sprintf("Cannot get connection for custom check '%s': %v", check.Name, err),
-				})
-				continue
-			}
-			validator, err := connections.GetConnection(connName)
-			if err != nil {
-				issues = append(issues, &Issue{
-					Task:        asset,
-					Description: fmt.Sprintf("Cannot get connection for custom check '%s': %v", check.Name, err),
-				})
-				continue
-			}
-			validatorInstance, ok := validator.(queryValidator)
-			if !ok {
-				// Just skip if the validator does not implement queryValidator
-				continue
-			}
+
 			q := &query.Query{Query: check.Query}
 			valid, err := validatorInstance.IsValid(ctx, q)
 			if err != nil {
