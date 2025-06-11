@@ -3,7 +3,7 @@
 # Tabs Overview
 These tabs give you direct access to view and manage details of the currently open Bruin asset.
 
-## 1. Asset Details
+## 1. General
 This tab provides a comprehensive view of your asset, allowing you to manage key information and execute actions directly from the UI.
 
 - **Pipeline & Asset Name**: Displays the current pipeline and asset names. The asset name can be updated from the UI.
@@ -35,13 +35,27 @@ This tab provides a comprehensive view of your asset, allowing you to manage key
 
 ![Bruin Columns Tab](../../../public/vscode-extension/panels/side-panel/manage-columns.gif)
 
-## 3. Materialization
+## 3. Details
 
-The Materialization tab allows you to configure how your asset is materialized in the database. This includes setting the type of materialization, partitioning, clustering, and specifying strategies for data handling.
+The Details tab is your central hub for configuring crucial metadata and operational aspects of your asset within the database. It allows you to manage everything from how your asset is stored to who owns it and how its data intervals are defined.
 
 ### Features:
+- **Owner and Tags**:
+  - **Owner**: Set or edit the owner of the asset. This can be useful for identifying who is responsible for the asset.
+  - **Tags**: Add or remove tags to categorize and filter assets.
 
-- **Materialization Type**:
+- **Partitioning**:
+  - Select a column or manually enter an expression to partition the table by. Supports expressions such as date(col_name) or timestamp_trunc(col2, hour).
+
+- **Clustering**:
+  - Select multiple columns to cluster the table by. Clustering organizes data storage based on the specified columns, which can improve query performance.
+
+- **Interval Modifiers**: Define the time window or validity period for your asset's data. See [Interval Modifiers](../../../assets/interval-modifiers.md) for more details.
+
+  - **Start**: Set the beginning of the interval using a numerical value and select a specific unit from the dropdown (e.g., -2 days).
+  - **End**: Set the end of the interval using a numerical value and select a specific unit from the dropdown (e.g., 1 month).
+
+- **Materialization**: Control how your asset is materialized in the database.
   - **None**: No materialization.
   - **Table**: Materialize the asset as a table.
   - **View**: Materialize the asset as a view.
@@ -54,38 +68,31 @@ The Materialization tab allows you to configure how your asset is materialized i
   - **Time Interval**: Process time-based data using an incremental key.
   - **DDL**: Use DDL to create a new table using the information provided in the embedded Bruin section.
 
-- **Partitioning**:
-  - Select a column or manually enter an expression to partition the table by. Supports expressions such as date(col_name) or timestamp_trunc(col2, hour).
-
-- **Clustering**:
-  - Select multiple columns to cluster the table by. Clustering organizes data storage based on the specified columns, which can improve query performance.
-
-- **Owner and Tags**:
-  - **Owner**: Set or edit the owner of the asset. This can be useful for identifying who is responsible for the asset.
-  - **Tags**: Add or remove tags to categorize and filter assets.
-
 ### How to Use:
 
-1. **Select Materialization Type**:
-   - Choose between `None`, `Table`, or `View` using the radio buttons.
-
-2. **Configure Strategy** (if Table is selected):
-   - Select a strategy from the dropdown menu. Each strategy has a description to help you understand its use case.
-
-3. **Set Partitioning**:
-   - Click on the partitioning input field and select a column from the dropdown list to partition your table.
-
-4. **Set Clustering**:
-   - Click on the clustering input field and select one or more columns from the dropdown list to cluster your table.
-
-5. **Set Owner and Tags**:
+1. **Set Owner and Tags**:
    - Edit the owner by clicking on the edit icon next to the owner field. Changes are saved immediately.
    - Add or remove tags by clicking on the add or remove icons next to the tags field. Changes are saved immediately.
 
-6. **Save Changes**:
+2. **Set Partitioning**:
+   - Click on the partitioning input field and select a column from the dropdown list to partition your table.
+
+3. **Set Clustering**:
+   - Click on the clustering input field and select one or more columns from the dropdown list to cluster your table.
+
+4. **Set Interval Modifiers**:
+   - Edit the interval modifiers by clicking on the edit icon next to the interval modifiers field. Changes are saved immediately.
+
+5. **Select Materialization Type**:
+   - Choose between `None`, `Table`, or `View` using the radio buttons.
+
+6. **Configure Strategy** (if Table is selected):
+   - Select a strategy from the dropdown menu. Each strategy has a description to help you understand its use case.
+
+7. **Save Changes**:
    - Click the "Save Changes" button to apply your materialization settings for partitioning, clustering, and strategy.
 
-![Materialization Tab](../../../public/vscode-extension/panels/side-panel/materialization-tab.gif)
+![Details Tab](../../../public/vscode-extension/panels/side-panel/details-tab.gif)
 
 ## 4. Custom Checks
 The Custom Checks tab allows you to manage custom checks for your assets directly from the UI.
