@@ -292,9 +292,9 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 			}
 		}
 
-		// Make Snowflake private key path absolute
+		// Make Snowflake private key path absolute when using a path
 		for i, conn := range env.Connections.Snowflake {
-			if conn.PrivateKeyPath == "" {
+			if conn.PrivateKey != "" || conn.PrivateKeyPath == "" {
 				continue
 			}
 

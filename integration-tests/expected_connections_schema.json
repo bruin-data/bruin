@@ -173,6 +173,22 @@
         "region"
       ]
     },
+    "AttioConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "AwsConnection": {
       "properties": {
         "name": {
@@ -577,28 +593,27 @@
           },
           "type": "array"
         },
-        "spanner": {
-          "items": {
-            "$ref": "#/$defs/SpannerConnection"
-          },
-          "type": "array"
-        },
-        "attio": {
-          "items": {
-            "$ref": "#/$defs/AttioConnection"
-          },
-          "type": "array"
-        },
-
         "solidgate": {
           "items": {
             "$ref": "#/$defs/SolidgateConnection"
           },
           "type": "array"
         },
+        "spanner": {
+          "items": {
+            "$ref": "#/$defs/SpannerConnection"
+          },
+          "type": "array"
+        },
         "smartsheet": {
           "items": {
             "$ref": "#/$defs/SmartsheetConnection"
+          },
+          "type": "array"
+        },
+        "attio": {
+          "items": {
+            "$ref": "#/$defs/AttioConnection"
           },
           "type": "array"
         }
@@ -1541,6 +1556,22 @@
         "api_key"
       ]
     },
+    "SmartsheetConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token"
+      ]
+    },
     "SnowflakeConnection": {
       "oneOf": [
         {
@@ -1551,9 +1582,15 @@
         },
         {
           "required": [
-            "private_key_path"
+            "private_key"
           ],
           "title": "private_key"
+        },
+        {
+          "required": [
+            "private_key_path"
+          ],
+          "title": "private_key_path"
         }
       ],
       "properties": {
@@ -1584,6 +1621,9 @@
         "warehouse": {
           "type": "string"
         },
+        "private_key": {
+          "type": "string"
+        },
         "private_key_path": {
           "type": "string"
         }
@@ -1595,6 +1635,26 @@
         "account",
         "username",
         "region"
+      ]
+    },
+    "SolidgateConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "public_key": {
+          "type": "string"
+        },
+        "secret_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "public_key",
+        "secret_key"
       ]
     },
     "SpannerConnection": {
@@ -1611,10 +1671,10 @@
         "database": {
           "type": "string"
         },
-        "service_account_file": {
+        "service_account_json": {
           "type": "string"
         },
-        "service_account_json": {
+        "service_account_file": {
           "type": "string"
         }
       },
@@ -1625,42 +1685,6 @@
         "project_id",
         "instance_id",
         "database"
-      ]
-    },
-    "SolidgateConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "secret_key": {
-          "type": "string"
-        },
-        "public_key": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "public_key",
-        "secret_key"
-      ]
-    },
-    "SmartsheetConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "access_token": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "access_token"
       ]
     },
     "StripeConnection": {
@@ -1762,19 +1786,6 @@
         "oauth_token",
         "sub_domain"
       ]
-    },
-    "AttioConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "api_key": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": ["name", "api_key"] 
     }
   }
 }

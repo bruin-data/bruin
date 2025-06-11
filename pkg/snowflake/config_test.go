@@ -1,6 +1,11 @@
 package snowflake
 
 import (
+	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"testing"
 
 	"github.com/snowflakedb/gosnowflake"
@@ -60,4 +65,38 @@ func TestConfig_DSN(t *testing.T) {
 			require.Equal(t, wantDsn, got)
 		})
 	}
+}
+
+func generatePrivateKeyPEM(t *testing.T) string {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 1024)
+	require.NoError(t, err)
+
+	keyBytes, err := x509.MarshalPKCS8PrivateKey(key)
+	require.NoError(t, err)
+
+	var buf bytes.Buffer
+	pem.Encode(&buf, &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes})
+	return buf.String()
+}
+
+func TestConfig_DSN_WithPrivateKey(t *testing.T) {
+	t.Parallel()
+
+	pemKey := generatePrivateKeyPEM(t)
+
+	c := Config{
+		Account:    "my-account",
+		Username:   "my-user",
+		Region:     "us-east-1",
+		PrivateKey: pemKey,
+	}
+	dsn, err := c.DSN()
+	require.NoError(t, err)
+
+	cfg, err := gosnowflake.ParseDSN(dsn)
+	require.NoError(t, err)
+
+	require.Equal(t, gosnowflake.AuthTypeJwt, cfg.Authenticator)
+	require.NotNil(t, cfg.PrivateKey)
 }

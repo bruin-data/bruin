@@ -19,7 +19,12 @@ There's 2 different ways to fill it in
           warehouse: "warehouse_name" # optional
           role: "data_analyst" # optional
           region: "eu-west1" # optional
+          # specify either private_key or private_key_path for key-based authentication
           private_key_path: "path/to/private_key" # optional
+          # private_key: |
+          #   -----BEGIN PRIVATE KEY-----
+          #   ...
+          #   -----END PRIVATE KEY-----
 ```
 
 Where account is the identifier that you can copy here:
@@ -29,7 +34,7 @@ Where account is the identifier that you can copy here:
 
 ### Key-based Authentication
 
-Snowflake currently supports both password-based authentication as well as key-based authentication. In order to use key-based authentication, you need to provide a path to the private key file as the `private_key_path` parameter. See [this guide](https://select.dev/docs/snowflake-developer-guide/snowflake-key-pair) to create a key-pair if you haven't done that before.
+Snowflake currently supports both password-based authentication as well as key-based authentication. For key-based auth you can either embed the key directly using the `private_key` option or reference it with `private_key_path`. See [this guide](https://select.dev/docs/snowflake-developer-guide/snowflake-key-pair) to create a key-pair if you haven't done that before.
 
 
 ## Snowflake Assets

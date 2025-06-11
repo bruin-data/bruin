@@ -268,22 +268,30 @@ type SnowflakeConnection struct {
 	Database       string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 	Schema         string `yaml:"schema,omitempty" json:"schema,omitempty" mapstructure:"schema"`
 	Warehouse      string `yaml:"warehouse,omitempty" json:"warehouse,omitempty" mapstructure:"warehouse"`
-	PrivateKeyPath string `yaml:"private_key_path,omitempty" json:"private_key_path,omitempty" jsonschema:"oneof_required=private_key" mapstructure:"private_key_path"`
+	PrivateKey     string `yaml:"private_key,omitempty" json:"private_key,omitempty" jsonschema:"oneof_required=private_key" mapstructure:"private_key"`
+	PrivateKeyPath string `yaml:"private_key_path,omitempty" json:"private_key_path,omitempty" jsonschema:"oneof_required=private_key_path" mapstructure:"private_key_path"`
 }
 
 func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]string{
-		"name":             c.Name,
-		"account":          c.Account,
-		"username":         c.Username,
-		"password":         c.Password,
-		"region":           c.Region,
-		"role":             c.Role,
-		"database":         c.Database,
-		"schema":           c.Schema,
-		"warehouse":        c.Warehouse,
-		"private_key_path": c.PrivateKeyPath,
-	})
+	m := map[string]string{
+		"name":      c.Name,
+		"account":   c.Account,
+		"username":  c.Username,
+		"password":  c.Password,
+		"region":    c.Region,
+		"role":      c.Role,
+		"database":  c.Database,
+		"schema":    c.Schema,
+		"warehouse": c.Warehouse,
+	}
+
+	if c.PrivateKey != "" {
+		m["private_key"] = c.PrivateKey
+	} else {
+		m["private_key_path"] = c.PrivateKeyPath
+	}
+
+	return json.Marshal(m)
 }
 
 func (c SnowflakeConnection) GetName() string {

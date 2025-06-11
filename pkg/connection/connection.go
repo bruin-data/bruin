@@ -1578,8 +1578,8 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 	}
 	m.mutex.Unlock()
 
-	privateKey := ""
-	if connection.PrivateKeyPath != "" {
+	privateKey := connection.PrivateKey
+	if privateKey == "" && connection.PrivateKeyPath != "" {
 		privateKeyBytes, err := os.ReadFile(connection.PrivateKeyPath)
 		if err != nil {
 			return err
