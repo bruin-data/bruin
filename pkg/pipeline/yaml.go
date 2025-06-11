@@ -117,6 +117,8 @@ func (a *depends) UnmarshalYAML(value *yaml.Node) error {
 		}
 		*a = []upstream{single}
 		return nil
+	case yaml.DocumentNode, yaml.AliasNode:
+		return &ParseError{Msg: "Malformed `depends` items"}
 	default:
 		return &ParseError{Msg: "Malformed `depends` items"}
 	}
