@@ -145,7 +145,16 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 		clusterByClause = "CLUSTER BY " + strings.Join(mat.ClusterBy, ", ")
 	}
 
-	return fmt.Sprintf("CREATE OR REPLACE TABLE %s %s %s AS\n%s", asset.Name, partitionClause, clusterByClause, query), nil
+	optionsClause := ""
+	if asset.BigQuery.RequirePartitionFilter {
+		optionsClause = "OPTIONS (require_partition_filter = TRUE)"
+	}
+
+	if optionsClause == "" {
+		return fmt.Sprintf("CREATE OR REPLACE TABLE %s %s %s AS\n%s", asset.Name, partitionClause, clusterByClause, query), nil
+	}
+
+	return fmt.Sprintf("CREATE OR REPLACE TABLE %s %s %s %s AS\n%s", asset.Name, partitionClause, clusterByClause, optionsClause, query), nil
 }
 
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -214,6 +223,12 @@ func BuildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	}
 	if len(asset.Materialization.ClusterBy) > 0 {
 		q += "\nCLUSTER BY " + strings.Join(asset.Materialization.ClusterBy, ", ")
+	}
+
+	// When enabled, propagate the require_partition_filter option to the
+	// DDL statement so BigQuery enforces filters on partitioned tables.
+	if asset.BigQuery.RequirePartitionFilter {
+		q += "\nOPTIONS (\n  require_partition_filter = TRUE\n)"
 	}
 
 	return q, nil

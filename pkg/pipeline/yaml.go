@@ -298,6 +298,10 @@ type athena struct {
 	QueryResultsPath string `yaml:"query_results_path"`
 }
 
+type bigquery struct {
+	RequirePartitionFilter bool `yaml:"require_partition_filter"`
+}
+
 type taskDefinition struct {
 	Name              string            `yaml:"name"`
 	URI               string            `yaml:"uri"`
@@ -319,6 +323,7 @@ type taskDefinition struct {
 	Tags              []string          `yaml:"tags"`
 	Snowflake         snowflake         `yaml:"snowflake"`
 	Athena            athena            `yaml:"athena"`
+	BigQuery          bigquery          `yaml:"bigquery"`
 	IntervalModifiers IntervalModifiers `yaml:"interval_modifiers"`
 }
 
@@ -486,6 +491,7 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		CustomChecks:      make([]CustomCheck, len(definition.CustomChecks)),
 		Snowflake:         SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},
 		Athena:            AthenaConfig{Location: definition.Athena.QueryResultsPath},
+		BigQuery:          BigQueryConfig{RequirePartitionFilter: definition.BigQuery.RequirePartitionFilter},
 		IntervalModifiers: definition.IntervalModifiers,
 	}
 
