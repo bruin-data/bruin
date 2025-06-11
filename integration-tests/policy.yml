@@ -8,6 +8,9 @@ custom_rules:
   - name: asset-has-sql-tag
     description: "Asset should have sql tag"
     criteria: "'sql' in asset.Tags"
+  - name: asset-has-message-variable
+    description: "Asset should have a message variable"
+    criteria: "var.message == 'This is emergency!'"
 
 rulesets:
   - name: builtin-policies
@@ -91,3 +94,9 @@ rulesets:
       - pipeline: policies-validate-single-asset
     rules:
       - asset-name-contains-public
+  
+  - name: validate-single-asset-with-variable
+    selector:
+      - pipeline: policies-variables
+    rules:
+      - asset-has-message-variable
