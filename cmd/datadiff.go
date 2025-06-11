@@ -14,7 +14,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/fatih/color"
-	"github.com/jedib0t/go-pretty/v6/list"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/sourcegraph/conc"
@@ -177,28 +176,37 @@ func DataDiffCmd() *cli.Command {
 			}
 
 			if schemaComparison != nil {
-				printSchemaComparisonOutput(*schemaComparison, table1Identifier, table2Identifier, tolerance, schemaOnly, c.App.Writer)
+				hasDifferences := printSchemaComparisonOutput(*schemaComparison, table1Identifier, table2Identifier, tolerance, schemaOnly, c.App.Writer)
+				if hasDifferences {
+					return cli.Exit("", 1) // Exit with code 1 when differences are found
+				}
 			} else {
 				fmt.Fprintf(c.App.ErrWriter, "\nUnable to compare summaries - the comparison result is nil\n")
 				return errors.New("failed to compare table summaries due to missing data")
 			}
 
-			return nil
+			return nil // Exit with code 0 when no differences are found
 		},
 	}
 }
 
-func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, table1Name, table2Name string, tolerance float64, schemaOnly bool, errOut io.Writer) {
+func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, table1Name, table2Name string, tolerance float64, schemaOnly bool, errOut io.Writer) bool {
 	fmt.Fprint(errOut, schemaComparison.GetSummaryTable()+"\n")
 
 	// Print column types comparison table
 	fmt.Fprintf(errOut, "\n%s\n", getColumnTypesComparisonTable(schemaComparison, table1Name, table2Name))
 
 	greenPrinter := color.New(color.FgGreen)
+	hasDifferences := false
 
 	var overallSchemaMessage string
 	t1Schema := schemaComparison.Table1.Table
 	t2Schema := schemaComparison.Table2.Table
+
+	// Check for schema differences
+	if schemaComparison.HasSchemaDifferences || schemaComparison.HasRowCountDifference {
+		hasDifferences = true
+	}
 
 	if !schemaComparison.HasSchemaDifferences && !schemaComparison.HasRowCountDifference {
 		if schemaComparison.SamePropertiesCount == 0 && len(t1Schema.Columns) == 0 && len(t2Schema.Columns) == 0 {
@@ -206,8 +214,11 @@ func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, t
 		} else {
 			overallSchemaMessage = "Table schemas are considered identical."
 		}
+		
 		greenPrinter.Fprintf(errOut, "\n%s\n", overallSchemaMessage)
-		return
+		if schemaOnly {
+			return false // No differences found in schema-only mode
+		}
 	}
 
 	if schemaComparison.HasSchemaDifferences {
@@ -245,6 +256,11 @@ func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, t
 						fmt.Fprintf(errOut, "\n%s%s\n", t1Column.Name, typeInfo)
 						fmt.Fprintf(errOut, "%s\n", tableStatsToTable(t1Column.Stats, t2Column.Stats, table1Name, table2Name, tolerance))
 						someColumnsExist = true
+						
+						// Check if this column has data differences beyond tolerance
+						if hasDataDifferences(t1Column.Stats, t2Column.Stats, tolerance) {
+							hasDifferences = true
+						}
 					}
 				}
 			}
@@ -252,7 +268,97 @@ func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, t
 				fmt.Fprintf(errOut, "No columns exist in both tables.\n")
 			}
 		}
+		
+		// If no schema differences but we're not in schema-only mode, check if only identical
+		if !schemaComparison.HasSchemaDifferences && !schemaComparison.HasRowCountDifference && !hasDifferences {
+			greenPrinter.Fprintf(errOut, "\n%s\n", overallSchemaMessage)
+		}
 	}
+	
+	// Return true if any differences were found
+	return hasDifferences
+}
+
+// hasDataDifferences checks if column statistics have differences beyond the tolerance
+func hasDataDifferences(stats1, stats2 diff.ColumnStatistics, tolerance float64) bool {
+	if stats1 == nil || stats2 == nil {
+		return false
+	}
+	
+	if stats1.Type() != stats2.Type() {
+		return true // Different stat types indicate data differences
+	}
+	
+	switch stats1.Type() {
+	case "numerical":
+		numStats1 := stats1.(*diff.NumericalStatistics)
+		numStats2 := stats2.(*diff.NumericalStatistics)
+		
+		// Check count differences
+		if hasSignificantDifference(float64(numStats1.Count), float64(numStats2.Count), tolerance) {
+			return true
+		}
+		// Check null count differences
+		if hasSignificantDifference(float64(numStats1.NullCount), float64(numStats2.NullCount), tolerance) {
+			return true
+		}
+		// Check statistical differences if available
+		if numStats1.Avg != nil && numStats2.Avg != nil {
+			if hasSignificantDifference(*numStats1.Avg, *numStats2.Avg, tolerance) {
+				return true
+			}
+		}
+		
+	case "string":
+		strStats1 := stats1.(*diff.StringStatistics)
+		strStats2 := stats2.(*diff.StringStatistics)
+		
+		if hasSignificantDifference(float64(strStats1.Count), float64(strStats2.Count), tolerance) {
+			return true
+		}
+		if hasSignificantDifference(float64(strStats1.NullCount), float64(strStats2.NullCount), tolerance) {
+			return true
+		}
+		if hasSignificantDifference(float64(strStats1.DistinctCount), float64(strStats2.DistinctCount), tolerance) {
+			return true
+		}
+		
+	case "boolean":
+		boolStats1 := stats1.(*diff.BooleanStatistics)
+		boolStats2 := stats2.(*diff.BooleanStatistics)
+		
+		if hasSignificantDifference(float64(boolStats1.Count), float64(boolStats2.Count), tolerance) {
+			return true
+		}
+		if hasSignificantDifference(float64(boolStats1.TrueCount), float64(boolStats2.TrueCount), tolerance) {
+			return true
+		}
+		
+	case "datetime":
+		dtStats1 := stats1.(*diff.DateTimeStatistics)
+		dtStats2 := stats2.(*diff.DateTimeStatistics)
+		
+		if hasSignificantDifference(float64(dtStats1.Count), float64(dtStats2.Count), tolerance) {
+			return true
+		}
+		if hasSignificantDifference(float64(dtStats1.UniqueCount), float64(dtStats2.UniqueCount), tolerance) {
+			return true
+		}
+	}
+	
+	return false
+}
+
+// hasSignificantDifference checks if two values differ beyond the tolerance percentage
+func hasSignificantDifference(val1, val2, tolerance float64) bool {
+	if val1 == val2 {
+		return false
+	}
+	if val2 == 0 {
+		return val1 != 0 // Any non-zero value is significant when comparing to zero
+	}
+	diffPercent := abs(((val1 - val2) / val2) * 100)
+	return diffPercent > tolerance
 }
 
 func calculatePercentageDiff(val1, val2, tolerance float64) string {
@@ -697,74 +803,6 @@ func getColumnValue(col *diff.Column, exists bool, property string) string {
 	default:
 		return "-"
 	}
-}
-
-func getColumnDifferencesTable(columnDifferences []diff.ColumnDifference, table1Name, table2Name string) string {
-	l := list.NewWriter()
-	l.SetStyle(list.StyleConnectedRounded)
-
-	// Create color printers
-	columnPrinter := color.New(color.FgCyan, color.Bold)
-	faintPrinter := color.New(color.Faint)
-	redPrinter := color.New(color.FgRed)
-	greenPrinter := color.New(color.FgGreen)
-	yellowPrinter := color.New(color.FgYellow)
-
-	l.AppendItem(yellowPrinter.Sprint("Column Differences") + ":")
-
-	for _, diff := range columnDifferences {
-		// Create column header
-		columnHeader := columnPrinter.Sprintf("%s", diff.ColumnName)
-		l.Indent()
-		l.AppendItem(columnHeader)
-
-		// Add differences as sub-items
-		l.Indent()
-
-		if diff.TypeDifference != nil {
-			if diff.TypeDifference.IsComparable {
-				typeMsg := fmt.Sprintf("Type: %s in %s vs %s in %s %s",
-					greenPrinter.Sprintf("'%s'", diff.TypeDifference.Table1Type),
-					faintPrinter.Sprint(table1Name),
-					greenPrinter.Sprintf("'%s'", diff.TypeDifference.Table2Type),
-					faintPrinter.Sprint(table2Name),
-					faintPrinter.Sprintf("(both map to '%s' - comparable)", diff.TypeDifference.Table1NormalizedType))
-				l.AppendItem(typeMsg)
-			} else {
-				typeMsg := fmt.Sprintf("Type: %s (%s) in %s vs %s (%s) in %s",
-					redPrinter.Sprintf("'%s'", diff.TypeDifference.Table1Type),
-					faintPrinter.Sprint(diff.TypeDifference.Table1NormalizedType),
-					faintPrinter.Sprint(table1Name),
-					redPrinter.Sprintf("'%s'", diff.TypeDifference.Table2Type),
-					faintPrinter.Sprint(diff.TypeDifference.Table2NormalizedType),
-					faintPrinter.Sprint(table2Name))
-				l.AppendItem(typeMsg)
-			}
-		}
-
-		if diff.NullabilityDifference != nil {
-			nullabilityMsg := fmt.Sprintf("Nullability: %s in %s vs %s in %s",
-				formatBooleanValue(diff.NullabilityDifference.Table1Nullable),
-				faintPrinter.Sprint(table1Name),
-				formatBooleanValue(diff.NullabilityDifference.Table2Nullable),
-				faintPrinter.Sprint(table2Name))
-			l.AppendItem(nullabilityMsg)
-		}
-
-		if diff.UniquenessDifference != nil {
-			uniquenessMsg := fmt.Sprintf("Uniqueness: %s in %s vs %s in %s",
-				formatBooleanValue(diff.UniquenessDifference.Table1Unique),
-				faintPrinter.Sprint(table1Name),
-				formatBooleanValue(diff.UniquenessDifference.Table2Unique),
-				faintPrinter.Sprint(table2Name))
-			l.AppendItem(uniquenessMsg)
-		}
-
-		l.UnIndent()
-		l.UnIndent()
-	}
-
-	return l.Render()
 }
 
 func formatBooleanValue(value bool) string {
