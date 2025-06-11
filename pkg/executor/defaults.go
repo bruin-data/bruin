@@ -67,10 +67,21 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
 		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
 	},
+	pipeline.AssetTypeClickHouseQuerySensor: {
+		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
+	},
 	pipeline.AssetTypePostgresSeed: {
 		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
 		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
 		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
+	},
+	pipeline.AssetTypePostgresQuerySensor: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
 	},
 	pipeline.AssetTypeRedshiftQuery: {
 		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
@@ -86,6 +97,12 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
 		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
 		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
+	},
+	pipeline.AssetTypeRedshiftQuerySensor: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
 	},
 	pipeline.AssetTypeMsSQLSeed: {
 		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
@@ -123,6 +140,11 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
 	},
 	pipeline.AssetTypeDuckDBSeed: {
+		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
+	},
+	pipeline.AssetTypeDuckDBQuerySensor: {
 		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
 		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
 		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
