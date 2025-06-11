@@ -248,6 +248,7 @@ func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, t
 
 	if len(t1Schema.Columns) > 0 && len(t2Schema.Columns) > 0 {
 		fmt.Fprintf(errOut, "\n\nColumns that exist in both tables:\n")
+		someColumnsExist := false
 		for _, t1Column := range t1Schema.Columns {
 			if t2Column, ok := t2Columns[t1Column.Name]; ok {
 				if t1Column.Stats != nil && t2Column.Stats != nil {
@@ -263,8 +264,12 @@ func printSchemaComparisonOutput(schemaComparison diff.SchemaComparisonResult, t
 					}
 					fmt.Fprintf(errOut, "\n%s%s\n", t1Column.Name, typeInfo)
 					fmt.Fprintf(errOut, "%s\n", tableStatsToTable(t1Column.Stats, t2Column.Stats, table1Name, table2Name, tolerance))
+					someColumnsExist = true
 				}
 			}
+		}
+		if !someColumnsExist {
+			fmt.Fprintf(errOut, "No columns exist in both tables.\n")
 		}
 	}
 }
