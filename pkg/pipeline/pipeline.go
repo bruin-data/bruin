@@ -52,11 +52,13 @@ const (
 	AssetTypeAthenaSeed             = AssetType("athena.seed")
 	AssetTypeMsSQLQuery             = AssetType("ms.sql")
 	AssetTypeMsSQLSeed              = AssetType("ms.seed")
+	AssetTypeMsSQLQuerySensor       = AssetType("ms.sensor.query")
 	AssetTypeDatabricksQuery        = AssetType("databricks.sql")
 	AssetTypeDatabricksSeed         = AssetType("databricks.seed")
 	AssetTypeDatabricksQuerySensor  = AssetType("databricks.sensor.query")
 	AssetTypeSynapseQuery           = AssetType("synapse.sql")
 	AssetTypeSynapseSeed            = AssetType("synapse.seed")
+	AssetTypeSynapseQuerySensor     = AssetType("synapse.sensor.query")
 	AssetTypeIngestr                = AssetType("ingestr")
 	AssetTypeTableau                = AssetType("tableau")
 	AssetTypeClickHouse             = AssetType("clickhouse.sql")
@@ -517,11 +519,13 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeRedshiftQuerySensor:   "redshift",
 	AssetTypeMsSQLQuery:            "mssql",
 	AssetTypeMsSQLSeed:             "mssql",
+	AssetTypeMsSQLQuerySensor:      "mssql",
 	AssetTypeDatabricksQuery:       "databricks",
 	AssetTypeDatabricksSeed:        "databricks",
 	AssetTypeDatabricksQuerySensor: "databricks",
 	AssetTypeSynapseQuery:          "synapse",
 	AssetTypeSynapseSeed:           "synapse",
+	AssetTypeSynapseQuerySensor:    "synapse",
 	AssetTypeAthenaQuery:           "athena",
 	AssetTypeAthenaSeed:            "athena",
 	AssetTypeAthenaSQLSensor:       "athena",
