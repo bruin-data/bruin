@@ -204,6 +204,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			AssetValidator:   ValidateCustomCheckQueryDryRun(connectionManager),
 			ApplicableLevels: []Level{LevelAsset},
 		},
+		&SimpleRule{
+			Identifier:       "materialization-type-match",
+			Fast:             false,
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   ValidateMaterializationTypeMatches(connectionManager),
+			ApplicableLevels: []Level{LevelAsset},
+		},
 	}
 
 	if parser != nil {

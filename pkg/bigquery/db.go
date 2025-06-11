@@ -40,6 +40,7 @@ type TableManager interface {
 	IsMaterializationTypeMismatch(ctx context.Context, meta *bigquery.TableMetadata, asset *pipeline.Asset) bool
 	DropTableOnMismatch(ctx context.Context, tableName string, asset *pipeline.Asset) error
 	BuildTableExistsQuery(tableName string) (string, error)
+	MaterializationTypeMatches(ctx context.Context, asset *pipeline.Asset) (bool, error)
 }
 
 type DB interface {
@@ -478,4 +479,27 @@ func (d *Client) BuildTableExistsQuery(tableName string) (string, error) {
 		SELECT EXISTS (SELECT 1 FROM %s WHERE table_name = '%s')`, datasetRef, targetTable)
 
 	return strings.TrimSpace(query), nil
+}
+
+func (d *Client) MaterializationTypeMatches(ctx context.Context, asset *pipeline.Asset) (bool, error) {
+	if asset.Materialization.Type == pipeline.MaterializationTypeNone {
+		return true, nil
+	}
+
+	tableRef, err := d.getTableRef(asset.Name)
+	if err != nil {
+		return false, err
+	}
+
+	meta, err := tableRef.Metadata(ctx)
+	if err != nil {
+		var apiErr *googleapi.Error
+		if errors.As(err, &apiErr) && apiErr.Code == 404 {
+			return true, nil
+		}
+		return false, fmt.Errorf("failed to fetch metadata for table '%s': %w", asset.Name, err)
+	}
+
+	mismatch := d.IsMaterializationTypeMismatch(ctx, meta, asset)
+	return !mismatch, nil
 }
