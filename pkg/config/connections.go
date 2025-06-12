@@ -268,7 +268,8 @@ type SnowflakeConnection struct {
 	Database       string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 	Schema         string `yaml:"schema,omitempty" json:"schema,omitempty" mapstructure:"schema"`
 	Warehouse      string `yaml:"warehouse,omitempty" json:"warehouse,omitempty" mapstructure:"warehouse"`
-	PrivateKeyPath string `yaml:"private_key_path,omitempty" json:"private_key_path,omitempty" jsonschema:"oneof_required=private_key" mapstructure:"private_key_path"`
+	PrivateKeyPath string `yaml:"private_key_path,omitempty" json:"private_key_path,omitempty" jsonschema:"oneof_required=private_key_path" mapstructure:"private_key_path"`
+	PrivateKey     string `yaml:"private_key,omitempty" json:"private_key,omitempty" jsonschema:"oneof_required=private_key" mapstructure:"private_key"`
 }
 
 func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
@@ -283,6 +284,7 @@ func (c SnowflakeConnection) MarshalJSON() ([]byte, error) {
 		"schema":           c.Schema,
 		"warehouse":        c.Warehouse,
 		"private_key_path": c.PrivateKeyPath,
+		"private_key":      c.PrivateKey,
 	})
 }
 
