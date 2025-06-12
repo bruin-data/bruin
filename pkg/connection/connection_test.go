@@ -8,6 +8,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/personio"
+	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
@@ -403,6 +404,48 @@ func TestNewManagerFromConfig(t *testing.T) {
 			got, errors := NewManagerFromConfig(tt.cm)
 			assert.Equalf(t, tt.want, got, "NewManagerFromConfig(%v)", tt.cm)
 			assert.Equalf(t, tt.errors, errors, "NewManagerFromConfig(%v)", tt.cm)
+		})
+	}
+}
+
+func TestManager_GetSfConnection(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		Snowflake: map[string]*snowflake.DB{
+			"existing": &snowflake.DB{},
+		},
+	}
+
+	tests := []struct {
+		name           string
+		connectionName string
+		wantErr        bool
+	}{
+		{
+			name:           "should return error when no connections are found",
+			connectionName: "non-existing",
+			wantErr:        true,
+		},
+		{
+			name:           "should find the correct connection",
+			connectionName: "existing",
+			wantErr:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := m.GetSfConnection(tt.connectionName)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Nil(t, got)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, got)
+			}
 		})
 	}
 }

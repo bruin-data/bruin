@@ -151,7 +151,7 @@ func Lint(isDebug *bool) *cli.Command {
 			}
 			defer parser.Close()
 
-			rules, err := lint.GetRules(fs, &git.RepoFinder{}, c.Bool("exclude-warnings"), parser, true, connectionManager)
+			rules, err := lint.GetRules(fs, &git.RepoFinder{}, c.Bool("exclude-warnings"), parser, true)
 			if err != nil {
 				printError(err, c.String("output"), "An error occurred while building the validation rules")
 
@@ -161,6 +161,7 @@ func Lint(isDebug *bool) *cli.Command {
 			logger.Debugf("successfully loaded %d rules", len(rules))
 
 			rules = append(rules, queryValidatorRules(logger, cm, connectionManager)...)
+			rules = append(rules, lint.GetCustomCheckQueryDryRunRule(connectionManager))
 
 			var result *lint.PipelineAnalysisResult
 			var errr error

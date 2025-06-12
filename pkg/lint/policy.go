@@ -29,12 +29,14 @@ var (
 var validRulePattern = regexp.MustCompile(`^[A-Za-z0-9\-]+$`)
 
 type assetValidatorEnv struct {
-	Asset    *pipeline.Asset    `expr:"asset"`
-	Pipeline *pipeline.Pipeline `expr:"pipeline"`
+	Asset     *pipeline.Asset    `expr:"asset"`
+	Pipeline  *pipeline.Pipeline `expr:"pipeline"`
+	Variables map[string]any     `expr:"var"`
 }
 
 type pipelineValidatorEnv struct {
-	Pipeline *pipeline.Pipeline `expr:"pipeline"`
+	Pipeline  *pipeline.Pipeline `expr:"pipeline"`
+	Variables map[string]any     `expr:"var"`
 }
 
 type validators struct {
@@ -218,7 +220,7 @@ func (spec *PolicySpecification) getValidators(name string) (validators, bool) {
 
 func assetValidatorFromRuleDef(def *RuleDefinition) AssetValidator {
 	return func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-		env := assetValidatorEnv{asset, pipeline}
+		env := assetValidatorEnv{asset, pipeline, pipeline.Variables.Value()}
 		result, err := expr.Run(def.evalutor, env)
 		if err != nil {
 			return nil, fmt.Errorf("error evaluating rule %s: %w", def.Name, err)
@@ -239,7 +241,7 @@ func assetValidatorFromRuleDef(def *RuleDefinition) AssetValidator {
 
 func pipelineValidatorFromRuleDef(def *RuleDefinition) PipelineValidator {
 	return func(pipe *pipeline.Pipeline) ([]*Issue, error) {
-		env := pipelineValidatorEnv{pipe}
+		env := pipelineValidatorEnv{pipe, pipe.Variables.Value()}
 		result, err := expr.Run(def.evalutor, env)
 		if err != nil {
 			return nil, fmt.Errorf("error evaluating rule %s: %w", def.Name, err)

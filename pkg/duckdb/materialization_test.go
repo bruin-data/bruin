@@ -179,8 +179,31 @@ COMMIT;`,
 					{Name: "name", Type: "varchar", PrimaryKey: false, UpdateOnMerge: true},
 				},
 			},
-			query:   "SELECT 1 as id, 'abc' as name",
-			wantErr: true,
+			query: "SELECT 1 as id, 'abc' as name",
+			want: "^BEGIN TRANSACTION;\n" +
+				"CREATE OR REPLACE TABLE my\\.asset AS WITH source_data AS \\(" +
+				"SELECT 1 as id, 'abc' as name\\) SELECT \\* FROM source_data UNION ALL SELECT dt\\.\\* FROM my\\.asset AS dt LEFT JOIN source_data AS sd USING\\(id\\) WHERE sd.id IS NULL;\n" +
+				"COMMIT;$",
+		},
+		{
+			name: "merge with composite primary keys",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "int", PrimaryKey: true},
+					{Name: "category", Type: "varchar", PrimaryKey: true},
+					{Name: "name", Type: "varchar", UpdateOnMerge: true},
+				},
+			},
+			query: "SELECT 1 as id, 'A' as category, 'abc' as name",
+			want: "^BEGIN TRANSACTION;\n" +
+				"CREATE OR REPLACE TABLE my\\.asset AS WITH source_data AS \\(" +
+				"SELECT 1 as id, 'A' as category, 'abc' as name\\) SELECT \\* FROM source_data UNION ALL SELECT dt\\.\\* FROM my\\.asset AS dt LEFT JOIN source_data AS sd USING\\(id, category\\) WHERE sd.id IS NULL;\n" +
+				"COMMIT;$",
 		},
 		{
 			name: "time_interval_no_incremental_key",

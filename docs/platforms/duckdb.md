@@ -58,6 +58,40 @@ SELECT COUNT(*) as customers, region
 FROM events.customers
 ```
 
+### `duckdb.sensor.query`
+
+Checks if a query returns any results in DuckDB, runs every 5 minutes until this query returns any results.
+
+```yaml
+name: string
+type: string
+parameters:
+    query: string
+```
+
+**Parameters**:
+- `query`: Query you expect to return any results
+
+#### Example: Partitioned upstream table
+
+Checks if the data available in upstream table for end date of the run.
+```yaml
+name: analytics_123456789.events
+type: duckdb.sensor.query
+parameters:
+    query: select exists(select 1 from upstream_table where dt = "{{ end_date }}"
+```
+
+#### Example: Streaming upstream table
+
+Checks if there is any data after end timestamp, by assuming that older data is not appended to the table.
+```yaml
+name: analytics_123456789.events
+type: duckdb.sensor.query
+parameters:
+    query: select exists(select 1 from upstream_table where inserted_at > "{{ end_timestamp }}"
+```
+
 
 ### `duckdb.seed`
 `duckdb.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your DuckDB database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the DuckDB database.

@@ -39,24 +39,31 @@ const (
 	AssetTypeBigquerySeed           = AssetType("bq.seed")
 	AssetTypeDuckDBQuery            = AssetType("duckdb.sql")
 	AssetTypeDuckDBSeed             = AssetType("duckdb.seed")
+	AssetTypeDuckDBQuerySensor      = AssetType("duckdb.sensor.query")
 	AssetTypeEmpty                  = AssetType("empty")
 	AssetTypePostgresQuery          = AssetType("pg.sql")
 	AssetTypePostgresSeed           = AssetType("pg.seed")
+	AssetTypePostgresQuerySensor    = AssetType("pg.sensor.query")
 	AssetTypeRedshiftQuery          = AssetType("rs.sql")
 	AssetTypeRedshiftSeed           = AssetType("rs.seed")
+	AssetTypeRedshiftQuerySensor    = AssetType("rs.sensor.query")
 	AssetTypeAthenaQuery            = AssetType("athena.sql")
 	AssetTypeAthenaSQLSensor        = AssetType("athena.sensor.query")
 	AssetTypeAthenaSeed             = AssetType("athena.seed")
 	AssetTypeMsSQLQuery             = AssetType("ms.sql")
 	AssetTypeMsSQLSeed              = AssetType("ms.seed")
+	AssetTypeMsSQLQuerySensor       = AssetType("ms.sensor.query")
 	AssetTypeDatabricksQuery        = AssetType("databricks.sql")
 	AssetTypeDatabricksSeed         = AssetType("databricks.seed")
+	AssetTypeDatabricksQuerySensor  = AssetType("databricks.sensor.query")
 	AssetTypeSynapseQuery           = AssetType("synapse.sql")
 	AssetTypeSynapseSeed            = AssetType("synapse.seed")
+	AssetTypeSynapseQuerySensor     = AssetType("synapse.sensor.query")
 	AssetTypeIngestr                = AssetType("ingestr")
 	AssetTypeTableau                = AssetType("tableau")
 	AssetTypeClickHouse             = AssetType("clickhouse.sql")
 	AssetTypeClickHouseSeed         = AssetType("clickhouse.seed")
+	AssetTypeClickHouseQuerySensor  = AssetType("clickhouse.sensor.query")
 	AssetTypeEMRServerlessSpark     = AssetType("emr_serverless.spark")
 	AssetTypeEMRServerlessPyspark   = AssetType("emr_serverless.pyspark")
 	RunConfigFullRefresh            = RunConfig("full-refresh")
@@ -496,33 +503,40 @@ func (c *Column) HasCheck(check string) bool {
 type AssetType string
 
 var AssetTypeConnectionMapping = map[AssetType]string{
-	AssetTypeBigqueryQuery:        "google_cloud_platform",
-	AssetTypeBigqueryTableSensor:  "google_cloud_platform",
-	AssetTypeBigquerySeed:         "google_cloud_platform",
-	AssetTypeBigquerySource:       "google_cloud_platform",
-	AssetTypeBigqueryQuerySensor:  "google_cloud_platform",
-	AssetTypeSnowflakeQuery:       "snowflake",
-	AssetTypeSnowflakeQuerySensor: "snowflake",
-	AssetTypeSnowflakeSeed:        "snowflake",
-	AssetTypePostgresQuery:        "postgres",
-	AssetTypePostgresSeed:         "postgres",
-	AssetTypeRedshiftQuery:        "redshift",
-	AssetTypeRedshiftSeed:         "redshift",
-	AssetTypeMsSQLQuery:           "mssql",
-	AssetTypeMsSQLSeed:            "mssql",
-	AssetTypeDatabricksQuery:      "databricks",
-	AssetTypeDatabricksSeed:       "databricks",
-	AssetTypeSynapseQuery:         "synapse",
-	AssetTypeSynapseSeed:          "synapse",
-	AssetTypeAthenaQuery:          "athena",
-	AssetTypeAthenaSeed:           "athena",
-	AssetTypeAthenaSQLSensor:      "athena",
-	AssetTypeDuckDBQuery:          "duckdb",
-	AssetTypeDuckDBSeed:           "duckdb",
-	AssetTypeClickHouse:           "clickhouse",
-	AssetTypeClickHouseSeed:       "clickhouse",
-	AssetTypeEMRServerlessSpark:   "emr_serverless",
-	AssetTypeEMRServerlessPyspark: "emr_serverless",
+	AssetTypeBigqueryQuery:         "google_cloud_platform",
+	AssetTypeBigqueryTableSensor:   "google_cloud_platform",
+	AssetTypeBigquerySeed:          "google_cloud_platform",
+	AssetTypeBigquerySource:        "google_cloud_platform",
+	AssetTypeBigqueryQuerySensor:   "google_cloud_platform",
+	AssetTypeSnowflakeQuery:        "snowflake",
+	AssetTypeSnowflakeQuerySensor:  "snowflake",
+	AssetTypeSnowflakeSeed:         "snowflake",
+	AssetTypePostgresQuery:         "postgres",
+	AssetTypePostgresSeed:          "postgres",
+	AssetTypePostgresQuerySensor:   "postgres",
+	AssetTypeRedshiftQuery:         "redshift",
+	AssetTypeRedshiftSeed:          "redshift",
+	AssetTypeRedshiftQuerySensor:   "redshift",
+	AssetTypeMsSQLQuery:            "mssql",
+	AssetTypeMsSQLSeed:             "mssql",
+	AssetTypeMsSQLQuerySensor:      "mssql",
+	AssetTypeDatabricksQuery:       "databricks",
+	AssetTypeDatabricksSeed:        "databricks",
+	AssetTypeDatabricksQuerySensor: "databricks",
+	AssetTypeSynapseQuery:          "synapse",
+	AssetTypeSynapseSeed:           "synapse",
+	AssetTypeSynapseQuerySensor:    "synapse",
+	AssetTypeAthenaQuery:           "athena",
+	AssetTypeAthenaSeed:            "athena",
+	AssetTypeAthenaSQLSensor:       "athena",
+	AssetTypeDuckDBQuery:           "duckdb",
+	AssetTypeDuckDBSeed:            "duckdb",
+	AssetTypeDuckDBQuerySensor:     "duckdb",
+	AssetTypeClickHouse:            "clickhouse",
+	AssetTypeClickHouseSeed:        "clickhouse",
+	AssetTypeClickHouseQuerySensor: "clickhouse",
+	AssetTypeEMRServerlessSpark:    "emr_serverless",
+	AssetTypeEMRServerlessPyspark:  "emr_serverless",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
