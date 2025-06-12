@@ -273,7 +273,7 @@ func Run(isDebug *bool) *cli.Command {
 			if os.Getenv("BRUIN_RUN_ID") != "" {
 				runID = os.Getenv("BRUIN_RUN_ID")
 			}
-			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, "test", runID, nil)
+			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, "", runID, nil)
 			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
 
 			runCtx := context.Background()
@@ -351,6 +351,9 @@ func Run(isDebug *bool) *cli.Command {
 			}
 			var pipelineState *scheduler.PipelineState
 			if c.Bool("continue") {
+				// BUG: Because of our parameter rendering using mutators, we
+				// won't correctly render the start/end date in assets that continue
+				// from failure.
 				pipelineState, err = ReadState(afero.NewOsFs(), statePath, filter)
 				if err != nil {
 					errorPrinter.Printf("Failed to restore state: %v\n", err)
@@ -453,6 +456,8 @@ func Run(isDebug *bool) *cli.Command {
 				}()
 			}
 
+			// recreate the renderer with the pipeline name.
+			// We create another renderer earlier in the parsing stage, but it does not have the pipeline name set.
 			renderer = jinja.NewRendererWithStartEndDates(&startDate, &endDate, foundPipeline.Name, runID, nil)
 			mainExecutors, err := SetupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode, renderer, parser)
 			if err != nil {
