@@ -9,7 +9,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/connection"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/git"
-	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
@@ -27,30 +27,25 @@ type ingestrRunner interface {
 	RunIngestr(ctx context.Context, args, extraPackages []string, repo *git.Repo) error
 }
 
-type renderer interface {
-	Render(query string) (string, error)
-	RenderAsset(asset *pipeline.Asset) (*pipeline.Asset, error)
-}
-
 type BasicOperator struct {
 	conn          connectionFetcher
 	runner        ingestrRunner
 	finder        repoFinder
-	jinjaRenderer renderer
+	jinjaRenderer jinja.RendererInterface
 }
 
 type SeedOperator struct {
 	conn     connectionFetcher
 	runner   ingestrRunner
 	finder   repoFinder
-	renderer renderer
+	renderer jinja.RendererInterface
 }
 
 type pipelineConnection interface {
 	GetIngestrURI() (string, error)
 }
 
-func NewBasicOperator(conn *connection.Manager, j renderer) (*BasicOperator, error) {
+func NewBasicOperator(conn *connection.Manager, j jinja.RendererInterface) (*BasicOperator, error) {
 	uvRunner := &python.UvPythonRunner{
 		UvInstaller: &python.UvChecker{},
 		Cmd:         &python.CommandRunner{},
@@ -62,6 +57,7 @@ func NewBasicOperator(conn *connection.Manager, j renderer) (*BasicOperator, err
 func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	var extraPackages []string
 
+	asset := ti.GetAsset()
 	// Source connection
 	sourceConnectionName, ok := asset.Parameters["source_connection"]
 	if !ok {
@@ -145,7 +141,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
 }
 
-func NewSeedOperator(conn *connection.Manager, renderer renderer) (*SeedOperator, error) {
+func NewSeedOperator(conn *connection.Manager, renderer jinja.RendererInterface) (*SeedOperator, error) {
 	uvRunner := &python.UvPythonRunner{
 		UvInstaller: &python.UvChecker{},
 		Cmd:         &python.CommandRunner{},
@@ -163,11 +159,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 	var extraPackages []string
 	// Source connection
 
-	asset, err := o.renderer.RenderAsset(ti.GetAsset())
-	if err != nil {
-		return fmt.Errorf("failed to render asset: %w", err)
-	}
-
+	asset := ti.GetAsset()
 	sourceConnectionPath, ok := asset.Parameters["path"]
 	if !ok {
 		return errors.New("source connection not configured")

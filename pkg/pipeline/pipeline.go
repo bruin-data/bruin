@@ -70,7 +70,6 @@ const (
 	RunConfigApplyIntervalModifiers = RunConfig("apply-interval-modifiers")
 	RunConfigStartDate              = RunConfig("start-date")
 	RunConfigEndDate                = RunConfig("end-date")
-	RunConfigPipelineName           = RunConfig("pipeline")
 	RunConfigRunID                  = RunConfig("run-id")
 )
 
@@ -1552,7 +1551,12 @@ func WithMutate() CreatePipelineOption {
 	}
 }
 
-func (b *Builder) PeekPipeline(pathToPipeline string) (*Pipeline, error) {
+func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline string, opts ...CreatePipelineOption) (*Pipeline, error) {
+	config := createPipelineConfig{}
+	for _, opt := range opts {
+		opt(&config)
+	}
+
 	pipelineFilePath := pathToPipeline
 	if !matchPipelineFileName(pipelineFilePath, b.config.PipelineFileName) {
 		resolvedPath, err := resolvePipelineFilePath(pathToPipeline, b.config.PipelineFileName, b.fs)
@@ -1563,20 +1567,10 @@ func (b *Builder) PeekPipeline(pathToPipeline string) (*Pipeline, error) {
 	} else {
 		pathToPipeline = filepath.Dir(pipelineFilePath)
 	}
-	return PipelineFromPath(pipelineFilePath, b.fs)
-}
-
-func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline string, opts ...CreatePipelineOption) (*Pipeline, error) {
-	config := createPipelineConfig{}
-	for _, opt := range opts {
-		opt(&config)
-	}
-
-	pipeline, err := b.PeekPipeline(pathToPipeline)
+	pipeline, err := PipelineFromPath(pipelineFilePath, b.fs)
 	if err != nil {
 		return nil, err
 	}
-	pipelineFilePath := pipeline.DefinitionFile.Path
 
 	// this is needed until we migrate all the pipelines to use the new naming convention
 	if pipeline.Name == "" {

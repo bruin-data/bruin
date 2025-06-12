@@ -296,8 +296,6 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, runConfig.ExpUseWingetForUv) //nolint:staticcheck
 			runCtx = context.WithValue(runCtx, python.LocalIngestr, c.String("debug-ingestr-src"))
 			runCtx = context.WithValue(runCtx, config.EnvironmentContextKey, cm.SelectedEnvironment)
-			// runCtx = context.WithValue(runCtx, pipeline.RunConfigPipelineName, foundPipeline.Name)
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigPipelineName, "test")
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, runID)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 

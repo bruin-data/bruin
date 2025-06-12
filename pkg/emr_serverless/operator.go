@@ -41,12 +41,8 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	logger := log.New(
 		ctx.Value(executor.KeyPrinter).(io.Writer), "", 0,
 	)
-	renderer := op.renderer.CloneForAsset(ctx, ti.GetPipeline(), ti.GetAsset())
-	asset, err := renderer.RenderAsset(ti.GetAsset())
 
-	if err != nil {
-		return fmt.Errorf("error rendering asset: %w", err)
-	}
+	asset := ti.GetAsset()
 	connID, err := ti.GetPipeline().GetConnectionNameForAsset(asset)
 	if err != nil {
 		return fmt.Errorf("error looking up connection name: %w", err)
