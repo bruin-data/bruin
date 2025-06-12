@@ -280,21 +280,10 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if ts.sensorMode == "skip" {
 		return nil
 	}
-	tableNameParam, ok := t.Parameters["table"]
+	tableName, ok := t.Parameters["table"]
 	if !ok {
 		return errors.New("table sensor requires a parameter named 'table'")
 	}
-
-	// Create a new extractor instance for the current asset context to render the table name
-	extractor := ts.extractor.CloneForAsset(ctx, p, t)
-	renderedTableNameQueries, err := extractor.ExtractQueriesFromString(tableNameParam)
-	if err != nil {
-		return errors.Wrap(err, "failed to render table sensor table name parameter")
-	}
-	if len(renderedTableNameQueries) == 0 {
-		return errors.New("rendered table name parameter resulted in an empty string")
-	}
-	tableName := renderedTableNameQueries[0].Query // Use the rendered table name
 
 	connName, err := p.GetConnectionNameForAsset(t)
 	if err != nil {
