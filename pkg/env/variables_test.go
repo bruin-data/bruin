@@ -26,7 +26,6 @@ func TestSetupVariables(t *testing.T) {
 				ctx := context.Background()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
-				ctx = context.WithValue(ctx, pipeline.RunConfigPipelineName, "test-pipeline")
 				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
 				ctx = context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, false)
 				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, true)
@@ -42,7 +41,6 @@ func TestSetupVariables(t *testing.T) {
 				ctx := context.Background()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
-				ctx = context.WithValue(ctx, pipeline.RunConfigPipelineName, "test-pipeline")
 				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
 				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, true)
 				return ctx
@@ -71,7 +69,6 @@ func TestSetupVariables(t *testing.T) {
 				ctx := context.Background()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC))
-				ctx = context.WithValue(ctx, pipeline.RunConfigPipelineName, "test-pipeline")
 				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
 				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, true)
 				return ctx
@@ -100,7 +97,6 @@ func TestSetupVariables(t *testing.T) {
 				ctx := context.Background()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
-				ctx = context.WithValue(ctx, pipeline.RunConfigPipelineName, "test-pipeline")
 				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
 				ctx = context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, false)
 				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, true)
@@ -140,7 +136,6 @@ func TestSetupVariables(t *testing.T) {
 				ctx := context.Background()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC))
-				ctx = context.WithValue(ctx, pipeline.RunConfigPipelineName, "test-pipeline")
 				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
 				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, false)
 				return ctx

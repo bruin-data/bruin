@@ -9,6 +9,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/fatih/color"
 	"github.com/spf13/afero"
@@ -40,6 +41,21 @@ var (
 
 	DefaultPipelineBuilder = pipeline.NewBuilder(builderConfig, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, DefaultGlossaryReader)
 )
+
+func renderAssetParamsMutator(renderer jinja.RendererInterface) pipeline.AssetMutator {
+	return func(ctx context.Context, a *pipeline.Asset, p *pipeline.Pipeline) (*pipeline.Asset, error) {
+		renderer = renderer.CloneForAsset(ctx, p, a)
+		for key, value := range a.Parameters {
+			renderedValue, err := renderer.Render(value)
+			if err != nil {
+				return nil, fmt.Errorf("error rendering parameter %q: %w", key, err)
+			}
+			a.Parameters[key] = renderedValue
+		}
+
+		return a, nil
+	}
+}
 
 func variableOverridesMutator(variables []string) pipeline.PipelineMutator {
 	return func(ctx context.Context, p *pipeline.Pipeline) (*pipeline.Pipeline, error) {

@@ -70,7 +70,6 @@ const (
 	RunConfigApplyIntervalModifiers = RunConfig("apply-interval-modifiers")
 	RunConfigStartDate              = RunConfig("start-date")
 	RunConfigEndDate                = RunConfig("end-date")
-	RunConfigPipelineName           = RunConfig("pipeline")
 	RunConfigRunID                  = RunConfig("run-id")
 )
 
@@ -1572,6 +1571,7 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 	if err != nil {
 		return nil, err
 	}
+
 	// this is needed until we migrate all the pipelines to use the new naming convention
 	if pipeline.Name == "" {
 		pipeline.Name = pipeline.LegacyID
