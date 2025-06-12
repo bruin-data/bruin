@@ -149,6 +149,7 @@ func Lint(isDebug *bool) *cli.Command {
 			if err != nil {
 				printError(err, c.String("output"), "Could not initialize sql parser")
 			}
+			defer parser.Close()
 
 			rules, err := lint.GetRules(fs, &git.RepoFinder{}, c.Bool("exclude-warnings"), parser, true)
 			if err != nil {

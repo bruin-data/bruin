@@ -322,6 +322,7 @@ func (r *ParseCommand) Run(ctx context.Context, assetPath string, lineage bool) 
 		if panics != nil {
 			return cli.Exit("", 1)
 		}
+		defer sqlParser.Close()
 
 		processedAssets := make(map[string]bool)
 		lineageExtractor := lineagepackage.NewLineageExtractor(sqlParser)
