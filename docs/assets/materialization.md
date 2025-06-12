@@ -49,7 +49,10 @@ The strategy used for the materialization, can be one of the following:
 - `delete+insert`: incrementally update the table by only refreshing a certain partition.
 - `append`: only append the new data to the table, never overwrite.
 - `merge`: merge the existing records with the new records, requires a primary key to be set.
+- `time_interval`: incrementally load time-based data within specific time windows.
 - `DDL`: create a new table using a DDL (Data Definition Language) statement.
+- `scd2_by_column`: implement SCD2 logic that tracks changes based on column value differences.
+- `scd2_by_time`: implement SCD2 logic that tracks changes based on time-based incremental key.
 
 ### `materialization > partition_by`
 Define the column that will be used for the partitioning of the resulting table. This is used to instruct the data warehouse to set the column for the partition key.
@@ -312,3 +315,205 @@ in the materialization definition with the following keys:
 - `partition_by`
 - `cluster_by`
 
+### `scd2_by_column`
+
+The `scd2_by_column` strategy implements [Slowly Changing Dimension Type 2](https://en.wikipedia.org/wiki/Slowly_changing_dimension) logic, which maintains a full history of data changes over time. This strategy is useful when you want to track changes to records and preserve the historical state of your data.
+
+This strategy automatically detects changes in non-primary key columns and creates new versions of records when changes occur, while marking previous versions as historical.
+
+**Requirements:**
+- At least one column must be marked as `primary_key: true`
+- The column names `_valid_from`, `_valid_until`, and `_is_current` are reserved and cannot be used in your column definitions
+
+**How it works:**
+When changes are detected in non-primary key columns:
+1. The existing record is marked as historical (`_is_current: false`) and gets an end timestamp in `_valid_until`
+2. A new record is inserted with the updated values (`_is_current: true`) and `_valid_until` set to '9999-12-31'
+3. Records that no longer exist in the source are marked as historical
+
+**Automatically added columns:**
+- `_valid_from`: TIMESTAMP when the record version became active (set to `CURRENT_TIMESTAMP()`)
+- `_valid_until`: TIMESTAMP when the record version became inactive (set to `TIMESTAMP('9999-12-31')` for current records)
+- `_is_current`: BOOLEAN indicating if this is the current version of the record
+
+Here's an example of an asset with `scd2_by_column` materialization:
+
+```bruin-sql
+/* @bruin
+name: test.product_catalog
+type: bq.sql
+
+materialization:
+  type: table
+  strategy: scd2_by_column
+
+columns:
+  - name: ID
+    type: INTEGER
+    description: "Unique identifier for Product"
+    primary_key: true
+  - name: Name
+    type: VARCHAR
+    description: "Name of the Product"
+  - name: Price
+    type: FLOAT
+    description: "Price of the Product"
+@bruin */
+
+SELECT 1 AS ID, 'Wireless Mouse' AS Name, 29.99 AS Price
+UNION ALL
+SELECT 2 AS ID, 'USB Cable' AS Name, 12.99 AS Price
+UNION ALL
+SELECT 3 AS ID, 'Keyboard' AS Name, 89.99 AS Price
+```
+
+**Example behavior:**
+
+Let's say you want to create a new table to track product catalog with SCD2. If the table doesn't exist yet, you'll need an initial run with the `--full-refresh` flag:
+
+```bash
+bruin run --full-refresh path/to/your/product_catalog.sql
+```
+
+This initial run creates:
+```
+ID | Name          | Price | _is_current | _valid_from         | _valid_until
+1  | Wireless Mouse| 29.99 | true        | 2024-01-01 10:00:00| 9999-12-31 23:59:59
+2  | USB Cable     | 12.99 | true        | 2024-01-01 10:00:00| 9999-12-31 23:59:59
+3  | Keyboard      | 89.99 | true        | 2024-01-01 10:00:00| 9999-12-31 23:59:59
+```
+
+Now lets say you have new incoming data that updates Wireless Mouse price to 39.99, removes Keyboard from the catalog, and adds a new item Monitor. When you run the asset again:
+
+```bash
+bruin run path/to/your/product_catalog.sql
+```
+
+The table becomes:
+```
+ID | Name          | Price | _is_current | _valid_from         | _valid_until
+1  | Wireless Mouse| 29.99 | false       | 2024-01-01 10:00:00| 2024-01-02 14:30:00
+1  | Wireless Mouse| 39.99 | true        | 2024-01-02 14:30:00| 9999-12-31 23:59:59
+2  | USB Cable     | 12.99 | true        | 2024-01-01 10:00:00| 9999-12-31 23:59:59
+3  | Keyboard      | 89.99 | false       | 2024-01-01 10:00:00| 2024-01-02 14:30:00
+4  | Monitor       | 199.99| true        | 2024-01-02 14:30:00| 9999-12-31 23:59:59
+```
+
+Notice how:
+- Wireless Mouse (ID=1) now has two records: the old price (marked as historical) and the new price (current)
+- USB Cable (ID=2) remains unchanged with its original record still current
+- Keyboard (ID=3) is marked as historical since it's no longer in the source data
+- Monitor (ID=4) is added as a new current record
+
+### `scd2_by_time`
+
+The `scd2_by_time` strategy implements [Slowly Changing Dimension Type 2](https://en.wikipedia.org/wiki/Slowly_changing_dimension) logic based on a time-based incremental key. This strategy is ideal when your source data includes timestamps or dates that indicate when records were last modified, and you want to maintain historical versions based on these time changes.
+
+**Requirements:**
+- At least one column must be marked as `primary_key: true`
+- An `incremental_key` must be specified that references a column of type `TIMESTAMP` or `DATE`
+- The column names `_valid_from`, `_valid_until`, and `_is_current` are reserved and cannot be used in your column definitions
+
+**How it works:**
+The strategy tracks changes based on the time values in the `incremental_key` column:
+1. When a record has a newer timestamp than existing records, it creates a new version
+2. Previous versions are marked as historical (`_is_current: false`) with their `_valid_until` updated
+3. Records no longer present in the source are marked as historical
+
+**Automatically added columns:**
+- `_valid_from`: TIMESTAMP when the record version became active (derived from the `incremental_key`)
+- `_valid_until`: TIMESTAMP when the record version became inactive (set to `TIMESTAMP('9999-12-31')` for current records)
+- `_is_current`: BOOLEAN indicating if this is the current version of the record
+
+Here's an example of an asset with `scd2_by_time` materialization:
+
+```bruin-sql
+/* @bruin
+name: test.products
+type: bq.sql
+
+materialization:
+  type: table
+  strategy: scd2_by_time
+  incremental_key: dt
+
+columns:
+  - name: product_id
+    type: INTEGER
+    description: "Unique identifier for the product"
+    primary_key: true
+  - name: product_name
+    type: VARCHAR
+    description: "Name of the product"
+  - name: stock
+    type: INTEGER
+    description: "Number of units in stock"
+  - name: dt
+    type: DATE
+    description: "Date when the product was last updated"
+@bruin */
+
+SELECT
+    1 AS product_id,
+    'Laptop' AS product_name,
+    100 AS stock,
+    DATE '2025-04-02' AS dt
+UNION ALL
+SELECT
+    2 AS product_id,
+    'Smartphone' AS product_name,
+    150 AS stock,
+    DATE '2025-04-02' AS dt
+```
+
+**Example behavior:**
+
+Let's say you want to create a new table to track product inventory with SCD2 based on time. If the table doesn't exist yet, you'll need an initial run with the `--full-refresh` flag:
+
+```bash
+bruin run --full-refresh path/to/your/products.sql
+```
+
+This initial run creates:
+```
+product_id | product_name | stock | _is_current | _valid_from         | _valid_until
+1          | Laptop       | 100   | true        | 2025-04-02 00:00:00| 9999-12-31 23:59:59
+2          | Smartphone   | 150   | true        | 2025-04-02 00:00:00| 9999-12-31 23:59:59
+3          | Headphones   | 175   | true        | 2025-04-02 00:00:00| 9999-12-31 23:59:59
+4          | Monitor      | 25    | true        | 2025-04-02 00:00:00| 9999-12-31 23:59:59
+```
+
+Now lets say you have new incoming data with updates: Headphones stock changed from 175 to 900 with a new date (2025-06-02), Monitor is no longer available, and a new product PS5 is added. When you run the asset again:
+
+```bash
+bruin run path/to/your/products.sql
+```
+
+The table becomes:
+```
+product_id | product_name | stock | _is_current | _valid_from         | _valid_until
+1          | Laptop       | 100   | true        | 2025-04-02 00:00:00| 9999-12-31 23:59:59
+2          | Smartphone   | 150   | true        | 2025-04-02 00:00:00| 9999-12-31 23:59:59
+3          | Headphones   | 175   | false       | 2025-04-02 00:00:00| 2025-06-02 00:00:00
+3          | Headphones   | 900   | true        | 2025-06-02 00:00:00| 9999-12-31 23:59:59
+4          | Monitor      | 25    | false       | 2025-04-02 00:00:00| 2025-06-02 00:00:00
+5          | PS5          | 25    | true        | 2025-06-02 00:00:00| 9999-12-31 23:59:59
+```
+
+Notice how:
+- Laptop (ID=1) and Smartphone (ID=2) remain unchanged with their original records still current
+- Headphones (ID=3) now has two records: the old stock level (marked as historical) and the new stock level (current) based on the newer date
+- Monitor (ID=4) is marked as historical since it's no longer in the source data
+- PS5 (ID=5) is added as a new current record with the latest date
+
+**Key differences between scd2_by_column and scd2_by_time:**
+
+| Aspect | scd2_by_column | scd2_by_time |
+|--------|----------------|--------------|
+| **Change Detection** | Automatically detects changes in any non-primary key column | Based on time values in the incremental_key column |
+| **_valid_from Value** | Set to `CURRENT_TIMESTAMP()` when change is processed | Derived from the incremental_key column value |
+| **Use Case** | When you want to track any column changes regardless of when they occurred | When your source data has reliable timestamps indicating when changes happened |
+| **Configuration** | Only requires primary_key columns | Requires both primary_key columns and incremental_key |
+
+> [!WARNING]
+> SCD2 materializations are currently only supported for bigquery.
