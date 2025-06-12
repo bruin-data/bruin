@@ -263,7 +263,7 @@ type SnowflakeConnection struct {
 	Account        string `yaml:"account,omitempty" json:"account" mapstructure:"account"`
 	Username       string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
 	Password       string `yaml:"password,omitempty" json:"password,omitempty" jsonschema:"oneof_required=password" mapstructure:"password"`
-	Region         string `yaml:"region,omitempty" json:"region" mapstructure:"region"`
+	Region         string `yaml:"region,omitempty" json:"region,omitempty" mapstructure:"region"`
 	Role           string `yaml:"role,omitempty" json:"role,omitempty" mapstructure:"role"`
 	Database       string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
 	Schema         string `yaml:"schema,omitempty" json:"schema,omitempty" mapstructure:"schema"`

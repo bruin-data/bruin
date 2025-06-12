@@ -1,0 +1,7 @@
+name: policies-variables
+schedule: hourly
+start_date: "1970-01-01"
+variables:
+  message:
+    type: string
+    default: "This is emergency!"

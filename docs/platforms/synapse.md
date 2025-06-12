@@ -53,6 +53,40 @@ from temp_orders
 group by customer_id;
 ```
 
+### `synapse.sensor.query`
+
+Checks if a query returns any results in SQL Server, runs every 5 minutes until this query returns any results.
+
+```yaml
+name: string
+type: string
+parameters:
+    query: string
+```
+
+**Parameters**:
+- `query`: Query you expect to return any results
+
+#### Example: Partitioned upstream table
+
+Checks if the data available in upstream table for end date of the run.
+```yaml
+name: analytics_123456789.events
+type: synapse.sensor.query
+parameters:
+    query: select exists(select 1 from upstream_table where dt = "{{ end_date }}"
+```
+
+#### Example: Streaming upstream table
+
+Checks if there is any data after end timestamp, by assuming that older data is not appended to the table.
+```yaml
+name: analytics_123456789.events
+type: synapse.sensor.query
+parameters:
+    query: select exists(select 1 from upstream_table where inserted_at > "{{ end_timestamp }}"
+```
+
 ### `synapse.seed`
 `synapse.seed` is a special type of asset used to represent CSV files that contain data that is prepared outside of your pipeline that will be loaded into your Synapse database. Bruin supports seed assets natively, allowing you to simply drop a CSV file in your pipeline and ensuring the data is loaded to the Synapse database.
 

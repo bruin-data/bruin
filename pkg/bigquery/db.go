@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
@@ -55,8 +56,9 @@ var (
 )
 
 type Client struct {
-	client *bigquery.Client
-	config *Config
+	client     *bigquery.Client
+	config     *Config
+	typeMapper *diff.DatabaseTypeMapper
 }
 
 func NewDB(c *Config) (*Client, error) {
@@ -89,8 +91,9 @@ func NewDB(c *Config) (*Client, error) {
 	}
 
 	return &Client{
-		client: client,
-		config: c,
+		client:     client,
+		config:     c,
+		typeMapper: diff.NewBigQueryTypeMapper(),
 	}, nil
 }
 
@@ -478,4 +481,357 @@ func (d *Client) BuildTableExistsQuery(tableName string) (string, error) {
 		SELECT EXISTS (SELECT 1 FROM %s WHERE table_name = '%s')`, datasetRef, targetTable)
 
 	return strings.TrimSpace(query), nil
+}
+
+func (d *Client) GetTableSummary(ctx context.Context, tableName string) (*diff.TableSummaryResult, error) {
+	// Get row count
+	countQuery := fmt.Sprintf("SELECT COUNT(*) as row_count FROM `%s`", tableName)
+	countResult, err := d.Select(ctx, &query.Query{Query: countQuery})
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute count query for table '%s': %w", tableName, err)
+	}
+
+	var rowCount int64
+	if len(countResult) > 0 && len(countResult[0]) > 0 {
+		if val, ok := countResult[0][0].(int64); ok {
+			rowCount = val
+		} else {
+			return nil, fmt.Errorf("unexpected row count type for table '%s'", tableName)
+		}
+	}
+
+	// Get table schema using INFORMATION_SCHEMA
+	tableComponents := strings.Split(tableName, ".")
+	var schemaQuery string
+
+	switch len(tableComponents) {
+	case 2:
+		// dataset.table format
+		schemaQuery = fmt.Sprintf(`
+			SELECT 
+				column_name,
+				data_type,
+				is_nullable,
+				is_partitioning_column
+			FROM %s.%s.INFORMATION_SCHEMA.COLUMNS 
+			WHERE table_name = '%s'
+			ORDER BY ordinal_position`,
+			d.config.ProjectID, tableComponents[0], tableComponents[1])
+	case 3:
+		// project.dataset.table format
+		schemaQuery = fmt.Sprintf(`
+			SELECT 
+				column_name,
+				data_type,
+				is_nullable,
+				is_partitioning_column
+			FROM %s.%s.INFORMATION_SCHEMA.COLUMNS 
+			WHERE table_name = '%s'
+			ORDER BY ordinal_position`,
+			tableComponents[0], tableComponents[1], tableComponents[2])
+	default:
+		return nil, fmt.Errorf("table name must be in dataset.table or project.dataset.table format, '%s' given", tableName)
+	}
+
+	schemaResult, err := d.Select(ctx, &query.Query{Query: schemaQuery})
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute schema query for table '%s': %w", tableName, err)
+	}
+
+	columns := make([]*diff.Column, 0, len(schemaResult))
+	for _, row := range schemaResult {
+		if len(row) < 4 {
+			continue
+		}
+
+		columnName, ok := row[0].(string)
+		if !ok {
+			continue
+		}
+
+		dataType, ok := row[1].(string)
+		if !ok {
+			continue
+		}
+
+		isNullableStr, ok := row[2].(string)
+		if !ok {
+			continue
+		}
+
+		isPartitioning, _ := row[3].(string)
+
+		nullable := strings.ToLower(isNullableStr) == "yes"
+		normalizedType := d.typeMapper.MapType(dataType)
+
+		// Debug: log type mapping for troubleshooting
+		if normalizedType == diff.CommonTypeUnknown {
+			fmt.Printf("Warning: Unknown type mapping for BigQuery type '%s' in column '%s'\n", dataType, columnName)
+		}
+
+		// Collect statistics for this column
+		var stats diff.ColumnStatistics
+		switch normalizedType {
+		case diff.CommonTypeNumeric:
+			stats, err = d.fetchNumericalStats(ctx, tableName, columnName)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch numerical stats for column '%s' (BigQuery type: %s, normalized: %s): %w", columnName, dataType, normalizedType, err)
+			}
+		case diff.CommonTypeString:
+			stats, err = d.fetchStringStats(ctx, tableName, columnName)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch string stats for column '%s' (BigQuery type: %s, normalized: %s): %w", columnName, dataType, normalizedType, err)
+			}
+		case diff.CommonTypeBoolean:
+			stats, err = d.fetchBooleanStats(ctx, tableName, columnName)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch boolean stats for column '%s' (BigQuery type: %s, normalized: %s): %w", columnName, dataType, normalizedType, err)
+			}
+		case diff.CommonTypeDateTime:
+			stats, err = d.fetchDateTimeStats(ctx, tableName, columnName)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch datetime stats for column '%s' (BigQuery type: %s, normalized: %s): %w", columnName, dataType, normalizedType, err)
+			}
+		case diff.CommonTypeJSON:
+			stats, err = d.fetchJSONStats(ctx, tableName, columnName)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch JSON stats for column '%s' (BigQuery type: %s, normalized: %s): %w", columnName, dataType, normalizedType, err)
+			}
+		case diff.CommonTypeBinary, diff.CommonTypeUnknown:
+			fmt.Printf("Warning: Using unknown statistics for column '%s' with BigQuery type '%s'\n", columnName, dataType)
+			stats = &diff.UnknownStatistics{}
+		}
+
+		columns = append(columns, &diff.Column{
+			Name:           columnName,
+			Type:           dataType,
+			NormalizedType: normalizedType,
+			Nullable:       nullable,
+			PrimaryKey:     false,                   // BigQuery doesn't have traditional primary keys
+			Unique:         isPartitioning == "YES", // Use partitioning as a proxy for uniqueness
+			Stats:          stats,
+		})
+	}
+
+	dbTable := &diff.Table{
+		Name:    tableName,
+		Columns: columns,
+	}
+
+	return &diff.TableSummaryResult{
+		RowCount: rowCount,
+		Table:    dbTable,
+	}, nil
+}
+
+func (d *Client) fetchNumericalStats(ctx context.Context, tableName, columnName string) (*diff.NumericalStatistics, error) {
+	statsQuery := fmt.Sprintf(`
+		SELECT 
+			MIN(%s) as min_val,
+			MAX(%s) as max_val,
+			AVG(%s) as avg_val,
+			SUM(%s) as sum_val,
+			COUNT(%s) as count_val,
+			COUNTIF(%s IS NULL) as null_count,
+			STDDEV(%s) as stddev_val
+		FROM %s`,
+		columnName, columnName, columnName, columnName, columnName, columnName, columnName, "`"+tableName+"`")
+
+	result, err := d.Select(ctx, &query.Query{Query: statsQuery})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch numerical stats for column '%s': %w", columnName, err)
+	}
+
+	if len(result) == 0 || len(result[0]) < 7 {
+		return nil, fmt.Errorf("insufficient statistical data returned for column '%s'", columnName)
+	}
+
+	row := result[0]
+	stats := &diff.NumericalStatistics{}
+
+	// Handle potentially null values from BigQuery
+	if val, ok := row[0].(float64); ok {
+		stats.Min = &val
+	}
+	if val, ok := row[1].(float64); ok {
+		stats.Max = &val
+	}
+	if val, ok := row[2].(float64); ok {
+		stats.Avg = &val
+	}
+	if val, ok := row[3].(float64); ok {
+		stats.Sum = &val
+	}
+	if val, ok := row[4].(int64); ok {
+		stats.Count = val
+	}
+	if val, ok := row[5].(int64); ok {
+		stats.NullCount = val
+	}
+	if val, ok := row[6].(float64); ok {
+		stats.StdDev = &val
+	}
+
+	return stats, nil
+}
+
+func (d *Client) fetchStringStats(ctx context.Context, tableName, columnName string) (*diff.StringStatistics, error) {
+	statsQuery := fmt.Sprintf(`
+		SELECT 
+			MIN(LENGTH(%s)) as min_len,
+			MAX(LENGTH(%s)) as max_len,
+			AVG(LENGTH(%s)) as avg_len,
+			COUNT(DISTINCT %s) as distinct_count,
+			COUNT(*) as total_count,
+			COUNTIF(%s IS NULL) as null_count,
+			COUNTIF(%s = '') as empty_count
+		FROM %s`,
+		columnName, columnName, columnName, columnName, columnName, columnName, "`"+tableName+"`")
+
+	result, err := d.Select(ctx, &query.Query{Query: statsQuery})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch string stats for column '%s': %w", columnName, err)
+	}
+
+	if len(result) == 0 || len(result[0]) < 7 {
+		return nil, fmt.Errorf("insufficient statistical data returned for column '%s'", columnName)
+	}
+
+	row := result[0]
+	stats := &diff.StringStatistics{}
+
+	if val, ok := row[0].(int64); ok {
+		stats.MinLength = int(val)
+	}
+	if val, ok := row[1].(int64); ok {
+		stats.MaxLength = int(val)
+	}
+	if val, ok := row[2].(float64); ok {
+		stats.AvgLength = val
+	}
+	if val, ok := row[3].(int64); ok {
+		stats.DistinctCount = val
+	}
+	if val, ok := row[4].(int64); ok {
+		stats.Count = val
+	}
+	if val, ok := row[5].(int64); ok {
+		stats.NullCount = val
+	}
+	if val, ok := row[6].(int64); ok {
+		stats.EmptyCount = val
+	}
+
+	return stats, nil
+}
+
+func (d *Client) fetchBooleanStats(ctx context.Context, tableName, columnName string) (*diff.BooleanStatistics, error) {
+	statsQuery := fmt.Sprintf(`
+		SELECT 
+			COUNTIF(%s = true) as true_count,
+			COUNTIF(%s = false) as false_count,
+			COUNT(*) as total_count,
+			COUNTIF(%s IS NULL) as null_count
+		FROM %s`,
+		columnName, columnName, columnName, "`"+tableName+"`")
+
+	result, err := d.Select(ctx, &query.Query{Query: statsQuery})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch boolean stats for column '%s': %w", columnName, err)
+	}
+
+	if len(result) == 0 || len(result[0]) < 4 {
+		return nil, fmt.Errorf("insufficient statistical data returned for column '%s'", columnName)
+	}
+
+	row := result[0]
+	stats := &diff.BooleanStatistics{}
+
+	if val, ok := row[0].(int64); ok {
+		stats.TrueCount = val
+	}
+	if val, ok := row[1].(int64); ok {
+		stats.FalseCount = val
+	}
+	if val, ok := row[2].(int64); ok {
+		stats.Count = val
+	}
+	if val, ok := row[3].(int64); ok {
+		stats.NullCount = val
+	}
+
+	return stats, nil
+}
+
+func (d *Client) fetchDateTimeStats(ctx context.Context, tableName, columnName string) (*diff.DateTimeStatistics, error) {
+	statsQuery := fmt.Sprintf(`
+		SELECT 
+			MIN(%s) as min_date,
+			MAX(%s) as max_date,
+			COUNT(DISTINCT %s) as unique_count,
+			COUNT(*) as count_val,
+			COUNTIF(%s IS NULL) as null_count
+		FROM %s`,
+		columnName, columnName, columnName, columnName, "`"+tableName+"`")
+
+	result, err := d.Select(ctx, &query.Query{Query: statsQuery})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch datetime stats for column '%s': %w", columnName, err)
+	}
+
+	if len(result) == 0 || len(result[0]) < 5 {
+		return nil, fmt.Errorf("insufficient statistical data returned for column '%s'", columnName)
+	}
+
+	row := result[0]
+	stats := &diff.DateTimeStatistics{}
+
+	// Handle datetime values - BigQuery returns them as strings
+	if val, ok := row[0].(string); ok && val != "" {
+		stats.EarliestDate = &val
+	}
+	if val, ok := row[1].(string); ok && val != "" {
+		stats.LatestDate = &val
+	}
+	if val, ok := row[2].(int64); ok {
+		stats.UniqueCount = val
+	}
+	if val, ok := row[3].(int64); ok {
+		stats.Count = val
+	}
+	if val, ok := row[4].(int64); ok {
+		stats.NullCount = val
+	}
+
+	return stats, nil
+}
+
+func (d *Client) fetchJSONStats(ctx context.Context, tableName, columnName string) (*diff.JSONStatistics, error) {
+	statsQuery := fmt.Sprintf(`
+		SELECT 
+			COUNT(*) as count_val,
+			COUNTIF(%s IS NULL) as null_count
+		FROM %s`,
+		columnName, "`"+tableName+"`")
+
+	result, err := d.Select(ctx, &query.Query{Query: statsQuery})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch JSON stats for column '%s': %w", columnName, err)
+	}
+
+	if len(result) == 0 || len(result[0]) < 2 {
+		return nil, fmt.Errorf("insufficient statistical data returned for column '%s'", columnName)
+	}
+
+	row := result[0]
+	stats := &diff.JSONStatistics{}
+
+	if val, ok := row[0].(int64); ok {
+		stats.Count = val
+	}
+	if val, ok := row[1].(int64); ok {
+		stats.NullCount = val
+	}
+
+	return stats, nil
 }

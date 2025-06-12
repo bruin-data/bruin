@@ -190,10 +190,10 @@ type CustomCheck struct {
 	renderer jinja.RendererInterface
 }
 
-func NewCustomCheck(conn connectionFetcher) *CustomCheck {
+func NewCustomCheck(conn connectionFetcher, renderer jinja.RendererInterface) *CustomCheck {
 	// TODO: this needs to use an actual renderer instead of the yesterday, since this `NewRendererWithYesterday` does not honor
 	// the parameters passed to the `bruin run` command.
-	return &CustomCheck{conn: conn, renderer: jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")}
+	return &CustomCheck{conn: conn, renderer: renderer}
 }
 
 func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstance) error {
