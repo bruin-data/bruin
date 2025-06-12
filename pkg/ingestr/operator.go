@@ -62,11 +62,6 @@ func NewBasicOperator(conn *connection.Manager, j renderer) (*BasicOperator, err
 func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
 	var extraPackages []string
 
-	asset, err := o.jinjaRenderer.RenderAsset(ti.GetAsset())
-	if err != nil {
-		return fmt.Errorf("failed to render asset: %w", err)
-	}
-
 	// Source connection
 	sourceConnectionName, ok := asset.Parameters["source_connection"]
 	if !ok {

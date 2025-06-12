@@ -1552,12 +1552,7 @@ func WithMutate() CreatePipelineOption {
 	}
 }
 
-func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline string, opts ...CreatePipelineOption) (*Pipeline, error) {
-	config := createPipelineConfig{}
-	for _, opt := range opts {
-		opt(&config)
-	}
-
+func (b *Builder) PeekPipeline(pathToPipeline string) (*Pipeline, error) {
 	pipelineFilePath := pathToPipeline
 	if !matchPipelineFileName(pipelineFilePath, b.config.PipelineFileName) {
 		resolvedPath, err := resolvePipelineFilePath(pathToPipeline, b.config.PipelineFileName, b.fs)
@@ -1568,10 +1563,21 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 	} else {
 		pathToPipeline = filepath.Dir(pipelineFilePath)
 	}
-	pipeline, err := PipelineFromPath(pipelineFilePath, b.fs)
+	return PipelineFromPath(pipelineFilePath, b.fs)
+}
+
+func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline string, opts ...CreatePipelineOption) (*Pipeline, error) {
+	config := createPipelineConfig{}
+	for _, opt := range opts {
+		opt(&config)
+	}
+
+	pipeline, err := b.PeekPipeline(pathToPipeline)
 	if err != nil {
 		return nil, err
 	}
+	pipelineFilePath := pipeline.DefinitionFile.Path
+
 	// this is needed until we migrate all the pipelines to use the new naming convention
 	if pipeline.Name == "" {
 		pipeline.Name = pipeline.LegacyID

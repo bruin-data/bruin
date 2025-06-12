@@ -269,7 +269,39 @@ func Run(isDebug *bool) *cli.Command {
 				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
 			}
 
-			pipelineInfo, err := GetPipeline(c.Context, inputPath, runConfig, logger)
+			runID := time.Now().Format("2006_01_02_15_04_05")
+			if os.Getenv("BRUIN_RUN_ID") != "" {
+				runID = os.Getenv("BRUIN_RUN_ID")
+			}
+			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, "test", runID, nil)
+			DefaultPipelineBuilder.AddAssetMutator(func(ctx context.Context, asset *pipeline.Asset, foundPipeline *pipeline.Pipeline) (*pipeline.Asset, error) {
+				re := renderer.CloneForAsset(ctx, foundPipeline, asset)
+				for k, v := range asset.Parameters {
+					rendererd, err := re.Render(v)
+					if err != nil {
+						return nil, err
+					}
+					asset.Parameters[k] = rendererd
+				}
+				fmt.Println(asset.Parameters)
+				return asset, nil
+			})
+
+			runCtx := context.Background()
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
+			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
+			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, runConfig.ExpUseWingetForUv) //nolint:staticcheck
+			runCtx = context.WithValue(runCtx, python.LocalIngestr, c.String("debug-ingestr-src"))
+			runCtx = context.WithValue(runCtx, config.EnvironmentContextKey, cm.SelectedEnvironment)
+			// runCtx = context.WithValue(runCtx, pipeline.RunConfigPipelineName, foundPipeline.Name)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigPipelineName, "test")
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, runID)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
+
+			pipelineInfo, err := GetPipeline(runCtx, inputPath, runConfig, logger)
 			if err != nil {
 				return err
 			}
@@ -281,7 +313,7 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to build asset: %v\n", err)
 					return cli.Exit("", 1)
 				}
-				task, err = DefaultPipelineBuilder.MutateAsset(c.Context, task, pipelineInfo.Pipeline)
+				task, err = DefaultPipelineBuilder.MutateAsset(runCtx, task, pipelineInfo.Pipeline)
 				if err != nil {
 					errorPrinter.Printf("Failed to mutate asset: %v\n", err)
 					return cli.Exit("", 1)
@@ -293,10 +325,6 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			// handle log files
-			runID := time.Now().Format("2006_01_02_15_04_05")
-			if os.Getenv("BRUIN_RUN_ID") != "" {
-				runID = os.Getenv("BRUIN_RUN_ID")
-			}
 			executionStartLog := "Starting execution..."
 			if !c.Bool("minimal-logs") {
 				infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
@@ -438,7 +466,8 @@ func Run(isDebug *bool) *cli.Command {
 				}()
 			}
 
-			mainExecutors, err := SetupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode, parser)
+			renderer = jinja.NewRendererWithStartEndDates(&startDate, &endDate, foundPipeline.Name, runID, nil)
+			mainExecutors, err := SetupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode, renderer, parser)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -453,19 +482,6 @@ func Run(isDebug *bool) *cli.Command {
 				errorPrinter.Printf("Failed to create executor: %v\n", err)
 				return cli.Exit("", 1)
 			}
-
-			runCtx := context.Background()
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
-			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
-			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, runConfig.ExpUseWingetForUv) //nolint:staticcheck
-			runCtx = context.WithValue(runCtx, python.LocalIngestr, c.String("debug-ingestr-src"))
-			runCtx = context.WithValue(runCtx, config.EnvironmentContextKey, cm.SelectedEnvironment)
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigPipelineName, foundPipeline.Name)
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, runID)
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 
 			exeCtx, cancel := signal.NotifyContext(runCtx, syscall.SIGINT, syscall.SIGTERM)
 			defer cancel()
@@ -521,7 +537,6 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 		return nil, errors.New("you cannot use the '--tag' flag when running a single asset")
 	}
 
-	var task *pipeline.Asset
 	var err error
 	runDownstreamTasks := false
 
@@ -546,36 +561,6 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 			RunningForAnAsset:  runningForAnAsset,
 			RunDownstreamTasks: runDownstreamTasks,
 		}, err
-	}
-
-	if runningForAnAsset {
-		task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath, foundPipeline)
-		if err != nil {
-			errorPrinter.Printf("Failed to build asset: %v. Are you sure you used the correct path?\n", err.Error())
-			return &PipelineInfo{
-				RunningForAnAsset:  runningForAnAsset,
-				RunDownstreamTasks: runDownstreamTasks,
-				Pipeline:           foundPipeline,
-			}, err
-		}
-
-		task, err = DefaultPipelineBuilder.MutateAsset(ctx, task, foundPipeline)
-		if err != nil {
-			errorPrinter.Printf("Failed to mutate asset: %v\n", err)
-			return &PipelineInfo{
-				RunningForAnAsset:  runningForAnAsset,
-				RunDownstreamTasks: runDownstreamTasks,
-				Pipeline:           foundPipeline,
-			}, err
-		}
-		if task == nil {
-			errorPrinter.Printf("The given file path doesn't seem to be a Bruin task definition: '%s'\n", inputPath)
-			return &PipelineInfo{
-				RunningForAnAsset:  runningForAnAsset,
-				RunDownstreamTasks: runDownstreamTasks,
-				Pipeline:           foundPipeline,
-			}, err
-		}
 	}
 
 	return &PipelineInfo{
@@ -715,6 +700,7 @@ func SetupExecutors(
 	fullRefresh bool,
 	usePipForPython bool,
 	sensorMode string,
+	renderer *jinja.Renderer,
 	parser *sqlparser.SQLParser,
 ) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
@@ -723,7 +709,6 @@ func SetupExecutors(
 	// this should go away once we incorporate URIs into the assets
 	estimateCustomCheckType := s.FindMajorityOfTypes(pipeline.AssetTypeBigqueryQuery)
 
-	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID, nil)
 	seedOperator, err := ingestr.NewSeedOperator(conn, renderer)
 
 	if err != nil {
