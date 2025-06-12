@@ -1,8 +1,5 @@
 name: Update Ingestr Version
-
 on:
-  schedule:
-    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -37,7 +34,7 @@ jobs:
           if version_gt "$latest" "$current"; then
               echo "new=true" >> "$GITHUB_OUTPUT"
               echo "version=$latest" >> "$GITHUB_OUTPUT"
-              sed -i -E "s/(ingestrVersion\s*=\s*")[^"]+(\")/\1$latest\2/" pkg/python/uv.go
+              sed -i -E "s|(ingestrVersion\s*=\s*\")[^\"]+(\" )|\1$latest\2|" pkg/python/uv.go
           else
               echo "new=false" >> "$GITHUB_OUTPUT"
           fi
