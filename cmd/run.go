@@ -856,13 +856,19 @@ func SetupExecutors(
 		}
 	}
 
+	//nolint: dupl
 	if s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuery) || estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery ||
-		s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuery) || estimateCustomCheckType == pipeline.AssetTypeSynapseQuery || s.WillRunTaskOfType(pipeline.AssetTypeMsSQLSeed) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseSeed) {
+		s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuery) || estimateCustomCheckType == pipeline.AssetTypeSynapseQuery ||
+		s.WillRunTaskOfType(pipeline.AssetTypeMsSQLSeed) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseSeed) ||
+		s.WillRunTaskOfType(pipeline.AssetTypeMsSQLQuerySensor) || s.WillRunTaskOfType(pipeline.AssetTypeSynapseQuerySensor) {
 		msOperator := mssql.NewBasicOperator(conn, wholeFileExtractor, mssql.NewMaterializer(fullRefresh))
 		synapseOperator := synapse.NewBasicOperator(conn, wholeFileExtractor, synapse.NewMaterializer(fullRefresh))
 
 		msCheckRunner := mssql.NewColumnCheckOperator(conn)
 		synapseCheckRunner := synapse.NewColumnCheckOperator(conn)
+
+		msQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		synapseQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 
 		mainExecutors[pipeline.AssetTypeMsSQLQuery][scheduler.TaskInstanceTypeMain] = msOperator
 		mainExecutors[pipeline.AssetTypeMsSQLQuery][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
@@ -876,9 +882,21 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeMsSQLSeed][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
 		mainExecutors[pipeline.AssetTypeMsSQLSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
+		mainExecutors[pipeline.AssetTypeMsSQLQuerySensor][scheduler.TaskInstanceTypeMain] = msQuerySensor
+		mainExecutors[pipeline.AssetTypeMsSQLQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = msCheckRunner
+		mainExecutors[pipeline.AssetTypeMsSQLQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
 		mainExecutors[pipeline.AssetTypeSynapseSeed][scheduler.TaskInstanceTypeMain] = seedOperator
 		mainExecutors[pipeline.AssetTypeSynapseSeed][scheduler.TaskInstanceTypeColumnCheck] = synapseCheckRunner
 		mainExecutors[pipeline.AssetTypeSynapseSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeSynapseSeed][scheduler.TaskInstanceTypeMain] = seedOperator
+		mainExecutors[pipeline.AssetTypeSynapseSeed][scheduler.TaskInstanceTypeColumnCheck] = synapseCheckRunner
+		mainExecutors[pipeline.AssetTypeSynapseSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+
+		mainExecutors[pipeline.AssetTypeSynapseQuerySensor][scheduler.TaskInstanceTypeMain] = synapseQuerySensor
+		mainExecutors[pipeline.AssetTypeSynapseQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = synapseCheckRunner
+		mainExecutors[pipeline.AssetTypeSynapseQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
 		// we set the Python runners to run the checks on MsSQL
 		if estimateCustomCheckType == pipeline.AssetTypeMsSQLQuery || estimateCustomCheckType == pipeline.AssetTypeSynapseQuery {
@@ -1003,7 +1021,7 @@ func SetupExecutors(
 		if s.WillRunTaskOfType(typ) {
 			emrServerlessOperator, err := emr_serverless.NewBasicOperator(conn, jinjaVariables, renderer)
 			emrCheckRunner := emr_serverless.NewColumnCheckOperator(conn)
-			emrCustomCheckRunner := emr_serverless.NewCustomCheckOperator(conn)
+			emrCustomCheckRunner := emr_serverless.NewCustomCheckOperator(conn, renderer)
 			if err != nil {
 				return nil, err
 			}

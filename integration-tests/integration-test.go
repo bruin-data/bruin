@@ -641,6 +641,32 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
+			Name:    "policy-variables",
+			Command: binary,
+			Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/policies-variables/assets/target.sql")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+			},
+			WorkingDir: currentFolder,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+			},
+		},
+		{
+			Name:    "policy-variables-fail",
+			Command: binary,
+			Args:    []string{"validate", "--var", `message="This should fail"`, filepath.Join(currentFolder, "test-pipelines/policies-variables/assets/target.sql")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 1,
+			},
+			WorkingDir: currentFolder,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+			},
+		},
+		{
 			Name:          "parse-whole-pipeline",
 			Command:       binary,
 			Args:          []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "test-pipelines/parse-whole-pipeline")},

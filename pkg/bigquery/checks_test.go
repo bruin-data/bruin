@@ -307,7 +307,7 @@ func TestCustomCheck(t *testing.T) {
 
 			conn := new(mockConnectionFetcher)
 			conn.On("GetConnection", "test").Return(q, nil)
-			n := ansisql.NewCustomCheck(conn)
+			n := ansisql.NewCustomCheck(conn, nil)
 
 			testInstance := &scheduler.CustomCheckInstance{
 				AssetInstance: &scheduler.AssetInstance{

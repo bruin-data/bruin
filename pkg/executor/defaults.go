@@ -93,18 +93,23 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
 		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
 	},
-	pipeline.AssetTypeMsSQLQuery: {
-		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
-		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
-		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
-	},
 	pipeline.AssetTypeRedshiftQuerySensor: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 		scheduler.TaskInstanceTypeColumnCheck:  NoOpOperator{},
 		scheduler.TaskInstanceTypeCustomCheck:  NoOpOperator{},
 	},
+	pipeline.AssetTypeMsSQLQuery: {
+		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
+	},
 	pipeline.AssetTypeMsSQLSeed: {
+		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
+	},
+	pipeline.AssetTypeMsSQLQuerySensor: {
 		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
 		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
 		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
@@ -160,6 +165,11 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
 	},
 	pipeline.AssetTypeSynapseSeed: {
+		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
+		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
+		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},
+	},
+	pipeline.AssetTypeSynapseQuerySensor: {
 		scheduler.TaskInstanceTypeMain:        NoOpOperator{},
 		scheduler.TaskInstanceTypeColumnCheck: NoOpOperator{},
 		scheduler.TaskInstanceTypeCustomCheck: NoOpOperator{},

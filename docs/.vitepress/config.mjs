@@ -247,6 +247,7 @@ export default withMermaid({
                 items: [
                     {text: "Clean", link: "/commands/clean"},
                     {text: "Connections", link: "/commands/connections.md"},
+                    {text: "Data Diff", link: "/commands/data-diff"},
                     {text: "Environments", link: "/commands/environments"},
                     {text: "Format", link: "/commands/format"},
                     {text: "Init", link: "/commands/init"},
