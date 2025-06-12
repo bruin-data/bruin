@@ -725,7 +725,6 @@ func SetupExecutors(
 
 	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID, nil)
 	seedOperator, err := ingestr.NewSeedOperator(conn, renderer)
-
 	if err != nil {
 		return nil, err
 	}

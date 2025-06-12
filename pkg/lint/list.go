@@ -224,6 +224,7 @@ func GetCustomCheckQueryDryRunRule(connectionManager connectionManager) *SimpleR
 		ApplicableLevels: []Level{LevelAsset},
 	}
 }
+
 func FilterRulesByLevel(rules []Rule, level Level) []Rule {
 	filtered := make([]Rule, 0, len(rules))
 	for _, rule := range rules {

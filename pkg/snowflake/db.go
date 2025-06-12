@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
@@ -25,6 +26,7 @@ type DB struct {
 	schemaCreator *ansisql.SchemaCreator
 	dsn           string
 	mutex         sync.Mutex
+	typeMapper    *diff.DatabaseTypeMapper
 }
 
 func NewDB(c *Config) (*DB, error) {
@@ -40,6 +42,7 @@ func NewDB(c *Config) (*DB, error) {
 		schemaCreator: ansisql.NewSchemaCreator(),
 		dsn:           dsn,
 		mutex:         sync.Mutex{},
+		typeMapper:    diff.NewSnowflakeTypeMapper(),
 	}, nil
 }
 
@@ -368,4 +371,403 @@ func (db *DB) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset)
 
 func escapeSQLString(s string) string {
 	return strings.ReplaceAll(s, "'", "''") // Escape single quotes for SQL safety
+}
+
+func (db *DB) GetTableSummary(ctx context.Context, tableName string, schemaOnly bool) (*diff.TableSummaryResult, error) {
+	var rowCount int64
+
+	// Get row count only if not in schema-only mode
+	if !schemaOnly {
+		countResult, err := db.Select(ctx, &query.Query{Query: "SELECT COUNT(*) as row_count FROM " + tableName})
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute count query for table '%s': %w", tableName, err)
+		}
+
+		if len(countResult) > 0 && len(countResult[0]) > 0 {
+			if val, ok := countResult[0][0].(int64); ok {
+				rowCount = val
+			} else if val, ok := countResult[0][0].(int); ok {
+				rowCount = int64(val)
+			} else {
+				return nil, fmt.Errorf("unexpected row count type for table '%s'", tableName)
+			}
+		}
+	}
+
+	// Parse table name components for Snowflake
+	tableComponents := strings.Split(tableName, ".")
+	var databaseName, schemaName, tableNameOnly string
+
+	switch len(tableComponents) {
+	case 1:
+		// Use current database and schema
+		databaseName = db.config.Database
+		schemaName = db.config.Schema
+		tableNameOnly = strings.ToUpper(tableComponents[0])
+	case 2:
+		// schema.table format
+		databaseName = db.config.Database
+		schemaName = strings.ToUpper(tableComponents[0])
+		tableNameOnly = strings.ToUpper(tableComponents[1])
+	case 3:
+		// database.schema.table format
+		databaseName = strings.ToUpper(tableComponents[0])
+		schemaName = strings.ToUpper(tableComponents[1])
+		tableNameOnly = strings.ToUpper(tableComponents[2])
+	default:
+		return nil, fmt.Errorf("invalid table name format: %s", tableName)
+	}
+
+	// Get table schema using information_schema
+	schemaQuery := fmt.Sprintf(`
+	SELECT 
+		column_name,
+		data_type,
+		is_nullable,
+		column_default,
+		character_maximum_length,
+		numeric_precision,
+		numeric_scale,
+		is_identity
+	FROM %s.information_schema.columns 
+	WHERE table_schema = '%s' AND table_name = '%s'
+	ORDER BY ordinal_position`, databaseName, schemaName, tableNameOnly)
+
+	schemaResult, err := db.Select(ctx, &query.Query{Query: schemaQuery})
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute schema query for table '%s': %w", tableName, err)
+	}
+
+	columns := make([]*diff.Column, 0)
+	for _, row := range schemaResult {
+		if len(row) < 8 {
+			continue
+		}
+
+		columnName, ok := row[0].(string)
+		if !ok {
+			continue
+		}
+
+		dataType, ok := row[1].(string)
+		if !ok {
+			continue
+		}
+
+		isNullableStr, ok := row[2].(string)
+		if !ok {
+			continue
+		}
+
+		// Optional fields
+		var charMaxLength *int64
+		if row[4] != nil {
+			if val, ok := row[4].(int64); ok {
+				charMaxLength = &val
+			}
+		}
+
+		var numericPrecision, numericScale *int64
+		if row[5] != nil {
+			if val, ok := row[5].(int64); ok {
+				numericPrecision = &val
+			}
+		}
+		if row[6] != nil {
+			if val, ok := row[6].(int64); ok {
+				numericScale = &val
+			}
+		}
+
+		// Build the full type name with precision/scale if available
+		fullType := dataType
+		if charMaxLength != nil && *charMaxLength > 0 {
+			fullType = fmt.Sprintf("%s(%d)", dataType, *charMaxLength)
+		} else if numericPrecision != nil && numericScale != nil && *numericPrecision > 0 {
+			if *numericScale > 0 {
+				fullType = fmt.Sprintf("%s(%d,%d)", dataType, *numericPrecision, *numericScale)
+			} else {
+				fullType = fmt.Sprintf("%s(%d)", dataType, *numericPrecision)
+			}
+		}
+
+		normalizedType := db.typeMapper.MapType(strings.ToLower(dataType))
+		nullable := strings.ToUpper(isNullableStr) == "YES"
+
+		// TODO: Add logic to detect primary keys and unique constraints
+		// This would require additional queries to information_schema.table_constraints
+		// and information_schema.key_column_usage
+
+		var stats diff.ColumnStatistics
+		if schemaOnly {
+			// In schema-only mode, don't collect statistics
+			stats = nil
+		} else {
+			switch normalizedType {
+			case diff.CommonTypeNumeric:
+				stats, err = db.fetchNumericalStats(ctx, tableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch numerical stats for column '%s': %w", columnName, err)
+				}
+			case diff.CommonTypeString:
+				stats, err = db.fetchStringStats(ctx, tableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch string stats for column '%s': %w", columnName, err)
+				}
+			case diff.CommonTypeBoolean:
+				stats, err = db.fetchBooleanStats(ctx, tableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch boolean stats for column '%s': %w", columnName, err)
+				}
+			case diff.CommonTypeDateTime:
+				stats, err = db.fetchDateTimeStats(ctx, tableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch datetime stats for column '%s': %w", columnName, err)
+				}
+			case diff.CommonTypeJSON:
+				stats, err = db.fetchJSONStats(ctx, tableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch JSON stats for column '%s': %w", columnName, err)
+				}
+			case diff.CommonTypeBinary, diff.CommonTypeUnknown:
+				stats = &diff.UnknownStatistics{}
+			}
+		}
+
+		columns = append(columns, &diff.Column{
+			Name:           columnName,
+			Type:           fullType,
+			NormalizedType: normalizedType,
+			Nullable:       nullable,
+			PrimaryKey:     false, // TODO: Implement PK detection
+			Unique:         false, // TODO: Implement unique constraint detection
+			Stats:          stats,
+		})
+	}
+
+	dbTable := &diff.Table{
+		Name:    tableName,
+		Columns: columns,
+	}
+
+	return &diff.TableSummaryResult{
+		RowCount: rowCount,
+		Table:    dbTable,
+	}, nil
+}
+
+func (db *DB) fetchNumericalStats(ctx context.Context, tableName, columnName string) (*diff.NumericalStatistics, error) {
+	stats := &diff.NumericalStatistics{}
+	queryStr := fmt.Sprintf(`
+        SELECT 
+            COUNT(*) as count,
+            COUNT(*) - COUNT(%s) as null_count,
+            MIN(%s) as min_val,
+            MAX(%s) as max_val,
+            AVG(%s) as avg_val,
+            SUM(%s) as sum_val,
+            STDDEV(%s) as stddev_val
+        FROM %s`,
+		columnName, columnName, columnName, columnName, columnName, columnName, tableName)
+
+	result, err := db.Select(ctx, &query.Query{Query: queryStr})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(result) > 0 && len(result[0]) >= 7 { //nolint:nestif
+		row := result[0]
+
+		if val, ok := row[0].(int64); ok {
+			stats.Count = val
+		}
+		if val, ok := row[1].(int64); ok {
+			stats.NullCount = val
+		}
+
+		// Handle nullable numeric fields
+		if row[2] != nil {
+			if val, ok := row[2].(float64); ok {
+				stats.Min = &val
+			}
+		}
+		if row[3] != nil {
+			if val, ok := row[3].(float64); ok {
+				stats.Max = &val
+			}
+		}
+		if row[4] != nil {
+			if val, ok := row[4].(float64); ok {
+				stats.Avg = &val
+			}
+		}
+		if row[5] != nil {
+			if val, ok := row[5].(float64); ok {
+				stats.Sum = &val
+			}
+		}
+		if row[6] != nil {
+			if val, ok := row[6].(float64); ok {
+				stats.StdDev = &val
+			}
+		}
+	}
+
+	return stats, nil
+}
+
+func (db *DB) fetchStringStats(ctx context.Context, tableName, columnName string) (*diff.StringStatistics, error) {
+	stats := &diff.StringStatistics{}
+	queryStr := fmt.Sprintf(`
+        SELECT 
+            COUNT(*) as count,
+            COUNT(*) - COUNT(%s) as null_count,
+            COUNT(DISTINCT %s) as distinct_count,
+            COUNT(CASE WHEN %s = '' THEN 1 END) as empty_count,
+            MIN(LENGTH(%s)) as min_length,
+            MAX(LENGTH(%s)) as max_length,
+            AVG(LENGTH(%s)) as avg_length
+        FROM %s`,
+		columnName, columnName, columnName, columnName, columnName, columnName, tableName)
+
+	result, err := db.Select(ctx, &query.Query{Query: queryStr})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(result) > 0 && len(result[0]) >= 7 {
+		row := result[0]
+
+		if val, ok := row[0].(int64); ok {
+			stats.Count = val
+		}
+		if val, ok := row[1].(int64); ok {
+			stats.NullCount = val
+		}
+		if val, ok := row[2].(int64); ok {
+			stats.DistinctCount = val
+		}
+		if val, ok := row[3].(int64); ok {
+			stats.EmptyCount = val
+		}
+		if val, ok := row[4].(int64); ok {
+			stats.MinLength = int(val)
+		}
+		if val, ok := row[5].(int64); ok {
+			stats.MaxLength = int(val)
+		}
+		if val, ok := row[6].(float64); ok {
+			stats.AvgLength = val
+		}
+	}
+
+	return stats, nil
+}
+
+func (db *DB) fetchBooleanStats(ctx context.Context, tableName, columnName string) (*diff.BooleanStatistics, error) {
+	stats := &diff.BooleanStatistics{}
+	queryStr := fmt.Sprintf(`
+        SELECT 
+            COUNT(*) as count,
+            COUNT(*) - COUNT(%s) as null_count,
+            COUNT(CASE WHEN %s = true THEN 1 END) as true_count,
+            COUNT(CASE WHEN %s = false THEN 1 END) as false_count
+        FROM %s`,
+		columnName, columnName, columnName, tableName)
+
+	result, err := db.Select(ctx, &query.Query{Query: queryStr})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(result) > 0 && len(result[0]) >= 4 {
+		row := result[0]
+
+		if val, ok := row[0].(int64); ok {
+			stats.Count = val
+		}
+		if val, ok := row[1].(int64); ok {
+			stats.NullCount = val
+		}
+		if val, ok := row[2].(int64); ok {
+			stats.TrueCount = val
+		}
+		if val, ok := row[3].(int64); ok {
+			stats.FalseCount = val
+		}
+	}
+
+	return stats, nil
+}
+
+func (db *DB) fetchDateTimeStats(ctx context.Context, tableName, columnName string) (*diff.DateTimeStatistics, error) {
+	stats := &diff.DateTimeStatistics{}
+	queryStr := fmt.Sprintf(`
+        SELECT 
+            COUNT(*) as count,
+            COUNT(*) - COUNT(%s) as null_count,
+            COUNT(DISTINCT %s) as unique_count,
+            MIN(%s)::string as earliest_date,
+            MAX(%s)::string as latest_date
+        FROM %s`,
+		columnName, columnName, columnName, columnName, tableName)
+
+	result, err := db.Select(ctx, &query.Query{Query: queryStr})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(result) > 0 && len(result[0]) >= 5 {
+		row := result[0]
+
+		if val, ok := row[0].(int64); ok {
+			stats.Count = val
+		}
+		if val, ok := row[1].(int64); ok {
+			stats.NullCount = val
+		}
+		if val, ok := row[2].(int64); ok {
+			stats.UniqueCount = val
+		}
+		if row[3] != nil {
+			if val, ok := row[3].(string); ok {
+				stats.EarliestDate = &val
+			}
+		}
+		if row[4] != nil {
+			if val, ok := row[4].(string); ok {
+				stats.LatestDate = &val
+			}
+		}
+	}
+
+	return stats, nil
+}
+
+func (db *DB) fetchJSONStats(ctx context.Context, tableName, columnName string) (*diff.JSONStatistics, error) {
+	stats := &diff.JSONStatistics{}
+	queryStr := fmt.Sprintf(`
+        SELECT 
+            COUNT(*) as count,
+            COUNT(*) - COUNT(%s) as null_count
+        FROM %s`,
+		columnName, tableName)
+
+	result, err := db.Select(ctx, &query.Query{Query: queryStr})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(result) > 0 && len(result[0]) >= 2 {
+		row := result[0]
+
+		if val, ok := row[0].(int64); ok {
+			stats.Count = val
+		}
+		if val, ok := row[1].(int64); ok {
+			stats.NullCount = val
+		}
+	}
+
+	return stats, nil
 }

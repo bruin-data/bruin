@@ -141,6 +141,35 @@ Specify a different configuration file:
 bruin data-diff --config-file /path/to/custom/.bruin.yml prod:table1 staging:table2
 ```
 
+## Supported Data Platforms
+
+The `data-diff` command includes specialized type mapping support for the following data platforms:
+
+- **DuckDB** - Full support for DuckDB data types including `HUGEINT`, `UHUGEINT`, and specialized time types
+- **BigQuery** - Native support for BigQuery types including `INT64`, `FLOAT64`, `BIGNUMERIC`, and BigQuery-specific formatting
+- **PostgreSQL & AWS Redshift** - Complete support for PostgreSQL types including `SERIAL` types, `MONEY`, network types (`CIDR`, `INET`), and `JSONB`
+- **Snowflake** - Full support for Snowflake types including `NUMBER`, `VARIANT`, and timezone-aware timestamp types
+
+### Type Mapping Features
+
+Each supported platform includes intelligent type mapping that:
+
+- **Normalizes data types** across platforms (e.g., PostgreSQL `INTEGER` and BigQuery `INT64` both map to `numeric`)
+- **Handles parametrized types** automatically (e.g., `VARCHAR(255)` and `VARCHAR(100)` are both treated as `string`)
+- **Supports case-insensitive matching** for type names
+- **Maps platform-specific types** to common categories for cross-platform comparisons
+
+### Cross-Platform Comparisons
+
+When comparing tables between different platforms, the command intelligently maps data types to common categories:
+
+- **Numeric types:** All integer, float, decimal, and monetary types
+- **String types:** VARCHAR, CHAR, TEXT, and similar text types  
+- **Boolean types:** BOOL, BOOLEAN, and logical types
+- **DateTime types:** DATE, TIME, TIMESTAMP, and interval types
+- **Binary types:** BLOB, BYTEA, BINARY, and similar binary types
+- **JSON types:** JSON, JSONB, VARIANT, and structured data types
+
 ## Connection Requirements
 
 To use the `data-diff` command, your connections must support table summarization. This means the connection type must implement the `TableSummarizer` interface, which includes the ability to:
@@ -149,7 +178,7 @@ To use the `data-diff` command, your connections must support table summarizatio
 - Calculate statistical summaries for different column types
 - Handle various data types (numerical, string, boolean, datetime, JSON)
 
-Supported connection types include most major databases and data warehouses that Bruin supports.
+For optimal results, use one of the fully supported data platforms listed above. Other database connections may work but may have limited type mapping capabilities.
 
 ## Use Cases
 
@@ -160,9 +189,10 @@ bruin data-diff source_db:customer_data target_db:customer_data
 ```
 
 ### Environment Consistency Checks
+If you are comparing different environments, you can use the `--schema-only` flag to only compare the schema of the tables and not the data.
 ```bash
 # Ensure staging matches production structure
-bruin data-diff prod:important_table staging:important_table --tolerance 0.01
+bruin data-diff --schema-only prod:important_table staging:important_table --tolerance 0.01
 ```
 
 ### ETL Process Monitoring  
@@ -179,18 +209,22 @@ bruin data-diff yesterday_snapshot:metrics today_snapshot:metrics
 
 ## Troubleshooting
 
-**Error: "connection type does not support table summarization"**
-- The specified connection type doesn't support the required table analysis features
-- Ensure you're using a supported database connection
+### Error: "connection type does not support table summarization"
+The specified connection type doesn't support the required table analysis features.
 
-**Error: "incorrect number of arguments"**
-- The command requires exactly two table arguments
-- Verify you've provided both table identifiers
+If you'd like to see another platform supported, feel free to open an issue on our [GitHub repository](https://github.com/bruin-data/bruin/issues).
 
-**Error: "connection not specified for table"**
-- Table identifier doesn't include a connection prefix and no default connection was set
-- Either use the format `connection:table` or add the `--connection` flag
+### Error: "incorrect number of arguments"
+The command requires exactly two table arguments.
 
-**Error: "failed to get connection"**
-- The specified connection name doesn't exist in your configuration
-- Check your `.bruin.yml` file for available connections 
+Verify you've provided both table identifiers.
+
+### Error: "connection not specified for table"
+Table identifier doesn't include a connection prefix and no default connection was set.
+
+Either use the format `connection:table` or add the `--connection` flag.
+
+### Error: "failed to get connection"
+The specified connection name doesn't exist in your configuration.
+
+Check your `.bruin.yml` file for available connections.

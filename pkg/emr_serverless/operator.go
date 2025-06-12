@@ -43,7 +43,6 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	)
 	renderer := op.renderer.CloneForAsset(ctx, ti.GetPipeline(), ti.GetAsset())
 	asset, err := renderer.RenderAsset(ti.GetAsset())
-
 	if err != nil {
 		return fmt.Errorf("error rendering asset: %w", err)
 	}
