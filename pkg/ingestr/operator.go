@@ -35,10 +35,9 @@ type BasicOperator struct {
 }
 
 type SeedOperator struct {
-	conn     connectionFetcher
-	runner   ingestrRunner
-	finder   repoFinder
-	renderer jinja.RendererInterface
+	conn   connectionFetcher
+	runner ingestrRunner
+	finder repoFinder
 }
 
 type pipelineConnection interface {
@@ -141,17 +140,16 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
 }
 
-func NewSeedOperator(conn *connection.Manager, renderer jinja.RendererInterface) (*SeedOperator, error) {
+func NewSeedOperator(conn *connection.Manager) (*SeedOperator, error) {
 	uvRunner := &python.UvPythonRunner{
 		UvInstaller: &python.UvChecker{},
 		Cmd:         &python.CommandRunner{},
 	}
 
 	return &SeedOperator{
-		conn:     conn,
-		runner:   uvRunner,
-		finder:   &git.RepoFinder{},
-		renderer: renderer,
+		conn:   conn,
+		runner: uvRunner,
+		finder: &git.RepoFinder{},
 	}, nil
 }
 

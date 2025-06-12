@@ -15,7 +15,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/env"
 	"github.com/bruin-data/bruin/pkg/executor"
-	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 )
@@ -34,7 +33,6 @@ type connectionFetcher interface {
 type BasicOperator struct {
 	connection connectionFetcher
 	env        map[string]string
-	renderer   jinja.RendererInterface
 }
 
 func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
@@ -93,11 +91,10 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	return job.Run(ctx)
 }
 
-func NewBasicOperator(conn connectionFetcher, env map[string]string, renderer jinja.RendererInterface) (*BasicOperator, error) {
+func NewBasicOperator(conn connectionFetcher, env map[string]string) (*BasicOperator, error) {
 	return &BasicOperator{
 		connection: conn,
 		env:        env,
-		renderer:   renderer,
 	}, nil
 }
 
