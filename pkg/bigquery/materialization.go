@@ -418,12 +418,13 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 	if asset.Materialization.IncrementalKey == "" {
 		return "", errors.New("incremental_key is required for SCD2 strategy")
 	}
-
+  
 	primaryKeys := asset.ColumnNamesWithPrimaryKey()
 	if len(primaryKeys) == 0 {
 		return "", errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
 	}
 	tbl := fmt.Sprintf("`%s`", asset.Name)
+	cluster := strings.Join(primaryKeys, ", ")
 	stmt := fmt.Sprintf(
 		`CREATE OR REPLACE TABLE %s
 PARTITION BY DATE(_valid_from)
@@ -437,7 +438,7 @@ FROM (
 %s
 ) AS src;`,
 		tbl,
-		primaryKeys[0],
+		cluster,
 		asset.Materialization.IncrementalKey,
 		strings.TrimSpace(query),
 	)
@@ -450,14 +451,14 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 		return "", errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
 	}
 	tbl := fmt.Sprintf("`%s`", asset.Name)
+	cluster := strings.Join(primaryKeys, ", ")
 	stmt := fmt.Sprintf(
-		`DECLARE run_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP();
-
+		`
 CREATE OR REPLACE TABLE %s
 PARTITION BY DATE(_valid_from)
 CLUSTER BY _is_current, %s AS
 SELECT
-  run_ts AS _valid_from,
+  CURRENT_TIMESTAMP() AS _valid_from,
   src.*,
   TIMESTAMP('9999-12-31') AS _valid_until,
   TRUE                    AS _is_current
@@ -465,7 +466,7 @@ FROM (
 %s
 ) AS src;`,
 		tbl,
-		primaryKeys[0],
+		cluster,
 		strings.TrimSpace(query),
 	)
 
