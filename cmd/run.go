@@ -283,7 +283,6 @@ func Run(isDebug *bool) *cli.Command {
 					}
 					asset.Parameters[k] = rendererd
 				}
-				fmt.Println(asset.Parameters)
 				return asset, nil
 			})
 
