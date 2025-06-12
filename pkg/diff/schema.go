@@ -63,6 +63,7 @@ type SchemaComparisonResult struct {
 
 func (c *SchemaComparisonResult) GetSummaryTable() string {
 	t := table.NewWriter()
+	t.SetStyle(table.StyleRounded)
 	t.SetRowPainter(func(row table.Row) text.Colors {
 		if len(row) == 0 {
 			return text.Colors{}
@@ -148,10 +149,8 @@ func CompareTableSchemas(summary1, summary2 *TableSummaryResult, t1Name, t2Name 
 					Table2NormalizedType: col2.NormalizedType,
 					IsComparable:         normalizedTypesMatch,
 				}
-				// Only consider it a schema difference if normalized types don't match
-				if !normalizedTypesMatch {
-					columnIsDifferent = true
-				}
+
+				columnIsDifferent = true
 			}
 			if col1.Nullable != col2.Nullable {
 				colDiff.NullabilityDifference = &NullabilityDifference{

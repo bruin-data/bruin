@@ -41,7 +41,6 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	logger := log.New(
 		ctx.Value(executor.KeyPrinter).(io.Writer), "", 0,
 	)
-
 	asset := ti.GetAsset()
 	connID, err := ti.GetPipeline().GetConnectionNameForAsset(asset)
 	if err != nil {

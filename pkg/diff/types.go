@@ -244,6 +244,111 @@ func NewBigQueryTypeMapper() *DatabaseTypeMapper {
 	return mapper
 }
 
+// NewPostgresTypeMapper provides PostgreSQL-specific type mapping.
+func NewPostgresTypeMapper() *DatabaseTypeMapper {
+	mapper := NewDatabaseTypeMapper()
+
+	// Numeric types in PostgreSQL
+	mapper.AddNumericTypes(
+		"smallint", "int2",
+		"integer", "int", "int4",
+		"bigint", "int8",
+		"decimal", "numeric",
+		"real", "float4",
+		"double precision", "float8",
+		"smallserial", "serial2",
+		"serial", "serial4",
+		"bigserial", "serial8",
+		"money",
+	)
+
+	// String types in PostgreSQL
+	mapper.AddStringTypes(
+		"character varying", "varchar",
+		"character", "char", "bpchar",
+		"text",
+		"name",
+		"cidr", "inet", "macaddr", "macaddr8",
+		"uuid",
+	)
+
+	// Boolean types in PostgreSQL
+	mapper.AddBooleanTypes(
+		"boolean", "bool",
+	)
+
+	// DateTime types in PostgreSQL
+	mapper.AddDateTimeTypes(
+		"timestamp", "timestamptz",
+		"timestamp without time zone",
+		"timestamp with time zone",
+		"date",
+		"time", "timetz",
+		"time without time zone",
+		"time with time zone",
+		"interval",
+	)
+
+	// Binary types in PostgreSQL
+	mapper.AddBinaryTypes(
+		"bytea",
+		"bit", "bit varying", "varbit",
+	)
+
+	// JSON types in PostgreSQL
+	mapper.AddJSONTypes(
+		"json", "jsonb",
+	)
+
+	return mapper
+}
+
+// NewSnowflakeTypeMapper provides Snowflake-specific type mapping.
+func NewSnowflakeTypeMapper() *DatabaseTypeMapper {
+	mapper := NewDatabaseTypeMapper()
+
+	// Numeric types in Snowflake
+	mapper.AddNumericTypes(
+		"number", "decimal", "numeric",
+		"int", "integer", "bigint", "smallint", "tinyint",
+		"byteint",
+		"float", "float4", "float8",
+		"double", "double precision",
+		"real",
+	)
+
+	// String types in Snowflake
+	mapper.AddStringTypes(
+		"varchar", "char", "character",
+		"string", "text",
+	)
+
+	// Boolean types in Snowflake
+	mapper.AddBooleanTypes(
+		"boolean", "bool",
+	)
+
+	// DateTime types in Snowflake
+	mapper.AddDateTimeTypes(
+		"date",
+		"datetime",
+		"time",
+		"timestamp", "timestamp_ltz", "timestamp_ntz", "timestamp_tz",
+	)
+
+	// Binary types in Snowflake
+	mapper.AddBinaryTypes(
+		"binary", "varbinary",
+	)
+
+	// JSON types in Snowflake
+	mapper.AddJSONTypes(
+		"variant", "object", "array",
+	)
+
+	return mapper
+}
+
 type Table struct {
 	Name    string
 	Columns []*Column
