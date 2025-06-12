@@ -274,17 +274,7 @@ func Run(isDebug *bool) *cli.Command {
 				runID = os.Getenv("BRUIN_RUN_ID")
 			}
 			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, "test", runID, nil)
-			DefaultPipelineBuilder.AddAssetMutator(func(ctx context.Context, asset *pipeline.Asset, foundPipeline *pipeline.Pipeline) (*pipeline.Asset, error) {
-				re := renderer.CloneForAsset(ctx, foundPipeline, asset)
-				for k, v := range asset.Parameters {
-					rendererd, err := re.Render(v)
-					if err != nil {
-						return nil, err
-					}
-					asset.Parameters[k] = rendererd
-				}
-				return asset, nil
-			})
+			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
 
 			runCtx := context.Background()
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
