@@ -34,7 +34,7 @@ var AvailablePythonVersions = map[string]bool{
 const (
 	UvVersion               = "0.6.16"
 	pythonVersionForIngestr = "3.11"
-	ingestrVersion          = "0.13.51"
+	ingestrVersion          = "0.13.53"
 )
 
 // UvChecker handles checking and installing the uv package manager.
@@ -195,7 +195,7 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 		return errors.Wrap(err, "failed to install ingestr")
 	}
 
-	flags := []string{"tool", "run", "--python", pythonVersionForIngestr, "ingestr"}
+	flags := []string{"tool", "run", "--prerelease", "allow", "--python", pythonVersionForIngestr, "ingestr"}
 	flags = append(flags, args...)
 
 	noDependencyCommand := &CommandInstance{
@@ -349,7 +349,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		return errors.Wrap(err, "failed to install ingestr")
 	}
 
-	runArgs := slices.Concat([]string{"tool", "run", "--python", pythonVersionForIngestr, "ingestr"}, cmdArgs)
+	runArgs := slices.Concat([]string{"tool", "run", "--prerelease", "allow", "--python", pythonVersionForIngestr, "ingestr"}, cmdArgs)
 
 	if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
 		boolVal := debug.(*bool)
@@ -392,6 +392,8 @@ func (u *UvPythonRunner) ingestrInstallCmd(ctx context.Context, pkgs []string) [
 		"install",
 		"--force",
 		"--quiet",
+		"--prerelease",
+		"allow",
 		"--python",
 		pythonVersionForIngestr,
 	}

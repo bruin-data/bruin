@@ -1,6 +1,6 @@
 /* @bruin
 name: public.standard
-type: bq.sql
+type: duckdb.sql
 description: |
     This pipeline demonstrates the use of the standard policy.
 owner: engineering@getbruin.com

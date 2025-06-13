@@ -2,6 +2,8 @@ package jinja
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 	"sync"
@@ -146,6 +148,21 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 	}
 }
 
+func (r *Renderer) RenderAsset(asset *pipeline.Asset) (*pipeline.Asset, error) {
+	clone, err := deepCopy(asset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deep copy asset '%s': %w", asset.Name, err)
+	}
+	for key, val := range clone.Parameters {
+		rendered, err := r.Render(val)
+		if err != nil {
+			return nil, fmt.Errorf("failed to render parameter '%s' for asset '%s': %w", key, clone.Name, err)
+		}
+		clone.Parameters[key] = rendered
+	}
+	return clone, nil
+}
+
 func findRenderErrorType(err error) string {
 	message := err.Error()
 	errorBits := strings.Split(message, ": ")
@@ -182,5 +199,15 @@ func findParserErrorType(err error) string {
 // this ugly interface is needed to avoid circular dependencies and the ability to create different renderer instances per asset.
 type RendererInterface interface {
 	Render(query string) (string, error)
+	RenderAsset(asset *pipeline.Asset) (*pipeline.Asset, error)
 	CloneForAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) RendererInterface
+}
+
+func deepCopy(src *pipeline.Asset) (*pipeline.Asset, error) {
+	b, err := json.Marshal(src)
+	if err != nil {
+		return nil, err
+	}
+	clone := &pipeline.Asset{}
+	return clone, json.Unmarshal(b, clone)
 }

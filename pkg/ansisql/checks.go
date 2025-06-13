@@ -190,10 +190,10 @@ type CustomCheck struct {
 	renderer jinja.RendererInterface
 }
 
-func NewCustomCheck(conn connectionFetcher) *CustomCheck {
+func NewCustomCheck(conn connectionFetcher, renderer jinja.RendererInterface) *CustomCheck {
 	// TODO: this needs to use an actual renderer instead of the yesterday, since this `NewRendererWithYesterday` does not honor
 	// the parameters passed to the `bruin run` command.
-	return &CustomCheck{conn: conn, renderer: jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")}
+	return &CustomCheck{conn: conn, renderer: renderer}
 }
 
 func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstance) error {
@@ -207,8 +207,14 @@ func (c *CustomCheck) Check(ctx context.Context, ti *scheduler.CustomCheckInstan
 
 		qq = qry
 	}
-	return NewCountableQueryCheck(c.conn, ti.Check.Value, &query.Query{Query: qq}, ti.Check.Name, func(count int64) error {
-		return errors.Errorf("custom check '%s' has returned %d instead of the expected %d", ti.Check.Name, count, ti.Check.Value)
+	expected := ti.Check.Value
+	if ti.Check.Count != nil {
+		expected = *ti.Check.Count
+		qq = fmt.Sprintf("SELECT count(*) FROM (%s) AS t", qq)
+	}
+
+	return NewCountableQueryCheck(c.conn, expected, &query.Query{Query: qq}, ti.Check.Name, func(count int64) error {
+		return errors.Errorf("custom check '%s' has returned %d instead of the expected %d", ti.Check.Name, count, expected)
 	}).CustomCheck(ctx, ti)
 }
 

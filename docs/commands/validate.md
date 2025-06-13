@@ -24,6 +24,7 @@ Defaults to the current directory (".") if not provided.
 | `--output [format]`      | `-o`       | Specifies the output type, possible values: `plain`, `json`.               |
 | `--exclude-warnings`     |            | Excludes warnings from the validation output.                              |
 | `--config-file`          |            | The path to the `.bruin.yml` file.                                           |
+| `--exclude-tag`          |            | Excludes assets with the given tag from validation.                          |
 
 
 

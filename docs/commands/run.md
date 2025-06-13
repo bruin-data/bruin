@@ -30,19 +30,30 @@ table td:first-child {
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--downstream` | bool | `false` | Run all downstream tasks as well. |
+| `--workers` | int | `16` | Number of workers to run tasks in parallel. |
 | `--start-date` | str | Beginning of yesterday | The start date of the range the pipeline will run for. Format: `YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, or `YYYY-MM-DD HH:MM:SS.ffffff` |
 | `--end-date` | str | End of yesterday | The end date of the range the pipeline will run for. Format: `YYYY-MM-DD`, `YYYY-MM-DD HH:MM:SS`, or `YYYY-MM-DD HH:MM:SS.ffffff` |
 | `--environment` | str | - | The environment to use. |
-| `--force` | bool | `false` | Do not ask for confirmation in a production environment. |
-| `--full-refresh` | bool | `false` | Truncate the table before running. |
-| `--no-log-file` | bool | `false` | Do not create a log file for this run. |
-| `--only` | []str | `main`, `checks` | Limit the types of tasks to run. Options: `main`, `checks`, `push-metadata`. |
 | `--push-metadata` | bool | `false` | Push metadata to the destination database if supported (currently BigQuery). |
+| `--force` | bool | `false` | Do not ask for confirmation in a production environment. |
+| `--no-log-file` | bool | `false` | Do not create a log file for this run. |
+| `--sensor-mode` | str | `'once'` | Set sensor mode: `skip`, `once`, or `wait`. |
+| `--full-refresh` | bool | `false` | Truncate the table before running. |
+| `--apply-interval-modifiers` | bool | `false` | Apply interval modifiers. |
+| `--use-pip` | bool | `false` | Use pip for managing Python dependencies. |
+| `--continue` | bool | `false` | Continue from the last failed asset. |
 | `--tag` | str | - | Pick assets with the given tag. |
-| `--exclude-tag` | []str | - | Exclude assets with the given tag. |
-| `--workers` | int | `16` | Number of workers to run tasks in parallel. |
-|  `--continue` | bool | `false` | Continue from the last failed asset. |
+| `--single-check` | str | - | Run a single column or custom check by ID. |
+| `--exclude-tag` | str | - | Exclude assets with the given tag. |
+| `--only` | []str | `'main', 'checks', 'push-metadata'` | Limit the types of tasks to run. By default it runs `main` and `checks`, while `push-metadata` is optional if defined in the pipeline definition. |
+| `--exp-use-winget-for-uv` | bool | `false` | Use PowerShell to manage and install `uv` on Windows. Has no effect on non-Windows systems. |
+| `--debug-ingestr-src` | str | - | Use ingestr from the given path instead of the builtin version. |
 | `--config-file` | str | - | The path to the `.bruin.yml` file. |
+| `--no-validation` | bool | `false` | Skip validation for this run. |
+| `--no-timestamp` | bool | `false` | Skip logging timestamps for this run. |
+| `--no-color` | bool | `false` | Plain log output for this run. |
+| `--minimal-logs` | bool | `false` | Skip initial pipeline analysis logs for this run. |
+| `--var` | []str | - | Override pipeline variables with custom values. |
 
 
 ### Continue from the last failed asset

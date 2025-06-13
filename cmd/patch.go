@@ -75,6 +75,7 @@ func Patch() *cli.Command {
 						printErrorForOutput(output, fmt.Errorf("failed to create sql parser: %w", err))
 						return cli.Exit("", 1)
 					}
+					defer sqlParserInstance.Close()
 
 					jinjaRenderer := jinja.NewRendererWithYesterday("test-pipeline", "test-run-id")
 

@@ -16,6 +16,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 	"github.com/robfig/cron/v3"
 	"github.com/spf13/afero"
@@ -1056,6 +1057,55 @@ func EnsureBigQueryQuerySensorHasTableParameterForASingleAsset(ctx context.Conte
 	}
 
 	return issues, nil
+}
+
+// ValidateCustomCheckQueryDryRun validates CustomCheck.Query using a dry-run against the DB.
+func ValidateCustomCheckQueryDryRun(connections connectionManager) AssetValidator {
+	return func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+		var issues []*Issue
+
+		if len(asset.CustomChecks) == 0 {
+			return issues, nil
+		}
+
+		connName, err := p.GetConnectionNameForAsset(asset)
+		if err != nil { //nolint
+			return issues, nil
+		}
+
+		validator, err := connections.GetConnection(connName)
+		if err != nil { //nolint
+			return issues, nil
+		}
+
+		validatorInstance, ok := validator.(queryValidator)
+		if !ok { //nolint
+			return issues, nil
+		}
+
+		for _, check := range asset.CustomChecks {
+			if strings.TrimSpace(check.Query) == "" {
+				continue
+			}
+
+			q := &query.Query{Query: check.Query}
+			valid, err := validatorInstance.IsValid(ctx, q)
+			if err != nil {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: fmt.Sprintf("Failed to validate custom check query '%s': %s", check.Name, err),
+					Context:     []string{check.Query},
+				})
+			} else if !valid {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "Custom check query is invalid:" + check.Query,
+					Context:     []string{check.Query},
+				})
+			}
+		}
+		return issues, nil
+	}
 }
 
 type GlossaryChecker struct {

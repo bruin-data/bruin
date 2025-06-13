@@ -58,17 +58,38 @@ func CastResultToInteger(res [][]interface{}) (int64, error) {
 		return int64(v), nil
 	case float32:
 		return int64(v), nil
+	case int8:
+		return int64(v), nil
+	case int16:
+		return int64(v), nil
+	case int32:
+		return int64(v), nil
 	case int64:
 		return v, nil
 	case int:
+		return int64(v), nil
+	case uint8:
+		return int64(v), nil
+	case uint16:
+		return int64(v), nil
+	case uint32:
+		return int64(v), nil
+	case uint64:
+		if v > math.MaxInt64 {
+			return 0, errors.Errorf("uint64 value %d overflows int64", v)
+		}
+		return int64(v), nil
+	case uint:
+		if uint64(v) > math.MaxInt64 {
+			return 0, errors.Errorf("uint value %d overflows int64", v)
+		}
+		// #nosec G115: overflow is checked above
 		return int64(v), nil
 	case bool:
 		if v {
 			return 1, nil
 		}
 		return 0, nil
-	case uint64:
-		return int64(math.Abs(float64(v))), nil
 
 	case string:
 		atoi, err := strconv.Atoi(v)
@@ -119,6 +140,7 @@ func ReadJSONToFile(fs afero.Fs, filename string, v interface{}) error {
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
 	decoder := json.NewDecoder(file)
 	err = decoder.Decode(v)

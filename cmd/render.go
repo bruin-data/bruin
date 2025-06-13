@@ -277,7 +277,7 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 		if task.Materialization.Strategy == pipeline.MaterializationStrategyTimeInterval {
 			var rextractedQueries []*query.Query
 
-			rextractedQueries, err = r.extractor.ExtractQueriesFromString(materialized)
+			rextractedQueries, err = extractor.ExtractQueriesFromString(materialized)
 			if err != nil {
 				r.printErrorOrJSON(err.Error())
 				return cli.Exit("", 1)

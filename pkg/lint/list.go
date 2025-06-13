@@ -70,6 +70,7 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			Validator:        EnsurePipelineNameIsValid,
 			ApplicableLevels: []Level{LevelPipeline},
 		},
+
 		&SimpleRule{
 			Identifier:       "valid-task-type",
 			Fast:             true,
@@ -212,6 +213,16 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 	}
 
 	return rules, nil
+}
+
+func GetCustomCheckQueryDryRunRule(connectionManager connectionManager) *SimpleRule {
+	return &SimpleRule{
+		Identifier:       "custom-check-query-dry-run",
+		Fast:             false,
+		Severity:         ValidatorSeverityCritical,
+		AssetValidator:   ValidateCustomCheckQueryDryRun(connectionManager),
+		ApplicableLevels: []Level{LevelAsset},
+	}
 }
 
 func FilterRulesByLevel(rules []Rule, level Level) []Rule {

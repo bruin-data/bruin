@@ -28,7 +28,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyAppend:        buildAppendQuery,
 		pipeline.MaterializationStrategyCreateReplace: buildCreateReplaceQuery,
 		pipeline.MaterializationStrategyDeleteInsert:  buildIncrementalQuery,
-		pipeline.MaterializationStrategyMerge:         errorMaterializer, // not supported yet,
+		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
 	},
@@ -62,6 +62,38 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", task.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", task.Name, tempTableName),
 		"DROP TABLE IF EXISTS " + tempTableName,
+		"COMMIT",
+	}
+
+	return strings.Join(queries, ";\n") + ";", nil
+}
+
+func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
+	if len(asset.Columns) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `columns` field to be set", asset.Materialization.Strategy)
+	}
+
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
+	}
+
+	query = strings.TrimSuffix(query, ";")
+	usingClause := strings.Join(primaryKeys, ", ")
+	whereClause := primaryKeys[0]
+
+	mergeQuery := fmt.Sprintf(
+		"CREATE OR REPLACE TABLE %s AS WITH source_data AS (%s) SELECT * FROM source_data UNION ALL SELECT dt.* FROM %s AS dt LEFT JOIN source_data AS sd USING(%s) WHERE sd.%s IS NULL",
+		asset.Name,
+		query,
+		asset.Name,
+		usingClause,
+		whereClause,
+	)
+
+	queries := []string{
+		"BEGIN TRANSACTION",
+		mergeQuery,
 		"COMMIT",
 	}
 

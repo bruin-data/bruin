@@ -834,6 +834,7 @@ func (m *Manager) GetAttioConnectionWithoutDefault(name string) (*attio.Client, 
 
 	return db, nil
 }
+
 func (m *Manager) GetAdjustConnection(name string) (*adjust.Client, error) {
 	db, err := m.GetAdjustConnectionWithoutDefault(name)
 	if err == nil {
@@ -1578,7 +1579,11 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 	m.mutex.Unlock()
 
 	privateKey := ""
-	if connection.PrivateKeyPath != "" {
+
+	// Prioritize the direct PrivateKey field over PrivateKeyPath
+	if connection.PrivateKey != "" {
+		privateKey = connection.PrivateKey
+	} else if connection.PrivateKeyPath != "" {
 		privateKeyBytes, err := os.ReadFile(connection.PrivateKeyPath)
 		if err != nil {
 			return err

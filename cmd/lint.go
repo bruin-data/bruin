@@ -68,6 +68,10 @@ func Lint(isDebug *bool) *cli.Command {
 				EnvVars: []string{"BRUIN_CONFIG_FILE"},
 				Usage:   "the path to the .bruin.yml file",
 			},
+			&cli.StringFlag{
+				Name:  "exclude-tag",
+				Usage: "exclude assets with the given tag from the validation",
+			},
 			&cli.StringSliceFlag{
 				Name:  "var",
 				Usage: "override pipeline variables with custom values",
@@ -145,6 +149,7 @@ func Lint(isDebug *bool) *cli.Command {
 			if err != nil {
 				printError(err, c.String("output"), "Could not initialize sql parser")
 			}
+			defer parser.Close()
 
 			rules, err := lint.GetRules(fs, &git.RepoFinder{}, c.Bool("exclude-warnings"), parser, true)
 			if err != nil {
@@ -156,6 +161,7 @@ func Lint(isDebug *bool) *cli.Command {
 			logger.Debugf("successfully loaded %d rules", len(rules))
 
 			rules = append(rules, queryValidatorRules(logger, cm, connectionManager)...)
+			rules = append(rules, lint.GetCustomCheckQueryDryRunRule(connectionManager))
 
 			var result *lint.PipelineAnalysisResult
 			var errr error

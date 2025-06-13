@@ -17,7 +17,9 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Panicf("error initializing SQL parser: %v", err)
 	}
-	os.Exit(m.Run())
+	rc := m.Run()
+	SQLParser.Close()
+	os.Exit(rc)
 }
 
 func SetupSQLParser() error {

@@ -642,6 +642,32 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
+			Name:    "policy-variables",
+			Command: binary,
+			Args:    []string{"validate", filepath.Join(currentFolder, "test-pipelines/policies-variables/assets/target.sql")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+			},
+			WorkingDir: currentFolder,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+			},
+		},
+		{
+			Name:    "policy-variables-fail",
+			Command: binary,
+			Args:    []string{"validate", "--var", `message="This should fail"`, filepath.Join(currentFolder, "test-pipelines/policies-variables/assets/target.sql")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 1,
+			},
+			WorkingDir: currentFolder,
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+			},
+		},
+		{
 			Name:          "parse-whole-pipeline",
 			Command:       binary,
 			Args:          []string{"internal", "parse-pipeline", filepath.Join(currentFolder, "test-pipelines/parse-whole-pipeline")},
@@ -897,9 +923,49 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
+			Name:    "validate-with-exclude-tags",
+			Command: binary,
+			Args:    []string{"validate", "--exclude-tag", "exclude", filepath.Join(currentFolder, "test-pipelines/validate-with-exclude-tag")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+				Contains: []string{" Successfully validated 2 assets across 1 pipeline, all good."},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
 			Name:    "run-use-uv",
 			Command: binary,
 			Args:    []string{"run", "--env", "env-run-use-uv", "--use-uv", filepath.Join(currentFolder, "test-pipelines/run-use-uv-pipeline")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 0,
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+			},
+		},
+		{
+			Name:    "run-custom-check-count-false",
+			Command: binary,
+			Args:    []string{"run", "--env", "env-custom-check-count-false", filepath.Join(currentFolder, "test-pipelines/custom-check-count-false")},
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 1,
+				Contains: []string{"custom check 'row_count' has returned 4 instead of the expected 7"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "run-custom-check-count-true",
+			Command: binary,
+			Args:    []string{"run", "--env", "env-custom-check-count-true", filepath.Join(currentFolder, "test-pipelines/custom-check-count-true")},
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,

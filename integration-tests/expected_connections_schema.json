@@ -1553,6 +1553,12 @@
           "required": [
             "private_key_path"
           ],
+          "title": "private_key_path"
+        },
+        {
+          "required": [
+            "private_key"
+          ],
           "title": "private_key"
         }
       ],
@@ -1586,6 +1592,9 @@
         },
         "private_key_path": {
           "type": "string"
+        },
+        "private_key": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
@@ -1593,8 +1602,7 @@
       "required": [
         "name",
         "account",
-        "username",
-        "region"
+        "username"
       ]
     },
     "SpannerConnection": {

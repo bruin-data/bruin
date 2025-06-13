@@ -2,9 +2,12 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jackc/pgx/v5"
@@ -18,6 +21,7 @@ type Client struct {
 	connection    connection
 	config        PgConfig
 	schemaCreator *ansisql.SchemaCreator
+	typeMapper    *diff.DatabaseTypeMapper
 }
 
 type PgConfig interface {
@@ -37,7 +41,12 @@ func NewClient(ctx context.Context, c PgConfig) (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{connection: conn, config: c, schemaCreator: ansisql.NewSchemaCreator()}, nil
+	return &Client{
+		connection:    conn,
+		config:        c,
+		schemaCreator: ansisql.NewSchemaCreator(),
+		typeMapper:    diff.NewPostgresTypeMapper(),
+	}, nil
 }
 
 func (c *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
@@ -214,4 +223,297 @@ ORDER BY table_schema, table_name;
 
 func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
 	return c.schemaCreator.CreateSchemaIfNotExist(ctx, c, asset)
+}
+
+func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOnly bool) (*diff.TableSummaryResult, error) {
+	var rowCount int64
+
+	// Get row count only if not in schema-only mode
+	if !schemaOnly {
+		rows, err := c.connection.Query(ctx, "SELECT COUNT(*) as row_count FROM "+tableName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute count query for table '%s': %w", tableName, err)
+		}
+		defer rows.Close()
+
+		if rows.Next() {
+			if err := rows.Scan(&rowCount); err != nil {
+				return nil, fmt.Errorf("failed to scan row count for table '%s': %w", tableName, err)
+			}
+		}
+		if err = rows.Err(); err != nil {
+			return nil, fmt.Errorf("error after iterating rows for count query on table '%s': %w", tableName, err)
+		}
+	}
+
+	// Get table schema using information_schema
+	schemaQuery := `
+	SELECT 
+		column_name,
+		data_type,
+		is_nullable,
+		column_default,
+		character_maximum_length,
+		numeric_precision,
+		numeric_scale
+	FROM information_schema.columns 
+	WHERE table_name = $1
+	ORDER BY ordinal_position`
+
+	schemaRows, err := c.connection.Query(ctx, schemaQuery, tableName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute schema query for table '%s': %w", tableName, err)
+	}
+	defer schemaRows.Close()
+
+	var columns []*diff.Column
+	for schemaRows.Next() {
+		var (
+			columnName       string
+			dataType         string
+			isNullable       string
+			columnDefault    *string
+			charMaxLength    *int
+			numericPrecision *int
+			numericScale     *int
+		)
+
+		if err := schemaRows.Scan(&columnName, &dataType, &isNullable, &columnDefault, &charMaxLength, &numericPrecision, &numericScale); err != nil {
+			return nil, fmt.Errorf("failed to scan schema info for table '%s': %w", tableName, err)
+		}
+
+		// Build the full type name with precision/scale if available
+		fullType := dataType
+		if charMaxLength != nil && *charMaxLength > 0 {
+			fullType = fmt.Sprintf("%s(%d)", dataType, *charMaxLength)
+		} else if numericPrecision != nil && numericScale != nil && *numericPrecision > 0 {
+			if *numericScale > 0 {
+				fullType = fmt.Sprintf("%s(%d,%d)", dataType, *numericPrecision, *numericScale)
+			} else {
+				fullType = fmt.Sprintf("%s(%d)", dataType, *numericPrecision)
+			}
+		}
+
+		normalizedType := c.typeMapper.MapType(dataType)
+		nullable := strings.ToUpper(isNullable) == "YES"
+
+		// TODO: Add logic to detect primary keys and unique constraints
+		// This would require additional queries to information_schema.table_constraints
+		// and information_schema.key_column_usage
+
+		var stats diff.ColumnStatistics
+		if schemaOnly {
+			// In schema-only mode, don't collect statistics
+			stats = nil
+		} else {
+			switch normalizedType {
+			case diff.CommonTypeNumeric:
+				stats, err = c.fetchNumericalStats(ctx, tableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch numerical stats for column '%s': %w", columnName, err)
+				}
+			case diff.CommonTypeString:
+				stats, err = c.fetchStringStats(ctx, tableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch string stats for column '%s': %w", columnName, err)
+				}
+			case diff.CommonTypeBoolean:
+				stats, err = c.fetchBooleanStats(ctx, tableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch boolean stats for column '%s': %w", columnName, err)
+				}
+			case diff.CommonTypeDateTime:
+				stats, err = c.fetchDateTimeStats(ctx, tableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch datetime stats for column '%s': %w", columnName, err)
+				}
+			case diff.CommonTypeJSON:
+				stats, err = c.fetchJSONStats(ctx, tableName, columnName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch JSON stats for column '%s': %w", columnName, err)
+				}
+			case diff.CommonTypeBinary, diff.CommonTypeUnknown:
+				stats = &diff.UnknownStatistics{}
+			}
+		}
+
+		columns = append(columns, &diff.Column{
+			Name:           columnName,
+			Type:           fullType,
+			NormalizedType: normalizedType,
+			Nullable:       nullable,
+			PrimaryKey:     false, // TODO: Implement PK detection
+			Unique:         false, // TODO: Implement unique constraint detection
+			Stats:          stats,
+		})
+	}
+	if err = schemaRows.Err(); err != nil {
+		return nil, fmt.Errorf("error after iterating schema rows for table '%s': %w", tableName, err)
+	}
+
+	dbTable := &diff.Table{
+		Name:    tableName,
+		Columns: columns,
+	}
+
+	return &diff.TableSummaryResult{
+		RowCount: rowCount,
+		Table:    dbTable,
+	}, nil
+}
+
+func (c *Client) fetchNumericalStats(ctx context.Context, tableName, columnName string) (*diff.NumericalStatistics, error) {
+	stats := &diff.NumericalStatistics{}
+	query := fmt.Sprintf(`
+        SELECT 
+            COUNT(*) as count,
+            COUNT(*) - COUNT(%s) as null_count,
+            MIN(%s) as min_val,
+            MAX(%s) as max_val,
+            AVG(%s::float) as avg_val,
+            SUM(%s::float) as sum_val,
+            STDDEV(%s::float) as stddev_val
+        FROM %s`,
+		columnName, columnName, columnName, columnName, columnName, columnName, tableName)
+
+	rows, err := c.connection.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		var minVal, maxVal, avgVal, sumVal, stddevVal *float64
+		err := rows.Scan(&stats.Count, &stats.NullCount, &minVal, &maxVal, &avgVal, &sumVal, &stddevVal)
+		if err != nil {
+			return nil, err
+		}
+
+		stats.Min = minVal
+		stats.Max = maxVal
+		stats.Avg = avgVal
+		stats.Sum = sumVal
+		stats.StdDev = stddevVal
+	}
+
+	return stats, rows.Err()
+}
+
+func (c *Client) fetchStringStats(ctx context.Context, tableName, columnName string) (*diff.StringStatistics, error) {
+	stats := &diff.StringStatistics{}
+	query := fmt.Sprintf(`
+        SELECT 
+            COUNT(*) as count,
+            COUNT(*) - COUNT(%s) as null_count,
+            COUNT(DISTINCT %s) as distinct_count,
+            COUNT(CASE WHEN %s = '' THEN 1 END) as empty_count,
+            MIN(LENGTH(%s)) as min_length,
+            MAX(LENGTH(%s)) as max_length,
+            AVG(LENGTH(%s)) as avg_length
+        FROM %s`,
+		columnName, columnName, columnName, columnName, columnName, columnName, tableName)
+
+	rows, err := c.connection.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		var avgLength float64
+		err := rows.Scan(&stats.Count, &stats.NullCount, &stats.DistinctCount,
+			&stats.EmptyCount, &stats.MinLength, &stats.MaxLength, &avgLength)
+		if err != nil {
+			return nil, err
+		}
+
+		stats.AvgLength = avgLength
+	}
+
+	return stats, rows.Err()
+}
+
+func (c *Client) fetchBooleanStats(ctx context.Context, tableName, columnName string) (*diff.BooleanStatistics, error) {
+	stats := &diff.BooleanStatistics{}
+	query := fmt.Sprintf(`
+        SELECT 
+            COUNT(*) as count,
+            COUNT(*) - COUNT(%s) as null_count,
+            COUNT(CASE WHEN %s = true THEN 1 END) as true_count,
+            COUNT(CASE WHEN %s = false THEN 1 END) as false_count
+        FROM %s`,
+		columnName, columnName, columnName, tableName)
+
+	rows, err := c.connection.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		err := rows.Scan(&stats.Count, &stats.NullCount, &stats.TrueCount, &stats.FalseCount)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return stats, rows.Err()
+}
+
+func (c *Client) fetchDateTimeStats(ctx context.Context, tableName, columnName string) (*diff.DateTimeStatistics, error) {
+	stats := &diff.DateTimeStatistics{}
+	query := fmt.Sprintf(`
+        SELECT 
+            COUNT(*) as count,
+            COUNT(*) - COUNT(%s) as null_count,
+            COUNT(DISTINCT %s) as unique_count,
+            MIN(%s)::text as earliest_date,
+            MAX(%s)::text as latest_date
+        FROM %s`,
+		columnName, columnName, columnName, columnName, tableName)
+
+	rows, err := c.connection.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		var earliestDate, latestDate *string
+		err := rows.Scan(&stats.Count, &stats.NullCount, &stats.UniqueCount,
+			&earliestDate, &latestDate)
+		if err != nil {
+			return nil, err
+		}
+
+		stats.EarliestDate = earliestDate
+		stats.LatestDate = latestDate
+	}
+
+	return stats, rows.Err()
+}
+
+func (c *Client) fetchJSONStats(ctx context.Context, tableName, columnName string) (*diff.JSONStatistics, error) {
+	stats := &diff.JSONStatistics{}
+	query := fmt.Sprintf(`
+        SELECT 
+            COUNT(*) as count,
+            COUNT(*) - COUNT(%s) as null_count
+        FROM %s`,
+		columnName, tableName)
+
+	rows, err := c.connection.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		err := rows.Scan(&stats.Count, &stats.NullCount)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return stats, rows.Err()
 }
