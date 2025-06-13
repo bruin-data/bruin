@@ -25,6 +25,7 @@ Defaults to the current directory (".") if not provided.
 | `--exclude-warnings`     |            | Excludes warnings from the validation output.                              |
 | `--config-file`          |            | The path to the `.bruin.yml` file.                                           |
 | `--exclude-tag`          |            | Excludes assets with the given tag from validation.                          |
+| `--fast`                 |            | Runs only fast validation rules, excludes some important rules such as query validation. |
 
 
 
