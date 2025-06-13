@@ -867,10 +867,10 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 		}
 
 		if asset.Materialization.IncrementalKey != "" &&
-			asset.Materialization.Strategy != pipeline.MaterializationStrategyDeleteInsert && asset.Materialization.Strategy != pipeline.MaterializationStrategyTimeInterval {
+			asset.Materialization.Strategy != pipeline.MaterializationStrategyDeleteInsert && asset.Materialization.Strategy != pipeline.MaterializationStrategyTimeInterval && asset.Materialization.Strategy != pipeline.MaterializationStrategySCD2ByTime {
 			issues = append(issues, &Issue{
 				Task:        asset,
-				Description: "Incremental key is only supported with 'delete+insert' or 'time_interval' strategies.",
+				Description: "Incremental key is only supported with 'delete+insert', 'time_interval' and 'scd2_by_time' strategies.",
 			})
 		}
 
@@ -914,6 +914,29 @@ func EnsureMaterializationValuesAreValidForSingleAsset(ctx context.Context, p *p
 					Description: "Materialization strategy 'merge' requires the 'primary_key' field to be set on at least one column",
 				})
 			}
+		case pipeline.MaterializationStrategySCD2ByColumn:
+			primaryKeys := asset.ColumnNamesWithPrimaryKey()
+			if len(primaryKeys) == 0 {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "Materialization strategy 'scd2_by_column' requires the 'primary_key' field to be set on at least one column",
+				})
+			}
+		case pipeline.MaterializationStrategySCD2ByTime:
+			if asset.Materialization.IncrementalKey == "" {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "Materialization strategy 'scd2_by_type' requires the 'incremental_key' field to be set",
+				})
+			}
+			primaryKeys := asset.ColumnNamesWithPrimaryKey()
+			if len(primaryKeys) == 0 {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "Materialization strategy 'scd2_by_type' requires the 'primary_key' field to be set on at least one column",
+				})
+			}
+
 		case pipeline.MaterializationStrategyTimeInterval:
 			if asset.Materialization.IncrementalKey == "" {
 				issues = append(issues, &Issue{
