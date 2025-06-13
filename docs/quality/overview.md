@@ -19,11 +19,9 @@ columns:
       - name: not_null
 ```
 
-If any of those checks fails the asset will be marked as failed and any
-downstream assets will not be executed.
+If any of those checks fails the asset will be marked as failed and any downstream assets will not be executed.
 
-Quality checks can also be executed on their own without running the asset
-again:
+Quality checks can also be executed on their own without running the asset again:
 
 ```bash
 bruin run --only checks assets/my_asset.sql
