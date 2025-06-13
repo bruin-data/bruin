@@ -589,7 +589,12 @@
           },
           "type": "array"
         },
-
+        "sftp": {
+          "items": {
+            "$ref": "#/$defs/SFTPConnection"
+          },
+          "type": "array"
+        },
         "solidgate": {
           "items": {
             "$ref": "#/$defs/SolidgateConnection"
@@ -1783,6 +1788,28 @@
       "additionalProperties": false,
       "type": "object",
       "required": ["name", "api_key"] 
+    },
+    "SFTPConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": ["name", "host", "port", "username", "password"]
     }
   }
 }
