@@ -3,6 +3,7 @@ package snowflake
 import (
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -58,22 +59,33 @@ func (c Config) DSN() (string, error) {
 func (c Config) GetIngestrURI() (string, error) {
 	u := &url.URL{
 		Scheme: "snowflake",
-		User:   url.UserPassword(c.Username, c.Password),
-		Host:   c.Account,
 		Path:   c.Database,
+		Host:   c.Account,
+	}
+	if c.PrivateKey == "" {
+		u.User = url.UserPassword(c.Username, c.Password)
+	} else {
+		u.User = url.User(c.Username)
 	}
 
 	values := u.Query()
+
 	if c.Warehouse != "" {
 		values.Add("warehouse", c.Warehouse)
 	}
-
 	if c.Role != "" {
 		values.Add("role", c.Role)
 	}
 
-	u.RawQuery = values.Encode()
+	if c.PrivateKey != "" {
+		encodedKey := base64.StdEncoding.EncodeToString([]byte(c.PrivateKey))
+		values.Add("private_key", url.QueryEscape(encodedKey))
+		if c.Password != "" {
+			values.Add("private_key_passphrase", url.QueryEscape(c.Password))
+		}
+	}
 
+	u.RawQuery = values.Encode()
 	return u.String(), nil
 }
 
