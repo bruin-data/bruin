@@ -20,7 +20,7 @@ func TestGetLineageForRunner(t *testing.T) {
 	// Create a long query by appending a fixed string multiple times
 	baseQuery := `SELECT * FROM (SELECT * FROM table1) t1 JOIN (SELECT * FROM table2) t2`
 	longQuery := baseQuery
-	for i := 0; i < 100; i++ {
+	for range [100]int{} {
 		longQuery += " UNION ALL " + baseQuery // Linear growth
 	}
 
