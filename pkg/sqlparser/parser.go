@@ -138,6 +138,14 @@ type Lineage struct {
 }
 
 func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage, error) {
+	if len(sql) > 10000 {
+		return &Lineage{
+			Columns:            []ColumnLineage{},
+			NonSelectedColumns: []ColumnLineage{},
+			Errors:             []string{"query is too long skipping column lineage analysis"},
+		}, nil
+	}
+
 	command := parserCommand{
 		Command: "lineage",
 		Contents: map[string]interface{}{
