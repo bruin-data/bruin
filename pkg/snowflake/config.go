@@ -3,14 +3,13 @@ package snowflake
 import (
 	"crypto/rsa"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"net/url"
-	"strings"
 
 	"github.com/snowflakedb/gosnowflake"
+	"github.com/youmark/pkcs8"
 )
 
 type Config struct {
@@ -34,7 +33,7 @@ func (c Config) DSN() (string, error) {
 	var privateKey *rsa.PrivateKey
 	var err error
 	if c.PrivateKey != "" {
-		privateKey, err = parsePrivateKey(c.PrivateKey)
+		privateKey, err = parsePrivateKey(c.PrivateKey, c.Password)
 		if err != nil {
 			return "", fmt.Errorf("failed to parse private key: %w", err)
 		}
@@ -78,13 +77,11 @@ func (c Config) GetIngestrURI() (string, error) {
 	}
 
 	if c.PrivateKey != "" {
-		encodedKey := base64.StdEncoding.EncodeToString([]byte(c.PrivateKey))
-		values.Add("private_key", url.QueryEscape(encodedKey))
+		values.Add("private_key", c.PrivateKey)
 		if c.Password != "" {
-			values.Add("private_key_passphrase", url.QueryEscape(c.Password))
+			values.Add("private_key_passphrase", c.Password)
 		}
 	}
-
 	u.RawQuery = values.Encode()
 	return u.String(), nil
 }
@@ -93,33 +90,30 @@ func (c Config) IsValid() bool {
 	return c.Account != "" && c.Username != "" && c.Password != "" && c.Region != ""
 }
 
-func parsePrivateKey(content string) (*rsa.PrivateKey, error) {
-	// Decode the PEM block
+func parsePrivateKey(content string, passphrase string) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode([]byte(content))
 	if block == nil {
 		return nil, errors.New("failed to parse PEM block containing the private key")
 	}
 
-	// Check for keywords in the PEM block type to identify encryption
-	if block.Type == "ENCRYPTED PRIVATE KEY" {
-		return nil, errors.New("encrypted private keys are not supported at the moment, please provide an unencrypted key")
-	}
-
-	// Attempt to parse the private key
 	privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if err != nil {
-		// Check if the error suggests encryption issues
-		if strings.Contains(err.Error(), "encrypted") {
-			return nil, errors.New("failed to parse encrypted private due to an encryption issue, please provide an unencrypted key")
+	if err == nil {
+		pk, ok := privateKey.(*rsa.PrivateKey)
+		if !ok {
+			return nil, errors.New("private key is not of type *rsa.PrivateKey")
 		}
-		return nil, fmt.Errorf("failed to parse private key: %w", err)
+		return pk, nil
 	}
-
-	// Assert the type to *rsa.PrivateKey
-	pk, ok := privateKey.(*rsa.PrivateKey)
-	if !ok {
-		return nil, fmt.Errorf("failed to convert parsed private key to an actual instance, got '%T' instead", privateKey)
+	if passphrase != "" {
+		decryptedKey, err := pkcs8.ParsePKCS8PrivateKey(block.Bytes, []byte(passphrase))
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt private key with passphrase: %w", err)
+		}
+		pk, ok := decryptedKey.(*rsa.PrivateKey)
+		if !ok {
+			return nil, errors.New("private key is not of type *rsa.PrivateKey")
+		}
+		return pk, nil
 	}
-
-	return pk, nil
+	return nil, fmt.Errorf("failed to parse private key: %w", err)
 }
