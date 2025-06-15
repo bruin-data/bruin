@@ -1596,6 +1596,13 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 		Path: absPipelineFilePath,
 	}
 
+	if config.isMutate {
+		pipeline, err = b.MutatePipeline(ctx, pipeline)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	taskFiles := make([]string, 0)
 	for _, tasksDirectoryName := range b.config.TasksDirectoryNames {
 		tasksPath := filepath.Join(pathToPipeline, tasksDirectoryName)
@@ -1668,13 +1675,6 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 			if err != nil {
 				return nil, errors.Wrap(err, "error enriching asset from entity attributes")
 			}
-		}
-	}
-
-	if config.isMutate {
-		pipeline, err = b.MutatePipeline(ctx, pipeline)
-		if err != nil {
-			return nil, err
 		}
 	}
 
