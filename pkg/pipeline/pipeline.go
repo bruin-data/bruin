@@ -70,7 +70,6 @@ const (
 	RunConfigApplyIntervalModifiers = RunConfig("apply-interval-modifiers")
 	RunConfigStartDate              = RunConfig("start-date")
 	RunConfigEndDate                = RunConfig("end-date")
-	RunConfigPipelineName           = RunConfig("pipeline")
 	RunConfigRunID                  = RunConfig("run-id")
 )
 
@@ -1541,6 +1540,7 @@ func resolvePipelineFilePath(basePath string, validFileNames []string, fs afero.
 type createPipelineConfig struct {
 	parseGitMetadata bool
 	isMutate         bool
+	onlyPipeline     bool
 }
 
 type CreatePipelineOption func(*createPipelineConfig)
@@ -1554,6 +1554,12 @@ func WithGitMetadata() CreatePipelineOption {
 func WithMutate() CreatePipelineOption {
 	return func(o *createPipelineConfig) {
 		o.isMutate = true
+	}
+}
+
+func WithOnlyPipeline() CreatePipelineOption {
+	return func(o *createPipelineConfig) {
+		o.onlyPipeline = true
 	}
 }
 
@@ -1577,6 +1583,7 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 	if err != nil {
 		return nil, err
 	}
+
 	// this is needed until we migrate all the pipelines to use the new naming convention
 	if pipeline.Name == "" {
 		pipeline.Name = pipeline.LegacyID
@@ -1599,6 +1606,17 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 	pipeline.DefinitionFile = DefinitionFile{
 		Name: filepath.Base(pipelineFilePath),
 		Path: absPipelineFilePath,
+	}
+
+	if config.isMutate {
+		pipeline, err = b.MutatePipeline(ctx, pipeline)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if config.onlyPipeline {
+		return pipeline, nil
 	}
 
 	taskFiles := make([]string, 0)
@@ -1673,13 +1691,6 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 			if err != nil {
 				return nil, errors.Wrap(err, "error enriching asset from entity attributes")
 			}
-		}
-	}
-
-	if config.isMutate {
-		pipeline, err = b.MutatePipeline(ctx, pipeline)
-		if err != nil {
-			return nil, err
 		}
 	}
 

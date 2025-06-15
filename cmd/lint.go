@@ -6,6 +6,7 @@ import (
 	"os"
 	path2 "path"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -89,6 +90,14 @@ func Lint(isDebug *bool) *cli.Command {
 			if vars := c.StringSlice("var"); len(vars) > 0 {
 				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
 			}
+
+			runID := time.Now().Format("2006_01_02_15_04_05")
+			if os.Getenv("BRUIN_RUN_ID") != "" {
+				runID = os.Getenv("BRUIN_RUN_ID")
+			}
+
+			renderer := jinja.NewRendererWithStartEndDates(&defaultStartDate, &defaultEndDate, "<bruin-validation>", runID, nil)
+			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
 
 			logger := makeLogger(*isDebug)
 

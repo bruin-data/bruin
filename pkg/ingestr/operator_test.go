@@ -252,36 +252,6 @@ func TestBasicOperator_ConvertTaskInstanceToIngestrCommand(t *testing.T) {
 				"--full-refresh",
 			},
 		},
-		{
-			name:        "source table is rendered as a jinja field",
-			fullRefresh: false,
-			asset: &pipeline.Asset{
-				Name:       "asset-name",
-				Connection: "bq",
-				Columns: []pipeline.Column{
-					{Name: "id", PrimaryKey: true},
-					{Name: "date", PrimaryKey: true},
-					{Name: "name"},
-					{Name: "updated_at"},
-				},
-				Parameters: map[string]string{
-					"source_connection": "sf",
-					"source_table":      "bucket/{{ end_datetime | date_format('%Y-%m-%d')}}",
-					"destination":       "bigquery",
-				},
-			},
-			want: []string{
-				"ingest",
-				"--source-uri", "snowflake://uri-here",
-				"--source-table", "bucket/2025-01-02",
-				"--dest-uri", "bigquery://uri-here",
-				"--dest-table", "asset-name",
-				"--yes",
-				"--progress", "log",
-				"--primary-key", "id",
-				"--primary-key", "date",
-			},
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -462,27 +432,6 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 				"id:bigint,load_date:timestamp,percent:double",
 			},
 		},
-		{
-			name:        "path is rendered as a jinja field",
-			fullRefresh: false,
-			asset: &pipeline.Asset{
-				Name:       "asset-name",
-				Connection: "duck",
-				Parameters: map[string]string{
-					"path": "{{ var.source_file }}",
-				},
-			},
-			want: []string{
-				"ingest",
-				"--source-uri", "csv://staging.csv",
-				"--source-table", "seed.raw",
-				"--dest-uri", "duckdb:////some/path",
-				"--dest-table", "asset-name",
-				"--yes",
-				"--progress",
-				"log",
-			},
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -491,16 +440,10 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 			runner := new(mockRunner)
 			runner.On("RunIngestr", mock.Anything, tt.want, tt.extraPackages, repo).Return(nil)
 
-			startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
-			endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
-
 			o := &SeedOperator{
 				conn:   &fetcher,
 				finder: finder,
 				runner: runner,
-				renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "ingestr-test", "ingestr-test", map[string]any{
-					"source_file": "staging.csv",
-				}),
 			}
 
 			ti := scheduler.AssetInstance{
