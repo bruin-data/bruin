@@ -709,12 +709,8 @@ func SetupExecutors(
 	// this should go away once we incorporate URIs into the assets
 	estimateCustomCheckType := s.FindMajorityOfTypes(pipeline.AssetTypeBigqueryQuery)
 
-<<<<<<< HEAD
-	seedOperator, err := ingestr.NewSeedOperator(conn, renderer)
-=======
 	seedOperator, err := ingestr.NewSeedOperator(conn)
 
->>>>>>> 79827bc4 (misc: cleanup renderer usage)
 	if err != nil {
 		return nil, err
 	}
