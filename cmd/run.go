@@ -291,22 +291,14 @@ func Run(isDebug *bool) *cli.Command {
 				return err
 			}
 
-			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, preview.Pipeline.Name, runID, nil)
-			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
-
-			pipelineInfo, err := GetPipeline(runCtx, inputPath, runConfig, logger)
-			if err != nil {
-				return err
-			}
-
 			var task *pipeline.Asset
-			if pipelineInfo.RunningForAnAsset {
-				task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath, pipelineInfo.Pipeline)
+			if preview.RunningForAnAsset {
+				task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath, preview.Pipeline)
 				if err != nil {
 					errorPrinter.Printf("Failed to build asset: %v\n", err)
 					return cli.Exit("", 1)
 				}
-				task, err = DefaultPipelineBuilder.MutateAsset(runCtx, task, pipelineInfo.Pipeline)
+				task, err = DefaultPipelineBuilder.MutateAsset(runCtx, task, preview.Pipeline)
 				if err != nil {
 					errorPrinter.Printf("Failed to mutate asset: %v\n", err)
 					return cli.Exit("", 1)
@@ -315,6 +307,48 @@ func Run(isDebug *bool) *cli.Command {
 					errorPrinter.Printf("Failed to create asset from file '%s'\n", inputPath)
 					return cli.Exit("", 1)
 				}
+			}
+
+			statePath := filepath.Join(repoRoot.Path, "logs/runs", preview.Pipeline.Name)
+			err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/runs")
+			if err != nil {
+				errorPrinter.Printf("Failed to add the run state folder to .gitignore: %v\n", err)
+				return cli.Exit("", 1)
+			}
+			singleCheckID := c.String("single-check")
+			filter := &Filter{
+				IncludeTag:        runConfig.Tag,
+				OnlyTaskTypes:     runConfig.Only,
+				IncludeDownstream: preview.RunDownstreamTasks,
+				PushMetaData:      runConfig.PushMetadata,
+				SingleTask:        task,
+				ExcludeTag:        runConfig.ExcludeTag,
+				singleCheckID:     singleCheckID,
+			}
+			var pipelineState *scheduler.PipelineState
+			if c.Bool("continue") {
+				pipelineState, err = ReadState(afero.NewOsFs(), statePath, filter)
+				if err != nil {
+					errorPrinter.Printf("Failed to restore state: %v\n", err)
+					return err
+				}
+
+				runConfig = &pipelineState.Parameters
+
+				parsedStartDate, parsedEndDate, err := ParseDate(runConfig.StartDate, runConfig.EndDate, logger)
+				if err != nil {
+					return cli.Exit("", 1)
+				}
+				startDate = parsedStartDate
+				endDate = parsedEndDate
+			}
+
+			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, preview.Pipeline.Name, runID, nil)
+			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
+
+			pipelineInfo, err := GetPipeline(runCtx, inputPath, runConfig, logger)
+			if err != nil {
+				return err
 			}
 
 			// handle log files
@@ -337,43 +371,6 @@ func Run(isDebug *bool) *cli.Command {
 				if err := CheckLint(pipelineInfo.Pipeline, inputPath, logger, nil, connectionManager); err != nil {
 					return err
 				}
-			}
-
-			statePath := filepath.Join(repoRoot.Path, "logs/runs", pipelineInfo.Pipeline.Name)
-			err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/runs")
-			if err != nil {
-				errorPrinter.Printf("Failed to add the run state folder to .gitignore: %v\n", err)
-				return cli.Exit("", 1)
-			}
-			singleCheckID := c.String("single-check")
-			filter := &Filter{
-				IncludeTag:        runConfig.Tag,
-				OnlyTaskTypes:     runConfig.Only,
-				IncludeDownstream: pipelineInfo.RunDownstreamTasks,
-				PushMetaData:      runConfig.PushMetadata,
-				SingleTask:        task,
-				ExcludeTag:        runConfig.ExcludeTag,
-				singleCheckID:     singleCheckID,
-			}
-			var pipelineState *scheduler.PipelineState
-			if c.Bool("continue") {
-				// BUG: Because of our parameter rendering using mutators, we
-				// won't correctly render the start/end date in assets that continue
-				// from failure.
-				pipelineState, err = ReadState(afero.NewOsFs(), statePath, filter)
-				if err != nil {
-					errorPrinter.Printf("Failed to restore state: %v\n", err)
-					return err
-				}
-
-				runConfig = &pipelineState.Parameters
-
-				parsedStartDate, parsedEndDate, err := ParseDate(runConfig.StartDate, runConfig.EndDate, logger)
-				if err != nil {
-					return cli.Exit("", 1)
-				}
-				startDate = parsedStartDate
-				endDate = parsedEndDate
 			}
 
 			foundPipeline := pipelineInfo.Pipeline
@@ -463,9 +460,6 @@ func Run(isDebug *bool) *cli.Command {
 				}()
 			}
 
-			// recreate the renderer with the pipeline name.
-			// We create another renderer earlier in the parsing stage, but it does not have the pipeline name set.
-			renderer = jinja.NewRendererWithStartEndDates(&startDate, &endDate, foundPipeline.Name, runID, nil)
 			mainExecutors, err := SetupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode, renderer, parser)
 			if err != nil {
 				errorPrinter.Println(err.Error())
