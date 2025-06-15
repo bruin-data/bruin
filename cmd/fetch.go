@@ -260,7 +260,6 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 		fetchCtx := context.Background()
 		fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigStartDate, startDate)
 		fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigEndDate, endDate)
-		fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigPipelineName, pipelineInfo.Pipeline.Name)
 		fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigRunID, "your-run-id")
 		// Auto-detect mode (both asset path and query)
 		extractor = &query.WholeFileExtractor{
@@ -292,7 +291,6 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 	fetchCtx := context.Background()
 	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigStartDate, startDate)
 	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigEndDate, endDate)
-	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigPipelineName, pipelineInfo.Pipeline.Name)
 	fetchCtx = context.WithValue(fetchCtx, pipeline.RunConfigRunID, "your-run-id")
 	extractor = &query.WholeFileExtractor{
 		Fs: fs,
