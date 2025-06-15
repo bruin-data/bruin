@@ -440,16 +440,10 @@ func TestBasicOperator_ConvertSeedTaskInstanceToIngestrCommand(t *testing.T) {
 			runner := new(mockRunner)
 			runner.On("RunIngestr", mock.Anything, tt.want, tt.extraPackages, repo).Return(nil)
 
-			startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
-			endDate := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
-
 			o := &SeedOperator{
 				conn:   &fetcher,
 				finder: finder,
 				runner: runner,
-				renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, "ingestr-test", "ingestr-test", map[string]any{
-					"source_file": "staging.csv",
-				}),
 			}
 
 			ti := scheduler.AssetInstance{
