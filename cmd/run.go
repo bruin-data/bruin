@@ -273,8 +273,6 @@ func Run(isDebug *bool) *cli.Command {
 			if os.Getenv("BRUIN_RUN_ID") != "" {
 				runID = os.Getenv("BRUIN_RUN_ID")
 			}
-			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, "", runID, nil)
-			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
 
 			runCtx := context.Background()
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
@@ -287,6 +285,14 @@ func Run(isDebug *bool) *cli.Command {
 			runCtx = context.WithValue(runCtx, config.EnvironmentContextKey, cm.SelectedEnvironment)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, runID)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
+
+			preview, err := GetPipeline(runCtx, inputPath, runConfig, logger, pipeline.WithOnlyPipeline())
+			if err != nil {
+				return err
+			}
+
+			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, preview.Pipeline.Name, runID, nil)
+			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
 
 			pipelineInfo, err := GetPipeline(runCtx, inputPath, runConfig, logger)
 			if err != nil {
@@ -522,7 +528,7 @@ func ReadState(fs afero.Fs, statePath string, filter *Filter) (*scheduler.Pipeli
 	return pipelineState, nil
 }
 
-func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.RunConfig, log logger.Logger) (*PipelineInfo, error) {
+func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.RunConfig, log logger.Logger, opts ...pipeline.CreatePipelineOption) (*PipelineInfo, error) {
 	pipelinePath := inputPath
 	runningForAnAsset := isPathReferencingAsset(inputPath)
 	if runningForAnAsset && runConfig.Tag != "" {
@@ -544,7 +550,8 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 		}
 	}
 
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, pipeline.WithMutate())
+	opts = append(opts, pipeline.WithMutate())
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, opts...)
 	if err != nil {
 		errorPrinter.Println("failed to build pipeline, are you sure you have referred the right path?")
 		errorPrinter.Println("\nHint: You need to run this command with a path to either the pipeline directory or the asset file itself directly.")
