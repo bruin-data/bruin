@@ -6,7 +6,7 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-func varSchemaLoader() *gojsonschema.SchemaLoader {
+func varSchemaLoader() *gojsonschema.SchemaLoader { //nolint:unused
 	loader := gojsonschema.NewSchemaLoader()
 	loader.Draft = gojsonschema.Draft7
 	loader.Validate = true
@@ -19,10 +19,15 @@ func (v Variables) Validate() error {
 	// TODO(turtledev):
 	// - validate the defaults actually satisfy the schema
 	// - make "properties" a required field for object types
-	_, err := varSchemaLoader().Compile(gojsonschema.NewGoLoader(v.Schema()))
-	if err != nil {
-		return fmt.Errorf("invalid variables schema: %w", err)
-	}
+	//
+	// BUG: Schema compiler fetches the schema from the spec URL, which may break
+	// in environments where internet access is restricted.
+
+	// TODO: Use a local copy of the schema.
+	// _, err := varSchemaLoader().Compile(gojsonschema.NewGoLoader(v.Schema()))
+	// if err != nil {
+	// 	return fmt.Errorf("invalid variables schema: %w", err)
+	// }
 	for key, value := range v {
 		if _, ok := value["default"]; !ok {
 			return fmt.Errorf("invalid variable %q: must have a default value", key)

@@ -390,7 +390,7 @@ var builtinRules = map[string]validators{
 		},
 	},
 	"pipeline-has-notifications": {
-		Pipeline: func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+		Pipeline: func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
 			notifs := pipeline.Notifications
 			if len(notifs.Discord) > 0 || len(notifs.MSTeams) > 0 || len(notifs.Slack) > 0 {
 				return nil, nil
@@ -403,7 +403,7 @@ var builtinRules = map[string]validators{
 		},
 	},
 	"pipeline-has-retries": {
-		Pipeline: func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+		Pipeline: func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
 			if pipeline.Retries > 0 {
 				return nil, nil
 			}
@@ -416,7 +416,7 @@ var builtinRules = map[string]validators{
 		},
 	},
 	"pipeline-has-start-date": {
-		Pipeline: func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+		Pipeline: func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
 			if strings.TrimSpace(pipeline.StartDate) != "" {
 				return nil, nil
 			}
@@ -428,7 +428,7 @@ var builtinRules = map[string]validators{
 		},
 	},
 	"pipeline-has-metadata-push": {
-		Pipeline: func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+		Pipeline: func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
 			if pipeline.MetadataPush.HasAnyEnabled() {
 				return nil, nil
 			}

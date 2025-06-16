@@ -76,4 +76,31 @@ where dt between '{{ start_datetime }}' and '{{ end_datetime }}'
 
 This example will incrementally update the data in the destination table using this query. Read more about [materialization here](./materialization.md). 
 
-This example also uses Jinja templates, you can read more about [Jinja here](./templating/templating.md). 
+This example also uses Jinja templates, you can read more about [Jinja here](./templating/templating.md).
+
+### Adding quality checks
+SQL assets can define quality checks on the columns produced by the query.
+
+```bruin-sql
+/* @bruin
+
+name: dashboard.hello_bq
+type: bq.sql
+
+materialization:
+    type: table
+
+columns:
+  - name: one
+    type: integer
+    checks:
+      - name: positive
+      - name: unique
+@bruin */
+
+select 1 as one
+union all
+select -1 as one
+```
+
+In this example the `one` column is validated to be positive and unique after the query runs.

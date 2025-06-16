@@ -28,14 +28,16 @@ func TestLinter_Lint(t *testing.T) {
 	t.Parallel()
 
 	errorRule := &SimpleRule{
-		Identifier:       "errorRule",
-		Validator:        func(p *pipeline.Pipeline) ([]*Issue, error) { return nil, errors.New("first rule failed") },
+		Identifier: "errorRule",
+		Validator: func(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+			return nil, errors.New("first rule failed")
+		},
 		ApplicableLevels: []Level{LevelPipeline},
 	}
 
 	successRule := &SimpleRule{
 		Identifier:       "successRule",
-		Validator:        func(p *pipeline.Pipeline) ([]*Issue, error) { return nil, nil },
+		Validator:        func(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) { return nil, nil },
 		ApplicableLevels: []Level{LevelPipeline},
 	}
 
@@ -193,6 +195,7 @@ func TestLinter_Lint(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		ctx := context.Background()
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -209,7 +212,7 @@ func TestLinter_Lint(t *testing.T) {
 				logger:        logger.Sugar(),
 			}
 
-			_, err := l.Lint(tt.args.rootPath, tt.args.pipelineDefinitionFileName, cli.NewContext(nil, nil, nil))
+			_, err := l.Lint(ctx, tt.args.rootPath, tt.args.pipelineDefinitionFileName, cli.NewContext(nil, nil, nil))
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -459,6 +462,7 @@ func TestLinter_LintAsset(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		ctx := context.Background()
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -475,7 +479,7 @@ func TestLinter_LintAsset(t *testing.T) {
 				logger:        logger.Sugar(),
 			}
 
-			_, err := l.LintAsset(tt.args.rootPath, tt.args.pipelineDefinitionFileName, "my-asset", cli.NewContext(nil, nil, nil))
+			_, err := l.LintAsset(ctx, tt.args.rootPath, tt.args.pipelineDefinitionFileName, "my-asset", cli.NewContext(nil, nil, nil))
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Equal(t, tt.errorMessage, err.Error())

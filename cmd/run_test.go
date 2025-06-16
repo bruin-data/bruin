@@ -1272,6 +1272,7 @@ func TestCheckLintFunc(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		ctx := context.Background()
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			logger := zaptest.NewLogger(t).Sugar()
@@ -1308,7 +1309,7 @@ func TestCheckLintFunc(t *testing.T) {
 				SelectedEnvironment:     defaultEnv,
 			}
 			connectionManager, _ := connection.NewManagerFromConfig(cfg)
-			err := CheckLint(tt.foundPipeline, tt.pipelinePath, logger, nil, connectionManager)
+			err := CheckLint(ctx, tt.foundPipeline, tt.pipelinePath, logger, nil, connectionManager)
 			require.NoError(t, err, "Expected no error but got one")
 		})
 	}

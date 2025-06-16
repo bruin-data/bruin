@@ -64,6 +64,24 @@ parameters:
 
 This asset will wait until the query returns any result.
 
+### Adding quality checks
+Sensors also support quality checks. You can use them to validate the external data once the sensor succeeds.
+
+```yaml
+name: raw.external_asset
+type: bq.sensor.query
+parameters:
+    query: select count(*) > 0 from `your-project-id.raw.external_asset`
+
+columns:
+  - name: count
+    type: integer
+    checks:
+      - name: positive
+```
+
+The snippet above ensures the `raw.external_asset` table exposes a `count` column and that the values are positive. The sensor waits until the query returns true, and then the quality check validates the data before downstream assets run.
+
 
 
 

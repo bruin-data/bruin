@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 	path2 "path"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
@@ -76,6 +78,10 @@ func Lint(isDebug *bool) *cli.Command {
 				Name:  "var",
 				Usage: "override pipeline variables with custom values",
 			},
+			&cli.BoolFlag{
+				Name:  "fast",
+				Usage: "run only fast validation rules, excludes some important rules such as query validation",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			// if the output is JSON then we intend to discard all the nicer pretty-print statements
@@ -89,6 +95,14 @@ func Lint(isDebug *bool) *cli.Command {
 			if vars := c.StringSlice("var"); len(vars) > 0 {
 				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
 			}
+
+			runID := time.Now().Format("2006_01_02_15_04_05")
+			if os.Getenv("BRUIN_RUN_ID") != "" {
+				runID = os.Getenv("BRUIN_RUN_ID")
+			}
+
+			renderer := jinja.NewRendererWithStartEndDates(&defaultStartDate, &defaultEndDate, "<bruin-validation>", runID, nil)
+			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
 
 			logger := makeLogger(*isDebug)
 
@@ -158,10 +172,20 @@ func Lint(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			logger.Debugf("successfully loaded %d rules", len(rules))
-
 			rules = append(rules, queryValidatorRules(logger, cm, connectionManager)...)
 			rules = append(rules, lint.GetCustomCheckQueryDryRunRule(connectionManager))
+
+			if c.Bool("fast") {
+				rules = lint.FilterRulesBySpeed(rules, true)
+				logger.Debugf("filtered to %d fast rules", len(rules))
+			} else {
+				logger.Debugf("successfully loaded %d rules", len(rules))
+			}
+
+			lintCtx := context.Background()
+			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigStartDate, defaultStartDate)
+			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigEndDate, defaultEndDate)
+			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigRunID, NewRunID())
 
 			var result *lint.PipelineAnalysisResult
 			var errr error
@@ -169,12 +193,12 @@ func Lint(isDebug *bool) *cli.Command {
 				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
 				logger.Debugf("running %d rules for pipeline validation", len(rules))
 				infoPrinter.Printf("Validating pipelines in '%s' for '%s' environment...\n", rootPath, cm.SelectedEnvironmentName)
-				result, errr = linter.Lint(rootPath, PipelineDefinitionFiles, c)
+				result, errr = linter.Lint(lintCtx, rootPath, PipelineDefinitionFiles, c)
 			} else {
 				rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
 				logger.Debugf("running %d rules for asset-only validation", len(rules))
 				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
-				result, errr = linter.LintAsset(rootPath, PipelineDefinitionFiles, asset, c)
+				result, errr = linter.LintAsset(lintCtx, rootPath, PipelineDefinitionFiles, asset, c)
 			}
 
 			printer := lint.Printer{RootCheckPath: rootPath}

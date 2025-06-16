@@ -38,3 +38,23 @@ B,LinkedIn,SDE 2,2024-01-01
 ```
 
 This operation will load the CSV into a table called `seed.raw` in the DuckDB database.
+
+### Adding quality checks
+You can attach quality checks to seed assets the same way you do for other assets.
+
+```yaml
+name: dashboard.hello
+type: duckdb.seed
+
+parameters:
+    path: hello.csv
+
+columns:
+  - name: name
+    type: string
+    checks:
+      - name: not_null
+      - name: unique
+```
+
+The example above ensures that the `name` column contains unique and non-null values after the CSV is loaded.

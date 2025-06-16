@@ -269,19 +269,32 @@ func Run(isDebug *bool) *cli.Command {
 				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
 			}
 
-			pipelineInfo, err := GetPipeline(c.Context, inputPath, runConfig, logger)
+			runID := NewRunID()
+			runCtx := context.Background()
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
+			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
+			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, runConfig.ExpUseWingetForUv) //nolint:staticcheck
+			runCtx = context.WithValue(runCtx, python.LocalIngestr, c.String("debug-ingestr-src"))
+			runCtx = context.WithValue(runCtx, config.EnvironmentContextKey, cm.SelectedEnvironment)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, runID)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
+
+			preview, err := GetPipeline(runCtx, inputPath, runConfig, logger, pipeline.WithOnlyPipeline())
 			if err != nil {
 				return err
 			}
 
 			var task *pipeline.Asset
-			if pipelineInfo.RunningForAnAsset {
-				task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath, pipelineInfo.Pipeline)
+			if preview.RunningForAnAsset {
+				task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath, preview.Pipeline)
 				if err != nil {
 					errorPrinter.Printf("Failed to build asset: %v\n", err)
 					return cli.Exit("", 1)
 				}
-				task, err = DefaultPipelineBuilder.MutateAsset(c.Context, task, pipelineInfo.Pipeline)
+				task, err = DefaultPipelineBuilder.MutateAsset(runCtx, task, preview.Pipeline)
 				if err != nil {
 					errorPrinter.Printf("Failed to mutate asset: %v\n", err)
 					return cli.Exit("", 1)
@@ -292,33 +305,7 @@ func Run(isDebug *bool) *cli.Command {
 				}
 			}
 
-			// handle log files
-			runID := time.Now().Format("2006_01_02_15_04_05")
-			if os.Getenv("BRUIN_RUN_ID") != "" {
-				runID = os.Getenv("BRUIN_RUN_ID")
-			}
-			executionStartLog := "Starting execution..."
-			if !c.Bool("minimal-logs") {
-				infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
-
-				if pipelineInfo.RunningForAnAsset {
-					infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
-				}
-				executionStartLog = "Starting the pipeline execution..."
-			}
-			connectionManager, errs := connection.NewManagerFromConfig(cm)
-			if len(errs) > 0 {
-				printErrors(errs, runConfig.Output, "Failed to register connections")
-				return cli.Exit("", 1)
-			}
-			shouldValidate := !pipelineInfo.RunningForAnAsset && !c.Bool("no-validation")
-			if shouldValidate {
-				if err := CheckLint(pipelineInfo.Pipeline, inputPath, logger, nil, connectionManager); err != nil {
-					return err
-				}
-			}
-
-			statePath := filepath.Join(repoRoot.Path, "logs/runs", pipelineInfo.Pipeline.Name)
+			statePath := filepath.Join(repoRoot.Path, "logs/runs", preview.Pipeline.Name)
 			err = git.EnsureGivenPatternIsInGitignore(afero.NewOsFs(), repoRoot.Path, "logs/runs")
 			if err != nil {
 				errorPrinter.Printf("Failed to add the run state folder to .gitignore: %v\n", err)
@@ -328,7 +315,7 @@ func Run(isDebug *bool) *cli.Command {
 			filter := &Filter{
 				IncludeTag:        runConfig.Tag,
 				OnlyTaskTypes:     runConfig.Only,
-				IncludeDownstream: pipelineInfo.RunDownstreamTasks,
+				IncludeDownstream: preview.RunDownstreamTasks,
 				PushMetaData:      runConfig.PushMetadata,
 				SingleTask:        task,
 				ExcludeTag:        runConfig.ExcludeTag,
@@ -350,6 +337,36 @@ func Run(isDebug *bool) *cli.Command {
 				}
 				startDate = parsedStartDate
 				endDate = parsedEndDate
+			}
+
+			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, preview.Pipeline.Name, runID, nil)
+			DefaultPipelineBuilder.AddAssetMutator(renderAssetParamsMutator(renderer))
+
+			pipelineInfo, err := GetPipeline(runCtx, inputPath, runConfig, logger)
+			if err != nil {
+				return err
+			}
+
+			// handle log files
+			executionStartLog := "Starting execution..."
+			if !c.Bool("minimal-logs") {
+				infoPrinter.Printf("Analyzed the pipeline '%s' with %d assets.\n", pipelineInfo.Pipeline.Name, len(pipelineInfo.Pipeline.Assets))
+
+				if pipelineInfo.RunningForAnAsset {
+					infoPrinter.Printf("Running only the asset '%s'\n", task.Name)
+				}
+				executionStartLog = "Starting the pipeline execution..."
+			}
+			connectionManager, errs := connection.NewManagerFromConfig(cm)
+			if len(errs) > 0 {
+				printErrors(errs, runConfig.Output, "Failed to register connections")
+				return cli.Exit("", 1)
+			}
+			shouldValidate := !pipelineInfo.RunningForAnAsset && !c.Bool("no-validation")
+			if shouldValidate {
+				if err := CheckLint(runCtx, pipelineInfo.Pipeline, inputPath, logger, nil, connectionManager); err != nil {
+					return err
+				}
 			}
 
 			foundPipeline := pipelineInfo.Pipeline
@@ -439,7 +456,7 @@ func Run(isDebug *bool) *cli.Command {
 				}()
 			}
 
-			mainExecutors, err := SetupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode, parser)
+			mainExecutors, err := SetupExecutors(s, cm, connectionManager, startDate, endDate, foundPipeline.Name, runID, runConfig.FullRefresh, runConfig.UsePip, runConfig.SensorMode, renderer, parser)
 			if err != nil {
 				errorPrinter.Println(err.Error())
 				return cli.Exit("", 1)
@@ -454,19 +471,6 @@ func Run(isDebug *bool) *cli.Command {
 				errorPrinter.Printf("Failed to create executor: %v\n", err)
 				return cli.Exit("", 1)
 			}
-
-			runCtx := context.Background()
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
-			runCtx = context.WithValue(runCtx, executor.KeyIsDebug, isDebug)
-			runCtx = context.WithValue(runCtx, python.CtxUseWingetForUv, runConfig.ExpUseWingetForUv) //nolint:staticcheck
-			runCtx = context.WithValue(runCtx, python.LocalIngestr, c.String("debug-ingestr-src"))
-			runCtx = context.WithValue(runCtx, config.EnvironmentContextKey, cm.SelectedEnvironment)
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigPipelineName, foundPipeline.Name)
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, runID)
-			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 
 			exeCtx, cancel := signal.NotifyContext(runCtx, syscall.SIGINT, syscall.SIGTERM)
 			defer cancel()
@@ -514,7 +518,7 @@ func ReadState(fs afero.Fs, statePath string, filter *Filter) (*scheduler.Pipeli
 	return pipelineState, nil
 }
 
-func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.RunConfig, log logger.Logger) (*PipelineInfo, error) {
+func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.RunConfig, log logger.Logger, opts ...pipeline.CreatePipelineOption) (*PipelineInfo, error) {
 	pipelinePath := inputPath
 	runningForAnAsset := isPathReferencingAsset(inputPath)
 	if runningForAnAsset && runConfig.Tag != "" {
@@ -522,7 +526,6 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 		return nil, errors.New("you cannot use the '--tag' flag when running a single asset")
 	}
 
-	var task *pipeline.Asset
 	var err error
 	runDownstreamTasks := false
 
@@ -537,7 +540,8 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 		}
 	}
 
-	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, pipeline.WithMutate())
+	opts = append(opts, pipeline.WithMutate())
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, opts...)
 	if err != nil {
 		errorPrinter.Println("failed to build pipeline, are you sure you have referred the right path?")
 		errorPrinter.Println("\nHint: You need to run this command with a path to either the pipeline directory or the asset file itself directly.")
@@ -547,36 +551,6 @@ func GetPipeline(ctx context.Context, inputPath string, runConfig *scheduler.Run
 			RunningForAnAsset:  runningForAnAsset,
 			RunDownstreamTasks: runDownstreamTasks,
 		}, err
-	}
-
-	if runningForAnAsset {
-		task, err = DefaultPipelineBuilder.CreateAssetFromFile(inputPath, foundPipeline)
-		if err != nil {
-			errorPrinter.Printf("Failed to build asset: %v. Are you sure you used the correct path?\n", err.Error())
-			return &PipelineInfo{
-				RunningForAnAsset:  runningForAnAsset,
-				RunDownstreamTasks: runDownstreamTasks,
-				Pipeline:           foundPipeline,
-			}, err
-		}
-
-		task, err = DefaultPipelineBuilder.MutateAsset(ctx, task, foundPipeline)
-		if err != nil {
-			errorPrinter.Printf("Failed to mutate asset: %v\n", err)
-			return &PipelineInfo{
-				RunningForAnAsset:  runningForAnAsset,
-				RunDownstreamTasks: runDownstreamTasks,
-				Pipeline:           foundPipeline,
-			}, err
-		}
-		if task == nil {
-			errorPrinter.Printf("The given file path doesn't seem to be a Bruin task definition: '%s'\n", inputPath)
-			return &PipelineInfo{
-				RunningForAnAsset:  runningForAnAsset,
-				RunDownstreamTasks: runDownstreamTasks,
-				Pipeline:           foundPipeline,
-			}, err
-		}
 	}
 
 	return &PipelineInfo{
@@ -623,7 +597,7 @@ func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger 
 	return startDate, endDate, inputPath, nil
 }
 
-func CheckLint(foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, parser *sqlparser.SQLParser, connectionManager *connection.Manager) error {
+func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, parser *sqlparser.SQLParser, connectionManager *connection.Manager) error {
 	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, parser, true)
 	if err != nil {
 		errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
@@ -633,7 +607,7 @@ func CheckLint(foundPipeline *pipeline.Pipeline, pipelinePath string, logger log
 	rules = lint.FilterRulesBySpeed(rules, true)
 
 	linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
-	res, err := linter.LintPipelines([]*pipeline.Pipeline{foundPipeline})
+	res, err := linter.LintPipelines(ctx, []*pipeline.Pipeline{foundPipeline})
 	err = reportLintErrors(res, err, lint.Printer{RootCheckPath: pipelinePath}, "")
 	if err != nil {
 		return err
@@ -716,6 +690,7 @@ func SetupExecutors(
 	fullRefresh bool,
 	usePipForPython bool,
 	sensorMode string,
+	renderer *jinja.Renderer,
 	parser *sqlparser.SQLParser,
 ) (map[pipeline.AssetType]executor.Config, error) {
 	mainExecutors := executor.DefaultExecutorsV2
@@ -724,8 +699,8 @@ func SetupExecutors(
 	// this should go away once we incorporate URIs into the assets
 	estimateCustomCheckType := s.FindMajorityOfTypes(pipeline.AssetTypeBigqueryQuery)
 
-	renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineName, runID, nil)
-	seedOperator, err := ingestr.NewSeedOperator(conn, renderer)
+	seedOperator, err := ingestr.NewSeedOperator(conn)
+
 	if err != nil {
 		return nil, err
 	}
@@ -1019,7 +994,7 @@ func SetupExecutors(
 
 	for _, typ := range emrServerlessAssetTypes {
 		if s.WillRunTaskOfType(typ) {
-			emrServerlessOperator, err := emr_serverless.NewBasicOperator(conn, jinjaVariables, renderer)
+			emrServerlessOperator, err := emr_serverless.NewBasicOperator(conn, jinjaVariables)
 			emrCheckRunner := emr_serverless.NewColumnCheckOperator(conn)
 			emrCustomCheckRunner := emr_serverless.NewCustomCheckOperator(conn, renderer)
 			if err != nil {

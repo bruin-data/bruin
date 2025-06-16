@@ -787,3 +787,15 @@ type AttioConnection struct {
 func (c AttioConnection) GetName() string {
 	return c.Name
 }
+
+type SFTPConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Host     string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port,omitempty" json:"port" mapstructure:"port"`
+	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+}
+
+func (c SFTPConnection) GetName() string {
+	return c.Name
+}
