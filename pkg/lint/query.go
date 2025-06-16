@@ -295,7 +295,7 @@ func (q *QueryValidatorRule) bufferSize() int {
 	return 256
 }
 
-func (q *QueryValidatorRule) Validate(p *pipeline.Pipeline) ([]*Issue, error) {
+func (q *QueryValidatorRule) Validate(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
 	// skip if there are no workers defined

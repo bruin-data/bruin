@@ -18,7 +18,7 @@ import (
 
 type (
 	pipelineFinder    func(root string, pipelineDefinitionFile []string) ([]string, error)
-	PipelineValidator func(pipeline *pipeline.Pipeline) ([]*Issue, error)
+	PipelineValidator func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error)
 	AssetValidator    func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error)
 )
 
@@ -35,7 +35,7 @@ type Issue struct {
 type Rule interface {
 	Name() string
 	IsFast() bool
-	Validate(pipeline *pipeline.Pipeline) ([]*Issue, error)
+	Validate(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error)
 	ValidateAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error)
 	GetApplicableLevels() []Level
 	GetSeverity() ValidatorSeverity
@@ -50,8 +50,8 @@ type SimpleRule struct {
 	Severity         ValidatorSeverity
 }
 
-func (g *SimpleRule) Validate(pipeline *pipeline.Pipeline) ([]*Issue, error) {
-	return g.Validator(pipeline)
+func (g *SimpleRule) Validate(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
+	return g.Validator(ctx, pipeline)
 }
 
 func (g *SimpleRule) IsFast() bool {
@@ -94,7 +94,7 @@ func NewLinter(findPipelines pipelineFinder, builder pipelineBuilder, rules []Ru
 	}
 }
 
-func (l *Linter) Lint(rootPath string, pipelineDefinitionFileName []string, c *cli.Context) (*PipelineAnalysisResult, error) {
+func (l *Linter) Lint(ctx context.Context, rootPath string, pipelineDefinitionFileName []string, c *cli.Context) (*PipelineAnalysisResult, error) {
 	pipelines, err := l.extractPipelinesFromPath(rootPath, pipelineDefinitionFileName)
 
 	excludeTag := ""
@@ -133,10 +133,10 @@ func (l *Linter) Lint(rootPath string, pipelineDefinitionFileName []string, c *c
 		return nil, err
 	}
 
-	return l.LintPipelines(pipelines)
+	return l.LintPipelines(ctx, pipelines)
 }
 
-func (l *Linter) LintAsset(rootPath string, pipelineDefinitionFileName []string, assetNameOrPath string, c *cli.Context) (*PipelineAnalysisResult, error) {
+func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinitionFileName []string, assetNameOrPath string, c *cli.Context) (*PipelineAnalysisResult, error) {
 	pipelines, err := l.extractPipelinesFromPath(rootPath, pipelineDefinitionFileName)
 	if err != nil {
 		return nil, err
@@ -201,7 +201,7 @@ func (l *Linter) LintAsset(rootPath string, pipelineDefinitionFileName []string,
 
 	// now the actual validation starts
 	for _, rule := range rules {
-		issues, err := rule.ValidateAsset(context.TODO(), assetPipeline, asset)
+		issues, err := rule.ValidateAsset(ctx, assetPipeline, asset)
 		if err != nil {
 			return nil, err
 		}
@@ -341,11 +341,11 @@ func (p *PipelineIssues) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (l *Linter) LintPipelines(pipelines []*pipeline.Pipeline) (*PipelineAnalysisResult, error) {
+func (l *Linter) LintPipelines(ctx context.Context, pipelines []*pipeline.Pipeline) (*PipelineAnalysisResult, error) {
 	result := &PipelineAnalysisResult{}
 
 	for _, p := range pipelines {
-		pipelineResult, err := l.LintPipeline(p)
+		pipelineResult, err := l.LintPipeline(ctx, p)
 		if err != nil {
 			return nil, err
 		}
@@ -355,17 +355,15 @@ func (l *Linter) LintPipelines(pipelines []*pipeline.Pipeline) (*PipelineAnalysi
 	return result, nil
 }
 
-func (l *Linter) LintPipeline(p *pipeline.Pipeline) (*PipelineIssues, error) {
-	return RunLintRulesOnPipeline(p, l.rules)
+func (l *Linter) LintPipeline(ctx context.Context, p *pipeline.Pipeline) (*PipelineIssues, error) {
+	return RunLintRulesOnPipeline(ctx, p, l.rules)
 }
 
-func RunLintRulesOnPipeline(p *pipeline.Pipeline, rules []Rule) (*PipelineIssues, error) {
+func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []Rule) (*PipelineIssues, error) {
 	pipelineResult := &PipelineIssues{
 		Pipeline: p,
 		Issues:   make(map[Rule][]*Issue),
 	}
-	ctx := context.Background()
-
 	policyRules, err := loadPolicy(p.DefinitionFile.Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policy: %w", err)
@@ -377,7 +375,7 @@ func RunLintRulesOnPipeline(p *pipeline.Pipeline, rules []Rule) (*PipelineIssues
 	for _, rule := range rules {
 		levels := rule.GetApplicableLevels()
 		if slices.Contains(levels, LevelPipeline) {
-			issues, err := rule.Validate(p)
+			issues, err := rule.Validate(ctx, p)
 			if err != nil {
 				return nil, err
 			}

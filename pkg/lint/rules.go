@@ -84,7 +84,7 @@ func EnsureTaskNameIsValidForASingleAsset(ctx context.Context, p *pipeline.Pipel
 	return issues, nil
 }
 
-func EnsureTaskNameIsUnique(p *pipeline.Pipeline) ([]*Issue, error) {
+func EnsureTaskNameIsUnique(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	nameFileMapping := make(map[string][]*pipeline.Asset)
 	for _, task := range p.Assets {
 		if task.Name == "" {
@@ -203,7 +203,7 @@ func EnsureExecutableFileIsValidForASingleAsset(fs afero.Fs) AssetValidator {
 	}
 }
 
-func EnsurePipelineNameIsValid(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+func EnsurePipelineNameIsValid(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if pipeline.Name == "" {
 		issues = append(issues, &Issue{
@@ -222,11 +222,11 @@ func EnsurePipelineNameIsValid(pipeline *pipeline.Pipeline) ([]*Issue, error) {
 	return issues, nil
 }
 
-func CallFuncForEveryAsset(callable AssetValidator) func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
-	return func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+func CallFuncForEveryAsset(callable AssetValidator) func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
+	return func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
 		issues := make([]*Issue, 0)
 		for _, task := range pipeline.Assets {
-			assetIssues, err := callable(context.TODO(), pipeline, task)
+			assetIssues, err := callable(ctx, pipeline, task)
 			if err != nil {
 				return issues, err
 			}
@@ -316,7 +316,7 @@ func EnsureDependencyExistsForASingleAsset(ctx context.Context, p *pipeline.Pipe
 	return issues, nil
 }
 
-func EnsurePipelineScheduleIsValidCron(p *pipeline.Pipeline) ([]*Issue, error) {
+func EnsurePipelineScheduleIsValidCron(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if p.Schedule == "" {
 		return issues, nil
@@ -345,7 +345,7 @@ type WarnRegularYamlFiles struct {
 	fs afero.Fs
 }
 
-func (w *WarnRegularYamlFiles) WarnRegularYamlFilesInRepo(p *pipeline.Pipeline) ([]*Issue, error) {
+func (w *WarnRegularYamlFiles) WarnRegularYamlFilesInRepo(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
 	if p.DefinitionFile.Path == "" {
@@ -411,7 +411,7 @@ func (w *WarnRegularYamlFiles) WarnRegularYamlFilesInRepo(p *pipeline.Pipeline) 
 	return issues, nil
 }
 
-func EnsurePipelineStartDateIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
+func EnsurePipelineStartDateIsValid(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	if p.StartDate == "" {
 		return issues, nil
@@ -662,7 +662,7 @@ func ValidateDuplicateColumnNames(ctx context.Context, p *pipeline.Pipeline, ass
 	return issues, nil
 }
 
-func ValidateAssetDirectoryExist(p *pipeline.Pipeline) ([]*Issue, error) {
+func ValidateAssetDirectoryExist(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	var issues []*Issue
 
 	parentDir := filepath.Dir(p.DefinitionFile.Path)
@@ -700,7 +700,7 @@ func EnsureTypeIsCorrectForASingleAsset(ctx context.Context, p *pipeline.Pipelin
 // Since the pipelines are directed graphs, strongly connected components mean cycles, therefore
 // they would be considered invalid for our pipelines.
 // Strong connectivity wouldn't work for tasks that depend on themselves, therefore there's a specific check for that.
-func EnsurePipelineHasNoCycles(p *pipeline.Pipeline) ([]*Issue, error) {
+func EnsurePipelineHasNoCycles(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
 	for _, task := range p.Assets {
@@ -777,7 +777,7 @@ func isStringInArray(arr []string, str string) bool {
 	return false
 }
 
-func EnsureSlackFieldInPipelineIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
+func EnsureSlackFieldInPipelineIsValid(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
 	slackChannels := make([]string, 0, len(p.Notifications.Slack))
@@ -802,7 +802,7 @@ func EnsureSlackFieldInPipelineIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
 	return issues, nil
 }
 
-func EnsureMSTeamsFieldInPipelineIsValid(p *pipeline.Pipeline) ([]*Issue, error) {
+func EnsureMSTeamsFieldInPipelineIsValid(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
 	MSTeamsConnections := make([]string, 0, len(p.Notifications.MSTeams))
@@ -1202,8 +1202,8 @@ func (u UsedTableValidatorRule) GetSeverity() ValidatorSeverity {
 	return ValidatorSeverityWarning
 }
 
-func (u UsedTableValidatorRule) Validate(p *pipeline.Pipeline) ([]*Issue, error) {
-	return CallFuncForEveryAsset(u.ValidateAsset)(p)
+func (u UsedTableValidatorRule) Validate(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	return CallFuncForEveryAsset(u.ValidateAsset)(ctx, p)
 }
 
 func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -1231,7 +1231,7 @@ func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.P
 	return issues, nil
 }
 
-func ValidateVariables(p *pipeline.Pipeline) ([]*Issue, error) {
+func ValidateVariables(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
 	if p.Variables == nil {

@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/manifoldco/promptui"
@@ -109,4 +111,12 @@ func printError(err error, output string, message string) {
 	} else {
 		errorPrinter.Printf("%s: %v\n", message, err)
 	}
+}
+
+func NewRunID() string {
+	runID := time.Now().Format("2006_01_02_15_04_05")
+	if os.Getenv("BRUIN_RUN_ID") != "" {
+		runID = os.Getenv("BRUIN_RUN_ID")
+	}
+	return runID
 }
