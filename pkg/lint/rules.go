@@ -1060,7 +1060,7 @@ func EnsureBigQueryQuerySensorHasTableParameterForASingleAsset(ctx context.Conte
 }
 
 // ValidateCustomCheckQueryDryRun validates CustomCheck.Query using a dry-run against the DB.
-func ValidateCustomCheckQueryDryRun(connections connectionManager) AssetValidator {
+func ValidateCustomCheckQueryDryRun(connections connectionManager, renderer jinja.RendererInterface) AssetValidator {
 	return func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 		var issues []*Issue
 
@@ -1083,24 +1083,36 @@ func ValidateCustomCheckQueryDryRun(connections connectionManager) AssetValidato
 			return issues, nil
 		}
 
+		assetRenderer := renderer.CloneForAsset(ctx, p, asset)
+
 		for _, check := range asset.CustomChecks {
 			if strings.TrimSpace(check.Query) == "" {
 				continue
 			}
 
-			q := &query.Query{Query: check.Query}
+			renderedQuery, err := assetRenderer.Render(check.Query)
+			if err != nil {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: fmt.Sprintf("Failed to render custom check query '%s': %s", check.Name, err),
+					Context:     []string{check.Query},
+				})
+				continue
+			}
+
+			q := &query.Query{Query: renderedQuery}
 			valid, err := validatorInstance.IsValid(ctx, q)
 			if err != nil {
 				issues = append(issues, &Issue{
 					Task:        asset,
 					Description: fmt.Sprintf("Failed to validate custom check query '%s': %s", check.Name, err),
-					Context:     []string{check.Query},
+					Context:     []string{renderedQuery},
 				})
 			} else if !valid {
 				issues = append(issues, &Issue{
 					Task:        asset,
-					Description: "Custom check query is invalid:" + check.Query,
-					Context:     []string{check.Query},
+					Description: "Custom check query is invalid:" + renderedQuery,
+					Context:     []string{renderedQuery},
 				})
 			}
 		}

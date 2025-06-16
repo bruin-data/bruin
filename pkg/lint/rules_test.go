@@ -2495,7 +2495,7 @@ func TestValidateCustomCheckQueryDryRun(t *testing.T) {
 	t.Run("valid custom check query", func(t *testing.T) {
 		t.Parallel()
 		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: true}}
-		validator := ValidateCustomCheckQueryDryRun(cm)
+		validator := ValidateCustomCheckQueryDryRun(cm, jinja.NewRendererWithYesterday("test", "test"))
 		issues, err := validator(context.Background(), p.Pipeline, assetWithValidCheck)
 		require.NoError(t, err)
 		assert.Empty(t, issues)
@@ -2504,7 +2504,7 @@ func TestValidateCustomCheckQueryDryRun(t *testing.T) {
 	t.Run("invalid custom check query", func(t *testing.T) {
 		t.Parallel()
 		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: false}}
-		validator := ValidateCustomCheckQueryDryRun(cm)
+		validator := ValidateCustomCheckQueryDryRun(cm, jinja.NewRendererWithYesterday("test", "test"))
 		issues, err := validator(context.Background(), p.Pipeline, assetWithInvalidCheck)
 		require.NoError(t, err)
 		assert.Len(t, issues, 1)
@@ -2514,7 +2514,7 @@ func TestValidateCustomCheckQueryDryRun(t *testing.T) {
 	t.Run("custom check with empty query", func(t *testing.T) {
 		t.Parallel()
 		cm := &fakeConnectionManager{validator: &fakeQueryValidator{isValid: true}}
-		validator := ValidateCustomCheckQueryDryRun(cm)
+		validator := ValidateCustomCheckQueryDryRun(cm, jinja.NewRendererWithYesterday("test", "test"))
 		issues, err := validator(context.Background(), p.Pipeline, assetWithEmptyCheck)
 		require.NoError(t, err)
 		assert.Empty(t, issues)
@@ -2523,7 +2523,7 @@ func TestValidateCustomCheckQueryDryRun(t *testing.T) {
 	t.Run("connection error", func(t *testing.T) {
 		t.Parallel()
 		cm := &fakeConnectionManager{err: errors.New("connection error")}
-		validator := ValidateCustomCheckQueryDryRun(cm)
+		validator := ValidateCustomCheckQueryDryRun(cm, jinja.NewRendererWithYesterday("test", "test"))
 		issues, err := validator(context.Background(), p.Pipeline, assetWithValidCheck)
 		require.NoError(t, err)
 		assert.Empty(t, issues)
@@ -2532,7 +2532,7 @@ func TestValidateCustomCheckQueryDryRun(t *testing.T) {
 	t.Run("validator type assertion fails", func(t *testing.T) {
 		t.Parallel()
 		cm := &fakeConnectionManager{validator: struct{}{}}
-		validator := ValidateCustomCheckQueryDryRun(cm)
+		validator := ValidateCustomCheckQueryDryRun(cm, jinja.NewRendererWithYesterday("test", "test"))
 		issues, err := validator(context.Background(), p.Pipeline, assetWithValidCheck)
 		require.NoError(t, err)
 		assert.Empty(t, issues)
