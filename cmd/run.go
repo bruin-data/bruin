@@ -269,11 +269,7 @@ func Run(isDebug *bool) *cli.Command {
 				DefaultPipelineBuilder.AddPipelineMutator(variableOverridesMutator(vars))
 			}
 
-			runID := time.Now().Format("2006_01_02_15_04_05")
-			if os.Getenv("BRUIN_RUN_ID") != "" {
-				runID = os.Getenv("BRUIN_RUN_ID")
-			}
-
+			runID := NewRunID()
 			runCtx := context.Background()
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigFullRefresh, runConfig.FullRefresh)
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
@@ -368,7 +364,7 @@ func Run(isDebug *bool) *cli.Command {
 			}
 			shouldValidate := !pipelineInfo.RunningForAnAsset && !c.Bool("no-validation")
 			if shouldValidate {
-				if err := CheckLint(pipelineInfo.Pipeline, inputPath, logger, nil, connectionManager); err != nil {
+				if err := CheckLint(runCtx, pipelineInfo.Pipeline, inputPath, logger, nil, connectionManager); err != nil {
 					return err
 				}
 			}
@@ -601,7 +597,7 @@ func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger 
 	return startDate, endDate, inputPath, nil
 }
 
-func CheckLint(foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, parser *sqlparser.SQLParser, connectionManager *connection.Manager) error {
+func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, parser *sqlparser.SQLParser, connectionManager *connection.Manager) error {
 	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, parser, true)
 	if err != nil {
 		errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
@@ -611,7 +607,7 @@ func CheckLint(foundPipeline *pipeline.Pipeline, pipelinePath string, logger log
 	rules = lint.FilterRulesBySpeed(rules, true)
 
 	linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
-	res, err := linter.LintPipelines([]*pipeline.Pipeline{foundPipeline})
+	res, err := linter.LintPipelines(ctx, []*pipeline.Pipeline{foundPipeline})
 	err = reportLintErrors(res, err, lint.Printer{RootCheckPath: pipelinePath}, "")
 	if err != nil {
 		return err

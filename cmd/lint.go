@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -181,18 +182,23 @@ func Lint(isDebug *bool) *cli.Command {
 				logger.Debugf("successfully loaded %d rules", len(rules))
 			}
 
+			lintCtx := context.Background()
+			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigStartDate, defaultStartDate)
+			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigEndDate, defaultEndDate)
+			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigRunID, NewRunID())
+
 			var result *lint.PipelineAnalysisResult
 			var errr error
 			if asset == "" {
 				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
 				logger.Debugf("running %d rules for pipeline validation", len(rules))
 				infoPrinter.Printf("Validating pipelines in '%s' for '%s' environment...\n", rootPath, cm.SelectedEnvironmentName)
-				result, errr = linter.Lint(rootPath, PipelineDefinitionFiles, c)
+				result, errr = linter.Lint(lintCtx, rootPath, PipelineDefinitionFiles, c)
 			} else {
 				rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
 				logger.Debugf("running %d rules for asset-only validation", len(rules))
 				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
-				result, errr = linter.LintAsset(rootPath, PipelineDefinitionFiles, asset, c)
+				result, errr = linter.LintAsset(lintCtx, rootPath, PipelineDefinitionFiles, asset, c)
 			}
 
 			printer := lint.Printer{RootCheckPath: rootPath}

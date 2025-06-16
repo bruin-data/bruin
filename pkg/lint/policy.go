@@ -240,7 +240,7 @@ func assetValidatorFromRuleDef(def *RuleDefinition) AssetValidator {
 }
 
 func pipelineValidatorFromRuleDef(def *RuleDefinition) PipelineValidator {
-	return func(pipe *pipeline.Pipeline) ([]*Issue, error) {
+	return func(ctx context.Context, pipe *pipeline.Pipeline) ([]*Issue, error) {
 		env := pipelineValidatorEnv{pipe, pipe.Variables.Value()}
 		result, err := expr.Run(def.evalutor, env)
 		if err != nil {
@@ -262,7 +262,7 @@ func pipelineValidatorFromRuleDef(def *RuleDefinition) PipelineValidator {
 func withSelector(selector []map[string]any, downstream validators) validators {
 	middleware := validators{}
 	if downstream.Pipeline != nil {
-		middleware.Pipeline = func(pipeline *pipeline.Pipeline) ([]*Issue, error) {
+		middleware.Pipeline = func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
 			match, err := doesSelectorMatch(selector, pipeline, nil)
 			if err != nil {
 				return nil, fmt.Errorf("error matching selector: %w", err)
@@ -272,7 +272,7 @@ func withSelector(selector []map[string]any, downstream validators) validators {
 				return nil, nil
 			}
 
-			return downstream.Pipeline(pipeline)
+			return downstream.Pipeline(ctx, pipeline)
 		}
 	}
 	if downstream.Asset != nil {
