@@ -1,6 +1,5 @@
 # Snowflake Assets
-
-Bruin supports Snowflake as a data platform. 
+Bruin supports Snowflake as a data platform.
 
 ## Connection
 In order to set up a Snowflake connection, you need to add a configuration item to `connections` in the `.bruin.yml` file.
@@ -26,10 +25,55 @@ Where account is the identifier that you can copy here:
 
 ![Snowflake Account](/snowflake.png)
 
-
 ### Key-based Authentication
 
-Snowflake currently supports both password-based authentication as well as key-based authentication. In order to use key-based authentication, you need to provide a path to the private key file as the `private_key_path` parameter. See [this guide](https://select.dev/docs/snowflake-developer-guide/snowflake-key-pair) to create a key-pair if you haven't done that before.
+Snowflake currently supports both password-based authentication as well as key-based authentication. In order to set up key-based authentication, follow the following steps.
+
+
+#### Step 1: Generate a key-pair
+
+Open your terminal and run the following command to create a key pair. If you’re using a mac, OpenSSL should be installed by default, so no additional setup is required. For Linux or Windows, you may need to [install OpenSSL first](https://docs.openssl.org/3.4/man7/ossl-guide-introduction/).
+
+```terminal
+openssl genrsa 2048 | openssl pkcs8 -topk8 -inform PEM -out rsa_key.p8 -nocrypt
+openssl rsa -in rsa_key.p8 -pubout -out rsa_key.pub
+```
+
+#### Step 2: Set public key for Snowflake user
+
+Log into Snowflake as an admin, create a new worksheet and run the following command (don't forget the single quotes around the key):
+
+```sql
+ALTER USER your_snowflake_username
+SET RSA_PUBLIC_KEY='your_public_key_here';
+```
+
+#### Step 3: Verify
+```sql
+DESC USER your_snowflake_username;
+```
+
+This will show a column named `RSA_PUBLIC_KEY`. You should see your actual key there.
+
+#### Step 4: Update Bruin configuration
+
+In your `.bruin.yml` file, update the Snowflake connection configuration to include the `private_key_path` parameter pointing to your private key file. For example:
+
+```yaml
+            snowflake:
+                - name: snowflake-default
+                  username: JOHN_DOE
+                  account: EXAMPLE-ACCOUNT
+                  database: dev
+                  schema: schema_name
+                  warehouse: warehouse_name
+                  role: data_analyst
+                  region: eu-west1
+                  private_key_path: /Users/johndoe/rsa_key.pem
+```
+
+
+For more details on how to set up key-based authentication, see [this guide](https://select.dev/docs/snowflake-developer-guide/snowflake-key-pair).
 
 
 ## Snowflake Assets
