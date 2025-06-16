@@ -77,6 +77,10 @@ func Lint(isDebug *bool) *cli.Command {
 				Name:  "var",
 				Usage: "override pipeline variables with custom values",
 			},
+			&cli.BoolFlag{
+				Name:  "fast",
+				Usage: "run only fast validation rules, excludes some important rules such as query validation",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			// if the output is JSON then we intend to discard all the nicer pretty-print statements
@@ -167,10 +171,15 @@ func Lint(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			logger.Debugf("successfully loaded %d rules", len(rules))
-
 			rules = append(rules, queryValidatorRules(logger, cm, connectionManager)...)
 			rules = append(rules, lint.GetCustomCheckQueryDryRunRule(connectionManager))
+
+			if c.Bool("fast") {
+				rules = lint.FilterRulesBySpeed(rules, true)
+				logger.Debugf("filtered to %d fast rules", len(rules))
+			} else {
+				logger.Debugf("successfully loaded %d rules", len(rules))
+			}
 
 			var result *lint.PipelineAnalysisResult
 			var errr error
