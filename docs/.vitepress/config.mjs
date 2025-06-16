@@ -210,6 +210,7 @@ export default withMermaid({
                             {text: "Salesforce", link: "/ingestion/salesforce"},
                             {text: "SAP HANA", link: "/ingestion/sap_hana"},
                             {text: "S3", link: "/ingestion/s3"},
+                            {text: "SFTP", link: "/ingestion/sftp"},
                             {text: "Shopify", link: "/ingestion/shopify"},
                             {text: "Smartsheet", link: "/ingestion/smartsheet"},
                             {text: "Solidgate", link: "/ingestion/solidgate"},

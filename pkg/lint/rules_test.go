@@ -90,11 +90,12 @@ func TestEnsureTaskNameIsNotEmpty(t *testing.T) {
 			wantErr: false,
 		},
 	}
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := CallFuncForEveryAsset(EnsureTaskNameIsValidForASingleAsset)(tt.args.pipeline)
+			got, err := CallFuncForEveryAsset(EnsureTaskNameIsValidForASingleAsset)(ctx, tt.args.pipeline)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -392,6 +393,7 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 			want: noIssues,
 		},
 	}
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -403,7 +405,7 @@ func TestEnsureExecutableFileIsValid(t *testing.T) {
 
 			checker := CallFuncForEveryAsset(EnsureExecutableFileIsValidForASingleAsset(fs))
 
-			got, err := checker(&tt.args.pipeline)
+			got, err := checker(ctx, &tt.args.pipeline)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -535,11 +537,12 @@ func TestEnsureDependencyExists(t *testing.T) {
 			},
 		},
 	}
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := CallFuncForEveryAsset(EnsureDependencyExistsForASingleAsset)(tt.args.p)
+			got, err := CallFuncForEveryAsset(EnsureDependencyExistsForASingleAsset)(ctx, tt.args.p)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -613,11 +616,12 @@ func TestEnsurePipelineScheduleIsValidCron(t *testing.T) {
 			want: noIssues,
 		},
 	}
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := EnsurePipelineScheduleIsValidCron(tt.args.p)
+			got, err := EnsurePipelineScheduleIsValidCron(ctx, tt.args.p)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -693,11 +697,12 @@ func TestEnsureOnlyAcceptedTaskTypesAreThere(t *testing.T) {
 			want: noIssues,
 		},
 	}
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := CallFuncForEveryAsset(EnsureTypeIsCorrectForASingleAsset)(tt.args.p)
+			got, err := CallFuncForEveryAsset(EnsureTypeIsCorrectForASingleAsset)(ctx, tt.args.p)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -770,11 +775,12 @@ func TestEnsureTaskNameIsUnique(t *testing.T) {
 			wantErr: false,
 		},
 	}
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := EnsureTaskNameIsUnique(tt.p)
+			got, err := EnsureTaskNameIsUnique(ctx, tt.p)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -958,11 +964,12 @@ func TestEnsurePipelineNameIsValid(t *testing.T) {
 			wantErr: false,
 		},
 	}
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := EnsurePipelineNameIsValid(tt.args.p)
+			got, err := EnsurePipelineNameIsValid(ctx, tt.args.p)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -1051,11 +1058,12 @@ func TestEnsurePipelineHasNoCycles(t *testing.T) {
 			wantErr: false,
 		},
 	}
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := EnsurePipelineHasNoCycles(tt.args.p)
+			got, err := EnsurePipelineHasNoCycles(ctx, tt.args.p)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -1175,10 +1183,11 @@ func TestEnsureSlackFieldInPipelineIsValid(t *testing.T) {
 			},
 		},
 	}
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := EnsureSlackFieldInPipelineIsValid(tt.args.p)
+			got, err := EnsureSlackFieldInPipelineIsValid(ctx, tt.args.p)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -1257,10 +1266,11 @@ func TestMSTeamsFieldInPipelineIsValid(t *testing.T) {
 			},
 		},
 	}
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := EnsureMSTeamsFieldInPipelineIsValid(tt.args.p)
+			got, err := EnsureMSTeamsFieldInPipelineIsValid(ctx, tt.args.p)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -1481,11 +1491,12 @@ func TestEnsureMaterializationValuesAreValid(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 	}
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := CallFuncForEveryAsset(EnsureMaterializationValuesAreValidForSingleAsset)(&pipeline.Pipeline{
+			got, err := CallFuncForEveryAsset(EnsureMaterializationValuesAreValidForSingleAsset)(ctx, &pipeline.Pipeline{
 				Assets: tt.assets,
 			})
 
@@ -1562,11 +1573,12 @@ func TestEnsureSnowflakeSensorHasQueryParameter(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 	}
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := CallFuncForEveryAsset(EnsureSnowflakeSensorHasQueryParameterForASingleAsset)(tt.p)
+			got, err := CallFuncForEveryAsset(EnsureSnowflakeSensorHasQueryParameterForASingleAsset)(ctx, tt.p)
 			if !tt.wantErr(t, err) {
 				return
 			}
@@ -1640,11 +1652,12 @@ func TestEnsureBigqueryQuerySensorHasQueryParameter(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 	}
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := CallFuncForEveryAsset(EnsureBigQueryQuerySensorHasTableParameterForASingleAsset)(tt.p)
+			got, err := CallFuncForEveryAsset(EnsureBigQueryQuerySensorHasTableParameterForASingleAsset)(ctx, tt.p)
 			if !tt.wantErr(t, err) {
 				return
 			}
@@ -1733,11 +1746,12 @@ func TestEnsureBigQueryTableSensorHasTableParameter(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 	}
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := CallFuncForEveryAsset(EnsureBigQueryTableSensorHasTableParameterForASingleAsset)(tt.p)
+			got, err := CallFuncForEveryAsset(EnsureBigQueryTableSensorHasTableParameterForASingleAsset)(ctx, tt.p)
 			if !tt.wantErr(t, err) {
 				return
 			}
@@ -1911,11 +1925,12 @@ func TestEnsurePipelineStartDateIsValid(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 	}
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := EnsurePipelineStartDateIsValid(tt.p)
+			got, err := EnsurePipelineStartDateIsValid(ctx, tt.p)
 			tt.wantErr(t, err)
 			assert.Equal(t, tt.want, got)
 		})
@@ -2400,6 +2415,8 @@ func TestWarnRegularYamlFiles_WarnRegularYamlFilesInRepo(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 	}
+
+	ctx := context.Background()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -2407,7 +2424,7 @@ func TestWarnRegularYamlFiles_WarnRegularYamlFilesInRepo(t *testing.T) {
 			w := &WarnRegularYamlFiles{
 				fs: afero.NewOsFs(),
 			}
-			got, err := w.WarnRegularYamlFilesInRepo(tt.p)
+			got, err := w.WarnRegularYamlFilesInRepo(ctx, tt.p)
 			if !tt.wantErr(t, err, fmt.Sprintf("WarnRegularYamlFilesInRepo(%v)", tt.p)) {
 				return
 			}

@@ -14,7 +14,7 @@ import (
 // SetupVariables prepares the environment variables for a pipeline run.
 // It is meant for use in python operators.
 func SetupVariables(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset, env map[string]string) (map[string]string, error) {
-	env, err := envMutateIntervals(ctx, t, env)
+	env, err := envMutateIntervals(ctx, p, t, env)
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +27,7 @@ func SetupVariables(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset
 	return env, nil
 }
 
-func envMutateIntervals(ctx context.Context, t *pipeline.Asset, env map[string]string) (map[string]string, error) {
+func envMutateIntervals(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset, env map[string]string) (map[string]string, error) {
 	if val := ctx.Value(pipeline.RunConfigApplyIntervalModifiers); val != nil {
 		if applyModifiers, ok := val.(bool); !ok || !applyModifiers {
 			return env, nil
@@ -42,12 +42,6 @@ func envMutateIntervals(ctx context.Context, t *pipeline.Asset, env map[string]s
 	if !ok {
 		return nil, errors.New("end date is required - please provide a valid date")
 	}
-
-	pipelineName, ok := ctx.Value(pipeline.RunConfigPipelineName).(string)
-	if !ok {
-		return nil, errors.New("pipeline name is required - please provide a valid pipeline name")
-	}
-
 	runID, ok := ctx.Value(pipeline.RunConfigRunID).(string)
 	if !ok {
 		return nil, errors.New("run ID not found - please check if the run exists")
@@ -60,7 +54,7 @@ func envMutateIntervals(ctx context.Context, t *pipeline.Asset, env map[string]s
 	modifiedStartDate := pipeline.ModifyDate(startDate, t.IntervalModifiers.Start)
 	modifiedEndDate := pipeline.ModifyDate(endDate, t.IntervalModifiers.End)
 
-	return jinja.PythonEnvVariables(&modifiedStartDate, &modifiedEndDate, pipelineName, runID, fullRefresh), nil
+	return jinja.PythonEnvVariables(&modifiedStartDate, &modifiedEndDate, p.Name, runID, fullRefresh), nil
 }
 
 func envInjectVariables(env map[string]string, variables map[string]any) (map[string]string, error) {

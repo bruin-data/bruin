@@ -314,6 +314,12 @@ environments:
       attio:
         - name: "attio-1"
           api_key: "api-key-123"
+      sftp:
+        - name: "sftp-1"
+          host: "sftp-host"
+          port: 22
+          username: "sftp-user"
+          password: "sftp-password"
 
   prod:
     connections:
