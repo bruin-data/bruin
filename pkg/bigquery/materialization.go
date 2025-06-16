@@ -155,6 +155,7 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 		return fmt.Sprintf("CREATE OR REPLACE TABLE %s %s %s AS\n%s", asset.Name, partitionClause, clusterByClause, query), nil
 	}
 }
+
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error) {
 	if asset.Materialization.IncrementalKey == "" {
 		return "", errors.New("incremental_key is required for time_interval strategy")
@@ -445,6 +446,7 @@ FROM (
 
 	return strings.TrimSpace(stmt), nil
 }
+
 func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, error) {
 	primaryKeys := asset.ColumnNamesWithPrimaryKey()
 	if len(primaryKeys) == 0 {

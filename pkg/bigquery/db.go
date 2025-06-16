@@ -418,7 +418,7 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 			}
 			datasetNameCache.Store(cacheKey, true)
 		} else {
-			return fmt.Errorf("failed to fetch metadata for table '%s': %w", tableName, err)
+			return fmt.Errorf("failed to fetch metadata to create dataset for table '%s': %w", tableName, err)
 		}
 	}
 

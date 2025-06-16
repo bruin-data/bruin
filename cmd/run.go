@@ -700,7 +700,6 @@ func SetupExecutors(
 	estimateCustomCheckType := s.FindMajorityOfTypes(pipeline.AssetTypeBigqueryQuery)
 
 	seedOperator, err := ingestr.NewSeedOperator(conn)
-
 	if err != nil {
 		return nil, err
 	}

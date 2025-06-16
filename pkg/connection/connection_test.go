@@ -413,7 +413,7 @@ func TestManager_GetSfConnection(t *testing.T) {
 
 	m := Manager{
 		Snowflake: map[string]*snowflake.DB{
-			"existing": &snowflake.DB{},
+			"existing": {},
 		},
 	}
 
