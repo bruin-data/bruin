@@ -88,7 +88,7 @@ def merge_docs(docs_dir, output_file):
 
 if __name__ == '__main__':
     # Merge docs
-    docs_dir = '/Users/sabrikaragonen/Desktop/bruin/bruin/docs'
+    docs_dir = './docs'
     output_file = 'merged_documentation.md'
     merge_docs(docs_dir, output_file)
     print(f'Documentation merged into {output_file}') 
