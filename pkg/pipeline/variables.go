@@ -19,6 +19,9 @@ func (v Variables) Validate() error {
 	// TODO(turtledev):
 	// - validate the defaults actually satisfy the schema
 	// - make "properties" a required field for object types
+	//
+	// BUG: Schema compiler fetches the schema from the spec URL, which may break
+	// in environments where internet access is restricted.
 	_, err := varSchemaLoader().Compile(gojsonschema.NewGoLoader(v.Schema()))
 	if err != nil {
 		return fmt.Errorf("invalid variables schema: %w", err)

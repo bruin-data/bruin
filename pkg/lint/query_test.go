@@ -283,6 +283,7 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		ctx := context.Background()
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -309,7 +310,7 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 				Materializer: mat,
 			}
 
-			got, err := q.Validate(tt.p)
+			got, err := q.Validate(ctx, tt.p)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
