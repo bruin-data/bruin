@@ -45,6 +45,7 @@ require (
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/xeipuuv/gojsonschema v1.2.0
 	github.com/xlab/treeprint v1.2.0
+	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56

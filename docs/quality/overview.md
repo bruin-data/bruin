@@ -1,24 +1,28 @@
 # Quality checks
 
-Quality checks are tests you can perform on your Bruin assets after they run to verify that the asset's data satisfies your expectations. 
+Quality checks are tests you can perform on your Bruin assets **after** they run to verify that the produced data satisfies your expectations. They are a great way to ensure your data is accurate, complete and consistent.
 
-You can use quality checks to ensure that your data is accurate, complete, and consistent. Quality checks are a powerful tool for ensuring that your data is reliable and trustworthy.
+Quality checks run after the asset has been executed. If a check fails and its
+`blocking` attribute is `true`, the rest of the checks are skipped and the asset
+is marked as failed. When `blocking` is `false` the asset still fails but the
+remaining checks continue to run. `blocking` defaults to `true`.
 
-Quality checks run **after** the asset has been executed. If an asset fails a quality check and the `blocking` attribute of that check is `true`, the remaining checks won't be executed. 
-If `blocking` is `false`, the asset will be marked as failed, but the remaining checks will be executed.
-
-See example below:
+Below is a short example of attaching checks to columns:
 
 ```yaml
 columns:
-  - name: one
+  - name: id
     type: integer
-    description: "Just a number"
-    checks:
-        - name: unique
-          blocking: true
+    description: "Primary key"
+    checks:            # run built-in checks
+      - name: unique
+      - name: not_null
 ```
 
-`blocking` is `true` by default.
+If any of those checks fails the asset will be marked as failed and any downstream assets will not be executed.
 
-If any of the checks fails, the asset will be marked as failed and any of the downstream assets will not be executed.
+Quality checks can also be executed on their own without running the asset again:
+
+```bash
+bruin run --only checks assets/my_asset.sql
+```

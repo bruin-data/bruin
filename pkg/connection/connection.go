@@ -52,6 +52,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/salesforce"
+	"github.com/bruin-data/bruin/pkg/sftp"
 	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/slack"
 	"github.com/bruin-data/bruin/pkg/smartsheet"
@@ -121,6 +122,7 @@ type Manager struct {
 	Solidgate       map[string]*solidgate.Client
 	Smartsheet      map[string]*smartsheet.Client
 	Attio           map[string]*attio.Client
+	Sftp            map[string]*sftp.Client
 	mutex           sync.Mutex
 }
 
@@ -442,6 +444,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connAttio, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Attio)...)
+
+	connSftp, err := m.GetSftpConnectionWithoutDefault(name)
+	if err == nil {
+		return connSftp, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Sftp)...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -832,6 +840,26 @@ func (m *Manager) GetAttioConnectionWithoutDefault(name string) (*attio.Client, 
 		return nil, errors.Errorf("attio connection not found for '%s'", name)
 	}
 
+	return db, nil
+}
+
+func (m *Manager) GetSftpConnection(name string) (*sftp.Client, error) {
+	db, err := m.GetSftpConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+
+	return m.GetSftpConnectionWithoutDefault("sftp-default")
+}
+
+func (m *Manager) GetSftpConnectionWithoutDefault(name string) (*sftp.Client, error) {
+	if m.Sftp == nil {
+		return nil, errors.New("no sftp connections found")
+	}
+	db, ok := m.Sftp[name]
+	if !ok {
+		return nil, errors.Errorf("sftp connection not found for '%s'", name)
+	}
 	return db, nil
 }
 
@@ -2160,6 +2188,29 @@ func (m *Manager) AddSmartsheetConnectionFromConfig(connection *config.Smartshee
 	return nil
 }
 
+func (m *Manager) AddSftpConnectionFromConfig(connection *config.SFTPConnection) error {
+	m.mutex.Lock()
+	if m.Sftp == nil {
+		m.Sftp = make(map[string]*sftp.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := sftp.NewClient(sftp.Config{
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Username: connection.Username,
+		Password: connection.Password,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Sftp[connection.Name] = client
+
+	return nil
+}
+
 func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnection) error {
 	m.mutex.Lock()
 	if m.Kafka == nil {
@@ -2930,6 +2981,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Solidgate, connectionManager.AddSolidgateConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Smartsheet, connectionManager.AddSmartsheetConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Attio, connectionManager.AddAttioConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Sftp, connectionManager.AddSftpConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }

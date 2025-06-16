@@ -29,6 +29,9 @@ FROM dataset.players
 GROUP BY 1
 ```
 
+> [!INFO]
+> Non-blocking checks are useful for long-running or expensive quality checks. It means the downstream assets will not be waiting for this quality check to finish.
+
 There are a few fields to configure the check behavior:
 - `name`: required, give a name to the check.
 - `query`: required, the query to run as the quality check
@@ -81,7 +84,6 @@ SELECT name, count(*)
 FROM dataset.players
 GROUP BY 1
 ```
-
 > [!INFO]
 > Non-blocking checks are useful for long-running or expensive quality checks. It means the downstream assets will not be waiting for this quality check to finish.
 

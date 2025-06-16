@@ -191,8 +191,6 @@ type CustomCheck struct {
 }
 
 func NewCustomCheck(conn connectionFetcher, renderer jinja.RendererInterface) *CustomCheck {
-	// TODO: this needs to use an actual renderer instead of the yesterday, since this `NewRendererWithYesterday` does not honor
-	// the parameters passed to the `bruin run` command.
 	return &CustomCheck{conn: conn, renderer: renderer}
 }
 
