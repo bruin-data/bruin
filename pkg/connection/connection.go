@@ -2,9 +2,11 @@ package connection
 
 import (
 	"context"
+	"maps"
 	"os"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 
@@ -65,7 +67,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/zendesk"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc"
-	"golang.org/x/exp/maps"
 )
 
 type Manager struct {
@@ -134,322 +135,322 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	if err == nil {
 		return connBigQuery, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.BigQuery)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.BigQuery))...)
 
 	connSnowflake, err := m.GetSfConnectionWithoutDefault(name)
 	if err == nil {
 		return connSnowflake, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Snowflake)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Snowflake))...)
 
 	connPostgres, err := m.GetPgConnectionWithoutDefault(name)
 	if err == nil {
 		return connPostgres, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Postgres)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Postgres))...)
 
 	connMSSql, err := m.GetMsConnectionWithoutDefault(name)
 	if err == nil {
 		return connMSSql, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.MsSQL)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.MsSQL))...)
 
 	connDatabricks, err := m.GetDatabricksConnectionWithoutDefault(name)
 	if err == nil {
 		return connDatabricks, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Databricks)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Databricks))...)
 
 	connMongo, err := m.GetMongoConnectionWithoutDefault(name)
 	if err == nil {
 		return connMongo, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Mongo)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Mongo))...)
 
 	connMysql, err := m.GetMySQLConnectionWithoutDefault(name)
 	if err == nil {
 		return connMysql, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Mysql)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Mysql))...)
 
 	connNotion, err := m.GetNotionConnectionWithoutDefault(name)
 	if err == nil {
 		return connNotion, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Notion)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Notion))...)
 
 	connHANA, err := m.GetHANAConnectionWithoutDefault(name)
 	if err == nil {
 		return connHANA, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.HANA)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.HANA))...)
 
 	connShopify, err := m.GetShopifyConnectionWithoutDefault(name)
 	if err == nil {
 		return connShopify, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Shopify)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Shopify))...)
 
 	connGorgias, err := m.GetGorgiasConnectionWithoutDefault(name)
 	if err == nil {
 		return connGorgias, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Gorgias)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Gorgias))...)
 
 	connKlaviyo, err := m.GetKlaviyoConnectionWithoutDefault(name)
 	if err == nil {
 		return connKlaviyo, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Klaviyo)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Klaviyo))...)
 
 	connAdjust, err := m.GetAdjustConnectionWithoutDefault(name)
 	if err == nil {
 		return connAdjust, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Adjust)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Adjust))...)
 
 	athenaConnection, err := m.GetAthenaConnectionWithoutDefault(name)
 	if err == nil {
 		return athenaConnection, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Athena)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Athena))...)
 
 	connFacebookAds, err := m.GetFacebookAdsConnectionWithoutDefault(name)
 	if err == nil {
 		return connFacebookAds, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.FacebookAds)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.FacebookAds))...)
 
 	connStripe, err := m.GetStripeConnectionWithoutDefault(name)
 	if err == nil {
 		return connStripe, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Stripe)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Stripe))...)
 
 	connAppsflyer, err := m.GetAppsflyerConnectionWithoutDefault(name)
 	if err == nil {
 		return connAppsflyer, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Appsflyer)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Appsflyer))...)
 
 	connKafka, err := m.GetKafkaConnectionWithoutDefault(name)
 	if err == nil {
 		return connKafka, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Kafka)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Kafka))...)
 
 	connDuckDB, err := m.GetDuckDBConnectionWithoutDefault(name)
 	if err == nil {
 		return connDuckDB, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.DuckDB)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.DuckDB))...)
 
 	connClickHouse, err := m.GetClickHouseConnectionWithoutDefault(name)
 	if err == nil {
 		return connClickHouse, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.ClickHouse)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.ClickHouse))...)
 
 	connHubspot, err := m.GetHubspotConnectionWithoutDefault(name)
 	if err == nil {
 		return connHubspot, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Hubspot)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Hubspot))...)
 
 	connGoogleSheets, err := m.GetGoogleSheetsConnectionWithoutDefault(name)
 	if err == nil {
 		return connGoogleSheets, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GoogleSheets)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.GoogleSheets))...)
 
 	connChess, err := m.GetChessConnectionWithoutDefault(name)
 	if err == nil {
 		return connChess, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Chess)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Chess))...)
 
 	connAirtable, err := m.GetAirtableConnectionWithoutDefault(name)
 	if err == nil {
 		return connAirtable, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Airtable)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Airtable))...)
 
 	connS3, err := m.GetS3ConnectionWithoutDefault(name)
 	if err == nil {
 		return connS3, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.S3)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.S3))...)
 
 	connSlack, err := m.GetSlackConnectionWithoutDefault(name)
 	if err == nil {
 		return connSlack, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Slack)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Slack))...)
 
 	connAsana, err := m.GetAsanaConnectionWithoutDefault(name)
 	if err == nil {
 		return connAsana, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Asana)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Asana))...)
 
 	connDynamoDB, err := m.GetDynamoDBConnectionWithoutDefault(name)
 	if err == nil {
 		return connDynamoDB, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.DynamoDB)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.DynamoDB))...)
 
 	connZendesk, err := m.GetZendeskConnectionWithoutDefault(name)
 	if err == nil {
 		return connZendesk, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Zendesk)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Zendesk))...)
 
 	connGoogleAds, err := m.GetGoogleAdsConnectionWithoutDefault(name)
 	if err == nil {
 		return connGoogleAds, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GoogleAds)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.GoogleAds))...)
 	connTikTokAds, err := m.GetTikTokAdsConnectionWithoutDefault(name)
 	if err == nil {
 		return connTikTokAds, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.TikTokAds)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.TikTokAds))...)
 
 	connGitHub, err := m.GetGitHubConnectionWithoutDefault(name)
 	if err == nil {
 		return connGitHub, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GitHub)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.GitHub))...)
 
 	connAppStore, err := m.GetAppStoreConnectionWithoutDefault(name)
 	if err == nil {
 		return connAppStore, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.AppStore)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.AppStore))...)
 
 	connLinkedInAds, err := m.GetLinkedInAdsConnectionWithoutDefault(name)
 	if err == nil {
 		return connLinkedInAds, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.LinkedInAds)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.LinkedInAds))...)
 
 	connApplovinMax, err := m.GetApplovinMaxConnectionWithoutDefault(name)
 	if err == nil {
 		return connApplovinMax, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.ApplovinMax)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.ApplovinMax))...)
 
 	connPersonio, err := m.GetPersonioConnectionWithoutDefault(name)
 	if err == nil {
 		return connPersonio, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Personio)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Personio))...)
 
 	connGCS, err := m.GetGCSConnectionWithoutDefault(name)
 	if err == nil {
 		return connGCS, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GCS)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.GCS))...)
 
 	connKinesis, err := m.GetKinesisConnectionWithoutDefault(name)
 	if err == nil {
 		return connKinesis, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Kinesis)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Kinesis))...)
 
 	connPipedrive, err := m.GetPipedriveConnectionWithoutDefault(name)
 	if err == nil {
 		return connPipedrive, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Pipedrive)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Pipedrive))...)
 
 	connEMRServerless, err := m.GetEMRServerlessConnectionWithoutDefault(name)
 	if err == nil {
 		return connEMRServerless, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.EMRSeverless)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.EMRSeverless))...)
 
 	connGoogleAnalytics, err := m.GetGoogleAnalyticsConnectionWithoutDefault(name)
 	if err == nil {
 		return connGoogleAnalytics, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.GoogleAnalytics)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.GoogleAnalytics))...)
 
 	connAppLovin, err := m.GetAppLovinConnectionWithoutDefault(name)
 	if err == nil {
 		return connAppLovin, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.AppLovin)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.AppLovin))...)
 
 	connFrankfurter, err := m.GetFrankfurterConnectionWithoutDefault(name)
 	if err == nil {
 		return connFrankfurter, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Frankfurter)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Frankfurter))...)
 	connSalesforce, err := m.GetSalesforceConnectionWithoutDefault(name)
 	if err == nil {
 		return connSalesforce, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Salesforce)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Salesforce))...)
 	connSQLite, err := m.GetSQLiteConnectionWithoutDefault(name)
 	if err == nil {
 		return connSQLite, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.SQLite)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.SQLite))...)
 
 	connDB2, err := m.GetDB2ConnectionWithoutDefault(name)
 	if err == nil {
 		return connDB2, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.DB2)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.DB2))...)
 
 	connOracle, err := m.GetOracleConnectionWithoutDefault(name)
 	if err == nil {
 		return connOracle, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Oracle)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Oracle))...)
 
 	connPhantombuster, err := m.GetPhantombusterConnectionWithoutDefault(name)
 	if err == nil {
 		return connPhantombuster, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Phantombuster)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Phantombuster))...)
 
 	connElasticsearch, err := m.GetElasticsearchConnectionWithoutDefault(name)
 	if err == nil {
 		return connElasticsearch, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Elasticsearch)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Elasticsearch))...)
 
 	connSpanner, err := m.GetSpannerConnectionWithoutDefault(name)
 	if err == nil {
 		return connSpanner, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Spanner)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Spanner))...)
 
 	connSolidgate, err := m.GetSolidgateConnectionWithoutDefault(name)
 	if err == nil {
 		return connSolidgate, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Solidgate)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Solidgate))...)
 
 	connSmartsheet, err := m.GetSmartsheetConnectionWithoutDefault(name)
 	if err == nil {
 		return connSmartsheet, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Smartsheet)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Smartsheet))...)
 
 	connAttio, err := m.GetAttioConnectionWithoutDefault(name)
 	if err == nil {
 		return connAttio, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Attio)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Attio))...)
 
 	connSftp, err := m.GetSftpConnectionWithoutDefault(name)
 	if err == nil {
 		return connSftp, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Sftp)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Sftp))...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
