@@ -450,7 +450,7 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	if err == nil {
 		return connSftp, nil
 	}
-	availableConnectionNames = append(availableConnectionNames, maps.Keys(m.Sftp)...)
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Sftp))...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
