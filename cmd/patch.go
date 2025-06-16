@@ -57,11 +57,35 @@ func updateAssetDependencies(ctx context.Context, asset *pipeline.Asset, p *pipe
 }
 
 // Returns: status ("updated", "skipped", "failed").
-func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string) (string, error) {
-	_, conn, err := getConnectionFromPipelineInfo(pp, environment)
-	if err != nil {
-		return fillStatusFailed, fmt.Errorf("failed to get connection for asset '%s': %w", pp.Asset.Name, err)
+func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager interface{}) (string, error) {
+	var conn interface{}
+	var err error
+
+	//
+	if manager != nil {
+		managerInterface, ok := manager.(interface {
+			GetConnection(name string) (interface{}, error)
+		})
+		if !ok {
+			return fillStatusFailed, errors.New("manager does not implement GetConnection")
+		}
+
+		connName, err := pp.Pipeline.GetConnectionNameForAsset(pp.Asset)
+		if err != nil {
+			return fillStatusFailed, err
+		}
+
+		conn, err = managerInterface.GetConnection(connName)
+		if err != nil {
+			return fillStatusFailed, fmt.Errorf("failed to get connection for asset '%s': %w", pp.Asset.Name, err)
+		}
+	} else {
+		_, conn, err = getConnectionFromPipelineInfo(pp, environment)
+		if err != nil {
+			return fillStatusFailed, fmt.Errorf("failed to get connection for asset '%s': %w", pp.Asset.Name, err)
+		}
 	}
+
 	querier, ok := conn.(interface {
 		SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
 	})
@@ -69,7 +93,7 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string) (string, err
 		return fillStatusFailed, fmt.Errorf("connection for asset '%s' does not support schema introspection", pp.Asset.Name)
 	}
 	tableName := pp.Asset.Name
-	queryStr := fmt.Sprintf("SELECT * FROM %s LIMIT 0", tableName)
+	queryStr := fmt.Sprintf("SELECT * FROM %s WHERE 1=0", tableName)
 	q := &query.Query{Query: queryStr}
 	result, err := querier.SelectWithSchema(context.Background(), q)
 	if err != nil {
@@ -247,15 +271,16 @@ func Patch() *cli.Command {
 
 						for _, asset := range foundPipeline.Assets {
 							pp := &ppInfo{Pipeline: foundPipeline, Asset: asset, Config: cm}
-							status, err := fillColumnsFromDB(pp, afero.NewOsFs(), "")
+							status, err := fillColumnsFromDB(pp, afero.NewOsFs(), "", nil)
 							processedAssets++
+							assetName := asset.Name
 							switch status {
 							case fillStatusUpdated:
-								updatedAssets = append(updatedAssets, asset.Name)
+								updatedAssets = append(updatedAssets, assetName)
 							case fillStatusSkipped:
-								skippedAssets = append(skippedAssets, asset.Name)
+								skippedAssets = append(skippedAssets, assetName)
 							case fillStatusFailed:
-								failedAssets[asset.Name] = err
+								failedAssets[assetName] = err
 							}
 						}
 
@@ -345,24 +370,20 @@ func Patch() *cli.Command {
 							printErrorForOutput(output, err)
 							return cli.Exit("", 1)
 						}
-						status, err := fillColumnsFromDB(pp, fs, environment)
+						status, err := fillColumnsFromDB(pp, fs, environment, nil)
 						if err != nil {
 							printErrorForOutput(output, fmt.Errorf("failed to fill columns from DB for asset '%s': %w", pp.Asset.Name, err))
 							return cli.Exit("", 1)
 						}
-						if output == "json" {
-							fmt.Printf(`{"status": "%s", "asset Name": "%s'"}\n`, status, pp.Asset.Name)
-							return nil
-						}
 						switch status {
 						case fillStatusUpdated:
-							successPrinter.Printf("Columns filled from DB for asset '%s'\n", pp.Asset.Name)
+							printSuccessForOutput(output, fmt.Sprintf("Columns filled from DB for asset '%s'", pp.Asset.Name))
 							return nil
 						case fillStatusSkipped:
-							warningPrinter.Printf("No changes needed for asset '%s'\n", pp.Asset.Name)
+							printWarningForOutput(output, fmt.Sprintf("No changes needed for asset '%s'", pp.Asset.Name))
 							return nil
 						case fillStatusFailed:
-							errorPrinter.Printf("Failed to fill columns from DB for asset '%s'\n", pp.Asset.Name)
+							printErrorForOutput(output, fmt.Errorf("failed to fill columns from DB for asset '%s'", pp.Asset.Name))
 							return cli.Exit("", 1)
 						}
 						return nil
@@ -386,40 +407,52 @@ func Patch() *cli.Command {
 						}
 						updatedAssets := []string{}
 						skippedAssets := []string{}
-						failedAssets := map[string]error{}
+						failedAssets := []string{}
+						failedAssetErrors := map[string]error{}
 						processedAssets := 0
 
 						for _, asset := range foundPipeline.Assets {
 							pp := &ppInfo{Pipeline: foundPipeline, Asset: asset, Config: cm}
-							status, err := fillColumnsFromDB(pp, fs, environment)
+							status, err := fillColumnsFromDB(pp, fs, environment, nil)
 							processedAssets++
+							assetName := asset.Name
 							switch status {
 							case fillStatusUpdated:
-								updatedAssets = append(updatedAssets, asset.Name)
+								updatedAssets = append(updatedAssets, assetName)
 							case fillStatusSkipped:
-								skippedAssets = append(skippedAssets, asset.Name)
+								skippedAssets = append(skippedAssets, assetName)
 							case fillStatusFailed:
-								failedAssets[asset.Name] = err
+								failedAssets = append(failedAssets, assetName)
+								failedAssetErrors[assetName] = err
 							}
 						}
 
-						if output == "json" {
-							status := "success"
-							if len(failedAssets) > 0 {
-								status = "partial"
-								if len(updatedAssets) == 0 {
-									status = "failed"
-								}
-							} else if len(updatedAssets) == 0 {
-								status = "skipped"
-							}
+						status := "success"
+						switch {
+						case len(failedAssets) > 0 && len(updatedAssets) == 0:
+							status = "failed"
+						case len(failedAssets) > 0:
+							status = "partial"
+						case len(updatedAssets) == 0:
+							status = "skipped"
+						}
 
+						summaryMsg := fmt.Sprintf(
+							"Processed %d assets: %d updated, %d required no changes, %d failed.",
+							processedAssets, len(updatedAssets), len(skippedAssets), len(failedAssets),
+						)
+
+						if output == "json" {
 							resp := map[string]interface{}{
-								"status":           status,
-								"skipped_assets":   len(skippedAssets),
-								"updated_assets":   len(updatedAssets),
-								"failed_assets":    len(failedAssets),
-								"processed_assets": processedAssets,
+								"status":              status,
+								"updated_assets":      len(updatedAssets),
+								"skipped_assets":      len(skippedAssets),
+								"failed_assets":       len(failedAssets),
+								"processed_assets":    processedAssets,
+								"updated_asset_names": updatedAssets,
+								"skipped_asset_names": skippedAssets,
+								"failed_asset_names":  failedAssets,
+								"message":             summaryMsg,
 							}
 							jsonResp, _ := json.Marshal(resp)
 							fmt.Println(string(jsonResp))
@@ -429,56 +462,16 @@ func Patch() *cli.Command {
 							return nil
 						}
 
-						status := "success"
-						if len(failedAssets) > 0 {
-							status = "partial"
-							if len(updatedAssets) == 0 {
-								status = "failed"
-							}
-						} else if len(updatedAssets) == 0 {
-							status = "skipped"
-						}
-
+						// Plain output
 						switch status {
 						case "failed":
-							errorPrinter.Printf("Failed to fill columns from DB for %d assets:\n", len(failedAssets))
-							for assetName, _ := range failedAssets {
-								errorPrinter.Printf("- '%s'\n", assetName)
-							}
-							if len(skippedAssets) > 0 {
-								warningPrinter.Printf("\n No changes required for %d assets:\n", len(skippedAssets))
-								for _, name := range skippedAssets {
-									warningPrinter.Printf("- %s\n", name)
-								}
-							}
+							errorPrinter.Printf("%s\n", summaryMsg)
 							return cli.Exit("", 1)
 						case "skipped":
-							warningPrinter.Printf("No changes needed for pipeline '%s': %d assets skipped\n", foundPipeline.Name, len(skippedAssets))
+							warningPrinter.Printf("%s\n", summaryMsg)
 							return nil
-						case "success":
-							successPrinter.Printf("Successfully updated all %d assets in pipeline '%s'\n", len(updatedAssets), foundPipeline.Name)
-
-							return nil
-						case "partial":
-							successPrinter.Printf("Partially updated pipeline '%s':\n", foundPipeline.Name)
-							if len(updatedAssets) > 0 {
-								successPrinter.Printf("Successfully updated %d assets:\n", len(updatedAssets))
-								for _, name := range updatedAssets {
-									successPrinter.Printf("- %s\n", name)
-								}
-							}
-							if len(skippedAssets) > 0 {
-								warningPrinter.Printf("\nSkipped %d assets:\n", len(skippedAssets))
-								for _, name := range skippedAssets {
-									warningPrinter.Printf("- %s\n", name)
-								}
-							}
-							if len(failedAssets) > 0 {
-								errorPrinter.Printf("\nFailed to update %d assets:\n", len(failedAssets))
-								for assetName, err := range failedAssets {
-									errorPrinter.Printf("- '%s': %s\n", assetName, err)
-								}
-							}
+						case "success", "partial":
+							successPrinter.Printf("%s\n", summaryMsg)
 							return nil
 						}
 						return nil

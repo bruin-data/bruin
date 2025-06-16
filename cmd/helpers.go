@@ -23,6 +23,16 @@ type ErrorResponses struct {
 	Error []string `json:"error"`
 }
 
+type SuccessResponse struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
+}
+
+type WarningResponse struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
+}
+
 func switchEnvironment(env string, force bool, cm *config.Config, stdin io.ReadCloser) error {
 	if env == "" {
 		return nil
@@ -113,10 +123,45 @@ func printError(err error, output string, message string) {
 	}
 }
 
+
 func NewRunID() string {
 	runID := time.Now().Format("2006_01_02_15_04_05")
 	if os.Getenv("BRUIN_RUN_ID") != "" {
 		runID = os.Getenv("BRUIN_RUN_ID")
 	}
 	return runID
+}
+
+func printSuccessForOutput(output string, message string) {
+	if output == "json" {
+		successResponse := SuccessResponse{
+			Status:  "success",
+			Message: message,
+		}
+		jsonData, err := json.Marshal(successResponse)
+		if err != nil {
+			fmt.Println("Error:", err.Error())
+			return
+		}
+		fmt.Println(string(jsonData))
+	} else {
+		successPrinter.Printf("%s\n", message)
+	}
+}
+
+func printWarningForOutput(output string, message string) {
+	if output == "json" {
+		warningResponse := WarningResponse{
+			Status:  "warning",
+			Message: message,
+		}
+		jsonData, err := json.Marshal(warningResponse)
+		if err != nil {
+			fmt.Println("Error:", err.Error())
+			return
+		}
+		fmt.Println(string(jsonData))
+	} else {
+		warningPrinter.Printf("%s\n", message)
+	}
 }
