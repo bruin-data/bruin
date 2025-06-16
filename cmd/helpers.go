@@ -123,7 +123,6 @@ func printError(err error, output string, message string) {
 	}
 }
 
-
 func NewRunID() string {
 	runID := time.Now().Format("2006_01_02_15_04_05")
 	if os.Getenv("BRUIN_RUN_ID") != "" {
