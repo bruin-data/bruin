@@ -95,7 +95,7 @@ func NewLinter(findPipelines pipelineFinder, builder pipelineBuilder, rules []Ru
 }
 
 func (l *Linter) Lint(ctx context.Context, rootPath string, pipelineDefinitionFileName []string, c *cli.Context) (*PipelineAnalysisResult, error) {
-	pipelines, err := l.extractPipelinesFromPath(rootPath, pipelineDefinitionFileName)
+	pipelines, err := l.extractPipelinesFromPath(ctx, rootPath, pipelineDefinitionFileName)
 
 	excludeTag := ""
 	if c != nil {
@@ -137,7 +137,7 @@ func (l *Linter) Lint(ctx context.Context, rootPath string, pipelineDefinitionFi
 }
 
 func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinitionFileName []string, assetNameOrPath string, c *cli.Context) (*PipelineAnalysisResult, error) {
-	pipelines, err := l.extractPipelinesFromPath(rootPath, pipelineDefinitionFileName)
+	pipelines, err := l.extractPipelinesFromPath(ctx, rootPath, pipelineDefinitionFileName)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +218,7 @@ func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinit
 	}, nil
 }
 
-func (l *Linter) extractPipelinesFromPath(rootPath string, pipelineDefinitionFileName []string) ([]*pipeline.Pipeline, error) {
+func (l *Linter) extractPipelinesFromPath(ctx context.Context, rootPath string, pipelineDefinitionFileName []string) ([]*pipeline.Pipeline, error) {
 	pipelinePaths, err := l.findPipelines(rootPath, pipelineDefinitionFileName)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -245,7 +245,7 @@ func (l *Linter) extractPipelinesFromPath(rootPath string, pipelineDefinitionFil
 	for _, pipelinePath := range pipelinePaths {
 		l.logger.Debugf("creating pipeline from path '%s'", pipelinePath)
 
-		p, err := l.builder.CreatePipelineFromPath(context.Background(), pipelinePath, pipeline.WithMutate())
+		p, err := l.builder.CreatePipelineFromPath(ctx, pipelinePath, pipeline.WithMutate())
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating pipeline from path '%s'", pipelinePath)
 		}

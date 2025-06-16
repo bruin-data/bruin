@@ -154,7 +154,7 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 	return issues, nil
 }
 
-func (q *QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.Asset, done chan<- []*Issue) {
+func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipeline, task *pipeline.Asset, done chan<- []*Issue) {
 	issues := make([]*Issue, 0)
 
 	q.Logger.Debugf("validating pipeline '%s' task '%s'", p.Name, task.Name)
@@ -255,7 +255,7 @@ func (q *QueryValidatorRule) validateTask(p *pipeline.Pipeline, task *pipeline.A
 
 				return
 			}
-			valid, err := valll.IsValid(context.Background(), foundQuery)
+			valid, err := valll.IsValid(ctx, foundQuery)
 			if err != nil {
 				mu.Lock()
 				issues = append(issues, &Issue{
@@ -312,7 +312,7 @@ func (q *QueryValidatorRule) Validate(ctx context.Context, p *pipeline.Pipeline)
 	for range q.WorkerCount {
 		go func(taskChannel <-chan *pipeline.Asset, results chan<- []*Issue) {
 			for task := range taskChannel {
-				q.validateTask(p, task, results)
+				q.validateTask(ctx, p, task, results)
 			}
 		}(taskChannel, results)
 	}
