@@ -175,14 +175,13 @@ func Lint(isDebug *bool) *cli.Command {
 			rules = append(rules, queryValidatorRules(logger, cm, connectionManager)...)
 			rules = append(rules, lint.GetCustomCheckQueryDryRunRule(connectionManager))
 
-
 			if c.Bool("fast") {
 				rules = lint.FilterRulesBySpeed(rules, true)
 				logger.Debugf("filtered to %d fast rules", len(rules))
 			} else {
 				logger.Debugf("successfully loaded %d rules", len(rules))
 			}
-      
+
 			lintCtx := context.Background()
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigStartDate, defaultStartDate)
 			lintCtx = context.WithValue(lintCtx, pipeline.RunConfigEndDate, defaultEndDate)
