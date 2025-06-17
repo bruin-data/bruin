@@ -93,7 +93,7 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager inte
 		return fillStatusFailed, fmt.Errorf("connection for asset '%s' does not support schema introspection", pp.Asset.Name)
 	}
 	tableName := pp.Asset.Name
-	queryStr := fmt.Sprintf("SELECT * FROM %s WHERE 1=0", tableName)
+	queryStr := fmt.Sprintf("SELECT * FROM %s WHERE 1=0 LIMIT 0", tableName)
 	q := &query.Query{Query: queryStr}
 	result, err := querier.SelectWithSchema(context.Background(), q)
 	if err != nil {
