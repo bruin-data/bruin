@@ -44,6 +44,11 @@ func (m *mockExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipeline,
 	return m.Called(ctx, p, t).Get(0).(query.QueryExtractor)
 }
 
+func (m *mockExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
+	res := m.Called(content)
+	return res.Get(0).([]string), res.Error(1)
+}
+
 type mockMaterializer struct {
 	mock.Mock
 }
@@ -113,6 +118,8 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 				},
 			},
 			setup: func(f *fields) {
+				// Mock CloneForAsset to return the extractor itself
+				f.extractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).Return(f.extractor)
 				f.extractor.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{}, errors.New("something failed"))
 			},
@@ -147,6 +154,7 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 				},
 			},
 			setup: func(f *fields) {
+				f.extractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).Return(f.extractor)
 				f.extractor.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{}, nil)
 			},
@@ -190,6 +198,9 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 				},
 			},
 			setup: func(f *fields) {
+				// Mock CloneForAsset for both assets
+				f.extractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).Return(f.extractor)
+
 				f.extractor.On("ExtractQueriesFromString", "content1").
 					Return(
 						[]*query.Query{
@@ -241,6 +252,9 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 				},
 			},
 			setup: func(f *fields) {
+				// Mock CloneForAsset for both assets
+				f.extractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).Return(f.extractor)
+
 				f.extractor.On("ExtractQueriesFromString", "content1").
 					Return(
 						[]*query.Query{
