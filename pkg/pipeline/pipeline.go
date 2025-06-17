@@ -1636,15 +1636,15 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 			return nil, err
 		}
 
+		if task == nil {
+			continue
+		}
+
 		if config.isMutate {
 			task, err = b.MutateAsset(ctx, task, pipeline)
 			if err != nil {
 				return nil, err
 			}
-		}
-
-		if task == nil {
-			continue
 		}
 
 		task.upstream = make([]*Asset, 0)
