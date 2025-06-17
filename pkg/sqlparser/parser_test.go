@@ -17,6 +17,13 @@ func TestGetLineageForRunner(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, lineage.Start())
 
+	// Create a long query by appending a fixed string multiple times
+	baseQuery := `SELECT * FROM (SELECT * FROM table1) t1 JOIN (SELECT * FROM table2) t2`
+	longQuery := baseQuery
+	for range [100]int{} {
+		longQuery += " UNION ALL " + baseQuery // Linear growth
+	}
+
 	tests := []struct {
 		name    string
 		sql     string
@@ -25,6 +32,15 @@ func TestGetLineageForRunner(t *testing.T) {
 		want    *Lineage
 		wantErr bool
 	}{
+		{
+			name: "long query",
+			sql:  longQuery,
+			want: &Lineage{
+				Columns:            nil,
+				NonSelectedColumns: nil,
+				Errors:             []string{"query is too long skipping column lineage analysis"},
+			},
+		},
 		{
 			name: "nested subqueries",
 			sql: `
