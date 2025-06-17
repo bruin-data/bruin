@@ -84,6 +84,11 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return errors.New("source table not configured")
 	}
 
+	fileType, ok := asset.Parameters["file_type"]
+	if ok {
+		sourceTable = sourceTable + "#" + fileType
+	}
+
 	destConnectionName, err := ti.GetPipeline().GetConnectionNameForAsset(asset)
 	if err != nil {
 		return err
