@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -135,6 +136,17 @@ func splitQueries(fileContent string) []*Query {
 	}
 
 	return queries
+}
+
+func (f *FileQuerySplitterExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) QueryExtractor {
+	return &FileQuerySplitterExtractor{
+		Renderer: f.Renderer.CloneForAsset(ctx, p, t),
+		Fs:       f.Fs,
+	}
+}
+
+func (f *FileQuerySplitterExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 // WholeFileExtractor is a regular file extractor that returns the whole file content as the query string. It is useful
