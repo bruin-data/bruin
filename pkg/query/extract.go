@@ -137,6 +137,17 @@ func splitQueries(fileContent string) []*Query {
 	return queries
 }
 
+func (f FileQuerySplitterExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) QueryExtractor {
+	return &FileQuerySplitterExtractor{
+		Renderer: f.Renderer.CloneForAsset(ctx, p, t),
+		Fs:       f.Fs,
+	}
+}
+
+func (f FileQuerySplitterExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
 // WholeFileExtractor is a regular file extractor that returns the whole file content as the query string. It is useful
 // for cases where the whole file content can be treated as a single query, such as validating GoogleCloudPlatform queries via dry-run.
 type WholeFileExtractor struct {
