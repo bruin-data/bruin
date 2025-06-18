@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	fs2 "io/fs"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -142,14 +141,7 @@ func Init() *cli.Command {
 		),
 		Flags: []cli.Flag{},
 		Action: func(c *cli.Context) error {
-			defer func() {
-				if err := recover(); err != nil {
-					log.Println("=======================================")
-					log.Println("Bruin encountered an unexpected error, please report the issue to the Bruin team.")
-					log.Println(err)
-					log.Println("=======================================")
-				}
-			}()
+			defer RecoverFromPanic()
 
 			templateName := c.Args().Get(0)
 			if len(templateName) == 0 {
