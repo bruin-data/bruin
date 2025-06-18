@@ -596,6 +596,7 @@ func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePa
 		errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
 		return err
 	}
+	rules = append(rules, SeedAssetsValidator)
 
 	rules = lint.FilterRulesBySpeed(rules, true)
 
