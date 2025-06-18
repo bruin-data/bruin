@@ -164,7 +164,6 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager inte
 	return fillStatusUpdated, nil
 }
 
-
 func Patch() *cli.Command {
 	return &cli.Command{
 		Name:      "patch",
@@ -331,12 +330,12 @@ func Patch() *cli.Command {
 					if inputPath == "" {
 						return errors.New("please provide a path to an asset or a pipeline")
 					}
-			
+
 					output := c.String("output")
 					environment := c.String("environment")
 					fs := afero.NewOsFs()
 					ctx := context.Background()
-			
+
 					if isPathReferencingAsset(inputPath) { //nolint:nestif
 						// Single asset
 						pp, err := GetPipelineAndAsset(ctx, inputPath, fs, "")
@@ -384,7 +383,7 @@ func Patch() *cli.Command {
 						failedAssets := []string{}
 						failedAssetErrors := map[string]error{}
 						processedAssets := 0
-			
+
 						for _, asset := range foundPipeline.Assets {
 							pp := &ppInfo{Pipeline: foundPipeline, Asset: asset, Config: cm}
 							status, err := fillColumnsFromDB(pp, fs, environment, nil)
@@ -400,7 +399,7 @@ func Patch() *cli.Command {
 								failedAssetErrors[assetName] = err
 							}
 						}
-			
+
 						status := "success"
 						switch {
 						case len(failedAssets) > 0 && len(updatedAssets) == 0:
@@ -410,12 +409,12 @@ func Patch() *cli.Command {
 						case len(updatedAssets) == 0:
 							status = "skipped"
 						}
-			
+
 						summaryMsg := fmt.Sprintf(
 							"Processed %d assets: %d updated, %d required no changes, %d failed.",
 							processedAssets, len(updatedAssets), len(skippedAssets), len(failedAssets),
 						)
-			
+
 						if output == "json" {
 							resp := map[string]interface{}{
 								"status":              status,
@@ -435,7 +434,7 @@ func Patch() *cli.Command {
 							}
 							return nil
 						}
-			
+
 						// Plain output
 						switch status {
 						case "failed":
