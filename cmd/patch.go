@@ -164,6 +164,7 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager inte
 	return fillStatusUpdated, nil
 }
 
+
 func Patch() *cli.Command {
 	return &cli.Command{
 		Name:      "patch",
@@ -252,35 +253,16 @@ func Patch() *cli.Command {
 							return cli.Exit("", 1)
 						}
 
-						// Load config once for the pipeline
-						repoRoot, err := git.FindRepoFromPath(pipelinePath)
-						if err != nil {
-							printErrorForOutput(output, fmt.Errorf("failed to find the git repository root: %w", err))
-							return cli.Exit("", 1)
-						}
-						cm, err := config.LoadOrCreate(afero.NewOsFs(), filepath.Join(repoRoot.Path, ".bruin.yml"))
-						if err != nil {
-							printErrorForOutput(output, fmt.Errorf("failed to load the config file: %w", err))
-							return cli.Exit("", 1)
-						}
-
-						updatedAssets := []string{}
-						skippedAssets := []string{}
-						failedAssets := map[string]error{}
+						failedAssets := make(map[string]error)
 						processedAssets := 0
-
+						successfulAssets := 0
 						for _, asset := range foundPipeline.Assets {
-							pp := &ppInfo{Pipeline: foundPipeline, Asset: asset, Config: cm}
-							status, err := fillColumnsFromDB(pp, afero.NewOsFs(), "", nil)
 							processedAssets++
-							assetName := asset.Name
-							switch status {
-							case fillStatusUpdated:
-								updatedAssets = append(updatedAssets, assetName)
-							case fillStatusSkipped:
-								skippedAssets = append(skippedAssets, assetName)
-							case fillStatusFailed:
-								failedAssets[assetName] = err
+							err := updateAssetDependencies(ctx, asset, foundPipeline, sqlParserInstance, jinjaRenderer)
+							if err != nil {
+								failedAssets[asset.Name] = err
+							} else {
+								successfulAssets++
 							}
 						}
 
@@ -289,12 +271,12 @@ func Patch() *cli.Command {
 								fmt.Println(`{"status": "success", "message": "Asset dependencies updated successfully"}`)
 								return nil
 							} else {
-								successPrinter.Printf("Successfully updated dependencies for %d assets in pipeline '%s'.\n", len(updatedAssets), foundPipeline.Name)
+								successPrinter.Printf("Successfully updated dependencies for %d assets in pipeline '%s'.\n", successfulAssets, foundPipeline.Name)
 								return nil
 							}
 						}
 
-						if len(updatedAssets) == 0 {
+						if successfulAssets == 0 {
 							printErrorForOutput(output, fmt.Errorf("encountered errors while processing pipeline '%s' with %d assets", foundPipeline.Name, len(failedAssets)))
 							return cli.Exit("", 1)
 						}
@@ -302,8 +284,8 @@ func Patch() *cli.Command {
 						if output == "json" {
 							resp := map[string]interface{}{
 								"status":            "failed",
-								"message":           fmt.Sprintf("Asset dependencies updated successfully for %d assets in pipeline '%s'", len(updatedAssets), foundPipeline.Name),
-								"successful_assets": len(updatedAssets),
+								"message":           fmt.Sprintf("Asset dependencies updated successfully for %d assets in pipeline '%s'", successfulAssets, foundPipeline.Name),
+								"successful_assets": successfulAssets,
 								"failed_assets":     len(failedAssets),
 								"processed_assets":  processedAssets,
 							}
@@ -317,18 +299,10 @@ func Patch() *cli.Command {
 						}
 						errorPrinter.Println("Summary:")
 						errorPrinter.Printf("Processed %d assets in pipeline '%s'\n", processedAssets, foundPipeline.Name)
-						errorPrinter.Printf("Successfully updated dependencies for %d assets\n", len(updatedAssets))
-						if len(skippedAssets) > 0 {
-							errorPrinter.Printf("Skipped %d non-SQL assets:\n", len(skippedAssets))
-							for _, name := range skippedAssets {
-								errorPrinter.Printf("- %s\n", name)
-							}
-						}
-						if len(failedAssets) > 0 {
-							errorPrinter.Printf("Failed to update dependencies for %d assets\n", len(failedAssets))
-							for assetName, err := range failedAssets {
-								errorPrinter.Printf("- '%s': %s\n", assetName, err)
-							}
+						errorPrinter.Printf("Successfully updated dependencies for %d assets\n", successfulAssets)
+						errorPrinter.Printf("Failed to update dependencies for %d assets\n", len(failedAssets))
+						for assetName, err := range failedAssets {
+							errorPrinter.Printf("- '%s': %s\n", assetName, err)
 						}
 
 						return nil
@@ -357,12 +331,12 @@ func Patch() *cli.Command {
 					if inputPath == "" {
 						return errors.New("please provide a path to an asset or a pipeline")
 					}
-
+			
 					output := c.String("output")
 					environment := c.String("environment")
 					fs := afero.NewOsFs()
 					ctx := context.Background()
-
+			
 					if isPathReferencingAsset(inputPath) { //nolint:nestif
 						// Single asset
 						pp, err := GetPipelineAndAsset(ctx, inputPath, fs, "")
@@ -410,7 +384,7 @@ func Patch() *cli.Command {
 						failedAssets := []string{}
 						failedAssetErrors := map[string]error{}
 						processedAssets := 0
-
+			
 						for _, asset := range foundPipeline.Assets {
 							pp := &ppInfo{Pipeline: foundPipeline, Asset: asset, Config: cm}
 							status, err := fillColumnsFromDB(pp, fs, environment, nil)
@@ -426,7 +400,7 @@ func Patch() *cli.Command {
 								failedAssetErrors[assetName] = err
 							}
 						}
-
+			
 						status := "success"
 						switch {
 						case len(failedAssets) > 0 && len(updatedAssets) == 0:
@@ -436,12 +410,12 @@ func Patch() *cli.Command {
 						case len(updatedAssets) == 0:
 							status = "skipped"
 						}
-
+			
 						summaryMsg := fmt.Sprintf(
 							"Processed %d assets: %d updated, %d required no changes, %d failed.",
 							processedAssets, len(updatedAssets), len(skippedAssets), len(failedAssets),
 						)
-
+			
 						if output == "json" {
 							resp := map[string]interface{}{
 								"status":              status,
@@ -461,7 +435,7 @@ func Patch() *cli.Command {
 							}
 							return nil
 						}
-
+			
 						// Plain output
 						switch status {
 						case "failed":
