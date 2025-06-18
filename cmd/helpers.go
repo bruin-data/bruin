@@ -58,7 +58,7 @@ func RecoverFromPanic() {
 		log.Println("Bruin encountered an unexpected error, please report the issue to the Bruin team.")
 		log.Println(err)
 		log.Println("=======================================")
-		os.Exit(-1)
+		os.Exit(1)
 	}
 }
 
