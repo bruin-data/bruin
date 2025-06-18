@@ -10,6 +10,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/glossary"
 	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/lint"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/fatih/color"
 	"github.com/spf13/afero"
@@ -40,6 +41,13 @@ var (
 	}
 
 	DefaultPipelineBuilder = pipeline.NewBuilder(builderConfig, pipeline.CreateTaskFromYamlDefinition(fs), pipeline.CreateTaskFromFileComments(fs), fs, DefaultGlossaryReader)
+	SeedAssetsValidator    = &lint.SimpleRule{
+		Identifier:       "assets-seed-validation",
+		Fast:             true,
+		Severity:         lint.ValidatorSeverityCritical,
+		AssetValidator:   lint.ValidateAssetSeedValidation,
+		ApplicableLevels: []lint.Level{lint.LevelAsset},
+	}
 )
 
 func renderAssetParamsMutator(renderer jinja.RendererInterface) pipeline.AssetMutator {
