@@ -902,7 +902,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Args:    []string{"run", "--env", "env-push-metadata", "--push-metadata", "--only", "push-metadata", filepath.Join(currentFolder, "test-pipelines/push-metadata-pipeline")},
 			Env:     []string{},
 			Expected: e2e.Output{
-				ExitCode: 1,
+				ExitCode: 0,
 				Contains: []string{"Running:  shopify_raw.products:metadata-push", "Running:  shopify_raw.inventory_items:metadata-push"},
 			},
 			Asserts: []func(*e2e.Task) error{
