@@ -11,6 +11,13 @@ import (
 func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs []string) ([]string, error) {
 	if value, exists := asset.Parameters["incremental_key"]; exists && value != "" {
 		cmdArgs = append(cmdArgs, "--incremental-key", value)
+
+		// Check if the incremental key column exists and is of date type
+		for _, column := range asset.Columns {
+			if column.Name == value && strings.ToLower(column.Type) == "date" {
+				cmdArgs = append(cmdArgs, "--columns", column.Name+":"+column.Type)
+			}
+		}
 	}
 
 	if value, exists := asset.Parameters["incremental_strategy"]; exists && value != "" {
