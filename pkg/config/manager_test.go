@@ -1793,3 +1793,108 @@ func TestConnections_MergeFrom(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadFromFileOrEnv_EnvironmentVariable(t *testing.T) {
+	t.Parallel()
+
+	// Test data from environ.yml
+	envConfigContent := `default_environment: dev
+environments:
+  dev:
+    connections:
+      google_cloud_platform:
+        - name: conn1
+          service_account_json: "{\"key10\": \"value10\"}"
+          service_account_file: "D:\\path\\to\\service_account.json"
+          project_id: "my-project"`
+
+	expectedConfig := &Config{
+		DefaultEnvironmentName:  "dev",
+		SelectedEnvironmentName: "dev",
+		SelectedEnvironment: &Environment{
+			Connections: &Connections{
+				GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+					{
+						Name:               "conn1",
+						ServiceAccountJSON: "{\"key10\": \"value10\"}",
+						ServiceAccountFile: "D:\\path\\to\\service_account.json",
+						ProjectID:          "my-project",
+					},
+				},
+			},
+		},
+		Environments: map[string]Environment{
+			"dev": {
+				Connections: &Connections{
+					GoogleCloudPlatform: []GoogleCloudPlatformConnection{
+						{
+							Name:               "conn1",
+							ServiceAccountJSON: "{\"key10\": \"value10\"}",
+							ServiceAccountFile: "D:\\path\\to\\service_account.json",
+							ProjectID:          "my-project",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name           string
+		envConfig      string
+		configFilePath string
+		want           *Config
+		wantErr        assert.ErrorAssertionFunc
+	}{
+		{
+			name:           "load from environment variable when file doesn't exist",
+			envConfig:      envConfigContent,
+			configFilePath: "testdata/nonexistent.yml",
+			want:           expectedConfig,
+			wantErr:        assert.NoError,
+		},
+		{
+			name:           "load from environment variable with invalid YAML",
+			envConfig:      "invalid: yaml: content",
+			configFilePath: "testdata/nonexistent.yml",
+			want:           nil,
+			wantErr:        assert.Error,
+		},
+		{
+			name:           "load from environment variable with empty content",
+			envConfig:      "",
+			configFilePath: "testdata/nonexistent.yml",
+			want:           nil,
+			wantErr:        assert.Error,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Set environment variable
+			if tt.envConfig != "" {
+				t.Setenv("BRUIN_CONFIG_FILE_CONTENT", tt.envConfig)
+			} else {
+				t.Setenv("BRUIN_CONFIG_FILE_CONTENT", "")
+			}
+
+			fs := afero.NewReadOnlyFs(afero.NewOsFs())
+			got, err := LoadFromFileOrEnv(fs, tt.configFilePath)
+
+			tt.wantErr(t, err)
+			if tt.want != nil {
+				tt.want.fs = fs
+				tt.want.path = tt.configFilePath
+			}
+
+			if tt.want != nil {
+				got.SelectedEnvironment.Connections.byKey = nil
+				assert.EqualExportedValues(t, *tt.want, *got)
+			} else {
+				assert.Nil(t, got)
+			}
+		})
+	}
+}

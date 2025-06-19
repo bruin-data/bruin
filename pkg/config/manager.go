@@ -250,7 +250,6 @@ func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 		err = path2.ReadYaml(fs, path, &config)
 	}
 
-	
 	if err != nil {
 		return nil, err
 	}
