@@ -289,13 +289,13 @@ func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer li
 		return nil
 	}
 
-	validatedTaskCount := 0
+	taskCount := 0
 	excludedAssetNumber := 0
 	for _, p := range result.Pipelines {
-		validatedTaskCount += len(p.Pipeline.Assets)
+		taskCount += len(p.Pipeline.Assets)
 		excludedAssetNumber += p.ExcludedAssetNumber
 	}
-	validatedTaskCount -= excludedAssetNumber
+	validatedTaskCount := taskCount - excludedAssetNumber
 	successPrinter.Printf("\n✓ Successfully validated %d assets across %d %s, all good.\n", validatedTaskCount, pipelineCount, pipelineStr)
 	return nil
 }
