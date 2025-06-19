@@ -702,7 +702,7 @@ func TestRunLintRulesOnPipeline_ExcludeTag(t *testing.T) {
 
 			ctx := context.Background()
 			if tt.excludeTag != "" {
-				ctx = context.WithValue(ctx, "exclude-tag", tt.excludeTag)
+				ctx = context.WithValue(ctx, excludeTagKey, tt.excludeTag)
 			}
 
 			result, err := RunLintRulesOnPipeline(ctx, pipeline, []Rule{assetRule})

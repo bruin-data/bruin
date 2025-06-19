@@ -47,7 +47,6 @@ func (l *Printer) PrintJSON(analysis *PipelineAnalysisResult) error {
 	return nil
 }
 
-
 func (l *Printer) printPipelineSummary(pipelineIssues *PipelineIssues) {
 	successPrinter.Println()
 

@@ -16,6 +16,12 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+type contextKey string
+
+const (
+	excludeTagKey contextKey = "exclude-tag"
+)
+
 type (
 	pipelineFinder    func(root string, pipelineDefinitionFile []string) ([]string, error)
 	PipelineValidator func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error)
@@ -101,7 +107,7 @@ func (l *Linter) Lint(ctx context.Context, rootPath string, pipelineDefinitionFi
 	if c != nil {
 		excludeTag = c.String("exclude-tag")
 	}
-	ctx = context.WithValue(ctx, "exclude-tag", excludeTag)
+	ctx = context.WithValue(ctx, excludeTagKey, excludeTag)
 
 	assetStats := make(map[string]int)
 	for _, pipeline := range pipelines {
@@ -284,24 +290,20 @@ type PipelineIssues struct {
 	ExcludedAssetNumber int
 }
 
-// UniqueAssetTracker tracks unique asset names that have been processed
 type UniqueAssetTracker struct {
 	assetNames map[string]bool
 }
 
-// NewUniqueAssetTracker creates a new tracker for unique asset names
 func NewUniqueAssetTracker() *UniqueAssetTracker {
 	return &UniqueAssetTracker{
 		assetNames: make(map[string]bool),
 	}
 }
 
-// AddAsset adds an asset name to the tracker
 func (t *UniqueAssetTracker) AddAsset(name string) {
 	t.assetNames[name] = true
 }
 
-// GetUniqueAssetNames returns a slice of unique asset names that have been tracked
 func (t *UniqueAssetTracker) GetUniqueAssetNames() []string {
 	names := make([]string, 0, len(t.assetNames))
 	for name := range t.assetNames {
@@ -310,7 +312,6 @@ func (t *UniqueAssetTracker) GetUniqueAssetNames() []string {
 	return names
 }
 
-// Count returns the number of unique assets tracked
 func (t *UniqueAssetTracker) Count() int {
 	return len(t.assetNames)
 }
@@ -396,7 +397,7 @@ func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []R
 		Issues:              make(map[Rule][]*Issue),
 		ExcludedAssetNumber: excludedAssetNumber,
 	}
-	excludeTag, ok := ctx.Value("exclude-tag").(string)
+	excludeTag, ok := ctx.Value(excludeTagKey).(string)
 	if !ok {
 		excludeTag = ""
 	}
