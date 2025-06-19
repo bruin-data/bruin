@@ -1,6 +1,8 @@
 package quickbooks
 
-import "fmt"
+import (
+	"net/url"
+)
 
 // Config holds credentials for QuickBooks connection.
 type Config struct {
@@ -14,13 +16,17 @@ type Config struct {
 
 // GetIngestrURI builds an ingestr URI for QuickBooks.
 func (c *Config) GetIngestrURI() string {
-	uri := fmt.Sprintf("quickbooks://?company_id=%s&client_id=%s&client_secret=%s&refresh_token=%s",
-		c.CompanyID, c.ClientID, c.ClientSecret, c.RefreshToken)
+	u := url.Values{}
+	u.Set("company_id", c.CompanyID)
+	u.Set("client_id", c.ClientID)
+	u.Set("client_secret", c.ClientSecret)
+	u.Set("refresh_token", c.RefreshToken)
+
 	if c.Environment != "" {
-		uri += "&environment=" + c.Environment
+		u.Set("environment", c.Environment)
 	}
 	if c.MinorVersion != "" {
-		uri += "&minor_version=" + c.MinorVersion
+		u.Set("minor_version", c.MinorVersion)
 	}
-	return uri
+	return "quickbooks://?" + u.Encode()
 }
