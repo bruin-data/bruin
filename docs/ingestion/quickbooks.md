@@ -18,7 +18,14 @@ connections:
       client_id: "cid"
       client_secret: "csecret"
       refresh_token: "rtoken"
+      environment: production
 ```
+
+- `company_id`: The QuickBooks company (realm) id.
+- `client_id`: OAuth client id from your Intuit application.
+- `client_secret`: OAuth client secret.
+- `refresh_token`: OAuth refresh token used to obtain access tokens.
+- `environment`: Optional environment name, either production or sandbox. Defaults to production.
 
 ### Step 2: Create an asset file for data ingestion
 Create an [asset configuration](/assets/ingestr#asset-structure) file to define the data flow:
