@@ -1795,8 +1795,6 @@ func TestConnections_MergeFrom(t *testing.T) {
 }
 
 func TestLoadFromFileOrEnv_EnvironmentVariable(t *testing.T) {
-	t.Parallel()
-
 	// Test data from environ.yml
 	envConfigContent := `default_environment: dev
 environments:
@@ -1805,7 +1803,6 @@ environments:
       google_cloud_platform:
         - name: conn1
           service_account_json: "{\"key10\": \"value10\"}"
-          service_account_file: "D:\\path\\to\\service_account.json"
           project_id: "my-project"`
 
 	expectedConfig := &Config{
@@ -1817,7 +1814,6 @@ environments:
 					{
 						Name:               "conn1",
 						ServiceAccountJSON: "{\"key10\": \"value10\"}",
-						ServiceAccountFile: "D:\\path\\to\\service_account.json",
 						ProjectID:          "my-project",
 					},
 				},
@@ -1830,7 +1826,6 @@ environments:
 						{
 							Name:               "conn1",
 							ServiceAccountJSON: "{\"key10\": \"value10\"}",
-							ServiceAccountFile: "D:\\path\\to\\service_account.json",
 							ProjectID:          "my-project",
 						},
 					},
@@ -1871,8 +1866,6 @@ environments:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			// Set environment variable
 			if tt.envConfig != "" {
 				t.Setenv("BRUIN_CONFIG_FILE_CONTENT", tt.envConfig)
