@@ -39,7 +39,7 @@ This tab provides a comprehensive view of your asset, allowing you to manage key
 
 The Details tab is your central hub for configuring crucial metadata and operational aspects of your asset within the database. It allows you to manage everything from how your asset is stored to who owns it and how its data intervals are defined.
 
-### Features:
+### Features
 - **Owner and Tags**:
   - **Owner**: Set or edit the owner of the asset. This can be useful for identifying who is responsible for the asset.
   - **Tags**: Add or remove tags to categorize and filter assets.
@@ -68,7 +68,7 @@ The Details tab is your central hub for configuring crucial metadata and operati
   - **Time Interval**: Process time-based data using an incremental key.
   - **DDL**: Use DDL to create a new table using the information provided in the embedded Bruin section.
 
-### How to Use:
+### How to Use
 
 1. **Set Owner and Tags**:
    - Edit the owner by clicking on the edit icon next to the owner field. Changes are saved immediately.
@@ -97,7 +97,7 @@ The Details tab is your central hub for configuring crucial metadata and operati
 ## 4. Custom Checks
 The Custom Checks tab allows you to manage custom checks for your assets directly from the UI.
 
-### How to Use:
+### How to Use
 
 1. **Add a Custom Check**:
    - Click the "Add Check" button.
