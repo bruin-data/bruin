@@ -238,7 +238,7 @@ func (c *Config) SelectEnvironment(name string) error {
 	return nil
 }
 
-func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
+func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 	var config Config
 
 	err := path2.ReadYaml(fs, path, &config)
@@ -316,7 +316,7 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 }
 
 func LoadOrCreate(fs afero.Fs, path string) (*Config, error) {
-	config, err := LoadFromFile(fs, path)
+	config, err := LoadFromFileOrEnv(fs, path)
 	if err != nil && !errors.Is(err, fs2.ErrNotExist) {
 		return nil, err
 	}

@@ -562,7 +562,7 @@ func TestLoadFromFile(t *testing.T) {
 			t.Parallel()
 
 			fs := afero.NewReadOnlyFs(afero.NewOsFs())
-			got, err := LoadFromFile(fs, tt.args.path)
+			got, err := LoadFromFileOrEnv(fs, tt.args.path)
 
 			tt.wantErr(t, err)
 			if tt.want != nil {
