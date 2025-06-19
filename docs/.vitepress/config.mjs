@@ -207,6 +207,7 @@ export default withMermaid({
                             {text: "Personio", link: "/ingestion/personio"},
                             {text: "PhantomBuster", link: "/ingestion/phantombuster"},
                             {text: "Pipedrive", link: "/ingestion/pipedrive"},
+                            {text: "QuickBooks", link: "/ingestion/quickbooks"},
                             {text: "Salesforce", link: "/ingestion/salesforce"},
                             {text: "SAP HANA", link: "/ingestion/sap_hana"},
                             {text: "S3", link: "/ingestion/s3"},

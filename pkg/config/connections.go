@@ -637,6 +637,20 @@ func (c PipedriveConnection) GetName() string {
 	return c.Name
 }
 
+type QuickBooksConnection struct {
+	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	CompanyID    string `yaml:"company_id,omitempty" json:"company_id" mapstructure:"company_id"`
+	ClientID     string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
+	ClientSecret string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret"`
+	RefreshToken string `yaml:"refresh_token,omitempty" json:"refresh_token" mapstructure:"refresh_token"`
+	Environment  string `yaml:"environment,omitempty" json:"environment" mapstructure:"environment"`
+	MinorVersion string `yaml:"minor_version,omitempty" json:"minor_version" mapstructure:"minor_version"`
+}
+
+func (c QuickBooksConnection) GetName() string {
+	return c.Name
+}
+
 type EMRServerlessConnection struct {
 	Name          string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessKey     string `yaml:"access_key" json:"access_key" mapstructure:"access_key"`

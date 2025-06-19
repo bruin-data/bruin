@@ -242,6 +242,12 @@ environments:
       pipedrive:
         - name: "pipedrive-1"
           api_token: "token-123"
+      quickbooks:
+        - name: "quickbooks-1"
+          company_id: "123456"
+          client_id: "cid"
+          client_secret: "csecret"
+          refresh_token: "rtoken"
       emr_serverless:
         - name: emr_serverless-test
           access_key: AKIAEXAMPLE

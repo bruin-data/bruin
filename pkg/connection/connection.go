@@ -52,6 +52,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/phantombuster"
 	"github.com/bruin-data/bruin/pkg/pipedrive"
 	"github.com/bruin-data/bruin/pkg/postgres"
+	"github.com/bruin-data/bruin/pkg/quickbooks"
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/salesforce"
 	"github.com/bruin-data/bruin/pkg/sftp"
@@ -109,6 +110,7 @@ type Manager struct {
 	Personio        map[string]*personio.Client
 	Kinesis         map[string]*kinesis.Client
 	Pipedrive       map[string]*pipedrive.Client
+	QuickBooks      map[string]*quickbooks.Client
 	Frankfurter     map[string]*frankfurter.Client
 	EMRSeverless    map[string]*emr_serverless.Client
 	GoogleAnalytics map[string]*googleanalytics.Client
@@ -363,6 +365,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connPipedrive, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Pipedrive))...)
+
+	connQuickBooks, err := m.GetQuickBooksConnectionWithoutDefault(name)
+	if err == nil {
+		return connQuickBooks, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.QuickBooks))...)
 
 	connEMRServerless, err := m.GetEMRServerlessConnectionWithoutDefault(name)
 	if err == nil {
@@ -1360,6 +1368,25 @@ func (m *Manager) GetPipedriveConnectionWithoutDefault(name string) (*pipedrive.
 	db, ok := m.Pipedrive[name]
 	if !ok {
 		return nil, errors.Errorf("pipedrive connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetQuickBooksConnection(name string) (*quickbooks.Client, error) {
+	db, err := m.GetQuickBooksConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetQuickBooksConnectionWithoutDefault("quickbooks-default")
+}
+
+func (m *Manager) GetQuickBooksConnectionWithoutDefault(name string) (*quickbooks.Client, error) {
+	if m.QuickBooks == nil {
+		return nil, errors.New("no quickbooks connections found")
+	}
+	db, ok := m.QuickBooks[name]
+	if !ok {
+		return nil, errors.Errorf("quickbooks connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2649,6 +2676,30 @@ func (m *Manager) AddPipedriveConnectionFromConfig(connection *config.PipedriveC
 	return nil
 }
 
+func (m *Manager) AddQuickBooksConnectionFromConfig(connection *config.QuickBooksConnection) error {
+	m.mutex.Lock()
+	if m.QuickBooks == nil {
+		m.QuickBooks = make(map[string]*quickbooks.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := quickbooks.NewClient(quickbooks.Config{
+		CompanyID:    connection.CompanyID,
+		ClientID:     connection.ClientID,
+		ClientSecret: connection.ClientSecret,
+		RefreshToken: connection.RefreshToken,
+		Environment:  connection.Environment,
+		MinorVersion: connection.MinorVersion,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.QuickBooks[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddGoogleAnalyticsConnectionFromConfig(connection *config.GoogleAnalyticsConnection) error {
 	m.mutex.Lock()
 	if m.GoogleAnalytics == nil {
@@ -2968,6 +3019,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.ApplovinMax, connectionManager.AddApplovinMaxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.QuickBooks, connectionManager.AddQuickBooksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleAnalytics, connectionManager.AddGoogleAnalyticsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
