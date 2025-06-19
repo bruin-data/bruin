@@ -101,32 +101,18 @@ func (l *Linter) Lint(ctx context.Context, rootPath string, pipelineDefinitionFi
 	if c != nil {
 		excludeTag = c.String("exclude-tag")
 	}
+	ctx = context.WithValue(ctx, "exclude-tag", excludeTag)
+
 	assetStats := make(map[string]int)
-
-	for _, p := range pipelines {
-		filtered := make([]*pipeline.Asset, 0, len(p.Assets))
-		for _, a := range p.Assets {
-			skip := false
-			if excludeTag != "" {
-				for _, tag := range a.Tags {
-					if tag == excludeTag {
-						skip = true
-						break
-					}
-				}
+	for _, pipeline := range pipelines {
+		for _, asset := range pipeline.Assets {
+			_, ok := assetStats[string(asset.Type)]
+			if !ok {
+				assetStats[string(asset.Type)] = 0
 			}
-			if !skip {
-				filtered = append(filtered, a)
-				_, ok := assetStats[string(a.Type)]
-				if !ok {
-					assetStats[string(a.Type)] = 0
-				}
-				assetStats[string(a.Type)]++
-			}
+			assetStats[string(asset.Type)]++
 		}
-		p.Assets = filtered
 	}
-
 	telemetry.SendEventWithAssetStats("validate_assets", assetStats, c)
 
 	if err != nil {
@@ -293,8 +279,40 @@ func (p *PipelineAnalysisResult) WarningCount() int {
 }
 
 type PipelineIssues struct {
-	Pipeline *pipeline.Pipeline
-	Issues   map[Rule][]*Issue
+	Pipeline            *pipeline.Pipeline
+	Issues              map[Rule][]*Issue
+	ExcludedAssetNumber int
+}
+
+// UniqueAssetTracker tracks unique asset names that have been processed
+type UniqueAssetTracker struct {
+	assetNames map[string]bool
+}
+
+// NewUniqueAssetTracker creates a new tracker for unique asset names
+func NewUniqueAssetTracker() *UniqueAssetTracker {
+	return &UniqueAssetTracker{
+		assetNames: make(map[string]bool),
+	}
+}
+
+// AddAsset adds an asset name to the tracker
+func (t *UniqueAssetTracker) AddAsset(name string) {
+	t.assetNames[name] = true
+}
+
+// GetUniqueAssetNames returns a slice of unique asset names that have been tracked
+func (t *UniqueAssetTracker) GetUniqueAssetNames() []string {
+	names := make([]string, 0, len(t.assetNames))
+	for name := range t.assetNames {
+		names = append(names, name)
+	}
+	return names
+}
+
+// Count returns the number of unique assets tracked
+func (t *UniqueAssetTracker) Count() int {
+	return len(t.assetNames)
 }
 
 func (p *PipelineIssues) MarshalJSON() ([]byte, error) {
@@ -359,10 +377,28 @@ func (l *Linter) LintPipeline(ctx context.Context, p *pipeline.Pipeline) (*Pipel
 	return RunLintRulesOnPipeline(ctx, p, l.rules)
 }
 
+func ContainsTag(tags []string, target string) bool {
+	if target == "" {
+		return false
+	}
+	for _, tag := range tags {
+		if tag == target {
+			return true
+		}
+	}
+	return false
+}
+
 func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []Rule) (*PipelineIssues, error) {
+	excludedAssetNumber := 0
 	pipelineResult := &PipelineIssues{
-		Pipeline: p,
-		Issues:   make(map[Rule][]*Issue),
+		Pipeline:            p,
+		Issues:              make(map[Rule][]*Issue),
+		ExcludedAssetNumber: excludedAssetNumber,
+	}
+	excludeTag, ok := ctx.Value("exclude-tag").(string)
+	if !ok {
+		excludeTag = ""
 	}
 	policyRules, err := loadPolicy(p.DefinitionFile.Path)
 	if err != nil {
@@ -371,7 +407,7 @@ func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []R
 	if len(policyRules) > 0 {
 		rules = slices.Concat([]Rule{}, rules, policyRules)
 	}
-
+	assetTracker := NewUniqueAssetTracker()
 	for _, rule := range rules {
 		levels := rule.GetApplicableLevels()
 		if slices.Contains(levels, LevelPipeline) {
@@ -384,6 +420,10 @@ func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []R
 			}
 		} else if slices.Contains(levels, LevelAsset) {
 			for _, asset := range p.Assets {
+				if ContainsTag(asset.Tags, excludeTag) {
+					assetTracker.AddAsset(asset.Name)
+					continue
+				}
 				issues, err := rule.ValidateAsset(ctx, p, asset)
 				if err != nil {
 					return nil, err
@@ -394,7 +434,7 @@ func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []R
 			}
 		}
 	}
-
+	pipelineResult.ExcludedAssetNumber = assetTracker.Count()
 	return pipelineResult, nil
 }
 

@@ -929,7 +929,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{" Successfully validated 2 assets across 1 pipeline, all good."},
+				Contains: []string{" Successfully validated 4 assets across 1 pipeline, all good."},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,

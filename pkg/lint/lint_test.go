@@ -557,3 +557,227 @@ func TestPipelineAnalysisResult_ErrorCount(t *testing.T) {
 		})
 	}
 }
+
+func TestUniqueAssetTracker(t *testing.T) {
+	t.Parallel()
+
+	t.Run("new tracker is empty", func(t *testing.T) {
+		t.Parallel()
+		tracker := NewUniqueAssetTracker()
+		assert.Equal(t, 0, tracker.Count())
+		assert.Empty(t, tracker.GetUniqueAssetNames())
+	})
+
+	t.Run("add single asset", func(t *testing.T) {
+		t.Parallel()
+		tracker := NewUniqueAssetTracker()
+		tracker.AddAsset("asset1")
+
+		assert.Equal(t, 1, tracker.Count())
+		names := tracker.GetUniqueAssetNames()
+		assert.Len(t, names, 1)
+		assert.Contains(t, names, "asset1")
+	})
+
+	t.Run("add multiple unique assets", func(t *testing.T) {
+		t.Parallel()
+		tracker := NewUniqueAssetTracker()
+		tracker.AddAsset("asset1")
+		tracker.AddAsset("asset2")
+		tracker.AddAsset("asset3")
+
+		assert.Equal(t, 3, tracker.Count())
+		names := tracker.GetUniqueAssetNames()
+		assert.Len(t, names, 3)
+		assert.Contains(t, names, "asset1")
+		assert.Contains(t, names, "asset2")
+		assert.Contains(t, names, "asset3")
+	})
+
+	t.Run("duplicate assets are not counted twice", func(t *testing.T) {
+		t.Parallel()
+		tracker := NewUniqueAssetTracker()
+		tracker.AddAsset("asset1")
+		tracker.AddAsset("asset1")
+		tracker.AddAsset("asset2")
+		tracker.AddAsset("asset1")
+
+		assert.Equal(t, 2, tracker.Count())
+		names := tracker.GetUniqueAssetNames()
+		assert.Len(t, names, 2)
+		assert.Contains(t, names, "asset1")
+		assert.Contains(t, names, "asset2")
+	})
+}
+
+func TestRunLintRulesOnPipeline_ExcludeTag(t *testing.T) {
+	t.Parallel()
+
+	// Create a rule that will be called for each asset
+	assetRule := &SimpleRule{
+		Identifier: "testAssetRule",
+		AssetValidator: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+			return []*Issue{
+				{
+					Task:        asset,
+					Description: "test issue for " + asset.Name,
+				},
+			}, nil
+		},
+		ApplicableLevels: []Level{LevelAsset},
+	}
+
+	tests := []struct {
+		name                  string
+		assets                []*pipeline.Asset
+		excludeTag            string
+		expectedIssues        int
+		expectedExcludedCount int
+	}{
+		{
+			name: "no exclude tag, all assets processed",
+			assets: []*pipeline.Asset{
+				{Name: "asset1", Tags: []string{"tag1"}},
+				{Name: "asset2", Tags: []string{"tag2"}},
+				{Name: "asset3", Tags: []string{"tag3"}},
+			},
+			excludeTag:            "",
+			expectedIssues:        3,
+			expectedExcludedCount: 0,
+		},
+		{
+			name: "exclude tag matches some assets",
+			assets: []*pipeline.Asset{
+				{Name: "asset1", Tags: []string{"skip"}},
+				{Name: "asset2", Tags: []string{"process"}},
+				{Name: "asset3", Tags: []string{"skip"}},
+				{Name: "asset4", Tags: []string{"process"}},
+			},
+			excludeTag:            "skip",
+			expectedIssues:        2, // Only asset2 and asset4 should be processed
+			expectedExcludedCount: 2, // asset1 and asset3 should be excluded
+		},
+		{
+			name: "exclude tag matches all assets",
+			assets: []*pipeline.Asset{
+				{Name: "asset1", Tags: []string{"skip"}},
+				{Name: "asset2", Tags: []string{"skip"}},
+				{Name: "asset3", Tags: []string{"skip"}},
+			},
+			excludeTag:            "skip",
+			expectedIssues:        0, // No assets should be processed
+			expectedExcludedCount: 3, // All assets should be excluded
+		},
+		{
+			name: "exclude tag doesn't match any assets",
+			assets: []*pipeline.Asset{
+				{Name: "asset1", Tags: []string{"tag1"}},
+				{Name: "asset2", Tags: []string{"tag2"}},
+			},
+			excludeTag:            "nonexistent",
+			expectedIssues:        2, // All assets should be processed
+			expectedExcludedCount: 0, // No assets should be excluded
+		},
+		{
+			name: "assets with no tags",
+			assets: []*pipeline.Asset{
+				{Name: "asset1", Tags: nil},
+				{Name: "asset2", Tags: []string{}},
+				{Name: "asset3", Tags: []string{"skip"}},
+			},
+			excludeTag:            "skip",
+			expectedIssues:        2, // asset1 and asset2 should be processed
+			expectedExcludedCount: 1, // asset3 should be excluded
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			pipeline := &pipeline.Pipeline{
+				Name:   "test-pipeline",
+				Assets: tt.assets,
+			}
+
+			ctx := context.Background()
+			if tt.excludeTag != "" {
+				ctx = context.WithValue(ctx, "exclude-tag", tt.excludeTag)
+			}
+
+			result, err := RunLintRulesOnPipeline(ctx, pipeline, []Rule{assetRule})
+			require.NoError(t, err)
+
+			// Count total issues across all rules
+			totalIssues := 0
+			for _, issues := range result.Issues {
+				totalIssues += len(issues)
+			}
+
+			assert.Equal(t, tt.expectedIssues, totalIssues, "Expected %d issues, got %d", tt.expectedIssues, totalIssues)
+			assert.Equal(t, tt.expectedExcludedCount, result.ExcludedAssetNumber, "Expected %d excluded assets, got %d", tt.expectedExcludedCount, result.ExcludedAssetNumber)
+		})
+	}
+}
+
+func TestContainsTag(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		tags     []string
+		target   string
+		expected bool
+	}{
+		{
+			name:     "empty target returns false",
+			tags:     []string{"tag1", "tag2"},
+			target:   "",
+			expected: false,
+		},
+		{
+			name:     "nil tags returns false",
+			tags:     nil,
+			target:   "tag1",
+			expected: false,
+		},
+		{
+			name:     "empty tags returns false",
+			tags:     []string{},
+			target:   "tag1",
+			expected: false,
+		},
+		{
+			name:     "tag found",
+			tags:     []string{"tag1", "tag2", "tag3"},
+			target:   "tag2",
+			expected: true,
+		},
+		{
+			name:     "tag not found",
+			tags:     []string{"tag1", "tag2", "tag3"},
+			target:   "tag4",
+			expected: false,
+		},
+		{
+			name:     "case sensitive match",
+			tags:     []string{"Tag1", "TAG2", "tag3"},
+			target:   "tag2",
+			expected: false,
+		},
+		{
+			name:     "exact match",
+			tags:     []string{"tag1", "tag2", "tag3"},
+			target:   "tag1",
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := ContainsTag(tt.tags, tt.target)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
