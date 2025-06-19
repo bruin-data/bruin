@@ -28,4 +28,3 @@ func (c *Config) GetIngestrURI() string {
 
 	return "mixpanel://?" + params.Encode()
 }
-
