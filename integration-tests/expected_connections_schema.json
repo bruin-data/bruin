@@ -517,6 +517,12 @@
           },
           "type": "array"
         },
+        "mixpanel": {
+          "items": {
+            "$ref": "#/$defs/MixpanelConnection"
+          },
+          "type": "array"
+        },
         "emr_serverless": {
           "items": {
             "$ref": "#/$defs/EMRServerlessConnection"
@@ -1351,6 +1357,18 @@
         "name",
         "api_token"
       ]
+    },
+    "MixpanelConnection": {
+      "properties": {
+        "name": {"type": "string"},
+        "username": {"type": "string"},
+        "password": {"type": "string"},
+        "project_id": {"type": "string"},
+        "server": {"type": "string"}
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": ["name", "username", "password", "project_id"]
     },
     "PostgresConnection": {
       "properties": {
