@@ -6,6 +6,7 @@ import (
 	"fmt"
 	fs2 "io/fs"
 	"maps"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/invopop/jsonschema"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert/yaml"
 )
 
 type Connections struct {
@@ -240,8 +242,15 @@ func (c *Config) SelectEnvironment(name string) error {
 
 func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 	var config Config
+	var err error
+	envConfig, exists := os.LookupEnv("BRUIN_CONFIG_FILE_CONTENT")
+	if exists {
+		err = yaml.Unmarshal([]byte(envConfig), &config)
+	} else {
+		err = path2.ReadYaml(fs, path, &config)
+	}
 
-	err := path2.ReadYaml(fs, path, &config)
+	
 	if err != nil {
 		return nil, err
 	}
