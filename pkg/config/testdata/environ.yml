@@ -1,0 +1,9 @@
+default_environment: dev
+environments:
+  dev:
+    connections:
+      google_cloud_platform:
+        - name: conn1
+          service_account_json: "{\"key10\": \"value10\"}"
+          service_account_file: "D:\\path\\to\\service_account.json"
+          project_id: "my-project"
