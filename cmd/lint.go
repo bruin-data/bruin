@@ -203,7 +203,6 @@ func Lint(isDebug *bool) *cli.Command {
 			}
 
 			printer := lint.Printer{RootCheckPath: rootPath}
-
 			if errr != nil || result == nil {
 				printError(errr, c.String("output"), "An error occurred")
 				return cli.Exit("", 1)
@@ -291,11 +290,13 @@ func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer li
 	}
 
 	taskCount := 0
+	excludedAssetNumber := 0
 	for _, p := range result.Pipelines {
 		taskCount += len(p.Pipeline.Assets)
+		excludedAssetNumber += p.ExcludedAssetNumber
 	}
-
-	successPrinter.Printf("\n✓ Successfully validated %d assets across %d %s, all good.\n", taskCount, pipelineCount, pipelineStr)
+	validatedTaskCount := taskCount - excludedAssetNumber
+	successPrinter.Printf("\n✓ Successfully validated %d assets across %d %s, all good.\n", validatedTaskCount, pipelineCount, pipelineStr)
 	return nil
 }
 
