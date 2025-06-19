@@ -520,6 +520,12 @@
         "quickbooks": {
           "items": {
             "$ref": "#/$defs/QuickBooksConnection"
+        },
+        "type": "array"
+      },
+        "mixpanel": {
+          "items": {
+            "$ref": "#/$defs/MixpanelConnection"
           },
           "type": "array"
         },
@@ -1385,6 +1391,18 @@
       "additionalProperties": false,
       "type": "object",
       "required": ["name", "company_id", "client_id", "client_secret", "refresh_token"]
+    },
+    "MixpanelConnection": {
+      "properties": {
+        "name": {"type": "string"},
+        "username": {"type": "string"},
+        "password": {"type": "string"},
+        "project_id": {"type": "string"},
+        "server": {"type": "string"}
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": ["name", "username", "password", "project_id"]
     },
     "PostgresConnection": {
       "properties": {
