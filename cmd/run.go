@@ -431,7 +431,8 @@ func Run(isDebug *bool) *cli.Command {
 			}
 			sendTelemetry(s, c)
 			infoPrinter.Printf("\n%s\n", executionStartLog)
-			infoPrinter.Println()
+			infoPrinter.Printf("Start date: %s\n", startDate.Format(time.RFC3339))
+			infoPrinter.Printf("End date:   %s\n\n", endDate.Format(time.RFC3339))
 			if runConfig.SensorMode != "" {
 				if !(runConfig.SensorMode == "skip" || runConfig.SensorMode == "once" || runConfig.SensorMode == "wait") {
 					errorPrinter.Printf("invalid value for '--mode' flag: '%s', valid options are --skip ,--once, --wait", runConfig.SensorMode)
