@@ -201,6 +201,7 @@ export default withMermaid({
                             {text: "Kinesis", link: "/ingestion/kinesis.md"},
                             {text: "Klaviyo", link: "/ingestion/klaviyo.md"},
                             {text: "LinkedIn Ads", link: "/ingestion/linkedinads.md"},
+                            {text: "Mixpanel", link: "/ingestion/mixpanel"},
                             {text: "MongoDB", link: "/ingestion/mongo"},
                             {text: "MySQL", link: "/ingestion/mysql"},
                             {text: "Notion", link: "/ingestion/notion"},

@@ -66,6 +66,7 @@ type Connections struct {
 	Personio            []PersonioConnection            `yaml:"personio,omitempty" json:"personio,omitempty" mapstructure:"personio"`
 	Kinesis             []KinesisConnection             `yaml:"kinesis,omitempty" json:"kinesis,omitempty" mapstructure:"kinesis"`
 	Pipedrive           []PipedriveConnection           `yaml:"pipedrive,omitempty" json:"pipedrive,omitempty" mapstructure:"pipedrive"`
+	Mixpanel            []MixpanelConnection            `yaml:"mixpanel,omitempty" json:"mixpanel,omitempty" mapstructure:"mixpanel"`
 	EMRServerless       []EMRServerlessConnection       `yaml:"emr_serverless,omitempty" json:"emr_serverless,omitempty" mapstructure:"emr_serverless"`
 	GoogleAnalytics     []GoogleAnalyticsConnection     `yaml:"googleanalytics,omitempty" json:"googleanalytics,omitempty" mapstructure:"googleanalytics"`
 	AppLovin            []AppLovinConnection            `yaml:"applovin,omitempty" json:"applovin,omitempty" mapstructure:"applovin"`
@@ -724,6 +725,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Pipedrive = append(env.Connections.Pipedrive, conn)
+	case "mixpanel":
+		var conn MixpanelConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Mixpanel = append(env.Connections.Mixpanel, conn)
 	case "emr_serverless":
 		var conn EMRServerlessConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -948,6 +956,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Kinesis = removeConnection(env.Connections.Kinesis, connectionName)
 	case "pipedrive":
 		env.Connections.Pipedrive = removeConnection(env.Connections.Pipedrive, connectionName)
+	case "mixpanel":
+		env.Connections.Mixpanel = removeConnection(env.Connections.Mixpanel, connectionName)
 	case "emr_serverless":
 		env.Connections.EMRServerless = removeConnection(env.Connections.EMRServerless, connectionName)
 	case "googleanalytics":

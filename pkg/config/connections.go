@@ -637,6 +637,18 @@ func (c PipedriveConnection) GetName() string {
 	return c.Name
 }
 
+type MixpanelConnection struct {
+	Name      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username  string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password  string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	ProjectID string `yaml:"project_id,omitempty" json:"project_id" mapstructure:"project_id"`
+	Server    string `yaml:"server,omitempty" json:"server,omitempty" mapstructure:"server"`
+}
+
+func (c MixpanelConnection) GetName() string {
+	return c.Name
+}
+
 type EMRServerlessConnection struct {
 	Name          string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessKey     string `yaml:"access_key" json:"access_key" mapstructure:"access_key"`
