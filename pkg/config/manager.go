@@ -243,8 +243,8 @@ func (c *Config) SelectEnvironment(name string) error {
 func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 	var config Config
 	var err error
-	envConfig, exists := os.LookupEnv("BRUIN_CONFIG_FILE_CONTENT")
-	if exists {
+	envConfig := os.Getenv("BRUIN_CONFIG_FILE_CONTENT")
+	if envConfig != "" {
 		err = yaml.Unmarshal([]byte(envConfig), &config)
 	} else {
 		err = path2.ReadYaml(fs, path, &config)
