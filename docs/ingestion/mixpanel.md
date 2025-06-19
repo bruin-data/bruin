@@ -45,3 +45,5 @@ parameters:
 bruin run assets/mixpanel_ingestion.yml
 ```
 Running this command ingests data from Mixpanel into your Postgres database.
+
+<img alt="Mixpanel" src="./media/mixpanel.png">
