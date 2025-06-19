@@ -20,16 +20,9 @@ In addition, there are some optional components:
 
 ## Bruin CLI
 
-### MacOS
-If you are on macOS, you can use `brew` to install Bruin:
+### Install using `curl`
 
-```shell
-brew install bruin-data/tap/bruin
-```
-
-### Windows, Linux and MacOS
-
-If you are on macOS, linux or windows, you can use `curl` to install Bruin:
+Use `curl` to install Bruin on macOS, Linux or Windows:
 
 ```shell
 curl -LsSf https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh
@@ -40,6 +33,9 @@ Or you can also use `wget` to install Bruin:
 ```shell
 wget -qO- https://raw.githubusercontent.com/bruin-data/bruin/refs/heads/main/install.sh | sh
 ```
+
+> [!NOTE]
+> The Homebrew installation method is **deprecated**. If you previously installed Bruin using `brew`, uninstall it first before running the `curl` command.
 
 > [!IMPORTANT]
 > If you are on Windows, make sure to run the command in the [Git Bash](https://git-scm.com/downloads/win) or [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) terminal.

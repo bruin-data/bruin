@@ -387,6 +387,24 @@ func TestLoadFromFile(t *testing.T) {
 					APIToken: "token-123",
 				},
 			},
+			QuickBooks: []QuickBooksConnection{
+				{
+					Name:         "quickbooks-1",
+					CompanyID:    "123456",
+					ClientID:     "cid",
+					ClientSecret: "csecret",
+					RefreshToken: "rtoken",
+				},
+			},
+			Mixpanel: []MixpanelConnection{
+				{
+					Name:      "mixpanel-1",
+					Username:  "user-123",
+					Password:  "secret-123",
+					ProjectID: "12345",
+					Server:    "eu",
+				},
+			},
 			EMRServerless: []EMRServerlessConnection{
 				{
 					Name:          "emr_serverless-test",
