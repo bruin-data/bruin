@@ -517,6 +517,12 @@
           },
           "type": "array"
         },
+        "quickbooks": {
+          "items": {
+            "$ref": "#/$defs/QuickBooksConnection"
+        },
+        "type": "array"
+      },
         "mixpanel": {
           "items": {
             "$ref": "#/$defs/MixpanelConnection"
@@ -1357,6 +1363,34 @@
         "name",
         "api_token"
       ]
+    },
+    "QuickBooksConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "company_id": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "refresh_token": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "minor_version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": ["name", "company_id", "client_id", "client_secret", "refresh_token"]
     },
     "MixpanelConnection": {
       "properties": {
