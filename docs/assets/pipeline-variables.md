@@ -92,3 +92,6 @@ bruin run --var env=prod --var '{"users": ["alice", "bob"]}'
 
 The flag may be used multiple times. If the same key is specified more than once, the last value wins.
 
+## Further reading
+
+- [Jinja Templating](/assets/templating/templating)

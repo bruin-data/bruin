@@ -161,7 +161,7 @@ export default withMermaid({
                     {text: "Credentials", link: "/getting-started/credentials"},
                     {text: "Interval Modifiers", link: "/assets/interval-modifiers"},
                     {text: "Materialization", link: "/assets/materialization"},
-                    {text: "Pipeline Variables", link: "/pipeline-variables"},
+                    {text: "Pipeline Variables", link: "/assets/pipeline-variables"},
                     {
                         text: " Jinja Templating",
                         link: "/assets/templating/templating",
