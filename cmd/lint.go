@@ -26,7 +26,6 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-// ErrExcludeTagNotSupported is returned when the exclude-tag flag is used with asset-only validation
 var ErrExcludeTagNotSupported = errors.New("exclude-tag flag is not supported for asset-only validation")
 
 type jinjaRenderedMaterializer struct {
