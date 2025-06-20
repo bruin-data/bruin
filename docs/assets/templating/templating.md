@@ -56,7 +56,7 @@ You can read more about [Jinja here](https://jinja.palletsprojects.com/en/3.1.x/
 ## Adding variables
 
 You can add variables in your `pipeline.yml` file. We support all YAML data types to give you the
-maximum flexibility in your variable configuration. `variables` are declared as [JSON Schema object](https://json-schema.org/draft-07/draft-handrews-json-schema-01#rfc.section.4.2.1). Here's a comprehensive example:
+maximum flexibility in your variable configuration. `variables` are declared as [JSON Schema object](https://json-schema.org/draft-07/draft-handrews-json-schema-01#rfc.section.4.2.1). See [pipeline variables](../../pipeline-variables.md) for a dedicated guide. Here's a comprehensive example:
 
 ::: code-group 
 ```yaml [pipeline.yml]
