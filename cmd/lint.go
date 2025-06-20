@@ -202,6 +202,7 @@ func Lint(isDebug *bool) *cli.Command {
 				excludeTag := c.String("exclude-tag")
 				if excludeTag != "" {
 					printError(ErrExcludeTagNotSupported, c.String("output"), "Exclude tag flag is not supported for asset-only validation")
+					return cli.Exit("", 1)
 				}
 				rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
 				logger.Debugf("running %d rules for asset-only validation", len(rules))
@@ -300,7 +301,7 @@ func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer li
 	excludedAssetNumber := 0
 	for _, p := range result.Pipelines {
 		taskCount += len(p.Pipeline.Assets)
-		excludedAssetNumber += p.ExcludedAssetNumber
+		excludedAssetNumber += result.AssetWithExcludeTagCount
 	}
 	validatedTaskCount := taskCount - excludedAssetNumber
 	successPrinter.Printf("\n✓ Successfully validated %d assets across %d %s, all good.\n", validatedTaskCount, pipelineCount, pipelineStr)

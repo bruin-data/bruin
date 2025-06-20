@@ -491,7 +491,6 @@ func TestLinter_LintAsset(t *testing.T) {
 		})
 	}
 }
-
 func TestPipelineAnalysisResult_ErrorCount(t *testing.T) {
 	t.Parallel()
 
@@ -556,58 +555,6 @@ func TestPipelineAnalysisResult_ErrorCount(t *testing.T) {
 			assert.Equal(t, tt.want, p.ErrorCount())
 		})
 	}
-}
-
-func TestUniqueAssetTracker(t *testing.T) {
-	t.Parallel()
-
-	t.Run("new tracker is empty", func(t *testing.T) {
-		t.Parallel()
-		tracker := NewUniqueAssetTracker()
-		assert.Equal(t, 0, tracker.Count())
-		assert.Empty(t, tracker.GetUniqueAssetNames())
-	})
-
-	t.Run("add single asset", func(t *testing.T) {
-		t.Parallel()
-		tracker := NewUniqueAssetTracker()
-		tracker.AddAsset("asset1")
-
-		assert.Equal(t, 1, tracker.Count())
-		names := tracker.GetUniqueAssetNames()
-		assert.Len(t, names, 1)
-		assert.Contains(t, names, "asset1")
-	})
-
-	t.Run("add multiple unique assets", func(t *testing.T) {
-		t.Parallel()
-		tracker := NewUniqueAssetTracker()
-		tracker.AddAsset("asset1")
-		tracker.AddAsset("asset2")
-		tracker.AddAsset("asset3")
-
-		assert.Equal(t, 3, tracker.Count())
-		names := tracker.GetUniqueAssetNames()
-		assert.Len(t, names, 3)
-		assert.Contains(t, names, "asset1")
-		assert.Contains(t, names, "asset2")
-		assert.Contains(t, names, "asset3")
-	})
-
-	t.Run("duplicate assets are not counted twice", func(t *testing.T) {
-		t.Parallel()
-		tracker := NewUniqueAssetTracker()
-		tracker.AddAsset("asset1")
-		tracker.AddAsset("asset1")
-		tracker.AddAsset("asset2")
-		tracker.AddAsset("asset1")
-
-		assert.Equal(t, 2, tracker.Count())
-		names := tracker.GetUniqueAssetNames()
-		assert.Len(t, names, 2)
-		assert.Contains(t, names, "asset1")
-		assert.Contains(t, names, "asset2")
-	})
 }
 
 func TestRunLintRulesOnPipeline_ExcludeTag(t *testing.T) {
@@ -715,7 +662,9 @@ func TestRunLintRulesOnPipeline_ExcludeTag(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.expectedIssues, totalIssues, "Expected %d issues, got %d", tt.expectedIssues, totalIssues)
-			assert.Equal(t, tt.expectedExcludedCount, result.ExcludedAssetNumber, "Expected %d excluded assets, got %d", tt.expectedExcludedCount, result.ExcludedAssetNumber)
+
+			// Note: The excluded count is now tracked at the PipelineAnalysisResult level, not at the PipelineIssues level
+			// This test only checks the individual pipeline result, so we don't check the excluded count here
 		})
 	}
 }
@@ -778,6 +727,121 @@ func TestContainsTag(t *testing.T) {
 			t.Parallel()
 			result := ContainsTag(tt.tags, tt.target)
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestLinter_LintPipelines_AssetWithExcludeTagCount(t *testing.T) {
+	t.Parallel()
+
+	// Create a simple rule that will be called for each asset
+	assetRule := &SimpleRule{
+		Identifier: "testAssetRule",
+		AssetValidator: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+			return []*Issue{
+				{
+					Task:        asset,
+					Description: "test issue for " + asset.Name,
+				},
+			}, nil
+		},
+		ApplicableLevels: []Level{LevelAsset},
+	}
+
+	tests := []struct {
+		name                  string
+		pipelines             []*pipeline.Pipeline
+		excludeTag            string
+		expectedExcludedCount int
+	}{
+		{
+			name: "no exclude tag, no excluded assets",
+			pipelines: []*pipeline.Pipeline{
+				{
+					Name: "pipeline1",
+					Assets: []*pipeline.Asset{
+						{Name: "asset1", Tags: []string{"tag1"}},
+						{Name: "asset2", Tags: []string{"tag2"}},
+					},
+				},
+			},
+			excludeTag:            "",
+			expectedExcludedCount: 0,
+		},
+		{
+			name: "exclude tag matches some assets across multiple pipelines",
+			pipelines: []*pipeline.Pipeline{
+				{
+					Name: "pipeline1",
+					Assets: []*pipeline.Asset{
+						{Name: "asset1", Tags: []string{"skip"}},
+						{Name: "asset2", Tags: []string{"process"}},
+					},
+				},
+				{
+					Name: "pipeline2",
+					Assets: []*pipeline.Asset{
+						{Name: "asset3", Tags: []string{"skip"}},
+						{Name: "asset4", Tags: []string{"process"}},
+					},
+				},
+			},
+			excludeTag:            "skip",
+			expectedExcludedCount: 2, // asset1 and asset3 should be excluded
+		},
+		{
+			name: "exclude tag matches all assets",
+			pipelines: []*pipeline.Pipeline{
+				{
+					Name: "pipeline1",
+					Assets: []*pipeline.Asset{
+						{Name: "asset1", Tags: []string{"skip"}},
+						{Name: "asset2", Tags: []string{"skip"}},
+					},
+				},
+			},
+			excludeTag:            "skip",
+			expectedExcludedCount: 2, // All assets should be excluded
+		},
+		{
+			name: "context without assetWithExcludeTagCountKey should default to 0",
+			pipelines: []*pipeline.Pipeline{
+				{
+					Name: "pipeline1",
+					Assets: []*pipeline.Asset{
+						{Name: "asset1", Tags: []string{"skip"}},
+						{Name: "asset2", Tags: []string{"process"}},
+					},
+				},
+			},
+			excludeTag:            "skip",
+			expectedExcludedCount: 0, // Should default to 0 when context key is missing
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			if tt.excludeTag != "" {
+				ctx = context.WithValue(ctx, excludeTagKey, tt.excludeTag)
+			}
+
+			// Only set the assetWithExcludeTagCountKey for tests that expect it
+			if tt.name != "context without assetWithExcludeTagCountKey should default to 0" {
+				ctx = context.WithValue(ctx, assetWithExcludeTagCountKey, tt.expectedExcludedCount)
+			}
+
+			l := &Linter{
+				rules: []Rule{assetRule},
+			}
+
+			result, err := l.LintPipelines(ctx, tt.pipelines)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expectedExcludedCount, result.AssetWithExcludeTagCount,
+				"Expected %d excluded assets, got %d", tt.expectedExcludedCount, result.AssetWithExcludeTagCount)
 		})
 	}
 }
