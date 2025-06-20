@@ -80,8 +80,6 @@ Bruin injects several variables automatically:
 
 In Python assets these built-ins are exposed as environment variables (e.g. `BRUIN_START_DATE`). User-defined variables are available as the JSON string `BRUIN_VARS`.
 
-Sensor and ingestr processes receive the same environment variables, enabling any custom scripts they execute to access `BRUIN_VARS` as well.
-
 ## Overriding variables
 
 During `bruin run` you can override variable values with the `--var` flag:
