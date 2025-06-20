@@ -22,27 +22,47 @@ variables:
 ## Referencing variables in assets
 
 All variables are accessible in SQL, Python, **sensor**, and **ingestr** assets via the `var` namespace:
-
+::: code-group
 ```sql [asset.sql]
 SELECT * FROM events
 WHERE user_id IN ({{ ','.join(var.users) }})
 ```
+:::
 
+::: code-group
 ```python [asset.py]
 import os, json
 vars = json.loads(os.environ["BRUIN_VARS"])
 print(vars["env"])
 ```
-
+:::
 Sensor and ingestr assets, defined as YAML files, can embed variables in the same way:
 
+::: code-group
 ```yaml [sensor.asset.yml]
 name: wait_for_table
 type: bq.sensor.query
 parameters:
-  query: select count(*) > 0 from `{{ var.table }}`
+  query: |
+    select count(*) > 0 
+    from `{{ var.table }}`
+    where load_time > {{ start_datetime }}
 ```
+:::
+::: code-group
+```yaml [ingestr.asset.yml]
+name: public.rates
+type: ingestr
+parameters:
+  source_connection: s3
+  source_table: '{{ var.bucket }}/rates.csv'
+  destination: postgres
+```
+:::
 
+::: info NOTE
+For YAML-style assets, variables can only be used in the value context of `parameter` field.
+:::
 ## Built-in variables
 
 Bruin injects several variables automatically:
