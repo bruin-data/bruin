@@ -195,14 +195,7 @@ func Run(isDebug *bool) *cli.Command {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			defer func() {
-				if err := recover(); err != nil {
-					log.Println("=======================================")
-					log.Println("Bruin encountered an unexpected error, please report the issue to the Bruin team.")
-					log.Println(err)
-					log.Println("=======================================")
-				}
-			}()
+			defer RecoverFromPanic()
 
 			logger := makeLogger(*isDebug)
 			// Initialize runConfig with values from cli.Context
@@ -430,8 +423,9 @@ func Run(isDebug *bool) *cli.Command {
 				return nil
 			}
 			sendTelemetry(s, c)
+			infoPrinter.Printf("\nStart date: %s\n", startDate.Format(time.RFC3339))
+			infoPrinter.Printf("End date:   %s\n", endDate.Format(time.RFC3339))
 			infoPrinter.Printf("\n%s\n", executionStartLog)
-			infoPrinter.Println()
 			if runConfig.SensorMode != "" {
 				if !(runConfig.SensorMode == "skip" || runConfig.SensorMode == "once" || runConfig.SensorMode == "wait") {
 					errorPrinter.Printf("invalid value for '--mode' flag: '%s', valid options are --skip ,--once, --wait", runConfig.SensorMode)
@@ -603,6 +597,7 @@ func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePa
 		errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
 		return err
 	}
+	rules = append(rules, SeedAssetsValidator)
 
 	rules = lint.FilterRulesBySpeed(rules, true)
 

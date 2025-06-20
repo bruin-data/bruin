@@ -16,6 +16,13 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+type contextKey string
+
+const (
+	excludeTagKey               contextKey = "exclude-tag"
+	assetWithExcludeTagCountKey contextKey = "asset-with-exclude-tag-count"
+)
+
 type (
 	pipelineFinder    func(root string, pipelineDefinitionFile []string) ([]string, error)
 	PipelineValidator func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error)
@@ -96,38 +103,27 @@ func NewLinter(findPipelines pipelineFinder, builder pipelineBuilder, rules []Ru
 
 func (l *Linter) Lint(ctx context.Context, rootPath string, pipelineDefinitionFileName []string, c *cli.Context) (*PipelineAnalysisResult, error) {
 	pipelines, err := l.extractPipelinesFromPath(ctx, rootPath, pipelineDefinitionFileName)
-
 	excludeTag := ""
 	if c != nil {
 		excludeTag = c.String("exclude-tag")
 	}
+	ctx = context.WithValue(ctx, excludeTagKey, excludeTag)
+	assetWithExcludeTagCount := 0
 	assetStats := make(map[string]int)
-
-	for _, p := range pipelines {
-		filtered := make([]*pipeline.Asset, 0, len(p.Assets))
-		for _, a := range p.Assets {
-			skip := false
-			if excludeTag != "" {
-				for _, tag := range a.Tags {
-					if tag == excludeTag {
-						skip = true
-						break
-					}
-				}
+	for _, pipeline := range pipelines {
+		for _, asset := range pipeline.Assets {
+			if ContainsTag(asset.Tags, excludeTag) {
+				assetWithExcludeTagCount++
 			}
-			if !skip {
-				filtered = append(filtered, a)
-				_, ok := assetStats[string(a.Type)]
-				if !ok {
-					assetStats[string(a.Type)] = 0
-				}
-				assetStats[string(a.Type)]++
+			_, ok := assetStats[string(asset.Type)]
+			if !ok {
+				assetStats[string(asset.Type)] = 0
 			}
+			assetStats[string(asset.Type)]++
 		}
-		p.Assets = filtered
 	}
-
 	telemetry.SendEventWithAssetStats("validate_assets", assetStats, c)
+	ctx = context.WithValue(ctx, assetWithExcludeTagCountKey, assetWithExcludeTagCount)
 
 	if err != nil {
 		return nil, err
@@ -215,6 +211,7 @@ func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinit
 		Pipelines: []*PipelineIssues{
 			pipelineResult,
 		},
+		AssetWithExcludeTagCount: 0,
 	}, nil
 }
 
@@ -257,7 +254,8 @@ func (l *Linter) extractPipelinesFromPath(ctx context.Context, rootPath string, 
 }
 
 type PipelineAnalysisResult struct {
-	Pipelines []*PipelineIssues `json:"pipelines"`
+	Pipelines                []*PipelineIssues `json:"pipelines"`
+	AssetWithExcludeTagCount int
 }
 
 func (p *PipelineAnalysisResult) MarshalJSON() ([]byte, error) {
@@ -342,7 +340,14 @@ func (p *PipelineIssues) MarshalJSON() ([]byte, error) {
 }
 
 func (l *Linter) LintPipelines(ctx context.Context, pipelines []*pipeline.Pipeline) (*PipelineAnalysisResult, error) {
-	result := &PipelineAnalysisResult{}
+	assetWithExcludeTagCount := 0
+	if count, ok := ctx.Value(assetWithExcludeTagCountKey).(int); ok {
+		assetWithExcludeTagCount = count
+	}
+
+	result := &PipelineAnalysisResult{
+		AssetWithExcludeTagCount: assetWithExcludeTagCount,
+	}
 
 	for _, p := range pipelines {
 		pipelineResult, err := l.LintPipeline(ctx, p)
@@ -359,10 +364,26 @@ func (l *Linter) LintPipeline(ctx context.Context, p *pipeline.Pipeline) (*Pipel
 	return RunLintRulesOnPipeline(ctx, p, l.rules)
 }
 
+func ContainsTag(tags []string, target string) bool {
+	if target == "" {
+		return false
+	}
+	for _, tag := range tags {
+		if tag == target {
+			return true
+		}
+	}
+	return false
+}
+
 func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []Rule) (*PipelineIssues, error) {
 	pipelineResult := &PipelineIssues{
 		Pipeline: p,
 		Issues:   make(map[Rule][]*Issue),
+	}
+	excludeTag, ok := ctx.Value(excludeTagKey).(string)
+	if !ok {
+		excludeTag = ""
 	}
 	policyRules, err := loadPolicy(p.DefinitionFile.Path)
 	if err != nil {
@@ -371,7 +392,6 @@ func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []R
 	if len(policyRules) > 0 {
 		rules = slices.Concat([]Rule{}, rules, policyRules)
 	}
-
 	for _, rule := range rules {
 		levels := rule.GetApplicableLevels()
 		if slices.Contains(levels, LevelPipeline) {
@@ -384,6 +404,9 @@ func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []R
 			}
 		} else if slices.Contains(levels, LevelAsset) {
 			for _, asset := range p.Assets {
+				if ContainsTag(asset.Tags, excludeTag) {
+					continue
+				}
 				issues, err := rule.ValidateAsset(ctx, p, asset)
 				if err != nil {
 					return nil, err
@@ -394,7 +417,6 @@ func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []R
 			}
 		}
 	}
-
 	return pipelineResult, nil
 }
 

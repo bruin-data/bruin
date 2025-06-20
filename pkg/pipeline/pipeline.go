@@ -995,20 +995,23 @@ func (a *Asset) EnrichFromEntityAttributes(entities []*glossary.Entity) error {
 func (a *Asset) GetNameIfItWasSetFromItsPath(foundPipeline *Pipeline) (string, error) {
 	var err error
 	var baseFolder string
-	if foundPipeline != nil {
-		pipelinePath := foundPipeline.DefinitionFile.Path
-		baseFolder = filepath.Join(filepath.Dir(pipelinePath), "assets")
-	} else {
-		pipelinePath, err := path.GetPipelineRootFromTask(a.DefinitionFile.Path, []string{"pipeline.yml", "pipeline.yaml"})
+	relativePath := a.DefinitionFile.Path
+	if filepath.IsAbs(a.DefinitionFile.Path) {
+		if foundPipeline != nil {
+			pipelinePath := foundPipeline.DefinitionFile.Path
+			baseFolder = filepath.Join(filepath.Dir(pipelinePath), "assets")
+		} else {
+			pipelinePath, err := path.GetPipelineRootFromTask(a.DefinitionFile.Path, []string{"pipeline.yml", "pipeline.yaml"})
+			if err != nil {
+				return "", err
+			}
+			baseFolder = filepath.Join(pipelinePath, "assets")
+		}
+
+		relativePath, err = filepath.Rel(baseFolder, a.DefinitionFile.Path)
 		if err != nil {
 			return "", err
 		}
-		baseFolder = filepath.Join(pipelinePath, "assets")
-	}
-
-	relativePath, err := filepath.Rel(baseFolder, a.DefinitionFile.Path)
-	if err != nil {
-		return "", err
 	}
 
 	name := strings.ReplaceAll(relativePath, string(filepath.Separator), ".")
@@ -1636,15 +1639,15 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 			return nil, err
 		}
 
+		if task == nil {
+			continue
+		}
+
 		if config.isMutate {
 			task, err = b.MutateAsset(ctx, task, pipeline)
 			if err != nil {
 				return nil, err
 			}
-		}
-
-		if task == nil {
-			continue
 		}
 
 		task.upstream = make([]*Asset, 0)

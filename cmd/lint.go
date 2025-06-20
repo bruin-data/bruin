@@ -26,6 +26,8 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+var ErrExcludeTagNotSupported = errors.New("exclude-tag flag is not supported for asset-only validation")
+
 type jinjaRenderedMaterializer struct {
 	renderer     *jinja.Renderer
 	materializer queryMaterializer
@@ -174,6 +176,7 @@ func Lint(isDebug *bool) *cli.Command {
 
 			rules = append(rules, queryValidatorRules(logger, cm, connectionManager)...)
 			rules = append(rules, lint.GetCustomCheckQueryDryRunRule(connectionManager, renderer))
+			rules = append(rules, SeedAssetsValidator)
 
 			if c.Bool("fast") {
 				rules = lint.FilterRulesBySpeed(rules, true)
@@ -195,6 +198,11 @@ func Lint(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("Validating pipelines in '%s' for '%s' environment...\n", rootPath, cm.SelectedEnvironmentName)
 				result, errr = linter.Lint(lintCtx, rootPath, PipelineDefinitionFiles, c)
 			} else {
+				excludeTag := c.String("exclude-tag")
+				if excludeTag != "" {
+					printError(ErrExcludeTagNotSupported, c.String("output"), "Exclude tag flag is not supported for asset-only validation")
+					return cli.Exit("", 1)
+				}
 				rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
 				logger.Debugf("running %d rules for asset-only validation", len(rules))
 				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
@@ -202,7 +210,6 @@ func Lint(isDebug *bool) *cli.Command {
 			}
 
 			printer := lint.Printer{RootCheckPath: rootPath}
-
 			if errr != nil || result == nil {
 				printError(errr, c.String("output"), "An error occurred")
 				return cli.Exit("", 1)
@@ -290,11 +297,13 @@ func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer li
 	}
 
 	taskCount := 0
+
 	for _, p := range result.Pipelines {
 		taskCount += len(p.Pipeline.Assets)
 	}
-
-	successPrinter.Printf("\n✓ Successfully validated %d assets across %d %s, all good.\n", taskCount, pipelineCount, pipelineStr)
+	excludedAssetNumber := result.AssetWithExcludeTagCount
+	validatedTaskCount := taskCount - excludedAssetNumber
+	successPrinter.Printf("\n✓ Successfully validated %d assets across %d %s, all good.\n", validatedTaskCount, pipelineCount, pipelineStr)
 	return nil
 }
 

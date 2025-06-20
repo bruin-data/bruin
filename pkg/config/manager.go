@@ -6,6 +6,7 @@ import (
 	"fmt"
 	fs2 "io/fs"
 	"maps"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/invopop/jsonschema"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert/yaml"
 )
 
 type Connections struct {
@@ -64,6 +66,8 @@ type Connections struct {
 	Personio            []PersonioConnection            `yaml:"personio,omitempty" json:"personio,omitempty" mapstructure:"personio"`
 	Kinesis             []KinesisConnection             `yaml:"kinesis,omitempty" json:"kinesis,omitempty" mapstructure:"kinesis"`
 	Pipedrive           []PipedriveConnection           `yaml:"pipedrive,omitempty" json:"pipedrive,omitempty" mapstructure:"pipedrive"`
+	Mixpanel            []MixpanelConnection            `yaml:"mixpanel,omitempty" json:"mixpanel,omitempty" mapstructure:"mixpanel"`
+	QuickBooks          []QuickBooksConnection          `yaml:"quickbooks,omitempty" json:"quickbooks,omitempty" mapstructure:"quickbooks"`
 	EMRServerless       []EMRServerlessConnection       `yaml:"emr_serverless,omitempty" json:"emr_serverless,omitempty" mapstructure:"emr_serverless"`
 	GoogleAnalytics     []GoogleAnalyticsConnection     `yaml:"googleanalytics,omitempty" json:"googleanalytics,omitempty" mapstructure:"googleanalytics"`
 	AppLovin            []AppLovinConnection            `yaml:"applovin,omitempty" json:"applovin,omitempty" mapstructure:"applovin"`
@@ -238,10 +242,16 @@ func (c *Config) SelectEnvironment(name string) error {
 	return nil
 }
 
-func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
+func LoadFromFileOrEnv(fs afero.Fs, path string) (*Config, error) {
 	var config Config
+	var err error
+	envConfig := os.Getenv("BRUIN_CONFIG_FILE_CONTENT")
+	if envConfig != "" {
+		err = yaml.Unmarshal([]byte(envConfig), &config)
+	} else {
+		err = path2.ReadYaml(fs, path, &config)
+	}
 
-	err := path2.ReadYaml(fs, path, &config)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +326,7 @@ func LoadFromFile(fs afero.Fs, path string) (*Config, error) {
 }
 
 func LoadOrCreate(fs afero.Fs, path string) (*Config, error) {
-	config, err := LoadFromFile(fs, path)
+	config, err := LoadFromFileOrEnv(fs, path)
 	if err != nil && !errors.Is(err, fs2.ErrNotExist) {
 		return nil, err
 	}
@@ -716,6 +726,20 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Pipedrive = append(env.Connections.Pipedrive, conn)
+	case "mixpanel":
+		var conn MixpanelConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Mixpanel = append(env.Connections.Mixpanel, conn)
+	case "quickbooks":
+		var conn QuickBooksConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.QuickBooks = append(env.Connections.QuickBooks, conn)
 	case "emr_serverless":
 		var conn EMRServerlessConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -940,6 +964,10 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Kinesis = removeConnection(env.Connections.Kinesis, connectionName)
 	case "pipedrive":
 		env.Connections.Pipedrive = removeConnection(env.Connections.Pipedrive, connectionName)
+	case "mixpanel":
+		env.Connections.Mixpanel = removeConnection(env.Connections.Mixpanel, connectionName)
+	case "quickbooks":
+		env.Connections.QuickBooks = removeConnection(env.Connections.QuickBooks, connectionName)
 	case "emr_serverless":
 		env.Connections.EMRServerless = removeConnection(env.Connections.EMRServerless, connectionName)
 	case "googleanalytics":

@@ -21,6 +21,7 @@ type connectionManager interface {
 
 type queryExtractor interface {
 	ExtractQueriesFromString(content string) ([]*query.Query, error)
+	CloneForAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) query.QueryExtractor
 }
 
 type materializer interface {
@@ -62,7 +63,9 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 		return issues, nil
 	}
 
-	queries, err := q.Extractor.ExtractQueriesFromString(asset.ExecutableFile.Content)
+	extractor := q.Extractor.CloneForAsset(ctx, p, asset)
+
+	queries, err := extractor.ExtractQueriesFromString(asset.ExecutableFile.Content)
 	if err != nil {
 		q.Logger.Debugf("failed to extract the queries from pipeline '%s' task '%s'", p.Name, asset.Name)
 		issues = append(issues, &Issue{
@@ -157,8 +160,9 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipeline, task *pipeline.Asset, done chan<- []*Issue) {
 	issues := make([]*Issue, 0)
 
+	extractor := q.Extractor.CloneForAsset(ctx, p, task)
 	q.Logger.Debugf("validating pipeline '%s' task '%s'", p.Name, task.Name)
-	queries, err := q.Extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
+	queries, err := extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
 	q.Logger.Debugf("got the query extract results from file for pipeline '%s' task '%s'", p.Name, task.Name)
 
 	if err != nil {
@@ -298,6 +302,11 @@ func (q *QueryValidatorRule) bufferSize() int {
 func (q *QueryValidatorRule) Validate(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
+	excludeTag, ok := ctx.Value(excludeTagKey).(string)
+	if !ok {
+		excludeTag = ""
+	}
+
 	// skip if there are no workers defined
 	if q.WorkerCount == 0 {
 		return issues, nil
@@ -321,6 +330,9 @@ func (q *QueryValidatorRule) Validate(ctx context.Context, p *pipeline.Pipeline)
 	for _, task := range p.Assets {
 		if task.Type != q.TaskType {
 			q.Logger.Debug("Skipping task, task type not matched")
+			continue
+		}
+		if ContainsTag(task.Tags, excludeTag) {
 			continue
 		}
 		q.Logger.Debugf("Processing task type: %s", task.Type)

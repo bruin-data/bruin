@@ -225,7 +225,14 @@ func EnsurePipelineNameIsValid(ctx context.Context, pipeline *pipeline.Pipeline)
 func CallFuncForEveryAsset(callable AssetValidator) func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
 	return func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
 		issues := make([]*Issue, 0)
+		excludeTag, ok := ctx.Value(excludeTagKey).(string)
+		if !ok {
+			excludeTag = ""
+		}
 		for _, task := range pipeline.Assets {
+			if ContainsTag(task.Tags, excludeTag) {
+				continue
+			}
 			assetIssues, err := callable(ctx, pipeline, task)
 			if err != nil {
 				return issues, err
