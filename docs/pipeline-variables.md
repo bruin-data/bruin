@@ -21,7 +21,7 @@ variables:
 
 ## Referencing variables in assets
 
-All variables are accessible in SQL, Python, **sensor**, and **ingestr** assets via the `var` namespace:
+All variables are accessible in SQL, Python, `sensor`, and `ingestr` assets via the `var` namespace:
 ::: code-group
 ```sql [asset.sql]
 SELECT * FROM events
