@@ -231,7 +231,6 @@ func CallFuncForEveryAsset(callable AssetValidator) func(ctx context.Context, pi
 		}
 		for _, task := range pipeline.Assets {
 			if ContainsTag(task.Tags, excludeTag) {
-
 				continue
 			}
 			assetIssues, err := callable(ctx, pipeline, task)

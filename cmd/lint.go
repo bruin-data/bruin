@@ -26,6 +26,9 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+// ErrExcludeTagNotSupported is returned when the exclude-tag flag is used with asset-only validation
+var ErrExcludeTagNotSupported = errors.New("exclude-tag flag is not supported for asset-only validation")
+
 type jinjaRenderedMaterializer struct {
 	renderer     *jinja.Renderer
 	materializer queryMaterializer
@@ -196,6 +199,10 @@ func Lint(isDebug *bool) *cli.Command {
 				infoPrinter.Printf("Validating pipelines in '%s' for '%s' environment...\n", rootPath, cm.SelectedEnvironmentName)
 				result, errr = linter.Lint(lintCtx, rootPath, PipelineDefinitionFiles, c)
 			} else {
+				excludeTag := c.String("exclude-tag")
+				if excludeTag != "" {
+					printError(ErrExcludeTagNotSupported, c.String("output"), "Exclude tag flag is not supported for asset-only validation")
+				}
 				rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
 				logger.Debugf("running %d rules for asset-only validation", len(rules))
 				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
