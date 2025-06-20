@@ -297,7 +297,7 @@ func reportLintErrors(result *lint.PipelineAnalysisResult, err error, printer li
 	}
 
 	taskCount := 0
-	
+
 	for _, p := range result.Pipelines {
 		taskCount += len(p.Pipeline.Assets)
 	}
