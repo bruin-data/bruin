@@ -53,54 +53,6 @@ GROUP BY 1,2
 ```
 You can read more about [Jinja here](https://jinja.palletsprojects.com/en/3.1.x/).
 
-## Adding variables
-
-You can add variables in your `pipeline.yml` file. We support all YAML data types to give you the
-maximum flexibility in your variable configuration. `variables` are declared as [JSON Schema object](https://json-schema.org/draft-07/draft-handrews-json-schema-01#rfc.section.4.2.1). See [pipeline variables](/assets/pipeline-variables) for a dedicated guide. Here's a comprehensive example:
-
-::: code-group 
-```yaml [pipeline.yml]
-name: var-pipeline
-variables:
-  users:
-    type: array
-    items:
-      type: string
-    default: ["jhon", "nick"]
-  env:
-    type: string
-    default: dev
-  tags:
-    type: object
-    properties:
-      team:
-        type: string
-      tenant:
-        type: string
-    default:
-      team: data
-      tenant: acme
-```
-:::
-All user-defined variables are accessible via the `var` namespace. For example, if you define a variable called `src`, it will be available as <code>&lbrace;&lbrace; var.src &rbrace;&rbrace;</code> in your assets.
-
-Additionally all top level variables must define a `default` value. This will be used to render your assets in absence of values supplied on the commandline.
-
-## Overriding Variables
-
-You can override variables defined in your `pipeline.yml` file during a `bruin run` execution by using the `--var` flag. This allows you to dynamically adjust variable values without modifying the pipeline configuration file.
-
-Bruin supports two different syntax for overriding variables:
-```sh
-# key value form; value must be valid JSON
-$ bruin run --var key=value
-
-# json form
-$ bruin run --var '{"key": "value"}'
-```
-
-The `--var` flag can be specified multiple times. However, beware that if you specify the same key multiple times, the latter one will overwrite the previous one.
-
 ## Builtin variables
 
 Bruin injects various variables by default:
@@ -125,3 +77,6 @@ WHERE dt BETWEEN '{{ start_date }}' AND '{{ end_date }}'
 > Date-related variables are passed in as strings, and they will be driven by the flags given to the `bruin run` command, read more on that [here](../../commands/run.md).
 
 You can modify these variables with the use of [filters](./filters.md).
+
+## Custom variables.
+You can define your own variables and use them across your Assets. See [variables](/getting-started/pipeline-variables) for more information.

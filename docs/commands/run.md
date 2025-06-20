@@ -53,9 +53,8 @@ table td:first-child {
 | `--no-timestamp` | bool | `false` | Skip logging timestamps for this run. |
 | `--no-color` | bool | `false` | Plain log output for this run. |
 | `--minimal-logs` | bool | `false` | Skip initial pipeline analysis logs for this run. |
-| `--var` | []str | - | Override pipeline variables with custom values. |
+| `--var` | []str | - | Override pipeline [variables](/getting-started/pipeline-variables.md) with custom values. |
 
-See [pipeline variables](/assets/pipeline-variables.md) for details on declaring and using variables.
 
 
 ### Continue from the last failed asset

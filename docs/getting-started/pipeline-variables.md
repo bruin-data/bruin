@@ -1,4 +1,4 @@
-# Pipeline Variables
+# Variables
 
 Bruin lets you parameterize your pipelines with custom variables. These variables are defined in `pipeline.yml` using [JSON Schema](https://json-schema.org/) and are available in your assets during execution.
 

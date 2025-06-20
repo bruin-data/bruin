@@ -65,7 +65,8 @@ export default withMermaid({
                         items: [
                             {text: "Glossary", link: "/getting-started/glossary"},
                             {text: "Policies", link: "/getting-started/policies"},
-                            {text: "Developer Environments", link: "/getting-started/devenv"}
+                            {text: "Developer Environments", link: "/getting-started/devenv"},
+                            {text: "Variables", link: "/getting-started/pipeline-variables"},
                         ]
                     },
                     {text: "Concepts", link: "/getting-started/concepts"},
@@ -161,7 +162,6 @@ export default withMermaid({
                     {text: "Credentials", link: "/getting-started/credentials"},
                     {text: "Interval Modifiers", link: "/assets/interval-modifiers"},
                     {text: "Materialization", link: "/assets/materialization"},
-                    {text: "Pipeline Variables", link: "/assets/pipeline-variables"},
                     {
                         text: " Jinja Templating",
                         link: "/assets/templating/templating",
