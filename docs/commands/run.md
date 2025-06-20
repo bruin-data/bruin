@@ -55,7 +55,7 @@ table td:first-child {
 | `--minimal-logs` | bool | `false` | Skip initial pipeline analysis logs for this run. |
 | `--var` | []str | - | Override pipeline variables with custom values. |
 
-See [pipeline variables](../pipeline-variables.md) for details on declaring and using variables.
+See [pipeline variables](/assets/pipeline-variables.md) for details on declaring and using variables.
 
 
 ### Continue from the last failed asset
