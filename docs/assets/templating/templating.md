@@ -78,5 +78,5 @@ WHERE dt BETWEEN '{{ start_date }}' AND '{{ end_date }}'
 
 You can modify these variables with the use of [filters](./filters.md).
 
-## Custom variables.
+## Custom variables
 You can define your own variables and use them across your Assets. See [variables](/getting-started/pipeline-variables) for more information.
