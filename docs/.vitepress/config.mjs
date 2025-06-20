@@ -65,7 +65,8 @@ export default withMermaid({
                         items: [
                             {text: "Glossary", link: "/getting-started/glossary"},
                             {text: "Policies", link: "/getting-started/policies"},
-                            {text: "Developer Environments", link: "/getting-started/devenv"}
+                            {text: "Developer Environments", link: "/getting-started/devenv"},
+                            {text: "Variables", link: "/getting-started/pipeline-variables"},
                         ]
                     },
                     {text: "Concepts", link: "/getting-started/concepts"},
