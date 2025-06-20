@@ -21,7 +21,9 @@ variables:
 
 ## Referencing variables in assets
 
-All variables are accessible in SQL, Python, `sensor`, and `ingestr` assets via the `var` namespace:
+All variables are accessible in SQL, `seed`, `sensor`, and `ingestr` assets via the `var` namespace.
+
+In Python assets, variables are exposed under `BRUIN_VARS` environment variable.
 ::: code-group
 ```sql [asset.sql]
 SELECT * FROM events
