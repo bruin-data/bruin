@@ -302,6 +302,11 @@ func (q *QueryValidatorRule) bufferSize() int {
 func (q *QueryValidatorRule) Validate(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
+	excludeTag, ok := ctx.Value(excludeTagKey).(string)
+	if !ok {
+		excludeTag = ""
+	}
+
 	// skip if there are no workers defined
 	if q.WorkerCount == 0 {
 		return issues, nil
@@ -325,6 +330,9 @@ func (q *QueryValidatorRule) Validate(ctx context.Context, p *pipeline.Pipeline)
 	for _, task := range p.Assets {
 		if task.Type != q.TaskType {
 			q.Logger.Debug("Skipping task, task type not matched")
+			continue
+		}
+		if ContainsTag(task.Tags, excludeTag) {
 			continue
 		}
 		q.Logger.Debugf("Processing task type: %s", task.Type)
