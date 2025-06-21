@@ -19,6 +19,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/pkg/errors"
+	"github.com/sourcegraph/conc/pool"
 	"github.com/spf13/afero"
 )
 
@@ -35,7 +36,21 @@ const (
 	UvVersion               = "0.6.16"
 	pythonVersionForIngestr = "3.11"
 	ingestrVersion          = "0.13.58"
+	sqlfluffVersion         = "3.4.1"
 )
+
+var DatabasePrefixToSqlfluffDialect = map[string]string{
+	"bq":         "bigquery",
+	"sf":         "snowflake",
+	"pg":         "postgres",
+	"rs":         "redshift",
+	"athena":     "athena",
+	"ms":         "tsql",
+	"databricks": "sparksql",
+	"synapse":    "tsql",
+	"duckdb":     "duckdb",
+	"clickhouse": "clickhouse",
+}
 
 // UvChecker handles checking and installing the uv package manager.
 type UvChecker struct {
@@ -447,3 +462,141 @@ with pa.OSFile("$ARROW_FILE_PATH", 'wb') as f:
 	writer.write_table(table)
 	writer.close()
 `
+
+type SqlfluffRunner struct {
+	UvInstaller    uvInstaller
+	binaryFullPath string
+}
+
+type SQLFileInfo struct {
+	FilePath string
+	Dialect  string
+}
+
+// DetectDialectFromAssetType extracts the dialect from an asset's type field
+// by splitting on the first dot and mapping the prefix
+func DetectDialectFromAssetType(assetType string) string {
+	parts := strings.Split(assetType, ".")
+	if len(parts) == 0 {
+		return "ansi" // fallback to ANSI SQL
+	}
+
+	prefix := parts[0]
+	if dialect, exists := DatabasePrefixToSqlfluffDialect[prefix]; exists {
+		return dialect
+	}
+	return "ansi" // fallback to ANSI SQL
+}
+
+func (s *SqlfluffRunner) RunSqlfluffWithDialects(ctx context.Context, sqlFiles []SQLFileInfo, repo *git.Repo) error {
+	binaryFullPath, err := s.UvInstaller.EnsureUvInstalled(ctx)
+	if err != nil {
+		return err
+	}
+	s.binaryFullPath = binaryFullPath
+
+	// Install sqlfluff
+	err = s.installSqlfluff(ctx, repo)
+	if err != nil {
+		return errors.Wrap(err, "failed to install sqlfluff")
+	}
+
+	if len(sqlFiles) == 0 {
+		return nil
+	}
+
+	// For single asset, use majority dialect detection logic
+	if len(sqlFiles) == 1 {
+		// For single asset, use its specific dialect
+		sqlFileInfo := sqlFiles[0]
+		err = s.formatSQLFileWithDialect(ctx, sqlFileInfo.FilePath, sqlFileInfo.Dialect, repo)
+		if err != nil {
+			// Check if it's a non-critical exit code (1 = unfixable violations)
+			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+				// Exit code 1 means there were unfixable violations but fixes were applied
+				// This is acceptable, so we continue
+				return nil
+			}
+			return errors.Wrapf(err, "failed to format SQL file %s", sqlFileInfo.FilePath)
+		}
+		return nil
+	}
+
+	// Use conc pool to process SQL files in parallel with max 30 goroutines
+	sqlPool := pool.New().WithMaxGoroutines(30)
+	errorList := make([]error, 0)
+	var errorMutex sync.Mutex
+
+	for _, sqlFileInfo := range sqlFiles {
+		sqlPool.Go(func() {
+			fileInfo := sqlFileInfo
+
+			err := s.formatSQLFileWithDialect(ctx, fileInfo.FilePath, fileInfo.Dialect, repo)
+			if err != nil {
+				// Check if it's a non-critical exit code (1 = unfixable violations)
+				if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+					// Exit code 1 means there were unfixable violations but fixes were applied
+					// This is acceptable, so we continue
+					return
+				}
+
+				// Add error to the list in a thread-safe manner
+				errorMutex.Lock()
+				errorList = append(errorList, errors.Wrapf(err, "failed to format SQL file %s", fileInfo.FilePath))
+				errorMutex.Unlock()
+			}
+		})
+	}
+
+	sqlPool.Wait()
+
+	// Return the first error if any occurred
+	if len(errorList) > 0 {
+		return errorList[0]
+	}
+
+	return nil
+}
+
+func (s *SqlfluffRunner) installSqlfluff(ctx context.Context, repo *git.Repo) error {
+	cmdArgs := []string{
+		"tool",
+		"install",
+		"--force",
+		"--quiet",
+		"--python",
+		pythonVersionForIngestr,
+		"sqlfluff==" + sqlfluffVersion,
+	}
+
+	cmd := &CommandInstance{
+		Name: s.binaryFullPath,
+		Args: cmdArgs,
+	}
+
+	cmdRunner := &CommandRunner{}
+	return cmdRunner.Run(ctx, repo, cmd)
+}
+
+func (s *SqlfluffRunner) formatSQLFileWithDialect(ctx context.Context, sqlFile, dialect string, repo *git.Repo) error {
+	cmdArgs := []string{
+		"tool",
+		"run",
+		"--python",
+		pythonVersionForIngestr,
+		"sqlfluff",
+		"fix",
+		"--quiet",
+		"--dialect",
+		dialect,
+		sqlFile,
+	}
+
+	cmd := &CommandInstance{
+		Name: s.binaryFullPath,
+		Args: cmdArgs,
+	}
+
+	cmdRunner := &CommandRunner{}
+	return cmdRunner.Run(ctx, repo, cmd)
+}

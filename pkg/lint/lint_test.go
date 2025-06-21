@@ -491,6 +491,7 @@ func TestLinter_LintAsset(t *testing.T) {
 		})
 	}
 }
+
 func TestPipelineAnalysisResult_ErrorCount(t *testing.T) {
 	t.Parallel()
 
