@@ -23,4 +23,49 @@ Specifies the output format for the command.
 Possible values:
 - `plain` (default): Prints human-readable messages.
 - `json`: Prints errors (if any) in JSON format.  
-- `fail-if-changed`: fail the command if any of the assets need reformatting
+
+**--fail-if-changed** (optional):  
+Fail the command if any of the assets need reformatting.
+
+**--sqlfluff** (optional):  
+Run SQLFluff to format SQL files in addition to formatting Bruin asset definitions. SQLFluff is a SQL linting and formatting tool that ensures consistent SQL code style across your project.
+
+## SQLFluff Integration
+
+When the `--sqlfluff` flag is used, Bruin automatically:
+
+1. **Detects SQL dialects** based on asset types (e.g., `sf.sql` → Snowflake, `bq.sql` → BigQuery)
+2. **Formats SQL files** using the appropriate dialect-specific rules
+3. **Processes files in parallel** for improved performance (up to 30 concurrent operations)
+
+### Supported Database Dialects
+
+| Asset Type Prefix | SQLFluff Dialect | Database |
+|-------------------|------------------|----------|
+| `sf.` | snowflake | Snowflake |
+| `bq.` | bigquery | BigQuery |
+| `pg.` | postgres | PostgreSQL |
+| `rs.` | redshift | Amazon Redshift |
+| `athena.` | athena | Amazon Athena |
+| `ms.` | tsql | Microsoft SQL Server |
+| `databricks.` | sparksql | Databricks |
+| `synapse.` | tsql | Azure Synapse |
+| `duckdb.` | duckdb | DuckDB |
+| `clickhouse.` | clickhouse | ClickHouse |
+
+### Examples
+
+Format all assets including SQL files:
+```bash
+bruin format --sqlfluff
+```
+
+Format a single SQL asset:
+```bash
+bruin format assets/sf.my_table.sql --sqlfluff
+```
+
+Format with JSON output:
+```bash
+bruin format --sqlfluff --output json
+```
