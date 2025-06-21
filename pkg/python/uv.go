@@ -474,7 +474,7 @@ type SQLFileInfo struct {
 }
 
 // DetectDialectFromAssetType extracts the dialect from an asset's type field
-// by splitting on the first dot and mapping the prefix
+// by splitting on the first dot and mapping the prefix.
 func DetectDialectFromAssetType(assetType string) string {
 	parts := strings.Split(assetType, ".")
 	if len(parts) == 0 {
@@ -512,7 +512,8 @@ func (s *SqlfluffRunner) RunSqlfluffWithDialects(ctx context.Context, sqlFiles [
 		err = s.formatSQLFileWithDialect(ctx, sqlFileInfo.FilePath, sqlFileInfo.Dialect, repo)
 		if err != nil {
 			// Check if it's a non-critical exit code (1 = unfixable violations)
-			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			var exitErr *exec.ExitError
+			if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
 				// Exit code 1 means there were unfixable violations but fixes were applied
 				// This is acceptable, so we continue
 				return nil
@@ -534,7 +535,8 @@ func (s *SqlfluffRunner) RunSqlfluffWithDialects(ctx context.Context, sqlFiles [
 			err := s.formatSQLFileWithDialect(ctx, fileInfo.FilePath, fileInfo.Dialect, repo)
 			if err != nil {
 				// Check if it's a non-critical exit code (1 = unfixable violations)
-				if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+				var exitErr *exec.ExitError
+				if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
 					// Exit code 1 means there were unfixable violations but fixes were applied
 					// This is acceptable, so we continue
 					return
