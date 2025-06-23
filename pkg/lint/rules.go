@@ -17,6 +17,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
 	"github.com/robfig/cron/v3"
 	"github.com/spf13/afero"
@@ -1198,6 +1199,7 @@ func (g *GlossaryChecker) EnsureAssetEntitiesExistInGlossary(ctx context.Context
 type sqlParser interface {
 	UsedTables(sql, dialect string) ([]string, error)
 	GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeline *pipeline.Pipeline, renderer jinja.RendererInterface) ([]string, error)
+	ExtractColumns(sql, dialect string) ([]string, error)
 }
 
 type UsedTableValidatorRule struct {
@@ -1246,6 +1248,81 @@ func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.P
 		Description: "There are some tables that are referenced in the query but not included in the 'depends' list.",
 		Context:     missingDeps,
 	})
+
+	return issues, nil
+}
+
+type ColumnMatchQueryValidatorRule struct {
+	parser   sqlParser
+	renderer jinja.RendererInterface
+	isFast   bool
+	severity ValidatorSeverity
+}
+
+func (c ColumnMatchQueryValidatorRule) Name() string {
+	return "columns-match-query"
+}
+
+func (c ColumnMatchQueryValidatorRule) IsFast() bool {
+	return c.isFast
+}
+
+func (c ColumnMatchQueryValidatorRule) GetApplicableLevels() []Level {
+	return []Level{LevelAsset}
+}
+
+func (c ColumnMatchQueryValidatorRule) GetSeverity() ValidatorSeverity {
+	return c.severity
+}
+
+func (c ColumnMatchQueryValidatorRule) Validate(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	return CallFuncForEveryAsset(c.ValidateAsset)(ctx, p)
+}
+
+func (c ColumnMatchQueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	if !asset.IsSQLAsset() {
+		return issues, nil
+	}
+
+	dialect, err := sqlparser.AssetTypeToDialect(asset.Type)
+	if err != nil { //nolint:nilerr
+		return issues, nil
+	}
+	renderedQuery, err := c.renderer.Render(asset.ExecutableFile.Content)
+	if err != nil { //nolint:nilerr
+		return issues, nil
+	}
+
+	queryColumns, err := c.parser.ExtractColumns(renderedQuery, dialect)
+	if err != nil { //nolint:nilerr
+		return issues, nil
+	}
+
+	if len(queryColumns) == 0 {
+		return issues, nil
+	}
+
+	yamlColumns := make(map[string]bool)
+	for _, col := range asset.Columns {
+		yamlColumns[col.Name] = true
+	}
+
+	missingColumns := make([]string, 0)
+	for _, queryCol := range queryColumns {
+		if !yamlColumns[queryCol] {
+			missingColumns = append(missingColumns, queryCol)
+		}
+	}
+
+	if len(missingColumns) > 0 {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Columns found in query but missing from columns metadata: " + strings.Join(missingColumns, ", "),
+			Context:     missingColumns,
+		})
+	}
 
 	return issues, nil
 }
