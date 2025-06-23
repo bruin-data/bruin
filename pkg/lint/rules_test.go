@@ -2587,7 +2587,6 @@ func TestValidateColumnsMatchQuery(t *testing.T) {
 				Type: pipeline.AssetTypeBigqueryQuery,
 				ExecutableFile: pipeline.ExecutableFile{
 					Content: "SELECT id, name, email FROM users",
-					
 				},
 				Materialization: pipeline.Materialization{
 					Type: pipeline.MaterializationTypeTable,
