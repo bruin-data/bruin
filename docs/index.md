@@ -16,10 +16,13 @@ Bruin is packed with features:
 - 📐 table/view [materializations](assets/materialization.md), incremental tables
 - 🐍 run Python in isolated environments using [uv](https://github.com/astral-sh/uv)
 - 💅 built-in data quality checks
+- 🔗 visualize dependencies with [lineage](commands/lineage.md)
+- 🔍 compare tables across connections with [data-diff](commands/data-diff.md)
 - 🚀 Jinja templating to avoid repetition
 - ✅ validate pipelines end-to-end via dry-run
 - 👷 run on your local machine, an EC2 instance, or [GitHub Actions](cicd/github-action.md)
 - 🔒 secrets injection via environment variables
+- 📚 shared terminology via [glossaries](getting-started/glossary.md)
 - [VS Code extension](vscode-extension/overview.md) for a better developer experience
 - ⚡ written in Golang
 - 📦 [easy to install](getting-started/introduction/installation.md) and use
