@@ -637,7 +637,7 @@ GROUP BY 1`,
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := lineage.ColumnLineage(tt.sql, tt.dialect, tt.schema)
 			if tt.wantErr {
