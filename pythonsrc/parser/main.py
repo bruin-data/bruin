@@ -366,3 +366,21 @@ def add_limit(query: str, limit_value: int, dialect: str = None) -> dict:
 
     limited_query = parsed.limit(limit_value).sql(dialect=dialect)
     return {"query": limited_query}
+
+
+def extract_columns_command(query: str, dialect: str) -> dict:
+    """Extract column names from a SQL query without needing a schema."""
+    try:
+        parsed = parse_one(query, dialect=dialect)
+        if parsed is None:
+            return {"columns": [], "error": "unable to parse query"}
+        
+        if not isinstance(parsed, exp.Query):
+            return {"columns": [], "error": "not a SELECT query"}
+        
+        cols = extract_columns(parsed)
+        column_names = [col["name"] for col in cols]
+        
+        return {"columns": column_names}
+    except Exception as e:
+        return {"columns": [], "error": str(e)}

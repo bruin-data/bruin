@@ -373,6 +373,41 @@ func (s *SQLParser) AddLimit(sql string, limit int, dialect string) (string, err
 	return resp.Query, nil
 }
 
+func (s *SQLParser) ExtractColumns(sql, dialect string) ([]string, error) {
+	err := s.Start()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to start sql parser")
+	}
+
+	command := parserCommand{
+		Command: "extract-columns",
+		Contents: map[string]interface{}{
+			"query":   sql,
+			"dialect": dialect,
+		},
+	}
+
+	resp, err := s.sendCommand(&command)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to send command")
+	}
+
+	var result struct {
+		Columns []string `json:"columns"`
+		Error   string   `json:"error"`
+	}
+	err = json.Unmarshal([]byte(resp), &result)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal response")
+	}
+
+	if result.Error != "" {
+		return nil, errors.New(result.Error)
+	}
+
+	return result.Columns, nil
+}
+
 func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeline *pipeline.Pipeline, renderer jinja.RendererInterface) ([]string, error) {
 	err := s.Start()
 	if err != nil {

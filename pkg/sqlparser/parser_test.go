@@ -637,13 +637,12 @@ GROUP BY 1`,
 		},
 	}
 
-	for _, tt := range tests { //nolint
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := lineage.ColumnLineage(tt.sql, tt.dialect, tt.schema)
 			if tt.wantErr {
 				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
+				return
 			}
 
 			require.Equal(t, tt.want.Columns, got.Columns)
@@ -1042,6 +1041,67 @@ func TestGetMissingDependenciesForAsset(t *testing.T) {
 				require.NoError(t, err)
 				require.ElementsMatch(t, tt.expectedDeps, got)
 			}
+		})
+	}
+}
+
+func TestExtractColumns(t *testing.T) {
+	t.Parallel()
+
+	parser, err := NewSQLParser(true)
+	require.NoError(t, err)
+	defer parser.Close()
+
+	require.NoError(t, err)
+	require.NoError(t, parser.Start())
+
+	tests := []struct {
+		name     string
+		sql      string
+		dialect  string
+		expected []string
+		wantErr  bool
+	}{
+		{
+			name:     "simple select",
+			sql:      "SELECT id, name, email FROM users",
+			dialect:  "bigquery",
+			expected: []string{"id", "name", "email"},
+			wantErr:  false,
+		},
+		{
+			name:     "select with aliases",
+			sql:      "SELECT id as user_id, name as user_name FROM users",
+			dialect:  "bigquery",
+			expected: []string{"user_id", "user_name"},
+			wantErr:  false,
+		},
+		{
+			name:     "select with expressions",
+			sql:      "SELECT id, name, COUNT(*) as count FROM users GROUP BY id, name",
+			dialect:  "bigquery",
+			expected: []string{"id", "name", "count"},
+			wantErr:  false,
+		},
+		{
+			name:     "invalid sql",
+			sql:      "INVALID SQL QUERY",
+			dialect:  "bigquery",
+			expected: nil,
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests { //nolint
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parser.ExtractColumns(tt.sql, tt.dialect)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, got)
 		})
 	}
 }

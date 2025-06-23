@@ -2,7 +2,7 @@ import json
 import sys
 import logging
 import os
-from parser.main import get_column_lineage, get_tables, add_limit
+from parser.main import get_column_lineage, get_tables, add_limit, extract_columns_command
 
 from pathlib import Path
 
@@ -54,6 +54,10 @@ def main():
                 logging.info("got add-limit command")
                 c = cmd["contents"]
                 result = add_limit(c["query"], c["limit"], c["dialect"])
+            elif cmd["command"] == "extract-columns":
+                logging.info("got extract-columns command")
+                c = cmd["contents"]
+                result = extract_columns_command(c["query"], c["dialect"])
             elif cmd["command"] == "exit":
                 logging.info("got exit command amx")
                 break
