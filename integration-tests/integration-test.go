@@ -1052,7 +1052,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 		{
 			Name:          "validate-missing-upstream",
 			Command:       binary,
-			Args:          []string{"validate","--fast", "-o", "json", filepath.Join(currentFolder, "test-pipelines/missing-upstream-pipeline/assets/nonexistent.sql")},
+			Args:          []string{"validate", "--fast", "-o", "json", filepath.Join(currentFolder, "test-pipelines/missing-upstream-pipeline/assets/nonexistent.sql")},
 			Env:           []string{},
 			SkipJSONNodes: []string{"\"path\"", "\"extends\""},
 			Expected: e2e.Output{

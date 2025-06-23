@@ -2587,6 +2587,10 @@ func TestValidateColumnsMatchQuery(t *testing.T) {
 				Type: pipeline.AssetTypeBigqueryQuery,
 				ExecutableFile: pipeline.ExecutableFile{
 					Content: "SELECT id, name, email FROM users",
+					
+				},
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
 				},
 				Columns: []pipeline.Column{
 					{Name: "id"},
@@ -2607,6 +2611,9 @@ func TestValidateColumnsMatchQuery(t *testing.T) {
 					Content: "SELECT id, name, email FROM users",
 				},
 				Columns: []pipeline.Column{}, // No columns defined
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
 			},
 			setup: func(p *mockSQLParser) {
 				p.On("ExtractColumns", "SELECT id, name, email FROM users", "bigquery").Return([]string{"id", "name", "email"}, nil)
