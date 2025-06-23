@@ -276,7 +276,7 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 	for _, pk := range primaryKeys {
 		joinConds = append(joinConds, fmt.Sprintf("target.%[1]s = source.%[1]s", pk))
 	}
-	joinConds = append(joinConds, "target._is_current = source._is_current")
+	joinConds = append(joinConds, "target._is_current AND source._is_current")
 	onCondition := strings.Join(joinConds, " AND ")
 	tbl := fmt.Sprintf("`%s`", asset.Name)
 
@@ -286,13 +286,13 @@ USING (
   WITH s1 AS (
     %s
   )
-  SELECT *, TRUE AS _is_current
+  SELECT s1.*, TRUE AS _is_current
   FROM   s1
   UNION ALL
   SELECT s1.*, FALSE AS _is_current
-  FROM   s1
+  FROM s1
   JOIN   %s AS t1 USING (%s)
-  WHERE  t1._valid_from < CAST (s1.%s AS TIMESTAMP)
+  WHERE  t1._valid_from < CAST (s1.%s AS TIMESTAMP) AND t1._is_current
 ) AS source
 ON  %s
 

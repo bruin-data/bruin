@@ -1542,6 +1542,60 @@ func getCloudWorkflows(binary string, currentFolder string, tempdir string) []e2
 						e2e.AssertByCSV,
 					},
 				},
+				{
+					Name:    "copy products_latest.sql to products.sql",
+					Command: "cp",
+					Args:    []string{filepath.Join(currentFolder, "bigquery-integration-tests/resources/products_latest.sql"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-time-pipeline/assets/products.sql")},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "update table again with scd2_by_time materialization",
+					Command: binary,
+					Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-time-pipeline/assets/products.sql")},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "query the scd2_by_time materialized table",
+					Command: binary,
+					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+						CSVFile:  filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-time-pipeline/expectations/scd2_time_latest_expected.csv"),
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByCSV,
+					},
+				},
+				{
+					Name:    "restore asset to initial state",
+					Command: "cp",
+					Args:    []string{filepath.Join(currentFolder, "bigquery-integration-tests/resources/products_original.sql"), filepath.Join(currentFolder, "bigquery-integration-tests/big-test-pipes/scd2-by-time-pipeline/assets/products.sql")},
+					Env:     []string{},
+
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
 			},
 		},
 	}

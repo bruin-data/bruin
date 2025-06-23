@@ -594,15 +594,15 @@ func TestBuildSCD2Query(t *testing.T) {
 				"  WITH s1 AS (\n" +
 				"    SELECT id, event_name, ts from source_table\n" +
 				"  )\n" +
-				"  SELECT *, TRUE AS _is_current\n" +
+				"  SELECT s1.*, TRUE AS _is_current\n" +
 				"  FROM   s1\n" +
 				"  UNION ALL\n" +
 				"  SELECT s1.*, FALSE AS _is_current\n" +
-				"  FROM   s1\n" +
+				"  FROM s1\n" +
 				"  JOIN   `my.asset` AS t1 USING (id)\n" +
-				"  WHERE  t1._valid_from < CAST (s1.ts AS TIMESTAMP)\n" +
+				"  WHERE  t1._valid_from < CAST (s1.ts AS TIMESTAMP) AND t1._is_current\n" +
 				") AS source\n" +
-				"ON  target.id = source.id AND target._is_current = source._is_current\n" +
+				"ON  target.id = source.id AND target._is_current AND source._is_current\n" +
 				"\n" +
 				"WHEN MATCHED AND (\n" +
 				"  target._valid_from < CAST (source.ts AS TIMESTAMP)\n" +
@@ -643,15 +643,15 @@ func TestBuildSCD2Query(t *testing.T) {
 				"  WITH s1 AS (\n" +
 				"    SELECT id, event_type, col1, col2, ts from source_table\n" +
 				"  )\n" +
-				"  SELECT *, TRUE AS _is_current\n" +
+				"  SELECT s1.*, TRUE AS _is_current\n" +
 				"  FROM   s1\n" +
 				"  UNION ALL\n" +
 				"  SELECT s1.*, FALSE AS _is_current\n" +
-				"  FROM   s1\n" +
+				"  FROM s1\n" +
 				"  JOIN   `my.asset` AS t1 USING (id, event_type)\n" +
-				"  WHERE  t1._valid_from < CAST (s1.ts AS TIMESTAMP)\n" +
+				"  WHERE  t1._valid_from < CAST (s1.ts AS TIMESTAMP) AND t1._is_current\n" +
 				") AS source\n" +
-				"ON  target.id = source.id AND target.event_type = source.event_type AND target._is_current = source._is_current\n" +
+				"ON  target.id = source.id AND target.event_type = source.event_type AND target._is_current AND source._is_current\n" +
 				"\n" +
 				"WHEN MATCHED AND (\n" +
 				"  target._valid_from < CAST (source.ts AS TIMESTAMP)\n" +
