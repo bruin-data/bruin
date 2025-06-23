@@ -24,12 +24,13 @@ import (
 )
 
 type SQLParser struct {
-	ep          *python.EmbeddedPython
-	sqlglotDir  *embed_util.EmbeddedFiles
-	rendererSrc *embed_util.EmbeddedFiles
-	tmpDir      string
-	started     bool
-	randomize   bool
+	ep             *python.EmbeddedPython
+	sqlglotDir     *embed_util.EmbeddedFiles
+	rendererSrc    *embed_util.EmbeddedFiles
+	tmpDir         string
+	started        bool
+	randomize      bool
+	MaxQueryLength int
 
 	stdout io.ReadCloser
 	stdin  io.WriteCloser
@@ -40,6 +41,10 @@ type SQLParser struct {
 }
 
 func NewSQLParser(randomize bool) (*SQLParser, error) {
+	return NewSQLParserWithConfig(randomize, 10000)
+}
+
+func NewSQLParserWithConfig(randomize bool, maxQueryLength int) (*SQLParser, error) {
 	randomInt := 0
 	if randomize {
 		b := make([]byte, 4)
@@ -67,11 +72,12 @@ func NewSQLParser(randomize bool) (*SQLParser, error) {
 	}
 
 	return &SQLParser{
-		ep:          ep,
-		sqlglotDir:  sqlglotDir,
-		rendererSrc: rendererSrc,
-		tmpDir:      tmpDir,
-		randomize:   randomize,
+		ep:             ep,
+		sqlglotDir:     sqlglotDir,
+		rendererSrc:    rendererSrc,
+		tmpDir:         tmpDir,
+		randomize:      randomize,
+		MaxQueryLength: maxQueryLength,
 	}, nil
 }
 
@@ -138,7 +144,7 @@ type Lineage struct {
 }
 
 func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage, error) {
-	if len(sql) > 10000 {
+	if len(sql) > s.MaxQueryLength {
 		return &Lineage{
 			Columns:            []ColumnLineage{},
 			NonSelectedColumns: []ColumnLineage{},
