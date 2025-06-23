@@ -271,5 +271,6 @@
   },
   "catchup": false,
   "commit": "",
-  "retries": 3
+  "retries": 3,
+  "concurrency": 0
 }

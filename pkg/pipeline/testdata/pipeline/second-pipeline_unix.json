@@ -3,13 +3,10 @@
     "name": "first-pipeline",
     "schedule": "",
     "start_date": "",
-    "snapshot": "",
-    "agent": false,
     "definition_file": {
         "name": "pipeline.yml",
         "path": "__BASEDIR__/testdata/pipeline/second-pipeline/pipeline.yml"
     },
-    "variables": null,
     "default_connections": {
         "gcpConnectionId": "gcp-connection-id-here",
         "slack": "slack-connection"
@@ -24,7 +21,6 @@
             "connection": "",
             "tags": [],
             "materialization": null,
-            "interval_modifiers": null,
             "upstreams": [],
             "image": "",
             "instance": "",
@@ -50,7 +46,8 @@
             "custom_checks": [],
             "metadata": {},
             "snowflake": null,
-            "athena": null
+            "athena": null,
+            "interval_modifiers": null
         },
         {
             "id": "a01e7580b118b5fbbdc1f7c8de6b8c377c684727e4e8ad574e9153a3dbd46dd1",
@@ -61,7 +58,6 @@
             "connection": "",
             "tags": [],
             "materialization": null,
-            "interval_modifiers": null,
             "upstreams": [],
             "image": "",
             "instance": "",
@@ -87,7 +83,8 @@
             "custom_checks": [],
             "metadata": {},
             "snowflake": null,
-            "athena": null
+            "athena": null,
+            "interval_modifiers": null
         },
         {
             "id": "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
@@ -101,7 +98,6 @@
                 "tag2:value2"
             ],
             "materialization": null,
-            "interval_modifiers": null,
             "upstreams": [
                 {
                     "type": "asset",
@@ -230,12 +226,12 @@
                     "value": 16,
                     "blocking": false,
                     "query": "select 5"
-
                 }
             ],
             "metadata": {},
             "snowflake": null,
-            "athena": null
+            "athena": null,
+            "interval_modifiers": null
         }
     ],
     "notifications": {
@@ -244,9 +240,13 @@
         "discord": []
     },
     "catchup": false,
-    "commit": "",
     "metadata_push": {
         "bigquery": false
     },
-    "retries": 0
+    "retries": 0,
+    "concurrency": 0,
+    "commit": "",
+    "snapshot": "",
+    "agent": false,
+    "variables": null
 }
