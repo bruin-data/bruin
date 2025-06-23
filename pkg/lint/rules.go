@@ -1282,6 +1282,10 @@ func (c ColumnMatchQueryValidatorRule) Validate(ctx context.Context, p *pipeline
 func (c ColumnMatchQueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
+	if asset.Materialization.Type == pipeline.MaterializationTypeNone {
+		return issues, nil
+	}
+
 	if !asset.IsSQLAsset() {
 		return issues, nil
 	}
