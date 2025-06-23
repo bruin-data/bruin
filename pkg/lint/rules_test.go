@@ -2662,3 +2662,163 @@ func TestValidateColumnsMatchQuery(t *testing.T) {
 		})
 	}
 }
+
+type fakeQuerierWithSchema struct {
+	columns     []string
+	columnTypes []string
+	err         error
+}
+
+func (f *fakeQuerierWithSchema) SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &query.QueryResult{
+		Columns:     f.columns,
+		ColumnTypes: f.columnTypes,
+		Rows:        [][]interface{}{},
+	}, nil
+}
+
+func TestColumnMatchDBValidatorRule_Simple(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name           string
+		asset          *pipeline.Asset
+		setup          func(cm *fakeConnectionManager)
+		expectedIssues int
+		description    string
+	}{
+		{
+			name: "Missing column in metadata",
+			asset: &pipeline.Asset{
+				Name:       "test_table",
+				Connection: "conn",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id"},
+				},
+			},
+			setup: func(cm *fakeConnectionManager) {
+				cm.validator = &fakeQuerierWithSchema{
+					columns:     []string{"id", "missing_col"},
+					columnTypes: []string{"INTEGER", "VARCHAR"},
+				}
+			},
+			expectedIssues: 1,
+			description:    "missing_col",
+		},
+		{
+			name: "Connection error should skip",
+			asset: &pipeline.Asset{
+				Name:       "test_table",
+				Connection: "conn",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id"},
+				},
+			},
+			setup: func(cm *fakeConnectionManager) {
+				cm.err = errors.New("connection error")
+			},
+			expectedIssues: 0,
+		},
+		{
+			name: "Case-insensitive matching",
+			asset: &pipeline.Asset{
+				Name:       "test_table",
+				Connection: "conn",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+				Columns: []pipeline.Column{
+					{Name: "UserId"},
+					{Name: "UserName"},
+				},
+			},
+			setup: func(cm *fakeConnectionManager) {
+				cm.validator = &fakeQuerierWithSchema{
+					columns:     []string{"userid", "username", "email"},
+					columnTypes: []string{"INTEGER", "VARCHAR", "VARCHAR"},
+				}
+			},
+			expectedIssues: 1,
+			description:    "email",
+		},
+		{
+			name: "No missing columns - all match",
+			asset: &pipeline.Asset{
+				Name:       "test_table",
+				Connection: "conn",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id"},
+					{Name: "name"},
+					{Name: "email"},
+				},
+			},
+			setup: func(cm *fakeConnectionManager) {
+				cm.validator = &fakeQuerierWithSchema{
+					columns:     []string{"id", "name", "email"},
+					columnTypes: []string{"INTEGER", "VARCHAR", "VARCHAR"},
+				}
+			},
+			expectedIssues: 0,
+		},
+		{
+			name: "Table has no columns (table doesn't exist or is empty)",
+			asset: &pipeline.Asset{
+				Name:       "test_table",
+				Connection: "conn",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeTable,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id"},
+					{Name: "name"},
+				},
+			},
+			setup: func(cm *fakeConnectionManager) {
+				cm.validator = &fakeQuerierWithSchema{
+					columns:     []string{},
+					columnTypes: []string{},
+				}
+			},
+			expectedIssues: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			cm := &fakeConnectionManager{}
+			rule := ColumnMatchDBValidatorRule{
+				connections: cm,
+				renderer:    jinja.NewRendererWithYesterday("test", "test"),
+				isFast:      false,
+				severity:    ValidatorSeverityWarning,
+			}
+
+			if tt.setup != nil {
+				tt.setup(cm)
+			}
+
+			basePipeline := &pipeline.Pipeline{Assets: []*pipeline.Asset{tt.asset}}
+			p := &testPipeline{Pipeline: basePipeline}
+
+			issues, err := rule.ValidateAsset(context.Background(), p.Pipeline, tt.asset)
+			require.NoError(t, err)
+			assert.Len(t, issues, tt.expectedIssues)
+
+			if tt.expectedIssues > 0 && tt.description != "" {
+				assert.Contains(t, issues[0].Description, tt.description)
+			}
+		})
+	}
+}

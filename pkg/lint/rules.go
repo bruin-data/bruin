@@ -1347,3 +1347,108 @@ func ValidateVariables(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, err
 
 	return issues, nil
 }
+
+type ColumnMatchDBValidatorRule struct {
+	connections connectionManager
+	renderer    jinja.RendererInterface
+	isFast      bool
+	severity    ValidatorSeverity
+}
+
+func (c ColumnMatchDBValidatorRule) Name() string {
+	return "columns-match-db"
+}
+
+func (c ColumnMatchDBValidatorRule) IsFast() bool {
+	return c.isFast
+}
+
+func (c ColumnMatchDBValidatorRule) GetApplicableLevels() []Level {
+	return []Level{LevelAsset}
+}
+
+func (c ColumnMatchDBValidatorRule) GetSeverity() ValidatorSeverity {
+	return c.severity
+}
+
+func (c ColumnMatchDBValidatorRule) Validate(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	return CallFuncForEveryAsset(c.ValidateAsset)(ctx, p)
+}
+
+func (c ColumnMatchDBValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	if asset.Materialization.Type != pipeline.MaterializationTypeTable {
+		return issues, nil
+	}
+
+	connName, err := p.GetConnectionNameForAsset(asset)
+	if err != nil {
+		return issues, nil //nolint:nilerr
+	}
+
+	conn, err := c.connections.GetConnection(connName)
+	if err != nil {
+		return issues, nil //nolint:nilerr
+	}
+
+	querier, ok := conn.(interface {
+		SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
+	})
+	if !ok {
+		return issues, nil //nolint:nilerr
+	}
+
+	tableName := asset.Name
+	queryStr := fmt.Sprintf("SELECT * FROM %s WHERE 1=0 LIMIT 0", tableName)
+	q := &query.Query{Query: queryStr}
+	result, err := querier.SelectWithSchema(ctx, q)
+	if err != nil {
+		return issues, nil //nolint:nilerr
+	}
+
+	if len(result.Columns) == 0 {
+		return issues, nil //nolint:nilerr
+	}
+
+	skipColumns := map[string]bool{
+		"_is_current":  true,
+		"_valid_until": true,
+		"_valid_from":  true,
+	}
+
+	existingColumns := make(map[string]bool)
+	for _, col := range asset.Columns {
+		existingColumns[strings.ToLower(col.Name)] = true
+	}
+
+	missingColumns := make([]string, 0)
+	for _, colName := range result.Columns {
+		if skipColumns[colName] {
+			continue
+		}
+		lowerColName := strings.ToLower(colName)
+		if !existingColumns[lowerColName] {
+			missingColumns = append(missingColumns, colName)
+		}
+	}
+
+	if len(missingColumns) > 0 {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: "Columns found in database but missing from metadata: " + strings.Join(missingColumns, ", "),
+			Context:     missingColumns,
+		})
+	}
+
+	return issues, nil
+}
+
+func GetColumnMatchDBValidatorRule(connections connectionManager, renderer jinja.RendererInterface) *ColumnMatchDBValidatorRule {
+	return &ColumnMatchDBValidatorRule{
+		connections: connections,
+		renderer:    renderer,
+		isFast:      false,
+		severity:    ValidatorSeverityWarning,
+	}
+}
