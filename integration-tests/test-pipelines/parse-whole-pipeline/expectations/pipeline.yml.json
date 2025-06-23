@@ -208,5 +208,6 @@
   "metadata_push": {
     "bigquery": false
   },
-  "retries": 0
+  "retries": 0,
+  "concurrency": 0
 }
