@@ -292,7 +292,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 	}
 
 	// build ingestr flags
-	cmdArgs, err := ConsolidatedParameters(ctx, asset, []string{
+	cmdArgs, err := ConsolidatedParameters(ctx, execCtx.pipeline, asset, []string{
 		"ingest",
 		"--source-uri",
 		"mmap://" + arrowFilePath,

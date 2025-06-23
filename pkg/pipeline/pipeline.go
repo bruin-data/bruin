@@ -669,6 +669,11 @@ type Asset struct { //nolint:recvcheck
 	Athena            AthenaConfig       `json:"athena" yaml:"athena,omitempty" mapstructure:"athena"`
 	IntervalModifiers IntervalModifiers  `json:"interval_modifiers" yaml:"interval_modifiers,omitempty" mapstructure:"interval_modifiers"`
 
+	// StartDate indicates from which point in time the asset should be
+	// backfilled when running a full refresh. If empty, the pipeline
+	// StartDate will be used.
+	StartDate string `json:"start_date,omitempty" yaml:"start_date,omitempty" mapstructure:"start_date"`
+
 	upstream   []*Asset
 	downstream []*Asset
 }

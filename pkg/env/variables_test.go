@@ -36,7 +36,7 @@ func TestSetupVariables(t *testing.T) {
 			expectedEnv: map[string]string{"EXISTING": "value"},
 		},
 		{
-			name: "with days modifier",
+			name: "with days modifier, no full refresh modifiers",
 			setupCtx: func() context.Context {
 				ctx := context.Background()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
@@ -52,9 +52,9 @@ func TestSetupVariables(t *testing.T) {
 				},
 			},
 			expectedEnv: map[string]string{
-				"BRUIN_START_DATE":      "2024-01-02",
-				"BRUIN_START_DATETIME":  "2024-01-02T00:00:00",
-				"BRUIN_START_TIMESTAMP": "2024-01-02T00:00:00.000000Z",
+				"BRUIN_START_DATE":      "2024-01-01",
+				"BRUIN_START_DATETIME":  "2024-01-01T00:00:00",
+				"BRUIN_START_TIMESTAMP": "2024-01-01T00:00:00.000000Z",
 				"BRUIN_END_DATE":        "2024-01-02",
 				"BRUIN_END_DATETIME":    "2024-01-02T00:00:00",
 				"BRUIN_END_TIMESTAMP":   "2024-01-02T00:00:00.000000Z",
@@ -64,7 +64,7 @@ func TestSetupVariables(t *testing.T) {
 			},
 		},
 		{
-			name: "with hours modifier",
+			name: "with hours modifier, no full refresh modifiers",
 			setupCtx: func() context.Context {
 				ctx := context.Background()
 				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC))
@@ -81,8 +81,8 @@ func TestSetupVariables(t *testing.T) {
 			},
 			expectedEnv: map[string]string{
 				"BRUIN_START_DATE":      "2024-01-01",
-				"BRUIN_START_DATETIME":  "2024-01-01T12:00:00",
-				"BRUIN_START_TIMESTAMP": "2024-01-01T12:00:00.000000Z",
+				"BRUIN_START_DATETIME":  "2024-01-01T10:00:00",
+				"BRUIN_START_TIMESTAMP": "2024-01-01T10:00:00.000000Z",
 				"BRUIN_END_DATE":        "2024-01-01",
 				"BRUIN_END_DATETIME":    "2024-01-01T12:00:00",
 				"BRUIN_END_TIMESTAMP":   "2024-01-01T12:00:00.000000Z",
@@ -177,6 +177,65 @@ func TestSetupVariables(t *testing.T) {
 				"BRUIN_PIPELINE":        "test-pipeline",
 				"BRUIN_RUN_ID":          "test-run",
 				"BRUIN_VARS":            `{"env":"dev","users":["alice","bob","charlie"]}`,
+			},
+		},
+		{
+			name: "full refresh uses asset start date",
+			setupCtx: func() context.Context {
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 10, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 12, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
+				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, true)
+				return ctx
+			},
+			asset: &pipeline.Asset{
+				StartDate: "2024-01-05",
+				IntervalModifiers: pipeline.IntervalModifiers{
+					Start: pipeline.TimeModifier{Days: 1},
+				},
+			},
+			pipeline: &pipeline.Pipeline{
+				Name:      "test-pipeline",
+				StartDate: "2024-01-03",
+			},
+			expectedEnv: map[string]string{
+				"BRUIN_START_DATE":      "2024-01-05",
+				"BRUIN_START_DATETIME":  "2024-01-05T00:00:00",
+				"BRUIN_START_TIMESTAMP": "2024-01-05T00:00:00.000000Z",
+				"BRUIN_END_DATE":        "2024-01-12",
+				"BRUIN_END_DATETIME":    "2024-01-12T00:00:00",
+				"BRUIN_END_TIMESTAMP":   "2024-01-12T00:00:00.000000Z",
+				"BRUIN_PIPELINE":        "test-pipeline",
+				"BRUIN_RUN_ID":          "test-run",
+				"BRUIN_FULL_REFRESH":    "1",
+			},
+		},
+		{
+			name: "full refresh uses pipeline start date",
+			setupCtx: func() context.Context {
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Date(2024, 1, 10, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Date(2024, 1, 12, 0, 0, 0, 0, time.UTC))
+				ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run")
+				ctx = context.WithValue(ctx, pipeline.RunConfigFullRefresh, true)
+				return ctx
+			},
+			asset: &pipeline.Asset{},
+			pipeline: &pipeline.Pipeline{
+				Name:      "test-pipeline",
+				StartDate: "2024-01-04",
+			},
+			expectedEnv: map[string]string{
+				"BRUIN_START_DATE":      "2024-01-04",
+				"BRUIN_START_DATETIME":  "2024-01-04T00:00:00",
+				"BRUIN_START_TIMESTAMP": "2024-01-04T00:00:00.000000Z",
+				"BRUIN_END_DATE":        "2024-01-12",
+				"BRUIN_END_DATETIME":    "2024-01-12T00:00:00",
+				"BRUIN_END_TIMESTAMP":   "2024-01-12T00:00:00.000000Z",
+				"BRUIN_PIPELINE":        "test-pipeline",
+				"BRUIN_RUN_ID":          "test-run",
+				"BRUIN_FULL_REFRESH":    "1",
 			},
 		},
 	}
