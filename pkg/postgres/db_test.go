@@ -422,10 +422,12 @@ func TestDB_GetDatabaseSummary(t *testing.T) {
 						Name: "schema1",
 						Tables: []*ansisql.DBTable{
 							{
-								Name: "table1",
+								Name:    "table1",
+								Columns: []*ansisql.DBColumn{},
 							},
 							{
-								Name: "table2",
+								Name:    "table2",
+								Columns: []*ansisql.DBColumn{},
 							},
 						},
 					},
@@ -433,7 +435,8 @@ func TestDB_GetDatabaseSummary(t *testing.T) {
 						Name: "schema2",
 						Tables: []*ansisql.DBTable{
 							{
-								Name: "table2",
+								Name:    "table2",
+								Columns: []*ansisql.DBColumn{},
 							},
 						},
 					},

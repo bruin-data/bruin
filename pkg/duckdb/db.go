@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
@@ -412,4 +413,70 @@ func (c *Client) fetchJSONStats(ctx context.Context, tableName, columnName strin
 	}
 
 	return stats, nil
+}
+
+func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
+	// DuckDB uses a catalog approach, we'll use the INFORMATION_SCHEMA
+	// First, let's get all schemas and tables
+	q := `
+SELECT
+    table_schema,
+    table_name
+FROM
+    information_schema.tables
+WHERE
+    table_type IN ('BASE TABLE', 'VIEW')
+    AND table_schema NOT IN ('information_schema', 'pg_catalog', 'main')
+ORDER BY table_schema, table_name;
+`
+
+	rows, err := c.connection.QueryContext(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query DuckDB information_schema: %w", err)
+	}
+	defer rows.Close()
+
+	summary := &ansisql.DBDatabase{
+		Name:    "duckdb", // DuckDB doesn't have a specific database name concept like traditional databases
+		Schemas: []*ansisql.DBSchema{},
+	}
+	schemas := make(map[string]*ansisql.DBSchema)
+
+	for rows.Next() {
+		var schemaName, tableName string
+		if err := rows.Scan(&schemaName, &tableName); err != nil {
+			return nil, fmt.Errorf("failed to scan schema and table names: %w", err)
+		}
+
+		// Create schema if it doesn't exist
+		if _, exists := schemas[schemaName]; !exists {
+			schema := &ansisql.DBSchema{
+				Name:   schemaName,
+				Tables: []*ansisql.DBTable{},
+			}
+			schemas[schemaName] = schema
+		}
+
+		// Add table to schema
+		table := &ansisql.DBTable{
+			Name:    tableName,
+			Columns: []*ansisql.DBColumn{}, // Initialize empty columns array
+		}
+		schemas[schemaName].Tables = append(schemas[schemaName].Tables, table)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over schema rows: %w", err)
+	}
+
+	for _, schema := range schemas {
+		summary.Schemas = append(summary.Schemas, schema)
+	}
+
+	// Sort schemas by name
+	sort.Slice(summary.Schemas, func(i, j int) bool {
+		return summary.Schemas[i].Name < summary.Schemas[j].Name
+	})
+
+	return summary, nil
 }

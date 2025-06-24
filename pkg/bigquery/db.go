@@ -3,10 +3,12 @@ package bigquery
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -842,4 +844,64 @@ func (d *Client) fetchJSONStats(ctx context.Context, tableName, columnName strin
 	}
 
 	return stats, nil
+}
+
+func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
+	// For BigQuery, we'll list all datasets in the project and their tables
+	projectID := d.config.ProjectID
+
+	summary := &ansisql.DBDatabase{
+		Name:    projectID,
+		Schemas: []*ansisql.DBSchema{},
+	}
+
+	// List all datasets in the project using BigQuery API
+	datasets := d.client.Datasets(ctx)
+	for {
+		dataset, err := datasets.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to list BigQuery datasets: %w", err)
+		}
+
+		schema := &ansisql.DBSchema{
+			Name:   dataset.DatasetID,
+			Tables: []*ansisql.DBTable{},
+		}
+
+		// List all tables in this dataset
+		tables := dataset.Tables(ctx)
+		for {
+			table, err := tables.Next()
+			if errors.Is(err, iterator.Done) {
+				break
+			}
+			if err != nil {
+				return nil, fmt.Errorf("failed to list tables in dataset %s: %w", dataset.DatasetID, err)
+			}
+
+			// Add table to schema
+			dbTable := &ansisql.DBTable{
+				Name:    table.TableID,
+				Columns: []*ansisql.DBColumn{}, // Initialize empty columns array
+			}
+			schema.Tables = append(schema.Tables, dbTable)
+		}
+
+		// Sort tables by name for consistent output
+		sort.Slice(schema.Tables, func(i, j int) bool {
+			return schema.Tables[i].Name < schema.Tables[j].Name
+		})
+
+		summary.Schemas = append(summary.Schemas, schema)
+	}
+
+	// Sort schemas by name for consistent output
+	sort.Slice(summary.Schemas, func(i, j int) bool {
+		return summary.Schemas[i].Name < summary.Schemas[j].Name
+	})
+
+	return summary, nil
 }

@@ -2,9 +2,12 @@ package clickhouse
 
 import (
 	"context"
+	"fmt"
+	"sort"
 
 	click_house "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
 )
@@ -125,8 +128,76 @@ func (c *Client) Ping(ctx context.Context) error {
 	}
 	err := c.RunQueryWithoutResult(ctx, &q)
 	if err != nil {
-		return errors.Wrap(err, "failed to run test query on Postgres connection")
+		return errors.Wrap(err, "failed to run test query on ClickHouse connection")
 	}
 
 	return nil
+}
+
+func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
+	// ClickHouse has databases and tables
+	// We'll query system.tables to get all databases and tables
+	q := `
+SELECT
+    database,
+    name as table_name
+FROM
+    system.tables
+WHERE
+    database NOT IN ('system', 'information_schema', 'INFORMATION_SCHEMA')
+ORDER BY database, name;
+`
+
+	result, err := c.Select(ctx, &query.Query{Query: q})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query ClickHouse system tables: %w", err)
+	}
+
+	summary := &ansisql.DBDatabase{
+		Name:    "clickhouse", // ClickHouse instance
+		Schemas: []*ansisql.DBSchema{},
+	}
+	schemas := make(map[string]*ansisql.DBSchema)
+
+	for _, row := range result {
+		if len(row) != 2 {
+			continue
+		}
+
+		schemaName, ok := row[0].(string)
+		if !ok {
+			continue
+		}
+		tableName, ok := row[1].(string)
+		if !ok {
+			continue
+		}
+
+		// Create schema if it doesn't exist
+		if _, exists := schemas[schemaName]; !exists {
+			schema := &ansisql.DBSchema{
+				Name:   schemaName,
+				Tables: []*ansisql.DBTable{},
+			}
+			schemas[schemaName] = schema
+		}
+
+		// Add table to schema
+		table := &ansisql.DBTable{
+			Name:    tableName,
+			Columns: []*ansisql.DBColumn{}, // Initialize empty columns array
+		}
+		schemas[schemaName].Tables = append(schemas[schemaName].Tables, table)
+	}
+
+	for _, schema := range schemas {
+		summary.Schemas = append(summary.Schemas, schema)
+	}
+
+	// Sort schemas by name
+	sort.Slice(summary.Schemas, func(i, j int) bool {
+		return summary.Schemas[i].Name < summary.Schemas[j].Name
+	})
+
+	return summary, nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"sync"
 
@@ -770,4 +771,75 @@ func (db *DB) fetchJSONStats(ctx context.Context, tableName, columnName string) 
 	}
 
 	return stats, nil
+}
+
+func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
+	// Get the current database name
+	databaseName := db.config.Database
+
+	// Query to get all schemas and tables in the database
+	q := fmt.Sprintf(`
+SELECT
+    table_schema,
+    table_name
+FROM
+    %s.INFORMATION_SCHEMA.TABLES
+WHERE
+    table_type IN ('BASE TABLE', 'VIEW')
+ORDER BY table_schema, table_name;
+`, databaseName)
+
+	result, err := db.Select(ctx, &query.Query{Query: q})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query Snowflake INFORMATION_SCHEMA: %w", err)
+	}
+
+	summary := &ansisql.DBDatabase{
+		Name:    databaseName,
+		Schemas: []*ansisql.DBSchema{},
+	}
+	schemas := make(map[string]*ansisql.DBSchema)
+
+	for _, row := range result {
+		if len(row) != 2 {
+			continue
+		}
+
+		schemaName, ok := row[0].(string)
+		if !ok {
+			continue
+		}
+		tableName, ok := row[1].(string)
+		if !ok {
+			continue
+		}
+
+		// Create schema if it doesn't exist
+		schemaKey := databaseName + "." + schemaName
+		if _, exists := schemas[schemaKey]; !exists {
+			schema := &ansisql.DBSchema{
+				Name:   schemaName,
+				Tables: []*ansisql.DBTable{},
+			}
+			schemas[schemaKey] = schema
+		}
+
+		// Add table to schema
+		table := &ansisql.DBTable{
+			Name:    tableName,
+			Columns: []*ansisql.DBColumn{}, // Initialize empty columns array
+		}
+		schemas[schemaKey].Tables = append(schemas[schemaKey].Tables, table)
+	}
+
+	for _, schema := range schemas {
+		summary.Schemas = append(summary.Schemas, schema)
+	}
+
+	// Sort schemas by name
+	sort.Slice(summary.Schemas, func(i, j int) bool {
+		return summary.Schemas[i].Name < summary.Schemas[j].Name
+	})
+
+	return summary, nil
 }

@@ -3,8 +3,8 @@ package ansisql
 import "fmt"
 
 type DBDatabase struct {
-	Name    string
-	Schemas []*DBSchema
+	Name    string      `json:"name"`
+	Schemas []*DBSchema `json:"schemas"`
 }
 
 func (d *DBDatabase) TableExists(schema, table string) bool {
@@ -21,33 +21,33 @@ func (d *DBDatabase) TableExists(schema, table string) bool {
 }
 
 type DBSchema struct {
-	Name   string
-	Tables []*DBTable
+	Name   string     `json:"name"`
+	Tables []*DBTable `json:"tables"`
 }
 
 type DBTable struct {
-	Name    string
-	Columns []*DBColumn
+	Name    string      `json:"name"`
+	Columns []*DBColumn `json:"columns"`
 }
 
 type DBColumn struct {
-	Name       string
-	Type       string
-	Nullable   bool
-	PrimaryKey bool
-	Unique     bool
+	Name       string `json:"name"`
+	Type       string `json:"type"`
+	Nullable   bool   `json:"nullable"`
+	PrimaryKey bool   `json:"primary_key"`
+	Unique     bool   `json:"unique"`
 }
 
 type DBColumnType struct {
-	Name      string
-	Size      int
-	Precision int
-	Scale     int
+	Name      string `json:"name"`
+	Size      int    `json:"size"`
+	Precision int    `json:"precision"`
+	Scale     int    `json:"scale"`
 }
 
 type TableSummaryResult struct {
-	RowCount int64
-	Table    *DBTable
+	RowCount int64    `json:"row_count"`
+	Table    *DBTable `json:"table"`
 }
 
 func (tsr *TableSummaryResult) String() string {
