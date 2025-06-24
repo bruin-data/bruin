@@ -34,14 +34,36 @@ jobs:
           if version_gt "$latest" "$current"; then
               echo "new=true" >> "$GITHUB_OUTPUT"
               echo "version=$latest" >> "$GITHUB_OUTPUT"
-              sed -i -E "s|(ingestrVersion\s*=\s*\")[^\"]+(\" )|\1$latest\2|" pkg/python/uv.go
           else
               echo "new=false" >> "$GITHUB_OUTPUT"
           fi
-          # echo "Script completed"
+
+      - name: Update ingestr version in code
+        if: steps.check.outputs.new == 'true'
+        run: |
+          set -euo pipefail
+          
+          # Update the version using sed with a more robust pattern
+          sed -i -E 's/(ingestrVersion[[:space:]]*=[[:space:]]*)"[^"]+"/\1"${{ steps.check.outputs.version }}"/' pkg/python/uv.go
+          
+          # Verify the change was made
+          echo "Updated version in pkg/python/uv.go:"
+          grep -n "ingestrVersion" pkg/python/uv.go
+          
+          # Stage the changes
+          git add pkg/python/uv.go
+          
+          # Check if there are actually changes to commit
+          if git diff --cached --quiet; then
+            echo "No changes detected after update"
+            exit 1
+          fi
+          
+          echo "Changes staged successfully"
 
       - name: Check if branch exists
         id: check-branch-exists
+        if: steps.check.outputs.new == 'true'
         run: |
             if [[ -n $(git ls-remote --heads origin update-ingestr-${{ steps.check.outputs.version }}) ]]; then
                 echo "exists=true" >> $GITHUB_OUTPUT
