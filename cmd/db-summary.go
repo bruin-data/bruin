@@ -78,10 +78,10 @@ func DBSummary() *cli.Command {
 				printDatabaseSummary(summary)
 			case "json":
 				type jsonResponse struct {
-					DatabaseName string                `json:"database_name"`
-					Schemas      []*ansisql.DBSchema   `json:"schemas"`
-					ConnName     string                `json:"connection_name"`
-					Summary      *SummaryStats         `json:"summary"`
+					DatabaseName string              `json:"database_name"`
+					Schemas      []*ansisql.DBSchema `json:"schemas"`
+					ConnName     string              `json:"connection_name"`
+					Summary      *SummaryStats       `json:"summary"`
 				}
 
 				stats := calculateSummaryStats(summary)

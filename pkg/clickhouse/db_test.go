@@ -385,7 +385,7 @@ func TestClient_Ping(t *testing.T) {
 			setupMock: func(conn *MockConn) {
 				conn.On("Exec", mock.Anything, "SELECT 1").Return(errors.New("ping error"))
 			},
-			wantErr: "failed to run test query on Postgres connection: ping error",
+			wantErr: "failed to run test query on ClickHouse connection: ping error",
 		},
 	}
 

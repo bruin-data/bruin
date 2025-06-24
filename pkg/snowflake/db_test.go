@@ -703,3 +703,95 @@ func TestDB_PushColumnDescriptions(t *testing.T) {
 		})
 	}
 }
+
+func TestDB_GetDatabaseSummary(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		mockConnection func(mock sqlmock.Sqlmock)
+		want           *ansisql.DBDatabase
+		wantErr        string
+	}{
+		{
+			name: "successful database summary",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(`SELECT
+    table_schema,
+    table_name
+FROM
+    TESTDB.INFORMATION_SCHEMA.TABLES
+WHERE
+    table_type IN \('BASE TABLE', 'VIEW'\)
+ORDER BY table_schema, table_name;`).
+					WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name"}).
+						AddRow("SCHEMA1", "TABLE1").
+						AddRow("SCHEMA1", "TABLE2").
+						AddRow("SCHEMA2", "TABLE1"))
+			},
+			want: &ansisql.DBDatabase{
+				Name: "TESTDB",
+				Schemas: []*ansisql.DBSchema{
+					{
+						Name: "SCHEMA1",
+						Tables: []*ansisql.DBTable{
+							{Name: "TABLE1"},
+							{Name: "TABLE2"},
+						},
+					},
+					{
+						Name: "SCHEMA2",
+						Tables: []*ansisql.DBTable{
+							{Name: "TABLE1"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "query error",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(`SELECT
+    table_schema,
+    table_name
+FROM
+    TESTDB.INFORMATION_SCHEMA.TABLES
+WHERE
+    table_type IN \('BASE TABLE', 'VIEW'\)
+ORDER BY table_schema, table_name;`).
+					WillReturnError(errors.New("connection error"))
+			},
+			wantErr: "failed to query Snowflake INFORMATION_SCHEMA: connection error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+			require.NoError(t, err)
+			defer mockDB.Close()
+			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+
+			tt.mockConnection(mock)
+			db := DB{
+				conn: sqlxDB,
+				config: &Config{
+					Database: "TESTDB",
+				},
+			}
+
+			got, err := db.GetDatabaseSummary(context.Background())
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+			}
+
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}

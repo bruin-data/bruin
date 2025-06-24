@@ -6,8 +6,10 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -195,6 +197,95 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tt.want, got)
+			}
+
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestClient_GetDatabaseSummary(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		mockConnection func(mock sqlmock.Sqlmock)
+		want           *ansisql.DBDatabase
+		wantErr        string
+	}{
+		{
+			name: "successful database summary",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(`SELECT
+    table_schema,
+    table_name
+FROM
+    information_schema.tables
+WHERE
+    table_type IN \('BASE TABLE', 'VIEW'\)
+    AND table_schema NOT IN \('information_schema', 'pg_catalog', 'main'\)
+ORDER BY table_schema, table_name;`).
+					WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name"}).
+						AddRow("schema1", "table1").
+						AddRow("schema1", "table2").
+						AddRow("schema2", "table1"))
+			},
+			want: &ansisql.DBDatabase{
+				Name: "duckdb",
+				Schemas: []*ansisql.DBSchema{
+					{
+						Name: "schema1",
+						Tables: []*ansisql.DBTable{
+							{Name: "table1"},
+							{Name: "table2"},
+						},
+					},
+					{
+						Name: "schema2",
+						Tables: []*ansisql.DBTable{
+							{Name: "table1"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "query error",
+			mockConnection: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(`SELECT
+    table_schema,
+    table_name
+FROM
+    information_schema.tables
+WHERE
+    table_type IN \('BASE TABLE', 'VIEW'\)
+    AND table_schema NOT IN \('information_schema', 'pg_catalog', 'main'\)
+ORDER BY table_schema, table_name;`).
+					WillReturnError(errors.New("connection error"))
+			},
+			wantErr: "failed to query DuckDB information_schema: connection error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+			require.NoError(t, err)
+			defer mockDB.Close()
+			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
+
+			tt.mockConnection(mock)
+			db := Client{connection: sqlxDB}
+
+			got, err := db.GetDatabaseSummary(context.Background())
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, got)
 			}
 
 			require.NoError(t, mock.ExpectationsWereMet())
