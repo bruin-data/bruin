@@ -72,7 +72,6 @@ func main() {
 			cmd.Environments(&isDebug),
 			cmd.Connections(),
 			cmd.Query(),
-			cmd.DBSummary(),
 			cmd.Patch(),
 			cmd.DataDiffCmd(),
 			versionCommand,
