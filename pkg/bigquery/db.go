@@ -884,7 +884,8 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 
 			// Add table to schema
 			dbTable := &ansisql.DBTable{
-				Name: table.TableID,
+				Name:    table.TableID,
+				Columns: []*ansisql.DBColumn{}, // Initialize empty columns array
 			}
 			schema.Tables = append(schema.Tables, dbTable)
 		}

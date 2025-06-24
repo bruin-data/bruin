@@ -735,14 +735,14 @@ ORDER BY table_schema, table_name;`).
 					{
 						Name: "SCHEMA1",
 						Tables: []*ansisql.DBTable{
-							{Name: "TABLE1"},
-							{Name: "TABLE2"},
+							{Name: "TABLE1", Columns: []*ansisql.DBColumn{}},
+							{Name: "TABLE2", Columns: []*ansisql.DBColumn{}},
 						},
 					},
 					{
 						Name: "SCHEMA2",
 						Tables: []*ansisql.DBTable{
-							{Name: "TABLE1"},
+							{Name: "TABLE1", Columns: []*ansisql.DBColumn{}},
 						},
 					},
 				},

@@ -826,7 +826,8 @@ ORDER BY table_schema, table_name;
 
 		// Add table to schema
 		table := &ansisql.DBTable{
-			Name: tableName,
+			Name:    tableName,
+			Columns: []*ansisql.DBColumn{}, // Initialize empty columns array
 		}
 		schemas[schemaKey].Tables = append(schemas[schemaKey].Tables, table)
 	}

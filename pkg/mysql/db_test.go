@@ -261,14 +261,14 @@ ORDER BY table_schema, table_name;`).
 					{
 						Name: "schema1",
 						Tables: []*ansisql.DBTable{
-							{Name: "table1"},
-							{Name: "table2"},
+							{Name: "table1", Columns: []*ansisql.DBColumn{}},
+							{Name: "table2", Columns: []*ansisql.DBColumn{}},
 						},
 					},
 					{
 						Name: "schema2",
 						Tables: []*ansisql.DBTable{
-							{Name: "table1"},
+							{Name: "table1", Columns: []*ansisql.DBColumn{}},
 						},
 					},
 				},

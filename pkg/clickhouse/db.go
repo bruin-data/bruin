@@ -184,7 +184,8 @@ ORDER BY database, name;
 
 		// Add table to schema
 		table := &ansisql.DBTable{
-			Name: tableName,
+			Name:    tableName,
+			Columns: []*ansisql.DBColumn{}, // Initialize empty columns array
 		}
 		schemas[schemaName].Tables = append(schemas[schemaName].Tables, table)
 	}
