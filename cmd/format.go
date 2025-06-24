@@ -188,6 +188,10 @@ func formatAsset(path string) (*pipeline.Asset, error) {
 		return nil, errors2.Wrap(err, "failed to build the asset")
 	}
 
+	if asset == nil {
+		return nil, errors2.New("no valid asset found in the file")
+	}
+
 	return asset, asset.Persist(afero.NewOsFs())
 }
 
@@ -205,6 +209,10 @@ func shouldFileChange(path string) (bool, error) {
 	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(path, nil)
 	if err != nil {
 		return false, errors2.Wrap(err, "failed to build the asset")
+	}
+
+	if asset == nil {
+		return false, errors2.New("no valid asset found in the file")
 	}
 
 	// Generate the new content without persisting
