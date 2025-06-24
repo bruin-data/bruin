@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -392,6 +393,9 @@ func abs(x float64) float64 {
 func formatDiffValue(rawDiff float64, percentageDiff string) string {
 	if percentageDiff == "-" {
 		return "-"
+	}
+	if rawDiff == math.Trunc(rawDiff) {
+		return strconv.FormatInt(int64(rawDiff), 10)
 	}
 	return fmt.Sprintf("%.4g", rawDiff)
 }
