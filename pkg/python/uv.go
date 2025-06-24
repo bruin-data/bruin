@@ -584,14 +584,12 @@ func (s *SqlfluffRunner) installSqlfluff(ctx context.Context, repo *git.Repo) er
 
 var rendererFs = afero.NewCacheOnReadFs(afero.NewOsFs(), afero.NewMemMapFs(), 0)
 
-// PyprojectToml represents the structure of a pyproject.toml file with sqlfluff config
 type PyprojectToml struct {
 	Tool struct {
 		Sqlfluff map[string]any `toml:"sqlfluff"`
 	} `toml:"tool"`
 }
 
-// parsePyprojectToml reads and parses a pyproject.toml file to extract sqlfluff configuration
 func parsePyprojectToml(filePath string) (map[string]any, error) {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		return nil, nil // No pyproject.toml file found
@@ -610,16 +608,15 @@ func parsePyprojectToml(filePath string) (map[string]any, error) {
 	return pyproject.Tool.Sqlfluff, nil
 }
 
-// convertTomlConfigToIni converts TOML-style sqlfluff config to INI format for sqlfluff
 func convertTomlConfigToIni(config map[string]any, prefix string) string {
 	var result strings.Builder
-	
+
 	for key, value := range config {
 		sectionName := key
 		if prefix != "" {
 			sectionName = prefix + ":" + key
 		}
-		
+
 		switch v := value.(type) {
 		case map[string]any:
 			// Nested section
@@ -643,11 +640,10 @@ func convertTomlConfigToIni(config map[string]any, prefix string) string {
 			result.WriteString(fmt.Sprintf("%s = %v\n", key, v))
 		}
 	}
-	
+
 	return result.String()
 }
 
-// findPipelineFile searches for pipeline.yml or pipeline.yaml in the given directory
 func findPipelineFile(basePath string) (string, error) {
 	pipelineFileNames := []string{"pipeline.yml", "pipeline.yaml"}
 	for _, fileName := range pipelineFileNames {
@@ -659,9 +655,7 @@ func findPipelineFile(basePath string) (string, error) {
 	return "", fmt.Errorf("no pipeline file found in '%s'. Supported files: %v", basePath, pipelineFileNames)
 }
 
-// createSqlfluffConfigWithJinjaContext creates a sqlfluff config file content
-// with Jinja templating enabled and context variables defined
-func (s *SqlfluffRunner) createSqlfluffConfigWithJinjaContext(sqlFilePath string, repo *git.Repo) (string, error) {
+func (s *SqlfluffRunner) createSqlfluffConfigWithJinjaContext(sqlFilePath string, repo *git.Repo) string {
 	// Try to find and parse pyproject.toml for existing sqlfluff configuration
 	pyprojectPath := filepath.Join(repo.Path, "pyproject.toml")
 	userSqlfluffConfig, err := parsePyprojectToml(pyprojectPath)
@@ -725,16 +719,12 @@ func (s *SqlfluffRunner) createSqlfluffConfigWithJinjaContext(sqlFilePath string
 	configContent += "run_id = placeholder\n"
 	configContent += fmt.Sprintf("this = %s\n", filepath.Base(strings.TrimSuffix(sqlFilePath, filepath.Ext(sqlFilePath))))
 
-	return configContent, nil
+	return configContent
 }
 
 func (s *SqlfluffRunner) formatSQLFileWithDialect(ctx context.Context, sqlFile, dialect string, repo *git.Repo) error {
 	// Create a temporary .sqlfluff config file with Jinja context
-	configContent, err := s.createSqlfluffConfigWithJinjaContext(sqlFile, repo)
-	if err != nil {
-		// If we can't generate config, fall back to basic sqlfluff without templating
-		return s.formatSQLFileWithoutTemplating(ctx, sqlFile, dialect, repo)
-	}
+	configContent := s.createSqlfluffConfigWithJinjaContext(sqlFile, repo)
 
 	// Create temporary config file
 	configFile, err := os.CreateTemp("", ".sqlfluff-*.cfg")
