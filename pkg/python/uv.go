@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -583,6 +584,69 @@ func (s *SqlfluffRunner) installSqlfluff(ctx context.Context, repo *git.Repo) er
 
 var rendererFs = afero.NewCacheOnReadFs(afero.NewOsFs(), afero.NewMemMapFs(), 0)
 
+// PyprojectToml represents the structure of a pyproject.toml file with sqlfluff config
+type PyprojectToml struct {
+	Tool struct {
+		Sqlfluff map[string]any `toml:"sqlfluff"`
+	} `toml:"tool"`
+}
+
+// parsePyprojectToml reads and parses a pyproject.toml file to extract sqlfluff configuration
+func parsePyprojectToml(filePath string) (map[string]any, error) {
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return nil, nil // No pyproject.toml file found
+	}
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read pyproject.toml: %w", err)
+	}
+
+	var pyproject PyprojectToml
+	if err := toml.Unmarshal(content, &pyproject); err != nil {
+		return nil, fmt.Errorf("failed to parse pyproject.toml: %w", err)
+	}
+
+	return pyproject.Tool.Sqlfluff, nil
+}
+
+// convertTomlConfigToIni converts TOML-style sqlfluff config to INI format for sqlfluff
+func convertTomlConfigToIni(config map[string]any, prefix string) string {
+	var result strings.Builder
+	
+	for key, value := range config {
+		sectionName := key
+		if prefix != "" {
+			sectionName = prefix + ":" + key
+		}
+		
+		switch v := value.(type) {
+		case map[string]any:
+			// Nested section
+			result.WriteString(fmt.Sprintf("[sqlfluff:%s]\n", sectionName))
+			result.WriteString(convertTomlConfigToIni(v, sectionName))
+			result.WriteString("\n")
+		case string:
+			result.WriteString(fmt.Sprintf("%s = %s\n", key, v))
+		case bool:
+			result.WriteString(fmt.Sprintf("%s = %t\n", key, v))
+		case int, int64, float64:
+			result.WriteString(fmt.Sprintf("%s = %v\n", key, v))
+		case []any:
+			// Handle arrays like exclude_rules
+			var items []string
+			for _, item := range v {
+				items = append(items, fmt.Sprintf("%v", item))
+			}
+			result.WriteString(fmt.Sprintf("%s = %s\n", key, strings.Join(items, ",")))
+		default:
+			result.WriteString(fmt.Sprintf("%s = %v\n", key, v))
+		}
+	}
+	
+	return result.String()
+}
+
 // findPipelineFile searches for pipeline.yml or pipeline.yaml in the given directory
 func findPipelineFile(basePath string) (string, error) {
 	pipelineFileNames := []string{"pipeline.yml", "pipeline.yaml"}
@@ -598,6 +662,15 @@ func findPipelineFile(basePath string) (string, error) {
 // createSqlfluffConfigWithJinjaContext creates a sqlfluff config file content
 // with Jinja templating enabled and context variables defined
 func (s *SqlfluffRunner) createSqlfluffConfigWithJinjaContext(sqlFilePath string, repo *git.Repo) (string, error) {
+	// Try to find and parse pyproject.toml for existing sqlfluff configuration
+	pyprojectPath := filepath.Join(repo.Path, "pyproject.toml")
+	userSqlfluffConfig, err := parsePyprojectToml(pyprojectPath)
+	if err != nil {
+		// Log the error but continue - we'll use default config
+		fmt.Printf("Warning: failed to parse pyproject.toml: %v\n", err)
+		userSqlfluffConfig = nil
+	}
+
 	// Try to find pipeline.yml to extract user-defined variables
 	var pipelineVars map[string]any
 
@@ -617,7 +690,20 @@ func (s *SqlfluffRunner) createSqlfluffConfigWithJinjaContext(sqlFilePath string
 		}
 	}
 
-	configContent := "[sqlfluff]\ntemplater = jinja\n\n[sqlfluff:templater:jinja:context]\n"
+	// Start with basic sqlfluff config
+	configContent := "[sqlfluff]\ntemplater = jinja\n\n"
+
+	// Merge user's existing sqlfluff configuration if available
+	if userSqlfluffConfig != nil {
+		// Convert user's TOML config to INI format and append
+		userConfigSection := convertTomlConfigToIni(userSqlfluffConfig, "")
+		if userConfigSection != "" {
+			configContent += userConfigSection + "\n"
+		}
+	}
+
+	// Add Jinja context section
+	configContent += "[sqlfluff:templater:jinja:context]\n"
 
 	// Add pipeline variables under var namespace
 	for varName, varValue := range pipelineVars {

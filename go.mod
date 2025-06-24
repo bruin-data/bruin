@@ -6,6 +6,7 @@ toolchain go1.23.2
 
 require (
 	cloud.google.com/go/bigquery v1.69.0
+	github.com/BurntSushi/toml v1.5.0
 	github.com/ClickHouse/clickhouse-go/v2 v2.37.1
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/alecthomas/chroma/v2 v2.18.0
@@ -66,7 +67,6 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.18.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.1 // indirect
-	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/ClickHouse/ch-go v0.66.0 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/apache/arrow-go/v18 v18.3.0 // indirect
