@@ -17,6 +17,7 @@ import (
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc/pool"
@@ -580,7 +581,113 @@ func (s *SqlfluffRunner) installSqlfluff(ctx context.Context, repo *git.Repo) er
 	return cmdRunner.Run(ctx, repo, cmd)
 }
 
+var rendererFs = afero.NewCacheOnReadFs(afero.NewOsFs(), afero.NewMemMapFs(), 0)
+
+// findPipelineFile searches for pipeline.yml or pipeline.yaml in the given directory
+func findPipelineFile(basePath string) (string, error) {
+	pipelineFileNames := []string{"pipeline.yml", "pipeline.yaml"}
+	for _, fileName := range pipelineFileNames {
+		candidatePath := filepath.Join(basePath, fileName)
+		if _, err := os.Stat(candidatePath); err == nil {
+			return candidatePath, nil
+		}
+	}
+	return "", fmt.Errorf("no pipeline file found in '%s'. Supported files: %v", basePath, pipelineFileNames)
+}
+
+// createSqlfluffConfigWithJinjaContext creates a sqlfluff config file content
+// with Jinja templating enabled and context variables defined
+func (s *SqlfluffRunner) createSqlfluffConfigWithJinjaContext(sqlFilePath string, repo *git.Repo) (string, error) {
+	// Try to find pipeline.yml to extract user-defined variables
+	var pipelineVars map[string]any
+
+	// Look for pipeline.yml or pipeline.yaml in the repo using the same logic as CreatePipelineFromPath
+	pipelinePath, err := findPipelineFile(repo.Path)
+	if err == nil {
+		if pipelineInstance, err := pipeline.PipelineFromPath(pipelinePath, rendererFs); err == nil && pipelineInstance != nil {
+			// Use Variables.Value() to get the default values
+			pipelineVars = pipelineInstance.Variables.Value()
+		}
+	}
+
+	if pipelineVars == nil {
+		pipelineVars = map[string]any{
+			"test1": "my_test1",
+			"test2": "placeholder",
+		}
+	}
+
+	configContent := "[sqlfluff]\ntemplater = jinja\n\n[sqlfluff:templater:jinja:context]\n"
+
+	// Add pipeline variables under var namespace
+	for varName, varValue := range pipelineVars {
+		if strValue, ok := varValue.(string); ok {
+			configContent += fmt.Sprintf("var.%s = %s\n", varName, strValue)
+		} else {
+			configContent += fmt.Sprintf("var.%s = placeholder\n", varName)
+		}
+	}
+
+	// Add standard Bruin variables
+	configContent += "end_date = 2024-01-01\n"
+	configContent += "start_date = 2024-01-01\n"
+	configContent += "start_datetime = 2024-01-01 00:00:00\n"
+	configContent += "end_datetime = 2024-01-01 00:00:00\n"
+	configContent += "start_timestamp = 2024-01-01 00:00:00\n"
+	configContent += "end_timestamp = 2024-01-01 00:00:00\n"
+	configContent += "pipeline = placeholder\n"
+	configContent += "run_id = placeholder\n"
+	configContent += fmt.Sprintf("this = %s\n", filepath.Base(strings.TrimSuffix(sqlFilePath, filepath.Ext(sqlFilePath))))
+
+	return configContent, nil
+}
+
 func (s *SqlfluffRunner) formatSQLFileWithDialect(ctx context.Context, sqlFile, dialect string, repo *git.Repo) error {
+	// Create a temporary .sqlfluff config file with Jinja context
+	configContent, err := s.createSqlfluffConfigWithJinjaContext(sqlFile, repo)
+	if err != nil {
+		// If we can't generate config, fall back to basic sqlfluff without templating
+		return s.formatSQLFileWithoutTemplating(ctx, sqlFile, dialect, repo)
+	}
+
+	// Create temporary config file
+	configFile, err := os.CreateTemp("", ".sqlfluff-*.cfg")
+	if err != nil {
+		return s.formatSQLFileWithoutTemplating(ctx, sqlFile, dialect, repo)
+	}
+	defer os.Remove(configFile.Name())
+	defer configFile.Close()
+
+	if _, err := configFile.WriteString(configContent); err != nil {
+		return s.formatSQLFileWithoutTemplating(ctx, sqlFile, dialect, repo)
+	}
+	configFile.Close()
+
+	cmdArgs := []string{
+		"tool",
+		"run",
+		"--python",
+		pythonVersionForIngestr,
+		"sqlfluff",
+		"fix",
+		"--quiet",
+		"--dialect",
+		dialect,
+		"--config",
+		configFile.Name(),
+		sqlFile,
+	}
+
+	cmd := &CommandInstance{
+		Name: s.binaryFullPath,
+		Args: cmdArgs,
+	}
+
+	cmdRunner := &CommandRunner{}
+	return cmdRunner.Run(ctx, repo, cmd)
+}
+
+func (s *SqlfluffRunner) formatSQLFileWithoutTemplating(ctx context.Context, sqlFile, dialect string, repo *git.Repo) error {
 	cmdArgs := []string{
 		"tool",
 		"run",
