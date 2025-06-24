@@ -10,11 +10,13 @@ import (
 )
 
 func TestParsePyprojectToml(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
-		name         string
-		tomlContent  string
-		expected     map[string]any
-		wantErr      bool
+		name        string
+		tomlContent string
+		expected    map[string]any
+		wantErr     bool
 	}{
 		{
 			name: "valid_pyproject_toml_with_sqlfluff_config",
@@ -33,39 +35,38 @@ indented_using_on = true`,
 					"exclude_rules":   []any{"LT05", "ST06"},
 				},
 				"indentation": map[string]any{
-					"indented_joins":   false,
+					"indented_joins":    false,
 					"indented_using_on": true,
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name:         "empty_pyproject_toml",
-			tomlContent:  "",
-			expected:     nil,
-			wantErr:      false,
+			name:        "empty_pyproject_toml",
+			tomlContent: "",
+			expected:    nil,
+			wantErr:     false,
 		},
 		{
-			name:         "pyproject_toml_without_sqlfluff_section",
-			tomlContent:  `[tool.other]
+			name: "pyproject_toml_without_sqlfluff_section",
+			tomlContent: `[tool.other]
 value = "test"`,
-			expected:     nil,
-			wantErr:      false,
+			expected: nil,
+			wantErr:  false,
 		},
 		{
-			name:         "non_existent_file",
-			tomlContent:  "", 
-			expected:     nil,
-			wantErr:      false,
+			name:        "non_existent_file",
+			tomlContent: "",
+			expected:    nil,
+			wantErr:     false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a temporary directory for each test
-			testTempDir, err := os.MkdirTemp("", "test-pyproject-*")
-			require.NoError(t, err)
-			defer os.RemoveAll(testTempDir)
+			t.Parallel()
+			
+			testTempDir := t.TempDir()
 
 			var filePath string
 			if tt.name == "non_existent_file" {
@@ -73,16 +74,16 @@ value = "test"`,
 				// Don't create the file for this test case
 			} else {
 				filePath = filepath.Join(testTempDir, "test.toml")
-				err := os.WriteFile(filePath, []byte(tt.tomlContent), 0644)
+				err := os.WriteFile(filePath, []byte(tt.tomlContent), 0o644)
 				require.NoError(t, err)
 			}
 
 			result, err := parsePyprojectToml(filePath)
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tt.expected, result)
 			}
 		})
@@ -90,6 +91,8 @@ value = "test"`,
 }
 
 func TestConvertTomlConfigToIni(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		config   map[string]any
@@ -112,7 +115,7 @@ func TestConvertTomlConfigToIni(t *testing.T) {
 			name: "nested_config_with_boolean",
 			config: map[string]any{
 				"indentation": map[string]any{
-					"indented_joins":   false,
+					"indented_joins":    false,
 					"indented_using_on": true,
 				},
 			},
@@ -129,6 +132,8 @@ func TestConvertTomlConfigToIni(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result := convertTomlConfigToIni(tt.config, tt.prefix)
 			assert.Equal(t, tt.expected, result)
 		})
