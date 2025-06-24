@@ -25,5 +25,6 @@
   },
   "catchup": false,
   "commit": "",
-  "retries": 0
+  "retries": 0,
+  "concurrency": 0
 }

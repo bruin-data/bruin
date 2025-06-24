@@ -2,14 +2,11 @@
     "legacy_id": "",
     "name": "pipeline-with-no-assets",
     "schedule": "",
-    "snapshot": "",
     "start_date": "",
-    "agent": false,
     "definition_file": {
         "name": "pipeline.yml",
         "path": "__BASEDIR__/testdata/pipeline/pipeline-with-no-assets/pipeline.yml"
     },
-    "variables": null,
     "default_connections": {
         "gcpConnectionId": "gcp-connection-id-here",
         "slack": "slack-connection"
@@ -21,9 +18,13 @@
         "discord": []
     },
     "catchup": false,
-    "commit": "",
     "metadata_push": {
         "bigquery": false
     },
-    "retries": 0
+    "retries": 0,
+    "concurrency": 0,
+    "commit": "",
+    "snapshot": "",
+    "agent": false,
+    "variables": null
 }

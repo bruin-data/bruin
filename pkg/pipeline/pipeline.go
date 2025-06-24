@@ -1196,6 +1196,7 @@ type Pipeline struct {
 	Catchup            bool                   `json:"catchup" yaml:"catchup" mapstructure:"catchup"`
 	MetadataPush       MetadataPush           `json:"metadata_push" yaml:"metadata_push" mapstructure:"metadata_push"`
 	Retries            int                    `json:"retries" yaml:"retries" mapstructure:"retries"`
+	Concurrency        int                    `json:"concurrency" yaml:"concurrency" mapstructure:"concurrency"`
 	DefaultValues      *DefaultValues         `json:"default,omitempty" yaml:"default,omitempty" mapstructure:"default,omitempty"`
 	Commit             string                 `json:"commit"`
 	Snapshot           string                 `json:"snapshot"`

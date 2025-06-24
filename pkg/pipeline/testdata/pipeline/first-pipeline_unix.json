@@ -2,18 +2,21 @@
     "legacy_id": "first-pipeline",
     "name": "first-pipeline",
     "schedule": "",
-    "snapshot": "",
     "start_date": "",
+    "snapshot": "",
     "agent": false,
     "definition_file": {
         "name": "pipeline.yml",
         "path": "__BASEDIR__/testdata/pipeline/first-pipeline/pipeline.yml"
     },
+    "variables": null,
     "default_connections": {
         "gcpConnectionId": "gcp-connection-id-here",
         "slack": "slack-connection"
     },
-    "variables": null,
+    "metadata_push": {
+        "bigquery": false
+    },
     "assets": [
         {
             "id": "943be81e20336c53de2c8ab40991839ca3b88bcb4f854f03cdbd69825eb369b6",
@@ -24,7 +27,6 @@
             "connection": "conn1",
             "tags": [],
             "materialization": null,
-            "interval_modifiers": null,
             "upstreams": [
                 {
                     "type": "asset",
@@ -56,7 +58,8 @@
             "custom_checks": [],
             "metadata": {},
             "snowflake": null,
-            "athena": null
+            "athena": null,
+            "interval_modifiers": null
         },
         {
             "id": "c69409a1840ddb3639a4acbaaec46c238c63b6431cc74ee5254b6dcef7b88c4b",
@@ -67,7 +70,6 @@
             "connection": "",
             "tags": [],
             "materialization": null,
-            "interval_modifiers": null,
             "upstreams": [],
             "image": "",
             "instance": "",
@@ -93,7 +95,8 @@
             "custom_checks": [],
             "metadata": {},
             "snowflake": null,
-            "athena": null
+            "athena": null,
+            "interval_modifiers": null
         },
         {
             "id": "21f2fa1b09d584a6b4fe30cd82b4540b769fd777da7c547353386e2930291ef9",
@@ -104,7 +107,6 @@
             "connection": "first-connection",
             "tags": [],
             "materialization": null,
-            "interval_modifiers": null,
             "upstreams": [
                 {
                     "type": "asset",
@@ -167,7 +169,8 @@
             "custom_checks": [],
             "metadata": {},
             "snowflake": null,
-            "athena": null
+            "athena": null,
+            "interval_modifiers": null
         },
         {
             "id": "5812ba61bb0f08ce192bf074c9de21c19355e08cd52e75d008bbff59e5729e5b",
@@ -178,7 +181,6 @@
             "connection": "conn2",
             "tags": [],
             "materialization": null,
-            "interval_modifiers": null,
             "upstreams": [
                 {
                     "type": "asset",
@@ -240,7 +242,8 @@
             "custom_checks": [],
             "metadata": {},
             "snowflake": null,
-            "athena": null
+            "athena": null,
+            "interval_modifiers": null
         }
     ],
     "notifications": {
@@ -268,8 +271,6 @@
     },
     "catchup": false,
     "commit": "",
-    "metadata_push": {
-        "bigquery": false
-    },
-    "retries": 3
+    "retries": 3,
+    "concurrency": 0
 }
