@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -611,7 +612,15 @@ func parsePyprojectToml(filePath string) (map[string]any, error) {
 func convertTomlConfigToIni(config map[string]any, prefix string) string {
 	var result strings.Builder
 
-	for key, value := range config {
+	// Sort keys to ensure deterministic output
+	keys := make([]string, 0, len(config))
+	for key := range config {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		value := config[key]
 		sectionName := key
 		if prefix != "" {
 			sectionName = prefix + ":" + key

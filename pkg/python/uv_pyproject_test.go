@@ -109,7 +109,7 @@ func TestConvertTomlConfigToIni(t *testing.T) {
 				},
 			},
 			prefix:   "",
-			expected: "[sqlfluff:core]\ndialect = duckdb\nmax_line_length = 120\nexclude_rules = LT05,ST06\n\n",
+			expected: "[sqlfluff:core]\ndialect = duckdb\nexclude_rules = LT05,ST06\nmax_line_length = 120\n\n",
 		},
 		{
 			name: "nested_config_with_boolean",
