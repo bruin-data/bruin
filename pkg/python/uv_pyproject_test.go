@@ -65,7 +65,7 @@ value = "test"`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			testTempDir := t.TempDir()
 
 			var filePath string
