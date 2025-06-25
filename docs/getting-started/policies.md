@@ -167,6 +167,41 @@ Bruin provides a set of built-in lint rules that are ready to use without requir
   </thead>
   <tbody>
     <tr>
+      <td><code>asset-has-checks</code></td>
+      <td><code>asset</code></td>
+      <td>Asset must have at least one check (<code>column</code> or <code>custom_checks</code>).</td>
+    </tr>
+    <tr>
+      <td><code>asset-has-columns</code></td>
+      <td><code>asset</code></td>
+      <td>Assets must define their columns.</td>
+    </tr>
+    <tr>
+      <td><code>asset-has-description</code></td>
+      <td><code>asset</code></td>
+      <td>Assets must have a description.</td>
+    </tr>
+    <tr>
+      <td><code>asset-has-no-cross-pipeline-dependencies</code></td>
+      <td><code>asset</code></td>
+      <td>Assets must not depend on assets in other pipelines.</td>
+    </tr>
+    <tr>
+      <td><code>asset-has-owner</code></td>
+      <td><code>asset</code></td>
+      <td>Assets must have an owner assigned.</td>
+    </tr>
+    <tr>
+      <td><code>asset-has-primary-key</code></td>
+      <td><code>asset</code></td>
+      <td>Assets must define at least one column as a primary key.</td>
+    </tr>
+    <tr>
+      <td><code>asset-has-tags</code></td>
+      <td><code>asset</code></td>
+      <td>Asset must have at least one tag.</td>
+    </tr>
+    <tr>
       <td><code>asset-name-is-lowercase</code></td>
       <td><code>asset</code></td>
       <td>Asset names must be in lowercase.</td>
@@ -177,44 +212,9 @@ Bruin provides a set of built-in lint rules that are ready to use without requir
       <td>Asset names must follow the format <code>schema.table</code>.</td>
     </tr>
     <tr>
-      <td><code>asset-has-description</code></td>
-      <td><code>asset</code></td>
-      <td>Assets must have a description.</td>
-    </tr>
-    <tr>
-      <td><code>asset-has-owner</code></td>
-      <td><code>asset</code></td>
-      <td>Assets must have an owner assigned.</td>
-    </tr>
-    <tr>
-      <td><code>asset-has-columns</code></td>
-      <td><code>asset</code></td>
-      <td>Assets must define their columns.</td>
-    </tr>
-    <tr>
-      <td><code>asset-has-primary-key</code></td>
-      <td><code>asset</code></td>
-      <td>Assets must define at least one column as a primary key.</td>
-    </tr>
-    <tr>
-      <td><code>asset-has-checks</code></td>
-      <td><code>asset</code></td>
-      <td>Asset must have at least one check (<code>column</code> or <code>custom_checks</code>).</td>
-    </tr>
-    <tr>
-      <td><code>asset-has-tags</code></td>
-      <td><code>asset</code></td>
-      <td>Asset must have at least one tag.</td>
-    </tr>
-    <tr>
       <td><code>column-has-description</code></td>
       <td><code>asset</code></td>
       <td>All columns declared by Asset must have description.</td>
-    </tr>
-    <tr>
-      <td><code>column-name-is-snake-case</code></td>
-      <td><code>asset</code></td>
-      <td>Column names must be in <code>snake_case</code>.</td>
     </tr>
     <tr>
       <td><code>column-name-is-camel-case</code></td>
@@ -222,9 +222,19 @@ Bruin provides a set of built-in lint rules that are ready to use without requir
       <td>Column names must be in <code>camelCase</code>.</td>
     </tr>
     <tr>
+      <td><code>column-name-is-snake-case</code></td>
+      <td><code>asset</code></td>
+      <td>Column names must be in <code>snake_case</code>.</td>
+    </tr>
+    <tr>
       <td><code>column-type-is-valid-for-platform</code></td>
       <td><code>asset</code></td>
       <td>Ensure that column types declared by asset are valid types in the relevant platform (BigQuery and Snowflake only).</td>
+    </tr>
+    <tr>
+      <td><code>columns-match-query</code></td>
+      <td><code>asset</code></td>
+      <td>Columns found in SQL queries must be properly defined in the asset's metadata. This rule validates that all columns referenced in the SQL query are declared in the asset's <code>columns</code> section.</td>
     </tr>
     <tr>
       <td><code>description-must-not-be-placeholder</code></td>
@@ -232,9 +242,9 @@ Bruin provides a set of built-in lint rules that are ready to use without requir
       <td><code>asset</code> and <code>column</code> descriptions must not contain placeholder strings</td>
     </tr>
     <tr>
-      <td><code>asset-has-no-cross-pipeline-dependencies</code></td>
-      <td><code>asset</code></td>
-      <td>Assets must not depend on assets in other pipelines.</td>
+      <td><code>pipeline-has-metadata-push</code></td>
+      <td><code>pipeline</code></td>
+      <td>Pipeline must push it's metadata</td>
     </tr>
     <tr>
       <td><code>pipeline-has-notifications</code></td>
@@ -250,11 +260,6 @@ Bruin provides a set of built-in lint rules that are ready to use without requir
       <td><code>pipeline-has-start-date</code></td>
       <td><code>pipeline</code></td>
       <td>Pipeline must have a `start_date`</td>
-    </tr>
-    <tr>
-      <td><code>pipeline-has-metadata-push</code></td>
-      <td><code>pipeline</code></td>
-      <td>Pipeline must push it's metadata</td>
     </tr>
   </tbody>
 </table>
