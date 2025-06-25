@@ -602,7 +602,7 @@ func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePa
 	rules = lint.FilterRulesBySpeed(rules, true)
 
 	linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
-	res, err := linter.LintPipelines(ctx, []*pipeline.Pipeline{foundPipeline})
+	res, err := linter.LintPipelines(ctx, []*pipeline.Pipeline{foundPipeline}, parser)
 	err = reportLintErrors(res, err, lint.Printer{RootCheckPath: pipelinePath}, "")
 	if err != nil {
 		return err

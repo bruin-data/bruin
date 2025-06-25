@@ -212,7 +212,7 @@ func TestLinter_Lint(t *testing.T) {
 				logger:        logger.Sugar(),
 			}
 
-			_, err := l.Lint(ctx, tt.args.rootPath, tt.args.pipelineDefinitionFileName, cli.NewContext(nil, nil, nil))
+			_, err := l.Lint(ctx, tt.args.rootPath, tt.args.pipelineDefinitionFileName, cli.NewContext(nil, nil, nil), nil)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -479,7 +479,7 @@ func TestLinter_LintAsset(t *testing.T) {
 				logger:        logger.Sugar(),
 			}
 
-			_, err := l.LintAsset(ctx, tt.args.rootPath, tt.args.pipelineDefinitionFileName, "my-asset", cli.NewContext(nil, nil, nil))
+			_, err := l.LintAsset(ctx, tt.args.rootPath, tt.args.pipelineDefinitionFileName, "my-asset", cli.NewContext(nil, nil, nil), nil)
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Equal(t, tt.errorMessage, err.Error())
@@ -652,7 +652,7 @@ func TestRunLintRulesOnPipeline_ExcludeTag(t *testing.T) {
 				ctx = context.WithValue(ctx, excludeTagKey, tt.excludeTag)
 			}
 
-			result, err := RunLintRulesOnPipeline(ctx, pipeline, []Rule{assetRule})
+			result, err := RunLintRulesOnPipeline(ctx, pipeline, []Rule{assetRule}, nil)
 			require.NoError(t, err)
 
 			// Count total issues across all rules
@@ -837,7 +837,7 @@ func TestLinter_LintPipelines_AssetWithExcludeTagCount(t *testing.T) {
 				rules: []Rule{assetRule},
 			}
 
-			result, err := l.LintPipelines(ctx, tt.pipelines)
+			result, err := l.LintPipelines(ctx, tt.pipelines, nil)
 			require.NoError(t, err)
 
 			assert.Equal(t, tt.expectedExcludedCount, result.AssetWithExcludeTagCount,

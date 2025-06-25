@@ -99,245 +99,354 @@ var placeholderDescriptions = []string{
 	"work in progress",
 }
 
-var builtinRules = map[string]validators{
-	"asset-name-is-lowercase": {
-		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			if strings.ToLower(asset.Name) == asset.Name {
+func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
+	builtinRules := map[string]validators{
+		"asset-name-is-lowercase": {
+			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+				if strings.ToLower(asset.Name) == asset.Name {
+					return nil, nil
+				}
+
+				return []*Issue{
+					{
+						Task:        asset,
+						Description: "Asset name must be lowercase",
+					},
+				}, nil
+			},
+		},
+		"asset-name-is-schema-dot-table": {
+			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+				if strings.Count(asset.Name, ".") == 1 {
+					return nil, nil
+				}
+
+				return []*Issue{
+					{
+						Task:        asset,
+						Description: "Asset name must be of the form {schema}.{table}",
+					},
+				}, nil
+			},
+		},
+		"asset-has-description": {
+			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+				if strings.TrimSpace(asset.Description) != "" {
+					return nil, nil
+				}
+				return []*Issue{
+					{
+						Task:        asset,
+						Description: "Asset must have a description",
+					},
+				}, nil
+			},
+		},
+		"asset-has-owner": {
+			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+				if strings.TrimSpace(asset.Owner) != "" {
+					return nil, nil
+				}
+				return []*Issue{
+					{
+						Task:        asset,
+						Description: "Asset must have an owner",
+					},
+				}, nil
+			},
+		},
+		"asset-has-columns": {
+			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+				if len(asset.Columns) > 0 {
+					return nil, nil
+				}
+				return []*Issue{
+					{
+						Task:        asset,
+						Description: "Asset must have columns",
+					},
+				}, nil
+			},
+		},
+		"asset-has-primary-key": {
+			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+				if len(asset.Columns) == 0 {
+					return []*Issue{
+						{
+							Task:        asset,
+							Description: msgPrimaryKeyMustBeSet,
+						},
+					}, nil
+				}
+				var primaryKeyFound bool
+				for _, col := range asset.Columns {
+					if col.PrimaryKey {
+						primaryKeyFound = true
+						break
+					}
+				}
+				if !primaryKeyFound {
+					return []*Issue{
+						{
+							Task:        asset,
+							Description: msgPrimaryKeyMustBeSet,
+						},
+					}, nil
+				}
 				return nil, nil
-			}
-
-			return []*Issue{
-				{
-					Task:        asset,
-					Description: "Asset name must be lowercase",
-				},
-			}, nil
+			},
 		},
-	},
-	"asset-name-is-schema-dot-table": {
-		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			if strings.Count(asset.Name, ".") == 1 {
+		"asset-has-checks": {
+			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+				if asset.CheckCount() == 0 {
+					return []*Issue{
+						{
+							Task:        asset,
+							Description: "Asset must have atleast one check",
+						},
+					}, nil
+				}
 				return nil, nil
-			}
-
-			return []*Issue{
-				{
-					Task:        asset,
-					Description: "Asset name must be of the form {schema}.{table}",
-				},
-			}, nil
+			},
 		},
-	},
-	"asset-has-description": {
-		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			if strings.TrimSpace(asset.Description) != "" {
+		"asset-has-tags": {
+			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+				if len(asset.Tags) == 0 {
+					return []*Issue{
+						{
+							Task:        asset,
+							Description: "Asset must have tags",
+						},
+					}, nil
+				}
 				return nil, nil
-			}
-			return []*Issue{
-				{
-					Task:        asset,
-					Description: "Asset must have a description",
-				},
-			}, nil
+			},
 		},
-	},
-	"asset-has-owner": {
-		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			if strings.TrimSpace(asset.Owner) != "" {
+		"column-has-description": {
+			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+				for _, col := range asset.Columns {
+					if strings.TrimSpace(col.Description) != "" {
+						continue
+					}
+
+					return []*Issue{
+						{
+							Task:        asset,
+							Description: "Column must have a description",
+						},
+					}, nil
+				}
 				return nil, nil
-			}
-			return []*Issue{
-				{
-					Task:        asset,
-					Description: "Asset must have an owner",
-				},
-			}, nil
+			},
 		},
-	},
-	"asset-has-columns": {
-		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			if len(asset.Columns) > 0 {
+		"column-has-type": {
+			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+				for _, col := range asset.Columns {
+					if strings.TrimSpace(col.Type) != "" {
+						continue
+					}
+
+					return []*Issue{
+						{
+							Task:        asset,
+							Description: "Column must have a type",
+						},
+					}, nil
+				}
 				return nil, nil
-			}
-			return []*Issue{
-				{
-					Task:        asset,
-					Description: "Asset must have columns",
-				},
-			}, nil
+			},
 		},
-	},
-	"asset-has-primary-key": {
-		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			if len(asset.Columns) == 0 {
-				return []*Issue{
-					{
-						Task:        asset,
-						Description: msgPrimaryKeyMustBeSet,
-					},
-				}, nil
-			}
-			var primaryKeyFound bool
-			for _, col := range asset.Columns {
-				if col.PrimaryKey {
-					primaryKeyFound = true
-					break
-				}
-			}
-			if !primaryKeyFound {
-				return []*Issue{
-					{
-						Task:        asset,
-						Description: msgPrimaryKeyMustBeSet,
-					},
-				}, nil
-			}
-			return nil, nil
-		},
-	},
-	"asset-has-checks": {
-		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			if asset.CheckCount() == 0 {
-				return []*Issue{
-					{
-						Task:        asset,
-						Description: "Asset must have atleast one check",
-					},
-				}, nil
-			}
-			return nil, nil
-		},
-	},
-	"asset-has-tags": {
-		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			if len(asset.Tags) == 0 {
-				return []*Issue{
-					{
-						Task:        asset,
-						Description: "Asset must have tags",
-					},
-				}, nil
-			}
-			return nil, nil
-		},
-	},
-	"column-has-description": {
-		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			for _, col := range asset.Columns {
-				if strings.TrimSpace(col.Description) != "" {
-					continue
-				}
+		"column-name-is-snake-case": {
+			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+				for _, col := range asset.Columns {
+					if snakeCasePattern.MatchString(col.Name) {
+						continue
+					}
 
-				return []*Issue{
-					{
-						Task:        asset,
-						Description: "Column must have a description",
-					},
-				}, nil
-			}
-			return nil, nil
-		},
-	},
-	"column-has-type": {
-		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			for _, col := range asset.Columns {
-				if strings.TrimSpace(col.Type) != "" {
-					continue
+					return []*Issue{
+						{
+							Task:        asset,
+							Description: "Column names must be in snake_case",
+						},
+					}, nil
 				}
-
-				return []*Issue{
-					{
-						Task:        asset,
-						Description: "Column must have a type",
-					},
-				}, nil
-			}
-			return nil, nil
-		},
-	},
-	"column-name-is-snake-case": {
-		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			for _, col := range asset.Columns {
-				if snakeCasePattern.MatchString(col.Name) {
-					continue
-				}
-
-				return []*Issue{
-					{
-						Task:        asset,
-						Description: "Column names must be in snake_case",
-					},
-				}, nil
-			}
-			return nil, nil
-		},
-	},
-	"column-name-is-camel-case": {
-		Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			for _, col := range asset.Columns {
-				if camelCasePattern.MatchString(col.Name) {
-					continue
-				}
-
-				return []*Issue{
-					{
-						Task:        asset,
-						Description: "Column names must be in camelCase",
-					},
-				}, nil
-			}
-			return nil, nil
-		},
-	},
-	"column-type-is-valid-for-platform": {
-		Asset: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			var validTypes map[string]struct{}
-			var platformName string
-
-			switch {
-			case strings.HasPrefix(string(asset.Type), "bq."):
-				validTypes = validBigQueryTypes
-				platformName = "BigQuery"
-			case strings.HasPrefix(string(asset.Type), "sf."):
-				validTypes = validSnowflakeTypes
-				platformName = "Snowflake"
-			default:
-				// Ignore assets of other types
 				return nil, nil
-			}
-
-			if len(validTypes) == 0 {
-				// Should not happen if sets are defined, but good practice
-				return nil, nil
-			}
-
-			var issues []*Issue
-			for _, col := range asset.Columns {
-				if strings.TrimSpace(col.Type) == "" {
-					// Let column-has-type rule handle this
-					continue
-				}
-
-				// Normalize type: lowercase and remove parameters like (size) or (precision, scale)
-				normalizedType := strings.ToLower(col.Type)
-				if idx := strings.Index(normalizedType, "("); idx != -1 {
-					normalizedType = normalizedType[:idx]
-				}
-				// Handle potential spaces in type names like 'double precision'
-				normalizedType = strings.TrimSpace(normalizedType)
-
-				if _, ok := validTypes[normalizedType]; !ok {
-					issues = append(issues, &Issue{
-						Task:        asset,
-						Description: "Column '" + col.Name + "' has invalid type '" + col.Type + "' for platform '" + platformName + "'",
-					})
-				}
-			}
-
-			return issues, nil
+			},
 		},
-	},
-	"columns-match-query": {
+		"column-name-is-camel-case": {
+			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+				for _, col := range asset.Columns {
+					if camelCasePattern.MatchString(col.Name) {
+						continue
+					}
+
+					return []*Issue{
+						{
+							Task:        asset,
+							Description: "Column names must be in camelCase",
+						},
+					}, nil
+				}
+				return nil, nil
+			},
+		},
+		"column-type-is-valid-for-platform": {
+			Asset: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+				var validTypes map[string]struct{}
+				var platformName string
+
+				switch {
+				case strings.HasPrefix(string(asset.Type), "bq."):
+					validTypes = validBigQueryTypes
+					platformName = "BigQuery"
+				case strings.HasPrefix(string(asset.Type), "sf."):
+					validTypes = validSnowflakeTypes
+					platformName = "Snowflake"
+				default:
+					// Ignore assets of other types
+					return nil, nil
+				}
+
+				if len(validTypes) == 0 {
+					// Should not happen if sets are defined, but good practice
+					return nil, nil
+				}
+
+				var issues []*Issue
+				for _, col := range asset.Columns {
+					if strings.TrimSpace(col.Type) == "" {
+						// Let column-has-type rule handle this
+						continue
+					}
+
+					// Normalize type: lowercase and remove parameters like (size) or (precision, scale)
+					normalizedType := strings.ToLower(col.Type)
+					if idx := strings.Index(normalizedType, "("); idx != -1 {
+						normalizedType = normalizedType[:idx]
+					}
+					// Handle potential spaces in type names like 'double precision'
+					normalizedType = strings.TrimSpace(normalizedType)
+
+					if _, ok := validTypes[normalizedType]; !ok {
+						issues = append(issues, &Issue{
+							Task:        asset,
+							Description: "Column '" + col.Name + "' has invalid type '" + col.Type + "' for platform '" + platformName + "'",
+						})
+					}
+				}
+
+				return issues, nil
+			},
+		},
+		"description-must-not-be-placeholder": {
+			Asset: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+				var issues []*Issue
+
+				lowerAssetDesc := strings.ToLower(strings.TrimSpace(asset.Description))
+				if lowerAssetDesc != "" {
+					for _, placeholder := range placeholderDescriptions {
+						if strings.Contains(lowerAssetDesc, placeholder) {
+							issues = append(issues, &Issue{
+								Task:        asset,
+								Description: "Asset description appears to contain placeholder text: '" + placeholder + "'",
+							})
+							break
+						}
+					}
+				}
+
+				for _, col := range asset.Columns {
+					lowerColDesc := strings.ToLower(strings.TrimSpace(col.Description))
+					if lowerColDesc == "" {
+						continue
+					}
+
+					for _, placeholder := range placeholderDescriptions {
+						if strings.Contains(lowerColDesc, placeholder) {
+							issues = append(issues, &Issue{
+								Task:        asset,
+								Description: "Column '" + col.Name + "' description appears to contain placeholder text: '" + placeholder + "'",
+							})
+							break
+						}
+					}
+				}
+
+				return issues, nil
+			},
+		},
+		"asset-has-no-cross-pipeline-dependencies": {
+			Asset: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+				for _, upstream := range asset.Upstreams {
+					if upstream.Type != "uri" {
+						continue
+					}
+
+					return []*Issue{
+						{
+							Task:        asset,
+							Description: "Asset must not have a cross pipeline dependency",
+						},
+					}, nil
+				}
+				return nil, nil
+			},
+		},
+		"pipeline-has-notifications": {
+			Pipeline: func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
+				notifs := pipeline.Notifications
+				if len(notifs.Discord) > 0 || len(notifs.MSTeams) > 0 || len(notifs.Slack) > 0 {
+					return nil, nil
+				}
+				return []*Issue{
+					{
+						Description: "Pipeline must have at least one notification set up",
+					},
+				}, nil
+			},
+		},
+		"pipeline-has-retries": {
+			Pipeline: func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
+				if pipeline.Retries > 0 {
+					return nil, nil
+				}
+
+				return []*Issue{
+					{
+						Description: "Pipeline must have `retries` set to a value greater than zero",
+					},
+				}, nil
+			},
+		},
+		"pipeline-has-start-date": {
+			Pipeline: func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
+				if strings.TrimSpace(pipeline.StartDate) != "" {
+					return nil, nil
+				}
+				return []*Issue{
+					{
+						Description: "Pipeline must have a start date",
+					},
+				}, nil
+			},
+		},
+		"pipeline-has-metadata-push": {
+			Pipeline: func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
+				if pipeline.MetadataPush.HasAnyEnabled() {
+					return nil, nil
+				}
+
+				return []*Issue{
+					{
+						Description: "Pipeline must have metadata push enabled",
+					},
+				}, nil
+			},
+		},
+	}
+
+	// Add the columns-match-query rule that requires sqlParser
+	builtinRules["columns-match-query"] = validators{
 		Asset: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 			issues := make([]*Issue, 0)
 
@@ -361,12 +470,9 @@ var builtinRules = map[string]validators{
 				return issues, nil
 			}
 
-			// Create a SQL parser to extract columns
-			sqlParser, err := sqlparser.NewSQLParser(false)
-			if err != nil { //nolint:nilerr
+			if sqlParser == nil { //nolint:nilerr
 				return issues, nil
 			}
-			defer sqlParser.Close()
 
 			err = sqlParser.Start()
 			if err != nil { //nolint:nilerr
@@ -405,110 +511,6 @@ var builtinRules = map[string]validators{
 			return issues, nil
 		},
 		Severity: ValidatorSeverityWarning,
-	},
-	"description-must-not-be-placeholder": {
-		Asset: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			var issues []*Issue
-
-			lowerAssetDesc := strings.ToLower(strings.TrimSpace(asset.Description))
-			if lowerAssetDesc != "" {
-				for _, placeholder := range placeholderDescriptions {
-					if strings.Contains(lowerAssetDesc, placeholder) {
-						issues = append(issues, &Issue{
-							Task:        asset,
-							Description: "Asset description appears to contain placeholder text: '" + placeholder + "'",
-						})
-						break
-					}
-				}
-			}
-
-			for _, col := range asset.Columns {
-				lowerColDesc := strings.ToLower(strings.TrimSpace(col.Description))
-				if lowerColDesc == "" {
-					continue
-				}
-
-				for _, placeholder := range placeholderDescriptions {
-					if strings.Contains(lowerColDesc, placeholder) {
-						issues = append(issues, &Issue{
-							Task:        asset,
-							Description: "Column '" + col.Name + "' description appears to contain placeholder text: '" + placeholder + "'",
-						})
-						break
-					}
-				}
-			}
-
-			return issues, nil
-		},
-	},
-	"asset-has-no-cross-pipeline-dependencies": {
-		Asset: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
-			for _, upstream := range asset.Upstreams {
-				if upstream.Type != "uri" {
-					continue
-				}
-
-				return []*Issue{
-					{
-						Task:        asset,
-						Description: "Asset must not have a cross pipeline dependency",
-					},
-				}, nil
-			}
-			return nil, nil
-		},
-	},
-	"pipeline-has-notifications": {
-		Pipeline: func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
-			notifs := pipeline.Notifications
-			if len(notifs.Discord) > 0 || len(notifs.MSTeams) > 0 || len(notifs.Slack) > 0 {
-				return nil, nil
-			}
-			return []*Issue{
-				{
-					Description: "Pipeline must have at least one notification set up",
-				},
-			}, nil
-		},
-	},
-	"pipeline-has-retries": {
-		Pipeline: func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
-			if pipeline.Retries > 0 {
-				return nil, nil
-			}
-
-			return []*Issue{
-				{
-					Description: "Pipeline must have `retries` set to a value greater than zero",
-				},
-			}, nil
-		},
-	},
-	"pipeline-has-start-date": {
-		Pipeline: func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
-			if strings.TrimSpace(pipeline.StartDate) != "" {
-				return nil, nil
-			}
-			return []*Issue{
-				{
-					Description: "Pipeline must have a start date",
-				},
-			}, nil
-		},
-	},
-	"pipeline-has-metadata-push": {
-		Pipeline: func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
-			if pipeline.MetadataPush.HasAnyEnabled() {
-				return nil, nil
-			}
-
-			return []*Issue{
-				{
-					Description: "Pipeline must have metadata push enabled",
-				},
-			}, nil
-		},
-	},
+	}
+	return builtinRules
 }

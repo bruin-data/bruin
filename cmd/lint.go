@@ -196,7 +196,7 @@ func Lint(isDebug *bool) *cli.Command {
 				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
 				logger.Debugf("running %d rules for pipeline validation", len(rules))
 				infoPrinter.Printf("Validating pipelines in '%s' for '%s' environment...\n", rootPath, cm.SelectedEnvironmentName)
-				result, errr = linter.Lint(lintCtx, rootPath, PipelineDefinitionFiles, c)
+				result, errr = linter.Lint(lintCtx, rootPath, PipelineDefinitionFiles, c, parser)
 			} else {
 				excludeTag := c.String("exclude-tag")
 				if excludeTag != "" {
@@ -206,7 +206,7 @@ func Lint(isDebug *bool) *cli.Command {
 				rules = lint.FilterRulesByLevel(rules, lint.LevelAsset)
 				logger.Debugf("running %d rules for asset-only validation", len(rules))
 				linter := lint.NewLinter(path.GetPipelinePaths, DefaultPipelineBuilder, rules, logger)
-				result, errr = linter.LintAsset(lintCtx, rootPath, PipelineDefinitionFiles, asset, c)
+				result, errr = linter.LintAsset(lintCtx, rootPath, PipelineDefinitionFiles, asset, c, parser)
 			}
 
 			printer := lint.Printer{RootCheckPath: rootPath}

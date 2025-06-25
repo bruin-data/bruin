@@ -21,7 +21,7 @@ func TestPolicyRuleDefinition(t *testing.T) {
 			},
 		}
 
-		_, err := spec.Rules()
+		_, err := spec.Rules(nil)
 		require.Error(t, err)
 	})
 	t.Run("rule definition must have a description", func(t *testing.T) {
@@ -34,7 +34,7 @@ func TestPolicyRuleDefinition(t *testing.T) {
 				},
 			},
 		}
-		_, err := spec.Rules()
+		_, err := spec.Rules(nil)
 		require.Error(t, err)
 	})
 
@@ -48,7 +48,7 @@ func TestPolicyRuleDefinition(t *testing.T) {
 				},
 			},
 		}
-		_, err := spec.Rules()
+		_, err := spec.Rules(nil)
 		require.Error(t, err)
 	})
 	t.Run("every rule must have a unique name", func(t *testing.T) {
@@ -67,7 +67,7 @@ func TestPolicyRuleDefinition(t *testing.T) {
 				},
 			},
 		}
-		_, err := spec.Rules()
+		_, err := spec.Rules(nil)
 		require.Error(t, err)
 	})
 
@@ -87,7 +87,7 @@ func TestPolicyRuleDefinition(t *testing.T) {
 				},
 			},
 		}
-		_, err := spec.Rules()
+		_, err := spec.Rules(nil)
 		require.Error(t, err)
 	})
 	t.Run("rule name must only be alpha-numeric and dash", func(t *testing.T) {
@@ -114,7 +114,7 @@ func TestPolicyRuleDefinition(t *testing.T) {
 					},
 				},
 			}
-			_, err := spec.Rules()
+			_, err := spec.Rules(nil)
 			require.Error(t, err)
 		}
 	})
@@ -143,7 +143,7 @@ func TestPolicyRuleDefinition(t *testing.T) {
 					},
 				},
 			}
-			_, err := spec.Rules()
+			_, err := spec.Rules(nil)
 			require.Error(t, err)
 		}
 	})
@@ -158,7 +158,7 @@ func TestPolicyRuleSet(t *testing.T) {
 				{},
 			},
 		}
-		_, err := spec.Rules()
+		_, err := spec.Rules(nil)
 		require.Error(t, err)
 	})
 	t.Run("ruleset must specify rules", func(t *testing.T) {
@@ -170,7 +170,7 @@ func TestPolicyRuleSet(t *testing.T) {
 				},
 			},
 		}
-		_, err := spec.Rules()
+		_, err := spec.Rules(nil)
 		require.Error(t, err)
 	})
 }
@@ -188,7 +188,7 @@ func TestBuiltinColumnsMatchQueryPolicy(t *testing.T) {
 				},
 			},
 		}
-		rules, err := spec.Rules()
+		rules, err := spec.Rules(nil)
 		require.NoError(t, err)
 		assert.Len(t, rules, 1)
 		assert.Equal(t, "policy:test-ruleset:columns-match-query", rules[0].Name())
@@ -205,7 +205,7 @@ func TestBuiltinColumnsMatchQueryPolicy(t *testing.T) {
 				},
 			},
 		}
-		_, err := spec.Rules()
+		_, err := spec.Rules(nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "rule is builtin: columns-match-query")
 	})
@@ -222,7 +222,7 @@ func TestBuiltinColumnsMatchQueryPolicy(t *testing.T) {
 				},
 			},
 		}
-		rules, err := spec.Rules()
+		rules, err := spec.Rules(nil)
 		require.NoError(t, err)
 		assert.Len(t, rules, 1)
 

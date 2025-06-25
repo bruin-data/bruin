@@ -11,6 +11,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
@@ -101,7 +102,7 @@ func NewLinter(findPipelines pipelineFinder, builder pipelineBuilder, rules []Ru
 	}
 }
 
-func (l *Linter) Lint(ctx context.Context, rootPath string, pipelineDefinitionFileName []string, c *cli.Context) (*PipelineAnalysisResult, error) {
+func (l *Linter) Lint(ctx context.Context, rootPath string, pipelineDefinitionFileName []string, c *cli.Context, sqlParser *sqlparser.SQLParser) (*PipelineAnalysisResult, error) {
 	pipelines, err := l.extractPipelinesFromPath(ctx, rootPath, pipelineDefinitionFileName)
 	excludeTag := ""
 	if c != nil {
@@ -129,10 +130,10 @@ func (l *Linter) Lint(ctx context.Context, rootPath string, pipelineDefinitionFi
 		return nil, err
 	}
 
-	return l.LintPipelines(ctx, pipelines)
+	return l.LintPipelines(ctx, pipelines, sqlParser)
 }
 
-func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinitionFileName []string, assetNameOrPath string, c *cli.Context) (*PipelineAnalysisResult, error) {
+func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinitionFileName []string, assetNameOrPath string, c *cli.Context, sqlParser *sqlparser.SQLParser) (*PipelineAnalysisResult, error) {
 	pipelines, err := l.extractPipelinesFromPath(ctx, rootPath, pipelineDefinitionFileName)
 	if err != nil {
 		return nil, err
@@ -179,7 +180,7 @@ func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinit
 	}
 
 	rules := l.rules
-	policyRules, err := loadPolicy(assetPipeline.DefinitionFile.Path)
+	policyRules, err := loadPolicy(assetPipeline.DefinitionFile.Path, sqlParser)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policy: %w", err)
 	}
@@ -339,7 +340,7 @@ func (p *PipelineIssues) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (l *Linter) LintPipelines(ctx context.Context, pipelines []*pipeline.Pipeline) (*PipelineAnalysisResult, error) {
+func (l *Linter) LintPipelines(ctx context.Context, pipelines []*pipeline.Pipeline, sqlParser *sqlparser.SQLParser) (*PipelineAnalysisResult, error) {
 	assetWithExcludeTagCount := 0
 	if count, ok := ctx.Value(assetWithExcludeTagCountKey).(int); ok {
 		assetWithExcludeTagCount = count
@@ -350,7 +351,7 @@ func (l *Linter) LintPipelines(ctx context.Context, pipelines []*pipeline.Pipeli
 	}
 
 	for _, p := range pipelines {
-		pipelineResult, err := l.LintPipeline(ctx, p)
+		pipelineResult, err := l.LintPipeline(ctx, p, sqlParser)
 		if err != nil {
 			return nil, err
 		}
@@ -360,8 +361,8 @@ func (l *Linter) LintPipelines(ctx context.Context, pipelines []*pipeline.Pipeli
 	return result, nil
 }
 
-func (l *Linter) LintPipeline(ctx context.Context, p *pipeline.Pipeline) (*PipelineIssues, error) {
-	return RunLintRulesOnPipeline(ctx, p, l.rules)
+func (l *Linter) LintPipeline(ctx context.Context, p *pipeline.Pipeline, sqlParser *sqlparser.SQLParser) (*PipelineIssues, error) {
+	return RunLintRulesOnPipeline(ctx, p, l.rules, sqlParser)
 }
 
 func ContainsTag(tags []string, target string) bool {
@@ -376,7 +377,7 @@ func ContainsTag(tags []string, target string) bool {
 	return false
 }
 
-func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []Rule) (*PipelineIssues, error) {
+func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []Rule, sqlParser *sqlparser.SQLParser) (*PipelineIssues, error) {
 	pipelineResult := &PipelineIssues{
 		Pipeline: p,
 		Issues:   make(map[Rule][]*Issue),
@@ -385,7 +386,7 @@ func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []R
 	if !ok {
 		excludeTag = ""
 	}
-	policyRules, err := loadPolicy(p.DefinitionFile.Path)
+	policyRules, err := loadPolicy(p.DefinitionFile.Path, sqlParser)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policy: %w", err)
 	}

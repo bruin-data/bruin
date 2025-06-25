@@ -11,6 +11,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
 	"github.com/pkg/errors"
@@ -152,7 +153,7 @@ type PolicySpecification struct {
 	compiledRules map[string]*RuleDefinition
 }
 
-func (spec *PolicySpecification) init() error {
+func (spec *PolicySpecification) init(sqlParser *sqlparser.SQLParser) error {
 	spec.compiledRules = make(map[string]*RuleDefinition)
 	for idx, def := range spec.Definitions {
 		err := def.validate()
@@ -162,6 +163,7 @@ func (spec *PolicySpecification) init() error {
 		if spec.compiledRules[def.Name] != nil {
 			return fmt.Errorf("duplicate rule: %s", def.Name)
 		}
+		builtinRules := getBuiltinRules(sqlParser)
 		if _, exists := builtinRules[def.Name]; exists {
 			return fmt.Errorf("rule is builtin: %s", def.Name)
 		}
@@ -173,8 +175,8 @@ func (spec *PolicySpecification) init() error {
 	return nil
 }
 
-func (spec *PolicySpecification) Rules() ([]Rule, error) {
-	if err := spec.init(); err != nil {
+func (spec *PolicySpecification) Rules(sqlParser *sqlparser.SQLParser) ([]Rule, error) {
+	if err := spec.init(sqlParser); err != nil {
 		return nil, err
 	}
 
@@ -186,7 +188,7 @@ func (spec *PolicySpecification) Rules() ([]Rule, error) {
 		}
 
 		for _, ruleName := range ruleSet.Rules {
-			validators, found := spec.getValidators(ruleName)
+			validators, found := spec.getValidators(ruleName, sqlParser)
 			if !found {
 				return nil, fmt.Errorf("no such rule: %s", ruleName)
 			}
@@ -204,10 +206,11 @@ func (spec *PolicySpecification) Rules() ([]Rule, error) {
 	return rules, nil
 }
 
-func (spec *PolicySpecification) getValidators(name string) (validators, bool) {
+func (spec *PolicySpecification) getValidators(name string, sqlParser *sqlparser.SQLParser) (validators, bool) {
 	def, found := spec.compiledRules[name]
 	if !found {
-		validators, found := builtinRules[name]
+		allBuiltinRules := getBuiltinRules(sqlParser)
+		validators, found := allBuiltinRules[name]
 		return validators, found
 	}
 
@@ -349,7 +352,7 @@ func addBoundaryAnchors(pattern string) string {
 	return pattern
 }
 
-func loadPolicy(path string) (rules []Rule, err error) {
+func loadPolicy(path string, sqlParser *sqlparser.SQLParser) (rules []Rule, err error) {
 	// TODO(turtledev): utilize cached FS to improve performance
 	repo, err := git.FindRepoFromPath(path)
 	if errors.Is(err, git.ErrNoGitRepoFound) {
@@ -375,7 +378,7 @@ func loadPolicy(path string) (rules []Rule, err error) {
 		return nil, fmt.Errorf("error reading policy file: %w", err)
 	}
 
-	policyRules, err := spec.Rules()
+	policyRules, err := spec.Rules(sqlParser)
 	if err != nil {
 		return nil, fmt.Errorf("error reading policy: %w", err)
 	}
