@@ -463,5 +463,5 @@
     "bigquery": false
   },
   "retries": 0,
-  "concurrency": 0
+  "concurrency": 1
 }
