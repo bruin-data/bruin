@@ -1266,3 +1266,13 @@ func ValidateVariables(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, err
 
 	return issues, nil
 }
+
+func EnsureConcurrenyIsPositive(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+	if p.Concurrency <= 0 {
+		issues = append(issues, &Issue{
+			Description: "concurrency must be positive value",
+		})
+	}
+	return issues, nil
+}
