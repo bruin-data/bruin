@@ -248,5 +248,5 @@
   "catchup": false,
   "commit": "",
   "retries": 0,
-  "concurrency": 0
+  "concurrency": 1
 }

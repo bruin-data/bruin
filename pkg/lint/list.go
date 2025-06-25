@@ -190,6 +190,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			Validator:        ValidateVariables,
 			ApplicableLevels: []Level{LevelPipeline},
 		},
+		&SimpleRule{
+			Identifier:       "valid-pipeline-concurrency",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			Validator:        EnsurePipelineConcurrencyIsValid,
+			ApplicableLevels: []Level{LevelPipeline},
+		},
 	}
 
 	if parser != nil {

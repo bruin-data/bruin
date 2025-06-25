@@ -1257,15 +1257,16 @@ func TestCheckLintFunc(t *testing.T) {
 		{
 			name: "Lint Rule Error",
 			foundPipeline: &pipeline.Pipeline{
-				Name: "TestPipeline",
+				Name:        "TestPipeline",
+				Concurrency: 1,
 			},
 			pipelinePath: "path/to/pipeline",
 		},
 		{
 			name: "Linting Error",
-
 			foundPipeline: &pipeline.Pipeline{
-				Name: "TestPipeline",
+				Name:        "TestPipeline",
+				Concurrency: 1,
 			},
 			pipelinePath: "path/to/pipeline",
 		},
