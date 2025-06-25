@@ -517,3 +517,91 @@ func (c *Client) fetchJSONStats(ctx context.Context, tableName, columnName strin
 
 	return stats, rows.Err()
 }
+
+func escapeSQLString(s string) string {
+	return strings.ReplaceAll(s, "'", "''") // Escape single quotes for SQL safety
+}
+
+func (c *Client) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error {
+	tableComponents := strings.Split(asset.Name, ".")
+	var schemaName string
+	var tableName string
+	switch len(tableComponents) {
+	case 2:
+		schemaName = strings.ToUpper(tableComponents[0])
+		tableName = strings.ToUpper(tableComponents[1])
+	case 3:
+		schemaName = strings.ToUpper(tableComponents[1])
+		tableName = strings.ToUpper(tableComponents[2])
+	default:
+		return nil
+	}
+
+	if asset.Description == "" && len(asset.Columns) == 0 {
+		return errors.New("no metadata to push: table and columns have no descriptions")
+	}
+
+	queryStr := fmt.Sprintf(`
+			SELECT 
+				cols.column_name,
+				pgd.description
+			FROM 
+				pg_catalog.pg_statio_all_tables AS st
+			JOIN 
+				pg_catalog.pg_description pgd 
+				ON pgd.objoid = st.relid
+			JOIN 
+				information_schema.columns cols 
+				ON cols.table_schema = st.schemaname
+				AND cols.table_name = st.relname
+				AND cols.ordinal_position = pgd.objsubid
+			WHERE 
+				cols.table_name = '%s'
+				AND cols.table_schema = '%s';`,
+		tableName, schemaName)
+
+	rows, err := c.Select(ctx, &query.Query{Query: queryStr})
+	if err != nil {
+		return errors.Wrapf(err, "failed to query column metadata for %s.%s", schemaName, tableName)
+	}
+
+	existingComments := make(map[string]string)
+	for _, row := range rows {
+		columnName := row[0].(string)
+		comment := ""
+		if row[1] != nil {
+			comment = row[1].(string)
+		}
+		existingComments[columnName] = comment
+	}
+
+	// Find columns that need updates
+	var updateQueries []string
+	for _, col := range asset.Columns {
+		if col.Description != "" && existingComments[col.Name] != col.Description {
+			query := fmt.Sprintf(
+				`COMMENT ON COLUMN %s.%s.%s IS '%s'`,
+				schemaName, tableName, col.Name, escapeSQLString(col.Description),
+			)
+			updateQueries = append(updateQueries, query)
+		}
+	}
+	if len(updateQueries) > 0 {
+		batchQuery := strings.Join(updateQueries, "; ")
+		if err := c.RunQueryWithoutResult(ctx, &query.Query{Query: batchQuery}); err != nil {
+			return errors.Wrap(err, "failed to update column descriptions")
+		}
+	}
+
+	if asset.Description != "" {
+		updateTableQuery := fmt.Sprintf(
+			`COMMENT ON TABLE %s.%s.%s IS '%s'`,
+			schemaName, tableName, escapeSQLString(asset.Description),
+		)
+		if err := c.RunQueryWithoutResult(ctx, &query.Query{Query: updateTableQuery}); err != nil {
+			return errors.Wrap(err, "failed to update table description")
+		}
+	}
+
+	return nil
+}

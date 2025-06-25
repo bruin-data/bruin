@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"io"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/devenv"
@@ -25,6 +26,7 @@ type PgClient interface {
 	Ping(ctx context.Context) error
 	GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error)
 	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error
+	PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error
 }
 
 type connectionFetcher interface {
@@ -148,4 +150,45 @@ func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOpera
 		"accepted_values": &AcceptedValuesCheck{conn: manager},
 		"pattern":         &PatternCheck{conn: manager},
 	})
+}
+
+type MetadataOperator struct {
+	connection connectionFetcher
+}
+
+func NewMetadataPushOperator(conn connectionFetcher) *MetadataOperator {
+	return &MetadataOperator{
+		connection: conn,
+	}
+}
+
+func (o *MetadataOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
+	connName, err := ti.GetPipeline().GetConnectionNameForAsset(ti.GetAsset())
+	if err != nil {
+		return err
+	}
+
+	client, err := o.connection.GetPgConnection(connName)
+	if err != nil {
+		return err
+	}
+
+	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
+	if writer == nil {
+		return errors.New("no writer found in context, please create an issue for this: https://github.com/bruin-data/bruin/issues")
+	}
+
+	// Skip metadata push for views
+	if ti.GetAsset().Materialization.Type == pipeline.MaterializationTypeView {
+		_, _ = writer.Write([]byte("\"Skipping metadata update: Column comments are not supported for Views.\n"))
+		return nil
+	}
+
+	err = client.PushColumnDescriptions(ctx, ti.GetAsset())
+	if err != nil {
+		_, _ = writer.Write([]byte("Failed to push metadata to Postgres, skipping...\n"))
+		return err
+	}
+
+	return nil
 }
