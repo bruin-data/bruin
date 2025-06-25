@@ -77,6 +77,51 @@ image: python:3.11
 print('hello world')
 ```
 
+## Secrets
+
+Bruin supports injecting connections into your Python assets as environment variables.
+
+You can define secrets in your asset definition using the `secrets` key, and Bruin will automatically make them available as environment variables during execution.
+The injected secret is a JSON representation of the connection model.
+
+This is useful for API keys, passwords, and other sensitive information.
+
+::: code-group
+```bruin-python [secret.py]
+"""@bruin
+name: tier1.my_custom_api
+secrets:
+    - key: connection_name
+@bruin"""
+
+import os
+
+my_secret = os.environ["connection_name"]
+# Use your secret in your code
+```
+:::
+
+By default, secrets are injected as environment variables using the key name. If you want to inject a secret under a different environment variable name, you can use the `inject_as` field:
+
+::: code-group
+```bruin-python [secret_renamed.py]
+"""@bruin
+name: tier1.my_custom_api
+secrets:
+    - key: connection_name
+      inject_as: creds #[!code ++]
+@bruin"""
+
+import os
+
+my_secret = os.environ["creds"] #[!code warning]
+# Use your secret in your code
+```
+:::
+
+This allows you to map a secret key to any environment variable name you prefer inside your Python code.  
+
+
 ## Environment Variables
 Bruin introduces a set of environment variables by default to every Python asset.
 

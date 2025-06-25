@@ -168,7 +168,7 @@ Bruin allows you to define all of your credentials in a gitignored file called `
 """@bruin
 name: tier1.my_custom_api
 secrets:
-    - name: MY_SNOWFLAKE_CONN
+    - key: MY_SNOWFLAKE_CONN
 @bruin"""
 
 import os
