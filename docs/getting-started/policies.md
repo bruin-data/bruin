@@ -234,7 +234,7 @@ Bruin provides a set of built-in lint rules that are ready to use without requir
     <tr>
       <td><code>columns-match-query</code></td>
       <td><code>asset</code></td>
-      <td>Columns found in SQL queries must be properly defined in the asset's metadata. This rule validates that all columns referenced in the SQL query are declared in the asset's <code>columns</code> section.</td>
+      <td>Columns found in SQL queries must be properly defined in the asset's metadata. This rule validates that all columns referenced in the SQL query are declared in the asset's <code>columns</code> section. <strong>This rule produces a warning, not a critical error.</strong></td>
     </tr>
     <tr>
       <td><code>description-must-not-be-placeholder</code></td>
