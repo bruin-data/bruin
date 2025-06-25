@@ -47,6 +47,8 @@ const (
 	pipelineMSTeamsConnectionFieldNotUnique = "The `connection` attribute under the MS Teams notifications must be unique"
 	pipelineMSTeamsConnectionFieldEmpty     = "MS Teams notifications `connection` attribute must not be empty"
 
+	pipelineConcurrencyMustBePositive = "Pipeline concurrency must be 1 or greater"
+
 	materializationStrategyIsNotSupportedForViews     = "Materialization strategy is not supported for views"
 	materializationPartitionByNotSupportedForViews    = "Materialization partition by is not supported for views because views cannot be partitioned"
 	materializationIncrementalKeyNotSupportedForViews = "Materialization incremental key is not supported for views because views cannot be updated incrementally"
@@ -1261,6 +1263,18 @@ func ValidateVariables(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, err
 	if err != nil {
 		issues = append(issues, &Issue{
 			Description: err.Error(),
+		})
+	}
+
+	return issues, nil
+}
+
+func EnsurePipelineConcurrencyIsValid(ctx context.Context, p *pipeline.Pipeline) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	if p.Concurrency < 1 {
+		issues = append(issues, &Issue{
+			Description: pipelineConcurrencyMustBePositive,
 		})
 	}
 

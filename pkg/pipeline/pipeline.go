@@ -1206,6 +1206,36 @@ type Pipeline struct {
 	tasksByName        map[string]*Asset
 }
 
+func (p *Pipeline) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type pipelineAlias Pipeline
+	aux := (*pipelineAlias)(p)
+
+	if err := unmarshal(aux); err != nil {
+		return err
+	}
+
+	if p.Concurrency == 0 {
+		p.Concurrency = 1
+	}
+
+	return nil
+}
+
+func (p *Pipeline) UnmarshalJSON(data []byte) error {
+	type pipelineAlias Pipeline
+	aux := (*pipelineAlias)(p)
+
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+
+	if p.Concurrency == 0 {
+		p.Concurrency = 1
+	}
+
+	return nil
+}
+
 type DefaultValues struct {
 	Type              string            `json:"type" yaml:"type" mapstructure:"type"`
 	Parameters        map[string]string `json:"parameters" yaml:"parameters" mapstructure:"parameters"`

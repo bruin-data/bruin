@@ -2538,3 +2538,62 @@ func TestValidateCustomCheckQueryDryRun(t *testing.T) {
 		assert.Empty(t, issues)
 	})
 }
+
+func TestEnsurePipelineConcurrencyIsValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		concurrency int
+		want        []*Issue
+		wantErr     bool
+	}{
+		{
+			name:        "valid concurrency of 1",
+			concurrency: 1,
+			want:        noIssues,
+			wantErr:     false,
+		},
+		{
+			name:        "valid concurrency greater than 1",
+			concurrency: 5,
+			want:        noIssues,
+			wantErr:     false,
+		},
+		{
+			name:        "invalid concurrency of 0",
+			concurrency: 0,
+			want: []*Issue{
+				{
+					Description: pipelineConcurrencyMustBePositive,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:        "invalid negative concurrency",
+			concurrency: -1,
+			want: []*Issue{
+				{
+					Description: pipelineConcurrencyMustBePositive,
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p := &pipeline.Pipeline{
+				Concurrency: tt.concurrency,
+			}
+			got, err := EnsurePipelineConcurrencyIsValid(context.Background(), p)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("EnsurePipelineConcurrencyIsValid() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
