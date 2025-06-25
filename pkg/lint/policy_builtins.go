@@ -5,7 +5,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
 const (
@@ -330,6 +332,74 @@ var builtinRules = map[string]validators{
 						Description: "Column '" + col.Name + "' has invalid type '" + col.Type + "' for platform '" + platformName + "'",
 					})
 				}
+			}
+
+			return issues, nil
+		},
+	},
+	"columns-match-query": {
+		Asset: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+			issues := make([]*Issue, 0)
+
+			if asset.Materialization.Type == pipeline.MaterializationTypeNone {
+				return issues, nil
+			}
+
+			if !asset.IsSQLAsset() {
+				return issues, nil
+			}
+
+			dialect, err := sqlparser.AssetTypeToDialect(asset.Type)
+			if err != nil { //nolint:nilerr
+				return issues, nil
+			}
+
+			// Create a renderer for this asset
+			renderer := jinja.NewRendererWithYesterday("columns-match-query", "validation")
+			renderedQuery, err := renderer.Render(asset.ExecutableFile.Content)
+			if err != nil { //nolint:nilerr
+				return issues, nil
+			}
+
+			// Create a SQL parser to extract columns
+			sqlParser, err := sqlparser.NewSQLParser(false)
+			if err != nil { //nolint:nilerr
+				return issues, nil
+			}
+			defer sqlParser.Close()
+
+			err = sqlParser.Start()
+			if err != nil { //nolint:nilerr
+				return issues, nil
+			}
+
+			queryColumns, err := sqlParser.ExtractColumns(renderedQuery, dialect)
+			if err != nil { //nolint:nilerr
+				return issues, nil
+			}
+
+			if len(queryColumns) == 0 {
+				return issues, nil
+			}
+
+			yamlColumns := make(map[string]bool)
+			for _, col := range asset.Columns {
+				yamlColumns[col.Name] = true
+			}
+
+			missingColumns := make([]string, 0)
+			for _, queryCol := range queryColumns {
+				if !yamlColumns[queryCol] {
+					missingColumns = append(missingColumns, queryCol)
+				}
+			}
+
+			if len(missingColumns) > 0 {
+				issues = append(issues, &Issue{
+					Task:        asset,
+					Description: "Columns found in query but missing from columns metadata: " + strings.Join(missingColumns, ", "),
+					Context:     missingColumns,
+				})
 			}
 
 			return issues, nil

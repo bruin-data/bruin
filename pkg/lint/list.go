@@ -197,12 +197,6 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			renderer: jinja.NewRendererWithYesterday("your-pipeline", "some-run-id"),
 			parser:   parser,
 		})
-		rules = append(rules, ColumnMatchQueryValidatorRule{
-			parser:   parser,
-			renderer: jinja.NewRendererWithYesterday("your-pipeline", "some-run-id"),
-			isFast:   false,
-			severity: ValidatorSeverityWarning,
-		})
 	}
 
 	if excludeWarnings {
