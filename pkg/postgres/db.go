@@ -603,5 +603,57 @@ func (c *Client) PushColumnDescriptions(ctx context.Context, asset *pipeline.Ass
 		}
 	}
 
+	err = c.PrintTableMetadata(ctx, asset.Name)
+
+	return nil
+}
+
+// PrintTableMetadata queries and prints all columns with their metadata for the given 'schema.table'.
+func (c *Client) PrintTableMetadata(ctx context.Context, schemaTable string) error {
+	tableParts := strings.Split(schemaTable, ".")
+	var schemaName, tableName string
+	if len(tableParts) == 2 {
+		schemaName = tableParts[0]
+		tableName = tableParts[1]
+	} else if len(tableParts) == 1 {
+		schemaName = "public"
+		tableName = tableParts[0]
+	} else {
+		return errors.Errorf("table name must be in schema.table or table format, '%s' given", schemaTable)
+	}
+
+	queryStr := `
+			SELECT c.column_name, pgd.description
+			FROM information_schema.columns c
+			LEFT JOIN pg_catalog.pg_statio_all_tables as st
+			  ON c.table_schema = st.schemaname AND c.table_name = st.relname
+			LEFT JOIN pg_catalog.pg_description pgd
+			  ON pgd.objoid = st.relid AND pgd.objsubid = c.ordinal_position
+			WHERE c.table_name = $1 AND c.table_schema = $2
+			ORDER BY c.ordinal_position`
+
+	rows, err := c.connection.Query(ctx, queryStr, tableName, schemaName)
+	if err != nil {
+		return errors.Wrapf(err, "failed to query table metadata for %s.%s", schemaName, tableName)
+	}
+	defer rows.Close()
+
+	fmt.Printf("Columns for table '%s.%s':\n", schemaName, tableName)
+	fmt.Printf("%-32s %-s\n", "Name", "Description")
+	for rows.Next() {
+		var name string
+		var description *string
+		if err := rows.Scan(&name, &description); err != nil {
+			return errors.Wrap(err, "failed to scan column metadata")
+		}
+		descVal := ""
+		if description != nil {
+			descVal = *description
+		}
+		fmt.Printf("%-32s %-s\n", name, descVal)
+	}
+	if err := rows.Err(); err != nil {
+		return errors.Wrap(err, "error iterating over column metadata rows")
+	}
 	return nil
 }
