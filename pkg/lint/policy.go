@@ -214,7 +214,9 @@ func (spec *PolicySpecification) getValidators(name string, sqlParser *sqlparser
 		return validators, found
 	}
 
-	v := validators{}
+	v := validators{
+		Severity: ValidatorSeverityCritical,
+	}
 
 	switch def.RuleTarget {
 	case RuleTargetAsset:
@@ -268,7 +270,9 @@ func pipelineValidatorFromRuleDef(def *RuleDefinition) PipelineValidator {
 }
 
 func withSelector(selector []map[string]any, downstream validators) validators {
-	middleware := validators{}
+	middleware := validators{
+		Severity: downstream.Severity,
+	}
 	if downstream.Pipeline != nil {
 		middleware.Pipeline = func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
 			match, err := doesSelectorMatch(selector, pipeline, nil)

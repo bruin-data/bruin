@@ -114,6 +114,7 @@ func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
 					},
 				}, nil
 			},
+			Severity: ValidatorSeverityCritical,
 		},
 		"asset-name-is-schema-dot-table": {
 			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -128,6 +129,7 @@ func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
 					},
 				}, nil
 			},
+			Severity: ValidatorSeverityCritical,
 		},
 		"asset-has-description": {
 			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -141,6 +143,7 @@ func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
 					},
 				}, nil
 			},
+			Severity: ValidatorSeverityCritical,
 		},
 		"asset-has-owner": {
 			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -154,6 +157,7 @@ func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
 					},
 				}, nil
 			},
+			Severity: ValidatorSeverityCritical,
 		},
 		"asset-has-columns": {
 			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -167,6 +171,7 @@ func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
 					},
 				}, nil
 			},
+			Severity: ValidatorSeverityCritical,
 		},
 		"asset-has-primary-key": {
 			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -195,6 +200,7 @@ func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
 				}
 				return nil, nil
 			},
+			Severity: ValidatorSeverityCritical,
 		},
 		"asset-has-checks": {
 			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -208,6 +214,7 @@ func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
 				}
 				return nil, nil
 			},
+			Severity: ValidatorSeverityCritical,
 		},
 		"asset-has-tags": {
 			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -221,6 +228,7 @@ func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
 				}
 				return nil, nil
 			},
+			Severity: ValidatorSeverityCritical,
 		},
 		"column-has-description": {
 			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -238,6 +246,7 @@ func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
 				}
 				return nil, nil
 			},
+			Severity: ValidatorSeverityCritical,
 		},
 		"column-has-type": {
 			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -255,6 +264,7 @@ func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
 				}
 				return nil, nil
 			},
+			Severity: ValidatorSeverityCritical,
 		},
 		"column-name-is-snake-case": {
 			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -272,6 +282,7 @@ func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
 				}
 				return nil, nil
 			},
+			Severity: ValidatorSeverityCritical,
 		},
 		"column-name-is-camel-case": {
 			Asset: func(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -289,6 +300,7 @@ func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
 				}
 				return nil, nil
 			},
+			Severity: ValidatorSeverityCritical,
 		},
 		"column-type-is-valid-for-platform": {
 			Asset: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -374,6 +386,7 @@ func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
 
 				return issues, nil
 			},
+			Severity: ValidatorSeverityCritical,
 		},
 		"asset-has-no-cross-pipeline-dependencies": {
 			Asset: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
@@ -391,6 +404,7 @@ func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
 				}
 				return nil, nil
 			},
+			Severity: ValidatorSeverityCritical,
 		},
 		"pipeline-has-notifications": {
 			Pipeline: func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
@@ -404,6 +418,7 @@ func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
 					},
 				}, nil
 			},
+			Severity: ValidatorSeverityCritical,
 		},
 		"pipeline-has-retries": {
 			Pipeline: func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
@@ -417,6 +432,7 @@ func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
 					},
 				}, nil
 			},
+			Severity: ValidatorSeverityCritical,
 		},
 		"pipeline-has-start-date": {
 			Pipeline: func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
@@ -429,6 +445,7 @@ func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
 					},
 				}, nil
 			},
+			Severity: ValidatorSeverityCritical,
 		},
 		"pipeline-has-metadata-push": {
 			Pipeline: func(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
@@ -442,6 +459,7 @@ func getBuiltinRules(sqlParser *sqlparser.SQLParser) map[string]validators {
 					},
 				}, nil
 			},
+			Severity: ValidatorSeverityCritical,
 		},
 	}
 
