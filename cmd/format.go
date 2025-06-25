@@ -2,13 +2,18 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
+	"github.com/bruin-data/bruin/pkg/executor"
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/python"
 	errors2 "github.com/pkg/errors"
 	"github.com/sourcegraph/conc/pool"
 	"github.com/spf13/afero"
@@ -31,6 +36,11 @@ func Format(isDebug *bool) *cli.Command {
 				Usage: "fail the command if any of the assets need reformatting",
 				Value: false,
 			},
+			&cli.BoolFlag{
+				Name:  "sqlfluff",
+				Usage: "run sqlfluff to format SQL files",
+				Value: false,
+			},
 		},
 		Action: func(c *cli.Context) error {
 			logger := makeLogger(*isDebug)
@@ -42,6 +52,7 @@ func Format(isDebug *bool) *cli.Command {
 
 			output := c.String("output")
 			checkLint := c.Bool("fail-if-changed")
+			runSqlfluff := c.Bool("sqlfluff")
 
 			if isPathReferencingAsset(repoOrAsset) {
 				if checkLint {
@@ -125,38 +136,48 @@ func Format(isDebug *bool) *cli.Command {
 				}
 				return cli.Exit("", 1)
 			}
-			if !checkLint && len(errorList) == 0 {
+
+			if checkLint || len(errorList) > 0 {
 				if output == "json" {
-					return nil
+					jsMessage, err := json.Marshal(errorList)
+					if err != nil {
+						printErrorJSON(err)
+					}
+					fmt.Println(jsMessage)
+					return cli.Exit("", 1)
 				}
 
-				if processedAssetCount == 0 {
-					infoPrinter.Println("no actual assets were found in the given path, nothing has changed.")
-					return nil
+				errorPrinter.Println("Some errors occurred:")
+				for _, err := range errorList {
+					errorPrinter.Println("  - " + err.Error())
 				}
 
-				assetStr := "asset"
-				if processedAssetCount > 1 {
-					assetStr += "s"
-				}
-				infoPrinter.Printf("Successfully formatted %d %s.\n", processedAssetCount, assetStr)
-				return nil
-			}
-			if output == "json" {
-				jsMessage, err := json.Marshal(errorList)
-				if err != nil {
-					printErrorJSON(err)
-				}
-				fmt.Println(jsMessage)
 				return cli.Exit("", 1)
 			}
 
-			errorPrinter.Println("Some errors occurred:")
-			for _, err := range errorList {
-				errorPrinter.Println("  - " + err.Error())
+			if output == "json" {
+				return nil
 			}
 
-			return cli.Exit("", 1)
+			if processedAssetCount == 0 {
+				infoPrinter.Println("no actual assets were found in the given path, nothing has changed.")
+				return nil
+			}
+
+			assetStr := "asset"
+			if processedAssetCount > 1 {
+				assetStr += "s"
+			}
+			infoPrinter.Printf("Successfully formatted %d %s.\n", processedAssetCount, assetStr)
+
+			// Run sqlfluff if requested
+			if runSqlfluff {
+				if err := runSqlfluffWithErrorHandling(repoOrAsset, output, logger); err != nil {
+					return err
+				}
+			}
+
+			return nil
 		},
 	}
 }
@@ -165,6 +186,10 @@ func formatAsset(path string) (*pipeline.Asset, error) {
 	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(path, nil)
 	if err != nil {
 		return nil, errors2.Wrap(err, "failed to build the asset")
+	}
+
+	if asset == nil {
+		return nil, errors2.New("no valid asset found in the file")
 	}
 
 	return asset, asset.Persist(afero.NewOsFs())
@@ -184,6 +209,10 @@ func shouldFileChange(path string) (bool, error) {
 	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(path, nil)
 	if err != nil {
 		return false, errors2.Wrap(err, "failed to build the asset")
+	}
+
+	if asset == nil {
+		return false, errors2.New("no valid asset found in the file")
 	}
 
 	// Generate the new content without persisting
@@ -221,4 +250,187 @@ func checkChangesForSingleAsset(repoOrAsset, output string) error {
 func normalizeLineEndings(content []byte) []byte {
 	content = bytes.ReplaceAll(content, []byte("\r\n"), []byte("\n"))
 	return bytes.ReplaceAll(content, []byte("\r"), []byte("\n"))
+}
+
+func runSqlfluffFormatting(repoPath string, logger interface{}) error {
+	// Find all SQL files with their asset information
+	sqlFilesWithDialects, err := findSQLFilesWithDialects(repoPath)
+	if err != nil {
+		return errors2.Wrap(err, "failed to find SQL files")
+	}
+
+	if len(sqlFilesWithDialects) == 0 {
+		return nil // No SQL files to format
+	}
+
+	// Find the git repo
+	repoFinder := &git.RepoFinder{}
+	repo, err := repoFinder.Repo(repoPath)
+	if err != nil {
+		return errors2.Wrap(err, "failed to find git repository")
+	}
+
+	// Create sqlfluff runner
+	sqlfluffRunner := &python.SqlfluffRunner{
+		UvInstaller: &python.UvChecker{},
+	}
+
+	// Run sqlfluff on all SQL files
+	ctx := context.WithValue(context.Background(), executor.ContextLogger, logger)
+	return sqlfluffRunner.RunSqlfluffWithDialects(ctx, sqlFilesWithDialects, repo)
+}
+
+func runSqlfluffFormattingForSingleAsset(assetPath string, repo *git.Repo, logger interface{}) error {
+	// Parse the single asset to get its type
+	asset, err := DefaultPipelineBuilder.CreateAssetFromFile(assetPath, nil)
+	if err != nil {
+		return errors2.Wrap(err, "failed to parse asset")
+	}
+
+	if asset == nil {
+		return nil // Not a valid asset
+	}
+
+	// Detect dialect from asset type
+	dialect := python.DetectDialectFromAssetType(string(asset.Type))
+
+	// Convert to absolute path for now since we're working in a nested repo structure
+	absolutePath, err := filepath.Abs(assetPath)
+	if err != nil {
+		return errors2.Wrap(err, "failed to get absolute path")
+	}
+
+	sqlFileInfo := python.SQLFileInfo{
+		FilePath: absolutePath,
+		Dialect:  dialect,
+	}
+
+	// Create sqlfluff runner
+	sqlfluffRunner := &python.SqlfluffRunner{
+		UvInstaller: &python.UvChecker{},
+	}
+
+	// Run sqlfluff on the single file
+	ctx := context.WithValue(context.Background(), executor.ContextLogger, logger)
+	return sqlfluffRunner.RunSqlfluffWithDialects(ctx, []python.SQLFileInfo{sqlFileInfo}, repo)
+}
+
+func findSQLFilesWithDialects(repoPath string) ([]python.SQLFileInfo, error) {
+	// Check if we're formatting a single asset
+	if isPathReferencingAsset(repoPath) {
+		// Single asset - detect dialect from the asset itself
+		asset, err := DefaultPipelineBuilder.CreateAssetFromFile(repoPath, nil)
+		if err != nil {
+			return nil, errors2.Wrap(err, "failed to parse asset")
+		}
+
+		if asset != nil {
+			dialect := python.DetectDialectFromAssetType(string(asset.Type))
+			return []python.SQLFileInfo{{
+				FilePath: repoPath,
+				Dialect:  dialect,
+			}}, nil
+		}
+		return []python.SQLFileInfo{}, nil
+	}
+
+	// Full pipeline - analyze all SQL files and detect dialects in parallel
+	sqlPaths := path.GetAllPossibleAssetPaths(repoPath, assetsDirectoryNames, []string{".sql"})
+
+	if len(sqlPaths) == 0 {
+		return []python.SQLFileInfo{}, nil
+	}
+
+	// Use conc pool to process assets in parallel with max 30 goroutines
+	assetPool := pool.New().WithMaxGoroutines(30)
+	sqlFilesWithDialects := make([]python.SQLFileInfo, len(sqlPaths))
+	errorList := make([]error, 0)
+
+	for i, sqlPath := range sqlPaths {
+		assetPool.Go(func() {
+			index := i
+			// Check if file exists
+			if _, err := os.Stat(sqlPath); err != nil {
+				return
+			}
+
+			// Try to parse asset to get type information
+			asset, err := DefaultPipelineBuilder.CreateAssetFromFile(sqlPath, nil)
+			if err != nil || asset == nil {
+				// If we can't parse the asset, use ANSI as fallback
+				sqlFilesWithDialects[index] = python.SQLFileInfo{
+					FilePath: sqlPath,
+					Dialect:  "ansi",
+				}
+				return
+			}
+
+			dialect := python.DetectDialectFromAssetType(string(asset.Type))
+			sqlFilesWithDialects[index] = python.SQLFileInfo{
+				FilePath: sqlPath,
+				Dialect:  dialect,
+			}
+		})
+	}
+
+	assetPool.Wait()
+
+	// Filter out empty entries (from files that didn't exist)
+	result := make([]python.SQLFileInfo, 0, len(sqlFilesWithDialects))
+	for _, sqlFile := range sqlFilesWithDialects {
+		if sqlFile.FilePath != "" {
+			result = append(result, sqlFile)
+		}
+	}
+
+	if len(errorList) > 0 {
+		return result, errorList[0] // Return first error if any occurred
+	}
+
+	return result, nil
+}
+
+func runSqlfluffWithErrorHandling(repoOrAsset, output string, logger interface{}) error {
+	infoPrinter.Println("Running sqlfluff...")
+
+	var err error
+	// For single asset formatting, we need to handle it differently
+	if isPathReferencingAsset(repoOrAsset) {
+		// Find the repository root for the single asset
+		// Use the directory containing the asset to find the repo
+		repoFinder := &git.RepoFinder{}
+		assetDir := filepath.Dir(repoOrAsset)
+		repo, repoErr := repoFinder.Repo(assetDir)
+		if repoErr != nil {
+			if output == "json" {
+				jsMessage, err := json.Marshal([]error{repoErr})
+				if err != nil {
+					printErrorJSON(err)
+				}
+				fmt.Println(jsMessage)
+				return cli.Exit("", 1)
+			}
+			errorPrinter.Printf("Error finding repository for sqlfluff: %v\n", repoErr)
+			return cli.Exit("", 1)
+		}
+		err = runSqlfluffFormattingForSingleAsset(repoOrAsset, repo, logger)
+	} else {
+		err = runSqlfluffFormatting(repoOrAsset, logger)
+	}
+
+	if err != nil {
+		if output == "json" {
+			jsMessage, jsonErr := json.Marshal([]error{err})
+			if jsonErr != nil {
+				printErrorJSON(jsonErr)
+			}
+			fmt.Println(jsMessage)
+			return cli.Exit("", 1)
+		}
+		errorPrinter.Printf("Error running sqlfluff: %v\n", err)
+		return cli.Exit("", 1)
+	}
+
+	infoPrinter.Println("Successfully formatted SQL files with sqlfluff.")
+	return nil
 }

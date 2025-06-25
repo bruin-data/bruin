@@ -10,15 +10,19 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/pkg/errors"
+	"github.com/sourcegraph/conc/pool"
 	"github.com/spf13/afero"
 )
 
@@ -35,7 +39,21 @@ const (
 	UvVersion               = "0.6.16"
 	pythonVersionForIngestr = "3.11"
 	ingestrVersion          = "0.13.58"
+	sqlfluffVersion         = "3.4.1"
 )
+
+var DatabasePrefixToSqlfluffDialect = map[string]string{
+	"bq":         "bigquery",
+	"sf":         "snowflake",
+	"pg":         "postgres",
+	"rs":         "redshift",
+	"athena":     "athena",
+	"ms":         "tsql",
+	"databricks": "sparksql",
+	"synapse":    "tsql",
+	"duckdb":     "duckdb",
+	"clickhouse": "clickhouse",
+}
 
 // UvChecker handles checking and installing the uv package manager.
 type UvChecker struct {
@@ -447,3 +465,332 @@ with pa.OSFile("$ARROW_FILE_PATH", 'wb') as f:
 	writer.write_table(table)
 	writer.close()
 `
+
+type SqlfluffRunner struct {
+	UvInstaller    uvInstaller
+	binaryFullPath string
+}
+
+type SQLFileInfo struct {
+	FilePath string
+	Dialect  string
+}
+
+// DetectDialectFromAssetType extracts the dialect from an asset's type field
+// by splitting on the first dot and mapping the prefix.
+func DetectDialectFromAssetType(assetType string) string {
+	parts := strings.Split(assetType, ".")
+	if len(parts) == 0 {
+		return "ansi" // fallback to ANSI SQL
+	}
+
+	prefix := parts[0]
+	if dialect, exists := DatabasePrefixToSqlfluffDialect[prefix]; exists {
+		return dialect
+	}
+	return "ansi" // fallback to ANSI SQL
+}
+
+func (s *SqlfluffRunner) RunSqlfluffWithDialects(ctx context.Context, sqlFiles []SQLFileInfo, repo *git.Repo) error {
+	binaryFullPath, err := s.UvInstaller.EnsureUvInstalled(ctx)
+	if err != nil {
+		return err
+	}
+	s.binaryFullPath = binaryFullPath
+
+	// Install sqlfluff
+	err = s.installSqlfluff(ctx, repo)
+	if err != nil {
+		return errors.Wrap(err, "failed to install sqlfluff")
+	}
+
+	if len(sqlFiles) == 0 {
+		return nil
+	}
+
+	// For single asset, use majority dialect detection logic
+	if len(sqlFiles) == 1 {
+		// For single asset, use its specific dialect
+		sqlFileInfo := sqlFiles[0]
+		err = s.formatSQLFileWithDialect(ctx, sqlFileInfo.FilePath, sqlFileInfo.Dialect, repo)
+		if err != nil {
+			// Check if it's a non-critical exit code (1 = unfixable violations)
+			var exitErr *exec.ExitError
+			if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+				// Exit code 1 means there were unfixable violations but fixes were applied
+				// This is acceptable, so we continue
+				return nil
+			}
+			return errors.Wrapf(err, "failed to format SQL file %s", sqlFileInfo.FilePath)
+		}
+		return nil
+	}
+
+	// Use conc pool to process SQL files in parallel with max 30 goroutines
+	sqlPool := pool.New().WithMaxGoroutines(30)
+	errorList := make([]error, 0)
+	var errorMutex sync.Mutex
+
+	for _, sqlFileInfo := range sqlFiles {
+		sqlPool.Go(func() {
+			fileInfo := sqlFileInfo
+
+			err := s.formatSQLFileWithDialect(ctx, fileInfo.FilePath, fileInfo.Dialect, repo)
+			if err != nil {
+				// Check if it's a non-critical exit code (1 = unfixable violations)
+				var exitErr *exec.ExitError
+				if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+					// Exit code 1 means there were unfixable violations but fixes were applied
+					// This is acceptable, so we continue
+					return
+				}
+
+				// Add error to the list in a thread-safe manner
+				errorMutex.Lock()
+				errorList = append(errorList, errors.Wrapf(err, "failed to format SQL file %s", fileInfo.FilePath))
+				errorMutex.Unlock()
+			}
+		})
+	}
+
+	sqlPool.Wait()
+
+	// Return the first error if any occurred
+	if len(errorList) > 0 {
+		return errorList[0]
+	}
+
+	return nil
+}
+
+func (s *SqlfluffRunner) installSqlfluff(ctx context.Context, repo *git.Repo) error {
+	cmdArgs := []string{
+		"tool",
+		"install",
+		"--force",
+		"--quiet",
+		"--python",
+		pythonVersionForIngestr,
+		"sqlfluff==" + sqlfluffVersion,
+	}
+
+	cmd := &CommandInstance{
+		Name: s.binaryFullPath,
+		Args: cmdArgs,
+	}
+
+	cmdRunner := &CommandRunner{}
+	return cmdRunner.Run(ctx, repo, cmd)
+}
+
+var rendererFs = afero.NewCacheOnReadFs(afero.NewOsFs(), afero.NewMemMapFs(), 0)
+
+type PyprojectToml struct {
+	Tool struct {
+		Sqlfluff map[string]any `toml:"sqlfluff"`
+	} `toml:"tool"`
+}
+
+func parsePyprojectToml(filePath string) (map[string]any, error) {
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return nil, nil // No pyproject.toml file found
+	}
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read pyproject.toml: %w", err)
+	}
+
+	var pyproject PyprojectToml
+	if err := toml.Unmarshal(content, &pyproject); err != nil {
+		return nil, fmt.Errorf("failed to parse pyproject.toml: %w", err)
+	}
+
+	return pyproject.Tool.Sqlfluff, nil
+}
+
+func convertTomlConfigToIni(config map[string]any, prefix string) string {
+	var result strings.Builder
+
+	// Sort keys to ensure deterministic output
+	keys := make([]string, 0, len(config))
+	for key := range config {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		value := config[key]
+		sectionName := key
+		if prefix != "" {
+			sectionName = prefix + ":" + key
+		}
+
+		switch v := value.(type) {
+		case map[string]any:
+			// Nested section
+			result.WriteString(fmt.Sprintf("[sqlfluff:%s]\n", sectionName))
+			result.WriteString(convertTomlConfigToIni(v, sectionName))
+			result.WriteString("\n")
+		case string:
+			result.WriteString(fmt.Sprintf("%s = %s\n", key, v))
+		case bool:
+			result.WriteString(fmt.Sprintf("%s = %t\n", key, v))
+		case int, int64, float64:
+			result.WriteString(fmt.Sprintf("%s = %v\n", key, v))
+		case []any:
+			// Handle arrays like exclude_rules
+			var items []string
+			for _, item := range v {
+				items = append(items, fmt.Sprintf("%v", item))
+			}
+			result.WriteString(fmt.Sprintf("%s = %s\n", key, strings.Join(items, ",")))
+		default:
+			result.WriteString(fmt.Sprintf("%s = %v\n", key, v))
+		}
+	}
+
+	return result.String()
+}
+
+func findPipelineFile(basePath string) (string, error) {
+	pipelineFileNames := []string{"pipeline.yml", "pipeline.yaml"}
+	for _, fileName := range pipelineFileNames {
+		candidatePath := filepath.Join(basePath, fileName)
+		if _, err := os.Stat(candidatePath); err == nil {
+			return candidatePath, nil
+		}
+	}
+	return "", fmt.Errorf("no pipeline file found in '%s'. Supported files: %v", basePath, pipelineFileNames)
+}
+
+func (s *SqlfluffRunner) createSqlfluffConfigWithJinjaContext(sqlFilePath string, repo *git.Repo) string {
+	// Try to find and parse pyproject.toml for existing sqlfluff configuration
+	pyprojectPath := filepath.Join(repo.Path, "pyproject.toml")
+	userSqlfluffConfig, err := parsePyprojectToml(pyprojectPath)
+	if err != nil {
+		// Log the error but continue - we'll use default config
+		fmt.Printf("Warning: failed to parse pyproject.toml: %v\n", err)
+		userSqlfluffConfig = nil
+	}
+
+	// Try to find pipeline.yml to extract user-defined variables
+	var pipelineVars map[string]any
+
+	// Look for pipeline.yml or pipeline.yaml in the repo using the same logic as CreatePipelineFromPath
+	pipelinePath, err := findPipelineFile(repo.Path)
+	if err == nil {
+		if pipelineInstance, err := pipeline.PipelineFromPath(pipelinePath, rendererFs); err == nil && pipelineInstance != nil {
+			// Use Variables.Value() to get the default values
+			pipelineVars = pipelineInstance.Variables.Value()
+		}
+	}
+
+	if pipelineVars == nil {
+		pipelineVars = map[string]any{
+			"test1": "my_test1",
+			"test2": "placeholder",
+		}
+	}
+
+	// Start with basic sqlfluff config
+	configContent := "[sqlfluff]\ntemplater = jinja\n\n"
+
+	// Merge user's existing sqlfluff configuration if available
+	if userSqlfluffConfig != nil {
+		// Convert user's TOML config to INI format and append
+		userConfigSection := convertTomlConfigToIni(userSqlfluffConfig, "")
+		if userConfigSection != "" {
+			configContent += userConfigSection + "\n"
+		}
+	}
+
+	// Add Jinja context section
+	configContent += "[sqlfluff:templater:jinja:context]\n"
+
+	// Add pipeline variables under var namespace
+	for varName, varValue := range pipelineVars {
+		if strValue, ok := varValue.(string); ok {
+			configContent += fmt.Sprintf("var.%s = %s\n", varName, strValue)
+		} else {
+			configContent += fmt.Sprintf("var.%s = placeholder\n", varName)
+		}
+	}
+
+	// Add standard Bruin variables
+	configContent += "end_date = 2024-01-01\n"
+	configContent += "start_date = 2024-01-01\n"
+	configContent += "start_datetime = 2024-01-01 00:00:00\n"
+	configContent += "end_datetime = 2024-01-01 00:00:00\n"
+	configContent += "start_timestamp = 2024-01-01 00:00:00\n"
+	configContent += "end_timestamp = 2024-01-01 00:00:00\n"
+	configContent += "pipeline = placeholder\n"
+	configContent += "run_id = placeholder\n"
+	configContent += fmt.Sprintf("this = %s\n", filepath.Base(strings.TrimSuffix(sqlFilePath, filepath.Ext(sqlFilePath))))
+
+	return configContent
+}
+
+func (s *SqlfluffRunner) formatSQLFileWithDialect(ctx context.Context, sqlFile, dialect string, repo *git.Repo) error {
+	// Create a temporary .sqlfluff config file with Jinja context
+	configContent := s.createSqlfluffConfigWithJinjaContext(sqlFile, repo)
+
+	// Create temporary config file
+	configFile, err := os.CreateTemp("", ".sqlfluff-*.cfg")
+	if err != nil {
+		return s.formatSQLFileWithoutTemplating(ctx, sqlFile, dialect, repo)
+	}
+	defer os.Remove(configFile.Name())
+	defer configFile.Close()
+
+	if _, err := configFile.WriteString(configContent); err != nil {
+		return s.formatSQLFileWithoutTemplating(ctx, sqlFile, dialect, repo)
+	}
+	configFile.Close()
+
+	cmdArgs := []string{
+		"tool",
+		"run",
+		"--python",
+		pythonVersionForIngestr,
+		"sqlfluff",
+		"fix",
+		"--quiet",
+		"--dialect",
+		dialect,
+		"--config",
+		configFile.Name(),
+		sqlFile,
+	}
+
+	cmd := &CommandInstance{
+		Name: s.binaryFullPath,
+		Args: cmdArgs,
+	}
+
+	cmdRunner := &CommandRunner{}
+	return cmdRunner.Run(ctx, repo, cmd)
+}
+
+func (s *SqlfluffRunner) formatSQLFileWithoutTemplating(ctx context.Context, sqlFile, dialect string, repo *git.Repo) error {
+	cmdArgs := []string{
+		"tool",
+		"run",
+		"--python",
+		pythonVersionForIngestr,
+		"sqlfluff",
+		"fix",
+		"--quiet",
+		"--dialect",
+		dialect,
+		sqlFile,
+	}
+
+	cmd := &CommandInstance{
+		Name: s.binaryFullPath,
+		Args: cmdArgs,
+	}
+
+	cmdRunner := &CommandRunner{}
+	return cmdRunner.Run(ctx, repo, cmd)
+}
