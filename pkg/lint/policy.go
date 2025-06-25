@@ -42,6 +42,7 @@ type pipelineValidatorEnv struct {
 type validators struct {
 	Pipeline PipelineValidator
 	Asset    AssetValidator
+	Severity ValidatorSeverity
 }
 
 func (v validators) GetApplicableLevels() (levels []Level) {
@@ -52,6 +53,10 @@ func (v validators) GetApplicableLevels() (levels []Level) {
 		levels = append(levels, LevelPipeline)
 	}
 	return levels
+}
+
+func (v validators) GetSeverity() ValidatorSeverity {
+	return v.Severity
 }
 
 type RuleTarget string
@@ -189,7 +194,7 @@ func (spec *PolicySpecification) Rules() ([]Rule, error) {
 			rules = append(rules, &SimpleRule{
 				Identifier:       fmt.Sprintf("policy:%s:%s", ruleSet.Name, ruleName),
 				Fast:             true,
-				Severity:         ValidatorSeverityCritical,
+				Severity:         validators.GetSeverity(),
 				Validator:        validators.Pipeline,
 				AssetValidator:   validators.Asset,
 				ApplicableLevels: validators.GetApplicableLevels(),

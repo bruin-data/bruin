@@ -230,5 +230,9 @@ func TestBuiltinColumnsMatchQueryPolicy(t *testing.T) {
 		levels := rules[0].GetApplicableLevels()
 		assert.Contains(t, levels, lint.LevelAsset)
 		assert.NotContains(t, levels, lint.LevelPipeline)
+
+		// Verify the rule has the correct severity (warning)
+		severity := rules[0].GetSeverity()
+		assert.Equal(t, lint.ValidatorSeverityWarning, severity)
 	})
 }

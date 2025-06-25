@@ -404,6 +404,7 @@ var builtinRules = map[string]validators{
 
 			return issues, nil
 		},
+		Severity: ValidatorSeverityWarning,
 	},
 	"description-must-not-be-placeholder": {
 		Asset: func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
