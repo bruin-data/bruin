@@ -374,7 +374,12 @@ func calculatePercentageDiff(val1, val2, tolerance float64) string {
 		return fmt.Sprintf("<%.3g%%", tolerance)
 	}
 
-	return fmt.Sprintf("%.1f%%", diffPercent)
+	formatted := fmt.Sprintf("%.1f%%", diffPercent)
+	// Fix the "-0.0%" display issue
+	if formatted == "-0.0%" {
+		return "0.0%"
+	}
+	return formatted
 }
 
 func calculatePercentageDiffInt(val1, val2 int64, tolerance float64) string {
@@ -419,9 +424,20 @@ func tableStatsToTable(stats1 diff.ColumnStatistics, stats2 diff.ColumnStatistic
 			return text.Colors{}
 		}
 
+		// Check if this is a datetime row with different values
 		diffStr := fmt.Sprintf("%v", row[3])
+		if diffStr == "-" && fmt.Sprintf("%v", row[4]) == "N/A" {
+			// This might be a datetime row, check if the actual values are different
+			val1 := fmt.Sprintf("%v", row[1])
+			val2 := fmt.Sprintf("%v", row[2])
+			if val1 != val2 {
+				return text.Colors{text.FgRed}
+			}
+			return text.Colors{text.FgGreen}
+		}
+
 		diffVal, _ := strconv.ParseFloat(diffStr, 64)
-		if diffVal > tolerance {
+		if abs(diffVal) > tolerance {
 			return text.Colors{text.FgRed}
 		}
 		return text.Colors{text.FgGreen}
