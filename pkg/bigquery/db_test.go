@@ -318,16 +318,9 @@ func mockBqSummaryHandler(t *testing.T, projectID string, datasetTables map[stri
 				datasets = append(datasets, &bigquery2.DatasetListDatasets{DatasetReference: &bigquery2.DatasetReference{ProjectId: projectID, DatasetId: ds}})
 			}
 			resp, err := json.Marshal(&bigquery2.DatasetList{Datasets: datasets})
-			if err != nil {
-				t.Logf("failed to marshal datasets response: %v", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
+			require.NoError(t, err) //nolint
 			_, err = w.Write(resp)
-			if err != nil {
-				t.Logf("failed to write datasets response: %v", err)
-				return
-			}
+			require.NoError(t, err) //nolint
 			return
 		}
 
@@ -341,16 +334,9 @@ func mockBqSummaryHandler(t *testing.T, projectID string, datasetTables map[stri
 					tableEntries = append(tableEntries, &bigquery2.TableListTables{TableReference: &bigquery2.TableReference{ProjectId: projectID, DatasetId: datasetID, TableId: tbl}})
 				}
 				resp, err := json.Marshal(&bigquery2.TableList{Tables: tableEntries})
-				if err != nil {
-					t.Logf("failed to marshal tables response: %v", err)
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
+				require.NoError(t, err) //nolint
 				_, err = w.Write(resp)
-				if err != nil {
-					t.Logf("failed to write tables response: %v", err)
-					return
-				}
+				require.NoError(t, err) //nolint
 				return
 			}
 		}
@@ -366,25 +352,16 @@ func mockBqSummaryHandler(t *testing.T, projectID string, datasetTables map[stri
 					fields = append(fields, &bigquery2.TableFieldSchema{Name: c, Type: "STRING", Mode: "NULLABLE"})
 				}
 				resp, err := json.Marshal(&bigquery2.Table{Schema: &bigquery2.TableSchema{Fields: fields}})
-				if err != nil {
-					t.Logf("failed to marshal table schema response: %v", err)
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
+				require.NoError(t, err) //nolint
 				_, err = w.Write(resp)
-				if err != nil {
-					t.Logf("failed to write table schema response: %v", err)
-					return
-				}
+				require.NoError(t, err) //nolint
 				return
 			}
 		}
 
 		w.WriteHeader(http.StatusInternalServerError)
 		_, err := w.Write([]byte("no handler for " + r.Method + " " + r.URL.Path))
-		if err != nil {
-			t.Logf("failed to write error response: %v", err)
-		}
+		require.NoError(t, err) //nolint
 	})
 }
 

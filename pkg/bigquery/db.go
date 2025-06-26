@@ -889,8 +889,18 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 		Schemas: []*ansisql.DBSchema{},
 	}
 
+
+	mu := sync.Mutex{}
+	var errs []error
+
+	workers := runtime.NumCPU()
+	if workers < 8 {
+		workers = 8
+	}
+
+	p := pool.New().WithMaxGoroutines(workers)
+
 	datasetsIter := d.client.Datasets(ctx)
-	datasets := make([]*bigquery.Dataset, 0)
 	for {
 		ds, err := datasetsIter.Next()
 		if errors.Is(err, iterator.Done) {
@@ -899,20 +909,7 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 		if err != nil {
 			return nil, fmt.Errorf("failed to list BigQuery datasets: %w", err)
 		}
-		datasets = append(datasets, ds)
-	}
 
-	workers := runtime.NumCPU()
-	if workers < 8 {
-		workers = 8
-	}
-
-	mu := sync.Mutex{}
-	var errs []error
-
-	p := pool.New().WithMaxGoroutines(workers)
-	for _, dataset := range datasets {
-		ds := dataset
 		p.Go(func() {
 			schema := &ansisql.DBSchema{
 				Name:   ds.DatasetID,
@@ -920,8 +917,6 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 			}
 
 			tables := ds.Tables(ctx)
-			tablePool := pool.New().WithMaxGoroutines(workers)
-			tableMu := sync.Mutex{}
 			for {
 				t, err := tables.Next()
 				if errors.Is(err, iterator.Done) {
@@ -934,24 +929,9 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 					return
 				}
 
-				table := t
-				tablePool.Go(func() {
-					cols, err := d.getTableColumns(ctx, ds.DatasetID, table.TableID)
-					if err != nil {
-						mu.Lock()
-						errs = append(errs, fmt.Errorf("failed to list columns for table %s.%s: %w", ds.DatasetID, table.TableID, err))
-						mu.Unlock()
-						return
-					}
-
-					dbTable := &ansisql.DBTable{Name: table.TableID, Columns: cols}
-					tableMu.Lock()
-					schema.Tables = append(schema.Tables, dbTable)
-					tableMu.Unlock()
-				})
+				schema.Tables = append(schema.Tables, &ansisql.DBTable{Name: t.TableID})
 			}
 
-			tablePool.Wait()
 			sort.Slice(schema.Tables, func(i, j int) bool { return schema.Tables[i].Name < schema.Tables[j].Name })
 
 			mu.Lock()
