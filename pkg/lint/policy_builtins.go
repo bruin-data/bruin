@@ -452,9 +452,13 @@ var builtinRules = map[string]validators{
 	},
 }
 
-func QueryColumnsMatchColumnsPolicy(sqlParser *sqlparser.SQLParser) func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+func QueryColumnsMatchColumnsPolicy(parser *sqlparser.SQLParser) func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	return func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 		issues := make([]*Issue, 0)
+
+		if parser == nil {
+			return issues, nil
+		}
 
 		if !asset.IsSQLAsset() {
 			return issues, nil
@@ -470,15 +474,11 @@ func QueryColumnsMatchColumnsPolicy(sqlParser *sqlparser.SQLParser) func(ctx con
 		if err != nil { //nolint:nilerr
 			return issues, nil
 		}
-		err = sqlParser.Start()
-		if err != nil { //nolint:nilerr
-			return issues, nil
-		}
 		// Build schema from upstream assets using lineage extractor
-		lineageExtractor := lineage.NewLineageExtractor(sqlParser)
+		lineageExtractor := lineage.NewLineageExtractor(parser)
 		schema := lineageExtractor.TableSchemaForUpstreams(p, asset)
 
-		lineage, err := sqlParser.ColumnLineage(renderedQuery, dialect, schema)
+		lineage, err := parser.ColumnLineage(renderedQuery, dialect, schema)
 		if err != nil { //nolint:nilerr
 			return issues, nil
 		}
