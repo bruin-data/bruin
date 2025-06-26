@@ -1,10 +1,14 @@
 # Zoom
 [Zoom](https://zoom.us/) is a video conferencing platform used for online meetings and webinars.
 
-Bruin supports Zoom as a source for [Ingestr assets](/assets/ingestr), so you can ingest data from Zoom into your data warehouse.
+Bruin supports Zoom as a source for [ingestr assets](/assets/ingestr), so you can ingest data from Zoom into your data warehouse.
 
-To connect to Zoom you must add a configuration item to the `.bruin.yml` file and the asset file. You will need `client_id`, `client_secret` and `account_id`.
+### Prerequisites
+- A Zoom Server-to-Server OAuth App
+- Appropriate permissions related to meetings and users must be added in the app's scopes
+- Obtain the client_id, client_secret and account_id credentials from the app
 
+To connect to Zoom you must add a configuration item to the `.bruin.yml` file and the asset file.
 Follow the steps below to correctly set up Zoom as a data source and run ingestion.
 
 ### Step 1: Add a connection to .bruin.yml file
@@ -38,12 +42,12 @@ parameters:
 ```
 
 - `source_connection`: name of the Zoom connection defined in `.bruin.yml`.
-- `source_table`: Zoom table to ingest.
+- `source_table`: Zoom table to ingest. For more information, [read here](https://bruin-data.github.io/ingestr/supported-sources/zoom.html)
 - `destination`: name of the destination connection.
 
 ### Step 3: [Run](/commands/run) asset to ingest data
 ```
 bruin run assets/zoom_asset.yml
 ```
+<img alt="zoom" src="./media/zoom_ingestion.png">
 
-Executing this command ingests data from Zoom into your DuckDB database.
