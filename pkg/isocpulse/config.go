@@ -1,7 +1,7 @@
 package isocpulse
 
 import (
-	"fmt"
+	"errors"
 	"net/url"
 	"strings"
 )
@@ -11,14 +11,10 @@ type Config struct {
 }
 
 func (c Config) GetIngestrURI() (string, error) {
-	token := strings.TrimSpace(c.Token)
-	if token == "" {
-		return "", fmt.Errorf("token is required")
-	}
 	u := url.URL{
 		Scheme: "isoc-pulse",
 		RawQuery: url.Values{
-			"token": []string{token},
+			"token": []string{c.Token},
 		}.Encode(),
 	}
 
@@ -30,6 +26,10 @@ type Client struct {
 }
 
 func NewClient(cfg Config) (*Client, error) {
+	token := strings.TrimSpace(cfg.Token)
+	if token == "" {
+		return nil, errors.New("token is required")
+	}
 	return &Client{
 		cfg: cfg,
 	}, nil
