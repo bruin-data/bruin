@@ -332,6 +332,9 @@ environments:
           port: 22
           username: "sftp-user"
           password: "sftp-password"
+      isoc_pulse:
+        - name: "isoc_pulse-1"
+          token: "isoc-pulse-token-123"
 
   prod:
     connections:
