@@ -470,7 +470,10 @@ func QueryColumnsMatchColumnsPolicy(sqlParser *sqlparser.SQLParser) func(ctx con
 		if err != nil { //nolint:nilerr
 			return issues, nil
 		}
-
+		err = sqlParser.Start()
+		if err != nil { //nolint:nilerr
+			return issues, nil
+		}
 		// Build schema from upstream assets using lineage extractor
 		lineageExtractor := lineage.NewLineageExtractor(sqlParser)
 		schema := lineageExtractor.TableSchemaForUpstreams(p, asset)

@@ -144,11 +144,6 @@ type Lineage struct {
 }
 
 func (s *SQLParser) ColumnLineage(sql, dialect string, schema Schema) (*Lineage, error) {
-	err := s.Start()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to start sql parser")
-	}
-
 	if len(sql) > s.MaxQueryLength {
 		return &Lineage{
 			Columns:            []ColumnLineage{},
