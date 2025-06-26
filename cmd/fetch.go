@@ -494,6 +494,13 @@ func GetPipelineAndAsset(ctx context.Context, inputPath string, fs afero.Fs, con
 		errorPrinter.Printf("The given file path doesn't seem to be a Bruin task definition: '%s'\n", inputPath)
 		return nil, err
 	}
+
+	task, err = DefaultPipelineBuilder.MutateAsset(ctx, task, foundPipeline)
+	if err != nil {
+		errorPrinter.Printf("Failed to mutate asset '%s': %v\n", task.Name, err)
+		return nil, err
+	}
+
 	return &ppInfo{
 		Pipeline: foundPipeline,
 		Asset:    task,
