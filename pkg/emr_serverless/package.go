@@ -2,7 +2,6 @@ package emr_serverless //nolint
 
 import (
 	"archive/zip"
-	"fmt"
 	"io"
 	"io/fs"
 	"path"
@@ -63,7 +62,7 @@ func packageContextWithPrefix(zw *zip.Writer, context fs.FS, prefix string) erro
 			return err
 		}
 		if !info.Mode().IsRegular() {
-			return fmt.Errorf("package: cannot add non-regular file: %v", fullPath)
+			return nil
 		}
 		h, err := zip.FileInfoHeader(info)
 		if err != nil {
