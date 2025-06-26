@@ -317,9 +317,9 @@ func mockBqSummaryHandler(t *testing.T, projectID string, datasetTables map[stri
 				datasets = append(datasets, &bigquery2.DatasetListDatasets{DatasetReference: &bigquery2.DatasetReference{ProjectId: projectID, DatasetId: ds}})
 			}
 			resp, err := json.Marshal(&bigquery2.DatasetList{Datasets: datasets})
-			require.NoError(t, err)
+			require.NoError(t, err) //nolint
 			_, err = w.Write(resp)
-			require.NoError(t, err)
+			require.NoError(t, err) //nolint
 			return
 		}
 
@@ -333,9 +333,9 @@ func mockBqSummaryHandler(t *testing.T, projectID string, datasetTables map[stri
 					tableEntries = append(tableEntries, &bigquery2.TableListTables{TableReference: &bigquery2.TableReference{ProjectId: projectID, DatasetId: datasetID, TableId: tbl}})
 				}
 				resp, err := json.Marshal(&bigquery2.TableList{Tables: tableEntries})
-				require.NoError(t, err)
+				require.NoError(t, err) //nolint
 				_, err = w.Write(resp)
-				require.NoError(t, err)
+				require.NoError(t, err) //nolint
 				return
 			}
 		}
@@ -351,16 +351,16 @@ func mockBqSummaryHandler(t *testing.T, projectID string, datasetTables map[stri
 					fields = append(fields, &bigquery2.TableFieldSchema{Name: c, Type: "STRING", Mode: "NULLABLE"})
 				}
 				resp, err := json.Marshal(&bigquery2.Table{Schema: &bigquery2.TableSchema{Fields: fields}})
-				require.NoError(t, err)
+				require.NoError(t, err) //nolint
 				_, err = w.Write(resp)
-				require.NoError(t, err)
+				require.NoError(t, err) //nolint
 				return
 			}
 		}
 
 		w.WriteHeader(http.StatusInternalServerError)
 		_, err := w.Write([]byte("no handler for " + r.Method + " " + r.URL.Path))
-		require.NoError(t, err)
+		require.NoError(t, err) //nolint
 	})
 }
 
