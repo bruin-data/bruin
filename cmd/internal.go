@@ -598,42 +598,41 @@ func convertToBruinAsset(fs afero.Fs, filePath string) error {
 
 	fileName := filepath.Base(filePath)
 	assetName := strings.TrimSuffix(fileName, filepath.Ext(fileName))
-
-	var bruinHeader string
 	ext := strings.ToLower(filepath.Ext(filePath))
 
 	// Try to determine the majority asset type from the pipeline
 	var assetType = pipeline.AssetTypeBigqueryQuery // default fallback
 	pipelineRootPath, err := path.GetPipelineRootFromTask(filePath, PipelineDefinitionFiles)
-	if err == nil {
-		var pipelineFilePath string
-		for _, fileName := range PipelineDefinitionFiles {
-			candidatePath := filepath.Join(pipelineRootPath, fileName)
-			if exists, _ := afero.Exists(fs, candidatePath); exists {
-				pipelineFilePath = candidatePath
-				break
-			}
-		}
-
-		if pipelineFilePath != "" {
-			if foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(context.Background(), pipelineRootPath); err == nil {
-				assetType = foundPipeline.GetMajorityAssetTypesFromSQLAssets(pipeline.AssetTypeBigqueryQuery)
-			}
-		}
-	}
-
-	switch ext {
-	case ".sql":
-		bruinHeader = fmt.Sprintf("/* @bruin\nname: %s\ntype: %s\n@bruin */\n\n", assetName, assetType)
-	case ".py":
-		bruinHeader = fmt.Sprintf("\"\"\" @bruin\nname: %s\n@bruin \"\"\"\n\n", assetName)
-	default:
-		return nil // unsupported file types
-	}
-	newContent := bruinHeader + string(content)
-	err = afero.WriteFile(fs, filePath, []byte(newContent), 0o644)
 	if err != nil {
-		printErrorJSON(errors2.Wrap(err, "failed to write file"))
+		printErrorJSON(errors2.Wrap(err, "failed to get pipeline root path"))
+	}
+	if foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(context.Background(), pipelineRootPath); err == nil {
+		assetType = foundPipeline.GetMajorityAssetTypesFromSQLAssets(pipeline.AssetTypeBigqueryQuery)
+	}
+	if err != nil {
+		printErrorJSON(errors2.Wrap(err, "failed to create asset"))
+	}
+
+	if ext != ".sql" && ext != ".py" {
+		return nil
+	}
+	asset := &pipeline.Asset{
+		Name: assetName,
+		Type: assetType,
+		ExecutableFile: pipeline.ExecutableFile{
+			Name:    fileName,
+			Path:    filePath,
+			Content: string(content),
+		},
+	}
+
+	if ext == ".py" {
+		asset.Type = pipeline.AssetTypePython
+	}
+
+	err = asset.Persist(fs)
+	if err != nil {
+		printErrorJSON(errors2.Wrap(err, "failed to persist asset"))
 		return cli.Exit("", 1)
 	}
 
