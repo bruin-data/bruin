@@ -386,12 +386,17 @@ func (db *DB) GetTableSummary(ctx context.Context, tableName string, schemaOnly 
 		}
 
 		if len(countResult) > 0 && len(countResult[0]) > 0 {
-			if val, ok := countResult[0][0].(int64); ok {
+			switch val := countResult[0][0].(type) {
+			case int64:
 				rowCount = val
-			} else if val, ok := countResult[0][0].(int); ok {
+			case int:
 				rowCount = int64(val)
-			} else {
-				return nil, fmt.Errorf("unexpected row count type for table '%s'", tableName)
+			case int32:
+				rowCount = int64(val)
+			case float64:
+				rowCount = int64(val)
+			default:
+				return nil, fmt.Errorf("unexpected row count type for table '%s': got %T with value %v", tableName, val, val)
 			}
 		}
 	}
