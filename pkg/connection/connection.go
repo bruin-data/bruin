@@ -67,6 +67,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/stripe"
 	"github.com/bruin-data/bruin/pkg/tiktokads"
 	"github.com/bruin-data/bruin/pkg/zendesk"
+	"github.com/bruin-data/bruin/pkg/zoom"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/conc"
 )
@@ -113,6 +114,7 @@ type Manager struct {
 	Pipedrive       map[string]*pipedrive.Client
 	Mixpanel        map[string]*mixpanel.Client
 	QuickBooks      map[string]*quickbooks.Client
+	Zoom            map[string]*zoom.Client
 	Frankfurter     map[string]*frankfurter.Client
 	EMRSeverless    map[string]*emr_serverless.Client
 	GoogleAnalytics map[string]*googleanalytics.Client
@@ -379,6 +381,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connQuickBooks, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.QuickBooks))...)
+
+	connZoom, err := m.GetZoomConnectionWithoutDefault(name)
+	if err == nil {
+		return connZoom, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Zoom))...)
 
 	connEMRServerless, err := m.GetEMRServerlessConnectionWithoutDefault(name)
 	if err == nil {
@@ -1414,6 +1422,25 @@ func (m *Manager) GetQuickBooksConnectionWithoutDefault(name string) (*quickbook
 	db, ok := m.QuickBooks[name]
 	if !ok {
 		return nil, errors.Errorf("quickbooks connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetZoomConnection(name string) (*zoom.Client, error) {
+	db, err := m.GetZoomConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetZoomConnectionWithoutDefault("zoom-default")
+}
+
+func (m *Manager) GetZoomConnectionWithoutDefault(name string) (*zoom.Client, error) {
+	if m.Zoom == nil {
+		return nil, errors.New("no zoom connections found")
+	}
+	db, ok := m.Zoom[name]
+	if !ok {
+		return nil, errors.Errorf("zoom connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2727,6 +2754,27 @@ func (m *Manager) AddQuickBooksConnectionFromConfig(connection *config.QuickBook
 	return nil
 }
 
+func (m *Manager) AddZoomConnectionFromConfig(connection *config.ZoomConnection) error {
+	m.mutex.Lock()
+	if m.Zoom == nil {
+		m.Zoom = make(map[string]*zoom.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := zoom.NewClient(zoom.Config{
+		ClientID:     connection.ClientID,
+		ClientSecret: connection.ClientSecret,
+		AccountID:    connection.AccountID,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Zoom[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddMixpanelConnectionFromConfig(connection *config.MixpanelConnection) error {
 	m.mutex.Lock()
 	if m.Mixpanel == nil {
@@ -3070,6 +3118,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mixpanel, connectionManager.AddMixpanelConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.QuickBooks, connectionManager.AddQuickBooksConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Zoom, connectionManager.AddZoomConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleAnalytics, connectionManager.AddGoogleAnalyticsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppLovin, connectionManager.AddAppLovinConnectionFromConfig, &wg, &errList, &mu)
