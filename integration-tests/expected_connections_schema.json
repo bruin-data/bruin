@@ -173,6 +173,22 @@
         "region"
       ]
     },
+    "AttioConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "AwsConnection": {
       "properties": {
         "name": {
@@ -517,15 +533,15 @@
           },
           "type": "array"
         },
-        "quickbooks": {
-          "items": {
-            "$ref": "#/$defs/QuickBooksConnection"
-        },
-        "type": "array"
-      },
         "mixpanel": {
           "items": {
             "$ref": "#/$defs/MixpanelConnection"
+          },
+          "type": "array"
+        },
+        "quickbooks": {
+          "items": {
+            "$ref": "#/$defs/QuickBooksConnection"
           },
           "type": "array"
         },
@@ -595,9 +611,21 @@
           },
           "type": "array"
         },
+        "solidgate": {
+          "items": {
+            "$ref": "#/$defs/SolidgateConnection"
+          },
+          "type": "array"
+        },
         "spanner": {
           "items": {
             "$ref": "#/$defs/SpannerConnection"
+          },
+          "type": "array"
+        },
+        "smartsheet": {
+          "items": {
+            "$ref": "#/$defs/SmartsheetConnection"
           },
           "type": "array"
         },
@@ -613,15 +641,9 @@
           },
           "type": "array"
         },
-        "solidgate": {
+        "isoc_pulse": {
           "items": {
-            "$ref": "#/$defs/SolidgateConnection"
-          },
-          "type": "array"
-        },
-        "smartsheet": {
-          "items": {
-            "$ref": "#/$defs/SmartsheetConnection"
+            "$ref": "#/$defs/ISOCPulseConnection"
           },
           "type": "array"
         }
@@ -1061,6 +1083,22 @@
         "api_key"
       ]
     },
+    "ISOCPulseConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "token"
+      ]
+    },
     "KafkaConnection": {
       "properties": {
         "name": {
@@ -1157,6 +1195,33 @@
         "name",
         "access_token",
         "account_ids"
+      ]
+    },
+    "MixpanelConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "server": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "username",
+        "password",
+        "project_id"
       ]
     },
     "MongoConnection": {
@@ -1370,70 +1435,6 @@
         "api_token"
       ]
     },
-    "QuickBooksConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "company_id": {
-          "type": "string"
-        },
-        "client_id": {
-          "type": "string"
-        },
-        "client_secret": {
-          "type": "string"
-        },
-        "refresh_token": {
-          "type": "string"
-        },
-        "environment": {
-          "type": "string"
-        },
-        "minor_version": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": ["name", "company_id", "client_id", "client_secret", "refresh_token"]
-    },
-    "MixpanelConnection": {
-      "properties": {
-        "name": {"type": "string"},
-        "username": {"type": "string"},
-        "password": {"type": "string"},
-        "project_id": {"type": "string"},
-        "server": {"type": "string"}
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": ["name", "username", "password", "project_id"]
-    },
-    "ZoomConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "client_id": {
-          "type": "string"
-        },
-        "client_secret": {
-          "type": "string"
-        },
-        "account_id": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "client_id",
-        "client_secret",
-        "account_id"
-      ]
-    },
     "PostgresConnection": {
       "properties": {
         "name": {
@@ -1474,6 +1475,40 @@
         "host",
         "port",
         "database"
+      ]
+    },
+    "QuickBooksConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "company_id": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "refresh_token": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "minor_version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "company_id",
+        "client_id",
+        "client_secret",
+        "refresh_token"
       ]
     },
     "RedshiftConnection": {
@@ -1552,6 +1587,34 @@
         "layout"
       ]
     },
+    "SFTPConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "port",
+        "username",
+        "password"
+      ]
+    },
     "SQLiteConnection": {
       "properties": {
         "name": {
@@ -1628,6 +1691,22 @@
         "api_key"
       ]
     },
+    "SmartsheetConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token"
+      ]
+    },
     "SnowflakeConnection": {
       "oneOf": [
         {
@@ -1692,6 +1771,26 @@
         "username"
       ]
     },
+    "SolidgateConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "public_key": {
+          "type": "string"
+        },
+        "secret_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "public_key",
+        "secret_key"
+      ]
+    },
     "SpannerConnection": {
       "properties": {
         "name": {
@@ -1706,10 +1805,10 @@
         "database": {
           "type": "string"
         },
-        "service_account_file": {
+        "service_account_json": {
           "type": "string"
         },
-        "service_account_json": {
+        "service_account_file": {
           "type": "string"
         }
       },
@@ -1720,42 +1819,6 @@
         "project_id",
         "instance_id",
         "database"
-      ]
-    },
-    "SolidgateConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "secret_key": {
-          "type": "string"
-        },
-        "public_key": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "public_key",
-        "secret_key"
-      ]
-    },
-    "SmartsheetConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "access_token": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "access_token"
       ]
     },
     "StripeConnection": {
@@ -1858,40 +1921,29 @@
         "sub_domain"
       ]
     },
-    "AttioConnection": {
+    "ZoomConnection": {
       "properties": {
         "name": {
           "type": "string"
         },
-        "api_key": {
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "account_id": {
           "type": "string"
         }
       },
       "additionalProperties": false,
       "type": "object",
-      "required": ["name", "api_key"] 
-    },
-    "SFTPConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "host": {
-          "type": "string"
-        },
-        "port": {
-          "type": "integer"
-        },
-        "username": {
-          "type": "string"
-        },
-        "password": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": ["name", "host", "port", "username", "password"]
+      "required": [
+        "name",
+        "client_id",
+        "client_secret",
+        "account_id"
+      ]
     }
   }
 }

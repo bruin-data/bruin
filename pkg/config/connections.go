@@ -836,3 +836,12 @@ type SFTPConnection struct {
 func (c SFTPConnection) GetName() string {
 	return c.Name
 }
+
+type ISOCPulseConnection struct {
+	Name  string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Token string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
+}
+
+func (c ISOCPulseConnection) GetName() string {
+	return c.Name
+}

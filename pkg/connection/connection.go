@@ -39,6 +39,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/gsheets"
 	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/hubspot"
+	"github.com/bruin-data/bruin/pkg/isocpulse"
 	"github.com/bruin-data/bruin/pkg/kafka"
 	"github.com/bruin-data/bruin/pkg/kinesis"
 	"github.com/bruin-data/bruin/pkg/klaviyo"
@@ -130,6 +131,7 @@ type Manager struct {
 	Smartsheet      map[string]*smartsheet.Client
 	Attio           map[string]*attio.Client
 	Sftp            map[string]*sftp.Client
+	ISOCPulse       map[string]*isocpulse.Client
 	mutex           sync.Mutex
 }
 
@@ -475,6 +477,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connSftp, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Sftp))...)
+
+	connPulse, err := m.GetISOCPulseConnectionWithoutDefault(name)
+	if err == nil {
+		return connPulse, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.ISOCPulse))...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -1460,6 +1468,25 @@ func (m *Manager) GetEMRServerlessConnectionWithoutDefault(name string) (*emr_se
 	db, ok := m.EMRSeverless[name]
 	if !ok {
 		return nil, errors.Errorf("EMR Serverless connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetISOCPulseConnection(name string) (*isocpulse.Client, error) {
+	db, err := m.GetISOCPulseConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetISOCPulseConnectionWithoutDefault("isoc_pulse-default")
+}
+
+func (m *Manager) GetISOCPulseConnectionWithoutDefault(name string) (*isocpulse.Client, error) {
+	if m.ISOCPulse == nil {
+		return nil, errors.New("no ISOC Pulse connections found")
+	}
+	db, ok := m.ISOCPulse[name]
+	if !ok {
+		return nil, errors.Errorf("ISOC Pulse connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2754,6 +2781,25 @@ func (m *Manager) AddQuickBooksConnectionFromConfig(connection *config.QuickBook
 	return nil
 }
 
+func (m *Manager) AddISOCPulseConnectionFromConfig(connection *config.ISOCPulseConnection) error {
+	m.mutex.Lock()
+	if m.ISOCPulse == nil {
+		m.ISOCPulse = make(map[string]*isocpulse.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := isocpulse.NewClient(isocpulse.Config{
+		Token: connection.Token,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.ISOCPulse[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddZoomConnectionFromConfig(connection *config.ZoomConnection) error {
 	m.mutex.Lock()
 	if m.Zoom == nil {
@@ -3134,6 +3180,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Smartsheet, connectionManager.AddSmartsheetConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Attio, connectionManager.AddAttioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sftp, connectionManager.AddSftpConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.ISOCPulse, connectionManager.AddISOCPulseConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }
