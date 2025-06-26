@@ -90,14 +90,16 @@ type Linter struct {
 	builder       pipelineBuilder
 	rules         []Rule
 	logger        logger.Logger
+	sqlParser     sqlParser
 }
 
-func NewLinter(findPipelines pipelineFinder, builder pipelineBuilder, rules []Rule, logger logger.Logger) *Linter {
+func NewLinter(findPipelines pipelineFinder, builder pipelineBuilder, rules []Rule, logger logger.Logger, sqlParser sqlParser) *Linter {
 	return &Linter{
 		findPipelines: findPipelines,
 		builder:       builder,
 		rules:         rules,
 		logger:        logger,
+		sqlParser:     sqlParser,
 	}
 }
 
@@ -179,7 +181,7 @@ func (l *Linter) LintAsset(ctx context.Context, rootPath string, pipelineDefinit
 	}
 
 	rules := l.rules
-	policyRules, err := loadPolicy(assetPipeline.DefinitionFile.Path)
+	policyRules, err := loadPolicy(assetPipeline.DefinitionFile.Path, l.sqlParser)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policy: %w", err)
 	}
@@ -361,7 +363,7 @@ func (l *Linter) LintPipelines(ctx context.Context, pipelines []*pipeline.Pipeli
 }
 
 func (l *Linter) LintPipeline(ctx context.Context, p *pipeline.Pipeline) (*PipelineIssues, error) {
-	return RunLintRulesOnPipeline(ctx, p, l.rules)
+	return RunLintRulesOnPipeline(ctx, p, l.rules, l.sqlParser)
 }
 
 func ContainsTag(tags []string, target string) bool {
@@ -376,7 +378,7 @@ func ContainsTag(tags []string, target string) bool {
 	return false
 }
 
-func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []Rule) (*PipelineIssues, error) {
+func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []Rule, sqlParser sqlParser) (*PipelineIssues, error) {
 	pipelineResult := &PipelineIssues{
 		Pipeline: p,
 		Issues:   make(map[Rule][]*Issue),
@@ -385,7 +387,7 @@ func RunLintRulesOnPipeline(ctx context.Context, p *pipeline.Pipeline, rules []R
 	if !ok {
 		excludeTag = ""
 	}
-	policyRules, err := loadPolicy(p.DefinitionFile.Path)
+	policyRules, err := loadPolicy(p.DefinitionFile.Path, sqlParser)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policy: %w", err)
 	}

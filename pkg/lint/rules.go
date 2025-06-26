@@ -17,6 +17,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
 	"github.com/robfig/cron/v3"
 	"github.com/spf13/afero"
@@ -1200,6 +1201,7 @@ func (g *GlossaryChecker) EnsureAssetEntitiesExistInGlossary(ctx context.Context
 type sqlParser interface {
 	UsedTables(sql, dialect string) ([]string, error)
 	GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeline *pipeline.Pipeline, renderer jinja.RendererInterface) ([]string, error)
+	ColumnLineage(sql, dialect string, schema sqlparser.Schema) (*sqlparser.Lineage, error)
 }
 
 type UsedTableValidatorRule struct {

@@ -653,7 +653,8 @@ func TestRunLintRulesOnPipeline_ExcludeTag(t *testing.T) {
 				ctx = context.WithValue(ctx, excludeTagKey, tt.excludeTag)
 			}
 
-			result, err := RunLintRulesOnPipeline(ctx, pipeline, []Rule{assetRule})
+			mockParser := new(mockSQLParser)
+			result, err := RunLintRulesOnPipeline(ctx, pipeline, []Rule{assetRule}, mockParser)
 			require.NoError(t, err)
 
 			// Count total issues across all rules

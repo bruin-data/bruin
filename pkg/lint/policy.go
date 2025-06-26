@@ -11,6 +11,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
 	"github.com/pkg/errors"
@@ -168,7 +169,8 @@ func (spec *PolicySpecification) init() error {
 	return nil
 }
 
-func (spec *PolicySpecification) Rules() ([]Rule, error) {
+// we need to pass in the sqlparser to the policy because of the query-matches-columns rule.
+func (spec *PolicySpecification) Rules(sqlParser sqlParser) ([]Rule, error) {
 	if err := spec.init(); err != nil {
 		return nil, err
 	}
@@ -181,7 +183,7 @@ func (spec *PolicySpecification) Rules() ([]Rule, error) {
 		}
 
 		for _, ruleName := range ruleSet.Rules {
-			validators, found := spec.getValidators(ruleName)
+			validators, found := spec.getValidators(ruleName, sqlParser)
 			if !found {
 				return nil, fmt.Errorf("no such rule: %s", ruleName)
 			}
@@ -199,10 +201,17 @@ func (spec *PolicySpecification) Rules() ([]Rule, error) {
 	return rules, nil
 }
 
-func (spec *PolicySpecification) getValidators(name string) (validators, bool) {
+// we need to pass in the sqlparser to the policy because of the query-matches-columns rule.
+func (spec *PolicySpecification) getValidators(name string, sqlParser sqlParser) (validators, bool) {
 	def, found := spec.compiledRules[name]
 	if !found {
 		validators, found := builtinRules[name]
+		if found && name == "query-matches-columns" && sqlParser != nil {
+			// Special case: replace the noop validator with the actual implementation
+			if realParser, ok := sqlParser.(*sqlparser.SQLParser); ok {
+				validators.Asset = QueryColumnsMatchColumnsPolicy(realParser)
+			}
+		}
 		return validators, found
 	}
 
@@ -344,7 +353,7 @@ func addBoundaryAnchors(pattern string) string {
 	return pattern
 }
 
-func loadPolicy(path string) (rules []Rule, err error) {
+func loadPolicy(path string, sqlParser sqlParser) (rules []Rule, err error) {
 	// TODO(turtledev): utilize cached FS to improve performance
 	repo, err := git.FindRepoFromPath(path)
 	if errors.Is(err, git.ErrNoGitRepoFound) {
@@ -365,12 +374,13 @@ func loadPolicy(path string) (rules []Rule, err error) {
 	defer fd.Close()
 
 	spec := PolicySpecification{}
+
 	err = yaml.NewDecoder(fd).Decode(&spec)
 	if err != nil {
 		return nil, fmt.Errorf("error reading policy file: %w", err)
 	}
 
-	policyRules, err := spec.Rules()
+	policyRules, err := spec.Rules(sqlParser)
 	if err != nil {
 		return nil, fmt.Errorf("error reading policy: %w", err)
 	}
