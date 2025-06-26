@@ -602,9 +602,29 @@ func convertToBruinAsset(fs afero.Fs, filePath string) error {
 	var bruinHeader string
 	ext := strings.ToLower(filepath.Ext(filePath))
 
+	// Try to determine the majority asset type from the pipeline
+	var assetType = pipeline.AssetTypeBigqueryQuery // default fallback
+	pipelineRootPath, err := path.GetPipelineRootFromTask(filePath, PipelineDefinitionFiles)
+	if err == nil {
+		var pipelineFilePath string
+		for _, fileName := range PipelineDefinitionFiles {
+			candidatePath := filepath.Join(pipelineRootPath, fileName)
+			if exists, _ := afero.Exists(fs, candidatePath); exists {
+				pipelineFilePath = candidatePath
+				break
+			}
+		}
+
+		if pipelineFilePath != "" {
+			if foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(context.Background(), pipelineRootPath); err == nil {
+				assetType = foundPipeline.GetMajorityAssetTypesFromSQLAssets(pipeline.AssetTypeBigqueryQuery)
+			}
+		}
+	}
+
 	switch ext {
 	case ".sql":
-		bruinHeader = fmt.Sprintf("/* @bruin\nname: %s\ntype: bq.sql\n@bruin */\n\n", assetName)
+		bruinHeader = fmt.Sprintf("/* @bruin\nname: %s\ntype: %s\n@bruin */\n\n", assetName, assetType)
 	case ".py":
 		bruinHeader = fmt.Sprintf("\"\"\" @bruin\nname: %s\n@bruin \"\"\"\n\n", assetName)
 	default:
