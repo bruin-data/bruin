@@ -3,9 +3,32 @@ package lint_test
 import (
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/lint"
+	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
+
+type mockSQLParser struct {
+	mock.Mock
+}
+
+func (m *mockSQLParser) UsedTables(sql, dialect string) ([]string, error) {
+	args := m.Called(sql, dialect)
+	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *mockSQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeline *pipeline.Pipeline, renderer jinja.RendererInterface) ([]string, error) {
+	args := m.Called(asset, pipeline, renderer)
+	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *mockSQLParser) ColumnLineage(sql, dialect string, schema sqlparser.Schema) (*sqlparser.Lineage, error) {
+	args := m.Called(sql, dialect, schema)
+	return args.Get(0).(*sqlparser.Lineage), args.Error(1)
+}
 
 func TestPolicyRuleDefinition(t *testing.T) {
 	t.Parallel()
@@ -20,7 +43,8 @@ func TestPolicyRuleDefinition(t *testing.T) {
 			},
 		}
 
-		_, err := spec.Rules()
+		mockParser := new(mockSQLParser)
+		_, err := spec.Rules(mockParser)
 		assert.Error(t, err)
 	})
 	t.Run("rule definition must have a description", func(t *testing.T) {
@@ -33,7 +57,8 @@ func TestPolicyRuleDefinition(t *testing.T) {
 				},
 			},
 		}
-		_, err := spec.Rules()
+		mockParser := new(mockSQLParser)
+		_, err := spec.Rules(mockParser)
 		assert.Error(t, err)
 	})
 
@@ -47,7 +72,8 @@ func TestPolicyRuleDefinition(t *testing.T) {
 				},
 			},
 		}
-		_, err := spec.Rules()
+		mockParser := new(mockSQLParser)
+		_, err := spec.Rules(mockParser)
 		assert.Error(t, err)
 	})
 	t.Run("every rule must have a unique name", func(t *testing.T) {
@@ -66,7 +92,8 @@ func TestPolicyRuleDefinition(t *testing.T) {
 				},
 			},
 		}
-		_, err := spec.Rules()
+		mockParser := new(mockSQLParser)
+		_, err := spec.Rules(mockParser)
 		assert.Error(t, err)
 	})
 
@@ -86,7 +113,8 @@ func TestPolicyRuleDefinition(t *testing.T) {
 				},
 			},
 		}
-		_, err := spec.Rules()
+		mockParser := new(mockSQLParser)
+		_, err := spec.Rules(mockParser)
 		assert.Error(t, err)
 	})
 	t.Run("rule name must only be alpha-numeric and dash", func(t *testing.T) {
@@ -113,7 +141,8 @@ func TestPolicyRuleDefinition(t *testing.T) {
 					},
 				},
 			}
-			_, err := spec.Rules()
+			mockParser := new(mockSQLParser)
+			_, err := spec.Rules(mockParser)
 			assert.Error(t, err)
 		}
 	})
@@ -142,7 +171,8 @@ func TestPolicyRuleDefinition(t *testing.T) {
 					},
 				},
 			}
-			_, err := spec.Rules()
+			mockParser := new(mockSQLParser)
+			_, err := spec.Rules(mockParser)
 			assert.Error(t, err)
 		}
 	})
@@ -157,7 +187,8 @@ func TestPolicyRuleSet(t *testing.T) {
 				{},
 			},
 		}
-		_, err := spec.Rules()
+		mockParser := new(mockSQLParser)
+		_, err := spec.Rules(mockParser)
 		assert.Error(t, err)
 	})
 	t.Run("ruleset must specify rules", func(t *testing.T) {
@@ -169,7 +200,8 @@ func TestPolicyRuleSet(t *testing.T) {
 				},
 			},
 		}
-		_, err := spec.Rules()
+		mockParser := new(mockSQLParser)
+		_, err := spec.Rules(mockParser)
 		assert.Error(t, err)
 	})
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -2105,6 +2106,11 @@ func (m *mockSQLParser) UsedTables(sql, dialect string) ([]string, error) {
 func (m *mockSQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeline *pipeline.Pipeline, renderer jinja.RendererInterface) ([]string, error) {
 	args := m.Called(asset, pipeline, renderer)
 	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *mockSQLParser) ColumnLineage(sql, dialect string, schema sqlparser.Schema) (*sqlparser.Lineage, error) {
+	args := m.Called(sql, dialect, schema)
+	return args.Get(0).(*sqlparser.Lineage), args.Error(1)
 }
 
 func TestUsedTableValidatorRule_ValidateAsset(t *testing.T) {
