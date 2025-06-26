@@ -469,8 +469,11 @@ func QueryColumnsMatchColumnsPolicy(parser *sqlparser.SQLParser) func(ctx contex
 			return issues, nil
 		}
 
-		renderer := jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")
+		var renderer jinja.RendererInterface
+		renderer = jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")
+		renderer = renderer.CloneForAsset(ctx, p, asset)
 		renderedQuery, err := renderer.Render(asset.ExecutableFile.Content)
+
 		if err != nil { //nolint:nilerr
 			return issues, nil
 		}
