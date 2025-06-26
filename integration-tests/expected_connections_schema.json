@@ -545,6 +545,12 @@
           },
           "type": "array"
         },
+        "zoom": {
+          "items": {
+            "$ref": "#/$defs/ZoomConnection"
+          },
+          "type": "array"
+        },
         "emr_serverless": {
           "items": {
             "$ref": "#/$defs/EMRServerlessConnection"
@@ -1913,6 +1919,30 @@
         "email",
         "oauth_token",
         "sub_domain"
+      ]
+    },
+    "ZoomConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "account_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "client_id",
+        "client_secret",
+        "account_id"
       ]
     }
   }

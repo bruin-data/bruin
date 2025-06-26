@@ -535,6 +535,14 @@ func TestLoadFromFile(t *testing.T) {
 					Token: "isoc-pulse-token-123",
 				},
 			},
+			Zoom: []ZoomConnection{
+				{
+					Name:         "zoom-1",
+					ClientID:     "zid",
+					ClientSecret: "zsecret",
+					AccountID:    "accid",
+				},
+			},
 		},
 	}
 
