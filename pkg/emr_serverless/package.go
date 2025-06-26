@@ -2,11 +2,38 @@ package emr_serverless //nolint
 
 import (
 	"archive/zip"
-	"errors"
 	"io"
 	"io/fs"
 	"path"
+	"path/filepath"
+	"regexp"
+	"slices"
 )
+
+var bruinExcludes = []string{
+	"README.md",
+	".bruin.yml",
+	"pipeline.yml",
+	"pipeline.yaml",
+}
+var venvExcludes = []*regexp.Regexp{
+	regexp.MustCompile(`[/\\].venv[/\\]`),
+	regexp.MustCompile(`[/\\]venv[/\\]`),
+}
+
+func exclude(path string) bool {
+	fileName := filepath.Base(path)
+	if slices.Contains(bruinExcludes, fileName) {
+		return true
+	}
+
+	for _, re := range venvExcludes {
+		if re.MatchString(path) {
+			return true
+		}
+	}
+	return false
+}
 
 // zip.AddFS() modified with support for filesystem prefix
 // and some spark specific adjustments.
@@ -18,11 +45,15 @@ func packageContextWithPrefix(zw *zip.Writer, context fs.FS, prefix string) erro
 		if err != nil {
 			return err
 		}
+		fullPath := path.Join(prefix, name)
+		if exclude(fullPath) {
+			return nil
+		}
 		if d.IsDir() {
 			// spark will refuse to treat a directory as a package
 			// if it doesn't contain __init__.py
 			zw.CreateHeader(&zip.FileHeader{ //nolint
-				Name: path.Join(prefix, name, "__init__.py"),
+				Name: path.Join(fullPath, "__init__.py"),
 			})
 			return nil
 		}
@@ -31,13 +62,13 @@ func packageContextWithPrefix(zw *zip.Writer, context fs.FS, prefix string) erro
 			return err
 		}
 		if !info.Mode().IsRegular() {
-			return errors.New("package: cannot add non-regular file")
+			return nil
 		}
 		h, err := zip.FileInfoHeader(info)
 		if err != nil {
 			return err
 		}
-		h.Name = path.Join(prefix, name)
+		h.Name = fullPath
 		h.Method = zip.Deflate
 		fw, err := zw.CreateHeader(h)
 		if err != nil {
