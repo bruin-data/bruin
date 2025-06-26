@@ -782,14 +782,14 @@ func (c *Client) PushColumnDescriptions(ctx context.Context, asset *pipeline.Ass
 	for _, col := range asset.Columns {
 		if col.Description != "" && existingComments[col.Name] != col.Description {
 			query := fmt.Sprintf(
-				`COMMENT ON COLUMN %s.%s.%s IS '%s'`,
+				`COMMENT ON COLUMN %s.%s.%s IS '%s';`,
 				schemaName, tableName, col.Name, escapeSQLString(col.Description),
 			)
 			updateQueries = append(updateQueries, query)
 		}
 	}
 	if len(updateQueries) > 0 {
-		batchQuery := strings.Join(updateQueries, "; ")
+		batchQuery := strings.Join(updateQueries, "\n")
 		if err := c.RunQueryWithoutResult(ctx, &query.Query{Query: batchQuery}); err != nil {
 			return errors.Wrap(err, "failed to update column descriptions")
 		}
@@ -797,7 +797,7 @@ func (c *Client) PushColumnDescriptions(ctx context.Context, asset *pipeline.Ass
 
 	if asset.Description != "" {
 		updateTableQuery := fmt.Sprintf(
-			`COMMENT ON TABLE %s.%s.%s IS '%s'`,
+			`COMMENT ON TABLE %s.%s IS '%s';`,
 			schemaName, tableName, escapeSQLString(asset.Description),
 		)
 		if err := c.RunQueryWithoutResult(ctx, &query.Query{Query: updateTableQuery}); err != nil {
@@ -805,7 +805,7 @@ func (c *Client) PushColumnDescriptions(ctx context.Context, asset *pipeline.Ass
 		}
 	}
 
-	err = c.PrintTableMetadata(ctx, asset.Name)
+	//err = c.PrintTableMetadata(ctx, asset.Name)
 
 	return nil
 }
