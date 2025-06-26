@@ -2597,3 +2597,68 @@ func TestEnsurePipelineConcurrencyIsValid(t *testing.T) {
 		})
 	}
 }
+
+func TestEnsureAssetTierIsValidForASingleAsset(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		tier    int
+		want    []*Issue
+		wantErr bool
+	}{
+		{
+			name:    "valid tier 1",
+			tier:    1,
+			want:    noIssues,
+			wantErr: false,
+		},
+		{
+			name:    "valid tier 5",
+			tier:    5,
+			want:    noIssues,
+			wantErr: false,
+		},
+		{
+			name:    "missing tier defaults to valid",
+			tier:    0,
+			want:    noIssues,
+			wantErr: false,
+		},
+		{
+			name: "invalid tier 6",
+			tier: 6,
+			want: []*Issue{
+				{
+					Task:        &pipeline.Asset{Tier: 6},
+					Description: assetTierMustBeBetweenOneAndFive,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid negative tier",
+			tier: -1,
+			want: []*Issue{
+				{
+					Task:        &pipeline.Asset{Tier: -1},
+					Description: assetTierMustBeBetweenOneAndFive,
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			asset := &pipeline.Asset{Tier: tt.tier}
+			got, err := EnsureAssetTierIsValidForASingleAsset(context.Background(), &pipeline.Pipeline{}, asset)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("EnsureAssetTierIsValidForASingleAsset() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

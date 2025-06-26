@@ -48,6 +48,7 @@ const (
 	pipelineMSTeamsConnectionFieldEmpty     = "MS Teams notifications `connection` attribute must not be empty"
 
 	pipelineConcurrencyMustBePositive = "Pipeline concurrency must be 1 or greater"
+	assetTierMustBeBetweenOneAndFive  = "Asset tier must be between 1 and 5"
 
 	materializationStrategyIsNotSupportedForViews     = "Materialization strategy is not supported for views"
 	materializationPartitionByNotSupportedForViews    = "Materialization partition by is not supported for views because views cannot be partitioned"
@@ -1275,6 +1276,19 @@ func EnsurePipelineConcurrencyIsValid(ctx context.Context, p *pipeline.Pipeline)
 	if p.Concurrency < 1 {
 		issues = append(issues, &Issue{
 			Description: pipelineConcurrencyMustBePositive,
+		})
+	}
+
+	return issues, nil
+}
+
+func EnsureAssetTierIsValidForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	if asset.Tier != 0 && (asset.Tier < 1 || asset.Tier > 5) {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: assetTierMustBeBetweenOneAndFive,
 		})
 	}
 

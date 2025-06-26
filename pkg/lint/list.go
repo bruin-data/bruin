@@ -177,6 +177,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "valid-asset-tier",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   EnsureAssetTierIsValidForASingleAsset,
+			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "plain-yaml-files",
 			Fast:             false,
 			Severity:         ValidatorSeverityWarning,

@@ -657,6 +657,7 @@ type Asset struct { //nolint:recvcheck
 	Image             string             `json:"image" yaml:"image,omitempty" mapstructure:"image"`
 	Instance          string             `json:"instance" yaml:"instance,omitempty" mapstructure:"instance"`
 	Owner             string             `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
+	Tier              int                `json:"tier" yaml:"tier,omitempty" mapstructure:"tier"`
 	ExecutableFile    ExecutableFile     `json:"executable_file" yaml:"-" mapstructure:"-"`
 	DefinitionFile    TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
 	Parameters        EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`
