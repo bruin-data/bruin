@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
@@ -368,26 +369,62 @@ func (c *Client) fetchBooleanStats(ctx context.Context, tableName, columnName st
 func (c *Client) fetchDateTimeStats(ctx context.Context, tableName, columnName string) (*diff.DateTimeStatistics, error) {
 	stats := &diff.DateTimeStatistics{}
 
-	// Get min, max dates
+	// Get min, max dates with explicit string conversion
 	query := fmt.Sprintf(`
         SELECT 
-            MIN(%s) as min_date,
-            MAX(%s) as max_date,
+            CAST(MIN(%s) AS VARCHAR) as min_date,
+            CAST(MAX(%s) AS VARCHAR) as max_date,
             COUNT(DISTINCT %s) as unique_count,
             COUNT(*) as count_val,
             COUNT(*) - COUNT(%s) as null_count
         FROM %s
     `, columnName, columnName, columnName, columnName, tableName)
 
+	var minDate, maxDate interface{}
 	err := c.connection.QueryRowContext(ctx, query).Scan(
-		&stats.EarliestDate,
-		&stats.LatestDate,
+		&minDate,
+		&maxDate,
 		&stats.UniqueCount,
 		&stats.Count,
 		&stats.NullCount,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch datetime stats for column '%s': %w", columnName, err)
+	}
+
+	// Handle datetime values with robust type conversion
+	if minDate != nil {
+		switch val := minDate.(type) {
+		case string:
+			if val != "" {
+				stats.EarliestDate = &val
+			}
+		case time.Time:
+			dateStr := val.Format("2006-01-02 15:04:05")
+			stats.EarliestDate = &dateStr
+		default:
+			// Try converting to string for other types
+			if dateStr := fmt.Sprintf("%v", val); dateStr != "" && dateStr != "<nil>" {
+				stats.EarliestDate = &dateStr
+			}
+		}
+	}
+	
+	if maxDate != nil {
+		switch val := maxDate.(type) {
+		case string:
+			if val != "" {
+				stats.LatestDate = &val
+			}
+		case time.Time:
+			dateStr := val.Format("2006-01-02 15:04:05")
+			stats.LatestDate = &dateStr
+		default:
+			// Try converting to string for other types
+			if dateStr := fmt.Sprintf("%v", val); dateStr != "" && dateStr != "<nil>" {
+				stats.LatestDate = &dateStr
+			}
+		}
 	}
 
 	return stats, nil
