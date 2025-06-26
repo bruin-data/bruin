@@ -329,5 +329,4 @@ func TestQueryColumnsMatchColumnsPolicy_JinjaIntegration(t *testing.T) {
 		// So we need a more sophisticated test...
 		assert.Empty(t, issues, "This test alone cannot distinguish between working and broken cloneForAsset")
 	})
-
 }
