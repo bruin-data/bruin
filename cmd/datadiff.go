@@ -615,10 +615,20 @@ func tableStatsToTable(stats1 diff.ColumnStatistics, stats2 diff.ColumnStatistic
 
 		// Date range statistics
 		if dtStats1.EarliestDate != nil && dtStats2.EarliestDate != nil {
-			t.AppendRow(table.Row{"Earliest Date", *dtStats1.EarliestDate, *dtStats2.EarliestDate, "-", "N/A"})
+			t.AppendRow(table.Row{
+				"Earliest Date",
+				dtStats1.EarliestDate.Format("2006-01-02 15:04:05"),
+				dtStats2.EarliestDate.Format("2006-01-02 15:04:05"),
+				"-", "N/A",
+			})
 		}
 		if dtStats1.LatestDate != nil && dtStats2.LatestDate != nil {
-			t.AppendRow(table.Row{"Latest Date", *dtStats1.LatestDate, *dtStats2.LatestDate, "-", "N/A"})
+			t.AppendRow(table.Row{
+				"Latest Date",
+				dtStats1.LatestDate.Format("2006-01-02 15:04:05"),
+				dtStats2.LatestDate.Format("2006-01-02 15:04:05"),
+				"-", "N/A",
+			})
 		}
 
 	case "json":

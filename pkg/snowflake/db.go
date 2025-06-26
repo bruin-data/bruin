@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
@@ -736,38 +735,16 @@ func (db *DB) fetchDateTimeStats(ctx context.Context, tableName, columnName stri
 		if val, ok := row[2].(int64); ok {
 			stats.UniqueCount = val
 		}
-		// Handle datetime values with robust type conversion
+		// Handle datetime values - convert to proper time.Time objects
 		if row[3] != nil {
-			switch val := row[3].(type) {
-			case string:
-				if val != "" {
-					stats.EarliestDate = &val
-				}
-			case time.Time:
-				dateStr := val.Format("2006-01-02 15:04:05")
-				stats.EarliestDate = &dateStr
-			default:
-				// Try converting to string for other types
-				if dateStr := fmt.Sprintf("%v", val); dateStr != "" && dateStr != "<nil>" {
-					stats.EarliestDate = &dateStr
-				}
+			if parsedTime, err := diff.ParseDateTime(row[3]); err == nil {
+				stats.EarliestDate = parsedTime
 			}
 		}
-		
+
 		if row[4] != nil {
-			switch val := row[4].(type) {
-			case string:
-				if val != "" {
-					stats.LatestDate = &val
-				}
-			case time.Time:
-				dateStr := val.Format("2006-01-02 15:04:05")
-				stats.LatestDate = &dateStr
-			default:
-				// Try converting to string for other types
-				if dateStr := fmt.Sprintf("%v", val); dateStr != "" && dateStr != "<nil>" {
-					stats.LatestDate = &dateStr
-				}
+			if parsedTime, err := diff.ParseDateTime(row[4]); err == nil {
+				stats.LatestDate = parsedTime
 			}
 		}
 	}

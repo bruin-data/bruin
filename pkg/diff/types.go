@@ -1,7 +1,10 @@
 package diff
 
 import (
+	"errors"
+	"fmt"
 	"strings"
+	"time"
 )
 
 // CommonDataType represents the normalized data type categories.
@@ -426,8 +429,8 @@ func (bs *BooleanStatistics) Type() string {
 }
 
 type DateTimeStatistics struct {
-	EarliestDate *string // ISO format or nil
-	LatestDate   *string
+	EarliestDate *time.Time // Earliest datetime value or nil
+	LatestDate   *time.Time // Latest datetime value or nil
 	Count        int64
 	NullCount    int64
 	UniqueCount  int64
@@ -450,4 +453,41 @@ type UnknownStatistics struct{}
 
 func (us *UnknownStatistics) Type() string {
 	return "unknown"
+}
+
+// ParseDateTime converts various datetime representations to time.Time.
+// This is a shared utility function used across all database implementations.
+func ParseDateTime(value interface{}) (*time.Time, error) {
+	switch val := value.(type) {
+	case time.Time:
+		return &val, nil
+	case string:
+		if val == "" {
+			return nil, errors.New("empty string")
+		}
+		// Try common datetime formats
+		formats := []string{
+			time.RFC3339,                    // 2006-01-02T15:04:05Z07:00
+			time.RFC3339Nano,                // 2006-01-02T15:04:05.999999999Z07:00
+			"2006-01-02T15:04:05",           // RFC3339 without timezone
+			"2006-01-02 15:04:05 -0700 MST", // BigQuery format with timezone
+			"2006-01-02 15:04:05",           // Standard datetime
+			"2006-01-02 15:04:05.999999",    // With microseconds
+			"2006-01-02",                    // Date only
+			"15:04:05",                      // Time only
+		}
+
+		for _, format := range formats {
+			if parsedTime, err := time.Parse(format, val); err == nil {
+				return &parsedTime, nil
+			}
+		}
+		return nil, fmt.Errorf("unable to parse datetime string: %s", val)
+	default:
+		// Try converting to string and then parsing
+		if str := fmt.Sprintf("%v", val); str != "" && str != "<nil>" {
+			return ParseDateTime(str)
+		}
+		return nil, fmt.Errorf("unsupported datetime type: %T", val)
+	}
 }

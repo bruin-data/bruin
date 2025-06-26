@@ -242,7 +242,7 @@ func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOn
 			if err := rows.Scan(&countValue); err != nil {
 				return nil, fmt.Errorf("failed to scan row count for table '%s': %w", tableName, err)
 			}
-			
+
 			// Handle different numeric types for row count
 			switch val := countValue.(type) {
 			case int64:
@@ -502,8 +502,17 @@ func (c *Client) fetchDateTimeStats(ctx context.Context, tableName, columnName s
 			return nil, err
 		}
 
-		stats.EarliestDate = earliestDate
-		stats.LatestDate = latestDate
+		// Parse datetime strings to time.Time objects
+		if earliestDate != nil {
+			if parsedTime, err := diff.ParseDateTime(*earliestDate); err == nil {
+				stats.EarliestDate = parsedTime
+			}
+		}
+		if latestDate != nil {
+			if parsedTime, err := diff.ParseDateTime(*latestDate); err == nil {
+				stats.LatestDate = parsedTime
+			}
+		}
 	}
 
 	return stats, rows.Err()

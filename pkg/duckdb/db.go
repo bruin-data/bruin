@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"fmt"
 	"sort"
-	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
@@ -187,7 +186,7 @@ func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOn
 			if err := rows.Scan(&countValue); err != nil {
 				return nil, fmt.Errorf("failed to scan row count for table '%s': %w", tableName, err)
 			}
-			
+
 			// Handle different numeric types for row count
 			switch val := countValue.(type) {
 			case int64:
@@ -407,38 +406,16 @@ func (c *Client) fetchDateTimeStats(ctx context.Context, tableName, columnName s
 		return nil, fmt.Errorf("failed to fetch datetime stats for column '%s': %w", columnName, err)
 	}
 
-	// Handle datetime values with robust type conversion
+	// Handle datetime values - convert to proper time.Time objects
 	if minDate != nil {
-		switch val := minDate.(type) {
-		case string:
-			if val != "" {
-				stats.EarliestDate = &val
-			}
-		case time.Time:
-			dateStr := val.Format("2006-01-02 15:04:05")
-			stats.EarliestDate = &dateStr
-		default:
-			// Try converting to string for other types
-			if dateStr := fmt.Sprintf("%v", val); dateStr != "" && dateStr != "<nil>" {
-				stats.EarliestDate = &dateStr
-			}
+		if parsedTime, err := diff.ParseDateTime(minDate); err == nil {
+			stats.EarliestDate = parsedTime
 		}
 	}
-	
+
 	if maxDate != nil {
-		switch val := maxDate.(type) {
-		case string:
-			if val != "" {
-				stats.LatestDate = &val
-			}
-		case time.Time:
-			dateStr := val.Format("2006-01-02 15:04:05")
-			stats.LatestDate = &dateStr
-		default:
-			// Try converting to string for other types
-			if dateStr := fmt.Sprintf("%v", val); dateStr != "" && dateStr != "<nil>" {
-				stats.LatestDate = &dateStr
-			}
+		if parsedTime, err := diff.ParseDateTime(maxDate); err == nil {
+			stats.LatestDate = parsedTime
 		}
 	}
 

@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/ansisql"
@@ -784,8 +783,8 @@ func (d *Client) fetchBooleanStats(ctx context.Context, tableName, columnName st
 func (d *Client) fetchDateTimeStats(ctx context.Context, tableName, columnName string) (*diff.DateTimeStatistics, error) {
 	statsQuery := fmt.Sprintf(`
 		SELECT 
-			CAST(MIN(%s) AS STRING) as min_date,
-			CAST(MAX(%s) AS STRING) as max_date,
+			MIN(%s) as min_date,
+			MAX(%s) as max_date,
 			COUNT(DISTINCT %s) as unique_count,
 			COUNT(*) as count_val,
 			COUNTIF(%s IS NULL) as null_count
@@ -804,38 +803,16 @@ func (d *Client) fetchDateTimeStats(ctx context.Context, tableName, columnName s
 	row := result[0]
 	stats := &diff.DateTimeStatistics{}
 
-	// Handle datetime values - BigQuery may return them in different formats
+	// Handle datetime values - convert to proper time.Time objects
 	if row[0] != nil {
-		switch val := row[0].(type) {
-		case string:
-			if val != "" {
-				stats.EarliestDate = &val
-			}
-		case time.Time:
-			dateStr := val.Format("2006-01-02 15:04:05")
-			stats.EarliestDate = &dateStr
-		default:
-			// Try converting to string for other types
-			if dateStr := fmt.Sprintf("%v", val); dateStr != "" && dateStr != "<nil>" {
-				stats.EarliestDate = &dateStr
-			}
+		if parsedTime, err := diff.ParseDateTime(row[0]); err == nil {
+			stats.EarliestDate = parsedTime
 		}
 	}
-	
+
 	if row[1] != nil {
-		switch val := row[1].(type) {
-		case string:
-			if val != "" {
-				stats.LatestDate = &val
-			}
-		case time.Time:
-			dateStr := val.Format("2006-01-02 15:04:05")
-			stats.LatestDate = &dateStr
-		default:
-			// Try converting to string for other types
-			if dateStr := fmt.Sprintf("%v", val); dateStr != "" && dateStr != "<nil>" {
-				stats.LatestDate = &dateStr
-			}
+		if parsedTime, err := diff.ParseDateTime(row[1]); err == nil {
+			stats.LatestDate = parsedTime
 		}
 	}
 	if val, ok := row[2].(int64); ok {
