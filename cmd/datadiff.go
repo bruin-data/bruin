@@ -375,9 +375,9 @@ func calculatePercentageDiff(val1, val2, tolerance float64) string {
 	}
 
 	formatted := fmt.Sprintf("%.1f%%", diffPercent)
-	// Fix the "-0.0%" display issue
+	// Fix the "-0.0%" display issue - treat as within tolerance
 	if formatted == "-0.0%" {
-		return "0.0%"
+		return fmt.Sprintf("<%.3g%%", tolerance)
 	}
 	return formatted
 }
