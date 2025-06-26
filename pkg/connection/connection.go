@@ -1445,7 +1445,7 @@ func (m *Manager) GetEMRServerlessConnectionWithoutDefault(name string) (*emr_se
 	return db, nil
 }
 
-func (m *Manager) GetISOCPulseConnection(name string) (*emr_serverless.Client, error) {
+func (m *Manager) GetISOCPulseConnection(name string) (*isocpulse.Client, error) {
 	db, err := m.GetISOCPulseConnectionWithoutDefault(name)
 	if err == nil {
 		return db, nil
@@ -1453,11 +1453,11 @@ func (m *Manager) GetISOCPulseConnection(name string) (*emr_serverless.Client, e
 	return m.GetISOCPulseConnectionWithoutDefault("isoc_pulse-default")
 }
 
-func (m *Manager) GetISOCPulseConnectionWithoutDefault(name string) (*emr_serverless.Client, error) {
-	if m.EMRSeverless == nil {
+func (m *Manager) GetISOCPulseConnectionWithoutDefault(name string) (*isocpulse.Client, error) {
+	if m.ISOCPulse == nil {
 		return nil, errors.New("no ISOC Pulse connections found")
 	}
-	db, ok := m.EMRSeverless[name]
+	db, ok := m.ISOCPulse[name]
 	if !ok {
 		return nil, errors.Errorf("ISOC Pulse connection not found for '%s'", name)
 	}
