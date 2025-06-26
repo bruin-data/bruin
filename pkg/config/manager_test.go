@@ -529,6 +529,14 @@ func TestLoadFromFile(t *testing.T) {
 					Password: "sftp-password",
 				},
 			},
+			Zoom: []ZoomConnection{
+				{
+					Name:         "zoom-1",
+					ClientID:     "zid",
+					ClientSecret: "zsecret",
+					AccountID:    "accid",
+				},
+			},
 		},
 	}
 
