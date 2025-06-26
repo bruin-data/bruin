@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -68,6 +71,10 @@ func RecoverFromPanic() {
 		log.Println("Bruin encountered an unexpected error, please report the issue to the Bruin team.")
 		log.Println(err)
 		log.Println("=======================================")
+		b := bufio.NewScanner(bytes.NewBuffer(debug.Stack()))
+		for b.Scan() {
+			log.Println(b.Text())
+		}
 		os.Exit(1)
 	}
 }
