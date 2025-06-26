@@ -5,7 +5,6 @@ import (
 	"errors"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/bruin-data/bruin/pkg/pipeline"
-	"github.com/jmoiron/sqlx"
 	"testing"
 
 	_ "github.com/DATA-DOG/go-sqlmock"
@@ -606,20 +605,19 @@ func TestDB_PushColumnDescriptions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
-			require.NoError(t, err)
-			defer mockDB.Close()
 
-			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
-			db := &Client{
-				connection: sqlxDB,
-				config: &Config{
-					Database: "MYDB",
-				},
+			t.Parallel()
+
+			mock, err := pgxmock.NewPool()
+			if err != nil {
+				t.Fatal(err)
 			}
+			defer mock.Close()
+
+			client := Client{connection: mock, config: Config{Database: "database1"}}
+
 			tt.mockSetup(mock)
-			err = db.PushColumnDescriptions(context.Background(), tt.asset)
+			err = client.PushColumnDescriptions(context.Background(), tt.asset)
 
 			if tt.expectedError != "" {
 				require.Error(t, err)
