@@ -52,7 +52,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.height = msg.Height
-		visibleCount := m.height - 6
+		visibleCount := m.height - 7
 		if visibleCount >= len(choices) {
 			m.pageStart = 0
 		} else if m.cursor < m.pageStart {
@@ -62,7 +62,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.KeyMsg:
-		visibleCount := m.height - 6
+		visibleCount := m.height - 7
 		if visibleCount < 1 {
 			visibleCount = 1
 		}
@@ -104,18 +104,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	s := strings.Builder{}
-	s.WriteString("Please select a template below\n\n")
-	visibleCount := m.height - 6
-	if visibleCount < 1 {
-		visibleCount = 1
+	s.WriteString("Please select a template below:\n\n")
+	visibleCount := m.height - 7
+	maxStart := len(choices) - visibleCount
+	if maxStart < 0 {
+		maxStart = 0
 	}
-	if visibleCount >= len(choices) {
-		m.pageStart = 0
+	if m.pageStart > maxStart {
+		m.pageStart = maxStart
 	}
 	end := m.pageStart + visibleCount
 	if end > len(choices) {
 		end = len(choices)
 	}
+
 	for i := m.pageStart; i < end; i++ {
 		if m.cursor == i {
 			s.WriteString(" [x] ")
@@ -126,11 +128,6 @@ func (m model) View() string {
 		s.WriteString("\n")
 	}
 
-	if visibleCount == 0 {
-		s.WriteString("\n(press q to quit)\n")
-	}
-
-	// Updated display message to show the exact range of options
 	if visibleCount == 1 {
 		s.WriteString(fmt.Sprintf(
 			"\ndisplaying options %d of %d\n",
