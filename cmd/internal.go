@@ -947,11 +947,11 @@ func FetchColumns() *cli.Command {
 				printColumns(databaseName, tableName, columns)
 			case "json":
 				type jsonResponse struct {
-					Database     string              `json:"database"`
-					Table        string              `json:"table"`
-					Columns      []*ansisql.DBColumn `json:"columns"`
-					ConnName     string              `json:"connection_name"`
-					ColumnCount  int                 `json:"column_count"`
+					Database    string              `json:"database"`
+					Table       string              `json:"table"`
+					Columns     []*ansisql.DBColumn `json:"columns"`
+					ConnName    string              `json:"connection_name"`
+					ColumnCount int                 `json:"column_count"`
 				}
 
 				finalOutput := jsonResponse{

@@ -5,6 +5,7 @@ package duck
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -476,7 +477,7 @@ ORDER BY table_schema;
 
 func (c *Client) GetTables(ctx context.Context, databaseName string) ([]string, error) {
 	if databaseName == "" {
-		return nil, fmt.Errorf("database name cannot be empty")
+		return nil, errors.New("database name cannot be empty")
 	}
 
 	q := `
@@ -511,10 +512,10 @@ ORDER BY table_name;
 
 func (c *Client) GetColumns(ctx context.Context, databaseName, tableName string) ([]*ansisql.DBColumn, error) {
 	if databaseName == "" {
-		return nil, fmt.Errorf("database name cannot be empty")
+		return nil, errors.New("database name cannot be empty")
 	}
 	if tableName == "" {
-		return nil, fmt.Errorf("table name cannot be empty")
+		return nil, errors.New("table name cannot be empty")
 	}
 
 	q := `

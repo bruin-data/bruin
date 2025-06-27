@@ -1514,7 +1514,7 @@ func TestClient_GetTables(t *testing.T) {
 			// Dataset metadata request
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"kind":      "bigquery#dataset",
 				"id":        "test-project:test_dataset",
 				"datasetId": "test_dataset",
@@ -1523,7 +1523,7 @@ func TestClient_GetTables(t *testing.T) {
 			// Non-existent dataset request
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"error": map[string]interface{}{
 					"code":    404,
 					"message": "Dataset test-project:nonexistent_dataset was not found",
@@ -1533,7 +1533,7 @@ func TestClient_GetTables(t *testing.T) {
 			// Tables listing request
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"kind": "bigquery#tableList",
 				"tables": []map[string]interface{}{
 					{
@@ -1562,7 +1562,7 @@ func TestClient_GetTables(t *testing.T) {
 			// Empty dataset tables listing request
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"kind":   "bigquery#tableList",
 				"tables": []map[string]interface{}{},
 			})
@@ -1570,7 +1570,7 @@ func TestClient_GetTables(t *testing.T) {
 			// Empty dataset metadata request
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"kind":      "bigquery#dataset",
 				"id":        "test-project:empty_dataset",
 				"datasetId": "empty_dataset",
@@ -1579,7 +1579,7 @@ func TestClient_GetTables(t *testing.T) {
 			// Users table metadata request
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"kind":    "bigquery#table",
 				"id":      "test-project:test_dataset.users",
 				"tableId": "users",
@@ -1610,7 +1610,7 @@ func TestClient_GetTables(t *testing.T) {
 			// Orders table metadata request
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"kind":    "bigquery#table",
 				"id":      "test-project:test_dataset.orders",
 				"tableId": "orders",

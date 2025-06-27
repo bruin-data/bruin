@@ -186,7 +186,7 @@ ORDER BY datname;
 
 func (c *Client) GetTables(ctx context.Context, databaseName string) ([]string, error) {
 	if databaseName == "" {
-		return nil, fmt.Errorf("database name cannot be empty")
+		return nil, errors.New("database name cannot be empty")
 	}
 
 	q := `
@@ -225,10 +225,10 @@ ORDER BY table_name;
 
 func (c *Client) GetColumns(ctx context.Context, databaseName, tableName string) ([]*ansisql.DBColumn, error) {
 	if databaseName == "" {
-		return nil, fmt.Errorf("database name cannot be empty")
+		return nil, errors.New("database name cannot be empty")
 	}
 	if tableName == "" {
-		return nil, fmt.Errorf("table name cannot be empty")
+		return nil, errors.New("table name cannot be empty")
 	}
 
 	// Parse table name to extract schema and table components
@@ -275,7 +275,7 @@ ORDER BY ordinal_position;
 		return nil, errors.Wrap(err, "failed to collect row values")
 	}
 
-	var columns []*ansisql.DBColumn
+	columns := make([]*ansisql.DBColumn, 0, len(collectedRows))
 	for _, row := range collectedRows {
 		if len(row) < 7 {
 			continue

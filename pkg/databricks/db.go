@@ -112,10 +112,10 @@ func (db *DB) GetDatabases(ctx context.Context) ([]string, error) {
 
 func (db *DB) GetTables(ctx context.Context, databaseName string) ([]string, error) {
 	if databaseName == "" {
-		return nil, fmt.Errorf("database name cannot be empty")
+		return nil, errors.New("database name cannot be empty")
 	}
 
-	q := fmt.Sprintf(`SHOW TABLES IN %s`, databaseName)
+	q := `SHOW TABLES IN ` + databaseName
 
 	result, err := db.Select(ctx, &query.Query{Query: q})
 	if err != nil {
@@ -137,10 +137,10 @@ func (db *DB) GetTables(ctx context.Context, databaseName string) ([]string, err
 
 func (db *DB) GetColumns(ctx context.Context, databaseName, tableName string) ([]*ansisql.DBColumn, error) {
 	if databaseName == "" {
-		return nil, fmt.Errorf("database name cannot be empty")
+		return nil, errors.New("database name cannot be empty")
 	}
 	if tableName == "" {
-		return nil, fmt.Errorf("table name cannot be empty")
+		return nil, errors.New("table name cannot be empty")
 	}
 
 	q := fmt.Sprintf(`DESCRIBE TABLE %s.%s`, databaseName, tableName)
@@ -150,7 +150,7 @@ func (db *DB) GetColumns(ctx context.Context, databaseName, tableName string) ([
 		return nil, fmt.Errorf("failed to query columns for table '%s.%s': %w", databaseName, tableName, err)
 	}
 
-	var columns []*ansisql.DBColumn
+	columns := make([]*ansisql.DBColumn, 0, len(result))
 	for _, row := range result {
 		if len(row) < 3 {
 			continue
@@ -166,10 +166,7 @@ func (db *DB) GetColumns(ctx context.Context, databaseName, tableName string) ([
 			continue
 		}
 
-		_, ok := row[2].(string)
-		if !ok {
-			// Skip if comment field is not available
-		}
+		// Third column contains comment, but we don't use it
 
 		// Skip partition information and metadata rows
 		if strings.HasPrefix(columnName, "#") || columnName == "" {
