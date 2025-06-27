@@ -90,7 +90,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	if t.Materialization.Strategy != pipeline.MaterializationStrategyNone {
+	if t.Materialization.Type != pipeline.MaterializationTypeNone {
 		if err := conn.CreateDataSetIfNotExist(t, ctx); err != nil {
 			return err
 		}
