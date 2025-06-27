@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/microsoft/go-mssqldb"
@@ -86,4 +87,158 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 func (db *DB) Limit(query string, limit int64) string {
 	query = strings.TrimRight(query, "; \n\t")
 	return fmt.Sprintf("SELECT TOP %d * FROM (\n%s\n) as t", limit, query)
+}
+
+func (db *DB) GetDatabases(ctx context.Context) ([]string, error) {
+	q := `
+SELECT name
+FROM sys.databases
+WHERE database_id > 4  -- Exclude system databases (master, model, msdb, tempdb)
+ORDER BY name;
+`
+
+	result, err := db.Select(ctx, &query.Query{Query: q})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query SQL Server databases: %w", err)
+	}
+
+	var databases []string
+	for _, row := range result {
+		if len(row) > 0 {
+			if dbName, ok := row[0].(string); ok {
+				databases = append(databases, dbName)
+			}
+		}
+	}
+
+	return databases, nil
+}
+
+func (db *DB) GetTables(ctx context.Context, databaseName string) ([]string, error) {
+	if databaseName == "" {
+		return nil, fmt.Errorf("database name cannot be empty")
+	}
+
+	q := fmt.Sprintf(`
+USE [%s];
+SELECT TABLE_NAME
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_TYPE IN ('BASE TABLE', 'VIEW')
+    AND TABLE_SCHEMA NOT IN ('sys', 'information_schema')
+ORDER BY TABLE_NAME;
+`, databaseName)
+
+	result, err := db.Select(ctx, &query.Query{Query: q})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tables in database '%s': %w", databaseName, err)
+	}
+
+	var tables []string
+	for _, row := range result {
+		if len(row) > 0 {
+			if tableName, ok := row[0].(string); ok {
+				tables = append(tables, tableName)
+			}
+		}
+	}
+
+	return tables, nil
+}
+
+func (db *DB) GetColumns(ctx context.Context, databaseName, tableName string) ([]*ansisql.DBColumn, error) {
+	if databaseName == "" {
+		return nil, fmt.Errorf("database name cannot be empty")
+	}
+	if tableName == "" {
+		return nil, fmt.Errorf("table name cannot be empty")
+	}
+
+	// Parse table name to extract schema and table components
+	tableComponents := strings.Split(tableName, ".")
+	var schemaName, tableNameOnly string
+
+	switch len(tableComponents) {
+	case 1:
+		// table only - use dbo schema by default
+		schemaName = "dbo"
+		tableNameOnly = tableComponents[0]
+	case 2:
+		// schema.table format
+		schemaName = tableComponents[0]
+		tableNameOnly = tableComponents[1]
+	default:
+		return nil, fmt.Errorf("invalid table name format: %s", tableName)
+	}
+
+	q := fmt.Sprintf(`
+USE [%s];
+SELECT 
+    COLUMN_NAME,
+    DATA_TYPE,
+    IS_NULLABLE,
+    COLUMN_DEFAULT,
+    CHARACTER_MAXIMUM_LENGTH,
+    NUMERIC_PRECISION,
+    NUMERIC_SCALE
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'
+ORDER BY ORDINAL_POSITION;
+`, databaseName, schemaName, tableNameOnly)
+
+	result, err := db.Select(ctx, &query.Query{Query: q})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query columns for table '%s.%s': %w", databaseName, tableName, err)
+	}
+
+	var columns []*ansisql.DBColumn
+	for _, row := range result {
+		if len(row) < 7 {
+			continue
+		}
+
+		columnName, ok := row[0].(string)
+		if !ok {
+			continue
+		}
+
+		dataType, ok := row[1].(string)
+		if !ok {
+			continue
+		}
+
+		isNullableStr, ok := row[2].(string)
+		if !ok {
+			continue
+		}
+
+		// Build the full type name with precision/scale if available
+		fullType := dataType
+		if row[4] != nil {
+			if charMaxLength, ok := row[4].(int64); ok && charMaxLength > 0 {
+				fullType = fmt.Sprintf("%s(%d)", dataType, charMaxLength)
+			}
+		} else if row[5] != nil && row[6] != nil {
+			if numericPrecision, ok := row[5].(int32); ok {
+				if numericScale, ok := row[6].(int32); ok && numericPrecision > 0 {
+					if numericScale > 0 {
+						fullType = fmt.Sprintf("%s(%d,%d)", dataType, numericPrecision, numericScale)
+					} else {
+						fullType = fmt.Sprintf("%s(%d)", dataType, numericPrecision)
+					}
+				}
+			}
+		}
+
+		column := &ansisql.DBColumn{
+			Name:       columnName,
+			Type:       fullType,
+			Nullable:   strings.ToUpper(isNullableStr) == "YES",
+			PrimaryKey: false,
+			Unique:     false,
+		}
+
+		columns = append(columns, column)
+	}
+
+	return columns, nil
 }
