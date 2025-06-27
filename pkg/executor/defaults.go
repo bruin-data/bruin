@@ -259,7 +259,11 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 	},
-	pipeline.AssetTypeQlickSense: {
+	pipeline.AssetTypeQlikSense: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
+	pipeline.AssetTypeQlikView: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 	},
@@ -272,6 +276,30 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 	},
 	pipeline.AssetTypeQuicksight: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
+	pipeline.AssetTypeMetabase: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
+	pipeline.AssetTypeGrafana: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
+	pipeline.AssetTypeSuperset: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
+	pipeline.AssetTypeModeBI: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
+	pipeline.AssetTypeRedash: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
+	pipeline.AssetTypeGoodData: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 	},

@@ -499,10 +499,17 @@ func (d *Client) GetTableSummary(ctx context.Context, tableName string, schemaOn
 		}
 
 		if len(countResult) > 0 && len(countResult[0]) > 0 {
-			if val, ok := countResult[0][0].(int64); ok {
+			switch val := countResult[0][0].(type) {
+			case int64:
 				rowCount = val
-			} else {
-				return nil, fmt.Errorf("unexpected row count type for table '%s'", tableName)
+			case int:
+				rowCount = int64(val)
+			case int32:
+				rowCount = int64(val)
+			case float64:
+				rowCount = int64(val)
+			default:
+				return nil, fmt.Errorf("unexpected row count type for table '%s': got %T with value %v", tableName, val, val)
 			}
 		}
 	}
@@ -798,12 +805,17 @@ func (d *Client) fetchDateTimeStats(ctx context.Context, tableName, columnName s
 	row := result[0]
 	stats := &diff.DateTimeStatistics{}
 
-	// Handle datetime values - BigQuery returns them as strings
-	if val, ok := row[0].(string); ok && val != "" {
-		stats.EarliestDate = &val
+	// Handle datetime values - convert to proper time.Time objects
+	if row[0] != nil {
+		if parsedTime, err := diff.ParseDateTime(row[0]); err == nil {
+			stats.EarliestDate = parsedTime
+		}
 	}
-	if val, ok := row[1].(string); ok && val != "" {
-		stats.LatestDate = &val
+
+	if row[1] != nil {
+		if parsedTime, err := diff.ParseDateTime(row[1]); err == nil {
+			stats.LatestDate = parsedTime
+		}
 	}
 	if val, ok := row[2].(int64); ok {
 		stats.UniqueCount = val

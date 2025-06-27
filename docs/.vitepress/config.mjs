@@ -198,6 +198,7 @@ export default withMermaid({
                             {text: "Google Analytics", link: "/ingestion/google_analytics.md"},
                             {text: "Gorgias", link: "/ingestion/gorgias"},
                             {text: "Hubspot", link: "/ingestion/hubspot.md"},
+                            {text: "Internet Society Pulse", link: "/ingestion/isoc_pulse.md"},
                             {text: "Kafka", link: "/ingestion/kafka.md"},
                             {text: "Kinesis", link: "/ingestion/kinesis.md"},
                             {text: "Klaviyo", link: "/ingestion/klaviyo.md"},
@@ -210,6 +211,7 @@ export default withMermaid({
                             {text: "PhantomBuster", link: "/ingestion/phantombuster"},
                             {text: "Pipedrive", link: "/ingestion/pipedrive"},
                             {text: "QuickBooks", link: "/ingestion/quickbooks"},
+                            {text: "Zoom", link: "/ingestion/zoom"},
                             {text: "Salesforce", link: "/ingestion/salesforce"},
                             {text: "SAP HANA", link: "/ingestion/sap_hana"},
                             {text: "S3", link: "/ingestion/s3"},
@@ -222,6 +224,7 @@ export default withMermaid({
                             {text: "SQLite", link: "/ingestion/sqlite"},
                             {text: "TikTok Ads", link: "/ingestion/tiktokads.md"},
                             {text: "Zendesk", link: "/ingestion/zendesk.md"},
+                            {text: "Zoom", link: "/ingestion/zoom"},
                         ],
                     },
                     {text: "Destinations", link: "/ingestion/destinations.md"}

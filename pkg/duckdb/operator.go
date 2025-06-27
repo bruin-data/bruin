@@ -95,9 +95,11 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	err = conn.CreateSchemaIfNotExist(ctx, t)
-	if err != nil {
-		return err
+	if t.Materialization.Type != pipeline.MaterializationTypeNone {
+		err = conn.CreateSchemaIfNotExist(ctx, t)
+		if err != nil {
+			return err
+		}
 	}
 
 	return conn.RunQueryWithoutResult(ctx, q)

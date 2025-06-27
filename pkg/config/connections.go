@@ -663,6 +663,17 @@ func (c QuickBooksConnection) GetName() string {
 	return c.Name
 }
 
+type ZoomConnection struct {
+	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	ClientID     string `yaml:"client_id,omitempty" json:"client_id" mapstructure:"client_id"`
+	ClientSecret string `yaml:"client_secret,omitempty" json:"client_secret" mapstructure:"client_secret"`
+	AccountID    string `yaml:"account_id,omitempty" json:"account_id" mapstructure:"account_id"`
+}
+
+func (c ZoomConnection) GetName() string {
+	return c.Name
+}
+
 type EMRServerlessConnection struct {
 	Name          string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	AccessKey     string `yaml:"access_key" json:"access_key" mapstructure:"access_key"`
@@ -823,5 +834,14 @@ type SFTPConnection struct {
 }
 
 func (c SFTPConnection) GetName() string {
+	return c.Name
+}
+
+type ISOCPulseConnection struct {
+	Name  string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Token string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
+}
+
+func (c ISOCPulseConnection) GetName() string {
 	return c.Name
 }

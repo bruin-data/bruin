@@ -68,6 +68,7 @@ type Connections struct {
 	Pipedrive           []PipedriveConnection           `yaml:"pipedrive,omitempty" json:"pipedrive,omitempty" mapstructure:"pipedrive"`
 	Mixpanel            []MixpanelConnection            `yaml:"mixpanel,omitempty" json:"mixpanel,omitempty" mapstructure:"mixpanel"`
 	QuickBooks          []QuickBooksConnection          `yaml:"quickbooks,omitempty" json:"quickbooks,omitempty" mapstructure:"quickbooks"`
+	Zoom                []ZoomConnection                `yaml:"zoom,omitempty" json:"zoom,omitempty" mapstructure:"zoom"`
 	EMRServerless       []EMRServerlessConnection       `yaml:"emr_serverless,omitempty" json:"emr_serverless,omitempty" mapstructure:"emr_serverless"`
 	GoogleAnalytics     []GoogleAnalyticsConnection     `yaml:"googleanalytics,omitempty" json:"googleanalytics,omitempty" mapstructure:"googleanalytics"`
 	AppLovin            []AppLovinConnection            `yaml:"applovin,omitempty" json:"applovin,omitempty" mapstructure:"applovin"`
@@ -83,6 +84,7 @@ type Connections struct {
 	Smartsheet          []SmartsheetConnection          `yaml:"smartsheet,omitempty" json:"smartsheet,omitempty" mapstructure:"smartsheet"`
 	Attio               []AttioConnection               `yaml:"attio,omitempty" json:"attio,omitempty" mapstructure:"attio"`
 	Sftp                []SFTPConnection                `yaml:"sftp,omitempty" json:"sftp,omitempty" mapstructure:"sftp"`
+	ISOCPulse           []ISOCPulseConnection           `yaml:"isoc_pulse,omitempty" json:"isoc_pulse,omitempty" mapstructure:"isoc_pulse"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -740,6 +742,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.QuickBooks = append(env.Connections.QuickBooks, conn)
+	case "zoom":
+		var conn ZoomConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Zoom = append(env.Connections.Zoom, conn)
 	case "emr_serverless":
 		var conn EMRServerlessConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -847,6 +856,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Sftp = append(env.Connections.Sftp, conn)
+	case "isoc_pulse":
+		var conn ISOCPulseConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.ISOCPulse = append(env.Connections.ISOCPulse, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -968,6 +984,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Mixpanel = removeConnection(env.Connections.Mixpanel, connectionName)
 	case "quickbooks":
 		env.Connections.QuickBooks = removeConnection(env.Connections.QuickBooks, connectionName)
+	case "zoom":
+		env.Connections.Zoom = removeConnection(env.Connections.Zoom, connectionName)
 	case "emr_serverless":
 		env.Connections.EMRServerless = removeConnection(env.Connections.EMRServerless, connectionName)
 	case "googleanalytics":
@@ -998,6 +1016,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Attio = removeConnection(env.Connections.Attio, connectionName)
 	case "sftp":
 		env.Connections.Sftp = removeConnection(env.Connections.Sftp, connectionName)
+	case "isoc_pulse":
+		env.Connections.ISOCPulse = removeConnection(env.Connections.ISOCPulse, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}

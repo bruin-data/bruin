@@ -254,6 +254,11 @@ environments:
           client_id: "cid"
           client_secret: "csecret"
           refresh_token: "rtoken"
+      zoom:
+        - name: "zoom-1"
+          client_id: "zid"
+          client_secret: "zsecret"
+          account_id: "accid"
       emr_serverless:
         - name: emr_serverless-test
           access_key: AKIAEXAMPLE
@@ -332,6 +337,9 @@ environments:
           port: 22
           username: "sftp-user"
           password: "sftp-password"
+      isoc_pulse:
+        - name: "isoc_pulse-1"
+          token: "isoc-pulse-token-123"
 
   prod:
     connections:

@@ -5,12 +5,19 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/lineage"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 )
 
 const (
 	msgPrimaryKeyMustBeSet = "Asset must have atleast one primary key"
 )
+
+var noopAssetValidator = func(ctx context.Context, p *pipeline.Pipeline, a *pipeline.Asset) ([]*Issue, error) {
+	return nil, nil
+}
 
 var (
 	snakeCasePattern = regexp.MustCompile("^[a-z]+(_[a-z]+)*$")
@@ -440,4 +447,69 @@ var builtinRules = map[string]validators{
 			}, nil
 		},
 	},
+	"query-matches-columns": {
+		Asset: noopAssetValidator,
+	},
+}
+
+func QueryColumnsMatchColumnsPolicy(parser *sqlparser.SQLParser) func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	return func(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+		issues := make([]*Issue, 0)
+
+		if parser == nil {
+			return issues, nil
+		}
+
+		if !asset.IsSQLAsset() {
+			return issues, nil
+		}
+
+		dialect, err := sqlparser.AssetTypeToDialect(asset.Type)
+		if err != nil { //nolint:nilerr
+			return issues, nil
+		}
+
+		var renderer jinja.RendererInterface
+		renderer = jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")
+		renderer = renderer.CloneForAsset(ctx, p, asset)
+		renderedQuery, err := renderer.Render(asset.ExecutableFile.Content)
+
+		if err != nil { //nolint:nilerr
+			return issues, nil
+		}
+		// Build schema from upstream assets using lineage extractor
+		lineageExtractor := lineage.NewLineageExtractor(parser)
+		schema := lineageExtractor.TableSchemaForUpstreams(p, asset)
+
+		lineage, err := parser.ColumnLineage(renderedQuery, dialect, schema)
+		if err != nil { //nolint:nilerr
+			return issues, nil
+		}
+
+		if len(lineage.Columns) == 0 {
+			return issues, nil
+		}
+
+		yamlColumns := make(map[string]bool)
+		for _, col := range asset.Columns {
+			yamlColumns[col.Name] = true
+		}
+
+		missingColumns := make([]string, 0)
+		for _, queryCol := range lineage.Columns {
+			if !yamlColumns[queryCol.Name] {
+				missingColumns = append(missingColumns, queryCol.Name)
+			}
+		}
+
+		if len(missingColumns) > 0 {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: "Columns found in query but missing from columns metadata: " + strings.Join(missingColumns, ", "),
+				Context:     missingColumns,
+			})
+		}
+
+		return issues, nil
+	}
 }

@@ -529,6 +529,20 @@ func TestLoadFromFile(t *testing.T) {
 					Password: "sftp-password",
 				},
 			},
+			ISOCPulse: []ISOCPulseConnection{
+				{
+					Name:  "isoc_pulse-1",
+					Token: "isoc-pulse-token-123",
+				},
+			},
+			Zoom: []ZoomConnection{
+				{
+					Name:         "zoom-1",
+					ClientID:     "zid",
+					ClientSecret: "zsecret",
+					AccountID:    "accid",
+				},
+			},
 		},
 	}
 
