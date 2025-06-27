@@ -26,6 +26,10 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+const (
+	outputFormatPlain = "plain"
+)
+
 type ppInfo struct {
 	Pipeline *pipeline.Pipeline
 	Asset    *pipeline.Asset
@@ -60,8 +64,8 @@ func Query() *cli.Command {
 			&cli.StringFlag{
 				Name:        "output",
 				Aliases:     []string{"o"},
-				DefaultText: "plain",
-				Value:       "plain",
+				DefaultText: outputFormatPlain,
+				Value:       outputFormatPlain,
 				Usage:       "the output type, possible values are: plain, json, csv",
 			},
 			&cli.StringFlag{
@@ -134,7 +138,7 @@ func Query() *cli.Command {
 				}
 				output := c.String("output")
 				switch output {
-				case "plain":
+				case outputFormatPlain:
 					printTable(result.Columns, result.Rows)
 				case "json":
 					type jsonResponse struct {

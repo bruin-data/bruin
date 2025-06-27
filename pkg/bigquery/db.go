@@ -895,7 +895,7 @@ func (d *Client) GetDatabases(ctx context.Context) ([]string, error) {
 func (d *Client) GetTables(ctx context.Context, databaseName string) ([]string, error) {
 	// Validate dataset name
 	if databaseName == "" {
-		return nil, fmt.Errorf("database name cannot be empty")
+		return nil, errors.New("database name cannot be empty")
 	}
 
 	// Check if dataset exists
@@ -933,10 +933,10 @@ func (d *Client) GetTables(ctx context.Context, databaseName string) ([]string, 
 func (d *Client) GetColumns(ctx context.Context, databaseName, tableName string) ([]*ansisql.DBColumn, error) {
 	// Validate input parameters
 	if databaseName == "" {
-		return nil, fmt.Errorf("database name cannot be empty")
+		return nil, errors.New("database name cannot be empty")
 	}
 	if tableName == "" {
-		return nil, fmt.Errorf("table name cannot be empty")
+		return nil, errors.New("table name cannot be empty")
 	}
 
 	// Use the existing getTableColumns method
@@ -955,7 +955,6 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 		Name:    projectID,
 		Schemas: []*ansisql.DBSchema{},
 	}
-
 
 	mu := sync.Mutex{}
 	var errs []error

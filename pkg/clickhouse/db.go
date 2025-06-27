@@ -161,7 +161,7 @@ ORDER BY database;
 
 func (c *Client) GetTables(ctx context.Context, databaseName string) ([]string, error) {
 	if databaseName == "" {
-		return nil, fmt.Errorf("database name cannot be empty")
+		return nil, errors.New("database name cannot be empty")
 	}
 
 	q := fmt.Sprintf(`
@@ -190,10 +190,10 @@ ORDER BY name;
 
 func (c *Client) GetColumns(ctx context.Context, databaseName, tableName string) ([]*ansisql.DBColumn, error) {
 	if databaseName == "" {
-		return nil, fmt.Errorf("database name cannot be empty")
+		return nil, errors.New("database name cannot be empty")
 	}
 	if tableName == "" {
-		return nil, fmt.Errorf("table name cannot be empty")
+		return nil, errors.New("table name cannot be empty")
 	}
 
 	q := fmt.Sprintf(`
@@ -212,7 +212,7 @@ ORDER BY position;
 		return nil, fmt.Errorf("failed to query columns for table '%s.%s': %w", databaseName, tableName, err)
 	}
 
-	var columns []*ansisql.DBColumn
+	columns := make([]*ansisql.DBColumn, 0, len(result))
 	for _, row := range result {
 		if len(row) < 4 {
 			continue
