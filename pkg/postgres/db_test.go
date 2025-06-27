@@ -473,7 +473,7 @@ func TestDB_GetDatabaseSummary(t *testing.T) {
 	}
 }
 
-func TestClient_PushColumnDescriptions_Postgres(t *testing.T) {
+func TestClient_PushColumnDescriptions(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -483,9 +483,20 @@ func TestClient_PushColumnDescriptions_Postgres(t *testing.T) {
 		expectedError string
 	}{
 		{
+			name: "table formatted incorrectly",
+			asset: &pipeline.Asset{
+				Name:    "mytable",
+				Columns: []pipeline.Column{},
+			},
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				// No DB interaction expected
+			},
+			expectedError: "table name must be in schema.table or table format, 'mytable' given",
+		},
+		{
 			name: "no metadata to push",
 			asset: &pipeline.Asset{
-				Name:    "myschema.mytable",
+				Name:    "database.myschema.mytable",
 				Columns: []pipeline.Column{},
 			},
 			setupMock: func(mock pgxmock.PgxPoolIface) {
@@ -564,6 +575,39 @@ func TestClient_PushColumnDescriptions_Postgres(t *testing.T) {
 				mock.ExpectExec("COMMENT ON COLUMN MYSCHEMA\\.MYTABLE\\.col1 IS 'desc1';" +
 					"\nCOMMENT ON COLUMN MYSCHEMA\\.MYTABLE\\.col2 IS 'desc2'").
 					WillReturnResult(pgxmock.NewResult("UPDATE", 2))
+			},
+		},
+		{
+			name: "no new metadata to push",
+			asset: &pipeline.Asset{
+				Name:        "myschema.mytable",
+				Description: "",
+				Columns: []pipeline.Column{
+					{Name: "col1", Description: "desc1"},
+					{Name: "col2", Description: "desc2"},
+				},
+			},
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				// Mock query for existing column comments
+				rows := pgxmock.NewRows([]string{"column_name", "description"}).
+					AddRow("col1", "desc1").
+					AddRow("col2", "desc2")
+				mock.ExpectQuery("SELECT" +
+					"\n\tcols.column_name," +
+					"\n\tpgd.description" +
+					"\nFROM" +
+					"\n\tpg_catalog.pg_statio_all_tables AS st" +
+					"\nJOIN" +
+					"\n\tpg_catalog.pg_description pgd" +
+					"\n\tON pgd.objoid = st.relid" +
+					"\nJOIN" +
+					"\n\tinformation_schema.columns cols" +
+					"\n\tON cols.table_schema = st.schemaname" +
+					"\n\tAND cols.table_name = st.relname" +
+					"\n\tAND cols.ordinal_position = pgd.objsubid" +
+					"\nWHERE" +
+					"\n\tcols.table_name = 'MYTABLE'" +
+					"\n\tAND cols.table_schema = 'MYSCHEMA';").WillReturnRows(rows)
 			},
 		},
 		{
