@@ -1503,6 +1503,220 @@ func TestBuildTableExistsQuery(t *testing.T) {
 	}
 }
 
+func TestClient_GetTables(t *testing.T) {
+	t.Parallel()
+
+	projectID := testProjectID
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Mock BigQuery API responses based on the request path
+		switch {
+		case strings.Contains(r.URL.Path, "/datasets/test_dataset"):
+			// Dataset metadata request
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"kind":      "bigquery#dataset",
+				"id":        "test-project:test_dataset",
+				"datasetId": "test_dataset",
+			})
+		case strings.Contains(r.URL.Path, "/datasets/nonexistent_dataset"):
+			// Non-existent dataset request
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"error": map[string]interface{}{
+					"code":    404,
+					"message": "Dataset test-project:nonexistent_dataset was not found",
+				},
+			})
+		case strings.Contains(r.URL.Path, "/datasets/test_dataset/tables"):
+			// Tables listing request
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"kind": "bigquery#tableList",
+				"tables": []map[string]interface{}{
+					{
+						"kind":    "bigquery#table",
+						"id":      "test-project:test_dataset.users",
+						"tableId": "users",
+						"tableReference": map[string]interface{}{
+							"projectId": "test-project",
+							"datasetId": "test_dataset",
+							"tableId":   "users",
+						},
+					},
+					{
+						"kind":    "bigquery#table",
+						"id":      "test-project:test_dataset.orders",
+						"tableId": "orders",
+						"tableReference": map[string]interface{}{
+							"projectId": "test-project",
+							"datasetId": "test_dataset",
+							"tableId":   "orders",
+						},
+					},
+				},
+			})
+		case strings.Contains(r.URL.Path, "/datasets/empty_dataset/tables"):
+			// Empty dataset tables listing request
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"kind":   "bigquery#tableList",
+				"tables": []map[string]interface{}{},
+			})
+		case strings.Contains(r.URL.Path, "/datasets/empty_dataset"):
+			// Empty dataset metadata request
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"kind":      "bigquery#dataset",
+				"id":        "test-project:empty_dataset",
+				"datasetId": "empty_dataset",
+			})
+		case strings.Contains(r.URL.Path, "/tables/users"):
+			// Users table metadata request
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"kind":    "bigquery#table",
+				"id":      "test-project:test_dataset.users",
+				"tableId": "users",
+				"schema": map[string]interface{}{
+					"fields": []map[string]interface{}{
+						{
+							"name":     "id",
+							"type":     "INTEGER",
+							"mode":     "REQUIRED",
+							"required": true,
+						},
+						{
+							"name":     "name",
+							"type":     "STRING",
+							"mode":     "NULLABLE",
+							"required": false,
+						},
+						{
+							"name":     "email",
+							"type":     "STRING",
+							"mode":     "NULLABLE",
+							"required": false,
+						},
+					},
+				},
+			})
+		case strings.Contains(r.URL.Path, "/tables/orders"):
+			// Orders table metadata request
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"kind":    "bigquery#table",
+				"id":      "test-project:test_dataset.orders",
+				"tableId": "orders",
+				"schema": map[string]interface{}{
+					"fields": []map[string]interface{}{
+						{
+							"name":     "order_id",
+							"type":     "INTEGER",
+							"mode":     "REQUIRED",
+							"required": true,
+						},
+						{
+							"name":     "user_id",
+							"type":     "INTEGER",
+							"mode":     "NULLABLE",
+							"required": false,
+						},
+						{
+							"name":     "amount",
+							"type":     "FLOAT",
+							"mode":     "NULLABLE",
+							"required": false,
+						},
+					},
+				},
+			})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	tests := []struct {
+		name         string
+		databaseName string
+		want         []string
+		wantErr      bool
+		errContains  string
+	}{
+		{
+			name:         "valid dataset with tables",
+			databaseName: "test_dataset",
+			want:         []string{"orders", "users"},
+			wantErr:      false,
+		},
+		{
+			name:         "empty dataset",
+			databaseName: "empty_dataset",
+			want:         []string{},
+			wantErr:      false,
+		},
+		{
+			name:         "non-existent dataset",
+			databaseName: "nonexistent_dataset",
+			want:         nil,
+			wantErr:      true,
+			errContains:  "dataset 'nonexistent_dataset' does not exist",
+		},
+		{
+			name:         "empty database name",
+			databaseName: "",
+			want:         nil,
+			wantErr:      true,
+			errContains:  "database name cannot be empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			client, err := bigquery.NewClient(
+				context.Background(),
+				projectID,
+				option.WithEndpoint(srv.URL),
+				option.WithCredentials(&google.Credentials{
+					ProjectID: projectID,
+					TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+						AccessToken: "some-token",
+					}),
+				}),
+			)
+			require.NoError(t, err)
+
+			d := Client{
+				client: client,
+				config: &Config{
+					ProjectID: projectID,
+				},
+			}
+
+			got, err := d.GetTables(context.Background(), tt.databaseName)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				assert.Nil(t, got)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestParseDateTime(t *testing.T) {
 	t.Parallel()
 
