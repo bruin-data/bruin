@@ -134,6 +134,132 @@ func (c *Client) Ping(ctx context.Context) error {
 	return nil
 }
 
+func (c *Client) GetDatabases(ctx context.Context) ([]string, error) {
+	q := `
+SELECT DISTINCT database
+FROM system.tables
+WHERE database NOT IN ('system', 'information_schema', 'INFORMATION_SCHEMA')
+ORDER BY database;
+`
+
+	result, err := c.Select(ctx, &query.Query{Query: q})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query ClickHouse databases: %w", err)
+	}
+
+	var databases []string
+	for _, row := range result {
+		if len(row) > 0 {
+			if dbName, ok := row[0].(string); ok {
+				databases = append(databases, dbName)
+			}
+		}
+	}
+
+	return databases, nil
+}
+
+func (c *Client) GetTables(ctx context.Context, databaseName string) ([]string, error) {
+	if databaseName == "" {
+		return nil, fmt.Errorf("database name cannot be empty")
+	}
+
+	q := fmt.Sprintf(`
+SELECT name
+FROM system.tables
+WHERE database = '%s'
+ORDER BY name;
+`, databaseName)
+
+	result, err := c.Select(ctx, &query.Query{Query: q})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tables in database '%s': %w", databaseName, err)
+	}
+
+	var tables []string
+	for _, row := range result {
+		if len(row) > 0 {
+			if tableName, ok := row[0].(string); ok {
+				tables = append(tables, tableName)
+			}
+		}
+	}
+
+	return tables, nil
+}
+
+func (c *Client) GetColumns(ctx context.Context, databaseName, tableName string) ([]*ansisql.DBColumn, error) {
+	if databaseName == "" {
+		return nil, fmt.Errorf("database name cannot be empty")
+	}
+	if tableName == "" {
+		return nil, fmt.Errorf("table name cannot be empty")
+	}
+
+	q := fmt.Sprintf(`
+SELECT 
+    name,
+    type,
+    default_kind,
+    is_in_primary_key
+FROM system.columns
+WHERE database = '%s' AND table = '%s'
+ORDER BY position;
+`, databaseName, tableName)
+
+	result, err := c.Select(ctx, &query.Query{Query: q})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query columns for table '%s.%s': %w", databaseName, tableName, err)
+	}
+
+	var columns []*ansisql.DBColumn
+	for _, row := range result {
+		if len(row) < 4 {
+			continue
+		}
+
+		columnName, ok := row[0].(string)
+		if !ok {
+			continue
+		}
+
+		dataType, ok := row[1].(string)
+		if !ok {
+			continue
+		}
+
+		defaultKind, ok := row[2].(string)
+		if !ok {
+			continue
+		}
+
+		isInPrimaryKey, ok := row[3].(uint8)
+		if !ok {
+			continue
+		}
+
+		// ClickHouse allows NULL in most types unless explicitly Nullable(T) or NOT NULL
+		nullable := true
+		if len(dataType) > 8 && dataType[:8] == "Nullable" {
+			nullable = true
+		} else if defaultKind == "DEFAULT" {
+			nullable = false
+		}
+
+		column := &ansisql.DBColumn{
+			Name:       columnName,
+			Type:       dataType,
+			Nullable:   nullable,
+			PrimaryKey: isInPrimaryKey == 1,
+			Unique:     isInPrimaryKey == 1, // Primary key implies unique in ClickHouse
+		}
+
+		columns = append(columns, column)
+	}
+
+	return columns, nil
+}
+
 func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
 	// ClickHouse has databases and tables
 	// We'll query system.tables to get all databases and tables
