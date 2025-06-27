@@ -15,6 +15,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/afero"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
 
@@ -26,54 +27,125 @@ const (
 var choices = []string{}
 
 type model struct {
-	cursor int
-	choice string
+	cursor    int
+	choice    string
+	pageStart int
+	height    int
+}
+
+func getTerminalHeight() int {
+	if term.IsTerminal(int(os.Stdout.Fd())) {
+		_, h, err := term.GetSize(int(os.Stdout.Fd()))
+		if err == nil {
+			return h
+		}
+	}
+	return 24 // fallback default
 }
 
 func (m model) Init() tea.Cmd {
-	return nil
+	// Set initial terminal height
+	return tea.EnterAltScreen
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if msg, ok := msg.(tea.KeyMsg); ok {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.height = msg.Height
+		visibleCount := m.height - 6
+		if visibleCount >= len(choices) {
+			m.pageStart = 0
+		} else if m.cursor < m.pageStart {
+			m.pageStart = m.cursor
+		} else if m.cursor >= m.pageStart+visibleCount {
+			m.pageStart = m.cursor - visibleCount + 1
+		}
+		return m, nil
+	case tea.KeyMsg:
+		visibleCount := m.height - 6
+		if visibleCount < 1 {
+			visibleCount = 1
+		}
+		if visibleCount >= len(choices) {
+			m.pageStart = 0
+		}
 		switch msg.String() {
 		case "ctrl+c", "q", "esc":
 			return m, tea.Quit
 		case "enter":
-			// Send the choice on the channel and exit.
 			m.choice = choices[m.cursor]
 			return m, tea.Quit
 		case "down", "j":
 			m.cursor++
 			if m.cursor >= len(choices) {
 				m.cursor = 0
+				m.pageStart = 0
+			} else if m.cursor >= m.pageStart+visibleCount {
+				m.pageStart++
 			}
 		case "up", "k":
 			m.cursor--
 			if m.cursor < 0 {
 				m.cursor = len(choices) - 1
+				m.pageStart = len(choices) - visibleCount
+				if m.pageStart < 0 {
+					m.pageStart = 0
+				}
+			} else if m.cursor < m.pageStart {
+				m.pageStart--
+				if m.pageStart < 0 {
+					m.pageStart = 0
+				}
 			}
 		}
 	}
-	// Return the concrete type instead of the interface
-	return m, nil // This line is fine as it is
+	return m, nil
 }
 
 func (m model) View() string {
 	s := strings.Builder{}
 	s.WriteString("Please select a template below\n\n")
-
-	for i, choice := range choices {
+	visibleCount := m.height - 6
+	if visibleCount < 1 {
+		visibleCount = 1
+	}
+	if visibleCount >= len(choices) {
+		m.pageStart = 0
+	}
+	end := m.pageStart + visibleCount
+	if end > len(choices) {
+		end = len(choices)
+	}
+	for i := m.pageStart; i < end; i++ {
 		if m.cursor == i {
 			s.WriteString(" [x] ")
 		} else {
 			s.WriteString(" [ ] ")
 		}
-		s.WriteString(choice)
+		s.WriteString(choices[i])
 		s.WriteString("\n")
 	}
-	s.WriteString("\n(press q to quit)\n")
 
+	if visibleCount == 0 {
+		s.WriteString("\n(press q to quit)\n")
+	}
+
+	// Updated display message to show the exact range of options
+	if visibleCount == 1 {
+		s.WriteString(fmt.Sprintf(
+			"\ndisplaying options %d of %d\n",
+			end, len(choices),
+		))
+	}
+
+	if visibleCount > 1 {
+		s.WriteString(fmt.Sprintf(
+			"\ndisplaying options %d-%d of %d\n",
+			m.pageStart+1, end, len(choices),
+		))
+	}
+
+	s.WriteString("\n(press q to quit)\n")
 	return s.String()
 }
 
@@ -131,7 +203,8 @@ func Init() *cli.Command {
 	}
 
 	choices = templateList
-	p := tea.NewProgram(model{})
+	initialHeight := getTerminalHeight()
+	p := tea.NewProgram(model{height: initialHeight})
 	return &cli.Command{
 		Name:  "init",
 		Usage: "init a Bruin pipeline",
