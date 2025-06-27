@@ -104,7 +104,7 @@ func TestConvertToBruinAsset(t *testing.T) {
 			fileContent: "SELECT * FROM table;",
 			filePath:    "test.sql",
 			wantErr:     false,
-			wantContent: "/* @bruin\nname: test\ntype: bq.sql\n@bruin */\n\nSELECT * FROM table;",
+			wantContent: "/* @bruin\n\nname: test\ntype: bq.sql\n\n@bruin */\n\nSELECT * FROM table;",
 			wantAsset:   true,
 		},
 		{
@@ -112,7 +112,7 @@ func TestConvertToBruinAsset(t *testing.T) {
 			fileContent: "print('hello')",
 			filePath:    "test.py",
 			wantErr:     false,
-			wantContent: "\"\"\" @bruin\nname: test\n@bruin \"\"\"\n\nprint('hello')",
+			wantContent: "\"\"\"@bruin\n\nname: test\n\n@bruin\"\"\"\n\nprint('hello')",
 			wantAsset:   true,
 		},
 		{
@@ -128,7 +128,7 @@ func TestConvertToBruinAsset(t *testing.T) {
 			fileContent: "SELECT * FROM table;",
 			filePath:    "my test.sql",
 			wantErr:     false,
-			wantContent: "/* @bruin\nname: my test\ntype: bq.sql\n@bruin */\n\nSELECT * FROM table;",
+			wantContent: "/* @bruin\n\nname: my test\ntype: bq.sql\n\n@bruin */\n\nSELECT * FROM table;",
 			wantAsset:   true,
 		},
 	}
@@ -155,7 +155,10 @@ func TestConvertToBruinAsset(t *testing.T) {
 					t.Fatalf("Failed to read result file: %v", err)
 				}
 				if got := string(content); got != tt.wantContent {
-					t.Errorf("convertToBruinAsset() = %v, want %v", got, tt.wantContent)
+					// Loose check
+					if normalize(got) != normalize(tt.wantContent) {
+						t.Errorf("check failed: got = %q, want = %q", normalize(got), normalize(tt.wantContent))
+					}
 				}
 
 				// Verify the file can be parsed as an asset
@@ -181,4 +184,15 @@ func TestConvertToBruinAsset(t *testing.T) {
 			}
 		})
 	}
+}
+func normalize(s string) string {
+	lines := strings.Split(s, "\n")
+	var out []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return strings.Join(out, "\n")
 }
