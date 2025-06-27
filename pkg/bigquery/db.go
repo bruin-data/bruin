@@ -3,6 +3,7 @@ package bigquery
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/pkg/errors"
+	"github.com/sourcegraph/conc/pool"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -858,8 +860,28 @@ func (d *Client) fetchJSONStats(ctx context.Context, tableName, columnName strin
 	return stats, nil
 }
 
+func (d *Client) getTableColumns(ctx context.Context, datasetID, tableID string) ([]*ansisql.DBColumn, error) {
+	meta, err := d.client.Dataset(datasetID).Table(tableID).Metadata(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get metadata for table %s.%s: %w", datasetID, tableID, err)
+	}
+
+	cols := make([]*ansisql.DBColumn, 0, len(meta.Schema))
+	for _, field := range meta.Schema {
+		cols = append(cols, &ansisql.DBColumn{
+			Name:       field.Name,
+			Type:       string(field.Type),
+			Nullable:   !field.Required,
+			PrimaryKey: false,
+			Unique:     false,
+		})
+	}
+
+	sort.Slice(cols, func(i, j int) bool { return cols[i].Name < cols[j].Name })
+	return cols, nil
+}
+
 func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
-	// For BigQuery, we'll list all datasets in the project and their tables
 	projectID := d.config.ProjectID
 
 	summary := &ansisql.DBDatabase{
@@ -867,53 +889,84 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 		Schemas: []*ansisql.DBSchema{},
 	}
 
-	// List all datasets in the project using BigQuery API
-	datasets := d.client.Datasets(ctx)
+	datasetsIter := d.client.Datasets(ctx)
+	datasets := make([]*bigquery.Dataset, 0)
 	for {
-		dataset, err := datasets.Next()
+		ds, err := datasetsIter.Next()
 		if errors.Is(err, iterator.Done) {
 			break
 		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to list BigQuery datasets: %w", err)
 		}
-
-		schema := &ansisql.DBSchema{
-			Name:   dataset.DatasetID,
-			Tables: []*ansisql.DBTable{},
-		}
-
-		// List all tables in this dataset
-		tables := dataset.Tables(ctx)
-		for {
-			table, err := tables.Next()
-			if errors.Is(err, iterator.Done) {
-				break
-			}
-			if err != nil {
-				return nil, fmt.Errorf("failed to list tables in dataset %s: %w", dataset.DatasetID, err)
-			}
-
-			// Add table to schema
-			dbTable := &ansisql.DBTable{
-				Name:    table.TableID,
-				Columns: []*ansisql.DBColumn{}, // Initialize empty columns array
-			}
-			schema.Tables = append(schema.Tables, dbTable)
-		}
-
-		// Sort tables by name for consistent output
-		sort.Slice(schema.Tables, func(i, j int) bool {
-			return schema.Tables[i].Name < schema.Tables[j].Name
-		})
-
-		summary.Schemas = append(summary.Schemas, schema)
+		datasets = append(datasets, ds)
 	}
 
-	// Sort schemas by name for consistent output
-	sort.Slice(summary.Schemas, func(i, j int) bool {
-		return summary.Schemas[i].Name < summary.Schemas[j].Name
-	})
+	workers := runtime.NumCPU()
+	if workers < 8 {
+		workers = 8
+	}
+
+	mu := sync.Mutex{}
+	var errs []error
+
+	p := pool.New().WithMaxGoroutines(workers)
+	for _, dataset := range datasets {
+		ds := dataset
+		p.Go(func() {
+			schema := &ansisql.DBSchema{
+				Name:   ds.DatasetID,
+				Tables: []*ansisql.DBTable{},
+			}
+
+			tables := ds.Tables(ctx)
+			tablePool := pool.New().WithMaxGoroutines(workers)
+			tableMu := sync.Mutex{}
+			for {
+				t, err := tables.Next()
+				if errors.Is(err, iterator.Done) {
+					break
+				}
+				if err != nil {
+					mu.Lock()
+					errs = append(errs, fmt.Errorf("failed to list tables in dataset %s: %w", ds.DatasetID, err))
+					mu.Unlock()
+					return
+				}
+
+				table := t
+				tablePool.Go(func() {
+					cols, err := d.getTableColumns(ctx, ds.DatasetID, table.TableID)
+					if err != nil {
+						mu.Lock()
+						errs = append(errs, fmt.Errorf("failed to list columns for table %s.%s: %w", ds.DatasetID, table.TableID, err))
+						mu.Unlock()
+						return
+					}
+
+					dbTable := &ansisql.DBTable{Name: table.TableID, Columns: cols}
+					tableMu.Lock()
+					schema.Tables = append(schema.Tables, dbTable)
+					tableMu.Unlock()
+				})
+			}
+
+			tablePool.Wait()
+			sort.Slice(schema.Tables, func(i, j int) bool { return schema.Tables[i].Name < schema.Tables[j].Name })
+
+			mu.Lock()
+			summary.Schemas = append(summary.Schemas, schema)
+			mu.Unlock()
+		})
+	}
+
+	p.Wait()
+
+	if len(errs) > 0 {
+		return nil, errs[0]
+	}
+
+	sort.Slice(summary.Schemas, func(i, j int) bool { return summary.Schemas[i].Name < summary.Schemas[j].Name })
 
 	return summary, nil
 }

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -306,6 +307,84 @@ func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse,
 		if err != nil {
 			t.Fatal(err)
 		} // Updated error handling
+	})
+}
+
+func mockBqSummaryHandler(t *testing.T, projectID string, datasetTables map[string]map[string][]string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/projects/%s/datasets", projectID) {
+			datasets := make([]*bigquery2.DatasetListDatasets, 0, len(datasetTables))
+			for ds := range datasetTables {
+				datasets = append(datasets, &bigquery2.DatasetListDatasets{DatasetReference: &bigquery2.DatasetReference{ProjectId: projectID, DatasetId: ds}})
+			}
+			resp, err := json.Marshal(&bigquery2.DatasetList{Datasets: datasets})
+			if err != nil {
+				t.Logf("failed to marshal datasets response: %v", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			_, err = w.Write(resp)
+			if err != nil {
+				t.Logf("failed to write datasets response: %v", err)
+				return
+			}
+			return
+		}
+
+		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/tables") {
+			parts := strings.Split(r.URL.Path, "/")
+			if len(parts) >= 6 {
+				datasetID := parts[4]
+				tables := datasetTables[datasetID]
+				tableEntries := make([]*bigquery2.TableListTables, 0, len(tables))
+				for tbl := range tables {
+					tableEntries = append(tableEntries, &bigquery2.TableListTables{TableReference: &bigquery2.TableReference{ProjectId: projectID, DatasetId: datasetID, TableId: tbl}})
+				}
+				resp, err := json.Marshal(&bigquery2.TableList{Tables: tableEntries})
+				if err != nil {
+					t.Logf("failed to marshal tables response: %v", err)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				_, err = w.Write(resp)
+				if err != nil {
+					t.Logf("failed to write tables response: %v", err)
+					return
+				}
+				return
+			}
+		}
+
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/tables/") {
+			parts := strings.Split(r.URL.Path, "/")
+			if len(parts) >= 7 {
+				datasetID := parts[4]
+				tableID := parts[6]
+				cols := datasetTables[datasetID][tableID]
+				fields := make([]*bigquery2.TableFieldSchema, 0, len(cols))
+				for _, c := range cols {
+					fields = append(fields, &bigquery2.TableFieldSchema{Name: c, Type: "STRING", Mode: "NULLABLE"})
+				}
+				resp, err := json.Marshal(&bigquery2.Table{Schema: &bigquery2.TableSchema{Fields: fields}})
+				if err != nil {
+					t.Logf("failed to marshal table schema response: %v", err)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				_, err = w.Write(resp)
+				if err != nil {
+					t.Logf("failed to write table schema response: %v", err)
+					return
+				}
+				return
+			}
+		}
+
+		w.WriteHeader(http.StatusInternalServerError)
+		_, err := w.Write([]byte("no handler for " + r.Method + " " + r.URL.Path))
+		if err != nil {
+			t.Logf("failed to write error response: %v", err)
+		}
 	})
 }
 
@@ -1059,6 +1138,79 @@ func TestClient_getTableRef_TableNameValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClient_GetDatabaseSummary(t *testing.T) {
+	t.Parallel()
+
+	projectID := testProjectID
+
+	datasetTables := map[string]map[string][]string{
+		"dataset1": {
+			"table1": {"col1", "col2"},
+			"table2": {"col1"},
+		},
+		"dataset2": {
+			"table3": {"colA"},
+		},
+	}
+
+	srv := httptest.NewServer(mockBqSummaryHandler(t, projectID, datasetTables))
+	defer srv.Close()
+
+	client, err := bigquery.NewClient(
+		context.Background(),
+		projectID,
+		option.WithEndpoint(srv.URL),
+		option.WithCredentials(&google.Credentials{
+			ProjectID:   projectID,
+			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token"}),
+		}),
+	)
+	require.NoError(t, err)
+	client.Location = "US"
+
+	c := Client{client: client, config: &Config{ProjectID: projectID}}
+
+	got, err := c.GetDatabaseSummary(context.Background())
+	require.NoError(t, err)
+
+	want := &ansisql.DBDatabase{
+		Name: projectID,
+		Schemas: []*ansisql.DBSchema{
+			{
+				Name: "dataset1",
+				Tables: []*ansisql.DBTable{
+					{
+						Name: "table1",
+						Columns: []*ansisql.DBColumn{
+							{Name: "col1", Type: "STRING", Nullable: true},
+							{Name: "col2", Type: "STRING", Nullable: true},
+						},
+					},
+					{
+						Name: "table2",
+						Columns: []*ansisql.DBColumn{
+							{Name: "col1", Type: "STRING", Nullable: true},
+						},
+					},
+				},
+			},
+			{
+				Name: "dataset2",
+				Tables: []*ansisql.DBTable{
+					{
+						Name: "table3",
+						Columns: []*ansisql.DBColumn{
+							{Name: "colA", Type: "STRING", Nullable: true},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	assert.Equal(t, want, got)
 }
 
 func TestIsSamePartitioning(t *testing.T) {
