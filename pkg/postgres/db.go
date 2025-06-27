@@ -238,8 +238,23 @@ func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOn
 		defer rows.Close()
 
 		if rows.Next() {
-			if err := rows.Scan(&rowCount); err != nil {
+			var countValue interface{}
+			if err := rows.Scan(&countValue); err != nil {
 				return nil, fmt.Errorf("failed to scan row count for table '%s': %w", tableName, err)
+			}
+
+			// Handle different numeric types for row count
+			switch val := countValue.(type) {
+			case int64:
+				rowCount = val
+			case int:
+				rowCount = int64(val)
+			case int32:
+				rowCount = int64(val)
+			case float64:
+				rowCount = int64(val)
+			default:
+				return nil, fmt.Errorf("unexpected row count type for table '%s': got %T with value %v", tableName, val, val)
 			}
 		}
 		if err = rows.Err(); err != nil {
@@ -487,8 +502,17 @@ func (c *Client) fetchDateTimeStats(ctx context.Context, tableName, columnName s
 			return nil, err
 		}
 
-		stats.EarliestDate = earliestDate
-		stats.LatestDate = latestDate
+		// Parse datetime strings to time.Time objects
+		if earliestDate != nil {
+			if parsedTime, err := diff.ParseDateTime(*earliestDate); err == nil {
+				stats.EarliestDate = parsedTime
+			}
+		}
+		if latestDate != nil {
+			if parsedTime, err := diff.ParseDateTime(*latestDate); err == nil {
+				stats.LatestDate = parsedTime
+			}
+		}
 	}
 
 	return stats, rows.Err()

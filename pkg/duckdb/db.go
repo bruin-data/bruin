@@ -182,8 +182,23 @@ func (c *Client) GetTableSummary(ctx context.Context, tableName string, schemaOn
 
 		defer rows.Close()
 		if rows.Next() {
-			if err := rows.Scan(&rowCount); err != nil {
+			var countValue interface{}
+			if err := rows.Scan(&countValue); err != nil {
 				return nil, fmt.Errorf("failed to scan row count for table '%s': %w", tableName, err)
+			}
+
+			// Handle different numeric types for row count
+			switch val := countValue.(type) {
+			case int64:
+				rowCount = val
+			case int:
+				rowCount = int64(val)
+			case int32:
+				rowCount = int64(val)
+			case float64:
+				rowCount = int64(val)
+			default:
+				return nil, fmt.Errorf("unexpected row count type for table '%s': got %T with value %v", tableName, val, val)
 			}
 		}
 		if err = rows.Err(); err != nil {
@@ -368,26 +383,40 @@ func (c *Client) fetchBooleanStats(ctx context.Context, tableName, columnName st
 func (c *Client) fetchDateTimeStats(ctx context.Context, tableName, columnName string) (*diff.DateTimeStatistics, error) {
 	stats := &diff.DateTimeStatistics{}
 
-	// Get min, max dates
+	// Get min, max dates with explicit string conversion
 	query := fmt.Sprintf(`
         SELECT 
-            MIN(%s) as min_date,
-            MAX(%s) as max_date,
+            CAST(MIN(%s) AS VARCHAR) as min_date,
+            CAST(MAX(%s) AS VARCHAR) as max_date,
             COUNT(DISTINCT %s) as unique_count,
             COUNT(*) as count_val,
             COUNT(*) - COUNT(%s) as null_count
         FROM %s
     `, columnName, columnName, columnName, columnName, tableName)
 
+	var minDate, maxDate interface{}
 	err := c.connection.QueryRowContext(ctx, query).Scan(
-		&stats.EarliestDate,
-		&stats.LatestDate,
+		&minDate,
+		&maxDate,
 		&stats.UniqueCount,
 		&stats.Count,
 		&stats.NullCount,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch datetime stats for column '%s': %w", columnName, err)
+	}
+
+	// Handle datetime values - convert to proper time.Time objects
+	if minDate != nil {
+		if parsedTime, err := diff.ParseDateTime(minDate); err == nil {
+			stats.EarliestDate = parsedTime
+		}
+	}
+
+	if maxDate != nil {
+		if parsedTime, err := diff.ParseDateTime(maxDate); err == nil {
+			stats.LatestDate = parsedTime
+		}
 	}
 
 	return stats, nil

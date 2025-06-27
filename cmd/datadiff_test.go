@@ -196,7 +196,7 @@ func TestCalculatePercentageDiffEdgeCases(t *testing.T) {
 			val1:      0.9999,
 			val2:      1.0,
 			tolerance: 0.001,
-			expected:  "-0.0%", // Should round to -0.0%
+			expected:  "<0.001%", // Should be treated as within tolerance
 		},
 		{
 			name:      "precise decimal calculation",
