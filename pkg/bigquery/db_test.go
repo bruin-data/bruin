@@ -1692,3 +1692,193 @@ func timePtr(t time.Time) *time.Time {
 	return &t
 }
 
+func mockGetTablesHandler(t *testing.T, projectID string, datasets map[string][]string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Handle dataset metadata requests (to check if dataset exists)
+		if strings.HasPrefix(r.URL.Path, fmt.Sprintf("/projects/%s/datasets/", projectID)) && 
+		   !strings.HasSuffix(r.URL.Path, "/tables") {
+			parts := strings.Split(r.URL.Path, "/")
+			if len(parts) >= 5 {
+				datasetID := parts[4]
+				if _, exists := datasets[datasetID]; exists {
+					dataset := &bigquery2.Dataset{
+						DatasetReference: &bigquery2.DatasetReference{
+							ProjectId: projectID,
+							DatasetId: datasetID,
+						},
+					}
+					resp, err := json.Marshal(dataset)
+					if err != nil {
+						t.Logf("failed to marshal dataset response: %v", err)
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					w.WriteHeader(http.StatusOK)
+					_, err = w.Write(resp)
+					if err != nil {
+						t.Logf("failed to write dataset response: %v", err)
+					}
+				} else {
+					w.WriteHeader(http.StatusNotFound)
+					errorResp := map[string]interface{}{
+						"error": map[string]interface{}{
+							"code":    404,
+							"message": fmt.Sprintf("Dataset %s:%s was not found", projectID, datasetID),
+						},
+					}
+					resp, _ := json.Marshal(errorResp)
+					w.Write(resp)
+				}
+				return
+			}
+		}
+
+		// Handle table listing requests
+		if strings.HasPrefix(r.URL.Path, fmt.Sprintf("/projects/%s/datasets/", projectID)) && 
+		   strings.HasSuffix(r.URL.Path, "/tables") {
+			parts := strings.Split(r.URL.Path, "/")
+			if len(parts) >= 6 {
+				datasetID := parts[4]
+				tables, exists := datasets[datasetID]
+				if !exists {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+
+				tableEntries := make([]*bigquery2.TableListTables, 0, len(tables))
+				for _, tableID := range tables {
+					tableEntries = append(tableEntries, &bigquery2.TableListTables{
+						TableReference: &bigquery2.TableReference{
+							ProjectId: projectID,
+							DatasetId: datasetID,
+							TableId:   tableID,
+						},
+					})
+				}
+
+				tableList := &bigquery2.TableList{Tables: tableEntries}
+				resp, err := json.Marshal(tableList)
+				if err != nil {
+					t.Logf("failed to marshal table list response: %v", err)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				_, err = w.Write(resp)
+				if err != nil {
+					t.Logf("failed to write table list response: %v", err)
+				}
+				return
+			}
+		}
+
+		w.WriteHeader(http.StatusInternalServerError)
+		_, err := w.Write([]byte("no handler for " + r.Method + " " + r.URL.Path))
+		if err != nil {
+			t.Logf("failed to write error response: %v", err)
+		}
+	})
+}
+
+func TestClient_GetTables(t *testing.T) {
+	t.Parallel()
+
+	projectID := testProjectID
+
+	tests := []struct {
+		name         string
+		databaseName string
+		datasets     map[string][]string
+		want         []string
+		wantErr      bool
+		errContains  string
+	}{
+		{
+			name:         "empty database name",
+			databaseName: "",
+			want:         nil,
+			wantErr:      true,
+			errContains:  "database name cannot be empty",
+		},
+		{
+			name:         "non-existent dataset",
+			databaseName: "nonexistent",
+			datasets: map[string][]string{
+				"dataset1": {"table1"},
+			},
+			want:        nil,
+			wantErr:     true,
+			errContains: "dataset 'nonexistent' does not exist",
+		},
+		{
+			name:         "dataset exists but has no tables",
+			databaseName: "empty_dataset",
+			datasets: map[string][]string{
+				"empty_dataset": {},
+			},
+			want:    nil,
+			wantErr: false,
+		},
+		{
+			name:         "dataset exists with single table",
+			databaseName: "dataset1",
+			datasets: map[string][]string{
+				"dataset1": {"table1"},
+			},
+			want:    []string{"table1"},
+			wantErr: false,
+		},
+		{
+			name:         "dataset exists with multiple tables (should be sorted)",
+			databaseName: "dataset2",
+			datasets: map[string][]string{
+				"dataset2": {"zebra_table", "alpha_table", "beta_table"},
+			},
+			want:    []string{"alpha_table", "beta_table", "zebra_table"},
+			wantErr: false,
+		},
+	}
+
+	// Run regular tests
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			srv := httptest.NewServer(mockGetTablesHandler(t, projectID, tt.datasets))
+			defer srv.Close()
+
+			client, err := bigquery.NewClient(
+				context.Background(),
+				projectID,
+				option.WithEndpoint(srv.URL),
+				option.WithCredentials(&google.Credentials{
+					ProjectID:   projectID,
+					TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token"}),
+				}),
+			)
+			require.NoError(t, err)
+			client.Location = "US"
+
+			c := Client{client: client, config: &Config{ProjectID: projectID}}
+
+			got, err := c.GetTables(context.Background(), tt.databaseName)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+				assert.Nil(t, got)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+
+}
+
