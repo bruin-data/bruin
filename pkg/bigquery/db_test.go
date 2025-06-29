@@ -309,115 +309,107 @@ func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse,
 		} // Updated error handling
 	})
 }
+type mockEndpoint struct {
+	pattern string
+	handler func(http.ResponseWriter, *http.Request, map[string]string)
+}
+
 func mockBqSummaryHandler(t *testing.T, projectID string, datasetTables map[string]map[string][]string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/projects/%s/datasets", projectID) {
-			datasets := make([]*bigquery2.DatasetListDatasets, 0, len(datasetTables))
-			for ds := range datasetTables {
-				datasets = append(datasets, &bigquery2.DatasetListDatasets{DatasetReference: &bigquery2.DatasetReference{ProjectId: projectID, DatasetId: ds}})
-			}
-			resp, err := json.Marshal(&bigquery2.DatasetList{Datasets: datasets})
-			if err != nil {
-				t.Logf("failed to marshal datasets response: %v", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			_, err = w.Write(resp)
-			if err != nil {
-				t.Logf("failed to write datasets response: %v", err)
-				return
-			}
+	writeJSON := func(w http.ResponseWriter, data interface{}) {
+		resp, err := json.Marshal(data)
+		if err != nil {
+			t.Logf("failed to marshal response: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		_, err = w.Write(resp)
+		if err != nil {
+			t.Logf("failed to write response: %v", err)
+		}
+	}
 
-		// Handle dataset metadata requests (for checking if dataset exists)
-		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, fmt.Sprintf("/projects/%s/datasets/", projectID)) && !strings.HasSuffix(r.URL.Path, "/tables") && !strings.Contains(r.URL.Path, "/tables/") {
-			parts := strings.Split(r.URL.Path, "/")
-			if len(parts) >= 5 {
-				datasetID := parts[4]
+	writeError := func(w http.ResponseWriter, code int, message string) {
+		w.WriteHeader(code)
+		writeJSON(w, map[string]interface{}{
+			"error": map[string]interface{}{
+				"code":    code,
+				"message": message,
+			},
+		})
+	}
+
+	endpoints := []mockEndpoint{
+		{
+			fmt.Sprintf("/projects/%s/datasets", projectID),
+			func(w http.ResponseWriter, r *http.Request, params map[string]string) {
+				datasets := make([]*bigquery2.DatasetListDatasets, 0, len(datasetTables))
+				for ds := range datasetTables {
+					datasets = append(datasets, &bigquery2.DatasetListDatasets{
+						DatasetReference: &bigquery2.DatasetReference{ProjectId: projectID, DatasetId: ds},
+					})
+				}
+				writeJSON(w, &bigquery2.DatasetList{Datasets: datasets})
+			},
+		},
+		{
+			fmt.Sprintf("/projects/%s/datasets/{datasetID}", projectID),
+			func(w http.ResponseWriter, r *http.Request, params map[string]string) {
+				datasetID := params["datasetID"]
 				if tables, exists := datasetTables[datasetID]; exists && tables != nil {
-					resp, err := json.Marshal(&bigquery2.Dataset{
+					writeJSON(w, &bigquery2.Dataset{
 						DatasetReference: &bigquery2.DatasetReference{
 							ProjectId: projectID,
 							DatasetId: datasetID,
 						},
 					})
-					if err != nil {
-						t.Logf("failed to marshal dataset metadata response: %v", err)
-						w.WriteHeader(http.StatusInternalServerError)
-						return
-					}
-					_, err = w.Write(resp)
-					if err != nil {
-						t.Logf("failed to write dataset metadata response: %v", err)
-						return
-					}
-					return
 				} else {
-					w.WriteHeader(http.StatusNotFound)
-					resp, _ := json.Marshal(map[string]interface{}{
-						"error": map[string]interface{}{
-							"code":    404,
-							"message": fmt.Sprintf("Dataset %s:%s was not found", projectID, datasetID),
-						},
-					})
-					w.Write(resp)
-					return
+					writeError(w, 404, fmt.Sprintf("Dataset %s:%s was not found", projectID, datasetID))
 				}
-			}
-		}
-
-		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/tables") {
-			parts := strings.Split(r.URL.Path, "/")
-			if len(parts) >= 6 {
-				datasetID := parts[4]
+			},
+		},
+		{
+			fmt.Sprintf("/projects/%s/datasets/{datasetID}/tables", projectID),
+			func(w http.ResponseWriter, r *http.Request, params map[string]string) {
+				datasetID := params["datasetID"]
 				tables := datasetTables[datasetID]
 				tableEntries := make([]*bigquery2.TableListTables, 0, len(tables))
 				for tbl := range tables {
-					tableEntries = append(tableEntries, &bigquery2.TableListTables{TableReference: &bigquery2.TableReference{ProjectId: projectID, DatasetId: datasetID, TableId: tbl}})
+					tableEntries = append(tableEntries, &bigquery2.TableListTables{
+						TableReference: &bigquery2.TableReference{ProjectId: projectID, DatasetId: datasetID, TableId: tbl},
+					})
 				}
-				resp, err := json.Marshal(&bigquery2.TableList{Tables: tableEntries})
-				if err != nil {
-					t.Logf("failed to marshal tables response: %v", err)
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				_, err = w.Write(resp)
-				if err != nil {
-					t.Logf("failed to write tables response: %v", err)
-					return
-				}
-				return
-			}
-		}
-
-		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/tables/") && !strings.HasSuffix(r.URL.Path, "/tables") {
-			parts := strings.Split(r.URL.Path, "/")
-			if len(parts) >= 7 {
-				datasetID := parts[4]
-				tableID := parts[6]
+				writeJSON(w, &bigquery2.TableList{Tables: tableEntries})
+			},
+		},
+		{
+			fmt.Sprintf("/projects/%s/datasets/{datasetID}/tables/{tableID}", projectID),
+			func(w http.ResponseWriter, r *http.Request, params map[string]string) {
+				datasetID := params["datasetID"]
+				tableID := params["tableID"]
 				if tables, datasetExists := datasetTables[datasetID]; datasetExists && tables != nil {
 					if cols, tableExists := tables[tableID]; tableExists {
 						fields := make([]*bigquery2.TableFieldSchema, 0, len(cols))
 						for _, c := range cols {
 							fields = append(fields, &bigquery2.TableFieldSchema{Name: c, Type: "STRING", Mode: "NULLABLE"})
 						}
-						table := &bigquery2.Table{Schema: &bigquery2.TableSchema{Fields: fields}}
-						resp, err := json.Marshal(table)
-						if err != nil {
-							w.WriteHeader(http.StatusInternalServerError)
-							return
-						}
-						w.WriteHeader(http.StatusOK)
-						_, err = w.Write(resp)
-						if err != nil {
-							return
-						}
+						writeJSON(w, &bigquery2.Table{Schema: &bigquery2.TableSchema{Fields: fields}})
 						return
 					}
 				}
-				// Table not found
 				w.WriteHeader(http.StatusNotFound)
+			},
+		},
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		for _, endpoint := range endpoints {
+			if params := matchPath(endpoint.pattern, r.URL.Path); params != nil {
+				endpoint.handler(w, r, params)
 				return
 			}
 		}
@@ -428,6 +420,26 @@ func mockBqSummaryHandler(t *testing.T, projectID string, datasetTables map[stri
 			t.Logf("failed to write error response: %v", err)
 		}
 	})
+}
+
+func matchPath(pattern, path string) map[string]string {
+	patternParts := strings.Split(pattern, "/")
+	pathParts := strings.Split(path, "/")
+
+	if len(patternParts) != len(pathParts) {
+		return nil
+	}
+
+	params := make(map[string]string)
+	for i, part := range patternParts {
+		if strings.HasPrefix(part, "{") && strings.HasSuffix(part, "}") {
+			paramName := part[1 : len(part)-1]
+			params[paramName] = pathParts[i]
+		} else if part != pathParts[i] {
+			return nil
+		}
+	}
+	return params
 }
 
 func TestDB_Select(t *testing.T) {
