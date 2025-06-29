@@ -1004,7 +1004,18 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 					return
 				}
 
-				schema.Tables = append(schema.Tables, &ansisql.DBTable{Name: t.TableID})
+				columns, err := d.getTableColumns(ctx, ds.DatasetID, t.TableID)
+				if err != nil {
+					mu.Lock()
+					errs = append(errs, fmt.Errorf("failed to get columns for table %s.%s: %w", ds.DatasetID, t.TableID, err))
+					mu.Unlock()
+					return
+				}
+
+				schema.Tables = append(schema.Tables, &ansisql.DBTable{
+					Name:    t.TableID,
+					Columns: columns,
+				})
 			}
 
 			sort.Slice(schema.Tables, func(i, j int) bool { return schema.Tables[i].Name < schema.Tables[j].Name })

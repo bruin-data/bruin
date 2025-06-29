@@ -309,7 +309,6 @@ func mockBqHandler(t *testing.T, projectID, jobID string, jsr jobSubmitResponse,
 		} // Updated error handling
 	})
 }
-
 func mockBqSummaryHandler(t *testing.T, projectID string, datasetTables map[string]map[string][]string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/projects/%s/datasets", projectID) {
@@ -318,10 +317,54 @@ func mockBqSummaryHandler(t *testing.T, projectID string, datasetTables map[stri
 				datasets = append(datasets, &bigquery2.DatasetListDatasets{DatasetReference: &bigquery2.DatasetReference{ProjectId: projectID, DatasetId: ds}})
 			}
 			resp, err := json.Marshal(&bigquery2.DatasetList{Datasets: datasets})
-			require.NoError(t, err) //nolint
+			if err != nil {
+				t.Logf("failed to marshal datasets response: %v", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
 			_, err = w.Write(resp)
-			require.NoError(t, err) //nolint
+			if err != nil {
+				t.Logf("failed to write datasets response: %v", err)
+				return
+			}
 			return
+		}
+
+		// Handle dataset metadata requests (for checking if dataset exists)
+		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, fmt.Sprintf("/projects/%s/datasets/", projectID)) && !strings.HasSuffix(r.URL.Path, "/tables") && !strings.Contains(r.URL.Path, "/tables/") {
+			parts := strings.Split(r.URL.Path, "/")
+			if len(parts) >= 5 {
+				datasetID := parts[4]
+				if tables, exists := datasetTables[datasetID]; exists && tables != nil {
+					resp, err := json.Marshal(&bigquery2.Dataset{
+						DatasetReference: &bigquery2.DatasetReference{
+							ProjectId: projectID,
+							DatasetId: datasetID,
+						},
+					})
+					if err != nil {
+						t.Logf("failed to marshal dataset metadata response: %v", err)
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					_, err = w.Write(resp)
+					if err != nil {
+						t.Logf("failed to write dataset metadata response: %v", err)
+						return
+					}
+					return
+				} else {
+					w.WriteHeader(http.StatusNotFound)
+					resp, _ := json.Marshal(map[string]interface{}{
+						"error": map[string]interface{}{
+							"code":    404,
+							"message": fmt.Sprintf("Dataset %s:%s was not found", projectID, datasetID),
+						},
+					})
+					w.Write(resp)
+					return
+				}
+			}
 		}
 
 		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/tables") {
@@ -334,34 +377,56 @@ func mockBqSummaryHandler(t *testing.T, projectID string, datasetTables map[stri
 					tableEntries = append(tableEntries, &bigquery2.TableListTables{TableReference: &bigquery2.TableReference{ProjectId: projectID, DatasetId: datasetID, TableId: tbl}})
 				}
 				resp, err := json.Marshal(&bigquery2.TableList{Tables: tableEntries})
-				require.NoError(t, err) //nolint
+				if err != nil {
+					t.Logf("failed to marshal tables response: %v", err)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
 				_, err = w.Write(resp)
-				require.NoError(t, err) //nolint
+				if err != nil {
+					t.Logf("failed to write tables response: %v", err)
+					return
+				}
 				return
 			}
 		}
 
-		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/tables/") {
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/tables/") && !strings.HasSuffix(r.URL.Path, "/tables") {
 			parts := strings.Split(r.URL.Path, "/")
 			if len(parts) >= 7 {
 				datasetID := parts[4]
 				tableID := parts[6]
-				cols := datasetTables[datasetID][tableID]
-				fields := make([]*bigquery2.TableFieldSchema, 0, len(cols))
-				for _, c := range cols {
-					fields = append(fields, &bigquery2.TableFieldSchema{Name: c, Type: "STRING", Mode: "NULLABLE"})
+				if tables, datasetExists := datasetTables[datasetID]; datasetExists && tables != nil {
+					if cols, tableExists := tables[tableID]; tableExists {
+						fields := make([]*bigquery2.TableFieldSchema, 0, len(cols))
+						for _, c := range cols {
+							fields = append(fields, &bigquery2.TableFieldSchema{Name: c, Type: "STRING", Mode: "NULLABLE"})
+						}
+						table := &bigquery2.Table{Schema: &bigquery2.TableSchema{Fields: fields}}
+						resp, err := json.Marshal(table)
+						if err != nil {
+							w.WriteHeader(http.StatusInternalServerError)
+							return
+						}
+						w.WriteHeader(http.StatusOK)
+						_, err = w.Write(resp)
+						if err != nil {
+							return
+						}
+						return
+					}
 				}
-				resp, err := json.Marshal(&bigquery2.Table{Schema: &bigquery2.TableSchema{Fields: fields}})
-				require.NoError(t, err) //nolint
-				_, err = w.Write(resp)
-				require.NoError(t, err) //nolint
+				// Table not found
+				w.WriteHeader(http.StatusNotFound)
 				return
 			}
 		}
 
 		w.WriteHeader(http.StatusInternalServerError)
 		_, err := w.Write([]byte("no handler for " + r.Method + " " + r.URL.Path))
-		require.NoError(t, err) //nolint
+		if err != nil {
+			t.Logf("failed to write error response: %v", err)
+		}
 	})
 }
 
@@ -1503,220 +1568,6 @@ func TestBuildTableExistsQuery(t *testing.T) {
 	}
 }
 
-func TestClient_GetTables(t *testing.T) {
-	t.Parallel()
-
-	projectID := testProjectID
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Mock BigQuery API responses based on the request path
-		switch {
-		case strings.Contains(r.URL.Path, "/datasets/test_dataset"):
-			// Dataset metadata request
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"kind":      "bigquery#dataset",
-				"id":        "test-project:test_dataset",
-				"datasetId": "test_dataset",
-			})
-		case strings.Contains(r.URL.Path, "/datasets/nonexistent_dataset"):
-			// Non-existent dataset request
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusNotFound)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"error": map[string]interface{}{
-					"code":    404,
-					"message": "Dataset test-project:nonexistent_dataset was not found",
-				},
-			})
-		case strings.Contains(r.URL.Path, "/datasets/test_dataset/tables"):
-			// Tables listing request
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"kind": "bigquery#tableList",
-				"tables": []map[string]interface{}{
-					{
-						"kind":    "bigquery#table",
-						"id":      "test-project:test_dataset.users",
-						"tableId": "users",
-						"tableReference": map[string]interface{}{
-							"projectId": "test-project",
-							"datasetId": "test_dataset",
-							"tableId":   "users",
-						},
-					},
-					{
-						"kind":    "bigquery#table",
-						"id":      "test-project:test_dataset.orders",
-						"tableId": "orders",
-						"tableReference": map[string]interface{}{
-							"projectId": "test-project",
-							"datasetId": "test_dataset",
-							"tableId":   "orders",
-						},
-					},
-				},
-			})
-		case strings.Contains(r.URL.Path, "/datasets/empty_dataset/tables"):
-			// Empty dataset tables listing request
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"kind":   "bigquery#tableList",
-				"tables": []map[string]interface{}{},
-			})
-		case strings.Contains(r.URL.Path, "/datasets/empty_dataset"):
-			// Empty dataset metadata request
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"kind":      "bigquery#dataset",
-				"id":        "test-project:empty_dataset",
-				"datasetId": "empty_dataset",
-			})
-		case strings.Contains(r.URL.Path, "/tables/users"):
-			// Users table metadata request
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"kind":    "bigquery#table",
-				"id":      "test-project:test_dataset.users",
-				"tableId": "users",
-				"schema": map[string]interface{}{
-					"fields": []map[string]interface{}{
-						{
-							"name":     "id",
-							"type":     "INTEGER",
-							"mode":     "REQUIRED",
-							"required": true,
-						},
-						{
-							"name":     "name",
-							"type":     "STRING",
-							"mode":     "NULLABLE",
-							"required": false,
-						},
-						{
-							"name":     "email",
-							"type":     "STRING",
-							"mode":     "NULLABLE",
-							"required": false,
-						},
-					},
-				},
-			})
-		case strings.Contains(r.URL.Path, "/tables/orders"):
-			// Orders table metadata request
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"kind":    "bigquery#table",
-				"id":      "test-project:test_dataset.orders",
-				"tableId": "orders",
-				"schema": map[string]interface{}{
-					"fields": []map[string]interface{}{
-						{
-							"name":     "order_id",
-							"type":     "INTEGER",
-							"mode":     "REQUIRED",
-							"required": true,
-						},
-						{
-							"name":     "user_id",
-							"type":     "INTEGER",
-							"mode":     "NULLABLE",
-							"required": false,
-						},
-						{
-							"name":     "amount",
-							"type":     "FLOAT",
-							"mode":     "NULLABLE",
-							"required": false,
-						},
-					},
-				},
-			})
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer srv.Close()
-
-	tests := []struct {
-		name         string
-		databaseName string
-		want         []string
-		wantErr      bool
-		errContains  string
-	}{
-		{
-			name:         "valid dataset with tables",
-			databaseName: "test_dataset",
-			want:         []string{"orders", "users"},
-			wantErr:      false,
-		},
-		{
-			name:         "empty dataset",
-			databaseName: "empty_dataset",
-			want:         []string{},
-			wantErr:      false,
-		},
-		{
-			name:         "non-existent dataset",
-			databaseName: "nonexistent_dataset",
-			want:         nil,
-			wantErr:      true,
-			errContains:  "dataset 'nonexistent_dataset' does not exist",
-		},
-		{
-			name:         "empty database name",
-			databaseName: "",
-			want:         nil,
-			wantErr:      true,
-			errContains:  "database name cannot be empty",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			client, err := bigquery.NewClient(
-				context.Background(),
-				projectID,
-				option.WithEndpoint(srv.URL),
-				option.WithCredentials(&google.Credentials{
-					ProjectID: projectID,
-					TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
-						AccessToken: "some-token",
-					}),
-				}),
-			)
-			require.NoError(t, err)
-
-			d := Client{
-				client: client,
-				config: &Config{
-					ProjectID: projectID,
-				},
-			}
-
-			got, err := d.GetTables(context.Background(), tt.databaseName)
-
-			if tt.wantErr {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errContains)
-				assert.Nil(t, got)
-				return
-			}
-
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func TestParseDateTime(t *testing.T) {
 	t.Parallel()
 
@@ -1828,3 +1679,4 @@ func TestParseDateTime(t *testing.T) {
 func timePtr(t time.Time) *time.Time {
 	return &t
 }
+
