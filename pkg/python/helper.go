@@ -5,10 +5,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/date"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 )
 
-func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs []string) ([]string, error) {
+func ConsolidatedParameters(ctx context.Context, pipe *pipeline.Pipeline, asset *pipeline.Asset, cmdArgs []string) ([]string, error) {
 	if value, exists := asset.Parameters["incremental_key"]; exists && value != "" {
 		cmdArgs = append(cmdArgs, "--incremental-key", value)
 
@@ -81,8 +82,20 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 		if okParse {
 			applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
 			startTime := startTimeInstance
-			if ok && applyModifiers {
-				startTime = pipeline.ModifyDate(startTimeInstance, asset.IntervalModifiers.Start)
+			fullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+			if fullRefresh {
+				if asset.StartDate != "" {
+					if parsed, err := date.ParseTime(asset.StartDate); err == nil {
+						startTime = parsed
+					}
+				} else if pipe != nil && pipe.StartDate != "" {
+					if parsed, err := date.ParseTime(pipe.StartDate); err == nil {
+						startTime = parsed
+					}
+				}
+			}
+			if ok && applyModifiers && !fullRefresh {
+				startTime = pipeline.ModifyDate(startTime, asset.IntervalModifiers.Start)
 			}
 			cmdArgs = append(cmdArgs, "--interval-start", startTime.Format(time.RFC3339))
 		}
@@ -93,8 +106,9 @@ func ConsolidatedParameters(ctx context.Context, asset *pipeline.Asset, cmdArgs 
 		if okParse {
 			applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
 			endTime := endTimeInstance
-			if ok && applyModifiers {
-				endTime = pipeline.ModifyDate(endTimeInstance, asset.IntervalModifiers.Start)
+			fullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+			if ok && applyModifiers && !fullRefresh {
+				endTime = pipeline.ModifyDate(endTimeInstance, asset.IntervalModifiers.End)
 			}
 			cmdArgs = append(cmdArgs, "--interval-end", endTime.Format(time.RFC3339))
 		}
