@@ -33,7 +33,10 @@ func TestSetupVariables(t *testing.T) {
 			},
 			asset:       &pipeline.Asset{},
 			existingEnv: map[string]string{"EXISTING": "value"},
-			expectedEnv: map[string]string{"EXISTING": "value"},
+			expectedEnv: map[string]string{
+				"EXISTING":   "value",
+				"BRUIN_VARS": "{}",
+			},
 		},
 		{
 			name: "with days modifier",
@@ -61,6 +64,7 @@ func TestSetupVariables(t *testing.T) {
 				"BRUIN_PIPELINE":        "test-pipeline",
 				"BRUIN_RUN_ID":          "test-run",
 				"BRUIN_FULL_REFRESH":    "1",
+				"BRUIN_VARS":            "{}",
 			},
 		},
 		{
@@ -89,6 +93,7 @@ func TestSetupVariables(t *testing.T) {
 				"BRUIN_PIPELINE":        "test-pipeline",
 				"BRUIN_RUN_ID":          "test-run",
 				"BRUIN_FULL_REFRESH":    "1",
+				"BRUIN_VARS":            "{}",
 			},
 		},
 		{
@@ -129,6 +134,7 @@ func TestSetupVariables(t *testing.T) {
 				"BRUIN_PIPELINE":        "test-pipeline",
 				"BRUIN_RUN_ID":          "test-run",
 				"BRUIN_FULL_REFRESH":    "1",
+				"BRUIN_VARS":            "{}",
 			},
 		},
 		{
