@@ -8,19 +8,18 @@
     "connection": "",
     "tags": [],
     "materialization": null,
-    "interval_modifiers": null,
     "upstreams": [],
     "image": "",
     "instance": "",
     "owner": "",
     "executable_file": {
       "name": "chess_profiles.asset.yml",
-      "path": "/integration-tests/happy-path/assets/chess_profiles.asset.yml",
+      "path": "test-pipelines/parse-happy-path/assets/chess_profiles.asset.yml",
       "content": "name: chess_playground.profiles\ntype: ingestr\nparameters:\n  source_connection: chess-default\n  source_table: profiles\n  destination: duckdb"
     },
     "definition_file": {
       "name": "chess_profiles.asset.yml",
-      "path": "/integration-tests/happy-path/assets/chess_profiles.asset.yml",
+      "path": "test-pipelines/parse-happy-path/assets/chess_profiles.asset.yml",
       "type": "yaml"
     },
     "parameters": {
@@ -29,17 +28,19 @@
       "source_table": "profiles"
     },
     "secrets": [],
+    "extends": null,
     "columns": [],
     "custom_checks": [],
     "metadata": {},
     "snowflake": null,
-    "athena": null
+    "athena": null,
+    "interval_modifiers": null
   },
   "pipeline": {
     "name": "integration_test",
     "schedule": ""
   },
   "repo": {
-    "path": "/integration-tests"
+    "path": "/Users/bruin/GolandProjects/bruin/integration-tests"
   }
 }

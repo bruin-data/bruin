@@ -3,13 +3,11 @@
   "name": "integration_test",
   "schedule": "",
   "start_date": "",
-  "agent": false,
   "definition_file": {
     "name": "pipeline.yml",
-    "path": "integration-tests/test-pipelines/parse-asset-extends/pipeline.yml"
+    "path": "test-pipelines/parse-asset-extends/pipeline.yml"
   },
   "default_connections": {},
-  "variables": null,
   "assets": [
     {
       "id": "aff64e4fd520bd185cb01adab98d2d20060f621c62d5cad5204712cfa2294ef7",
@@ -27,19 +25,18 @@
         "incremental_key": "",
         "time_granularity": ""
       },
-      "interval_modifiers": null,
       "upstreams": [],
       "image": "",
       "instance": "",
       "owner": "",
       "executable_file": {
         "name": "country.sql",
-        "path": "integration-tests/test-pipelines/parse-asset-extends/assets/country.sql",
+        "path": "test-pipelines/parse-asset-extends/assets/country.sql",
         "content": ""
       },
       "definition_file": {
         "name": "country.sql",
-        "path": "integration-tests/test-pipelines/parse-asset-extends/assets/country.sql",
+        "path": "test-pipelines/parse-asset-extends/assets/country.sql",
         "type": "comment"
       },
       "parameters": {},
@@ -101,7 +98,8 @@
       "custom_checks": [],
       "metadata": {},
       "snowflake": null,
-      "athena": null
+      "athena": null,
+      "interval_modifiers": null
     }
   ],
   "notifications": {
@@ -114,5 +112,9 @@
     "bigquery": false
   },
   "retries": 0,
-  "concurrency": 1
+  "concurrency": 1,
+  "commit": "",
+  "snapshot": "",
+  "agent": false,
+  "variables": null
 }

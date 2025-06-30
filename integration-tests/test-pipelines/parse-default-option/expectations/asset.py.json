@@ -8,7 +8,6 @@
     "connection": "",
     "tags": [],
     "materialization": null,
-    "interval_modifiers": null,
     "upstreams": [
       {
         "type": "asset",
@@ -22,12 +21,12 @@
     "owner": "",
     "executable_file": {
       "name": "asset.py",
-      "path": "integration-tests/test-pipelines/parse-default-option/assets/asset.py",
+      "path": "test-pipelines/parse-default-option/assets/asset.py",
       "content": "import os\nimport duckdb\n\nif os.getenv('INJECTED1') != \"value1\":\n    raise Exception(\"KEY1 is not injected correctly\")\n\ncon = duckdb.connect(database = \"duckdb-files/env-run-default-option.db\", read_only = False)\n\ncon.execute(\"SELECT * FROM chess_playground.player_summary\")\nresult = con.fetchall()\nif len(result) != 2:\n    raise Exception(\"Incorrect number of rows in player_summary\")"
     },
     "definition_file": {
       "name": "asset.py",
-      "path": "integration-tests/test-pipelines/parse-default-option/assets/asset.py",
+      "path": "test-pipelines/parse-default-option/assets/asset.py",
       "type": "comment"
     },
     "parameters": {
@@ -44,17 +43,19 @@
         "injected_key": "INJECTED2"
       }
     ],
+    "extends": null,
     "columns": [],
     "custom_checks": [],
     "metadata": {},
     "snowflake": null,
-    "athena": null
+    "athena": null,
+    "interval_modifiers": null
   },
   "pipeline": {
     "name": "integration_test",
     "schedule": ""
   },
   "repo": {
-    "path": "integration-tests"
+    "path": "/Users/bruin/GolandProjects/bruin/integration-tests"
   }
 }
