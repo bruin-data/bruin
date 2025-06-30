@@ -55,7 +55,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.height = msg.Height
 		visibleCount := m.height - templateHeaderHeight
-		if visibleCount >= len(choices) {
+		if visibleCount >= len(choices) { // nolint:gocritic
 			m.pageStart = 0
 		} else if m.cursor < m.pageStart {
 			m.pageStart = m.cursor
@@ -228,7 +228,6 @@ func Init() *cli.Command {
 					if m.choice != "" {
 						templateName = m.choice
 					} else if m.quitting {
-						fmt.Printf("Quitting... Goodbye!\n")
 						return nil
 					}
 				}
