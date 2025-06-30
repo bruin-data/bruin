@@ -604,7 +604,7 @@ func convertToBruinAsset(fs afero.Fs, filePath string) error {
 	ext := strings.ToLower(filepath.Ext(filePath))
 
 	// Try to determine the majority asset type from the pipeline
-	var assetType = pipeline.AssetTypeBigqueryQuery // default fallback
+	assetType := pipeline.AssetTypeBigqueryQuery // default fallback
 	pipelineRootPath, err := path.GetPipelineRootFromTask(filePath, PipelineDefinitionFiles)
 	if err != nil {
 		printErrorJSON(errors2.Wrap(err, "failed to get pipeline root path"))
