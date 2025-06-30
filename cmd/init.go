@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	DefaultTemplate   = "default"
-	DefaultFolderName = "bruin-pipeline"
+	DefaultTemplate      = "default"
+	DefaultFolderName    = "bruin-pipeline"
+	templateHeaderHeight = 7
 )
 
 var choices = []string{}
@@ -31,6 +32,7 @@ type model struct {
 	choice    string
 	pageStart int
 	height    int
+	quitting  bool
 }
 
 func getTerminalHeight() int {
@@ -52,7 +54,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.height = msg.Height
-		visibleCount := m.height - 7
+		visibleCount := m.height - templateHeaderHeight
 		if visibleCount >= len(choices) {
 			m.pageStart = 0
 		} else if m.cursor < m.pageStart {
@@ -62,7 +64,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.KeyMsg:
-		visibleCount := m.height - 7
+		visibleCount := m.height - templateHeaderHeight
 		if visibleCount < 1 {
 			visibleCount = 1
 		}
@@ -71,6 +73,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch msg.String() {
 		case "ctrl+c", "q", "esc":
+			m.quitting = true
 			return m, tea.Quit
 		case "enter":
 			m.choice = choices[m.cursor]
@@ -105,7 +108,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	s := strings.Builder{}
 	s.WriteString("Please select a template below:\n\n")
-	visibleCount := m.height - 7
+	visibleCount := m.height - templateHeaderHeight
 	maxStart := len(choices) - visibleCount
 	if maxStart < 0 {
 		maxStart = 0
@@ -221,8 +224,13 @@ func Init() *cli.Command {
 					os.Exit(1)
 				}
 
-				if m, ok := m.(model); ok && m.choice != "" {
-					templateName = m.choice
+				if m, ok := m.(model); ok {
+					if m.choice != "" {
+						templateName = m.choice
+					} else if m.quitting {
+						fmt.Printf("Quitting... Goodbye!\n")
+						return nil
+					}
 				}
 			}
 
