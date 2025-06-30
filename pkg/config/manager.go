@@ -67,6 +67,7 @@ type Connections struct {
 	Kinesis             []KinesisConnection             `yaml:"kinesis,omitempty" json:"kinesis,omitempty" mapstructure:"kinesis"`
 	Pipedrive           []PipedriveConnection           `yaml:"pipedrive,omitempty" json:"pipedrive,omitempty" mapstructure:"pipedrive"`
 	Mixpanel            []MixpanelConnection            `yaml:"mixpanel,omitempty" json:"mixpanel,omitempty" mapstructure:"mixpanel"`
+	Pinterest           []PinterestConnection           `yaml:"pinterest,omitempty" json:"pinterest,omitempty" mapstructure:"pinterest"`
 	QuickBooks          []QuickBooksConnection          `yaml:"quickbooks,omitempty" json:"quickbooks,omitempty" mapstructure:"quickbooks"`
 	Zoom                []ZoomConnection                `yaml:"zoom,omitempty" json:"zoom,omitempty" mapstructure:"zoom"`
 	EMRServerless       []EMRServerlessConnection       `yaml:"emr_serverless,omitempty" json:"emr_serverless,omitempty" mapstructure:"emr_serverless"`
@@ -735,6 +736,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.Mixpanel = append(env.Connections.Mixpanel, conn)
+	case "pinterest":
+		var conn PinterestConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Pinterest = append(env.Connections.Pinterest, conn)
 	case "quickbooks":
 		var conn QuickBooksConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -982,6 +990,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Pipedrive = removeConnection(env.Connections.Pipedrive, connectionName)
 	case "mixpanel":
 		env.Connections.Mixpanel = removeConnection(env.Connections.Mixpanel, connectionName)
+	case "pinterest":
+		env.Connections.Pinterest = removeConnection(env.Connections.Pinterest, connectionName)
 	case "quickbooks":
 		env.Connections.QuickBooks = removeConnection(env.Connections.QuickBooks, connectionName)
 	case "zoom":

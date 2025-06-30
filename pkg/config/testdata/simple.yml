@@ -248,6 +248,9 @@ environments:
           password: "secret-123"
           project_id: "12345"
           server: "eu"
+      pinterest:
+        - name: "pinterest-1"
+          access_token: "token"
       quickbooks:
         - name: "quickbooks-1"
           company_id: "123456"

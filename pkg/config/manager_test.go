@@ -396,6 +396,12 @@ func TestLoadFromFile(t *testing.T) {
 					RefreshToken: "rtoken",
 				},
 			},
+			Pinterest: []PinterestConnection{
+				{
+					Name:        "pinterest-1",
+					AccessToken: "token",
+				},
+			},
 			Mixpanel: []MixpanelConnection{
 				{
 					Name:      "mixpanel-1",

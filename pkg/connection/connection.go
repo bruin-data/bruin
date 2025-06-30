@@ -52,6 +52,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/personio"
 	"github.com/bruin-data/bruin/pkg/phantombuster"
+	"github.com/bruin-data/bruin/pkg/pinterest"
 	"github.com/bruin-data/bruin/pkg/pipedrive"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/quickbooks"
@@ -114,6 +115,7 @@ type Manager struct {
 	Kinesis         map[string]*kinesis.Client
 	Pipedrive       map[string]*pipedrive.Client
 	Mixpanel        map[string]*mixpanel.Client
+	Pinterest       map[string]*pinterest.Client
 	QuickBooks      map[string]*quickbooks.Client
 	Zoom            map[string]*zoom.Client
 	Frankfurter     map[string]*frankfurter.Client
@@ -377,6 +379,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connMixpanel, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Mixpanel))...)
+
+	connPinterest, err := m.GetPinterestConnectionWithoutDefault(name)
+	if err == nil {
+		return connPinterest, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Pinterest))...)
 
 	connQuickBooks, err := m.GetQuickBooksConnectionWithoutDefault(name)
 	if err == nil {
@@ -1430,6 +1438,25 @@ func (m *Manager) GetQuickBooksConnectionWithoutDefault(name string) (*quickbook
 	db, ok := m.QuickBooks[name]
 	if !ok {
 		return nil, errors.Errorf("quickbooks connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetPinterestConnection(name string) (*pinterest.Client, error) {
+	db, err := m.GetPinterestConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetPinterestConnectionWithoutDefault("pinterest-default")
+}
+
+func (m *Manager) GetPinterestConnectionWithoutDefault(name string) (*pinterest.Client, error) {
+	if m.Pinterest == nil {
+		return nil, errors.New("no pinterest connections found")
+	}
+	db, ok := m.Pinterest[name]
+	if !ok {
+		return nil, errors.Errorf("pinterest connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2781,6 +2808,25 @@ func (m *Manager) AddQuickBooksConnectionFromConfig(connection *config.QuickBook
 	return nil
 }
 
+func (m *Manager) AddPinterestConnectionFromConfig(connection *config.PinterestConnection) error {
+	m.mutex.Lock()
+	if m.Pinterest == nil {
+		m.Pinterest = make(map[string]*pinterest.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := pinterest.NewClient(pinterest.Config{
+		AccessToken: connection.AccessToken,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Pinterest[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddISOCPulseConnectionFromConfig(connection *config.ISOCPulseConnection) error {
 	m.mutex.Lock()
 	if m.ISOCPulse == nil {
@@ -3163,6 +3209,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mixpanel, connectionManager.AddMixpanelConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Pinterest, connectionManager.AddPinterestConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.QuickBooks, connectionManager.AddQuickBooksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Zoom, connectionManager.AddZoomConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)
