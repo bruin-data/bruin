@@ -881,16 +881,10 @@ func (d *Client) getTableColumns(ctx context.Context, datasetID, tableID string)
 	return cols, nil
 }
 
-func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
-	projectID := d.config.ProjectID
-
-	summary := &ansisql.DBDatabase{
-		Name:    projectID,
-		Schemas: []*ansisql.DBSchema{},
-	}
+func (d *Client) GetDatabases(ctx context.Context) ([]string, error) {
+	var databases []string
 
 	datasetsIter := d.client.Datasets(ctx)
-	datasets := make([]*bigquery.Dataset, 0)
 	for {
 		ds, err := datasetsIter.Next()
 		if errors.Is(err, iterator.Done) {
@@ -899,20 +893,98 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 		if err != nil {
 			return nil, fmt.Errorf("failed to list BigQuery datasets: %w", err)
 		}
-		datasets = append(datasets, ds)
+
+		databases = append(databases, ds.DatasetID)
 	}
 
-	workers := runtime.NumCPU()
-	if workers < 8 {
-		workers = 8
+	sort.Strings(databases)
+	return databases, nil
+}
+
+// GetTables retrieves all table names from a BigQuery dataset (database).
+// It takes a context and dataset name as parameters and returns a slice of table names.
+// The method handles errors appropriately and returns an empty slice if the dataset has no tables.
+func (d *Client) GetTables(ctx context.Context, databaseName string) ([]string, error) {
+	// Validate dataset name
+	if databaseName == "" {
+		return nil, errors.New("database name cannot be empty")
+	}
+
+	// Check if dataset exists
+	dataset := d.client.Dataset(databaseName)
+	_, err := dataset.Metadata(ctx)
+	if err != nil {
+		var apiErr *googleapi.Error
+		if errors.As(err, &apiErr) && apiErr.Code == 404 {
+			return nil, fmt.Errorf("dataset '%s' does not exist", databaseName)
+		}
+		return nil, fmt.Errorf("failed to access dataset '%s': %w", databaseName, err)
+	}
+
+	// Get all tables in the dataset
+	var tableNames []string
+	tablesIter := dataset.Tables(ctx)
+	for {
+		table, err := tablesIter.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to list tables in dataset '%s': %w", databaseName, err)
+		}
+		tableNames = append(tableNames, table.TableID)
+	}
+
+	sort.Strings(tableNames)
+	return tableNames, nil
+}
+
+// GetColumns retrieves column information for a specific table in a BigQuery dataset.
+// It takes a context, dataset name, and table name as parameters and returns a slice of column information.
+// The method handles errors appropriately and returns an error if the table doesn't exist.
+func (d *Client) GetColumns(ctx context.Context, databaseName, tableName string) ([]*ansisql.DBColumn, error) {
+	// Validate input parameters
+	if databaseName == "" {
+		return nil, errors.New("database name cannot be empty")
+	}
+	if tableName == "" {
+		return nil, errors.New("table name cannot be empty")
+	}
+
+	// Use the existing getTableColumns method
+	columns, err := d.getTableColumns(ctx, databaseName, tableName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get columns for table '%s.%s': %w", databaseName, tableName, err)
+	}
+
+	return columns, nil
+}
+
+func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
+	projectID := d.config.ProjectID
+
+	summary := &ansisql.DBDatabase{
+		Name:    projectID,
+		Schemas: []*ansisql.DBSchema{},
 	}
 
 	mu := sync.Mutex{}
 	var errs []error
 
+	workers := max(runtime.NumCPU(), 8)
+
 	p := pool.New().WithMaxGoroutines(workers)
-	for _, dataset := range datasets {
-		ds := dataset
+
+	datasetsIter := d.client.Datasets(ctx)
+	for {
+		ds, err := datasetsIter.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to list BigQuery datasets: %w", err)
+		}
+
 		p.Go(func() {
 			schema := &ansisql.DBSchema{
 				Name:   ds.DatasetID,
@@ -920,8 +992,6 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 			}
 
 			tables := ds.Tables(ctx)
-			tablePool := pool.New().WithMaxGoroutines(workers)
-			tableMu := sync.Mutex{}
 			for {
 				t, err := tables.Next()
 				if errors.Is(err, iterator.Done) {
@@ -934,24 +1004,20 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 					return
 				}
 
-				table := t
-				tablePool.Go(func() {
-					cols, err := d.getTableColumns(ctx, ds.DatasetID, table.TableID)
-					if err != nil {
-						mu.Lock()
-						errs = append(errs, fmt.Errorf("failed to list columns for table %s.%s: %w", ds.DatasetID, table.TableID, err))
-						mu.Unlock()
-						return
-					}
+				columns, err := d.getTableColumns(ctx, ds.DatasetID, t.TableID)
+				if err != nil {
+					mu.Lock()
+					errs = append(errs, fmt.Errorf("failed to get columns for table %s.%s: %w", ds.DatasetID, t.TableID, err))
+					mu.Unlock()
+					return
+				}
 
-					dbTable := &ansisql.DBTable{Name: table.TableID, Columns: cols}
-					tableMu.Lock()
-					schema.Tables = append(schema.Tables, dbTable)
-					tableMu.Unlock()
+				schema.Tables = append(schema.Tables, &ansisql.DBTable{
+					Name:    t.TableID,
+					Columns: columns,
 				})
 			}
 
-			tablePool.Wait()
 			sort.Slice(schema.Tables, func(i, j int) bool { return schema.Tables[i].Name < schema.Tables[j].Name })
 
 			mu.Lock()

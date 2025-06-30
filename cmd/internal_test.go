@@ -185,6 +185,7 @@ func TestConvertToBruinAsset(t *testing.T) {
 		})
 	}
 }
+
 func normalize(s string) string {
 	lines := strings.Split(s, "\n")
 	var out []string
