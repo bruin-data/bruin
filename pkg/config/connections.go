@@ -649,6 +649,15 @@ func (c MixpanelConnection) GetName() string {
 	return c.Name
 }
 
+type PinterestConnection struct {
+	Name        string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	AccessToken string `yaml:"access_token,omitempty" json:"access_token" mapstructure:"access_token"`
+}
+
+func (c PinterestConnection) GetName() string {
+	return c.Name
+}
+
 type QuickBooksConnection struct {
 	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	CompanyID    string `yaml:"company_id,omitempty" json:"company_id" mapstructure:"company_id"`
