@@ -634,7 +634,7 @@ func (u Upstream) MarshalYAML() (interface{}, error) {
 }
 
 type SnowflakeConfig struct {
-	Warehouse string `json:"warehouse"`
+	Warehouse string `json:"warehouse"  yaml:"warehouse" `
 }
 
 func (s SnowflakeConfig) MarshalJSON() ([]byte, error) {
