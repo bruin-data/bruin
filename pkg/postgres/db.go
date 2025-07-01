@@ -743,52 +743,15 @@ func (c *Client) PushColumnDescriptions(ctx context.Context, asset *pipeline.Ass
 		return errors.New("no metadata to push: table and columns have no descriptions")
 	}
 
-	//TODO: DELETE THIS QUERY
-	queryStr := fmt.Sprintf(`
-			SELECT 
-				cols.column_name,
-				pgd.description
-			FROM 
-				pg_catalog.pg_statio_all_tables AS st
-			JOIN 
-				pg_catalog.pg_description pgd 
-				ON pgd.objoid = st.relid
-			JOIN 
-				information_schema.columns cols 
-				ON cols.table_schema = st.schemaname
-				AND cols.table_name = st.relname
-				AND cols.ordinal_position = pgd.objsubid
-			WHERE 
-				cols.table_name = '%s'
-				AND cols.table_schema = '%s';`,
-		tableName, schemaName)
-
-	rows, err := c.Select(ctx, &query.Query{Query: queryStr})
-	if err != nil {
-		return errors.Wrapf(err, "failed to query column metadata for %s.%s", schemaName, tableName)
-	}
-
-	existingComments := make(map[string]string)
-	for _, row := range rows {
-		columnName := row[0].(string)
-		comment := ""
-		if row[1] != nil {
-			comment = row[1].(string)
-		}
-		existingComments[columnName] = comment
-	}
-
-	// Find columns that need updates
 	var updateQueries []string
 	for _, col := range asset.Columns {
-		if col.Description != "" && existingComments[col.Name] != col.Description {
-			query := fmt.Sprintf(
-				`COMMENT ON COLUMN %s.%s.%s IS '%s';`,
-				schemaName, tableName, col.Name, escapeSQLString(col.Description),
-			)
-			updateQueries = append(updateQueries, query)
-		}
+		query := fmt.Sprintf(
+			`COMMENT ON COLUMN %s.%s.%s IS '%s';`,
+			schemaName, tableName, col.Name, escapeSQLString(col.Description),
+		)
+		updateQueries = append(updateQueries, query)
 	}
+
 	if len(updateQueries) > 0 {
 		batchQuery := strings.Join(updateQueries, "\n")
 		if err := c.RunQueryWithoutResult(ctx, &query.Query{Query: batchQuery}); err != nil {
@@ -808,53 +771,3 @@ func (c *Client) PushColumnDescriptions(ctx context.Context, asset *pipeline.Ass
 
 	return nil
 }
-
-// PrintTableMetadata queries and prints all columns with their metadata for the given 'schema.table'.
-//func (c *Client) PrintTableMetadata(ctx context.Context, schemaTable string) error {
-//	tableParts := strings.Split(schemaTable, ".")
-//	var schemaName, tableName string
-//	if len(tableParts) == 2 {
-//		schemaName = tableParts[0]
-//		tableName = tableParts[1]
-//	} else if len(tableParts) == 1 {
-//		schemaName = "public"
-//		tableName = tableParts[0]
-//	} else {
-//		return errors.Errorf("table name must be in schema.table or table format, '%s' given", schemaTable)
-//	}
-//
-//	queryStr := `
-//			SELECT c.column_name, pgd.description
-//			FROM information_schema.columns c
-//			LEFT JOIN pg_catalog.pg_statio_all_tables as st
-//			  ON c.table_schema = st.schemaname AND c.table_name = st.relname
-//			LEFT JOIN pg_catalog.pg_description pgd
-//			  ON pgd.objoid = st.relid AND pgd.objsubid = c.ordinal_position
-//			WHERE c.table_name = $1 AND c.table_schema = $2
-//			ORDER BY c.ordinal_position`
-//
-//	rows, err := c.connection.Query(ctx, queryStr, tableName, schemaName)
-//	if err != nil {
-//		return errors.Wrapf(err, "failed to query table metadata for %s.%s", schemaName, tableName)
-//	}
-//	defer rows.Close()
-//
-//	fmt.Printf("Columns for table '%s.%s':\n", schemaName, tableName)
-//	fmt.Printf("%-32s %-s\n", "Name", "Description")
-//	for rows.Next() {
-//		var name string
-//		var description *string
-//		if err := rows.Scan(&name, &description); err != nil {
-//			return errors.Wrap(err, "failed to scan column metadata")
-//		}
-//		descVal := ""
-//		if description != nil {
-//			descVal = *description
-//		}
-//		fmt.Printf("%-32s %-s\n", name, descVal)
-//	}
-//	if err := rows.Err(); err != nil {
-//		return errors.Wrap(err, "error iterating over column metadata rows")
-//	}
-//	return nil
-//}

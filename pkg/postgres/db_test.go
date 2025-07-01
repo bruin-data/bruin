@@ -515,28 +515,7 @@ func TestClient_PushColumnDescriptions(t *testing.T) {
 				},
 			},
 			setupMock: func(mock pgxmock.PgxPoolIface) {
-				// Mock query for existing column comments
-				rows := pgxmock.NewRows([]string{"column_name", "description"}).
-					AddRow("col1", nil).
-					AddRow("col2", nil)
-				mock.ExpectQuery("SELECT" +
-					"\n\tcols.column_name," +
-					"\n\tpgd.description" +
-					"\nFROM" +
-					"\n\tpg_catalog.pg_statio_all_tables AS st" +
-					"\nJOIN" +
-					"\n\tpg_catalog.pg_description pgd" +
-					"\n\tON pgd.objoid = st.relid" +
-					"\nJOIN" +
-					"\n\tinformation_schema.columns cols" +
-					"\n\tON cols.table_schema = st.schemaname" +
-					"\n\tAND cols.table_name = st.relname" +
-					"\n\tAND cols.ordinal_position = pgd.objsubid" +
-					"\nWHERE" +
-					"\n\tcols.table_name = 'MYTABLE'" +
-					"\n\tAND cols.table_schema = 'MYSCHEMA';").WillReturnRows(rows)
-				// Mock update for column comments
-				mock.ExpectExec("COMMENT ON COLUMN MYSCHEMA\\.MYTABLE\\.col2 IS 'desc2';").
+				mock.ExpectExec("COMMENT ON COLUMN MYSCHEMA.MYTABLE.col1 IS ''; COMMENT ON COLUMN MYSCHEMA.MYTABLE.col2 IS 'desc2';").
 					WillReturnResult(pgxmock.NewResult("UPDATE", 2))
 			},
 		},
@@ -551,122 +530,33 @@ func TestClient_PushColumnDescriptions(t *testing.T) {
 				},
 			},
 			setupMock: func(mock pgxmock.PgxPoolIface) {
-				// Mock query for existing column comments
-				rows := pgxmock.NewRows([]string{"column_name", "description"}).
-					AddRow("col1", nil).
-					AddRow("col2", nil)
-				mock.ExpectQuery("SELECT" +
-					"\n\tcols.column_name," +
-					"\n\tpgd.description" +
-					"\nFROM" +
-					"\n\tpg_catalog.pg_statio_all_tables AS st" +
-					"\nJOIN" +
-					"\n\tpg_catalog.pg_description pgd" +
-					"\n\tON pgd.objoid = st.relid" +
-					"\nJOIN" +
-					"\n\tinformation_schema.columns cols" +
-					"\n\tON cols.table_schema = st.schemaname" +
-					"\n\tAND cols.table_name = st.relname" +
-					"\n\tAND cols.ordinal_position = pgd.objsubid" +
-					"\nWHERE" +
-					"\n\tcols.table_name = 'MYTABLE'" +
-					"\n\tAND cols.table_schema = 'MYSCHEMA';").WillReturnRows(rows)
-				// Mock update for column comments
 				mock.ExpectExec("COMMENT ON COLUMN MYSCHEMA\\.MYTABLE\\.col1 IS 'desc1';" +
 					"\nCOMMENT ON COLUMN MYSCHEMA\\.MYTABLE\\.col2 IS 'desc2'").
 					WillReturnResult(pgxmock.NewResult("UPDATE", 2))
 			},
 		},
 		{
-			name: "no new metadata to push",
+			name: "no metadata to push",
 			asset: &pipeline.Asset{
-				Name:        "myschema.mytable",
+				Name:        "database.myschema.mytable",
 				Description: "",
-				Columns: []pipeline.Column{
-					{Name: "col1", Description: "desc1"},
-					{Name: "col2", Description: "desc2"},
-				},
+				Columns:     []pipeline.Column{},
 			},
 			setupMock: func(mock pgxmock.PgxPoolIface) {
-				// Mock query for existing column comments
-				rows := pgxmock.NewRows([]string{"column_name", "description"}).
-					AddRow("col1", "desc1").
-					AddRow("col2", "desc2")
-				mock.ExpectQuery("SELECT" +
-					"\n\tcols.column_name," +
-					"\n\tpgd.description" +
-					"\nFROM" +
-					"\n\tpg_catalog.pg_statio_all_tables AS st" +
-					"\nJOIN" +
-					"\n\tpg_catalog.pg_description pgd" +
-					"\n\tON pgd.objoid = st.relid" +
-					"\nJOIN" +
-					"\n\tinformation_schema.columns cols" +
-					"\n\tON cols.table_schema = st.schemaname" +
-					"\n\tAND cols.table_name = st.relname" +
-					"\n\tAND cols.ordinal_position = pgd.objsubid" +
-					"\nWHERE" +
-					"\n\tcols.table_name = 'MYTABLE'" +
-					"\n\tAND cols.table_schema = 'MYSCHEMA';").WillReturnRows(rows)
+				// No DB interaction expected
 			},
+			expectedError: "no metadata to push: table and columns have no descriptions",
 		},
 		{
 			name: "update table description",
 			asset: &pipeline.Asset{
 				Name:        "myschema.mytable",
 				Description: "table desc",
-				Columns: []pipeline.Column{
-					{Name: "col1", Description: ""},
-				},
-			},
-			setupMock: func(mock pgxmock.PgxPoolIface) {
-				rows := pgxmock.NewRows([]string{"column_name", "description"}).
-					AddRow("col1", nil)
-				mock.ExpectQuery("SELECT" +
-					"\n\tcols.column_name," +
-					"\n\tpgd.description" +
-					"\nFROM" +
-					"\n\tpg_catalog.pg_statio_all_tables AS st" +
-					"\nJOIN" +
-					"\n\tpg_catalog.pg_description pgd" +
-					"\n\tON pgd.objoid = st.relid" +
-					"\nJOIN" +
-					"\n\tinformation_schema.columns cols" +
-					"\n\tON cols.table_schema = st.schemaname" +
-					"\n\tAND cols.table_name = st.relname" +
-					"\n\tAND cols.ordinal_position = pgd.objsubid" +
-					"\nWHERE" +
-					"\n\tcols.table_name = 'MYTABLE'" +
-					"\n\tAND cols.table_schema = 'MYSCHEMA';").WillReturnRows(rows)
-				mock.ExpectExec("COMMENT ON TABLE MYSCHEMA\\.MYTABLE IS 'table desc';").WillReturnResult(pgxmock.NewResult("UPDATE", 1))
-			},
-		},
-		{
-			name: "error querying column metadata",
-			asset: &pipeline.Asset{
-				Name:        "myschema.mytable",
-				Description: "desc",
 				Columns:     []pipeline.Column{},
 			},
 			setupMock: func(mock pgxmock.PgxPoolIface) {
-				mock.ExpectQuery("SELECT" +
-					"\n\tcols.column_name," +
-					"\n\tpgd.description" +
-					"\nFROM" +
-					"\n\tpg_catalog.pg_statio_all_tables AS st" +
-					"\nJOIN" +
-					"\n\tpg_catalog.pg_description pgd" +
-					"\n\tON pgd.objoid = st.relid" +
-					"\nJOIN" +
-					"\n\tinformation_schema.columns cols" +
-					"\n\tON cols.table_schema = st.schemaname" +
-					"\n\tAND cols.table_name = st.relname" +
-					"\n\tAND cols.ordinal_position = pgd.objsubid" +
-					"\nWHERE" +
-					"\n\tcols.table_name = 'MYTABLE'" +
-					"\n\tAND cols.table_schema = 'MYSCHEMA';").WillReturnError(errors.New("query error"))
+				mock.ExpectExec("COMMENT ON TABLE MYSCHEMA\\.MYTABLE IS 'table desc';").WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 			},
-			expectedError: "failed to query column metadata for MYSCHEMA.MYTABLE: query error",
 		},
 		{
 			name: "error updating column descriptions",
@@ -678,24 +568,6 @@ func TestClient_PushColumnDescriptions(t *testing.T) {
 				},
 			},
 			setupMock: func(mock pgxmock.PgxPoolIface) {
-				rows := pgxmock.NewRows([]string{"column_name", "description"}).
-					AddRow("col1", nil)
-				mock.ExpectQuery("SELECT" +
-					"\n\tcols.column_name," +
-					"\n\tpgd.description" +
-					"\nFROM" +
-					"\n\tpg_catalog.pg_statio_all_tables AS st" +
-					"\nJOIN" +
-					"\n\tpg_catalog.pg_description pgd" +
-					"\n\tON pgd.objoid = st.relid" +
-					"\nJOIN" +
-					"\n\tinformation_schema.columns cols" +
-					"\n\tON cols.table_schema = st.schemaname" +
-					"\n\tAND cols.table_name = st.relname" +
-					"\n\tAND cols.ordinal_position = pgd.objsubid" +
-					"\nWHERE" +
-					"\n\tcols.table_name = 'MYTABLE'" +
-					"\n\tAND cols.table_schema = 'MYSCHEMA';").WillReturnRows(rows)
 				mock.ExpectExec("COMMENT ON COLUMN MYSCHEMA\\.MYTABLE\\.col1 IS 'desc1'").
 					WillReturnError(errors.New("update error"))
 			},
@@ -709,24 +581,6 @@ func TestClient_PushColumnDescriptions(t *testing.T) {
 				Columns:     []pipeline.Column{},
 			},
 			setupMock: func(mock pgxmock.PgxPoolIface) {
-				rows := pgxmock.NewRows([]string{"column_name", "description"}).
-					AddRow("col1", nil)
-				mock.ExpectQuery("SELECT" +
-					"\n\tcols.column_name," +
-					"\n\tpgd.description" +
-					"\nFROM" +
-					"\n\tpg_catalog.pg_statio_all_tables AS st" +
-					"\nJOIN" +
-					"\n\tpg_catalog.pg_description pgd" +
-					"\n\tON pgd.objoid = st.relid" +
-					"\nJOIN" +
-					"\n\tinformation_schema.columns cols" +
-					"\n\tON cols.table_schema = st.schemaname" +
-					"\n\tAND cols.table_name = st.relname" +
-					"\n\tAND cols.ordinal_position = pgd.objsubid" +
-					"\nWHERE" +
-					"\n\tcols.table_name = 'MYTABLE'" +
-					"\n\tAND cols.table_schema = 'MYSCHEMA';").WillReturnRows(rows)
 				mock.ExpectExec("COMMENT ON TABLE MYSCHEMA\\.MYTABLE IS 'desc'").
 					WillReturnError(errors.New("update error"))
 			},
