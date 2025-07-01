@@ -642,7 +642,8 @@ func (s SnowflakeConfig) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	return json.Marshal(s)
+	type Alias SnowflakeConfig
+	return json.Marshal(Alias(s))
 }
 
 type AthenaConfig struct {
@@ -654,7 +655,8 @@ func (s AthenaConfig) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	return json.Marshal(s)
+	type Alias AthenaConfig
+	return json.Marshal(Alias(s))
 }
 
 type Asset struct { //nolint:recvcheck
