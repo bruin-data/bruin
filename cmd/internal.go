@@ -628,6 +628,7 @@ func convertToBruinAsset(fs afero.Fs, filePath string) error {
 	}
 
 	if ext == ".py" {
+		asset.Type = ""
 		asset.Description = "this is a python asset"
 	}
 
