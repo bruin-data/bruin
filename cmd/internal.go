@@ -600,7 +600,6 @@ func convertToBruinAsset(fs afero.Fs, filePath string) error {
 	}
 
 	fileName := filepath.Base(filePath)
-	assetName := strings.TrimSuffix(fileName, filepath.Ext(fileName))
 	ext := strings.ToLower(filepath.Ext(filePath))
 
 	// Try to determine the majority asset type from the pipeline
@@ -620,7 +619,6 @@ func convertToBruinAsset(fs afero.Fs, filePath string) error {
 		return nil
 	}
 	asset := &pipeline.Asset{
-		Name: assetName,
 		Type: assetType,
 		ExecutableFile: pipeline.ExecutableFile{
 			Name:    fileName,
@@ -630,7 +628,7 @@ func convertToBruinAsset(fs afero.Fs, filePath string) error {
 	}
 
 	if ext == ".py" {
-		asset.Type = pipeline.AssetTypePython
+		asset.Description = "this is a python asset"
 	}
 
 	err = asset.Persist(fs)
