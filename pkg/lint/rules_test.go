@@ -2838,6 +2838,7 @@ func TestEnsureAssetTierIsValidForASingleAsset(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
 func TestEnsureSecretMappingsHaveKeyForASingleAsset(t *testing.T) {
 	t.Parallel()
 
@@ -2882,6 +2883,179 @@ func TestEnsureSecretMappingsHaveKeyForASingleAsset(t *testing.T) {
 				return
 			}
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestValidateCrossPipelineURIDependencies(t *testing.T) {
+	t.Parallel()
+
+	type args struct {
+		pipelines []*pipeline.Pipeline
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*Issue
+		wantErr bool
+	}{
+		{
+			name: "no pipelines returns no issues",
+			args: args{
+				pipelines: []*pipeline.Pipeline{},
+			},
+			want: noIssues,
+		},
+		{
+			name: "pipelines with no URI dependencies return no issues",
+			args: args{
+				pipelines: []*pipeline.Pipeline{
+					{
+						Name: "pipeline1",
+						Assets: []*pipeline.Asset{
+							{
+								Name: "task1",
+								Upstreams: []pipeline.Upstream{
+									{Type: "asset", Value: "task2"},
+								},
+							},
+							{
+								Name: "task2",
+							},
+						},
+					},
+				},
+			},
+			want: noIssues,
+		},
+		{
+			name: "valid URI dependencies are resolved correctly",
+			args: args{
+				pipelines: []*pipeline.Pipeline{
+					{
+						Name: "pipeline1",
+						Assets: []*pipeline.Asset{
+							{
+								Name: "task1",
+								Upstreams: []pipeline.Upstream{
+									{Type: "uri", Value: "external://dataset1"},
+								},
+							},
+						},
+					},
+					{
+						Name: "pipeline2",
+						Assets: []*pipeline.Asset{
+							{
+								Name: "task2",
+								URI:  "external://dataset1",
+							},
+						},
+					},
+				},
+			},
+			want: noIssues,
+		},
+		{
+			name: "missing URI dependencies are reported",
+			args: args{
+				pipelines: []*pipeline.Pipeline{
+					{
+						Name: "pipeline1",
+						Assets: []*pipeline.Asset{
+							{
+								Name: "task1",
+								Upstreams: []pipeline.Upstream{
+									{Type: "uri", Value: "external://missing_dataset"},
+									{Type: "uri", Value: "external://another_missing"},
+								},
+							},
+							{
+								Name: "task2",
+								Upstreams: []pipeline.Upstream{
+									{Type: "uri", Value: "external://dataset1"}, // this one exists
+								},
+							},
+						},
+					},
+					{
+						Name: "pipeline2",
+						Assets: []*pipeline.Asset{
+							{
+								Name: "task3",
+								URI:  "external://dataset1",
+							},
+						},
+					},
+				},
+			},
+			want: []*Issue{
+				{
+					Task: &pipeline.Asset{
+						Name: "task1",
+						Upstreams: []pipeline.Upstream{
+							{Type: "uri", Value: "external://missing_dataset"},
+							{Type: "uri", Value: "external://another_missing"},
+						},
+					},
+					Description: "Cross-pipeline URI dependency 'external://missing_dataset' not found in any available pipeline",
+				},
+				{
+					Task: &pipeline.Asset{
+						Name: "task1",
+						Upstreams: []pipeline.Upstream{
+							{Type: "uri", Value: "external://missing_dataset"},
+							{Type: "uri", Value: "external://another_missing"},
+						},
+					},
+					Description: "Cross-pipeline URI dependency 'external://another_missing' not found in any available pipeline",
+				},
+			},
+		},
+		{
+			name: "empty URI dependencies are reported",
+			args: args{
+				pipelines: []*pipeline.Pipeline{
+					{
+						Name: "pipeline1",
+						Assets: []*pipeline.Asset{
+							{
+								Name: "task1",
+								Upstreams: []pipeline.Upstream{
+									{Type: "uri", Value: ""},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []*Issue{
+				{
+					Task: &pipeline.Asset{
+						Name: "task1",
+						Upstreams: []pipeline.Upstream{
+							{Type: "uri", Value: ""},
+						},
+					},
+					Description: "URI dependency cannot be empty",
+				},
+			},
+		},
+	}
+
+	ctx := context.Background()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := ValidateCrossPipelineURIDependencies(ctx, tt.args.pipelines)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.ElementsMatch(t, tt.want, got)
 		})
 	}
 }
