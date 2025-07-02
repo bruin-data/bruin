@@ -37,3 +37,5 @@ parameters:
 bruin run assets/linear_ingestion.yml
 ```
 Running this command ingests data from Linear into your Postgres database.
+
+<img alt="Linear" src="./media/linear_ingestion.png">
