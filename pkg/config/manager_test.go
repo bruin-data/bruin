@@ -411,6 +411,13 @@ func TestLoadFromFile(t *testing.T) {
 					Server:    "eu",
 				},
 			},
+			Trustpilot: []TrustpilotConnection{
+				{
+					Name:           "trustpilot-1",
+					BusinessUnitID: "unit123",
+					APIKey:         "apikey",
+				},
+			},
 			EMRServerless: []EMRServerlessConnection{
 				{
 					Name:          "emr_serverless-test",

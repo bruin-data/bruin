@@ -658,6 +658,16 @@ func (c PinterestConnection) GetName() string {
 	return c.Name
 }
 
+type TrustpilotConnection struct {
+	Name           string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	BusinessUnitID string `yaml:"business_unit_id,omitempty" json:"business_unit_id" mapstructure:"business_unit_id"`
+	APIKey         string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c TrustpilotConnection) GetName() string {
+	return c.Name
+}
+
 type QuickBooksConnection struct {
 	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	CompanyID    string `yaml:"company_id,omitempty" json:"company_id" mapstructure:"company_id"`
