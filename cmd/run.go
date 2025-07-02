@@ -763,6 +763,7 @@ func SetupExecutors(
 		pgCheckRunner := postgres.NewColumnCheckOperator(conn)
 		pgOperator := postgres.NewBasicOperator(conn, wholeFileExtractor, postgres.NewMaterializer(fullRefresh), parser)
 		pgQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		pgMetadataPushOperator := postgres.NewMetadataPushOperator(conn)
 
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeMain] = pgOperator
 		mainExecutors[pipeline.AssetTypeRedshiftQuery][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
@@ -771,10 +772,12 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeMain] = pgOperator
 		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
 		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypePostgresQuery][scheduler.TaskInstanceTypeMetadataPush] = pgMetadataPushOperator
 
 		mainExecutors[pipeline.AssetTypePostgresSeed][scheduler.TaskInstanceTypeMain] = seedOperator
 		mainExecutors[pipeline.AssetTypePostgresSeed][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
 		mainExecutors[pipeline.AssetTypePostgresSeed][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+		mainExecutors[pipeline.AssetTypePostgresSeed][scheduler.TaskInstanceTypeMetadataPush] = pgMetadataPushOperator
 
 		mainExecutors[pipeline.AssetTypeRedshiftSeed][scheduler.TaskInstanceTypeMain] = seedOperator
 		mainExecutors[pipeline.AssetTypeRedshiftSeed][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
@@ -792,6 +795,7 @@ func SetupExecutors(
 		if estimateCustomCheckType == pipeline.AssetTypePostgresQuery || estimateCustomCheckType == pipeline.AssetTypeRedshiftQuery {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = pgCheckRunner
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMetadataPush] = pgMetadataPushOperator
 		}
 	}
 
