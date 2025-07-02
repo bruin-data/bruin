@@ -539,6 +539,12 @@
           },
           "type": "array"
         },
+        "trustpilot": {
+          "items": {
+            "$ref": "#/$defs/TrustpilotConnection"
+          },
+          "type": "array"
+        },
         "pinterest": {
           "items": {
             "$ref": "#/$defs/PinterestConnection"
@@ -1228,6 +1234,26 @@
         "username",
         "password",
         "project_id"
+      ]
+    },
+    "TrustpilotConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "business_unit_id": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "business_unit_id",
+        "api_key"
       ]
     },
     "MongoConnection": {
