@@ -68,6 +68,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlite"
 	"github.com/bruin-data/bruin/pkg/stripe"
 	"github.com/bruin-data/bruin/pkg/tiktokads"
+	"github.com/bruin-data/bruin/pkg/trustpilot"
 	"github.com/bruin-data/bruin/pkg/zendesk"
 	"github.com/bruin-data/bruin/pkg/zoom"
 	"github.com/pkg/errors"
@@ -116,6 +117,7 @@ type Manager struct {
 	Pipedrive       map[string]*pipedrive.Client
 	Mixpanel        map[string]*mixpanel.Client
 	Pinterest       map[string]*pinterest.Client
+	Trustpilot      map[string]*trustpilot.Client
 	QuickBooks      map[string]*quickbooks.Client
 	Zoom            map[string]*zoom.Client
 	Frankfurter     map[string]*frankfurter.Client
@@ -385,6 +387,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connPinterest, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Pinterest))...)
+
+	connTrustpilot, err := m.GetTrustpilotConnectionWithoutDefault(name)
+	if err == nil {
+		return connTrustpilot, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Trustpilot))...)
 
 	connQuickBooks, err := m.GetQuickBooksConnectionWithoutDefault(name)
 	if err == nil {
@@ -1457,6 +1465,25 @@ func (m *Manager) GetPinterestConnectionWithoutDefault(name string) (*pinterest.
 	db, ok := m.Pinterest[name]
 	if !ok {
 		return nil, errors.Errorf("pinterest connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetTrustpilotConnection(name string) (*trustpilot.Client, error) {
+	db, err := m.GetTrustpilotConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetTrustpilotConnectionWithoutDefault("trustpilot-default")
+}
+
+func (m *Manager) GetTrustpilotConnectionWithoutDefault(name string) (*trustpilot.Client, error) {
+	if m.Trustpilot == nil {
+		return nil, errors.New("no trustpilot connections found")
+	}
+	db, ok := m.Trustpilot[name]
+	if !ok {
+		return nil, errors.Errorf("trustpilot connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2827,6 +2854,26 @@ func (m *Manager) AddPinterestConnectionFromConfig(connection *config.PinterestC
 	return nil
 }
 
+func (m *Manager) AddTrustpilotConnectionFromConfig(connection *config.TrustpilotConnection) error {
+	m.mutex.Lock()
+	if m.Trustpilot == nil {
+		m.Trustpilot = make(map[string]*trustpilot.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := trustpilot.NewClient(trustpilot.Config{
+		BusinessUnitID: connection.BusinessUnitID,
+		APIKey:         connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Trustpilot[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddISOCPulseConnectionFromConfig(connection *config.ISOCPulseConnection) error {
 	m.mutex.Lock()
 	if m.ISOCPulse == nil {
@@ -3210,6 +3257,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mixpanel, connectionManager.AddMixpanelConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pinterest, connectionManager.AddPinterestConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Trustpilot, connectionManager.AddTrustpilotConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.QuickBooks, connectionManager.AddQuickBooksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Zoom, connectionManager.AddZoomConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)

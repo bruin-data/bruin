@@ -211,6 +211,7 @@ export default withMermaid({
                             {text: "PhantomBuster", link: "/ingestion/phantombuster"},
                             {text: "Pipedrive", link: "/ingestion/pipedrive"},
                             {text: "Pinterest", link: "/ingestion/pinterest"},
+                            {text: "Trustpilot", link: "/ingestion/trustpilot"},
                             {text: "QuickBooks", link: "/ingestion/quickbooks"},
                             {text: "Salesforce", link: "/ingestion/salesforce"},
                             {text: "SAP HANA", link: "/ingestion/sap_hana"},
