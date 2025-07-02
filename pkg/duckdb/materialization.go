@@ -320,7 +320,7 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 	}
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
 	insertValues = append(insertValues, "CURRENT_TIMESTAMP()", "TIMESTAMP('9999-12-31')", "TRUE")
-	pkList := strings.Join(primaryKeys, ", ")
+	//pkList := strings.Join(primaryKeys, ", ")
 	for i, pk := range primaryKeys {
 		primaryKeys[i] = fmt.Sprintf("target.%[1]s = source.%[1]s", pk)
 	}
@@ -369,48 +369,91 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 	//		strings.Join(compareConds, " OR "),
 	//	)
 
+	//queryStr := fmt.Sprintf(`
+	//MERGE INTO %s AS target
+	//USING (
+	// WITH s1 AS (
+	//   %s
+	// )
+	// SELECT *, TRUE AS _is_current
+	// FROM   s1
+	// UNION ALL
+	// SELECT s1.*, FALSE AS _is_current
+	// FROM   s1
+	// JOIN   %s AS t1 USING (%s)
+	// WHERE  %s
+	//) AS source
+	//ON  %s
+	//
+	//WHEN MATCHED AND (
+	//   %s
+	//) THEN
+	// UPDATE SET
+	//   target._valid_until = CURRENT_TIMESTAMP(),
+	//   target._is_current  = FALSE
+	//
+	//WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
+	// UPDATE SET
+	//   target._valid_until = CURRENT_TIMESTAMP(),
+	//   target._is_current  = FALSE
+	//
+	//
+	//WHEN NOT MATCHED BY TARGET THEN
+	// INSERT (%s)
+	// VALUES (%s);`,
+	//	tbl,
+	//	strings.TrimSpace(query),
+	//	tbl,
+	//	pkList,
+	//	strings.Join(compareCondsS1T1, " OR "),
+	//	onCondition,
+	//	strings.Join(compareConds, " OR "),
+	//	strings.Join(insertCols, ", "),
+	//	strings.Join(insertValues, ", "),
+	//)
+
 	queryStr := fmt.Sprintf(`
-	MERGE INTO %s AS target
-	USING (
-	 WITH s1 AS (
-	   %s
-	 )
-	 SELECT *, TRUE AS _is_current
-	 FROM   s1
-	 UNION ALL
-	 SELECT s1.*, FALSE AS _is_current
-	 FROM   s1
-	 JOIN   %s AS t1 USING (%s)
-	 WHERE  %s
-	) AS source
-	ON  %s
-	
-	WHEN MATCHED AND (
-	   %s
-	) THEN
-	 UPDATE SET
-	   target._valid_until = CURRENT_TIMESTAMP(),
-	   target._is_current  = FALSE
-	
-	WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
-	 UPDATE SET
-	   target._valid_until = CURRENT_TIMESTAMP(),
-	   target._is_current  = FALSE
-	
-	
-	WHEN NOT MATCHED BY TARGET THEN
-	 INSERT (%s)
-	 VALUES (%s);`,
-		tbl,
-		strings.TrimSpace(query),
-		tbl,
-		pkList,
-		strings.Join(compareCondsS1T1, " OR "),
-		onCondition,
-		strings.Join(compareConds, " OR "),
-		strings.Join(insertCols, ", "),
-		strings.Join(insertValues, ", "),
-	)
+CREATE OR REPLACE TABLE %s AS
+WITH
+source AS (
+  %s
+),
+current_data AS (
+  SELECT * FROM %s WHERE _is_current = TRUE
+),
+t_new AS (
+  SELECT 
+    t.ID,
+    t.Name,
+    t.Price,
+    t._valid_from,
+    CASE 
+      WHEN s.ID IS NOT NULL THEN CURRENT_TIMESTAMP 
+      ELSE t._valid_until 
+    END AS _valid_until,
+    CASE 
+      WHEN s.ID IS NOT NULL THEN FALSE 
+      ELSE t._is_current 
+    END AS _is_current
+  FROM current_data t
+  LEFT JOIN source s ON t.ID = s.ID AND (t.Name != s.Name OR t.Price != s.Price)
+),
+inserts AS (
+  SELECT 
+    s.ID,
+    s.Name,
+    s.Price,
+    CURRENT_TIMESTAMP AS _valid_from,
+    TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
+    TRUE AS _is_current
+  FROM source s
+  LEFT JOIN current_data t ON s.ID = t.ID AND (t.Name != s.Name OR t.Price != s.Price)
+  WHERE t.ID IS NULL OR t.Name != s.Name OR t.Price != s.Price
+)
+SELECT * FROM t_new
+UNION ALL
+SELECT * FROM inserts;
+`, tbl, strings.TrimSpace(query), tbl)
 	print(queryStr + "\n")
 	return strings.TrimSpace(queryStr), nil
 }
