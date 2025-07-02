@@ -61,6 +61,7 @@ type Connections struct {
 	GoogleAds           []GoogleAdsConnection           `yaml:"googleads,omitempty" json:"googleads,omitempty" mapstructure:"googleads"`
 	AppStore            []AppStoreConnection            `yaml:"appstore,omitempty" json:"appstore,omitempty" mapstructure:"appstore"`
 	LinkedInAds         []LinkedInAdsConnection         `yaml:"linkedinads,omitempty" json:"linkedinads,omitempty" mapstructure:"linkedinads"`
+	Linear              []LinearConnection              `yaml:"linear,omitempty" json:"linear,omitempty" mapstructure:"linear"`
 	GCS                 []GCSConnection                 `yaml:"gcs,omitempty" json:"gcs,omitempty" mapstructure:"gcs"`
 	ApplovinMax         []ApplovinMaxConnection         `yaml:"applovinmax,omitempty" json:"applovinmax,omitempty" mapstructure:"applovinmax"`
 	Personio            []PersonioConnection            `yaml:"personio,omitempty" json:"personio,omitempty" mapstructure:"personio"`
@@ -688,6 +689,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.LinkedInAds = append(env.Connections.LinkedInAds, conn)
+	case "linear":
+		var conn LinearConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Linear = append(env.Connections.Linear, conn)
 	case "gcs":
 		var conn GCSConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -984,6 +992,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.AppStore = removeConnection(env.Connections.AppStore, connectionName)
 	case "linkedinads":
 		env.Connections.LinkedInAds = removeConnection(env.Connections.LinkedInAds, connectionName)
+	case "linear":
+		env.Connections.Linear = removeConnection(env.Connections.Linear, connectionName)
 	case "gcs":
 		env.Connections.GCS = removeConnection(env.Connections.GCS, connectionName)
 	case "clickhouse":
@@ -1130,6 +1140,7 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.DynamoDB, source.DynamoDB)
 	mergeConnectionList(&c.AppStore, source.AppStore)
 	mergeConnectionList(&c.LinkedInAds, source.LinkedInAds)
+	mergeConnectionList(&c.Linear, source.Linear)
 	mergeConnectionList(&c.GCS, source.GCS)
 	mergeConnectionList(&c.Personio, source.Personio)
 	mergeConnectionList(&c.EMRServerless, source.EMRServerless)
