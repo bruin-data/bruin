@@ -3,11 +3,11 @@ package postgres
 import (
 	"context"
 	"errors"
-	"github.com/bruin-data/bruin/pkg/pipeline"
 	"testing"
 
 	_ "github.com/DATA-DOG/go-sqlmock"
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pashagolub/pgxmock/v3"

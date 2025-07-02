@@ -743,7 +743,7 @@ func (c *Client) PushColumnDescriptions(ctx context.Context, asset *pipeline.Ass
 		return errors.New("no metadata to push: table and columns have no descriptions")
 	}
 
-	var updateQueries []string
+	var updateQueries []string //nolint:prealloc
 	for _, col := range asset.Columns {
 		query := fmt.Sprintf(
 			`COMMENT ON COLUMN %s.%s.%s IS '%s';`,
