@@ -286,14 +286,105 @@ WHEN NOT MATCHED BY TARGET THEN
 	return strings.TrimSpace(queryStr), nil
 }
 
+//func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error) {
+//	query = strings.TrimRight(query, ";")
+//	var (
+//		primaryKeys      = make([]string, 0, 4)
+//		compareConds     = make([]string, 0, 12)
+//		compareCondsS1T1 = make([]string, 0, 4)
+//		insertCols       = make([]string, 0, 12)
+//		insertValues     = make([]string, 0, 12)
+//	)
+//
+//	for _, col := range asset.Columns {
+//		if col.PrimaryKey {
+//			primaryKeys = append(primaryKeys, col.Name)
+//		}
+//		switch col.Name {
+//		case "_is_current", "_valid_from", "_valid_until":
+//			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
+//		}
+//		insertCols = append(insertCols, col.Name)
+//		insertValues = append(insertValues, "source."+col.Name)
+//		if !col.PrimaryKey {
+//			compareConds = append(compareConds,
+//				fmt.Sprintf("target.%[1]s != source.%[1]s", col.Name))
+//			compareCondsS1T1 = append(compareCondsS1T1,
+//				fmt.Sprintf("t1.%[1]s != s1.%[1]s", col.Name))
+//		}
+//	}
+//
+//	if len(primaryKeys) == 0 {
+//		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column",
+//			asset.Materialization.Strategy)
+//	}
+//	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
+//	insertValues = append(insertValues, "CURRENT_TIMESTAMP()", "TIMESTAMP('9999-12-31')", "TRUE")
+//	//pkList := strings.Join(primaryKeys, ", ")
+//	for i, pk := range primaryKeys {
+//		primaryKeys[i] = fmt.Sprintf("target.%[1]s = source.%[1]s", pk)
+//	}
+//	onCondition := strings.Join(primaryKeys, " AND ")
+//	onCondition += " AND target._is_current = source._is_current"
+//
+//	tbl := fmt.Sprintf("%s", asset.Name)
+//
+//	queryStr := fmt.Sprintf(`
+//CREATE OR REPLACE TABLE %s AS
+//WITH
+//source AS (
+//  %s
+//),
+//current_data AS (
+//  SELECT * FROM %s WHERE _is_current = TRUE
+//),
+//t_new AS (
+//  SELECT
+//    t.ID,
+//    t.Name,
+//    t.Price,
+//    t._valid_from,
+//    CASE
+//      WHEN s.ID IS NOT NULL THEN CURRENT_TIMESTAMP
+//      ELSE t._valid_until
+//    END AS _valid_until,
+//    CASE
+//      WHEN s.ID IS NOT NULL THEN FALSE
+//      ELSE t._is_current
+//    END AS _is_current
+//  FROM current_data t
+//  LEFT JOIN source s ON t.ID = s.ID AND (t.Name != s.Name OR t.Price != s.Price)
+//),
+//inserts AS (
+//  SELECT
+//    s.ID,
+//    s.Name,
+//    s.Price,
+//    CURRENT_TIMESTAMP AS _valid_from,
+//    TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
+//    TRUE AS _is_current
+//  FROM source s
+//  LEFT JOIN current_data t ON s.ID = t.ID AND (t.Name != s.Name OR t.Price != s.Price)
+//  WHERE t.ID IS NULL OR t.Name != s.Name OR t.Price != s.Price
+//)
+//SELECT * FROM t_new
+//UNION ALL
+//SELECT * FROM inserts;
+//`, tbl, strings.TrimSpace(query), tbl)
+//	print(queryStr + "\n")
+//	return strings.TrimSpace(queryStr), nil
+//}
+
 func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error) {
 	query = strings.TrimRight(query, ";")
 	var (
-		primaryKeys      = make([]string, 0, 4)
-		compareConds     = make([]string, 0, 12)
-		compareCondsS1T1 = make([]string, 0, 4)
-		insertCols       = make([]string, 0, 12)
-		insertValues     = make([]string, 0, 12)
+		primaryKeys       = make([]string, 0, 4)
+		compareConds      = make([]string, 0, 12)
+		compareCondsS1T1  = make([]string, 0, 4)
+		insertCols        = make([]string, 0, 12)
+		insertValues      = make([]string, 0, 12)
+		tNewSelectCols    = make([]string, 0, 12)
+		insertsSelectCols = make([]string, 0, 12)
 	)
 
 	for _, col := range asset.Columns {
@@ -304,113 +395,40 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 		case "_is_current", "_valid_from", "_valid_until":
 			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
 		}
+
 		insertCols = append(insertCols, col.Name)
-		insertValues = append(insertValues, "source."+col.Name)
+		insertValues = append(insertValues, fmt.Sprintf("source.%s", col.Name))
+
 		if !col.PrimaryKey {
-			compareConds = append(compareConds,
-				fmt.Sprintf("target.%[1]s != source.%[1]s", col.Name))
-			compareCondsS1T1 = append(compareCondsS1T1,
-				fmt.Sprintf("t1.%[1]s != s1.%[1]s", col.Name))
+			compareConds = append(compareConds, fmt.Sprintf("target.%[1]s != source.%[1]s", col.Name))
+			compareCondsS1T1 = append(compareCondsS1T1, fmt.Sprintf("t.%[1]s != s.%[1]s", col.Name))
 		}
+
+		// For t_new SELECT
+		tNewSelectCols = append(tNewSelectCols, fmt.Sprintf("t.%s", col.Name))
+		// For inserts SELECT
+		insertsSelectCols = append(insertsSelectCols, fmt.Sprintf("s.%s", col.Name))
 	}
 
 	if len(primaryKeys) == 0 {
 		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column",
 			asset.Materialization.Strategy)
 	}
+
+	// Add system columns
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
-	insertValues = append(insertValues, "CURRENT_TIMESTAMP()", "TIMESTAMP('9999-12-31')", "TRUE")
-	//pkList := strings.Join(primaryKeys, ", ")
+	insertValues = append(insertValues, "CURRENT_TIMESTAMP()", "TIMESTAMP('9999-12-31 23:59:59')", "TRUE")
+
+	// Generate ON condition for joins
+	onConds := make([]string, len(primaryKeys))
 	for i, pk := range primaryKeys {
-		primaryKeys[i] = fmt.Sprintf("target.%[1]s = source.%[1]s", pk)
+		onConds[i] = fmt.Sprintf("t.%[1]s = s.%[1]s", pk)
 	}
-	onCondition := strings.Join(primaryKeys, " AND ")
-	onCondition += " AND target._is_current = source._is_current"
+	joinCondition := strings.Join(onConds, " AND ")
+	fullCompareCondition := strings.Join(compareCondsS1T1, " OR ")
+	//whereCondition := fmt.Sprintf("s.%s IS NOT NULL", primaryKeys[0]) // Use any non-null check
 
-	tbl := fmt.Sprintf("%s", asset.Name)
-
-	//queryStr := fmt.Sprintf(`
-	//WITH s1 AS (
-	//  %s
-	//),
-	//current_rows AS (
-	//  SELECT *, CURRENT_TIMESTAMP AS _valid_from,
-	//         TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
-	//         TRUE AS _is_current
-	//  FROM s1
-	//)
-	//
-	//UPDATE %s
-	//SET _valid_until = CURRENT_TIMESTAMP,
-	//    _is_current = FALSE
-	//WHERE _is_current = TRUE
-	//  AND (%s)
-	//  AND (%s);
-	//
-	//INSERT INTO %s (%s)
-	//SELECT %s
-	//FROM current_rows
-	//WHERE NOT EXISTS (
-	//  SELECT 1 FROM %s t
-	//  WHERE t._is_current = TRUE
-	//    AND (%s)
-	//    AND (%s)
-	//);
-	//`,
-	//		tbl,
-	//		strings.TrimSpace(query),
-	//		pkList,
-	//		strings.Join(compareCondsS1T1, " OR "),
-	//		tbl,
-	//		strings.Join(insertCols, ", "),
-	//		strings.Join(insertValues, ", "),
-	//		tbl,
-	//		pkList,
-	//		strings.Join(compareConds, " OR "),
-	//	)
-
-	//queryStr := fmt.Sprintf(`
-	//MERGE INTO %s AS target
-	//USING (
-	// WITH s1 AS (
-	//   %s
-	// )
-	// SELECT *, TRUE AS _is_current
-	// FROM   s1
-	// UNION ALL
-	// SELECT s1.*, FALSE AS _is_current
-	// FROM   s1
-	// JOIN   %s AS t1 USING (%s)
-	// WHERE  %s
-	//) AS source
-	//ON  %s
-	//
-	//WHEN MATCHED AND (
-	//   %s
-	//) THEN
-	// UPDATE SET
-	//   target._valid_until = CURRENT_TIMESTAMP(),
-	//   target._is_current  = FALSE
-	//
-	//WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
-	// UPDATE SET
-	//   target._valid_until = CURRENT_TIMESTAMP(),
-	//   target._is_current  = FALSE
-	//
-	//
-	//WHEN NOT MATCHED BY TARGET THEN
-	// INSERT (%s)
-	// VALUES (%s);`,
-	//	tbl,
-	//	strings.TrimSpace(query),
-	//	tbl,
-	//	pkList,
-	//	strings.Join(compareCondsS1T1, " OR "),
-	//	onCondition,
-	//	strings.Join(compareConds, " OR "),
-	//	strings.Join(insertCols, ", "),
-	//	strings.Join(insertValues, ", "),
-	//)
+	tbl := asset.Name
 
 	queryStr := fmt.Sprintf(`
 CREATE OR REPLACE TABLE %s AS
@@ -423,37 +441,44 @@ current_data AS (
 ),
 t_new AS (
   SELECT 
-    t.ID,
-    t.Name,
-    t.Price,
+    %s,
     t._valid_from,
     CASE 
-      WHEN s.ID IS NOT NULL THEN CURRENT_TIMESTAMP 
+      WHEN %s THEN CURRENT_TIMESTAMP()
       ELSE t._valid_until 
     END AS _valid_until,
     CASE 
-      WHEN s.ID IS NOT NULL THEN FALSE 
+      WHEN %s THEN FALSE 
       ELSE t._is_current 
     END AS _is_current
   FROM current_data t
-  LEFT JOIN source s ON t.ID = s.ID AND (t.Name != s.Name OR t.Price != s.Price)
+  LEFT JOIN source s ON %s
 ),
 inserts AS (
   SELECT 
-    s.ID,
-    s.Name,
-    s.Price,
-    CURRENT_TIMESTAMP AS _valid_from,
+    %s,
+    CURRENT_TIMESTAMP() AS _valid_from,
     TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
     TRUE AS _is_current
   FROM source s
-  LEFT JOIN current_data t ON s.ID = t.ID AND (t.Name != s.Name OR t.Price != s.Price)
-  WHERE t.ID IS NULL OR t.Name != s.Name OR t.Price != s.Price
+  LEFT JOIN current_data t ON %s
+  WHERE %s
 )
 SELECT * FROM t_new
 UNION ALL
 SELECT * FROM inserts;
-`, tbl, strings.TrimSpace(query), tbl)
+`,
+		tbl,
+		strings.TrimSpace(query),
+		tbl,
+		strings.Join(tNewSelectCols, ",\n    "),
+		fullCompareCondition,
+		fullCompareCondition,
+		joinCondition,
+		strings.Join(insertsSelectCols, ",\n    "),
+		joinCondition,
+		fullCompareCondition,
+	)
 	print(queryStr + "\n")
 	return strings.TrimSpace(queryStr), nil
 }
