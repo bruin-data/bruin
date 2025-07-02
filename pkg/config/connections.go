@@ -607,6 +607,15 @@ func (c LinkedInAdsConnection) GetName() string {
 	return c.Name
 }
 
+type LinearConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c LinearConnection) GetName() string {
+	return c.Name
+}
+
 type GCSConnection struct {
 	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file" mapstructure:"service_account_file"`

@@ -214,6 +214,9 @@ environments:
         - name: "linkedinads-1"
           access_token: "access-token-123"
           account_ids: "account-id-123,account-id-456"
+      linear:
+        - name: "linear-1"
+          api_key: "api-key-123"
       clickhouse:
         - name: "conn-clickhouse"
           host: "clickhousehost"

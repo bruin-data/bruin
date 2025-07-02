@@ -354,6 +354,12 @@ func TestLoadFromFile(t *testing.T) {
 					AccountIds:  "account-id-123,account-id-456",
 				},
 			},
+			Linear: []LinearConnection{
+				{
+					Name:   "linear-1",
+					APIKey: "api-key-123",
+				},
+			},
 			GCS: []GCSConnection{
 				{
 					Name:               "gcs-1",
