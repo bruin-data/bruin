@@ -7,6 +7,7 @@ import (
 
 	_ "github.com/DATA-DOG/go-sqlmock"
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pashagolub/pgxmock/v3"
@@ -467,6 +468,143 @@ func TestDB_GetDatabaseSummary(t *testing.T) {
 			}
 
 			require.Equal(t, tt.want, got)
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestClient_PushColumnDescriptions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		asset         *pipeline.Asset
+		setupMock     func(mock pgxmock.PgxPoolIface)
+		expectedError string
+	}{
+		{
+			name: "table formatted incorrectly",
+			asset: &pipeline.Asset{
+				Name:    "mytable",
+				Columns: []pipeline.Column{},
+			},
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				// No DB interaction expected
+			},
+			expectedError: "table name must be in schema.table or table format, 'mytable' given",
+		},
+		{
+			name: "no metadata to push",
+			asset: &pipeline.Asset{
+				Name:    "database.myschema.mytable",
+				Columns: []pipeline.Column{},
+			},
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				// No DB interaction expected
+			},
+			expectedError: "no metadata to push: table and columns have no descriptions",
+		},
+		{
+			name: "update column descriptions",
+			asset: &pipeline.Asset{
+				Name:        "myschema.mytable",
+				Description: "",
+				Columns: []pipeline.Column{
+					{Name: "col1", Description: ""},
+					{Name: "col2", Description: "desc2"},
+				},
+			},
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectExec("COMMENT ON COLUMN MYSCHEMA.MYTABLE.col1 IS ''; COMMENT ON COLUMN MYSCHEMA.MYTABLE.col2 IS 'desc2';").
+					WillReturnResult(pgxmock.NewResult("UPDATE", 2))
+			},
+		},
+		{
+			name: "update column descriptions",
+			asset: &pipeline.Asset{
+				Name:        "myschema.mytable",
+				Description: "",
+				Columns: []pipeline.Column{
+					{Name: "col1", Description: "desc1"},
+					{Name: "col2", Description: "desc2"},
+				},
+			},
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectExec("COMMENT ON COLUMN MYSCHEMA\\.MYTABLE\\.col1 IS 'desc1';" +
+					"\nCOMMENT ON COLUMN MYSCHEMA\\.MYTABLE\\.col2 IS 'desc2'").
+					WillReturnResult(pgxmock.NewResult("UPDATE", 2))
+			},
+		},
+		{
+			name: "no metadata to push",
+			asset: &pipeline.Asset{
+				Name:        "database.myschema.mytable",
+				Description: "",
+				Columns:     []pipeline.Column{},
+			},
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				// No DB interaction expected
+			},
+			expectedError: "no metadata to push: table and columns have no descriptions",
+		},
+		{
+			name: "update table description",
+			asset: &pipeline.Asset{
+				Name:        "myschema.mytable",
+				Description: "table desc",
+				Columns:     []pipeline.Column{},
+			},
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectExec("COMMENT ON TABLE MYSCHEMA\\.MYTABLE IS 'table desc';").WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+			},
+		},
+		{
+			name: "error updating column descriptions",
+			asset: &pipeline.Asset{
+				Name:        "myschema.mytable",
+				Description: "",
+				Columns: []pipeline.Column{
+					{Name: "col1", Description: "desc1"},
+				},
+			},
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectExec("COMMENT ON COLUMN MYSCHEMA\\.MYTABLE\\.col1 IS 'desc1'").
+					WillReturnError(errors.New("update error"))
+			},
+			expectedError: "failed to update column descriptions: update error",
+		},
+		{
+			name: "error updating table description",
+			asset: &pipeline.Asset{
+				Name:        "myschema.mytable",
+				Description: "desc",
+				Columns:     []pipeline.Column{},
+			},
+			setupMock: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectExec("COMMENT ON TABLE MYSCHEMA\\.MYTABLE IS 'desc'").
+					WillReturnError(errors.New("update error"))
+			},
+			expectedError: "failed to update table description: update error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			mock, err := pgxmock.NewPool()
+			require.NoError(t, err)
+			defer mock.Close()
+
+			tt.setupMock(mock)
+			client := Client{connection: mock, config: Config{Database: "db"}}
+
+			err = client.PushColumnDescriptions(context.Background(), tt.asset)
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+			}
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
