@@ -1,6 +1,6 @@
 /* @bruin
 name: test.menu
-type: bq.sql 
+type: duckdb.sql
 materialization:
   type: table
   strategy: scd2_by_column

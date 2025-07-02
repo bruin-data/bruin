@@ -214,3 +214,8 @@ environments:
         - name: "duckdb-custom-check-count-true"
           path: "duckdb-files/duckdb-custom-check-count-true.db"
 
+  env-scd2-col-duckdb:
+    connections:
+      duckdb:
+        - name: "scd2-by-col-duckdb"
+          path: "duckdb-files/scd2-by-col-duckdb.db"
