@@ -329,38 +329,78 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 
 	tbl := fmt.Sprintf("%s", asset.Name)
 
+	//queryStr := fmt.Sprintf(`
+	//WITH s1 AS (
+	//  %s
+	//),
+	//current_rows AS (
+	//  SELECT *, CURRENT_TIMESTAMP AS _valid_from,
+	//         TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
+	//         TRUE AS _is_current
+	//  FROM s1
+	//)
+	//
+	//UPDATE %s
+	//SET _valid_until = CURRENT_TIMESTAMP,
+	//    _is_current = FALSE
+	//WHERE _is_current = TRUE
+	//  AND (%s)
+	//  AND (%s);
+	//
+	//INSERT INTO %s (%s)
+	//SELECT %s
+	//FROM current_rows
+	//WHERE NOT EXISTS (
+	//  SELECT 1 FROM %s t
+	//  WHERE t._is_current = TRUE
+	//    AND (%s)
+	//    AND (%s)
+	//);
+	//`,
+	//		tbl,
+	//		strings.TrimSpace(query),
+	//		pkList,
+	//		strings.Join(compareCondsS1T1, " OR "),
+	//		tbl,
+	//		strings.Join(insertCols, ", "),
+	//		strings.Join(insertValues, ", "),
+	//		tbl,
+	//		pkList,
+	//		strings.Join(compareConds, " OR "),
+	//	)
+
 	queryStr := fmt.Sprintf(`
-MERGE INTO %s AS target
-USING (
-  WITH s1 AS (
-    %s
-  )
-  SELECT *, TRUE AS _is_current
-  FROM   s1
-  UNION ALL
-  SELECT s1.*, FALSE AS _is_current
-  FROM   s1
-  JOIN   %s AS t1 USING (%s)
-  WHERE  %s
-) AS source
-ON  %s
-
-WHEN MATCHED AND (
-    %s
-) THEN
-  UPDATE SET
-    target._valid_until = CURRENT_TIMESTAMP(),
-    target._is_current  = FALSE
-
-WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
-  UPDATE SET 
-    target._valid_until = CURRENT_TIMESTAMP(),
-    target._is_current  = FALSE
-
-
-WHEN NOT MATCHED BY TARGET THEN
-  INSERT (%s)
-  VALUES (%s);`,
+	MERGE INTO %s AS target
+	USING (
+	 WITH s1 AS (
+	   %s
+	 )
+	 SELECT *, TRUE AS _is_current
+	 FROM   s1
+	 UNION ALL
+	 SELECT s1.*, FALSE AS _is_current
+	 FROM   s1
+	 JOIN   %s AS t1 USING (%s)
+	 WHERE  %s
+	) AS source
+	ON  %s
+	
+	WHEN MATCHED AND (
+	   %s
+	) THEN
+	 UPDATE SET
+	   target._valid_until = CURRENT_TIMESTAMP(),
+	   target._is_current  = FALSE
+	
+	WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
+	 UPDATE SET
+	   target._valid_until = CURRENT_TIMESTAMP(),
+	   target._is_current  = FALSE
+	
+	
+	WHEN NOT MATCHED BY TARGET THEN
+	 INSERT (%s)
+	 VALUES (%s);`,
 		tbl,
 		strings.TrimSpace(query),
 		tbl,
@@ -371,7 +411,7 @@ WHEN NOT MATCHED BY TARGET THEN
 		strings.Join(insertCols, ", "),
 		strings.Join(insertValues, ", "),
 	)
-
+	print(queryStr + "\n")
 	return strings.TrimSpace(queryStr), nil
 }
 
@@ -427,6 +467,5 @@ FROM (
 		tbl,
 		strings.TrimSpace(query),
 	)
-	print(stmt + "\n")
 	return strings.TrimSpace(stmt), nil
 }
