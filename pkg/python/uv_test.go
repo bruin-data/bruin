@@ -42,7 +42,7 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &CommandInstance{
 					Name: "~/.bruin/uv",
-					Args: []string{"run", "--no-config", "--python", "3.11", "--module", module},
+					Args: []string{"run", "--no-config", "--no-sync", "--python", "3.11", "--module", module},
 				}).Return(assert.AnError)
 
 				inst := new(mockUvInstaller)
@@ -69,7 +69,7 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &CommandInstance{
 					Name: "~/.bruin/uv",
-					Args: []string{"run", "--no-config", "--python", "3.11", "--with-requirements", "/path/to/requirements.txt", "--module", module},
+					Args: []string{"run", "--no-config", "--no-sync", "--python", "3.11", "--with-requirements", "/path/to/requirements.txt", "--module", module},
 				}).Return(assert.AnError)
 
 				inst := new(mockUvInstaller)
@@ -96,7 +96,7 @@ func Test_uvPythonRunner_Run(t *testing.T) {
 				cmd := new(mockCmd)
 				cmd.On("Run", mock.Anything, repo, &CommandInstance{
 					Name: "~/.bruin/uv",
-					Args: []string{"run", "--no-config", "--python", "3.13", "--with-requirements", "/path/to/requirements.txt", "--module", module},
+					Args: []string{"run", "--no-config", "--no-sync", "--python", "3.13", "--with-requirements", "/path/to/requirements.txt", "--module", module},
 				}).Return(assert.AnError)
 
 				inst := new(mockUvInstaller)
