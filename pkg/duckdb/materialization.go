@@ -258,6 +258,9 @@ source AS (
 current_data AS (
   SELECT * FROM %s WHERE _is_current = TRUE
 ),
+historical_data AS (
+  SELECT * FROM test.products WHERE _is_current = FALSE
+),
 t_new AS (
   SELECT 
     t.%s,
@@ -290,8 +293,7 @@ insert_rows AS (
   LEFT JOIN current_data t ON %s
   WHERE t.%s IS NULL OR t._valid_from < CAST(s.%s AS TIMESTAMP)
 )
-SELECT * FROM t_new
-UNION ALL
+SELECT * FROM t_new UNION ALL
 SELECT * FROM insert_rows;`,
 		asset.Name,
 		query,

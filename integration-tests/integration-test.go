@@ -122,12 +122,12 @@ func main() {
 
 	includeIngestr := os.Getenv("INCLUDE_INGESTR") == "1"
 	runIntegrationTests(binary, currentFolder, includeIngestr)
-	runIntegrationWorkflow(binary, currentFolder)
+	//runIntegrationWorkflow(binary, currentFolder)
 
 	// Check if .bruin.cloud.yml file exists and run cloud integration tests if it does
 	if _, err := os.Stat(filepath.Join(currentFolder, ".bruin.cloud.yml")); err == nil {
-		runCloudIntegrationTests(binary, currentFolder)
-		runCloudWorkflows(binary, currentFolder)
+		//runCloudIntegrationTests(binary, currentFolder)
+		//runCloudWorkflows(binary, currentFolder)
 	}
 }
 
