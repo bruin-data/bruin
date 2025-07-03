@@ -1,12 +1,13 @@
 # Dashboard Assets
 
-Dashboard assets are special assets that serve as placeholder to represent where data is collected or processed by any dashboard tools in your pipeline.
+Dashboard assets serve as placeholders to represent where data is collected, queried, or visualized by any dashboarding tools in your pipeline.
 
-They do not perform any computation, transformation, or data movement of their own but instead are used preserve an accurate overview of your data pipeline lineage.
+They do not perform any computation, transformation, or data movement of their own, but instead are used to preserve an accurate overview of your data pipeline’s lineage.
 
 This helps you visualize and document the tools used in your data pipeline, making it easier to understand and maintain.
 
-We support a variety of dashboard tools, including Amazon QuickSight, Apache Superset, Domo, Good Data, Grafana, Looker, Metabase, Mode BI, Power BI, Qlik Sense, Qlik View, Redash, Sisense, and Tableau.
+We support a variety of dashboard tools, including:
+Amazon QuickSight, Apache Superset, Domo, Good Data, Grafana, Looker, Metabase, Mode BI, Power BI, Qlik Sense, Qlik View, Redash, Sisense, and Tableau.
 
 ## Definition Schema
 Dashboard assets are defined using the extension `{asset_name}.asset.yml`. Here is an example of the schema:
