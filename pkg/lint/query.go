@@ -376,3 +376,8 @@ func (q *QueryValidatorRule) Validate(ctx context.Context, p *pipeline.Pipeline)
 
 	return issues, nil
 }
+
+func (q *QueryValidatorRule) ValidateCrossPipeline(ctx context.Context, pipelines []*pipeline.Pipeline) ([]*Issue, error) {
+	// This rule doesn't need cross-pipeline validation
+	return []*Issue{}, nil
+}
