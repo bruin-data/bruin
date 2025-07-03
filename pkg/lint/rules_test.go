@@ -3041,6 +3041,44 @@ func TestValidateCrossPipelineURIDependencies(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "duplicate URIs are reported",
+			args: args{
+				pipelines: []*pipeline.Pipeline{
+					{
+						Name: "pipeline1",
+						Assets: []*pipeline.Asset{
+							{
+								Name: "task1",
+								URI:  "external://dataset1",
+							},
+							{
+								Name: "task2",
+								URI:  "external://dataset1", // duplicate
+							},
+						},
+					},
+					{
+						Name: "pipeline2",
+						Assets: []*pipeline.Asset{
+							{
+								Name: "task3",
+								URI:  "external://dataset1", // another duplicate
+							},
+						},
+					},
+				},
+			},
+			want: []*Issue{
+				{
+					Task: &pipeline.Asset{
+						Name: "task1",
+						URI:  "external://dataset1",
+					},
+					Description: "Duplicate URI 'external://dataset1' found across multiple assets: task1, task2, task3",
+				},
+			},
+		},
 	}
 
 	ctx := context.Background()

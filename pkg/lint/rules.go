@@ -1358,17 +1358,35 @@ func EnsureSecretMappingsHaveKeyForASingleAsset(ctx context.Context, p *pipeline
 }
 
 // ValidateCrossPipelineURIDependencies validates all URI dependencies across all pipelines
-// and returns warnings for any URI dependencies that cannot be resolved.
+// and returns warnings for any URI dependencies that cannot be resolved or duplicate URIs.
 func ValidateCrossPipelineURIDependencies(ctx context.Context, pipelines []*pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 	
-	// Create a map of all available URIs across all pipelines
+	// Create a map of all available URIs across all pipelines and track duplicates
 	availableURIs := make(map[string]*pipeline.Asset)
+	uriToAssets := make(map[string][]*pipeline.Asset)
+	
 	for _, pl := range pipelines {
 		for _, asset := range pl.Assets {
 			if asset.URI != "" {
 				availableURIs[asset.URI] = asset
+				uriToAssets[asset.URI] = append(uriToAssets[asset.URI], asset)
 			}
+		}
+	}
+	
+	// Check for duplicate URIs
+	for uri, assets := range uriToAssets {
+		if len(assets) > 1 {
+			// Report duplicate URI issue for the first asset
+			assetNames := make([]string, len(assets))
+			for i, asset := range assets {
+				assetNames[i] = asset.Name
+			}
+			issues = append(issues, &Issue{
+				Task:        assets[0],
+				Description: fmt.Sprintf("Duplicate URI '%s' found across multiple assets: %s", uri, strings.Join(assetNames, ", ")),
+			})
 		}
 	}
 	
