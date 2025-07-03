@@ -1,17 +1,31 @@
 # Dashboard Assets
 
-Dashboard assets in Bruin are special, lightweight assets that serve as placeholders or organizational markers within your pipeline. They do not perform any computation, transformation, or data movement. Instead, they are used to represent documentation points in your data workflows and lineages.
+Dashboard assets are special assets that serve as placeholder to represent where data is collected or processed by any dashboard tools in your pipeline.
 
-## Purpose
-- **Placeholders:** Indicate where processes such as data visualizations, progress tracking or communication with clients takes place.
-- **Organization:** Help structure your pipeline lineage visually, making it easier to understand and maintain.
-- **Documentation:** Provide context or notes within your pipeline without affecting execution.
+They do not perform any computation, transformation, or data movement of their own but instead are used preserve an accurate overview of your data pipeline lineage.
 
+This helps you visualize and document the tools used in your data pipeline, making it easier to understand and maintain.
 
-## Definition
-Dashboard assets are defined using the extension `{asset_name}.asset.yml`. They have minimal a configuration and only specify a `name` and `type`.
+We support a variety of dashboard tools, including Amazon QuickSight, Apache Superset, Domo, Good Data, Grafana, Looker, Metabase, Mode BI, Power BI, Qlik Sense, Qlik View, Redash, Sisense, and Tableau.
 
-## Examples
+## Definition Schema
+Dashboard assets are defined using the extension `{asset_name}.asset.yml`. Here is an example of the schema:
+
+```yaml
+name: dashboard.quicksight
+type: quicksight
+
+depends:
+    - schema.my_asset
+
+owner: my-team@acme-corp.com
+
+tags:
+  - dashboard
+  - team.xyz
+```
+
+## Supported Dashboard Tools
 
 ### Amazon QuickSight
 ```yaml
