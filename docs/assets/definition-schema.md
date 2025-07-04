@@ -54,7 +54,7 @@ Must consist of letters and dot `.` character.
 - **Type:** `String`
 
 ## `uri`
-We use `uri` (Universal resource locator) as another way to identify assets. This should be unique accross all your pipelines and can be used to define [cross pipeline dependencies](../cloud/cross-pipeline).
+We use `uri` (Universal Resource Identifier) as another way to identify assets. URIs must be unique across all your pipelines and can be used to define [cross pipeline dependencies](../cloud/cross-pipeline).
 - **Type:** `String`
 
 ## `type`
@@ -79,7 +79,7 @@ The items of this list can be just a `String` with the name of the asset in the 
   * `asset` : The name of the asset. Must be on the same pipeline
   * `uri` : The URI of the upstream asset. This is used in [cloud](../cloud/overview.md) when you want to have an upstream on a different pipeline. See [uri](#uri) above
   * `mode`: can be `full` (a normal dependency) or `symbolic`. The latter being just for the purpose of showing lineage without the downstream actually depending or having to wait on the upstream to run.
-  
+
 
 ```
   - asset: asset_name
