@@ -4,9 +4,10 @@ Dashboard assets serve as placeholders to represent where data is collected, que
 
 They do not perform any computation, transformation, or data movement of their own, but instead are used to preserve an accurate overview of your data pipeline’s lineage.
 
-This helps you visualize and document the tools used in your data pipeline, making it easier to understand and maintain.
+This helps you more accurately visualize and document the tools used in your data pipeline.
 
-We support a variety of dashboard tools, including:
+Bruin supports the following dashboard tools as assets:
+
 Amazon QuickSight, Apache Superset, Domo, Good Data, Grafana, Looker, Metabase, Mode BI, Power BI, Qlik Sense, Qlik View, Redash, Sisense, and Tableau.
 
 ## Definition Schema
@@ -15,6 +16,7 @@ Dashboard assets are defined using the extension `{asset_name}.asset.yml`. Here 
 ```yaml
 name: dashboard.quicksight
 type: quicksight
+description: "Dashboard sales data visualization."
 
 depends:
     - schema.my_asset
@@ -30,85 +32,85 @@ tags:
 
 ### Amazon QuickSight
 ```yaml
-name: dashboard.quicksight
+name: myschema.asset_name
 type: quicksight
 ```
 
 ### Apache Superset
 ```yaml
-name: dashboard.superset
+name: myschema.asset_name
 type: superset
 ```
 
 ### Domo
 ```yaml
-name: dashboard.domo
+name: myschema.asset_name
 type: domo
 ```
 
 ### Good Data
 ```yaml
-name: dashboard.gooddata
+name: myschema.asset_name
 type: gooddata
 ```
 
 ### Grafana
 ```yaml
-name: dashboard.grafana
+name: myschema.asset_name
 type: grafana
 ```
 
 ### Looker
 ```yaml
-name: dashboard.looker
+name: myschema.asset_name
 type: looker
 ```
 
 ### Metabase
 ```yaml
-name: dashboard.metabase
+name: myschema.asset_name
 type: metabase
 ```
 
 ### Mode BI
 ```yaml
-name: dashboard.modebi
+name: myschema.asset_name
 type: modebi
 ```
 
 ### Power BI
 ```yaml
-name: dashboard.powerbi
+name: myschema.asset_name
 type: powerbi
 ```
 
 ### Qlik Sense
 ```yaml
-name: dashboard.qliksense
+name: myschema.asset_name
 type: qliksense
 ```
 
 ### Qlik View
 ```yaml
-name: dashboard.qlikview
+name: myschema.asset_name
 type: qlikview
 ```
 
 ### Redash
 ```yaml
-name: dashboard.redash
+name: myschema.asset_name
 type: redash
 ```
 
 ### Sisense
 ```yaml
-name: dashboard.sisense
+name: myschema.asset_name
 type: sisense
 ```
 
 ### Tableau
 ```yaml
-name: dashboard.tableau 
+name: myschema.asset_name
 type: tableau
 ```
 
