@@ -59,7 +59,10 @@ The type of the asset, determines how the execution will happen. Must be one of 
 
 ## `owner`
 The owner of the asset, has no functional implications on Bruin CLI as of today, allows documenting the ownership information. On [Bruin Cloud](https://getbruin.com), it is used to analyze ownership information, used in governance reports and ownership lineage.  
-- **Type:** `String` 
+- **Type:** `String`
+
+## `tier`
+Defines an optional priority grouping for assets. Valid values range from `1` to `5`; omit the field to use the default behavior.
 
 ## `tags`
 As the name states, tags that are applied to the asset. These tags can then be used while running assets, e.g.:
