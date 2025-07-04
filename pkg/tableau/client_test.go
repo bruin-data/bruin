@@ -3,10 +3,11 @@ package tableau
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewClient_WithUsernamePassword(t *testing.T) {
+	t.Parallel()
 	config := Config{
 		Name:       "test-tableau",
 		Host:       "tableau.example.com",
@@ -17,12 +18,13 @@ func TestNewClient_WithUsernamePassword(t *testing.T) {
 	}
 
 	client, err := NewClient(config)
-	assert.NoError(t, err)
-	assert.NotNil(t, client)
-	assert.Equal(t, config, client.config)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+	require.Equal(t, config, client.config)
 }
 
 func TestNewClient_WithPAT(t *testing.T) {
+	t.Parallel()
 	config := Config{
 		Name:                      "test-tableau",
 		Host:                      "tableau.example.com",
@@ -33,12 +35,13 @@ func TestNewClient_WithPAT(t *testing.T) {
 	}
 
 	client, err := NewClient(config)
-	assert.NoError(t, err)
-	assert.NotNil(t, client)
-	assert.Equal(t, config, client.config)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+	require.Equal(t, config, client.config)
 }
 
 func TestNewClient_MissingRequiredFields(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		config  Config
@@ -92,15 +95,17 @@ func TestNewClient_MissingRequiredFields(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			client, err := NewClient(tt.config)
-			assert.Error(t, err)
-			assert.Nil(t, client)
-			assert.Contains(t, err.Error(), tt.wantErr)
+			require.Error(t, err)
+			require.Nil(t, client)
+			require.Contains(t, err.Error(), tt.wantErr)
 		})
 	}
 }
 
 func TestNewClient_DefaultAPIVersion(t *testing.T) {
+	t.Parallel()
 	config := Config{
 		Host:     "tableau.example.com",
 		Username: "user",
@@ -110,7 +115,7 @@ func TestNewClient_DefaultAPIVersion(t *testing.T) {
 	}
 
 	client, err := NewClient(config)
-	assert.NoError(t, err)
-	assert.NotNil(t, client)
-	assert.Equal(t, "3.4", client.config.APIVersion)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+	require.Equal(t, "3.4", client.config.APIVersion)
 }

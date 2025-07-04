@@ -7,6 +7,7 @@ import (
 )
 
 func TestConfig_GetName(t *testing.T) {
+	t.Parallel()
 	config := Config{
 		Name: "test-tableau",
 	}

@@ -23,7 +23,6 @@ type RefreshResponse struct {
 	Status string `json:"status"`
 }
 
-// JSON structures for Tableau API
 type TSCredentials struct {
 	Name     string `json:"name"`
 	Password string `json:"password"`
@@ -101,7 +100,7 @@ func (c *Client) authenticate(ctx context.Context) error {
 			},
 		}
 	} else {
-		//fallback to username/password.
+		// fallback to username/password.
 		authPayload = map[string]interface{}{
 			"credentials": map[string]interface{}{
 				"name":     c.config.Username,
@@ -118,7 +117,7 @@ func (c *Client) authenticate(ctx context.Context) error {
 		return errors.Wrap(err, "failed to marshal authentication payload")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", authURL, bytes.NewBuffer(payloadBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, authURL, bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		return errors.Wrap(err, "failed to create authentication request")
 	}
@@ -171,7 +170,7 @@ func (c *Client) RefreshDataSource(ctx context.Context, datasourceID string) err
 		return errors.Wrap(err, "failed to marshal refresh payload")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", refreshURL, bytes.NewBuffer(payloadBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, refreshURL, bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		return errors.Wrap(err, "failed to create refresh request")
 	}
@@ -202,7 +201,7 @@ func (c *Client) Ping(ctx context.Context) error {
 	pingURL := fmt.Sprintf("https://%s/api/%s/sites/%s/users",
 		c.config.Host, c.config.APIVersion, c.siteID)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", pingURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pingURL, nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to create ping request")
 	}
