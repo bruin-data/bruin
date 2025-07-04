@@ -99,3 +99,29 @@ lint-python:
 
 	@echo "$(OK_COLOR)==> Running Python linting with flake8...$(NO_COLOR)"
 	@ruff check --fix ./pythonsrc
+
+refresh-integration-test-expectancies: build
+	@echo "$(OK_COLOR)==> Refreshing integration test expectancies...$(NO_COLOR)"
+	@echo "$(WARN_COLOR)Warning: This will overwrite existing expectation files$(NO_COLOR)"
+	@echo "$(OK_COLOR)==> Creating expectancy refresh script...$(NO_COLOR)"
+	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
+	@mkdir -p integration-tests/duckdb-files  # Recreate the directory
+	@touch integration-tests/.git
+	@touch integration-tests/bruin
+	@rm -rf integration-tests/.git
+	@rm integration-tests/bruin
+	@cd integration-tests && git init
+	@echo "$(OK_COLOR)==> Running commands to capture fresh outputs...$(NO_COLOR)"
+	@# Refresh connection schema expectations
+	@./bin/bruin internal connections > integration-tests/expected_connections_schema.json || true
+	@# Refresh connection list expectations  
+	@cd integration-tests && ../bin/bruin connections list -o json . > expected_connections.json || true
+	@# Refresh parse expectations for happy path assets
+	@./bin/bruin internal parse-asset integration-tests/test-pipelines/parse-happy-path/assets/asset.py > integration-tests/test-pipelines/parse-happy-path/expectations/asset.py.json || true
+	@./bin/bruin internal parse-asset integration-tests/test-pipelines/parse-happy-path/assets/chess_games.asset.yml > integration-tests/test-pipelines/parse-happy-path/expectations/chess_games.asset.yml.json || true
+	@./bin/bruin internal parse-asset integration-tests/test-pipelines/parse-happy-path/assets/chess_profiles.asset.yml > integration-tests/test-pipelines/parse-happy-path/expectations/chess_profiles.asset.yml.json || true
+	@./bin/bruin internal parse-asset integration-tests/test-pipelines/parse-happy-path/assets/player_summary.sql > integration-tests/test-pipelines/parse-happy-path/expectations/player_summary.sql.json || true
+	@# Note: Additional expectations would need to be refreshed by running specific test scenarios
+	@echo "$(OK_COLOR)==> Basic expectancy files have been refreshed$(NO_COLOR)"
+	@echo "$(WARN_COLOR)Note: Some expectation files require running full integration test scenarios to refresh$(NO_COLOR)"
+	@echo "$(OK_COLOR)==> Consider running 'make integration-test' to verify all expectations$(NO_COLOR)"
