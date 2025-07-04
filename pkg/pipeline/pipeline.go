@@ -1219,6 +1219,7 @@ type Pipeline struct {
 	Snapshot           string                 `json:"snapshot"`
 	Agent              bool                   `json:"agent" yaml:"agent" mapstructure:"agent"`
 	Variables          Variables              `json:"variables" yaml:"variables" mapstructure:"variables"`
+	Tags               EmptyStringArray       `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
 	TasksByType        map[AssetType][]*Asset `json:"-"`
 	tasksByName        map[string]*Asset
 }
