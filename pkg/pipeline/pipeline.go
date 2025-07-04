@@ -61,6 +61,7 @@ const (
 	AssetTypeSynapseQuerySensor     = AssetType("synapse.sensor.query")
 	AssetTypeIngestr                = AssetType("ingestr")
 	AssetTypeTableau                = AssetType("tableau")
+	AssetTypeTableauRefresh         = AssetType("tableau.refresh")
 	AssetTypeClickHouse             = AssetType("clickhouse.sql")
 	AssetTypeClickHouseSeed         = AssetType("clickhouse.seed")
 	AssetTypeClickHouseQuerySensor  = AssetType("clickhouse.sensor.query")
