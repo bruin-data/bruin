@@ -3,7 +3,7 @@ package lint
 type Level int
 
 const (
-	LevelPipeline      Level = iota
+	LevelPipeline Level = iota
 	LevelAsset
 	LevelCrossPipeline
 )
