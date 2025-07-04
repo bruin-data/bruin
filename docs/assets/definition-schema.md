@@ -53,6 +53,10 @@ The name of the asset, used for many things including dependencies, materializat
 Must consist of letters and dot `.` character.
 - **Type:** `String`
 
+## `uri`
+We use `uri` (Universal Resource Identifier) as another way to identify assets. URIs must be unique across all your pipelines and can be used to define [cross pipeline dependencies](../cloud/cross-pipeline).
+- **Type:** `String`
+
 ## `type`
 The type of the asset, determines how the execution will happen. Must be one of the types [here](https://github.com/bruin-data/bruin/blob/main/pkg/executor/defaults.go).
 - **Type:** `String` 
@@ -71,7 +75,17 @@ bruin run --tags client1
 ## `depends`
 The list of assets this asset depends on. This list determines the execution order.
 In other words, the asset will be executed only when all of the assets in the `depends` list have succeeded.
-- **Type:** `String[]`
+The items of this list can be just a `String` with the name of the asset in the same pipeline or an `Object` which can contain the following attributes
+  * `asset` : The name of the asset. Must be on the same pipeline
+  * `uri` : The URI of the upstream asset. This is used in [cloud](../cloud/overview.md) when you want to have an upstream on a different pipeline. See [uri](#uri) above
+  * `mode`: can be `full` (a normal dependency) or `symbolic`. The latter being just for the purpose of showing lineage without the downstream actually depending or having to wait on the upstream to run.
+
+
+```
+  - asset: asset_name
+    mode: symbolic
+```
+
 
 ## `interval_modifiers`
 Controls how the processing window is adjusted by shifting the start and end times. Requires the `--apply-interval-modifiers` flag when running the pipeline.
