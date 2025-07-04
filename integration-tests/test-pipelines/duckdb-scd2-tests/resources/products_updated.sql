@@ -15,6 +15,7 @@ columns:
   - name: product_name
     type: VARCHAR
     description: "Name of the product"
+    primary_key: true
   - name: dt
     type: DATE
     description: "incremental key"

@@ -18,6 +18,7 @@ columns:
     description: "Name of the Menu Item"
     checks:
       - name: not_null
+    primary_key: true
   - name: Price
     type: FLOAT
     description: "Price of the Menu Item"

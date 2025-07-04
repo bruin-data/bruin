@@ -232,10 +232,16 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 	}
 
 	pkJoin := make([]string, 0, len(primaryKeys))
+	sourcePKs := make([]string, 0, len(primaryKeys))
+	sourceNPKs := make([]string, 0, len(primaryKeys))
 	for _, pk := range primaryKeys {
 		pkJoin = append(pkJoin, fmt.Sprintf("t.%[1]s = s.%[1]s", pk))
+		sourcePKs = append(sourcePKs, fmt.Sprintf("s.%[1]s IS NULL", pk))
+		sourceNPKs = append(sourceNPKs, fmt.Sprintf("s.%[1]s IS NOT NULL", pk))
 	}
-	pkList := strings.Join(primaryKeys, ", ")
+	//pkList := strings.Join(primaryKeys, ", ")
+	nullPKList := strings.Join(sourcePKs, " AND ")
+	notNullPKList := strings.Join(sourceNPKs, " AND ")
 	joinCondition := strings.Join(pkJoin, " AND ")
 	incrementalKey := asset.Materialization.IncrementalKey
 
@@ -253,16 +259,16 @@ t_new AS (
   SELECT
     %s, t._valid_from,
     CASE 
-      WHEN s.%s IS NULL THEN CURRENT_TIMESTAMP
-      WHEN s.%s IS NOT NULL 
+      WHEN %s THEN CURRENT_TIMESTAMP
+      WHEN %s 
            AND %s 
            AND t._valid_from < CAST(s.%s AS TIMESTAMP)
       THEN CAST(s.dt AS TIMESTAMP)
       ELSE t._valid_until
     END AS _valid_until,
 	CASE
-      WHEN s.%s IS NULL THEN FALSE
-      WHEN s.%s IS NOT NULL 
+      WHEN %s THEN FALSE
+      WHEN %s
            AND %s
            AND t._valid_from < CAST(s.%s AS TIMESTAMP)
       THEN FALSE
@@ -286,12 +292,12 @@ SELECT * FROM insert_rows;`,
 		query,      //source rows
 		asset.Name, //current data
 		nonIncColsList,
-		pkList,
-		pkList,
+		nullPKList,
+		notNullPKList,
 		joinCondition,
 		incrementalKey,
-		pkList,
-		pkList,
+		nullPKList,
+		notNullPKList,
 		joinCondition,
 		incrementalKey,
 		joinCondition,
@@ -437,11 +443,17 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 
 	// Generate ON condition for joins
 	onConds := make([]string, len(primaryKeys))
+	sourcePKs := make([]string, 0, len(primaryKeys))
+	targetPKs := make([]string, 0, len(primaryKeys))
 	for i, pk := range primaryKeys {
 		onConds[i] = fmt.Sprintf("t.%[1]s = s.%[1]s", pk)
+		sourcePKs = append(sourcePKs, fmt.Sprintf("s.%[1]s IS NULL", pk))
+		targetPKs = append(targetPKs, fmt.Sprintf("t.%[1]s IS NULL", pk))
 	}
 	joinCondition := strings.Join(onConds, " AND ")
 	fullCompareCondition := strings.Join(compareCondsS1T1, " OR ")
+	isNullPKListForSource := strings.Join(sourcePKs, " AND ")
+	isNULLPKListForTarget := strings.Join(targetPKs, " AND ")
 	//whereCondition := fmt.Sprintf("s.%s IS NOT NULL", primaryKeys[0]) // Use any non-null check
 
 	tbl := asset.Name
@@ -459,40 +471,47 @@ t_new AS (
   SELECT 
     %s,
     t._valid_from,
-    CASE 
-      WHEN %s THEN CURRENT_TIMESTAMP()
+    CASE
+	  WHEN %s THEN CURRENT_TIMESTAMP
+      WHEN %s THEN CURRENT_TIMESTAMP
       ELSE t._valid_until 
     END AS _valid_until,
     CASE 
-      WHEN %s THEN FALSE 
-      ELSE t._is_current 
+	  WHEN %s THEN FALSE
+      WHEN %s 
+      THEN FALSE 
+      ELSE t._is_current
     END AS _is_current
   FROM current_data t
   LEFT JOIN source s ON %s
 ),
-inserts AS (
+insert_rows AS (
   SELECT 
     %s,
-    CURRENT_TIMESTAMP() AS _valid_from,
+    CURRENT_TIMESTAMP AS _valid_from,
     TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
     TRUE AS _is_current
   FROM source s
   LEFT JOIN current_data t ON %s
   WHERE %s
+	OR %s
 )
 SELECT * FROM t_new
-UNION ALL
-SELECT * FROM inserts;
+UNION
+SELECT * FROM insert_rows;
 `,
 		tbl,
 		strings.TrimSpace(query),
 		tbl,
 		strings.Join(tNewSelectCols, ",\n    "),
+		isNullPKListForSource,
 		fullCompareCondition,
+		isNullPKListForSource,
 		fullCompareCondition,
 		joinCondition,
-		strings.Join(insertsSelectCols, ",\n    "),
+		strings.Join(insertsSelectCols, ",\n    "), // For inserts SELECT
 		joinCondition,
+		isNULLPKListForTarget,
 		fullCompareCondition,
 	)
 	print(queryStr + "\n")
