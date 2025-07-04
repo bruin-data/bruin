@@ -51,13 +51,13 @@ type Rule interface {
 }
 
 type SimpleRule struct {
-	Identifier               string
-	Fast                     bool
-	Validator                PipelineValidator
-	AssetValidator           AssetValidator
-	CrossPipelineValidator   CrossPipelineValidator
-	ApplicableLevels         []Level
-	Severity                 ValidatorSeverity
+	Identifier             string
+	Fast                   bool
+	Validator              PipelineValidator
+	AssetValidator         AssetValidator
+	CrossPipelineValidator CrossPipelineValidator
+	ApplicableLevels       []Level
+	Severity               ValidatorSeverity
 }
 
 func (g *SimpleRule) Validate(ctx context.Context, pipeline *pipeline.Pipeline) ([]*Issue, error) {
@@ -382,7 +382,7 @@ func (l *Linter) LintPipelines(ctx context.Context, pipelines []*pipeline.Pipeli
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Add cross-pipeline issues to the first pipeline's result
 		// (this is a design choice - we could distribute them differently)
 		if len(crossPipelineIssues) > 0 && len(result.Pipelines) == 0 {
@@ -390,7 +390,7 @@ func (l *Linter) LintPipelines(ctx context.Context, pipelines []*pipeline.Pipeli
 				pipelineResult.Issues[rule] = append(pipelineResult.Issues[rule], issues...)
 			}
 		}
-		
+
 		result.Pipelines = append(result.Pipelines, pipelineResult)
 	}
 

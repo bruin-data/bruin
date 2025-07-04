@@ -1361,11 +1361,11 @@ func EnsureSecretMappingsHaveKeyForASingleAsset(ctx context.Context, p *pipeline
 // and returns warnings for any URI dependencies that cannot be resolved or duplicate URIs.
 func ValidateCrossPipelineURIDependencies(ctx context.Context, pipelines []*pipeline.Pipeline) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
-	
+
 	// Create a map of all available URIs across all pipelines and track duplicates
 	availableURIs := make(map[string]*pipeline.Asset)
 	uriToAssets := make(map[string][]*pipeline.Asset)
-	
+
 	for _, pl := range pipelines {
 		for _, asset := range pl.Assets {
 			if asset.URI != "" {
@@ -1374,7 +1374,7 @@ func ValidateCrossPipelineURIDependencies(ctx context.Context, pipelines []*pipe
 			}
 		}
 	}
-	
+
 	// Check for duplicate URIs
 	for uri, assets := range uriToAssets {
 		if len(assets) > 1 {
@@ -1389,7 +1389,7 @@ func ValidateCrossPipelineURIDependencies(ctx context.Context, pipelines []*pipe
 			})
 		}
 	}
-	
+
 	// Check each asset in all pipelines for URI dependencies
 	for _, pl := range pipelines {
 		for _, asset := range pl.Assets {
@@ -1397,7 +1397,7 @@ func ValidateCrossPipelineURIDependencies(ctx context.Context, pipelines []*pipe
 				if dep.Type != "uri" {
 					continue
 				}
-				
+
 				if dep.Value == "" {
 					issues = append(issues, &Issue{
 						Task:        asset,
@@ -1405,7 +1405,7 @@ func ValidateCrossPipelineURIDependencies(ctx context.Context, pipelines []*pipe
 					})
 					continue
 				}
-				
+
 				// Check if the URI exists in any of the available pipelines
 				if _, exists := availableURIs[dep.Value]; !exists {
 					issues = append(issues, &Issue{
@@ -1416,6 +1416,6 @@ func ValidateCrossPipelineURIDependencies(ctx context.Context, pipelines []*pipe
 			}
 		}
 	}
-	
+
 	return issues, nil
 }
