@@ -151,6 +151,183 @@ func (c *Client) IsValid(ctx context.Context, query *query.Query) (bool, error) 
 	return err == nil, err
 }
 
+func (c *Client) GetDatabases(ctx context.Context) ([]string, error) {
+	q := `
+SELECT datname
+FROM pg_database
+WHERE datistemplate = false
+ORDER BY datname;
+`
+
+	rows, err := c.connection.Query(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query PostgreSQL databases: %w", err)
+	}
+	defer rows.Close()
+
+	collectedRows, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) ([]any, error) {
+		return row.Values()
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to collect row values")
+	}
+
+	var databases []string
+	for _, row := range collectedRows {
+		if len(row) > 0 {
+			if dbName, ok := row[0].(string); ok {
+				databases = append(databases, dbName)
+			}
+		}
+	}
+
+	return databases, nil
+}
+
+func (c *Client) GetTables(ctx context.Context, databaseName string) ([]string, error) {
+	if databaseName == "" {
+		return nil, errors.New("database name cannot be empty")
+	}
+
+	q := `
+SELECT table_name
+FROM information_schema.tables
+WHERE table_catalog = $1
+    AND table_schema NOT IN ('pg_catalog', 'information_schema')
+    AND table_type IN ('BASE TABLE', 'VIEW')
+ORDER BY table_name;
+`
+
+	rows, err := c.connection.Query(ctx, q, databaseName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tables in database '%s': %w", databaseName, err)
+	}
+	defer rows.Close()
+
+	collectedRows, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) ([]any, error) {
+		return row.Values()
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to collect row values")
+	}
+
+	var tables []string
+	for _, row := range collectedRows {
+		if len(row) > 0 {
+			if tableName, ok := row[0].(string); ok {
+				tables = append(tables, tableName)
+			}
+		}
+	}
+
+	return tables, nil
+}
+
+func (c *Client) GetColumns(ctx context.Context, databaseName, tableName string) ([]*ansisql.DBColumn, error) {
+	if databaseName == "" {
+		return nil, errors.New("database name cannot be empty")
+	}
+	if tableName == "" {
+		return nil, errors.New("table name cannot be empty")
+	}
+
+	// Parse table name to extract schema and table components
+	tableComponents := strings.Split(tableName, ".")
+	var schemaName, tableNameOnly string
+
+	switch len(tableComponents) {
+	case 1:
+		// table only - use public schema by default
+		schemaName = "public"
+		tableNameOnly = tableComponents[0]
+	case 2:
+		// schema.table format
+		schemaName = tableComponents[0]
+		tableNameOnly = tableComponents[1]
+	default:
+		return nil, fmt.Errorf("invalid table name format: %s", tableName)
+	}
+
+	q := `
+SELECT 
+    column_name,
+    data_type,
+    is_nullable,
+    column_default,
+    character_maximum_length,
+    numeric_precision,
+    numeric_scale
+FROM information_schema.columns
+WHERE table_catalog = $1 AND table_schema = $2 AND table_name = $3
+ORDER BY ordinal_position;
+`
+
+	rows, err := c.connection.Query(ctx, q, databaseName, schemaName, tableNameOnly)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query columns for table '%s.%s': %w", databaseName, tableName, err)
+	}
+	defer rows.Close()
+
+	collectedRows, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) ([]any, error) {
+		return row.Values()
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to collect row values")
+	}
+
+	columns := make([]*ansisql.DBColumn, 0, len(collectedRows))
+	for _, row := range collectedRows {
+		if len(row) < 7 {
+			continue
+		}
+
+		columnName, ok := row[0].(string)
+		if !ok {
+			continue
+		}
+
+		dataType, ok := row[1].(string)
+		if !ok {
+			continue
+		}
+
+		isNullableStr, ok := row[2].(string)
+		if !ok {
+			continue
+		}
+
+		// Build the full type name with precision/scale if available
+		fullType := dataType
+		if row[4] != nil {
+			if charMaxLength, ok := row[4].(int32); ok && charMaxLength > 0 {
+				fullType = fmt.Sprintf("%s(%d)", dataType, charMaxLength)
+			}
+		} else if row[5] != nil && row[6] != nil {
+			if numericPrecision, ok := row[5].(int32); ok {
+				if numericScale, ok := row[6].(int32); ok && numericPrecision > 0 {
+					if numericScale > 0 {
+						fullType = fmt.Sprintf("%s(%d,%d)", dataType, numericPrecision, numericScale)
+					} else {
+						fullType = fmt.Sprintf("%s(%d)", dataType, numericPrecision)
+					}
+				}
+			}
+		}
+
+		column := &ansisql.DBColumn{
+			Name:       columnName,
+			Type:       fullType,
+			Nullable:   strings.ToUpper(isNullableStr) == "YES",
+			PrimaryKey: false,
+			Unique:     false,
+		}
+
+		columns = append(columns, column)
+	}
+
+	return columns, nil
+}
+
 func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
 	db := c.config.GetDatabase()
 	q := `

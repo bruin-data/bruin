@@ -561,6 +561,24 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 						e2e.AssertByOutputString,
 					},
 				},
+				{
+					Name:    "get databases from duckdb",
+					Command: binary,
+					Args: []string{
+						"internal",
+						"fetch-databases",
+						"--connection", "duckdb-variables",
+					},
+					WorkingDir: currentFolder,
+					Expected: e2e.Output{
+						ExitCode: 0,
+						Contains: []string{"PUBLIC"},
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByContains,
+					},
+				},
 			},
 		},
 	}

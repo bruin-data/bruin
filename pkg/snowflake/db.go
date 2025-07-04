@@ -780,6 +780,153 @@ func (db *DB) fetchJSONStats(ctx context.Context, tableName, columnName string) 
 	return stats, nil
 }
 
+func (db *DB) GetDatabases(ctx context.Context) ([]string, error) {
+	q := `SHOW DATABASES`
+
+	result, err := db.Select(ctx, &query.Query{Query: q})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query Snowflake databases: %w", err)
+	}
+
+	var databases []string
+	for _, row := range result {
+		if len(row) > 1 {
+			if dbName, ok := row[1].(string); ok {
+				databases = append(databases, dbName)
+			}
+		}
+	}
+
+	sort.Strings(databases)
+	return databases, nil
+}
+
+func (db *DB) GetTables(ctx context.Context, databaseName string) ([]string, error) {
+	if databaseName == "" {
+		return nil, errors.New("database name cannot be empty")
+	}
+
+	q := fmt.Sprintf(`
+SELECT table_name
+FROM %s.INFORMATION_SCHEMA.TABLES
+WHERE table_type IN ('BASE TABLE', 'VIEW')
+ORDER BY table_name;
+`, databaseName)
+
+	result, err := db.Select(ctx, &query.Query{Query: q})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tables in database '%s': %w", databaseName, err)
+	}
+
+	var tables []string
+	for _, row := range result {
+		if len(row) > 0 {
+			if tableName, ok := row[0].(string); ok {
+				tables = append(tables, tableName)
+			}
+		}
+	}
+
+	return tables, nil
+}
+
+func (db *DB) GetColumns(ctx context.Context, databaseName, tableName string) ([]*ansisql.DBColumn, error) {
+	if databaseName == "" {
+		return nil, errors.New("database name cannot be empty")
+	}
+	if tableName == "" {
+		return nil, errors.New("table name cannot be empty")
+	}
+
+	// Parse table name to extract schema and table components
+	tableComponents := strings.Split(tableName, ".")
+	var schemaName, tableNameOnly string
+
+	switch len(tableComponents) {
+	case 1:
+		// Use current schema from config
+		schemaName = db.config.Schema
+		tableNameOnly = strings.ToUpper(tableComponents[0])
+	case 2:
+		// schema.table format
+		schemaName = strings.ToUpper(tableComponents[0])
+		tableNameOnly = strings.ToUpper(tableComponents[1])
+	default:
+		return nil, fmt.Errorf("invalid table name format: %s", tableName)
+	}
+
+	q := fmt.Sprintf(`
+SELECT 
+    column_name,
+    data_type,
+    is_nullable,
+    column_default,
+    character_maximum_length,
+    numeric_precision,
+    numeric_scale
+FROM %s.INFORMATION_SCHEMA.COLUMNS
+WHERE table_schema = '%s' AND table_name = '%s'
+ORDER BY ordinal_position;
+`, databaseName, schemaName, tableNameOnly)
+
+	result, err := db.Select(ctx, &query.Query{Query: q})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query columns for table '%s.%s': %w", databaseName, tableName, err)
+	}
+
+	columns := make([]*ansisql.DBColumn, 0, len(result))
+	for _, row := range result {
+		if len(row) < 7 {
+			continue
+		}
+
+		columnName, ok := row[0].(string)
+		if !ok {
+			continue
+		}
+
+		dataType, ok := row[1].(string)
+		if !ok {
+			continue
+		}
+
+		isNullableStr, ok := row[2].(string)
+		if !ok {
+			continue
+		}
+
+		// Build the full type name with precision/scale if available
+		fullType := dataType
+		if row[4] != nil {
+			if charMaxLength, ok := row[4].(int64); ok && charMaxLength > 0 {
+				fullType = fmt.Sprintf("%s(%d)", dataType, charMaxLength)
+			}
+		} else if row[5] != nil && row[6] != nil {
+			if numericPrecision, ok := row[5].(int64); ok {
+				if numericScale, ok := row[6].(int64); ok && numericPrecision > 0 {
+					if numericScale > 0 {
+						fullType = fmt.Sprintf("%s(%d,%d)", dataType, numericPrecision, numericScale)
+					} else {
+						fullType = fmt.Sprintf("%s(%d)", dataType, numericPrecision)
+					}
+				}
+			}
+		}
+
+		column := &ansisql.DBColumn{
+			Name:       columnName,
+			Type:       fullType,
+			Nullable:   strings.ToUpper(isNullableStr) == "YES",
+			PrimaryKey: false,
+			Unique:     false,
+		}
+
+		columns = append(columns, column)
+	}
+
+	return columns, nil
+}
+
 func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
 	// Get the current database name
 	databaseName := db.config.Database

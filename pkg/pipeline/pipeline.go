@@ -634,7 +634,7 @@ func (u Upstream) MarshalYAML() (interface{}, error) {
 }
 
 type SnowflakeConfig struct {
-	Warehouse string `json:"warehouse"`
+	Warehouse string `json:"warehouse"  yaml:"warehouse" `
 }
 
 func (s SnowflakeConfig) MarshalJSON() ([]byte, error) {
@@ -642,7 +642,8 @@ func (s SnowflakeConfig) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	return json.Marshal(s)
+	type Alias SnowflakeConfig
+	return json.Marshal(Alias(s))
 }
 
 type AthenaConfig struct {
@@ -654,7 +655,8 @@ func (s AthenaConfig) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	return json.Marshal(s)
+	type Alias AthenaConfig
+	return json.Marshal(Alias(s))
 }
 
 type Asset struct { //nolint:recvcheck
@@ -670,6 +672,7 @@ type Asset struct { //nolint:recvcheck
 	Image             string             `json:"image" yaml:"image,omitempty" mapstructure:"image"`
 	Instance          string             `json:"instance" yaml:"instance,omitempty" mapstructure:"instance"`
 	Owner             string             `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
+	Tier              int                `json:"tier,omitempty" yaml:"tier,omitempty" mapstructure:"tier"`
 	ExecutableFile    ExecutableFile     `json:"executable_file" yaml:"-" mapstructure:"-"`
 	DefinitionFile    TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
 	Parameters        EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`

@@ -59,12 +59,15 @@ func envMutateIntervals(ctx context.Context, p *pipeline.Pipeline, t *pipeline.A
 
 func envInjectVariables(env map[string]string, variables map[string]any) (map[string]string, error) {
 	if len(variables) == 0 {
+		env["BRUIN_VARS"] = "{}"
 		return env, nil
 	}
+
 	doc, err := json.Marshal(variables)
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling variables to JSON: %w", err)
 	}
+
 	env["BRUIN_VARS"] = string(doc)
 	return env, nil
 }

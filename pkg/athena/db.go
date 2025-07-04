@@ -196,19 +196,132 @@ func (db *DB) Ping(ctx context.Context) error {
 	return nil
 }
 
+func (db *DB) GetDatabases(ctx context.Context) ([]string, error) {
+	q := `
+SELECT DISTINCT table_schema
+FROM information_schema.tables
+WHERE table_schema NOT IN ('information_schema')
+ORDER BY table_schema;
+`
+
+	result, err := db.Select(ctx, &query.Query{Query: q})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query Athena schemas: %w", err)
+	}
+
+	var databases []string
+	for _, row := range result {
+		if len(row) > 0 {
+			if schemaName, ok := row[0].(string); ok {
+				databases = append(databases, schemaName)
+			}
+		}
+	}
+
+	return databases, nil
+}
+
+func (db *DB) GetTables(ctx context.Context, databaseName string) ([]string, error) {
+	if databaseName == "" {
+		return nil, errors.New("database name cannot be empty")
+	}
+
+	q := fmt.Sprintf(`
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = '%s'
+    AND table_type IN ('BASE TABLE', 'VIEW')
+ORDER BY table_name;
+`, databaseName)
+
+	result, err := db.Select(ctx, &query.Query{Query: q})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tables in schema '%s': %w", databaseName, err)
+	}
+
+	var tables []string
+	for _, row := range result {
+		if len(row) > 0 {
+			if tableName, ok := row[0].(string); ok {
+				tables = append(tables, tableName)
+			}
+		}
+	}
+
+	return tables, nil
+}
+
+func (db *DB) GetColumns(ctx context.Context, databaseName, tableName string) ([]*ansisql.DBColumn, error) {
+	if databaseName == "" {
+		return nil, errors.New("database name cannot be empty")
+	}
+	if tableName == "" {
+		return nil, errors.New("table name cannot be empty")
+	}
+
+	q := fmt.Sprintf(`
+SELECT 
+    column_name,
+    data_type,
+    is_nullable
+FROM information_schema.columns
+WHERE table_schema = '%s' AND table_name = '%s'
+ORDER BY ordinal_position;
+`, databaseName, tableName)
+
+	result, err := db.Select(ctx, &query.Query{Query: q})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query columns for table '%s.%s': %w", databaseName, tableName, err)
+	}
+
+	columns := make([]*ansisql.DBColumn, 0, len(result))
+	for _, row := range result {
+		if len(row) < 3 {
+			continue
+		}
+
+		columnName, ok := row[0].(string)
+		if !ok {
+			continue
+		}
+
+		dataType, ok := row[1].(string)
+		if !ok {
+			continue
+		}
+
+		isNullableStr, ok := row[2].(string)
+		if !ok {
+			continue
+		}
+
+		column := &ansisql.DBColumn{
+			Name:       columnName,
+			Type:       dataType,
+			Nullable:   strings.ToUpper(isNullableStr) == "YES",
+			PrimaryKey: false,
+			Unique:     false,
+		}
+
+		columns = append(columns, column)
+	}
+
+	return columns, nil
+}
+
 func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
 	// Athena uses AWS Glue Data Catalog
 	// We'll query INFORMATION_SCHEMA to get all schemas and tables
 	q := `
 SELECT
-    schema_name,
+    table_schema,
     table_name
 FROM
     information_schema.tables
 WHERE
     table_type IN ('BASE TABLE', 'VIEW')
-    AND schema_name NOT IN ('information_schema')
-ORDER BY schema_name, table_name;
+    AND table_schema NOT IN ('information_schema')
+ORDER BY table_schema, table_name;
 `
 
 	result, err := db.Select(ctx, &query.Query{Query: q})

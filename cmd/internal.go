@@ -34,6 +34,9 @@ func Internal() *cli.Command {
 			PatchAsset(),
 			ConnectionSchemas(),
 			DBSummary(),
+			FetchDatabases(),
+			FetchTables(),
+			FetchColumns(),
 		},
 	}
 }
@@ -597,11 +600,10 @@ func convertToBruinAsset(fs afero.Fs, filePath string) error {
 	}
 
 	fileName := filepath.Base(filePath)
-	assetName := strings.TrimSuffix(fileName, filepath.Ext(fileName))
 	ext := strings.ToLower(filepath.Ext(filePath))
 
 	// Try to determine the majority asset type from the pipeline
-	var assetType = pipeline.AssetTypeBigqueryQuery // default fallback
+	assetType := pipeline.AssetTypeBigqueryQuery // default fallback
 	pipelineRootPath, err := path.GetPipelineRootFromTask(filePath, PipelineDefinitionFiles)
 	if err != nil {
 		printErrorJSON(errors2.Wrap(err, "failed to get pipeline root path"))
@@ -617,7 +619,6 @@ func convertToBruinAsset(fs afero.Fs, filePath string) error {
 		return nil
 	}
 	asset := &pipeline.Asset{
-		Name: assetName,
 		Type: assetType,
 		ExecutableFile: pipeline.ExecutableFile{
 			Name:    fileName,
@@ -627,7 +628,8 @@ func convertToBruinAsset(fs afero.Fs, filePath string) error {
 	}
 
 	if ext == ".py" {
-		asset.Type = pipeline.AssetTypePython
+		asset.Type = ""
+		asset.Description = "this is a python asset"
 	}
 
 	err = asset.Persist(fs)
@@ -637,4 +639,374 @@ func convertToBruinAsset(fs afero.Fs, filePath string) error {
 	}
 
 	return nil
+}
+
+func FetchDatabases() *cli.Command {
+	return &cli.Command{
+		Name:   "fetch-databases",
+		Usage:  "Fetch available databases/datasets for a specified connection",
+		Before: telemetry.BeforeCommand,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "connection",
+				Aliases:  []string{"c"},
+				Usage:    "the name of the connection to use",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:        "output",
+				Aliases:     []string{"o"},
+				DefaultText: "plain",
+				Value:       "plain",
+				Usage:       "the output type, possible values are: plain, json",
+			},
+			&cli.StringFlag{
+				Name:    "environment",
+				Aliases: []string{"env"},
+				Usage:   "Target environment name as defined in .bruin.yml. Specifies the configuration environment for the database fetch.",
+			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Usage:   "the path to the .bruin.yml file",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			fs := afero.NewOsFs()
+			connectionName := c.String("connection")
+			environment := c.String("environment")
+			output := c.String("output")
+
+			// Get connection from config
+			conn, err := getConnectionFromConfig(environment, connectionName, fs, c.String("config-file"))
+			if err != nil {
+				return handleError(output, errors2.Wrap(err, "failed to get database connection"))
+			}
+
+			// Check if connection supports GetDatabases
+			fetcher, ok := conn.(interface {
+				GetDatabases(ctx context.Context) ([]string, error)
+			})
+			if !ok {
+				return handleError(output, fmt.Errorf("connection type '%s' does not support database fetching", connectionName))
+			}
+
+			// Get databases
+			ctx := context.Background()
+			databases, err := fetcher.GetDatabases(ctx)
+			if err != nil {
+				return handleError(output, errors2.Wrap(err, "failed to retrieve databases"))
+			}
+
+			// Output result based on format specified
+			switch output {
+			case "plain":
+				printDatabases(databases)
+			case "json":
+				type jsonResponse struct {
+					Databases []string `json:"databases"`
+					ConnName  string   `json:"connection_name"`
+					Count     int      `json:"count"`
+				}
+
+				finalOutput := jsonResponse{
+					Databases: databases,
+					ConnName:  connectionName,
+					Count:     len(databases),
+				}
+
+				jsonData, err := json.Marshal(finalOutput)
+				if err != nil {
+					return handleError(output, errors2.Wrap(err, "failed to marshal result to JSON"))
+				}
+				fmt.Println(string(jsonData))
+			default:
+				return handleError(output, fmt.Errorf("invalid output type: %s", output))
+			}
+
+			return nil
+		},
+	}
+}
+
+func printDatabases(databases []string) {
+	if len(databases) == 0 {
+		fmt.Println("No databases found")
+		return
+	}
+
+	fmt.Printf("Found %d database(s):\n", len(databases))
+	fmt.Println(strings.Repeat("=", 30))
+
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Database"})
+
+	for _, db := range databases {
+		t.AppendRow(table.Row{db})
+	}
+
+	t.SetStyle(table.StyleLight)
+	t.Render()
+}
+
+func FetchTables() *cli.Command {
+	return &cli.Command{
+		Name:   "fetch-tables",
+		Usage:  "Fetch table names for a specified database/dataset",
+		Before: telemetry.BeforeCommand,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "connection",
+				Aliases:  []string{"c"},
+				Usage:    "the name of the connection to use",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "database",
+				Aliases:  []string{"d"},
+				Usage:    "the name of the database/dataset to fetch columns from",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:        "output",
+				Aliases:     []string{"o"},
+				DefaultText: "plain",
+				Value:       "plain",
+				Usage:       "the output type, possible values are: plain, json",
+			},
+			&cli.StringFlag{
+				Name:    "environment",
+				Aliases: []string{"env"},
+				Usage:   "Target environment name as defined in .bruin.yml. Specifies the configuration environment for the table fetch.",
+			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Usage:   "the path to the .bruin.yml file",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			fs := afero.NewOsFs()
+			connectionName := c.String("connection")
+			databaseName := c.String("database")
+			environment := c.String("environment")
+			output := c.String("output")
+
+			// Get connection from config
+			conn, err := getConnectionFromConfig(environment, connectionName, fs, c.String("config-file"))
+			if err != nil {
+				return handleError(output, errors2.Wrap(err, "failed to get database connection"))
+			}
+
+			// Check if connection supports GetTables
+			fetcher, ok := conn.(interface {
+				GetTables(ctx context.Context, databaseName string) ([]string, error)
+			})
+			if !ok {
+				return handleError(output, fmt.Errorf("connection type '%s' does not support table fetching", connectionName))
+			}
+
+			// Get tables
+			ctx := context.Background()
+			tables, err := fetcher.GetTables(ctx, databaseName)
+			if err != nil {
+				return handleError(output, errors2.Wrap(err, "failed to retrieve tables"))
+			}
+
+			// Output result based on format specified
+			switch output {
+			case "plain":
+				printTableNames(databaseName, tables)
+			case "json":
+				type jsonResponse struct {
+					Database   string   `json:"database"`
+					Tables     []string `json:"tables"`
+					ConnName   string   `json:"connection_name"`
+					TableCount int      `json:"table_count"`
+				}
+
+				finalOutput := jsonResponse{
+					Database:   databaseName,
+					Tables:     tables,
+					ConnName:   connectionName,
+					TableCount: len(tables),
+				}
+
+				jsonData, err := json.Marshal(finalOutput)
+				if err != nil {
+					return handleError(output, errors2.Wrap(err, "failed to marshal result to JSON"))
+				}
+				fmt.Println(string(jsonData))
+			default:
+				return handleError(output, fmt.Errorf("invalid output type: %s", output))
+			}
+
+			return nil
+		},
+	}
+}
+
+func printTableNames(databaseName string, tables []string) {
+	if len(tables) == 0 {
+		fmt.Printf("No tables found in database '%s'\n", databaseName)
+		return
+	}
+
+	fmt.Printf("Database: %s\n", databaseName)
+	fmt.Printf("Found %d table(s):\n", len(tables))
+	fmt.Println(strings.Repeat("=", 30))
+
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Table"})
+
+	for _, tableName := range tables {
+		t.AppendRow(table.Row{tableName})
+	}
+
+	t.SetStyle(table.StyleLight)
+	t.Render()
+}
+
+func FetchColumns() *cli.Command {
+	return &cli.Command{
+		Name:   "fetch-columns",
+		Usage:  "Fetch column information for a specified table in a database/dataset",
+		Before: telemetry.BeforeCommand,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "connection",
+				Aliases:  []string{"c"},
+				Usage:    "the name of the connection to use",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "database",
+				Aliases:  []string{"d"},
+				Usage:    "the name of the database/dataset",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:     "table",
+				Aliases:  []string{"t"},
+				Usage:    "the name of the table to fetch columns from",
+				Required: true,
+			},
+			&cli.StringFlag{
+				Name:        "output",
+				Aliases:     []string{"o"},
+				DefaultText: "plain",
+				Value:       "plain",
+				Usage:       "the output type, possible values are: plain, json",
+			},
+			&cli.StringFlag{
+				Name:    "environment",
+				Aliases: []string{"env"},
+				Usage:   "Target environment name as defined in .bruin.yml. Specifies the configuration environment for the column fetch.",
+			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Usage:   "the path to the .bruin.yml file",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			fs := afero.NewOsFs()
+			connectionName := c.String("connection")
+			databaseName := c.String("database")
+			tableName := c.String("table")
+			environment := c.String("environment")
+			output := c.String("output")
+
+			// Get connection from config
+			conn, err := getConnectionFromConfig(environment, connectionName, fs, c.String("config-file"))
+			if err != nil {
+				return handleError(output, errors2.Wrap(err, "failed to get database connection"))
+			}
+
+			// Check if connection supports GetColumns
+			fetcher, ok := conn.(interface {
+				GetColumns(ctx context.Context, databaseName, tableName string) ([]*ansisql.DBColumn, error)
+			})
+			if !ok {
+				return handleError(output, fmt.Errorf("connection type '%s' does not support column fetching", connectionName))
+			}
+
+			// Get columns
+			ctx := context.Background()
+			columns, err := fetcher.GetColumns(ctx, databaseName, tableName)
+			if err != nil {
+				return handleError(output, errors2.Wrap(err, "failed to retrieve columns"))
+			}
+
+			// Output result based on format specified
+			switch output {
+			case "plain":
+				printColumns(databaseName, tableName, columns)
+			case "json":
+				type jsonResponse struct {
+					Database    string              `json:"database"`
+					Table       string              `json:"table"`
+					Columns     []*ansisql.DBColumn `json:"columns"`
+					ConnName    string              `json:"connection_name"`
+					ColumnCount int                 `json:"column_count"`
+				}
+
+				finalOutput := jsonResponse{
+					Database:    databaseName,
+					Table:       tableName,
+					Columns:     columns,
+					ConnName:    connectionName,
+					ColumnCount: len(columns),
+				}
+
+				jsonData, err := json.Marshal(finalOutput)
+				if err != nil {
+					return handleError(output, errors2.Wrap(err, "failed to marshal result to JSON"))
+				}
+				fmt.Println(string(jsonData))
+			default:
+				return handleError(output, fmt.Errorf("invalid output type: %s", output))
+			}
+
+			return nil
+		},
+	}
+}
+
+func printColumns(databaseName, tableName string, columns []*ansisql.DBColumn) {
+	if len(columns) == 0 {
+		fmt.Printf("No columns found in table '%s.%s'\n", databaseName, tableName)
+		return
+	}
+
+	fmt.Printf("Database: %s\n", databaseName)
+	fmt.Printf("Table: %s\n", tableName)
+	fmt.Printf("Found %d column(s):\n", len(columns))
+	fmt.Println(strings.Repeat("=", 60))
+
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Column", "Type", "Nullable", "Primary Key", "Unique"})
+
+	for _, col := range columns {
+		nullable := "NO"
+		if col.Nullable {
+			nullable = "YES"
+		}
+		primaryKey := "NO"
+		if col.PrimaryKey {
+			primaryKey = "YES"
+		}
+		unique := "NO"
+		if col.Unique {
+			unique = "YES"
+		}
+
+		t.AppendRow(table.Row{col.Name, col.Type, nullable, primaryKey, unique})
+	}
+
+	t.SetStyle(table.StyleLight)
+	t.Render()
 }

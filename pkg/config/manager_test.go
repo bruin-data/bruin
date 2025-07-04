@@ -354,6 +354,12 @@ func TestLoadFromFile(t *testing.T) {
 					AccountIds:  "account-id-123,account-id-456",
 				},
 			},
+			Linear: []LinearConnection{
+				{
+					Name:   "linear-1",
+					APIKey: "api-key-123",
+				},
+			},
 			GCS: []GCSConnection{
 				{
 					Name:               "gcs-1",
@@ -396,6 +402,12 @@ func TestLoadFromFile(t *testing.T) {
 					RefreshToken: "rtoken",
 				},
 			},
+			Pinterest: []PinterestConnection{
+				{
+					Name:        "pinterest-1",
+					AccessToken: "token",
+				},
+			},
 			Mixpanel: []MixpanelConnection{
 				{
 					Name:      "mixpanel-1",
@@ -403,6 +415,13 @@ func TestLoadFromFile(t *testing.T) {
 					Password:  "secret-123",
 					ProjectID: "12345",
 					Server:    "eu",
+				},
+			},
+			Trustpilot: []TrustpilotConnection{
+				{
+					Name:           "trustpilot-1",
+					BusinessUnitID: "unit123",
+					APIKey:         "apikey",
 				},
 			},
 			EMRServerless: []EMRServerlessConnection{

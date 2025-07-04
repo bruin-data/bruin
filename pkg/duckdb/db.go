@@ -5,6 +5,7 @@ package duck
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -442,6 +443,127 @@ func (c *Client) fetchJSONStats(ctx context.Context, tableName, columnName strin
 	}
 
 	return stats, nil
+}
+
+func (c *Client) GetDatabases(ctx context.Context) ([]string, error) {
+	q := `
+SELECT DISTINCT table_schema
+FROM information_schema.tables
+WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
+ORDER BY table_schema;
+`
+
+	rows, err := c.connection.QueryContext(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query DuckDB schemas: %w", err)
+	}
+	defer rows.Close()
+
+	var databases []string
+	for rows.Next() {
+		var schemaName string
+		if err := rows.Scan(&schemaName); err != nil {
+			return nil, fmt.Errorf("failed to scan schema name: %w", err)
+		}
+		databases = append(databases, schemaName)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over schema rows: %w", err)
+	}
+
+	return databases, nil
+}
+
+func (c *Client) GetTables(ctx context.Context, databaseName string) ([]string, error) {
+	if databaseName == "" {
+		return nil, errors.New("database name cannot be empty")
+	}
+
+	q := `
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = ?
+    AND table_type IN ('BASE TABLE', 'VIEW')
+ORDER BY table_name;
+`
+
+	rows, err := c.connection.QueryContext(ctx, q, databaseName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tables in schema '%s': %w", databaseName, err)
+	}
+	defer rows.Close()
+
+	var tables []string
+	for rows.Next() {
+		var tableName string
+		if err := rows.Scan(&tableName); err != nil {
+			return nil, fmt.Errorf("failed to scan table name: %w", err)
+		}
+		tables = append(tables, tableName)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over table rows: %w", err)
+	}
+
+	return tables, nil
+}
+
+func (c *Client) GetColumns(ctx context.Context, databaseName, tableName string) ([]*ansisql.DBColumn, error) {
+	if databaseName == "" {
+		return nil, errors.New("database name cannot be empty")
+	}
+	if tableName == "" {
+		return nil, errors.New("table name cannot be empty")
+	}
+
+	q := `
+SELECT 
+    column_name,
+    data_type,
+    is_nullable,
+    column_default
+FROM information_schema.columns
+WHERE table_schema = ? AND table_name = ?
+ORDER BY ordinal_position;
+`
+
+	rows, err := c.connection.QueryContext(ctx, q, databaseName, tableName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query columns for table '%s.%s': %w", databaseName, tableName, err)
+	}
+	defer rows.Close()
+
+	var columns []*ansisql.DBColumn
+	for rows.Next() {
+		var (
+			columnName    string
+			dataType      string
+			isNullable    string
+			columnDefault sql.NullString
+		)
+
+		if err := rows.Scan(&columnName, &dataType, &isNullable, &columnDefault); err != nil {
+			return nil, fmt.Errorf("failed to scan column info: %w", err)
+		}
+
+		column := &ansisql.DBColumn{
+			Name:       columnName,
+			Type:       dataType,
+			Nullable:   isNullable == "YES",
+			PrimaryKey: false,
+			Unique:     false,
+		}
+
+		columns = append(columns, column)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over column rows: %w", err)
+	}
+
+	return columns, nil
 }
 
 func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {

@@ -104,7 +104,7 @@ func TestConvertToBruinAsset(t *testing.T) {
 			fileContent: "SELECT * FROM table;",
 			filePath:    "test.sql",
 			wantErr:     false,
-			wantContent: "/* @bruin\n\nname: test\ntype: bq.sql\n\n@bruin */\n\nSELECT * FROM table;",
+			wantContent: "/* @bruin\n\ntype: bq.sql\n\n@bruin */\n\nSELECT * FROM table;",
 			wantAsset:   true,
 		},
 		{
@@ -112,7 +112,7 @@ func TestConvertToBruinAsset(t *testing.T) {
 			fileContent: "print('hello')",
 			filePath:    "test.py",
 			wantErr:     false,
-			wantContent: "\"\"\"@bruin\n\nname: test\n\n@bruin\"\"\"\n\nprint('hello')",
+			wantContent: "\"\"\"@bruin\ndescription: this is a python asset\n@bruin\"\"\"\n\nprint('hello')",
 			wantAsset:   true,
 		},
 		{
@@ -128,7 +128,7 @@ func TestConvertToBruinAsset(t *testing.T) {
 			fileContent: "SELECT * FROM table;",
 			filePath:    "my test.sql",
 			wantErr:     false,
-			wantContent: "/* @bruin\n\nname: my test\ntype: bq.sql\n\n@bruin */\n\nSELECT * FROM table;",
+			wantContent: "/* @bruin\n\ntype: bq.sql\n\n@bruin */\n\nSELECT * FROM table;",
 			wantAsset:   true,
 		},
 	}
@@ -169,12 +169,6 @@ func TestConvertToBruinAsset(t *testing.T) {
 					}
 					if asset == nil {
 						t.Error("Expected asset to be created, but got nil")
-					} else {
-						// Verify asset properties
-						expectedName := strings.TrimSuffix(filepath.Base(tt.filePath), filepath.Ext(tt.filePath))
-						if asset.Name != expectedName {
-							t.Errorf("Asset name = %v, want %v", asset.Name, expectedName)
-						}
 					}
 				} else { //nolint
 					if asset != nil {
@@ -185,6 +179,7 @@ func TestConvertToBruinAsset(t *testing.T) {
 		})
 	}
 }
+
 func normalize(s string) string {
 	lines := strings.Split(s, "\n")
 	var out []string

@@ -23,7 +23,7 @@ variables:
 
 All variables are accessible in SQL, `seed`, `sensor`, and `ingestr` assets via the `var` namespace.
 
-In Python assets, variables are exposed under `BRUIN_VARS` environment variable.
+In Python assets, variables are exposed under `BRUIN_VARS` environment variable. When a pipeline defines no variables, this environment variable contains `{}`.
 ::: code-group
 ```sql [asset.sql]
 SELECT * FROM events

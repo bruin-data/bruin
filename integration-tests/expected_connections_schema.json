@@ -503,6 +503,12 @@
           },
           "type": "array"
         },
+        "linear": {
+          "items": {
+            "$ref": "#/$defs/LinearConnection"
+          },
+          "type": "array"
+        },
         "gcs": {
           "items": {
             "$ref": "#/$defs/GCSConnection"
@@ -536,6 +542,18 @@
         "mixpanel": {
           "items": {
             "$ref": "#/$defs/MixpanelConnection"
+          },
+          "type": "array"
+        },
+        "trustpilot": {
+          "items": {
+            "$ref": "#/$defs/TrustpilotConnection"
+          },
+          "type": "array"
+        },
+        "pinterest": {
+          "items": {
+            "$ref": "#/$defs/PinterestConnection"
           },
           "type": "array"
         },
@@ -1197,6 +1215,22 @@
         "account_ids"
       ]
     },
+    "LinearConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "MixpanelConnection": {
       "properties": {
         "name": {
@@ -1222,6 +1256,26 @@
         "username",
         "password",
         "project_id"
+      ]
+    },
+    "TrustpilotConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "business_unit_id": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "business_unit_id",
+        "api_key"
       ]
     },
     "MongoConnection": {
@@ -1509,6 +1563,22 @@
         "client_id",
         "client_secret",
         "refresh_token"
+      ]
+    },
+    "PinterestConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token"
       ]
     },
     "RedshiftConnection": {

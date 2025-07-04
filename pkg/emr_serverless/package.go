@@ -16,6 +16,7 @@ var bruinExcludes = []string{
 	"pipeline.yml",
 	"pipeline.yaml",
 }
+
 var venvExcludes = []*regexp.Regexp{
 	regexp.MustCompile(`[/\\].venv[/\\]`),
 	regexp.MustCompile(`[/\\]venv[/\\]`),

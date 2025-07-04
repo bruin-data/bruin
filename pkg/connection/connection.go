@@ -43,6 +43,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/kafka"
 	"github.com/bruin-data/bruin/pkg/kinesis"
 	"github.com/bruin-data/bruin/pkg/klaviyo"
+	"github.com/bruin-data/bruin/pkg/linear"
 	"github.com/bruin-data/bruin/pkg/linkedinads"
 	"github.com/bruin-data/bruin/pkg/mixpanel"
 	"github.com/bruin-data/bruin/pkg/mongo"
@@ -52,6 +53,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/oracle"
 	"github.com/bruin-data/bruin/pkg/personio"
 	"github.com/bruin-data/bruin/pkg/phantombuster"
+	"github.com/bruin-data/bruin/pkg/pinterest"
 	"github.com/bruin-data/bruin/pkg/pipedrive"
 	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/quickbooks"
@@ -67,6 +69,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/sqlite"
 	"github.com/bruin-data/bruin/pkg/stripe"
 	"github.com/bruin-data/bruin/pkg/tiktokads"
+	"github.com/bruin-data/bruin/pkg/trustpilot"
 	"github.com/bruin-data/bruin/pkg/zendesk"
 	"github.com/bruin-data/bruin/pkg/zoom"
 	"github.com/pkg/errors"
@@ -107,6 +110,7 @@ type Manager struct {
 	GitHub          map[string]*github.Client
 	AppStore        map[string]*appstore.Client
 	LinkedInAds     map[string]*linkedinads.Client
+	Linear          map[string]*linear.Client
 	ClickHouse      map[string]*clickhouse.Client
 	GCS             map[string]*gcs.Client
 	ApplovinMax     map[string]*applovinmax.Client
@@ -114,6 +118,8 @@ type Manager struct {
 	Kinesis         map[string]*kinesis.Client
 	Pipedrive       map[string]*pipedrive.Client
 	Mixpanel        map[string]*mixpanel.Client
+	Pinterest       map[string]*pinterest.Client
+	Trustpilot      map[string]*trustpilot.Client
 	QuickBooks      map[string]*quickbooks.Client
 	Zoom            map[string]*zoom.Client
 	Frankfurter     map[string]*frankfurter.Client
@@ -342,6 +348,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.LinkedInAds))...)
 
+	connLinear, err := m.GetLinearConnectionWithoutDefault(name)
+	if err == nil {
+		return connLinear, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Linear))...)
+
 	connApplovinMax, err := m.GetApplovinMaxConnectionWithoutDefault(name)
 	if err == nil {
 		return connApplovinMax, nil
@@ -377,6 +389,18 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connMixpanel, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Mixpanel))...)
+
+	connPinterest, err := m.GetPinterestConnectionWithoutDefault(name)
+	if err == nil {
+		return connPinterest, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Pinterest))...)
+
+	connTrustpilot, err := m.GetTrustpilotConnectionWithoutDefault(name)
+	if err == nil {
+		return connTrustpilot, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Trustpilot))...)
 
 	connQuickBooks, err := m.GetQuickBooksConnectionWithoutDefault(name)
 	if err == nil {
@@ -1301,6 +1325,25 @@ func (m *Manager) GetLinkedInAdsConnectionWithoutDefault(name string) (*linkedin
 	return db, nil
 }
 
+func (m *Manager) GetLinearConnection(name string) (*linear.Client, error) {
+	db, err := m.GetLinearConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetLinearConnectionWithoutDefault("linear-default")
+}
+
+func (m *Manager) GetLinearConnectionWithoutDefault(name string) (*linear.Client, error) {
+	if m.Linear == nil {
+		return nil, errors.New("no linear connections found")
+	}
+	db, ok := m.Linear[name]
+	if !ok {
+		return nil, errors.Errorf("linear connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
 func (m *Manager) GetGCSConnection(name string) (*gcs.Client, error) {
 	db, err := m.GetGCSConnectionWithoutDefault(name)
 	if err == nil {
@@ -1430,6 +1473,44 @@ func (m *Manager) GetQuickBooksConnectionWithoutDefault(name string) (*quickbook
 	db, ok := m.QuickBooks[name]
 	if !ok {
 		return nil, errors.Errorf("quickbooks connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetPinterestConnection(name string) (*pinterest.Client, error) {
+	db, err := m.GetPinterestConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetPinterestConnectionWithoutDefault("pinterest-default")
+}
+
+func (m *Manager) GetPinterestConnectionWithoutDefault(name string) (*pinterest.Client, error) {
+	if m.Pinterest == nil {
+		return nil, errors.New("no pinterest connections found")
+	}
+	db, ok := m.Pinterest[name]
+	if !ok {
+		return nil, errors.Errorf("pinterest connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetTrustpilotConnection(name string) (*trustpilot.Client, error) {
+	db, err := m.GetTrustpilotConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetTrustpilotConnectionWithoutDefault("trustpilot-default")
+}
+
+func (m *Manager) GetTrustpilotConnectionWithoutDefault(name string) (*trustpilot.Client, error) {
+	if m.Trustpilot == nil {
+		return nil, errors.New("no trustpilot connections found")
+	}
+	db, ok := m.Trustpilot[name]
+	if !ok {
+		return nil, errors.Errorf("trustpilot connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2661,6 +2742,25 @@ func (m *Manager) AddLinkedInAdsConnectionFromConfig(connection *config.LinkedIn
 	return nil
 }
 
+func (m *Manager) AddLinearConnectionFromConfig(connection *config.LinearConnection) error {
+	m.mutex.Lock()
+	if m.Linear == nil {
+		m.Linear = make(map[string]*linear.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := linear.NewClient(linear.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Linear[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddGCSConnectionFromConfig(connection *config.GCSConnection) error {
 	m.mutex.Lock()
 	if m.GCS == nil {
@@ -2778,6 +2878,45 @@ func (m *Manager) AddQuickBooksConnectionFromConfig(connection *config.QuickBook
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.QuickBooks[connection.Name] = client
+	return nil
+}
+
+func (m *Manager) AddPinterestConnectionFromConfig(connection *config.PinterestConnection) error {
+	m.mutex.Lock()
+	if m.Pinterest == nil {
+		m.Pinterest = make(map[string]*pinterest.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := pinterest.NewClient(pinterest.Config{
+		AccessToken: connection.AccessToken,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Pinterest[connection.Name] = client
+	return nil
+}
+
+func (m *Manager) AddTrustpilotConnectionFromConfig(connection *config.TrustpilotConnection) error {
+	m.mutex.Lock()
+	if m.Trustpilot == nil {
+		m.Trustpilot = make(map[string]*trustpilot.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := trustpilot.NewClient(trustpilot.Config{
+		BusinessUnitID: connection.BusinessUnitID,
+		APIKey:         connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Trustpilot[connection.Name] = client
 	return nil
 }
 
@@ -3157,12 +3296,15 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.GitHub, connectionManager.AddGitHubConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppStore, connectionManager.AddAppStoreConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.LinkedInAds, connectionManager.AddLinkedInAdsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Linear, connectionManager.AddLinearConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GCS, connectionManager.AddGCSConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Personio, connectionManager.AddPersonioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.ApplovinMax, connectionManager.AddApplovinMaxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mixpanel, connectionManager.AddMixpanelConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Pinterest, connectionManager.AddPinterestConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Trustpilot, connectionManager.AddTrustpilotConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.QuickBooks, connectionManager.AddQuickBooksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Zoom, connectionManager.AddZoomConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)
