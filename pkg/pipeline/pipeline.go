@@ -61,6 +61,7 @@ const (
 	AssetTypeSynapseQuerySensor     = AssetType("synapse.sensor.query")
 	AssetTypeIngestr                = AssetType("ingestr")
 	AssetTypeTableau                = AssetType("tableau")
+	AssetTypeTableauRefresh         = AssetType("tableau.refresh")
 	AssetTypeClickHouse             = AssetType("clickhouse.sql")
 	AssetTypeClickHouseSeed         = AssetType("clickhouse.seed")
 	AssetTypeClickHouseQuerySensor  = AssetType("clickhouse.sensor.query")
@@ -672,6 +673,7 @@ type Asset struct { //nolint:recvcheck
 	Image             string             `json:"image" yaml:"image,omitempty" mapstructure:"image"`
 	Instance          string             `json:"instance" yaml:"instance,omitempty" mapstructure:"instance"`
 	Owner             string             `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
+	Tier              int                `json:"tier,omitempty" yaml:"tier,omitempty" mapstructure:"tier"`
 	ExecutableFile    ExecutableFile     `json:"executable_file" yaml:"-" mapstructure:"-"`
 	DefinitionFile    TaskDefinitionFile `json:"definition_file" yaml:"-" mapstructure:"-"`
 	Parameters        EmptyStringMap     `json:"parameters" yaml:"parameters,omitempty" mapstructure:"parameters"`

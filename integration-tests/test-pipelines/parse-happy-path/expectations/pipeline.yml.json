@@ -5,7 +5,7 @@
   "start_date": "",
   "definition_file": {
     "name": "pipeline.yml",
-    "path": "__PIPELINEDIR__pipeline.yml"
+    "path": "test-pipelines/parse-happy-path/pipeline.yml"
   },
   "default_connections": {},
   "assets": [
@@ -18,13 +18,12 @@
       "connection": "",
       "tags": [],
       "materialization": null,
-      "interval_modifiers": null,
       "upstreams": [
         {
           "type": "asset",
           "value": "chess_playground.player_summary",
           "columns": [],
-        "mode": "full"
+          "mode": "full"
         }
       ],
       "image": "python:3.11",
@@ -32,12 +31,12 @@
       "owner": "",
       "executable_file": {
         "name": "asset.py",
-        "path": "__ASSETSDIR__asset.py",
+        "path": "test-pipelines/parse-happy-path/assets/asset.py",
         "content": ""
       },
       "definition_file": {
         "name": "asset.py",
-        "path": "__ASSETSDIR__asset.py",
+        "path": "test-pipelines/parse-happy-path/assets/asset.py",
         "type": "comment"
       },
       "parameters": {},
@@ -47,11 +46,13 @@
           "injected_key": "INJECTED1"
         }
       ],
+      "extends": null,
       "columns": [],
       "custom_checks": [],
       "metadata": {},
       "snowflake": null,
-      "athena": null
+      "athena": null,
+      "interval_modifiers": null
     },
     {
       "id": "209c299a591add072bfa259ad5f311ab7c5aa154960a55b20f3d6de33bb8f21b",
@@ -62,19 +63,18 @@
       "connection": "",
       "tags": [],
       "materialization": null,
-      "interval_modifiers": null,
       "upstreams": [],
       "image": "",
       "instance": "",
       "owner": "",
       "executable_file": {
         "name": "chess_games.asset.yml",
-        "path": "__ASSETSDIR__chess_games.asset.yml",
+        "path": "test-pipelines/parse-happy-path/assets/chess_games.asset.yml",
         "content": ""
       },
       "definition_file": {
         "name": "chess_games.asset.yml",
-        "path": "__ASSETSDIR__chess_games.asset.yml",
+        "path": "test-pipelines/parse-happy-path/assets/chess_games.asset.yml",
         "type": "yaml"
       },
       "parameters": {
@@ -83,11 +83,13 @@
         "source_table": "games"
       },
       "secrets": [],
+      "extends": null,
       "columns": [],
       "custom_checks": [],
       "metadata": {},
       "snowflake": null,
-      "athena": null
+      "athena": null,
+      "interval_modifiers": null
     },
     {
       "id": "c53385eb13eb4d3d102be02b0d3fe4a10661339b3c098de8b226f7317fc47d21",
@@ -98,19 +100,18 @@
       "connection": "",
       "tags": [],
       "materialization": null,
-      "interval_modifiers": null,
       "upstreams": [],
       "image": "",
       "instance": "",
       "owner": "",
       "executable_file": {
         "name": "chess_profiles.asset.yml",
-        "path": "__ASSETSDIR__chess_profiles.asset.yml",
+        "path": "test-pipelines/parse-happy-path/assets/chess_profiles.asset.yml",
         "content": ""
       },
       "definition_file": {
         "name": "chess_profiles.asset.yml",
-        "path": "__ASSETSDIR__chess_profiles.asset.yml",
+        "path": "test-pipelines/parse-happy-path/assets/chess_profiles.asset.yml",
         "type": "yaml"
       },
       "parameters": {
@@ -119,11 +120,13 @@
         "source_table": "profiles"
       },
       "secrets": [],
+      "extends": null,
       "columns": [],
       "custom_checks": [],
       "metadata": {},
       "snowflake": null,
-      "athena": null
+      "athena": null,
+      "interval_modifiers": null
     },
     {
       "id": "8361c0131fda306b28fd4f3c8f2af121cca5e57baf77a771b4cb218abda4ca5b",
@@ -141,19 +144,18 @@
         "incremental_key": "",
         "time_granularity": ""
       },
-      "interval_modifiers": null,
       "upstreams": [
         {
           "type": "asset",
           "value": "chess_playground.games",
           "columns": [],
-        "mode": "full"
+          "mode": "full"
         },
         {
           "type": "asset",
           "value": "chess_playground.profiles",
           "columns": [],
-        "mode": "full"
+          "mode": "full"
         }
       ],
       "image": "",
@@ -161,16 +163,17 @@
       "owner": "",
       "executable_file": {
         "name": "player_summary.sql",
-        "path": "__ASSETSDIR__player_summary.sql",
+        "path": "test-pipelines/parse-happy-path/assets/player_summary.sql",
         "content": ""
       },
       "definition_file": {
         "name": "player_summary.sql",
-        "path": "__ASSETSDIR__player_summary.sql",
+        "path": "test-pipelines/parse-happy-path/assets/player_summary.sql",
         "type": "comment"
       },
       "parameters": {},
       "secrets": [],
+      "extends": null,
       "columns": [
         {
           "entity_attribute": null,
@@ -194,7 +197,8 @@
       "custom_checks": [],
       "metadata": {},
       "snowflake": null,
-      "athena": null
+      "athena": null,
+      "interval_modifiers": null
     }
   ],
   "notifications": {
@@ -207,5 +211,9 @@
     "bigquery": false
   },
   "retries": 0,
-  "concurrency": 0
+  "concurrency": 1,
+  "commit": "",
+  "snapshot": "",
+  "agent": false,
+  "variables": null
 }

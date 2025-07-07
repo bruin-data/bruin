@@ -607,6 +607,15 @@ func (c LinkedInAdsConnection) GetName() string {
 	return c.Name
 }
 
+type LinearConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	APIKey string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c LinearConnection) GetName() string {
+	return c.Name
+}
+
 type GCSConnection struct {
 	Name               string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	ServiceAccountFile string `yaml:"service_account_file,omitempty" json:"service_account_file" mapstructure:"service_account_file"`
@@ -655,6 +664,16 @@ type PinterestConnection struct {
 }
 
 func (c PinterestConnection) GetName() string {
+	return c.Name
+}
+
+type TrustpilotConnection struct {
+	Name           string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	BusinessUnitID string `yaml:"business_unit_id,omitempty" json:"business_unit_id" mapstructure:"business_unit_id"`
+	APIKey         string `yaml:"api_key,omitempty" json:"api_key" mapstructure:"api_key"`
+}
+
+func (c TrustpilotConnection) GetName() string {
 	return c.Name
 }
 
@@ -852,5 +871,20 @@ type ISOCPulseConnection struct {
 }
 
 func (c ISOCPulseConnection) GetName() string {
+	return c.Name
+}
+
+type TableauConnection struct {
+	Name                      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Host                      string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Username                  string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password                  string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	PersonalAccessTokenName   string `yaml:"personal_access_token_name,omitempty" json:"personal_access_token_name" mapstructure:"personal_access_token_name"`
+	PersonalAccessTokenSecret string `yaml:"personal_access_token_secret,omitempty" json:"personal_access_token_secret" mapstructure:"personal_access_token_secret"`
+	SiteID                    string `yaml:"site_id,omitempty" json:"site_id" mapstructure:"site_id"`
+	APIVersion                string `yaml:"api_version,omitempty" json:"api_version" mapstructure:"api_version"`
+}
+
+func (c TableauConnection) GetName() string {
 	return c.Name
 }

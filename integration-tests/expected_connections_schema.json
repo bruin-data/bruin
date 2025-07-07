@@ -503,6 +503,12 @@
           },
           "type": "array"
         },
+        "linear": {
+          "items": {
+            "$ref": "#/$defs/LinearConnection"
+          },
+          "type": "array"
+        },
         "gcs": {
           "items": {
             "$ref": "#/$defs/GCSConnection"
@@ -542,6 +548,12 @@
         "pinterest": {
           "items": {
             "$ref": "#/$defs/PinterestConnection"
+          },
+          "type": "array"
+        },
+        "trustpilot": {
+          "items": {
+            "$ref": "#/$defs/TrustpilotConnection"
           },
           "type": "array"
         },
@@ -650,6 +662,12 @@
         "isoc_pulse": {
           "items": {
             "$ref": "#/$defs/ISOCPulseConnection"
+          },
+          "type": "array"
+        },
+        "tableau": {
+          "items": {
+            "$ref": "#/$defs/TableauConnection"
           },
           "type": "array"
         }
@@ -1183,6 +1201,22 @@
         "api_key"
       ]
     },
+    "LinearConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_key"
+      ]
+    },
     "LinkedInAdsConnection": {
       "properties": {
         "name": {
@@ -1425,6 +1459,22 @@
         "api_key"
       ]
     },
+    "PinterestConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "access_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "access_token"
+      ]
+    },
     "PipedriveConnection": {
       "properties": {
         "name": {
@@ -1515,22 +1565,6 @@
         "client_id",
         "client_secret",
         "refresh_token"
-      ]
-    },
-    "PinterestConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "access_token": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "access_token"
       ]
     },
     "RedshiftConnection": {
@@ -1892,6 +1926,46 @@
         "database"
       ]
     },
+    "TableauConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "personal_access_token_name": {
+          "type": "string"
+        },
+        "personal_access_token_secret": {
+          "type": "string"
+        },
+        "site_id": {
+          "type": "string"
+        },
+        "api_version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "username",
+        "password",
+        "personal_access_token_name",
+        "personal_access_token_secret",
+        "site_id",
+        "api_version"
+      ]
+    },
     "TikTokAdsConnection": {
       "properties": {
         "name": {
@@ -1913,6 +1987,26 @@
         "name",
         "access_token",
         "advertiser_ids"
+      ]
+    },
+    "TrustpilotConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "business_unit_id": {
+          "type": "string"
+        },
+        "api_key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "business_unit_id",
+        "api_key"
       ]
     },
     "ZendeskConnection": {

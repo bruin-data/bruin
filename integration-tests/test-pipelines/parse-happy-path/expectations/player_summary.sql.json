@@ -15,7 +15,6 @@
       "incremental_key": "",
       "time_granularity": ""
     },
-    "interval_modifiers": null,
     "upstreams": [
       {
         "type": "asset",
@@ -35,16 +34,17 @@
     "owner": "",
     "executable_file": {
       "name": "player_summary.sql",
-      "path": "/integration-tests/happy-path/assets/player_summary.sql",
-      "content": "WITH game_results AS (\n    SELECT\n        CASE\n            WHEN g.white-\u003e\u003e'result' = 'win' THEN g.white-\u003e\u003e'@id'\n            WHEN g.black-\u003e\u003e'result' = 'win' THEN g.black-\u003e\u003e'@id'\n            ELSE NULL\n            END AS winner_aid,\n        g.white-\u003e\u003e'@id' AS white_aid,\n    g.black-\u003e\u003e'@id' AS black_aid\nFROM chess_playground.games g\n)\n\nSELECT\n    p.username,\n    p.aid,\n    COUNT(*) AS total_games,\n    COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) AS white_wins,\n    COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) AS black_wins,\n    COUNT(CASE WHEN g.white_aid = p.aid THEN 1 END) AS white_games,\n    COUNT(CASE WHEN g.black_aid = p.aid THEN 1 END) AS black_games,\n    ROUND(COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) * 100.0 / NULLIF(COUNT(CASE WHEN g.white_aid = p.aid THEN 1 END), 0), 2) AS white_win_rate,\n    ROUND(COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) * 100.0 / NULLIF(COUNT(CASE WHEN g.black_aid = p.aid THEN 1 END), 0), 2) AS black_win_rate\nFROM chess_playground.profiles p\nLEFT JOIN game_results g\n       ON p.aid IN (g.white_aid, g.black_aid)\nGROUP BY p.username, p.aid\nORDER BY total_games DESC"
+      "path": "test-pipelines/parse-happy-path/assets/player_summary.sql",
+      "content": "WITH game_results AS (\n    SELECT\n        CASE\n            WHEN g.white->>'result' = 'win' THEN g.white->>'@id'\n            WHEN g.black->>'result' = 'win' THEN g.black->>'@id'\n            ELSE NULL\n            END AS winner_aid,\n        g.white->>'@id' AS white_aid,\n    g.black->>'@id' AS black_aid\nFROM chess_playground.games g\n)\n\nSELECT\n    p.username,\n    p.aid,\n    COUNT(*) AS total_games,\n    COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) AS white_wins,\n    COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) AS black_wins,\n    COUNT(CASE WHEN g.white_aid = p.aid THEN 1 END) AS white_games,\n    COUNT(CASE WHEN g.black_aid = p.aid THEN 1 END) AS black_games,\n    ROUND(COUNT(CASE WHEN g.white_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) * 100.0 / NULLIF(COUNT(CASE WHEN g.white_aid = p.aid THEN 1 END), 0), 2) AS white_win_rate,\n    ROUND(COUNT(CASE WHEN g.black_aid = p.aid AND g.winner_aid = p.aid THEN 1 END) * 100.0 / NULLIF(COUNT(CASE WHEN g.black_aid = p.aid THEN 1 END), 0), 2) AS black_win_rate\nFROM chess_playground.profiles p\nLEFT JOIN game_results g\n       ON p.aid IN (g.white_aid, g.black_aid)\nGROUP BY p.username, p.aid\nORDER BY total_games DESC"
     },
     "definition_file": {
       "name": "player_summary.sql",
-      "path": "/integration-tests/happy-path/assets/player_summary.sql",
+      "path": "test-pipelines/parse-happy-path/assets/player_summary.sql",
       "type": "comment"
     },
     "parameters": {},
     "secrets": [],
+    "extends": null,
     "columns": [
       {
         "entity_attribute": null,
@@ -68,13 +68,14 @@
     "custom_checks": [],
     "metadata": {},
     "snowflake": null,
-    "athena": null
+    "athena": null,
+    "interval_modifiers": null
   },
   "pipeline": {
     "name": "integration_test",
     "schedule": ""
   },
   "repo": {
-    "path": "/integration-tests"
+    "path": "/Users/bruin/GolandProjects/bruin/integration-tests"
   }
 }

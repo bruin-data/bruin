@@ -3,13 +3,11 @@
   "name": "integration_test",
   "schedule": "",
   "start_date": "",
-  "agent" : false,
   "definition_file": {
     "name": "pipeline.yml",
-    "path": "integration-tests/test-pipelines/parse-lineage-pipeline/pipeline.yml"
+    "path": "test-pipelines/parse-lineage-pipeline/pipeline.yml"
   },
   "default_connections": {},
-  "variables": null,
   "assets": [
     {
       "id": "aff64e4fd520bd185cb01adab98d2d20060f621c62d5cad5204712cfa2294ef7",
@@ -27,7 +25,6 @@
         "incremental_key": "",
         "time_granularity": ""
       },
-      "interval_modifiers": null,
       "upstreams": [
         {
           "type": "asset",
@@ -42,7 +39,7 @@
               "usage": ""
             }
           ],
-        "mode": "full"
+          "mode": "full"
         }
       ],
       "image": "",
@@ -50,16 +47,17 @@
       "owner": "",
       "executable_file": {
         "name": "country.sql",
-        "path": "integration-tests/test-pipelines/parse-lineage-pipeline/assets/country.sql",
+        "path": "test-pipelines/parse-lineage-pipeline/assets/country.sql",
         "content": ""
       },
       "definition_file": {
         "name": "country.sql",
-        "path": "integration-tests/test-pipelines/parse-lineage-pipeline/assets/country.sql",
+        "path": "test-pipelines/parse-lineage-pipeline/assets/country.sql",
         "type": "comment"
       },
       "parameters": {},
       "secrets": [],
+      "extends": null,
       "columns": [
         {
           "entity_attribute": null,
@@ -95,7 +93,8 @@
       "custom_checks": [],
       "metadata": {},
       "snowflake": null,
-      "athena": null
+      "athena": null,
+      "interval_modifiers": null
     },
     {
       "id": "50d858e0985ecc7f60418aaf0cc5ab587f42c2570a884095a9e8ccacd0f6545c",
@@ -113,7 +112,6 @@
         "incremental_key": "",
         "time_granularity": ""
       },
-      "interval_modifiers": null,
       "upstreams": [
         {
           "type": "asset",
@@ -128,7 +126,7 @@
               "usage": ""
             }
           ],
-        "mode": "full"
+          "mode": "full"
         },
         {
           "type": "asset",
@@ -151,7 +149,7 @@
               "usage": ""
             }
           ],
-        "mode": "full"
+          "mode": "full"
         }
       ],
       "image": "",
@@ -159,16 +157,17 @@
       "owner": "",
       "executable_file": {
         "name": "example.sql",
-        "path": "integration-tests/test-pipelines/parse-lineage-pipeline/assets/example.sql",
+        "path": "test-pipelines/parse-lineage-pipeline/assets/example.sql",
         "content": ""
       },
       "definition_file": {
         "name": "example.sql",
-        "path": "integration-tests/test-pipelines/parse-lineage-pipeline/assets/example.sql",
+        "path": "test-pipelines/parse-lineage-pipeline/assets/example.sql",
         "type": "comment"
       },
       "parameters": {},
       "secrets": [],
+      "extends": null,
       "columns": [
         {
           "entity_attribute": null,
@@ -234,7 +233,8 @@
       "custom_checks": [],
       "metadata": {},
       "snowflake": null,
-      "athena": null
+      "athena": null,
+      "interval_modifiers": null
     },
     {
       "id": "c9022680f888674e2b2274758755bfa07dea729b68d71cde5c521ed70ef261bf",
@@ -252,7 +252,6 @@
         "incremental_key": "",
         "time_granularity": ""
       },
-      "interval_modifiers": null,
       "upstreams": [
         {
           "type": "asset",
@@ -279,7 +278,7 @@
               "usage": ""
             }
           ],
-        "mode": "full"
+          "mode": "full"
         }
       ],
       "image": "",
@@ -287,16 +286,17 @@
       "owner": "",
       "executable_file": {
         "name": "people.sql",
-        "path": "integration-tests/test-pipelines/parse-lineage-pipeline/assets/people.sql",
+        "path": "test-pipelines/parse-lineage-pipeline/assets/people.sql",
         "content": ""
       },
       "definition_file": {
         "name": "people.sql",
-        "path": "integration-tests/test-pipelines/parse-lineage-pipeline/assets/people.sql",
+        "path": "test-pipelines/parse-lineage-pipeline/assets/people.sql",
         "type": "comment"
       },
       "parameters": {},
       "secrets": [],
+      "extends": null,
       "columns": [
         {
           "entity_attribute": null,
@@ -362,7 +362,8 @@
       "custom_checks": [],
       "metadata": {},
       "snowflake": null,
-      "athena": null
+      "athena": null,
+      "interval_modifiers": null
     },
     {
       "id": "7dfb4cf67742cb0660305e56ef816c53fcec892cae7f6ee39b75f34e659d672c",
@@ -380,23 +381,23 @@
         "incremental_key": "",
         "time_granularity": ""
       },
-      "interval_modifiers": null,
       "upstreams": [],
       "image": "",
       "instance": "",
       "owner": "",
       "executable_file": {
         "name": "users.sql",
-        "path": "integration-tests/test-pipelines/parse-lineage-pipeline/assets/users.sql",
+        "path": "test-pipelines/parse-lineage-pipeline/assets/users.sql",
         "content": ""
       },
       "definition_file": {
         "name": "users.sql",
-        "path": "integration-tests/test-pipelines/parse-lineage-pipeline/assets/users.sql",
+        "path": "test-pipelines/parse-lineage-pipeline/assets/users.sql",
         "type": "comment"
       },
       "parameters": {},
       "secrets": [],
+      "extends": null,
       "columns": [
         {
           "entity_attribute": null,
@@ -452,7 +453,8 @@
       "custom_checks": [],
       "metadata": {},
       "snowflake": null,
-      "athena": null
+      "athena": null,
+      "interval_modifiers": null
     }
   ],
   "notifications": {
@@ -465,5 +467,9 @@
     "bigquery": false
   },
   "retries": 0,
-  "concurrency": 1
+  "concurrency": 1,
+  "commit": "",
+  "snapshot": "",
+  "agent": false,
+  "variables": null
 }

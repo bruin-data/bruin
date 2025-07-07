@@ -87,7 +87,7 @@ func (u *UvChecker) EnsureUvInstalled(ctx context.Context) (string, error) {
 		return uvBinaryPath, nil
 	}
 
-	cmd := exec.Command(uvBinaryPath, "version", "--output-format", "json")
+	cmd := exec.Command(uvBinaryPath, "version", "--no-config", "--output-format", "json")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to check uv version: %w -- Output: %s", err, output)
@@ -213,7 +213,7 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 		return errors.Wrap(err, "failed to install ingestr")
 	}
 
-	flags := []string{"tool", "run", "--prerelease", "allow", "--python", pythonVersionForIngestr, "ingestr"}
+	flags := []string{"tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr, "ingestr"}
 	flags = append(flags, args...)
 
 	noDependencyCommand := &CommandInstance{
@@ -226,7 +226,7 @@ func (u *UvPythonRunner) RunIngestr(ctx context.Context, args, extraPackages []s
 }
 
 func (u *UvPythonRunner) runWithNoMaterialization(ctx context.Context, execCtx *executionContext, pythonVersion string) error {
-	flags := []string{"run", "--python", pythonVersion}
+	flags := []string{"run", "--no-config", "--no-sync", "--python", pythonVersion}
 	if execCtx.requirementsTxt != "" {
 		flags = append(flags, "--with-requirements", execCtx.requirementsTxt)
 	}
@@ -274,7 +274,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		return fmt.Errorf("failed to write to temp file: %w", err)
 	}
 
-	flags := []string{"run", "--python", pythonVersion}
+	flags := []string{"run", "--no-config", "--no-sync", "--python", pythonVersion}
 	if execCtx.requirementsTxt != "" {
 		flags = append(flags, "--with-requirements", execCtx.requirementsTxt)
 	}
@@ -367,7 +367,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		return errors.Wrap(err, "failed to install ingestr")
 	}
 
-	runArgs := slices.Concat([]string{"tool", "run", "--prerelease", "allow", "--python", pythonVersionForIngestr, "ingestr"}, cmdArgs)
+	runArgs := slices.Concat([]string{"tool", "run", "--no-config", "--prerelease", "allow", "--python", pythonVersionForIngestr, "ingestr"}, cmdArgs)
 
 	if debug := ctx.Value(executor.KeyIsDebug); debug != nil {
 		boolVal := debug.(*bool)
@@ -408,6 +408,7 @@ func (u *UvPythonRunner) ingestrInstallCmd(ctx context.Context, pkgs []string) [
 	cmdline := []string{
 		"tool",
 		"install",
+		"--no-config",
 		"--force",
 		"--quiet",
 		"--prerelease",
@@ -567,6 +568,7 @@ func (s *SqlfluffRunner) installSqlfluff(ctx context.Context, repo *git.Repo) er
 	cmdArgs := []string{
 		"tool",
 		"install",
+		"--no-config",
 		"--force",
 		"--quiet",
 		"--python",
@@ -751,6 +753,7 @@ func (s *SqlfluffRunner) formatSQLFileWithDialect(ctx context.Context, sqlFile, 
 	cmdArgs := []string{
 		"tool",
 		"run",
+		"--no-config",
 		"--python",
 		pythonVersionForIngestr,
 		"sqlfluff",
@@ -776,6 +779,7 @@ func (s *SqlfluffRunner) formatSQLFileWithoutTemplating(ctx context.Context, sql
 	cmdArgs := []string{
 		"tool",
 		"run",
+		"--no-config",
 		"--python",
 		pythonVersionForIngestr,
 		"sqlfluff",

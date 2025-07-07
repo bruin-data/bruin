@@ -2,7 +2,6 @@
   "default_environment_name": "default",
   "selected_environment_name": "default",
   "selected_environment": {
-    "schema_prefix":  "",
     "connections": {
       "generic": [
         {
@@ -13,11 +12,11 @@
       "duckdb": [
         {
           "name": "duckdb-default",
-          "path": "integration-tests/duckdb-files/duckdb.db"
+          "path": "duckdb-files/duckdb.db"
         },
         {
           "name": "duckdb-variables",
-          "path": "variables.db"
+          "path": "duckdb-files/variables.db"
         }
       ],
       "chess": [
@@ -29,11 +28,11 @@
           ]
         }
       ]
-    }
+    },
+    "schema_prefix": ""
   },
   "environments": {
     "default": {
-      "schema_prefix": "",
       "connections": {
         "generic": [
           {
@@ -44,11 +43,11 @@
         "duckdb": [
           {
             "name": "duckdb-default",
-            "path": "integration-tests/duckdb-files/duckdb.db"
+            "path": "duckdb-files/duckdb.db"
           },
           {
             "name": "duckdb-variables",
-            "path": "variables.db"
+            "path": "duckdb-files/variables.db"
           }
         ],
         "chess": [
@@ -60,15 +59,48 @@
             ]
           }
         ]
-      }
+      },
+      "schema_prefix": ""
+    },
+    "env-custom-check-count-false": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-custom-check-count-false",
+            "path": "duckdb-files/duckdb-custom-check-count-false.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-custom-check-count-true": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-custom-check-count-true",
+            "path": "duckdb-files/duckdb-custom-check-count-true.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-duckdb-ddl": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-ddl",
+            "path": "duckdb-files/duckdb-ddl.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
     },
     "env-ingestr": {
-      "schema_prefix": "",
       "connections": {
         "duckdb": [
           {
             "name": "duckdb-ingestr",
-            "path": "integration-tests/duckdb-files/ingestr.db"
+            "path": "duckdb-files/ingestr.db"
           }
         ],
         "chess": [
@@ -80,32 +112,65 @@
             ]
           }
         ]
-      }
+      },
+      "schema_prefix": ""
+    },
+    "env-interval-modifiers": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-interval-modifiers",
+            "path": "duckdb-files/interval-modifiers.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
     },
     "env-push-metadata": {
-      "schema_prefix": "",
       "connections": {
         "duckdb": [
           {
             "name": "duckdb-push-metadata",
-            "path": "integration-tests/duckdb-files/push-metadata.db"
+            "path": "duckdb-files/push-metadata.db"
           }
         ]
-      }
+      },
+      "schema_prefix": ""
     },
     "env-query-asset": {
-      "schema_prefix": "",
       "connections": {
         "duckdb": [
           {
             "name": "duckdb-query-asset",
-            "path": "integration-tests/duckdb-files/query-asset.db"
+            "path": "duckdb-files/query-asset.db"
           }
         ]
-      }
+      },
+      "schema_prefix": ""
+    },
+    "env-query-export": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-query-export",
+            "path": "duckdb-files/env-query-export.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-render-template-this": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-render-template-this",
+            "path": "duckdb-files/render-template-this.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
     },
     "env-run-default-option": {
-      "schema_prefix": "",
       "connections": {
         "generic": [
           {
@@ -120,7 +185,7 @@
         "duckdb": [
           {
             "name": "duckdb-env-run-default-option",
-            "path": "integration-tests/duckdb-files/env-run-default-option.db"
+            "path": "duckdb-files/env-run-default-option.db"
           }
         ],
         "chess": [
@@ -132,10 +197,10 @@
             ]
           }
         ]
-      }
+      },
+      "schema_prefix": ""
     },
     "env-run-main-with-downstream": {
-      "schema_prefix": "",
       "connections": {
         "generic": [
           {
@@ -146,7 +211,7 @@
         "duckdb": [
           {
             "name": "duckdb-run-main-with-downstream",
-            "path": "integration-tests/duckdb-files/run-main-with-downstream.db"
+            "path": "duckdb-files/run-main-with-downstream.db"
           }
         ],
         "chess": [
@@ -158,10 +223,10 @@
             ]
           }
         ]
-      }
+      },
+      "schema_prefix": ""
     },
     "env-run-main-with-filters": {
-      "schema_prefix": "",
       "connections": {
         "generic": [
           {
@@ -172,7 +237,7 @@
         "duckdb": [
           {
             "name": "duckdb-run-main-with-filters",
-            "path": "integration-tests/duckdb-files/run-main-with-filters.db"
+            "path": "duckdb-files/run-main-with-filters.db"
           }
         ],
         "chess": [
@@ -184,10 +249,10 @@
             ]
           }
         ]
-      }
+      },
+      "schema_prefix": ""
     },
     "env-run-malformed-sql": {
-      "schema_prefix": "",
       "connections": {
         "generic": [
           {
@@ -198,7 +263,7 @@
         "duckdb": [
           {
             "name": "duckdb-run-malformed-sql",
-            "path": "integration-tests/duckdb-files/run-malformed-sql.db"
+            "path": "duckdb-files/run-malformed-sql.db"
           }
         ],
         "chess": [
@@ -210,32 +275,54 @@
             ]
           }
         ]
-      }
+      },
+      "schema_prefix": ""
+    },
+    "env-run-nameless-asset": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-run-nameless-asset",
+            "path": "duckdb-files/run-nameless-asset.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-run-non-wait-symbolic": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-env-run-non-wait-symbolic",
+            "path": "duckdb-files/env-run-non-wait-symbolic.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
     },
     "env-run-python-materialization": {
-      "schema_prefix": "",
       "connections": {
         "duckdb": [
           {
             "name": "duckdb-run-python-materialization",
-            "path": "integration-tests/duckdb-files/run-python-materialization.db"
+            "path": "duckdb-files/run-python-materialization.db"
           }
         ]
-      }
+      },
+      "schema_prefix": ""
     },
     "env-run-seed-data": {
-      "schema_prefix": "",
       "connections": {
         "duckdb": [
           {
             "name": "duckdb-run-seed-data",
-            "path": "integration-tests/duckdb-files/run-seed-data.db"
+            "path": "duckdb-files/run-seed-data.db"
           }
         ]
-      }
+      },
+      "schema_prefix": ""
     },
     "env-run-use-uv": {
-      "schema_prefix": "",
       "connections": {
         "generic": [
           {
@@ -246,7 +333,7 @@
         "duckdb": [
           {
             "name": "duckdb-env-run-use-uv",
-            "path": "integration-tests/duckdb-files/env-run-use-uv.db"
+            "path": "duckdb-files/env-run-use-uv.db"
           }
         ],
         "chess": [
@@ -258,10 +345,10 @@
             ]
           }
         ]
-      }
+      },
+      "schema_prefix": ""
     },
     "env-run-with-downstream": {
-      "schema_prefix": "",
       "connections": {
         "generic": [
           {
@@ -272,7 +359,7 @@
         "duckdb": [
           {
             "name": "duckdb-run-with-downstream",
-            "path": "integration-tests/duckdb-files/run-with-downstream.db"
+            "path": "duckdb-files/run-with-downstream.db"
           }
         ],
         "chess": [
@@ -284,10 +371,10 @@
             ]
           }
         ]
-      }
+      },
+      "schema_prefix": ""
     },
     "env-run-with-filters": {
-      "schema_prefix": "",
       "connections": {
         "generic": [
           {
@@ -298,7 +385,7 @@
         "duckdb": [
           {
             "name": "duckdb-run-with-filters",
-            "path": "integration-tests/duckdb-files/run-with-filters.db"
+            "path": "duckdb-files/run-with-filters.db"
           }
         ],
         "chess": [
@@ -310,10 +397,10 @@
             ]
           }
         ]
-      }
+      },
+      "schema_prefix": ""
     },
     "env-run-with-tags": {
-      "schema_prefix": "",
       "connections": {
         "generic": [
           {
@@ -324,7 +411,7 @@
         "duckdb": [
           {
             "name": "duckdb-run-with-tags",
-            "path": "integration-tests/duckdb-files/run-with-tags.db"
+            "path": "duckdb-files/run-with-tags.db"
           }
         ],
         "chess": [
@@ -336,107 +423,19 @@
             ]
           }
         ]
-      }
+      },
+      "schema_prefix": ""
     },
     "env-time-materialization": {
-      "schema_prefix": "",
       "connections": {
         "duckdb": [
           {
             "name": "duckdb-time-materialization",
-            "path": "integration-tests/duckdb-files/time-materialization.db"
+            "path": "duckdb-files/time-materialization.db"
           }
         ]
-      }
-    },
-    "env-run-non-wait-symbolic": {
-      "schema_prefix": "",
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-env-run-non-wait-symbolic",
-            "path": "integration-tests/duckdb-files/env-run-non-wait-symbolic.db"
-          }
-        ]
-      }
-    },
-    "env-query-export": {
-      "schema_prefix": "",
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-query-export",
-            "path": "integration-tests/duckdb-files/env-query-export.db"
-          }
-        ]
-      }
-    },
-    "env-run-nameless-asset": {
-      "schema_prefix": "",
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-run-nameless-asset",
-            "path": "integration-tests/duckdb-files/run-nameless-asset.db"
-          }
-        ]
-      }
-    },
-    "env-interval-modifiers": {
-      "schema_prefix": "",
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-interval-modifiers",
-            "path": "integration-tests/duckdb-files/interval-modifiers.db"
-          }
-        ]
-      }
-    },
-    "env-render-template-this": {
-      "schema_prefix": "",
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-render-template-this",
-            "path": "integration-tests/duckdb-files/render-template-this.db"
-          }
-        ]
-      }
-    },
-    "env-duckdb-ddl": {
-      "schema_prefix": "",
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-ddl",
-            "path": "integration-tests/duckdb-files/duckdb-ddl.db"
-          }
-        ]
-      }
-    },
-
-    "env-custom-check-count-false": {
-      "schema_prefix": "",
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-custom-check-count-false",
-            "path": "integration-tests/duckdb-files/duckdb-custom-check-count-false.db"
-          }
-        ]
-      }
-    },
-    "env-custom-check-count-true": {
-      "schema_prefix": "",
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-custom-check-count-true",
-            "path": "integration-tests/duckdb-files/duckdb-custom-check-count-true.db"
-          }
-        ]
-      }
+      },
+      "schema_prefix": ""
     },
     "env-validate-with-exclude-tag": {
         "schema_prefix": "",
@@ -470,6 +469,5 @@
           }
         ]
       }
-    }
   }
 }

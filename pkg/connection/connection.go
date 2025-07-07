@@ -43,6 +43,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/kafka"
 	"github.com/bruin-data/bruin/pkg/kinesis"
 	"github.com/bruin-data/bruin/pkg/klaviyo"
+	"github.com/bruin-data/bruin/pkg/linear"
 	"github.com/bruin-data/bruin/pkg/linkedinads"
 	"github.com/bruin-data/bruin/pkg/mixpanel"
 	"github.com/bruin-data/bruin/pkg/mongo"
@@ -67,7 +68,9 @@ import (
 	"github.com/bruin-data/bruin/pkg/spanner"
 	"github.com/bruin-data/bruin/pkg/sqlite"
 	"github.com/bruin-data/bruin/pkg/stripe"
+	"github.com/bruin-data/bruin/pkg/tableau"
 	"github.com/bruin-data/bruin/pkg/tiktokads"
+	"github.com/bruin-data/bruin/pkg/trustpilot"
 	"github.com/bruin-data/bruin/pkg/zendesk"
 	"github.com/bruin-data/bruin/pkg/zoom"
 	"github.com/pkg/errors"
@@ -108,6 +111,7 @@ type Manager struct {
 	GitHub          map[string]*github.Client
 	AppStore        map[string]*appstore.Client
 	LinkedInAds     map[string]*linkedinads.Client
+	Linear          map[string]*linear.Client
 	ClickHouse      map[string]*clickhouse.Client
 	GCS             map[string]*gcs.Client
 	ApplovinMax     map[string]*applovinmax.Client
@@ -116,6 +120,7 @@ type Manager struct {
 	Pipedrive       map[string]*pipedrive.Client
 	Mixpanel        map[string]*mixpanel.Client
 	Pinterest       map[string]*pinterest.Client
+	Trustpilot      map[string]*trustpilot.Client
 	QuickBooks      map[string]*quickbooks.Client
 	Zoom            map[string]*zoom.Client
 	Frankfurter     map[string]*frankfurter.Client
@@ -134,6 +139,7 @@ type Manager struct {
 	Attio           map[string]*attio.Client
 	Sftp            map[string]*sftp.Client
 	ISOCPulse       map[string]*isocpulse.Client
+	Tableau         map[string]*tableau.Client
 	mutex           sync.Mutex
 }
 
@@ -344,6 +350,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 	}
 	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.LinkedInAds))...)
 
+	connLinear, err := m.GetLinearConnectionWithoutDefault(name)
+	if err == nil {
+		return connLinear, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Linear))...)
+
 	connApplovinMax, err := m.GetApplovinMaxConnectionWithoutDefault(name)
 	if err == nil {
 		return connApplovinMax, nil
@@ -385,6 +397,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connPinterest, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Pinterest))...)
+
+	connTrustpilot, err := m.GetTrustpilotConnectionWithoutDefault(name)
+	if err == nil {
+		return connTrustpilot, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Trustpilot))...)
 
 	connQuickBooks, err := m.GetQuickBooksConnectionWithoutDefault(name)
 	if err == nil {
@@ -491,6 +509,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connPulse, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.ISOCPulse))...)
+
+	connTableau, err := m.GetTableauConnectionWithoutDefault(name)
+	if err == nil {
+		return connTableau, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Tableau))...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -1309,6 +1333,25 @@ func (m *Manager) GetLinkedInAdsConnectionWithoutDefault(name string) (*linkedin
 	return db, nil
 }
 
+func (m *Manager) GetLinearConnection(name string) (*linear.Client, error) {
+	db, err := m.GetLinearConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetLinearConnectionWithoutDefault("linear-default")
+}
+
+func (m *Manager) GetLinearConnectionWithoutDefault(name string) (*linear.Client, error) {
+	if m.Linear == nil {
+		return nil, errors.New("no linear connections found")
+	}
+	db, ok := m.Linear[name]
+	if !ok {
+		return nil, errors.Errorf("linear connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
 func (m *Manager) GetGCSConnection(name string) (*gcs.Client, error) {
 	db, err := m.GetGCSConnectionWithoutDefault(name)
 	if err == nil {
@@ -1457,6 +1500,25 @@ func (m *Manager) GetPinterestConnectionWithoutDefault(name string) (*pinterest.
 	db, ok := m.Pinterest[name]
 	if !ok {
 		return nil, errors.Errorf("pinterest connection not found for '%s'", name)
+	}
+	return db, nil
+}
+
+func (m *Manager) GetTrustpilotConnection(name string) (*trustpilot.Client, error) {
+	db, err := m.GetTrustpilotConnectionWithoutDefault(name)
+	if err == nil {
+		return db, nil
+	}
+	return m.GetTrustpilotConnectionWithoutDefault("trustpilot-default")
+}
+
+func (m *Manager) GetTrustpilotConnectionWithoutDefault(name string) (*trustpilot.Client, error) {
+	if m.Trustpilot == nil {
+		return nil, errors.New("no trustpilot connections found")
+	}
+	db, ok := m.Trustpilot[name]
+	if !ok {
+		return nil, errors.Errorf("trustpilot connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -2688,6 +2750,25 @@ func (m *Manager) AddLinkedInAdsConnectionFromConfig(connection *config.LinkedIn
 	return nil
 }
 
+func (m *Manager) AddLinearConnectionFromConfig(connection *config.LinearConnection) error {
+	m.mutex.Lock()
+	if m.Linear == nil {
+		m.Linear = make(map[string]*linear.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := linear.NewClient(linear.Config{
+		APIKey: connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Linear[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddGCSConnectionFromConfig(connection *config.GCSConnection) error {
 	m.mutex.Lock()
 	if m.GCS == nil {
@@ -2824,6 +2905,26 @@ func (m *Manager) AddPinterestConnectionFromConfig(connection *config.PinterestC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Pinterest[connection.Name] = client
+	return nil
+}
+
+func (m *Manager) AddTrustpilotConnectionFromConfig(connection *config.TrustpilotConnection) error {
+	m.mutex.Lock()
+	if m.Trustpilot == nil {
+		m.Trustpilot = make(map[string]*trustpilot.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := trustpilot.NewClient(trustpilot.Config{
+		BusinessUnitID: connection.BusinessUnitID,
+		APIKey:         connection.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Trustpilot[connection.Name] = client
 	return nil
 }
 
@@ -3118,6 +3219,55 @@ func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRSer
 	return nil
 }
 
+func (m *Manager) AddTableauConnectionFromConfig(connection *config.TableauConnection) error {
+	m.mutex.Lock()
+	if m.Tableau == nil {
+		m.Tableau = make(map[string]*tableau.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := tableau.NewClient(tableau.Config{
+		Name:                      connection.Name,
+		Host:                      connection.Host,
+		Username:                  connection.Username,
+		Password:                  connection.Password,
+		PersonalAccessTokenName:   connection.PersonalAccessTokenName,
+		PersonalAccessTokenSecret: connection.PersonalAccessTokenSecret,
+		SiteID:                    connection.SiteID,
+		APIVersion:                connection.APIVersion,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Tableau[connection.Name] = client
+
+	return nil
+}
+
+func (m *Manager) GetTableauConnection(name string) (*tableau.Client, error) {
+	conn, err := m.GetTableauConnectionWithoutDefault(name)
+	if err != nil {
+		return nil, err
+	}
+
+	return conn, nil
+}
+
+func (m *Manager) GetTableauConnectionWithoutDefault(name string) (*tableau.Client, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	conn, ok := m.Tableau[name]
+	if !ok {
+		return nil, errors.Errorf("tableau connection '%s' not found", name)
+	}
+
+	return conn, nil
+}
+
 var envVarRegex = regexp.MustCompile(`\${([^}]+)}`)
 
 func processConnections[T config.Named](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {
@@ -3203,6 +3353,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.GitHub, connectionManager.AddGitHubConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.AppStore, connectionManager.AddAppStoreConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.LinkedInAds, connectionManager.AddLinkedInAdsConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Linear, connectionManager.AddLinearConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GCS, connectionManager.AddGCSConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Personio, connectionManager.AddPersonioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.ApplovinMax, connectionManager.AddApplovinMaxConnectionFromConfig, &wg, &errList, &mu)
@@ -3210,6 +3361,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mixpanel, connectionManager.AddMixpanelConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pinterest, connectionManager.AddPinterestConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Trustpilot, connectionManager.AddTrustpilotConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.QuickBooks, connectionManager.AddQuickBooksConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Zoom, connectionManager.AddZoomConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.EMRServerless, connectionManager.AddEMRServerlessConnectionFromConfig, &wg, &errList, &mu)
@@ -3228,6 +3380,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Attio, connectionManager.AddAttioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sftp, connectionManager.AddSftpConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.ISOCPulse, connectionManager.AddISOCPulseConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Tableau, connectionManager.AddTableauConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }

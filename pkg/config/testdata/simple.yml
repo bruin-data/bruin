@@ -214,6 +214,9 @@ environments:
         - name: "linkedinads-1"
           access_token: "access-token-123"
           account_ids: "account-id-123,account-id-456"
+      linear:
+        - name: "linear-1"
+          api_key: "api-key-123"
       clickhouse:
         - name: "conn-clickhouse"
           host: "clickhousehost"
@@ -251,6 +254,10 @@ environments:
       pinterest:
         - name: "pinterest-1"
           access_token: "token"
+      trustpilot:
+        - name: "trustpilot-1"
+          business_unit_id: "unit123"
+          api_key: "apikey"
       quickbooks:
         - name: "quickbooks-1"
           company_id: "123456"
