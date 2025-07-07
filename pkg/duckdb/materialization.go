@@ -196,7 +196,6 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 
 	var (
 		primaryKeys        = make([]string, 0, 4)
-		insertCols         = make([]string, 0, 12)
 		nonIncrementalCols = make([]string, 0, 12)
 		insertValues       = make([]string, 0, 12)
 	)
@@ -213,9 +212,8 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 			}
 		}
 		if col.Name != asset.Materialization.IncrementalKey {
-			insertCols = append(insertCols, col.Name)
-			insertValues = append(insertValues, fmt.Sprintf("s.%s", col.Name))
-			nonIncrementalCols = append(nonIncrementalCols, fmt.Sprintf("t.%s", col.Name))
+			insertValues = append(insertValues, "s."+col.Name)
+			nonIncrementalCols = append(nonIncrementalCols, "t."+col.Name)
 		}
 		if col.PrimaryKey {
 			primaryKeys = append(primaryKeys, col.Name)
@@ -238,7 +236,7 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 		pkJoin = append(pkJoin, fmt.Sprintf("t.%[1]s = s.%[1]s", pk))
 		sourcePKs = append(sourcePKs, fmt.Sprintf("s.%[1]s IS NULL", pk))
 		sourceNPKs = append(sourceNPKs, fmt.Sprintf("s.%[1]s IS NOT NULL", pk))
-	}	
+	}
 	sourcePrimaryKeyIsNull := strings.Join(sourcePKs, " AND ")
 	sourcePrimaryKeyIsNotNull := strings.Join(sourceNPKs, " AND ")
 	joinCondition := strings.Join(pkJoin, " AND ")
@@ -288,7 +286,7 @@ SELECT * FROM t_new
 UNION
 SELECT * FROM insert_rows;`,
 		asset.Name,
-		query,     
+		query,
 		asset.Name,
 		nonIncColsList,
 		sourcePrimaryKeyIsNull,
@@ -303,7 +301,6 @@ SELECT * FROM insert_rows;`,
 		strings.Join(insertValues, ", "),
 		incrementalKey,
 	)
-	fmt.Printf(finalQuery + "\n")
 	return strings.TrimSpace(finalQuery), nil
 }
 
@@ -311,10 +308,7 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 	query = strings.TrimRight(query, ";")
 	var (
 		primaryKeys       = make([]string, 0, 4)
-		compareConds      = make([]string, 0, 12)
 		compareCondsS1T1  = make([]string, 0, 4)
-		insertCols        = make([]string, 0, 12)
-		insertValues      = make([]string, 0, 12)
 		tNewSelectCols    = make([]string, 0, 12)
 		insertsSelectCols = make([]string, 0, 12)
 	)
@@ -328,18 +322,14 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
 		}
 
-		insertCols = append(insertCols, col.Name)
-		insertValues = append(insertValues, fmt.Sprintf("source.%s", col.Name))
-
 		if !col.PrimaryKey {
-			compareConds = append(compareConds, fmt.Sprintf("target.%[1]s != source.%[1]s", col.Name))
 			compareCondsS1T1 = append(compareCondsS1T1, fmt.Sprintf("t.%[1]s != s.%[1]s", col.Name))
 		}
 
 		// For t_new SELECT
-		tNewSelectCols = append(tNewSelectCols, fmt.Sprintf("t.%s", col.Name))
+		tNewSelectCols = append(tNewSelectCols, "t."+col.Name)
 		// For inserts SELECT
-		insertsSelectCols = append(insertsSelectCols, fmt.Sprintf("s.%s", col.Name))
+		insertsSelectCols = append(insertsSelectCols, "s."+col.Name)
 	}
 
 	if len(primaryKeys) == 0 {
@@ -347,11 +337,6 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 			asset.Materialization.Strategy)
 	}
 
-	// Add system columns
-	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
-	insertValues = append(insertValues, "CURRENT_TIMESTAMP()", "TIMESTAMP('9999-12-31 23:59:59')", "TRUE")
-
-	// Generate ON condition for joins
 	onConds := make([]string, len(primaryKeys))
 	sourcePKs := make([]string, 0, len(primaryKeys))
 	targetPKs := make([]string, 0, len(primaryKeys))
@@ -432,7 +417,7 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 	if len(primaryKeys) == 0 {
 		return "", errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
 	}
-	tbl := fmt.Sprintf("%s", asset.Name)
+	tbl := asset.Name
 	stmt := fmt.Sprintf(
 		`CREATE OR REPLACE TABLE %s AS
 SELECT
@@ -456,7 +441,7 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 	if len(primaryKeys) == 0 {
 		return "", errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
 	}
-	tbl := fmt.Sprintf("%s", asset.Name)
+	tbl := asset.Name
 	stmt := fmt.Sprintf(
 		`
 CREATE OR REPLACE TABLE %s AS

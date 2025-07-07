@@ -584,6 +584,7 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 	}
 }
 
+//nolint:maintidx
 func getTasks(binary string, currentFolder string) []e2e.Task {
 	return []e2e.Task{
 		{
@@ -832,12 +833,10 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Command: binary,
 			Args:    []string{"query", "--env", "env-query-export", "--output", "json", "--asset", filepath.Join(currentFolder, "test-pipelines/query-export-pipeline/assets/products.sql"), "--export"},
 			Env:     []string{},
-		
 			Expected: e2e.Output{
 				ExitCode: 0,
 				Output:   helpers.ReadFile(filepath.Join(currentFolder, "test-pipelines/query-export-pipeline/expected.csv")),
 			},
-		
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
 				e2e.AssertByQueryResultCSV,
@@ -848,7 +847,6 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Command: binary,
 			Args:    []string{"run", "-env", "env-run-with-filters", "--tag", "include", "--exclude-tag", "exclude", "--start-date", "2024-01-01", "--end-date", "2024-12-31", filepath.Join(currentFolder, "test-pipelines/run-with-filters-pipeline")},
 			Env:     []string{},
-		
 			Expected: e2e.Output{
 				ExitCode: 0,
 				Contains: []string{"Executed 3 tasks", "Finished: shipping_provider", "Finished: products", "Finished: products:price:positive"},
@@ -875,7 +873,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Command: binary,
 			Args:    []string{"run", "--env", "env-run-main-with-filters", "--tag", "include", "--exclude-tag", "exclude", "--only", "main", "--start-date", "2024-01-01", "--end-date", "2024-12-31", filepath.Join(currentFolder, "test-pipelines/run-main-with-filters-pipeline")},
 			Env:     []string{},
-		
+
 			Expected: e2e.Output{
 				ExitCode: 0,
 				Contains: []string{"Executed 2 tasks", "Finished: shipping_provider", "Finished: products"},
@@ -1056,7 +1054,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Command: binary,
 			Args:    []string{"internal", "parse-asset", filepath.Join(currentFolder, "test-pipelines/faulty-pipeline/assets/error.sql")},
 			Env:     []string{},
-		
+
 			Expected: e2e.Output{
 				ExitCode: 1,
 				Contains: []string{"error creating asset from file", "unmarshal errors"},
@@ -1086,7 +1084,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Command: binary,
 			Args:    []string{"run", "--env", "env-run-malformed-sql", filepath.Join(currentFolder, "test-pipelines/run-malformed-pipeline/assets/malformed.sql")},
 			Env:     []string{},
-		
+
 			Expected: e2e.Output{
 				ExitCode: 1,
 				Contains: []string{"Parser Error: syntax error at or near \"S_ELECT_\"", "Failed assets 1"},

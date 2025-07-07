@@ -437,19 +437,7 @@
       },
       "schema_prefix": ""
     },
-    "env-validate-with-exclude-tag": {
-        "schema_prefix": "",
-        "connections": {
-          "duckdb": [
-            {
-              "name": "duckdb-validate-with-exclude-tag",
-              "path": "integration-tests/duckdb-files/validate-with-exclude-tag.db"
-            }
-          ]
-        }
-      },
-      "env-scd2-col-duckdb": {
-      "schema_prefix": "",
+    "env-scd2-col-duckdb": {
       "connections": {
         "duckdb": [
           {
@@ -457,10 +445,10 @@
             "path": "integration-tests/duckdb-files/scd2-by-col-duckdb.db"
           }
         ]
-      }
+      },
+      "schema_prefix": ""
     },
     "env-scd2-time-duckdb": {
-      "schema_prefix": "",
       "connections": {
         "duckdb": [
           {
@@ -468,6 +456,22 @@
             "path": "integration-tests/duckdb-files/scd2-by-time-duckdb.db"
           }
         ]
-      }
+      },
+      "schema_prefix": ""
+    },
+    "env-validate-with-exclude-tag": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-validate-with-exclude-tag",
+            "path": "duckdb-files/validate-with-exclude-tag.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    }
   }
 }
+      
+
+
