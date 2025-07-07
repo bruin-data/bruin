@@ -1,6 +1,6 @@
 /* @bruin
 name: test.menu
-type: bq.sql 
+type: sf.sql
 materialization:
   type: table
   strategy: scd2_by_column
@@ -16,6 +16,7 @@ columns:
   - name: Name
     type: VARCHAR
     description: "Name of the Menu Item"
+    primary_key: true
     checks:
       - name: not_null
   - name: Price
@@ -24,10 +25,9 @@ columns:
 @bruin */
 
 
-
-SELECT 1 AS ID, 'Cola' AS Name, 3.99 AS Price
+SELECT 1 AS ID, 'Cola' AS Name, 7.99 AS Price
 UNION ALL
 SELECT 2 AS ID, 'Tea' AS Name, 4.99 AS Price
 UNION ALL
-SELECT 3 AS ID, 'Coffee' AS Name, 5.99 AS Price
+SELECT 4 AS ID, 'Fanta' AS Name, 1.99 AS Price
 

@@ -1,6 +1,6 @@
 /* @bruin
 name: test.menu
-type: bq.sql 
+type: sf.sql 
 materialization:
   type: table
   strategy: scd2_by_column
@@ -16,6 +16,7 @@ columns:
   - name: Name
     type: VARCHAR
     description: "Name of the Menu Item"
+    primary_key: true
     checks:
       - name: not_null
   - name: Price
