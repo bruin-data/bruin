@@ -8,25 +8,25 @@
     "connection": "",
     "tags": [],
     "materialization": null,
-    "interval_modifiers": null,
     "upstreams": [],
     "image": "",
     "instance": "",
     "owner": "",
     "executable_file": {
       "name": "seed.asset.yml",
-      "path": "/integration-tests/test-pipelines/run-seed-data/assets/seed.asset.yml",
+      "path": "test-pipelines/run-seed-data/assets/seed.asset.yml",
       "content": "name: seed.raw\ntype: duckdb.seed\n\ndescription: This asset loads a CSV file into a DuckDB database.\ncolumns:\n  - name: name\n    type: varchar\n    description: \"Contact person's full name\"\n    checks:\n      - name: not_null\n  - name: networking_through\n    type: varchar\n    description: \"Source or connection through which contact was made\"\n    checks:\n      - name: not_null\n      - name: accepted_values\n        value:\n          - LinkedIn\n          - Twitter\n          - Facebook\n          - Instagram\n  - name: position\n    type: varchar\n    description: \"Contact's job position or title\"\n    checks:\n      - name: not_null\n  - name: contact_date\n    type: varchar\n    description: \"Date when contact was established\"\n\n\nparameters:\n  path: ./seed.csv\n"
     },
     "definition_file": {
       "name": "seed.asset.yml",
-      "path": "/integration-tests/test-pipelines/run-seed-data/assets/seed.asset.yml",
+      "path": "test-pipelines/run-seed-data/assets/seed.asset.yml",
       "type": "yaml"
     },
     "parameters": {
       "path": "./seed.csv"
     },
     "secrets": [],
+    "extends": null,
     "columns": [
       {
         "entity_attribute": null,
@@ -108,13 +108,14 @@
     "custom_checks": [],
     "metadata": {},
     "snowflake": null,
-    "athena": null
+    "athena": null,
+    "interval_modifiers": null
   },
   "pipeline": {
     "name": "bruin-init",
     "schedule": "daily"
   },
   "repo": {
-    "path": "/integration-tests"
+    "path": "/Users/bruin/GolandProjects/bruin/integration-tests"
   }
 }

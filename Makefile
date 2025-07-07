@@ -11,7 +11,9 @@ CURRENT_DIR=$(pwd)
 TELEMETRY_KEY=""
 FILES := $(wildcard *.yml *.txt *.py)
 
-.PHONY: all clean test build build-no-duckdb tools format pre-commit tools-update
+JQ_REL_PATH = jq --arg prefix "$$(pwd)/" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
+
+.PHONY: all clean test build build-no-duckdb tools format pre-commit tools-update refresh-integration-expectations
 all: clean deps test build
 
 deps: tools
@@ -99,3 +101,31 @@ lint-python:
 
 	@echo "$(OK_COLOR)==> Running Python linting with flake8...$(NO_COLOR)"
 	@ruff check --fix ./pythonsrc
+
+refresh-integration-expectations: build
+	@echo "$(OK_COLOR)==> Refreshing integration expectations...$(NO_COLOR)"
+	@cd integration-tests && git init
+	@echo "$(OK_COLOR)==> Updating parse-whole-pipeline expectations...$(NO_COLOR)"
+	@cd integration-tests && ../bin/bruin internal parse-pipeline test-pipelines/parse-whole-pipeline | $(JQ_REL_PATH) > test-pipelines/parse-whole-pipeline/expectations/pipeline.yml.json
+	@echo "$(OK_COLOR)==> Updating parse-happy-path expectations...$(NO_COLOR)"
+	@cd integration-tests && ../bin/bruin internal parse-pipeline test-pipelines/parse-happy-path | $(JQ_REL_PATH) > test-pipelines/parse-happy-path/expectations/pipeline.yml.json
+	@cd integration-tests && ../bin/bruin internal parse-asset test-pipelines/parse-happy-path/assets/asset.py | $(JQ_REL_PATH) > test-pipelines/parse-happy-path/expectations/asset.py.json
+	@cd integration-tests && ../bin/bruin internal parse-asset test-pipelines/parse-happy-path/assets/chess_games.asset.yml | $(JQ_REL_PATH) > test-pipelines/parse-happy-path/expectations/chess_games.asset.yml.json
+	@cd integration-tests && ../bin/bruin internal parse-asset test-pipelines/parse-happy-path/assets/chess_profiles.asset.yml | $(JQ_REL_PATH) > test-pipelines/parse-happy-path/expectations/chess_profiles.asset.yml.json
+	@cd integration-tests && ../bin/bruin internal parse-asset test-pipelines/parse-happy-path/assets/player_summary.sql | $(JQ_REL_PATH) > test-pipelines/parse-happy-path/expectations/player_summary.sql.json
+	@echo "$(OK_COLOR)==> Updating parse-lineage-pipeline expectations...$(NO_COLOR)"
+	@cd integration-tests && ../bin/bruin internal parse-pipeline -c test-pipelines/parse-lineage-pipeline | $(JQ_REL_PATH) > test-pipelines/parse-lineage-pipeline/expectations/lineage.json
+	@echo "$(OK_COLOR)==> Updating parse-asset-lineage-pipeline expectations...$(NO_COLOR)"
+	@cd integration-tests && ../bin/bruin internal parse-asset -c test-pipelines/parse-asset-lineage-pipeline/assets/example.sql | $(JQ_REL_PATH) > test-pipelines/parse-asset-lineage-pipeline/expectations/lineage-asset.json
+	@echo "$(OK_COLOR)==> Updating parse-default-option expectations...$(NO_COLOR)"
+	@cd integration-tests && ../bin/bruin internal parse-pipeline test-pipelines/parse-default-option | $(JQ_REL_PATH) > test-pipelines/parse-default-option/expectations/pipeline.yml.json
+	@cd integration-tests && ../bin/bruin internal parse-asset test-pipelines/parse-default-option/assets/asset.py | $(JQ_REL_PATH) > test-pipelines/parse-default-option/expectations/asset.py.json
+	@cd integration-tests && ../bin/bruin internal parse-asset test-pipelines/parse-default-option/assets/chess_games.asset.yml | $(JQ_REL_PATH) > test-pipelines/parse-default-option/expectations/chess_games.asset.yml.json
+	@echo "$(OK_COLOR)==> Updating parse-asset-extends expectations...$(NO_COLOR)"
+	@cd integration-tests && ../bin/bruin internal parse-pipeline test-pipelines/parse-asset-extends | $(JQ_REL_PATH) > test-pipelines/parse-asset-extends/expectations/pipeline.json
+	@echo "$(OK_COLOR)==> Updating run-seed-data expectations...$(NO_COLOR)"
+	@cd integration-tests && ../bin/bruin internal parse-asset test-pipelines/run-seed-data/assets/seed.asset.yml | $(JQ_REL_PATH) > test-pipelines/run-seed-data/expectations/seed.asset.yml.json
+	@echo "$(OK_COLOR)==> Updating connection expectations...$(NO_COLOR)"
+	@cd integration-tests && ../bin/bruin internal connections | $(JQ_REL_PATH) > expected_connections_schema.json
+	@cd integration-tests && ../bin/bruin connections list -o json . | $(JQ_REL_PATH) > expected_connections.json
+	@echo "$(OK_COLOR)==> Integration expectations refreshed successfully!$(NO_COLOR)"

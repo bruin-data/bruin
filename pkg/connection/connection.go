@@ -68,6 +68,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/spanner"
 	"github.com/bruin-data/bruin/pkg/sqlite"
 	"github.com/bruin-data/bruin/pkg/stripe"
+	"github.com/bruin-data/bruin/pkg/tableau"
 	"github.com/bruin-data/bruin/pkg/tiktokads"
 	"github.com/bruin-data/bruin/pkg/trustpilot"
 	"github.com/bruin-data/bruin/pkg/zendesk"
@@ -138,6 +139,7 @@ type Manager struct {
 	Attio           map[string]*attio.Client
 	Sftp            map[string]*sftp.Client
 	ISOCPulse       map[string]*isocpulse.Client
+	Tableau         map[string]*tableau.Client
 	mutex           sync.Mutex
 }
 
@@ -507,6 +509,12 @@ func (m *Manager) GetConnection(name string) (interface{}, error) {
 		return connPulse, nil
 	}
 	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.ISOCPulse))...)
+
+	connTableau, err := m.GetTableauConnectionWithoutDefault(name)
+	if err == nil {
+		return connTableau, nil
+	}
+	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Tableau))...)
 
 	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
 }
@@ -3211,6 +3219,55 @@ func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRSer
 	return nil
 }
 
+func (m *Manager) AddTableauConnectionFromConfig(connection *config.TableauConnection) error {
+	m.mutex.Lock()
+	if m.Tableau == nil {
+		m.Tableau = make(map[string]*tableau.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := tableau.NewClient(tableau.Config{
+		Name:                      connection.Name,
+		Host:                      connection.Host,
+		Username:                  connection.Username,
+		Password:                  connection.Password,
+		PersonalAccessTokenName:   connection.PersonalAccessTokenName,
+		PersonalAccessTokenSecret: connection.PersonalAccessTokenSecret,
+		SiteID:                    connection.SiteID,
+		APIVersion:                connection.APIVersion,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Tableau[connection.Name] = client
+
+	return nil
+}
+
+func (m *Manager) GetTableauConnection(name string) (*tableau.Client, error) {
+	conn, err := m.GetTableauConnectionWithoutDefault(name)
+	if err != nil {
+		return nil, err
+	}
+
+	return conn, nil
+}
+
+func (m *Manager) GetTableauConnectionWithoutDefault(name string) (*tableau.Client, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	conn, ok := m.Tableau[name]
+	if !ok {
+		return nil, errors.Errorf("tableau connection '%s' not found", name)
+	}
+
+	return conn, nil
+}
+
 var envVarRegex = regexp.MustCompile(`\${([^}]+)}`)
 
 func processConnections[T config.Named](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {
@@ -3323,6 +3380,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Attio, connectionManager.AddAttioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sftp, connectionManager.AddSftpConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.ISOCPulse, connectionManager.AddISOCPulseConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Tableau, connectionManager.AddTableauConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }

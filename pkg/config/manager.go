@@ -88,6 +88,7 @@ type Connections struct {
 	Attio               []AttioConnection               `yaml:"attio,omitempty" json:"attio,omitempty" mapstructure:"attio"`
 	Sftp                []SFTPConnection                `yaml:"sftp,omitempty" json:"sftp,omitempty" mapstructure:"sftp"`
 	ISOCPulse           []ISOCPulseConnection           `yaml:"isoc_pulse,omitempty" json:"isoc_pulse,omitempty" mapstructure:"isoc_pulse"`
+	Tableau             []TableauConnection             `yaml:"tableau,omitempty" json:"tableau,omitempty" mapstructure:"tableau"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }
@@ -887,6 +888,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.ISOCPulse = append(env.Connections.ISOCPulse, conn)
+	case "tableau":
+		var conn TableauConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.Tableau = append(env.Connections.Tableau, conn)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1048,6 +1056,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Sftp = removeConnection(env.Connections.Sftp, connectionName)
 	case "isoc_pulse":
 		env.Connections.ISOCPulse = removeConnection(env.Connections.ISOCPulse, connectionName)
+	case "tableau":
+		env.Connections.Tableau = removeConnection(env.Connections.Tableau, connectionName)
 	default:
 		return fmt.Errorf("unsupported connection type: %s", connType)
 	}
@@ -1158,6 +1168,8 @@ func (c *Connections) MergeFrom(source *Connections) error {
 	mergeConnectionList(&c.Smartsheet, source.Smartsheet)
 	mergeConnectionList(&c.Sftp, source.Sftp)
 	mergeConnectionList(&c.Attio, source.Attio)
+	mergeConnectionList(&c.ISOCPulse, source.ISOCPulse)
+	mergeConnectionList(&c.Tableau, source.Tableau)
 	c.buildConnectionKeyMap()
 	return nil
 }

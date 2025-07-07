@@ -42,6 +42,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/synapse"
+	"github.com/bruin-data/bruin/pkg/tableau"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
@@ -983,6 +984,11 @@ func SetupExecutors(
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeColumnCheck] = checkRunner
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		}
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeTableauRefresh) {
+		tableauOperator := tableau.NewBasicOperator(conn)
+		mainExecutors[pipeline.AssetTypeTableauRefresh][scheduler.TaskInstanceTypeMain] = tableauOperator
 	}
 
 	emrServerlessAssetTypes := []pipeline.AssetType{
