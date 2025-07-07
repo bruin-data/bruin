@@ -1186,3 +1186,29 @@ func populateAwsConfigAliases(creds map[string]any) map[string]any {
 
 	return creds
 }
+
+// AddEnvironment adds a new environment to the configuration.
+// If an environment with the given name already exists an error is returned.
+// The schemaPrefix argument is optional and can be left empty.
+func (c *Config) AddEnvironment(name, schemaPrefix string) error {
+	if name == "" {
+		return errors.New("environment name cannot be empty")
+	}
+
+	if c.Environments == nil {
+		c.Environments = make(map[string]Environment)
+	}
+
+	if _, exists := c.Environments[name]; exists {
+		return fmt.Errorf("environment '%s' already exists", name)
+	}
+
+	env := Environment{
+		Connections:  &Connections{},
+		SchemaPrefix: schemaPrefix,
+	}
+
+	c.Environments[name] = env
+
+	return nil
+}
