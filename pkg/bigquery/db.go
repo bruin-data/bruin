@@ -168,16 +168,16 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query, ti
 	if err != nil {
 		return nil, fmt.Errorf("failed to start query job: %w", err)
 	}
-	
+
 	if timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 		defer cancel()
-		
+
 		go func() {
 			<-ctx.Done()
 			if ctx.Err() == context.DeadlineExceeded {
-				cancelCtx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
+				cancelCtx, cancelFunc := context.WithTimeout(ctx, 30*time.Second)
 				defer cancelFunc()
 				if cancelErr := job.Cancel(cancelCtx); cancelErr != nil {
 					fmt.Printf("Warning: Failed to cancel BigQuery job %s: %v\n", job.ID(), cancelErr)
@@ -185,7 +185,7 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query, ti
 			}
 		}()
 	}
-	
+
 	status, err := job.Wait(ctx)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
@@ -193,12 +193,12 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query, ti
 		}
 		return nil, fmt.Errorf("query job failed: %w", err)
 	}
-	
+
 	// Check if the job completed successfully
 	if status.Err() != nil {
 		return nil, fmt.Errorf("query job failed: %w", status.Err())
 	}
-	
+
 	// Get the results from the completed job
 	rows, err := job.Read(ctx)
 	if err != nil {

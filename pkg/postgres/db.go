@@ -93,7 +93,7 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query, ti
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 		defer cancel()
 	}
-	
+
 	rows, err := c.connection.Query(ctx, queryObj.String())
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
@@ -102,7 +102,7 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query, ti
 		return nil, errors.Wrap(err, "failed to execute query")
 	}
 	defer rows.Close()
-	
+
 	// Retrieve column metadata using FieldDescriptions
 	fieldDescriptions := rows.FieldDescriptions()
 	if fieldDescriptions == nil {

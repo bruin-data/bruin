@@ -117,7 +117,7 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query,
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 		defer cancel()
 	}
-	
+
 	LockDatabase(c.config.ToDBConnectionURI())
 	defer UnlockDatabase(c.config.ToDBConnectionURI())
 

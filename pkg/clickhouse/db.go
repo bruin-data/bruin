@@ -94,7 +94,7 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query, ti
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 		defer cancel()
 	}
-	
+
 	rows, err := c.connection.Query(ctx, queryObj.String())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to execute query")

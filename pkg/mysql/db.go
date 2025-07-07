@@ -117,7 +117,7 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query, ti
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 		defer cancel()
 	}
-	
+
 	queryString := queryObj.String()
 	rows, err := c.conn.QueryContext(ctx, queryString)
 	if err != nil {

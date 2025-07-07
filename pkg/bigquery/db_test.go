@@ -793,7 +793,7 @@ func TestDB_UpdateTableMetadataIfNotExists(t *testing.T) {
 
 func TestDB_SelectWithSchema(t *testing.T) {
 	t.Skip("Skipping complex HTTP-level integration test - our new implementation uses Query.Run() instead of Query.Read()")
-	
+
 	// TODO: Rewrite this test to work with the new Query.Run() + Job.Wait() approach
 	// The current test mocks the HTTP API directly but our implementation now uses
 	// the BigQuery Go client's Job API which requires different mocking

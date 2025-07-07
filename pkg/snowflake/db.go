@@ -177,7 +177,7 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query, timeo
 	if err := db.initializeDB(); err != nil {
 		return nil, err
 	}
-	
+
 	// Prepare Snowflake context for the query execution first
 	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
 	if err != nil {
