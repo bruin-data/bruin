@@ -6,7 +6,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/e2e"
 )
 
-// GetTasks returns Snowflake-specific integration test tasks
+// GetTasks returns Snowflake-specific integration test tasks.
 func GetTasks(binary string, currentFolder string) []e2e.Task {
 	configFlags := []string{"--config-file", filepath.Join(currentFolder, "integration-tests/cloud-integration-tests/.bruin.cloud.yml")}
 
@@ -35,7 +35,7 @@ func GetTasks(binary string, currentFolder string) []e2e.Task {
 	return tasks
 }
 
-// GetWorkflows returns Snowflake-specific integration test workflows
+// GetWorkflows returns Snowflake-specific integration test workflows.
 func GetWorkflows(binary string, currentFolder string) []e2e.Workflow {
 	// Example workflows for Snowflake
 	workflows := []e2e.Workflow{
@@ -61,4 +61,4 @@ func GetWorkflows(binary string, currentFolder string) []e2e.Workflow {
 	}
 
 	return workflows
-} 
+}

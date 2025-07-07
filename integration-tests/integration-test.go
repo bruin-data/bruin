@@ -1567,7 +1567,3 @@ func GetTempFile(tempdir string, filename string) string {
 
 	return tempfile.Name()
 }
-
-
-
-

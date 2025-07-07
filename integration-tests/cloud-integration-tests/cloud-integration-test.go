@@ -6,17 +6,15 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/bruin-data/bruin/pkg/e2e"
-	"gopkg.in/yaml.v3"
-
-	// Import platform test packages
 	"github.com/bruin-data/bruin/integration-tests/cloud-integration-tests/bigquery"
 	"github.com/bruin-data/bruin/integration-tests/cloud-integration-tests/snowflake"
+	"github.com/bruin-data/bruin/pkg/e2e"
+	"gopkg.in/yaml.v3"
 )
 
-// CloudConfig represents the structure of .bruin.cloud.yml
+// CloudConfig represents the structure of .bruin.cloud.yml.
 type CloudConfig struct {
-	DefaultEnvironment string `yaml:"default_environment"`
+	DefaultEnvironment string                 `yaml:"default_environment"`
 	Environments       map[string]Environment `yaml:"environments"`
 }
 
@@ -24,13 +22,13 @@ type Environment struct {
 	Connections map[string]interface{} `yaml:"connections"`
 }
 
-// PlatformTestProvider defines the interface for platform-specific test providers
+// PlatformTestProvider defines the interface for platform-specific test providers.
 type PlatformTestProvider interface {
 	GetTasks(binary string, currentFolder string) []e2e.Task
 	GetWorkflows(binary string, currentFolder string) []e2e.Workflow
 }
 
-// BigQueryProvider implements PlatformTestProvider for BigQuery
+// BigQueryProvider implements PlatformTestProvider for BigQuery.
 type BigQueryProvider struct{}
 
 func (p BigQueryProvider) GetTasks(binary string, currentFolder string) []e2e.Task {
@@ -41,7 +39,7 @@ func (p BigQueryProvider) GetWorkflows(binary string, currentFolder string) []e2
 	return bigquery.GetWorkflows(binary, currentFolder)
 }
 
-// SnowflakeProvider implements PlatformTestProvider for Snowflake
+// SnowflakeProvider implements PlatformTestProvider for Snowflake.
 type SnowflakeProvider struct{}
 
 func (p SnowflakeProvider) GetTasks(binary string, currentFolder string) []e2e.Task {
@@ -52,7 +50,7 @@ func (p SnowflakeProvider) GetWorkflows(binary string, currentFolder string) []e
 	return snowflake.GetWorkflows(binary, currentFolder)
 }
 
-// platformConnectionMap maps platform names to their connection type names in the config
+// platformConnectionMap maps platform names to their connection type names in the config.
 var platformConnectionMap = map[string]string{
 	"bigquery":  "gcp",
 	"snowflake": "snowflake",
@@ -61,7 +59,7 @@ var platformConnectionMap = map[string]string{
 	// "redshift": "redshift",
 }
 
-// getAvailablePlatforms reads the cloud config and returns available platforms
+// getAvailablePlatforms reads the cloud config and returns available platforms.
 func getAvailablePlatforms(configPath string) (map[string]bool, error) {
 	available := make(map[string]bool)
 
@@ -181,4 +179,4 @@ func main() {
 	fmt.Printf("Total tests: %d\n", totalTests)
 	fmt.Printf("Total workflows: %d\n", totalWorkflows)
 	fmt.Println("\nAll cloud integration tests completed successfully!")
-} 
+}
