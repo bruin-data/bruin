@@ -86,6 +86,12 @@ func Query() *cli.Command {
 				EnvVars: []string{"BRUIN_CONFIG_FILE"},
 				Usage:   "the path to the .bruin.yml file",
 			},
+			&cli.IntFlag{
+				Name:    "timeout",
+				Aliases: []string{"t"},
+				Usage:   "timeout for query execution in seconds",
+				Value:   0, // 0 means no timeout
+			},
 		},
 		Action: func(c *cli.Context) error {
 			fs := afero.NewOsFs()
@@ -116,13 +122,28 @@ func Query() *cli.Command {
 
 				queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn, parser, dialect)
 			}
-			if querier, ok := conn.(interface {
+			if querier, ok := conn.(interface { //nolint: nestif
 				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
 			}); ok {
-				ctx := context.Background()
+				// Create context with timeout if specified
+				var ctx context.Context
+				var cancel context.CancelFunc
+				if timeout := c.Int("timeout"); timeout > 0 {
+					ctx, cancel = context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+					defer cancel()
+				} else {
+					ctx = context.Background()
+				}
+
 				q := query.Query{Query: queryStr}
 				result, err := querier.SelectWithSchema(ctx, &q)
 				if err != nil {
+					if errors.Is(err, context.DeadlineExceeded) {
+						return handleError(c.String("output"), errors.New("query execution timed out"))
+					}
+					if errors.Is(err, context.Canceled) {
+						return handleError(c.String("output"), errors.New("query execution was cancelled"))
+					}
 					return handleError(c.String("output"), errors.Wrap(err, "query execution failed"))
 				}
 				// Output result based on format specified
