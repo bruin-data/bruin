@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/bruin-data/bruin/pkg/ansisql"
@@ -32,7 +33,7 @@ type Querier interface {
 }
 type Selector interface {
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
-	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
+	SelectWithSchema(ctx context.Context, queryObj *query.Query, timeout int) (*query.QueryResult, error)
 }
 
 type MetadataUpdater interface {
@@ -161,11 +162,47 @@ func (d *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 	return result, nil
 }
 
-func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query, timeout int) (*query.QueryResult, error) {
 	q := d.client.Query(queryObj.String())
-	rows, err := q.Read(ctx)
+	job, err := q.Run(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initiate query read: %w", err)
+		return nil, fmt.Errorf("failed to start query job: %w", err)
+	}
+	
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+		defer cancel()
+		
+		go func() {
+			<-ctx.Done()
+			if ctx.Err() == context.DeadlineExceeded {
+				cancelCtx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancelFunc()
+				if cancelErr := job.Cancel(cancelCtx); cancelErr != nil {
+					fmt.Printf("Warning: Failed to cancel BigQuery job %s: %v\n", job.ID(), cancelErr)
+				}
+			}
+		}()
+	}
+	
+	status, err := job.Wait(ctx)
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("query timed out after %d seconds (BigQuery job %s)", timeout, job.ID())
+		}
+		return nil, fmt.Errorf("query job failed: %w", err)
+	}
+	
+	// Check if the job completed successfully
+	if status.Err() != nil {
+		return nil, fmt.Errorf("query job failed: %w", status.Err())
+	}
+	
+	// Get the results from the completed job
+	rows, err := job.Read(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read query results: %w", err)
 	}
 
 	result := &query.QueryResult{

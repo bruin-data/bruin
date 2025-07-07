@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
@@ -172,20 +173,31 @@ func (db *DB) Ping(ctx context.Context) error {
 	return nil // Return nil if the query runs successfully
 }
 
-func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query, timeout int) (*query.QueryResult, error) {
 	if err := db.initializeDB(); err != nil {
 		return nil, err
 	}
-	// Prepare Snowflake context for the query execution
+	
+	// Prepare Snowflake context for the query execution first
 	ctx, err := gosnowflake.WithMultiStatement(ctx, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create snowflake context")
+	}
+
+	// Apply timeout if specified
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+		defer cancel()
 	}
 
 	// Convert query object to string and execute it
 	queryString := queryObj.String()
 	rows, err := db.conn.QueryContext(ctx, queryString)
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("query timed out after %d seconds", timeout)
+		}
 		errorMessage := err.Error()
 		err = errors.New(strings.ReplaceAll(errorMessage, "\n", "  -  "))
 		return nil, err
@@ -229,6 +241,9 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 	}
 
 	if rows.Err() != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("query timed out after %d seconds during row iteration", timeout)
+		}
 		return nil, fmt.Errorf("error occurred during row iteration: %w", rows.Err())
 	}
 

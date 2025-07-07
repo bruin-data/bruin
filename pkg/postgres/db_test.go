@@ -199,7 +199,7 @@ func TestClient_SelectWithSchema(t *testing.T) {
 
 			result, err := client.SelectWithSchema(context.TODO(), &query.Query{
 				Query: tt.query,
-			})
+			}, 0)
 
 			if tt.wantErr == "" {
 				require.NoError(t, err)

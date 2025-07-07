@@ -190,7 +190,7 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			tt.mockConnection(mock)
 			db := Client{connection: sqlxDB, config: Config{Path: "some/path.db"}}
 
-			got, err := db.SelectWithSchema(context.Background(), &tt.query)
+			got, err := db.SelectWithSchema(context.Background(), &tt.query, 0)
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Equal(t, tt.errorMessage, err.Error())

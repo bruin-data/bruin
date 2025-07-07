@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -19,7 +20,7 @@ type Querier interface {
 
 type Selector interface {
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
-	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
+	SelectWithSchema(ctx context.Context, queryObj *query.Query, timeout int) (*query.QueryResult, error)
 }
 
 type DB interface {
@@ -109,10 +110,20 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 	return collectedRows, nil
 }
 
-func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query, timeout int) (*query.QueryResult, error) {
+	// Apply timeout if specified
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+		defer cancel()
+	}
+	
 	queryString := queryObj.String()
 	rows, err := c.conn.QueryContext(ctx, queryString)
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("query timed out after %d seconds", timeout)
+		}
 		errorMessage := err.Error()
 		err = errors.New(strings.ReplaceAll(errorMessage, "\n", "  -  "))
 		return nil, err
@@ -140,6 +151,9 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		}
 
 		if err := rows.Scan(columnPointers...); err != nil {
+			if ctx.Err() == context.DeadlineExceeded {
+				return nil, fmt.Errorf("query timed out after %d seconds during row scanning", timeout)
+			}
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
 
@@ -154,6 +168,9 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 	}
 
 	if rows.Err() != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("query timed out after %d seconds during row iteration", timeout)
+		}
 		return nil, fmt.Errorf("error occurred during row iteration: %w", rows.Err())
 	}
 

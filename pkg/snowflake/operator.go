@@ -24,7 +24,7 @@ type SfClient interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 	Ping(ctx context.Context) error
-	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
+	SelectWithSchema(ctx context.Context, queryObj *query.Query, timeout int) (*query.QueryResult, error)
 	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error
 	PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error
 	RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error

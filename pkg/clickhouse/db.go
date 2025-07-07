@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	click_house "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -86,7 +87,14 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 	return collectedRows, nil
 }
 
-func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query, timeout int) (*query.QueryResult, error) {
+	// Apply timeout if specified
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+		defer cancel()
+	}
+	
 	rows, err := c.connection.Query(ctx, queryObj.String())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to execute query")

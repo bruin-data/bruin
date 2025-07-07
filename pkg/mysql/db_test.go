@@ -162,7 +162,7 @@ func TestClient_SelectWithSchema(t *testing.T) {
 			tt.mockConnection(mock)
 			client := Client{conn: sqlxDB}
 
-			got, err := client.SelectWithSchema(context.Background(), &tt.query)
+			got, err := client.SelectWithSchema(context.Background(), &tt.query, 0)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMessage)

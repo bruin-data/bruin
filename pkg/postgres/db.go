@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/diff"
@@ -85,12 +86,23 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 	return collectedRows, nil
 }
 
-func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query, timeout int) (*query.QueryResult, error) {
+	// Apply timeout if specified
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+		defer cancel()
+	}
+	
 	rows, err := c.connection.Query(ctx, queryObj.String())
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("query timed out after %d seconds", timeout)
+		}
 		return nil, errors.Wrap(err, "failed to execute query")
 	}
 	defer rows.Close()
+	
 	// Retrieve column metadata using FieldDescriptions
 	fieldDescriptions := rows.FieldDescriptions()
 	if fieldDescriptions == nil {
@@ -115,6 +127,9 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*
 		return row.Values()
 	})
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("query timed out after %d seconds during row collection", timeout)
+		}
 		return nil, errors.Wrap(err, "failed to collect row values")
 	}
 	result := &query.QueryResult{

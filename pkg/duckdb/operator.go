@@ -19,7 +19,7 @@ type materializer interface {
 type DuckDBClient interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
-	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
+	SelectWithSchema(ctx context.Context, queryObj *query.Query, timeout int) (*query.QueryResult, error)
 	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error
 }
 

@@ -86,6 +86,12 @@ func Query() *cli.Command {
 				EnvVars: []string{"BRUIN_CONFIG_FILE"},
 				Usage:   "the path to the .bruin.yml file",
 			},
+			&cli.IntFlag{
+				Name:    "timeout",
+				Aliases: []string{"t"},
+				Usage:   "timeout in seconds for query execution",
+				Value:   30,
+			},
 		},
 		Action: func(c *cli.Context) error {
 			fs := afero.NewOsFs()
@@ -117,11 +123,11 @@ func Query() *cli.Command {
 				queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn, parser, dialect)
 			}
 			if querier, ok := conn.(interface {
-				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
+				SelectWithSchema(ctx context.Context, q *query.Query, timeout int) (*query.QueryResult, error)
 			}); ok {
 				ctx := context.Background()
 				q := query.Query{Query: queryStr}
-				result, err := querier.SelectWithSchema(ctx, &q)
+				result, err := querier.SelectWithSchema(ctx, &q, c.Int("timeout"))
 				if err != nil {
 					return handleError(c.String("output"), errors.Wrap(err, "query execution failed"))
 				}

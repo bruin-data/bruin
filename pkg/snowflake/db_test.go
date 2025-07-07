@@ -313,7 +313,7 @@ func TestDB_SelectWithSchema(t *testing.T) {
 			db := DB{conn: sqlxDB}
 
 			// Execute SelectWithSchema
-			got, err := db.SelectWithSchema(context.Background(), &tt.query)
+			got, err := db.SelectWithSchema(context.Background(), &tt.query, 0)
 
 			// Validate the error expectations
 			if tt.wantErr {
