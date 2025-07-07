@@ -243,10 +243,6 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 	},
-	pipeline.AssetTypeTableauRefresh: {
-		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
-		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
-	},
 	pipeline.AssetTypeEMRServerlessSpark: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
@@ -304,6 +300,22 @@ var DefaultExecutorsV2 = map[pipeline.AssetType]Config{
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 	},
 	pipeline.AssetTypeGoodData: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
+	pipeline.AssetTypeTableauDatasource: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
+	pipeline.AssetTypeTableauWorkbook: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
+	pipeline.AssetTypeTableauWorksheet: {
+		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
+		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
+	},
+	pipeline.AssetTypeTableauDashboard: {
 		scheduler.TaskInstanceTypeMain:         NoOpOperator{},
 		scheduler.TaskInstanceTypeMetadataPush: NoOpOperator{},
 	},

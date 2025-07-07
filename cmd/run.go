@@ -982,10 +982,22 @@ func SetupExecutors(
 		}
 	}
 
-	if s.WillRunTaskOfType(pipeline.AssetTypeTableauRefresh) {
+	if s.WillRunTaskOfType(pipeline.AssetTypeTableauDatasource) {
 		tableauOperator := tableau.NewBasicOperator(conn)
-		mainExecutors[pipeline.AssetTypeTableauRefresh][scheduler.TaskInstanceTypeMain] = tableauOperator
+		mainExecutors[pipeline.AssetTypeTableauDatasource][scheduler.TaskInstanceTypeMain] = tableauOperator
 	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeTableauWorkbook) {
+		tableauOperator := tableau.NewBasicOperator(conn)
+		mainExecutors[pipeline.AssetTypeTableauWorkbook][scheduler.TaskInstanceTypeMain] = tableauOperator
+	}
+
+	if s.WillRunTaskOfType(pipeline.AssetTypeTableau) {
+		tableauOperator := tableau.NewBasicOperator(conn)
+		mainExecutors[pipeline.AssetTypeTableau][scheduler.TaskInstanceTypeMain] = tableauOperator
+	}
+	
+
 
 	emrServerlessAssetTypes := []pipeline.AssetType{
 		pipeline.AssetTypeEMRServerlessSpark,
