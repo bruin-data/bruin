@@ -193,6 +193,48 @@ func (c *Client) RefreshDataSource(ctx context.Context, datasourceID string) err
 	return nil
 }
 
+func (c *Client) RefreshWorksheet(ctx context.Context, workbookID string) error {
+	if err := c.authenticate(ctx); err != nil {
+		return errors.Wrap(err, "failed to authenticate with Tableau")
+	}
+
+	refreshURL := fmt.Sprintf("https://%s/api/%s/sites/%s/workbooks/%s/refresh",
+		c.config.Host, c.config.APIVersion, c.siteID, workbookID)
+
+	refreshPayload := map[string]interface{}{
+		"workbook": map[string]interface{}{
+			"id": workbookID,
+		},
+	}
+
+	payloadBytes, err := json.Marshal(refreshPayload)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal refresh payload")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, refreshURL, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return errors.Wrap(err, "failed to create refresh request")
+	}
+
+	req.Header.Set("X-Tableau-Auth", c.authToken)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return errors.Wrap(err, "failed to perform refresh request")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return errors.Errorf("refresh failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
 func (c *Client) Ping(ctx context.Context) error {
 	if err := c.authenticate(ctx); err != nil {
 		return errors.Wrap(err, "failed to authenticate during ping")

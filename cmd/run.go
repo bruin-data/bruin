@@ -996,8 +996,6 @@ func SetupExecutors(
 		tableauOperator := tableau.NewBasicOperator(conn)
 		mainExecutors[pipeline.AssetTypeTableau][scheduler.TaskInstanceTypeMain] = tableauOperator
 	}
-	
-
 
 	emrServerlessAssetTypes := []pipeline.AssetType{
 		pipeline.AssetTypeEMRServerlessSpark,
