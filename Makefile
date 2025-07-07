@@ -13,7 +13,7 @@ FILES := $(wildcard *.yml *.txt *.py)
 
 JQ_REL_PATH = jq --arg prefix "$$(pwd)/" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
 
-.PHONY: all clean test build build-no-duckdb tools format pre-commit tools-update refresh-integration-expectations
+.PHONY: all clean test build build-no-duckdb tools format pre-commit tools-update refresh-integration-expectations integration-test-cloud
 all: clean deps test build
 
 deps: tools
@@ -38,6 +38,15 @@ integration-test: build
 	@echo "$(OK_COLOR)==> Running integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
 	@INCLUDE_INGESTR=1 go run integration-tests/integration-test.go
+
+integration-test-cloud: build
+	@touch integration-tests/cloud-integration-tests/.git
+	@touch integration-tests/cloud-integration-tests/bruin
+	@rm -rf integration-tests/cloud-integration-tests/.git
+	@rm integration-tests/cloud-integration-tests/bruin
+	@echo "$(OK_COLOR)==> Running cloud integration tests...$(NO_COLOR)"
+	@cd integration-tests && git init
+	@go run integration-tests/cloud-integration-tests/cloud-integration-test.go
 
 integration-test-light: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
