@@ -177,7 +177,7 @@ func CreateEnvironment(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			printSuccessForOutput(output, fmt.Sprintf("Successfully created environment: %s", envName))
+			printSuccessForOutput(output, "Successfully created environment: "+envName)
 			return nil
 		},
 	}

@@ -1192,7 +1192,7 @@ func populateAwsConfigAliases(creds map[string]any) map[string]any {
 // The schemaPrefix argument is optional and can be left empty.
 func (c *Config) AddEnvironment(name, schemaPrefix string) error {
 	if name == "" {
-		return fmt.Errorf("environment name cannot be empty")
+		return errors.New("environment name cannot be empty")
 	}
 
 	if c.Environments == nil {
