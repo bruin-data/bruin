@@ -17,8 +17,8 @@ type MockConnection struct {
 	mock.Mock
 }
 
-func (m *MockConnection) SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error) {
-	args := m.Called(ctx, q)
+func (m *MockConnection) SelectWithSchema(ctx context.Context, q *query.Query, timeout int) (*query.QueryResult, error) {
+	args := m.Called(ctx, q, timeout)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -142,7 +142,7 @@ func TestFillColumnsFromDB(t *testing.T) {
 
 			// Setup mock connection
 			mockConn := new(MockConnection)
-			mockConn.On("SelectWithSchema", mock.Anything, mock.Anything).Return(&query.QueryResult{
+			mockConn.On("SelectWithSchema", mock.Anything, mock.Anything, mock.Anything).Return(&query.QueryResult{
 				Columns:     tt.dbColumns,
 				ColumnTypes: tt.dbColumnTypes,
 			}, nil)
