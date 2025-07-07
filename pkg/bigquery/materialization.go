@@ -431,8 +431,8 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 PARTITION BY DATE(_valid_from)
 CLUSTER BY _is_current, %s AS
 SELECT
-  src.*,
   CAST (%s AS TIMESTAMP) AS _valid_from,
+  src.*,
   TIMESTAMP('9999-12-31') AS _valid_until,
   TRUE AS _is_current
 FROM (
