@@ -437,6 +437,28 @@
       },
       "schema_prefix": ""
     },
+    "env-scd2-col-duckdb": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "scd2-by-col-duckdb",
+            "path": "integration-tests/duckdb-files/scd2-by-col-duckdb.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-scd2-time-duckdb": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "scd2-by-time-duckdb",
+            "path": "integration-tests/duckdb-files/scd2-by-time-duckdb.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
     "env-validate-with-exclude-tag": {
       "connections": {
         "duckdb": [
@@ -450,3 +472,6 @@
     }
   }
 }
+      
+
+
