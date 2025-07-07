@@ -42,10 +42,6 @@ func (m *mockMaterializer) LogIfFullRefreshAndDDL(writer interface{}, asset *pip
 	return nil
 }
 
-func (m *mockQuerierWithResult) PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error {
-	return nil
-}
-
 func TestBasicOperator_RunTask(t *testing.T) {
 	t.Parallel()
 
@@ -136,7 +132,6 @@ func TestBasicOperator_RunTask(t *testing.T) {
 				f.q.On("CreateSchemaIfNotExist", mock.Anything, mock.Anything).Return(nil)
 				f.q.On("RunQueryWithoutResult", mock.Anything, &query.Query{Query: "select * from users"}).
 					Return(errors.New("failed to run query"))
-				f.q.On("PushColumnDescriptions", mock.Anything, mock.Anything).Return(nil)
 			},
 			args: args{
 				t: &pipeline.Asset{
