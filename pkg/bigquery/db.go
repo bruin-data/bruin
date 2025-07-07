@@ -177,9 +177,9 @@ func (d *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query, ti
 		go func() {
 			<-ctx.Done()
 			if ctx.Err() == context.DeadlineExceeded {
-				cancelCtx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
+				cancelCtx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second) //nolint:contextcheck
 				defer cancelFunc()
-				if cancelErr := job.Cancel(cancelCtx); cancelErr != nil {
+				if cancelErr := job.Cancel(cancelCtx); cancelErr != nil { //nolint:contextcheck
 					fmt.Printf("Warning: Failed to cancel BigQuery job %s: %v\n", job.ID(), cancelErr)
 				}
 			}
