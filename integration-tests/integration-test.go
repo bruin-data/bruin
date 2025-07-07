@@ -1627,7 +1627,7 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 				{
 					Name:    "restore asset to initial state",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "snowflake-integration-tests/resources/menu_original.sql"), filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-column-pipeline/assets/menu.sql")},
+					Args:    []string{filepath.Join(currentFolder, "snowflake-integration-tests/resources/menu_original.sql"), filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-column-pipeline/assets/menu.sql")},
 					Env:     []string{},
 	
 					Expected: e2e.Output{
@@ -1640,7 +1640,7 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 				{
 					Name:    "create the table",
 					Command: binary,
-					Args:    []string{"run", "--full-refresh", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-column-pipeline")},
+					Args:    []string{"run", "--full-refresh", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-column-pipeline")},
 					Env:     []string{},
 	
 					Expected: e2e.Output{
@@ -1653,12 +1653,12 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 				{
 					Name:    "query the initial table",
 					Command: binary,
-					Args:    []string{"query", "--asset", filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-column-pipeline/assets/menu.sql"), "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
+					Args:    []string{"query", "--asset", filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
 					Env:     []string{},
 	
 					Expected: e2e.Output{
 						ExitCode: 0,
-						CSVFile:  filepath.Join(currentFolder, "snowflake-integration-tests/expected_initial.csv"),
+						CSVFile:  filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-column-pipeline/expectations/scd2_col_expected_initial.csv"),
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
@@ -1666,9 +1666,9 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 					},
 				},
 				{
-					Name:    "copy menu_updated.sql to menu.sql",
+					Name:    "copy menu_update_01.sql to menu.sql",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "snowflake-integration-tests/resources/menu_updated.sql"), filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-column-pipeline/assets/menu.sql")},
+					Args:    []string{filepath.Join(currentFolder, "snowflake-integration-tests/resources/menu_update_01.sql"), filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-column-pipeline/assets/menu.sql")},
 					Env:     []string{},
 	
 					Expected: e2e.Output{
@@ -1681,7 +1681,7 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 				{
 					Name:    "update table with scd2_by_column materialization",
 					Command: binary,
-					Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-column-pipeline/assets/menu.sql")},
+					Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-column-pipeline/assets/menu.sql")},
 					Env:     []string{},
 	
 					Expected: e2e.Output{
@@ -1694,12 +1694,12 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 				{
 					Name:    "query the scd2_by_column materialized table",
 					Command: binary,
-					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price,_is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
+					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price,_is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
 					Env:     []string{},
 	
 					Expected: e2e.Output{
 						ExitCode: 0,
-						CSVFile:  filepath.Join(currentFolder, "snowflake-integration-tests/final_expected.csv"),
+						CSVFile:  filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-column-pipeline/expectations/scd2_col_expected_update_01.csv"),
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
@@ -1707,9 +1707,9 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 					},
 				},
 				{
-					Name:    "copy menu_latest.sql to menu.sql",
+					Name:    "copy menu_update_02.sql to menu.sql",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "snowflake-integration-tests/resources/menu_latest.sql"), filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-column-pipeline/assets/menu.sql")},
+					Args:    []string{filepath.Join(currentFolder, "snowflake-integration-tests/resources/menu_update_02.sql"), filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-column-pipeline/assets/menu.sql")},
 					Env:     []string{},
 	
 					Expected: e2e.Output{
@@ -1722,7 +1722,7 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 				{
 					Name:    "update table with scd2_by_column materialization",
 					Command: binary,
-					Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-column-pipeline/assets/menu.sql")},
+					Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-column-pipeline/assets/menu.sql")},
 					Env:     []string{},
 	
 					Expected: e2e.Output{
@@ -1735,12 +1735,12 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 				{
 					Name:    "query the scd2_by_column materialized table",
 					Command: binary,
-					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price,_is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
+					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price,_is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"},
 					Env:     []string{},
 	
 					Expected: e2e.Output{
 						ExitCode: 0,
-						CSVFile:  filepath.Join(currentFolder, "snowflake-integration-tests/latest_expected.csv"),
+						CSVFile:  filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-column-pipeline/expectations/scd2_col_expected_update_02.csv"),
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
@@ -1755,7 +1755,7 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 				{
 					Name:    "restore asset to initial state",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "snowflake-integration-tests/resources/products_original.sql"), filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-time-pipeline/assets/products.sql")},
+					Args:    []string{filepath.Join(currentFolder, "snowflake-integration-tests/resources/products_original.sql"), filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-time-pipeline/assets/products.sql")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -1768,7 +1768,7 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 				{
 					Name:    "create the table",
 					Command: binary,
-					Args:    []string{"run", "--full-refresh", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-time-pipeline")},
+					Args:    []string{"run", "--full-refresh", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-time-pipeline")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -1781,12 +1781,12 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 				{
 					Name:    "query the initial table",
 					Command: binary,
-					Args:    []string{"query", "--asset", filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-time-pipeline/assets/products.sql"), "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--query", "SELECT  product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+					Args:    []string{"query", "--asset", filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--query", "SELECT  product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 					Env:     []string{},
 
 					Expected: e2e.Output{
 						ExitCode: 0,
-						CSVFile:  filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-time-pipeline/expectations/scd2_time_initial_expected.csv"),
+						CSVFile:  filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-time-pipeline/expectations/scd2_time_initial_expected.csv"),
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
@@ -1794,9 +1794,9 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 					},
 				},
 				{
-					Name:    "copy products_updated.sql to products.sql",
+					Name:    "copy products_update_01.sql to products.sql",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "snowflake-integration-tests/resources/products_updated.sql"), filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-time-pipeline/assets/products.sql")},
+					Args:    []string{filepath.Join(currentFolder, "snowflake-integration-tests/resources/products_update_01.sql"), filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-time-pipeline/assets/products.sql")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -1809,7 +1809,7 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 				{
 					Name:    "update table with scd2_by_time materialization",
 					Command: binary,
-					Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-time-pipeline/assets/products.sql")},
+					Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-time-pipeline/assets/products.sql")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -1822,12 +1822,12 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 				{
 					Name:    "query the scd2_by_time materialized table",
 					Command: binary,
-					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 					Env:     []string{},
 
 					Expected: e2e.Output{
 						ExitCode: 0,
-						CSVFile:  filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-time-pipeline/expectations/scd2_time_final_expected.csv"),
+						CSVFile:  filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-time-pipeline/expectations/scd2_time_final_expected.csv"),
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
@@ -1835,9 +1835,9 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 					},
 				},
 				{
-					Name:    "copy products_latest.sql to products.sql",
+					Name:    "copy products_update_02.sql to products.sql",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "snowflake-integration-tests/resources/products_latest.sql"), filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-time-pipeline/assets/products.sql")},
+					Args:    []string{filepath.Join(currentFolder, "snowflake-integration-tests/resources/products_update_02.sql"), filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-time-pipeline/assets/products.sql")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -1850,7 +1850,7 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 				{
 					Name:    "update table again with scd2_by_time materialization",
 					Command: binary,
-					Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-time-pipeline/assets/products.sql")},
+					Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-time-pipeline/assets/products.sql")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
@@ -1863,12 +1863,12 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 				{
 					Name:    "query the scd2_by_time materialized table",
 					Command: binary,
-					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 					Env:     []string{},
 
 					Expected: e2e.Output{
 						ExitCode: 0,
-						CSVFile:  filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-time-pipeline/expectations/scd2_time_latest_expected.csv"),
+						CSVFile:  filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-time-pipeline/expectations/scd2_time_latest_expected.csv"),
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
@@ -1878,7 +1878,7 @@ func getCloudWorkflowsForSnowflake(binary string, currentFolder string, tempdir 
 				{
 					Name:    "restore asset to initial state",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "snowflake-integration-tests/resources/products_original.sql"), filepath.Join(currentFolder, "snowflake-integration-tests/sf-test-pipes/scd2-by-time-pipeline/assets/products.sql")},
+					Args:    []string{filepath.Join(currentFolder, "snowflake-integration-tests/resources/products_original.sql"), filepath.Join(currentFolder, "snowflake-integration-tests/test-pipelines/scd2-by-time-pipeline/assets/products.sql")},
 					Env:     []string{},
 
 					Expected: e2e.Output{
