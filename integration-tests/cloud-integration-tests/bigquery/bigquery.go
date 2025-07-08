@@ -6,8 +6,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/e2e"
 )
 
-// GetTasks returns BigQuery-specific integration test tasks.
-func GetTasks(binary string, currentFolder string) []e2e.Task {
+func TestConnection(binary string, currentFolder string) []e2e.Task {
 	configFlags := []string{"--config-file", filepath.Join(currentFolder, "integration-tests/cloud-integration-tests/.bruin.cloud.yml")}
 
 	tasks := []e2e.Task{
@@ -34,7 +33,6 @@ func GetTasks(binary string, currentFolder string) []e2e.Task {
 	return tasks
 }
 
-// GetWorkflows returns BigQuery-specific integration test workflows.
 func GetWorkflows(binary string, currentFolder string) []e2e.Workflow {
 	configFlags := []string{"--config-file", filepath.Join(currentFolder, "integration-tests/cloud-integration-tests/.bruin.cloud.yml")}
 

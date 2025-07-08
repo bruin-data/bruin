@@ -12,7 +12,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// CloudConfig represents the structure of .bruin.cloud.yml.
 type CloudConfig struct {
 	DefaultEnvironment string                 `yaml:"default_environment"`
 	Environments       map[string]Environment `yaml:"environments"`
@@ -22,35 +21,32 @@ type Environment struct {
 	Connections map[string]interface{} `yaml:"connections"`
 }
 
-// PlatformTestProvider defines the interface for platform-specific test providers.
 type PlatformTestProvider interface {
-	GetTasks(binary string, currentFolder string) []e2e.Task
+	TestConnection(binary string, currentFolder string) []e2e.Task
 	GetWorkflows(binary string, currentFolder string) []e2e.Workflow
 }
 
-// BigQueryProvider implements PlatformTestProvider for BigQuery.
 type BigQueryProvider struct{}
 
-func (p BigQueryProvider) GetTasks(binary string, currentFolder string) []e2e.Task {
-	return bigquery.GetTasks(binary, currentFolder)
+func (p BigQueryProvider) TestConnection(binary string, currentFolder string) []e2e.Task {
+	return bigquery.TestConnection(binary, currentFolder)
 }
 
 func (p BigQueryProvider) GetWorkflows(binary string, currentFolder string) []e2e.Workflow {
 	return bigquery.GetWorkflows(binary, currentFolder)
 }
 
-// SnowflakeProvider implements PlatformTestProvider for Snowflake.
 type SnowflakeProvider struct{}
 
-func (p SnowflakeProvider) GetTasks(binary string, currentFolder string) []e2e.Task {
-	return snowflake.GetTasks(binary, currentFolder)
+func (p SnowflakeProvider) TestConnection(binary string, currentFolder string) []e2e.Task {
+	return snowflake.TestConnection(binary, currentFolder)
 }
 
 func (p SnowflakeProvider) GetWorkflows(binary string, currentFolder string) []e2e.Workflow {
 	return snowflake.GetWorkflows(binary, currentFolder)
 }
 
-// platformConnectionMap maps platform names to their connection type names in the config.
+
 var platformConnectionMap = map[string]string{
 	"bigquery":  "gcp",
 	"snowflake": "snowflake",
@@ -145,13 +141,13 @@ func main() {
 		fmt.Printf("\nRunning %s tests...\n", platformName)
 
 		// Get and run tasks
-		tasks := provider.GetTasks(binary, currentFolder)
+		tasks := provider.TestConnection(binary, currentFolder)
 		if len(tasks) > 0 {
-			fmt.Printf("Running %d tasks\n", len(tasks))
+			fmt.Printf("Testing connection...\n")
 			totalTests += len(tasks)
 			for _, task := range tasks {
 				if err := task.Run(); err != nil {
-					log.Fatalf("Task failed: %v", err)
+					log.Fatalf("Connection test failed: %v", err)
 				}
 			}
 		}
@@ -176,7 +172,7 @@ func main() {
 	fmt.Println("==================================")
 	fmt.Printf("Platforms tested: %d\n", len(platformProviders)-skippedPlatforms)
 	fmt.Printf("Platforms skipped: %d\n", skippedPlatforms)
-	fmt.Printf("Total tests: %d\n", totalTests)
-	fmt.Printf("Total workflows: %d\n", totalWorkflows)
+	fmt.Printf("Connection tests: %d\n", totalTests)
+	fmt.Printf("Workflows: %d\n", totalWorkflows)
 	fmt.Println("\nAll cloud integration tests completed successfully!")
 }
