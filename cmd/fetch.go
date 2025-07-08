@@ -414,6 +414,16 @@ type Limiter interface {
 }
 
 func addLimitToQuery(query string, limit int64, conn interface{}, parser *sqlparser.SQLParser, dialect string) string {
+	// Check if the query is a single SELECT statement before applying limit
+	if parser != nil {
+		isSingleSelect, err := parser.IsSingleSelectQuery(query, dialect)
+		if err == nil && !isSingleSelect {
+			// Not a single SELECT query, return the original query without limit
+			return query
+		}
+		// If there's an error checking or it is a single SELECT, proceed with adding limit
+	}
+
 	var err error
 	var limitedQuery string
 	if parser != nil {

@@ -1045,3 +1045,200 @@ func TestGetMissingDependenciesForAsset(t *testing.T) {
 		})
 	}
 }
+
+func TestSqlParser_IsSingleSelectQuery(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		query            string
+		dialect          string
+		expectedIsSelect bool
+		expectedError    bool
+	}{
+		{
+			name:             "simple SELECT query",
+			query:            "SELECT * FROM users",
+			dialect:          "bigquery",
+			expectedIsSelect: true,
+			expectedError:    false,
+		},
+		{
+			name: "SELECT with WHERE, ORDER BY, LIMIT",
+			query: `
+				SELECT id, name, email 
+				FROM users 
+				WHERE active = true 
+				ORDER BY name 
+				LIMIT 100
+			`,
+			dialect:          "bigquery",
+			expectedIsSelect: true,
+			expectedError:    false,
+		},
+		{
+			name: "SELECT with JOINs",
+			query: `
+				SELECT u.name, p.title 
+				FROM users u 
+				JOIN posts p ON u.id = p.user_id
+			`,
+			dialect:          "bigquery",
+			expectedIsSelect: true,
+			expectedError:    false,
+		},
+		{
+			name: "SELECT with CTEs",
+			query: `
+				WITH active_users AS (
+					SELECT id, name FROM users WHERE active = true
+				)
+				SELECT * FROM active_users
+			`,
+			dialect:          "bigquery",
+			expectedIsSelect: true,
+			expectedError:    false,
+		},
+		{
+			name: "UNION query (single statement)",
+			query: `
+				SELECT id, name FROM users 
+				UNION ALL 
+				SELECT id, name FROM archived_users
+			`,
+			dialect:          "bigquery",
+			expectedIsSelect: true,
+			expectedError:    false,
+		},
+		{
+			name: "multi-statement query",
+			query: `
+				CREATE TABLE temp_table AS SELECT 1 as id;
+				SELECT * FROM temp_table;
+			`,
+			dialect:          "bigquery",
+			expectedIsSelect: false,
+			expectedError:    false,
+		},
+		{
+			name:             "INSERT query",
+			query:            "INSERT INTO users (name, email) VALUES ('John', 'john@example.com')",
+			dialect:          "bigquery",
+			expectedIsSelect: false,
+			expectedError:    false,
+		},
+		{
+			name:             "UPDATE query",
+			query:            "UPDATE users SET active = false WHERE id = 1",
+			dialect:          "bigquery",
+			expectedIsSelect: false,
+			expectedError:    false,
+		},
+		{
+			name:             "DELETE query",
+			query:            "DELETE FROM users WHERE id = 1",
+			dialect:          "bigquery",
+			expectedIsSelect: false,
+			expectedError:    false,
+		},
+		{
+			name:             "CREATE TABLE query",
+			query:            "CREATE TABLE new_table (id INT, name VARCHAR(100))",
+			dialect:          "bigquery",
+			expectedIsSelect: false,
+			expectedError:    false,
+		},
+		{
+			name:             "DROP TABLE query",
+			query:            "DROP TABLE users",
+			dialect:          "bigquery",
+			expectedIsSelect: false,
+			expectedError:    false,
+		},
+		{
+			name:             "CREATE TABLE AS SELECT",
+			query:            "CREATE TABLE new_users AS SELECT * FROM users WHERE active = true",
+			dialect:          "bigquery",
+			expectedIsSelect: false,
+			expectedError:    false,
+		},
+		{
+			name: "multiple SELECT statements",
+			query: `
+				SELECT * FROM users;
+				SELECT * FROM posts;
+			`,
+			dialect:          "bigquery",
+			expectedIsSelect: false,
+			expectedError:    false,
+		},
+		{
+			name:             "PRAGMA query (SQLite)",
+			query:            "PRAGMA table_info(users)",
+			dialect:          "sqlite",
+			expectedIsSelect: false,
+			expectedError:    false,
+		},
+		{
+			name:             "SHOW query (MySQL)",
+			query:            "SHOW TABLES",
+			dialect:          "mysql",
+			expectedIsSelect: false,
+			expectedError:    false,
+		},
+		{
+			name:             "DESCRIBE query (MySQL)",
+			query:            "DESCRIBE users",
+			dialect:          "mysql",
+			expectedIsSelect: false,
+			expectedError:    false,
+		},
+		{
+			name:             "invalid SQL",
+			query:            "SELECT * FROM",
+			dialect:          "bigquery",
+			expectedIsSelect: false,
+			expectedError:    true,
+		},
+		{
+			name:             "empty query",
+			query:            "",
+			dialect:          "bigquery",
+			expectedIsSelect: false,
+			expectedError:    true,
+		},
+		{
+			name:             "snowflake SELECT with functions",
+			query:            "SELECT CONVERT_TIMEZONE('CET', '2025-05-20T00:00:00Z')",
+			dialect:          "snowflake",
+			expectedIsSelect: true,
+			expectedError:    false,
+		},
+		{
+			name:             "complex SELECT with subqueries",
+			query:            "SELECT id, (SELECT COUNT(*) FROM posts WHERE user_id = users.id) as post_count FROM users",
+			dialect:          "bigquery",
+			expectedIsSelect: true,
+			expectedError:    false,
+		},
+	}
+
+	parser, err := NewSQLParser(true)
+	require.NoError(t, err)
+	defer parser.Close()
+
+	err = parser.Start()
+	require.NoError(t, err)
+
+	for _, tt := range tests { //nolint
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parser.IsSingleSelectQuery(tt.query, tt.dialect)
+			if tt.expectedError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.expectedIsSelect, got)
+			}
+		})
+	}
+}
