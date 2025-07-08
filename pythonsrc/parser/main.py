@@ -47,6 +47,9 @@ def extract_non_selected_columns(parsed: exp.Select) -> list[Column]:
 
 
 def extract_tables(parsed):
+    if parsed is None:
+        return []
+
     def get_cte_names(parsed_stmt):
         """Get all CTE names from the parsed statement"""
         cte_names = set()
@@ -140,6 +143,8 @@ def get_tables(query: str, dialect: str):
 
     tables = []
     for parsedSingle in parsed:
+        if parsedSingle is None:
+            continue
         try:
             extracted = extract_tables(parsedSingle)
             tables.extend(extracted)

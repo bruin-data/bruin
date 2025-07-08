@@ -1936,6 +1936,18 @@ SELECT * from my_cte
     assert get_tables(query, dialect) == expected
 
 
+def test_get_tables_trailing_semicolon():
+    dialect = "bigquery"
+
+    query = "SELECT * FROM table1;"
+    expected = {"tables": ["table1"]}
+    assert get_tables(query, dialect) == expected
+
+    query = "SELECT * FROM table1;;"
+    expected = {"tables": ["table1"]}
+    assert get_tables(query, dialect) == expected
+
+
 def test_add_limit():
     query = """
     SELECT DISTINCT product_id, product_name, price, stock, created_at
