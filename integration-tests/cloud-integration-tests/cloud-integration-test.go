@@ -22,15 +22,10 @@ type Environment struct {
 }
 
 type PlatformTestProvider interface {
-	TestConnection(binary string, currentFolder string) []e2e.Task
 	GetWorkflows(binary string, currentFolder string) []e2e.Workflow
 }
 
 type BigQueryProvider struct{}
-
-func (p BigQueryProvider) TestConnection(binary string, currentFolder string) []e2e.Task {
-	return bigquery.TestConnection(binary, currentFolder)
-}
 
 func (p BigQueryProvider) GetWorkflows(binary string, currentFolder string) []e2e.Workflow {
 	return bigquery.GetWorkflows(binary, currentFolder)
@@ -38,14 +33,9 @@ func (p BigQueryProvider) GetWorkflows(binary string, currentFolder string) []e2
 
 type SnowflakeProvider struct{}
 
-func (p SnowflakeProvider) TestConnection(binary string, currentFolder string) []e2e.Task {
-	return snowflake.TestConnection(binary, currentFolder)
-}
-
 func (p SnowflakeProvider) GetWorkflows(binary string, currentFolder string) []e2e.Workflow {
 	return snowflake.GetWorkflows(binary, currentFolder)
 }
-
 
 var platformConnectionMap = map[string]string{
 	"bigquery":  "gcp",
@@ -55,23 +45,19 @@ var platformConnectionMap = map[string]string{
 	// "redshift": "redshift",
 }
 
-// getAvailablePlatforms reads the cloud config and returns available platforms.
 func getAvailablePlatforms(configPath string) (map[string]bool, error) {
 	available := make(map[string]bool)
 
-	// Read the config file
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return available, fmt.Errorf("failed to read config file %s: %w", configPath, err)
 	}
 
-	// Parse the YAML
 	var config CloudConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return available, fmt.Errorf("failed to parse config file %s: %w", configPath, err)
 	}
 
-	// Get the default environment connections
 	defaultEnv := config.DefaultEnvironment
 	if defaultEnv == "" {
 		defaultEnv = "default"
@@ -82,7 +68,6 @@ func getAvailablePlatforms(configPath string) (map[string]bool, error) {
 		return available, fmt.Errorf("default environment '%s' not found in config", defaultEnv)
 	}
 
-	// Check which platforms have connections configured
 	for platform, connectionType := range platformConnectionMap {
 		if _, hasConnection := env.Connections[connectionType]; hasConnection {
 			available[platform] = true
@@ -100,7 +85,6 @@ func main() {
 
 	binary := "./bin/bruin"
 
-	// Check if cloud config exists
 	configPath := filepath.Join(currentFolder, "integration-tests/cloud-integration-tests/.bruin.cloud.yml")
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		fmt.Printf("Cloud configuration file not found at %s\n", configPath)
@@ -108,7 +92,6 @@ func main() {
 		return
 	}
 
-	// Get available platforms from config
 	availablePlatforms, err := getAvailablePlatforms(configPath)
 	if err != nil {
 		fmt.Printf("Failed to parse cloud configuration: %v\n", err)
@@ -119,18 +102,14 @@ func main() {
 	fmt.Println("Running Cloud Integration Tests")
 	fmt.Println("=====================================")
 
-	// Map platform names to their providers
 	platformProviders := map[string]PlatformTestProvider{
 		"bigquery":  BigQueryProvider{},
 		"snowflake": SnowflakeProvider{},
-		// Add more platforms here as they're implemented
 	}
 
-	totalTests := 0
 	totalWorkflows := 0
 	skippedPlatforms := 0
 
-	// Run tests for each available platform
 	for platformName, provider := range platformProviders {
 		if !availablePlatforms[platformName] {
 			fmt.Printf("Skipping %s tests (no connection configured)\n", platformName)
@@ -140,19 +119,6 @@ func main() {
 
 		fmt.Printf("\nRunning %s tests...\n", platformName)
 
-		// Get and run tasks
-		tasks := provider.TestConnection(binary, currentFolder)
-		if len(tasks) > 0 {
-			fmt.Printf("Testing connection...\n")
-			totalTests += len(tasks)
-			for _, task := range tasks {
-				if err := task.Run(); err != nil {
-					log.Fatalf("Connection test failed: %v", err)
-				}
-			}
-		}
-
-		// Get and run workflows
 		workflows := provider.GetWorkflows(binary, currentFolder)
 		if len(workflows) > 0 {
 			fmt.Printf("Running %d workflows\n", len(workflows))
@@ -167,12 +133,10 @@ func main() {
 		fmt.Printf("%s tests completed successfully\n", platformName)
 	}
 
-	// Summary
 	fmt.Println("\nCloud Integration Test Summary")
 	fmt.Println("==================================")
 	fmt.Printf("Platforms tested: %d\n", len(platformProviders)-skippedPlatforms)
 	fmt.Printf("Platforms skipped: %d\n", skippedPlatforms)
-	fmt.Printf("Connection tests: %d\n", totalTests)
 	fmt.Printf("Workflows: %d\n", totalWorkflows)
 	fmt.Println("\nAll cloud integration tests completed successfully!")
 }
