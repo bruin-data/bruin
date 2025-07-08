@@ -373,6 +373,41 @@ func (s *SQLParser) AddLimit(sql string, limit int, dialect string) (string, err
 	return resp.Query, nil
 }
 
+func (s *SQLParser) IsSingleSelectQuery(sql string, dialect string) (bool, error) {
+	err := s.Start()
+	if err != nil {
+		return false, errors.Wrap(err, "failed to start sql parser")
+	}
+
+	command := parserCommand{
+		Command: "is-single-select",
+		Contents: map[string]interface{}{
+			"query":   sql,
+			"dialect": dialect,
+		},
+	}
+
+	responsePayload, err := s.sendCommand(&command)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to send command")
+	}
+
+	var resp struct {
+		IsSingleSelect bool   `json:"is_single_select"`
+		Error          string `json:"error"`
+	}
+	err = json.Unmarshal([]byte(responsePayload), &resp)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to unmarshal response")
+	}
+
+	if resp.Error != "" {
+		return false, errors.New(resp.Error)
+	}
+
+	return resp.IsSingleSelect, nil
+}
+
 func (s *SQLParser) GetMissingDependenciesForAsset(asset *pipeline.Asset, pipeline *pipeline.Pipeline, renderer jinja.RendererInterface) ([]string, error) {
 	err := s.Start()
 	if err != nil {
