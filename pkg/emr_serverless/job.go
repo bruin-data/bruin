@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -22,6 +21,23 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/google/uuid"
 )
+
+type errJobFailure struct {
+	RunID   string
+	Details string
+	State   types.JobRunState
+}
+
+func (e *errJobFailure) Error() string {
+	switch e.State {
+	case types.JobRunStateFailed:
+		return fmt.Sprintf("job run %s failed: %s", e.RunID, e.Details)
+	case types.JobRunStateCancelled:
+		return fmt.Sprintf("job run %s was cancelled: %s", e.RunID, e.Details)
+	default:
+		return fmt.Sprintf("job run %s is in an unknown state: %s", e.RunID, e.State)
+	}
+}
 
 type JobRunParams struct {
 	ApplicationID string
@@ -248,7 +264,7 @@ func (job Job) Run(ctx context.Context) (err error) {
 	}
 	job.logger.Printf("created job run: %s", *run.JobRunId)
 	defer func() { //nolint
-		if err != nil {
+		if err != nil && !errors.As(err, &errJobFailure{}) {
 			// todo(turtledev): timeout for cancellation
 			job.logger.Printf("error detected. cancelling job run.")
 			job.emrClient.CancelJobRun(context.Background(), &emrserverless.CancelJobRunInput{ //nolint
@@ -303,9 +319,19 @@ func (job Job) Run(ctx context.Context) (err error) {
 			for _, line := range jobLogs.Next() {
 				job.logger.Printf("%s | %s | %s ", line.Source.Name, line.Source.Stream, line.Message)
 			}
-			if slices.Contains(terminalJobRunStates, latestRun.State) {
+
+			switch latestRun.State {
+			case types.JobRunStateFailed:
+			case types.JobRunStateCancelled:
+				return &errJobFailure{
+					RunID:   *run.JobRunId,
+					State:   latestRun.State,
+					Details: *latestRun.StateDetails,
+				}
+			case types.JobRunStateSuccess:
 				return nil
 			}
+
 			if runs.NextToken != nil {
 				paginationToken = *runs.NextToken
 			}
