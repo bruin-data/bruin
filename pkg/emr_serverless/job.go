@@ -22,14 +22,14 @@ import (
 	"github.com/google/uuid"
 )
 
-type errJobFailure struct {
+type jobRunError struct {
 	RunID   string
 	Details string
 	State   types.JobRunState
 }
 
-func (e errJobFailure) Error() string {
-	switch e.State {
+func (e jobRunError) Error() string {
+	switch e.State { //nolint:exhaustive
 	case types.JobRunStateFailed:
 		return fmt.Sprintf("job run %s failed", e.RunID)
 	case types.JobRunStateCancelled:
@@ -264,7 +264,7 @@ func (job Job) Run(ctx context.Context) (err error) {
 	}
 	job.logger.Printf("created job run: %s", *run.JobRunId)
 	defer func() { //nolint
-		if err != nil && !errors.As(err, &errJobFailure{}) {
+		if err != nil && !errors.As(err, &jobRunError{}) {
 			// todo(turtledev): timeout for cancellation
 			job.logger.Printf("error detected. cancelling job run.")
 			job.emrClient.CancelJobRun(context.Background(), &emrserverless.CancelJobRunInput{ //nolint
@@ -320,9 +320,9 @@ func (job Job) Run(ctx context.Context) (err error) {
 				job.logger.Printf("%s | %s | %s ", line.Source.Name, line.Source.Stream, line.Message)
 			}
 
-			switch latestRun.State {
+			switch latestRun.State { //nolint:exhaustive
 			case types.JobRunStateFailed, types.JobRunStateCancelled:
-				return errJobFailure{
+				return jobRunError{
 					RunID:   *run.JobRunId,
 					State:   latestRun.State,
 					Details: *latestRun.StateDetails,
