@@ -28,12 +28,12 @@ type errJobFailure struct {
 	State   types.JobRunState
 }
 
-func (e *errJobFailure) Error() string {
+func (e errJobFailure) Error() string {
 	switch e.State {
 	case types.JobRunStateFailed:
-		return fmt.Sprintf("job run %s failed: %s", e.RunID, e.Details)
+		return fmt.Sprintf("job run %s failed", e.RunID)
 	case types.JobRunStateCancelled:
-		return fmt.Sprintf("job run %s was cancelled: %s", e.RunID, e.Details)
+		return fmt.Sprintf("job run %s was cancelled", e.RunID)
 	default:
 		return fmt.Sprintf("job run %s is in an unknown state: %s", e.RunID, e.State)
 	}
@@ -321,9 +321,8 @@ func (job Job) Run(ctx context.Context) (err error) {
 			}
 
 			switch latestRun.State {
-			case types.JobRunStateFailed:
-			case types.JobRunStateCancelled:
-				return &errJobFailure{
+			case types.JobRunStateFailed, types.JobRunStateCancelled:
+				return errJobFailure{
 					RunID:   *run.JobRunId,
 					State:   latestRun.State,
 					Details: *latestRun.StateDetails,
