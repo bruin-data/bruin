@@ -36,7 +36,7 @@ func TestBigQueryIndividualTasks(t *testing.T) {
 }
 
 func TestBigQueryWorkflows(t *testing.T) {
-	t.Parallel()
+	//t.Parallel()
 
 	currentFolder, err := os.Getwd()
 	require.NoError(t, err, "Failed to get current working directory")
@@ -156,7 +156,7 @@ func getWorkflows(binary string, currentFolder string) []e2e.Workflow {
 				{
 					Name:    "create the initial products table",
 					Command: binary,
-					Args:    append([]string{"run", "--full-refresh", "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products.sql")}, configFlags...),
+					Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products.sql")),
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,
@@ -168,7 +168,7 @@ func getWorkflows(binary string, currentFolder string) []e2e.Workflow {
 				{
 					Name:    "query the products table",
 					Command: binary,
-					Args:    append([]string{"query", "--connection", "gcp-default", "--query", "SELECT PRODUCT_ID, PRODUCT_NAME, PRICE, STOCK FROM dataset.products ORDER BY PRODUCT_ID;", "--output", "csv"}, configFlags...),
+					Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT PRODUCT_ID, PRODUCT_NAME, PRICE, STOCK FROM dataset.products ORDER BY PRODUCT_ID;", "--output", "csv"),
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,
@@ -185,7 +185,7 @@ func getWorkflows(binary string, currentFolder string) []e2e.Workflow {
 			Name: "[bigquery] SCD2 by column workflow",
 			Steps: []e2e.Task{
 				{
-					Name:    "restore menu asset to initial state",
+					Name:    "scd2-by-column: restore menu asset to initial state",
 					Command: "cp",
 					Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/menu_original.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql")},
 					Env:     []string{},
@@ -197,9 +197,9 @@ func getWorkflows(binary string, currentFolder string) []e2e.Workflow {
 					},
 				},
 				{
-					Name:    "create the initial table",
+					Name:    "scd2-by-column: create the initial table",
 					Command: binary,
-					Args:    append([]string{"run", "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline")}, configFlags...),
+					Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline")),
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,
@@ -209,9 +209,9 @@ func getWorkflows(binary string, currentFolder string) []e2e.Workflow {
 					},
 				},
 				{
-					Name:    "query the initial table",
+					Name:    "scd2-by-column: query the initial table",
 					Command: binary,
-					Args:    append([]string{"query", "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"}, configFlags...),
+					Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"),
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,
@@ -223,7 +223,7 @@ func getWorkflows(binary string, currentFolder string) []e2e.Workflow {
 					},
 				},
 				{
-					Name:    "copy updated menu data",
+					Name:    "scd2-by-column: copy updated menu data",
 					Command: "cp",
 					Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/menu_updated.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql")},
 					Env:     []string{},
@@ -235,9 +235,9 @@ func getWorkflows(binary string, currentFolder string) []e2e.Workflow {
 					},
 				},
 				{
-					Name:    "run SCD2 materialization",
+					Name:    "scd2-by-column: run SCD2 materialization",
 					Command: binary,
-					Args:    append([]string{"run", "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql")}, configFlags...),
+					Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql")),
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,
@@ -247,9 +247,9 @@ func getWorkflows(binary string, currentFolder string) []e2e.Workflow {
 					},
 				},
 				{
-					Name:    "query the final SCD2 table",
+					Name:    "scd2-by-column: query the final SCD2 table",
 					Command: binary,
-					Args:    append([]string{"query", "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"}, configFlags...),
+					Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"),
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,
@@ -266,7 +266,7 @@ func getWorkflows(binary string, currentFolder string) []e2e.Workflow {
 			Name: "[bigquery] SCD2 by time workflow",
 			Steps: []e2e.Task{
 				{
-					Name:    "restore products asset to initial state",
+					Name:    "scd2-by-time: restore products asset to initial state",
 					Command: "cp",
 					Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/products_original.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")},
 					Env:     []string{},
@@ -278,9 +278,9 @@ func getWorkflows(binary string, currentFolder string) []e2e.Workflow {
 					},
 				},
 				{
-					Name:    "create the initial products table",
+					Name:    "scd2-by-time: create the initial products table",
 					Command: binary,
-					Args:    append([]string{"run", "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline")}, configFlags...),
+					Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline")),
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,
@@ -290,7 +290,7 @@ func getWorkflows(binary string, currentFolder string) []e2e.Workflow {
 					},
 				},
 				{
-					Name:    "update products with new data",
+					Name:    "scd2-by-time: update products with new data",
 					Command: "cp",
 					Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/products_updated.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")},
 					Env:     []string{},
@@ -302,9 +302,9 @@ func getWorkflows(binary string, currentFolder string) []e2e.Workflow {
 					},
 				},
 				{
-					Name:    "run SCD2 by time materialization",
+					Name:    "scd2-by-time: run SCD2 by time materialization",
 					Command: binary,
-					Args:    append([]string{"run", "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")}, configFlags...),
+					Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")),
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,

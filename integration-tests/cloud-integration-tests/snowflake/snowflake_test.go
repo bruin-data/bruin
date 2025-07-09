@@ -180,7 +180,7 @@ func getWorkflows(binary string, currentFolder string) []e2e.Workflow {
 				{
 					Name:    "create the initial products table",
 					Command: binary,
-					Args:    append([]string{"run", "--full-refresh", "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products.sql")}, configFlags...),
+					Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products.sql")),
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,
@@ -192,7 +192,7 @@ func getWorkflows(binary string, currentFolder string) []e2e.Workflow {
 				{
 					Name:    "query the products table",
 					Command: binary,
-					Args:    append([]string{"query", "--connection", "snowflake-default", "--query", "SELECT PRODUCT_ID, PRODUCT_NAME, PRICE, STOCK FROM products ORDER BY PRODUCT_ID;", "--output", "csv"}, configFlags...),
+					Args:    append(append([]string{"query"}, configFlags...), "--connection", "snowflake-default", "--query", "SELECT PRODUCT_ID, PRODUCT_NAME, PRICE, STOCK FROM products ORDER BY PRODUCT_ID;", "--output", "csv"),
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,
