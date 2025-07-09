@@ -1,0 +1,8 @@
+default_environment: dev
+environments:
+    dev:
+        connections: {}
+        schema_prefix: dev_
+    staging:
+        connections: {}
+        schema_prefix: stage_
