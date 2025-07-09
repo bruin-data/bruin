@@ -1363,6 +1363,29 @@ func (p *Pipeline) GetConnectionNameForAsset(asset *Asset) (string, error) {
 	return defaultConn, nil
 }
 
+func (p *Pipeline) GetSecretsRequired(asset *Asset) []string {
+	secretKeys := make([]string, 0, len(asset.Secrets)+1)
+
+	// Add secret keys from the asset's Secrets attribute
+	for _, secret := range asset.Secrets {
+		secretKeys = append(secretKeys, secret.SecretKey)
+	}
+
+	// Add connection name if it can be determined
+	if connectionName, err := p.GetConnectionNameForAsset(asset); err == nil {
+		secretKeys = append(secretKeys, connectionName)
+	}
+
+	if asset.Type == AssetTypeIngestr {
+		ingestrSource, ok := asset.Parameters["source_connection"]
+		if ok {
+			secretKeys = append(secretKeys, ingestrSource)
+		}
+	}
+
+	return secretKeys
+}
+
 // WipeContentOfAssets removes the content of the executable files of all assets in the pipeline.
 // This is useful when we want to serialize the pipeline to JSON and we don't want to include the content of the assets.
 func (p *Pipeline) WipeContentOfAssets() {
