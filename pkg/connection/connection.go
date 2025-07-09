@@ -78,69 +78,70 @@ import (
 )
 
 type Manager struct {
-	BigQuery        map[string]*bigquery.Client
-	Snowflake       map[string]*snowflake.DB
-	Postgres        map[string]*postgres.Client
-	MsSQL           map[string]*mssql.DB
-	Databricks      map[string]*databricks.DB
-	Mongo           map[string]*mongo.DB
-	Mysql           map[string]*mysql.Client
-	Notion          map[string]*notion.Client
-	HANA            map[string]*hana.Client
-	Shopify         map[string]*shopify.Client
-	Gorgias         map[string]*gorgias.Client
-	Klaviyo         map[string]*klaviyo.Client
-	Adjust          map[string]*adjust.Client
-	Athena          map[string]*athena.DB
-	FacebookAds     map[string]*facebookads.Client
-	Stripe          map[string]*stripe.Client
-	Appsflyer       map[string]*appsflyer.Client
-	Kafka           map[string]*kafka.Client
-	Airtable        map[string]*airtable.Client
-	DuckDB          map[string]*duck.Client
-	Hubspot         map[string]*hubspot.Client
-	GoogleSheets    map[string]*gsheets.Client
-	Chess           map[string]*chess.Client
-	S3              map[string]*s3.Client
-	Slack           map[string]*slack.Client
-	Asana           map[string]*asana.Client
-	DynamoDB        map[string]*dynamodb.Client
-	Zendesk         map[string]*zendesk.Client
-	GoogleAds       map[string]*googleads.Client
-	TikTokAds       map[string]*tiktokads.Client
-	GitHub          map[string]*github.Client
-	AppStore        map[string]*appstore.Client
-	LinkedInAds     map[string]*linkedinads.Client
-	Linear          map[string]*linear.Client
-	ClickHouse      map[string]*clickhouse.Client
-	GCS             map[string]*gcs.Client
-	ApplovinMax     map[string]*applovinmax.Client
-	Personio        map[string]*personio.Client
-	Kinesis         map[string]*kinesis.Client
-	Pipedrive       map[string]*pipedrive.Client
-	Mixpanel        map[string]*mixpanel.Client
-	Pinterest       map[string]*pinterest.Client
-	Trustpilot      map[string]*trustpilot.Client
-	QuickBooks      map[string]*quickbooks.Client
-	Zoom            map[string]*zoom.Client
-	Frankfurter     map[string]*frankfurter.Client
-	EMRSeverless    map[string]*emr_serverless.Client
-	GoogleAnalytics map[string]*googleanalytics.Client
-	AppLovin        map[string]*applovin.Client
-	Salesforce      map[string]*salesforce.Client
-	SQLite          map[string]*sqlite.Client
-	DB2             map[string]*db2.Client
-	Oracle          map[string]*oracle.Client
-	Phantombuster   map[string]*phantombuster.Client
-	Elasticsearch   map[string]*elasticsearch.Client
-	Spanner         map[string]*spanner.Client
-	Solidgate       map[string]*solidgate.Client
-	Smartsheet      map[string]*smartsheet.Client
-	Attio           map[string]*attio.Client
-	Sftp            map[string]*sftp.Client
-	ISOCPulse       map[string]*isocpulse.Client
-	Tableau         map[string]*tableau.Client
-	mutex           sync.Mutex
+	BigQuery             map[string]*bigquery.Client
+	Snowflake            map[string]*snowflake.DB
+	Postgres             map[string]*postgres.Client
+	MsSQL                map[string]*mssql.DB
+	Databricks           map[string]*databricks.DB
+	Mongo                map[string]*mongo.DB
+	Mysql                map[string]*mysql.Client
+	Notion               map[string]*notion.Client
+	HANA                 map[string]*hana.Client
+	Shopify              map[string]*shopify.Client
+	Gorgias              map[string]*gorgias.Client
+	Klaviyo              map[string]*klaviyo.Client
+	Adjust               map[string]*adjust.Client
+	Athena               map[string]*athena.DB
+	FacebookAds          map[string]*facebookads.Client
+	Stripe               map[string]*stripe.Client
+	Appsflyer            map[string]*appsflyer.Client
+	Kafka                map[string]*kafka.Client
+	Airtable             map[string]*airtable.Client
+	DuckDB               map[string]*duck.Client
+	Hubspot              map[string]*hubspot.Client
+	GoogleSheets         map[string]*gsheets.Client
+	Chess                map[string]*chess.Client
+	S3                   map[string]*s3.Client
+	Slack                map[string]*slack.Client
+	Asana                map[string]*asana.Client
+	DynamoDB             map[string]*dynamodb.Client
+	Zendesk              map[string]*zendesk.Client
+	GoogleAds            map[string]*googleads.Client
+	TikTokAds            map[string]*tiktokads.Client
+	GitHub               map[string]*github.Client
+	AppStore             map[string]*appstore.Client
+	LinkedInAds          map[string]*linkedinads.Client
+	Linear               map[string]*linear.Client
+	ClickHouse           map[string]*clickhouse.Client
+	GCS                  map[string]*gcs.Client
+	ApplovinMax          map[string]*applovinmax.Client
+	Personio             map[string]*personio.Client
+	Kinesis              map[string]*kinesis.Client
+	Pipedrive            map[string]*pipedrive.Client
+	Mixpanel             map[string]*mixpanel.Client
+	Pinterest            map[string]*pinterest.Client
+	Trustpilot           map[string]*trustpilot.Client
+	QuickBooks           map[string]*quickbooks.Client
+	Zoom                 map[string]*zoom.Client
+	Frankfurter          map[string]*frankfurter.Client
+	EMRSeverless         map[string]*emr_serverless.Client
+	GoogleAnalytics      map[string]*googleanalytics.Client
+	AppLovin             map[string]*applovin.Client
+	Salesforce           map[string]*salesforce.Client
+	SQLite               map[string]*sqlite.Client
+	DB2                  map[string]*db2.Client
+	Oracle               map[string]*oracle.Client
+	Phantombuster        map[string]*phantombuster.Client
+	Elasticsearch        map[string]*elasticsearch.Client
+	Spanner              map[string]*spanner.Client
+	Solidgate            map[string]*solidgate.Client
+	Smartsheet           map[string]*smartsheet.Client
+	Attio                map[string]*attio.Client
+	Sftp                 map[string]*sftp.Client
+	ISOCPulse            map[string]*isocpulse.Client
+	Tableau              map[string]*tableau.Client
+	mutex                sync.Mutex
+	availableConnections map[string]any
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
@@ -1793,6 +1794,7 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.BigQuery[connection.Name] = db
+	m.availableConnections[connection.Name] = db
 
 	return nil
 }
@@ -1835,6 +1837,7 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Snowflake[connection.Name] = db
+	m.availableConnections[connection.Name] = db
 
 	return nil
 }
@@ -1865,6 +1868,7 @@ func (m *Manager) AddAthenaConnectionFromConfig(connection *config.AthenaConnect
 		SessionToken:    connection.SessionToken,
 		Database:        connection.Database,
 	})
+	m.availableConnections[connection.Name] = m.Athena[connection.Name]
 
 	return nil
 }
@@ -1902,6 +1906,7 @@ func (m *Manager) addRedshiftConnectionFromConfig(connection *config.RedshiftCon
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Postgres[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -1950,6 +1955,7 @@ func (m *Manager) addPgLikeConnectionFromConfig(connection *config.PostgresConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Postgres[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -1975,6 +1981,7 @@ func (m *Manager) AddMsSQLConnectionFromConfig(connection *config.MsSQLConnectio
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.MsSQL[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2000,6 +2007,7 @@ func (m *Manager) AddSynapseSQLConnectionFromConfig(connection *config.SynapseCo
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.MsSQL[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2026,6 +2034,7 @@ func (m *Manager) AddDatabricksConnectionFromConfig(connection *config.Databrick
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Databricks[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2051,6 +2060,7 @@ func (m *Manager) AddMongoConnectionFromConfig(connection *config.MongoConnectio
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Mongo[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2077,6 +2087,7 @@ func (m *Manager) AddMySQLConnectionFromConfig(connection *config.MySQLConnectio
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Mysql[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2098,6 +2109,7 @@ func (m *Manager) AddNotionConnectionFromConfig(connection *config.NotionConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Notion[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2120,6 +2132,7 @@ func (m *Manager) AddShopifyConnectionFromConfig(connection *config.ShopifyConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Shopify[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2143,6 +2156,7 @@ func (m *Manager) AddGorgiasConnectionFromConfig(connection *config.GorgiasConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Gorgias[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2164,6 +2178,7 @@ func (m *Manager) AddKlaviyoConnectionFromConfig(connection *config.KlaviyoConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Klaviyo[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2185,6 +2200,7 @@ func (m *Manager) AddAdjustConnectionFromConfig(connection *config.AdjustConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Adjust[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2210,6 +2226,7 @@ func (m *Manager) AddHANAConnectionFromConfig(connection *config.HANAConnection)
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.HANA[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2232,6 +2249,7 @@ func (m *Manager) AddFacebookAdsConnectionFromConfig(connection *config.Facebook
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.FacebookAds[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2253,6 +2271,7 @@ func (m *Manager) AddStripeConnectionFromConfig(connection *config.StripeConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Stripe[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2274,6 +2293,7 @@ func (m *Manager) AddAppsflyerConnectionFromConfig(connection *config.AppsflyerC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Appsflyer[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2311,6 +2331,7 @@ func (m *Manager) AddGoogleSheetsConnectionFromConfig(connection *config.GoogleS
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.GoogleSheets[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2339,6 +2360,7 @@ func (m *Manager) AddSpannerConnectionFromConfig(connection *config.SpannerConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Spanner[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2361,6 +2383,7 @@ func (m *Manager) AddSolidgateConnectionFromConfig(connection *config.SolidgateC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Solidgate[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2382,6 +2405,7 @@ func (m *Manager) AddSmartsheetConnectionFromConfig(connection *config.Smartshee
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Smartsheet[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2405,6 +2429,7 @@ func (m *Manager) AddSftpConnectionFromConfig(connection *config.SFTPConnection)
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Sftp[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2430,6 +2455,7 @@ func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnectio
 	}
 
 	m.Kafka[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2452,6 +2478,7 @@ func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnect
 	defer m.mutex.Unlock()
 
 	m.DuckDB[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2480,6 +2507,7 @@ func (m *Manager) AddClickHouseConnectionFromConfig(connection *config.ClickHous
 	defer m.mutex.Unlock()
 
 	m.ClickHouse[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2499,6 +2527,7 @@ func (m *Manager) AddChessConnectionFromConfig(connection *config.ChessConnectio
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Chess[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2519,6 +2548,7 @@ func (m *Manager) AddHubspotConnectionFromConfig(connection *config.HubspotConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Hubspot[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2539,6 +2569,7 @@ func (m *Manager) AddAirtableConnectionFromConfig(connection *config.AirtableCon
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Airtable[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2563,6 +2594,7 @@ func (m *Manager) AddS3ConnectionFromConfig(connection *config.S3Connection) err
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.S3[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2581,6 +2613,7 @@ func (m *Manager) AddSlackConnectionFromConfig(connection *config.SlackConnectio
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Slack[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2599,6 +2632,7 @@ func (m *Manager) AddAsanaConnectionFromConfig(connection *config.AsanaConnectio
 		return err
 	}
 	m.Asana[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2618,6 +2652,7 @@ func (m *Manager) AddDynamoDBConnectionFromConfig(connection *config.DynamoDBCon
 		return err
 	}
 	m.DynamoDB[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2638,6 +2673,7 @@ func (m *Manager) AddGoogleAdsConnectionFromConfig(connection *config.GoogleAdsC
 		return err
 	}
 	m.GoogleAds[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2659,6 +2695,7 @@ func (m *Manager) AddZendeskConnectionFromConfig(connection *config.ZendeskConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Zendesk[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2680,6 +2717,7 @@ func (m *Manager) AddTikTokAdsConnectionFromConfig(connection *config.TikTokAdsC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.TikTokAds[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2703,6 +2741,7 @@ func (m *Manager) AddGitHubConnectionFromConfig(connection *config.GitHubConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.GitHub[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2727,6 +2766,7 @@ func (m *Manager) AddAppStoreConnectionFromConfig(connection *config.AppStoreCon
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.AppStore[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2747,6 +2787,7 @@ func (m *Manager) AddLinkedInAdsConnectionFromConfig(connection *config.LinkedIn
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.LinkedInAds[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2766,6 +2807,7 @@ func (m *Manager) AddLinearConnectionFromConfig(connection *config.LinearConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Linear[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2787,6 +2829,7 @@ func (m *Manager) AddGCSConnectionFromConfig(connection *config.GCSConnection) e
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.GCS[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2802,6 +2845,7 @@ func (m *Manager) AddPersonioConnectionFromConfig(connection *config.PersonioCon
 		ClientID:     connection.ClientID,
 		ClientSecret: connection.ClientSecret,
 	})
+	m.availableConnections[connection.Name] = m.Personio[connection.Name]
 	return nil
 }
 
@@ -2822,6 +2866,7 @@ func (m *Manager) AddApplovinMaxConnectionFromConfig(connection *config.Applovin
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.ApplovinMax[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2842,6 +2887,7 @@ func (m *Manager) AddAppLovinConnectionFromConfig(connection *config.AppLovinCon
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.AppLovin[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2862,6 +2908,7 @@ func (m *Manager) AddPipedriveConnectionFromConfig(connection *config.PipedriveC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Pipedrive[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2886,6 +2933,7 @@ func (m *Manager) AddQuickBooksConnectionFromConfig(connection *config.QuickBook
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.QuickBooks[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2905,6 +2953,7 @@ func (m *Manager) AddPinterestConnectionFromConfig(connection *config.PinterestC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Pinterest[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2925,6 +2974,7 @@ func (m *Manager) AddTrustpilotConnectionFromConfig(connection *config.Trustpilo
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Trustpilot[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2944,6 +2994,7 @@ func (m *Manager) AddISOCPulseConnectionFromConfig(connection *config.ISOCPulseC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.ISOCPulse[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2965,6 +3016,7 @@ func (m *Manager) AddZoomConnectionFromConfig(connection *config.ZoomConnection)
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Zoom[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2987,6 +3039,7 @@ func (m *Manager) AddMixpanelConnectionFromConfig(connection *config.MixpanelCon
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Mixpanel[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3007,6 +3060,7 @@ func (m *Manager) AddGoogleAnalyticsConnectionFromConfig(connection *config.Goog
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.GoogleAnalytics[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3028,6 +3082,7 @@ func (m *Manager) AddSalesforceConnectionFromConfig(connection *config.Salesforc
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Salesforce[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3047,6 +3102,7 @@ func (m *Manager) AddSQLiteConnectionFromConfig(connection *config.SQLiteConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.SQLite[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3070,6 +3126,7 @@ func (m *Manager) AddOracleConnectionFromConfig(connection *config.OracleConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Oracle[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3091,6 +3148,7 @@ func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Kinesis[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3114,6 +3172,7 @@ func (m *Manager) AddDB2ConnectionFromConfig(connection *config.DB2Connection) e
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.DB2[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3133,6 +3192,7 @@ func (m *Manager) AddPhantombusterConnectionFromConfig(connection *config.Phanto
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Phantombuster[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3152,6 +3212,7 @@ func (m *Manager) AddAttioConnectionFromConfig(connection *config.AttioConnectio
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Attio[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3176,6 +3237,7 @@ func (m *Manager) AddElasticsearchConnectionFromConfig(connection *config.Elasti
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Elasticsearch[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3193,7 +3255,9 @@ func (m *Manager) AddFrankfurterConnectionFromConfig(connection *config.Frankfur
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Frankfurter[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	m.Frankfurter[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3215,6 +3279,7 @@ func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRSer
 		return err
 	}
 	m.EMRSeverless[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -3243,6 +3308,7 @@ func (m *Manager) AddTableauConnectionFromConfig(connection *config.TableauConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Tableau[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
