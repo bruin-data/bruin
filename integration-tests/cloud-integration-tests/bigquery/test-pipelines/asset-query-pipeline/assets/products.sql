@@ -1,5 +1,5 @@
 /* @bruin
-name: products
+name: dataset.products
 type: bq.sql
 
 materialization:

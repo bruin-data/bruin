@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestSnowflakeIntegrationFramework runs individual Snowflake integration tests
-func TestSnowflakeIntegrationFramework(t *testing.T) {
+// TestSnowflakeIndividualTasks runs individual Snowflake integration tests
+func TestSnowflakeIndividualTasks(t *testing.T) {
 	t.Parallel()
 
 	currentFolder, err := os.Getwd()
@@ -47,7 +47,7 @@ func TestSnowflakeWorkflows(t *testing.T) {
 	projectRoot := filepath.Join(currentFolder, "../../../")
 	binary := filepath.Join(projectRoot, "bin/bruin")
 
-	workflows := GetWorkflows(binary, currentFolder)
+	workflows := getWorkflows(binary, currentFolder)
 
 	for _, workflow := range workflows {
 		t.Run(workflow.Name, func(t *testing.T) {
@@ -61,8 +61,8 @@ func TestSnowflakeWorkflows(t *testing.T) {
 	}
 }
 
-// RunSnowflakeIntegrationTests runs individual Snowflake integration tests (can be called externally)
-func RunSnowflakeIntegrationTests(t *testing.T) {
+// RunSnowflakeIndividualTasks runs individual Snowflake integration tests (can be called externally)
+func RunSnowflakeIndividualTasks(t *testing.T) {
 	currentFolder, err := os.Getwd()
 	require.NoError(t, err, "Failed to get current working directory")
 
@@ -92,7 +92,7 @@ func RunSnowflakeWorkflows(t *testing.T) {
 	projectRoot := filepath.Join(currentFolder, "../../../")
 	binary := filepath.Join(projectRoot, "bin/bruin")
 
-	workflows := GetWorkflows(binary, currentFolder)
+	workflows := getWorkflows(binary, currentFolder)
 
 	for _, workflow := range workflows {
 		t.Run(workflow.Name, func(t *testing.T) {
@@ -117,7 +117,7 @@ func getSnowflakeTasks(binary string, currentFolder string) []e2e.Task {
 			Args: []string{
 				"query",
 				"--config-file", configFile,
-				"--env", "sf-query-asset",
+				"--env", "default",
 				"--output", "json",
 				"--asset", filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products.sql"),
 			},
@@ -137,7 +137,7 @@ func getSnowflakeTasks(binary string, currentFolder string) []e2e.Task {
 			Args: []string{
 				"run",
 				"--config-file", configFile,
-				"--env", "sf-query-asset",
+				"--env", "default",
 				"--full-refresh",
 				filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline"),
 			},
@@ -155,7 +155,7 @@ func getSnowflakeTasks(binary string, currentFolder string) []e2e.Task {
 			Args: []string{
 				"run",
 				"--config-file", configFile,
-				"--env", "sf-query-asset",
+				"--env", "default",
 				filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products.sql"),
 			},
 			Env: []string{},
@@ -169,7 +169,7 @@ func getSnowflakeTasks(binary string, currentFolder string) []e2e.Task {
 	}
 }
 
-func GetWorkflows(binary string, currentFolder string) []e2e.Workflow {
+func getWorkflows(binary string, currentFolder string) []e2e.Workflow {
 	projectRoot := filepath.Join(currentFolder, "../../../")
 	configFlags := []string{"--config-file", filepath.Join(projectRoot, "integration-tests/cloud-integration-tests/.bruin.cloud.yml")}
 
@@ -180,7 +180,7 @@ func GetWorkflows(binary string, currentFolder string) []e2e.Workflow {
 				{
 					Name:    "create the initial products table",
 					Command: binary,
-					Args:    append([]string{"run", "--full-refresh", "--env", "sf-query-asset", "--asset", filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products.sql")}, configFlags...),
+					Args:    append([]string{"run", "--full-refresh", "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products.sql")}, configFlags...),
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,

@@ -6,11 +6,10 @@ import (
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/e2e"
-	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/stretchr/testify/require"
 )
 
-func TestBigQueryIntegrationFramework(t *testing.T) {
+func TestBigQueryIndividualTasks(t *testing.T) {
 	t.Parallel()
 
 	currentFolder, err := os.Getwd()
@@ -45,7 +44,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 	projectRoot := filepath.Join(currentFolder, "../../../")
 	binary := filepath.Join(projectRoot, "bin/bruin")
 
-	workflows := GetWorkflows(binary, currentFolder)
+	workflows := getWorkflows(binary, currentFolder)
 
 	for _, workflow := range workflows {
 		t.Run(workflow.Name, func(t *testing.T) {
@@ -59,8 +58,8 @@ func TestBigQueryWorkflows(t *testing.T) {
 	}
 }
 
-// RunBigQueryIntegrationTests runs individual BigQuery integration tests (can be called externally)
-func RunBigQueryIntegrationTests(t *testing.T) {
+// RunBigQueryIndividualTasks runs individual BigQuery integration tests (can be called externally)
+func RunBigQueryIndividualTasks(t *testing.T) {
 	currentFolder, err := os.Getwd()
 	require.NoError(t, err, "Failed to get current working directory")
 
@@ -90,7 +89,7 @@ func RunBigQueryWorkflows(t *testing.T) {
 	projectRoot := filepath.Join(currentFolder, "../../../")
 	binary := filepath.Join(projectRoot, "bin/bruin")
 
-	workflows := GetWorkflows(binary, currentFolder)
+	workflows := getWorkflows(binary, currentFolder)
 
 	for _, workflow := range workflows {
 		t.Run(workflow.Name, func(t *testing.T) {
@@ -109,34 +108,14 @@ func getBigQueryTasks(binary string, currentFolder string) []e2e.Task {
 
 	return []e2e.Task{
 		{
-			Name:    "bigquery-query-asset",
-			Command: binary,
-			Args: []string{
-				"query",
-				"--config-file", configFile,
-				"--env", "bq-query-asset",
-				"--output", "json",
-				"--asset", filepath.Join(currentFolder, "big-test-pipes/asset-query-pipeline/assets/products.sql"),
-			},
-			Env: []string{},
-			Expected: e2e.Output{
-				ExitCode: 0,
-				Output:   helpers.ReadFile(filepath.Join(currentFolder, "big-test-pipes/asset-query-pipeline/expected.json")),
-			},
-			Asserts: []func(*e2e.Task) error{
-				e2e.AssertByExitCode,
-				e2e.AssertByOutputJSON,
-			},
-		},
-		{
 			Name:    "bigquery-run-pipeline",
 			Command: binary,
 			Args: []string{
 				"run",
 				"--config-file", configFile,
-				"--env", "bq-query-asset",
+				"--env", "default",
 				"--full-refresh",
-				filepath.Join(currentFolder, "big-test-pipes/asset-query-pipeline"),
+				filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline"),
 			},
 			Env: []string{},
 			Expected: e2e.Output{
@@ -152,8 +131,8 @@ func getBigQueryTasks(binary string, currentFolder string) []e2e.Task {
 			Args: []string{
 				"run",
 				"--config-file", configFile,
-				"--env", "bq-query-asset",
-				filepath.Join(currentFolder, "big-test-pipes/asset-query-pipeline/assets/products.sql"),
+				"--env", "default",
+				filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products.sql"),
 			},
 			Env: []string{},
 			Expected: e2e.Output{
@@ -166,7 +145,7 @@ func getBigQueryTasks(binary string, currentFolder string) []e2e.Task {
 	}
 }
 
-func GetWorkflows(binary string, currentFolder string) []e2e.Workflow {
+func getWorkflows(binary string, currentFolder string) []e2e.Workflow {
 	projectRoot := filepath.Join(currentFolder, "../../../")
 	configFlags := []string{"--config-file", filepath.Join(projectRoot, "integration-tests/cloud-integration-tests/.bruin.cloud.yml")}
 
@@ -177,7 +156,7 @@ func GetWorkflows(binary string, currentFolder string) []e2e.Workflow {
 				{
 					Name:    "create the initial products table",
 					Command: binary,
-					Args:    append([]string{"run", "--full-refresh", "--env", "bq-query-asset", "--asset", filepath.Join(currentFolder, "big-test-pipes/asset-query-pipeline/assets/products.sql")}, configFlags...),
+					Args:    append([]string{"run", "--full-refresh", "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products.sql")}, configFlags...),
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,
@@ -189,15 +168,149 @@ func GetWorkflows(binary string, currentFolder string) []e2e.Workflow {
 				{
 					Name:    "query the products table",
 					Command: binary,
-					Args:    append([]string{"query", "--connection", "bigquery-default", "--query", "SELECT PRODUCT_ID, PRODUCT_NAME, PRICE, STOCK FROM products ORDER BY PRODUCT_ID;", "--output", "csv"}, configFlags...),
+					Args:    append([]string{"query", "--connection", "gcp-default", "--query", "SELECT PRODUCT_ID, PRODUCT_NAME, PRICE, STOCK FROM dataset.products ORDER BY PRODUCT_ID;", "--output", "csv"}, configFlags...),
 					Env:     []string{},
 					Expected: e2e.Output{
 						ExitCode: 0,
-						CSVFile:  filepath.Join(currentFolder, "big-test-pipes/asset-query-pipeline/expected_products_table.csv"),
+						CSVFile:  filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/expected_products_table.csv"),
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
 						e2e.AssertByCSV,
+					},
+				},
+			},
+		},
+		{
+			Name: "[bigquery] SCD2 by column workflow",
+			Steps: []e2e.Task{
+				{
+					Name:    "restore menu asset to initial state",
+					Command: "cp",
+					Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/menu_original.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql")},
+					Env:     []string{},
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "create the initial table",
+					Command: binary,
+					Args:    append([]string{"run", "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline")}, configFlags...),
+					Env:     []string{},
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "query the initial table",
+					Command: binary,
+					Args:    append([]string{"query", "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"}, configFlags...),
+					Env:     []string{},
+					Expected: e2e.Output{
+						ExitCode: 0,
+						CSVFile:  filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/expectations/expected_initial.csv"),
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByCSV,
+					},
+				},
+				{
+					Name:    "copy updated menu data",
+					Command: "cp",
+					Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/menu_updated.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql")},
+					Env:     []string{},
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "run SCD2 materialization",
+					Command: binary,
+					Args:    append([]string{"run", "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql")}, configFlags...),
+					Env:     []string{},
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "query the final SCD2 table",
+					Command: binary,
+					Args:    append([]string{"query", "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"}, configFlags...),
+					Env:     []string{},
+					Expected: e2e.Output{
+						ExitCode: 0,
+						CSVFile:  filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/expectations/final_expected.csv"),
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+						e2e.AssertByCSV,
+					},
+				},
+			},
+		},
+		{
+			Name: "[bigquery] SCD2 by time workflow",
+			Steps: []e2e.Task{
+				{
+					Name:    "restore products asset to initial state",
+					Command: "cp",
+					Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/products_original.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")},
+					Env:     []string{},
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "create the initial products table",
+					Command: binary,
+					Args:    append([]string{"run", "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline")}, configFlags...),
+					Env:     []string{},
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "update products with new data",
+					Command: "cp",
+					Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/products_updated.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")},
+					Env:     []string{},
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "run SCD2 by time materialization",
+					Command: binary,
+					Args:    append([]string{"run", "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")}, configFlags...),
+					Env:     []string{},
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
 					},
 				},
 			},
