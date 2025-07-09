@@ -15,12 +15,16 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
-func TestManager_GetBqConnection(t *testing.T) {
+func TestManager_GetConnection(t *testing.T) {
 	t.Parallel()
 
 	existingDB := new(bigquery.Client)
 	m := Manager{
 		BigQuery: map[string]*bigquery.Client{
+			"another":  new(bigquery.Client),
+			"existing": existingDB,
+		},
+		availableConnections: map[string]any{
 			"another":  new(bigquery.Client),
 			"existing": existingDB,
 		},
@@ -48,8 +52,9 @@ func TestManager_GetBqConnection(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := m.GetBqConnection(tt.connectionName)
-			tt.wantErr(t, err)
+			got, ok := m.GetConnection(tt.connectionName).(bigquery.DB)
+			assert.True(t, ok)
+			assert.NotNil(t, got)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -60,8 +65,8 @@ func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res, err := m.GetBqConnection("test")
-	require.Error(t, err)
+	res, ok := m.GetConnection("test").(bigquery.DB)
+	assert.False(t, ok)
 	assert.Nil(t, res)
 
 	connection := &config.GoogleCloudPlatformConnection{
@@ -75,11 +80,11 @@ func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 		}),
 	})
 
-	err = m.AddBqConnectionFromConfig(connection)
+	err := m.AddBqConnectionFromConfig(connection)
 	require.Error(t, err)
 
-	res, err = m.GetBqConnection("test")
-	require.Error(t, err)
+	res, ok = m.GetConnection("test").(bigquery.DB)
+	assert.True(t, ok)
 	assert.Nil(t, res)
 }
 

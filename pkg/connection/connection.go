@@ -142,12 +142,12 @@ type Manager struct {
 	availableConnections map[string]any
 }
 
-func (m *Manager) GetConnection(name string) (interface{}, error) {
+func (m *Manager) GetConnection(name string) any {
 	connection, ok := m.availableConnections[name]
 	if !ok {
-		return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, m.availableConnections)
+		return nil
 	}
-	return connection, nil
+	return connection
 }
 
 func (m *Manager) GetAthenaConnection(name string) (athena.Client, error) {

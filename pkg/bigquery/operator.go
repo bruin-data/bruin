@@ -22,8 +22,7 @@ type materializer interface {
 }
 
 type connectionFetcher interface {
-	GetBqConnection(name string) (DB, error)
-	GetConnection(name string) (interface{}, error)
+	GetConnection(name string) any
 }
 
 type BasicOperator struct {
@@ -85,9 +84,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, err := o.connection.GetBqConnection(connName)
-	if err != nil {
-		return err
+	conn, ok := o.connection.GetConnection(connName).(DB)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", connName)
 	}
 
 	if t.Materialization.Type != pipeline.MaterializationTypeNone {
@@ -158,9 +157,9 @@ func (o *MetadataPushOperator) Run(ctx context.Context, ti scheduler.TaskInstanc
 		return err
 	}
 
-	client, err := o.connection.GetBqConnection(conn)
-	if err != nil {
-		return err
+	client, ok := o.connection.GetConnection(conn).(DB)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", conn)
 	}
 
 	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
@@ -219,9 +218,9 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return err
 	}
 
-	conn, err := o.connection.GetBqConnection(connName)
-	if err != nil {
-		return err
+	conn, ok := o.connection.GetConnection(connName).(DB)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", connName)
 	}
 
 	trimmedQuery := helpers.TrimToLength(qry[0].Query, 50)
@@ -293,9 +292,9 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, err := ts.connection.GetBqConnection(connName)
-	if err != nil {
-		return err
+	conn, ok := ts.connection.GetConnection(connName).(DB)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", connName)
 	}
 
 	qq, err := conn.BuildTableExistsQuery(tableName)
