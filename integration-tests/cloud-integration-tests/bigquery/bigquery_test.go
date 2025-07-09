@@ -15,7 +15,6 @@ func TestBigQueryIndividualTasks(t *testing.T) {
 	currentFolder, err := os.Getwd()
 	require.NoError(t, err, "Failed to get current working directory")
 
-	// Go back to project root from bigquery subdirectory
 	projectRoot := filepath.Join(currentFolder, "../../../")
 	binary := filepath.Join(projectRoot, "bin/bruin")
 
@@ -36,7 +35,7 @@ func TestBigQueryIndividualTasks(t *testing.T) {
 }
 
 func TestBigQueryWorkflows(t *testing.T) {
-	//t.Parallel()
+	t.Parallel()
 
 	currentFolder, err := os.Getwd()
 	require.NoError(t, err, "Failed to get current working directory")
@@ -58,7 +57,6 @@ func TestBigQueryWorkflows(t *testing.T) {
 	}
 }
 
-// RunBigQueryIndividualTasks runs individual BigQuery integration tests (can be called externally)
 func RunBigQueryIndividualTasks(t *testing.T) {
 	currentFolder, err := os.Getwd()
 	require.NoError(t, err, "Failed to get current working directory")
@@ -81,7 +79,6 @@ func RunBigQueryIndividualTasks(t *testing.T) {
 	}
 }
 
-// RunBigQueryWorkflows runs multi-step workflow tests (can be called externally)
 func RunBigQueryWorkflows(t *testing.T) {
 	currentFolder, err := os.Getwd()
 	require.NoError(t, err, "Failed to get current working directory")
@@ -101,7 +98,6 @@ func RunBigQueryWorkflows(t *testing.T) {
 	}
 }
 
-// getBigQueryTasks returns the list of individual BigQuery integration tests
 func getBigQueryTasks(binary string, currentFolder string) []e2e.Task {
 	projectRoot := filepath.Join(currentFolder, "../../../")
 	configFile := filepath.Join(projectRoot, "integration-tests/cloud-integration-tests/.bruin.cloud.yml")

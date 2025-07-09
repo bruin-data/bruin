@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -66,7 +67,8 @@ func runTestsInDirectory(t *testing.T, dir string, platformName string) {
 	t.Logf("%s test output:\n%s", platformName, string(output))
 
 	if err != nil {
-		if exitError, ok := err.(*exec.ExitError); ok {
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
 			if exitError.ExitCode() != 0 {
 				t.Errorf("%s tests failed with exit code %d", platformName, exitError.ExitCode())
 			}
@@ -79,6 +81,8 @@ func runTestsInDirectory(t *testing.T, dir string, platformName string) {
 }
 
 func TestCloudIntegration(t *testing.T) {
+	t.Parallel()
+
 	currentFolder, err := os.Getwd()
 	require.NoError(t, err, "Failed to get current working directory")
 
@@ -92,12 +96,13 @@ func TestCloudIntegration(t *testing.T) {
 	require.NoError(t, err, "Failed to parse cloud configuration")
 
 	t.Run("BigQuery", func(t *testing.T) {
+		t.Parallel()
+
 		if !availablePlatforms["bigquery"] {
 			t.Skip("Skipping BigQuery tests - no connection configured")
 			return
 		}
 
-		// Validate BigQuery test environment
 		bigqueryDir := filepath.Join(currentFolder, "bigquery")
 		require.DirExists(t, bigqueryDir, "BigQuery test directory should exist")
 
@@ -110,12 +115,13 @@ func TestCloudIntegration(t *testing.T) {
 	})
 
 	t.Run("Snowflake", func(t *testing.T) {
+		t.Parallel()
+
 		if !availablePlatforms["snowflake"] {
 			t.Skip("Skipping Snowflake tests - no connection configured")
 			return
 		}
 
-		// Validate Snowflake test environment
 		snowflakeDir := filepath.Join(currentFolder, "snowflake")
 		require.DirExists(t, snowflakeDir, "Snowflake test directory should exist")
 

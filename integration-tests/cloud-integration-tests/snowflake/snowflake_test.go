@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestSnowflakeIndividualTasks runs individual Snowflake integration tests
 func TestSnowflakeIndividualTasks(t *testing.T) {
 	t.Parallel()
 
@@ -37,7 +36,6 @@ func TestSnowflakeIndividualTasks(t *testing.T) {
 	}
 }
 
-// TestSnowflakeWorkflows runs multi-step workflow tests
 func TestSnowflakeWorkflows(t *testing.T) {
 	t.Parallel()
 
@@ -61,7 +59,6 @@ func TestSnowflakeWorkflows(t *testing.T) {
 	}
 }
 
-// RunSnowflakeIndividualTasks runs individual Snowflake integration tests (can be called externally)
 func RunSnowflakeIndividualTasks(t *testing.T) {
 	currentFolder, err := os.Getwd()
 	require.NoError(t, err, "Failed to get current working directory")
@@ -84,7 +81,6 @@ func RunSnowflakeIndividualTasks(t *testing.T) {
 	}
 }
 
-// RunSnowflakeWorkflows runs multi-step workflow tests (can be called externally)
 func RunSnowflakeWorkflows(t *testing.T) {
 	currentFolder, err := os.Getwd()
 	require.NoError(t, err, "Failed to get current working directory")
@@ -104,9 +100,7 @@ func RunSnowflakeWorkflows(t *testing.T) {
 	}
 }
 
-// getSnowflakeTasks returns the list of individual Snowflake integration tests
 func getSnowflakeTasks(binary string, currentFolder string) []e2e.Task {
-	// Get project root from currentFolder (which is snowflake directory)
 	projectRoot := filepath.Join(currentFolder, "../../../")
 	configFile := filepath.Join(projectRoot, "integration-tests/cloud-integration-tests/.bruin.cloud.yml")
 
