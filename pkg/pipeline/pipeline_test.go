@@ -1596,3 +1596,210 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 		})
 	}
 }
+
+func TestPipeline_GetSecretsRequired(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		pipeline *pipeline.Pipeline
+		asset    *pipeline.Asset
+		want     []string
+	}{
+		{
+			name: "should return empty slice for asset with no secrets or connections",
+			pipeline: &pipeline.Pipeline{
+				DefaultConnections: map[string]string{},
+			},
+			asset: &pipeline.Asset{
+				Name:    "test-asset",
+				Type:    "unknown",
+				Secrets: []pipeline.SecretMapping{},
+			},
+			want: []string{},
+		},
+		{
+			name: "should return asset secrets only",
+			pipeline: &pipeline.Pipeline{
+				DefaultConnections: map[string]string{},
+			},
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+				Type: "unknown",
+				Secrets: []pipeline.SecretMapping{
+					{SecretKey: "secret1"},
+					{SecretKey: "secret2"},
+				},
+			},
+			want: []string{"secret1", "secret2"},
+		},
+		{
+			name: "should return connection name for SQL asset",
+			pipeline: &pipeline.Pipeline{
+				DefaultConnections: map[string]string{
+					"google_cloud_platform": "gcp-connection",
+				},
+			},
+			asset: &pipeline.Asset{
+				Name:    "test-asset",
+				Type:    "bq.sql",
+				Secrets: []pipeline.SecretMapping{},
+			},
+			want: []string{"gcp-connection"},
+		},
+		{
+			name: "should return both asset secrets and connection name",
+			pipeline: &pipeline.Pipeline{
+				DefaultConnections: map[string]string{
+					"snowflake": "snowflake-connection",
+				},
+			},
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+				Type: "sf.sql",
+				Secrets: []pipeline.SecretMapping{
+					{SecretKey: "api-key"},
+					{SecretKey: "oauth-token"},
+				},
+			},
+			want: []string{"api-key", "oauth-token", "snowflake-connection"},
+		},
+		{
+			name: "should return custom connection when specified",
+			pipeline: &pipeline.Pipeline{
+				DefaultConnections: map[string]string{
+					"google_cloud_platform": "default-gcp",
+				},
+			},
+			asset: &pipeline.Asset{
+				Name:       "test-asset",
+				Type:       "bq.sql",
+				Connection: "custom-connection",
+				Secrets:    []pipeline.SecretMapping{},
+			},
+			want: []string{"custom-connection"},
+		},
+		{
+			name: "should handle ingestr asset with source connection",
+			pipeline: &pipeline.Pipeline{
+				DefaultConnections: map[string]string{
+					"google_cloud_platform": "gcp-connection",
+				},
+			},
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+				Type: "ingestr",
+				Parameters: map[string]string{
+					"destination":       "bigquery",
+					"source_connection": "postgres-source",
+				},
+				Secrets: []pipeline.SecretMapping{},
+			},
+			want: []string{"gcp-connection", "postgres-source"},
+		},
+		{
+			name: "should handle ingestr asset without source connection",
+			pipeline: &pipeline.Pipeline{
+				DefaultConnections: map[string]string{
+					"google_cloud_platform": "gcp-connection",
+				},
+			},
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+				Type: "ingestr",
+				Parameters: map[string]string{
+					"destination": "bigquery",
+				},
+				Secrets: []pipeline.SecretMapping{},
+			},
+			want: []string{"gcp-connection"},
+		},
+		{
+			name: "should handle ingestr asset with custom destination connection",
+			pipeline: &pipeline.Pipeline{
+				DefaultConnections: map[string]string{},
+			},
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+				Type: "ingestr",
+				Parameters: map[string]string{
+					"destination":            "bigquery",
+					"destination_connection": "custom-gcp-connection",
+					"source_connection":      "mysql-source",
+				},
+				Secrets: []pipeline.SecretMapping{},
+			},
+			want: []string{"gcp-default", "mysql-source"},
+		},
+		{
+			name: "should handle python asset with secrets",
+			pipeline: &pipeline.Pipeline{
+				DefaultConnections: map[string]string{},
+			},
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+				Type: "python",
+				Secrets: []pipeline.SecretMapping{
+					{SecretKey: "db-password"},
+					{SecretKey: "api-key"},
+				},
+			},
+			want: []string{"db-password", "api-key", "gcp-default"},
+		},
+		{
+			name: "should use default connection mapping when no custom connection",
+			pipeline: &pipeline.Pipeline{
+				DefaultConnections: map[string]string{},
+			},
+			asset: &pipeline.Asset{
+				Name:    "test-asset",
+				Type:    "pg.sql",
+				Secrets: []pipeline.SecretMapping{},
+			},
+			want: []string{"postgres-default"},
+		},
+		{
+			name: "should handle asset with both secrets and ingestr source",
+			pipeline: &pipeline.Pipeline{
+				DefaultConnections: map[string]string{
+					"google_cloud_platform": "gcp-connection",
+				},
+			},
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+				Type: "ingestr",
+				Parameters: map[string]string{
+					"destination":       "bigquery",
+					"source_connection": "postgres-source",
+				},
+				Secrets: []pipeline.SecretMapping{
+					{SecretKey: "vault-token"},
+				},
+			},
+			want: []string{"vault-token", "gcp-connection", "postgres-source"},
+		},
+		{
+			name: "should handle connection error gracefully",
+			pipeline: &pipeline.Pipeline{
+				DefaultConnections: map[string]string{},
+			},
+			asset: &pipeline.Asset{
+				Name: "test-asset",
+				Type: "unknown.type",
+				Secrets: []pipeline.SecretMapping{
+					{SecretKey: "secret1"},
+				},
+			},
+			want: []string{"secret1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := tt.pipeline.GetSecretsRequired(tt.asset)
+			assert.ElementsMatch(t, tt.want, got)
+		})
+	}
+}
