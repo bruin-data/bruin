@@ -58,7 +58,7 @@ func TestManager_GetBqConnection(t *testing.T) {
 func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 
 	res, err := m.GetBqConnection("test")
 	require.Error(t, err)
@@ -86,7 +86,7 @@ func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 func TestManager_AddPgConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 
 	res, err := m.GetPgConnection("test")
 	require.Error(t, err)
@@ -114,7 +114,7 @@ func TestManager_AddPgConnectionFromConfig(t *testing.T) {
 func TestManager_AddRedshiftConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 
 	res, err := m.GetPgConnection("test")
 	require.Error(t, err)
@@ -141,7 +141,7 @@ func TestManager_AddRedshiftConnectionFromConfig(t *testing.T) {
 func TestManager_AddMsSQLConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 
 	res, err := m.GetMsConnection("test")
 	require.Error(t, err)
@@ -167,7 +167,7 @@ func TestManager_AddMsSQLConnectionFromConfigConnectionFromConfig(t *testing.T) 
 func TestManager_AddMongoConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 
 	res, err := m.GetMongoConnection("test")
 	require.Error(t, err)
@@ -194,7 +194,8 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 	t.Parallel()
 
 	m := Manager{
-		Mysql: make(map[string]*mysql.Client),
+		availableConnections: make(map[string]any),
+		Mysql:                make(map[string]*mysql.Client),
 	}
 
 	res, err := m.GetMySQLConnection("test")
@@ -220,7 +221,7 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 func TestManager_AddNotionConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 
 	res, err := m.GetNotionConnection("test")
 	require.Error(t, err)
@@ -242,7 +243,7 @@ func TestManager_AddNotionConnectionFromConfigConnectionFromConfig(t *testing.T)
 func TestManager_AddShopiyConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 
 	res, err := m.GetShopifyConnection("test")
 	require.Error(t, err)
@@ -265,7 +266,7 @@ func TestManager_AddShopiyConnectionFromConfigConnectionFromConfig(t *testing.T)
 func TestManager_AddGorgiasConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 
 	res, err := m.GetGorgiasConnection("test")
 	require.Error(t, err)
@@ -289,7 +290,7 @@ func TestManager_AddGorgiasConnectionFromConfigConnectionFromConfig(t *testing.T
 func TestManager_AddHANAConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 
 	res, err := m.GetHANAConnection("test")
 	require.Error(t, err)
@@ -315,7 +316,7 @@ func TestManager_AddHANAConnectionFromConfigConnectionFromConfig(t *testing.T) {
 func Test_AddEMRServerlessConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 	res, err := m.GetEMRServerlessConnection("test")
 	require.Error(t, err)
 	assert.Nil(t, res)
@@ -377,6 +378,20 @@ func TestNewManagerFromConfig(t *testing.T) {
 				"PERSONIO_CLIENT_SECRET": "secret2",
 			},
 			want: &Manager{
+				availableConnections: map[string]any{
+					"key1": personio.NewClient(personio.Config{
+						ClientID:     "id1",
+						ClientSecret: "secret1",
+					}),
+					"key2": personio.NewClient(personio.Config{
+						ClientID:     "val1_id2_val2",
+						ClientSecret: "secret2",
+					}),
+					"key3": personio.NewClient(personio.Config{
+						ClientID:     "",
+						ClientSecret: "",
+					}),
+				},
 				Personio: map[string]*personio.Client{
 					"key1": personio.NewClient(personio.Config{
 						ClientID:     "id1",
