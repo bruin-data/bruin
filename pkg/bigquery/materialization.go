@@ -365,10 +365,11 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 		primaryKeys[i] = fmt.Sprintf("target.%[1]s = source.%[1]s", pk)
 	}
 	onCondition := strings.Join(primaryKeys, " AND ")
-	onCondition += " AND target._is_current = source._is_current"
+	onCondition += " AND target._is_current AND source._is_current"
 
 	tbl := fmt.Sprintf("`%s`", asset.Name)
-
+	whereCondition := strings.Join(compareCondsS1T1, " OR ")
+	whereCondition = "(" + whereCondition + ")" + " AND t1._is_current"
 	queryStr := fmt.Sprintf(`
 MERGE INTO %s AS target
 USING (
@@ -405,7 +406,7 @@ WHEN NOT MATCHED BY TARGET THEN
 		strings.TrimSpace(query),
 		tbl,
 		pkList,
-		strings.Join(compareCondsS1T1, " OR "),
+		whereCondition,
 		onCondition,
 		strings.Join(compareConds, " OR "),
 		strings.Join(insertCols, ", "),

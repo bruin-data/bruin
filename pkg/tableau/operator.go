@@ -38,14 +38,61 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.Wrap(err, "failed to get Tableau connection")
 	}
 
-	datasourceID, ok := t.Parameters["datasource_id"]
+	switch {
+	case t.Type == pipeline.AssetTypeTableauDatasource:
+		return o.handleDatasourceRefresh(ctx, client, t)
+	case t.Type == pipeline.AssetTypeTableauWorkbook:
+		return o.handleWorkbookRefresh(ctx, client, t)
+	case t.Type == pipeline.AssetTypeTableauWorksheet || t.Type == pipeline.AssetTypeTableauDashboard:
+		return nil
+	case t.Type == pipeline.AssetTypeTableau:
+		if t.Parameters["refresh"] == "" || t.Parameters["workbook_id"] == "" {
+			return nil
+		}
+		return o.handleWorkbookRefresh(ctx, client, t)
+
+	default:
+		return errors.Errorf("unsupported Tableau asset type: %s", t.Type)
+	}
+}
+
+func (o BasicOperator) handleDatasourceRefresh(ctx context.Context, client *Client, t *pipeline.Asset) error {
+	refreshVal, ok := t.Parameters["refresh"]
 	if !ok {
-		return errors.New("tableau asset requires 'datasource_id' parameter")
+		return errors.New("tableau.datasource asset requires 'refresh' parameter (true/false)")
 	}
 
-	err = client.RefreshDataSource(ctx, datasourceID)
-	if err != nil {
-		return errors.Wrap(err, "failed to refresh Tableau data source")
+	refresh := refreshVal == "true"
+
+	if refresh {
+		datasourceID, ok := t.Parameters["datasource_id"]
+		if !ok {
+			return errors.New("tableau.datasource asset requires 'datasource_id' parameter when 'refresh' is true")
+		}
+		if err := client.RefreshDataSource(ctx, datasourceID); err != nil {
+			return errors.Wrap(err, "failed to refresh Tableau data source")
+		}
+	}
+
+	return nil
+}
+
+func (o BasicOperator) handleWorkbookRefresh(ctx context.Context, client *Client, t *pipeline.Asset) error {
+	refreshVal, ok := t.Parameters["refresh"]
+	if !ok {
+		return errors.New("tableau.workbook asset requires 'refresh' parameter (true/false)")
+	}
+
+	refresh := refreshVal == "true"
+
+	if refresh {
+		workbookID, ok := t.Parameters["workbook_id"]
+		if !ok {
+			return errors.New("tableau.workbook asset requires 'workbook_id' parameter when 'refresh' is true")
+		}
+		if err := client.RefreshWorksheet(ctx, workbookID); err != nil {
+			return errors.Wrap(err, "failed to refresh Tableau workbook")
+		}
 	}
 
 	return nil

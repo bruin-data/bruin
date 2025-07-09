@@ -10,7 +10,6 @@ import (
 	awsCfg "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless"
-	"github.com/aws/aws-sdk-go-v2/service/emrserverless/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/env"
@@ -18,12 +17,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 )
-
-var terminalJobRunStates = []types.JobRunState{
-	types.JobRunStateFailed,
-	types.JobRunStateSuccess,
-	types.JobRunStateCancelled,
-}
 
 type connectionFetcher interface {
 	GetAthenaConnection(name string) (athena.Client, error)

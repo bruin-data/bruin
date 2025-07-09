@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 	path2 "path"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
@@ -68,6 +70,12 @@ func Query() *cli.Command {
 				Value:       outputFormatPlain,
 				Usage:       "the output type, possible values are: plain, json, csv",
 			},
+			&cli.IntFlag{
+				Name:    "timeout",
+				Aliases: []string{"t"},
+				Usage:   "timeout for query execution in seconds",
+				Value:   1000,
+			},
 			&cli.StringFlag{
 				Name:  "asset",
 				Usage: "Path to a SQL asset file within a Bruin pipeline. This file should contain the query to be executed.",
@@ -120,8 +128,14 @@ func Query() *cli.Command {
 				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
 			}); ok {
 				ctx := context.Background()
+				ctx, cancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+				defer cancel()
+
+				timeoutCtx, timeoutCancel := context.WithTimeout(ctx, time.Duration(c.Int("timeout"))*time.Second)
+				defer timeoutCancel()
+
 				q := query.Query{Query: queryStr}
-				result, err := querier.SelectWithSchema(ctx, &q)
+				result, err := querier.SelectWithSchema(timeoutCtx, &q)
 				if err != nil {
 					return handleError(c.String("output"), errors.Wrap(err, "query execution failed"))
 				}
@@ -400,6 +414,16 @@ type Limiter interface {
 }
 
 func addLimitToQuery(query string, limit int64, conn interface{}, parser *sqlparser.SQLParser, dialect string) string {
+	// Check if the query is a single SELECT statement before applying limit
+	if parser != nil {
+		isSingleSelect, err := parser.IsSingleSelectQuery(query, dialect)
+		if err == nil && !isSingleSelect {
+			// Not a single SELECT query, return the original query without limit
+			return query
+		}
+		// If there's an error checking or it is a single SELECT, proceed with adding limit
+	}
+
 	var err error
 	var limitedQuery string
 	if parser != nil {

@@ -152,16 +152,24 @@ func (c *Client) authenticate(ctx context.Context) error {
 }
 
 func (c *Client) RefreshDataSource(ctx context.Context, datasourceID string) error {
+	return c.refreshResource(ctx, "datasources", datasourceID, "datasource")
+}
+
+func (c *Client) RefreshWorksheet(ctx context.Context, workbookID string) error {
+	return c.refreshResource(ctx, "workbooks", workbookID, "workbook")
+}
+
+func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, payloadKey string) error {
 	if err := c.authenticate(ctx); err != nil {
 		return errors.Wrap(err, "failed to authenticate with Tableau")
 	}
 
-	refreshURL := fmt.Sprintf("https://%s/api/%s/sites/%s/datasources/%s/refresh",
-		c.config.Host, c.config.APIVersion, c.siteID, datasourceID)
+	refreshURL := fmt.Sprintf("https://%s/api/%s/sites/%s/%s/%s/refresh",
+		c.config.Host, c.config.APIVersion, c.siteID, resourceType, resourceID)
 
 	refreshPayload := map[string]interface{}{
-		"datasource": map[string]interface{}{
-			"id": datasourceID,
+		payloadKey: map[string]interface{}{
+			"id": resourceID,
 		},
 	}
 

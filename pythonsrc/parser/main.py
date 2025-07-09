@@ -366,3 +366,33 @@ def add_limit(query: str, limit_value: int, dialect: str = None) -> dict:
 
     limited_query = parsed.limit(limit_value).sql(dialect=dialect)
     return {"query": limited_query}
+
+
+def is_single_select_query(query: str, dialect: str = None) -> dict:
+    """
+    Check if a query is a single SELECT statement.
+    Returns {"is_single_select": bool, "error": str}
+    """
+    # Handle empty or whitespace-only queries
+    if not query or not query.strip():
+        return {"is_single_select": False, "error": "cannot parse query"}
+        
+    try:
+        # Parse all statements in the query
+        parsed_statements = parse(query, dialect=dialect)
+        if not parsed_statements:
+            return {"is_single_select": False, "error": "cannot parse query"}
+        
+        # Check if there's exactly one statement and it's a SELECT
+        if len(parsed_statements) == 1:
+            stmt = parsed_statements[0]
+            # Check if it's a SELECT statement (including CTEs with SELECT)
+            is_select = isinstance(stmt, (exp.Select, exp.Query))
+            return {"is_single_select": is_select, "error": ""}
+        else:
+            # Multiple statements
+            return {"is_single_select": False, "error": ""}
+            
+    except Exception as e:
+        return {"is_single_select": False, "error": str(e)}
+
