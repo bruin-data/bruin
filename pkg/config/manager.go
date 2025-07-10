@@ -1212,3 +1212,111 @@ func (c *Config) AddEnvironment(name, schemaPrefix string) error {
 
 	return nil
 }
+
+// UpdateEnvironment updates an existing environment in the configuration.
+// If the environment does not exist, an error is returned.
+func (c *Config) UpdateEnvironment(oldName, newName, schemaPrefix string) error {
+	if oldName == "" {
+		return errors.New("old environment name cannot be empty")
+	}
+	if newName == "" {
+		return errors.New("new environment name cannot be empty")
+	}
+
+	if c.Environments == nil {
+		return fmt.Errorf("environment '%s' does not exist", oldName)
+	}
+
+	env, exists := c.Environments[oldName]
+	if !exists {
+		return fmt.Errorf("environment '%s' does not exist", oldName)
+	}
+
+	// Check if new name already exists (unless it's the same as old name)
+	if oldName != newName {
+		if _, exists := c.Environments[newName]; exists {
+			return fmt.Errorf("environment '%s' already exists", newName)
+		}
+	}
+
+	// Update schema prefix if provided
+	if schemaPrefix != "" {
+		env.SchemaPrefix = schemaPrefix
+	}
+
+	// If renaming environment
+	if oldName != newName {
+		// Add with new name
+		c.Environments[newName] = env
+		// Remove old name
+		delete(c.Environments, oldName)
+
+		// Update selected environment if it was the one being renamed
+		if c.SelectedEnvironmentName == oldName {
+			c.SelectedEnvironmentName = newName
+		}
+
+		// Update default environment if it was the one being renamed
+		if c.DefaultEnvironmentName == oldName {
+			c.DefaultEnvironmentName = newName
+		}
+	} else {
+		// Just update the existing environment
+		c.Environments[oldName] = env
+	}
+
+	return nil
+}
+
+// DeleteEnvironment removes an environment from the configuration.
+// If the environment does not exist, an error is returned.
+func (c *Config) DeleteEnvironment(name string) error {
+	if name == "" {
+		return errors.New("environment name cannot be empty")
+	}
+
+	if c.Environments == nil {
+		return fmt.Errorf("environment '%s' does not exist", name)
+	}
+
+	if _, exists := c.Environments[name]; !exists {
+		return fmt.Errorf("environment '%s' does not exist", name)
+	}
+
+	// Don't allow deletion of the last environment
+	if len(c.Environments) == 1 {
+		return errors.New("cannot delete the last environment")
+	}
+
+	delete(c.Environments, name)
+
+	// If deleting the selected environment, select the first available one
+	if c.SelectedEnvironmentName == name {
+		for envName := range c.Environments {
+			err := c.SelectEnvironment(envName)
+			if err == nil {
+				c.SelectedEnvironmentName = envName
+				break
+			}
+		}
+	}
+
+	// If deleting the default environment, set default to the first available one
+	if c.DefaultEnvironmentName == name {
+		for envName := range c.Environments {
+			c.DefaultEnvironmentName = envName
+			break
+		}
+	}
+
+	return nil
+}
+
+// EnvironmentExists checks if an environment exists in the configuration.
+func (c *Config) EnvironmentExists(name string) bool {
+	if c.Environments == nil {
+		return false
+	}
+	_, exists := c.Environments[name]
+	return exists
+}
