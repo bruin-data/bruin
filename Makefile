@@ -46,7 +46,7 @@ integration-test-cloud: build
 	@rm integration-tests/cloud-integration-tests/bruin
 	@echo "$(OK_COLOR)==> Running cloud integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@go run integration-tests/cloud-integration-tests/cloud-integration-test.go
+	@cd integration-tests/cloud-integration-tests && go test -count=1 -v .
 
 integration-test-light: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists
@@ -66,7 +66,7 @@ test: test-unit
 
 test-unit:
 	@echo "$(OK_COLOR)==> Running the unit tests$(NO_COLOR)"
-	@go test -race -cover -timeout 10m ./... 
+	@go test -race -cover -timeout 10m $(shell go list ./... | grep -v '/cloud-integration-tests/') 
 
 format: tools lint-python
 	@echo "$(OK_COLOR)>> [go vet] running$(NO_COLOR)" & \
