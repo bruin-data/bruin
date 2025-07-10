@@ -244,7 +244,6 @@ func buildSCD2ByColumnQueryWithTimestamp(asset *pipeline.Asset, query, timestamp
 
 	tbl := asset.Name
 
-	// Multi-step SCD2 implementation for Snowflake with consistent timestamp
 	queryStr := fmt.Sprintf(`
 BEGIN TRANSACTION;
 
@@ -320,50 +319,20 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 		clusterByClause = fmt.Sprintf("CLUSTER BY (_is_current, %s)", cluster)
 	}
 
-	// Build column definitions from asset schema
-	columnDefs := make([]string, 0, len(asset.Columns)+3)
-	// Add SCD2 columns first for this strategy
-	columnDefs = append(columnDefs, "_valid_from TIMESTAMP")
-	for _, col := range asset.Columns {
-		columnDefs = append(columnDefs, fmt.Sprintf("%s %s", col.Name, col.Type))
-	}
-	columnDefs = append(columnDefs, "_valid_until TIMESTAMP")
-	columnDefs = append(columnDefs, "_is_current BOOLEAN")
-
-	// Build column names for INSERT
-	insertColumns := make([]string, 0, len(asset.Columns)+3)
-	selectColumns := make([]string, 0, len(asset.Columns)+3)
-
-	// For column-based SCD2, _valid_from comes first
-	insertColumns = append(insertColumns, "_valid_from")
-	selectColumns = append(selectColumns, "CURRENT_TIMESTAMP()")
-
-	for _, col := range asset.Columns {
-		insertColumns = append(insertColumns, col.Name)
-		selectColumns = append(selectColumns, "src."+col.Name)
-	}
-	insertColumns = append(insertColumns, "_valid_until", "_is_current")
-	selectColumns = append(selectColumns, "TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')", "TRUE")
-
 	stmt := fmt.Sprintf(
-		`BEGIN TRANSACTION;
-CREATE OR REPLACE TABLE %s %s (
-%s
-);
-INSERT INTO %s (%s)
+		`CREATE OR REPLACE TABLE %s %s AS
 SELECT
-  %s
+  CURRENT_TIMESTAMP() AS _valid_from,
+  src.*,
+  TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,
+  TRUE AS _is_current
 FROM (
 %s
-) AS src;
-COMMIT;`,
+) AS src`,
 		tbl,
 		clusterByClause,
-		strings.Join(columnDefs, ",\n"),
-		tbl,
-		strings.Join(insertColumns, ", "),
-		strings.Join(selectColumns, ",\n  "),
 		strings.TrimSpace(query),
 	)
+
 	return strings.TrimSpace(stmt), nil
 }

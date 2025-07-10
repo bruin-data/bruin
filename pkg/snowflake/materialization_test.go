@@ -550,27 +550,15 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			},
 			fullRefresh: true,
 			query:       "SELECT id, name, price from source_table",
-			want: "BEGIN TRANSACTION;\n" +
-				"CREATE OR REPLACE TABLE my.asset CLUSTER BY (_is_current, id) (\n" +
-				"_valid_from TIMESTAMP,\n" +
-				"id INTEGER,\n" +
-				"name VARCHAR,\n" +
-				"price FLOAT,\n" +
-				"_valid_until TIMESTAMP,\n" +
-				"_is_current BOOLEAN\n" +
-				");\n" +
-				"INSERT INTO my.asset (_valid_from, id, name, price, _valid_until, _is_current)\n" +
+			want: "CREATE OR REPLACE TABLE my.asset CLUSTER BY (_is_current, id) AS\n" +
 				"SELECT\n" +
-				"  CURRENT_TIMESTAMP(),\n" +
-				"  src.id,\n" +
-				"  src.name,\n" +
-				"  src.price,\n" +
-				"  TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS'),\n" +
-				"  TRUE\n" +
+				"  CURRENT_TIMESTAMP() AS _valid_from,\n" +
+				"  src.*,\n" +
+				"  TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,\n" +
+				"  TRUE AS _is_current\n" +
 				"FROM (\n" +
 				"SELECT id, name, price from source_table\n" +
-				") AS src;\n" +
-				"COMMIT;",
+				") AS src",
 		},
 		{
 			name: "scd2_full_refresh_with_custom_clustering",
@@ -589,27 +577,15 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			},
 			fullRefresh: true,
 			query:       "SELECT id, name, price from source_table",
-			want: "BEGIN TRANSACTION;\n" +
-				"CREATE OR REPLACE TABLE my.asset CLUSTER BY (category, id) (\n" +
-				"_valid_from TIMESTAMP,\n" +
-				"id INTEGER,\n" +
-				"name VARCHAR,\n" +
-				"price FLOAT,\n" +
-				"_valid_until TIMESTAMP,\n" +
-				"_is_current BOOLEAN\n" +
-				");\n" +
-				"INSERT INTO my.asset (_valid_from, id, name, price, _valid_until, _is_current)\n" +
+			want: "CREATE OR REPLACE TABLE my.asset CLUSTER BY (category, id) AS\n" +
 				"SELECT\n" +
-				"  CURRENT_TIMESTAMP(),\n" +
-				"  src.id,\n" +
-				"  src.name,\n" +
-				"  src.price,\n" +
-				"  TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS'),\n" +
-				"  TRUE\n" +
+				"  CURRENT_TIMESTAMP() AS _valid_from,\n" +
+				"  src.*,\n" +
+				"  TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS') AS _valid_until,\n" +
+				"  TRUE AS _is_current\n" +
 				"FROM (\n" +
 				"SELECT id, name, price from source_table\n" +
-				") AS src;\n" +
-				"COMMIT;",
+				") AS src",
 		},
 	}
 
