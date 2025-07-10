@@ -42,28 +42,33 @@ func TestManager_GetConnection(t *testing.T) {
 		name           string
 		connectionName string
 		want           bigquery.DB
-		wantErr        assert.ErrorAssertionFunc
+		wantErr        bool
 	}{
 		{
 			name:           "should return error when no connections are found",
 			connectionName: "non-existing",
-			wantErr:        assert.Error,
+			wantErr:        true,
 		},
 		{
 			name:           "should find the correct connection",
 			connectionName: "existing",
 			want:           existingDB,
-			wantErr:        assert.NoError,
+			wantErr:        false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-
 			got, ok := m.GetConnection(tt.connectionName).(bigquery.DB)
-			assert.True(t, ok)
-			assert.NotNil(t, got)
-			assert.Equal(t, tt.want, got)
+			if tt.wantErr {
+				assert.False(t, ok)
+				assert.Nil(t, got)
+			} else {
+				assert.True(t, ok)
+				assert.NotNil(t, got)
+				assert.Equal(t, tt.want, got)
+			}
+
 		})
 	}
 }
@@ -73,8 +78,7 @@ func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res, ok := m.GetConnection("test").(bigquery.DB)
-	assert.False(t, ok)
+	res := m.GetConnection("test")
 	assert.Nil(t, res)
 
 	connection := &config.GoogleCloudPlatformConnection{
@@ -91,8 +95,8 @@ func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 	err := m.AddBqConnectionFromConfig(connection)
 	require.Error(t, err)
 
-	res, ok = m.GetConnection("test").(bigquery.DB)
-	assert.True(t, ok)
+	res, ok := m.GetConnection("test").(bigquery.DB)
+	assert.False(t, ok)
 	assert.Nil(t, res)
 }
 
@@ -246,7 +250,7 @@ func TestManager_AddNotionConnectionFromConfigConnectionFromConfig(t *testing.T)
 	err := m.AddNotionConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, ok := m.GetConnection("test").(notion.NotionConfig)
+	res, ok := m.GetConnection("test").(*notion.Client)
 	assert.True(t, ok)
 	assert.NotNil(t, res)
 }
@@ -268,7 +272,7 @@ func TestManager_AddShopiyConnectionFromConfigConnectionFromConfig(t *testing.T)
 	err := m.AddShopifyConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, ok := m.GetConnection("test").(shopify.ShopifyConfig)
+	res, ok := m.GetConnection("test").(*shopify.Client)
 	assert.True(t, ok)
 	assert.NotNil(t, res)
 }
@@ -291,7 +295,7 @@ func TestManager_AddGorgiasConnectionFromConfigConnectionFromConfig(t *testing.T
 	err := m.AddGorgiasConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, ok := m.GetConnection("test").(gorgias.Config)
+	res, ok := m.GetConnection("test").(*gorgias.Client)
 	assert.True(t, ok)
 	assert.NotNil(t, res)
 }
@@ -316,7 +320,7 @@ func TestManager_AddHANAConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	err := m.AddHANAConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, ok := m.GetConnection("test").(hana.Client)
+	res, ok := m.GetConnection("test").(*hana.Client)
 	assert.True(t, ok)
 	assert.NotNil(t, res)
 }
@@ -340,7 +344,7 @@ func Test_AddEMRServerlessConnectionFromConfig(t *testing.T) {
 	err := m.AddEMRServerlessConnectionFromConfig(cfg)
 	require.NoError(t, err)
 
-	res, ok := m.GetConnection("test").(emr_serverless.Client)
+	res, ok := m.GetConnection("test").(*emr_serverless.Client)
 	assert.True(t, ok)
 	assert.NotNil(t, res)
 }
@@ -438,7 +442,7 @@ func TestManager_GetSfConnection(t *testing.T) {
 			"existing": {},
 		},
 		availableConnections: map[string]any{
-			"existing": snowflake.DB{},
+			"existing": &snowflake.DB{},
 		},
 	}
 

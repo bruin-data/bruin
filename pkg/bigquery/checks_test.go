@@ -99,16 +99,6 @@ type mockConnectionFetcher struct {
 	mock.Mock
 }
 
-func (m *mockConnectionFetcher) GetBqConnection(name string) (DB, error) {
-	args := m.Called(name)
-	get := args.Get(0)
-	if get == nil {
-		return nil, args.Error(1)
-	}
-
-	return get.(DB), args.Error(1)
-}
-
 func (m *mockConnectionFetcher) GetConnection(name string) any {
 	args := m.Called(name)
 	return args.Get(0)

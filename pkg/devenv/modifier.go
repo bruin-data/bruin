@@ -57,6 +57,9 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 	}
 
 	conn := d.Conn.GetConnection(connName)
+	if conn == nil {
+		return nil, fmt.Errorf("failed to get connection")
+	}
 
 	dbFetcherConn, ok := conn.(interface {
 		GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error)
