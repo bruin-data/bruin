@@ -554,6 +554,12 @@ func TestLoadFromFile(t *testing.T) {
 					Token: "isoc-pulse-token-123",
 				},
 			},
+			Pulse: []PulseConnection{
+				{
+					Name:  "pulse-1",
+					Token: "pulse-token-123",
+				},
+			},
 			Zoom: []ZoomConnection{
 				{
 					Name:         "zoom-1",

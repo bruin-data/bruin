@@ -54,6 +54,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/pinterest"
 	"github.com/bruin-data/bruin/pkg/pipedrive"
 	"github.com/bruin-data/bruin/pkg/postgres"
+	"github.com/bruin-data/bruin/pkg/pulse"
 	"github.com/bruin-data/bruin/pkg/quickbooks"
 	"github.com/bruin-data/bruin/pkg/s3"
 	"github.com/bruin-data/bruin/pkg/salesforce"
@@ -137,6 +138,7 @@ type Manager struct {
 	Attio                map[string]*attio.Client
 	Sftp                 map[string]*sftp.Client
 	ISOCPulse            map[string]*isocpulse.Client
+	Pulse                map[string]*pulse.Client
 	Tableau              map[string]*tableau.Client
 	mutex                sync.Mutex
 	availableConnections map[string]any
@@ -1584,6 +1586,26 @@ func (m *Manager) AddISOCPulseConnectionFromConfig(connection *config.ISOCPulseC
 	return nil
 }
 
+func (m *Manager) AddPulseConnectionFromConfig(connection *config.PulseConnection) error {
+	m.mutex.Lock()
+	if m.Pulse == nil {
+		m.Pulse = make(map[string]*pulse.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := pulse.NewClient(pulse.Config{
+		Token: connection.Token,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Pulse[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddZoomConnectionFromConfig(connection *config.ZoomConnection) error {
 	m.mutex.Lock()
 	if m.Zoom == nil {
@@ -2033,6 +2055,7 @@ func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	processConnections(cm.SelectedEnvironment.Connections.Attio, connectionManager.AddAttioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sftp, connectionManager.AddSftpConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.ISOCPulse, connectionManager.AddISOCPulseConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Pulse, connectionManager.AddPulseConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Tableau, connectionManager.AddTableauConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList

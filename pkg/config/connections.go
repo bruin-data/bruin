@@ -874,6 +874,15 @@ func (c ISOCPulseConnection) GetName() string {
 	return c.Name
 }
 
+type PulseConnection struct {
+	Name  string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Token string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
+}
+
+func (c PulseConnection) GetName() string {
+	return c.Name
+}
+
 type TableauConnection struct {
 	Name                      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Host                      string `yaml:"host,omitempty" json:"host" mapstructure:"host"`

@@ -350,6 +350,9 @@ environments:
       isoc_pulse:
         - name: "isoc_pulse-1"
           token: "isoc-pulse-token-123"
+      pulse:
+        - name: "pulse-1"
+          token: "pulse-token-123"
 
   prod:
     connections:

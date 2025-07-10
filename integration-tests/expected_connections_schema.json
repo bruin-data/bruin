@@ -665,6 +665,12 @@
           },
           "type": "array"
         },
+        "pulse": {
+          "items": {
+            "$ref": "#/$defs/PulseConnection"
+          },
+          "type": "array"
+        },
         "tableau": {
           "items": {
             "$ref": "#/$defs/TableauConnection"
@@ -1108,6 +1114,22 @@
       ]
     },
     "ISOCPulseConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "token"
+      ]
+    },
+    "PulseConnection": {
       "properties": {
         "name": {
           "type": "string"
