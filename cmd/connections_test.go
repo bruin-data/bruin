@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Test config constants
+// Test config constants.
 const testConfigWithConnections = `
 default_environment: dev
 environments:
@@ -53,57 +53,34 @@ environments:
     schema_prefix: "dev_"
 `
 
-// Helper function to create test credentials
-func createTestCredentials(connType string) map[string]interface{} {
-	switch connType {
-	case "postgres":
-		return map[string]interface{}{
-			"host":     "localhost",
-			"username": "user",
-			"password": "pass",
-			"database": "db",
-			"port":     5432,
-		}
-	case "mysql":
-		return map[string]interface{}{
-			"host":     "localhost",
-			"username": "user",
-			"password": "pass",
-			"database": "db",
-			"port":     3306,
-		}
-	default:
-		return map[string]interface{}{
-			"host": "localhost",
-			"port": 5432,
-		}
-	}
-}
-
-// Helper function to setup test config
+// Helper function to setup test config.
 func setupTestConfig(t *testing.T, configContent string) (afero.Fs, string) {
 	fs := afero.NewMemMapFs()
 	configFile := ".bruin.yml"
 
-	err := afero.WriteFile(fs, configFile, []byte(configContent), 0o644)
+	file, err := fs.Create(configFile)
+	require.NoError(t, err)
+	defer file.Close()
+
+	_, err = file.Write([]byte(configContent))
 	require.NoError(t, err)
 
 	return fs, configFile
 }
 
-// Mock connection manager for testing
+// Mock connection manager for testing.
 type mockConnectionManager struct {
 	connections map[string]interface{}
 }
 
-func (m *mockConnectionManager) GetConnection(name string) (interface{}, error) {
+func (m *mockConnectionManager) GetConnection(name string) (interface{}, error) { //nolint:ireturn // Mock function needs to return interface{} to match actual implementation
 	if conn, exists := m.connections[name]; exists {
 		return conn, nil
 	}
 	return nil, fmt.Errorf("connection '%s' not found", name)
 }
 
-// Mock pingable connection
+// Mock pingable connection.
 type mockPingableConnection struct {
 	name      string
 	shouldErr bool
@@ -116,9 +93,48 @@ func (m *mockPingableConnection) Ping(ctx context.Context) error {
 	return nil
 }
 
-// Mock non-pingable connection
+// Mock non-pingable connection.
 type mockNonPingableConnection struct {
 	name string
+}
+
+// Helper function to simulate ping logic and reduce complexity.
+func simulatePingLogic(connName string, pingable bool, shouldErr bool) error {
+	// Create mock connection manager
+	mockManager := &mockConnectionManager{
+		connections: make(map[string]interface{}),
+	}
+
+	// Add mock connections based on test case
+	if connName == "pg_conn" {
+		if pingable {
+			mockManager.connections[connName] = &mockPingableConnection{
+				name:      connName,
+				shouldErr: shouldErr,
+			}
+		} else {
+			mockManager.connections[connName] = &mockNonPingableConnection{
+				name: connName,
+			}
+		}
+	}
+
+	// Get connection
+	conn, err := mockManager.GetConnection(connName)
+	if err != nil {
+		return fmt.Errorf("failed to get connection '%s': %w", connName, err)
+	}
+
+	// Test ping functionality
+	if tester, ok := conn.(interface {
+		Ping(ctx context.Context) error
+	}); ok {
+		if pingErr := tester.Ping(context.Background()); pingErr != nil {
+			return fmt.Errorf("failed to test connection '%s': %w", connName, pingErr)
+		}
+	}
+
+	return nil
 }
 
 func TestAddConnectionCommand_Run(t *testing.T) {
@@ -221,11 +237,11 @@ func TestAddConnectionCommand_Run(t *testing.T) {
 				// Try to parse credentials
 				var creds map[string]interface{}
 				if err := json.Unmarshal([]byte(tt.credentials), &creds); err != nil {
-					testErr = fmt.Errorf("failed to parse credentials JSON: %v", err)
+					testErr = fmt.Errorf("failed to parse credentials JSON: %w", err)
 				} else {
 					// Try to add connection
 					if err := cm.AddConnection(tt.environment, tt.connName, tt.connType, creds); err != nil {
-						testErr = fmt.Errorf("failed to add connection: %v", err)
+						testErr = fmt.Errorf("failed to add connection: %w", err)
 					}
 				}
 			}
@@ -327,9 +343,6 @@ func TestListConnectionsCommand_Run(t *testing.T) {
 			} else {
 				fs, configFile = setupTestConfig(t, testConfigWithConnections)
 			}
-
-			// Create ConnectionsCommand instance
-			_ = ConnectionsCommand{}
 
 			// Mock the filesystem operations by creating a config directly
 			cm, err := config.LoadOrCreate(fs, configFile)
@@ -434,9 +447,7 @@ func TestDeleteConnectionCommand_Run(t *testing.T) {
 			originalEnv := cm.Environments[tt.environment]
 
 			// Simulate the DeleteConnection command logic
-			var testErr error
-
-			testErr = cm.DeleteConnection(tt.environment, tt.connName)
+			testErr := cm.DeleteConnection(tt.environment, tt.connName)
 
 			if tt.wantErr {
 				require.Error(t, testErr)
@@ -554,41 +565,9 @@ func TestPingConnectionCommand_Run(t *testing.T) {
 			var testErr error
 
 			if err := cm.SelectEnvironment(environment); err != nil {
-				testErr = fmt.Errorf("failed to select the environment: %v", err)
+				testErr = fmt.Errorf("failed to select the environment: %w", err)
 			} else {
-				// Create mock connection manager
-				mockManager := &mockConnectionManager{
-					connections: make(map[string]interface{}),
-				}
-
-				// Add mock connections based on test case
-				if tt.connName == "pg_conn" {
-					if tt.pingable {
-						mockManager.connections[tt.connName] = &mockPingableConnection{
-							name:      tt.connName,
-							shouldErr: tt.mockPingErr,
-						}
-					} else {
-						mockManager.connections[tt.connName] = &mockNonPingableConnection{
-							name: tt.connName,
-						}
-					}
-				}
-
-				// Get connection
-				conn, err := mockManager.GetConnection(tt.connName)
-				if err != nil {
-					testErr = fmt.Errorf("failed to get connection '%s': %v", tt.connName, err)
-				} else {
-					// Test ping functionality
-					if tester, ok := conn.(interface {
-						Ping(ctx context.Context) error
-					}); ok {
-						if pingErr := tester.Ping(context.Background()); pingErr != nil {
-							testErr = fmt.Errorf("failed to test connection '%s': %v", tt.connName, pingErr)
-						}
-					}
-				}
+				testErr = simulatePingLogic(tt.connName, tt.pingable, tt.mockPingErr)
 			}
 
 			if tt.wantErr {
@@ -665,9 +644,6 @@ func TestConnectionsCommand_ListConnections(t *testing.T) {
 				err := afero.WriteFile(fs, configFile, []byte(tt.configContent), 0o644)
 				require.NoError(t, err)
 			}
-
-			// Create ConnectionsCommand instance
-			_ = ConnectionsCommand{}
 
 			// Mock the filesystem operations by creating a config directly
 			cm, err := config.LoadOrCreate(fs, configFile)
