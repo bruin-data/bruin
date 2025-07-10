@@ -26,10 +26,35 @@ var scopes = []string{
 	"https://www.googleapis.com/auth/drive",
 }
 
+// DryRunMetadata contains metadata returned from a BigQuery dry run
+type DryRunMetadata struct {
+	// TotalBytesProcessed is the total amount of data that will be processed by the query
+	TotalBytesProcessed int64 `json:"total_bytes_processed"`
+
+	// TotalBytesBilled is the total amount of data that will be billed for the query
+	// This may be different from TotalBytesProcessed due to caching, minimum billing, etc.
+	TotalBytesBilled int64 `json:"total_bytes_billed"`
+
+	// TotalSlotMs is the total slot milliseconds that would be consumed by the query
+	// Useful for capacity planning in slot-based pricing
+	TotalSlotMs int64 `json:"total_slot_ms"`
+
+	// EstimatedCostUSD is a rough estimate of the query cost in USD
+	// Based on current on-demand pricing ($6.25 per TB as of 2024)
+	EstimatedCostUSD float64 `json:"estimated_cost_usd"`
+
+	// IsValid indicates whether the query passed validation
+	IsValid bool `json:"is_valid"`
+
+	// ValidationError contains any validation errors found
+	ValidationError string `json:"validation_error,omitempty"`
+}
+
 type Querier interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Ping(ctx context.Context) error
 }
+
 type Selector interface {
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
@@ -47,11 +72,17 @@ type TableManager interface {
 	BuildTableExistsQuery(tableName string) (string, error)
 }
 
+type DryRunValidator interface {
+	// GetDryRunMetadata performs a dry run and returns detailed metadata about the query
+	GetDryRunMetadata(ctx context.Context, query *query.Query) (*DryRunMetadata, error)
+}
+
 type DB interface {
 	Querier
 	Selector
 	MetadataUpdater
 	TableManager
+	DryRunValidator
 }
 
 var (
@@ -1039,4 +1070,44 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 	sort.Slice(summary.Schemas, func(i, j int) bool { return summary.Schemas[i].Name < summary.Schemas[j].Name })
 
 	return summary, nil
+}
+
+func (d *Client) GetDryRunMetadata(ctx context.Context, query *query.Query) (*DryRunMetadata, error) {
+	q := d.client.Query(query.ToDryRunQuery())
+	q.DryRun = true
+
+	job, err := q.Run(ctx)
+	if err != nil {
+		return &DryRunMetadata{
+			IsValid:         false,
+			ValidationError: formatError(err).Error(),
+		}, nil
+	}
+
+	status := job.LastStatus()
+	if err := status.Err(); err != nil {
+		return &DryRunMetadata{
+			IsValid:         false,
+			ValidationError: err.Error(),
+		}, nil
+	}
+
+	metadata := &DryRunMetadata{
+		IsValid: status.State == bigquery.Done,
+	}
+
+	// Extract query statistics if available and valid
+	if metadata.IsValid && status.Statistics != nil {
+		metadata.TotalBytesProcessed = status.Statistics.TotalBytesProcessed
+
+		// Calculate estimated cost based on on-demand pricing
+		// Current BigQuery on-demand pricing is $6.25 per TB (as of 2024)
+		const costPerTB = 6.25
+		if metadata.TotalBytesProcessed > 0 {
+			tbProcessed := float64(metadata.TotalBytesProcessed) / (1024 * 1024 * 1024 * 1024) // Convert bytes to TB
+			metadata.EstimatedCostUSD = tbProcessed * costPerTB
+		}
+	}
+
+	return metadata, nil
 }

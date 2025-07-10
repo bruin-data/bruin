@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -94,6 +95,10 @@ func Query() *cli.Command {
 				EnvVars: []string{"BRUIN_CONFIG_FILE"},
 				Usage:   "the path to the .bruin.yml file",
 			},
+			&cli.BoolFlag{
+				Name:  "dry-run",
+				Usage: "perform query validation and cost estimation without executing the query (BigQuery only)",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			fs := afero.NewOsFs()
@@ -124,6 +129,49 @@ func Query() *cli.Command {
 
 				queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn, parser, dialect)
 			}
+			// Check if dry-run mode is enabled
+			if c.Bool("dry-run") {
+				// Check if connection supports dry-run (BigQuery)
+				if dryRunner, ok := conn.(interface {
+					GetDryRunMetadata(ctx context.Context, q *query.Query) (*bigquery.DryRunMetadata, error)
+				}); ok {
+					ctx := context.Background()
+					ctx, cancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+					defer cancel()
+
+					timeoutCtx, timeoutCancel := context.WithTimeout(ctx, time.Duration(c.Int("timeout"))*time.Second)
+					defer timeoutCancel()
+
+					q := query.Query{Query: queryStr}
+					metadata, err := dryRunner.GetDryRunMetadata(timeoutCtx, &q)
+					if err != nil {
+						return handleError(c.String("output"), errors.Wrap(err, "dry run failed"))
+					}
+
+					// Output dry run metadata based on format specified
+					output := c.String("output")
+					switch output {
+					case "json":
+						jsonData, err := json.Marshal(metadata)
+						if err != nil {
+							return handleError(output, errors.Wrap(err, "failed to marshal dry run metadata to JSON"))
+						}
+						fmt.Println(string(jsonData))
+					default:
+						// Plain text output
+						fmt.Printf("Query Validation: %v\n", metadata.IsValid)
+						if !metadata.IsValid {
+							fmt.Printf("Validation Error: %s\n", metadata.ValidationError)
+						}
+						fmt.Printf("Total Bytes Processed: %d\n", metadata.TotalBytesProcessed)
+						fmt.Printf("Estimated Cost (USD): $%.10f\n", metadata.EstimatedCostUSD)
+					}
+					return nil
+				} else {
+					return handleError(c.String("output"), errors.New("dry-run is only supported for BigQuery connections"))
+				}
+			}
+
 			if querier, ok := conn.(interface {
 				SelectWithSchema(ctx context.Context, q *query.Query) (*query.QueryResult, error)
 			}); ok {
