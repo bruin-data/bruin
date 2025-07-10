@@ -438,6 +438,9 @@ func TestManager_GetSfConnection(t *testing.T) {
 		Snowflake: map[string]*snowflake.DB{
 			"existing": {},
 		},
+		availableConnections: map[string]any{
+			"existing": snowflake.DB{},
+		},
 	}
 
 	tests := []struct {
@@ -461,12 +464,12 @@ func TestManager_GetSfConnection(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := m.GetSfConnection(tt.connectionName)
+			got, ok := m.GetConnection(tt.connectionName).(snowflake.SfClient)
 			if tt.wantErr {
-				require.Error(t, err)
+				assert.False(t, ok)
 				assert.Nil(t, got)
 			} else {
-				require.NoError(t, err)
+				assert.True(t, ok)
 				assert.NotNil(t, got)
 			}
 		})

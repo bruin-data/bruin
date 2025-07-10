@@ -64,16 +64,6 @@ func (m *mockConnectionFetcher) GetConnection(name string) (interface{}, error) 
 	return get, args.Error(1)
 }
 
-func (m *mockConnectionFetcher) GetAthenaConnectionWithoutDefault(name string) (Client, error) {
-	args := m.Called(name)
-	get := args.Get(0)
-	if get == nil {
-		return nil, args.Error(1)
-	}
-
-	return get.(Client), args.Error(1)
-}
-
 func TestAcceptedValuesCheck_Check(t *testing.T) {
 	t.Parallel()
 

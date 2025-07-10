@@ -19,7 +19,7 @@ import (
 )
 
 type connectionFetcher interface {
-	GetAthenaConnection(name string) (athena.Client, error)
+	GetConnection(name string) any
 	GetEMRServerlessConnection(name string) (*Client, error)
 }
 

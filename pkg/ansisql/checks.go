@@ -12,7 +12,7 @@ import (
 )
 
 type connectionFetcher interface {
-	GetConnection(name string) (interface{}, error)
+	GetConnection(name string) any
 }
 
 type selector interface {
@@ -56,9 +56,9 @@ func (c *CountableQueryCheck) CustomCheck(ctx context.Context, ti *scheduler.Cus
 }
 
 func (c *CountableQueryCheck) check(ctx context.Context, connectionName string) error {
-	q, err := c.conn.GetConnection(connectionName)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get connection '%s' for '%s' check", connectionName, c.checkName)
+	q := c.conn.GetConnection(connectionName)
+	if q == nil {
+		return errors.Errorf("failed to get connection '%s' for '%s' check", connectionName, c.checkName)
 	}
 
 	s, ok := q.(selector)

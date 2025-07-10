@@ -27,8 +27,7 @@ type Client interface {
 }
 
 type connectionFetcher interface {
-	GetAthenaConnectionWithoutDefault(name string) (Client, error)
-	GetConnection(name string) (interface{}, error)
+	GetConnection(name string) any
 }
 
 type BasicOperator struct {
@@ -73,9 +72,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, err := o.connection.GetAthenaConnectionWithoutDefault(connName)
-	if err != nil {
-		return err
+	conn, ok := o.connection.GetConnection(connName).(Client)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a athena connection", connName)
 	}
 
 	q := queries[0]
@@ -152,9 +151,9 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return err
 	}
 
-	conn, err := o.connection.GetAthenaConnectionWithoutDefault(connName)
-	if err != nil {
-		return err
+	conn, ok := o.connection.GetConnection(connName).(Client)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a athena connection", connName)
 	}
 
 	for {

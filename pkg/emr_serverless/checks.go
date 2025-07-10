@@ -89,7 +89,7 @@ func (cr *connectionRemapper) GetConnection(string) (interface{}, error) {
 		cr.ti.GetAsset().Parameters["athena_connection"],
 		cr.ti.GetPipeline().DefaultConnections["athena"],
 	)
-	return cr.connectionFetcher.GetAthenaConnection(name)
+	return cr.connectionFetcher.GetConnection(name), nil
 }
 
 func newConnectionRemapper(conn connectionFetcher, ti scheduler.TaskInstance) *connectionRemapper {

@@ -51,9 +51,9 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return err
 	}
 
-	conn, err := o.connection.GetConnection(connName)
-	if err != nil {
-		return err
+	conn := o.connection.GetConnection(connName)
+	if conn == nil {
+		return errors.Errorf("'%s' does not exist", connName)
 	}
 
 	trimmedQuery := helpers.TrimToLength(qry[0].Query, 50)

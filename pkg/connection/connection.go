@@ -150,28 +150,6 @@ func (m *Manager) GetConnection(name string) any {
 	return connection
 }
 
-func (m *Manager) GetAthenaConnection(name string) (athena.Client, error) {
-	db, err := m.GetAthenaConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetAthenaConnectionWithoutDefault("athena-default")
-}
-
-func (m *Manager) GetAthenaConnectionWithoutDefault(name string) (athena.Client, error) {
-	if m.Athena == nil {
-		return nil, errors.New("no Athena connections found")
-	}
-
-	db, ok := m.Athena[name]
-	if !ok {
-		return nil, errors.Errorf("Athena connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
 func (m *Manager) GetDuckDBConnection(name string) (duck.DuckDBClient, error) {
 	db, err := m.GetDuckDBConnectionWithoutDefault(name)
 	if err == nil {
@@ -209,45 +187,6 @@ func (m *Manager) GetClickHouseConnectionWithoutDefault(name string) (clickhouse
 	db, ok := m.ClickHouse[name]
 	if !ok {
 		return nil, errors.Errorf("clickhouse connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetBqConnection(name string) (bigquery.DB, error) {
-	return m.GetBqConnectionWithoutDefault(name)
-}
-
-func (m *Manager) GetBqConnectionWithoutDefault(name string) (bigquery.DB, error) {
-	if m.BigQuery == nil {
-		return nil, errors.New("no bigquery connections found")
-	}
-
-	db, ok := m.BigQuery[name]
-	if !ok {
-		return nil, errors.Errorf("bigquery connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetSfConnection(name string) (snowflake.SfClient, error) {
-	db, err := m.GetSfConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetSfConnectionWithoutDefault("snowflake-default")
-}
-
-func (m *Manager) GetSfConnectionWithoutDefault(name string) (snowflake.SfClient, error) {
-	if m.Snowflake == nil {
-		return nil, errors.New("no snowflake connections found")
-	}
-
-	db, ok := m.Snowflake[name]
-	if !ok {
-		return nil, errors.Errorf("snowflake connection not found for '%s'", name)
 	}
 
 	return db, nil

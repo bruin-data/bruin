@@ -376,13 +376,13 @@ def is_single_select_query(query: str, dialect: str = None) -> dict:
     # Handle empty or whitespace-only queries
     if not query or not query.strip():
         return {"is_single_select": False, "error": "cannot parse query"}
-        
+
     try:
         # Parse all statements in the query
         parsed_statements = parse(query, dialect=dialect)
         if not parsed_statements:
             return {"is_single_select": False, "error": "cannot parse query"}
-        
+
         # Check if there's exactly one statement and it's a SELECT
         if len(parsed_statements) == 1:
             stmt = parsed_statements[0]
@@ -392,7 +392,6 @@ def is_single_select_query(query: str, dialect: str = None) -> dict:
         else:
             # Multiple statements
             return {"is_single_select": False, "error": ""}
-            
+
     except Exception as e:
         return {"is_single_select": False, "error": str(e)}
-
