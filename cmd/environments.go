@@ -278,7 +278,7 @@ func (r *EnvironmentUpdateCommand) Run(name, newName, schemaPrefix, output, conf
 
 	if output == "json" {
 		result := map[string]interface{}{
-			"message": "Environment updated successfully",
+			"message":  "Environment updated successfully",
 			"old_name": name,
 			"new_name": newName,
 		}
@@ -368,7 +368,7 @@ func (r *EnvironmentDeleteCommand) Run(name string, force bool, output, configFi
 
 	// Check if it's the last environment
 	if len(cm.Environments) == 1 {
-		printError(fmt.Errorf("cannot delete the last environment"), output, "")
+		printError(errors.New("cannot delete the last environment"), output, "")
 		return cli.Exit("", 1)
 	}
 
@@ -381,9 +381,13 @@ func (r *EnvironmentDeleteCommand) Run(name string, force bool, output, configFi
 			if output == "json" {
 				result := map[string]interface{}{
 					"message": "Environment deletion cancelled",
-					"name": name,
+					"name":    name,
 				}
-				js, _ := json.MarshalIndent(result, "", "  ")
+				js, err := json.MarshalIndent(result, "", "  ")
+				if err != nil {
+					printError(err, output, "failed to marshal JSON")
+					return cli.Exit("", 1)
+				}
 				fmt.Println(string(js))
 			} else {
 				fmt.Println("Environment deletion cancelled.")
@@ -407,7 +411,7 @@ func (r *EnvironmentDeleteCommand) Run(name string, force bool, output, configFi
 	if output == "json" {
 		result := map[string]interface{}{
 			"message": "Environment deleted successfully",
-			"name": name,
+			"name":    name,
 		}
 		js, err := json.MarshalIndent(result, "", "  ")
 		if err != nil {

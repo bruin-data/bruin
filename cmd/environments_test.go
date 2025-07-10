@@ -82,7 +82,7 @@ environments:
 
 			if tt.configExists {
 				// Create config file
-				err := afero.WriteFile(fs, tt.configFile, []byte(configContent), 0644)
+				err := afero.WriteFile(fs, tt.configFile, []byte(configContent), 0o644)
 				require.NoError(t, err)
 			}
 
@@ -232,7 +232,7 @@ environments:
 
 			if tt.configExists {
 				// Create config file
-				err := afero.WriteFile(fs, tt.configFile, []byte(configContent), 0644)
+				err := afero.WriteFile(fs, tt.configFile, []byte(configContent), 0o644)
 				require.NoError(t, err)
 			}
 
@@ -250,7 +250,6 @@ environments:
 			// Test the actual logic with our mock config
 			if !cm.EnvironmentExists(tt.envName) {
 				if tt.wantErr && tt.expectedErr == "environment '"+tt.envName+"' does not exist" {
-					assert.True(t, true) // Expected error
 					return
 				}
 				require.True(t, cm.EnvironmentExists(tt.envName))
@@ -263,7 +262,6 @@ environments:
 
 			if tt.envName != newName && cm.EnvironmentExists(newName) {
 				if tt.wantErr && tt.expectedErr == "environment '"+newName+"' already exists" {
-					assert.True(t, true) // Expected error
 					return
 				}
 				require.False(t, cm.EnvironmentExists(newName))
@@ -272,18 +270,12 @@ environments:
 			// Test update functionality
 			err = cm.UpdateEnvironment(tt.envName, newName, tt.schemaPrefix)
 			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-
-			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.expectedErr != "" {
 					assert.Contains(t, err.Error(), tt.expectedErr)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -408,7 +400,7 @@ environments:
 
 			if tt.configExists {
 				// Create config file
-				err := afero.WriteFile(fs, tt.configFile, []byte(tt.configContent), 0644)
+				err := afero.WriteFile(fs, tt.configFile, []byte(tt.configContent), 0o644)
 				require.NoError(t, err)
 			}
 
@@ -426,7 +418,6 @@ environments:
 			// Test the actual logic with our mock config
 			if !cm.EnvironmentExists(tt.envName) {
 				if tt.wantErr && tt.expectedErr == "environment '"+tt.envName+"' does not exist" {
-					assert.True(t, true) // Expected error
 					return
 				}
 				require.True(t, cm.EnvironmentExists(tt.envName))
@@ -435,7 +426,6 @@ environments:
 			// Check if it's the last environment
 			if len(cm.Environments) == 1 {
 				if tt.wantErr && tt.expectedErr == "cannot delete the last environment" {
-					assert.True(t, true) // Expected error
 					return
 				}
 				require.Greater(t, len(cm.Environments), 1)
@@ -444,18 +434,12 @@ environments:
 			// Test delete functionality
 			err = cm.DeleteEnvironment(tt.envName)
 			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-
-			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.expectedErr != "" {
 					assert.Contains(t, err.Error(), tt.expectedErr)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -492,14 +476,14 @@ environments:
 
 	// Setup in-memory filesystem
 	fs := afero.NewMemMapFs()
-	err := afero.WriteFile(fs, ".bruin.yml", []byte(configContent), 0644)
+	err := afero.WriteFile(fs, ".bruin.yml", []byte(configContent), 0o644)
 	require.NoError(t, err)
 
 	// Mock stdin to simulate user saying "n"
 	oldStdin := os.Stdin
 	r, w, _ := os.Pipe()
 	os.Stdin = r
-	w.Write([]byte("n\n"))
+	_, _ = w.WriteString("n\n")
 	w.Close()
 
 	// Create a mock config using the in-memory filesystem
