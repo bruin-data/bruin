@@ -24,8 +24,7 @@ type DuckDBClient interface {
 }
 
 type connectionFetcher interface {
-	GetDuckDBConnection(name string) (DuckDBClient, error)
-	GetConnection(name string) (interface{}, error)
+	GetConnection(name string) any
 }
 
 type BasicOperator struct {
@@ -90,9 +89,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, err := o.connection.GetDuckDBConnection(connName)
-	if err != nil {
-		return err
+	conn, ok := o.connection.GetConnection(connName).(DuckDBClient)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a duckdb connection", connName)
 	}
 
 	if t.Materialization.Type != pipeline.MaterializationTypeNone {

@@ -150,28 +150,6 @@ func (m *Manager) GetConnection(name string) any {
 	return connection
 }
 
-func (m *Manager) GetDuckDBConnection(name string) (duck.DuckDBClient, error) {
-	db, err := m.GetDuckDBConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetDuckDBConnectionWithoutDefault("duckdb-default")
-}
-
-func (m *Manager) GetDuckDBConnectionWithoutDefault(name string) (duck.DuckDBClient, error) {
-	if m.DuckDB == nil {
-		return nil, errors.New("no DuckDB connections found")
-	}
-
-	db, ok := m.DuckDB[name]
-	if !ok {
-		return nil, errors.Errorf("DuckDB connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
 func (m *Manager) GetClickHouseConnection(name string) (clickhouse.ClickHouseClient, error) {
 	db, err := m.GetClickHouseConnectionWithoutDefault(name)
 	if err == nil {
