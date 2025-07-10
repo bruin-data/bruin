@@ -95,6 +95,15 @@ func (m *mockQuerierWithResult) BuildTableExistsQuery(tableName string) (string,
 	return args.String(0), args.Error(1)
 }
 
+func (m *mockQuerierWithResult) GetDryRunMetadata(ctx context.Context, q *query.Query) (*DryRunMetadata, error) {
+	args := m.Called(ctx, q)
+	get := args.Get(0)
+	if get == nil {
+		return nil, args.Error(1)
+	}
+	return get.(*DryRunMetadata), args.Error(1)
+}
+
 type mockConnectionFetcher struct {
 	mock.Mock
 }
