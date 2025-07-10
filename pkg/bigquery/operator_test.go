@@ -415,7 +415,7 @@ func TestBasicOperator_RunTask_WithRenderer(t *testing.T) {
 			mat.On("IsFullRefresh").Return(false)
 			client.On("CreateDataSetIfNotExist", mock.AnythingOfType("*pipeline.Asset"), mock.Anything).Return(nil)
 			conn := new(mockConnectionFetcher)
-			conn.On("GetBqConnection", "gcp-default").Return(client, nil)
+			conn.On("GetConnection", "gcp-default").Return(client)
 			if tt.setup != nil {
 				tt.setup(&fields{
 					q: client,

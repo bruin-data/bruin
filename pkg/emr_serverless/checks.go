@@ -84,12 +84,12 @@ type connectionRemapper struct {
 	ti scheduler.TaskInstance
 }
 
-func (cr *connectionRemapper) GetConnection(string) (interface{}, error) {
+func (cr *connectionRemapper) GetConnection(string) any {
 	name := cmp.Or(
 		cr.ti.GetAsset().Parameters["athena_connection"],
 		cr.ti.GetPipeline().DefaultConnections["athena"],
 	)
-	return cr.connectionFetcher.GetConnection(name), nil
+	return cr.connectionFetcher.GetConnection(name)
 }
 
 func newConnectionRemapper(conn connectionFetcher, ti scheduler.TaskInstance) *connectionRemapper {

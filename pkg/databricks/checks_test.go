@@ -44,6 +44,7 @@ func (m *mockConnectionFetcher) GetConnection(name string) any {
 	args := m.Called(name)
 	return args.Get(0)
 }
+
 func TestAcceptedValuesCheck_Check(t *testing.T) {
 	t.Parallel()
 

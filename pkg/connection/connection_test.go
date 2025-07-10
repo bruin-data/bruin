@@ -6,10 +6,16 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/emr_serverless"
+	"github.com/bruin-data/bruin/pkg/gorgias"
+	"github.com/bruin-data/bruin/pkg/hana"
+	"github.com/bruin-data/bruin/pkg/mongo"
 	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
+	"github.com/bruin-data/bruin/pkg/notion"
 	"github.com/bruin-data/bruin/pkg/personio"
 	"github.com/bruin-data/bruin/pkg/postgres"
+	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -175,9 +181,8 @@ func TestManager_AddMongoConnectionFromConfigConnectionFromConfig(t *testing.T) 
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res, err := m.GetConnection("test")
+	res := m.GetConnection("test")
 
-	require.Error(t, err)
 	assert.Nil(t, res)
 
 	configuration := &config.MongoConnection{
@@ -189,11 +194,11 @@ func TestManager_AddMongoConnectionFromConfigConnectionFromConfig(t *testing.T) 
 		Port:     15432,
 	}
 
-	err = m.AddMongoConnectionFromConfig(configuration)
+	err := m.AddMongoConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, err = m.GetConnection("test")
-	require.NoError(t, err)
+	res, ok := m.GetConnection("test").(mongo.MongoConnection)
+	assert.True(t, ok)
 	assert.NotNil(t, res)
 }
 
@@ -205,8 +210,7 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 		Mysql:                make(map[string]*mysql.Client),
 	}
 
-	res, err := m.GetConnection("test")
-	require.Error(t, err)
+	res := m.GetConnection("test")
 	assert.Nil(t, res)
 
 	configuration := &config.MySQLConnection{
@@ -221,8 +225,8 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 	m.Mysql[configuration.Name] = new(mysql.Client)
 	m.availableConnections[configuration.Name] = m.Mysql[configuration.Name]
 
-	res, err = m.GetConnection("test")
-	require.NoError(t, err)
+	res, ok := m.GetConnection("test").(mysql.DB)
+	assert.True(t, ok)
 	assert.NotNil(t, res)
 }
 
@@ -231,8 +235,7 @@ func TestManager_AddNotionConnectionFromConfigConnectionFromConfig(t *testing.T)
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res, err := m.GetConnection("test")
-	require.Error(t, err)
+	res := m.GetConnection("test")
 	assert.Nil(t, res)
 
 	configuration := &config.NotionConnection{
@@ -240,11 +243,11 @@ func TestManager_AddNotionConnectionFromConfigConnectionFromConfig(t *testing.T)
 		APIKey: "xXXXXxxxxxYYY	",
 	}
 
-	err = m.AddNotionConnectionFromConfig(configuration)
+	err := m.AddNotionConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, err = m.GetConnection("test")
-	require.NoError(t, err)
+	res, ok := m.GetConnection("test").(notion.NotionConfig)
+	assert.True(t, ok)
 	assert.NotNil(t, res)
 }
 
@@ -253,8 +256,7 @@ func TestManager_AddShopiyConnectionFromConfigConnectionFromConfig(t *testing.T)
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res, err := m.GetConnection("test")
-	require.Error(t, err)
+	res := m.GetConnection("test")
 	assert.Nil(t, res)
 
 	configuration := &config.ShopifyConnection{
@@ -263,11 +265,11 @@ func TestManager_AddShopiyConnectionFromConfigConnectionFromConfig(t *testing.T)
 		URL:    "testxxx",
 	}
 
-	err = m.AddShopifyConnectionFromConfig(configuration)
+	err := m.AddShopifyConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, err = m.GetConnection("test")
-	require.NoError(t, err)
+	res, ok := m.GetConnection("test").(shopify.ShopifyConfig)
+	assert.True(t, ok)
 	assert.NotNil(t, res)
 }
 
@@ -276,8 +278,7 @@ func TestManager_AddGorgiasConnectionFromConfigConnectionFromConfig(t *testing.T
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res, err := m.GetConnection("test")
-	require.Error(t, err)
+	res := m.GetConnection("test")
 	assert.Nil(t, res)
 
 	configuration := &config.GorgiasConnection{
@@ -287,11 +288,11 @@ func TestManager_AddGorgiasConnectionFromConfigConnectionFromConfig(t *testing.T
 		Email:  "email",
 	}
 
-	err = m.AddGorgiasConnectionFromConfig(configuration)
+	err := m.AddGorgiasConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, err = m.GetConnection("test")
-	require.NoError(t, err)
+	res, ok := m.GetConnection("test").(gorgias.Config)
+	assert.True(t, ok)
 	assert.NotNil(t, res)
 }
 
@@ -300,8 +301,7 @@ func TestManager_AddHANAConnectionFromConfigConnectionFromConfig(t *testing.T) {
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res, err := m.GetConnection("test")
-	require.Error(t, err)
+	res := m.GetConnection("test")
 	assert.Nil(t, res)
 
 	configuration := &config.HANAConnection{
@@ -313,11 +313,11 @@ func TestManager_AddHANAConnectionFromConfigConnectionFromConfig(t *testing.T) {
 		Database: "db",
 	}
 
-	err = m.AddHANAConnectionFromConfig(configuration)
+	err := m.AddHANAConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, err = m.GetConnection("test")
-	require.NoError(t, err)
+	res, ok := m.GetConnection("test").(hana.Client)
+	assert.True(t, ok)
 	assert.NotNil(t, res)
 }
 
@@ -325,8 +325,7 @@ func Test_AddEMRServerlessConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
 	m := Manager{availableConnections: make(map[string]any)}
-	res, err := m.GetConnection("test")
-	require.Error(t, err)
+	res := m.GetConnection("test")
 	assert.Nil(t, res)
 
 	cfg := &config.EMRServerlessConnection{
@@ -338,11 +337,11 @@ func Test_AddEMRServerlessConnectionFromConfig(t *testing.T) {
 		Region:        "us-east-1",
 	}
 
-	err = m.AddEMRServerlessConnectionFromConfig(cfg)
+	err := m.AddEMRServerlessConnectionFromConfig(cfg)
 	require.NoError(t, err)
 
-	res, err = m.GetConnection("test")
-	require.NoError(t, err)
+	res, ok := m.GetConnection("test").(emr_serverless.Client)
+	assert.True(t, ok)
 	assert.NotNil(t, res)
 }
 

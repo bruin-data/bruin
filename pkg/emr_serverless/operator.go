@@ -44,7 +44,7 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 		return fmt.Errorf("connection %q is missing field: workspace", connID)
 	}
 
-	params := parseParams(conn, asset.Parameters)
+	params := parseParams(&conn, asset.Parameters)
 	cfg, err := awsCfg.LoadDefaultConfig(
 		ctx,
 		awsCfg.WithRegion(conn.Region),

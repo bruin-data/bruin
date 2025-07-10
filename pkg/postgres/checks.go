@@ -13,7 +13,7 @@ import (
 )
 
 type selectorFetcher interface {
-	GetConnection(name string) (interface{}, error)
+	GetConnection(name string) any
 }
 
 type AcceptedValuesCheck struct {

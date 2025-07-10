@@ -164,9 +164,9 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return err
 	}
 
-	conn, err := o.connection.GetConnection(connName).(snowflake.SfClient)
-	if err != nil {
-		return err
+	conn, ok := o.connection.GetConnection(connName).(SfClient)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a snowflake connection", connName)
 	}
 
 	for {

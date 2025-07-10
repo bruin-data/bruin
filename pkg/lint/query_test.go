@@ -26,9 +26,9 @@ type mockConnectionManager struct {
 	mock.Mock
 }
 
-func (m *mockConnectionManager) GetConnection(conn string) (interface{}, error) {
+func (m *mockConnectionManager) GetConnection(conn string) any {
 	res := m.Called(conn)
-	return res.Get(0), res.Error(1)
+	return res.Get(0)
 }
 
 type mockExtractor struct {

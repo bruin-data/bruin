@@ -16,7 +16,7 @@ import (
 )
 
 type connectionFetcher interface {
-	GetConnection(name string) (interface{}, error)
+	GetConnection(name string) any
 }
 
 type repoFinder interface {
@@ -63,9 +63,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return errors.New("source connection not configured")
 	}
 
-	sourceConnection, err := o.conn.GetConnection(sourceConnectionName)
-	if err != nil {
-		return errors.Wrapf(err, "source connection %s not found", sourceConnectionName)
+	sourceConnection := o.conn.GetConnection(sourceConnectionName)
+	if sourceConnection == nil {
+		return errors.Errorf("source connection %s not found", sourceConnectionName)
 	}
 
 	sourceURI, err := sourceConnection.(pipelineConnection).GetIngestrURI()
@@ -94,9 +94,9 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 		return err
 	}
 
-	destConnection, err := o.conn.GetConnection(destConnectionName)
-	if err != nil {
-		return fmt.Errorf("destination connection %s not found", destConnectionName)
+	destConnection := o.conn.GetConnection(destConnectionName)
+	if destConnection == nil {
+		return errors.Errorf("destination connection %s not found", destConnectionName)
 	}
 
 	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()
@@ -175,9 +175,9 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 		return err
 	}
 
-	destConnection, err := o.conn.GetConnection(destConnectionName)
-	if err != nil {
-		return fmt.Errorf("destination connection %s not found", destConnectionName)
+	destConnection := o.conn.GetConnection(destConnectionName)
+	if destConnection == nil {
+		return errors.Errorf("destination connection %s not found", destConnectionName)
 	}
 
 	destURI, err := destConnection.(pipelineConnection).GetIngestrURI()

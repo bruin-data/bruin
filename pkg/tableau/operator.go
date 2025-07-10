@@ -10,7 +10,7 @@ import (
 
 type connectionFetcher interface {
 	GetTableauConnectionWithoutDefault(name string) (*Client, error)
-	GetConnection(name string) (interface{}, error)
+	GetConnection(name string) any
 }
 
 type BasicOperator struct {

@@ -160,7 +160,7 @@ type uvInstaller interface {
 }
 
 type connectionFetcher interface {
-	GetConnection(name string) (interface{}, error)
+	GetConnection(name string) any
 }
 
 type pipelineConnection interface {
@@ -331,10 +331,7 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		return err
 	}
 
-	destConnection, err := u.conn.GetConnection(destConnectionName)
-	if err != nil {
-		return fmt.Errorf("destination connection %s not found", destConnectionName)
-	}
+	destConnection := u.conn.GetConnection(destConnectionName)
 
 	destConnectionInst, ok := destConnection.(pipelineConnection)
 	if !ok {

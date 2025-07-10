@@ -22,7 +22,7 @@ type DevEnvQueryModifier struct {
 }
 
 type connectionFetcher interface {
-	GetConnection(name string) (interface{}, error)
+	GetConnection(name string) any
 }
 
 type parser interface {
@@ -56,10 +56,7 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 		return nil, err
 	}
 
-	conn, err := d.Conn.GetConnection(connName)
-	if err != nil {
-		return nil, err
-	}
+	conn := d.Conn.GetConnection(connName)
 
 	dbFetcherConn, ok := conn.(interface {
 		GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error)
