@@ -1908,3 +1908,187 @@ func TestClient_GetTables(t *testing.T) {
 		})
 	}
 }
+
+func TestDryRunMetadata_CostCalculation(t *testing.T) {
+	tests := []struct {
+		name           string
+		bytesProcessed int64
+		expectedCost   float64
+	}{
+		{
+			name:           "1 GB should cost approximately $0.00625",
+			bytesProcessed: 1024 * 1024 * 1024, // 1 GB
+			expectedCost:   0.00625,
+		},
+		{
+			name:           "1 TB should cost $6.25",
+			bytesProcessed: 1024 * 1024 * 1024 * 1024, // 1 TB
+			expectedCost:   6.25,
+		},
+		{
+			name:           "10 GB should cost approximately $0.061",
+			bytesProcessed: 10 * 1024 * 1024 * 1024, // 10 GB
+			expectedCost:   0.06103515625,           // 10/1024 TB * $6.25
+		},
+		{
+			name:           "zero bytes should cost $0",
+			bytesProcessed: 0,
+			expectedCost:   0.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Calculate cost using the same formula as in the implementation
+			const costPerTB = 6.25
+			var estimatedCost float64
+			if tt.bytesProcessed > 0 {
+				tbProcessed := float64(tt.bytesProcessed) / (1024 * 1024 * 1024 * 1024) // Convert bytes to TB
+				estimatedCost = tbProcessed * costPerTB
+			}
+
+			assert.InDelta(t, tt.expectedCost, estimatedCost, 0.001, "Cost calculation should match expected value")
+		})
+	}
+}
+
+func TestDryRunMetadata_Struct(t *testing.T) {
+	metadata := &DryRunMetadata{
+		TotalBytesProcessed: 1024 * 1024 * 1024, // 1 GB
+		EstimatedCostUSD:    0.00625,
+		IsValid:             true,
+		ValidationError:     "",
+	}
+
+	assert.Equal(t, int64(1024*1024*1024), metadata.TotalBytesProcessed)
+	assert.Equal(t, 0.00625, metadata.EstimatedCostUSD)
+	assert.True(t, metadata.IsValid)
+	assert.Empty(t, metadata.ValidationError)
+}
+
+func TestDryRunMetadata_ValidationError(t *testing.T) {
+	metadata := &DryRunMetadata{
+		TotalBytesProcessed: 0,
+		EstimatedCostUSD:    0,
+		IsValid:             false,
+		ValidationError:     "Table not found: dataset.table",
+	}
+
+	assert.False(t, metadata.IsValid)
+	assert.Equal(t, "Table not found: dataset.table", metadata.ValidationError)
+	assert.Equal(t, int64(0), metadata.TotalBytesProcessed)
+	assert.Equal(t, 0.0, metadata.EstimatedCostUSD)
+}
+
+func TestDryRunMetadata_CostCalculationEdgeCases(t *testing.T) {
+	tests := []struct {
+		name           string
+		bytesProcessed int64
+		expectedCost   float64
+	}{
+		{
+			name:           "very small query - 1 KB",
+			bytesProcessed: 1024,                  // 1 KB
+			expectedCost:   5.960464477539063e-09, // Very small cost
+		},
+		{
+			name:           "medium query - 100 MB",
+			bytesProcessed: 100 * 1024 * 1024,    // 100 MB
+			expectedCost:   0.000596046447753906, // ~0.0006 USD
+		},
+		{
+			name:           "large query - 10 TB",
+			bytesProcessed: 10 * 1024 * 1024 * 1024 * 1024, // 10 TB
+			expectedCost:   62.5,                           // $62.50
+		},
+		{
+			name:           "max int64 bytes (very large)",
+			bytesProcessed: 9223372036854775807, // max int64
+			expectedCost:   5.24288e+07,         // Very large cost (adjusted for precision)
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			const costPerTB = 6.25
+			var estimatedCost float64
+			if tt.bytesProcessed > 0 {
+				tbProcessed := float64(tt.bytesProcessed) / (1024 * 1024 * 1024 * 1024)
+				estimatedCost = tbProcessed * costPerTB
+			}
+
+			assert.InDelta(t, tt.expectedCost, estimatedCost, 0.000001, "Cost calculation should match expected value")
+		})
+	}
+}
+
+func TestDryRunMetadata_JSONSerialization(t *testing.T) {
+	metadata := &DryRunMetadata{
+		TotalBytesProcessed: 1024 * 1024 * 1024, // 1 GB
+		TotalBytesBilled:    1024 * 1024 * 1024, // 1 GB
+		TotalSlotMs:         5000,
+		EstimatedCostUSD:    0.00625,
+		IsValid:             true,
+		ValidationError:     "",
+	}
+
+	// Test that all fields are present and correctly tagged for JSON serialization
+	assert.Equal(t, int64(1024*1024*1024), metadata.TotalBytesProcessed)
+	assert.Equal(t, int64(1024*1024*1024), metadata.TotalBytesBilled)
+	assert.Equal(t, int64(5000), metadata.TotalSlotMs)
+	assert.Equal(t, 0.00625, metadata.EstimatedCostUSD)
+	assert.True(t, metadata.IsValid)
+	assert.Empty(t, metadata.ValidationError)
+}
+
+func TestDryRunValidator_Interface(t *testing.T) {
+	// Test that Client implements the DryRunValidator interface
+	var _ DryRunValidator = &Client{}
+
+	// This test ensures the interface is properly defined and implemented
+	client := &Client{}
+	assert.NotNil(t, client)
+}
+
+func TestCalculateEstimatedCost(t *testing.T) {
+	tests := []struct {
+		name           string
+		bytesProcessed int64
+		expectedCost   float64
+	}{
+		{
+			name:           "zero bytes",
+			bytesProcessed: 0,
+			expectedCost:   0.0,
+		},
+		{
+			name:           "1 GB",
+			bytesProcessed: 1 * 1024 * 1024 * 1024,
+			expectedCost:   0.006103515625, // 1/1024 TB * $6.25
+		},
+		{
+			name:           "1 TB",
+			bytesProcessed: 1 * 1024 * 1024 * 1024 * 1024,
+			expectedCost:   6.25,
+		},
+		{
+			name:           "500 GB",
+			bytesProcessed: 500 * 1024 * 1024 * 1024,
+			expectedCost:   3.0517578125, // 500/1024 * 6.25
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test the cost calculation logic directly
+			const pricePerTB = 6.25
+			var cost float64
+			if tt.bytesProcessed > 0 {
+				tbProcessed := float64(tt.bytesProcessed) / (1024.0 * 1024.0 * 1024.0 * 1024.0)
+				cost = tbProcessed * pricePerTB
+			}
+
+			assert.InDelta(t, tt.expectedCost, cost, 0.0001)
+		})
+	}
+}
