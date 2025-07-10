@@ -34,46 +34,16 @@ parameters:
 - `type`: Set to `ingestr` to use the ingestr data pipeline.
 - `connection`: The destination connection (e.g., `postgres`).
 - `source_connection`: The name of the Pulse connection defined in `.bruin.yml`.
-- `source_table`: The metric to ingest (see below for options).
+- `source_table`: The metric to ingest. You can find the available source tables [here](https://bruin-data.github.io/ingestr/supported-sources/isoc-pulse.html#tables).
 
 ## Step 3: [Run](/commands/run) asset to ingest data
 
 ```
 bruin run assets/pulse_ingestion.asset.yml
 ```
-This command will ingest data from the specified Internet Society Pulse metric into your destination database.
+This command will ingest data from the specified Internet Society Pulse metrics into your destination database.
 
-## Supported Metrics and Tables
 
-You can ingest a variety of metrics from Internet Society Pulse. The `source_table` parameter supports the following (see [full list](https://bruin-data.github.io/ingestr/supported-sources/isoc-pulse.html#tables)):
+<img alt="isoc_pulse" src="./media/isoc_pulse_ingestion.png">
 
-- `https` (global HTTPS adoption)
-- `https:US` (country-specific, e.g., US)
-- `https:topsites` (top sites data)
-- `ipv6` (global IPv6 adoption)
-- `roa:4:US` (ROA IPv4 data by country)
-- `net_loss:shutdown:IN` (internet shutdowns in India)
-- ...and more
-
-Refer to the [Pulse documentation](https://bruin-data.github.io/ingestr/supported-sources/isoc-pulse.html#tables) for the full list and parameter syntax.
-
-## Example: Internet Shutdowns in US
-
-```yaml
-name: public.net_shutdown_us
-type: ingestr
-connection: postgres
-
-parameters:
-  source_connection: my-pulse
-  source_table: 'net_loss:shutdown:US'
-  destination: postgres
-```
-
-## Notes
-- You must obtain your API token from the Internet Society Pulse platform.
-- The `source_table` parameter uses a colon-separated syntax for metric, options, and country codes (e.g., `https:topsites:US`).
-- Country codes should follow the ISO 3166-1 alpha-2 format (e.g., US, GB, DE).
-
-For more details and advanced usage, see the [official documentation](https://pulse.internetsociety.org/api/docs).
 
