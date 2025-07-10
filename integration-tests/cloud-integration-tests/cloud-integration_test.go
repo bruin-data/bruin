@@ -21,7 +21,7 @@ type Environment struct {
 }
 
 var platformConnectionMap = map[string]string{
-	"bigquery":  "gcp",
+	"bigquery":  "google_cloud_platform",
 	"snowflake": "snowflake",
 }
 
