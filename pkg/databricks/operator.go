@@ -23,8 +23,7 @@ type Client interface {
 }
 
 type connectionFetcher interface {
-	GetDatabricksConnection(name string) (Client, error)
-	GetConnection(name string) (interface{}, error)
+	GetConnection(name string) any
 }
 
 type BasicOperator struct {
@@ -82,9 +81,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, err := o.connection.GetDatabricksConnection(connName)
-	if err != nil {
-		return err
+	conn, ok := o.connection.GetConnection(connName).(Client)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a Databricks connection", connName)
 	}
 
 	for _, queryString := range materializedQueries {

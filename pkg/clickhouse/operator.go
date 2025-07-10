@@ -23,8 +23,7 @@ type ClickHouseClient interface {
 }
 
 type connectionFetcher interface {
-	GetClickHouseConnection(name string) (ClickHouseClient, error)
-	GetConnection(name string) (interface{}, error)
+	GetConnection(name string) any
 }
 
 type BasicOperator struct {
@@ -75,9 +74,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, err := o.connection.GetClickHouseConnection(connName)
-	if err != nil {
-		return err
+	conn, ok := o.connection.GetConnection(connName).(ClickHouseClient)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a clickhouse connection", connName)
 	}
 
 	for _, queryString := range materializedQueries {

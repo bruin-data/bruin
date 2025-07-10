@@ -6,8 +6,10 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
 	"github.com/bruin-data/bruin/pkg/personio"
+	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -93,8 +95,7 @@ func TestManager_AddPgConnectionFromConfig(t *testing.T) {
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res, err := m.GetPgConnection("test")
-	require.Error(t, err)
+	res := m.GetConnection("test")
 	assert.Nil(t, res)
 
 	configuration := &config.PostgresConnection{
@@ -108,11 +109,11 @@ func TestManager_AddPgConnectionFromConfig(t *testing.T) {
 		PoolMaxConns: 10,
 	}
 
-	err = m.AddPgConnectionFromConfig(configuration)
+	err := m.AddPgConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, err = m.GetPgConnection("test")
-	require.NoError(t, err)
+	res, ok := m.GetConnection("test").(postgres.PgClient)
+	assert.True(t, ok)
 	assert.NotNil(t, res)
 }
 
@@ -121,8 +122,8 @@ func TestManager_AddRedshiftConnectionFromConfig(t *testing.T) {
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res, err := m.GetPgConnection("test")
-	require.Error(t, err)
+	res, ok := m.GetConnection("test").(postgres.PgClient)
+	assert.False(t, ok)
 	assert.Nil(t, res)
 
 	configuration := &config.RedshiftConnection{
@@ -135,11 +136,11 @@ func TestManager_AddRedshiftConnectionFromConfig(t *testing.T) {
 		SslMode:  "disable",
 	}
 
-	err = m.AddRedshiftConnectionFromConfig(configuration)
+	err := m.AddRedshiftConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, err = m.GetPgConnection("test")
-	require.NoError(t, err)
+	res, ok = m.GetConnection("test").(postgres.PgClient)
+	assert.True(t, ok)
 	assert.NotNil(t, res)
 }
 
@@ -148,8 +149,7 @@ func TestManager_AddMsSQLConnectionFromConfigConnectionFromConfig(t *testing.T) 
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res, err := m.GetMsConnection("test")
-	require.Error(t, err)
+	res := m.GetConnection("test")
 	assert.Nil(t, res)
 
 	configuration := &config.MsSQLConnection{
@@ -161,12 +161,12 @@ func TestManager_AddMsSQLConnectionFromConfigConnectionFromConfig(t *testing.T) 
 		Port:     15432,
 	}
 
-	err = m.AddMsSQLConnectionFromConfig(configuration)
+	err := m.AddMsSQLConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, err = m.GetMsConnection("test")
+	res, ok := m.GetConnection("test").(mssql.MsClient)
 
-	require.NoError(t, err)
+	assert.True(t, ok)
 	assert.NotNil(t, res)
 }
 

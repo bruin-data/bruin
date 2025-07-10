@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/bruin-data/bruin/pkg/athena"
 	"github.com/bruin-data/bruin/pkg/env"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -20,7 +19,6 @@ import (
 
 type connectionFetcher interface {
 	GetConnection(name string) any
-	GetEMRServerlessConnection(name string) (*Client, error)
 }
 
 type BasicOperator struct {
@@ -37,9 +35,9 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	if err != nil {
 		return fmt.Errorf("error looking up connection name: %w", err)
 	}
-	conn, err := op.connection.GetEMRServerlessConnection(connID)
-	if err != nil {
-		return fmt.Errorf("error fetching connection: %w", err)
+	conn, ok := op.connection.GetConnection(connID).(Client)
+	if !ok {
+		return fmt.Errorf("'%s' either does not exist or is not a EMR Serverless connection", connID)
 	}
 
 	if asset.Type == pipeline.AssetTypeEMRServerlessPyspark && conn.Workspace == "" {

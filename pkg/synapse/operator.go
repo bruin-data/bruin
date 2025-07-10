@@ -16,8 +16,7 @@ type materializer interface {
 }
 
 type connectionFetcher interface {
-	GetMsConnection(name string) (mssql.MsClient, error)
-	GetConnection(name string) (interface{}, error)
+	GetConnection(name string) any
 }
 
 type BasicOperator struct {
@@ -71,9 +70,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, err := o.connection.GetMsConnection(connName)
-	if err != nil {
-		return err
+	conn, ok := o.connection.GetConnection(connName).(mssql.MsClient)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a Synapse connection", connName)
 	}
 
 	for _, queryString := range materializedQueries {

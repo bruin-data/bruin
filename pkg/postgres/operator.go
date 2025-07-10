@@ -28,8 +28,7 @@ type PgClient interface {
 }
 
 type connectionFetcher interface {
-	GetPgConnection(name string) (PgClient, error)
-	GetConnection(name string) (interface{}, error)
+	GetConnection(name string) any
 }
 
 type devEnv interface {
@@ -106,9 +105,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, err := o.connection.GetPgConnection(connName)
-	if err != nil {
-		return err
+	conn, ok := o.connection.GetConnection(connName).(PgClient)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a postgres connection", connName)
 	}
 
 	if t.Materialization.Type != pipeline.MaterializationTypeNone {

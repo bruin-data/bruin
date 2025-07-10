@@ -36,24 +36,9 @@ type mockConnectionFetcher struct {
 	mock.Mock
 }
 
-func (m *mockConnectionFetcher) GetConnection(name string) (interface{}, error) {
+func (m *mockConnectionFetcher) GetConnection(name string) any {
 	args := m.Called(name)
-	get := args.Get(0)
-	if get == nil {
-		return nil, args.Error(1)
-	}
-
-	return get, args.Error(1)
-}
-
-func (m *mockConnectionFetcher) GetMsConnection(name string) (mssql.MsClient, error) {
-	args := m.Called(name)
-	get := args.Get(0)
-	if get == nil {
-		return nil, args.Error(1)
-	}
-
-	return get.(mssql.MsClient), args.Error(1)
+	return args.Get(0)
 }
 
 func TestAcceptedValuesCheck_Check(t *testing.T) {
