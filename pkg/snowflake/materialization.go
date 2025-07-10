@@ -196,6 +196,7 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	return ddl, nil
 }
 
+//nolint:unparam
 func buildPKConditions(primaryKeys []string, leftAlias, rightAlias string) []string {
 	conditions := make([]string, len(primaryKeys))
 	for i, pk := range primaryKeys {
@@ -312,7 +313,7 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 	tbl := asset.Name
 	cluster := strings.Join(primaryKeys, ", ")
 
-	clusterByClause := ""
+	var clusterByClause string
 	if len(asset.Materialization.ClusterBy) > 0 {
 		clusterByClause = fmt.Sprintf("CLUSTER BY (%s)", strings.Join(asset.Materialization.ClusterBy, ", "))
 	} else {
