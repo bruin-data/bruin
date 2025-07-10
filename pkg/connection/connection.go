@@ -2,11 +2,9 @@ package connection
 
 import (
 	"context"
-	"maps"
 	"os"
 	"reflect"
 	"regexp"
-	"slices"
 	"strings"
 	"sync"
 
@@ -78,445 +76,78 @@ import (
 )
 
 type Manager struct {
-	BigQuery        map[string]*bigquery.Client
-	Snowflake       map[string]*snowflake.DB
-	Postgres        map[string]*postgres.Client
-	MsSQL           map[string]*mssql.DB
-	Databricks      map[string]*databricks.DB
-	Mongo           map[string]*mongo.DB
-	Mysql           map[string]*mysql.Client
-	Notion          map[string]*notion.Client
-	HANA            map[string]*hana.Client
-	Shopify         map[string]*shopify.Client
-	Gorgias         map[string]*gorgias.Client
-	Klaviyo         map[string]*klaviyo.Client
-	Adjust          map[string]*adjust.Client
-	Athena          map[string]*athena.DB
-	FacebookAds     map[string]*facebookads.Client
-	Stripe          map[string]*stripe.Client
-	Appsflyer       map[string]*appsflyer.Client
-	Kafka           map[string]*kafka.Client
-	Airtable        map[string]*airtable.Client
-	DuckDB          map[string]*duck.Client
-	Hubspot         map[string]*hubspot.Client
-	GoogleSheets    map[string]*gsheets.Client
-	Chess           map[string]*chess.Client
-	S3              map[string]*s3.Client
-	Slack           map[string]*slack.Client
-	Asana           map[string]*asana.Client
-	DynamoDB        map[string]*dynamodb.Client
-	Zendesk         map[string]*zendesk.Client
-	GoogleAds       map[string]*googleads.Client
-	TikTokAds       map[string]*tiktokads.Client
-	GitHub          map[string]*github.Client
-	AppStore        map[string]*appstore.Client
-	LinkedInAds     map[string]*linkedinads.Client
-	Linear          map[string]*linear.Client
-	ClickHouse      map[string]*clickhouse.Client
-	GCS             map[string]*gcs.Client
-	ApplovinMax     map[string]*applovinmax.Client
-	Personio        map[string]*personio.Client
-	Kinesis         map[string]*kinesis.Client
-	Pipedrive       map[string]*pipedrive.Client
-	Mixpanel        map[string]*mixpanel.Client
-	Pinterest       map[string]*pinterest.Client
-	Trustpilot      map[string]*trustpilot.Client
-	QuickBooks      map[string]*quickbooks.Client
-	Zoom            map[string]*zoom.Client
-	Frankfurter     map[string]*frankfurter.Client
-	EMRSeverless    map[string]*emr_serverless.Client
-	GoogleAnalytics map[string]*googleanalytics.Client
-	AppLovin        map[string]*applovin.Client
-	Salesforce      map[string]*salesforce.Client
-	SQLite          map[string]*sqlite.Client
-	DB2             map[string]*db2.Client
-	Oracle          map[string]*oracle.Client
-	Phantombuster   map[string]*phantombuster.Client
-	Elasticsearch   map[string]*elasticsearch.Client
-	Spanner         map[string]*spanner.Client
-	Solidgate       map[string]*solidgate.Client
-	Smartsheet      map[string]*smartsheet.Client
-	Attio           map[string]*attio.Client
-	Sftp            map[string]*sftp.Client
-	ISOCPulse       map[string]*isocpulse.Client
-	Tableau         map[string]*tableau.Client
-	mutex           sync.Mutex
+	BigQuery             map[string]*bigquery.Client
+	Snowflake            map[string]*snowflake.DB
+	Postgres             map[string]*postgres.Client
+	MsSQL                map[string]*mssql.DB
+	Databricks           map[string]*databricks.DB
+	Mongo                map[string]*mongo.DB
+	Mysql                map[string]*mysql.Client
+	Notion               map[string]*notion.Client
+	HANA                 map[string]*hana.Client
+	Shopify              map[string]*shopify.Client
+	Gorgias              map[string]*gorgias.Client
+	Klaviyo              map[string]*klaviyo.Client
+	Adjust               map[string]*adjust.Client
+	Athena               map[string]*athena.DB
+	FacebookAds          map[string]*facebookads.Client
+	Stripe               map[string]*stripe.Client
+	Appsflyer            map[string]*appsflyer.Client
+	Kafka                map[string]*kafka.Client
+	Airtable             map[string]*airtable.Client
+	DuckDB               map[string]*duck.Client
+	Hubspot              map[string]*hubspot.Client
+	GoogleSheets         map[string]*gsheets.Client
+	Chess                map[string]*chess.Client
+	S3                   map[string]*s3.Client
+	Slack                map[string]*slack.Client
+	Asana                map[string]*asana.Client
+	DynamoDB             map[string]*dynamodb.Client
+	Zendesk              map[string]*zendesk.Client
+	GoogleAds            map[string]*googleads.Client
+	TikTokAds            map[string]*tiktokads.Client
+	GitHub               map[string]*github.Client
+	AppStore             map[string]*appstore.Client
+	LinkedInAds          map[string]*linkedinads.Client
+	Linear               map[string]*linear.Client
+	ClickHouse           map[string]*clickhouse.Client
+	GCS                  map[string]*gcs.Client
+	ApplovinMax          map[string]*applovinmax.Client
+	Personio             map[string]*personio.Client
+	Kinesis              map[string]*kinesis.Client
+	Pipedrive            map[string]*pipedrive.Client
+	Mixpanel             map[string]*mixpanel.Client
+	Pinterest            map[string]*pinterest.Client
+	Trustpilot           map[string]*trustpilot.Client
+	QuickBooks           map[string]*quickbooks.Client
+	Zoom                 map[string]*zoom.Client
+	Frankfurter          map[string]*frankfurter.Client
+	EMRSeverless         map[string]*emr_serverless.Client
+	GoogleAnalytics      map[string]*googleanalytics.Client
+	AppLovin             map[string]*applovin.Client
+	Salesforce           map[string]*salesforce.Client
+	SQLite               map[string]*sqlite.Client
+	DB2                  map[string]*db2.Client
+	Oracle               map[string]*oracle.Client
+	Phantombuster        map[string]*phantombuster.Client
+	Elasticsearch        map[string]*elasticsearch.Client
+	Spanner              map[string]*spanner.Client
+	Solidgate            map[string]*solidgate.Client
+	Smartsheet           map[string]*smartsheet.Client
+	Attio                map[string]*attio.Client
+	Sftp                 map[string]*sftp.Client
+	ISOCPulse            map[string]*isocpulse.Client
+	Tableau              map[string]*tableau.Client
+	mutex                sync.Mutex
+	availableConnections map[string]any
 }
 
 func (m *Manager) GetConnection(name string) (interface{}, error) {
-	availableConnectionNames := make([]string, 0)
-
-	// todo(turtledev): make this DRY
-	connBigQuery, err := m.GetBqConnectionWithoutDefault(name)
-	if err == nil {
-		return connBigQuery, nil
+	connection, ok := m.availableConnections[name]
+	if !ok {
+		return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, m.availableConnections)
 	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.BigQuery))...)
-
-	connSnowflake, err := m.GetSfConnectionWithoutDefault(name)
-	if err == nil {
-		return connSnowflake, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Snowflake))...)
-
-	connPostgres, err := m.GetPgConnectionWithoutDefault(name)
-	if err == nil {
-		return connPostgres, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Postgres))...)
-
-	connMSSql, err := m.GetMsConnectionWithoutDefault(name)
-	if err == nil {
-		return connMSSql, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.MsSQL))...)
-
-	connDatabricks, err := m.GetDatabricksConnectionWithoutDefault(name)
-	if err == nil {
-		return connDatabricks, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Databricks))...)
-
-	connMongo, err := m.GetMongoConnectionWithoutDefault(name)
-	if err == nil {
-		return connMongo, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Mongo))...)
-
-	connMysql, err := m.GetMySQLConnectionWithoutDefault(name)
-	if err == nil {
-		return connMysql, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Mysql))...)
-
-	connNotion, err := m.GetNotionConnectionWithoutDefault(name)
-	if err == nil {
-		return connNotion, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Notion))...)
-
-	connHANA, err := m.GetHANAConnectionWithoutDefault(name)
-	if err == nil {
-		return connHANA, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.HANA))...)
-
-	connShopify, err := m.GetShopifyConnectionWithoutDefault(name)
-	if err == nil {
-		return connShopify, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Shopify))...)
-
-	connGorgias, err := m.GetGorgiasConnectionWithoutDefault(name)
-	if err == nil {
-		return connGorgias, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Gorgias))...)
-
-	connKlaviyo, err := m.GetKlaviyoConnectionWithoutDefault(name)
-	if err == nil {
-		return connKlaviyo, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Klaviyo))...)
-
-	connAdjust, err := m.GetAdjustConnectionWithoutDefault(name)
-	if err == nil {
-		return connAdjust, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Adjust))...)
-
-	athenaConnection, err := m.GetAthenaConnectionWithoutDefault(name)
-	if err == nil {
-		return athenaConnection, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Athena))...)
-
-	connFacebookAds, err := m.GetFacebookAdsConnectionWithoutDefault(name)
-	if err == nil {
-		return connFacebookAds, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.FacebookAds))...)
-
-	connStripe, err := m.GetStripeConnectionWithoutDefault(name)
-	if err == nil {
-		return connStripe, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Stripe))...)
-
-	connAppsflyer, err := m.GetAppsflyerConnectionWithoutDefault(name)
-	if err == nil {
-		return connAppsflyer, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Appsflyer))...)
-
-	connKafka, err := m.GetKafkaConnectionWithoutDefault(name)
-	if err == nil {
-		return connKafka, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Kafka))...)
-
-	connDuckDB, err := m.GetDuckDBConnectionWithoutDefault(name)
-	if err == nil {
-		return connDuckDB, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.DuckDB))...)
-
-	connClickHouse, err := m.GetClickHouseConnectionWithoutDefault(name)
-	if err == nil {
-		return connClickHouse, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.ClickHouse))...)
-
-	connHubspot, err := m.GetHubspotConnectionWithoutDefault(name)
-	if err == nil {
-		return connHubspot, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Hubspot))...)
-
-	connGoogleSheets, err := m.GetGoogleSheetsConnectionWithoutDefault(name)
-	if err == nil {
-		return connGoogleSheets, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.GoogleSheets))...)
-
-	connChess, err := m.GetChessConnectionWithoutDefault(name)
-	if err == nil {
-		return connChess, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Chess))...)
-
-	connAirtable, err := m.GetAirtableConnectionWithoutDefault(name)
-	if err == nil {
-		return connAirtable, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Airtable))...)
-
-	connS3, err := m.GetS3ConnectionWithoutDefault(name)
-	if err == nil {
-		return connS3, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.S3))...)
-
-	connSlack, err := m.GetSlackConnectionWithoutDefault(name)
-	if err == nil {
-		return connSlack, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Slack))...)
-
-	connAsana, err := m.GetAsanaConnectionWithoutDefault(name)
-	if err == nil {
-		return connAsana, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Asana))...)
-
-	connDynamoDB, err := m.GetDynamoDBConnectionWithoutDefault(name)
-	if err == nil {
-		return connDynamoDB, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.DynamoDB))...)
-
-	connZendesk, err := m.GetZendeskConnectionWithoutDefault(name)
-	if err == nil {
-		return connZendesk, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Zendesk))...)
-
-	connGoogleAds, err := m.GetGoogleAdsConnectionWithoutDefault(name)
-	if err == nil {
-		return connGoogleAds, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.GoogleAds))...)
-	connTikTokAds, err := m.GetTikTokAdsConnectionWithoutDefault(name)
-	if err == nil {
-		return connTikTokAds, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.TikTokAds))...)
-
-	connGitHub, err := m.GetGitHubConnectionWithoutDefault(name)
-	if err == nil {
-		return connGitHub, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.GitHub))...)
-
-	connAppStore, err := m.GetAppStoreConnectionWithoutDefault(name)
-	if err == nil {
-		return connAppStore, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.AppStore))...)
-
-	connLinkedInAds, err := m.GetLinkedInAdsConnectionWithoutDefault(name)
-	if err == nil {
-		return connLinkedInAds, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.LinkedInAds))...)
-
-	connLinear, err := m.GetLinearConnectionWithoutDefault(name)
-	if err == nil {
-		return connLinear, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Linear))...)
-
-	connApplovinMax, err := m.GetApplovinMaxConnectionWithoutDefault(name)
-	if err == nil {
-		return connApplovinMax, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.ApplovinMax))...)
-
-	connPersonio, err := m.GetPersonioConnectionWithoutDefault(name)
-	if err == nil {
-		return connPersonio, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Personio))...)
-
-	connGCS, err := m.GetGCSConnectionWithoutDefault(name)
-	if err == nil {
-		return connGCS, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.GCS))...)
-
-	connKinesis, err := m.GetKinesisConnectionWithoutDefault(name)
-	if err == nil {
-		return connKinesis, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Kinesis))...)
-
-	connPipedrive, err := m.GetPipedriveConnectionWithoutDefault(name)
-	if err == nil {
-		return connPipedrive, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Pipedrive))...)
-
-	connMixpanel, err := m.GetMixpanelConnectionWithoutDefault(name)
-	if err == nil {
-		return connMixpanel, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Mixpanel))...)
-
-	connPinterest, err := m.GetPinterestConnectionWithoutDefault(name)
-	if err == nil {
-		return connPinterest, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Pinterest))...)
-
-	connTrustpilot, err := m.GetTrustpilotConnectionWithoutDefault(name)
-	if err == nil {
-		return connTrustpilot, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Trustpilot))...)
-
-	connQuickBooks, err := m.GetQuickBooksConnectionWithoutDefault(name)
-	if err == nil {
-		return connQuickBooks, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.QuickBooks))...)
-
-	connZoom, err := m.GetZoomConnectionWithoutDefault(name)
-	if err == nil {
-		return connZoom, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Zoom))...)
-
-	connEMRServerless, err := m.GetEMRServerlessConnectionWithoutDefault(name)
-	if err == nil {
-		return connEMRServerless, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.EMRSeverless))...)
-
-	connGoogleAnalytics, err := m.GetGoogleAnalyticsConnectionWithoutDefault(name)
-	if err == nil {
-		return connGoogleAnalytics, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.GoogleAnalytics))...)
-
-	connAppLovin, err := m.GetAppLovinConnectionWithoutDefault(name)
-	if err == nil {
-		return connAppLovin, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.AppLovin))...)
-
-	connFrankfurter, err := m.GetFrankfurterConnectionWithoutDefault(name)
-	if err == nil {
-		return connFrankfurter, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Frankfurter))...)
-	connSalesforce, err := m.GetSalesforceConnectionWithoutDefault(name)
-	if err == nil {
-		return connSalesforce, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Salesforce))...)
-	connSQLite, err := m.GetSQLiteConnectionWithoutDefault(name)
-	if err == nil {
-		return connSQLite, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.SQLite))...)
-
-	connDB2, err := m.GetDB2ConnectionWithoutDefault(name)
-	if err == nil {
-		return connDB2, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.DB2))...)
-
-	connOracle, err := m.GetOracleConnectionWithoutDefault(name)
-	if err == nil {
-		return connOracle, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Oracle))...)
-
-	connPhantombuster, err := m.GetPhantombusterConnectionWithoutDefault(name)
-	if err == nil {
-		return connPhantombuster, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Phantombuster))...)
-
-	connElasticsearch, err := m.GetElasticsearchConnectionWithoutDefault(name)
-	if err == nil {
-		return connElasticsearch, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Elasticsearch))...)
-
-	connSpanner, err := m.GetSpannerConnectionWithoutDefault(name)
-	if err == nil {
-		return connSpanner, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Spanner))...)
-
-	connSolidgate, err := m.GetSolidgateConnectionWithoutDefault(name)
-	if err == nil {
-		return connSolidgate, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Solidgate))...)
-
-	connSmartsheet, err := m.GetSmartsheetConnectionWithoutDefault(name)
-	if err == nil {
-		return connSmartsheet, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Smartsheet))...)
-
-	connAttio, err := m.GetAttioConnectionWithoutDefault(name)
-	if err == nil {
-		return connAttio, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Attio))...)
-
-	connSftp, err := m.GetSftpConnectionWithoutDefault(name)
-	if err == nil {
-		return connSftp, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Sftp))...)
-
-	connPulse, err := m.GetISOCPulseConnectionWithoutDefault(name)
-	if err == nil {
-		return connPulse, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.ISOCPulse))...)
-
-	connTableau, err := m.GetTableauConnectionWithoutDefault(name)
-	if err == nil {
-		return connTableau, nil
-	}
-	availableConnectionNames = append(availableConnectionNames, slices.Collect(maps.Keys(m.Tableau))...)
-
-	return nil, errors.Errorf("connection '%s' not found, available connection names are: %v", name, availableConnectionNames)
+	return connection, nil
 }
 
 func (m *Manager) GetAthenaConnection(name string) (athena.Client, error) {
@@ -688,860 +319,6 @@ func (m *Manager) GetDatabricksConnectionWithoutDefault(name string) (databricks
 	return db, nil
 }
 
-func (m *Manager) GetMongoConnection(name string) (*mongo.DB, error) {
-	db, err := m.GetMongoConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetMongoConnectionWithoutDefault("mongo-default")
-}
-
-func (m *Manager) GetMongoConnectionWithoutDefault(name string) (*mongo.DB, error) {
-	if m.Mongo == nil {
-		return nil, errors.New("no mongo connections found")
-	}
-
-	db, ok := m.Mongo[name]
-	if !ok {
-		return nil, errors.Errorf("mongo connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetMySQLConnection(name string) (*mysql.Client, error) {
-	db, err := m.GetMySQLConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetMySQLConnectionWithoutDefault("mysql-default")
-}
-
-func (m *Manager) GetMySQLConnectionWithoutDefault(name string) (*mysql.Client, error) {
-	if m.Mysql == nil {
-		return nil, errors.New("no mysql connections found")
-	}
-
-	db, ok := m.Mysql[name]
-	if !ok {
-		return nil, errors.Errorf("mysql connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetNotionConnection(name string) (*notion.Client, error) {
-	db, err := m.GetNotionConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetNotionConnectionWithoutDefault("notion-default")
-}
-
-func (m *Manager) GetNotionConnectionWithoutDefault(name string) (*notion.Client, error) {
-	if m.Notion == nil {
-		return nil, errors.New("no notion connections found")
-	}
-
-	db, ok := m.Notion[name]
-	if !ok {
-		return nil, errors.Errorf("notion connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetHANAConnection(name string) (*hana.Client, error) {
-	db, err := m.GetHANAConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetHANAConnectionWithoutDefault("hana-default")
-}
-
-func (m *Manager) GetHANAConnectionWithoutDefault(name string) (*hana.Client, error) {
-	if m.HANA == nil {
-		return nil, errors.New("no hana connections found")
-	}
-
-	db, ok := m.HANA[name]
-	if !ok {
-		return nil, errors.Errorf("hana connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetShopifyConnection(name string) (*shopify.Client, error) {
-	db, err := m.GetShopifyConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetShopifyConnectionWithoutDefault("shopify-default")
-}
-
-func (m *Manager) GetShopifyConnectionWithoutDefault(name string) (*shopify.Client, error) {
-	if m.Shopify == nil {
-		return nil, errors.New("no shopify connections found")
-	}
-
-	db, ok := m.Shopify[name]
-	if !ok {
-		return nil, errors.Errorf("shopify connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetKlaviyoConnection(name string) (*klaviyo.Client, error) {
-	db, err := m.GetKlaviyoConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetKlaviyoConnectionWithoutDefault("klaviyo-default")
-}
-
-func (m *Manager) GetKlaviyoConnectionWithoutDefault(name string) (*klaviyo.Client, error) {
-	if m.Klaviyo == nil {
-		return nil, errors.New("no klaviyo connections found")
-	}
-
-	db, ok := m.Klaviyo[name]
-	if !ok {
-		return nil, errors.Errorf("klaviyo connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetSpannerConnection(name string) (*spanner.Client, error) {
-	db, err := m.GetSpannerConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetSpannerConnectionWithoutDefault("spanner-default")
-}
-
-func (m *Manager) GetSpannerConnectionWithoutDefault(name string) (*spanner.Client, error) {
-	if m.Spanner == nil {
-		return nil, errors.New("no spanner connections found")
-	}
-
-	db, ok := m.Spanner[name]
-	if !ok {
-		return nil, errors.Errorf("spanner connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetSolidgateConnection(name string) (*solidgate.Client, error) {
-	db, err := m.GetSolidgateConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetSolidgateConnectionWithoutDefault("solidgate-default")
-}
-
-func (m *Manager) GetSolidgateConnectionWithoutDefault(name string) (*solidgate.Client, error) {
-	if m.Solidgate == nil {
-		return nil, errors.New("no solidgate connections found")
-	}
-
-	db, ok := m.Solidgate[name]
-	if !ok {
-		return nil, errors.Errorf("solidgate connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetSmartsheetConnection(name string) (*smartsheet.Client, error) {
-	db, err := m.GetSmartsheetConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetSmartsheetConnectionWithoutDefault("smartsheet-default")
-}
-
-func (m *Manager) GetSmartsheetConnectionWithoutDefault(name string) (*smartsheet.Client, error) {
-	if m.Smartsheet == nil {
-		return nil, errors.New("no smartsheet connections found")
-	}
-
-	db, ok := m.Smartsheet[name]
-	if !ok {
-		return nil, errors.Errorf("smartsheet connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetAttioConnection(name string) (*attio.Client, error) {
-	db, err := m.GetAttioConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetAttioConnectionWithoutDefault("attio-default")
-}
-
-func (m *Manager) GetAttioConnectionWithoutDefault(name string) (*attio.Client, error) {
-	if m.Attio == nil {
-		return nil, errors.New("no attio connections found")
-	}
-
-	db, ok := m.Attio[name]
-	if !ok {
-		return nil, errors.Errorf("attio connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetSftpConnection(name string) (*sftp.Client, error) {
-	db, err := m.GetSftpConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetSftpConnectionWithoutDefault("sftp-default")
-}
-
-func (m *Manager) GetSftpConnectionWithoutDefault(name string) (*sftp.Client, error) {
-	if m.Sftp == nil {
-		return nil, errors.New("no sftp connections found")
-	}
-	db, ok := m.Sftp[name]
-	if !ok {
-		return nil, errors.Errorf("sftp connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetAdjustConnection(name string) (*adjust.Client, error) {
-	db, err := m.GetAdjustConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetAdjustConnectionWithoutDefault("adjust-default")
-}
-
-func (m *Manager) GetAdjustConnectionWithoutDefault(name string) (*adjust.Client, error) {
-	if m.Adjust == nil {
-		return nil, errors.New("no adjust connections found")
-	}
-
-	db, ok := m.Adjust[name]
-	if !ok {
-		return nil, errors.Errorf("adjust connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetStripeConnection(name string) (*stripe.Client, error) {
-	db, err := m.GetStripeConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetStripeConnectionWithoutDefault("stripe-default")
-}
-
-func (m *Manager) GetStripeConnectionWithoutDefault(name string) (*stripe.Client, error) {
-	if m.Stripe == nil {
-		return nil, errors.New("no stripe connections found")
-	}
-
-	db, ok := m.Stripe[name]
-	if !ok {
-		return nil, errors.Errorf("stripe connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetGorgiasConnection(name string) (*gorgias.Client, error) {
-	db, err := m.GetGorgiasConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetGorgiasConnectionWithoutDefault("gorgias-default")
-}
-
-func (m *Manager) GetGorgiasConnectionWithoutDefault(name string) (*gorgias.Client, error) {
-	if m.Gorgias == nil {
-		return nil, errors.New("no gorgias connections found")
-	}
-
-	db, ok := m.Gorgias[name]
-	if !ok {
-		return nil, errors.Errorf("hana gorgias not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetFacebookAdsConnection(name string) (*facebookads.Client, error) {
-	db, err := m.GetFacebookAdsConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetFacebookAdsConnectionWithoutDefault("facebookads-default")
-}
-
-func (m *Manager) GetFacebookAdsConnectionWithoutDefault(name string) (*facebookads.Client, error) {
-	if m.FacebookAds == nil {
-		return nil, errors.New("no facebookads connections found")
-	}
-
-	db, ok := m.FacebookAds[name]
-	if !ok {
-		return nil, errors.Errorf("facebookads connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetAppsflyerConnection(name string) (*appsflyer.Client, error) {
-	db, err := m.GetAppsflyerConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetAppsflyerConnectionWithoutDefault("appsflyer-default")
-}
-
-func (m *Manager) GetAppsflyerConnectionWithoutDefault(name string) (*appsflyer.Client, error) {
-	if m.Appsflyer == nil {
-		return nil, errors.New("no appsflyer connections found")
-	}
-
-	db, ok := m.Appsflyer[name]
-	if !ok {
-		return nil, errors.Errorf("appsflyer connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetKafkaConnection(name string) (*kafka.Client, error) {
-	db, err := m.GetKafkaConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetKafkaConnectionWithoutDefault("kafka-default")
-}
-
-func (m *Manager) GetKafkaConnectionWithoutDefault(name string) (*kafka.Client, error) {
-	if m.Kafka == nil {
-		return nil, errors.New("no kafka connections found")
-	}
-
-	db, ok := m.Kafka[name]
-	if !ok {
-		return nil, errors.Errorf("kafka connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetHubspotConnection(name string) (*hubspot.Client, error) {
-	db, err := m.GetHubspotConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetHubspotConnectionWithoutDefault("hubspot-default")
-}
-
-func (m *Manager) GetHubspotConnectionWithoutDefault(name string) (*hubspot.Client, error) {
-	if m.Hubspot == nil {
-		return nil, errors.New("no Hubspot connections found")
-	}
-	db, ok := m.Hubspot[name]
-	if !ok {
-		return nil, errors.Errorf("hubspot connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetAirtableConnection(name string) (*airtable.Client, error) {
-	db, err := m.GetAirtableConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetAirtableConnectionWithoutDefault("airtable-default")
-}
-
-func (m *Manager) GetAirtableConnectionWithoutDefault(name string) (*airtable.Client, error) {
-	if m.Airtable == nil {
-		return nil, errors.New("no airtable connections found")
-	}
-	db, ok := m.Airtable[name]
-	if !ok {
-		return nil, errors.Errorf("airtable connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetGoogleSheetsConnection(name string) (*gsheets.Client, error) {
-	db, err := m.GetGoogleSheetsConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-
-	return m.GetGoogleSheetsConnectionWithoutDefault("google-sheets-default")
-}
-
-func (m *Manager) GetGoogleSheetsConnectionWithoutDefault(name string) (*gsheets.Client, error) {
-	if m.GoogleSheets == nil {
-		return nil, errors.New("no google sheets connections found")
-	}
-	db, ok := m.GoogleSheets[name]
-	if !ok {
-		return nil, errors.Errorf("google sheets connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetChessConnection(name string) (*chess.Client, error) {
-	db, err := m.GetChessConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetChessConnectionWithoutDefault("chess-default")
-}
-
-func (m *Manager) GetChessConnectionWithoutDefault(name string) (*chess.Client, error) {
-	if m.Chess == nil {
-		return nil, errors.New("no chess connections found")
-	}
-	db, ok := m.Chess[name]
-	if !ok {
-		return nil, errors.Errorf("chess connection not found for '%s'", name)
-	}
-
-	return db, nil
-}
-
-func (m *Manager) GetZendeskConnection(name string) (*zendesk.Client, error) {
-	if m.Zendesk == nil {
-		return nil, errors.New("no zendesk connections found")
-	}
-	db, ok := m.Zendesk[name]
-	if !ok {
-		return nil, errors.Errorf("zendesk connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetZendeskConnectionWithoutDefault(name string) (*zendesk.Client, error) {
-	if m.Zendesk == nil {
-		return nil, errors.New("no zendesk connections found")
-	}
-	db, ok := m.Zendesk[name]
-	if !ok {
-		return nil, errors.Errorf("zendesk connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetS3Connection(name string) (*s3.Client, error) {
-	db, err := m.GetS3ConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetS3ConnectionWithoutDefault("s3-default")
-}
-
-func (m *Manager) GetS3ConnectionWithoutDefault(name string) (*s3.Client, error) {
-	if m.S3 == nil {
-		return nil, errors.New("no s3 connections found")
-	}
-	db, ok := m.S3[name]
-	if !ok {
-		return nil, errors.Errorf("s3 connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetSlackConnection(name string) (*slack.Client, error) {
-	db, err := m.GetSlackConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetSlackConnectionWithoutDefault("slack-default")
-}
-
-func (m *Manager) GetSlackConnectionWithoutDefault(name string) (*slack.Client, error) {
-	if m.Slack == nil {
-		return nil, errors.New("no slack connections found")
-	}
-	db, ok := m.Slack[name]
-	if !ok {
-		return nil, errors.Errorf("slack connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetAsanaConnection(name string) (*asana.Client, error) {
-	db, err := m.GetAsanaConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetAsanaConnectionWithoutDefault("asana-default")
-}
-
-func (m *Manager) GetAsanaConnectionWithoutDefault(name string) (*asana.Client, error) {
-	if m.Asana == nil {
-		return nil, errors.New("no asana connections found")
-	}
-	db, ok := m.Asana[name]
-	if !ok {
-		return nil, errors.Errorf("asana connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetDynamoDBConnection(name string) (*dynamodb.Client, error) {
-	db, err := m.GetDynamoDBConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetDynamoDBConnectionWithoutDefault("dynamodb-default")
-}
-
-func (m *Manager) GetDynamoDBConnectionWithoutDefault(name string) (*dynamodb.Client, error) {
-	if m.DynamoDB == nil {
-		return nil, errors.New("no dynamodb connections found")
-	}
-	db, ok := m.DynamoDB[name]
-	if !ok {
-		return nil, errors.Errorf("dynamodb connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetGoogleAdsConnection(name string) (*googleads.Client, error) {
-	db, err := m.GetGoogleAdsConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetGoogleAdsConnectionWithoutDefault("googleads-default")
-}
-
-func (m *Manager) GetGoogleAdsConnectionWithoutDefault(name string) (*googleads.Client, error) {
-	if m.GoogleAds == nil {
-		return nil, errors.New("no googleads connections found")
-	}
-	db, ok := m.GoogleAds[name]
-	if !ok {
-		return nil, errors.Errorf("googleads connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetGitHubConnection(name string) (*github.Client, error) {
-	db, err := m.GetGitHubConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetGitHubConnectionWithoutDefault("github-default")
-}
-
-func (m *Manager) GetGitHubConnectionWithoutDefault(name string) (*github.Client, error) {
-	if m.GitHub == nil {
-		return nil, errors.New("no github connections found")
-	}
-	db, ok := m.GitHub[name]
-	if !ok {
-		return nil, errors.Errorf("github connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetTikTokAdsConnection(name string) (*tiktokads.Client, error) {
-	db, err := m.GetTikTokAdsConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetTikTokAdsConnectionWithoutDefault("tiktokads-default")
-}
-
-func (m *Manager) GetTikTokAdsConnectionWithoutDefault(name string) (*tiktokads.Client, error) {
-	if m.TikTokAds == nil {
-		return nil, errors.New("no tiktokads connections found")
-	}
-	db, ok := m.TikTokAds[name]
-	if !ok {
-		return nil, errors.Errorf("tiktokads connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetAppStoreConnection(name string) (*appstore.Client, error) {
-	db, err := m.GetAppStoreConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetAppStoreConnectionWithoutDefault("appstore-default")
-}
-
-func (m *Manager) GetAppStoreConnectionWithoutDefault(name string) (*appstore.Client, error) {
-	if m.AppStore == nil {
-		return nil, errors.New("no appstore connections found")
-	}
-	db, ok := m.AppStore[name]
-	if !ok {
-		return nil, errors.Errorf("appstore connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetLinkedInAdsConnection(name string) (*linkedinads.Client, error) {
-	db, err := m.GetLinkedInAdsConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetLinkedInAdsConnectionWithoutDefault("linkedinads-default")
-}
-
-func (m *Manager) GetLinkedInAdsConnectionWithoutDefault(name string) (*linkedinads.Client, error) {
-	if m.LinkedInAds == nil {
-		return nil, errors.New("no linkedinads connections found")
-	}
-	db, ok := m.LinkedInAds[name]
-	if !ok {
-		return nil, errors.Errorf("linkedinads connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetLinearConnection(name string) (*linear.Client, error) {
-	db, err := m.GetLinearConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetLinearConnectionWithoutDefault("linear-default")
-}
-
-func (m *Manager) GetLinearConnectionWithoutDefault(name string) (*linear.Client, error) {
-	if m.Linear == nil {
-		return nil, errors.New("no linear connections found")
-	}
-	db, ok := m.Linear[name]
-	if !ok {
-		return nil, errors.Errorf("linear connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetGCSConnection(name string) (*gcs.Client, error) {
-	db, err := m.GetGCSConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetGCSConnectionWithoutDefault("gcs-default")
-}
-
-func (m *Manager) GetGCSConnectionWithoutDefault(name string) (*gcs.Client, error) {
-	if m.GCS == nil {
-		return nil, errors.New("no gcs connections found")
-	}
-	db, ok := m.GCS[name]
-	if !ok {
-		return nil, errors.Errorf("gcs connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetApplovinMaxConnection(name string) (*applovinmax.Client, error) {
-	db, err := m.GetApplovinMaxConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetApplovinMaxConnectionWithoutDefault("applovinmax-default")
-}
-
-func (m *Manager) GetApplovinMaxConnectionWithoutDefault(name string) (*applovinmax.Client, error) {
-	if m.ApplovinMax == nil {
-		return nil, errors.New("no applovinmax connections found")
-	}
-	db, ok := m.ApplovinMax[name]
-	if !ok {
-		return nil, errors.Errorf("applovinmax connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetPersonioConnection(name string) (*personio.Client, error) {
-	db, err := m.GetPersonioConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetPersonioConnectionWithoutDefault("personio-default")
-}
-
-func (m *Manager) GetPersonioConnectionWithoutDefault(name string) (*personio.Client, error) {
-	if m.Personio == nil {
-		return nil, errors.New("no personio connections found")
-	}
-	db, ok := m.Personio[name]
-	if !ok {
-		return nil, errors.Errorf("personio connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetKinesisConnection(name string) (*kinesis.Client, error) {
-	db, err := m.GetKinesisConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetKinesisConnectionWithoutDefault("kinesis-default")
-}
-
-func (m *Manager) GetKinesisConnectionWithoutDefault(name string) (*kinesis.Client, error) {
-	if m.Kinesis == nil {
-		return nil, errors.New("no kinesis connections found")
-	}
-	db, ok := m.Kinesis[name]
-	if !ok {
-		return nil, errors.Errorf("kinesis connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetPipedriveConnection(name string) (*pipedrive.Client, error) {
-	db, err := m.GetPipedriveConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetPipedriveConnectionWithoutDefault("pipedrive-default")
-}
-
-func (m *Manager) GetPipedriveConnectionWithoutDefault(name string) (*pipedrive.Client, error) {
-	if m.Pipedrive == nil {
-		return nil, errors.New("no pipedrive connections found")
-	}
-	db, ok := m.Pipedrive[name]
-	if !ok {
-		return nil, errors.Errorf("pipedrive connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetMixpanelConnection(name string) (*mixpanel.Client, error) {
-	db, err := m.GetMixpanelConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetMixpanelConnectionWithoutDefault("mixpanel-default")
-}
-
-func (m *Manager) GetMixpanelConnectionWithoutDefault(name string) (*mixpanel.Client, error) {
-	if m.Mixpanel == nil {
-		return nil, errors.New("no mixpanel connections found")
-	}
-	db, ok := m.Mixpanel[name]
-	if !ok {
-		return nil, errors.Errorf("mixpanel connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetQuickBooksConnection(name string) (*quickbooks.Client, error) {
-	db, err := m.GetQuickBooksConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetQuickBooksConnectionWithoutDefault("quickbooks-default")
-}
-
-func (m *Manager) GetQuickBooksConnectionWithoutDefault(name string) (*quickbooks.Client, error) {
-	if m.QuickBooks == nil {
-		return nil, errors.New("no quickbooks connections found")
-	}
-	db, ok := m.QuickBooks[name]
-	if !ok {
-		return nil, errors.Errorf("quickbooks connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetPinterestConnection(name string) (*pinterest.Client, error) {
-	db, err := m.GetPinterestConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetPinterestConnectionWithoutDefault("pinterest-default")
-}
-
-func (m *Manager) GetPinterestConnectionWithoutDefault(name string) (*pinterest.Client, error) {
-	if m.Pinterest == nil {
-		return nil, errors.New("no pinterest connections found")
-	}
-	db, ok := m.Pinterest[name]
-	if !ok {
-		return nil, errors.Errorf("pinterest connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetTrustpilotConnection(name string) (*trustpilot.Client, error) {
-	db, err := m.GetTrustpilotConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetTrustpilotConnectionWithoutDefault("trustpilot-default")
-}
-
-func (m *Manager) GetTrustpilotConnectionWithoutDefault(name string) (*trustpilot.Client, error) {
-	if m.Trustpilot == nil {
-		return nil, errors.New("no trustpilot connections found")
-	}
-	db, ok := m.Trustpilot[name]
-	if !ok {
-		return nil, errors.Errorf("trustpilot connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetZoomConnection(name string) (*zoom.Client, error) {
-	db, err := m.GetZoomConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetZoomConnectionWithoutDefault("zoom-default")
-}
-
-func (m *Manager) GetZoomConnectionWithoutDefault(name string) (*zoom.Client, error) {
-	if m.Zoom == nil {
-		return nil, errors.New("no zoom connections found")
-	}
-	db, ok := m.Zoom[name]
-	if !ok {
-		return nil, errors.Errorf("zoom connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
 func (m *Manager) GetEMRServerlessConnection(name string) (*emr_serverless.Client, error) {
 	db, err := m.GetEMRServerlessConnectionWithoutDefault(name)
 	if err == nil {
@@ -1557,196 +334,6 @@ func (m *Manager) GetEMRServerlessConnectionWithoutDefault(name string) (*emr_se
 	db, ok := m.EMRSeverless[name]
 	if !ok {
 		return nil, errors.Errorf("EMR Serverless connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetISOCPulseConnection(name string) (*isocpulse.Client, error) {
-	db, err := m.GetISOCPulseConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetISOCPulseConnectionWithoutDefault("isoc_pulse-default")
-}
-
-func (m *Manager) GetISOCPulseConnectionWithoutDefault(name string) (*isocpulse.Client, error) {
-	if m.ISOCPulse == nil {
-		return nil, errors.New("no ISOC Pulse connections found")
-	}
-	db, ok := m.ISOCPulse[name]
-	if !ok {
-		return nil, errors.Errorf("ISOC Pulse connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetGoogleAnalyticsConnection(name string) (*googleanalytics.Client, error) {
-	db, err := m.GetGoogleAnalyticsConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetGoogleAnalyticsConnectionWithoutDefault("googleanalytics-default")
-}
-
-func (m *Manager) GetGoogleAnalyticsConnectionWithoutDefault(name string) (*googleanalytics.Client, error) {
-	if m.GoogleAnalytics == nil {
-		return nil, errors.New("no googleanalytics connections found")
-	}
-	db, ok := m.GoogleAnalytics[name]
-	if !ok {
-		return nil, errors.Errorf("googleanalytics connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetAppLovinConnection(name string) (*applovin.Client, error) {
-	db, err := m.GetAppLovinConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetAppLovinConnectionWithoutDefault("applovin-default")
-}
-
-func (m *Manager) GetAppLovinConnectionWithoutDefault(name string) (*applovin.Client, error) {
-	if m.AppLovin == nil {
-		return nil, errors.New("no applovin connections found")
-	}
-	db, ok := m.AppLovin[name]
-	if !ok {
-		return nil, errors.Errorf("applovin connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetFrankfurterConnection(name string) (*frankfurter.Client, error) {
-	db, err := m.GetFrankfurterConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetFrankfurterConnectionWithoutDefault("frankfurter-default")
-}
-
-func (m *Manager) GetFrankfurterConnectionWithoutDefault(name string) (*frankfurter.Client, error) {
-	if m.Frankfurter == nil {
-		return nil, errors.New("no frankfurter connections found")
-	}
-	db, ok := m.Frankfurter[name]
-	if !ok {
-		return nil, errors.Errorf("frankfurter connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetSalesforceConnection(name string) (*salesforce.Client, error) {
-	db, err := m.GetSalesforceConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetSalesforceConnectionWithoutDefault("salesforce-default")
-}
-
-func (m *Manager) GetSalesforceConnectionWithoutDefault(name string) (*salesforce.Client, error) {
-	if m.Salesforce == nil {
-		return nil, errors.New("no salesforce connections found")
-	}
-	db, ok := m.Salesforce[name]
-	if !ok {
-		return nil, errors.Errorf("salesforce connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetSQLiteConnection(name string) (*sqlite.Client, error) {
-	db, err := m.GetSQLiteConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetSQLiteConnectionWithoutDefault("sqlite-default")
-}
-
-func (m *Manager) GetSQLiteConnectionWithoutDefault(name string) (*sqlite.Client, error) {
-	if m.SQLite == nil {
-		return nil, errors.New("no sqlite connections found")
-	}
-	db, ok := m.SQLite[name]
-	if !ok {
-		return nil, errors.Errorf("sqlite connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetOracleConnection(name string) (*oracle.Client, error) {
-	db, err := m.GetOracleConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetOracleConnectionWithoutDefault("oracle-default")
-}
-
-func (m *Manager) GetOracleConnectionWithoutDefault(name string) (*oracle.Client, error) {
-	if m.Oracle == nil {
-		return nil, errors.New("no oracle connections found")
-	}
-	db, ok := m.Oracle[name]
-	if !ok {
-		return nil, errors.Errorf("oracle connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetPhantombusterConnection(name string) (*phantombuster.Client, error) {
-	db, err := m.GetPhantombusterConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetPhantombusterConnectionWithoutDefault("phantombuster-default")
-}
-
-func (m *Manager) GetPhantombusterConnectionWithoutDefault(name string) (*phantombuster.Client, error) {
-	if m.Phantombuster == nil {
-		return nil, errors.New("no phantombuster connections found")
-	}
-	db, ok := m.Phantombuster[name]
-	if !ok {
-		return nil, errors.Errorf("phantombuster connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetElasticsearchConnection(name string) (*elasticsearch.Client, error) {
-	db, err := m.GetElasticsearchConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetElasticsearchConnectionWithoutDefault("elasticsearch-default")
-}
-
-func (m *Manager) GetElasticsearchConnectionWithoutDefault(name string) (*elasticsearch.Client, error) {
-	if m.Elasticsearch == nil {
-		return nil, errors.New("no elasticsearch connections found")
-	}
-	db, ok := m.Elasticsearch[name]
-	if !ok {
-		return nil, errors.Errorf("elasticsearch connection not found for '%s'", name)
-	}
-	return db, nil
-}
-
-func (m *Manager) GetDB2Connection(name string) (*db2.Client, error) {
-	db, err := m.GetDB2ConnectionWithoutDefault(name)
-	if err == nil {
-		return db, nil
-	}
-	return m.GetDB2ConnectionWithoutDefault("db2-default")
-}
-
-func (m *Manager) GetDB2ConnectionWithoutDefault(name string) (*db2.Client, error) {
-	if m.DB2 == nil {
-		return nil, errors.New("no db2 connections found")
-	}
-	db, ok := m.DB2[name]
-	if !ok {
-		return nil, errors.Errorf("db2 connection not found for '%s'", name)
 	}
 	return db, nil
 }
@@ -1793,6 +380,7 @@ func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatfo
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.BigQuery[connection.Name] = db
+	m.availableConnections[connection.Name] = db
 
 	return nil
 }
@@ -1835,6 +423,7 @@ func (m *Manager) AddSfConnectionFromConfig(connection *config.SnowflakeConnecti
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Snowflake[connection.Name] = db
+	m.availableConnections[connection.Name] = db
 
 	return nil
 }
@@ -1865,6 +454,7 @@ func (m *Manager) AddAthenaConnectionFromConfig(connection *config.AthenaConnect
 		SessionToken:    connection.SessionToken,
 		Database:        connection.Database,
 	})
+	m.availableConnections[connection.Name] = m.Athena[connection.Name]
 
 	return nil
 }
@@ -1902,6 +492,7 @@ func (m *Manager) addRedshiftConnectionFromConfig(connection *config.RedshiftCon
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Postgres[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -1950,6 +541,7 @@ func (m *Manager) addPgLikeConnectionFromConfig(connection *config.PostgresConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Postgres[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -1975,6 +567,7 @@ func (m *Manager) AddMsSQLConnectionFromConfig(connection *config.MsSQLConnectio
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.MsSQL[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2000,6 +593,7 @@ func (m *Manager) AddSynapseSQLConnectionFromConfig(connection *config.SynapseCo
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.MsSQL[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2026,6 +620,7 @@ func (m *Manager) AddDatabricksConnectionFromConfig(connection *config.Databrick
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Databricks[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2051,6 +646,7 @@ func (m *Manager) AddMongoConnectionFromConfig(connection *config.MongoConnectio
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Mongo[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2077,6 +673,7 @@ func (m *Manager) AddMySQLConnectionFromConfig(connection *config.MySQLConnectio
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Mysql[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2098,6 +695,7 @@ func (m *Manager) AddNotionConnectionFromConfig(connection *config.NotionConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Notion[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2120,6 +718,7 @@ func (m *Manager) AddShopifyConnectionFromConfig(connection *config.ShopifyConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Shopify[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2143,6 +742,7 @@ func (m *Manager) AddGorgiasConnectionFromConfig(connection *config.GorgiasConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Gorgias[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2164,6 +764,7 @@ func (m *Manager) AddKlaviyoConnectionFromConfig(connection *config.KlaviyoConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Klaviyo[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2185,6 +786,7 @@ func (m *Manager) AddAdjustConnectionFromConfig(connection *config.AdjustConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Adjust[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2210,6 +812,7 @@ func (m *Manager) AddHANAConnectionFromConfig(connection *config.HANAConnection)
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.HANA[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2232,6 +835,7 @@ func (m *Manager) AddFacebookAdsConnectionFromConfig(connection *config.Facebook
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.FacebookAds[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2253,6 +857,7 @@ func (m *Manager) AddStripeConnectionFromConfig(connection *config.StripeConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Stripe[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2274,6 +879,7 @@ func (m *Manager) AddAppsflyerConnectionFromConfig(connection *config.AppsflyerC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Appsflyer[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2311,6 +917,7 @@ func (m *Manager) AddGoogleSheetsConnectionFromConfig(connection *config.GoogleS
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.GoogleSheets[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2339,6 +946,7 @@ func (m *Manager) AddSpannerConnectionFromConfig(connection *config.SpannerConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Spanner[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2361,6 +969,7 @@ func (m *Manager) AddSolidgateConnectionFromConfig(connection *config.SolidgateC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Solidgate[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2382,6 +991,7 @@ func (m *Manager) AddSmartsheetConnectionFromConfig(connection *config.Smartshee
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Smartsheet[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2405,6 +1015,7 @@ func (m *Manager) AddSftpConnectionFromConfig(connection *config.SFTPConnection)
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Sftp[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2430,6 +1041,7 @@ func (m *Manager) AddKafkaConnectionFromConfig(connection *config.KafkaConnectio
 	}
 
 	m.Kafka[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2452,6 +1064,7 @@ func (m *Manager) AddDuckDBConnectionFromConfig(connection *config.DuckDBConnect
 	defer m.mutex.Unlock()
 
 	m.DuckDB[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2480,6 +1093,7 @@ func (m *Manager) AddClickHouseConnectionFromConfig(connection *config.ClickHous
 	defer m.mutex.Unlock()
 
 	m.ClickHouse[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2499,6 +1113,7 @@ func (m *Manager) AddChessConnectionFromConfig(connection *config.ChessConnectio
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Chess[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2519,6 +1134,7 @@ func (m *Manager) AddHubspotConnectionFromConfig(connection *config.HubspotConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Hubspot[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2539,6 +1155,7 @@ func (m *Manager) AddAirtableConnectionFromConfig(connection *config.AirtableCon
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Airtable[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2563,6 +1180,7 @@ func (m *Manager) AddS3ConnectionFromConfig(connection *config.S3Connection) err
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.S3[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2581,6 +1199,7 @@ func (m *Manager) AddSlackConnectionFromConfig(connection *config.SlackConnectio
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Slack[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2599,6 +1218,7 @@ func (m *Manager) AddAsanaConnectionFromConfig(connection *config.AsanaConnectio
 		return err
 	}
 	m.Asana[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2618,6 +1238,7 @@ func (m *Manager) AddDynamoDBConnectionFromConfig(connection *config.DynamoDBCon
 		return err
 	}
 	m.DynamoDB[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2638,6 +1259,7 @@ func (m *Manager) AddGoogleAdsConnectionFromConfig(connection *config.GoogleAdsC
 		return err
 	}
 	m.GoogleAds[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2659,6 +1281,7 @@ func (m *Manager) AddZendeskConnectionFromConfig(connection *config.ZendeskConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Zendesk[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2680,6 +1303,7 @@ func (m *Manager) AddTikTokAdsConnectionFromConfig(connection *config.TikTokAdsC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.TikTokAds[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2703,6 +1327,7 @@ func (m *Manager) AddGitHubConnectionFromConfig(connection *config.GitHubConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.GitHub[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2727,6 +1352,7 @@ func (m *Manager) AddAppStoreConnectionFromConfig(connection *config.AppStoreCon
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.AppStore[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2747,6 +1373,7 @@ func (m *Manager) AddLinkedInAdsConnectionFromConfig(connection *config.LinkedIn
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.LinkedInAds[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2766,6 +1393,7 @@ func (m *Manager) AddLinearConnectionFromConfig(connection *config.LinearConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Linear[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2787,6 +1415,7 @@ func (m *Manager) AddGCSConnectionFromConfig(connection *config.GCSConnection) e
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.GCS[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2802,6 +1431,7 @@ func (m *Manager) AddPersonioConnectionFromConfig(connection *config.PersonioCon
 		ClientID:     connection.ClientID,
 		ClientSecret: connection.ClientSecret,
 	})
+	m.availableConnections[connection.Name] = m.Personio[connection.Name]
 	return nil
 }
 
@@ -2822,6 +1452,7 @@ func (m *Manager) AddApplovinMaxConnectionFromConfig(connection *config.Applovin
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.ApplovinMax[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2842,6 +1473,7 @@ func (m *Manager) AddAppLovinConnectionFromConfig(connection *config.AppLovinCon
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.AppLovin[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -2862,6 +1494,7 @@ func (m *Manager) AddPipedriveConnectionFromConfig(connection *config.PipedriveC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Pipedrive[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2886,6 +1519,7 @@ func (m *Manager) AddQuickBooksConnectionFromConfig(connection *config.QuickBook
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.QuickBooks[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2905,6 +1539,7 @@ func (m *Manager) AddPinterestConnectionFromConfig(connection *config.PinterestC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Pinterest[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2925,6 +1560,7 @@ func (m *Manager) AddTrustpilotConnectionFromConfig(connection *config.Trustpilo
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Trustpilot[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2944,6 +1580,7 @@ func (m *Manager) AddISOCPulseConnectionFromConfig(connection *config.ISOCPulseC
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.ISOCPulse[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2965,6 +1602,7 @@ func (m *Manager) AddZoomConnectionFromConfig(connection *config.ZoomConnection)
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Zoom[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -2987,6 +1625,7 @@ func (m *Manager) AddMixpanelConnectionFromConfig(connection *config.MixpanelCon
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Mixpanel[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3007,6 +1646,7 @@ func (m *Manager) AddGoogleAnalyticsConnectionFromConfig(connection *config.Goog
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.GoogleAnalytics[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3028,6 +1668,7 @@ func (m *Manager) AddSalesforceConnectionFromConfig(connection *config.Salesforc
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Salesforce[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3047,6 +1688,7 @@ func (m *Manager) AddSQLiteConnectionFromConfig(connection *config.SQLiteConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.SQLite[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3070,6 +1712,7 @@ func (m *Manager) AddOracleConnectionFromConfig(connection *config.OracleConnect
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Oracle[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3091,6 +1734,7 @@ func (m *Manager) AddKinesisConnectionFromConfig(connection *config.KinesisConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Kinesis[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3114,6 +1758,7 @@ func (m *Manager) AddDB2ConnectionFromConfig(connection *config.DB2Connection) e
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.DB2[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3133,6 +1778,7 @@ func (m *Manager) AddPhantombusterConnectionFromConfig(connection *config.Phanto
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Phantombuster[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3152,6 +1798,7 @@ func (m *Manager) AddAttioConnectionFromConfig(connection *config.AttioConnectio
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Attio[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3176,6 +1823,7 @@ func (m *Manager) AddElasticsearchConnectionFromConfig(connection *config.Elasti
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Elasticsearch[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3193,7 +1841,9 @@ func (m *Manager) AddFrankfurterConnectionFromConfig(connection *config.Frankfur
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Frankfurter[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	m.Frankfurter[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 	return nil
 }
 
@@ -3215,6 +1865,7 @@ func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRSer
 		return err
 	}
 	m.EMRSeverless[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -3243,6 +1894,7 @@ func (m *Manager) AddTableauConnectionFromConfig(connection *config.TableauConne
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.Tableau[connection.Name] = client
+	m.availableConnections[connection.Name] = client
 
 	return nil
 }
@@ -3313,6 +1965,7 @@ func processConnections[T config.Named](connections []T, adder func(*T) error, w
 
 func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
 	connectionManager := &Manager{}
+	connectionManager.availableConnections = make(map[string]any)
 
 	var wg conc.WaitGroup
 	var errList []error

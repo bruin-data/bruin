@@ -58,7 +58,7 @@ func TestManager_GetBqConnection(t *testing.T) {
 func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 
 	res, err := m.GetBqConnection("test")
 	require.Error(t, err)
@@ -86,7 +86,7 @@ func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 func TestManager_AddPgConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 
 	res, err := m.GetPgConnection("test")
 	require.Error(t, err)
@@ -114,7 +114,7 @@ func TestManager_AddPgConnectionFromConfig(t *testing.T) {
 func TestManager_AddRedshiftConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 
 	res, err := m.GetPgConnection("test")
 	require.Error(t, err)
@@ -141,7 +141,7 @@ func TestManager_AddRedshiftConnectionFromConfig(t *testing.T) {
 func TestManager_AddMsSQLConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 
 	res, err := m.GetMsConnection("test")
 	require.Error(t, err)
@@ -160,6 +160,7 @@ func TestManager_AddMsSQLConnectionFromConfigConnectionFromConfig(t *testing.T) 
 	require.NoError(t, err)
 
 	res, err = m.GetMsConnection("test")
+
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
@@ -167,9 +168,10 @@ func TestManager_AddMsSQLConnectionFromConfigConnectionFromConfig(t *testing.T) 
 func TestManager_AddMongoConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 
-	res, err := m.GetMongoConnection("test")
+	res, err := m.GetConnection("test")
+
 	require.Error(t, err)
 	assert.Nil(t, res)
 
@@ -185,7 +187,7 @@ func TestManager_AddMongoConnectionFromConfigConnectionFromConfig(t *testing.T) 
 	err = m.AddMongoConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, err = m.GetMongoConnection("test")
+	res, err = m.GetConnection("test")
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
@@ -194,10 +196,11 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 	t.Parallel()
 
 	m := Manager{
-		Mysql: make(map[string]*mysql.Client),
+		availableConnections: make(map[string]any),
+		Mysql:                make(map[string]*mysql.Client),
 	}
 
-	res, err := m.GetMySQLConnection("test")
+	res, err := m.GetConnection("test")
 	require.Error(t, err)
 	assert.Nil(t, res)
 
@@ -211,8 +214,9 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 	}
 
 	m.Mysql[configuration.Name] = new(mysql.Client)
+	m.availableConnections[configuration.Name] = m.Mysql[configuration.Name]
 
-	res, err = m.GetMySQLConnection("test")
+	res, err = m.GetConnection("test")
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
@@ -220,9 +224,9 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 func TestManager_AddNotionConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 
-	res, err := m.GetNotionConnection("test")
+	res, err := m.GetConnection("test")
 	require.Error(t, err)
 	assert.Nil(t, res)
 
@@ -234,7 +238,7 @@ func TestManager_AddNotionConnectionFromConfigConnectionFromConfig(t *testing.T)
 	err = m.AddNotionConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, err = m.GetNotionConnection("test")
+	res, err = m.GetConnection("test")
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
@@ -242,9 +246,9 @@ func TestManager_AddNotionConnectionFromConfigConnectionFromConfig(t *testing.T)
 func TestManager_AddShopiyConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 
-	res, err := m.GetShopifyConnection("test")
+	res, err := m.GetConnection("test")
 	require.Error(t, err)
 	assert.Nil(t, res)
 
@@ -257,7 +261,7 @@ func TestManager_AddShopiyConnectionFromConfigConnectionFromConfig(t *testing.T)
 	err = m.AddShopifyConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, err = m.GetShopifyConnection("test")
+	res, err = m.GetConnection("test")
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
@@ -265,9 +269,9 @@ func TestManager_AddShopiyConnectionFromConfigConnectionFromConfig(t *testing.T)
 func TestManager_AddGorgiasConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 
-	res, err := m.GetGorgiasConnection("test")
+	res, err := m.GetConnection("test")
 	require.Error(t, err)
 	assert.Nil(t, res)
 
@@ -281,7 +285,7 @@ func TestManager_AddGorgiasConnectionFromConfigConnectionFromConfig(t *testing.T
 	err = m.AddGorgiasConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, err = m.GetGorgiasConnection("test")
+	res, err = m.GetConnection("test")
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
@@ -289,9 +293,9 @@ func TestManager_AddGorgiasConnectionFromConfigConnectionFromConfig(t *testing.T
 func TestManager_AddHANAConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
+	m := Manager{availableConnections: make(map[string]any)}
 
-	res, err := m.GetHANAConnection("test")
+	res, err := m.GetConnection("test")
 	require.Error(t, err)
 	assert.Nil(t, res)
 
@@ -307,7 +311,7 @@ func TestManager_AddHANAConnectionFromConfigConnectionFromConfig(t *testing.T) {
 	err = m.AddHANAConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, err = m.GetHANAConnection("test")
+	res, err = m.GetConnection("test")
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
@@ -315,8 +319,8 @@ func TestManager_AddHANAConnectionFromConfigConnectionFromConfig(t *testing.T) {
 func Test_AddEMRServerlessConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{}
-	res, err := m.GetEMRServerlessConnection("test")
+	m := Manager{availableConnections: make(map[string]any)}
+	res, err := m.GetConnection("test")
 	require.Error(t, err)
 	assert.Nil(t, res)
 
@@ -332,7 +336,7 @@ func Test_AddEMRServerlessConnectionFromConfig(t *testing.T) {
 	err = m.AddEMRServerlessConnectionFromConfig(cfg)
 	require.NoError(t, err)
 
-	res, err = m.GetEMRServerlessConnection("test")
+	res, err = m.GetConnection("test")
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
@@ -377,6 +381,20 @@ func TestNewManagerFromConfig(t *testing.T) {
 				"PERSONIO_CLIENT_SECRET": "secret2",
 			},
 			want: &Manager{
+				availableConnections: map[string]any{
+					"key1": personio.NewClient(personio.Config{
+						ClientID:     "id1",
+						ClientSecret: "secret1",
+					}),
+					"key2": personio.NewClient(personio.Config{
+						ClientID:     "val1_id2_val2",
+						ClientSecret: "secret2",
+					}),
+					"key3": personio.NewClient(personio.Config{
+						ClientID:     "",
+						ClientSecret: "",
+					}),
+				},
 				Personio: map[string]*personio.Client{
 					"key1": personio.NewClient(personio.Config{
 						ClientID:     "id1",
