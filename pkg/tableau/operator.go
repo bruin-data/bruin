@@ -38,6 +38,10 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.Wrap(err, "failed to get Tableau connection")
 	}
 
+	if t.Parameters["refresh"] == "" {
+		return nil
+	}
+
 	switch {
 	case t.Type == pipeline.AssetTypeTableauDatasource:
 		return o.handleDatasourceRefresh(ctx, client, t)
@@ -46,9 +50,6 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	case t.Type == pipeline.AssetTypeTableauWorksheet || t.Type == pipeline.AssetTypeTableauDashboard:
 		return nil
 	case t.Type == pipeline.AssetTypeTableau:
-		if t.Parameters["refresh"] == "" || t.Parameters["workbook_id"] == "" {
-			return nil
-		}
 		return o.handleWorkbookRefresh(ctx, client, t)
 
 	default:
