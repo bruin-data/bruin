@@ -54,7 +54,7 @@ environments:
 `
 
 // Helper function to setup test config.
-func setupTestConfig(t *testing.T, configContent string) (afero.Fs, string) {
+func setupTestConfig(t *testing.T, configContent string) (afero.Fs, string) { //nolint:ireturn // Test helper needs to return interface for filesystem abstraction
 	fs := afero.NewMemMapFs()
 	configFile := ".bruin.yml"
 
@@ -73,7 +73,7 @@ type mockConnectionManager struct {
 	connections map[string]interface{}
 }
 
-func (m *mockConnectionManager) GetConnection(name string) (interface{}, error) { //nolint:ireturn // Mock function needs to return interface{} to match actual implementation
+func (m *mockConnectionManager) GetConnection(name string) (interface{}, error) {
 	if conn, exists := m.connections[name]; exists {
 		return conn, nil
 	}
@@ -81,7 +81,7 @@ func (m *mockConnectionManager) GetConnection(name string) (interface{}, error) 
 }
 
 // Mock pingable connection.
-type mockPingableConnection struct {
+type mockPingableConnection struct { //nolint:ireturn
 	name      string
 	shouldErr bool
 }
@@ -637,12 +637,14 @@ func TestConnectionsCommand_ListConnections(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			fs := afero.NewMemMapFs()
-			configFile := tt.configFile
+			var fs afero.Fs
+			var configFile string
 
 			if tt.configContent != "" {
-				err := afero.WriteFile(fs, configFile, []byte(tt.configContent), 0o644)
-				require.NoError(t, err)
+				fs, configFile = setupTestConfig(t, tt.configContent)
+			} else {
+				fs = afero.NewMemMapFs()
+				configFile = tt.configFile
 			}
 
 			// Mock the filesystem operations by creating a config directly
