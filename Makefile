@@ -46,7 +46,7 @@ integration-test-cloud: build
 	@rm integration-tests/cloud-integration-tests/bruin
 	@echo "$(OK_COLOR)==> Running cloud integration tests...$(NO_COLOR)"
 	@cd integration-tests && git init
-	@cd integration-tests/cloud-integration-tests && go test -v .
+	@cd integration-tests/cloud-integration-tests && go test -count=1 -v .
 
 integration-test-light: build
 	@rm -rf integration-tests/duckdb-files  # Clean up the directory if it exists

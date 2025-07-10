@@ -49,7 +49,6 @@ func TestBigQueryIndividualTasks(t *testing.T) {
 	}
 
 	for _, task := range tasks {
-		task := task // capture range variable
 		t.Run(task.Name, func(t *testing.T) {
 			t.Parallel()
 
