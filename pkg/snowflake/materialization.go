@@ -24,6 +24,7 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
+		pipeline.MaterializationStrategySCD2ByColumn:  buildSCD2ByColumnQuery,
 	},
 }
 
@@ -69,6 +70,10 @@ func buildIncrementalQuery(task *pipeline.Asset, query string) (string, error) {
 }
 
 func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error) {
+	if task.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByColumn {
+		return buildSCD2ByColumnfullRefresh(task, query)
+	}
+
 	mat := task.Materialization
 
 	clusterByClause := ""
@@ -189,4 +194,175 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	)
 
 	return ddl, nil
+}
+
+func buildPKConditions(primaryKeys []string, leftAlias, rightAlias string) []string {
+	conditions := make([]string, len(primaryKeys))
+	for i, pk := range primaryKeys {
+		conditions[i] = fmt.Sprintf("%s.%s = %s.%s", leftAlias, pk, rightAlias, pk)
+	}
+	return conditions
+}
+
+func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error) {
+	return buildSCD2ByColumnQueryWithTimestamp(asset, query, "CURRENT_TIMESTAMP()")
+}
+
+func buildSCD2ByColumnQueryWithTimestamp(asset *pipeline.Asset, query, timestampExpr string) (string, error) {
+	query = strings.TrimRight(query, ";")
+	var (
+		primaryKeys  = make([]string, 0, 4)
+		compareConds = make([]string, 0, 12)
+		insertCols   = make([]string, 0, 12)
+		insertValues = make([]string, 0, 12)
+	)
+
+	for _, col := range asset.Columns {
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, col.Name)
+		}
+		switch col.Name {
+		case "_is_current", "_valid_from", "_valid_until":
+			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
+		}
+		insertCols = append(insertCols, col.Name)
+		insertValues = append(insertValues, "source."+col.Name)
+		if !col.PrimaryKey {
+			compareConds = append(compareConds,
+				fmt.Sprintf("target.%[1]s != source.%[1]s", col.Name))
+		}
+	}
+
+	if len(primaryKeys) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column",
+			asset.Materialization.Strategy)
+	}
+
+	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
+	insertValues = append(insertValues, "$current_scd2_ts", "TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')", "TRUE")
+
+	tbl := asset.Name
+
+	// Multi-step SCD2 implementation for Snowflake with consistent timestamp
+	queryStr := fmt.Sprintf(`
+BEGIN TRANSACTION;
+
+-- Capture timestamp once for consistency across all operations
+SET current_scd2_ts = %s;
+
+-- Step 1: Update expired records that are no longer in source
+UPDATE %s AS target
+SET _valid_until = $current_scd2_ts, _is_current = FALSE
+WHERE target._is_current = TRUE
+  AND NOT EXISTS (
+    SELECT 1 FROM (%s) AS source 
+    WHERE %s
+  );
+
+-- Step 2: Update existing records that have changes
+UPDATE %s AS target
+SET _valid_until = $current_scd2_ts, _is_current = FALSE
+WHERE target._is_current = TRUE
+  AND EXISTS (
+    SELECT 1 FROM (%s) AS source
+    WHERE %s AND (%s)
+  );
+
+-- Step 3: Insert new records and new versions of changed records
+INSERT INTO %s (%s)
+SELECT %s
+FROM (%s) AS source
+WHERE NOT EXISTS (
+  SELECT 1 FROM %s AS target 
+  WHERE %s AND target._is_current = TRUE
+)
+OR EXISTS (
+  SELECT 1 FROM %s AS target
+  WHERE %s AND target._is_current = FALSE AND target._valid_until = $current_scd2_ts
+);
+
+COMMIT;`,
+		timestampExpr,
+		tbl,
+		strings.TrimSpace(query),
+		strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND "),
+		tbl,
+		strings.TrimSpace(query),
+		strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND "),
+		strings.Join(compareConds, " OR "),
+		tbl,
+		strings.Join(insertCols, ", "),
+		strings.Join(insertValues, ", "),
+		strings.TrimSpace(query),
+		tbl,
+		strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND "),
+		tbl,
+		strings.Join(buildPKConditions(primaryKeys, "target", "source"), " AND "),
+	)
+
+	return strings.TrimSpace(queryStr), nil
+}
+
+func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, error) {
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) == 0 {
+		return "", errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
+	}
+
+	tbl := asset.Name
+	cluster := strings.Join(primaryKeys, ", ")
+
+	clusterByClause := ""
+	if len(asset.Materialization.ClusterBy) > 0 {
+		clusterByClause = fmt.Sprintf("CLUSTER BY (%s)", strings.Join(asset.Materialization.ClusterBy, ", "))
+	} else {
+		clusterByClause = fmt.Sprintf("CLUSTER BY (_is_current, %s)", cluster)
+	}
+
+	// Build column definitions from asset schema
+	columnDefs := make([]string, 0, len(asset.Columns)+3)
+	// Add SCD2 columns first for this strategy
+	columnDefs = append(columnDefs, "_valid_from TIMESTAMP")
+	for _, col := range asset.Columns {
+		columnDefs = append(columnDefs, fmt.Sprintf("%s %s", col.Name, col.Type))
+	}
+	columnDefs = append(columnDefs, "_valid_until TIMESTAMP")
+	columnDefs = append(columnDefs, "_is_current BOOLEAN")
+
+	// Build column names for INSERT
+	insertColumns := make([]string, 0, len(asset.Columns)+3)
+	selectColumns := make([]string, 0, len(asset.Columns)+3)
+
+	// For column-based SCD2, _valid_from comes first
+	insertColumns = append(insertColumns, "_valid_from")
+	selectColumns = append(selectColumns, "CURRENT_TIMESTAMP()")
+
+	for _, col := range asset.Columns {
+		insertColumns = append(insertColumns, col.Name)
+		selectColumns = append(selectColumns, "src."+col.Name)
+	}
+	insertColumns = append(insertColumns, "_valid_until", "_is_current")
+	selectColumns = append(selectColumns, "TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS')", "TRUE")
+
+	stmt := fmt.Sprintf(
+		`BEGIN TRANSACTION;
+CREATE OR REPLACE TABLE %s %s (
+%s
+);
+INSERT INTO %s (%s)
+SELECT
+  %s
+FROM (
+%s
+) AS src;
+COMMIT;`,
+		tbl,
+		clusterByClause,
+		strings.Join(columnDefs, ",\n"),
+		tbl,
+		strings.Join(insertColumns, ", "),
+		strings.Join(selectColumns, ",\n  "),
+		strings.TrimSpace(query),
+	)
+	return strings.TrimSpace(stmt), nil
 }

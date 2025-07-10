@@ -1,6 +1,7 @@
 package snowflake
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -354,6 +355,274 @@ func TestMaterializer_Render(t *testing.T) {
 				if !assert.Regexp(t, tt.want, render) {
 					t.Logf("\nWant (regex): %s\nGot: %s", tt.want, render)
 				}
+			}
+		})
+	}
+}
+
+func TestBuildSCD2ByColumnQuery(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		asset       *pipeline.Asset
+		query       string
+		want        string
+		wantErr     bool
+		fullRefresh bool
+	}{
+		{
+			name: "scd2_no_primary_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id"},
+					{Name: "event_name"},
+					{Name: "ts", Type: "date"},
+				},
+			},
+			query:   "SELECT id, event_name, ts from source_table",
+			wantErr: true,
+		},
+		{
+			name: "scd2_reserved_column_name_is_current",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "_is_current"},
+				},
+			},
+			query:   "SELECT id, _is_current from source_table",
+			wantErr: true,
+		},
+		{
+			name: "scd2_reserved_column_name_valid_from",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "_valid_from"},
+				},
+			},
+			query:   "SELECT id, _valid_from from source_table",
+			wantErr: true,
+		},
+		{
+			name: "scd2_reserved_column_name_valid_until",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "_valid_until"},
+				},
+			},
+			query:   "SELECT id, _valid_until from source_table",
+			wantErr: true,
+		},
+		{
+			name: "scd2_basic_column_change_detection",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "col1"},
+					{Name: "col2"},
+					{Name: "col3"},
+					{Name: "col4"},
+				},
+			},
+			query: "SELECT id, col1, col2, col3, col4 from source_table",
+			want: "BEGIN TRANSACTION;\n\n" +
+				"-- Capture timestamp once for consistency across all operations\n" +
+				"SET current_scd2_ts = CURRENT_TIMESTAMP();\n\n" +
+				"-- Step 1: Update expired records that are no longer in source\n" +
+				"UPDATE my.asset AS target\n" +
+				"SET _valid_until = $current_scd2_ts, _is_current = FALSE\n" +
+				"WHERE target._is_current = TRUE\n" +
+				"  AND NOT EXISTS (\n" +
+				"    SELECT 1 FROM (SELECT id, col1, col2, col3, col4 from source_table) AS source \n" +
+				"    WHERE target.id = source.id\n" +
+				"  );\n\n" +
+				"-- Step 2: Update existing records that have changes\n" +
+				"UPDATE my.asset AS target\n" +
+				"SET _valid_until = $current_scd2_ts, _is_current = FALSE\n" +
+				"WHERE target._is_current = TRUE\n" +
+				"  AND EXISTS (\n" +
+				"    SELECT 1 FROM (SELECT id, col1, col2, col3, col4 from source_table) AS source\n" +
+				"    WHERE target.id = source.id AND (target.col1 != source.col1 OR target.col2 != source.col2 OR target.col3 != source.col3 OR target.col4 != source.col4)\n" +
+				"  );\n\n" +
+				"-- Step 3: Insert new records and new versions of changed records\n" +
+				"INSERT INTO my.asset (id, col1, col2, col3, col4, _valid_from, _valid_until, _is_current)\n" +
+				"SELECT source.id, source.col1, source.col2, source.col3, source.col4, $current_scd2_ts, TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS'), TRUE\n" +
+				"FROM (SELECT id, col1, col2, col3, col4 from source_table) AS source\n" +
+				"WHERE NOT EXISTS (\n" +
+				"  SELECT 1 FROM my.asset AS target \n" +
+				"  WHERE target.id = source.id AND target._is_current = TRUE\n" +
+				")\n" +
+				"OR EXISTS (\n" +
+				"  SELECT 1 FROM my.asset AS target\n" +
+				"  WHERE target.id = source.id AND target._is_current = FALSE AND target._valid_until = $current_scd2_ts\n" +
+				");\n\n" +
+				"COMMIT;",
+		},
+		{
+			name: "scd2_multiple_primary_keys",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "category", PrimaryKey: true},
+					{Name: "name"},
+					{Name: "price"},
+				},
+			},
+			query: "SELECT id, category, name, price from source_table",
+			want: "BEGIN TRANSACTION;\n\n" +
+				"-- Capture timestamp once for consistency across all operations\n" +
+				"SET current_scd2_ts = CURRENT_TIMESTAMP();\n\n" +
+				"-- Step 1: Update expired records that are no longer in source\n" +
+				"UPDATE my.asset AS target\n" +
+				"SET _valid_until = $current_scd2_ts, _is_current = FALSE\n" +
+				"WHERE target._is_current = TRUE\n" +
+				"  AND NOT EXISTS (\n" +
+				"    SELECT 1 FROM (SELECT id, category, name, price from source_table) AS source \n" +
+				"    WHERE target.id = source.id AND target.category = source.category\n" +
+				"  );\n\n" +
+				"-- Step 2: Update existing records that have changes\n" +
+				"UPDATE my.asset AS target\n" +
+				"SET _valid_until = $current_scd2_ts, _is_current = FALSE\n" +
+				"WHERE target._is_current = TRUE\n" +
+				"  AND EXISTS (\n" +
+				"    SELECT 1 FROM (SELECT id, category, name, price from source_table) AS source\n" +
+				"    WHERE target.id = source.id AND target.category = source.category AND (target.name != source.name OR target.price != source.price)\n" +
+				"  );\n\n" +
+				"-- Step 3: Insert new records and new versions of changed records\n" +
+				"INSERT INTO my.asset (id, category, name, price, _valid_from, _valid_until, _is_current)\n" +
+				"SELECT source.id, source.category, source.name, source.price, $current_scd2_ts, TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS'), TRUE\n" +
+				"FROM (SELECT id, category, name, price from source_table) AS source\n" +
+				"WHERE NOT EXISTS (\n" +
+				"  SELECT 1 FROM my.asset AS target \n" +
+				"  WHERE target.id = source.id AND target.category = source.category AND target._is_current = TRUE\n" +
+				")\n" +
+				"OR EXISTS (\n" +
+				"  SELECT 1 FROM my.asset AS target\n" +
+				"  WHERE target.id = source.id AND target.category = source.category AND target._is_current = FALSE AND target._valid_until = $current_scd2_ts\n" +
+				");\n\n" +
+				"COMMIT;",
+		},
+		{
+			name: "scd2_full_refresh_by_column",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER", PrimaryKey: true},
+					{Name: "name", Type: "VARCHAR"},
+					{Name: "price", Type: "FLOAT"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, name, price from source_table",
+			want: "BEGIN TRANSACTION;\n" +
+				"CREATE OR REPLACE TABLE my.asset CLUSTER BY (_is_current, id) (\n" +
+				"_valid_from TIMESTAMP,\n" +
+				"id INTEGER,\n" +
+				"name VARCHAR,\n" +
+				"price FLOAT,\n" +
+				"_valid_until TIMESTAMP,\n" +
+				"_is_current BOOLEAN\n" +
+				");\n" +
+				"INSERT INTO my.asset (_valid_from, id, name, price, _valid_until, _is_current)\n" +
+				"SELECT\n" +
+				"  CURRENT_TIMESTAMP(),\n" +
+				"  src.id,\n" +
+				"  src.name,\n" +
+				"  src.price,\n" +
+				"  TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS'),\n" +
+				"  TRUE\n" +
+				"FROM (\n" +
+				"SELECT id, name, price from source_table\n" +
+				") AS src;\n" +
+				"COMMIT;",
+		},
+		{
+			name: "scd2_full_refresh_with_custom_clustering",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:      pipeline.MaterializationTypeTable,
+					Strategy:  pipeline.MaterializationStrategySCD2ByColumn,
+					ClusterBy: []string{"category", "id"},
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER", PrimaryKey: true},
+					{Name: "name", Type: "VARCHAR"},
+					{Name: "price", Type: "FLOAT"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, name, price from source_table",
+			want: "BEGIN TRANSACTION;\n" +
+				"CREATE OR REPLACE TABLE my.asset CLUSTER BY (category, id) (\n" +
+				"_valid_from TIMESTAMP,\n" +
+				"id INTEGER,\n" +
+				"name VARCHAR,\n" +
+				"price FLOAT,\n" +
+				"_valid_until TIMESTAMP,\n" +
+				"_is_current BOOLEAN\n" +
+				");\n" +
+				"INSERT INTO my.asset (_valid_from, id, name, price, _valid_until, _is_current)\n" +
+				"SELECT\n" +
+				"  CURRENT_TIMESTAMP(),\n" +
+				"  src.id,\n" +
+				"  src.name,\n" +
+				"  src.price,\n" +
+				"  TO_TIMESTAMP('9999-12-31 23:59:59', 'YYYY-MM-DD HH24:MI:SS'),\n" +
+				"  TRUE\n" +
+				"FROM (\n" +
+				"SELECT id, name, price from source_table\n" +
+				") AS src;\n" +
+				"COMMIT;",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			m := NewMaterializer(tt.fullRefresh)
+			render, err := m.Render(tt.asset, tt.query)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, strings.TrimSpace(tt.want), render)
 			}
 		})
 	}
