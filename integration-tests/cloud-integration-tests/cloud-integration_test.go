@@ -23,6 +23,7 @@ type Environment struct {
 var platformConnectionMap = map[string]string{
 	"bigquery":  "google_cloud_platform",
 	"snowflake": "snowflake",
+	"postgres":  "postgres",
 }
 
 func getAvailablePlatforms(configPath string) (map[string]bool, error) {
@@ -131,5 +132,24 @@ func TestCloudIntegration(t *testing.T) {
 		t.Logf("Snowflake platform is available - running integration tests")
 
 		runTestsInDirectory(t, snowflakeDir, "Snowflake")
+	})
+
+	t.Run("Postgres", func(t *testing.T) {
+		t.Parallel()
+
+		if !availablePlatforms["postgres"] {
+			t.Skip("Skipping Postgres tests - no connection configured")
+			return
+		}
+
+		postgresDir := filepath.Join(currentFolder, "postgres")
+		require.DirExists(t, postgresDir, "Postgres test directory should exist")
+
+		testFile := filepath.Join(postgresDir, "postgres_test.go")
+		require.FileExists(t, testFile, "Postgres test file should exist")
+
+		t.Logf("Postgres platform is available - running integration tests")
+
+		runTestsInDirectory(t, postgresDir, "Postgres")
 	})
 }
