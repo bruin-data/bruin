@@ -3,17 +3,21 @@ package tableau
 import (
 	"context"
 
-	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
 )
 
-type BasicOperator struct {
-	connection config.ConnectionGetter
+type connectionFetcher interface {
+	GetTableauConnectionWithoutDefault(name string) (*Client, error)
+	GetConnection(name string) (interface{}, error)
 }
 
-func NewBasicOperator(conn config.ConnectionGetter) *BasicOperator {
+type BasicOperator struct {
+	connection connectionFetcher
+}
+
+func NewBasicOperator(conn connectionFetcher) *BasicOperator {
 	return &BasicOperator{
 		connection: conn,
 	}
@@ -29,9 +33,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return errors.Wrap(err, "failed to get connection name for asset")
 	}
 
-	client, ok := o.connection.GetConnection(connName).(*Client)
-	if !ok {
-		return errors.Errorf("'%s' either does not exist or is not a tableau connection", connName)
+	client, err := o.connection.GetTableauConnectionWithoutDefault(connName)
+	if err != nil {
+		return errors.Wrap(err, "failed to get Tableau connection")
 	}
 
 	if t.Parameters["refresh"] == "" {

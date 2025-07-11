@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/bruin-data/bruin/pkg/config"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -160,6 +159,10 @@ type uvInstaller interface {
 	EnsureUvInstalled(ctx context.Context) (string, error)
 }
 
+type connectionFetcher interface {
+	GetConnection(name string) (interface{}, error)
+}
+
 type pipelineConnection interface {
 	GetIngestrURI() (string, error)
 }
@@ -167,7 +170,7 @@ type pipelineConnection interface {
 type UvPythonRunner struct {
 	Cmd            cmd
 	UvInstaller    uvInstaller
-	conn           config.ConnectionGetter
+	conn           connectionFetcher
 	binaryFullPath string
 }
 
@@ -328,7 +331,10 @@ func (u *UvPythonRunner) runWithMaterialization(ctx context.Context, execCtx *ex
 		return err
 	}
 
-	destConnection := u.conn.GetConnection(destConnectionName)
+	destConnection, err := u.conn.GetConnection(destConnectionName)
+	if err != nil {
+		return fmt.Errorf("destination connection %s not found", destConnectionName)
+	}
 
 	destConnectionInst, ok := destConnection.(pipelineConnection)
 	if !ok {

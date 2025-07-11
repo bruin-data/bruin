@@ -6,7 +6,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -16,12 +15,12 @@ import (
 )
 
 type QuerySensor struct {
-	connection config.ConnectionGetter
+	connection connectionFetcher
 	extractor  query.QueryExtractor
 	sensorMode string
 }
 
-func NewQuerySensor(conn config.ConnectionGetter, extractor query.QueryExtractor, sensorMode string) *QuerySensor {
+func NewQuerySensor(conn connectionFetcher, extractor query.QueryExtractor, sensorMode string) *QuerySensor {
 	return &QuerySensor{
 		connection: conn,
 		extractor:  extractor,
@@ -52,9 +51,9 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return err
 	}
 
-	conn := o.connection.GetConnection(connName)
-	if conn == nil {
-		return errors.Errorf("'%s' does not exist", connName)
+	conn, err := o.connection.GetConnection(connName)
+	if err != nil {
+		return err
 	}
 
 	trimmedQuery := helpers.TrimToLength(qry[0].Query, 50)

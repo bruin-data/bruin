@@ -93,10 +93,6 @@ type Connections struct {
 	typeNameMap         map[string]string
 }
 
-type ConnectionGetter interface {
-	GetConnection(name string) any
-}
-
 func (c *Connections) ConnectionsSummaryList() map[string]string {
 	if c.typeNameMap == nil {
 		c.buildConnectionKeyMap()

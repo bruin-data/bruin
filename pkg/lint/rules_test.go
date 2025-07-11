@@ -2453,8 +2453,11 @@ type fakeConnectionManager struct {
 	err       error
 }
 
-func (f *fakeConnectionManager) GetConnection(name string) any {
-	return f.validator
+func (f *fakeConnectionManager) GetConnection(name string) (interface{}, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.validator, nil
 }
 
 type testPipeline struct {

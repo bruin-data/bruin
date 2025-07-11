@@ -6,16 +6,8 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/emr_serverless"
-	"github.com/bruin-data/bruin/pkg/gorgias"
-	"github.com/bruin-data/bruin/pkg/hana"
-	"github.com/bruin-data/bruin/pkg/mongo"
-	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/mysql"
-	"github.com/bruin-data/bruin/pkg/notion"
 	"github.com/bruin-data/bruin/pkg/personio"
-	"github.com/bruin-data/bruin/pkg/postgres"
-	"github.com/bruin-data/bruin/pkg/shopify"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,16 +15,12 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
-func TestManager_GetConnection(t *testing.T) {
+func TestManager_GetBqConnection(t *testing.T) {
 	t.Parallel()
 
 	existingDB := new(bigquery.Client)
 	m := Manager{
 		BigQuery: map[string]*bigquery.Client{
-			"another":  new(bigquery.Client),
-			"existing": existingDB,
-		},
-		availableConnections: map[string]any{
 			"another":  new(bigquery.Client),
 			"existing": existingDB,
 		},
@@ -42,32 +30,27 @@ func TestManager_GetConnection(t *testing.T) {
 		name           string
 		connectionName string
 		want           bigquery.DB
-		wantErr        bool
+		wantErr        assert.ErrorAssertionFunc
 	}{
 		{
 			name:           "should return error when no connections are found",
 			connectionName: "non-existing",
-			wantErr:        true,
+			wantErr:        assert.Error,
 		},
 		{
 			name:           "should find the correct connection",
 			connectionName: "existing",
 			want:           existingDB,
-			wantErr:        false,
+			wantErr:        assert.NoError,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, ok := m.GetConnection(tt.connectionName).(bigquery.DB)
-			if tt.wantErr {
-				assert.False(t, ok)
-				assert.Nil(t, got)
-			} else {
-				assert.True(t, ok)
-				assert.NotNil(t, got)
-				assert.Equal(t, tt.want, got)
-			}
+
+			got, err := m.GetBqConnection(tt.connectionName)
+			tt.wantErr(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -77,7 +60,8 @@ func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res := m.GetConnection("test")
+	res, err := m.GetBqConnection("test")
+	require.Error(t, err)
 	assert.Nil(t, res)
 
 	connection := &config.GoogleCloudPlatformConnection{
@@ -91,11 +75,11 @@ func TestManager_AddBqConnectionFromConfig(t *testing.T) {
 		}),
 	})
 
-	err := m.AddBqConnectionFromConfig(connection)
+	err = m.AddBqConnectionFromConfig(connection)
 	require.Error(t, err)
 
-	res, ok := m.GetConnection("test").(bigquery.DB)
-	assert.False(t, ok)
+	res, err = m.GetBqConnection("test")
+	require.Error(t, err)
 	assert.Nil(t, res)
 }
 
@@ -104,7 +88,8 @@ func TestManager_AddPgConnectionFromConfig(t *testing.T) {
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res := m.GetConnection("test")
+	res, err := m.GetPgConnection("test")
+	require.Error(t, err)
 	assert.Nil(t, res)
 
 	configuration := &config.PostgresConnection{
@@ -118,11 +103,11 @@ func TestManager_AddPgConnectionFromConfig(t *testing.T) {
 		PoolMaxConns: 10,
 	}
 
-	err := m.AddPgConnectionFromConfig(configuration)
+	err = m.AddPgConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, ok := m.GetConnection("test").(postgres.PgClient)
-	assert.True(t, ok)
+	res, err = m.GetPgConnection("test")
+	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
 
@@ -131,8 +116,8 @@ func TestManager_AddRedshiftConnectionFromConfig(t *testing.T) {
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res, ok := m.GetConnection("test").(postgres.PgClient)
-	assert.False(t, ok)
+	res, err := m.GetPgConnection("test")
+	require.Error(t, err)
 	assert.Nil(t, res)
 
 	configuration := &config.RedshiftConnection{
@@ -145,11 +130,11 @@ func TestManager_AddRedshiftConnectionFromConfig(t *testing.T) {
 		SslMode:  "disable",
 	}
 
-	err := m.AddRedshiftConnectionFromConfig(configuration)
+	err = m.AddRedshiftConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, ok = m.GetConnection("test").(postgres.PgClient)
-	assert.True(t, ok)
+	res, err = m.GetPgConnection("test")
+	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
 
@@ -158,7 +143,8 @@ func TestManager_AddMsSQLConnectionFromConfigConnectionFromConfig(t *testing.T) 
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res := m.GetConnection("test")
+	res, err := m.GetMsConnection("test")
+	require.Error(t, err)
 	assert.Nil(t, res)
 
 	configuration := &config.MsSQLConnection{
@@ -170,12 +156,12 @@ func TestManager_AddMsSQLConnectionFromConfigConnectionFromConfig(t *testing.T) 
 		Port:     15432,
 	}
 
-	err := m.AddMsSQLConnectionFromConfig(configuration)
+	err = m.AddMsSQLConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, ok := m.GetConnection("test").(mssql.MsClient)
+	res, err = m.GetMsConnection("test")
 
-	assert.True(t, ok)
+	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
 
@@ -184,8 +170,9 @@ func TestManager_AddMongoConnectionFromConfigConnectionFromConfig(t *testing.T) 
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res := m.GetConnection("test")
+	res, err := m.GetConnection("test")
 
+	require.Error(t, err)
 	assert.Nil(t, res)
 
 	configuration := &config.MongoConnection{
@@ -197,11 +184,11 @@ func TestManager_AddMongoConnectionFromConfigConnectionFromConfig(t *testing.T) 
 		Port:     15432,
 	}
 
-	err := m.AddMongoConnectionFromConfig(configuration)
+	err = m.AddMongoConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, ok := m.GetConnection("test").(mongo.MongoConnection)
-	assert.True(t, ok)
+	res, err = m.GetConnection("test")
+	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
 
@@ -213,7 +200,8 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 		Mysql:                make(map[string]*mysql.Client),
 	}
 
-	res := m.GetConnection("test")
+	res, err := m.GetConnection("test")
+	require.Error(t, err)
 	assert.Nil(t, res)
 
 	configuration := &config.MySQLConnection{
@@ -228,8 +216,8 @@ func TestManager_AddMySqlConnectionFromConfigConnectionFromConfig(t *testing.T) 
 	m.Mysql[configuration.Name] = new(mysql.Client)
 	m.availableConnections[configuration.Name] = m.Mysql[configuration.Name]
 
-	res, ok := m.GetConnection("test").(mysql.DB)
-	assert.True(t, ok)
+	res, err = m.GetConnection("test")
+	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
 
@@ -238,7 +226,8 @@ func TestManager_AddNotionConnectionFromConfigConnectionFromConfig(t *testing.T)
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res := m.GetConnection("test")
+	res, err := m.GetConnection("test")
+	require.Error(t, err)
 	assert.Nil(t, res)
 
 	configuration := &config.NotionConnection{
@@ -246,11 +235,11 @@ func TestManager_AddNotionConnectionFromConfigConnectionFromConfig(t *testing.T)
 		APIKey: "xXXXXxxxxxYYY	",
 	}
 
-	err := m.AddNotionConnectionFromConfig(configuration)
+	err = m.AddNotionConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, ok := m.GetConnection("test").(*notion.Client)
-	assert.True(t, ok)
+	res, err = m.GetConnection("test")
+	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
 
@@ -259,7 +248,8 @@ func TestManager_AddShopiyConnectionFromConfigConnectionFromConfig(t *testing.T)
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res := m.GetConnection("test")
+	res, err := m.GetConnection("test")
+	require.Error(t, err)
 	assert.Nil(t, res)
 
 	configuration := &config.ShopifyConnection{
@@ -268,11 +258,11 @@ func TestManager_AddShopiyConnectionFromConfigConnectionFromConfig(t *testing.T)
 		URL:    "testxxx",
 	}
 
-	err := m.AddShopifyConnectionFromConfig(configuration)
+	err = m.AddShopifyConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, ok := m.GetConnection("test").(*shopify.Client)
-	assert.True(t, ok)
+	res, err = m.GetConnection("test")
+	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
 
@@ -281,7 +271,8 @@ func TestManager_AddGorgiasConnectionFromConfigConnectionFromConfig(t *testing.T
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res := m.GetConnection("test")
+	res, err := m.GetConnection("test")
+	require.Error(t, err)
 	assert.Nil(t, res)
 
 	configuration := &config.GorgiasConnection{
@@ -291,11 +282,11 @@ func TestManager_AddGorgiasConnectionFromConfigConnectionFromConfig(t *testing.T
 		Email:  "email",
 	}
 
-	err := m.AddGorgiasConnectionFromConfig(configuration)
+	err = m.AddGorgiasConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, ok := m.GetConnection("test").(*gorgias.Client)
-	assert.True(t, ok)
+	res, err = m.GetConnection("test")
+	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
 
@@ -304,7 +295,8 @@ func TestManager_AddHANAConnectionFromConfigConnectionFromConfig(t *testing.T) {
 
 	m := Manager{availableConnections: make(map[string]any)}
 
-	res := m.GetConnection("test")
+	res, err := m.GetConnection("test")
+	require.Error(t, err)
 	assert.Nil(t, res)
 
 	configuration := &config.HANAConnection{
@@ -316,11 +308,11 @@ func TestManager_AddHANAConnectionFromConfigConnectionFromConfig(t *testing.T) {
 		Database: "db",
 	}
 
-	err := m.AddHANAConnectionFromConfig(configuration)
+	err = m.AddHANAConnectionFromConfig(configuration)
 	require.NoError(t, err)
 
-	res, ok := m.GetConnection("test").(*hana.Client)
-	assert.True(t, ok)
+	res, err = m.GetConnection("test")
+	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
 
@@ -328,7 +320,8 @@ func Test_AddEMRServerlessConnectionFromConfig(t *testing.T) {
 	t.Parallel()
 
 	m := Manager{availableConnections: make(map[string]any)}
-	res := m.GetConnection("test")
+	res, err := m.GetConnection("test")
+	require.Error(t, err)
 	assert.Nil(t, res)
 
 	cfg := &config.EMRServerlessConnection{
@@ -340,11 +333,11 @@ func Test_AddEMRServerlessConnectionFromConfig(t *testing.T) {
 		Region:        "us-east-1",
 	}
 
-	err := m.AddEMRServerlessConnectionFromConfig(cfg)
+	err = m.AddEMRServerlessConnectionFromConfig(cfg)
 	require.NoError(t, err)
 
-	res, ok := m.GetConnection("test").(*emr_serverless.Client)
-	assert.True(t, ok)
+	res, err = m.GetConnection("test")
+	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
 
@@ -440,9 +433,6 @@ func TestManager_GetSfConnection(t *testing.T) {
 		Snowflake: map[string]*snowflake.DB{
 			"existing": {},
 		},
-		availableConnections: map[string]any{
-			"existing": &snowflake.DB{},
-		},
 	}
 
 	tests := []struct {
@@ -466,12 +456,12 @@ func TestManager_GetSfConnection(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, ok := m.GetConnection(tt.connectionName).(snowflake.SfClient)
+			got, err := m.GetSfConnection(tt.connectionName)
 			if tt.wantErr {
-				assert.False(t, ok)
+				require.Error(t, err)
 				assert.Nil(t, got)
 			} else {
-				assert.True(t, ok)
+				require.NoError(t, err)
 				assert.NotNil(t, got)
 			}
 		})

@@ -7,7 +7,6 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/athena"
-	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 )
@@ -24,7 +23,7 @@ type builder[T any] func(conn *connectionRemapper) T
 
 type ColumnCheckOperator struct {
 	checks map[string]builder[CheckRunner]
-	conn   config.ConnectionGetter
+	conn   connectionFetcher
 }
 
 func (o *ColumnCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error {
@@ -42,7 +41,7 @@ func (o *ColumnCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance
 	return executor(conn).Check(ctx, test)
 }
 
-func NewColumnCheckOperator(conn config.ConnectionGetter) *ColumnCheckOperator {
+func NewColumnCheckOperator(conn connectionFetcher) *ColumnCheckOperator {
 	return &ColumnCheckOperator{
 		conn: conn,
 		checks: map[string]builder[CheckRunner]{
@@ -58,7 +57,7 @@ func NewColumnCheckOperator(conn config.ConnectionGetter) *ColumnCheckOperator {
 }
 
 type CustomCheckOperator struct {
-	conn    config.ConnectionGetter
+	conn    connectionFetcher
 	builder builder[CustomCheckRunner]
 }
 
@@ -71,7 +70,7 @@ func (o *CustomCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance
 	return o.builder(conn).Check(ctx, instance)
 }
 
-func NewCustomCheckOperator(conn config.ConnectionGetter, renderer jinja.RendererInterface) *CustomCheckOperator {
+func NewCustomCheckOperator(conn connectionFetcher, renderer jinja.RendererInterface) *CustomCheckOperator {
 	return &CustomCheckOperator{
 		conn: conn,
 		builder: func(c *connectionRemapper) CustomCheckRunner {
@@ -81,21 +80,21 @@ func NewCustomCheckOperator(conn config.ConnectionGetter, renderer jinja.Rendere
 }
 
 type connectionRemapper struct {
-	connGetter config.ConnectionGetter
-	ti         scheduler.TaskInstance
+	connectionFetcher
+	ti scheduler.TaskInstance
 }
 
-func (cr *connectionRemapper) GetConnection(string) any {
+func (cr *connectionRemapper) GetConnection(string) (interface{}, error) {
 	name := cmp.Or(
 		cr.ti.GetAsset().Parameters["athena_connection"],
 		cr.ti.GetPipeline().DefaultConnections["athena"],
 	)
-	return cr.connGetter.GetConnection(name)
+	return cr.connectionFetcher.GetAthenaConnection(name)
 }
 
-func newConnectionRemapper(conn config.ConnectionGetter, ti scheduler.TaskInstance) *connectionRemapper {
+func newConnectionRemapper(conn connectionFetcher, ti scheduler.TaskInstance) *connectionRemapper {
 	return &connectionRemapper{
-		connGetter: conn,
-		ti:         ti,
+		connectionFetcher: conn,
+		ti:                ti,
 	}
 }

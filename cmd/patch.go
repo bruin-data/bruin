@@ -63,7 +63,9 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager inte
 
 	//
 	if manager != nil {
-		managerInterface, ok := manager.(config.ConnectionGetter)
+		managerInterface, ok := manager.(interface {
+			GetConnection(name string) (interface{}, error)
+		})
 		if !ok {
 			return fillStatusFailed, errors.New("manager does not implement GetConnection")
 		}
@@ -73,9 +75,9 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager inte
 			return fillStatusFailed, err
 		}
 
-		conn = managerInterface.GetConnection(connName)
-		if conn == nil {
-			return fillStatusFailed, fmt.Errorf("failed to get connection for asset '%s'", pp.Asset.Name)
+		conn, err = managerInterface.GetConnection(connName)
+		if err != nil {
+			return fillStatusFailed, fmt.Errorf("failed to get connection for asset '%s': %w", pp.Asset.Name, err)
 		}
 	} else {
 		_, conn, err = getConnectionFromPipelineInfo(pp, environment)

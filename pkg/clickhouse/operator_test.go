@@ -202,7 +202,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			extractor := new(mockExtractor)
 			mat := new(mockMaterializer)
 			conn := new(mockConnectionFetcher)
-			conn.On("GetConnection", mock.Anything).Return(client)
+			conn.On("GetClickHouseConnection", mock.Anything).Return(client, nil)
 
 			if tt.setup != nil {
 				tt.setup(&fields{

@@ -7,14 +7,17 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
-	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
 )
 
+type selectorFetcher interface {
+	GetConnection(name string) (interface{}, error)
+}
+
 type AcceptedValuesCheck struct {
-	conn config.ConnectionGetter
+	conn selectorFetcher
 }
 
 func (c *AcceptedValuesCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
@@ -49,7 +52,7 @@ func (c *AcceptedValuesCheck) Check(ctx context.Context, ti *scheduler.ColumnChe
 }
 
 type PatternCheck struct {
-	conn config.ConnectionGetter
+	conn connectionFetcher
 }
 
 func (c *PatternCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstance) error {
@@ -68,7 +71,7 @@ func (c *PatternCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInsta
 	}).Check(ctx, ti)
 }
 
-func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnCheckOperator {
+func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOperator {
 	return ansisql.NewColumnCheckOperator(map[string]ansisql.CheckRunner{
 		"not_null":        ansisql.NewNotNullCheck(manager),
 		"unique":          ansisql.NewUniqueCheck(manager),

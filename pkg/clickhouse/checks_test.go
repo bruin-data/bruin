@@ -50,10 +50,24 @@ type mockConnectionFetcher struct {
 	mock.Mock
 }
 
-func (m *mockConnectionFetcher) GetConnection(name string) any {
+func (m *mockConnectionFetcher) GetConnection(name string) (interface{}, error) {
 	args := m.Called(name)
 	get := args.Get(0)
-	return get
+	if get == nil {
+		return nil, args.Error(1)
+	}
+
+	return get, args.Error(1)
+}
+
+func (m *mockConnectionFetcher) GetClickHouseConnection(name string) (ClickHouseClient, error) {
+	args := m.Called(name)
+	get := args.Get(0)
+	if get == nil {
+		return nil, args.Error(1)
+	}
+
+	return get.(ClickHouseClient), args.Error(1)
 }
 
 func TestAcceptedValuesCheck_Check(t *testing.T) {
