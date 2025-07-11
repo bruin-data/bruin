@@ -11,20 +11,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/bruin-data/bruin/pkg/athena"
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/env"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 )
 
-type connectionFetcher interface {
-	GetAthenaConnection(name string) (athena.Client, error)
-	GetEMRServerlessConnection(name string) (*Client, error)
-}
-
 type BasicOperator struct {
-	connection connectionFetcher
+	connection config.ConnectionGetter
 	env        map[string]string
 }
 
@@ -37,16 +32,16 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	if err != nil {
 		return fmt.Errorf("error looking up connection name: %w", err)
 	}
-	conn, err := op.connection.GetEMRServerlessConnection(connID)
-	if err != nil {
-		return fmt.Errorf("error fetching connection: %w", err)
+	conn, ok := op.connection.GetConnection(connID).(Client)
+	if !ok {
+		return fmt.Errorf("'%s' either does not exist or is not a EMR Serverless connection", connID)
 	}
 
 	if asset.Type == pipeline.AssetTypeEMRServerlessPyspark && conn.Workspace == "" {
 		return fmt.Errorf("connection %q is missing field: workspace", connID)
 	}
 
-	params := parseParams(conn, asset.Parameters)
+	params := parseParams(&conn, asset.Parameters)
 	cfg, err := awsCfg.LoadDefaultConfig(
 		ctx,
 		awsCfg.WithRegion(conn.Region),
@@ -84,7 +79,7 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	return job.Run(ctx)
 }
 
-func NewBasicOperator(conn connectionFetcher, env map[string]string) (*BasicOperator, error) {
+func NewBasicOperator(conn config.ConnectionGetter, env map[string]string) (*BasicOperator, error) {
 	return &BasicOperator{
 		connection: conn,
 		env:        env,

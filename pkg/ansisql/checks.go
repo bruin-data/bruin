@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -11,23 +12,19 @@ import (
 	"github.com/pkg/errors"
 )
 
-type connectionFetcher interface {
-	GetConnection(name string) (interface{}, error)
-}
-
 type selector interface {
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 }
 
 type CountableQueryCheck struct {
-	conn                connectionFetcher
+	conn                config.ConnectionGetter
 	expectedQueryResult int64
 	queryInstance       *query.Query
 	checkName           string
 	customError         func(count int64) error
 }
 
-func NewCountableQueryCheck(conn connectionFetcher, expectedQueryResult int64, queryInstance *query.Query, checkName string, customError func(count int64) error) *CountableQueryCheck {
+func NewCountableQueryCheck(conn config.ConnectionGetter, expectedQueryResult int64, queryInstance *query.Query, checkName string, customError func(count int64) error) *CountableQueryCheck {
 	return &CountableQueryCheck{
 		conn:                conn,
 		expectedQueryResult: expectedQueryResult,
@@ -56,9 +53,9 @@ func (c *CountableQueryCheck) CustomCheck(ctx context.Context, ti *scheduler.Cus
 }
 
 func (c *CountableQueryCheck) check(ctx context.Context, connectionName string) error {
-	q, err := c.conn.GetConnection(connectionName)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get connection '%s' for '%s' check", connectionName, c.checkName)
+	q := c.conn.GetConnection(connectionName)
+	if q == nil {
+		return errors.Errorf("failed to get connection '%s' for '%s' check", connectionName, c.checkName)
 	}
 
 	s, ok := q.(selector)
@@ -84,10 +81,10 @@ func (c *CountableQueryCheck) check(ctx context.Context, connectionName string) 
 }
 
 type NotNullCheck struct {
-	conn connectionFetcher
+	conn config.ConnectionGetter
 }
 
-func NewNotNullCheck(conn connectionFetcher) *NotNullCheck {
+func NewNotNullCheck(conn config.ConnectionGetter) *NotNullCheck {
 	return &NotNullCheck{conn: conn}
 }
 
@@ -106,10 +103,10 @@ func (c *NotNullCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInsta
 }
 
 type UniqueCheck struct {
-	conn connectionFetcher
+	conn config.ConnectionGetter
 }
 
-func NewUniqueCheck(conn connectionFetcher) *UniqueCheck {
+func NewUniqueCheck(conn config.ConnectionGetter) *UniqueCheck {
 	return &UniqueCheck{conn: conn}
 }
 
@@ -126,10 +123,10 @@ func (c *UniqueCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInstan
 }
 
 type PositiveCheck struct {
-	conn connectionFetcher
+	conn config.ConnectionGetter
 }
 
-func NewPositiveCheck(conn connectionFetcher) *PositiveCheck {
+func NewPositiveCheck(conn config.ConnectionGetter) *PositiveCheck {
 	return &PositiveCheck{conn: conn}
 }
 
@@ -146,10 +143,10 @@ func (c *PositiveCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInst
 }
 
 type NonNegativeCheck struct {
-	conn connectionFetcher
+	conn config.ConnectionGetter
 }
 
-func NewNonNegativeCheck(conn connectionFetcher) *NonNegativeCheck {
+func NewNonNegativeCheck(conn config.ConnectionGetter) *NonNegativeCheck {
 	return &NonNegativeCheck{conn: conn}
 }
 
@@ -166,10 +163,10 @@ func (c *NonNegativeCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckI
 }
 
 type NegativeCheck struct {
-	conn connectionFetcher
+	conn config.ConnectionGetter
 }
 
-func NewNegativeCheck(conn connectionFetcher) *NegativeCheck {
+func NewNegativeCheck(conn config.ConnectionGetter) *NegativeCheck {
 	return &NegativeCheck{conn: conn}
 }
 
@@ -186,11 +183,11 @@ func (c *NegativeCheck) Check(ctx context.Context, ti *scheduler.ColumnCheckInst
 }
 
 type CustomCheck struct {
-	conn     connectionFetcher
+	conn     config.ConnectionGetter
 	renderer jinja.RendererInterface
 }
 
-func NewCustomCheck(conn connectionFetcher, renderer jinja.RendererInterface) *CustomCheck {
+func NewCustomCheck(conn config.ConnectionGetter, renderer jinja.RendererInterface) *CustomCheck {
 	return &CustomCheck{conn: conn, renderer: renderer}
 }
 
@@ -252,7 +249,7 @@ type CustomCheckOperator struct {
 	checkRunner CustomCheckRunner
 }
 
-func NewCustomCheckOperator(manager connectionFetcher, r jinja.RendererInterface) *CustomCheckOperator {
+func NewCustomCheckOperator(manager config.ConnectionGetter, r jinja.RendererInterface) *CustomCheckOperator {
 	return &CustomCheckOperator{
 		checkRunner: &CustomCheck{conn: manager, renderer: r},
 	}

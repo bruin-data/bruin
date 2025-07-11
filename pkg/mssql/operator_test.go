@@ -198,7 +198,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			extractor := new(mockExtractor)
 			mat := new(mockMaterializer)
 			conn := new(mockConnectionFetcher)
-			conn.On("GetMsConnection", "mssql-default").Return(client, nil)
+			conn.On("GetConnection", "mssql-default").Return(client)
 
 			if tt.setup != nil {
 				tt.setup(&fields{

@@ -206,7 +206,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			extractor := new(mockExtractor)
 			mat := new(mockMaterializer)
 			conn := new(mockConnectionFetcher)
-			conn.On("GetPgConnection", mock.Anything).Return(client, nil)
+			conn.On("GetConnection", mock.Anything).Return(client)
 
 			if tt.setup != nil {
 				tt.setup(&fields{

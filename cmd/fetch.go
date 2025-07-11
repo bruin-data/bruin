@@ -360,9 +360,9 @@ func getConnectionFromConfig(env string, connectionName string, fs afero.Fs, con
 		return nil, errors.Wrap(errs[0], "failed to create connection manager")
 	}
 
-	conn, err := manager.GetConnection(connectionName)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get connection")
+	conn := manager.GetConnection(connectionName)
+	if conn == nil {
+		return nil, errors.Errorf("failed to get connection '%s'", connectionName)
 	}
 
 	return conn, nil
@@ -401,9 +401,9 @@ func getConnectionFromPipelineInfo(pipelineInfo *ppInfo, env string) (string, in
 		return "", nil, errors.Wrap(err, "failed to get connection")
 	}
 
-	conn, err := manager.GetConnection(connName)
-	if err != nil {
-		return "", nil, errors.Wrap(err, fmt.Sprintf("failed to get connection '%s'", connName))
+	conn := manager.GetConnection(connName)
+	if conn == nil {
+		return "", nil, errors.Errorf("failed to get connection '%s'", connName)
 	}
 
 	return connName, conn, nil

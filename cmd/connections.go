@@ -441,9 +441,9 @@ func PingConnection() *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			conn, err := manager.GetConnection(name)
-			if err != nil {
-				printErrorForOutput(output, errors2.Wrap(err, fmt.Sprintf("failed to get connection '%s'", name)))
+			conn := manager.GetConnection(name)
+			if conn == nil {
+				printErrorForOutput(output, errors2.Errorf("failed to get connection '%s'", name))
 				return cli.Exit("", 1)
 			}
 

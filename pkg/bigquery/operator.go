@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -21,18 +22,13 @@ type materializer interface {
 	LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error
 }
 
-type connectionFetcher interface {
-	GetBqConnection(name string) (DB, error)
-	GetConnection(name string) (interface{}, error)
-}
-
 type BasicOperator struct {
-	connection   connectionFetcher
+	connection   config.ConnectionGetter
 	extractor    query.QueryExtractor
 	materializer materializer
 }
 
-func NewBasicOperator(conn connectionFetcher, extractor query.QueryExtractor, materializer materializer) *BasicOperator {
+func NewBasicOperator(conn config.ConnectionGetter, extractor query.QueryExtractor, materializer materializer) *BasicOperator {
 	return &BasicOperator{
 		connection:   conn,
 		extractor:    extractor,
@@ -85,9 +81,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, err := o.connection.GetBqConnection(connName)
-	if err != nil {
-		return err
+	conn, ok := o.connection.GetConnection(connName).(DB)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", connName)
 	}
 
 	if t.Materialization.Type != pipeline.MaterializationTypeNone {
@@ -114,7 +110,7 @@ type ColumnCheckOperator struct {
 	checkRunners map[string]checkRunner
 }
 
-func NewColumnCheckOperator(manager connectionFetcher) (*ColumnCheckOperator, error) {
+func NewColumnCheckOperator(manager config.ConnectionGetter) (*ColumnCheckOperator, error) {
 	return &ColumnCheckOperator{
 		checkRunners: map[string]checkRunner{
 			"not_null":        ansisql.NewNotNullCheck(manager),
@@ -143,10 +139,10 @@ func (o ColumnCheckOperator) Run(ctx context.Context, ti scheduler.TaskInstance)
 }
 
 type MetadataPushOperator struct {
-	connection connectionFetcher
+	connection config.ConnectionGetter
 }
 
-func NewMetadataPushOperator(conn connectionFetcher) *MetadataPushOperator {
+func NewMetadataPushOperator(conn config.ConnectionGetter) *MetadataPushOperator {
 	return &MetadataPushOperator{
 		connection: conn,
 	}
@@ -158,9 +154,9 @@ func (o *MetadataPushOperator) Run(ctx context.Context, ti scheduler.TaskInstanc
 		return err
 	}
 
-	client, err := o.connection.GetBqConnection(conn)
-	if err != nil {
-		return err
+	client, ok := o.connection.GetConnection(conn).(DB)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", conn)
 	}
 
 	writer := ctx.Value(executor.KeyPrinter).(io.Writer)
@@ -183,12 +179,12 @@ func (o *MetadataPushOperator) Run(ctx context.Context, ti scheduler.TaskInstanc
 }
 
 type QuerySensor struct {
-	connection connectionFetcher
+	connection config.ConnectionGetter
 	extractor  query.QueryExtractor
 	sensorMode string
 }
 
-func NewQuerySensor(conn connectionFetcher, extractor query.QueryExtractor, sensorMode string) *QuerySensor {
+func NewQuerySensor(conn config.ConnectionGetter, extractor query.QueryExtractor, sensorMode string) *QuerySensor {
 	return &QuerySensor{
 		connection: conn,
 		extractor:  extractor,
@@ -219,9 +215,9 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return err
 	}
 
-	conn, err := o.connection.GetBqConnection(connName)
-	if err != nil {
-		return err
+	conn, ok := o.connection.GetConnection(connName).(DB)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", connName)
 	}
 
 	trimmedQuery := helpers.TrimToLength(qry[0].Query, 50)
@@ -262,12 +258,12 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 }
 
 type TableSensor struct {
-	connection connectionFetcher
+	connection config.ConnectionGetter
 	sensorMode string
 	extractor  query.QueryExtractor
 }
 
-func NewTableSensor(conn connectionFetcher, sensorMode string, extractor query.QueryExtractor) *TableSensor {
+func NewTableSensor(conn config.ConnectionGetter, sensorMode string, extractor query.QueryExtractor) *TableSensor {
 	return &TableSensor{
 		connection: conn,
 		sensorMode: sensorMode,
@@ -293,9 +289,9 @@ func (ts *TableSensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, err := ts.connection.GetBqConnection(connName)
-	if err != nil {
-		return err
+	conn, ok := ts.connection.GetConnection(connName).(DB)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a bigquery connection", connName)
 	}
 
 	qq, err := conn.BuildTableExistsQuery(tableName)

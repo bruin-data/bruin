@@ -147,14 +147,14 @@ func DataDiffCmd() *cli.Command {
 			}
 
 			// Get the connection
-			conn1, err := manager.GetConnection(conn1Name)
-			if err != nil {
-				return fmt.Errorf("failed to get connection '%s': %w", conn1Name, err)
+			conn1 := manager.GetConnection(conn1Name)
+			if conn1 == nil {
+				return fmt.Errorf("failed to get connection '%s'", conn1Name)
 			}
 
-			conn2, err := manager.GetConnection(conn2Name)
-			if err != nil {
-				return fmt.Errorf("failed to get connection '%s': %w", conn2Name, err)
+			conn2 := manager.GetConnection(conn2Name)
+			if conn2 == nil {
+				return fmt.Errorf("failed to get connection '%s'", conn2Name)
 			}
 
 			ctx := c.Context

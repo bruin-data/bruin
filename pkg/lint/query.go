@@ -16,7 +16,7 @@ type queryValidator interface {
 }
 
 type connectionManager interface {
-	GetConnection(conn string) (interface{}, error)
+	GetConnection(conn string) any
 }
 
 type queryExtractor interface {
@@ -119,8 +119,8 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 
 	q.Logger.Debugw("The connection will be used for asset", "asset", asset.Name, "connection", assetConnectionName)
 
-	validator, err := q.Connections.GetConnection(assetConnectionName)
-	if err != nil {
+	validator := q.Connections.GetConnection(assetConnectionName)
+	if validator == nil {
 		q.Logger.Debugf("failed to get connection instance for asset '%s'", asset.Name)
 		return issues, nil //nolint:nilerr
 	}
@@ -237,8 +237,8 @@ func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipel
 			}
 			q.Logger.Debugw("The connection will be used for asset", "asset", task.Name, "connection", assetConnectionName)
 
-			validator, err := q.Connections.GetConnection(assetConnectionName)
-			if err != nil {
+			validator := q.Connections.GetConnection(assetConnectionName)
+			if validator == nil {
 				mu.Lock()
 				issues = append(issues, &Issue{
 					Task:        task,

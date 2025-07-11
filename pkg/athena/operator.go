@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -26,18 +27,13 @@ type Client interface {
 	SelectWithSchema(ctx context.Context, queryObject *query.Query) (*query.QueryResult, error)
 }
 
-type connectionFetcher interface {
-	GetAthenaConnectionWithoutDefault(name string) (Client, error)
-	GetConnection(name string) (interface{}, error)
-}
-
 type BasicOperator struct {
-	connection   connectionFetcher
+	connection   config.ConnectionGetter
 	extractor    query.QueryExtractor
 	materializer materializer
 }
 
-func NewBasicOperator(conn connectionFetcher, extractor query.QueryExtractor, materializer materializer) *BasicOperator {
+func NewBasicOperator(conn config.ConnectionGetter, extractor query.QueryExtractor, materializer materializer) *BasicOperator {
 	return &BasicOperator{
 		connection:   conn,
 		extractor:    extractor,
@@ -73,9 +69,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, err := o.connection.GetAthenaConnectionWithoutDefault(connName)
-	if err != nil {
-		return err
+	conn, ok := o.connection.GetConnection(connName).(Client)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a athena connection", connName)
 	}
 
 	q := queries[0]
@@ -102,7 +98,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	return nil
 }
 
-func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOperator {
+func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnCheckOperator {
 	return ansisql.NewColumnCheckOperator(map[string]ansisql.CheckRunner{
 		"not_null":        ansisql.NewNotNullCheck(manager),
 		"unique":          ansisql.NewUniqueCheck(manager),
@@ -119,12 +115,12 @@ type renderer interface {
 }
 
 type QuerySensor struct {
-	connection     connectionFetcher
+	connection     config.ConnectionGetter
 	renderer       renderer
 	secondsToSleep int64
 }
 
-func NewQuerySensor(conn connectionFetcher, renderer renderer, secondsToSleep int64) *QuerySensor {
+func NewQuerySensor(conn config.ConnectionGetter, renderer renderer, secondsToSleep int64) *QuerySensor {
 	return &QuerySensor{
 		connection:     conn,
 		renderer:       renderer,
@@ -152,9 +148,9 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 		return err
 	}
 
-	conn, err := o.connection.GetAthenaConnectionWithoutDefault(connName)
-	if err != nil {
-		return err
+	conn, ok := o.connection.GetConnection(connName).(Client)
+	if !ok {
+		return errors.Errorf("'%s' either does not exist or is not a athena connection", connName)
 	}
 
 	for {

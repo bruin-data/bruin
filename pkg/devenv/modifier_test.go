@@ -18,14 +18,9 @@ type mockConnectionFetcher struct {
 	mock.Mock
 }
 
-func (m *mockConnectionFetcher) GetConnection(name string) (interface{}, error) {
+func (m *mockConnectionFetcher) GetConnection(name string) any {
 	args := m.Called(name)
-	get := args.Get(0)
-	if get == nil {
-		return nil, args.Error(1)
-	}
-
-	return get, args.Error(1)
+	return args.Get(0)
 }
 
 type mockSQLParser struct {
@@ -97,7 +92,7 @@ func TestDevEnvQueryModifier_Modify(t *testing.T) {
 			selectedEnv: &config.Environment{SchemaPrefix: "dev_"},
 			setupFields: func(f *fields) {
 				f.Conn.On("GetConnection", "postgres-default").
-					Return(nil, errors.New("failed to get connection"))
+					Return(nil)
 			},
 			error: "failed to get connection",
 		},
@@ -106,7 +101,7 @@ func TestDevEnvQueryModifier_Modify(t *testing.T) {
 			selectedEnv: &config.Environment{SchemaPrefix: "dev_"},
 			setupFields: func(f *fields) {
 				f.Conn.On("GetConnection", "postgres-default").
-					Return(new(mockConnectionWithoutDatabaseSummary), nil)
+					Return(new(mockConnectionWithoutDatabaseSummary))
 			},
 			error: "the asset type 'pg.sql' does not support developer environments, please create an issue if you'd like that",
 		},
@@ -142,7 +137,7 @@ func TestDevEnvQueryModifier_Modify(t *testing.T) {
 						},
 					},
 				}, nil)
-				f.Conn.On("GetConnection", "postgres-default").Return(c, nil)
+				f.Conn.On("GetConnection", "postgres-default").Return(c)
 
 				f.Parser.On("UsedTables", "select * from schema1.table1 t1 join schema2.table1 t2 using (someid)", "postgres").
 					Return([]string{}, errors.New("failed to get used tables"))
@@ -156,7 +151,7 @@ func TestDevEnvQueryModifier_Modify(t *testing.T) {
 			setupFields: func(f *fields) {
 				c := new(mockConnectionInstance)
 				c.On("GetDatabaseSummary", mock.Anything).Return(&ansisql.DBDatabase{}, errors.New("failed to get db summary"))
-				f.Conn.On("GetConnection", "postgres-default").Return(c, nil)
+				f.Conn.On("GetConnection", "postgres-default").Return(c)
 
 				f.Parser.On("UsedTables", "select * from schema1.table1 t1 join schema2.table1 t2 using (someid)", "postgres").
 					Return([]string{}, nil)
@@ -196,7 +191,7 @@ func TestDevEnvQueryModifier_Modify(t *testing.T) {
 						},
 					},
 				}, nil)
-				f.Conn.On("GetConnection", "postgres-default").Return(c, nil)
+				f.Conn.On("GetConnection", "postgres-default").Return(c)
 
 				f.Parser.On("UsedTables", "select * from schema1.table1 t1 join schema2.table1 t2 using (someid)", "postgres").
 					Return([]string{"schema1.table1", "schema2.table1"}, nil)

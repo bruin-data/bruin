@@ -1084,8 +1084,8 @@ func ValidateCustomCheckQueryDryRun(connections connectionManager, renderer jinj
 			return issues, nil
 		}
 
-		validator, err := connections.GetConnection(connName)
-		if err != nil { //nolint
+		validator := connections.GetConnection(connName)
+		if validator == nil {
 			return issues, nil
 		}
 
