@@ -446,6 +446,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 			wantErr:     true,
 			fullRefresh: false,
 		},
+		//nolint:dupword
 		{
 			name: "scd2_table_exists_with_incremental_key",
 			asset: &pipeline.Asset{
@@ -493,6 +494,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 				"  INSERT (id, event_name, ts, _valid_from, _valid_until, _is_current)\n" +
 				"  VALUES (source.id, source.event_name, source.ts, source.ts, '9999-12-31 00:00:00', TRUE);",
 		},
+		//nolint:dupword
 		{
 			name: "scd2_multiple_primary_keys_with_incremental_key",
 			asset: &pipeline.Asset{
