@@ -1,5 +1,5 @@
 /* @bruin
-name: public.products
+name: public.products_individual
 type: pg.sql
 
 materialization:
@@ -33,4 +33,4 @@ SELECT
     3 AS PRODUCT_ID, 'Headphones' AS PRODUCT_NAME, 199.99 AS PRICE, 100 AS STOCK
 UNION ALL
 SELECT
-    4 AS PRODUCT_ID, 'Monitor' AS PRODUCT_NAME, 299.99 AS PRICE, 25 AS STOCK;
+    4 AS PRODUCT_ID, 'Monitor' AS PRODUCT_NAME, 299.99 AS PRICE, 25 AS STOCK; 
