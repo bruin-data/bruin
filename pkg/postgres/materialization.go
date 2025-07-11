@@ -513,7 +513,6 @@ func buildRedshiftSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string
 	}
 	onCondition := strings.Join(onConditions, " AND ")
 
-	// Redshift doesn't support WHEN NOT MATCHED BY SOURCE, so we use a different approach
 	tempTableName := "__bruin_scd2_tmp_" + helpers.PrefixGenerator()
 
 	var matchedCondition string
@@ -637,7 +636,6 @@ func buildRedshiftSCD2QueryByTime(asset *pipeline.Asset, query string) (string, 
 
 	tempTableName := "__bruin_scd2_time_tmp_" + helpers.PrefixGenerator()
 
-	// Redshift approach using temp tables instead of complex MERGE
 	queryStr := fmt.Sprintf(`
 BEGIN TRANSACTION;
 
@@ -713,7 +711,6 @@ func buildRedshiftSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (st
 		return "", errors.New("materialization strategy 'SCD2_by_time' requires the `primary_key` field to be set on at least one column")
 	}
 
-	// Redshift uses different timestamp syntax
 	stmt := fmt.Sprintf(
 		`BEGIN TRANSACTION;
 DROP TABLE IF EXISTS %s;
@@ -742,7 +739,6 @@ func buildRedshiftSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (
 		return "", errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
 	}
 
-	// Redshift uses different timestamp syntax
 	stmt := fmt.Sprintf(
 		`BEGIN TRANSACTION;
 DROP TABLE IF EXISTS %s;
