@@ -110,14 +110,20 @@ func (s *SQLParser) Start() error {
 		return err
 	}
 
-	_, err = s.sendCommand(&parserCommand{
-		Command: "init",
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to send init command")
+	// Retry init command to handle race condition in release pipeline
+	const maxRetries = 3
+
+	for attempt := range maxRetries {
+		if _, err := s.sendCommand(&parserCommand{Command: "init"}); err == nil {
+			s.started = true
+			return nil
+		}
+		if attempt < maxRetries-1 {
+			time.Sleep(time.Duration(attempt+1) * 100 * time.Millisecond)
+		}
 	}
-	s.started = true
-	return nil
+
+	return errors.New("failed to send init command after retries")
 }
 
 type parserCommand struct {
@@ -265,7 +271,6 @@ func (s *SQLParser) sendCommand(pc *parserCommand) (string, error) {
 	}
 
 	reader := bufio.NewReader(s.stdout)
-
 	resp, err := reader.ReadString(byte('\n'))
 	return resp, err
 }
