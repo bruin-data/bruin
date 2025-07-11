@@ -2,6 +2,8 @@ package lint_test
 
 import (
 	"context"
+	"log"
+	"os"
 	"testing"
 	"time"
 
@@ -11,6 +13,35 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var sharedSQLParser *sqlparser.SQLParser
+
+func TestMain(m *testing.M) {
+	err := setupSharedSQLParser()
+	if err != nil {
+		log.Panicf("error initializing shared SQL parser: %v", err)
+	}
+	rc := m.Run()
+	if sharedSQLParser != nil {
+		sharedSQLParser.Close()
+	}
+	os.Exit(rc)
+}
+
+func setupSharedSQLParser() error {
+	if sharedSQLParser == nil {
+		var err error
+		sharedSQLParser, err = sqlparser.NewSQLParser(true)
+		if err != nil {
+			return err
+		}
+		err = sharedSQLParser.Start()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func TestQueryColumnsMatchColumnsPolicy(t *testing.T) { //nolint:paralleltest
 	// Set up context with required values for cloneForAsset
@@ -35,15 +66,7 @@ func TestQueryColumnsMatchColumnsPolicy(t *testing.T) { //nolint:paralleltest
 	})
 
 	t.Run("integration test - real parser with simple jinja", func(t *testing.T) { //nolint:paralleltest
-		// Create a real SQLParser for integration testing
-		parser, err := sqlparser.NewSQLParser(true)
-		require.NoError(t, err)
-		defer parser.Close()
-
-		err = parser.Start()
-		require.NoError(t, err)
-
-		validator := lint.QueryColumnsMatchColumnsPolicy(parser)
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
 
 		asset := &pipeline.Asset{
 			Name: "test.users",
@@ -79,15 +102,7 @@ func TestQueryColumnsMatchColumnsPolicy(t *testing.T) { //nolint:paralleltest
 	})
 
 	t.Run("integration test - this variable resolution MUST work", func(t *testing.T) { //nolint:paralleltest
-		// Create a real SQLParser for integration testing
-		parser, err := sqlparser.NewSQLParser(true)
-		require.NoError(t, err)
-		defer parser.Close()
-
-		err = parser.Start()
-		require.NoError(t, err)
-
-		validator := lint.QueryColumnsMatchColumnsPolicy(parser)
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
 
 		asset := &pipeline.Asset{
 			Name: "analytics.users",
@@ -114,14 +129,7 @@ func TestQueryColumnsMatchColumnsPolicy(t *testing.T) { //nolint:paralleltest
 	})
 
 	t.Run("returns no issues for non-SQL assets", func(t *testing.T) { //nolint:paralleltest
-		parser, err := sqlparser.NewSQLParser(true)
-		require.NoError(t, err)
-		defer parser.Close()
-
-		err = parser.Start()
-		require.NoError(t, err)
-
-		validator := lint.QueryColumnsMatchColumnsPolicy(parser)
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
 
 		asset := &pipeline.Asset{
 			Name: "test.table",
@@ -136,14 +144,7 @@ func TestQueryColumnsMatchColumnsPolicy(t *testing.T) { //nolint:paralleltest
 	})
 
 	t.Run("returns no issues when asset type dialect conversion fails", func(t *testing.T) { //nolint:paralleltest
-		parser, err := sqlparser.NewSQLParser(true)
-		require.NoError(t, err)
-		defer parser.Close()
-
-		err = parser.Start()
-		require.NoError(t, err)
-
-		validator := lint.QueryColumnsMatchColumnsPolicy(parser)
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
 
 		asset := &pipeline.Asset{
 			Name: "test.table",
@@ -169,14 +170,7 @@ func TestQueryColumnsMatchColumnsPolicy_JinjaIntegration(t *testing.T) { //nolin
 	ctx = context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, false)
 
 	t.Run("complex jinja template with variables and this resolution MUST work", func(t *testing.T) { //nolint:paralleltest
-		parser, err := sqlparser.NewSQLParser(true)
-		require.NoError(t, err)
-		defer parser.Close()
-
-		err = parser.Start()
-		require.NoError(t, err)
-
-		validator := lint.QueryColumnsMatchColumnsPolicy(parser)
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
 
 		asset := &pipeline.Asset{
 			Name: "analytics.user_metrics",
@@ -221,14 +215,7 @@ func TestQueryColumnsMatchColumnsPolicy_JinjaIntegration(t *testing.T) { //nolin
 	})
 
 	t.Run("jinja template with boolean and numeric variables MUST work", func(t *testing.T) { //nolint:paralleltest
-		parser, err := sqlparser.NewSQLParser(true)
-		require.NoError(t, err)
-		defer parser.Close()
-
-		err = parser.Start()
-		require.NoError(t, err)
-
-		validator := lint.QueryColumnsMatchColumnsPolicy(parser)
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
 
 		asset := &pipeline.Asset{
 			Name: "analytics.active_users",
@@ -265,14 +252,7 @@ func TestQueryColumnsMatchColumnsPolicy_JinjaIntegration(t *testing.T) { //nolin
 	})
 
 	t.Run("test that FAILS without cloneForAsset - undefined jinja variables", func(t *testing.T) { //nolint:paralleltest
-		parser, err := sqlparser.NewSQLParser(true)
-		require.NoError(t, err)
-		defer parser.Close()
-
-		err = parser.Start()
-		require.NoError(t, err)
-
-		validator := lint.QueryColumnsMatchColumnsPolicy(parser)
+		validator := lint.QueryColumnsMatchColumnsPolicy(sharedSQLParser)
 
 		asset := &pipeline.Asset{
 			Name: "test.table",
