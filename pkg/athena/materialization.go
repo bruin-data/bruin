@@ -29,6 +29,8 @@ var matMap = AssetMaterializationMap{
 		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
+		pipeline.MaterializationStrategySCD2ByColumn:  buildSCD2ByColumnQuery,
+		pipeline.MaterializationStrategySCD2ByTime:    buildSCD2ByTimeQuery,
 	},
 }
 
@@ -113,27 +115,34 @@ func buildMergeQuery(asset *pipeline.Asset, query, location string) ([]string, e
 }
 
 func buildCreateReplaceQuery(task *pipeline.Asset, query, location string) ([]string, error) {
-	query = strings.TrimSuffix(query, ";")
+	switch {
+	case task.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByTime:
+		return buildSCD2ByTimefullRefresh(task, query, location)
+	case task.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByColumn:
+		return buildSCD2ByColumnfullRefresh(task, query, location)
+	default:
+		query = strings.TrimSuffix(query, ";")
 
-	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
+		tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
-	var partitionBy string
-	if task.Materialization.PartitionBy != "" {
-		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", task.Materialization.PartitionBy)
+		var partitionBy string
+		if task.Materialization.PartitionBy != "" {
+			partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", task.Materialization.PartitionBy)
+		}
+
+		return []string{
+			fmt.Sprintf(
+				"CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS %s",
+				tempTableName,
+				location,
+				tempTableName,
+				partitionBy,
+				query,
+			),
+			"DROP TABLE IF EXISTS " + task.Name,
+			fmt.Sprintf("ALTER TABLE %s RENAME TO %s", tempTableName, task.Name),
+		}, nil
 	}
-
-	return []string{
-		fmt.Sprintf(
-			"CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS %s",
-			tempTableName,
-			location,
-			tempTableName,
-			partitionBy,
-			query,
-		),
-		"DROP TABLE IF EXISTS " + task.Name,
-		fmt.Sprintf("ALTER TABLE %s RENAME TO %s", tempTableName, task.Name),
-	}, nil
 }
 
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string, location string) ([]string, error) {
@@ -203,3 +212,233 @@ func buildDDLQuery(asset *pipeline.Asset, query string, location string) ([]stri
 
 	return []string{ddlQuery}, nil
 }
+
+func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]string, error) {
+	query = strings.TrimSuffix(query, ";")
+
+	var (
+		primaryKeys  = make([]string, 0, 4)
+		compareConds = make([]string, 0, 12)
+		insertCols   = make([]string, 0, 12)
+		insertValues = make([]string, 0, 12)
+	)
+
+	for _, col := range asset.Columns {
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, col.Name)
+		}
+		switch col.Name {
+		case "_is_current", "_valid_from", "_valid_until":
+			return nil, fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
+		}
+		insertCols = append(insertCols, col.Name)
+		insertValues = append(insertValues, "source."+col.Name)
+		if !col.PrimaryKey {
+			compareConds = append(compareConds,
+				fmt.Sprintf("target.%[1]s != source.%[1]s", col.Name))
+		}
+	}
+
+	if len(primaryKeys) == 0 {
+		return nil, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column",
+			asset.Materialization.Strategy)
+	}
+
+	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
+	insertValues = append(insertValues, "CURRENT_TIMESTAMP", "TIMESTAMP '9999-12-31'", "TRUE")
+
+	// Build ON condition for MERGE
+	onConditions := make([]string, 0, len(primaryKeys))
+	for _, pk := range primaryKeys {
+		onConditions = append(onConditions, fmt.Sprintf("target.%s = source.%s", pk, pk))
+	}
+	onConditions = append(onConditions, "target._is_current = TRUE")
+	onCondition := strings.Join(onConditions, " AND ")
+
+	var matchedCondition string
+	if len(compareConds) > 0 {
+		matchedCondition = strings.Join(compareConds, " OR ")
+	} else {
+		matchedCondition = "FALSE"
+	}
+
+	mergeQuery := fmt.Sprintf(`
+MERGE INTO %s AS target
+USING (%s) AS source
+ON %s
+
+WHEN MATCHED AND (%s) THEN
+  UPDATE SET
+    _valid_until = CURRENT_TIMESTAMP,
+    _is_current = FALSE
+
+WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
+  UPDATE SET 
+    _valid_until = CURRENT_TIMESTAMP,
+    _is_current = FALSE
+
+WHEN NOT MATCHED THEN
+  INSERT (%s)
+  VALUES (%s)`,
+		asset.Name,
+		strings.TrimSpace(query),
+		onCondition,
+		matchedCondition,
+		strings.Join(insertCols, ", "),
+		strings.Join(insertValues, ", "),
+	)
+
+	return []string{strings.TrimSpace(mergeQuery)}, nil
+}
+
+func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]string, error) {
+	query = strings.TrimSuffix(query, ";")
+
+	if asset.Materialization.IncrementalKey == "" {
+		return nil, errors.New("incremental_key is required for SCD2_by_time strategy")
+	}
+
+	var (
+		primaryKeys  = make([]string, 0, 4)
+		insertCols   = make([]string, 0, 12)
+		insertValues = make([]string, 0, 12)
+	)
+
+	for _, col := range asset.Columns {
+		switch col.Name {
+		case "_valid_from", "_valid_until", "_is_current":
+			return nil, fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
+		}
+		if col.Name == asset.Materialization.IncrementalKey {
+			lcType := strings.ToLower(col.Type)
+			if lcType != "timestamp" && lcType != "date" {
+				return nil, errors.New("incremental_key must be TIMESTAMP or DATE in SCD2_by_time strategy")
+			}
+		}
+		insertCols = append(insertCols, col.Name)
+		insertValues = append(insertValues, "source."+col.Name)
+
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, col.Name)
+		}
+	}
+
+	if len(primaryKeys) == 0 {
+		return nil, fmt.Errorf(
+			"materialization strategy %s requires the primary_key field to be set on at least one column",
+			asset.Materialization.Strategy,
+		)
+	}
+
+	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
+	insertValues = append(insertValues,
+		"CAST(source."+asset.Materialization.IncrementalKey+" AS TIMESTAMP)",
+		"TIMESTAMP '9999-12-31'",
+		"TRUE",
+	)
+
+	// Build ON condition for MERGE
+	onConditions := make([]string, 0, len(primaryKeys))
+	for _, pk := range primaryKeys {
+		onConditions = append(onConditions, fmt.Sprintf("target.%s = source.%s", pk, pk))
+	}
+	onConditions = append(onConditions, "target._is_current = TRUE")
+	onCondition := strings.Join(onConditions, " AND ")
+
+	mergeQuery := fmt.Sprintf(`
+MERGE INTO %s AS target
+USING (%s) AS source
+ON %s
+
+WHEN MATCHED AND (target._valid_from < CAST(source.%s AS TIMESTAMP)) THEN
+  UPDATE SET
+    _valid_until = CAST(source.%s AS TIMESTAMP),
+    _is_current = FALSE
+
+WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
+  UPDATE SET 
+    _valid_until = CURRENT_TIMESTAMP,
+    _is_current = FALSE
+
+WHEN NOT MATCHED THEN
+  INSERT (%s)
+  VALUES (%s)`,
+		asset.Name,
+		strings.TrimSpace(query),
+		onCondition,
+		asset.Materialization.IncrementalKey,
+		asset.Materialization.IncrementalKey,
+		strings.Join(insertCols, ", "),
+		strings.Join(insertValues, ", "),
+	)
+
+	return []string{strings.TrimSpace(mergeQuery)}, nil
+}
+
+func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query, location string) ([]string, error) {
+	if asset.Materialization.IncrementalKey == "" {
+		return nil, errors.New("incremental_key is required for SCD2 strategy")
+	}
+
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) == 0 {
+		return nil, errors.New("materialization strategy 'SCD2_by_time' requires the `primary_key` field to be set on at least one column")
+	}
+
+	var partitionBy string
+	if asset.Materialization.PartitionBy != "" {
+		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", asset.Materialization.PartitionBy)
+	}
+
+	createQuery := fmt.Sprintf(
+		`CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
+SELECT
+  CAST(%s AS TIMESTAMP) AS _valid_from,
+  src.*,
+  TIMESTAMP '9999-12-31' AS _valid_until,
+  TRUE AS _is_current
+FROM (
+%s
+) AS src`,
+		asset.Name,
+		location,
+		asset.Name,
+		partitionBy,
+		asset.Materialization.IncrementalKey,
+		strings.TrimSpace(query),
+	)
+
+	return []string{strings.TrimSpace(createQuery)}, nil
+}
+
+func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query, location string) ([]string, error) {
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) == 0 {
+		return nil, errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
+	}
+
+	var partitionBy string
+	if asset.Materialization.PartitionBy != "" {
+		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", asset.Materialization.PartitionBy)
+	}
+
+	createQuery := fmt.Sprintf(
+		`CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
+SELECT
+  CURRENT_TIMESTAMP AS _valid_from,
+  src.*,
+  TIMESTAMP '9999-12-31' AS _valid_until,
+  TRUE AS _is_current
+FROM (
+%s
+) AS src`,
+		asset.Name,
+		location,
+		asset.Name,
+		partitionBy,
+		strings.TrimSpace(query),
+	)
+
+	return []string{strings.TrimSpace(createQuery)}, nil
+}
+
