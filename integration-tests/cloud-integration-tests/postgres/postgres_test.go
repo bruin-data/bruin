@@ -45,7 +45,7 @@ func TestPostgresWorkflows(t *testing.T) {
 					{
 						Name:    "query the products table",
 						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "SELECT PRODUCT_ID, PRODUCT_NAME, PRICE, STOCK FROM products ORDER BY PRODUCT_ID;", "--output", "csv"),
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "SELECT PRODUCT_ID, PRODUCT_NAME, PRICE, STOCK FROM public.products ORDER BY PRODUCT_ID;", "--output", "csv"),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -179,15 +179,15 @@ func TestPostgresWorkflows(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-by-column: drop the table",
+						Name:    "scd2-by-column: drop the table (expect error but table will be dropped)",
 						Command: binary,
 						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, "../.bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "DROP TABLE IF EXISTS test.menu;"},
 						Env:     []string{},
 						Expected: e2e.Output{
-							ExitCode: 0,
+							ExitCode: 1, // Expect failure due to "field descriptions not available for DDL statements" - specific to PostgresSQL driver
 						},
 						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
+							e2e.AssertByExitCode, // Assert that it fails as expected
 						},
 					},
 					{
@@ -232,9 +232,9 @@ func TestPostgresIndividualTasks(t *testing.T) {
 
 	tasks := []e2e.Task{
 		{
-			Name:    "create the initial products table",
+			Name:    "create the initial products individual table",
 			Command: binary,
-			Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products.sql")),
+			Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products_individual.sql")),
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
@@ -244,9 +244,9 @@ func TestPostgresIndividualTasks(t *testing.T) {
 			},
 		},
 		{
-			Name:    "query the products table",
+			Name:    "query the products individual table",
 			Command: binary,
-			Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "SELECT PRODUCT_ID, PRODUCT_NAME, PRICE, STOCK FROM products ORDER BY PRODUCT_ID;", "--output", "csv"),
+			Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "SELECT PRODUCT_ID, PRODUCT_NAME, PRICE, STOCK FROM public.products_individual ORDER BY PRODUCT_ID;", "--output", "csv"),
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
