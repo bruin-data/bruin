@@ -31,6 +31,8 @@ var matMap = pipeline.AssetMaterializationMap{
 		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
+		pipeline.MaterializationStrategySCD2ByColumn:  buildSCD2ByColumnQuery,
+		pipeline.MaterializationStrategySCD2ByTime:    buildSCD2QueryByTime,
 	},
 }
 
@@ -112,12 +114,19 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error) {
-	query = strings.TrimSuffix(query, ";")
-	return fmt.Sprintf(
-		`BEGIN TRANSACTION;
+	switch {
+	case task.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByTime:
+		return buildSCD2ByTimefullRefresh(task, query)
+	case task.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByColumn:
+		return buildSCD2ByColumnfullRefresh(task, query)
+	default:
+		query = strings.TrimSuffix(query, ";")
+		return fmt.Sprintf(
+			`BEGIN TRANSACTION;
 DROP TABLE IF EXISTS %s; 
 CREATE TABLE %s AS %s;
 COMMIT;`, task.Name, task.Name, query), nil
+	}
 }
 
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error) {
@@ -189,4 +198,267 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 	}
 
 	return q, nil
+}
+
+func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, error) {
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) == 0 {
+		return "", errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
+	}
+
+	// PostgreSQL doesn't have BigQuery's partitioning/clustering syntax,
+	// so we create a simpler CREATE TABLE AS statement
+	stmt := fmt.Sprintf(
+		`BEGIN TRANSACTION;
+DROP TABLE IF EXISTS %s;
+CREATE TABLE %s AS
+SELECT
+  CURRENT_TIMESTAMP AS _valid_from,
+  src.*,
+  '9999-12-31 00:00:00'::TIMESTAMP AS _valid_until,
+  TRUE AS _is_current
+FROM (
+%s
+) AS src;
+COMMIT;`,
+		asset.Name,
+		asset.Name,
+		strings.TrimSpace(query),
+	)
+
+	return strings.TrimSpace(stmt), nil
+}
+
+func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error) {
+	query = strings.TrimRight(query, ";")
+	var (
+		primaryKeys      = make([]string, 0, 4)
+		compareConds     = make([]string, 0, 12)
+		compareCondsS1T1 = make([]string, 0, 4)
+		insertCols       = make([]string, 0, 12)
+		insertValues     = make([]string, 0, 12)
+	)
+
+	for _, col := range asset.Columns {
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, col.Name)
+		}
+		switch col.Name {
+		case "_is_current", "_valid_from", "_valid_until":
+			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
+		}
+		insertCols = append(insertCols, col.Name)
+		insertValues = append(insertValues, "source."+col.Name)
+		if !col.PrimaryKey {
+			compareConds = append(compareConds,
+				fmt.Sprintf("target.%[1]s != source.%[1]s", col.Name))
+			compareCondsS1T1 = append(compareCondsS1T1,
+				fmt.Sprintf("t1.%[1]s != s1.%[1]s", col.Name))
+		}
+	}
+
+	if len(primaryKeys) == 0 {
+		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column",
+			asset.Materialization.Strategy)
+	}
+	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
+	insertValues = append(insertValues, "CURRENT_TIMESTAMP", "'9999-12-31 00:00:00'::TIMESTAMP", "TRUE")
+	pkList := strings.Join(primaryKeys, ", ")
+
+	// Build ON condition for MERGE
+	onConditions := make([]string, 0, len(primaryKeys)+1)
+	for _, pk := range primaryKeys {
+		onConditions = append(onConditions, fmt.Sprintf("target.%s = source.%s", pk, pk))
+	}
+	onConditions = append(onConditions, "target._is_current AND source._is_current")
+	onCondition := strings.Join(onConditions, " AND ")
+
+	// Handle case where there are no non-primary key columns to compare
+	whereCondition := ""
+	matchedCondition := ""
+	if len(compareCondsS1T1) > 0 {
+		whereCondition = "(" + strings.Join(compareCondsS1T1, " OR ") + ")" + " AND t1._is_current"
+		matchedCondition = strings.Join(compareConds, " OR ")
+	} else {
+		// If only primary keys exist, we still need valid conditions but they'll never trigger
+		whereCondition = "FALSE AND t1._is_current"
+		matchedCondition = "FALSE"
+	}
+
+	queryStr := fmt.Sprintf(`
+MERGE INTO %s AS target
+USING (
+  WITH s1 AS (
+    %s
+  )
+  SELECT *, TRUE AS _is_current
+  FROM   s1
+  UNION ALL
+  SELECT s1.*, FALSE AS _is_current
+  FROM   s1
+  JOIN   %s AS t1 USING (%s)
+  WHERE  %s
+) AS source
+ON  %s
+
+WHEN MATCHED AND (
+    %s
+) THEN
+  UPDATE SET
+    _valid_until = CURRENT_TIMESTAMP,
+    _is_current  = FALSE
+
+WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
+  UPDATE SET 
+    _valid_until = CURRENT_TIMESTAMP,
+    _is_current  = FALSE
+
+WHEN NOT MATCHED BY TARGET THEN
+  INSERT (%s)
+  VALUES (%s);`,
+		asset.Name,
+		strings.TrimSpace(query),
+		asset.Name,
+		pkList,
+		whereCondition,
+		onCondition,
+		matchedCondition,
+		strings.Join(insertCols, ", "),
+		strings.Join(insertValues, ", "),
+	)
+
+	return strings.TrimSpace(queryStr), nil
+}
+
+func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, error) {
+	if asset.Materialization.IncrementalKey == "" {
+		return "", errors.New("incremental_key is required for SCD2 strategy")
+	}
+
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) == 0 {
+		return "", errors.New("materialization strategy 'SCD2_by_time' requires the `primary_key` field to be set on at least one column")
+	}
+
+	// PostgreSQL doesn't have BigQuery's partitioning/clustering syntax,
+	// so we create a simpler CREATE TABLE AS statement
+	stmt := fmt.Sprintf(
+		`BEGIN TRANSACTION;
+DROP TABLE IF EXISTS %s;
+CREATE TABLE %s AS
+SELECT
+  %s AS _valid_from,
+  src.*,
+  '9999-12-31 00:00:00'::TIMESTAMP AS _valid_until,
+  TRUE AS _is_current
+FROM (
+%s
+) AS src;
+COMMIT;`,
+		asset.Name,
+		asset.Name,
+		asset.Materialization.IncrementalKey,
+		strings.TrimSpace(query),
+	)
+
+	return strings.TrimSpace(stmt), nil
+}
+
+func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
+	query = strings.TrimRight(query, ";")
+
+	if asset.Materialization.IncrementalKey == "" {
+		return "", fmt.Errorf("incremental_key is required for SCD2_by_time strategy")
+	}
+
+	var (
+		primaryKeys  = make([]string, 0, 4)
+		joinConds    = make([]string, 0, 5)
+		insertCols   = make([]string, 0, 12)
+		insertValues = make([]string, 0, 12)
+	)
+	for _, col := range asset.Columns {
+		switch col.Name {
+		case "_valid_from", "_valid_until", "_is_current":
+			return "", fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
+		}
+		if col.Name == asset.Materialization.IncrementalKey {
+			lcType := strings.ToLower(col.Type)
+			if lcType != "timestamp" && lcType != "date" {
+				return "", fmt.Errorf("incremental_key must be TIMESTAMP or DATE in SCD2_by_time strategy")
+			}
+		}
+		insertCols = append(insertCols, col.Name)
+		insertValues = append(insertValues, "source."+col.Name)
+
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, col.Name)
+		}
+	}
+
+	if len(primaryKeys) == 0 {
+		return "", fmt.Errorf(
+			"materialization strategy %s requires the primary_key field to be set on at least one column",
+			asset.Materialization.Strategy,
+		)
+	}
+	pkList := strings.Join(primaryKeys, ", ")
+	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
+	insertValues = append(insertValues,
+		"source."+asset.Materialization.IncrementalKey,
+		"'9999-12-31 00:00:00'",
+		"TRUE",
+	)
+
+	for _, pk := range primaryKeys {
+		joinConds = append(joinConds, fmt.Sprintf("target.%[1]s = source.%[1]s", pk))
+	}
+	joinConds = append(joinConds, "target._is_current AND source._is_current")
+	onCondition := strings.Join(joinConds, " AND ")
+	tbl := asset.Name
+
+	queryStr := fmt.Sprintf(`
+MERGE INTO %s AS target
+USING (
+  WITH s1 AS (
+    %s
+  )
+  SELECT s1.*, TRUE AS _is_current
+  FROM   s1
+  UNION ALL
+  SELECT s1.*, FALSE AS _is_current
+  FROM s1
+  JOIN   %s AS t1 USING (%s)
+  WHERE  t1._valid_from < s1.%s AND t1._is_current
+) AS source
+ON  %s
+
+WHEN MATCHED AND (
+  target._valid_from < source.%s
+) THEN
+  UPDATE SET
+    _valid_until = source.%s,
+    _is_current  = FALSE
+
+WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
+  UPDATE SET 
+    _valid_until = CURRENT_TIMESTAMP,
+    _is_current  = FALSE
+
+WHEN NOT MATCHED BY TARGET THEN
+  INSERT (%s)
+  VALUES (%s);`,
+		tbl,
+		strings.TrimSpace(query),
+		tbl,
+		pkList,
+		asset.Materialization.IncrementalKey,
+		onCondition,
+		asset.Materialization.IncrementalKey,
+		asset.Materialization.IncrementalKey,
+		strings.Join(insertCols, ", "),
+		strings.Join(insertValues, ", "),
+	)
+
+	return strings.TrimSpace(queryStr), nil
 }
