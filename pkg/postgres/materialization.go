@@ -206,8 +206,6 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 		return "", errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
 	}
 
-	// PostgreSQL doesn't have BigQuery's partitioning/clustering syntax,
-	// so we create a simpler CREATE TABLE AS statement
 	stmt := fmt.Sprintf(
 		`BEGIN TRANSACTION;
 DROP TABLE IF EXISTS %s;
@@ -338,8 +336,6 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 		return "", errors.New("materialization strategy 'SCD2_by_time' requires the `primary_key` field to be set on at least one column")
 	}
 
-	// PostgreSQL doesn't have BigQuery's partitioning/clustering syntax,
-	// so we create a simpler CREATE TABLE AS statement
 	stmt := fmt.Sprintf(
 		`BEGIN TRANSACTION;
 DROP TABLE IF EXISTS %s;
