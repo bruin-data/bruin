@@ -273,14 +273,12 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error)
 	onConditions = append(onConditions, "target._is_current AND source._is_current")
 	onCondition := strings.Join(onConditions, " AND ")
 
-	// Handle case where there are no non-primary key columns to compare
-	whereCondition := ""
-	matchedCondition := ""
+	var whereCondition string
+	var matchedCondition string
 	if len(compareCondsS1T1) > 0 {
 		whereCondition = "(" + strings.Join(compareCondsS1T1, " OR ") + ")" + " AND t1._is_current"
 		matchedCondition = strings.Join(compareConds, " OR ")
 	} else {
-		// If only primary keys exist, we still need valid conditions but they'll never trigger
 		whereCondition = "FALSE AND t1._is_current"
 		matchedCondition = "FALSE"
 	}
@@ -368,7 +366,7 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 	query = strings.TrimRight(query, ";")
 
 	if asset.Materialization.IncrementalKey == "" {
-		return "", fmt.Errorf("incremental_key is required for SCD2_by_time strategy")
+		return "", errors.New("incremental_key is required for SCD2_by_time strategy")
 	}
 
 	var (
@@ -385,7 +383,7 @@ func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 		if col.Name == asset.Materialization.IncrementalKey {
 			lcType := strings.ToLower(col.Type)
 			if lcType != "timestamp" && lcType != "date" {
-				return "", fmt.Errorf("incremental_key must be TIMESTAMP or DATE in SCD2_by_time strategy")
+				return "", errors.New("incremental_key must be TIMESTAMP or DATE in SCD2_by_time strategy")
 			}
 		}
 		insertCols = append(insertCols, col.Name)
