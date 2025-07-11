@@ -19,7 +19,7 @@ columns:
     type: DATE
     description: "incremental key"
   - name: stock
-    type: INTEGER
+    type: NUMBER
     description: "Number of units in stock"
 @bruin */
 SELECT
