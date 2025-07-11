@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
-	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/devenv"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -28,19 +27,24 @@ type PgClient interface {
 	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error
 }
 
+type connectionFetcher interface {
+	GetPgConnection(name string) (PgClient, error)
+	GetConnection(name string) (interface{}, error)
+}
+
 type devEnv interface {
 	Modify(ctx context.Context, p *pipeline.Pipeline, a *pipeline.Asset, q *query.Query) (*query.Query, error)
 	RegisterAssetForSchemaCache(ctx context.Context, p *pipeline.Pipeline, a *pipeline.Asset, q *query.Query) error
 }
 
 type BasicOperator struct {
-	connection   config.ConnectionGetter
+	connection   connectionFetcher
 	extractor    query.QueryExtractor
 	materializer materializer
 	devEnv       devEnv
 }
 
-func NewBasicOperator(conn config.ConnectionGetter, extractor query.QueryExtractor, materializer materializer, parser *sqlparser.SQLParser) *BasicOperator {
+func NewBasicOperator(conn connectionFetcher, extractor query.QueryExtractor, materializer materializer, parser *sqlparser.SQLParser) *BasicOperator {
 	return &BasicOperator{
 		connection:   conn,
 		extractor:    extractor,
@@ -102,9 +106,9 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return err
 	}
 
-	conn, ok := o.connection.GetConnection(connName).(PgClient)
-	if !ok {
-		return errors.Errorf("'%s' either does not exist or is not a postgres connection", connName)
+	conn, err := o.connection.GetPgConnection(connName)
+	if err != nil {
+		return err
 	}
 
 	if t.Materialization.Type != pipeline.MaterializationTypeNone {
@@ -136,7 +140,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	return nil
 }
 
-func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnCheckOperator {
+func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOperator {
 	return ansisql.NewColumnCheckOperator(map[string]ansisql.CheckRunner{
 		"not_null":        ansisql.NewNotNullCheck(manager),
 		"unique":          ansisql.NewUniqueCheck(manager),

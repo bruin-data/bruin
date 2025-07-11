@@ -202,7 +202,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			extractor := new(mockExtractor)
 			mat := new(mockMaterializer)
 			conn := new(mockConnectionFetcher)
-			conn.On("GetConnection", mock.Anything).Return(client, nil)
+			conn.On("GetDuckDBConnection", mock.Anything).Return(client, nil)
 			client.On("CreateSchemaIfNotExist", mock.Anything, mock.Anything).Return(nil)
 
 			if tt.setup != nil {

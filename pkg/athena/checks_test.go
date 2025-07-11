@@ -54,9 +54,24 @@ func (m *mockQuerierWithResult) Ping(ctx context.Context) error {
 	return args.Error(0)
 }
 
-func (m *mockConnectionFetcher) GetConnection(name string) any {
+func (m *mockConnectionFetcher) GetConnection(name string) (interface{}, error) {
 	args := m.Called(name)
-	return args.Get(0)
+	get := args.Get(0)
+	if get == nil {
+		return nil, args.Error(1)
+	}
+
+	return get, args.Error(1)
+}
+
+func (m *mockConnectionFetcher) GetAthenaConnectionWithoutDefault(name string) (Client, error) {
+	args := m.Called(name)
+	get := args.Get(0)
+	if get == nil {
+		return nil, args.Error(1)
+	}
+
+	return get.(Client), args.Error(1)
 }
 
 func TestAcceptedValuesCheck_Check(t *testing.T) {

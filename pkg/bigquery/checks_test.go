@@ -99,9 +99,24 @@ type mockConnectionFetcher struct {
 	mock.Mock
 }
 
-func (m *mockConnectionFetcher) GetConnection(name string) any {
+func (m *mockConnectionFetcher) GetBqConnection(name string) (DB, error) {
 	args := m.Called(name)
-	return args.Get(0)
+	get := args.Get(0)
+	if get == nil {
+		return nil, args.Error(1)
+	}
+
+	return get.(DB), args.Error(1)
+}
+
+func (m *mockConnectionFetcher) GetConnection(name string) (interface{}, error) {
+	args := m.Called(name)
+	get := args.Get(0)
+	if get == nil {
+		return nil, args.Error(1)
+	}
+
+	return get.(DB), args.Error(1)
 }
 
 func TestAcceptedValuesCheck_Check(t *testing.T) {
@@ -111,7 +126,7 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 		t,
 		func(q *mockQuerierWithResult) checkRunner {
 			conn := new(mockConnectionFetcher)
-			conn.On("GetConnection", "test").Return(q)
+			conn.On("GetConnection", "test").Return(q, nil)
 			return &AcceptedValuesCheck{conn: conn}
 		},
 		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN (\"test\",\"test2\")",
@@ -128,7 +143,7 @@ func TestAcceptedValuesCheck_Check(t *testing.T) {
 		t,
 		func(q *mockQuerierWithResult) checkRunner {
 			conn := new(mockConnectionFetcher)
-			conn.On("GetConnection", "test").Return(q)
+			conn.On("GetConnection", "test").Return(q, nil)
 			return &AcceptedValuesCheck{conn: conn}
 		},
 		"SELECT COUNT(*) FROM dataset.test_asset WHERE CAST(test_column as STRING) NOT IN (\"1\",\"2\")",
@@ -291,7 +306,7 @@ func TestCustomCheck(t *testing.T) {
 			tt.setup(q)
 
 			conn := new(mockConnectionFetcher)
-			conn.On("GetConnection", "test").Return(q)
+			conn.On("GetConnection", "test").Return(q, nil)
 			n := ansisql.NewCustomCheck(conn, nil)
 
 			testInstance := &scheduler.CustomCheckInstance{
@@ -329,7 +344,7 @@ func TestPatternCheck_Check(t *testing.T) {
 		t,
 		func(q *mockQuerierWithResult) checkRunner {
 			conn := new(mockConnectionFetcher)
-			conn.On("GetConnection", "test").Return(q)
+			conn.On("GetConnection", "test").Return(q, nil)
 			return &PatternCheck{conn: conn}
 		},
 		"SELECT count(*) FROM dataset.test_asset WHERE REGEXP_CONTAINS(test_column, r'(a|b)')",

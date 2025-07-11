@@ -234,7 +234,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			mat.On("IsFullRefresh").Return(false)
 			client.On("CreateDataSetIfNotExist", mock.AnythingOfType("*pipeline.Asset"), mock.Anything).Return(nil)
 			conn := new(mockConnectionFetcher)
-			conn.On("GetConnection", "gcp-default").Return(client)
+			conn.On("GetBqConnection", "gcp-default").Return(client, nil)
 			if tt.setup != nil {
 				tt.setup(&fields{
 					q: client,
@@ -314,7 +314,7 @@ func TestMetadataPushOperator_Run(t *testing.T) {
 
 			client := new(mockQuerierWithResult)
 			conn := new(mockConnectionFetcher)
-			conn.On("GetConnection", "gcp-default").Return(client)
+			conn.On("GetBqConnection", "gcp-default").Return(client, nil)
 
 			if tt.setup != nil {
 				tt.setup(&fields{
@@ -415,7 +415,7 @@ func TestBasicOperator_RunTask_WithRenderer(t *testing.T) {
 			mat.On("IsFullRefresh").Return(false)
 			client.On("CreateDataSetIfNotExist", mock.AnythingOfType("*pipeline.Asset"), mock.Anything).Return(nil)
 			conn := new(mockConnectionFetcher)
-			conn.On("GetConnection", "gcp-default").Return(client)
+			conn.On("GetBqConnection", "gcp-default").Return(client, nil)
 			if tt.setup != nil {
 				tt.setup(&fields{
 					q: client,

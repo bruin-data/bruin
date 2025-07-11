@@ -2118,13 +2118,13 @@ def test_add_limit_with_convert_timezone():
 
 def test_is_single_select_query():
     """Test is_single_select_query function with various query types."""
-
+    
     # Test single SELECT query
     query = "SELECT * FROM users"
     result = is_single_select_query(query, "bigquery")
     assert result["is_single_select"] is True
     assert result["error"] == ""
-
+    
     # Test single SELECT query with WHERE, ORDER BY, etc.
     query = """
     SELECT id, name, email 
@@ -2136,7 +2136,7 @@ def test_is_single_select_query():
     result = is_single_select_query(query, "bigquery")
     assert result["is_single_select"] is True
     assert result["error"] == ""
-
+    
     # Test single SELECT query with JOINs
     query = """
     SELECT u.name, p.title 
@@ -2146,7 +2146,7 @@ def test_is_single_select_query():
     result = is_single_select_query(query, "bigquery")
     assert result["is_single_select"] is True
     assert result["error"] == ""
-
+    
     # Test single SELECT query with CTEs
     query = """
     WITH active_users AS (
@@ -2157,7 +2157,7 @@ def test_is_single_select_query():
     result = is_single_select_query(query, "bigquery")
     assert result["is_single_select"] is True
     assert result["error"] == ""
-
+    
     # Test multi-statement query
     query = """
     CREATE TABLE temp_table AS SELECT 1 as id;
@@ -2166,43 +2166,43 @@ def test_is_single_select_query():
     result = is_single_select_query(query, "bigquery")
     assert result["is_single_select"] is False
     assert result["error"] == ""
-
+    
     # Test INSERT query
     query = "INSERT INTO users (name, email) VALUES ('John', 'john@example.com')"
     result = is_single_select_query(query, "bigquery")
     assert result["is_single_select"] is False
     assert result["error"] == ""
-
+    
     # Test UPDATE query
     query = "UPDATE users SET active = false WHERE id = 1"
     result = is_single_select_query(query, "bigquery")
     assert result["is_single_select"] is False
     assert result["error"] == ""
-
+    
     # Test DELETE query
     query = "DELETE FROM users WHERE id = 1"
     result = is_single_select_query(query, "bigquery")
     assert result["is_single_select"] is False
     assert result["error"] == ""
-
+    
     # Test CREATE TABLE query
     query = "CREATE TABLE new_table (id INT, name VARCHAR(100))"
     result = is_single_select_query(query, "bigquery")
     assert result["is_single_select"] is False
     assert result["error"] == ""
-
+    
     # Test DROP TABLE query
     query = "DROP TABLE users"
     result = is_single_select_query(query, "bigquery")
     assert result["is_single_select"] is False
     assert result["error"] == ""
-
+    
     # Test CREATE TABLE AS SELECT (should be false - not a pure SELECT)
     query = "CREATE TABLE new_users AS SELECT * FROM users WHERE active = true"
     result = is_single_select_query(query, "bigquery")
     assert result["is_single_select"] is False
     assert result["error"] == ""
-
+    
     # Test multiple SELECT statements
     query = """
     SELECT * FROM users;
@@ -2211,7 +2211,7 @@ def test_is_single_select_query():
     result = is_single_select_query(query, "bigquery")
     assert result["is_single_select"] is False
     assert result["error"] == ""
-
+    
     # Test UNION query (single statement)
     query = """
     SELECT id, name FROM users 
@@ -2221,31 +2221,31 @@ def test_is_single_select_query():
     result = is_single_select_query(query, "bigquery")
     assert result["is_single_select"] is True
     assert result["error"] == ""
-
+    
     # Test invalid SQL
     query = "SELECT * FROM"
     result = is_single_select_query(query, "bigquery")
     assert result["is_single_select"] is False
     assert "error" in result and result["error"] != ""
-
+    
     # Test empty query
     query = ""
     result = is_single_select_query(query, "bigquery")
     assert result["is_single_select"] is False
     assert result["error"] == "cannot parse query"
-
+    
     # Test PRAGMA query (non-SELECT)
     query = "PRAGMA table_info(users)"
     result = is_single_select_query(query, "sqlite")
     assert result["is_single_select"] is False
     assert result["error"] == ""
-
+    
     # Test SHOW query (non-SELECT)
     query = "SHOW TABLES"
     result = is_single_select_query(query, "mysql")
     assert result["is_single_select"] is False
     assert result["error"] == ""
-
+    
     # Test DESCRIBE query (non-SELECT)
     query = "DESCRIBE users"
     result = is_single_select_query(query, "mysql")

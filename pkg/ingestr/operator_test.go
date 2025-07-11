@@ -36,8 +36,8 @@ func (m *mockFinder) Repo(path string) (*git.Repo, error) {
 	return repo, nil
 }
 
-func (s simpleConnectionFetcher) GetConnection(name string) any {
-	return s.connections[name]
+func (s simpleConnectionFetcher) GetConnection(name string) (interface{}, error) {
+	return s.connections[name], nil
 }
 
 type mockRunner struct {

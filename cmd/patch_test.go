@@ -29,9 +29,12 @@ type MockConnectionManager struct {
 	mock.Mock
 }
 
-func (m *MockConnectionManager) GetConnection(name string) any {
+func (m *MockConnectionManager) GetConnection(name string) (interface{}, error) {
 	args := m.Called(name)
-	return args.Get(0)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0), args.Error(1)
 }
 
 func TestFillColumnsFromDB(t *testing.T) {

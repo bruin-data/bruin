@@ -202,7 +202,7 @@ func TestBasicOperator_RunTask(t *testing.T) {
 			extractor := new(mockExtractor)
 			mat := new(mockMaterializer)
 			conn := new(mockConnectionFetcher)
-			conn.On("GetConnection", "databricks-default").Return(client)
+			conn.On("GetDatabricksConnection", "databricks-default").Return(client, nil)
 
 			if tt.setup != nil {
 				tt.setup(&fields{

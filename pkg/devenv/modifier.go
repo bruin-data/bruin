@@ -2,7 +2,6 @@ package devenv
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -15,12 +14,17 @@ import (
 
 type DevEnvQueryModifier struct {
 	Dialect string
-	Conn    config.ConnectionGetter
+	Conn    connectionFetcher
 	Parser  parser
 
 	connSchemaCache     map[string]*ansisql.DBDatabase
 	connSchemaCacheLock sync.Mutex
 }
+
+type connectionFetcher interface {
+	GetConnection(name string) (interface{}, error)
+}
+
 type parser interface {
 	UsedTables(sql, dialect string) ([]string, error)
 	RenameTables(sql, dialect string, tableMapping map[string]string) (string, error)
@@ -52,9 +56,9 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 		return nil, err
 	}
 
-	conn := d.Conn.GetConnection(connName)
-	if conn == nil {
-		return nil, errors.New("failed to get connection")
+	conn, err := d.Conn.GetConnection(connName)
+	if err != nil {
+		return nil, err
 	}
 
 	dbFetcherConn, ok := conn.(interface {

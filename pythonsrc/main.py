@@ -2,12 +2,7 @@ import json
 import sys
 import logging
 import os
-from parser.main import (
-    get_column_lineage,
-    get_tables,
-    add_limit,
-    is_single_select_query,
-)
+from parser.main import get_column_lineage, get_tables, add_limit, is_single_select_query
 
 from pathlib import Path
 
