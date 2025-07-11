@@ -26,14 +26,14 @@ func TestRedshiftWorkflows(t *testing.T) {
 		workflow e2e.Workflow
 	}{
 		{
-			name: "postgres-products-create-and-validate",
+			name: "redshift-products-create-and-validate",
 			workflow: e2e.Workflow{
-				Name: "postgres-products-create-and-validate",
+				Name: "redshift-products-create-and-validate",
 				Steps: []e2e.Task{
 					{
 						Name:    "create the initial products table",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products.sql")),
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products.sql")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -45,7 +45,7 @@ func TestRedshiftWorkflows(t *testing.T) {
 					{
 						Name:    "query the products table",
 						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "SELECT PRODUCT_ID, PRODUCT_NAME, PRICE, STOCK FROM public.products ORDER BY PRODUCT_ID;", "--output", "csv"),
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "SELECT PRODUCT_ID, PRODUCT_NAME, PRICE, STOCK FROM public.products ORDER BY PRODUCT_ID;", "--output", "csv"),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
@@ -181,10 +181,10 @@ func TestRedshiftWorkflows(t *testing.T) {
 					{
 						Name:    "scd2-by-column: drop the table (expect error but table will be dropped)",
 						Command: binary,
-						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, "../.bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "DROP TABLE IF EXISTS test.menu;"},
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "DROP TABLE IF EXISTS test.menu;"),
 						Env:     []string{},
 						Expected: e2e.Output{
-							ExitCode: 1, // Expect failure due to "field descriptions not available for DDL statements" - specific to PostgresSQL driver
+							ExitCode: 1, // Expect failure due to "field descriptions not available for DDL statements" - same as PostgreSQL
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode, // Assert that it fails as expected
@@ -193,10 +193,10 @@ func TestRedshiftWorkflows(t *testing.T) {
 					{
 						Name:    "scd2-by-column: confirm the table is dropped",
 						Command: binary,
-						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, "../.bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT * FROM test.menu;"},
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "SELECT * FROM test.menu;"),
 						Env:     []string{},
 						Expected: e2e.Output{
-							ExitCode: 1,
+							ExitCode: 1, // Should fail because table doesn't exist
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -325,12 +325,12 @@ func TestRedshiftWorkflows(t *testing.T) {
 						},
 					},
 					{
-						Name:    "scd2-by-time: drop the table",
+						Name:    "scd2-by-time: drop the table (expect error but table will be dropped)",
 						Command: binary,
-						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, "../.bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "DROP TABLE IF EXISTS test.products;"},
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "DROP TABLE IF EXISTS test.products;"),
 						Env:     []string{},
 						Expected: e2e.Output{
-							ExitCode: 1, // Expect failure due to "field descriptions not available for DDL statements" - specific to PostgresSQL driver
+							ExitCode: 1, // Expect failure due to "field descriptions not available for DDL statements" - same as PostgreSQL
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode, // Assert that it fails as expected
@@ -339,10 +339,10 @@ func TestRedshiftWorkflows(t *testing.T) {
 					{
 						Name:    "scd2-by-time: confirm the table is dropped",
 						Command: binary,
-						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, "../.bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT * FROM test.products;"},
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "SELECT * FROM test.products;"),
 						Env:     []string{},
 						Expected: e2e.Output{
-							ExitCode: 1,
+							ExitCode: 1, // Should fail because table doesn't exist
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -392,7 +392,7 @@ func TestRedshiftIndividualTasks(t *testing.T) {
 		{
 			Name:    "query the products individual table",
 			Command: binary,
-			Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "SELECT PRODUCT_ID, PRODUCT_NAME, PRICE, STOCK FROM public.products_individual ORDER BY PRODUCT_ID;", "--output", "csv"),
+			Args:    append(append([]string{"query"}, configFlags...), "--connection", "redshift-default", "--query", "SELECT PRODUCT_ID, PRODUCT_NAME, PRICE, STOCK FROM public.products_individual ORDER BY PRODUCT_ID;", "--output", "csv"),
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
