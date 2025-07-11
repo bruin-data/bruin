@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -30,17 +31,13 @@ type SfClient interface {
 	RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error
 }
 
-type connectionFetcher interface {
-	GetConnection(name string) any
-}
-
 type BasicOperator struct {
-	connection   connectionFetcher
+	connection   config.ConnectionGetter
 	extractor    query.QueryExtractor
 	materializer materializer
 }
 
-func NewBasicOperator(conn connectionFetcher, extractor query.QueryExtractor, materializer materializer) *BasicOperator {
+func NewBasicOperator(conn config.ConnectionGetter, extractor query.QueryExtractor, materializer materializer) *BasicOperator {
 	return &BasicOperator{
 		connection:   conn,
 		extractor:    extractor,
@@ -118,7 +115,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	return conn.RunQueryWithoutResult(ctx, q)
 }
 
-func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOperator {
+func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnCheckOperator {
 	return ansisql.NewColumnCheckOperator(map[string]ansisql.CheckRunner{
 		"not_null":        ansisql.NewNotNullCheck(manager),
 		"unique":          ansisql.NewUniqueCheck(manager),
@@ -131,12 +128,12 @@ func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOpera
 }
 
 type QuerySensor struct {
-	connection     connectionFetcher
+	connection     config.ConnectionGetter
 	extractor      query.QueryExtractor
 	secondsToSleep int64
 }
 
-func NewQuerySensor(conn connectionFetcher, extractor query.QueryExtractor, secondsToSleep int64) *QuerySensor {
+func NewQuerySensor(conn config.ConnectionGetter, extractor query.QueryExtractor, secondsToSleep int64) *QuerySensor {
 	return &QuerySensor{
 		connection:     conn,
 		extractor:      extractor,
@@ -191,10 +188,10 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 }
 
 type MetadataOperator struct {
-	connection connectionFetcher
+	connection config.ConnectionGetter
 }
 
-func NewMetadataPushOperator(conn connectionFetcher) *MetadataOperator {
+func NewMetadataPushOperator(conn config.ConnectionGetter) *MetadataOperator {
 	return &MetadataOperator{
 		connection: conn,
 	}

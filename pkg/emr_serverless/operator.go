@@ -11,18 +11,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/env"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/scheduler"
 )
 
-type connectionFetcher interface {
-	GetConnection(name string) any
-}
-
 type BasicOperator struct {
-	connection connectionFetcher
+	connection config.ConnectionGetter
 	env        map[string]string
 }
 
@@ -82,7 +79,7 @@ func (op *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) err
 	return job.Run(ctx)
 }
 
-func NewBasicOperator(conn connectionFetcher, env map[string]string) (*BasicOperator, error) {
+func NewBasicOperator(conn config.ConnectionGetter, env map[string]string) (*BasicOperator, error) {
 	return &BasicOperator{
 		connection: conn,
 		env:        env,

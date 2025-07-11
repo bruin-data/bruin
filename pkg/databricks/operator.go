@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -22,17 +23,13 @@ type Client interface {
 	Ping(ctx context.Context) error
 }
 
-type connectionFetcher interface {
-	GetConnection(name string) any
-}
-
 type BasicOperator struct {
-	connection   connectionFetcher
+	connection   config.ConnectionGetter
 	extractor    query.QueryExtractor
 	materializer materializer
 }
 
-func NewBasicOperator(conn connectionFetcher, extractor query.QueryExtractor, materializer materializer) *BasicOperator {
+func NewBasicOperator(conn config.ConnectionGetter, extractor query.QueryExtractor, materializer materializer) *BasicOperator {
 	return &BasicOperator{
 		connection:   conn,
 		extractor:    extractor,
@@ -97,7 +94,7 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	return nil
 }
 
-func NewColumnCheckOperator(manager connectionFetcher) *ansisql.ColumnCheckOperator {
+func NewColumnCheckOperator(manager config.ConnectionGetter) *ansisql.ColumnCheckOperator {
 	return ansisql.NewColumnCheckOperator(map[string]ansisql.CheckRunner{
 		"not_null":        ansisql.NewNotNullCheck(manager),
 		"unique":          ansisql.NewUniqueCheck(manager),

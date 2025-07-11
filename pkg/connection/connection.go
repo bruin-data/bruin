@@ -1711,27 +1711,6 @@ func (m *Manager) AddTableauConnectionFromConfig(connection *config.TableauConne
 	return nil
 }
 
-func (m *Manager) GetTableauConnection(name string) (*tableau.Client, error) {
-	conn, err := m.GetTableauConnectionWithoutDefault(name)
-	if err != nil {
-		return nil, err
-	}
-
-	return conn, nil
-}
-
-func (m *Manager) GetTableauConnectionWithoutDefault(name string) (*tableau.Client, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	conn, ok := m.Tableau[name]
-	if !ok {
-		return nil, errors.Errorf("tableau connection '%s' not found", name)
-	}
-
-	return conn, nil
-}
-
 var envVarRegex = regexp.MustCompile(`\${([^}]+)}`)
 
 func processConnections[T config.Named](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {

@@ -63,9 +63,7 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager inte
 
 	//
 	if manager != nil {
-		managerInterface, ok := manager.(interface {
-			GetConnection(name string) any
-		})
+		managerInterface, ok := manager.(config.ConnectionGetter)
 		if !ok {
 			return fillStatusFailed, errors.New("manager does not implement GetConnection")
 		}

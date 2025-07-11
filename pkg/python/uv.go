@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/bruin-data/bruin/pkg/config"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -159,10 +160,6 @@ type uvInstaller interface {
 	EnsureUvInstalled(ctx context.Context) (string, error)
 }
 
-type connectionFetcher interface {
-	GetConnection(name string) any
-}
-
 type pipelineConnection interface {
 	GetIngestrURI() (string, error)
 }
@@ -170,7 +167,7 @@ type pipelineConnection interface {
 type UvPythonRunner struct {
 	Cmd            cmd
 	UvInstaller    uvInstaller
-	conn           connectionFetcher
+	conn           config.ConnectionGetter
 	binaryFullPath string
 }
 

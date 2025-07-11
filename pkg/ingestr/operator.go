@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/git"
@@ -14,10 +15,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/scheduler"
 	"github.com/pkg/errors"
 )
-
-type connectionFetcher interface {
-	GetConnection(name string) any
-}
 
 type repoFinder interface {
 	Repo(path string) (*git.Repo, error)
@@ -28,14 +25,14 @@ type ingestrRunner interface {
 }
 
 type BasicOperator struct {
-	conn          connectionFetcher
+	conn          config.ConnectionGetter
 	runner        ingestrRunner
 	finder        repoFinder
 	jinjaRenderer jinja.RendererInterface
 }
 
 type SeedOperator struct {
-	conn   connectionFetcher
+	conn   config.ConnectionGetter
 	runner ingestrRunner
 	finder repoFinder
 }

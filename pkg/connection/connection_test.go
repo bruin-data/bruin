@@ -68,7 +68,6 @@ func TestManager_GetConnection(t *testing.T) {
 				assert.NotNil(t, got)
 				assert.Equal(t, tt.want, got)
 			}
-
 		})
 	}
 }
