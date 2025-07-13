@@ -1754,7 +1754,7 @@ func processConnections[T config.Named](connections []T, adder func(*T) error, w
 	}
 }
 
-func NewManagerFromConfig(cm *config.Config) (*Manager, []error) {
+func NewManagerFromConfig(cm *config.Config) (*config.ConnectionGetter, []error) {
 	connectionManager := &Manager{}
 	connectionManager.availableConnections = make(map[string]any)
 
