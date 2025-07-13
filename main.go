@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/bruin-data/bruin/cmd"
+	"github.com/bruin-data/bruin/cmd/mcp"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	v "github.com/bruin-data/bruin/pkg/version"
 	"github.com/fatih/color"
@@ -74,6 +75,7 @@ func main() {
 			cmd.Query(),
 			cmd.Patch(),
 			cmd.DataDiffCmd(),
+			mcp.MCPCmd(),
 			versionCommand,
 		},
 		DisableSliceFlagSeparator: true,
