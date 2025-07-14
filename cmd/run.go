@@ -93,9 +93,141 @@ func (s TaskTypeStats) SuccessRate() float64 {
 	return float64(s.Succeeded) / float64(s.Total) * 100
 }
 
+func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) {
+	// Group results by asset
+	assetResults := make(map[string]map[string]*scheduler.TaskExecutionResult)
+	assetOrder := make([]string, 0)
+	
+	for _, result := range results {
+		assetName := result.Instance.GetAsset().Name
+		if _, exists := assetResults[assetName]; !exists {
+			assetResults[assetName] = make(map[string]*scheduler.TaskExecutionResult)
+			assetOrder = append(assetOrder, assetName)
+		}
+		
+		switch instance := result.Instance.(type) {
+		case *scheduler.AssetInstance:
+			assetResults[assetName]["main"] = result
+		case *scheduler.ColumnCheckInstance:
+			key := fmt.Sprintf("column:%s:%s", instance.Column.Name, instance.Check.Name)
+			assetResults[assetName][key] = result
+		case *scheduler.CustomCheckInstance:
+			key := fmt.Sprintf("custom:%s", instance.Check.Name)
+			assetResults[assetName][key] = result
+		}
+	}
+	
+	// Add skipped assets
+	skippedTasks := s.GetTaskInstancesByStatus(scheduler.Skipped)
+	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
+	allSkippedTasks := append(skippedTasks, upstreamFailedTasks...)
+	
+	for _, task := range allSkippedTasks {
+		assetName := task.GetAsset().Name
+		if _, exists := assetResults[assetName]; !exists {
+			assetResults[assetName] = make(map[string]*scheduler.TaskExecutionResult)
+			assetOrder = append(assetOrder, assetName)
+		}
+		
+		// Create a fake skipped result
+		skippedResult := &scheduler.TaskExecutionResult{
+			Instance: task,
+			Error:    nil, // We'll use nil to indicate skipped
+		}
+		
+		switch instance := task.(type) {
+		case *scheduler.AssetInstance:
+			assetResults[assetName]["main"] = skippedResult
+		case *scheduler.ColumnCheckInstance:
+			key := fmt.Sprintf("column:%s:%s", instance.Column.Name, instance.Check.Name)
+			assetResults[assetName][key] = skippedResult
+		case *scheduler.CustomCheckInstance:
+			key := fmt.Sprintf("custom:%s", instance.Check.Name)
+			assetResults[assetName][key] = skippedResult
+		}
+	}
+	
+	if len(assetOrder) == 0 {
+		return
+	}
+	
+	fmt.Println()
+	
+	for _, assetName := range assetOrder {
+		results := assetResults[assetName]
+		mainResult := results["main"]
+		
+		// Asset name with status
+		var assetStatus string
+		var assetColor *color.Color
+		
+		if mainResult == nil {
+			// Asset not executed
+			assetStatus = "SKIP"
+			assetColor = color.New(color.Faint)
+		} else if mainResult.Error == nil {
+			// Check if this is actually skipped
+			_, isSkipped := find(skippedTasks, mainResult.Instance)
+			_, isUpstreamFailed := find(upstreamFailedTasks, mainResult.Instance)
+			
+			if isSkipped || isUpstreamFailed {
+				assetStatus = "SKIP"
+				assetColor = color.New(color.Faint)
+			} else {
+				assetStatus = "PASS"
+				assetColor = color.New(color.FgGreen)
+			}
+		} else {
+			assetStatus = "FAIL"
+			assetColor = color.New(color.FgRed)
+		}
+		
+		fmt.Printf("%s %s ", assetColor.Sprint(assetStatus), assetName)
+		
+		// Print dots for quality checks
+		checkCount := 0
+		for key, result := range results {
+			if key == "main" {
+				continue
+			}
+			
+			checkCount++
+			if result == nil {
+				fmt.Print(faint("."))
+			} else if result.Error == nil {
+				// Check if skipped
+				_, isSkipped := find(skippedTasks, result.Instance)
+				_, isUpstreamFailed := find(upstreamFailedTasks, result.Instance)
+				
+				if isSkipped || isUpstreamFailed {
+					fmt.Print(faint("."))
+				} else {
+					fmt.Print(color.New(color.FgGreen).Sprint("."))
+				}
+			} else {
+				fmt.Print(color.New(color.FgRed).Sprint("F"))
+			}
+		}
+		
+		fmt.Println()
+	}
+}
+
+func find(slice []scheduler.TaskInstance, item scheduler.TaskInstance) (int, bool) {
+	for i, v := range slice {
+		if v == item {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
 func printExecutionSummary(results []*scheduler.TaskExecutionResult, s *scheduler.Scheduler, duration time.Duration, _ int) {
 	summary := analyzeResults(results, s)
 	summary.Duration = duration
+
+	// Print execution table first
+	printExecutionTable(results, s)
 
 	// Determine overall status
 	hasFailures := summary.FailedTasks > 0
@@ -887,6 +1019,7 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 		data[assetName] = append(data[assetName], result)
 	}
 
+	fmt.Println()
 	tree := treeprint.NewWithRoot(color.New(color.FgRed).Sprintf("%d assets failed", len(data)))
 	for assetName, results := range data {
 		assetBranch := tree.AddBranch(color.New(color.FgYellow).Sprint(assetName))
