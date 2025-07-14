@@ -806,3 +806,520 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildRedshiftSCD2QueryByTime(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		asset       *pipeline.Asset
+		query       string
+		want        string
+		wantErr     bool
+		fullRefresh bool
+	}{
+		{
+			name: "scd2_no_primary_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER"},
+					{Name: "event_name", Type: "VARCHAR"},
+					{Name: "ts", Type: "TIMESTAMP"},
+				},
+			},
+			query:       "SELECT id, event_name, ts from source_table",
+			wantErr:     true,
+			fullRefresh: false,
+		},
+		{
+			name: "scd2_no_incremental_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByTime,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true, Type: "INTEGER"},
+					{Name: "event_name", Type: "VARCHAR"},
+				},
+			},
+			query:       "SELECT id, event_name from source_table",
+			wantErr:     true,
+			fullRefresh: false,
+		},
+		{
+			name: "scd2_reserved_column_name_is_current",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true, Type: "INTEGER"},
+					{Name: "_is_current", Type: "BOOLEAN"},
+					{Name: "ts", Type: "TIMESTAMP"},
+				},
+			},
+			query:       "SELECT id, _is_current from source_table",
+			wantErr:     true,
+			fullRefresh: false,
+		},
+		{
+			name: "scd2_reserved_column_name_valid_from",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true, Type: "INTEGER"},
+					{Name: "_valid_from", Type: "TIMESTAMP"},
+					{Name: "ts", Type: "TIMESTAMP"},
+				},
+			},
+			query:       "SELECT id, _valid_from from source_table",
+			wantErr:     true,
+			fullRefresh: false,
+		},
+		{
+			name: "scd2_reserved_column_name_valid_until",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true, Type: "INTEGER"},
+					{Name: "_valid_until", Type: "TIMESTAMP"},
+					{Name: "ts", Type: "TIMESTAMP"},
+				},
+			},
+			query:       "SELECT id, _valid_until from source_table",
+			wantErr:     true,
+			fullRefresh: false,
+		},
+		{
+			name: "scd2_invalid_incremental_key_type",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true, Type: "INTEGER"},
+					{Name: "event_name", Type: "VARCHAR"},
+					{Name: "ts", Type: "VARCHAR"},
+				},
+			},
+			query:       "SELECT id, event_name, ts from source_table",
+			wantErr:     true,
+			fullRefresh: false,
+		},
+		{
+			name: "scd2_table_exists_with_incremental_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true, Type: "INTEGER"},
+					{Name: "event_name", Type: "VARCHAR"},
+					{Name: "ts", Type: "DATE"},
+				},
+			},
+			query: "SELECT id, event_name, ts from source_table",
+			want: "^BEGIN TRANSACTION;\n\n" +
+				"-- Create temp table with source data\n" +
+				"CREATE TEMP TABLE __bruin_scd2_time_tmp_.+ AS \n" +
+				"SELECT \\*, TRUE AS _is_current FROM \\(SELECT id, event_name, ts from source_table\\) AS src;\n\n" +
+				"-- Update existing records where source timestamp is newer\n" +
+				"UPDATE my\\.asset AS target\n" +
+				"SET _valid_until = source\\.ts, _is_current = FALSE\n" +
+				"FROM __bruin_scd2_time_tmp_.+ AS source\n" +
+				"WHERE target\\.id = source\\.id\n" +
+				"  AND target\\._is_current = TRUE\n" +
+				"  AND target\\._valid_from < source\\.ts;\n\n" +
+				"-- Update records that are no longer in source \\(expired\\)\n" +
+				"UPDATE my\\.asset AS target\n" +
+				"SET _valid_until = CURRENT_TIMESTAMP, _is_current = FALSE\n" +
+				"WHERE target\\._is_current = TRUE\n" +
+				"  AND NOT EXISTS \\(\n" +
+				"    SELECT 1 FROM __bruin_scd2_time_tmp_.+ AS source\n" +
+				"    WHERE target\\.id = source\\.id\n" +
+				"  \\);\n\n" +
+				"-- Insert new records and new versions of changed records\n" +
+				"INSERT INTO my\\.asset \\(id, event_name, ts, _valid_from, _valid_until, _is_current\\)\n" +
+				"SELECT source\\.id, source\\.event_name, source\\.ts, source\\.ts, TIMESTAMP '9999-12-31 00:00:00', TRUE\n" + //nolint:dupword
+				"FROM __bruin_scd2_time_tmp_.+ AS source\n" +
+				"WHERE NOT EXISTS \\(\n" +
+				"  SELECT 1 FROM my\\.asset AS target \n" +
+				"  WHERE target\\.id = source\\.id AND target\\._is_current = TRUE\n" +
+				"\\)\n" +
+				"OR EXISTS \\(\n" +
+				"  SELECT 1 FROM my\\.asset AS target\n" +
+				"  WHERE target\\.id = source\\.id AND target\\._is_current = FALSE \n" +
+				"  AND target\\._valid_until = source\\.ts\n" +
+				"\\);\n\n" +
+				"DROP TABLE __bruin_scd2_time_tmp_.+;\n" +
+				"COMMIT;$",
+		},
+		{
+			name: "scd2_multiple_primary_keys_with_incremental_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true, Type: "INTEGER"},
+					{Name: "event_type", PrimaryKey: true, Type: "VARCHAR"},
+					{Name: "col1", Type: "VARCHAR"},
+					{Name: "col2", Type: "VARCHAR"},
+					{Name: "ts", Type: "TIMESTAMP"},
+				},
+			},
+			query: "SELECT id, event_type, col1, col2, ts from source_table",
+			want: "^BEGIN TRANSACTION;\n\n" +
+				"-- Create temp table with source data\n" +
+				"CREATE TEMP TABLE __bruin_scd2_time_tmp_.+ AS \n" +
+				"SELECT \\*, TRUE AS _is_current FROM \\(SELECT id, event_type, col1, col2, ts from source_table\\) AS src;\n\n" +
+				"-- Update existing records where source timestamp is newer\n" +
+				"UPDATE my\\.asset AS target\n" +
+				"SET _valid_until = source\\.ts, _is_current = FALSE\n" +
+				"FROM __bruin_scd2_time_tmp_.+ AS source\n" +
+				"WHERE target\\.id = source\\.id AND target\\.event_type = source\\.event_type\n" +
+				"  AND target\\._is_current = TRUE\n" +
+				"  AND target\\._valid_from < source\\.ts;\n\n" +
+				"-- Update records that are no longer in source \\(expired\\)\n" +
+				"UPDATE my\\.asset AS target\n" +
+				"SET _valid_until = CURRENT_TIMESTAMP, _is_current = FALSE\n" +
+				"WHERE target\\._is_current = TRUE\n" +
+				"  AND NOT EXISTS \\(\n" +
+				"    SELECT 1 FROM __bruin_scd2_time_tmp_.+ AS source\n" +
+				"    WHERE target\\.id = source\\.id AND target\\.event_type = source\\.event_type\n" +
+				"  \\);\n\n" +
+				"-- Insert new records and new versions of changed records\n" +
+				"INSERT INTO my\\.asset \\(id, event_type, col1, col2, ts, _valid_from, _valid_until, _is_current\\)\n" +
+				"SELECT source\\.id, source\\.event_type, source\\.col1, source\\.col2, source\\.ts, source\\.ts, TIMESTAMP '9999-12-31 00:00:00', TRUE\n" + //nolint:dupword
+				"FROM __bruin_scd2_time_tmp_.+ AS source\n" +
+				"WHERE NOT EXISTS \\(\n" +
+				"  SELECT 1 FROM my\\.asset AS target \n" +
+				"  WHERE target\\.id = source\\.id AND target\\.event_type = source\\.event_type AND target\\._is_current = TRUE\n" +
+				"\\)\n" +
+				"OR EXISTS \\(\n" +
+				"  SELECT 1 FROM my\\.asset AS target\n" +
+				"  WHERE target\\.id = source\\.id AND target\\.event_type = source\\.event_type AND target\\._is_current = FALSE \n" +
+				"  AND target\\._valid_until = source\\.ts\n" +
+				"\\);\n\n" +
+				"DROP TABLE __bruin_scd2_time_tmp_.+;\n" +
+				"COMMIT;$",
+		},
+		{
+			name: "scd2_full_refresh_with_incremental_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true, Type: "INTEGER"},
+					{Name: "event_name", Type: "VARCHAR"},
+					{Name: "ts", Type: "DATE"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, event_name, ts from source_table",
+			want: "BEGIN TRANSACTION;\n" +
+				"DROP TABLE IF EXISTS my.asset;\n" +
+				"CREATE TABLE my.asset AS\n" +
+				"SELECT\n" +
+				"  ts AS _valid_from,\n" +
+				"  src.*,\n" +
+				"  TIMESTAMP '9999-12-31 00:00:00' AS _valid_until,\n" +
+				"  TRUE AS _is_current\n" +
+				"FROM (\n" +
+				"SELECT id, event_name, ts from source_table\n" +
+				") AS src;\n" +
+				"COMMIT;",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			m := NewMaterializer(tt.fullRefresh)
+			render, err := m.Render(tt.asset, tt.query)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				if strings.HasSuffix(tt.want, "$") {
+					// Use regex matching for complex queries with temp table names
+					assert.Regexp(t, tt.want, render)
+				} else {
+					assert.Equal(t, strings.TrimSpace(tt.want), render)
+				}
+			}
+		})
+	}
+}
+
+func TestBuildRedshiftSCD2ByColumnQuery(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		asset       *pipeline.Asset
+		query       string
+		want        string
+		wantErr     bool
+		fullRefresh bool
+	}{
+		{
+			name: "scd2_no_primary_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id"},
+					{Name: "event_name"},
+					{Name: "ts", Type: "date"},
+				},
+			},
+			query:   "SELECT id, event_name, ts from source_table",
+			wantErr: true,
+		},
+		{
+			name: "scd2_reserved_column_name_is_current",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "_is_current"},
+				},
+			},
+			query:   "SELECT id, _is_current from source_table",
+			wantErr: true,
+		},
+		{
+			name: "scd2_reserved_column_name_valid_from",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "_valid_from"},
+				},
+			},
+			query:   "SELECT id, _valid_from from source_table",
+			wantErr: true,
+		},
+		{
+			name: "scd2_reserved_column_name_valid_until",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "_valid_until"},
+				},
+			},
+			query:   "SELECT id, _valid_until from source_table",
+			wantErr: true,
+		},
+		{
+			name: "scd2_basic_column_change_detection",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "col1"},
+					{Name: "col2"},
+					{Name: "col3"},
+					{Name: "col4"},
+				},
+			},
+			query: "SELECT id, col1, col2, col3, col4 from source_table",
+			want: "^BEGIN TRANSACTION;\n\n" +
+				"SET session_timestamp = CURRENT_TIMESTAMP;\n\n" +
+				"-- Create temp table with source data\n" +
+				"CREATE TEMP TABLE __bruin_scd2_tmp_.+ AS \n" +
+				"SELECT \\*, TRUE AS _is_current FROM \\(SELECT id, col1, col2, col3, col4 from source_table\\) AS src;\n\n" +
+				"-- Update existing records that have changes\n" +
+				"UPDATE my\\.asset AS target\n" +
+				"SET _valid_until = :session_timestamp, _is_current = FALSE\n" +
+				"WHERE target\\._is_current = TRUE\n" +
+				"  AND EXISTS \\(\n" +
+				"    SELECT 1 FROM __bruin_scd2_tmp_.+ AS source\n" +
+				"    WHERE target\\.id = source\\.id AND \\(target\\.col1 != source\\.col1 OR target\\.col2 != source\\.col2 OR target\\.col3 != source\\.col3 OR target\\.col4 != source\\.col4\\)\n" +
+				"  \\);\n\n" +
+				"-- Update records that are no longer in source \\(expired\\)\n" +
+				"UPDATE my\\.asset AS target\n" +
+				"SET _valid_until = :session_timestamp, _is_current = FALSE\n" +
+				"WHERE target\\._is_current = TRUE\n" +
+				"  AND NOT EXISTS \\(\n" +
+				"    SELECT 1 FROM __bruin_scd2_tmp_.+ AS source\n" +
+				"    WHERE target\\.id = source\\.id\n" +
+				"  \\);\n\n" +
+				"-- Insert new records and new versions of changed records\n" +
+				"INSERT INTO my\\.asset \\(id, col1, col2, col3, col4, _valid_from, _valid_until, _is_current\\)\n" +
+				"SELECT source\\.id, source\\.col1, source\\.col2, source\\.col3, source\\.col4, :session_timestamp, TIMESTAMP '9999-12-31 00:00:00', TRUE\n" +
+				"FROM __bruin_scd2_tmp_.+ AS source\n" +
+				"WHERE NOT EXISTS \\(\n" +
+				"  SELECT 1 FROM my\\.asset AS target \n" +
+				"  WHERE target\\.id = source\\.id AND target\\._is_current = TRUE\n" +
+				"\\);\n\n" +
+				"DROP TABLE __bruin_scd2_tmp_.+;\n" +
+				"COMMIT;$",
+		},
+		{
+			name: "scd2_multiple_primary_keys",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true},
+					{Name: "category", PrimaryKey: true},
+					{Name: "name"},
+					{Name: "price"},
+				},
+			},
+			query: "SELECT id, category, name, price from source_table",
+			want: "^BEGIN TRANSACTION;\n\n" +
+				"SET session_timestamp = CURRENT_TIMESTAMP;\n\n" +
+				"-- Create temp table with source data\n" +
+				"CREATE TEMP TABLE __bruin_scd2_tmp_.+ AS \n" +
+				"SELECT \\*, TRUE AS _is_current FROM \\(SELECT id, category, name, price from source_table\\) AS src;\n\n" +
+				"-- Update existing records that have changes\n" +
+				"UPDATE my\\.asset AS target\n" +
+				"SET _valid_until = :session_timestamp, _is_current = FALSE\n" +
+				"WHERE target\\._is_current = TRUE\n" +
+				"  AND EXISTS \\(\n" +
+				"    SELECT 1 FROM __bruin_scd2_tmp_.+ AS source\n" +
+				"    WHERE target\\.id = source\\.id AND target\\.category = source\\.category AND \\(target\\.name != source\\.name OR target\\.price != source\\.price\\)\n" +
+				"  \\);\n\n" +
+				"-- Update records that are no longer in source \\(expired\\)\n" +
+				"UPDATE my\\.asset AS target\n" +
+				"SET _valid_until = :session_timestamp, _is_current = FALSE\n" +
+				"WHERE target\\._is_current = TRUE\n" +
+				"  AND NOT EXISTS \\(\n" +
+				"    SELECT 1 FROM __bruin_scd2_tmp_.+ AS source\n" +
+				"    WHERE target\\.id = source\\.id AND target\\.category = source\\.category\n" +
+				"  \\);\n\n" +
+				"-- Insert new records and new versions of changed records\n" +
+				"INSERT INTO my\\.asset \\(id, category, name, price, _valid_from, _valid_until, _is_current\\)\n" +
+				"SELECT source\\.id, source\\.category, source\\.name, source\\.price, :session_timestamp, TIMESTAMP '9999-12-31 00:00:00', TRUE\n" +
+				"FROM __bruin_scd2_tmp_.+ AS source\n" +
+				"WHERE NOT EXISTS \\(\n" +
+				"  SELECT 1 FROM my\\.asset AS target \n" +
+				"  WHERE target\\.id = source\\.id AND target\\.category = source\\.category AND target\\._is_current = TRUE\n" +
+				"\\);\n\n" +
+				"DROP TABLE __bruin_scd2_tmp_.+;\n" +
+				"COMMIT;$",
+		},
+		{
+			name: "scd2_full_refresh_by_column",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Type: pipeline.AssetTypeRedshiftQuery,
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER", PrimaryKey: true},
+					{Name: "name", Type: "VARCHAR"},
+					{Name: "price", Type: "FLOAT"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, name, price from source_table",
+			want: "BEGIN TRANSACTION;\n" +
+				"DROP TABLE IF EXISTS my.asset;\n" +
+				"CREATE TABLE my.asset AS\n" +
+				"SELECT\n" +
+				"  CURRENT_TIMESTAMP AS _valid_from,\n" +
+				"  src.*,\n" +
+				"  TIMESTAMP '9999-12-31 00:00:00' AS _valid_until,\n" +
+				"  TRUE AS _is_current\n" +
+				"FROM (\n" +
+				"SELECT id, name, price from source_table\n" +
+				") AS src;\n" +
+				"COMMIT;",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			m := NewMaterializer(tt.fullRefresh)
+			render, err := m.Render(tt.asset, tt.query)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				if strings.HasSuffix(tt.want, "$") {
+					// Use regex matching for complex queries with temp table names
+					assert.Regexp(t, tt.want, render)
+				} else {
+					assert.Equal(t, strings.TrimSpace(tt.want), render)
+				}
+			}
+		})
+	}
+}
