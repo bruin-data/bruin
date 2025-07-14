@@ -277,9 +277,9 @@ ORDER BY table_schema, table_name;`).
 			sqlxDB := sqlx.NewDb(mockDB, "sqlmock")
 
 			tt.mockConnection(mock)
-			db := Client{connection: sqlxDB}
+			client := Client{connection: sqlxDB}
 
-			got, err := db.GetDatabaseSummary(context.Background())
+			got, err := client.GetDatabaseSummary(context.Background())
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
