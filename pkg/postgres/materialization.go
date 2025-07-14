@@ -482,7 +482,7 @@ WHEN NOT MATCHED BY TARGET THEN
 	return strings.TrimSpace(queryStr), nil
 }
 
-// Redshift-specific SCD2 functions - Redshift has different SQL syntax requirements compared to PostgreSQL
+// Redshift-specific SCD2 functions - Redshift has different SQL syntax requirements compared to PostgreSQL.
 func buildRedshiftSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error) {
 	query = strings.TrimRight(query, ";")
 	var (
@@ -711,4 +711,3 @@ COMMIT;`,
 
 	return strings.TrimSpace(queryStr), nil
 }
-
