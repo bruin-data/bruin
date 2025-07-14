@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -17,7 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	"github.com/aws/aws-sdk-go-v2/service/emrserverless/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/bruin-data/bruin/pkg/path"
+	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/google/uuid"
 )
@@ -177,15 +176,14 @@ func (job Job) prepareWorkspace(ctx context.Context) (*workspace, error) {
 	zipper := zip.NewWriter(fd)
 	defer zipper.Close()
 
-	pipelineRoot, err := path.GetPipelineRootFromTask(scriptPath, []string{"pipeline.yaml", "pipeline.yml"})
+	repo, err := git.FindRepoFromPath(scriptPath)
 	if err != nil {
-		return nil, fmt.Errorf("error finding pipeline root: %w", err)
+		return nil, fmt.Errorf("error finding project root: %w", err)
 	}
 
 	err = packageContextWithPrefix(
 		zipper,
-		os.DirFS(pipelineRoot),
-		filepath.Base(pipelineRoot),
+		os.DirFS(repo.Path),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error packaging files: %w", err)
