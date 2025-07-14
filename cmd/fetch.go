@@ -97,7 +97,7 @@ func Query() *cli.Command {
 			},
 			&cli.BoolFlag{
 				Name:  "dry-run",
-				Usage: "perform query validation and cost estimation without executing the query (BigQuery only)",
+				Usage: "perform query validation and query size estimation without executing the query (BigQuery only)",
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -129,9 +129,7 @@ func Query() *cli.Command {
 
 				queryStr = addLimitToQuery(queryStr, c.Int64("limit"), conn, parser, dialect)
 			}
-			// Check if dry-run mode is enabled
 			if c.Bool("dry-run") {
-				// Check if connection supports dry-run (BigQuery)
 				if dryRunner, ok := conn.(interface {
 					GetDryRunMetadata(ctx context.Context, q *query.Query) (*bigquery.DryRunMetadata, error)
 				}); ok {
@@ -147,7 +145,6 @@ func Query() *cli.Command {
 					if err != nil {
 						return handleError(c.String("output"), errors.Wrap(err, "dry run failed"))
 					}
-
 					// Output dry run metadata based on format specified
 					output := c.String("output")
 					switch output {
@@ -164,7 +161,6 @@ func Query() *cli.Command {
 							fmt.Printf("Validation Error: %s\n", metadata.ValidationError)
 						}
 						fmt.Printf("Total Bytes Processed: %d\n", metadata.TotalBytesProcessed)
-						fmt.Printf("Estimated Cost (USD): $%.10f\n", metadata.EstimatedCostUSD)
 					}
 					return nil
 				} else {

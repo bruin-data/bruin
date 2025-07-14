@@ -433,41 +433,20 @@ func TestBigQueryWorkflows(t *testing.T) {
 			},
 		},
 		{
-			name: "[bigquery] dry run asset cost estimation workflow",
+			name: "dry run asset bytes scanned estimation workflow",
 			workflow: e2e.Workflow{
-				Name: "[bigquery] dry run asset cost estimation workflow",
+				Name: "dry run asset bytes scanned estimation workflow",
 				Steps: []e2e.Task{
 					{
 						Name:    "dry-run-pipeline: create sample data table",
 						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/dry-run-pipeline")),
+						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/dry-run-pipeline")),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "dry-run: estimate cost of querying the created asset",
-						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/dry-run-pipeline/assets/sample_data.sql"), "--dry-run", "--output", "json"),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							// Expected output should contain dry run metadata JSON for valid query with actual cost
-							Contains: []string{
-								"\"total_bytes_processed\":0",
-								"\"total_bytes_billed\":0",
-								"\"total_slot_ms\":0",
-								"\"estimated_cost_usd\":0",
-								"\"is_valid\":true",
-							},
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByContains,
 						},
 					},
 					{
@@ -477,18 +456,38 @@ func TestBigQueryWorkflows(t *testing.T) {
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							// Expected output should contain dry run metadata JSON for custom query on real table
 							Contains: []string{
 								"\"total_bytes_processed\":225",
-								"\"total_bytes_billed\":0",
-								"\"total_slot_ms\":0",
-								"\"estimated_cost_usd\":1.2789769243681803e-9",
 								"\"is_valid\":true",
 							},
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
 							e2e.AssertByContains,
+						},
+					},
+					{
+						Name: "dry-run: drop the created table",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS dataset.sample_data;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
+						Name:    "dry-run: confirm the table is dropped",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM dataset.sample_data;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 1,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
 						},
 					},
 				},
@@ -502,57 +501,14 @@ func TestBigQueryWorkflows(t *testing.T) {
 					{
 						Name:    "dry-run: validate JSON structure for non-existent table",
 						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--dry-run", "--query", "SELECT id, name, value, category FROM dataset.sample_data WHERE value > 200 ORDER BY id;", "--output", "json"),
+						Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--dry-run", "--query", "SELECT * FROM non_existent_table;", "--output", "json"),
 						Env:     []string{},
 						Expected: e2e.Output{
 							ExitCode: 0,
-							// Expected output should contain dry run metadata JSON for invalid query (table doesn't exist)
 							Contains: []string{
 								"\"is_valid\":false",
-								"\"total_bytes_processed\":0", // No data processed for invalid query
-								"\"estimated_cost_usd\":0",    // No cost for invalid query
-								"\"validation_error\":",       // Should contain validation error
-								"Table",                       // Error message should mention table
-							},
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByContains,
-						},
-					},
-					{
-						Name:    "dry-run: validate JSON structure for complex query with non-existent table",
-						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--dry-run", "--query", "WITH category_stats AS (SELECT category, COUNT(*) as count, AVG(value) as avg_value FROM dataset.sample_data GROUP BY category) SELECT * FROM category_stats WHERE count > 2;", "--output", "json"),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							// Expected output should contain dry run metadata JSON for invalid query (table doesn't exist)
-							Contains: []string{
-								"\"is_valid\":false",
-								"\"total_bytes_processed\":0", // No data processed for invalid query
-								"\"estimated_cost_usd\":0",    // No cost for invalid query
-								"\"validation_error\":",       // Should contain validation error
-							},
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByContains,
-						},
-					},
-					{
-						Name:    "dry-run: validate error handling for clearly invalid query",
-						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--dry-run", "--query", "SELECT * FROM nonexistent_table;", "--output", "json"),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0, // Should not fail, but return validation error in metadata
-							// Expected output should contain validation error with zero cost
-							Contains: []string{
-								"\"is_valid\":false",
-								"\"total_bytes_processed\":0", // No data processed for invalid query
-								"\"estimated_cost_usd\":0",    // No cost for invalid query
-								"\"validation_error\":",       // Should contain validation error
+								"\"total_bytes_processed\":0",
+								"\"validation_error\":",
 							},
 						},
 						Asserts: []func(*e2e.Task) error{

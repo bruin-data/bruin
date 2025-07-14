@@ -35,13 +35,7 @@ type DryRunMetadata struct {
 	// This may be different from TotalBytesProcessed due to caching, minimum billing, etc.
 	TotalBytesBilled int64 `json:"total_bytes_billed"`
 
-	// TotalSlotMs is the total slot milliseconds that would be consumed by the query
-	// Useful for capacity planning in slot-based pricing
-	TotalSlotMs int64 `json:"total_slot_ms"`
-
-	// EstimatedCostUSD is a rough estimate of the query cost in USD
-	// Based on current on-demand pricing ($6.25 per TB as of 2024)
-	EstimatedCostUSD float64 `json:"estimated_cost_usd"`
+	// EstimatedCostUSD and TotalSlotMs fields removed
 
 	// IsValid indicates whether the query passed validation
 	IsValid bool `json:"is_valid"`
@@ -1096,17 +1090,8 @@ func (d *Client) GetDryRunMetadata(ctx context.Context, query *query.Query) (*Dr
 		IsValid: status.State == bigquery.Done,
 	}
 
-	// Extract query statistics if available and valid
 	if metadata.IsValid && status.Statistics != nil {
 		metadata.TotalBytesProcessed = status.Statistics.TotalBytesProcessed
-
-		// Calculate estimated cost based on on-demand pricing
-		// Current BigQuery on-demand pricing is $6.25 per TB (as of 2024)
-		const costPerTB = 6.25
-		if metadata.TotalBytesProcessed > 0 {
-			tbProcessed := float64(metadata.TotalBytesProcessed) / (1024 * 1024 * 1024 * 1024) // Convert bytes to TB
-			metadata.EstimatedCostUSD = tbProcessed * costPerTB
-		}
 	}
 
 	return metadata, nil
