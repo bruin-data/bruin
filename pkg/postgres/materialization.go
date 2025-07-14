@@ -115,10 +115,6 @@ func buildMergeQuery(asset *pipeline.Asset, query string) (string, error) {
 
 func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error) {
 	switch {
-	case task.Type == pipeline.AssetTypeRedshiftQuery && task.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByTime:
-		return buildRedshiftSCD2ByTimefullRefresh(task, query)
-	case task.Type == pipeline.AssetTypeRedshiftQuery && task.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByColumn:
-		return buildRedshiftSCD2ByColumnfullRefresh(task, query)
 	case task.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByTime:
 		return buildSCD2ByTimefullRefresh(task, query)
 	case task.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByColumn:
@@ -210,6 +206,13 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 		return "", errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
 	}
 
+	var validuntil string
+	if asset.Type == pipeline.AssetTypeRedshiftQuery {
+		validuntil = "TIMESTAMP '9999-12-31 00:00:00'"
+	} else {
+		validuntil = "'9999-12-31 00:00:00'::TIMESTAMP"
+	}
+
 	stmt := fmt.Sprintf(
 		`BEGIN TRANSACTION;
 DROP TABLE IF EXISTS %s;
@@ -217,7 +220,7 @@ CREATE TABLE %s AS
 SELECT
   CURRENT_TIMESTAMP AS _valid_from,
   src.*,
-  '9999-12-31 00:00:00'::TIMESTAMP AS _valid_until,
+  %s AS _valid_until,
   TRUE AS _is_current
 FROM (
 %s
@@ -225,6 +228,47 @@ FROM (
 COMMIT;`,
 		asset.Name,
 		asset.Name,
+		validuntil,
+		strings.TrimSpace(query),
+	)
+
+	return strings.TrimSpace(stmt), nil
+}
+
+func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, error) {
+	if asset.Materialization.IncrementalKey == "" {
+		return "", errors.New("incremental_key is required for SCD2 strategy")
+	}
+
+	primaryKeys := asset.ColumnNamesWithPrimaryKey()
+	if len(primaryKeys) == 0 {
+		return "", errors.New("materialization strategy 'SCD2_by_time' requires the `primary_key` field to be set on at least one column")
+	}
+
+	var validuntil string
+	if asset.Type == pipeline.AssetTypeRedshiftQuery {
+		validuntil = "TIMESTAMP '9999-12-31 00:00:00'"
+	} else {
+		validuntil = "'9999-12-31 00:00:00'::TIMESTAMP"
+	}
+
+	stmt := fmt.Sprintf(
+		`BEGIN TRANSACTION;
+DROP TABLE IF EXISTS %s;
+CREATE TABLE %s AS
+SELECT
+  %s AS _valid_from,
+  src.*,
+  %s AS _valid_until,
+  TRUE AS _is_current
+FROM (
+%s
+) AS src;
+COMMIT;`,
+		asset.Name,
+		asset.Name,
+		asset.Materialization.IncrementalKey,
+		validuntil,
 		strings.TrimSpace(query),
 	)
 
@@ -232,7 +276,6 @@ COMMIT;`,
 }
 
 func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error) {
-	// Route to Redshift-specific implementation for Redshift assets
 	if asset.Type == pipeline.AssetTypeRedshiftQuery {
 		return buildRedshiftSCD2ByColumnQuery(asset, query)
 	}
@@ -333,38 +376,6 @@ WHEN NOT MATCHED BY TARGET THEN
 	)
 
 	return strings.TrimSpace(queryStr), nil
-}
-
-func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, error) {
-	if asset.Materialization.IncrementalKey == "" {
-		return "", errors.New("incremental_key is required for SCD2 strategy")
-	}
-
-	primaryKeys := asset.ColumnNamesWithPrimaryKey()
-	if len(primaryKeys) == 0 {
-		return "", errors.New("materialization strategy 'SCD2_by_time' requires the `primary_key` field to be set on at least one column")
-	}
-
-	stmt := fmt.Sprintf(
-		`BEGIN TRANSACTION;
-DROP TABLE IF EXISTS %s;
-CREATE TABLE %s AS
-SELECT
-  %s AS _valid_from,
-  src.*,
-  '9999-12-31 00:00:00'::TIMESTAMP AS _valid_until,
-  TRUE AS _is_current
-FROM (
-%s
-) AS src;
-COMMIT;`,
-		asset.Name,
-		asset.Name,
-		asset.Materialization.IncrementalKey,
-		strings.TrimSpace(query),
-	)
-
-	return strings.TrimSpace(stmt), nil
 }
 
 func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
@@ -471,9 +482,7 @@ WHEN NOT MATCHED BY TARGET THEN
 	return strings.TrimSpace(queryStr), nil
 }
 
-// Redshift-specific SCD2 functions
-// Redshift has different SQL syntax requirements compared to PostgreSQL
-
+// Redshift-specific SCD2 functions - Redshift has different SQL syntax requirements compared to PostgreSQL
 func buildRedshiftSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error) {
 	query = strings.TrimRight(query, ";")
 	var (
@@ -504,7 +513,7 @@ func buildRedshiftSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string
 			asset.Materialization.Strategy)
 	}
 	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
-	insertValues = append(insertValues, "CURRENT_TIMESTAMP", "TIMESTAMP '9999-12-31 00:00:00'", "TRUE")
+	insertValues = append(insertValues, ":session_timestamp", "TIMESTAMP '9999-12-31 00:00:00'", "TRUE")
 
 	// Build ON condition for MERGE
 	onConditions := make([]string, 0, len(primaryKeys))
@@ -529,13 +538,15 @@ func buildRedshiftSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string
 	queryStr := fmt.Sprintf(`
 BEGIN TRANSACTION;
 
+SET session_timestamp = CURRENT_TIMESTAMP;
+
 -- Create temp table with source data
 CREATE TEMP TABLE %s AS 
 SELECT *, TRUE AS _is_current FROM (%s) AS src;
 
 -- Update existing records that have changes
 UPDATE %s AS target
-SET _valid_until = CURRENT_TIMESTAMP, _is_current = FALSE
+SET _valid_until = :session_timestamp, _is_current = FALSE
 WHERE target._is_current = TRUE
   AND EXISTS (
     SELECT 1 FROM %s AS source
@@ -544,7 +555,7 @@ WHERE target._is_current = TRUE
 
 -- Update records that are no longer in source (expired)
 UPDATE %s AS target
-SET _valid_until = CURRENT_TIMESTAMP, _is_current = FALSE
+SET _valid_until = :session_timestamp, _is_current = FALSE
 WHERE target._is_current = TRUE
   AND NOT EXISTS (
     SELECT 1 FROM %s AS source
@@ -701,61 +712,3 @@ COMMIT;`,
 	return strings.TrimSpace(queryStr), nil
 }
 
-func buildRedshiftSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, error) {
-	if asset.Materialization.IncrementalKey == "" {
-		return "", errors.New("incremental_key is required for SCD2 strategy")
-	}
-
-	primaryKeys := asset.ColumnNamesWithPrimaryKey()
-	if len(primaryKeys) == 0 {
-		return "", errors.New("materialization strategy 'SCD2_by_time' requires the `primary_key` field to be set on at least one column")
-	}
-
-	stmt := fmt.Sprintf(
-		`BEGIN TRANSACTION;
-DROP TABLE IF EXISTS %s;
-CREATE TABLE %s AS
-SELECT
-  %s AS _valid_from,
-  src.*,
-  TIMESTAMP '9999-12-31 00:00:00' AS _valid_until,
-  TRUE AS _is_current
-FROM (
-%s
-) AS src;
-COMMIT;`,
-		asset.Name,
-		asset.Name,
-		asset.Materialization.IncrementalKey,
-		strings.TrimSpace(query),
-	)
-
-	return strings.TrimSpace(stmt), nil
-}
-
-func buildRedshiftSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, error) {
-	primaryKeys := asset.ColumnNamesWithPrimaryKey()
-	if len(primaryKeys) == 0 {
-		return "", errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
-	}
-
-	stmt := fmt.Sprintf(
-		`BEGIN TRANSACTION;
-DROP TABLE IF EXISTS %s;
-CREATE TABLE %s AS
-SELECT
-  CURRENT_TIMESTAMP AS _valid_from,
-  src.*,
-  TIMESTAMP '9999-12-31 00:00:00' AS _valid_until,
-  TRUE AS _is_current
-FROM (
-%s
-) AS src;
-COMMIT;`,
-		asset.Name,
-		asset.Name,
-		strings.TrimSpace(query),
-	)
-
-	return strings.TrimSpace(stmt), nil
-}
