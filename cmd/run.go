@@ -592,7 +592,7 @@ func ValidateRunConfig(runConfig *scheduler.RunConfig, inputPath string, logger 
 	return startDate, endDate, inputPath, nil
 }
 
-func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, parser *sqlparser.SQLParser, connectionManager *connection.Manager) error {
+func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePath string, logger logger.Logger, parser *sqlparser.SQLParser, connectionManager config.ConnectionGetter) error {
 	rules, err := lint.GetRules(fs, &git.RepoFinder{}, true, parser, true)
 	if err != nil {
 		errorPrinter.Printf("An error occurred while linting the pipelines: %v\n", err)
@@ -678,7 +678,7 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 func SetupExecutors(
 	s *scheduler.Scheduler,
 	config *config.Config,
-	conn *connection.Manager,
+	conn config.ConnectionGetter,
 	startDate,
 	endDate time.Time,
 	pipelineName string,

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
-	"github.com/bruin-data/bruin/pkg/connection"
 	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -41,7 +40,7 @@ type pipelineConnection interface {
 	GetIngestrURI() (string, error)
 }
 
-func NewBasicOperator(conn *connection.Manager, j jinja.RendererInterface) (*BasicOperator, error) {
+func NewBasicOperator(conn config.ConnectionGetter, j jinja.RendererInterface) (*BasicOperator, error) {
 	uvRunner := &python.UvPythonRunner{
 		UvInstaller: &python.UvChecker{},
 		Cmd:         &python.CommandRunner{},
@@ -142,7 +141,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 	return o.runner.RunIngestr(ctx, cmdArgs, extraPackages, repo)
 }
 
-func NewSeedOperator(conn *connection.Manager) (*SeedOperator, error) {
+func NewSeedOperator(conn config.ConnectionGetter) (*SeedOperator, error) {
 	uvRunner := &python.UvPythonRunner{
 		UvInstaller: &python.UvChecker{},
 		Cmd:         &python.CommandRunner{},

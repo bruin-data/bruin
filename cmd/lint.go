@@ -357,7 +357,7 @@ func flattenErrors(err error) []string {
 	return foundErrors
 }
 
-func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionManager *connection.Manager) []lint.Rule {
+func queryValidatorRules(logger logger.Logger, cfg *config.Config, connectionManager config.ConnectionGetter) []lint.Rule {
 	rules := []lint.Rule{}
 	renderer := jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")
 	if len(cfg.SelectedEnvironment.Connections.GoogleCloudPlatform) > 0 {

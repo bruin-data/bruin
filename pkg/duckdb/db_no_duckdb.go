@@ -58,3 +58,7 @@ func (c *Client) SelectWithSchema(ctx context.Context, queryObject *query.Query)
 func (c *Client) CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error {
 	return errDuckDBNotSupported
 }
+
+func (c *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
+	return nil, errDuckDBNotSupported
+}
