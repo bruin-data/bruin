@@ -74,6 +74,7 @@ func main() {
 			cmd.Query(),
 			cmd.Patch(),
 			cmd.DataDiffCmd(),
+			cmd.Import(),
 			versionCommand,
 		},
 		DisableSliceFlagSeparator: true,
