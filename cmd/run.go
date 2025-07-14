@@ -60,6 +60,267 @@ type PipelineInfo struct {
 	RunDownstreamTasks bool
 }
 
+type ExecutionSummary struct {
+	TotalTasks      int
+	SuccessfulTasks int
+	FailedTasks     int
+	SkippedTasks    int
+
+	Assets       TaskTypeStats
+	ColumnChecks TaskTypeStats
+	CustomChecks TaskTypeStats
+	MetadataPush TaskTypeStats
+
+	Duration time.Duration
+}
+
+type TaskTypeStats struct {
+	Total            int
+	Succeeded        int
+	Failed           int // Failed in main execution
+	FailedDueToChecks int // Failed only due to checks (main execution succeeded)
+	Skipped          int
+}
+
+func (s TaskTypeStats) HasAny() bool {
+	return s.Total > 0
+}
+
+func (s TaskTypeStats) SuccessRate() float64 {
+	if s.Total == 0 {
+		return 0
+	}
+	return float64(s.Succeeded) / float64(s.Total) * 100
+}
+
+func printExecutionSummary(results []*scheduler.TaskExecutionResult, s *scheduler.Scheduler, duration time.Duration, _ int) {
+	summary := analyzeResults(results, s)
+	summary.Duration = duration
+
+	// Determine overall status
+	hasFailures := summary.FailedTasks > 0
+
+	// Header with status and task count
+	if hasFailures {
+		summaryPrinter.Printf("\n\nbruin run completed with %s in %s\n\n",
+			color.New(color.FgRed).Sprint("failures"),
+			duration.Truncate(time.Millisecond).String())
+	} else {
+		summaryPrinter.Printf("\n\nbruin run completed %s in %s\n\n",
+			color.New(color.FgGreen).Sprint("successfully"),
+			duration.Truncate(time.Millisecond).String())
+	}
+
+	// Assets executed (only actual assets, not including quality checks)
+	if summary.Assets.HasAny() {
+		if summary.Assets.Failed > 0 || summary.Assets.FailedDueToChecks > 0 || summary.Assets.Skipped > 0 {
+			summaryPrinter.Printf(" %s Assets executed      %s\n",
+				color.New(color.FgRed).Sprint("✗"),
+				formatCountWithSkipped(summary.Assets.Total, summary.Assets.Failed, summary.Assets.FailedDueToChecks, summary.Assets.Skipped))
+		} else {
+			summaryPrinter.Printf(" %s Assets executed      %s\n",
+				color.New(color.FgGreen).Sprint("✓"),
+				color.New(color.FgGreen).Sprintf("%d succeeded", summary.Assets.Succeeded))
+		}
+	}
+
+	// Quality checks
+	totalChecks := summary.ColumnChecks.Total + summary.CustomChecks.Total
+	totalCheckFailures := summary.ColumnChecks.Failed + summary.CustomChecks.Failed
+	totalCheckSkipped := summary.ColumnChecks.Skipped + summary.CustomChecks.Skipped
+	if totalChecks > 0 {
+		if totalCheckFailures > 0 || totalCheckSkipped > 0 {
+			summaryPrinter.Printf(" %s Quality checks       %s\n",
+				color.New(color.FgRed).Sprint("✗"),
+				formatCountWithSkipped(totalChecks, totalCheckFailures, 0, totalCheckSkipped))
+		} else {
+			summaryPrinter.Printf(" %s Quality checks       %s\n",
+				color.New(color.FgGreen).Sprint("✓"),
+				color.New(color.FgGreen).Sprintf("%d succeeded", summary.ColumnChecks.Succeeded + summary.CustomChecks.Succeeded))
+		}
+	}
+
+	// Metadata push
+	if summary.MetadataPush.HasAny() {
+		metadataExecuted := summary.MetadataPush.Succeeded + summary.MetadataPush.Failed
+		if summary.MetadataPush.Failed > 0 {
+			summaryPrinter.Printf(" %s Metadata pushed      %s\n",
+				color.New(color.FgRed).Sprint("✗"),
+				formatCount(metadataExecuted, summary.MetadataPush.Failed))
+		} else {
+			summaryPrinter.Printf(" %s Metadata pushed      %d\n",
+				color.New(color.FgGreen).Sprint("✓"), metadataExecuted)
+		}
+	}
+
+
+}
+
+func formatCount(total, failed int) string {
+	if failed == 0 {
+		return fmt.Sprintf("%d", total)
+	}
+	succeeded := total - failed
+	return fmt.Sprintf("%s / %s",
+		color.New(color.FgRed).Sprintf("%d failed", failed),
+		color.New(color.FgGreen).Sprintf("%d succeeded", succeeded))
+}
+
+func formatCountWithSkipped(total, failed, failedDueToChecks, skipped int) string {
+	succeeded := total - failed - failedDueToChecks - skipped
+	
+	var parts []string
+	if failed > 0 {
+		parts = append(parts, color.New(color.FgRed).Sprintf("%d failed", failed))
+	}
+	if failedDueToChecks > 0 {
+		parts = append(parts, color.New(color.FgYellow).Sprintf("%d failed due to checks", failedDueToChecks))
+	}
+	if succeeded > 0 {
+		parts = append(parts, color.New(color.FgGreen).Sprintf("%d succeeded", succeeded))
+	}
+	if skipped > 0 {
+		parts = append(parts, color.New(color.Faint).Sprintf("%d skipped", skipped))
+	}
+	
+	if len(parts) == 0 {
+		return "0"
+	}
+	if len(parts) == 1 && failed == 0 && failedDueToChecks == 0 && skipped == 0 {
+		return fmt.Sprintf("%d", succeeded)
+	}
+	
+	return strings.Join(parts, " / ")
+}
+
+func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) ExecutionSummary {
+	summary := ExecutionSummary{}
+
+	// Track asset status by asset name
+	assetMainStatus := make(map[string]bool)     // true if main execution succeeded
+	assetHasCheckFailures := make(map[string]bool) // true if any check failed
+	assetNames := make(map[string]bool)           // all assets seen
+
+	// Count all tasks by type and status
+	for _, result := range results {
+		summary.TotalTasks++
+
+		// Determine if task succeeded
+		succeeded := result.Error == nil
+		if succeeded {
+			summary.SuccessfulTasks++
+		} else {
+			summary.FailedTasks++
+		}
+
+		// Categorize by task type
+		switch instance := result.Instance.(type) {
+		case *scheduler.AssetInstance:
+			assetName := instance.GetAsset().Name
+			assetNames[assetName] = true
+			assetMainStatus[assetName] = succeeded
+			
+		case *scheduler.ColumnCheckInstance:
+			assetName := instance.GetAsset().Name
+			assetNames[assetName] = true
+			if !succeeded {
+				assetHasCheckFailures[assetName] = true
+			}
+			summary.ColumnChecks.Total++
+			if succeeded {
+				summary.ColumnChecks.Succeeded++
+			} else {
+				summary.ColumnChecks.Failed++
+			}
+		case *scheduler.CustomCheckInstance:
+			assetName := instance.GetAsset().Name
+			assetNames[assetName] = true
+			if !succeeded {
+				assetHasCheckFailures[assetName] = true
+			}
+			summary.CustomChecks.Total++
+			if succeeded {
+				summary.CustomChecks.Succeeded++
+			} else {
+				summary.CustomChecks.Failed++
+			}
+		case *scheduler.MetadataPushInstance:
+			summary.MetadataPush.Total++
+			if succeeded {
+				summary.MetadataPush.Succeeded++
+			} else {
+				summary.MetadataPush.Failed++
+			}
+		}
+	}
+
+	// Analyze asset-level results
+	for assetName := range assetNames {
+		summary.Assets.Total++
+		mainSucceeded := assetMainStatus[assetName]
+		hasCheckFailures := assetHasCheckFailures[assetName]
+
+		if mainSucceeded && !hasCheckFailures {
+			summary.Assets.Succeeded++
+		} else if !mainSucceeded {
+			summary.Assets.Failed++ // Failed in main execution
+		} else if mainSucceeded && hasCheckFailures {
+			summary.Assets.FailedDueToChecks++ // Main succeeded but checks failed
+		}
+	}
+
+	// Count skipped tasks from scheduler state
+	skippedTasks := s.GetTaskInstancesByStatus(scheduler.Skipped)
+	for _, skippedTask := range skippedTasks {
+		summary.SkippedTasks++
+
+		switch skippedTask.(type) {
+		case *scheduler.AssetInstance:
+			summary.Assets.Total++
+			summary.Assets.Skipped++
+		case *scheduler.ColumnCheckInstance:
+			summary.ColumnChecks.Total++
+			summary.ColumnChecks.Skipped++
+		case *scheduler.CustomCheckInstance:
+			summary.CustomChecks.Total++
+			summary.CustomChecks.Skipped++
+		case *scheduler.MetadataPushInstance:
+			summary.MetadataPush.Total++
+			summary.MetadataPush.Skipped++
+		}
+	}
+
+	// Count upstream failed tasks as skipped
+	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
+	skippedAssets := make(map[string]bool)
+	for _, t := range upstreamFailedTasks {
+		assetName := t.GetAsset().Name
+		if !skippedAssets[assetName] {
+			skippedAssets[assetName] = true
+			summary.Assets.Total++
+			summary.Assets.Skipped++
+		}
+		
+		// Also count individual check tasks as skipped
+		switch t.(type) {
+		case *scheduler.ColumnCheckInstance:
+			summary.ColumnChecks.Total++
+			summary.ColumnChecks.Skipped++
+		case *scheduler.CustomCheckInstance:
+			summary.CustomChecks.Total++
+			summary.CustomChecks.Skipped++
+		case *scheduler.MetadataPushInstance:
+			summary.MetadataPush.Total++
+			summary.MetadataPush.Skipped++
+		}
+	}
+
+	// Update total tasks to include skipped ones
+	summary.TotalTasks += summary.SkippedTasks
+
+	return summary
+}
+
 var (
 	yesterday        = time.Now().AddDate(0, 0, -1)
 	defaultStartDate = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
@@ -480,7 +741,6 @@ func Run(isDebug *bool) *cli.Command {
 				logger.Error("failed to save pipeline state", zap.Error(err))
 			}
 
-			successPrinter.Printf("\n\nExecuted %d tasks in %s\n", len(results), duration.Truncate(time.Millisecond).String())
 			errorsInTaskResults := make([]*scheduler.TaskExecutionResult, 0)
 			for _, res := range results {
 				if res.Error != nil {
@@ -489,10 +749,18 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			if len(errorsInTaskResults) > 0 {
+				printExecutionSummary(results, s, duration, len(results))
 				printErrorsInResults(errorsInTaskResults, s)
 				return cli.Exit("", 1)
 			}
 
+			// Print execution summary (unless minimal-logs is enabled)
+			minimalLogs := c.Bool("minimal-logs")
+			if minimalLogs {
+				successPrinter.Printf("\n\nExecuted %d tasks in %s\n", len(results), duration.Truncate(time.Millisecond).String())
+			} else {
+				printExecutionSummary(results, s, duration, len(results))
+			}
 			return nil
 		},
 		Before: telemetry.BeforeCommand,
@@ -619,9 +887,9 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 		data[assetName] = append(data[assetName], result)
 	}
 
-	tree := treeprint.New()
+	tree := treeprint.NewWithRoot(color.New(color.FgRed).Sprintf("%d assets failed", len(data)))
 	for assetName, results := range data {
-		assetBranch := tree.AddBranch(assetName)
+		assetBranch := tree.AddBranch(color.New(color.FgYellow).Sprint(assetName))
 
 		columnBranches := make(map[string]treeprint.Tree, len(results))
 
@@ -630,49 +898,30 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 			case *scheduler.ColumnCheckInstance:
 				colBranch, exists := columnBranches[instance.Column.Name]
 				if !exists {
-					colBranch = assetBranch.AddBranch("[Column] " + instance.Column.Name)
+					colBranch = assetBranch.AddBranch(fmt.Sprintf("%s %s", 
+						color.New(color.FgCyan).Sprint(instance.Column.Name),
+						faint("column")))
 					columnBranches[instance.Column.Name] = colBranch
 				}
 
-				checkBranch := colBranch.AddBranch("[Check] " + instance.Check.Name)
-				checkBranch.AddNode(fmt.Sprintf("'%s'", result.Error))
+				checkBranch := colBranch.AddBranch(fmt.Sprintf("%s %s", 
+					color.New(color.FgMagenta).Sprint(instance.Check.Name),
+					faint("check")))
+				checkBranch.AddNode(color.New(color.FgRed).Sprintf("%s", result.Error))
 
 			case *scheduler.CustomCheckInstance:
-				customBranch := assetBranch.AddBranch("[Custom Check] " + instance.Check.Name)
-				customBranch.AddNode(fmt.Sprintf("'%s'", result.Error))
+				customBranch := assetBranch.AddBranch(fmt.Sprintf("%s %s", 
+					color.New(color.FgMagenta).Sprint(instance.Check.Name),
+					faint("custom check")))
+				customBranch.AddNode(color.New(color.FgRed).Sprintf("%s", result.Error))
 
 			default:
-				assetBranch.AddNode(fmt.Sprintf("'%s'", result.Error))
+				assetBranch.AddNode(color.New(color.FgRed).Sprintf("%s", result.Error))
 			}
 		}
 	}
-	errorPrinter.Println(fmt.Sprintf("Failed assets %d", len(data)))
-	errorPrinter.Println(tree.String())
-	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
-	if len(upstreamFailedTasks) > 0 {
-		errorPrinter.Printf("The following tasks are skipped due to their upstream failing:\n")
-
-		skippedAssets := make(map[string]int, 0)
-		for _, t := range upstreamFailedTasks {
-			if _, ok := skippedAssets[t.GetAsset().Name]; !ok {
-				skippedAssets[t.GetAsset().Name] = 0
-			}
-
-			if t.GetType() == scheduler.TaskInstanceTypeMain {
-				continue
-			}
-
-			skippedAssets[t.GetAsset().Name] += 1
-		}
-
-		for asset, checkCount := range skippedAssets {
-			if checkCount == 0 {
-				errorPrinter.Printf("  - %s\n", asset)
-			} else {
-				errorPrinter.Printf("  - %s %s\n", asset, faint(fmt.Sprintf("(and %d checks)", checkCount)))
-			}
-		}
-	}
+	fmt.Println()
+	fmt.Println(tree.String())
 }
 
 func SetupExecutors(
