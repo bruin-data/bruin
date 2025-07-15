@@ -484,6 +484,24 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			},
 		},
 		{
+			name: "scd2_full_refresh_by_column_with_no_primary_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER"},
+					{Name: "name", Type: "VARCHAR"},
+					{Name: "price", Type: "FLOAT"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, name, price from source_table",
+			wantErr:     true,
+		},
+		{
 			name: "scd2_full_refresh_by_column",
 			asset: &pipeline.Asset{
 				Name: "my.asset",
@@ -500,7 +518,28 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT id, name, price from source_table",
 			want: []string{
-				"CREATE TABLE my.asset WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset') AS\nSELECT\n  CURRENT_TIMESTAMP AS _valid_from,\n  src.*,\n  TIMESTAMP '9999-12-31' AS _valid_until,\n  TRUE AS _is_current\nFROM (\nSELECT id, name, price from source_table\n) AS src",
+				"CREATE TABLE IF NOT EXISTS my.asset WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset') AS\nSELECT\n  CURRENT_TIMESTAMP AS _valid_from,\n  src.*,\n  TIMESTAMP '9999-12-31' AS _valid_until,\n  TRUE AS _is_current\nFROM (\nSELECT id, name, price from source_table\n) AS src",
+			},
+		},
+		{
+			name: "scd2_full_refresh_by_column_with_multiple_primary_keys",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER", PrimaryKey: true},
+					{Name: "category", Type: "VARCHAR", PrimaryKey: true},
+					{Name: "name", Type: "VARCHAR"},
+					{Name: "price", Type: "FLOAT"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, category, name, price from source_table",
+			want: []string{
+				"CREATE TABLE IF NOT EXISTS my.asset WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset') AS\nSELECT\n  CURRENT_TIMESTAMP AS _valid_from,\n  src.*,\n  TIMESTAMP '9999-12-31' AS _valid_until,\n  TRUE AS _is_current\nFROM (\nSELECT id, category, name, price from source_table\n) AS src",
 			},
 		},
 		{
@@ -521,7 +560,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT id, name, price from source_table",
 			want: []string{
-				"CREATE TABLE my.asset WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset', partitioning = ARRAY['category, id']) AS\nSELECT\n  CURRENT_TIMESTAMP AS _valid_from,\n  src.*,\n  TIMESTAMP '9999-12-31' AS _valid_until,\n  TRUE AS _is_current\nFROM (\nSELECT id, name, price from source_table\n) AS src",
+				"CREATE TABLE IF NOT EXISTS my.asset WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset', partitioning = ARRAY['category, id']) AS\nSELECT\n  CURRENT_TIMESTAMP AS _valid_from,\n  src.*,\n  TIMESTAMP '9999-12-31' AS _valid_until,\n  TRUE AS _is_current\nFROM (\nSELECT id, name, price from source_table\n) AS src",
 			},
 		},
 	}
@@ -700,6 +739,63 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 			},
 		},
 		{
+			name: "scd2_full_refresh_with_no_incremental_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByTime,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true, Type: "INTEGER"},
+					{Name: "event_name", Type: "VARCHAR"},
+					{Name: "ts", Type: "DATE"},
+				},
+			},
+			query:   "SELECT id, event_name, ts from source_table",
+			wantErr: true,
+		},
+		{
+			name: "scd2_full_refresh_with_no_primary_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER"},
+					{Name: "event_name", Type: "VARCHAR"},
+					{Name: "ts", Type: "DATE"},
+				},
+			},
+			query:   "SELECT id, event_name, ts from source_table",
+			wantErr: true,
+		},
+		{
+			name: "scd2_full_refresh_with_multiple_primary_keys",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", PrimaryKey: true, Type: "INTEGER"},
+					{Name: "event_type", PrimaryKey: true, Type: "VARCHAR"},
+					{Name: "event_name", Type: "VARCHAR"},
+					{Name: "ts", Type: "DATE"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, event_type, event_name, ts from source_table",
+			want: []string{
+				"CREATE TABLE IF NOT EXISTS my.asset WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset') AS\nSELECT\n  CAST(ts AS TIMESTAMP) AS _valid_from,\n  src.*,\n  TIMESTAMP '9999-12-31' AS _valid_until,\n  TRUE AS _is_current\nFROM (\nSELECT id, event_type, event_name, ts from source_table\n) AS src",
+			},
+		},
+		{
 			name: "scd2_full_refresh_with_incremental_key",
 			asset: &pipeline.Asset{
 				Name: "my.asset",
@@ -717,7 +813,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT id, event_name, ts from source_table",
 			want: []string{
-				"CREATE TABLE my.asset WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset') AS\nSELECT\n  CAST(ts AS TIMESTAMP) AS _valid_from,\n  src.*,\n  TIMESTAMP '9999-12-31' AS _valid_until,\n  TRUE AS _is_current\nFROM (\nSELECT id, event_name, ts from source_table\n) AS src",
+				"CREATE TABLE IF NOT EXISTS my.asset WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset') AS\nSELECT\n  CAST(ts AS TIMESTAMP) AS _valid_from,\n  src.*,\n  TIMESTAMP '9999-12-31' AS _valid_until,\n  TRUE AS _is_current\nFROM (\nSELECT id, event_name, ts from source_table\n) AS src",
 			},
 		},
 		{
@@ -739,7 +835,7 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT id, event_name, ts from source_table",
 			want: []string{
-				"CREATE TABLE my.asset WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset', partitioning = ARRAY['event_type, id']) AS\nSELECT\n  CAST(ts AS TIMESTAMP) AS _valid_from,\n  src.*,\n  TIMESTAMP '9999-12-31' AS _valid_until,\n  TRUE AS _is_current\nFROM (\nSELECT id, event_name, ts from source_table\n) AS src",
+				"CREATE TABLE IF NOT EXISTS my.asset WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset', partitioning = ARRAY['event_type, id']) AS\nSELECT\n  CAST(ts AS TIMESTAMP) AS _valid_from,\n  src.*,\n  TIMESTAMP '9999-12-31' AS _valid_until,\n  TRUE AS _is_current\nFROM (\nSELECT id, event_name, ts from source_table\n) AS src",
 			},
 		},
 	}
