@@ -391,7 +391,7 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query, location string) (
 	}
 
 	createQuery := fmt.Sprintf(
-		`CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
+		`CREATE TABLE IF NOT EXISTS %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
 SELECT
   CAST(%s AS TIMESTAMP) AS _valid_from,
   src.*,
@@ -423,7 +423,7 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query, location string)
 	}
 
 	createQuery := fmt.Sprintf(
-		`CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
+		`CREATE TABLE IF NOT EXISTS %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
 SELECT
   CURRENT_TIMESTAMP AS _valid_from,
   src.*,
@@ -441,4 +441,3 @@ FROM (
 
 	return []string{strings.TrimSpace(createQuery)}, nil
 }
-
