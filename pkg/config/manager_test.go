@@ -364,6 +364,9 @@ func TestLoadFromFile(t *testing.T) {
 				{
 					Name:               "gcs-1",
 					ServiceAccountFile: "/path/to/service_account.json",
+					BucketName:         "my-bucket",
+					PathToFile:         "/folder1/file.csv",
+					Layout:             "my_layout",
 				},
 			},
 			ApplovinMax: []ApplovinMaxConnection{
