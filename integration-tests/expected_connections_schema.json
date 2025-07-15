@@ -897,14 +897,23 @@
         },
         "service_account_json": {
           "type": "string"
+        },
+        "bucket_name": {
+          "type": "string"
+        },
+        "path_to_file": {
+          "type": "string"
+        },
+        "layout": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
       "type": "object",
-      "required": [
-        "name",
-        "service_account_file",
-        "service_account_json"
+      "required": ["name"],
+      "oneOf": [
+        { "required": ["service_account_file"], "title": "service_account_file" },
+        { "required": ["service_account_json"], "title": "service_account_json" }
       ]
     },
     "GenericConnection": {

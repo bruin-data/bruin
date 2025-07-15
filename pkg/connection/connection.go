@@ -1219,6 +1219,9 @@ func (m *Manager) AddGCSConnectionFromConfig(connection *config.GCSConnection) e
 	client, err := gcs.NewClient(gcs.Config{
 		ServiceAccountFile: connection.ServiceAccountFile,
 		ServiceAccountJSON: connection.ServiceAccountJSON,
+		BucketName:         connection.BucketName,
+		PathToFile:         connection.PathToFile,
+		Layout:             connection.Layout,
 	})
 	if err != nil {
 		return err

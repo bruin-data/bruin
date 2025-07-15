@@ -230,6 +230,9 @@ environments:
       gcs:
         - name: "gcs-1"
           service_account_file: "/path/to/service_account.json"
+          bucket_name: "my-bucket"
+          path_to_file: "/folder1/file.csv"
+          layout: "my_layout"
       applovinmax:
         - name: "applovinmax-1"
           api_key: "api-key-123"
