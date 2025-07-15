@@ -223,7 +223,7 @@ FROM
     information_schema.tables
 WHERE
     table_type IN \('BASE TABLE', 'VIEW'\)
-    AND table_schema NOT IN \('information_schema', 'pg_catalog', 'main'\)
+    AND table_schema NOT IN \('information_schema', 'pg_catalog'\)
 ORDER BY table_schema, table_name;`).
 					WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name"}).
 						AddRow("schema1", "table1").
@@ -259,7 +259,7 @@ FROM
     information_schema.tables
 WHERE
     table_type IN \('BASE TABLE', 'VIEW'\)
-    AND table_schema NOT IN \('information_schema', 'pg_catalog', 'main'\)
+    AND table_schema NOT IN \('information_schema', 'pg_catalog'\)
 ORDER BY table_schema, table_name;`).
 					WillReturnError(errors.New("connection error"))
 			},
