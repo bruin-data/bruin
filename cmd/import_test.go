@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -53,6 +54,8 @@ func (m *mockConnectionNoSchema) GetDatabases(ctx context.Context) ([]string, er
 func TestCreateAsset(t *testing.T) {
 	t.Parallel()
 
+	testAssetsPath := filepath.Join("test", "assets")
+
 	tests := []struct {
 		name        string
 		schemaName  string
@@ -76,7 +79,7 @@ func TestCreateAsset(t *testing.T) {
 				Type: pipeline.AssetTypePostgresSource,
 				ExecutableFile: pipeline.ExecutableFile{
 					Name: "public.users.asset.yml",
-					Path: "/test/assets/public.users.asset.yml",
+					Path: filepath.Join(testAssetsPath, "public.users.asset.yml"),
 				},
 				Name:        "public.users",
 				Description: "Imported table public.users",
@@ -103,7 +106,7 @@ func TestCreateAsset(t *testing.T) {
 				Type: pipeline.AssetTypePostgresSource,
 				ExecutableFile: pipeline.ExecutableFile{
 					Name: "public.products.asset.yml",
-					Path: "/test/assets/public.products.asset.yml",
+					Path: filepath.Join(testAssetsPath, "public.products.asset.yml"),
 				},
 				Name:        "public.products",
 				Description: "Imported table public.products",
@@ -145,7 +148,7 @@ func TestCreateAsset(t *testing.T) {
 				Type: pipeline.AssetTypePostgresSource,
 				ExecutableFile: pipeline.ExecutableFile{
 					Name: "public.temporal_table.asset.yml",
-					Path: "/test/assets/public.temporal_table.asset.yml",
+					Path: filepath.Join(testAssetsPath, "public.temporal_table.asset.yml"),
 				},
 				Name:        "public.temporal_table",
 				Description: "Imported table public.temporal_table",
@@ -164,7 +167,7 @@ func TestCreateAsset(t *testing.T) {
 			ctx := context.Background()
 			conn := tt.setupConn()
 
-			got, err := createAsset(ctx, "/test/assets", tt.schemaName, tt.tableName, tt.assetType, conn, tt.fillColumns)
+			got, err := createAsset(ctx, testAssetsPath, tt.schemaName, tt.tableName, tt.assetType, conn, tt.fillColumns)
 
 			if tt.wantErr != "" {
 				require.Error(t, err)
