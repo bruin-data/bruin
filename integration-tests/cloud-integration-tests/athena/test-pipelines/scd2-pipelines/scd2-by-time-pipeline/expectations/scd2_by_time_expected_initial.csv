@@ -1,0 +1,5 @@
+product_id,product_name,stock,_is_current,_valid_from
+1,Laptop,100,true,2025-04-02 00:00:00 +0200 CEST
+2,Smartphone,150,true,2025-04-02 00:00:00 +0200 CEST
+3,Headphones,175,true,2025-04-02 00:00:00 +0200 CEST
+4,Monitor,25,true,2025-04-02 00:00:00 +0200 CEST
