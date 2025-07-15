@@ -99,7 +99,9 @@ func (w worker) run(ctx context.Context, taskChannel <-chan scheduler.TaskInstan
 		w.printLock.Lock()
 
 		timestampStr := whitePrinter("[%s]", time.Now().Format(timeFormat))
-		w.printer = plainColor
+		if w.formatOpts.NoColor {
+			w.printer = plainColor
+		}
 		runningPrinter := w.printer
 		if !w.formatOpts.NoColor {
 			runningPrinter = color.New(color.Faint)
