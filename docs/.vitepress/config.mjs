@@ -259,6 +259,7 @@ export default withMermaid({
                     {text: "Environments", link: "/commands/environments"},
                     {text: "Format", link: "/commands/format"},
                     {text: "Init", link: "/commands/init"},
+                    {text: "Import", link: "/commands/import"},
                     {text: "Lineage", link: "/commands/lineage"},
                     {text: "Render", link: "/commands/render"},
                     {text: "Run", link: "/commands/run"},
