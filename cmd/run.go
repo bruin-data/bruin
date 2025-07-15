@@ -151,7 +151,7 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 		return
 	}
 	
-	fmt.Println()
+	fmt.Println("\n" + strings.Repeat("=", 50) + "\n")
 	
 	for _, assetName := range assetOrder {
 		results := assetResults[assetName]
@@ -817,8 +817,7 @@ func Run(isDebug *bool) *cli.Command {
 				return nil
 			}
 			sendTelemetry(s, c)
-			infoPrinter.Printf("\nStart date: %s\n", startDate.Format(time.RFC3339))
-			infoPrinter.Printf("End date:   %s\n", endDate.Format(time.RFC3339))
+			infoPrinter.Printf("\nInterval: %s - %s\n", startDate.Format(time.RFC3339), endDate.Format(time.RFC3339))
 			infoPrinter.Printf("\n%s\n", executionStartLog)
 			if runConfig.SensorMode != "" {
 				if !(runConfig.SensorMode == "skip" || runConfig.SensorMode == "once" || runConfig.SensorMode == "wait") {
@@ -1024,29 +1023,19 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 	for assetName, results := range data {
 		assetBranch := tree.AddBranch(color.New(color.FgYellow).Sprint(assetName))
 
-		columnBranches := make(map[string]treeprint.Tree, len(results))
-
 		for _, result := range results {
 			switch instance := result.Instance.(type) {
 			case *scheduler.ColumnCheckInstance:
-				colBranch, exists := columnBranches[instance.Column.Name]
-				if !exists {
-					colBranch = assetBranch.AddBranch(fmt.Sprintf("%s %s", 
-						color.New(color.FgCyan).Sprint(instance.Column.Name),
-						faint("column")))
-					columnBranches[instance.Column.Name] = colBranch
-				}
-
-				checkBranch := colBranch.AddBranch(fmt.Sprintf("%s %s", 
+				assetBranch.AddNode(fmt.Sprintf("%s.%s - %s", 
+					color.New(color.FgCyan).Sprint(instance.Column.Name),
 					color.New(color.FgMagenta).Sprint(instance.Check.Name),
-					faint("check")))
-				checkBranch.AddNode(color.New(color.FgRed).Sprintf("%s", result.Error))
+					color.New(color.FgRed).Sprintf("%s", result.Error)))
 
 			case *scheduler.CustomCheckInstance:
-				customBranch := assetBranch.AddBranch(fmt.Sprintf("%s %s", 
+				assetBranch.AddNode(fmt.Sprintf("%s %s - %s", 
 					color.New(color.FgMagenta).Sprint(instance.Check.Name),
-					faint("custom check")))
-				customBranch.AddNode(color.New(color.FgRed).Sprintf("%s", result.Error))
+					faint("custom check"),
+					color.New(color.FgRed).Sprintf("%s", result.Error)))
 
 			default:
 				assetBranch.AddNode(color.New(color.FgRed).Sprintf("%s", result.Error))
