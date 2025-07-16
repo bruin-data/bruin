@@ -23,6 +23,7 @@ var (
 
 	faint          = color.New(color.Faint).SprintFunc()
 	infoPrinter    = color.New(color.Bold)
+	summaryPrinter = color.New()
 	errorPrinter   = color.New(color.FgRed, color.Bold)
 	warningPrinter = color.New(color.FgYellow, color.Bold)
 	successPrinter = color.New(color.FgGreen, color.Bold)
