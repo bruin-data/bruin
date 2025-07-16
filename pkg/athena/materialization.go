@@ -217,26 +217,25 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 	query = strings.TrimSuffix(query, ";")
 
 	var (
-		primaryKeys  = make([]string, 0, 4)
-		compareConds = make([]string, 0, 12)
-		insertCols   = make([]string, 0, 12)
-		insertValues = make([]string, 0, 12)
+		primaryKeys       = make([]string, 0, 4)
+		compareConditions = make([]string, 0, 4)
+		userCols          = make([]string, 0, 12)
 	)
 
 	for _, col := range asset.Columns {
-		if col.PrimaryKey {
-			primaryKeys = append(primaryKeys, col.Name)
-		}
 		switch col.Name {
 		case "_is_current", "_valid_from", "_valid_until":
 			return nil, fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
 		}
-		insertCols = append(insertCols, col.Name)
-		insertValues = append(insertValues, "source."+col.Name)
-		if !col.PrimaryKey {
-			compareConds = append(compareConds,
-				fmt.Sprintf("target.%[1]s != source.%[1]s", col.Name))
+
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, col.Name)
+		} else {
+			// Non-primary key columns are used for change detection
+			compareConditions = append(compareConditions, fmt.Sprintf("t.%s != s.%s", col.Name, col.Name))
 		}
+
+		userCols = append(userCols, col.Name)
 	}
 
 	if len(primaryKeys) == 0 {
@@ -244,51 +243,105 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 			asset.Materialization.Strategy)
 	}
 
-	insertCols = append(insertCols, "_valid_from", "_valid_until", "_is_current")
-	insertValues = append(insertValues, "CURRENT_TIMESTAMP", "TIMESTAMP '9999-12-31'", "TRUE")
-
-	// Build ON condition for MERGE
-	onConditions := make([]string, 0, len(primaryKeys))
-	for _, pk := range primaryKeys {
-		onConditions = append(onConditions, fmt.Sprintf("target.%s = source.%s", pk, pk))
+	// Build join conditions and null checks
+	onConds := make([]string, len(primaryKeys))
+	sourcePKs := make([]string, 0, len(primaryKeys))
+	targetPKs := make([]string, 0, len(primaryKeys))
+	for i, pk := range primaryKeys {
+		onConds[i] = fmt.Sprintf("t.%s = s.%s", pk, pk)
+		sourcePKs = append(sourcePKs, fmt.Sprintf("s.%s IS NULL", pk))
+		targetPKs = append(targetPKs, fmt.Sprintf("t.%s IS NULL", pk))
 	}
-	onConditions = append(onConditions, "target._is_current = TRUE")
-	onCondition := strings.Join(onConditions, " AND ")
+	joinCondition := strings.Join(onConds, " AND ")
+	fullCompareCondition := strings.Join(compareConditions, " OR ")
+	sourcePrimaryKeyIsNull := strings.Join(sourcePKs, " AND ")
+	targetPrimaryKeyIsNull := strings.Join(targetPKs, " AND ")
 
-	var matchedCondition string
-	if len(compareConds) > 0 {
-		matchedCondition = strings.Join(compareConds, " OR ")
-	} else {
-		matchedCondition = "FALSE"
+	// Build column lists for different CTEs
+	tNewSelectCols := make([]string, 0, len(userCols)+3)
+	for _, col := range userCols {
+		tNewSelectCols = append(tNewSelectCols, "t."+col)
+	}
+	tNewSelectCols = append(tNewSelectCols, "t._valid_from")
+	tNewSelectCols = append(tNewSelectCols, fmt.Sprintf("CASE WHEN %s OR (%s) THEN CURRENT_TIMESTAMP ELSE t._valid_until END AS _valid_until", sourcePrimaryKeyIsNull, fullCompareCondition))
+	tNewSelectCols = append(tNewSelectCols, fmt.Sprintf("CASE WHEN %s OR (%s) THEN FALSE ELSE t._is_current END AS _is_current", sourcePrimaryKeyIsNull, fullCompareCondition))
+
+	insertsSelectCols := make([]string, 0, len(userCols)+3)
+	for _, col := range userCols {
+		insertsSelectCols = append(insertsSelectCols, "s."+col)
+	}
+	insertsSelectCols = append(insertsSelectCols, "CURRENT_TIMESTAMP AS _valid_from")
+	insertsSelectCols = append(insertsSelectCols, "TIMESTAMP '9999-12-31' AS _valid_until")
+	insertsSelectCols = append(insertsSelectCols, "TRUE AS _is_current")
+
+	// Historical data columns
+	allCols := append([]string{}, userCols...)
+	allCols = append(allCols, "_valid_from", "_valid_until", "_is_current")
+	histCols := make([]string, 0, len(allCols))
+	for _, col := range allCols {
+		histCols = append(histCols, "h."+col)
 	}
 
-	mergeQuery := fmt.Sprintf(`
-MERGE INTO %s AS target
-USING (%s) AS source
-ON %s
+	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
-WHEN MATCHED AND (%s) THEN
-  UPDATE SET
-    _valid_until = CURRENT_TIMESTAMP,
-    _is_current = FALSE
+	var partitionBy string
+	if asset.Materialization.PartitionBy != "" {
+		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", asset.Materialization.PartitionBy)
+	}
 
-WHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN
-  UPDATE SET 
-    _valid_until = CURRENT_TIMESTAMP,
-    _is_current = FALSE
-
-WHEN NOT MATCHED THEN
-  INSERT (%s)
-  VALUES (%s)`,
-		asset.Name,
+	createQuery := fmt.Sprintf(`
+CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
+WITH
+source AS (
+  %s
+),
+current_data AS (
+  SELECT * FROM %s WHERE _is_current = TRUE
+),
+historical_data AS (
+  SELECT %s FROM %s h WHERE h._is_current = FALSE
+),
+t_new AS (
+  SELECT 
+    %s
+  FROM current_data t
+  LEFT JOIN source s ON %s
+),
+insert_rows AS (
+  SELECT 
+    %s
+  FROM source s
+  LEFT JOIN current_data t ON %s
+  WHERE %s
+)
+SELECT %s FROM t_new
+UNION ALL
+SELECT %s FROM insert_rows
+UNION ALL
+SELECT %s FROM historical_data`,
+		tempTableName,
+		location,
+		tempTableName,
+		partitionBy,
 		strings.TrimSpace(query),
-		onCondition,
-		matchedCondition,
-		strings.Join(insertCols, ", "),
-		strings.Join(insertValues, ", "),
+		asset.Name,
+		strings.Join(histCols, ", "),
+		asset.Name,
+		strings.Join(tNewSelectCols, ",\n    "),
+		joinCondition,
+		strings.Join(insertsSelectCols, ",\n    "),
+		joinCondition,
+		targetPrimaryKeyIsNull,
+		strings.Join(allCols, ", "),
+		strings.Join(allCols, ", "),
+		strings.Join(allCols, ", "),
 	)
 
-	return []string{strings.TrimSpace(mergeQuery)}, nil
+	return []string{
+		strings.TrimSpace(createQuery),
+		"DROP TABLE IF EXISTS " + asset.Name,
+		fmt.Sprintf("ALTER TABLE %s RENAME TO %s", tempTableName, asset.Name),
+	}, nil
 }
 
 func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]string, error) {
