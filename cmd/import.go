@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/telemetry"
@@ -17,7 +18,16 @@ import (
 
 func Import() *cli.Command {
 	return &cli.Command{
-		Name:      "import",
+		Name: "import",
+		Subcommands: []*cli.Command{
+			ImportDatabase(),
+		},
+	}
+}
+
+func ImportDatabase() *cli.Command {
+	return &cli.Command{
+		Name:      "dwh",
 		Usage:     "Import database tables as Bruin assets",
 		ArgsUsage: "[pipeline path]",
 		Before:    telemetry.BeforeCommand,
@@ -29,7 +39,7 @@ func Import() *cli.Command {
 				Required: true,
 			},
 			&cli.StringFlag{
-				Name:    "database",
+				Name:    "db-name",
 				Aliases: []string{"d"},
 				Usage:   "filter by specific database/dataset name",
 			},
@@ -95,35 +105,60 @@ func runImport(ctx context.Context, pipelinePath, connectionName, database, sche
 		return errors2.Wrap(err, "failed to retrieve database summary")
 	}
 
-	// Check database filter if specified
 	if database != "" && !strings.EqualFold(summary.Name, database) {
 		return fmt.Errorf("database '%s' not found. Current database is '%s'", database, summary.Name)
 	}
 
-	// Validate pipeline path and ensure assets directory exists
-	assetsPath := filepath.Join(pipelinePath, "assets")
-	err = fs.MkdirAll(assetsPath, 0755)
+	pathParts := strings.Split(pipelinePath, "/")
+	if pathParts[len(pathParts)-1] == "pipeline.yml" || pathParts[len(pathParts)-1] == "pipeline.yaml" {
+		pipelinePath = strings.Join(pathParts[:len(pathParts)-2], "/")
+	}
+	pipelineFound, err := GetPipelinefromPath(ctx, pipelinePath)
 	if err != nil {
-		return errors2.Wrap(err, "failed to create assets directory")
+		return errors2.Wrap(err, "failed to get pipeline from path")
+	}
+	existingAssets := make(map[string]*pipeline.Asset, len(pipelineFound.Assets))
+	for _, asset := range pipelineFound.Assets {
+		existingAssets[asset.Name] = asset
 	}
 
-	// Determine asset type based on connection type
+	assetsPath := filepath.Join(pipelinePath, "assets")
 	assetType := determineAssetTypeFromConnection(connectionName, conn)
-
-	// Import tables as SQL assets with filtering
 	totalTables := 0
+	mergedTableCount := 0
 	for _, schemaObj := range summary.Schemas {
-		// Skip schema if schema filter is specified and doesn't match
 		if schema != "" && !strings.EqualFold(schemaObj.Name, schema) {
 			continue
 		}
-
 		for _, table := range schemaObj.Tables {
-			err := createSQLAsset(ctx, fs, assetsPath, schemaObj.Name, table.Name, assetType, conn, fillColumns)
+			createdAsset, err := createAsset(ctx, assetsPath, schemaObj.Name, table.Name, assetType, conn, fillColumns)
 			if err != nil {
 				return errors2.Wrapf(err, "failed to create asset for table %s.%s", schemaObj.Name, table.Name)
 			}
-			totalTables++
+			if existingAssets[createdAsset.Name] == nil {
+				err = createdAsset.Persist(fs)
+				if err != nil {
+					return err
+				}
+				existingAssets[createdAsset.Name] = createdAsset
+				totalTables++
+			} else {
+				existingAsset := existingAssets[createdAsset.Name]
+				existingColumns := make(map[string]pipeline.Column, len(existingAsset.Columns))
+				for _, column := range existingAsset.Columns {
+					existingColumns[column.Name] = column
+				}
+				for _, c := range createdAsset.Columns {
+					if _, ok := existingColumns[c.Name]; !ok {
+						existingAsset.Columns = append(existingAsset.Columns, c)
+					}
+				}
+				err = existingAsset.Persist(fs)
+				mergedTableCount++
+				if err != nil {
+					return err
+				}
+			}
 		}
 	}
 
@@ -133,8 +168,8 @@ func runImport(ctx context.Context, pipelinePath, connectionName, database, sche
 		filterDesc = fmt.Sprintf(" (schema: %s)", schema)
 	}
 
-	fmt.Printf("Successfully imported %d tables from database '%s'%s into pipeline '%s'\n",
-		totalTables, summary.Name, filterDesc, pipelinePath)
+	fmt.Printf("Imported %d tables and Merged %d from data warehouse '%s'%s into pipeline '%s'\n",
+		totalTables, mergedTableCount, summary.Name, filterDesc, pipelinePath)
 
 	return nil
 }
@@ -185,41 +220,30 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 	return nil
 }
 
-func createSQLAsset(ctx context.Context, fs afero.Fs, assetsPath, schemaName, tableName string, assetType pipeline.AssetType, conn interface{}, fillColumns bool) error {
-	fileName := fmt.Sprintf("%s.%s.sql", strings.ToLower(schemaName), strings.ToLower(tableName))
+func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, assetType pipeline.AssetType, conn interface{}, fillColumns bool) (*pipeline.Asset, error) {
+	fileName := fmt.Sprintf("%s.%s.asset.yml", strings.ToLower(schemaName), strings.ToLower(tableName))
 	filePath := filepath.Join(assetsPath, fileName)
-
-	// Create basic SQL select query
-	query := fmt.Sprintf("SELECT *\nFROM %s.%s", schemaName, tableName)
-
-	// Create asset
 	asset := &pipeline.Asset{
 		Type: assetType,
 		ExecutableFile: pipeline.ExecutableFile{
-			Name:    fileName,
-			Path:    filePath,
-			Content: query,
+			Name: fileName,
+			Path: filePath,
 		},
-		Name:        fmt.Sprintf("%s_%s", strings.ToLower(schemaName), strings.ToLower(tableName)),
+		Name:        fmt.Sprintf("%s.%s", strings.ToLower(schemaName), strings.ToLower(tableName)),
 		Description: fmt.Sprintf("Imported table %s.%s", schemaName, tableName),
 	}
 
-	// Fill columns from database if requested
 	if fillColumns {
 		err := fillAssetColumnsFromDB(ctx, asset, conn, schemaName, tableName)
 		if err != nil {
-			// Log warning but don't fail the import
-			fmt.Printf("Warning: Could not fill columns for %s.%s: %v\n", schemaName, tableName, err)
+			warningPrinter.Printf("Warning: Could not fill columns for %s.%s: %v\n", schemaName, tableName, err)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	// Persist the asset
-	err := asset.Persist(fs)
-	if err != nil {
-		return errors2.Wrap(err, "failed to persist asset")
-	}
-
-	return nil
+	return asset, nil
 }
 
 func determineAssetTypeFromConnection(connectionName string, conn interface{}) pipeline.AssetType {
@@ -231,25 +255,25 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 		connType := fmt.Sprintf("%T", conn)
 
 		if strings.Contains(connType, "snowflake") {
-			return pipeline.AssetTypeSnowflakeQuery
+			return pipeline.AssetTypeSnowflakeSource
 		}
 		if strings.Contains(connType, "bigquery") {
-			return pipeline.AssetTypeBigqueryQuery
+			return pipeline.AssetTypeBigquerySource
 		}
 		if strings.Contains(connType, "postgres") {
-			return pipeline.AssetTypePostgresQuery
+			return pipeline.AssetTypePostgresSource
 		}
 		if strings.Contains(connType, "athena") {
-			return pipeline.AssetTypeAthenaQuery
+			return pipeline.AssetTypeAthenaSource
 		}
 		if strings.Contains(connType, "databricks") {
-			return pipeline.AssetTypeDatabricksQuery
+			return pipeline.AssetTypeDatabricksSource
 		}
 		if strings.Contains(connType, "duckdb") {
-			return pipeline.AssetTypeDuckDBQuery
+			return pipeline.AssetTypeDuckDBSource
 		}
 		if strings.Contains(connType, "clickhouse") {
-			return pipeline.AssetTypeClickHouse
+			return pipeline.AssetTypeClickHouseSource
 		}
 	}
 
@@ -257,36 +281,52 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 	connectionLower := strings.ToLower(connectionName)
 
 	if strings.Contains(connectionLower, "snowflake") || strings.Contains(connectionLower, "sf") {
-		return pipeline.AssetTypeSnowflakeQuery
+		return pipeline.AssetTypeSnowflakeSource
 	}
 	if strings.Contains(connectionLower, "bigquery") || strings.Contains(connectionLower, "bq") {
-		return pipeline.AssetTypeBigqueryQuery
+		return pipeline.AssetTypeBigquerySource
 	}
 	if strings.Contains(connectionLower, "postgres") || strings.Contains(connectionLower, "pg") {
-		return pipeline.AssetTypePostgresQuery
+		return pipeline.AssetTypePostgresSource
 	}
 	if strings.Contains(connectionLower, "redshift") || strings.Contains(connectionLower, "rs") {
-		return pipeline.AssetTypeRedshiftQuery
+		return pipeline.AssetTypeRedshiftSource
 	}
 	if strings.Contains(connectionLower, "athena") {
-		return pipeline.AssetTypeAthenaQuery
+		return pipeline.AssetTypeAthenaSource
 	}
 	if strings.Contains(connectionLower, "databricks") {
-		return pipeline.AssetTypeDatabricksQuery
+		return pipeline.AssetTypeDatabricksSource
 	}
 	if strings.Contains(connectionLower, "duckdb") {
-		return pipeline.AssetTypeDuckDBQuery
+		return pipeline.AssetTypeDuckDBSource
 	}
 	if strings.Contains(connectionLower, "clickhouse") {
-		return pipeline.AssetTypeClickHouse
+		return pipeline.AssetTypeClickHouseSource
 	}
 	if strings.Contains(connectionLower, "synapse") {
-		return pipeline.AssetTypeSynapseQuery
+		return pipeline.AssetTypeSynapseSource
 	}
 	if strings.Contains(connectionLower, "mssql") || strings.Contains(connectionLower, "sqlserver") {
-		return pipeline.AssetTypeMsSQLQuery
+		return pipeline.AssetTypeMsSQLSource
 	}
 
 	// Default to Snowflake if we can't determine the type
-	return pipeline.AssetTypeSnowflakeQuery
+	return pipeline.AssetTypeSnowflakeSource
+}
+
+func GetPipelinefromPath(ctx context.Context, inputPath string) (*pipeline.Pipeline, error) {
+	pipelinePath, err := path.GetPipelineRootFromTask(inputPath, PipelineDefinitionFiles)
+	if err != nil {
+		errorPrinter.Printf("Failed to find the pipeline this task belongs to: '%s'\n", inputPath)
+		return nil, err
+	}
+
+	foundPipeline, err := DefaultPipelineBuilder.CreatePipelineFromPath(ctx, pipelinePath, pipeline.WithMutate())
+	if err != nil {
+		errorPrinter.Println("failed to get the pipeline this asset belongs to, are you sure you have referred the right path?")
+		errorPrinter.Println("\nHint: You need to run this command with a path to the asset file itself directly.")
+		return nil, err
+	}
+	return foundPipeline, nil
 }

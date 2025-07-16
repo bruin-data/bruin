@@ -37,6 +37,14 @@ const (
 	AssetTypeBigqueryQuerySensor    = AssetType("bq.sensor.query")
 	AssetTypeBigquerySource         = AssetType("bq.source")
 	AssetTypeBigquerySeed           = AssetType("bq.seed")
+	AssetTypeSnowflakeSource        = AssetType("sf.source")
+	AssetTypePostgresSource         = AssetType("pg.source")
+	AssetTypeRedshiftSource         = AssetType("rs.source")
+	AssetTypeMsSQLSource            = AssetType("ms.source")
+	AssetTypeDatabricksSource       = AssetType("databricks.source")
+	AssetTypeSynapseSource          = AssetType("synapse.source")
+	AssetTypeAthenaSource           = AssetType("athena.source")
+	AssetTypeDuckDBSource           = AssetType("duckdb.source")
 	AssetTypeDuckDBQuery            = AssetType("duckdb.sql")
 	AssetTypeDuckDBSeed             = AssetType("duckdb.seed")
 	AssetTypeDuckDBQuerySensor      = AssetType("duckdb.sensor.query")
@@ -68,6 +76,7 @@ const (
 	AssetTypeClickHouse             = AssetType("clickhouse.sql")
 	AssetTypeClickHouseSeed         = AssetType("clickhouse.seed")
 	AssetTypeClickHouseQuerySensor  = AssetType("clickhouse.sensor.query")
+	AssetTypeClickHouseSource       = AssetType("clickhouse.source")
 	AssetTypeEMRServerlessSpark     = AssetType("emr_serverless.spark")
 	AssetTypeEMRServerlessPyspark   = AssetType("emr_serverless.pyspark")
 	AssetTypeLooker                 = AssetType("looker")
@@ -506,6 +515,7 @@ type Column struct {
 	Description     string            `json:"description" yaml:"description,omitempty" mapstructure:"description"`
 	PrimaryKey      bool              `json:"primary_key" yaml:"primary_key,omitempty" mapstructure:"primary_key"`
 	UpdateOnMerge   bool              `json:"update_on_merge" yaml:"update_on_merge,omitempty" mapstructure:"update_on_merge"`
+	Nullable        *bool             `json:"nullable,omitempty" yaml:"nullable,omitempty" mapstructure:"nullable"`
 	Extends         string            `json:"-" yaml:"extends,omitempty" mapstructure:"extends"`
 	Checks          []ColumnCheck     `json:"checks" yaml:"checks,omitempty" mapstructure:"checks"`
 	Upstreams       []*UpstreamColumn `json:"upstreams" yaml:"-" mapstructure:"-"`
@@ -524,38 +534,48 @@ func (c *Column) HasCheck(check string) bool {
 type AssetType string
 
 var AssetTypeConnectionMapping = map[AssetType]string{
-	AssetTypeBigqueryQuery:         "google_cloud_platform",
-	AssetTypeBigqueryTableSensor:   "google_cloud_platform",
-	AssetTypeBigquerySeed:          "google_cloud_platform",
-	AssetTypeBigquerySource:        "google_cloud_platform",
-	AssetTypeBigqueryQuerySensor:   "google_cloud_platform",
+	AssetTypeBigqueryQuery:       "google_cloud_platform",
+	AssetTypeBigqueryTableSensor: "google_cloud_platform",
+	AssetTypeBigquerySeed:        "google_cloud_platform",
+	AssetTypeBigquerySource:      "google_cloud_platform",
+	AssetTypeBigqueryQuerySensor: "google_cloud_platform",
+
 	AssetTypeSnowflakeQuery:        "snowflake",
 	AssetTypeSnowflakeQuerySensor:  "snowflake",
 	AssetTypeSnowflakeSeed:         "snowflake",
+	AssetTypeSnowflakeSource:       "snowflake",
 	AssetTypePostgresQuery:         "postgres",
 	AssetTypePostgresSeed:          "postgres",
 	AssetTypePostgresQuerySensor:   "postgres",
+	AssetTypePostgresSource:        "postgres",
 	AssetTypeRedshiftQuery:         "redshift",
 	AssetTypeRedshiftSeed:          "redshift",
 	AssetTypeRedshiftQuerySensor:   "redshift",
+	AssetTypeRedshiftSource:        "redshift",
 	AssetTypeMsSQLQuery:            "mssql",
 	AssetTypeMsSQLSeed:             "mssql",
 	AssetTypeMsSQLQuerySensor:      "mssql",
+	AssetTypeMsSQLSource:           "mssql",
 	AssetTypeDatabricksQuery:       "databricks",
 	AssetTypeDatabricksSeed:        "databricks",
 	AssetTypeDatabricksQuerySensor: "databricks",
+	AssetTypeDatabricksSource:      "databricks",
 	AssetTypeSynapseQuery:          "synapse",
 	AssetTypeSynapseSeed:           "synapse",
 	AssetTypeSynapseQuerySensor:    "synapse",
+	AssetTypeSynapseSource:         "synapse",
 	AssetTypeAthenaQuery:           "athena",
 	AssetTypeAthenaSeed:            "athena",
 	AssetTypeAthenaSQLSensor:       "athena",
+	AssetTypeAthenaSource:          "athena",
 	AssetTypeDuckDBQuery:           "duckdb",
 	AssetTypeDuckDBSeed:            "duckdb",
 	AssetTypeDuckDBQuerySensor:     "duckdb",
+	AssetTypeDuckDBSource:          "duckdb",
 	AssetTypeClickHouse:            "clickhouse",
 	AssetTypeClickHouseSeed:        "clickhouse",
 	AssetTypeClickHouseQuerySensor: "clickhouse",
+	AssetTypeClickHouseSource:      "clickhouse",
 	AssetTypeEMRServerlessSpark:    "emr_serverless",
 	AssetTypeEMRServerlessPyspark:  "emr_serverless",
 }

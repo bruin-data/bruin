@@ -1,0 +1,182 @@
+# `import` Command
+
+The `import` commands allows you to automatically import existing tables in your data warehouse as Bruin assets. This command connects to your database, retrieves table metadata, and creates corresponding asset definition files in your pipeline.
+
+```bash
+bruin import dwh [FLAGS] [pipeline path]
+```
+
+## Overview
+
+The import command streamlines the process of migrating existing database tables into a Bruin pipeline by:
+
+- Connecting to your database using existing connection configurations
+- Scanning database schemas and tables
+- Creating asset definition files with table metadata
+- Optionally filling column metadata from the database schema
+- Organizing assets in the pipeline's `assets/` directory
+
+## Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `pipeline path` | **Required.** Path to the directory where the pipeline and assets will be created. |
+
+## Flags
+
+<style>
+table {
+  width: 100%;
+}
+table th:first-child,
+table td:first-child {
+  white-space: nowrap;
+}
+</style>
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--connection`, `-c` | string | - | **Required.** Name of the connection to use as defined in `.bruin.yml` |
+| `--db-name`, `-d` | string | - | Filter by specific database/dataset name |
+| `--schema`, `-s` | string | - | Filter by specific schema name |
+| `--fill-columns`, `-f` | bool | `false` | Automatically fill column metadata from database schema |
+| `--environment`, `--env` | string | - | Target environment name as defined in `.bruin.yml` |
+| `--config-file` | string | - | Path to the `.bruin.yml` file. Can also be set via `BRUIN_CONFIG_FILE` environment variable |
+
+## Supported Database Types
+
+The import command automatically detects the asset type based on your connection configuration and supports:
+
+- **Snowflake** → `snowflake` source assets
+- **BigQuery** → `bigquery` source assets  
+- **PostgreSQL** → `postgres` source assets
+- **Redshift** → `redshift` source assets
+- **Athena** → `athena` source assets
+- **Databricks** → `databricks` source assets
+- **DuckDB** → `duckdb` source assets
+- **ClickHouse** → `clickhouse` source assets
+- **Azure Synapse** → `synapse` source assets
+- **MS SQL Server** → `mssql` source assets
+
+## How It Works
+
+1. **Connection Setup**: Uses your existing connection configuration from `.bruin.yml`
+2. **Database Scanning**: Retrieves database summary including schemas and tables
+3. **Filtering**: Applies database and schema filters if specified
+4. **Asset Creation**: Creates YAML asset files with naming pattern `{schema}.{table}.asset.yml`
+5. **Directory Structure**: Places assets in `{pipeline_path}/assets/` directory
+6. **Column Metadata**: Optionally queries table schema to populate column information
+
+## Examples
+
+### Basic Import
+
+Import all tables from a Snowflake connection:
+
+```bash
+bruin import dwh --connection snowflake-prod ./my-pipeline
+```
+
+### Schema-Specific Import
+
+Import only tables from a specific schema:
+
+```bash
+bruin import dwh --connection bigquery-dev --schema analytics ./my-pipeline
+```
+
+### Import with Column Metadata
+
+Import tables and automatically fill column information:
+
+```bash
+bruin import dwh --connection postgres-local --fill-columns ./my-pipeline
+```
+
+### Environment-Specific Import
+
+Import using a specific environment configuration:
+
+```bash
+bruin import dwh --connection snowflake-prod --environment production ./my-pipeline
+```
+
+### Database and Schema Filtering
+
+Import from a specific database and schema:
+
+```bash
+bruin import dwh --connection redshift-prod --db-name warehouse --schema public ./my-pipeline
+```
+
+## Generated Asset Structure
+
+Each imported table creates a YAML asset file with the following structure:
+
+```yaml
+type: postgres  # or snowflake, bigquery, etc.
+name: schema.table
+description: "Imported table schema.table"
+```
+
+The asset file includes:
+- **File Name**: `{schema}.{table}.asset.yml` (lowercase)
+- **Asset Name**: `{schema}.{table}` (lowercase)
+- **Description**: `"Imported table {schema}.{table}"`
+- **Asset Type**: Automatically determined from connection type
+
+### With Column Metadata (`--fill-columns`)
+
+When using the `--fill-columns` flag, the asset will also include:
+
+```yaml
+type: postgres
+name: schema.table
+description: "Imported table schema.table"
+columns:
+  - name: column_name
+    type: column_type
+    checks: []
+    upstreams: []
+```
+
+## Prerequisites
+
+1. **Pipeline Directory**: The target pipeline path must exist
+2. **Connection Configuration**: The specified connection must be defined in `.bruin.yml`
+3. **Database Access**: The connection must have read permissions on the target database/schemas
+4. **Assets Directory**: Will be created automatically if it doesn't exist
+
+## Output
+
+The command provides feedback on the import process:
+
+```bash
+Imported 25 tables and Merged 3 from data warehouse 'analytics' (schema: public) into pipeline './my-pipeline'
+```
+
+If column filling encounters issues, warnings are displayed but don't stop the import:
+
+```bash
+Warning: Could not fill columns for public.table_name: connection does not support schema introspection
+```
+
+## Error Handling
+
+Common errors and solutions:
+
+- **Connection not found**: Verify the connection name exists in your `.bruin.yml`
+- **Database access denied**: Check connection credentials and permissions
+- **Schema not found**: Verify the schema name exists in the target database
+- **Pipeline path invalid**: Ensure the target directory exists and is writable
+
+## Best Practices
+
+1. **Start Small**: Use schema filtering for large databases to avoid importing too many tables
+2. **Use Column Metadata**: Enable `--fill-columns` to get richer asset definitions
+3. **Review Generated Assets**: Check and customize the generated assets  as needed
+
+
+## Related Commands
+- [`bruin run`](./run.md) - Execute the imported assets
+- [`bruin validate`](./validate.md) - Validate the imported pipeline structure 
