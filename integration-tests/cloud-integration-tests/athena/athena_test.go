@@ -65,6 +65,18 @@ func TestAthenaWorkflows(t *testing.T) {
 				Name: "athena-scd2_by_column",
 				Steps: []e2e.Task{
 					{
+						Name:    "scd2-by-column: drop table if exists",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "DROP TABLE IF EXISTS menu;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
 						Name:    "scd2-by-column: restore menu asset to initial state",
 						Command: "cp",
 						Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/menu_original.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql")},
@@ -211,6 +223,18 @@ func TestAthenaWorkflows(t *testing.T) {
 				Name: "athena-scd2-by-time",
 				Steps: []e2e.Task{
 					{
+						Name:    "scd2-by-time: drop table if exists",
+						Command: binary,
+						Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "DROP TABLE IF EXISTS products;"),
+						Env:     []string{},
+						Expected: e2e.Output{
+							ExitCode: 0,
+						},
+						Asserts: []func(*e2e.Task) error{
+							e2e.AssertByExitCode,
+						},
+					},
+					{
 						Name:    "scd2-by-time: restore products asset to initial state",
 						Command: "cp",
 						Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/products_original.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")},
@@ -330,10 +354,10 @@ func TestAthenaWorkflows(t *testing.T) {
 						Args:    append(append([]string{"query"}, configFlags...), "--connection", "athena-default", "--query", "DROP TABLE IF EXISTS products;"),
 						Env:     []string{},
 						Expected: e2e.Output{
-							ExitCode: 1, // Expect failure due to "field descriptions not available for DDL statements" - same as PostgreSQL
+							ExitCode: 0, 
 						},
 						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode, // Assert that it fails as expected
+							e2e.AssertByExitCode, 
 						},
 					},
 					{
