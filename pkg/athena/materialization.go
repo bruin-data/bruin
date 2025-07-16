@@ -390,6 +390,8 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query, location string) (
 		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", asset.Materialization.PartitionBy)
 	}
 
+	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
+
 	createQuery := fmt.Sprintf(
 		`CREATE TABLE IF NOT EXISTS %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
 SELECT
@@ -400,15 +402,19 @@ SELECT
 FROM (
 %s
 ) AS src`,
-		asset.Name,
+		tempTableName,
 		location,
-		asset.Name,
+		tempTableName,
 		partitionBy,
 		asset.Materialization.IncrementalKey,
 		strings.TrimSpace(query),
 	)
 
-	return []string{strings.TrimSpace(createQuery)}, nil
+	return []string{
+		strings.TrimSpace(createQuery),
+		"DROP TABLE IF EXISTS " + asset.Name,
+		fmt.Sprintf("ALTER TABLE %s RENAME TO %s", tempTableName, asset.Name),
+	}, nil
 }
 
 func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query, location string) ([]string, error) {
@@ -422,8 +428,10 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query, location string)
 		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", asset.Materialization.PartitionBy)
 	}
 
+	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
+
 	createQuery := fmt.Sprintf(
-		`CREATE TABLE IF NOT EXISTS %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
+		`CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
 SELECT
   CURRENT_TIMESTAMP AS _valid_from,
   src.*,
@@ -432,12 +440,16 @@ SELECT
 FROM (
 %s
 ) AS src`,
-		asset.Name,
+		tempTableName,
 		location,
-		asset.Name,
+		tempTableName,
 		partitionBy,
 		strings.TrimSpace(query),
 	)
 
-	return []string{strings.TrimSpace(createQuery)}, nil
+	return []string{
+		strings.TrimSpace(createQuery),
+		"DROP TABLE IF EXISTS " + asset.Name,
+		fmt.Sprintf("ALTER TABLE %s RENAME TO %s", tempTableName, asset.Name),
+	}, nil
 }
