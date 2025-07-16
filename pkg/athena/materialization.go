@@ -220,6 +220,7 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 		primaryKeys       = make([]string, 0, 4)
 		compareConditions = make([]string, 0, 4)
 		userCols          = make([]string, 0, 12)
+		colTypes          = make(map[string]string)
 	)
 
 	for _, col := range asset.Columns {
@@ -227,15 +228,18 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 		case "_is_current", "_valid_from", "_valid_until":
 			return nil, fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
 		}
-
 		if col.PrimaryKey {
 			primaryKeys = append(primaryKeys, col.Name)
 		} else {
-			// Non-primary key columns are used for change detection
 			compareConditions = append(compareConditions, fmt.Sprintf("t.%s != s.%s", col.Name, col.Name))
 		}
-
 		userCols = append(userCols, col.Name)
+		// Map FLOAT to DOUBLE for Athena
+		typeName := strings.ToUpper(col.Type)
+		if typeName == "FLOAT" {
+			typeName = "DOUBLE"
+		}
+		colTypes[col.Name] = typeName
 	}
 
 	if len(primaryKeys) == 0 {
@@ -245,51 +249,19 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 
 	// Build join conditions
 	onConds := make([]string, len(primaryKeys))
-	targetPKs := make([]string, 0, len(primaryKeys))
-	sourcePKs := make([]string, 0, len(primaryKeys))
 	for i, pk := range primaryKeys {
 		onConds[i] = fmt.Sprintf("t.%s = s.%s", pk, pk)
-		targetPKs = append(targetPKs, fmt.Sprintf("t.%s IS NULL", pk))
-		sourcePKs = append(sourcePKs, fmt.Sprintf("s.%s IS NULL", pk))
 	}
 	joinCondition := strings.Join(onConds, " AND ")
-	fullCompareCondition := strings.Join(compareConditions, " OR ")
-	targetPrimaryKeyIsNull := strings.Join(targetPKs, " AND ")
-	sourcePrimaryKeyIsNull := strings.Join(sourcePKs, " AND ")
+
+	// Build CASE condition for change detection
+	changeConds := make([]string, len(compareConditions))
+	copy(changeConds, compareConditions)
+	changeCondition := strings.Join(changeConds, " OR ")
 
 	// Build column lists
 	allCols := append([]string{}, userCols...)
 	allCols = append(allCols, "_valid_from", "_valid_until", "_is_current")
-
-	// For unchanged rows
-	unchangedSelectCols := make([]string, 0, len(allCols))
-	for _, col := range allCols {
-		unchangedSelectCols = append(unchangedSelectCols, "t."+col)
-	}
-
-	// For rows to expire (old versions that changed)
-	expireSelectCols := make([]string, 0, len(userCols)+3)
-	for _, col := range userCols {
-		expireSelectCols = append(expireSelectCols, "t."+col)
-	}
-	expireSelectCols = append(expireSelectCols, "t._valid_from")
-	expireSelectCols = append(expireSelectCols, "CURRENT_TIMESTAMP AS _valid_until")
-	expireSelectCols = append(expireSelectCols, "FALSE AS _is_current")
-
-	// For new/changed rows to insert
-	insertSelectCols := make([]string, 0, len(userCols)+3)
-	for _, col := range userCols {
-		insertSelectCols = append(insertSelectCols, "s."+col)
-	}
-	insertSelectCols = append(insertSelectCols, "CURRENT_TIMESTAMP AS _valid_from")
-	insertSelectCols = append(insertSelectCols, "TIMESTAMP '9999-12-31' AS _valid_until")
-	insertSelectCols = append(insertSelectCols, "TRUE AS _is_current")
-
-	// For historical rows
-	histSelectCols := make([]string, 0, len(allCols))
-	for _, col := range allCols {
-		histSelectCols = append(histSelectCols, "t."+col)
-	}
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
@@ -298,6 +270,79 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", asset.Materialization.PartitionBy)
 	}
 
+	// Build joined CTE SELECT with explicit aliases
+	joinedSelectCols := make([]string, 0, len(userCols)*2+3)
+	for _, col := range userCols {
+		joinedSelectCols = append(joinedSelectCols, fmt.Sprintf("t.%s AS t_%s", col, col))
+	}
+	joinedSelectCols = append(joinedSelectCols, "t._valid_from")
+	joinedSelectCols = append(joinedSelectCols, "t._valid_until")
+	joinedSelectCols = append(joinedSelectCols, "t._is_current")
+	for _, col := range userCols {
+		joinedSelectCols = append(joinedSelectCols, fmt.Sprintf("s.%s AS s_%s", col, col))
+	}
+
+	// Build unchanged CTE SELECT
+	unchangedSelectCols := make([]string, 0, len(allCols))
+	for _, col := range userCols {
+		colType := colTypes[col]
+		unchangedSelectCols = append(unchangedSelectCols, fmt.Sprintf("CAST(t_%s AS %s) AS %s", col, colType, col))
+	}
+	unchangedSelectCols = append(unchangedSelectCols, "CAST(_valid_from AS TIMESTAMP) AS _valid_from")
+	unchangedSelectCols = append(unchangedSelectCols, "CAST(_valid_until AS TIMESTAMP) AS _valid_until")
+	unchangedSelectCols = append(unchangedSelectCols, "CAST(_is_current AS BOOLEAN) AS _is_current")
+
+	// Build to_expire CTE SELECT
+	expireSelectCols := make([]string, 0, len(userCols)+3)
+	for _, col := range userCols {
+		colType := colTypes[col]
+		expireSelectCols = append(expireSelectCols, fmt.Sprintf("CAST(t_%s AS %s) AS %s", col, colType, col))
+	}
+	expireSelectCols = append(expireSelectCols, "CAST(_valid_from AS TIMESTAMP) AS _valid_from")
+	expireSelectCols = append(expireSelectCols, "CURRENT_TIMESTAMP AS _valid_until")
+	expireSelectCols = append(expireSelectCols, "FALSE AS _is_current")
+
+	// Build to_insert CTE SELECT
+	insertSelectCols := make([]string, 0, len(userCols)+3)
+	for _, col := range userCols {
+		colType := colTypes[col]
+		insertSelectCols = append(insertSelectCols, fmt.Sprintf("CAST(s.%s AS %s) AS %s", col, colType, col))
+	}
+	insertSelectCols = append(insertSelectCols, "CURRENT_TIMESTAMP AS _valid_from")
+	insertSelectCols = append(insertSelectCols, "TIMESTAMP '9999-12-31 23:59:59' AS _valid_until")
+	insertSelectCols = append(insertSelectCols, "TRUE AS _is_current")
+
+	// Build historical CTE SELECT with explicit casts
+	historicalSelectCols := make([]string, 0, len(userCols)+3)
+	for _, col := range userCols {
+		colType := colTypes[col]
+		historicalSelectCols = append(historicalSelectCols, fmt.Sprintf("CAST(%s AS %s) AS %s", col, colType, col))
+	}
+	historicalSelectCols = append(historicalSelectCols, "CAST(_valid_from AS TIMESTAMP) AS _valid_from")
+	historicalSelectCols = append(historicalSelectCols, "CAST(_valid_until AS TIMESTAMP) AS _valid_until")
+	historicalSelectCols = append(historicalSelectCols, "CAST(_is_current AS BOOLEAN) AS _is_current")
+
+	// Build change condition for joined CTE (using aliased column names)
+	joinedChangeConds := make([]string, len(compareConditions))
+	for i, cond := range compareConditions {
+		// Replace t.col and s.col with t_col and s_col
+		cond = strings.ReplaceAll(cond, "t.", "t_")
+		cond = strings.ReplaceAll(cond, "s.", "s_")
+		joinedChangeConds[i] = cond
+	}
+	joinedChangeCondition := strings.Join(joinedChangeConds, " OR ")
+
+	// Build unchanged condition (equality check)
+	unchangedConds := make([]string, len(compareConditions))
+	for i, cond := range compareConditions {
+		// Replace t.col != s.col with t_col = s_col for unchanged check
+		cond = strings.ReplaceAll(cond, "t.", "t_")
+		cond = strings.ReplaceAll(cond, "s.", "s_")
+		cond = strings.ReplaceAll(cond, "!=", "=")
+		unchangedConds[i] = cond
+	}
+	unchangedCondition := strings.Join(unchangedConds, " AND ")
+
 	createQuery := fmt.Sprintf(`
 CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
 WITH
@@ -305,79 +350,64 @@ source AS (
   %s
 ),
 target AS (
-  SELECT * FROM %s
+  SELECT * FROM %s WHERE _is_current = TRUE
 ),
--- Unchanged current rows (no change in source)
-unchanged AS (
-  SELECT %s
-  FROM target t
-  JOIN source s ON %s
-  WHERE t._is_current = TRUE
-    AND NOT (%s)
-),
--- Rows to expire (current rows that have changed)
-to_expire AS (
-  SELECT %s
-  FROM target t
-  JOIN source s ON %s
-  WHERE t._is_current = TRUE
-    AND (%s)
-),
--- Rows to expire due to missing in source (deletions)
-to_expire_missing AS (
-  SELECT %s
+joined AS (
+  SELECT
+    %s
   FROM target t
   LEFT JOIN source s ON %s
-  WHERE t._is_current = TRUE
-    AND %s
 ),
--- New/changed rows to insert
+-- Rows that are unchanged
+unchanged AS (
+  SELECT %s
+  FROM joined
+  WHERE s_%s IS NOT NULL AND %s
+),
+-- Rows that need to be expired (changed or missing in source)
+to_expire AS (
+  SELECT %s
+  FROM joined
+  WHERE s_%s IS NULL OR %s
+),
+-- New/changed inserts from source
 to_insert AS (
   SELECT %s
   FROM source s
-  LEFT JOIN target t ON %s AND t._is_current = TRUE
-  WHERE %s OR (%s)
+  LEFT JOIN target t ON %s
+  WHERE t.%s IS NULL OR %s
 ),
--- Historical rows (already expired)
+-- Already expired historical rows (untouched)
 historical AS (
-  SELECT %s
-  FROM target t
-  WHERE t._is_current = FALSE
+  SELECT %s FROM %s WHERE _is_current = FALSE
 )
-SELECT %s FROM unchanged
+SELECT * FROM unchanged
 UNION ALL
-SELECT %s FROM to_expire
+SELECT * FROM to_expire
 UNION ALL
-SELECT %s FROM to_expire_missing
+SELECT * FROM to_insert
 UNION ALL
-SELECT %s FROM to_insert
-UNION ALL
-SELECT %s FROM historical`,
+SELECT * FROM historical`,
 		tempTableName,
 		location,
 		tempTableName,
 		partitionBy,
 		strings.TrimSpace(query),
 		asset.Name,
+		strings.Join(joinedSelectCols, ",\n    "),
+		joinCondition,
 		strings.Join(unchangedSelectCols, ", "),
-		joinCondition,
-		fullCompareCondition,
+		primaryKeys[0],
+		unchangedCondition,
 		strings.Join(expireSelectCols, ", "),
-		joinCondition,
-		fullCompareCondition,
-		strings.Join(expireSelectCols, ", "),
-		joinCondition,
-		sourcePrimaryKeyIsNull,
+		primaryKeys[0],
+		joinedChangeCondition,
 		strings.Join(insertSelectCols, ", "),
 		joinCondition,
-		targetPrimaryKeyIsNull,
-		fullCompareCondition,
-		strings.Join(histSelectCols, ", "),
-		strings.Join(allCols, ", "),
-		strings.Join(allCols, ", "),
-		strings.Join(allCols, ", "),
-		strings.Join(allCols, ", "),
-		strings.Join(allCols, ", "),
+		primaryKeys[0],
+		changeCondition,
+		strings.Join(historicalSelectCols, ", "),
+		asset.Name,
 	)
 
 	return []string{
