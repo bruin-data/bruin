@@ -13,11 +13,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func NewVaultClient(logger logger.Logger) (*Client, error) {
-	host := os.Getenv("VAULT_HOST")
-	token := os.Getenv("VAULT_TOKEN")
-	role := os.Getenv("VAULT_ROLE")
-
+func NewVaultClient(logger logger.Logger, host, token, role string) (*Client, error) {
 	if host == "" {
 		return nil, nil
 	}

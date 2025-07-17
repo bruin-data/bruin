@@ -39,6 +39,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/bruin-data/bruin/pkg/secrets"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/synapse"
@@ -351,11 +352,23 @@ func Run(isDebug *bool) *cli.Command {
 				}
 				executionStartLog = "Starting the pipeline execution..."
 			}
-			connectionManager, errs := connection.NewManagerFromConfig(cm)
-			if len(errs) > 0 {
-				printErrors(errs, runConfig.Output, "Failed to register connections")
+
+			var connectionManager config.ConnectionGetter
+			connectionManager, err = secrets.NewVaultClient(logger, os.Getenv("VAULT_HOST"), os.Getenv("VAULT_TOKEN"), os.Getenv("VAULT_ROLE"))
+			if err != nil {
+				printError(err, runConfig.Output, "Failed to initialize vault client")
 				return cli.Exit("", 1)
 			}
+
+			if connectionManager == nil {
+				var errs []error
+				connectionManager, errs = connection.NewManagerFromConfig(cm)
+				if len(errs) > 0 {
+					printErrors(errs, runConfig.Output, "Failed to register connections")
+					return cli.Exit("", 1)
+				}
+			}
+
 			shouldValidate := !pipelineInfo.RunningForAnAsset && !c.Bool("no-validation")
 			if shouldValidate {
 				if err := CheckLint(runCtx, pipelineInfo.Pipeline, inputPath, logger, nil, connectionManager); err != nil {
