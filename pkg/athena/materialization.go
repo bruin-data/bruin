@@ -285,30 +285,24 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 	// Build unchanged CTE SELECT
 	unchangedSelectCols := make([]string, 0, len(allCols))
 	for _, col := range userCols {
-		colType := colTypes[col]
-		unchangedSelectCols = append(unchangedSelectCols, fmt.Sprintf("CAST(t_%s AS %s) AS %s", col, colType, col))
+		unchangedSelectCols = append(unchangedSelectCols, fmt.Sprintf("t_%s AS %s", col, col))
 	}
 
 	// Build to_expire CTE SELECT
 	expireSelectCols := make([]string, 0, len(userCols)+3)
 	for _, col := range userCols {
-		colType := colTypes[col]
-		expireSelectCols = append(expireSelectCols, fmt.Sprintf("CAST(t_%s AS %s) AS %s", col, colType, col))
+		expireSelectCols = append(expireSelectCols, fmt.Sprintf("t_%s AS %s", col, col))
 	}
 
 	// Build to_insert CTE SELECT
 	insertSelectCols := make([]string, 0, len(userCols)+3)
 	for _, col := range userCols {
-		colType := colTypes[col]
-		insertSelectCols = append(insertSelectCols, fmt.Sprintf("CAST(s.%s AS %s) AS %s", col, colType, col))
+		insertSelectCols = append(insertSelectCols, fmt.Sprintf("s.%s AS %s", col, col))
 	}
 
 	// Build historical CTE SELECT with explicit casts
 	historicalSelectCols := make([]string, 0, len(userCols)+3)
-	for _, col := range userCols {
-		colType := colTypes[col]
-		historicalSelectCols = append(historicalSelectCols, fmt.Sprintf("CAST(%s AS %s) AS %s", col, colType, col))
-	}
+	historicalSelectCols = append(historicalSelectCols, userCols...)
 	
 	// Build change condition for joined CTE (using aliased column names)
 	joinedChangeConds := make([]string, len(compareConditions))
@@ -338,7 +332,8 @@ source AS (
   %s
 ),
 target AS (
-  SELECT * FROM %s WHERE _is_current = TRUE
+  SELECT * FROM %s 
+  WHERE _is_current = TRUE
 ),
 joined AS (
   SELECT
@@ -349,16 +344,16 @@ joined AS (
 -- Rows that are unchanged
 unchanged AS (
   SELECT %s,
-  CAST(_valid_from AS TIMESTAMP) AS _valid_from,
-  CAST(_valid_until AS TIMESTAMP) AS _valid_until,
-  CAST(_is_current AS BOOLEAN) AS _is_current
+  _valid_from,
+  _valid_until,
+  _is_current
   FROM joined
   WHERE s_%s IS NOT NULL AND %s
 ),
 -- Rows that need to be expired (changed or missing in source)
 to_expire AS (
   SELECT %s,
-  CAST(_valid_from AS TIMESTAMP) AS _valid_from,
+  _valid_from,
   CURRENT_TIMESTAMP AS _valid_until,
   FALSE AS _is_current
   FROM joined
@@ -377,9 +372,9 @@ to_insert AS (
 -- Already expired historical rows (untouched)
 historical AS (
   SELECT %s,
-  CAST(_valid_from AS TIMESTAMP) AS _valid_from,
-  CAST(_valid_until AS TIMESTAMP) AS _valid_until,
-  CAST(_is_current AS BOOLEAN) AS _is_current
+  _valid_from,
+  _valid_until,
+  _is_current
   FROM %s
   WHERE _is_current = FALSE
 )
@@ -414,8 +409,8 @@ SELECT * FROM historical`,
 
 	return []string{
 		strings.TrimSpace(createQuery),
-		"DROP TABLE IF EXISTS " + asset.Name,
-		fmt.Sprintf("ALTER TABLE %s RENAME TO %s", tempTableName, asset.Name),
+		"\nDROP TABLE IF EXISTS " + asset.Name,
+		fmt.Sprintf("\nALTER TABLE %s RENAME TO %s;", tempTableName, asset.Name),
 	}, nil
 }
 
