@@ -373,7 +373,7 @@ SELECT %s FROM to_insert
 UNION ALL
 SELECT %s FROM historical`,
 		// Create table
-		tempTableName, 
+		tempTableName,
 		location,
 		tempTableName,
 		partitionBy,
@@ -396,13 +396,13 @@ SELECT %s FROM historical`,
 		// Insert data
 		strings.Join(insertSelectCols, ", "),
 		joinCondition,
-		primaryKeys[0], 
+		primaryKeys[0],
 		changeCondition,
 		// Historical data
 		strings.Join(allCols, ", "),
 		asset.Name,
 		// Unions
-		strings.Join(allCols, ", "), 
+		strings.Join(allCols, ", "),
 		strings.Join(allCols, ", "),
 		strings.Join(allCols, ", "),
 		strings.Join(allCols, ", "),
@@ -693,12 +693,17 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query, location string)
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
+	srcCols := make([]string, len(asset.Columns))
+		for i, col := range asset.Columns {
+    srcCols[i] = fmt.Sprintf("src.%s", col.Name)
+	}
+
 	createQuery := fmt.Sprintf(
 		`CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
 SELECT
+  %s,
   CURRENT_TIMESTAMP AS _valid_from,
-  src.*,
-  TIMESTAMP '9999-12-31' AS _valid_until,
+  TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
   TRUE AS _is_current
 FROM (
 %s
@@ -707,12 +712,13 @@ FROM (
 		location,
 		tempTableName,
 		partitionBy,
+		strings.Join(srcCols, ", "),
 		strings.TrimSpace(query),
 	)
 
 	return []string{
 		strings.TrimSpace(createQuery),
-		"DROP TABLE IF EXISTS " + asset.Name,
-		fmt.Sprintf("ALTER TABLE %s RENAME TO %s", tempTableName, asset.Name),
+		"\nDROP TABLE IF EXISTS " + asset.Name,
+		fmt.Sprintf("\nALTER TABLE %s RENAME TO %s;", tempTableName, asset.Name),
 	}, nil
 }
