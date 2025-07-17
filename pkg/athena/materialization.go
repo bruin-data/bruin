@@ -288,9 +288,6 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 		colType := colTypes[col]
 		unchangedSelectCols = append(unchangedSelectCols, fmt.Sprintf("CAST(t_%s AS %s) AS %s", col, colType, col))
 	}
-	unchangedSelectCols = append(unchangedSelectCols, "CAST(_valid_from AS TIMESTAMP) AS _valid_from")
-	unchangedSelectCols = append(unchangedSelectCols, "CAST(_valid_until AS TIMESTAMP) AS _valid_until")
-	unchangedSelectCols = append(unchangedSelectCols, "CAST(_is_current AS BOOLEAN) AS _is_current")
 
 	// Build to_expire CTE SELECT
 	expireSelectCols := make([]string, 0, len(userCols)+3)
@@ -298,9 +295,6 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 		colType := colTypes[col]
 		expireSelectCols = append(expireSelectCols, fmt.Sprintf("CAST(t_%s AS %s) AS %s", col, colType, col))
 	}
-	expireSelectCols = append(expireSelectCols, "CAST(_valid_from AS TIMESTAMP) AS _valid_from")
-	expireSelectCols = append(expireSelectCols, "CURRENT_TIMESTAMP AS _valid_until")
-	expireSelectCols = append(expireSelectCols, "FALSE AS _is_current")
 
 	// Build to_insert CTE SELECT
 	insertSelectCols := make([]string, 0, len(userCols)+3)
@@ -308,9 +302,6 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 		colType := colTypes[col]
 		insertSelectCols = append(insertSelectCols, fmt.Sprintf("CAST(s.%s AS %s) AS %s", col, colType, col))
 	}
-	insertSelectCols = append(insertSelectCols, "CURRENT_TIMESTAMP AS _valid_from")
-	insertSelectCols = append(insertSelectCols, "TIMESTAMP '9999-12-31 23:59:59' AS _valid_until")
-	insertSelectCols = append(insertSelectCols, "TRUE AS _is_current")
 
 	// Build historical CTE SELECT with explicit casts
 	historicalSelectCols := make([]string, 0, len(userCols)+3)
@@ -318,10 +309,7 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 		colType := colTypes[col]
 		historicalSelectCols = append(historicalSelectCols, fmt.Sprintf("CAST(%s AS %s) AS %s", col, colType, col))
 	}
-	historicalSelectCols = append(historicalSelectCols, "CAST(_valid_from AS TIMESTAMP) AS _valid_from")
-	historicalSelectCols = append(historicalSelectCols, "CAST(_valid_until AS TIMESTAMP) AS _valid_until")
-	historicalSelectCols = append(historicalSelectCols, "CAST(_is_current AS BOOLEAN) AS _is_current")
-
+	
 	// Build change condition for joined CTE (using aliased column names)
 	joinedChangeConds := make([]string, len(compareConditions))
 	for i, cond := range compareConditions {
@@ -360,26 +348,40 @@ joined AS (
 ),
 -- Rows that are unchanged
 unchanged AS (
-  SELECT %s
+  SELECT %s,
+  CAST(_valid_from AS TIMESTAMP) AS _valid_from,
+  CAST(_valid_until AS TIMESTAMP) AS _valid_until,
+  CAST(_is_current AS BOOLEAN) AS _is_current
   FROM joined
   WHERE s_%s IS NOT NULL AND %s
 ),
 -- Rows that need to be expired (changed or missing in source)
 to_expire AS (
-  SELECT %s
+  SELECT %s,
+  CAST(_valid_from AS TIMESTAMP) AS _valid_from,
+  CURRENT_TIMESTAMP AS _valid_until,
+  FALSE AS _is_current
   FROM joined
   WHERE s_%s IS NULL OR %s
 ),
 -- New/changed inserts from source
 to_insert AS (
-  SELECT %s
+  SELECT %s,
+  CURRENT_TIMESTAMP AS _valid_from,
+  TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
+  TRUE AS _is_current
   FROM source s
   LEFT JOIN target t ON %s
   WHERE t.%s IS NULL OR %s
 ),
 -- Already expired historical rows (untouched)
 historical AS (
-  SELECT %s FROM %s WHERE _is_current = FALSE
+  SELECT %s,
+  CAST(_valid_from AS TIMESTAMP) AS _valid_from,
+  CAST(_valid_until AS TIMESTAMP) AS _valid_until,
+  CAST(_is_current AS BOOLEAN) AS _is_current
+  FROM %s
+  WHERE _is_current = FALSE
 )
 SELECT * FROM unchanged
 UNION ALL
