@@ -254,6 +254,20 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 	}
 	joinCondition := strings.Join(onConds, " AND ")
 
+	// Build primary key checks
+	targetPrimaryKeys := make([]string, len(primaryKeys))
+	for i, pk := range primaryKeys {
+		targetPrimaryKeys[i] = fmt.Sprintf("t.%s", pk)
+	}
+	targetPKIsNullCheck := strings.Join(targetPrimaryKeys, " IS NULL AND ")
+	
+	sourcePrimaryKeys := make([]string, len(primaryKeys))
+	for i, pk := range primaryKeys {
+		sourcePrimaryKeys[i] = fmt.Sprintf("s_%s", pk)
+	}
+	sourcePKIsNullCheck := strings.Join(sourcePrimaryKeys, " IS NULL AND ")
+	sourcePKNotNullCheck := strings.Join(sourcePrimaryKeys, " IS NOT NULL AND ")
+
 	// Build CASE condition for change detection
 	changeCondition := strings.Join(compareConditions, " OR ")
 
@@ -338,7 +352,7 @@ unchanged AS (
   _valid_until,
   _is_current
   FROM joined
-  WHERE s_%s IS NOT NULL AND %s
+  WHERE %s IS NOT NULL AND %s
 ),
 -- Rows that need to be expired (changed or missing in source)
 to_expire AS (
@@ -347,7 +361,7 @@ to_expire AS (
   (SELECT now FROM time_now) AS _valid_until,
   FALSE AS _is_current
   FROM joined
-  WHERE s_%s IS NULL OR %s
+  WHERE %s IS NULL OR %s
 ),
 -- New/changed inserts from source
 to_insert AS (
@@ -357,7 +371,7 @@ to_insert AS (
   TRUE AS _is_current
   FROM source s
   LEFT JOIN target t ON %s
-  WHERE t.%s IS NULL OR %s
+  WHERE %s IS NULL OR %s
 ),
 -- Already expired historical rows (untouched)
 historical AS (
@@ -387,16 +401,16 @@ SELECT %s FROM historical`,
 		joinCondition,
 		// Unchanged data
 		strings.Join(unchangedSelectCols, ", "),
-		primaryKeys[0],
+		sourcePKNotNullCheck,
 		unchangedCondition,
 		// Expired data
 		strings.Join(expireSelectCols, ", "),
-		primaryKeys[0],
+		sourcePKIsNullCheck,
 		joinedChangeCondition,
 		// Insert data
 		strings.Join(insertSelectCols, ", "),
 		joinCondition,
-		primaryKeys[0],
+		targetPKIsNullCheck,
 		changeCondition,
 		// Historical data
 		strings.Join(allCols, ", "),
