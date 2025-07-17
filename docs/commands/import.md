@@ -3,7 +3,7 @@
 The `import` commands allows you to automatically import existing tables in your data warehouse as Bruin assets. This command connects to your database, retrieves table metadata, and creates corresponding asset definition files in your pipeline.
 
 ```bash
-bruin import dwh [FLAGS] [pipeline path]
+bruin import database [FLAGS] [pipeline path]
 ```
 
 ## Overview
@@ -12,7 +12,7 @@ The import command streamlines the process of migrating existing database tables
 
 - Connecting to your database using existing connection configurations
 - Scanning database schemas and tables
-- Creating asset definition files with table metadata
+- Creating asset definition files 
 - Optionally filling column metadata from the database schema
 - Organizing assets in the pipeline's `assets/` directory
 
@@ -37,7 +37,6 @@ table td:first-child {
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--connection`, `-c` | string | - | **Required.** Name of the connection to use as defined in `.bruin.yml` |
-| `--db-name`, `-d` | string | - | Filter by specific database/dataset name |
 | `--schema`, `-s` | string | - | Filter by specific schema name |
 | `--fill-columns`, `-f` | bool | `false` | Automatically fill column metadata from database schema |
 | `--environment`, `--env` | string | - | Target environment name as defined in `.bruin.yml` |
@@ -45,18 +44,16 @@ table td:first-child {
 
 ## Supported Database Types
 
-The import command automatically detects the asset type based on your connection configuration and supports:
-
-- **Snowflake** → `snowflake` source assets
-- **BigQuery** → `bigquery` source assets  
-- **PostgreSQL** → `postgres` source assets
-- **Redshift** → `redshift` source assets
-- **Athena** → `athena` source assets
-- **Databricks** → `databricks` source assets
-- **DuckDB** → `duckdb` source assets
-- **ClickHouse** → `clickhouse` source assets
-- **Azure Synapse** → `synapse` source assets
-- **MS SQL Server** → `mssql` source assets
+- **Snowflake** → `snowflake` 
+- **BigQuery** → `bigquery` 
+- **PostgreSQL** → `postgres` 
+- **Redshift** → `redshift` 
+- **Athena** → `athena` 
+- **Databricks** → `databricks`
+- **DuckDB** → `duckdb` 
+- **ClickHouse** → `clickhouse`
+- **Azure Synapse** → `synapse`
+- **MS SQL Server** → `mssql` 
 
 ## How It Works
 
@@ -74,7 +71,7 @@ The import command automatically detects the asset type based on your connection
 Import all tables from a Snowflake connection:
 
 ```bash
-bruin import dwh --connection snowflake-prod ./my-pipeline
+bruin import database --connection snowflake-prod ./my-pipeline
 ```
 
 ### Schema-Specific Import
@@ -82,7 +79,7 @@ bruin import dwh --connection snowflake-prod ./my-pipeline
 Import only tables from a specific schema:
 
 ```bash
-bruin import dwh --connection bigquery-dev --schema analytics ./my-pipeline
+bruin import database --connection bigquery-dev --schema analytics ./my-pipeline
 ```
 
 ### Import with Column Metadata
@@ -90,7 +87,7 @@ bruin import dwh --connection bigquery-dev --schema analytics ./my-pipeline
 Import tables and automatically fill column information:
 
 ```bash
-bruin import dwh --connection postgres-local --fill-columns ./my-pipeline
+bruin import database --connection postgres-local --fill-columns ./my-pipeline
 ```
 
 ### Environment-Specific Import
@@ -98,15 +95,7 @@ bruin import dwh --connection postgres-local --fill-columns ./my-pipeline
 Import using a specific environment configuration:
 
 ```bash
-bruin import dwh --connection snowflake-prod --environment production ./my-pipeline
-```
-
-### Database and Schema Filtering
-
-Import from a specific database and schema:
-
-```bash
-bruin import dwh --connection redshift-prod --db-name warehouse --schema public ./my-pipeline
+bruin import database --connection snowflake-prod --environment production ./my-pipeline
 ```
 
 ## Generated Asset Structure
