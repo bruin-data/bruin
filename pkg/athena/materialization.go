@@ -240,6 +240,13 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 			asset.Materialization.Strategy)
 	}
 
+	var partitionBy string
+	if asset.Materialization.PartitionBy != "" {
+		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", asset.Materialization.PartitionBy)
+	}
+
+	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
+
 	// Build join conditions
 	onConds := make([]string, len(primaryKeys))
 	for i, pk := range primaryKeys {
@@ -248,20 +255,11 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 	joinCondition := strings.Join(onConds, " AND ")
 
 	// Build CASE condition for change detection
-	changeConds := make([]string, len(compareConditions))
-	copy(changeConds, compareConditions)
-	changeCondition := strings.Join(changeConds, " OR ")
+	changeCondition := strings.Join(compareConditions, " OR ")
 
 	// Build column lists
 	allCols := append([]string{}, userCols...)
 	allCols = append(allCols, "_valid_from", "_valid_until", "_is_current")
-
-	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
-
-	var partitionBy string
-	if asset.Materialization.PartitionBy != "" {
-		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", asset.Materialization.PartitionBy)
-	}
 
 	// Build joined CTE SELECT with explicit aliases
 	joinedSelectCols := make([]string, 0, len(userCols)*2+3)
@@ -317,6 +315,9 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 	createQuery := fmt.Sprintf(`
 CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
 WITH
+time_now AS (
+  SELECT CURRENT_TIMESTAMP AS now
+),
 source AS (
   %s
 ),
@@ -343,7 +344,7 @@ unchanged AS (
 to_expire AS (
   SELECT %s,
   _valid_from,
-  CURRENT_TIMESTAMP AS _valid_until,
+  (SELECT now FROM time_now) AS _valid_until,
   FALSE AS _is_current
   FROM joined
   WHERE s_%s IS NULL OR %s
@@ -351,7 +352,7 @@ to_expire AS (
 -- New/changed inserts from source
 to_insert AS (
   SELECT %s,
-  CURRENT_TIMESTAMP AS _valid_from,
+  (SELECT now FROM time_now) AS _valid_from,
   TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
   TRUE AS _is_current
   FROM source s
@@ -371,28 +372,37 @@ UNION ALL
 SELECT %s FROM to_insert
 UNION ALL
 SELECT %s FROM historical`,
-		tempTableName,
+		// Create table
+		tempTableName, 
 		location,
 		tempTableName,
 		partitionBy,
+		// Source data
 		strings.TrimSpace(query),
+		// Target data
 		strings.Join(allCols, ", "),
 		asset.Name,
+		// Joined data
 		strings.Join(joinedSelectCols, ",\n    "),
 		joinCondition,
+		// Unchanged data
 		strings.Join(unchangedSelectCols, ", "),
 		primaryKeys[0],
 		unchangedCondition,
+		// Expired data
 		strings.Join(expireSelectCols, ", "),
 		primaryKeys[0],
 		joinedChangeCondition,
+		// Insert data
 		strings.Join(insertSelectCols, ", "),
 		joinCondition,
-		primaryKeys[0],
+		primaryKeys[0], 
 		changeCondition,
+		// Historical data
 		strings.Join(allCols, ", "),
 		asset.Name,
-		strings.Join(allCols, ", "),
+		// Unions
+		strings.Join(allCols, ", "), 
 		strings.Join(allCols, ", "),
 		strings.Join(allCols, ", "),
 		strings.Join(allCols, ", "),
