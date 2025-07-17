@@ -458,73 +458,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			},
 			query: "SELECT id, col1, col2 from source_table",
 			want: []string{
-				`CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS
-WITH
-time_now AS (
-  SELECT CURRENT_TIMESTAMP AS now
-),
-source AS (
-  SELECT id, col1, col2 from source_table
-),
-target AS (
-  SELECT id, col1, col2, _valid_from, _valid_until, _is_current 	
-  FROM my.asset 
-  WHERE _is_current = TRUE
-),
-joined AS (
-  SELECT t.id AS t_id,
-    t.col1 AS t_col1,
-    t.col2 AS t_col2,
-    t._valid_from,
-    t._valid_until,
-    t._is_current,
-    s.id AS s_id,
-    s.col1 AS s_col1,
-    s.col2 AS s_col2
-  FROM target t
-  LEFT JOIN source s ON t.id = s.id
-),
--- Rows that are unchanged
-unchanged AS (
-  SELECT t_id AS id, t_col1 AS col1, t_col2 AS col2,
-  _valid_from,
-  _valid_until,
-  _is_current
-  FROM joined
-  WHERE s_id IS NOT NULL AND t_col1 = s_col1 AND t_col2 = s_col2
-),
--- Rows that need to be expired (changed or missing in source)
-to_expire AS (
-  SELECT t_id AS id, t_col1 AS col1, t_col2 AS col2,
-  _valid_from,
-  (SELECT now FROM time_now) AS _valid_until,
-  FALSE AS _is_current
-  FROM joined
-  WHERE s_id IS NULL OR t_col1 != s_col1 OR t_col2 != s_col2
-),
--- New/changed inserts from source
-to_insert AS (
-  SELECT s.id AS id, s.col1 AS col1, s.col2 AS col2,
-  (SELECT now FROM time_now) AS _valid_from,
-  TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
-  TRUE AS _is_current
-  FROM source s
-  LEFT JOIN target t ON t.id = s.id
-  WHERE t.id IS NULL OR t.col1 != s.col1 OR t.col2 != s.col2
-),
--- Already expired historical rows (untouched)
-historical AS (
-  SELECT id, col1, col2, _valid_from, _valid_until, _is_current
-  FROM my.asset
-  WHERE _is_current = FALSE
-)
-SELECT id, col1, col2, _valid_from, _valid_until, _is_current FROM unchanged
-UNION ALL
-SELECT id, col1, col2, _valid_from, _valid_until, _is_current FROM to_expire
-UNION ALL
-SELECT id, col1, col2, _valid_from, _valid_until, _is_current FROM to_insert
-UNION ALL
-SELECT id, col1, col2, _valid_from, _valid_until, _is_current FROM historical`,
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS\nWITH\ntime_now AS (\n  SELECT CURRENT_TIMESTAMP AS now\n),\nsource AS (\n  SELECT id, col1, col2 from source_table\n),\ntarget AS (\n  SELECT id, col1, col2, _valid_from, _valid_until, _is_current \t\n  FROM my.asset \n  WHERE _is_current = TRUE\n),\njoined AS (\n  SELECT t.id AS t_id,\n    t.col1 AS t_col1,\n    t.col2 AS t_col2,\n    t._valid_from,\n    t._valid_until,\n    t._is_current,\n    s.id AS s_id,\n    s.col1 AS s_col1,\n    s.col2 AS s_col2\n  FROM target t\n  LEFT JOIN source s ON t.id = s.id\n),\n-- Rows that are unchanged\nunchanged AS (\n  SELECT t_id AS id, t_col1 AS col1, t_col2 AS col2,\n  _valid_from,\n  _valid_until,\n  _is_current\n  FROM joined\n  WHERE s_id IS NOT NULL AND t_col1 = s_col1 AND t_col2 = s_col2\n),\n-- Rows that need to be expired (changed or missing in source)\nto_expire AS (\n  SELECT t_id AS id, t_col1 AS col1, t_col2 AS col2,\n  _valid_from,\n  (SELECT now FROM time_now) AS _valid_until,\n  FALSE AS _is_current\n  FROM joined\n  WHERE s_id IS NULL OR t_col1 != s_col1 OR t_col2 != s_col2\n),\n-- New/changed inserts from source\nto_insert AS (\n  SELECT s.id AS id, s.col1 AS col1, s.col2 AS col2,\n  (SELECT now FROM time_now) AS _valid_from,\n  TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n  TRUE AS _is_current\n  FROM source s\n  LEFT JOIN target t ON t.id = s.id\n  WHERE t.id IS NULL OR t.col1 != s.col1 OR t.col2 != s.col2\n),\n-- Already expired historical rows (untouched)\nhistorical AS (\n  SELECT id, col1, col2, _valid_from, _valid_until, _is_current\n  FROM my.asset\n  WHERE _is_current = FALSE\n)\nSELECT id, col1, col2, _valid_from, _valid_until, _is_current FROM unchanged\nUNION ALL\nSELECT id, col1, col2, _valid_from, _valid_until, _is_current FROM to_expire\nUNION ALL\nSELECT id, col1, col2, _valid_from, _valid_until, _is_current FROM to_insert\nUNION ALL\nSELECT id, col1, col2, _valid_from, _valid_until, _is_current FROM historical",
 				"\nDROP TABLE IF EXISTS my.asset",
 				"\nALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
 			},
@@ -545,76 +479,10 @@ SELECT id, col1, col2, _valid_from, _valid_until, _is_current FROM historical`,
 			},
 			query: "SELECT id, category, name from source_table",
 			want: []string{
-				`CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS
-WITH
-time_now AS (
-  SELECT CURRENT_TIMESTAMP AS now
-),
-source AS (
-  SELECT id, category, name from source_table
-),
-target AS (
-  SELECT id, category, name, _valid_from, _valid_until, _is_current 	
-  FROM my.asset 
-  WHERE _is_current = TRUE
-),
-joined AS (
-  SELECT t.id AS t_id,
-    t.category AS t_category,
-    t.name AS t_name,
-    t._valid_from,
-    t._valid_until,
-    t._is_current,
-    s.id AS s_id,
-    s.category AS s_category,
-    s.name AS s_name
-  FROM target t
-  LEFT JOIN source s ON t.id = s.id AND t.category = s.category
-),
--- Rows that are unchanged
-unchanged AS (
-  SELECT t_id AS id, t_category AS category, t_name AS name,
-  _valid_from,
-  _valid_until,
-  _is_current
-  FROM joined
-  WHERE s_id IS NOT NULL AND s_category IS NOT NULL AND t_name = s_name
-),
--- Rows that need to be expired (changed or missing in source)
-to_expire AS (
-  SELECT t_id AS id, t_category AS category, t_name AS name,
-  _valid_from,
-  (SELECT now FROM time_now) AS _valid_until,
-  FALSE AS _is_current
-  FROM joined
-  WHERE s_id IS NULL AND s_category IS NULL OR t_name != s_name
-),
--- New/changed inserts from source
-to_insert AS (
-  SELECT s.id AS id, s.category AS category, s.name AS name,
-  (SELECT now FROM time_now) AS _valid_from,
-  TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
-  TRUE AS _is_current
-  FROM source s
-  LEFT JOIN target t ON t.id = s.id AND t.category = s.category
-  WHERE t.id IS NULL AND t.category IS NULL OR t.name != s.name
-),
--- Already expired historical rows (untouched)
-historical AS (
-  SELECT id, category, name, _valid_from, _valid_until, _is_current
-  FROM my.asset
-  WHERE _is_current = FALSE
-)
-SELECT id, category, name, _valid_from, _valid_until, _is_current FROM unchanged
-UNION ALL
-SELECT id, category, name, _valid_from, _valid_until, _is_current FROM to_expire
-UNION ALL
-SELECT id, category, name, _valid_from, _valid_until, _is_current FROM to_insert
-UNION ALL
-SELECT id, category, name, _valid_from, _valid_until, _is_current FROM historical`,
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS\nWITH\ntime_now AS (\n  SELECT CURRENT_TIMESTAMP AS now\n),\nsource AS (\n  SELECT id, category, name from source_table\n),\ntarget AS (\n  SELECT id, category, name, _valid_from, _valid_until, _is_current \t\n  FROM my.asset \n  WHERE _is_current = TRUE\n),\njoined AS (\n  SELECT t.id AS t_id,\n    t.category AS t_category,\n    t.name AS t_name,\n    t._valid_from,\n    t._valid_until,\n    t._is_current,\n    s.id AS s_id,\n    s.category AS s_category,\n    s.name AS s_name\n  FROM target t\n  LEFT JOIN source s ON t.id = s.id AND t.category = s.category\n),\n-- Rows that are unchanged\nunchanged AS (\n  SELECT t_id AS id, t_category AS category, t_name AS name,\n  _valid_from,\n  _valid_until,\n  _is_current\n  FROM joined\n  WHERE s_id IS NOT NULL AND s_category IS NOT NULL AND t_name = s_name\n),\n-- Rows that need to be expired (changed or missing in source)\nto_expire AS (\n  SELECT t_id AS id, t_category AS category, t_name AS name,\n  _valid_from,\n  (SELECT now FROM time_now) AS _valid_until,\n  FALSE AS _is_current\n  FROM joined\n  WHERE s_id IS NULL AND s_category IS NULL OR t_name != s_name\n),\n-- New/changed inserts from source\nto_insert AS (\n  SELECT s.id AS id, s.category AS category, s.name AS name,\n  (SELECT now FROM time_now) AS _valid_from,\n  TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n  TRUE AS _is_current\n  FROM source s\n  LEFT JOIN target t ON t.id = s.id AND t.category = s.category\n  WHERE t.id IS NULL AND t.category IS NULL OR t.name != s.name\n),\n-- Already expired historical rows (untouched)\nhistorical AS (\n  SELECT id, category, name, _valid_from, _valid_until, _is_current\n  FROM my.asset\n  WHERE _is_current = FALSE\n)\nSELECT id, category, name, _valid_from, _valid_until, _is_current FROM unchanged\nUNION ALL\nSELECT id, category, name, _valid_from, _valid_until, _is_current FROM to_expire\nUNION ALL\nSELECT id, category, name, _valid_from, _valid_until, _is_current FROM to_insert\nUNION ALL\nSELECT id, category, name, _valid_from, _valid_until, _is_current FROM historical",
 				"\nDROP TABLE IF EXISTS my.asset",
 				"\nALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
-			},
+			  },
 		},
 		{
 			name: "scd2_full_refresh_by_column_with_no_primary_key",
