@@ -354,7 +354,14 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			var connectionManager config.ConnectionGetter
-			connectionManager, err = secrets.NewVaultClient(logger, os.Getenv("VAULT_HOST"), os.Getenv("VAULT_TOKEN"), os.Getenv("VAULT_ROLE"))
+			connectionManager, err = secrets.NewVaultClient(
+				logger, 
+				os.Getenv("VAULT_HOST"), 
+				os.Getenv("VAULT_TOKEN"), 
+				os.Getenv("VAULT_ROLE"), 
+				os.Getenv("VAULT_PATH"),
+				os.Getenv("VAULT_MOUNTPATH"),
+			)
 			if err != nil {
 				printError(err, runConfig.Output, "Failed to initialize vault client")
 				return cli.Exit("", 1)

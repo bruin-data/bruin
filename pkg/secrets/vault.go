@@ -3,26 +3,33 @@ package secrets
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"time"
 
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/connection"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/hashicorp/vault-client-go"
 	"github.com/hashicorp/vault-client-go/schema"
 	"github.com/pkg/errors"
 )
 
-func NewVaultClient(logger logger.Logger, host, token, role string) (*Client, error) {
+func NewVaultClient(logger logger.Logger, host, token, role, path string, mountPath string) (*Client, error) {
 	if host == "" {
 		return nil, nil
 	}
-	if token != "" {
-		return newVaultClientWithToken(host, token, "bruin", logger)
+	if path == "" {
+		return nil, errors.New("no vault path provided")
 	}
-
+	if mountPath == "" {
+		return nil, errors.New("no vault mountpath provided")
+	}
+	if token != "" {
+		return newVaultClientWithToken(host, token, mountPath, logger, path)
+	}
 	if role != "" {
-		return newVaultClientWithKubernetesAuth(host, role, "bruin", logger)
+		return newVaultClientWithKubernetesAuth(host, role, mountPath, logger, path)
 	}
 
 	return nil, errors.New("no vault credentials provided")
@@ -31,10 +38,11 @@ func NewVaultClient(logger logger.Logger, host, token, role string) (*Client, er
 type Client struct {
 	client    *vault.Client
 	mountPath string
+	path      string
 	logger    logger.Logger
 }
 
-func newVaultClientWithToken(host, token, mountPath string, logger logger.Logger) (*Client, error) {
+func newVaultClientWithToken(host, token, mountPath string, logger logger.Logger, path string) (*Client, error) {
 	client, err := vault.New(
 		vault.WithAddress(host),
 		vault.WithRequestTimeout(30*time.Second),
@@ -50,11 +58,12 @@ func newVaultClientWithToken(host, token, mountPath string, logger logger.Logger
 	return &Client{
 		client:    client,
 		mountPath: mountPath,
+		path:      path,
 		logger:    logger,
 	}, nil
 }
 
-func newVaultClientWithKubernetesAuth(host, role, mountPath string, logger logger.Logger) (*Client, error) {
+func newVaultClientWithKubernetesAuth(host, role, mountPath string, logger logger.Logger, path string) (*Client, error) {
 	client, err := vault.New(
 		vault.WithAddress(host),
 		vault.WithRequestTimeout(30*time.Second),
@@ -81,6 +90,7 @@ func newVaultClientWithKubernetesAuth(host, role, mountPath string, logger logge
 	return &Client{
 		client:    client,
 		mountPath: mountPath,
+		path:      path,
 		logger:    logger,
 	}, nil
 }
@@ -89,7 +99,8 @@ func (c *Client) GetConnection(name string) any {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelFunc()
 
-	res, err := c.client.Secrets.KvV2Read(ctx, name, vault.WithMountPath(c.mountPath))
+	secretPath := fmt.Sprintf("%s/%s", c.path, name)
+	res, err := c.client.Secrets.KvV2Read(ctx, secretPath, vault.WithMountPath(c.mountPath))
 	if err != nil {
 		c.logger.Error("failed to read secret from Vault", "error", err)
 		return nil
@@ -102,15 +113,17 @@ func (c *Client) GetConnection(name string) any {
 		return nil
 	}
 
-	details, ok := detailsRaw.(map[string]string)
+	details, ok := detailsRaw.(map[string]any)
 	if !ok {
-		c.logger.Error("failed to read secret from Vault", "error", "details is not a map")
+		c.logger.Error("failed to read secret from Vault", "error", "details is not a map", "details:", detailsRaw)
 		return nil
 	}
 
-	connectionsMap := map[string][]map[string]string{
+	details["name"] = name
+
+	connectionsMap := map[string][]map[string]any{
 		secretType: {
-			details,
+			map[string]any(details),
 		},
 	}
 
@@ -121,10 +134,30 @@ func (c *Client) GetConnection(name string) any {
 	}
 
 	var connections config.Connections
+
 	if err := json.Unmarshal(serialized, &connections); err != nil {
 		c.logger.Error("failed to unmarshal connections map", "error", err)
 		return nil
 	}
 
-	return connections.GetByName(name)
+	environment := config.Environment{
+		Connections: &connections,
+	}
+
+	config := config.Config{
+		Environments: map[string]config.Environment{
+			"default": environment,
+		},
+		SelectedEnvironmentName: "default",
+		SelectedEnvironment:     &environment,
+		DefaultEnvironmentName:  "default",
+	}
+
+	manager, errs := connection.NewManagerFromConfig(&config)
+	if len(errs) > 0 {
+		c.logger.Error("failed to create manager from config", "error", errs)
+		return nil
+	}
+
+	return manager.GetConnection(name)
 }

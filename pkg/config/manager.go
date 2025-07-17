@@ -124,14 +124,6 @@ func (c *Connections) Exists(name string) bool {
 	return ok
 }
 
-func (c *Connections) GetByName(name string) any {
-	if c.byKey == nil {
-		c.buildConnectionKeyMap()
-	}
-
-	return c.typeNameMap[name]
-}
-
 func (c *Connections) buildConnectionKeyMap() {
 	c.byKey = make(map[string]any)
 	c.typeNameMap = make(map[string]string)
