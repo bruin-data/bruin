@@ -220,7 +220,6 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 		primaryKeys       = make([]string, 0, 4)
 		compareConditions = make([]string, 0, 4)
 		userCols          = make([]string, 0, 12)
-		colTypes          = make(map[string]string)
 	)
 
 	for _, col := range asset.Columns {
@@ -234,12 +233,6 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 			compareConditions = append(compareConditions, fmt.Sprintf("t.%s != s.%s", col.Name, col.Name))
 		}
 		userCols = append(userCols, col.Name)
-		// Map FLOAT to DOUBLE for Athena
-		typeName := strings.ToUpper(col.Type)
-		if typeName == "FLOAT" {
-			typeName = "DOUBLE"
-		}
-		colTypes[col.Name] = typeName
 	}
 
 	if len(primaryKeys) == 0 {
@@ -300,10 +293,6 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 		insertSelectCols = append(insertSelectCols, fmt.Sprintf("s.%s AS %s", col, col))
 	}
 
-	// Build historical CTE SELECT with explicit casts
-	historicalSelectCols := make([]string, 0, len(userCols)+3)
-	historicalSelectCols = append(historicalSelectCols, userCols...)
-	
 	// Build change condition for joined CTE (using aliased column names)
 	joinedChangeConds := make([]string, len(compareConditions))
 	for i, cond := range compareConditions {
@@ -332,12 +321,12 @@ source AS (
   %s
 ),
 target AS (
-  SELECT * FROM %s 
+  SELECT %s 	
+  FROM %s 
   WHERE _is_current = TRUE
 ),
 joined AS (
-  SELECT
-    %s
+  SELECT %s
   FROM target t
   LEFT JOIN source s ON %s
 ),
@@ -371,25 +360,23 @@ to_insert AS (
 ),
 -- Already expired historical rows (untouched)
 historical AS (
-  SELECT %s,
-  _valid_from,
-  _valid_until,
-  _is_current
+  SELECT %s
   FROM %s
   WHERE _is_current = FALSE
 )
-SELECT * FROM unchanged
+SELECT %s FROM unchanged
 UNION ALL
-SELECT * FROM to_expire
+SELECT %s FROM to_expire
 UNION ALL
-SELECT * FROM to_insert
+SELECT %s FROM to_insert
 UNION ALL
-SELECT * FROM historical`,
+SELECT %s FROM historical`,
 		tempTableName,
 		location,
 		tempTableName,
 		partitionBy,
 		strings.TrimSpace(query),
+		strings.Join(allCols, ", "),
 		asset.Name,
 		strings.Join(joinedSelectCols, ",\n    "),
 		joinCondition,
@@ -403,8 +390,12 @@ SELECT * FROM historical`,
 		joinCondition,
 		primaryKeys[0],
 		changeCondition,
-		strings.Join(historicalSelectCols, ", "),
+		strings.Join(allCols, ", "),
 		asset.Name,
+		strings.Join(allCols, ", "),
+		strings.Join(allCols, ", "),
+		strings.Join(allCols, ", "),
+		strings.Join(allCols, ", "),
 	)
 
 	return []string{
