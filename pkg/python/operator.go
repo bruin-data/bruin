@@ -47,14 +47,14 @@ type LocalOperator struct {
 	module       modulePathFinder
 	runner       localRunner
 	envVariables map[string]string
-	config       secretFinder
+	config       SecretFinder
 }
 
-type secretFinder interface {
-	GetSecretByKey(key string) (string, error)
+type SecretFinder interface {
+	GetSecretByKey(key string) string
 }
 
-func NewLocalOperator(config *config.Config, envVariables map[string]string) *LocalOperator {
+func NewLocalOperator(config SecretFinder, envVariables map[string]string) *LocalOperator {
 	cmdRunner := &CommandRunner{}
 	fs := afero.NewOsFs()
 
@@ -81,7 +81,7 @@ func NewLocalOperator(config *config.Config, envVariables map[string]string) *Lo
 	}
 }
 
-func NewLocalOperatorWithUv(config *config.Config, conn config.ConnectionGetter, envVariables map[string]string) *LocalOperator {
+func NewLocalOperatorWithUv(config SecretFinder, conn config.ConnectionGetter, envVariables map[string]string) *LocalOperator {
 	cmdRunner := &CommandRunner{}
 
 	return &LocalOperator{
@@ -158,10 +158,7 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	envVariables["BRUIN_THIS"] = t.Name
 
 	for _, mapping := range t.Secrets {
-		val, err := o.config.GetSecretByKey(mapping.SecretKey)
-		if err != nil {
-			return errors.Wrapf(err, "there's no secret with the name '%s', make sure you are referring to the right secret and the secret is defined correctly in your .bruin.yml file.", mapping.SecretKey)
-		}
+		val := o.config.GetSecretByKey(mapping.SecretKey)
 
 		if val == "" {
 			return errors.New(fmt.Sprintf("there's no secret with the name '%s', make sure you are referring to the right secret and the secret is defined correctly in your .bruin.yml file.", mapping.SecretKey))
