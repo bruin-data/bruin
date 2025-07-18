@@ -3,6 +3,7 @@ package mssql
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
@@ -241,4 +242,79 @@ ORDER BY ORDINAL_POSITION;
 	}
 
 	return columns, nil
+}
+
+func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
+	// Get the current database name from config
+	currentDB := db.config.GetDatabase()
+	if currentDB == "" {
+		return nil, errors.New("database name not configured")
+	}
+
+	q := fmt.Sprintf(`
+USE [%s];
+SELECT
+    TABLE_SCHEMA,
+    TABLE_NAME
+FROM
+    INFORMATION_SCHEMA.TABLES
+WHERE
+    TABLE_TYPE IN ('BASE TABLE', 'VIEW')
+    AND TABLE_SCHEMA NOT IN ('sys', 'information_schema')
+ORDER BY TABLE_SCHEMA, TABLE_NAME;
+`, currentDB)
+
+	result, err := db.Select(ctx, &query.Query{Query: q})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query SQL Server information_schema: %w", err)
+	}
+
+	summary := &ansisql.DBDatabase{
+		Name:    currentDB,
+		Schemas: []*ansisql.DBSchema{},
+	}
+	schemas := make(map[string]*ansisql.DBSchema)
+
+	for _, row := range result {
+		if len(row) != 2 {
+			continue
+		}
+
+		schemaName, ok := row[0].(string)
+		if !ok {
+			continue
+		}
+
+		tableName, ok := row[1].(string)
+		if !ok {
+			continue
+		}
+
+		// Create schema if it doesn't exist
+		if _, exists := schemas[schemaName]; !exists {
+			schema := &ansisql.DBSchema{
+				Name:   schemaName,
+				Tables: []*ansisql.DBTable{},
+			}
+			schemas[schemaName] = schema
+		}
+
+		// Add table to schema
+		table := &ansisql.DBTable{
+			Name:    tableName,
+			Columns: []*ansisql.DBColumn{}, // Initialize empty columns array
+		}
+		schemas[schemaName].Tables = append(schemas[schemaName].Tables, table)
+	}
+
+	for _, schema := range schemas {
+		summary.Schemas = append(summary.Schemas, schema)
+	}
+
+	// Sort schemas by name
+	sort.Slice(summary.Schemas, func(i, j int) bool {
+		return summary.Schemas[i].Name < summary.Schemas[j].Name
+	})
+
+	return summary, nil
 }
