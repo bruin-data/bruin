@@ -173,6 +173,11 @@ func Run(isDebug *bool) *cli.Command {
 				EnvVars: []string{"BRUIN_CONFIG_FILE"},
 				Usage:   "the path to the .bruin.yml file",
 			},
+			&cli.StringFlag{
+				Name:    "secrets-backend",
+				EnvVars: []string{"BRUIN_SECRETS_BACKEND"},
+				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault'",
+			},
 			&cli.BoolFlag{
 				Name:  "no-validation",
 				Usage: "skip validation for this run.",
@@ -355,15 +360,10 @@ func Run(isDebug *bool) *cli.Command {
 
 			var connectionManager config.ConnectionGetter
 			var errs []error
-			if os.Getenv("BRUIN_VAULT_HOST") != "" {
-				connectionManager, err = secrets.NewVaultClient( //nolint:staticcheck
-					logger,
-					os.Getenv("BRUIN_VAULT_HOST"),
-					os.Getenv("BRUIN_VAULT_TOKEN"),
-					os.Getenv("BRUIN_VAULT_ROLE"),
-					os.Getenv("BRUIN_VAULT_PATH"),
-					os.Getenv("BRUIN_VAULT_MOUNTPATH"),
-				)
+
+			secretsBackend := c.String("secrets-backend")
+			if secretsBackend == "vault" {
+				connectionManager, err = secrets.NewVaultClientFromEnv(logger)
 				if err != nil {
 					errs = append(errs, errors.Wrap(err, "failed to initialize vault client"))
 				}

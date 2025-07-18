@@ -15,6 +15,28 @@ import (
 	"github.com/pkg/errors"
 )
 
+func NewVaultClientFromEnv(logger logger.Logger) (*Client, error) {
+	host := os.Getenv("BRUIN_VAULT_HOST")
+	if host == "" {
+		return nil, errors.New("BRUIN_VAULT_HOST env variable not set")
+	}
+	token := os.Getenv("BRUIN_VAULT_TOKEN")
+	role := os.Getenv("BRUIN_VAULT_ROLE")
+	if token == "" && role == "" {
+		return nil, errors.New("BRUIN_VAULT_TOKEN or BRUIN_VAULT_ROLE env variable not set")
+	}
+	path := os.Getenv("BRUIN_VAULT_PATH")
+	if path == "" {
+		return nil, errors.New("BRUIN_VAULT_PATH env variable not set")
+	}
+	mountPath := os.Getenv("BRUIN_VAULT_MOUNT_PATH")
+	if mountPath == "" {
+		return nil, errors.New("BRUIN_VAULT_MOUNT_PATH env variable not set")
+	}
+
+	return NewVaultClient(logger, host, token, role, path, mountPath)
+}
+
 func NewVaultClient(logger logger.Logger, host, token, role, path string, mountPath string) (*Client, error) {
 	if host == "" {
 		return nil, errors.New("empty vault host provided")
