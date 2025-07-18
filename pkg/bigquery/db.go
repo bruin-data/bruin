@@ -26,10 +26,29 @@ var scopes = []string{
 	"https://www.googleapis.com/auth/drive",
 }
 
+// DryRunMetadata contains metadata returned from a BigQuery dry run
+type DryRunMetadata struct {
+	// TotalBytesProcessed is the total amount of data that will be processed by the query
+	TotalBytesProcessed int64 `json:"total_bytes_processed"`
+
+	// TotalBytesBilled is the total amount of data that will be billed for the query
+	// This may be different from TotalBytesProcessed due to caching, minimum billing, etc.
+	TotalBytesBilled int64 `json:"total_bytes_billed"`
+
+	// EstimatedCostUSD and TotalSlotMs fields removed
+
+	// IsValid indicates whether the query passed validation
+	IsValid bool `json:"is_valid"`
+
+	// ValidationError contains any validation errors found
+	ValidationError string `json:"validation_error,omitempty"`
+}
+
 type Querier interface {
 	RunQueryWithoutResult(ctx context.Context, query *query.Query) error
 	Ping(ctx context.Context) error
 }
+
 type Selector interface {
 	Select(ctx context.Context, query *query.Query) ([][]interface{}, error)
 	SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error)
@@ -47,11 +66,17 @@ type TableManager interface {
 	BuildTableExistsQuery(tableName string) (string, error)
 }
 
+type DryRunValidator interface {
+	// GetDryRunMetadata performs a dry run and returns detailed metadata about the query
+	GetDryRunMetadata(ctx context.Context, query *query.Query) (*DryRunMetadata, error)
+}
+
 type DB interface {
 	Querier
 	Selector
 	MetadataUpdater
 	TableManager
+	DryRunValidator
 }
 
 var (
@@ -1035,4 +1060,35 @@ func (d *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, e
 	sort.Slice(summary.Schemas, func(i, j int) bool { return summary.Schemas[i].Name < summary.Schemas[j].Name })
 
 	return summary, nil
+}
+
+func (d *Client) GetDryRunMetadata(ctx context.Context, query *query.Query) (*DryRunMetadata, error) {
+	q := d.client.Query(query.ToDryRunQuery())
+	q.DryRun = true
+
+	job, err := q.Run(ctx)
+	if err != nil {
+		return &DryRunMetadata{
+			IsValid:         false,
+			ValidationError: formatError(err).Error(),
+		}, nil
+	}
+
+	status := job.LastStatus()
+	if err := status.Err(); err != nil {
+		return &DryRunMetadata{
+			IsValid:         false,
+			ValidationError: err.Error(),
+		}, nil
+	}
+
+	metadata := &DryRunMetadata{
+		IsValid: status.State == bigquery.Done,
+	}
+
+	if metadata.IsValid && status.Statistics != nil {
+		metadata.TotalBytesProcessed = status.Statistics.TotalBytesProcessed
+	}
+
+	return metadata, nil
 }
