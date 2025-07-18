@@ -47,7 +47,3 @@ func (c *Config) GetIngestrURI() string {
 
 	return u.String()
 }
-
-func (c *Config) GetDatabase() string {
-	return c.Database
-}

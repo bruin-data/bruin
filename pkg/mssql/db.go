@@ -246,7 +246,7 @@ ORDER BY ORDINAL_POSITION;
 
 func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
 	// Get the current database name from config
-	currentDB := db.config.GetDatabase()
+	currentDB := db.config.Database
 	if currentDB == "" {
 		return nil, errors.New("database name not configured")
 	}
