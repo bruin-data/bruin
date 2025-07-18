@@ -697,7 +697,7 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 
 func SetupExecutors(
 	s *scheduler.Scheduler,
-	config *config.Config,
+	secretFinder python.SecretFinder,
 	conn config.ConnectionGetter,
 	startDate,
 	endDate time.Time,
@@ -723,9 +723,9 @@ func SetupExecutors(
 	jinjaVariables := jinja.PythonEnvVariables(&startDate, &endDate, pipelineName, runID, fullRefresh)
 	if s.WillRunTaskOfType(pipeline.AssetTypePython) {
 		if usePipForPython {
-			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(config, jinjaVariables)
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(secretFinder, jinjaVariables)
 		} else {
-			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperatorWithUv(config, conn, jinjaVariables)
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperatorWithUv(secretFinder, conn, jinjaVariables)
 		}
 	}
 

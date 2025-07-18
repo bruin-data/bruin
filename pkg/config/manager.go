@@ -176,7 +176,10 @@ func (e *Environment) GetSecretByKey(key string) string {
 		return v.Value
 	}
 
-	res, _ := json.Marshal(v)
+	res, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
 	return string(res)
 }
 

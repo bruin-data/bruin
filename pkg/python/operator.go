@@ -47,14 +47,14 @@ type LocalOperator struct {
 	module       modulePathFinder
 	runner       localRunner
 	envVariables map[string]string
-	config       secretFinder
+	config       SecretFinder
 }
 
-type secretFinder interface {
+type SecretFinder interface {
 	GetSecretByKey(key string) string
 }
 
-func NewLocalOperator(config *config.Config, envVariables map[string]string) *LocalOperator {
+func NewLocalOperator(config SecretFinder, envVariables map[string]string) *LocalOperator {
 	cmdRunner := &CommandRunner{}
 	fs := afero.NewOsFs()
 
@@ -81,7 +81,7 @@ func NewLocalOperator(config *config.Config, envVariables map[string]string) *Lo
 	}
 }
 
-func NewLocalOperatorWithUv(config *config.Config, conn config.ConnectionGetter, envVariables map[string]string) *LocalOperator {
+func NewLocalOperatorWithUv(config SecretFinder, conn config.ConnectionGetter, envVariables map[string]string) *LocalOperator {
 	cmdRunner := &CommandRunner{}
 
 	return &LocalOperator{
