@@ -42,3 +42,27 @@ func TestConfig_ToIngestr(t *testing.T) {
 
 	assert.Equal(t, "mssql://user:password@localhost:1433/database?TrustServerCertificate=yes&driver=ODBC+Driver+17+for+SQL+Server", c.GetIngestrURI())
 }
+
+func TestConfig_GetDatabase(t *testing.T) {
+	t.Parallel()
+	c := Config{
+		Username: "user",
+		Password: "password",
+		Host:     "localhost",
+		Port:     1433,
+		Database: "testdb",
+	}
+
+	assert.Equal(t, "testdb", c.GetDatabase())
+
+	// Test empty database
+	c2 := Config{
+		Username: "user",
+		Password: "password",
+		Host:     "localhost",
+		Port:     1433,
+		Database: "",
+	}
+
+	assert.Equal(t, "", c2.GetDatabase())
+}
