@@ -35,8 +35,12 @@ func NewVaultClient(logger logger.Logger, host, token, role, path string, mountP
 	return nil, errors.New("no vault credentials provided")
 }
 
+type kvV2Reader interface {
+	KvV2Read(ctx context.Context, path string, options ...vault.RequestOption) (*vault.Response[schema.KvV2ReadResponse], error)
+}
+
 type Client struct {
-	client    *vault.Client
+	client    kvV2Reader
 	mountPath string
 	path      string
 	logger    logger.Logger
@@ -56,7 +60,7 @@ func newVaultClientWithToken(host, token, mountPath string, logger logger.Logger
 	}
 
 	return &Client{
-		client:    client,
+		client:    &client.Secrets,
 		mountPath: mountPath,
 		path:      path,
 		logger:    logger,
@@ -88,7 +92,7 @@ func newVaultClientWithKubernetesAuth(host, role, mountPath string, logger logge
 	}
 
 	return &Client{
-		client:    client,
+		client:    &client.Secrets,
 		mountPath: mountPath,
 		path:      path,
 		logger:    logger,
@@ -100,7 +104,7 @@ func (c *Client) GetConnection(name string) any {
 	defer cancelFunc()
 
 	secretPath := fmt.Sprintf("%s/%s", c.path, name)
-	res, err := c.client.Secrets.KvV2Read(ctx, secretPath, vault.WithMountPath(c.mountPath))
+	res, err := c.client.KvV2Read(ctx, secretPath, vault.WithMountPath(c.mountPath))
 	if err != nil {
 		c.logger.Error("failed to read secret from Vault", "error", err)
 		return nil
