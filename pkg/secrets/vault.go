@@ -17,7 +17,7 @@ import (
 
 func NewVaultClient(logger logger.Logger, host, token, role, path string, mountPath string) (*Client, error) {
 	if host == "" {
-		return nil, nil
+		return nil, errors.New("no host provided")
 	}
 	if path == "" {
 		return nil, errors.New("no vault path provided")

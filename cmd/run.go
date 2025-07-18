@@ -354,26 +354,26 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			var connectionManager config.ConnectionGetter
-			connectionManager, err = secrets.NewVaultClient( //nolint:staticcheck
-				logger,
-				os.Getenv("VAULT_HOST"),
-				os.Getenv("VAULT_TOKEN"),
-				os.Getenv("VAULT_ROLE"),
-				os.Getenv("VAULT_PATH"),
-				os.Getenv("VAULT_MOUNTPATH"),
-			)
-			if err != nil {
-				printError(err, runConfig.Output, "Failed to initialize vault client")
-				return cli.Exit("", 1)
+			var errs []error
+			if os.Getenv("VAULT_HOST") != "" {
+				connectionManager, err = secrets.NewVaultClient( //nolint:staticcheck
+					logger,
+					os.Getenv("VAULT_HOST"),
+					os.Getenv("VAULT_TOKEN"),
+					os.Getenv("VAULT_ROLE"),
+					os.Getenv("VAULT_PATH"),
+					os.Getenv("VAULT_MOUNTPATH"),
+				)
+				if err != nil {
+					errs = append(errs, err)
+				}
+			} else {
+				connectionManager, errs = connection.NewManagerFromConfig(cm)
 			}
 
-			if connectionManager == nil { //nolint:staticcheck
-				var errs []error
-				connectionManager, errs = connection.NewManagerFromConfig(cm)
-				if len(errs) > 0 {
-					printErrors(errs, runConfig.Output, "Failed to register connections")
-					return cli.Exit("", 1)
-				}
+			if len(errs) > 0 {
+				printErrors(errs, runConfig.Output, "Errors occurred while initializing connection manager")
+				return cli.Exit("", 1)
 			}
 
 			shouldValidate := !pipelineInfo.RunningForAnAsset && !c.Bool("no-validation")

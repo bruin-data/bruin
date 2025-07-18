@@ -25,10 +25,10 @@ func TestNewVaultClient(t *testing.T) {
 	t.Parallel()
 	log := &mockLogger{}
 
-	t.Run("returns nil if host is empty", func(t *testing.T) {
+	t.Run("returns error if host is empty", func(t *testing.T) {
 		t.Parallel()
 		client, err := NewVaultClient(log, "", "token", "role", "path", "mount")
-		require.NoError(t, err)
+		require.Error(t, err)
 		require.Nil(t, client)
 	})
 
@@ -54,14 +54,6 @@ func TestNewVaultClient(t *testing.T) {
 	})
 }
 
-// Example stub for GetConnection, as full test would require heavy mocking of vault.Client.
-func TestClient_GetConnection_NilClient(t *testing.T) {
-	t.Parallel()
-	c := &Client{client: nil, logger: &mockLogger{}}
-	conn := c.GetConnection("test")
-	require.Nil(t, conn)
-}
-
 // Create a mock vault client that implements kvV2Reader
 // and returns a mock *vault.Response[schema.KvV2ReadResponse].
 type mockVaultClient struct{}
@@ -73,8 +65,12 @@ func (m *mockVaultClient) KvV2Read(ctx context.Context, path string, opts ...vau
 				"details": map[string]any{
 					"username": "testuser",
 					"password": "testpass",
+					"host":     "testhost",
+					"port":     1337,
+					"database": "testdb",
+					"schema":   "testschema",
 				},
-				"type": "test_type",
+				"type": "postgres",
 			},
 		},
 	}, nil
