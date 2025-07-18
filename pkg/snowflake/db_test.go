@@ -723,6 +723,7 @@ FROM
     TESTDB.INFORMATION_SCHEMA.TABLES
 WHERE
     table_type IN \('BASE TABLE', 'VIEW'\)
+AND table_schema != 'INFORMATION_SCHEMA'
 ORDER BY table_schema, table_name;`).
 					WillReturnRows(sqlmock.NewRows([]string{"table_schema", "table_name"}).
 						AddRow("SCHEMA1", "TABLE1").
@@ -758,6 +759,7 @@ FROM
     TESTDB.INFORMATION_SCHEMA.TABLES
 WHERE
     table_type IN \('BASE TABLE', 'VIEW'\)
+AND table_schema != 'INFORMATION_SCHEMA'
 ORDER BY table_schema, table_name;`).
 					WillReturnError(errors.New("connection error"))
 			},

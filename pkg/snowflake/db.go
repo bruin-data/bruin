@@ -939,7 +939,8 @@ SELECT
 FROM
     %s.INFORMATION_SCHEMA.TABLES
 WHERE
-    table_type IN ('BASE TABLE', 'VIEW')
+    table_type IN ('BASE TABLE', 'VIEW') 
+AND table_schema != 'INFORMATION_SCHEMA'
 ORDER BY table_schema, table_name;
 `, databaseName)
 

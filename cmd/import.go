@@ -27,7 +27,7 @@ func Import() *cli.Command {
 
 func ImportDatabase() *cli.Command {
 	return &cli.Command{
-		Name:      "dwh",
+		Name:      "database",
 		Usage:     "Import database tables as Bruin assets",
 		ArgsUsage: "[pipeline path]",
 		Before:    telemetry.BeforeCommand,
@@ -37,11 +37,6 @@ func ImportDatabase() *cli.Command {
 				Aliases:  []string{"c"},
 				Usage:    "the name of the connection to use",
 				Required: true,
-			},
-			&cli.StringFlag{
-				Name:    "db-name",
-				Aliases: []string{"d"},
-				Usage:   "filter by specific database/dataset name",
 			},
 			&cli.StringFlag{
 				Name:    "schema",
@@ -71,27 +66,24 @@ func ImportDatabase() *cli.Command {
 			}
 
 			connectionName := c.String("connection")
-			database := c.String("database")
 			schema := c.String("schema")
 			fillColumns := c.Bool("fill-columns")
 			environment := c.String("environment")
 			configFile := c.String("config-file")
 
-			return runImport(c.Context, pipelinePath, connectionName, database, schema, fillColumns, environment, configFile)
+			return runImport(c.Context, pipelinePath, connectionName, schema, fillColumns, environment, configFile)
 		},
 	}
 }
 
-func runImport(ctx context.Context, pipelinePath, connectionName, database, schema string, fillColumns bool, environment, configFile string) error {
+func runImport(ctx context.Context, pipelinePath, connectionName, schema string, fillColumns bool, environment, configFile string) error {
 	fs := afero.NewOsFs()
 
-	// Get connection from config
 	conn, err := getConnectionFromConfig(environment, connectionName, fs, configFile)
 	if err != nil {
 		return errors2.Wrap(err, "failed to get database connection")
 	}
 
-	// Check if connection supports GetDatabaseSummary
 	summarizer, ok := conn.(interface {
 		GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error)
 	})
@@ -99,14 +91,9 @@ func runImport(ctx context.Context, pipelinePath, connectionName, database, sche
 		return fmt.Errorf("connection type '%s' does not support database summary", connectionName)
 	}
 
-	// Get database summary
 	summary, err := summarizer.GetDatabaseSummary(ctx)
 	if err != nil {
 		return errors2.Wrap(err, "failed to retrieve database summary")
-	}
-
-	if database != "" && !strings.EqualFold(summary.Name, database) {
-		return fmt.Errorf("database '%s' not found. Current database is '%s'", database, summary.Name)
 	}
 
 	pathParts := strings.Split(pipelinePath, "/")
@@ -162,7 +149,6 @@ func runImport(ctx context.Context, pipelinePath, connectionName, database, sche
 		}
 	}
 
-	// Build filter description for output message
 	filterDesc := ""
 	if schema != "" {
 		filterDesc = fmt.Sprintf(" (schema: %s)", schema)
@@ -249,11 +235,9 @@ func createAsset(ctx context.Context, assetsPath, schemaName, tableName string, 
 func determineAssetTypeFromConnection(connectionName string, conn interface{}) pipeline.AssetType {
 	// First, try to determine from the actual connection type
 	if _, ok := conn.(interface {
-		GetDatabases(ctx context.Context) ([]string, error)
+		GetDatabaseSummary(ctx context.Context) ([]string, error)
 	}); ok {
-		// Check the package path or type name to determine the specific connection type
 		connType := fmt.Sprintf("%T", conn)
-
 		if strings.Contains(connType, "snowflake") {
 			return pipeline.AssetTypeSnowflakeSource
 		}
