@@ -243,7 +243,7 @@ ORDER BY TABLE_SCHEMA, TABLE_NAME;
 			errorMessage: "failed to query SQL Server information_schema: database connection failed",
 		},
 		{
-			name:         "missing database name in config",
+			name: "missing database name in config",
 			mockConnection: func(mock sqlmock.Sqlmock) {
 				// No query expected since it should fail before executing
 			},
