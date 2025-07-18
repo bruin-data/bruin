@@ -44,6 +44,7 @@ type Client struct {
 	mountPath string
 	path      string
 	logger    logger.Logger
+	cache     map[string]any
 }
 
 func newVaultClientWithToken(host, token, mountPath string, logger logger.Logger, path string) (*Client, error) {
@@ -64,6 +65,7 @@ func newVaultClientWithToken(host, token, mountPath string, logger logger.Logger
 		mountPath: mountPath,
 		path:      path,
 		logger:    logger,
+		cache:     make(map[string]any),
 	}, nil
 }
 
@@ -96,10 +98,15 @@ func newVaultClientWithKubernetesAuth(host, role, mountPath string, logger logge
 		mountPath: mountPath,
 		path:      path,
 		logger:    logger,
+		cache:     make(map[string]any),
 	}, nil
 }
 
 func (c *Client) GetConnection(name string) any {
+	if conn, ok := c.cache[name]; ok {
+		return conn
+	}
+
 	ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelFunc()
 
@@ -163,5 +170,12 @@ func (c *Client) GetConnection(name string) any {
 		return nil
 	}
 
-	return manager.GetConnection(name)
+	conn := manager.GetConnection(name)
+	if conn == nil {
+		return nil
+	}
+
+	c.cache[name] = conn
+
+	return conn
 }
