@@ -166,18 +166,18 @@ type Environment struct {
 	SchemaPrefix string       `yaml:"schema_prefix,omitempty" json:"schema_prefix" mapstructure:"schema_prefix"`
 }
 
-func (e *Environment) GetSecretByKey(key string) (string, error) {
+func (e *Environment) GetSecretByKey(key string) string {
 	v, ok := e.Connections.byKey[key]
 	if !ok {
-		return "", nil
+		return ""
 	}
 
 	if v, ok := v.(*GenericConnection); ok {
-		return v.Value, nil
+		return v.Value
 	}
 
-	res, err := json.Marshal(v)
-	return string(res), err
+	res, _ := json.Marshal(v)
+	return string(res)
 }
 
 type EnvContextKey string
@@ -225,7 +225,7 @@ func (c *Config) GetEnvironmentNames() []string {
 	return envs
 }
 
-func (c *Config) GetSecretByKey(key string) (string, error) {
+func (c *Config) GetSecretByKey(key string) string {
 	return c.SelectedEnvironment.GetSecretByKey(key)
 }
 

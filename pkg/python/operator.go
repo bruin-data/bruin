@@ -51,7 +51,7 @@ type LocalOperator struct {
 }
 
 type secretFinder interface {
-	GetSecretByKey(key string) (string, error)
+	GetSecretByKey(key string) string
 }
 
 func NewLocalOperator(config *config.Config, envVariables map[string]string) *LocalOperator {
@@ -158,10 +158,7 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	envVariables["BRUIN_THIS"] = t.Name
 
 	for _, mapping := range t.Secrets {
-		val, err := o.config.GetSecretByKey(mapping.SecretKey)
-		if err != nil {
-			return errors.Wrapf(err, "there's no secret with the name '%s', make sure you are referring to the right secret and the secret is defined correctly in your .bruin.yml file.", mapping.SecretKey)
-		}
+		val := o.config.GetSecretByKey(mapping.SecretKey)
 
 		if val == "" {
 			return errors.New(fmt.Sprintf("there's no secret with the name '%s', make sure you are referring to the right secret and the secret is defined correctly in your .bruin.yml file.", mapping.SecretKey))
