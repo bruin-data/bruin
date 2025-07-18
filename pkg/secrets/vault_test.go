@@ -1,14 +1,13 @@
 package secrets
 
 import (
-	"testing"
-
 	"context"
+	"testing"
 
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/hashicorp/vault-client-go"
 	"github.com/hashicorp/vault-client-go/schema"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockLogger struct{}
@@ -23,42 +22,48 @@ func (m *mockLogger) Debugw(msg string, keysAndValues ...any) {}
 func (m *mockLogger) Warnf(format string, args ...any)        {}
 
 func TestNewVaultClient(t *testing.T) {
+	t.Parallel()
 	log := &mockLogger{}
 
 	t.Run("returns nil if host is empty", func(t *testing.T) {
+		t.Parallel()
 		client, err := NewVaultClient(log, "", "token", "role", "path", "mount")
-		assert.NoError(t, err)
-		assert.Nil(t, client)
+		require.NoError(t, err)
+		require.Nil(t, client)
 	})
 
 	t.Run("returns error if path is empty", func(t *testing.T) {
+		t.Parallel()
 		client, err := NewVaultClient(log, "host", "token", "role", "", "mount")
-		assert.Error(t, err)
-		assert.Nil(t, client)
+		require.Error(t, err)
+		require.Nil(t, client)
 	})
 
 	t.Run("returns error if mountPath is empty", func(t *testing.T) {
+		t.Parallel()
 		client, err := NewVaultClient(log, "host", "token", "role", "path", "")
-		assert.Error(t, err)
-		assert.Nil(t, client)
+		require.Error(t, err)
+		require.Nil(t, client)
 	})
 
 	t.Run("returns error if no credentials provided", func(t *testing.T) {
+		t.Parallel()
 		client, err := NewVaultClient(log, "host", "", "", "path", "mount")
-		assert.Error(t, err)
-		assert.Nil(t, client)
+		require.Error(t, err)
+		require.Nil(t, client)
 	})
 }
 
-// Example stub for GetConnection, as full test would require heavy mocking of vault.Client
+// Example stub for GetConnection, as full test would require heavy mocking of vault.Client.
 func TestClient_GetConnection_NilClient(t *testing.T) {
+	t.Parallel()
 	c := &Client{client: nil, logger: &mockLogger{}}
 	conn := c.GetConnection("test")
-	assert.Nil(t, conn)
+	require.Nil(t, conn)
 }
 
 // Create a mock vault client that implements kvV2Reader
-// and returns a mock *vault.Response[schema.KvV2ReadResponse]
+// and returns a mock *vault.Response[schema.KvV2ReadResponse].
 type mockVaultClient struct{}
 
 func (m *mockVaultClient) KvV2Read(ctx context.Context, path string, opts ...vault.RequestOption) (*vault.Response[schema.KvV2ReadResponse], error) {
@@ -78,6 +83,7 @@ func (m *mockVaultClient) KvV2Read(ctx context.Context, path string, opts ...vau
 // Additional tests for newVaultClientWithToken and newVaultClientWithKubernetesAuth would require
 // interface abstraction or more advanced mocking, which is not shown here.
 func TestClient_GetConnection_ReturnsConnection(t *testing.T) {
+	t.Parallel()
 	c := &Client{
 		client:    &mockVaultClient{},
 		mountPath: "mount",
@@ -86,5 +92,5 @@ func TestClient_GetConnection_ReturnsConnection(t *testing.T) {
 	}
 
 	conn := c.GetConnection("test-connection")
-	assert.NotNil(t, conn)
+	require.NotNil(t, conn)
 }
