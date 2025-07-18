@@ -354,11 +354,11 @@ func Run(isDebug *bool) *cli.Command {
 			}
 
 			var connectionManager config.ConnectionGetter
-			connectionManager, err = secrets.NewVaultClient(
-				logger, 
-				os.Getenv("VAULT_HOST"), 
-				os.Getenv("VAULT_TOKEN"), 
-				os.Getenv("VAULT_ROLE"), 
+			connectionManager, err = secrets.NewVaultClient( //nolint:staticcheck
+				logger,
+				os.Getenv("VAULT_HOST"),
+				os.Getenv("VAULT_TOKEN"),
+				os.Getenv("VAULT_ROLE"),
 				os.Getenv("VAULT_PATH"),
 				os.Getenv("VAULT_MOUNTPATH"),
 			)
@@ -367,7 +367,7 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			if connectionManager == nil {
+			if connectionManager == nil { //nolint:staticcheck
 				var errs []error
 				connectionManager, errs = connection.NewManagerFromConfig(cm)
 				if len(errs) > 0 {

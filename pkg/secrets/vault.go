@@ -123,7 +123,7 @@ func (c *Client) GetConnection(name string) any {
 
 	connectionsMap := map[string][]map[string]any{
 		secretType: {
-			map[string]any(details),
+			details,
 		},
 	}
 
