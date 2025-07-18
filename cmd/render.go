@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -228,6 +229,7 @@ func Render() *cli.Command {
 
 type queryExtractor interface {
 	ExtractQueriesFromString(content string) ([]*query.Query, error)
+	CloneForAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) query.QueryExtractor
 }
 
 type queryMaterializer interface {
@@ -253,11 +255,17 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 	if task == nil {
 		return errors.New("failed to find the asset: asset cannot be nil")
 	}
-	extractor := r.extractor
-	applyModifiers := modifierInfo.ApplyModifiers
-	if applyModifiers {
-		extractor = modifyExtractor(modifierInfo, pl, task)
-	}
+	
+	// Create context with run configuration values for CloneForAsset
+	renderCtx := context.Background()
+	renderCtx = context.WithValue(renderCtx, pipeline.RunConfigStartDate, modifierInfo.StartDate)
+	renderCtx = context.WithValue(renderCtx, pipeline.RunConfigEndDate, modifierInfo.EndDate)
+	renderCtx = context.WithValue(renderCtx, pipeline.RunConfigApplyIntervalModifiers, modifierInfo.ApplyModifiers)
+	renderCtx = context.WithValue(renderCtx, pipeline.RunConfigRunID, "your-run-id")
+	
+	// Clone the extractor for this specific asset
+	extractor := r.extractor.CloneForAsset(renderCtx, pl, task)
+	
 	queries, err := extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
 	if err != nil {
 		r.printErrorOrJSON(err.Error())
@@ -361,13 +369,4 @@ func getPipelineDefinitionFullPath(pipelinePath string) (string, error) {
 	return "", errors.Errorf("no pipeline definition file found in '%s'. Supported files: %v", pipelinePath, PipelineDefinitionFiles)
 }
 
-func modifyExtractor(ctx ModifierInfo, p *pipeline.Pipeline, t *pipeline.Asset) queryExtractor {
-	newStartDate := pipeline.ModifyDate(ctx.StartDate, t.IntervalModifiers.Start)
-	newEnddate := pipeline.ModifyDate(ctx.EndDate, t.IntervalModifiers.End)
-	newRenderer := jinja.NewRendererWithStartEndDates(&newStartDate, &newEnddate, p.Name, "your-run-id", p.Variables.Value())
 
-	return &query.WholeFileExtractor{
-		Renderer: newRenderer,
-		Fs:       fs,
-	}
-}

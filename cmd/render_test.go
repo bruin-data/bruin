@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -8,7 +9,6 @@ import (
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 type mockBuilder struct {
@@ -35,6 +35,16 @@ func (m *mockExtractor) ExtractQueriesFromString(content string) ([]*query.Query
 	}
 
 	return res.Get(0).([]*query.Query), res.Error(1)
+}
+
+func (m *mockExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) query.QueryExtractor {
+	args := m.Called(ctx, p, asset)
+	return args.Get(0).(query.QueryExtractor)
+}
+
+func (m *mockExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
+	res := m.Called(content)
+	return res.Get(0).([]string), res.Error(1)
 }
 
 type mockMaterializer struct {
@@ -108,6 +118,8 @@ func TestRenderCommand_Run(t *testing.T) {
 				},
 			},
 			setup: func(f *fields) {
+				f.extractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).
+					Return(f.extractor)
 				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
 					Return(nil, assert.AnError)
 			},
@@ -125,6 +137,8 @@ func TestRenderCommand_Run(t *testing.T) {
 				},
 			},
 			setup: func(f *fields) {
+				f.extractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).
+					Return(f.extractor)
 				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
 					Return([]*query.Query{{Query: "some query"}}, nil)
 
@@ -145,6 +159,8 @@ func TestRenderCommand_Run(t *testing.T) {
 				},
 			},
 			setup: func(f *fields) {
+				f.extractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).
+					Return(f.extractor)
 				f.extractor.On("ExtractQueriesFromString", bqAsset.ExecutableFile.Content).
 					Return([]*query.Query{{Query: "extracted query"}}, nil)
 				f.bqMaterializer.On("Render", mock.Anything, "extracted query").
@@ -167,6 +183,8 @@ func TestRenderCommand_Run(t *testing.T) {
 				},
 			},
 			setup: func(f *fields) {
+				f.extractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).
+					Return(f.extractor)
 				f.extractor.On("ExtractQueriesFromString", nonBqAsset.ExecutableFile.Content).
 					Return([]*query.Query{{Query: "SELECT * FROM nonbq.table1"}}, nil)
 
@@ -216,73 +234,4 @@ func TestRenderCommand_Run(t *testing.T) {
 	}
 }
 
-func TestModifyExtractor(t *testing.T) {
-	t.Parallel()
-	type args struct {
-		task   *pipeline.Asset
-		params ModifierInfo
-		query  string
-	}
 
-	tests := []struct {
-		name      string
-		args      args
-		wantErr   assert.ErrorAssertionFunc
-		wantQuery string
-	}{
-		{
-			name: "test modifying extractor",
-			args: args{
-				task: &pipeline.Asset{
-					Name:           "Asset1",
-					Type:           pipeline.AssetTypeBigqueryQuery,
-					ExecutableFile: pipeline.ExecutableFile{},
-					IntervalModifiers: pipeline.IntervalModifiers{
-						Start: pipeline.TimeModifier{Days: 1},
-						End:   pipeline.TimeModifier{Days: 0},
-					},
-				},
-				params: ModifierInfo{
-					StartDate:      time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-					EndDate:        time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
-					ApplyModifiers: true,
-				},
-				query: "SELECT * FROM asset1 WHERE date(timestamp_col) = '{{ start_date }}'",
-			},
-			wantErr:   assert.NoError,
-			wantQuery: "SELECT * FROM asset1 WHERE date(timestamp_col) = '2024-01-02'",
-		},
-		{
-			name: "test modifying extractor with no modifiers",
-			args: args{
-				task: &pipeline.Asset{
-					Name:           "Asset1",
-					Type:           pipeline.AssetTypeBigqueryQuery,
-					ExecutableFile: pipeline.ExecutableFile{},
-					IntervalModifiers: pipeline.IntervalModifiers{
-						Start: pipeline.TimeModifier{Days: 0},
-						End:   pipeline.TimeModifier{Days: 0},
-					},
-				},
-				params: ModifierInfo{
-					StartDate:      time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-					EndDate:        time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC),
-					ApplyModifiers: true,
-				},
-				query: "SELECT * FROM asset1 WHERE date(timestamp_col) = '{{ start_date }}'",
-			},
-			wantErr:   assert.NoError,
-			wantQuery: "SELECT * FROM asset1 WHERE date(timestamp_col) = '2024-01-01'",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			extractor := modifyExtractor(tt.args.params, &pipeline.Pipeline{}, tt.args.task)
-			qry, err := extractor.ExtractQueriesFromString(tt.args.query)
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantQuery, qry[0].Query)
-		})
-	}
-}
