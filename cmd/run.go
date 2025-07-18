@@ -355,17 +355,17 @@ func Run(isDebug *bool) *cli.Command {
 
 			var connectionManager config.ConnectionGetter
 			var errs []error
-			if os.Getenv("VAULT_HOST") != "" {
+			if os.Getenv("BRUIN_VAULT_HOST") != "" {
 				connectionManager, err = secrets.NewVaultClient( //nolint:staticcheck
 					logger,
-					os.Getenv("VAULT_HOST"),
-					os.Getenv("VAULT_TOKEN"),
-					os.Getenv("VAULT_ROLE"),
-					os.Getenv("VAULT_PATH"),
-					os.Getenv("VAULT_MOUNTPATH"),
+					os.Getenv("BRUIN_VAULT_HOST"),
+					os.Getenv("BRUIN_VAULT_TOKEN"),
+					os.Getenv("BRUIN_VAULT_ROLE"),
+					os.Getenv("BRUIN_VAULT_PATH"),
+					os.Getenv("BRUIN_VAULT_MOUNTPATH"),
 				)
 				if err != nil {
-					errs = append(errs, err)
+					errs = append(errs, errors.Wrap(err, "failed to initialize vault client"))
 				}
 			} else {
 				connectionManager, errs = connection.NewManagerFromConfig(cm)

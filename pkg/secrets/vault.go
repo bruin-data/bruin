@@ -17,13 +17,13 @@ import (
 
 func NewVaultClient(logger logger.Logger, host, token, role, path string, mountPath string) (*Client, error) {
 	if host == "" {
-		return nil, errors.New("no host provided")
+		return nil, errors.New("empty vault host provided")
 	}
 	if path == "" {
-		return nil, errors.New("no vault path provided")
+		return nil, errors.New("empty vault path provided")
 	}
 	if mountPath == "" {
-		return nil, errors.New("no vault mountpath provided")
+		return nil, errors.New("empty vault mountpath provided")
 	}
 	if token != "" {
 		return newVaultClientWithToken(host, token, mountPath, logger, path)
@@ -132,6 +132,8 @@ func (c *Client) GetConnection(name string) any {
 
 	details["name"] = name
 
+	// This is a hacky way to use the already existing logic in connections manager that processes connections config to create the right
+	// platform/db client
 	connectionsMap := map[string][]map[string]any{
 		secretType: {
 			details,

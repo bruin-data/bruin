@@ -106,7 +106,7 @@ func TestClient_GetConnection_ReturnsConnection_FromCache(t *testing.T) {
 	c := &Client{
 		client: &mockVaultClient{
 			response: nil,
-			err:      errors.New("test error"), //This error should not be returned
+			err:      errors.New("test error"), // This error should not be returned
 		},
 		mountPath: "mount",
 		path:      "path",
