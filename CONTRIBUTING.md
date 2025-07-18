@@ -28,6 +28,7 @@ We use Makefile to build the code, which contains a set of commands to lint, tes
 
 - To build the code, run `make build`.
 - The resulting binary will be placed in the `bin` directory.
+- If you get errors related to missing duckdb library, try running `make duck-db-static-lib` and retrying.
 
 You can simply run it:
 ```sh
