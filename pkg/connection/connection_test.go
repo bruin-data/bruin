@@ -1,7 +1,6 @@
 package connection
 
 import (
-	"os"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/bigquery"
@@ -424,7 +423,7 @@ func TestNewManagerFromConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			for k, v := range tt.env {
-				os.Setenv(k, v)
+				t.Setenv(k, v)
 			}
 			got, errors := NewManagerFromConfig(tt.cm)
 			assert.Equalf(t, tt.want, got, "NewManagerFromConfig(%v)", tt.cm)

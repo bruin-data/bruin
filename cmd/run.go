@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -75,11 +76,11 @@ type ExecutionSummary struct {
 }
 
 type TaskTypeStats struct {
-	Total            int
-	Succeeded        int
-	Failed           int // Failed in main execution
+	Total             int
+	Succeeded         int
+	Failed            int // Failed in main execution
 	FailedDueToChecks int // Failed only due to checks (main execution succeeded)
-	Skipped          int
+	Skipped           int
 }
 
 func (s TaskTypeStats) HasAny() bool {
@@ -97,14 +98,14 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 	// Group results by asset
 	assetResults := make(map[string]map[string]*scheduler.TaskExecutionResult)
 	assetOrder := make([]string, 0)
-	
+
 	for _, result := range results {
 		assetName := result.Instance.GetAsset().Name
 		if _, exists := assetResults[assetName]; !exists {
 			assetResults[assetName] = make(map[string]*scheduler.TaskExecutionResult)
 			assetOrder = append(assetOrder, assetName)
 		}
-		
+
 		switch instance := result.Instance.(type) {
 		case *scheduler.AssetInstance:
 			assetResults[assetName]["main"] = result
@@ -112,29 +113,29 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 			key := fmt.Sprintf("column:%s:%s", instance.Column.Name, instance.Check.Name)
 			assetResults[assetName][key] = result
 		case *scheduler.CustomCheckInstance:
-			key := fmt.Sprintf("custom:%s", instance.Check.Name)
+			key := "custom:" + instance.Check.Name
 			assetResults[assetName][key] = result
 		}
 	}
-	
+
 	// Add skipped assets
 	skippedTasks := s.GetTaskInstancesByStatus(scheduler.Skipped)
 	upstreamFailedTasks := s.GetTaskInstancesByStatus(scheduler.UpstreamFailed)
-	allSkippedTasks := append(skippedTasks, upstreamFailedTasks...)
-	
+	allSkippedTasks := append(skippedTasks, upstreamFailedTasks...) // nolint:gocritic
+
 	for _, task := range allSkippedTasks {
 		assetName := task.GetAsset().Name
 		if _, exists := assetResults[assetName]; !exists {
 			assetResults[assetName] = make(map[string]*scheduler.TaskExecutionResult)
 			assetOrder = append(assetOrder, assetName)
 		}
-		
+
 		// Create a fake skipped result
 		skippedResult := &scheduler.TaskExecutionResult{
 			Instance: task,
 			Error:    nil, // We'll use nil to indicate skipped
 		}
-		
+
 		switch instance := task.(type) {
 		case *scheduler.AssetInstance:
 			assetResults[assetName]["main"] = skippedResult
@@ -142,26 +143,26 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 			key := fmt.Sprintf("column:%s:%s", instance.Column.Name, instance.Check.Name)
 			assetResults[assetName][key] = skippedResult
 		case *scheduler.CustomCheckInstance:
-			key := fmt.Sprintf("custom:%s", instance.Check.Name)
+			key := "custom:" + instance.Check.Name
 			assetResults[assetName][key] = skippedResult
 		}
 	}
-	
+
 	if len(assetOrder) == 0 {
 		return
 	}
-	
+
 	fmt.Println("\n" + strings.Repeat("=", 50) + "\n")
-	
+
 	for _, assetName := range assetOrder {
 		results := assetResults[assetName]
 		mainResult := results["main"]
-		
+
 		// Asset name with status
 		var assetStatus string
 		var assetColor *color.Color
-		
-		if mainResult == nil {
+
+		if mainResult == nil { // nolint:gocritic
 			// Asset not executed
 			assetStatus = "SKIP"
 			assetColor = color.New(color.Faint)
@@ -169,7 +170,7 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 			// Check if this is actually skipped
 			_, isSkipped := find(skippedTasks, mainResult.Instance)
 			_, isUpstreamFailed := find(upstreamFailedTasks, mainResult.Instance)
-			
+
 			if isSkipped || isUpstreamFailed {
 				assetStatus = "SKIP"
 				assetColor = color.New(color.Faint)
@@ -181,24 +182,24 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 			assetStatus = "FAIL"
 			assetColor = color.New(color.FgRed)
 		}
-		
+
 		fmt.Printf("%s %s ", assetColor.Sprint(assetStatus), assetName)
-		
+
 		// Print dots for quality checks
 		checkCount := 0
 		for key, result := range results {
 			if key == "main" {
 				continue
 			}
-			
+
 			checkCount++
-			if result == nil {
+			if result == nil { // nolint:gocritic
 				fmt.Print(faint("."))
 			} else if result.Error == nil {
 				// Check if skipped
 				_, isSkipped := find(skippedTasks, result.Instance)
 				_, isUpstreamFailed := find(upstreamFailedTasks, result.Instance)
-				
+
 				if isSkipped || isUpstreamFailed {
 					fmt.Print(faint("."))
 				} else {
@@ -208,12 +209,12 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 				fmt.Print(color.New(color.FgRed).Sprint("F"))
 			}
 		}
-		
+
 		fmt.Println()
 	}
 }
 
-func find(slice []scheduler.TaskInstance, item scheduler.TaskInstance) (int, bool) {
+func find(slice []scheduler.TaskInstance, item scheduler.TaskInstance) (int, bool) { // nolint:unparam
 	for i, v := range slice {
 		if v == item {
 			return i, true
@@ -268,7 +269,7 @@ func printExecutionSummary(results []*scheduler.TaskExecutionResult, s *schedule
 		} else {
 			summaryPrinter.Printf(" %s Quality checks       %s\n",
 				color.New(color.FgGreen).Sprint("✓"),
-				color.New(color.FgGreen).Sprintf("%d succeeded", summary.ColumnChecks.Succeeded + summary.CustomChecks.Succeeded))
+				color.New(color.FgGreen).Sprintf("%d succeeded", summary.ColumnChecks.Succeeded+summary.CustomChecks.Succeeded))
 		}
 	}
 
@@ -284,13 +285,11 @@ func printExecutionSummary(results []*scheduler.TaskExecutionResult, s *schedule
 				color.New(color.FgGreen).Sprint("✓"), metadataExecuted)
 		}
 	}
-
-
 }
 
 func formatCount(total, failed int) string {
 	if failed == 0 {
-		return fmt.Sprintf("%d", total)
+		return strconv.Itoa(total)
 	}
 	succeeded := total - failed
 	return fmt.Sprintf("%s / %s",
@@ -300,7 +299,7 @@ func formatCount(total, failed int) string {
 
 func formatCountWithSkipped(total, failed, failedDueToChecks, skipped int) string {
 	succeeded := total - failed - failedDueToChecks - skipped
-	
+
 	var parts []string
 	if failed > 0 {
 		parts = append(parts, color.New(color.FgRed).Sprintf("%d failed", failed))
@@ -314,14 +313,14 @@ func formatCountWithSkipped(total, failed, failedDueToChecks, skipped int) strin
 	if skipped > 0 {
 		parts = append(parts, color.New(color.Faint).Sprintf("%d skipped", skipped))
 	}
-	
+
 	if len(parts) == 0 {
 		return "0"
 	}
 	if len(parts) == 1 && failed == 0 && failedDueToChecks == 0 && skipped == 0 {
-		return fmt.Sprintf("%d", succeeded)
+		return strconv.Itoa(succeeded)
 	}
-	
+
 	return strings.Join(parts, " / ")
 }
 
@@ -329,9 +328,9 @@ func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Sched
 	summary := ExecutionSummary{}
 
 	// Track asset status by asset name
-	assetMainStatus := make(map[string]bool)     // true if main execution succeeded
+	assetMainStatus := make(map[string]bool)       // true if main execution succeeded
 	assetHasCheckFailures := make(map[string]bool) // true if any check failed
-	assetNames := make(map[string]bool)           // all assets seen
+	assetNames := make(map[string]bool)            // all assets seen
 
 	// Count all tasks by type and status
 	for _, result := range results {
@@ -351,7 +350,7 @@ func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Sched
 			assetName := instance.GetAsset().Name
 			assetNames[assetName] = true
 			assetMainStatus[assetName] = succeeded
-			
+
 		case *scheduler.ColumnCheckInstance:
 			assetName := instance.GetAsset().Name
 			assetNames[assetName] = true
@@ -392,7 +391,7 @@ func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Sched
 		mainSucceeded := assetMainStatus[assetName]
 		hasCheckFailures := assetHasCheckFailures[assetName]
 
-		if mainSucceeded && !hasCheckFailures {
+		if mainSucceeded && !hasCheckFailures { // nolint:gocritic
 			summary.Assets.Succeeded++
 		} else if !mainSucceeded {
 			summary.Assets.Failed++ // Failed in main execution
@@ -432,7 +431,7 @@ func analyzeResults(results []*scheduler.TaskExecutionResult, s *scheduler.Sched
 			summary.Assets.Total++
 			summary.Assets.Skipped++
 		}
-		
+
 		// Also count individual check tasks as skipped
 		switch t.(type) {
 		case *scheduler.ColumnCheckInstance:
@@ -1011,7 +1010,7 @@ func CheckLint(ctx context.Context, foundPipeline *pipeline.Pipeline, pipelinePa
 	return nil
 }
 
-func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) {
+func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, s *scheduler.Scheduler) { // nolint:unparam
 	data := make(map[string][]*scheduler.TaskExecutionResult, len(errorsInTaskResults))
 	for _, result := range errorsInTaskResults {
 		assetName := result.Instance.GetAsset().Name
@@ -1026,13 +1025,13 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 		for _, result := range results {
 			switch instance := result.Instance.(type) {
 			case *scheduler.ColumnCheckInstance:
-				assetBranch.AddNode(fmt.Sprintf("%s.%s - %s", 
+				assetBranch.AddNode(fmt.Sprintf("%s.%s - %s",
 					color.New(color.FgCyan).Sprint(instance.Column.Name),
 					color.New(color.FgMagenta).Sprint(instance.Check.Name),
 					color.New(color.FgRed).Sprintf("%s", result.Error)))
 
 			case *scheduler.CustomCheckInstance:
-				assetBranch.AddNode(fmt.Sprintf("%s %s - %s", 
+				assetBranch.AddNode(fmt.Sprintf("%s %s - %s",
 					color.New(color.FgMagenta).Sprint(instance.Check.Name),
 					faint("custom check"),
 					color.New(color.FgRed).Sprintf("%s", result.Error)))
