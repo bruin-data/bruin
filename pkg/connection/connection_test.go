@@ -477,3 +477,23 @@ func TestManager_GetSfConnection(t *testing.T) {
 		})
 	}
 }
+
+func TestManager_AddGenericConnectionFromConfig(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{availableConnections: make(map[string]any)}
+	res := m.GetConnection("test")
+	assert.Nil(t, res)
+
+	configuration := &config.GenericConnection{
+		Name:  "test",
+		Value: "somevalue",
+	}
+
+	err := m.AddGenericConnectionFromConfig(configuration)
+	require.NoError(t, err)
+
+	res, ok := m.GetConnection("test").(*config.GenericConnection)
+	assert.True(t, ok)
+	assert.NotNil(t, res)
+}
