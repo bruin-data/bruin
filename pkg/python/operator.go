@@ -2,6 +2,7 @@ package python
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -47,14 +48,10 @@ type LocalOperator struct {
 	module       modulePathFinder
 	runner       localRunner
 	envVariables map[string]string
-	config       secretFinder
+	config       config.ConnectionGetter
 }
 
-type secretFinder interface {
-	GetSecretByKey(key string) (string, error)
-}
-
-func NewLocalOperator(config *config.Config, envVariables map[string]string) *LocalOperator {
+func NewLocalOperator(config config.ConnectionGetter, envVariables map[string]string) *LocalOperator {
 	cmdRunner := &CommandRunner{}
 	fs := afero.NewOsFs()
 
@@ -81,7 +78,7 @@ func NewLocalOperator(config *config.Config, envVariables map[string]string) *Lo
 	}
 }
 
-func NewLocalOperatorWithUv(config *config.Config, conn config.ConnectionGetter, envVariables map[string]string) *LocalOperator {
+func NewLocalOperatorWithUv(config config.ConnectionGetter, conn config.ConnectionGetter, envVariables map[string]string) *LocalOperator {
 	cmdRunner := &CommandRunner{}
 
 	return &LocalOperator{
@@ -158,16 +155,22 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	envVariables["BRUIN_THIS"] = t.Name
 
 	for _, mapping := range t.Secrets {
-		val, err := o.config.GetSecretByKey(mapping.SecretKey)
+		conn := o.config.GetConnection(mapping.SecretKey)
+		if conn == nil {
+			return errors.New(fmt.Sprintf("there's no secret with the name '%s'.", mapping.SecretKey))
+		}
+
+		val, ok := conn.(config.GenericConnection)
+		if ok {
+			envVariables[mapping.InjectedKey] = val.Value
+			continue
+		}
+
+		res, err := json.Marshal(conn)
 		if err != nil {
-			return errors.Wrapf(err, "there's no secret with the name '%s', make sure you are referring to the right secret and the secret is defined correctly in your .bruin.yml file.", mapping.SecretKey)
+			return errors.Wrapf(err, "failed to marshal connection")
 		}
-
-		if val == "" {
-			return errors.New(fmt.Sprintf("there's no secret with the name '%s', make sure you are referring to the right secret and the secret is defined correctly in your .bruin.yml file.", mapping.SecretKey))
-		}
-
-		envVariables[mapping.InjectedKey] = val
+		envVariables[mapping.InjectedKey] = string(res)
 	}
 
 	err = o.runner.Run(ctx, &executionContext{
