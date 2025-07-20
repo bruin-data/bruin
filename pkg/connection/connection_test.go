@@ -424,7 +424,7 @@ func TestNewManagerFromConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			for k, v := range tt.env {
-				os.Setenv(k, v)
+				os.Setenv(k, v) //nolint
 			}
 			got, errors := NewManagerFromConfig(tt.cm)
 			assert.Equalf(t, tt.want, got, "NewManagerFromConfig(%v)", tt.cm)

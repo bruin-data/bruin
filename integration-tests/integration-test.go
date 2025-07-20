@@ -843,7 +843,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Executed 3 tasks", "Finished: shipping_provider", "Finished: products", "Finished: products:price:positive"},
+				Contains: []string{"bruin run completed", "Finished: shipping_provider", "Finished: products", "Finished: products:price:positive"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -870,7 +870,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Executed 2 tasks", "Finished: shipping_provider", "Finished: products"},
+				Contains: []string{"bruin run completed", "Finished: shipping_provider", "Finished: products"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -884,7 +884,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Executed 5 tasks", "Finished: products", "Finished: products:price:positive", "Finished: product_price_summary", "Finished: product_price_summary:product_count:non_negative", "Finished: product_price_summary:total_stock:non_negative"},
+				Contains: []string{"bruin run completed", "Finished: products", "Finished: products:price:positive", "Finished: product_price_summary", "Finished: product_price_summary:product_count:non_negative", "Finished: product_price_summary:total_stock:non_negative"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -898,7 +898,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Executed 2 tasks", "Finished: products", "Finished: product_price_summary"},
+				Contains: []string{"bruin run completed", "Finished: products", "Finished: product_price_summary"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -1081,7 +1081,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 
 			Expected: e2e.Output{
 				ExitCode: 1,
-				Contains: []string{"Parser Error: syntax error at or near \"S_ELECT_\"", "Failed assets 1"},
+				Contains: []string{"Parser Error: syntax error at or near \"S_ELECT_\"", "1 failed"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -1155,7 +1155,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Executed 5 tasks"},
+				Contains: []string{"bruin run completed"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -1184,7 +1184,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Successfully validated 4 assets", "Executed 5 tasks", "Finished: chess_playground.player_summary", "Finished: chess_playground.games", "Finished: python_asset"},
+				Contains: []string{"Successfully validated 4 assets", "bruin run completed", "Finished: chess_playground.player_summary", "Finished: chess_playground.games", "Finished: python_asset"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -1258,7 +1258,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Successfully validated 1 assets", "Executed 1 tasks", "Finished: materialize.country"},
+				Contains: []string{"Successfully validated 1 assets", "bruin run completed", "Finished: materialize.country"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -1286,7 +1286,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Successfully validated 2 assets", "Executed 4 tasks", "Finished: render_this.my_asset_2"},
+				Contains: []string{"Successfully validated 2 assets", "bruin run completed", "Finished: render_this.my_asset_2"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -1300,7 +1300,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Successfully validated 2 assets", "Executed 8 tasks", "Finished: my_schema.table_check"},
+				Contains: []string{"Successfully validated 2 assets", "bruin run completed", "Finished: my_schema.table_check"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
@@ -1548,7 +1548,7 @@ func getIngestrTasks(binary string, currentFolder string) []e2e.Task {
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
-				Contains: []string{"Executed 4 tasks", "Finished: chess_playground.profiles", "Finished: chess_playground.games", "Finished: chess_playground.player_summary", "Finished: chess_playground.player_summary:total_games:positive"},
+				Contains: []string{"bruin run completed", "Finished: chess_playground.profiles", "Finished: chess_playground.games", "Finished: chess_playground.player_summary", "Finished: chess_playground.player_summary:total_games:positive"},
 			},
 			Asserts: []func(*e2e.Task) error{
 				e2e.AssertByExitCode,
