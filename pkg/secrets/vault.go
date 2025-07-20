@@ -175,6 +175,10 @@ func (c *Client) GetConnection(name string) any {
 		return nil
 	}
 
+	if secretType == "generic" {
+		return connections.Generic[0]
+	}
+
 	environment := config.Environment{
 		Connections: &connections,
 	}

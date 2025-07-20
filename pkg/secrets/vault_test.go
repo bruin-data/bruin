@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/hashicorp/vault-client-go"
 	"github.com/hashicorp/vault-client-go/schema"
@@ -97,6 +98,33 @@ func TestClient_GetConnection_ReturnsConnection(t *testing.T) {
 
 	conn := c.GetConnection("test-connection")
 	require.NotNil(t, conn)
+}
+
+func TestClient_GetConnection_ReturnsGenericConnection(t *testing.T) {
+	t.Parallel()
+	c := &Client{
+		client: &mockVaultClient{
+			response: &vault.Response[schema.KvV2ReadResponse]{
+				Data: schema.KvV2ReadResponse{
+					Data: map[string]any{
+						"details": map[string]any{
+							"value": "somevalue",
+						},
+						"type": "generic",
+					},
+				},
+			},
+			err: nil,
+		},
+		mountPath: "mount",
+		path:      "path",
+		logger:    &mockLogger{},
+		cache:     make(map[string]any),
+	}
+
+	conn := c.GetConnection("test-connection")
+	require.NotNil(t, conn)
+	require.Equal(t, "somevalue", conn.(config.GenericConnection).Value)
 }
 
 // Additional tests for newVaultClientWithToken and newVaultClientWithKubernetesAuth would require
