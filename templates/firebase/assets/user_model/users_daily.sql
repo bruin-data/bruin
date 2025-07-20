@@ -1,22 +1,19 @@
 /* @bruin
 
-name: user_model.users_daily
 type: bq.sql
+description: The users_daily table contains daily user-level metrics and dimensions. The underlying table is partitioned by date and clustered by user_id. This table is used for reporting and ad-hoc analysis.
+
 materialization:
-    type: table
-    strategy: delete+insert
-    incremental_key: dt
-    partition_by: dt
-    cluster_by: 
-      - user_id
+  type: table
+  strategy: time_interval
+  partition_by: dt
+  cluster_by:
+    - user_id
+  incremental_key: dt
+  time_granularity: date
 
 depends:
   - events.events
-
-description:
-    The users_daily table contains daily user-level metrics and dimensions.
-    The underlying table is partitioned by date and clustered by user_id.
-    This table is used for reporting and ad-hoc analysis.
 
 columns:
   - name: user_id
@@ -34,7 +31,7 @@ columns:
 @bruin */
 
 SELECT
-  user_id,
+  user_id, --TODO: change to user_pseudo_id if needed
   dt,
   min_by(platform, ts) as platform, --TODO: Gets the first platform used by the user. Change it, or convert to dimension if needed.
 
@@ -80,7 +77,7 @@ SELECT
   --TODO: add game specific metrics 
 
 from events.events
-where user_id is not null
+where user_id is not null --TODO: change to user_pseudo_id if needed
   and event_name not in ("app_remove", "os_update", "app_clear_data", "app_update", "app_exception")
   and dt between '{{ start_date }}' and '{{ end_date }}'
 group by 1,2
