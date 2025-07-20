@@ -1,0 +1,5 @@
+# IF USING INTRADAY EXPORT, USE THIS
+# This will check if the day after end date's intraday table is available, which means the data is ready to be processed
+type: bq.sensor.query
+parameters:
+    query: 'SELECT EXISTS (SELECT 1 FROM {{this}}_{{ end_date | date_add(1) | date_format("%Y%m%d") }} )' #TODO: Change 123456789 to your analytics ID

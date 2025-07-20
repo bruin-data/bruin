@@ -1,0 +1,5 @@
+# IF USING DAILY EXPORT, USE THIS INSTEAD
+# This will check if the daily table is available for the end date.
+type: bq.sensor.table
+parameters:
+    table: "your-project-id.{{this}}_{{ end_date | date_format('%Y%m%d') }}"

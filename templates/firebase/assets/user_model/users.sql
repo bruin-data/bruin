@@ -75,7 +75,7 @@ t1 as
   group by 1
 )
 select *,
-  {%- for day_n in (range(1,8)|list) + [14,21,28,30,60,90] %}
+  {%- for day_n in (range(1,8)|list) + [14,21,28,30,60,90] %} -- TODO: Add more days if needed
   case when install_dt < current_date - {{ day_n }} then if(install_dt + {{ day_n }} in unnest(active_dates), 1, 0) end as ret_d{{day_n}},
   {%- endfor %}
 from t1
