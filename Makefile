@@ -10,6 +10,7 @@ TELEMETRY_OPTOUT=1
 CURRENT_DIR=$(pwd)
 TELEMETRY_KEY=""
 FILES := $(wildcard *.yml *.txt *.py)
+OS_ARCH:=$(shell go env GOOS)_$(shell go env GOARCH)
 
 JQ_REL_PATH = jq --arg prefix "$$(pwd)/" 'walk(if type == "object" and has("path") and (.path | type == "string") then .path |= (if startswith($$prefix) then .[($$prefix | length):] elif startswith("integration-tests/") then .[16:] else . end) else . end)'
 
@@ -66,7 +67,7 @@ test: test-unit
 
 test-unit:
 	@echo "$(OK_COLOR)==> Running the unit tests$(NO_COLOR)"
-	@go test -race -cover -timeout 10m $(shell go list ./... | grep -v '/cloud-integration-tests/') 
+	@go test -tags="no_duckdb_arrow" -race -cover -timeout 10m $(shell go list ./... | grep -v '/cloud-integration-tests/') 
 
 format: tools lint-python
 	@echo "$(OK_COLOR)>> [go vet] running$(NO_COLOR)" & \
@@ -138,3 +139,9 @@ refresh-integration-expectations: build
 	@cd integration-tests && ../bin/bruin internal connections | $(JQ_REL_PATH) > expected_connections_schema.json
 	@cd integration-tests && ../bin/bruin connections list -o json . | $(JQ_REL_PATH) > expected_connections.json
 	@echo "$(OK_COLOR)==> Integration expectations refreshed successfully!$(NO_COLOR)"
+
+# sometimes vendoring doesn't move the precompiled library
+duck-db-static-lib:
+	@mkdir vendor/github.com/marcboeker/go-duckdb/deps || true
+	@mkdir vendor/github.com/marcboeker/go-duckdb/deps/$(OS_ARCH) || true
+	@cp $$(go env GOPATH)/pkg/mod/github.com/marcboeker/go-duckdb@v1.8.2/deps/$(OS_ARCH)/libduckdb.a vendor/github.com/marcboeker/go-duckdb/deps/$(OS_ARCH)/libduckdb.a

@@ -269,6 +269,14 @@ export default withMermaid({
 
             },
             {
+                text: "Secret Providers",
+                collapsed: false,
+                items: [
+                    {text: "Overview", link: "/secrets/overview"},
+                    {text: "Hashicorp Vault", link: "/secrets/vault"}
+                ]
+            },
+            {
                 text: "Bruin Cloud",
                 collapsed: false,
                 items: [

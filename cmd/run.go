@@ -40,6 +40,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/bruin-data/bruin/pkg/secrets"
 	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/synapse"
@@ -564,6 +565,11 @@ func Run(isDebug *bool) *cli.Command {
 				EnvVars: []string{"BRUIN_CONFIG_FILE"},
 				Usage:   "the path to the .bruin.yml file",
 			},
+			&cli.StringFlag{
+				Name:    "secrets-backend",
+				EnvVars: []string{"BRUIN_SECRETS_BACKEND"},
+				Usage:   "the source of secrets if different from .bruin.yml. Possible values: 'vault'",
+			},
 			&cli.BoolFlag{
 				Name:  "no-validation",
 				Usage: "skip validation for this run.",
@@ -743,11 +749,25 @@ func Run(isDebug *bool) *cli.Command {
 				}
 				executionStartLog = "Starting the pipeline execution..."
 			}
-			connectionManager, errs := connection.NewManagerFromConfig(cm)
+
+			var connectionManager config.ConnectionGetter
+			var errs []error
+
+			secretsBackend := c.String("secrets-backend")
+			if secretsBackend == "vault" {
+				connectionManager, err = secrets.NewVaultClientFromEnv(logger)
+				if err != nil {
+					errs = append(errs, errors.Wrap(err, "failed to initialize vault client"))
+				}
+			} else {
+				connectionManager, errs = connection.NewManagerFromConfig(cm)
+			}
+
 			if len(errs) > 0 {
-				printErrors(errs, runConfig.Output, "Failed to register connections")
+				printErrors(errs, runConfig.Output, "Errors occurred while initializing connection manager")
 				return cli.Exit("", 1)
 			}
+
 			shouldValidate := !pipelineInfo.RunningForAnAsset && !c.Bool("no-validation")
 			if shouldValidate {
 				if err := CheckLint(runCtx, pipelineInfo.Pipeline, inputPath, logger, nil, connectionManager); err != nil {
