@@ -418,7 +418,12 @@ func (d *Client) CreateDataSetIfNotExist(asset *pipeline.Asset, ctx context.Cont
 		var apiErr *googleapi.Error
 		if errors.As(err, &apiErr) && apiErr.Code == 404 {
 			if err := dataset.Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
-				return fmt.Errorf("failed to create dataset '%s': %w", datasetName, err)
+				var createApiErr *googleapi.Error
+				if errors.As(err, &createApiErr) && createApiErr.Code == 409 {
+					// Dataset already exists (created by another process), ignore this error
+				} else {
+					return fmt.Errorf("failed to create dataset '%s': %w", datasetName, err)
+				}
 			}
 			datasetNameCache.Store(cacheKey, true)
 		} else {

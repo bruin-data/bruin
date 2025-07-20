@@ -8,11 +8,13 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
 	"github.com/bruin-data/bruin/pkg/config"
+	"github.com/bruin-data/bruin/pkg/devenv"
 	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/bruin-data/bruin/pkg/helpers"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/bruin-data/bruin/pkg/scheduler"
+	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/pkg/errors"
 )
 
@@ -22,17 +24,28 @@ type materializer interface {
 	LogIfFullRefreshAndDDL(writer interface{}, asset *pipeline.Asset) error
 }
 
+type devEnv interface {
+	Modify(ctx context.Context, p *pipeline.Pipeline, a *pipeline.Asset, q *query.Query) (*query.Query, error)
+	RegisterAssetForSchemaCache(ctx context.Context, p *pipeline.Pipeline, a *pipeline.Asset, q *query.Query) error
+}
+
 type BasicOperator struct {
 	connection   config.ConnectionGetter
 	extractor    query.QueryExtractor
 	materializer materializer
+	devEnv       devEnv
 }
 
-func NewBasicOperator(conn config.ConnectionGetter, extractor query.QueryExtractor, materializer materializer) *BasicOperator {
+func NewBasicOperator(conn config.ConnectionGetter, extractor query.QueryExtractor, materializer materializer, parser *sqlparser.SQLParser) *BasicOperator {
 	return &BasicOperator{
 		connection:   conn,
 		extractor:    extractor,
 		materializer: materializer,
+		devEnv: &devenv.DevEnvQueryModifier{
+			Dialect: "bigquery",
+			Conn:    conn,
+			Parser:  parser,
+		},
 	}
 }
 
@@ -99,7 +112,26 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		}
 	}
 
-	return conn.RunQueryWithoutResult(ctx, q)
+	if o.devEnv == nil {
+		return conn.RunQueryWithoutResult(ctx, q)
+	}
+
+	q, err = o.devEnv.Modify(ctx, p, t, q)
+	if err != nil {
+		return err
+	}
+
+	err = conn.RunQueryWithoutResult(ctx, q)
+	if err != nil {
+		return err
+	}
+
+	err = o.devEnv.RegisterAssetForSchemaCache(ctx, p, t, q)
+	if err != nil {
+		return errors.Wrap(err, "cannot register asset for schema cache")
+	}
+
+	return nil
 }
 
 type checkRunner interface {
