@@ -68,7 +68,7 @@ func (d *DevEnvQueryModifier) Modify(ctx context.Context, p *pipeline.Pipeline, 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		usedTables, usedTablesError = d.Parser.UsedTables(q.Query, "postgres")
+		usedTables, usedTablesError = d.Parser.UsedTables(q.Query, d.Dialect)
 	}()
 
 	var dbSummary *ansisql.DBDatabase
