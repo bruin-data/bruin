@@ -186,6 +186,7 @@ export default withMermaid({
                             {text: "Asana", link: "/ingestion/asana.md"},
                             {text: "Attio", link: "/ingestion/attio.md"},
                             {text: "Chess", link: "/ingestion/chess.md"},
+                            {text: "ClickUp", link: "/ingestion/clickup.md"},
                             {text: "DB2", link: "/ingestion/db2.md"},
                             {text: "DynamoDB", link: "/ingestion/dynamodb.md"},
                             {text: "Elasticsearch", link: "/ingestion/elasticsearch.md"},
