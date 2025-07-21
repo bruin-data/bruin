@@ -20,6 +20,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/bigquery"
 	"github.com/bruin-data/bruin/pkg/chess"
 	"github.com/bruin-data/bruin/pkg/clickhouse"
+	"github.com/bruin-data/bruin/pkg/clickup"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/databricks"
 	"github.com/bruin-data/bruin/pkg/db2"
@@ -117,6 +118,7 @@ type Manager struct {
 	Kinesis              map[string]*kinesis.Client
 	Pipedrive            map[string]*pipedrive.Client
 	Mixpanel             map[string]*mixpanel.Client
+	Clickup              map[string]*clickup.Client
 	Pinterest            map[string]*pinterest.Client
 	Trustpilot           map[string]*trustpilot.Client
 	QuickBooks           map[string]*quickbooks.Client
@@ -1314,6 +1316,26 @@ func (m *Manager) AddPipedriveConnectionFromConfig(connection *config.PipedriveC
 	return nil
 }
 
+func (m *Manager) AddClickupConnectionFromConfig(connection *config.ClickupConnection) error {
+	m.mutex.Lock()
+	if m.Clickup == nil {
+		m.Clickup = make(map[string]*clickup.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := clickup.NewClient(clickup.Config{
+		APIToken: connection.APIToken,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Clickup[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddQuickBooksConnectionFromConfig(connection *config.QuickBooksConnection) error {
 	m.mutex.Lock()
 	if m.QuickBooks == nil {
@@ -1819,6 +1841,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionGetter, []error) 
 	processConnections(cm.SelectedEnvironment.Connections.ApplovinMax, connectionManager.AddApplovinMaxConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Kinesis, connectionManager.AddKinesisConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pipedrive, connectionManager.AddPipedriveConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Clickup, connectionManager.AddClickupConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Mixpanel, connectionManager.AddMixpanelConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Pinterest, connectionManager.AddPinterestConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Trustpilot, connectionManager.AddTrustpilotConnectionFromConfig, &wg, &errList, &mu)

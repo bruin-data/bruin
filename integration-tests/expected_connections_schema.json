@@ -539,6 +539,12 @@
           },
           "type": "array"
         },
+        "clickup": {
+          "items": {
+            "$ref": "#/$defs/ClickupConnection"
+          },
+          "type": "array"
+        },
         "mixpanel": {
           "items": {
             "$ref": "#/$defs/MixpanelConnection"
@@ -1485,6 +1491,22 @@
       ]
     },
     "PipedriveConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_token"
+      ]
+    },
+    "ClickupConnection": {
       "properties": {
         "name": {
           "type": "string"

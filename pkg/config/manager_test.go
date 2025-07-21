@@ -396,6 +396,12 @@ func TestLoadFromFile(t *testing.T) {
 					APIToken: "token-123",
 				},
 			},
+			Clickup: []ClickupConnection{
+				{
+					Name:     "clickup-1",
+					APIToken: "token_123",
+				},
+			},
 			QuickBooks: []QuickBooksConnection{
 				{
 					Name:         "quickbooks-1",

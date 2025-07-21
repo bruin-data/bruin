@@ -249,6 +249,9 @@ environments:
       pipedrive:
         - name: "pipedrive-1"
           api_token: "token-123"
+      clickup:
+        - name: "clickup-1"
+          api_token: "token_123"
       mixpanel:
         - name: "mixpanel-1"
           username: "user-123"
