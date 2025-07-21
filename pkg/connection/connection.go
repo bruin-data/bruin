@@ -138,6 +138,7 @@ type Manager struct {
 	Sftp                 map[string]*sftp.Client
 	ISOCPulse            map[string]*isocpulse.Client
 	Tableau              map[string]*tableau.Client
+	Generic              map[string]*config.GenericConnection
 	mutex                sync.Mutex
 	availableConnections map[string]any
 }
@@ -1685,6 +1686,18 @@ func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRSer
 	return nil
 }
 
+func (m *Manager) AddGenericConnectionFromConfig(connection *config.GenericConnection) error {
+	m.mutex.Lock()
+	if m.Generic == nil {
+		m.Generic = make(map[string]*config.GenericConnection)
+	}
+	m.mutex.Unlock()
+
+	m.Generic[connection.Name] = connection
+	m.availableConnections[connection.Name] = connection
+	return nil
+}
+
 func (m *Manager) AddTableauConnectionFromConfig(connection *config.TableauConnection) error {
 	m.mutex.Lock()
 	if m.Tableau == nil {
@@ -1828,6 +1841,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionGetter, []error) 
 	processConnections(cm.SelectedEnvironment.Connections.Sftp, connectionManager.AddSftpConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.ISOCPulse, connectionManager.AddISOCPulseConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Tableau, connectionManager.AddTableauConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Generic, connectionManager.AddGenericConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }
