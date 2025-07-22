@@ -104,7 +104,7 @@ func (o *BasicOperator) Run(ctx context.Context, ti scheduler.TaskInstance) erro
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
 
-	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, []string{
+	cmdArgs, err := python.ConsolidatedParameters(ctx, ti.GetPipeline(), asset, []string{
 		"ingest",
 		"--source-uri",
 		sourceURI,
@@ -185,7 +185,7 @@ func (o *SeedOperator) Run(ctx context.Context, ti scheduler.TaskInstance) error
 
 	extraPackages = python.AddExtraPackages(destURI, sourceURI, extraPackages)
 
-	cmdArgs, err := python.ConsolidatedParameters(ctx, asset, []string{
+	cmdArgs, err := python.ConsolidatedParameters(ctx, ti.GetPipeline(), asset, []string{
 		"ingest",
 		"--source-uri",
 		sourceURI,

@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/date"
+
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/nikolalohinski/gonja/v2"
 	"github.com/nikolalohinski/gonja/v2/exec"
@@ -130,8 +132,21 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 		return r
 	}
 
+	fullRefresh, _ := ctx.Value(pipeline.RunConfigFullRefresh).(bool)
+	if fullRefresh {
+		if asset.StartDate != "" {
+			if parsed, err := date.ParseTime(asset.StartDate); err == nil {
+				startDate = parsed
+			}
+		} else if pipe.StartDate != "" {
+			if parsed, err := date.ParseTime(pipe.StartDate); err == nil {
+				startDate = parsed
+			}
+		}
+	}
+
 	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
-	if ok && applyModifiers {
+	if ok && applyModifiers && !fullRefresh {
 		startDate = pipeline.ModifyDate(startDate, asset.IntervalModifiers.Start)
 		endDate = pipeline.ModifyDate(endDate, asset.IntervalModifiers.End)
 	}
