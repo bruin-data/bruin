@@ -166,6 +166,7 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 			continue
 		}
 
+		// TODO this is hacky, we should make config comply with that interface from the beginning
 		detailsGetter, ok := o.config.(config.ConnectionDetailsGetter)
 		if !ok {
 			return errors.New(fmt.Sprintf("could not get details for connection '%s'.", mapping.SecretKey))

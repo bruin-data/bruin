@@ -1781,10 +1781,10 @@ func (m *Manager) AddEMRServerlessConnectionFromConfig(connection *config.EMRSer
 
 func (m *Manager) AddGenericConnectionFromConfig(connection *config.GenericConnection) error {
 	m.mutex.Lock()
+	defer m.mutex.Unlock()
 	if m.Generic == nil {
 		m.Generic = make(map[string]*config.GenericConnection)
 	}
-	m.mutex.Unlock()
 
 	m.Generic[connection.Name] = connection
 	m.availableConnections[connection.Name] = connection
