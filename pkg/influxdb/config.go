@@ -18,9 +18,15 @@ func (c Config) GetIngestrURI() string {
 	if c.Secure == "" {
 		c.Secure = "true"
 	}
+
 	u := &url.URL{
 		Scheme: "influxdb",
-		Host:   fmt.Sprintf("%s:%d", c.Host, c.Port),
+	}
+
+	if c.Port != 0 {
+		u.Host = fmt.Sprintf("%s:%d", c.Host, c.Port)
+	} else {
+		u.Host = c.Host
 	}
 	q := u.Query()
 	if c.Token != "" {
@@ -34,5 +40,6 @@ func (c Config) GetIngestrURI() string {
 	}
 	q.Set("secure", c.Secure)
 	u.RawQuery = q.Encode()
+	fmt.Print(u.String())
 	return u.String()
 }
