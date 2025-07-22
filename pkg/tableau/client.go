@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/pkg/errors"
 )
 
@@ -159,6 +161,67 @@ func (c *Client) RefreshWorksheet(ctx context.Context, workbookID string) error 
 	return c.refreshResource(ctx, "workbooks", workbookID, "workbook")
 }
 
+func (c *Client) pollJobStatus(ctx context.Context, jobID string) error {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
+	statusURL := fmt.Sprintf("https://%s/api/%s/sites/%s/jobs/%s", c.config.Host, c.config.APIVersion, c.siteID, jobID)
+	var writer io.Writer = os.Stdout
+	if w := ctx.Value(executor.KeyPrinter); w != nil {
+		if wr, ok := w.(io.Writer); ok {
+			writer = wr
+		}
+	}
+	writer.Write([]byte(fmt.Sprintf("Refresh started asynchronously, waiting for job to complete, job ID: %s\n", jobID)))
+	for {
+		select {
+		case <-ctx.Done():
+			return errors.New("timed out waiting for Tableau job to complete")
+		default:
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, statusURL, nil)
+			if err != nil {
+				return errors.Wrap(err, "failed to create job status request")
+			}
+			req.Header.Set("X-Tableau-Auth", c.authToken)
+			req.Header.Set("Accept", "application/json")
+
+			resp, err := c.httpClient.Do(req)
+			if err != nil {
+				return errors.Wrap(err, "failed to perform job status request")
+			}
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+
+			var jobResp struct {
+				Job struct {
+					ID                string `json:"id"`
+					Type              string `json:"type"`
+					CreatedAt         string `json:"createdAt"`
+					StartedAt         string `json:"startedAt"`
+					CompletedAt       string `json:"completedAt"`
+					FinishCode        string `json:"finishCode"`
+					ExtractRefreshJob struct {
+						Notes string `json:"notes"`
+					} `json:"extractRefreshJob"`
+				} `json:"job"`
+			}
+			if err := json.Unmarshal(body, &jobResp); err != nil {
+				return errors.Wrap(err, "failed to decode job status response")
+			}
+
+			if jobResp.Job.CompletedAt != "" {
+				if jobResp.Job.FinishCode == "0" {
+					return nil
+				} else {
+					errNotes := jobResp.Job.ExtractRefreshJob.Notes
+					return errors.Errorf("Tableau job failed: finishCode=%s, notes=%s", jobResp.Job.FinishCode, errNotes)
+				}
+			}
+
+			time.Sleep(5 * time.Second)
+		}
+	}
+}
+
 func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, payloadKey string) error {
 	if err := c.authenticate(ctx); err != nil {
 		return errors.Wrap(err, "failed to authenticate with Tableau")
@@ -193,11 +256,26 @@ func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, 
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusAccepted { // 202
+		// Parse job ID from response
+		var jobResp struct {
+			Job struct {
+				ID string `json:"id"`
+			} `json:"job"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&jobResp); err != nil {
+			return errors.Wrap(err, "failed to decode Tableau job response")
+		}
+		if jobResp.Job.ID == "" {
+			return errors.New("missing job ID in Tableau response")
+		}
+		return c.pollJobStatus(ctx, jobResp.Job.ID)
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return errors.Errorf("refresh failed with status %d: %s", resp.StatusCode, string(body))
 	}
-
 	return nil
 }
 
