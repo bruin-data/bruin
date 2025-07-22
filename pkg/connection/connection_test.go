@@ -420,7 +420,23 @@ func TestNewManagerFromConfig(t *testing.T) {
 				"PERSONIO_CLIENT_SECRET": "secret2",
 			},
 			want: &Manager{
-				AllConnectionDetails: map[string]any{},
+				AllConnectionDetails: map[string]any{
+					"key1": &config.PersonioConnection{
+						Name:         "key1",
+						ClientID:     "id1",
+						ClientSecret: "secret1",
+					},
+					"key2": &config.PersonioConnection{
+						Name:         "key2",
+						ClientID:     "val1_id2_val2",
+						ClientSecret: "secret2",
+					},
+					"key3": &config.PersonioConnection{
+						Name:         "key3",
+						ClientID:     "",
+						ClientSecret: "",
+					},
+				},
 				availableConnections: map[string]any{
 					"key1": personio.NewClient(personio.Config{
 						ClientID:     "id1",
