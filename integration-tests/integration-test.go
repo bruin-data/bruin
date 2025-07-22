@@ -751,7 +751,7 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			Command: binary,
 			Args: []string{
 				"run",
-				filepath.Join(currentFolder, "test-pipelines/happy-path/assets/asset.py"),
+				filepath.Join(currentFolder, "test-pipelines/happy-path/assets/happy.py"),
 			},
 			Expected: e2e.Output{
 				ExitCode: 0,

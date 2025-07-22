@@ -98,6 +98,10 @@ type ConnectionGetter interface {
 	GetConnection(name string) any
 }
 
+type ConnectionDetailsGetter interface {
+	GetConnectionDetails(name string) any
+}
+
 func (c *Connections) ConnectionsSummaryList() map[string]string {
 	if c.typeNameMap == nil {
 		c.buildConnectionKeyMap()
