@@ -184,6 +184,10 @@ func printExecutionTable(results []*scheduler.TaskExecutionResult, s *scheduler.
 			assetColor = color.New(color.FgRed)
 		}
 
+		if assetStatus == "SKIP" {
+			continue
+		}
+
 		fmt.Printf("%s %s ", assetColor.Sprint(assetStatus), assetName)
 
 		// Print dots for quality checks
@@ -247,14 +251,14 @@ func printExecutionSummary(results []*scheduler.TaskExecutionResult, s *schedule
 
 	// Assets executed (only actual assets, not including quality checks)
 	if summary.Assets.HasAny() {
-		if summary.Assets.Failed > 0 || summary.Assets.FailedDueToChecks > 0 || summary.Assets.Skipped > 0 {
+		if summary.Assets.Failed > 0 || summary.Assets.FailedDueToChecks > 0 {
 			summaryPrinter.Printf(" %s Assets executed      %s\n",
 				color.New(color.FgRed).Sprint("✗"),
 				formatCountWithSkipped(summary.Assets.Total, summary.Assets.Failed, summary.Assets.FailedDueToChecks, summary.Assets.Skipped))
 		} else {
 			summaryPrinter.Printf(" %s Assets executed      %s\n",
 				color.New(color.FgGreen).Sprint("✓"),
-				color.New(color.FgGreen).Sprintf("%d succeeded", summary.Assets.Succeeded))
+				formatCountWithSkipped(summary.Assets.Total, summary.Assets.Failed, summary.Assets.FailedDueToChecks, summary.Assets.Skipped))
 		}
 	}
 
@@ -263,14 +267,14 @@ func printExecutionSummary(results []*scheduler.TaskExecutionResult, s *schedule
 	totalCheckFailures := summary.ColumnChecks.Failed + summary.CustomChecks.Failed
 	totalCheckSkipped := summary.ColumnChecks.Skipped + summary.CustomChecks.Skipped
 	if totalChecks > 0 {
-		if totalCheckFailures > 0 || totalCheckSkipped > 0 {
+		if totalCheckFailures > 0 {
 			summaryPrinter.Printf(" %s Quality checks       %s\n",
 				color.New(color.FgRed).Sprint("✗"),
 				formatCountWithSkipped(totalChecks, totalCheckFailures, 0, totalCheckSkipped))
 		} else {
 			summaryPrinter.Printf(" %s Quality checks       %s\n",
 				color.New(color.FgGreen).Sprint("✓"),
-				color.New(color.FgGreen).Sprintf("%d succeeded", summary.ColumnChecks.Succeeded+summary.CustomChecks.Succeeded))
+				formatCountWithSkipped(totalChecks, totalCheckFailures, 0, totalCheckSkipped))
 		}
 	}
 
