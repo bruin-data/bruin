@@ -886,6 +886,20 @@ func (c ISOCPulseConnection) GetName() string {
 	return c.Name
 }
 
+type InfluxDBConnection struct {
+	Name   string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Host   string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port   int    `yaml:"port,omitempty" json:"port" mapstructure:"port"`
+	Token  string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
+	Org    string `yaml:"org,omitempty" json:"org" mapstructure:"org"`
+	Bucket string `yaml:"bucket,omitempty" json:"bucket" mapstructure:"bucket"`
+	Secure string `yaml:"secure,omitempty" json:"secure" mapstructure:"secure" default:"true"`
+}
+
+func (c InfluxDBConnection) GetName() string {
+	return c.Name
+}
+
 type TableauConnection struct {
 	Name                      string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
 	Host                      string `yaml:"host,omitempty" json:"host" mapstructure:"host"`

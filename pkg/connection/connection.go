@@ -38,6 +38,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/gsheets"
 	"github.com/bruin-data/bruin/pkg/hana"
 	"github.com/bruin-data/bruin/pkg/hubspot"
+	"github.com/bruin-data/bruin/pkg/influxdb"
 	"github.com/bruin-data/bruin/pkg/isocpulse"
 	"github.com/bruin-data/bruin/pkg/kafka"
 	"github.com/bruin-data/bruin/pkg/kinesis"
@@ -139,6 +140,7 @@ type Manager struct {
 	Attio                map[string]*attio.Client
 	Sftp                 map[string]*sftp.Client
 	ISOCPulse            map[string]*isocpulse.Client
+	InfluxDB             map[string]*influxdb.Client
 	Tableau              map[string]*tableau.Client
 	Generic              map[string]*config.GenericConnection
 	mutex                sync.Mutex
@@ -1422,6 +1424,31 @@ func (m *Manager) AddISOCPulseConnectionFromConfig(connection *config.ISOCPulseC
 	return nil
 }
 
+func (m *Manager) AddInfluxDBConnectionFromConfig(connection *config.InfluxDBConnection) error {
+	m.mutex.Lock()
+	if m.InfluxDB == nil {
+		m.InfluxDB = make(map[string]*influxdb.Client)
+	}
+	m.mutex.Unlock()
+
+	client, err := influxdb.NewClient(influxdb.Config{
+		Host:   connection.Host,
+		Port:   connection.Port,
+		Token:  connection.Token,
+		Org:    connection.Org,
+		Bucket: connection.Bucket,
+		Secure: connection.Secure,
+	})
+	if err != nil {
+		return err
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.InfluxDB[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	return nil
+}
+
 func (m *Manager) AddZoomConnectionFromConfig(connection *config.ZoomConnection) error {
 	m.mutex.Lock()
 	if m.Zoom == nil {
@@ -1863,6 +1890,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionGetter, []error) 
 	processConnections(cm.SelectedEnvironment.Connections.Attio, connectionManager.AddAttioConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Sftp, connectionManager.AddSftpConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.ISOCPulse, connectionManager.AddISOCPulseConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.InfluxDB, connectionManager.AddInfluxDBConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Tableau, connectionManager.AddTableauConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Generic, connectionManager.AddGenericConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
