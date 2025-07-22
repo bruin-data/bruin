@@ -747,6 +747,20 @@ func getTasks(binary string, currentFolder string) []e2e.Task {
 			},
 		},
 		{
+			Name:    "python-happy-path-run",
+			Command: binary,
+			Args: []string{
+				"run",
+				filepath.Join(currentFolder, "test-pipelines/happy-path/assets/asset.py"),
+			},
+			Expected: e2e.Output{
+				ExitCode: 0,
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+			},
+		},
+		{
 			Name:    "python-variable-injection",
 			Command: binary,
 			Args: []string{
