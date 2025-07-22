@@ -206,6 +206,17 @@ func TestLoadFromFile(t *testing.T) {
 					APIKey: "stripekey",
 				},
 			},
+			InfluxDB: []InfluxDBConnection{
+				{
+					Name:   "influxdb-1",
+					Host:   "influxdb-host",
+					Token:  "influxdb-token",
+					Org:    "influxdb-org",
+					Bucket: "influxdb-bucket",
+					Secure: "true",
+					
+				},
+			},
 			Appsflyer: []AppsflyerConnection{
 				{
 					Name:   "conn19",

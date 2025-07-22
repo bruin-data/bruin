@@ -356,6 +356,13 @@ environments:
       isoc_pulse:
         - name: "isoc_pulse-1"
           token: "isoc-pulse-token-123"
+      influxdb:
+        - name: "influxdb-1"
+          host: "influxdb-host"
+          token: "influxdb-token"
+          org: "influxdb-org"
+          bucket: "influxdb-bucket"
+          secure: "true"
 
   prod:
     connections:

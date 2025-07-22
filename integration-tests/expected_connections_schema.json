@@ -395,6 +395,12 @@
           },
           "type": "array"
         },
+        "influxdb": {
+          "items": {
+            "$ref": "#/$defs/InfluxDBConnection"
+          },
+          "type": "array"
+        },
         "appsflyer": {
           "items": {
             "$ref": "#/$defs/AppsflyerConnection"
@@ -1922,6 +1928,40 @@
       "required": [
         "name",
         "api_key"
+      ]
+    },
+    "InfluxDBConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port":{
+          "type": "integer"
+        },
+        "secure": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "org": {
+          "type": "string"
+        },
+        "bucket": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "token",
+        "org",
+        "bucket"
       ]
     },
     "SynapseConnection": {
