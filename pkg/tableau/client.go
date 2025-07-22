@@ -171,7 +171,9 @@ func (c *Client) pollJobStatus(ctx context.Context, jobID string) error {
 			writer = wr
 		}
 	}
-	writer.Write([]byte(fmt.Sprintf("Refresh started asynchronously, waiting for job to complete, job ID: %s\n", jobID)))
+	if _, err := writer.Write([]byte(fmt.Sprintf("Refresh started asynchronously, waiting for job to complete, job ID: %s\n", jobID))); err != nil {
+		return errors.Wrap(err, "failed to write log output")
+	}
 	for {
 		select {
 		case <-ctx.Done():
