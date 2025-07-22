@@ -154,6 +154,14 @@ func (m *Manager) GetConnection(name string) any {
 	return connection
 }
 
+func (m *Manager) GetConnectionDetails(name string) any {
+	connection, ok := m.AllConnectionDetails[name]
+	if !ok {
+		return nil
+	}
+	return connection
+}
+
 func (m *Manager) AddBqConnectionFromConfig(connection *config.GoogleCloudPlatformConnection) error {
 	m.mutex.Lock()
 	if m.BigQuery == nil {
