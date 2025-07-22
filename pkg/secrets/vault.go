@@ -176,7 +176,7 @@ func (c *Client) GetConnection(name string) any {
 	}
 
 	if secretType == "generic" {
-		return connections.Generic[0]
+		return &(connections.Generic[0])
 	}
 
 	environment := config.Environment{
