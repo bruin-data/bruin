@@ -160,7 +160,7 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 			return errors.New(fmt.Sprintf("there's no secret with the name '%s'.", mapping.SecretKey))
 		}
 
-		val, ok := conn.(*config.GenericConnection)
+		val, ok := conn.(config.GenericConnection)
 		if ok {
 			envVariables[mapping.InjectedKey] = val.Value
 			continue
