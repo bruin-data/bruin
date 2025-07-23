@@ -287,7 +287,6 @@ type column struct {
 	UpdateOnMerge bool             `yaml:"update_on_merge"`
 	Nullable      *bool            `yaml:"nullable"`
 	Upstreams     []columnUpstream `yaml:"upstreams"`
-	// New fields
 	Tags    []string          `yaml:"tags"`
 	Domains []string          `yaml:"domains"`
 	Meta    map[string]string `yaml:"meta"`
@@ -338,7 +337,6 @@ type taskDefinition struct {
 	Snowflake         snowflake         `yaml:"snowflake"`
 	Athena            athena            `yaml:"athena"`
 	IntervalModifiers IntervalModifiers `yaml:"interval_modifiers"`
-	// New fields
 	Domains []string          `yaml:"domains"`
 	Meta    map[string]string `yaml:"meta"`
 }
@@ -514,9 +512,8 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Snowflake:         SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},
 		Athena:            AthenaConfig{Location: definition.Athena.QueryResultsPath},
 		IntervalModifiers: definition.IntervalModifiers,
-		// New fields
 		Domains: definition.Domains,
-		Meta:    definition.Meta, // <-- set the new Meta field
+		Meta:    definition.Meta,
 	}
 
 	for index, check := range definition.CustomChecks {
