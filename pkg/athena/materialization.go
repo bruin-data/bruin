@@ -436,6 +436,8 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]stri
 		return nil, errors.New("incremental_key is required for SCD2_by_time strategy")
 	}
 
+	incrementalKey := asset.Materialization.IncrementalKey
+
 	var (
 		primaryKeys = make([]string, 0, 4)
 		userCols    = make([]string, 0, 12)
@@ -483,18 +485,11 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]stri
 	for _, col := range userCols {
 		tNewSelectCols = append(tNewSelectCols, "t."+col)
 	}
-	tNewSelectCols = append(tNewSelectCols, "t._valid_from")
-	// Only compare the timestamp (incremental key) for changes
-	tNewSelectCols = append(tNewSelectCols, fmt.Sprintf("CASE WHEN %s OR (s.%s IS NOT NULL AND CAST(s.%s AS TIMESTAMP) > t._valid_from) THEN CAST(s.%s AS TIMESTAMP) ELSE t._valid_until END AS _valid_until", sourcePrimaryKeyIsNull, asset.Materialization.IncrementalKey, asset.Materialization.IncrementalKey, asset.Materialization.IncrementalKey))
-	tNewSelectCols = append(tNewSelectCols, fmt.Sprintf("CASE WHEN %s OR (s.%s IS NOT NULL AND CAST(s.%s AS TIMESTAMP) > t._valid_from) THEN FALSE ELSE t._is_current END AS _is_current", sourcePrimaryKeyIsNull, asset.Materialization.IncrementalKey, asset.Materialization.IncrementalKey))
 
 	insertsSelectCols := make([]string, 0, len(userCols)+3)
 	for _, col := range userCols {
 		insertsSelectCols = append(insertsSelectCols, "s."+col)
 	}
-	insertsSelectCols = append(insertsSelectCols, fmt.Sprintf("CAST(s.%s AS TIMESTAMP) AS _valid_from", asset.Materialization.IncrementalKey))
-	insertsSelectCols = append(insertsSelectCols, "TIMESTAMP '9999-12-31' AS _valid_until")
-	insertsSelectCols = append(insertsSelectCols, "TRUE AS _is_current")
 
 	// Historical data columns
 	allCols := append([]string{}, userCols...)
@@ -518,20 +513,32 @@ source AS (
   %s
 ),
 current_data AS (
-  SELECT * FROM %s WHERE _is_current = TRUE
+  SELECT %s FROM %s WHERE _is_current = TRUE
 ),
 historical_data AS (
-  SELECT %s FROM %s h WHERE h._is_current = FALSE
+  SELECT %s FROM %s WHERE _is_current = FALSE
 ),
 t_new AS (
   SELECT 
-    %s
+    %s,
+    t._valid_from,
+    CASE WHEN %s OR (s.%s IS NOT NULL AND CAST(s.%s AS TIMESTAMP) > t._valid_from)
+	THEN CAST(s.%s AS TIMESTAMP) 
+	ELSE t._valid_until 
+	END AS _valid_until,
+    CASE WHEN %s OR (s.%s IS NOT NULL AND CAST(s.%s AS TIMESTAMP) > t._valid_from)
+	THEN FALSE 
+	ELSE t._is_current 
+	END AS _is_current
   FROM current_data t
   LEFT JOIN source s ON %s
 ),
 insert_rows AS (
   SELECT 
-    %s
+    %s,
+    CAST(s.%s AS TIMESTAMP) AS _valid_from,
+    TIMESTAMP '9999-12-31' AS _valid_until,
+    TRUE AS _is_current
   FROM source s
   LEFT JOIN current_data t ON %s
   WHERE %s OR (%s AND CAST(s.%s AS TIMESTAMP) > t._valid_from)
@@ -541,20 +548,36 @@ UNION ALL
 SELECT %s FROM insert_rows
 UNION ALL
 SELECT %s FROM historical_data`,
+		// Create table
 		tempTableName,
 		location,
 		tempTableName,
 		partitionBy,
+		// Source data
 		strings.TrimSpace(query),
+		// current data
+		strings.Join(allCols, ", "),
 		asset.Name,
-		strings.Join(histCols, ", "),
+		// Historical data
+		strings.Join(allCols, ", "),
 		asset.Name,
+		// t_new data
 		strings.Join(tNewSelectCols, ",\n    "),
+		sourcePrimaryKeyIsNull,
+		incrementalKey,
+		incrementalKey,
+		incrementalKey,
+		sourcePrimaryKeyIsNull,
+		incrementalKey,
+		incrementalKey,
 		joinCondition,
+		// insert_rows data
 		strings.Join(insertsSelectCols, ",\n    "),
+		incrementalKey,
 		joinCondition,
 		targetPrimaryKeyIsNull,
 		joinCondition,
+		// historical_data data
 		asset.Materialization.IncrementalKey,
 		strings.Join(allCols, ", "),
 		strings.Join(allCols, ", "),
@@ -563,8 +586,8 @@ SELECT %s FROM historical_data`,
 
 	return []string{
 		strings.TrimSpace(createQuery),
-		"DROP TABLE IF EXISTS " + asset.Name,
-		fmt.Sprintf("ALTER TABLE %s RENAME TO %s", tempTableName, asset.Name),
+		"\nDROP TABLE IF EXISTS " + asset.Name,
+		fmt.Sprintf("\nALTER TABLE %s RENAME TO %s;", tempTableName, asset.Name),
 	}, nil
 }
 
