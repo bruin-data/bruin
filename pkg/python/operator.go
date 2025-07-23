@@ -142,7 +142,14 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		}
 	}
 
-	perAssetEnvVariables, err := env.SetupVariables(ctx, p, t, o.envVariables)
+	// Create a copy of environment variables to avoid race conditions when multiple goroutines
+	// are running concurrently and modifying the same map
+	envCopy := make(map[string]string, len(o.envVariables))
+	for k, v := range o.envVariables {
+		envCopy[k] = v
+	}
+
+	perAssetEnvVariables, err := env.SetupVariables(ctx, p, t, envCopy)
 	if err != nil {
 		return errors.Wrap(err, "failed to setup environment variables")
 	}
