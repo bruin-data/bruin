@@ -55,16 +55,13 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 // nolint
 func (o BasicOperator) handleDatasourceRefresh(ctx context.Context, client *Client, t *pipeline.Asset) error {
 	refreshVal, ok := t.Parameters["refresh"]
-	if !ok {
-		return errors.New("tableau.datasource asset requires 'refresh' parameter (true/false)")
-	}
-
 	refresh := refreshVal == "true"
+	// if refresh is false, or if the parameter is not present, we treat 
+	if !ok || !refresh  {return nil }
 
-	if refresh { //nolint:nestif
-		datasourceID, ok := t.Parameters["datasource_id"]
-		if !ok || datasourceID == "" {
-			// Try to find by name
+    
+	datasourceID, ok := t.Parameters["datasource_id"]
+	if !ok || datasourceID == "" {
 			name, hasName := t.Parameters["datasource_name"]
 			if !hasName || name == "" {
 				return errors.New("tableau.datasource asset requires either 'datasource_id' or 'datasource_name' parameter when 'refresh' is true")
@@ -83,8 +80,7 @@ func (o BasicOperator) handleDatasourceRefresh(ctx context.Context, client *Clie
 			datasourceID = id
 		}
 		if err := client.RefreshDataSource(ctx, datasourceID); err != nil {
-			return errors.Wrap(err, "failed to refresh Tableau data source")
-		}
+		return errors.Wrap(err, "failed to refresh Tableau data source")
 	}
 
 	return nil
@@ -93,16 +89,12 @@ func (o BasicOperator) handleDatasourceRefresh(ctx context.Context, client *Clie
 // nolint
 func (o BasicOperator) handleWorkbookRefresh(ctx context.Context, client *Client, t *pipeline.Asset) error {
 	refreshVal, ok := t.Parameters["refresh"]
-	if !ok {
-		return errors.New("tableau.workbook asset requires 'refresh' parameter (true/false)")
-	}
-
 	refresh := refreshVal == "true"
+	// if refresh is false, or if the parameter is not present, we treat 
+	if !ok || !refresh {return nil}
 
-	if refresh {
-		workbookID, ok := t.Parameters["workbook_id"]
+	workbookID, ok := t.Parameters["workbook_id"]
 		if !ok || workbookID == "" {
-			// Try to find by name
 			name, hasName := t.Parameters["workbook_name"]
 			if !hasName || name == "" {
 				return errors.New("tableau.workbook asset requires either 'workbook_id' or 'workbook_name' parameter when 'refresh' is true")
@@ -123,7 +115,7 @@ func (o BasicOperator) handleWorkbookRefresh(ctx context.Context, client *Client
 		if err := client.RefreshWorksheet(ctx, workbookID); err != nil {
 			return errors.Wrap(err, "failed to refresh Tableau workbook")
 		}
-	}
+	
 
 	return nil
 }
