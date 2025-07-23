@@ -38,12 +38,12 @@
             "owner": "",
             "executable_file": {
                 "name": "task.yml",
-                "path": "__BASEDIR__/testdata/pipeline/second-pipeline/assets/test1/task.yml",
+                "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test1\\task.yml",
                 "content": "name: gcs-to-bq\ntype: bq.transfer\nparameters:\n  transfer_config_id: some-uuid\n  project_id: \"some-project-id\"\n  location: \"europe-west1\"\n"
             },
             "definition_file": {
                 "name": "task.yml",
-                "path": "__BASEDIR__/testdata/pipeline/second-pipeline/assets/test1/task.yml",
+                "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test1\\task.yml",
                 "type": "yaml"
             },
             "parameters": {
@@ -77,12 +77,12 @@
             "owner": "",
             "executable_file": {
                 "name": "task.yml",
-                "path": "__BASEDIR__/testdata/pipeline/second-pipeline/assets/test2/task.yml",
+                "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test2\\task.yml",
                 "content": "name: gcs-to-bq-2\ntype: bq.transfer\nparameters:\n  transfer_config_id: \"some-uuid\"\n  project_id: \"a-new-project-id\"\n  location: \"europe-west1\"\n"
             },
             "definition_file": {
                 "name": "task.yml",
-                "path": "__BASEDIR__/testdata/pipeline/second-pipeline/assets/test2/task.yml",
+                "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\test2\\task.yml",
                 "type": "yaml"
             },
             "parameters": {
@@ -150,12 +150,12 @@
             "owner": "jane.doe@getbruin.com",
             "executable_file": {
                 "name": "testblockcomments.py",
-                "path": "__BASEDIR__/testdata/pipeline/second-pipeline/assets/testblockcomments.py",
+                "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\testblockcomments.py",
                 "content": "print('hello world')"
             },
             "definition_file": {
                 "name": "testblockcomments.py",
-                "path": "__BASEDIR__/testdata/pipeline/second-pipeline/assets/testblockcomments.py",
+                "path": "__BASEDIR__\\testdata\\pipeline\\second-pipeline\\assets\\testblockcomments.py",
                 "type": "comment"
             },
             "parameters": {

@@ -45,12 +45,12 @@
             "owner": "",
             "executable_file": {
                 "name": "hello.sh",
-                "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/task1/hello.sh",
+                "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\task1\\hello.sh",
                 "content": "echo \"hello world from test script\""
             },
             "definition_file": {
                 "name": "task.yml",
-                "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/task1/task.yml",
+                "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\task1\\task.yml",
                 "type": "yaml"
             },
             "parameters": {
@@ -83,12 +83,12 @@
             "owner": "",
             "executable_file": {
                 "name": "task.yaml",
-                "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/task2/task.yaml",
+                "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\task2\\task.yaml",
                 "content": "name: second-task\ntype: bq.transfer\nparameters:\n  transfer_config_id: \"some-uuid\"\n  project_id: \"a-new-project-id\"\n  location: \"europe-west1\""
             },
             "definition_file": {
                 "name": "task.yaml",
-                "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/task2/task.yaml",
+                "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\task2\\task.yaml",
                 "type": "yaml"
             },
             "parameters": {
@@ -159,12 +159,12 @@
             "owner": "",
             "executable_file": {
                 "name": "test.py",
-                "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/test.py",
+                "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\test.py",
                 "content": "print('hello world')"
             },
             "definition_file": {
                 "name": "test.py",
-                "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/test.py",
+                "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\test.py",
                 "type": "comment"
             },
             "parameters": {
@@ -235,12 +235,12 @@
             "owner": "",
             "executable_file": {
                 "name": "test.sql",
-                "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/test.sql",
-                "content": "select *\nfrom foo;"
+                "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\test.sql",
+                "content": "select *\r\nfrom foo;"
             },
             "definition_file": {
                 "name": "test.sql",
-                "path": "__BASEDIR__/testdata/pipeline/first-pipeline/tasks/test.sql",
+                "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\test.sql",
                 "type": "comment"
             },
             "parameters": {
