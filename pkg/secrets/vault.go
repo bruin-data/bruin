@@ -84,11 +84,12 @@ func newVaultClientWithToken(host, token, mountPath string, logger logger.Logger
 	}
 
 	return &Client{
-		client:           &client.Secrets,
-		mountPath:        mountPath,
-		path:             path,
-		logger:           logger,
-		cacheConnections: make(map[string]any),
+		client:                  &client.Secrets,
+		mountPath:               mountPath,
+		path:                    path,
+		logger:                  logger,
+		cacheConnections:        make(map[string]any),
+		cacheConnectionsDetails: make(map[string]any),
 	}, nil
 }
 
@@ -117,11 +118,12 @@ func newVaultClientWithKubernetesAuth(host, role, mountPath string, logger logge
 	}
 
 	return &Client{
-		client:           &client.Secrets,
-		mountPath:        mountPath,
-		path:             path,
-		logger:           logger,
-		cacheConnections: make(map[string]any),
+		client:                  &client.Secrets,
+		mountPath:               mountPath,
+		path:                    path,
+		logger:                  logger,
+		cacheConnections:        make(map[string]any),
+		cacheConnectionsDetails: make(map[string]any),
 	}, nil
 }
 
