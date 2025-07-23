@@ -207,3 +207,7 @@ func (c *Client) GetConnection(name string) any {
 
 	return conn
 }
+
+func (c *Client) GetConnectionDetails(name string) any {
+	return nil
+}

@@ -166,7 +166,14 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 			continue
 		}
 
-		res, err := json.Marshal(conn)
+		// TODO this is hacky, we should make config comply with that interface from the beginning
+		detailsGetter, ok := o.config.(config.ConnectionDetailsGetter)
+		if !ok {
+			return errors.New(fmt.Sprintf("could not get details for connection '%s'.", mapping.SecretKey))
+		}
+		details := detailsGetter.GetConnectionDetails(mapping.SecretKey)
+
+		res, err := json.Marshal(details)
 		if err != nil {
 			return errors.Wrapf(err, "failed to marshal connection")
 		}
