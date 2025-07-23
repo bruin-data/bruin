@@ -79,6 +79,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			ApplicableLevels: []Level{LevelAsset},
 		},
 		&SimpleRule{
+			Identifier:       "secret-mapping-key-exists",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   EnsureSecretMappingsHaveKeyForASingleAsset,
+			ApplicableLevels: []Level{LevelAsset},
+		},
+		&SimpleRule{
 			Identifier:       "acyclic-pipeline",
 			Fast:             true,
 			Severity:         ValidatorSeverityCritical,
