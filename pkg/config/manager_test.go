@@ -214,7 +214,6 @@ func TestLoadFromFile(t *testing.T) {
 					Org:    "influxdb-org",
 					Bucket: "influxdb-bucket",
 					Secure: "true",
-					
 				},
 			},
 			Appsflyer: []AppsflyerConnection{
