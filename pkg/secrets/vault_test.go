@@ -124,7 +124,7 @@ func TestClient_GetConnection_ReturnsGenericConnection(t *testing.T) {
 
 	conn := c.GetConnection("test-connection")
 	require.NotNil(t, conn)
-	require.Equal(t, "somevalue", conn.(config.GenericConnection).Value)
+	require.Equal(t, "somevalue", conn.(*config.GenericConnection).Value)
 }
 
 // Additional tests for newVaultClientWithToken and newVaultClientWithKubernetesAuth would require
