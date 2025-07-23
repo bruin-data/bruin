@@ -463,7 +463,6 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			EntityAttribute: entityDefinition,
 			Extends:         column.Extends,
 			Upstreams:       upstreamColumns,
-			// New fields
 			Tags:    column.Tags,
 			Domains: column.Domains,
 			Meta:    column.Meta,
