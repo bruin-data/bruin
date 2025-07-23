@@ -196,8 +196,12 @@ func TestClient_GetConnectionDetails_ReturnsDetails_FromCache(t *testing.T) {
 	// First call should fetch and cache the details
 	deets := c.GetConnectionDetails("test-connection")
 	require.NotNil(t, deets)
-	require.Equal(t, deets, config.AthenaConnection{
-		Name:      "test-connection",
-		SecretKey: "test-secret-key",
-	})
+	require.Equal(
+		t,
+		config.AthenaConnection{
+			Name:      "test-connection",
+			SecretKey: "test-secret-key",
+		},
+		deets,
+	)
 }
