@@ -236,7 +236,7 @@
             "executable_file": {
                 "name": "test.sql",
                 "path": "__BASEDIR__\\testdata\\pipeline\\first-pipeline\\tasks\\test.sql",
-                "content": "select *\r\nfrom foo;"
+                "content": "select *\nfrom foo;"
             },
             "definition_file": {
                 "name": "test.sql",
