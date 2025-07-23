@@ -278,19 +278,19 @@ type columnUpstream struct {
 }
 
 type column struct {
-	Extends       string           `yaml:"extends"`
-	Name          string           `yaml:"name"`
-	Type          string           `yaml:"type"`
-	Description   string           `yaml:"description"`
-	Tests         []columnCheck    `yaml:"checks"`
-	PrimaryKey    bool             `yaml:"primary_key"`
-	UpdateOnMerge bool             `yaml:"update_on_merge"`
-	Nullable      *bool            `yaml:"nullable"`
-	Upstreams     []columnUpstream `yaml:"upstreams"`
-	Tags    []string          `yaml:"tags"`
-	Domains []string          `yaml:"domains"`
-	Meta    map[string]string `yaml:"meta"`
-	Owner   string            `yaml:"owner"`
+	Extends       string            `yaml:"extends"`
+	Name          string            `yaml:"name"`
+	Type          string            `yaml:"type"`
+	Description   string            `yaml:"description"`
+	Tests         []columnCheck     `yaml:"checks"`
+	PrimaryKey    bool              `yaml:"primary_key"`
+	UpdateOnMerge bool              `yaml:"update_on_merge"`
+	Nullable      *bool             `yaml:"nullable"`
+	Upstreams     []columnUpstream  `yaml:"upstreams"`
+	Tags          []string          `yaml:"tags"`
+	Domains       []string          `yaml:"domains"`
+	Meta          map[string]string `yaml:"meta"`
+	Owner         string            `yaml:"owner"`
 }
 
 type secretMapping struct {
@@ -337,8 +337,8 @@ type taskDefinition struct {
 	Snowflake         snowflake         `yaml:"snowflake"`
 	Athena            athena            `yaml:"athena"`
 	IntervalModifiers IntervalModifiers `yaml:"interval_modifiers"`
-	Domains []string          `yaml:"domains"`
-	Meta    map[string]string `yaml:"meta"`
+	Domains           []string          `yaml:"domains"`
+	Meta              map[string]string `yaml:"meta"`
 }
 
 func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
@@ -463,10 +463,10 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			EntityAttribute: entityDefinition,
 			Extends:         column.Extends,
 			Upstreams:       upstreamColumns,
-			Tags:    column.Tags,
-			Domains: column.Domains,
-			Meta:    column.Meta,
-			Owner:   column.Owner,
+			Tags:            column.Tags,
+			Domains:         column.Domains,
+			Meta:            column.Meta,
+			Owner:           column.Owner,
 		}
 	}
 
@@ -511,8 +511,8 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Snowflake:         SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},
 		Athena:            AthenaConfig{Location: definition.Athena.QueryResultsPath},
 		IntervalModifiers: definition.IntervalModifiers,
-		Domains: definition.Domains,
-		Meta:    definition.Meta,
+		Domains:           definition.Domains,
+		Meta:              definition.Meta,
 	}
 
 	for index, check := range definition.CustomChecks {
