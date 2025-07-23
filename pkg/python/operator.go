@@ -48,10 +48,10 @@ type LocalOperator struct {
 	module       modulePathFinder
 	runner       localRunner
 	envVariables map[string]string
-	config       config.ConnectionGetter
+	config       config.ConnectionDetailsGetter
 }
 
-func NewLocalOperator(config config.ConnectionGetter, envVariables map[string]string) *LocalOperator {
+func NewLocalOperator(config config.ConnectionAndDetailsGetter, envVariables map[string]string) *LocalOperator {
 	cmdRunner := &CommandRunner{}
 	fs := afero.NewOsFs()
 
@@ -78,7 +78,7 @@ func NewLocalOperator(config config.ConnectionGetter, envVariables map[string]st
 	}
 }
 
-func NewLocalOperatorWithUv(config config.ConnectionGetter, conn config.ConnectionGetter, envVariables map[string]string) *LocalOperator {
+func NewLocalOperatorWithUv(config config.ConnectionAndDetailsGetter, envVariables map[string]string) *LocalOperator {
 	cmdRunner := &CommandRunner{}
 
 	return &LocalOperator{
@@ -89,7 +89,7 @@ func NewLocalOperatorWithUv(config config.ConnectionGetter, conn config.Connecti
 			UvInstaller: &UvChecker{
 				cmd: CommandRunner{},
 			},
-			conn: conn,
+			conn: config,
 		},
 		envVariables: envVariables,
 		config:       config,
@@ -162,7 +162,7 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	envVariables["BRUIN_THIS"] = t.Name
 
 	for _, mapping := range t.Secrets {
-		conn := o.config.GetConnection(mapping.SecretKey)
+		conn := o.config.GetConnectionDetails(mapping.SecretKey)
 		if conn == nil {
 			return errors.New(fmt.Sprintf("there's no secret with the name '%s'.", mapping.SecretKey))
 		}
@@ -173,14 +173,7 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 			continue
 		}
 
-		// TODO this is hacky, we should make config comply with that interface from the beginning
-		detailsGetter, ok := o.config.(config.ConnectionDetailsGetter)
-		if !ok {
-			return errors.New(fmt.Sprintf("could not get details for connection '%s'.", mapping.SecretKey))
-		}
-		details := detailsGetter.GetConnectionDetails(mapping.SecretKey)
-
-		res, err := json.Marshal(details)
+		res, err := json.Marshal(conn)
 		if err != nil {
 			return errors.Wrapf(err, "failed to marshal connection")
 		}
