@@ -156,6 +156,7 @@ export default withMermaid({
                             {text: "Ingestr", link: "/assets/ingestr"},
                             {text: "Python", link: "/assets/python"},
                             {text: "Sensor", link: "/assets/sensor"},
+                            {text: "Dashboard", link: "/assets/dashboard"},
                         ]
                     },
                     {text: "Columns", link: "/assets/columns"},
