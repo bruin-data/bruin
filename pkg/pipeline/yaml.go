@@ -287,6 +287,11 @@ type column struct {
 	UpdateOnMerge bool             `yaml:"update_on_merge"`
 	Nullable      *bool            `yaml:"nullable"`
 	Upstreams     []columnUpstream `yaml:"upstreams"`
+	// New fields
+	Tags    []string          `yaml:"tags"`
+	Domains []string          `yaml:"domains"`
+	Meta    map[string]string `yaml:"meta"`
+	Owner   string            `yaml:"owner"`
 }
 
 type secretMapping struct {
@@ -333,6 +338,9 @@ type taskDefinition struct {
 	Snowflake         snowflake         `yaml:"snowflake"`
 	Athena            athena            `yaml:"athena"`
 	IntervalModifiers IntervalModifiers `yaml:"interval_modifiers"`
+	// New fields
+	Domains []string          `yaml:"domains"`
+	Meta    map[string]string `yaml:"meta"`
 }
 
 func CreateTaskFromYamlDefinition(fs afero.Fs) TaskCreator {
@@ -453,10 +461,15 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 			Checks:          tests,
 			PrimaryKey:      column.PrimaryKey,
 			UpdateOnMerge:   column.UpdateOnMerge,
-			Nullable:        column.Nullable,
+			Nullable:        DefaultTrueBool{Value: column.Nullable},
 			EntityAttribute: entityDefinition,
 			Extends:         column.Extends,
 			Upstreams:       upstreamColumns,
+			// New fields
+			Tags:    column.Tags,
+			Domains: column.Domains,
+			Meta:    column.Meta,
+			Owner:   column.Owner,
 		}
 	}
 
@@ -501,6 +514,9 @@ func ConvertYamlToTask(content []byte) (*Asset, error) {
 		Snowflake:         SnowflakeConfig{Warehouse: definition.Snowflake.Warehouse},
 		Athena:            AthenaConfig{Location: definition.Athena.QueryResultsPath},
 		IntervalModifiers: definition.IntervalModifiers,
+		// New fields
+		Domains: definition.Domains,
+		Meta:    definition.Meta, // <-- set the new Meta field
 	}
 
 	for index, check := range definition.CustomChecks {

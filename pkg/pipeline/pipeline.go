@@ -513,9 +513,13 @@ type Column struct {
 	Name            string            `json:"name" yaml:"name,omitempty" mapstructure:"name"`
 	Type            string            `json:"type" yaml:"type,omitempty" mapstructure:"type"`
 	Description     string            `json:"description" yaml:"description,omitempty" mapstructure:"description"`
+	Tags            EmptyStringArray  `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
 	PrimaryKey      bool              `json:"primary_key" yaml:"primary_key,omitempty" mapstructure:"primary_key"`
 	UpdateOnMerge   bool              `json:"update_on_merge" yaml:"update_on_merge,omitempty" mapstructure:"update_on_merge"`
-	Nullable        *bool             `json:"nullable,omitempty" yaml:"nullable,omitempty" mapstructure:"nullable"`
+	Nullable        DefaultTrueBool   `json:"nullable" yaml:"nullable,omitempty" mapstructure:"nullable"`
+	Owner           string            `json:"owner" yaml:"owner,omitempty" mapstructure:"owner"`
+	Domains         EmptyStringArray  `json:"domains" yaml:"domains,omitempty" mapstructure:"domains"`
+	Meta            EmptyStringMap    `json:"meta" yaml:"meta,omitempty" mapstructure:"meta"`
 	Extends         string            `json:"-" yaml:"extends,omitempty" mapstructure:"extends"`
 	Checks          []ColumnCheck     `json:"checks" yaml:"checks,omitempty" mapstructure:"checks"`
 	Upstreams       []*UpstreamColumn `json:"upstreams" yaml:"-" mapstructure:"-"`
@@ -691,6 +695,8 @@ type Asset struct { //nolint:recvcheck
 	Description       string             `json:"description" yaml:"description,omitempty" mapstructure:"description"`
 	Connection        string             `json:"connection" yaml:"connection,omitempty" mapstructure:"connection"`
 	Tags              EmptyStringArray   `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
+	Domains           EmptyStringArray   `json:"domains" yaml:"domains,omitempty" mapstructure:"domains"`
+	Meta              EmptyStringMap     `json:"meta" yaml:"meta,omitempty" mapstructure:"meta"`
 	Materialization   Materialization    `json:"materialization" yaml:"materialization,omitempty" mapstructure:"materialization"`
 	Upstreams         []Upstream         `json:"upstreams" yaml:"depends,omitempty" mapstructure:"depends"`
 	Image             string             `json:"image" yaml:"image,omitempty" mapstructure:"image"`
@@ -1227,6 +1233,9 @@ func (mp *MetadataPush) HasAnyEnabled() bool {
 type Pipeline struct {
 	LegacyID           string                 `json:"legacy_id" yaml:"id" mapstructure:"id"`
 	Name               string                 `json:"name" yaml:"name" mapstructure:"name"`
+	Tags               EmptyStringArray       `json:"tags" yaml:"tags,omitempty" mapstructure:"tags"`
+	Domains            EmptyStringArray       `json:"domains" yaml:"domains,omitempty" mapstructure:"domains"`
+	Meta               EmptyStringMap         `json:"meta" yaml:"meta,omitempty" mapstructure:"meta"`
 	Schedule           Schedule               `json:"schedule" yaml:"schedule" mapstructure:"schedule"`
 	StartDate          string                 `json:"start_date" yaml:"start_date" mapstructure:"start_date"`
 	DefinitionFile     DefinitionFile         `json:"definition_file"`
