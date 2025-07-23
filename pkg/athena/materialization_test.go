@@ -482,7 +482,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS\nWITH\ntime_now AS (\n  SELECT CURRENT_TIMESTAMP AS now\n),\nsource AS (\n  SELECT id, category, name from source_table\n),\ntarget AS (\n  SELECT id, category, name, _valid_from, _valid_until, _is_current \t\n  FROM my.asset \n  WHERE _is_current = TRUE\n),\njoined AS (\n  SELECT t.id AS t_id,\n    t.category AS t_category,\n    t.name AS t_name,\n    t._valid_from,\n    t._valid_until,\n    t._is_current,\n    s.id AS s_id,\n    s.category AS s_category,\n    s.name AS s_name\n  FROM target t\n  LEFT JOIN source s ON t.id = s.id AND t.category = s.category\n),\n-- Rows that are unchanged\nunchanged AS (\n  SELECT t_id AS id, t_category AS category, t_name AS name,\n  _valid_from,\n  _valid_until,\n  _is_current\n  FROM joined\n  WHERE s_id IS NOT NULL AND s_category IS NOT NULL AND t_name = s_name\n),\n-- Rows that need to be expired (changed or missing in source)\nto_expire AS (\n  SELECT t_id AS id, t_category AS category, t_name AS name,\n  _valid_from,\n  (SELECT now FROM time_now) AS _valid_until,\n  FALSE AS _is_current\n  FROM joined\n  WHERE s_id IS NULL AND s_category IS NULL OR t_name != s_name\n),\n-- New/changed inserts from source\nto_insert AS (\n  SELECT s.id AS id, s.category AS category, s.name AS name,\n  (SELECT now FROM time_now) AS _valid_from,\n  TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n  TRUE AS _is_current\n  FROM source s\n  LEFT JOIN target t ON t.id = s.id AND t.category = s.category\n  WHERE t.id IS NULL AND t.category IS NULL OR t.name != s.name\n),\n-- Already expired historical rows (untouched)\nhistorical AS (\n  SELECT id, category, name, _valid_from, _valid_until, _is_current\n  FROM my.asset\n  WHERE _is_current = FALSE\n)\nSELECT id, category, name, _valid_from, _valid_until, _is_current FROM unchanged\nUNION ALL\nSELECT id, category, name, _valid_from, _valid_until, _is_current FROM to_expire\nUNION ALL\nSELECT id, category, name, _valid_from, _valid_until, _is_current FROM to_insert\nUNION ALL\nSELECT id, category, name, _valid_from, _valid_until, _is_current FROM historical",
 				"\nDROP TABLE IF EXISTS my.asset",
 				"\nALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
-			  },
+			},
 		},
 		{
 			name: "scd2_full_refresh_by_column_with_no_primary_key",
@@ -528,8 +528,8 @@ SELECT
 FROM (
 SELECT id, name, price from source_table
 ) AS src`,
-"\nDROP TABLE IF EXISTS my.asset",
-"\nALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
+				"\nDROP TABLE IF EXISTS my.asset",
+				"\nALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
 			},
 		},
 		{
@@ -550,9 +550,9 @@ SELECT id, name, price from source_table
 			fullRefresh: true,
 			query:       "SELECT id, category, name, price from source_table",
 			want: []string{
-					"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS\nSELECT\n  src.id, src.category, src.name, src.price,\n  CURRENT_TIMESTAMP AS _valid_from,\n  TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n  TRUE AS _is_current\nFROM (\nSELECT id, category, name, price from source_table\n) AS src",
-					"\nDROP TABLE IF EXISTS my.asset",
-					"\nALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS\nSELECT\n  src.id, src.category, src.name, src.price,\n  CURRENT_TIMESTAMP AS _valid_from,\n  TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n  TRUE AS _is_current\nFROM (\nSELECT id, category, name, price from source_table\n) AS src",
+				"\nDROP TABLE IF EXISTS my.asset",
+				"\nALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
 			},
 		},
 		{
@@ -576,7 +576,7 @@ SELECT id, name, price from source_table
 				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['category, id']) AS\nSELECT\n  src.id, src.name, src.price,\n  CURRENT_TIMESTAMP AS _valid_from,\n  TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n  TRUE AS _is_current\nFROM (\nSELECT id, name, price from source_table\n) AS src",
 				"\nDROP TABLE IF EXISTS my.asset",
 				"\nALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
-			  },
+			},
 		},
 	}
 
@@ -728,7 +728,53 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 			},
 			query: "SELECT id, event_name, ts from source_table",
 			want: []string{
-				"MERGE INTO my.asset AS target\nUSING (SELECT id, event_name, ts from source_table) AS source\nON target.id = source.id AND target._is_current = TRUE\n\nWHEN MATCHED AND (target._valid_from < CAST(source.ts AS TIMESTAMP)) THEN\n  UPDATE SET\n    _valid_until = CAST(source.ts AS TIMESTAMP),\n    _is_current = FALSE\n\nWHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN\n  UPDATE SET \n    _valid_until = CURRENT_TIMESTAMP,\n    _is_current = FALSE\n\nWHEN NOT MATCHED THEN\n  INSERT (id, event_name, ts, _valid_from, _valid_until, _is_current)\n  VALUES (source.id, source.event_name, source.ts, CAST(source.ts AS TIMESTAMP), TIMESTAMP '9999-12-31', TRUE)",
+				`CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS
+WITH
+source AS (
+  SELECT id, event_name, ts from source_table
+),
+current_data AS (
+  SELECT id, event_name, ts, _valid_from, _valid_until, _is_current FROM my.asset WHERE _is_current = TRUE
+),
+historical_data AS (
+  SELECT id, event_name, ts, _valid_from, _valid_until, _is_current FROM my.asset WHERE _is_current = FALSE
+),
+t_new AS (
+  SELECT 
+    t.id,
+    t.event_name,
+    t.ts,
+    t._valid_from,
+    CASE WHEN s.id IS NULL OR (s.ts IS NOT NULL AND CAST(s.ts AS TIMESTAMP) > t._valid_from)
+	THEN CAST(s.ts AS TIMESTAMP) 
+	ELSE t._valid_until 
+	END AS _valid_until,
+    CASE WHEN s.id IS NULL OR (s.ts IS NOT NULL AND CAST(s.ts AS TIMESTAMP) > t._valid_from)
+	THEN FALSE 
+	ELSE t._is_current 
+	END AS _is_current
+  FROM current_data t
+  LEFT JOIN source s ON t.id = s.id
+),
+insert_rows AS (
+  SELECT 
+    s.id,
+    s.event_name,
+    s.ts,
+    CAST(s.ts AS TIMESTAMP) AS _valid_from,
+    TIMESTAMP '9999-12-31' AS _valid_until,
+    TRUE AS _is_current
+  FROM source s
+  LEFT JOIN current_data t ON t.id = s.id
+  WHERE t.id IS NULL OR (t.id = s.id AND CAST(s.ts AS TIMESTAMP) > t._valid_from)
+)
+SELECT id, event_name, ts, _valid_from, _valid_until, _is_current FROM t_new
+UNION ALL
+SELECT id, event_name, ts, _valid_from, _valid_until, _is_current FROM insert_rows
+UNION ALL
+SELECT id, event_name, ts, _valid_from, _valid_until, _is_current FROM historical_data`,
+				"\nDROP TABLE IF EXISTS my.asset",
+				"\nALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
 			},
 		},
 		{
@@ -750,7 +796,57 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 			},
 			query: "SELECT id, event_type, col1, col2, ts from source_table",
 			want: []string{
-				"MERGE INTO my.asset AS target\nUSING (SELECT id, event_type, col1, col2, ts from source_table) AS source\nON target.id = source.id AND target.event_type = source.event_type AND target._is_current = TRUE\n\nWHEN MATCHED AND (target._valid_from < CAST(source.ts AS TIMESTAMP)) THEN\n  UPDATE SET\n    _valid_until = CAST(source.ts AS TIMESTAMP),\n    _is_current = FALSE\n\nWHEN NOT MATCHED BY SOURCE AND target._is_current = TRUE THEN\n  UPDATE SET \n    _valid_until = CURRENT_TIMESTAMP,\n    _is_current = FALSE\n\nWHEN NOT MATCHED THEN\n  INSERT (id, event_type, col1, col2, ts, _valid_from, _valid_until, _is_current)\n  VALUES (source.id, source.event_type, source.col1, source.col2, source.ts, CAST(source.ts AS TIMESTAMP), TIMESTAMP '9999-12-31', TRUE)",
+				`CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS
+WITH
+source AS (
+  SELECT id, event_type, col1, col2, ts from source_table
+),
+current_data AS (
+  SELECT id, event_type, col1, col2, ts, _valid_from, _valid_until, _is_current FROM my.asset WHERE _is_current = TRUE
+),
+historical_data AS (
+  SELECT id, event_type, col1, col2, ts, _valid_from, _valid_until, _is_current FROM my.asset WHERE _is_current = FALSE
+),
+t_new AS (
+  SELECT 
+    t.id,
+    t.event_type,
+    t.col1,
+    t.col2,
+    t.ts,
+    t._valid_from,
+    CASE WHEN s.id IS NULL AND s.event_type IS NULL OR (s.ts IS NOT NULL AND CAST(s.ts AS TIMESTAMP) > t._valid_from)
+	THEN CAST(s.ts AS TIMESTAMP) 
+	ELSE t._valid_until 
+	END AS _valid_until,
+    CASE WHEN s.id IS NULL AND s.event_type IS NULL OR (s.ts IS NOT NULL AND CAST(s.ts AS TIMESTAMP) > t._valid_from)
+	THEN FALSE 
+	ELSE t._is_current 
+	END AS _is_current
+  FROM current_data t
+  LEFT JOIN source s ON t.id = s.id AND t.event_type = s.event_type
+),
+insert_rows AS (
+  SELECT 
+    s.id,
+    s.event_type,
+    s.col1,
+    s.col2,
+    s.ts,
+    CAST(s.ts AS TIMESTAMP) AS _valid_from,
+    TIMESTAMP '9999-12-31' AS _valid_until,
+    TRUE AS _is_current
+  FROM source s
+  LEFT JOIN current_data t ON t.id = s.id AND t.event_type = s.event_type
+  WHERE t.id IS NULL AND t.event_type IS NULL OR (t.id = s.id AND t.event_type = s.event_type AND CAST(s.ts AS TIMESTAMP) > t._valid_from)
+)
+SELECT id, event_type, col1, col2, ts, _valid_from, _valid_until, _is_current FROM t_new
+UNION ALL
+SELECT id, event_type, col1, col2, ts, _valid_from, _valid_until, _is_current FROM insert_rows
+UNION ALL
+SELECT id, event_type, col1, col2, ts, _valid_from, _valid_until, _is_current FROM historical_data`,
+				"\nDROP TABLE IF EXISTS my.asset",
+				"\nALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
 			},
 		},
 		{
@@ -807,7 +903,17 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT id, event_type, event_name, ts from source_table",
 			want: []string{
-				"CREATE TABLE IF NOT EXISTS my.asset WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset') AS\nSELECT\n  CAST(ts AS TIMESTAMP) AS _valid_from,\n  src.*,\n  TIMESTAMP '9999-12-31' AS _valid_until,\n  TRUE AS _is_current\nfrom (\nSELECT id, event_type, event_name, ts from source_table\n) AS src",
+				`CREATE TABLE IF NOT EXISTS __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS
+SELECT
+  src.id, src.event_type, src.event_name, src.ts,		
+  CAST(ts AS TIMESTAMP) AS _valid_from,
+  TIMESTAMP '9999-12-31' AS _valid_until,
+  TRUE AS _is_current
+FROM (
+SELECT id, event_type, event_name, ts from source_table
+) AS src`,
+				"DROP TABLE IF EXISTS my.asset",
+				"ALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset",
 			},
 		},
 		{
@@ -828,7 +934,17 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT id, event_name, ts from source_table",
 			want: []string{
-				"CREATE TABLE IF NOT EXISTS my.asset WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset') AS\nSELECT\n  CAST(ts AS TIMESTAMP) AS _valid_from,\n  src.*,\n  TIMESTAMP '9999-12-31' AS _valid_until,\n  TRUE AS _is_current\nfrom (\nSELECT id, event_name, ts from source_table\n) AS src",
+				`CREATE TABLE IF NOT EXISTS __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS
+SELECT
+  src.id, src.event_name, src.ts,		
+  CAST(ts AS TIMESTAMP) AS _valid_from,
+  TIMESTAMP '9999-12-31' AS _valid_until,
+  TRUE AS _is_current
+FROM (
+SELECT id, event_name, ts from source_table
+) AS src`,
+				"DROP TABLE IF EXISTS my.asset",
+				"ALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset",
 			},
 		},
 		{
@@ -850,7 +966,17 @@ func TestBuildSCD2QueryByTime(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT id, event_name, ts from source_table",
 			want: []string{
-				"CREATE TABLE IF NOT EXISTS my.asset WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/my.asset', partitioning = ARRAY['event_type, id']) AS\nSELECT\n  CAST(ts AS TIMESTAMP) AS _valid_from,\n  src.*,\n  TIMESTAMP '9999-12-31' AS _valid_until,\n  TRUE AS _is_current\nfrom (\nSELECT id, event_name, ts from source_table\n) AS src",
+				`CREATE TABLE IF NOT EXISTS __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['event_type, id']) AS
+SELECT
+  src.id, src.event_name, src.ts,		
+  CAST(ts AS TIMESTAMP) AS _valid_from,
+  TIMESTAMP '9999-12-31' AS _valid_until,
+  TRUE AS _is_current
+FROM (
+SELECT id, event_name, ts from source_table
+) AS src`,
+				"DROP TABLE IF EXISTS my.asset",
+				"ALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset",
 			},
 		},
 	}

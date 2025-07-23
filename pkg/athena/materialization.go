@@ -608,11 +608,16 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query, location string) (
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
+	srcCols := make([]string, len(asset.Columns))
+	for i, col := range asset.Columns {
+		srcCols[i] = fmt.Sprintf("src.%s", col.Name)
+	}
+
 	createQuery := fmt.Sprintf(
 		`CREATE TABLE IF NOT EXISTS %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
 SELECT
+  %s,		
   CAST(%s AS TIMESTAMP) AS _valid_from,
-  src.*,
   TIMESTAMP '9999-12-31' AS _valid_until,
   TRUE AS _is_current
 FROM (
@@ -622,6 +627,7 @@ FROM (
 		location,
 		tempTableName,
 		partitionBy,
+		strings.Join(srcCols, ", "),
 		asset.Materialization.IncrementalKey,
 		strings.TrimSpace(query),
 	)
