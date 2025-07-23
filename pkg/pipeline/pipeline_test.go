@@ -422,7 +422,7 @@ func TestPipeline_JsonMarshal(t *testing.T) {
 
 			// uncomment the line below and run the test once to refresh the data
 			// don't forget to comment it out again
-			//err = afero.WriteFile(afero.NewOsFs(), path, bytes.ReplaceAll(got, []byte(dir), []byte("__BASEDIR__")), 0o644)
+			// err = afero.WriteFile(afero.NewOsFs(), path, bytes.ReplaceAll(got, []byte(dir), []byte("__BASEDIR__")), 0o644)
 
 			expected := strings.NewReplacer("__BASEDIR__", dir).Replace(mustRead(t, path))
 
