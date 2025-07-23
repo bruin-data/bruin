@@ -176,8 +176,28 @@ func TestClient_GetConnectionDetails_ReturnsDetails(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "test-connection", gc.Name)
 	require.Equal(t, "somevalue", gc.Value)
+}
 
-	// Second call should hit the cache and return the same pointer
-	deets2 := c.GetConnectionDetails("test-connection")
-	require.True(t, deets == deets2)
+func TestClient_GetConnectionDetails_ReturnsDetails_FromCache(t *testing.T) {
+	t.Parallel()
+	c := &Client{
+		client: &mockVaultClient{
+			err: nil,
+		},
+		mountPath: "mount",
+		path:      "path",
+		logger:    &mockLogger{},
+		cacheConnectionsDetails: map[string]any{"test-connection": config.AthenaConnection{
+			Name:      "test-connection",
+			SecretKey: "test-secret-key",
+		}},
+	}
+
+	// First call should fetch and cache the details
+	deets := c.GetConnectionDetails("test-connection")
+	require.NotNil(t, deets)
+	require.Equal(t, deets, config.AthenaConnection{
+		Name:      "test-connection",
+		SecretKey: "test-secret-key",
+	})
 }
