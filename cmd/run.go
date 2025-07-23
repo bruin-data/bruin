@@ -750,7 +750,7 @@ func Run(isDebug *bool) *cli.Command {
 				executionStartLog = "Starting the pipeline execution..."
 			}
 
-			var connectionManager config.ConnectionGetter
+			var connectionManager config.ConnectionAndDetailsGetter
 			var errs []error
 
 			secretsBackend := c.String("secrets-backend")
@@ -1067,7 +1067,7 @@ func printErrorsInResults(errorsInTaskResults []*scheduler.TaskExecutionResult, 
 
 func SetupExecutors(
 	s *scheduler.Scheduler,
-	conn config.ConnectionGetter,
+	conn config.ConnectionAndDetailsGetter,
 	startDate,
 	endDate time.Time,
 	pipelineName string,
@@ -1094,7 +1094,7 @@ func SetupExecutors(
 		if usePipForPython {
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperator(conn, jinjaVariables)
 		} else {
-			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperatorWithUv(conn, conn, jinjaVariables)
+			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeMain] = python.NewLocalOperatorWithUv(conn, jinjaVariables)
 		}
 	}
 

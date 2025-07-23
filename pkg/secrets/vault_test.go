@@ -90,10 +90,10 @@ func TestClient_GetConnection_ReturnsConnection(t *testing.T) {
 			},
 			err: nil,
 		},
-		mountPath: "mount",
-		path:      "path",
-		logger:    &mockLogger{},
-		cache:     make(map[string]any),
+		mountPath:        "mount",
+		path:             "path",
+		logger:           &mockLogger{},
+		cacheConnections: make(map[string]any),
 	}
 
 	conn := c.GetConnection("test-connection")
@@ -116,10 +116,10 @@ func TestClient_GetConnection_ReturnsGenericConnection(t *testing.T) {
 			},
 			err: nil,
 		},
-		mountPath: "mount",
-		path:      "path",
-		logger:    &mockLogger{},
-		cache:     make(map[string]any),
+		mountPath:        "mount",
+		path:             "path",
+		logger:           &mockLogger{},
+		cacheConnections: make(map[string]any),
 	}
 
 	conn := c.GetConnection("test-connection")
@@ -136,13 +136,48 @@ func TestClient_GetConnection_ReturnsConnection_FromCache(t *testing.T) {
 			response: nil,
 			err:      errors.New("test error"), // This error should not be returned
 		},
-		mountPath: "mount",
-		path:      "path",
-		logger:    &mockLogger{},
-		cache:     map[string]any{"test-connection": []string{"some", "data", "not", "nil"}},
+		mountPath:        "mount",
+		path:             "path",
+		logger:           &mockLogger{},
+		cacheConnections: map[string]any{"test-connection": []string{"some", "data", "not", "nil"}},
 	}
 
 	conn := c.GetConnection("test-connection")
 	require.NotNil(t, conn)
 	require.Equal(t, []string{"some", "data", "not", "nil"}, conn)
+}
+
+func TestClient_GetConnectionDetails_ReturnsDetails(t *testing.T) {
+	t.Parallel()
+	c := &Client{
+		client: &mockVaultClient{
+			response: &vault.Response[schema.KvV2ReadResponse]{
+				Data: schema.KvV2ReadResponse{
+					Data: map[string]any{
+						"details": map[string]any{
+							"value": "somevalue",
+						},
+						"type": "generic",
+					},
+				},
+			},
+			err: nil,
+		},
+		mountPath:               "mount",
+		path:                    "path",
+		logger:                  &mockLogger{},
+		cacheConnectionsDetails: make(map[string]any),
+	}
+
+	// First call should fetch and cache the details
+	deets := c.GetConnectionDetails("test-connection")
+	require.NotNil(t, deets)
+	gc, ok := deets.(*config.GenericConnection)
+	require.True(t, ok)
+	require.Equal(t, "test-connection", gc.Name)
+	require.Equal(t, "somevalue", gc.Value)
+
+	// Second call should hit the cache and return the same pointer
+	deets2 := c.GetConnectionDetails("test-connection")
+	require.True(t, deets == deets2)
 }
