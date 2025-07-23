@@ -386,6 +386,7 @@ func (c *Client) GetDatasource(ctx context.Context) ([]DataSourceInfo, error) {
 	}
 	return datasources, nil
 }
+
 func FindDatasourceIDByName(ctx context.Context, name string, datasources []DataSourceInfo) (string, error) {
 	if datasources == nil {
 		return "", errors.New("no datasources provided")
