@@ -257,13 +257,13 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 	// Build primary key checks
 	targetPrimaryKeys := make([]string, len(primaryKeys))
 	for i, pk := range primaryKeys {
-		targetPrimaryKeys[i] = fmt.Sprintf("t.%s", pk)
+		targetPrimaryKeys[i] = "t." + pk
 	}
 	targetPKIsNullCheck := strings.Join(targetPrimaryKeys, " IS NULL AND ")
-	
+
 	sourcePrimaryKeys := make([]string, len(primaryKeys))
 	for i, pk := range primaryKeys {
-		sourcePrimaryKeys[i] = fmt.Sprintf("s_%s", pk)
+		sourcePrimaryKeys[i] = "s_" + pk
 	}
 	sourcePKIsNullCheck := strings.Join(sourcePrimaryKeys, " IS NULL AND ")
 	sourcePKNotNullCheck := strings.Join(sourcePrimaryKeys, " IS NOT NULL AND ")
@@ -326,6 +326,7 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 	}
 	unchangedCondition := strings.Join(unchangedConds, " AND ")
 
+	//nolint:dupword
 	createQuery := fmt.Sprintf(`
 CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
 WITH
@@ -494,10 +495,6 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]stri
 	// Historical data columns
 	allCols := append([]string{}, userCols...)
 	allCols = append(allCols, "_valid_from", "_valid_until", "_is_current")
-	histCols := make([]string, 0, len(allCols))
-	for _, col := range allCols {
-		histCols = append(histCols, "h."+col)
-	}
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
@@ -610,7 +607,7 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query, location string) (
 
 	srcCols := make([]string, len(asset.Columns))
 	for i, col := range asset.Columns {
-		srcCols[i] = fmt.Sprintf("src.%s", col.Name)
+		srcCols[i] = "src." + col.Name
 	}
 
 	createQuery := fmt.Sprintf(
@@ -654,7 +651,7 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query, location string)
 
 	srcCols := make([]string, len(asset.Columns))
 	for i, col := range asset.Columns {
-		srcCols[i] = fmt.Sprintf("src.%s", col.Name)
+		srcCols[i] = "src." + col.Name
 	}
 
 	createQuery := fmt.Sprintf(

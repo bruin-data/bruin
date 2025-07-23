@@ -196,7 +196,7 @@ func TestAthenaWorkflows(t *testing.T) {
 						Args:    append(append([]string{"query"}, configFlags...), "--connection", "athena-default", "--query", "DROP TABLE IF EXISTS menu;"),
 						Env:     []string{},
 						Expected: e2e.Output{
-							ExitCode: 0, 
+							ExitCode: 0,
 						},
 						Asserts: []func(*e2e.Task) error{
 							e2e.AssertByExitCode,
@@ -354,10 +354,10 @@ func TestAthenaWorkflows(t *testing.T) {
 						Args:    append(append([]string{"query"}, configFlags...), "--connection", "athena-default", "--query", "DROP TABLE IF EXISTS products;"),
 						Env:     []string{},
 						Expected: e2e.Output{
-							ExitCode: 0, 
+							ExitCode: 0,
 						},
 						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode, 
+							e2e.AssertByExitCode,
 						},
 					},
 					{
