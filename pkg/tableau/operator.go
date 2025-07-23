@@ -47,7 +47,6 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 		return nil
 	case t.Type == pipeline.AssetTypeTableau:
 		return o.handleWorkbookRefresh(ctx, client, t)
-
 	default:
 		return errors.Errorf("unsupported Tableau asset type: %s", t.Type)
 	}
