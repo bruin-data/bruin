@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -194,10 +195,19 @@ func Render() *cli.Command {
 				}
 			}
 
+			runCtx := context.WithValue(c.Context, pipeline.RunConfigFullRefresh, c.Bool("full-refresh"))
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigRunID, "your-run-id")
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigStartDate, startDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigEndDate, endDate)
+			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
+
+			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pl.Name, "your-run-id", pl.Variables.Value())
+			forAsset := renderer.CloneForAsset(runCtx, pl, asset)
+
 			r := RenderCommand{
 				extractor: &query.WholeFileExtractor{
 					Fs:       fs,
-					Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, pl.Name, "your-run-id", pl.Variables.Value()),
+					Renderer: forAsset,
 				},
 				materializers: map[pipeline.AssetType]queryMaterializer{
 					pipeline.AssetTypeBigqueryQuery:   bigquery.NewMaterializer(fullRefresh),
@@ -254,10 +264,7 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 		return errors.New("failed to find the asset: asset cannot be nil")
 	}
 	extractor := r.extractor
-	applyModifiers := modifierInfo.ApplyModifiers
-	if applyModifiers {
-		extractor = modifyExtractor(modifierInfo, pl, task)
-	}
+
 	queries, err := extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
 	if err != nil {
 		r.printErrorOrJSON(err.Error())
@@ -367,7 +374,7 @@ func modifyExtractor(ctx ModifierInfo, p *pipeline.Pipeline, t *pipeline.Asset) 
 	newRenderer := jinja.NewRendererWithStartEndDates(&newStartDate, &newEnddate, p.Name, "your-run-id", p.Variables.Value())
 
 	return &query.WholeFileExtractor{
-		Renderer: newRenderer,
+		Renderer: newRenderer.CloneForAsset(context.Background(), p, t),
 		Fs:       fs,
 	}
 }
