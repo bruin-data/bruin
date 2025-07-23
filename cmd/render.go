@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -226,10 +227,6 @@ func Render() *cli.Command {
 	}
 }
 
-type queryExtractor interface {
-	ExtractQueriesFromString(content string) ([]*query.Query, error)
-}
-
 type queryMaterializer interface {
 	Render(asset *pipeline.Asset, query string) (string, error)
 }
@@ -239,7 +236,7 @@ type taskCreator interface {
 }
 
 type RenderCommand struct {
-	extractor     queryExtractor
+	extractor     query.QueryExtractor
 	materializers map[pipeline.AssetType]queryMaterializer
 	builder       taskCreator
 
@@ -256,7 +253,11 @@ func (r *RenderCommand) Run(pl *pipeline.Pipeline, task *pipeline.Asset, modifie
 	extractor := r.extractor
 	applyModifiers := modifierInfo.ApplyModifiers
 	if applyModifiers {
-		extractor = modifyExtractor(modifierInfo, pl, task)
+		ctx := context.WithValue(context.Background(), pipeline.RunConfigStartDate, modifierInfo.StartDate)
+		ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, modifierInfo.EndDate)
+		ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "your-run-id")
+		ctx = context.WithValue(ctx, pipeline.RunConfigApplyIntervalModifiers, true)
+		extractor = extractor.CloneForAsset(ctx, pl, task)
 	}
 	queries, err := extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
 	if err != nil {
@@ -359,15 +360,4 @@ func getPipelineDefinitionFullPath(pipelinePath string) (string, error) {
 		}
 	}
 	return "", errors.Errorf("no pipeline definition file found in '%s'. Supported files: %v", pipelinePath, PipelineDefinitionFiles)
-}
-
-func modifyExtractor(ctx ModifierInfo, p *pipeline.Pipeline, t *pipeline.Asset) queryExtractor {
-	newStartDate := pipeline.ModifyDate(ctx.StartDate, t.IntervalModifiers.Start)
-	newEnddate := pipeline.ModifyDate(ctx.EndDate, t.IntervalModifiers.End)
-	newRenderer := jinja.NewRendererWithStartEndDates(&newStartDate, &newEnddate, p.Name, "your-run-id", p.Variables.Value())
-
-	return &query.WholeFileExtractor{
-		Renderer: newRenderer,
-		Fs:       fs,
-	}
 }

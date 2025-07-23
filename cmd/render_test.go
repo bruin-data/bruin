@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"context"
 	"testing"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/jinja"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
 	"github.com/stretchr/testify/assert"
@@ -37,6 +39,14 @@ func (m *mockExtractor) ExtractQueriesFromString(content string) ([]*query.Query
 	return res.Get(0).([]*query.Query), res.Error(1)
 }
 
+func (m *mockExtractor) CloneForAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) query.QueryExtractor {
+	return m
+}
+
+func (m *mockExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
+	return nil, nil
+}
+
 type mockMaterializer struct {
 	mock.Mock
 }
@@ -53,6 +63,17 @@ type mockWriter struct {
 func (m *mockWriter) Write(p []byte) (int, error) {
 	res := m.Called(p)
 	return res.Int(0), res.Error(1)
+}
+
+func modifyExtractor(ctx ModifierInfo, p *pipeline.Pipeline, t *pipeline.Asset) query.QueryExtractor {
+	newStartDate := pipeline.ModifyDate(ctx.StartDate, t.IntervalModifiers.Start)
+	newEnddate := pipeline.ModifyDate(ctx.EndDate, t.IntervalModifiers.End)
+	newRenderer := jinja.NewRendererWithStartEndDates(&newStartDate, &newEnddate, p.Name, "your-run-id", p.Variables.Value())
+
+	return &query.WholeFileExtractor{
+		Renderer: newRenderer,
+		Fs:       nil, // or fs if you have a test fs
+	}
 }
 
 func TestRenderCommand_Run(t *testing.T) {
