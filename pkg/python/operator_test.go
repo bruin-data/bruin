@@ -52,6 +52,11 @@ func (m *mockSecretFinder) GetConnection(name string) any {
 	return args.String(0)
 }
 
+func (m *mockSecretFinder) GetConnectionDetails(name string) any {
+	args := m.Called(name)
+	return args.String(0)
+}
+
 func TestLocalOperator_RunTask(t *testing.T) {
 	t.Parallel()
 
