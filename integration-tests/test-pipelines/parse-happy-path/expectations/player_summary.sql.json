@@ -7,6 +7,8 @@
     "description": "",
     "connection": "",
     "tags": [],
+    "domains": [],
+    "meta": {},
     "materialization": {
       "type": "table",
       "strategy": "",
@@ -51,8 +53,13 @@
         "name": "total_games",
         "type": "integer",
         "description": "the games",
+        "tags": [],
         "primary_key": false,
         "update_on_merge": false,
+        "nullable": null,
+        "owner": "",
+        "domains": [],
+        "meta": {},
         "checks": [
           {
             "id": "df9255080865c27b164a7de36a0a26bcc00345dddd66849d96aa96a2c68266ea",

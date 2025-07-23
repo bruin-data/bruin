@@ -426,23 +426,12 @@
       },
       "schema_prefix": ""
     },
-    "env-time-materialization": {
-      "connections": {
-        "duckdb": [
-          {
-            "name": "duckdb-time-materialization",
-            "path": "duckdb-files/time-materialization.db"
-          }
-        ]
-      },
-      "schema_prefix": ""
-    },
     "env-scd2-col-duckdb": {
       "connections": {
         "duckdb": [
           {
             "name": "scd2-by-col-duckdb",
-            "path": "integration-tests/duckdb-files/scd2-by-col-duckdb.db"
+            "path": "duckdb-files/scd2-by-col-duckdb.db"
           }
         ]
       },
@@ -453,7 +442,18 @@
         "duckdb": [
           {
             "name": "scd2-by-time-duckdb",
-            "path": "integration-tests/duckdb-files/scd2-by-time-duckdb.db"
+            "path": "duckdb-files/scd2-by-time-duckdb.db"
+          }
+        ]
+      },
+      "schema_prefix": ""
+    },
+    "env-time-materialization": {
+      "connections": {
+        "duckdb": [
+          {
+            "name": "duckdb-time-materialization",
+            "path": "duckdb-files/time-materialization.db"
           }
         ]
       },
@@ -472,6 +472,3 @@
     }
   }
 }
-      
-
-
