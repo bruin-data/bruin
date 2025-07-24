@@ -175,6 +175,11 @@ func (db *DB) SelectOnlyLastResult(ctx context.Context, query *query.Query) ([][
 			currentResult = append(currentResult, columns)
 		}
 
+		// Check for row errors after reading all rows in this result set
+		if rows.Err() != nil {
+			return nil, rows.Err()
+		}
+
 		// Overwrite result — so only the last result set remains
 		result = currentResult
 
