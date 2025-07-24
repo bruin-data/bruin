@@ -146,16 +146,8 @@ func LoadGlossaryFromFile(path string) (*Glossary, error) {
 		idx++
 	}
 
-	domains := make(map[string]*Domain)
-	for name, domain := range glossary.Domains {
-		if domain.Name == "" {
-			domain.Name = name
-		}
-		domains[name] = domain
-	}
-
 	return &Glossary{
 		Entities: result,
-		Domains:  domains,
+		Domains:  glossary.Domains,
 	}, nil
 }
