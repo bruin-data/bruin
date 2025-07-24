@@ -200,6 +200,7 @@ export default withMermaid({
                             {text: "Google Analytics", link: "/ingestion/google_analytics.md"},
                             {text: "Gorgias", link: "/ingestion/gorgias"},
                             {text: "Hubspot", link: "/ingestion/hubspot.md"},
+                            {text: "InfluxDB", link: "/ingestion/influxdb.md"},
                             {text: "Internet Society Pulse", link: "/ingestion/isoc_pulse.md"},
                             {text: "Kafka", link: "/ingestion/kafka.md"},
                             {text: "Kinesis", link: "/ingestion/kinesis.md"},
