@@ -12,13 +12,13 @@ import (
 )
 
 type Contact struct {
-	Type    string `json:"type" yaml:"type"`
-	Address string `json:"address" yaml:"address"`
+	Type    string `json:"type" yaml:"type,omitempty"`
+	Address string `json:"address" yaml:"address,omitempty"`
 }
 
 type Domain struct {
-	Name        string     `json:"name" yaml:"name"`
-	Description string     `json:"description" yaml:"description"`
+	Name        string     `json:"name" yaml:"name,omitempty"`
+	Description string     `json:"description" yaml:"description,omitempty"`
 	Owners      []string   `json:"owners" yaml:"owners,omitempty"`
 	Tags        []string   `json:"tags" yaml:"tags,omitempty"`
 	Contact     []*Contact `json:"contact" yaml:"contact,omitempty"`
