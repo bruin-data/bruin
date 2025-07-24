@@ -273,6 +273,22 @@
         "secure"
       ]
     },
+    "ClickupConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "api_token": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "api_token"
+      ]
+    },
     "Connections": {
       "properties": {
         "aws": {
@@ -539,15 +555,15 @@
           },
           "type": "array"
         },
-        "clickup": {
-          "items": {
-            "$ref": "#/$defs/ClickupConnection"
-          },
-          "type": "array"
-        },
         "mixpanel": {
           "items": {
             "$ref": "#/$defs/MixpanelConnection"
+          },
+          "type": "array"
+        },
+        "clickup": {
+          "items": {
+            "$ref": "#/$defs/ClickupConnection"
           },
           "type": "array"
         },
@@ -894,6 +910,20 @@
       ]
     },
     "GCSConnection": {
+      "oneOf": [
+        {
+          "required": [
+            "service_account_file"
+          ],
+          "title": "service_account_file"
+        },
+        {
+          "required": [
+            "service_account_json"
+          ],
+          "title": "service_account_json"
+        }
+      ],
       "properties": {
         "name": {
           "type": "string"
@@ -916,10 +946,8 @@
       },
       "additionalProperties": false,
       "type": "object",
-      "required": ["name"],
-      "oneOf": [
-        { "required": ["service_account_file"], "title": "service_account_file" },
-        { "required": ["service_account_json"], "title": "service_account_json" }
+      "required": [
+        "name"
       ]
     },
     "GenericConnection": {
@@ -1491,22 +1519,6 @@
       ]
     },
     "PipedriveConnection": {
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "api_token": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "name",
-        "api_token"
-      ]
-    },
-    "ClickupConnection": {
       "properties": {
         "name": {
           "type": "string"

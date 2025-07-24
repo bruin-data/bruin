@@ -7,6 +7,8 @@
     "description": "This asset loads a CSV file into a DuckDB database.",
     "connection": "",
     "tags": [],
+    "domains": [],
+    "meta": {},
     "materialization": null,
     "upstreams": [],
     "image": "",
@@ -33,8 +35,13 @@
         "name": "name",
         "type": "varchar",
         "description": "Contact person's full name",
+        "tags": [],
         "primary_key": false,
         "update_on_merge": false,
+        "nullable": null,
+        "owner": "",
+        "domains": [],
+        "meta": {},
         "checks": [
           {
             "id": "6d0edf3e6836006758d1213e7927cf9530d9dcdf9dcccc6638bee257dd73e857",
@@ -51,8 +58,13 @@
         "name": "networking_through",
         "type": "varchar",
         "description": "Source or connection through which contact was made",
+        "tags": [],
         "primary_key": false,
         "update_on_merge": false,
+        "nullable": null,
+        "owner": "",
+        "domains": [],
+        "meta": {},
         "checks": [
           {
             "id": "3a6115e7ac5dffc8f0c0c6cb8ea427296f7656167d574e5cefde62a37535222f",
@@ -81,8 +93,13 @@
         "name": "position",
         "type": "varchar",
         "description": "Contact's job position or title",
+        "tags": [],
         "primary_key": false,
         "update_on_merge": false,
+        "nullable": null,
+        "owner": "",
+        "domains": [],
+        "meta": {},
         "checks": [
           {
             "id": "d625425165fba6cc0d5c0ecf233d6d719b3bcadba8845f31396ce94acf051d60",
@@ -99,8 +116,13 @@
         "name": "contact_date",
         "type": "varchar",
         "description": "Date when contact was established",
+        "tags": [],
         "primary_key": false,
         "update_on_merge": false,
+        "nullable": null,
+        "owner": "",
+        "domains": [],
+        "meta": {},
         "checks": [],
         "upstreams": []
       }
