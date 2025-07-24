@@ -54,8 +54,8 @@ type GlossaryReader struct {
 }
 
 type Glossary struct {
-	Entities []*Entity           `yaml:"entities" json:"entities"`
-	Domains  map[string]*Domain   `yaml:"domains,omitempty" json:"domains"`
+	Entities []*Entity          `yaml:"entities" json:"entities"`
+	Domains  map[string]*Domain `yaml:"domains,omitempty" json:"domains"`
 }
 
 func (g *Glossary) GetEntity(name string) *Entity {
