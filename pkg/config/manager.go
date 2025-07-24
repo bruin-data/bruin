@@ -89,6 +89,7 @@ type Connections struct {
 	Attio               []AttioConnection               `yaml:"attio,omitempty" json:"attio,omitempty" mapstructure:"attio"`
 	Sftp                []SFTPConnection                `yaml:"sftp,omitempty" json:"sftp,omitempty" mapstructure:"sftp"`
 	ISOCPulse           []ISOCPulseConnection           `yaml:"isoc_pulse,omitempty" json:"isoc_pulse,omitempty" mapstructure:"isoc_pulse"`
+	InfluxDB            []InfluxDBConnection            `yaml:"influxdb,omitempty" json:"influxdb,omitempty" mapstructure:"influxdb"`
 	Tableau             []TableauConnection             `yaml:"tableau,omitempty" json:"tableau,omitempty" mapstructure:"tableau"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
@@ -96,6 +97,15 @@ type Connections struct {
 
 type ConnectionGetter interface {
 	GetConnection(name string) any
+}
+
+type ConnectionDetailsGetter interface {
+	GetConnectionDetails(name string) any
+}
+
+type ConnectionAndDetailsGetter interface {
+	ConnectionGetter
+	ConnectionDetailsGetter
 }
 
 func (c *Connections) ConnectionsSummaryList() map[string]string {
@@ -882,6 +892,13 @@ func (c *Config) AddConnection(environmentName, name, connType string, creds map
 		}
 		conn.Name = name
 		env.Connections.ISOCPulse = append(env.Connections.ISOCPulse, conn)
+	case "influxdb":
+		var conn InfluxDBConnection
+		if err := mapstructure.Decode(creds, &conn); err != nil {
+			return fmt.Errorf("failed to decode credentials: %w", err)
+		}
+		conn.Name = name
+		env.Connections.InfluxDB = append(env.Connections.InfluxDB, conn)
 	case "tableau":
 		var conn TableauConnection
 		if err := mapstructure.Decode(creds, &conn); err != nil {
@@ -1052,6 +1069,8 @@ func (c *Config) DeleteConnection(environmentName, connectionName string) error 
 		env.Connections.Sftp = removeConnection(env.Connections.Sftp, connectionName)
 	case "isoc_pulse":
 		env.Connections.ISOCPulse = removeConnection(env.Connections.ISOCPulse, connectionName)
+	case "influxdb":
+		env.Connections.InfluxDB = removeConnection(env.Connections.InfluxDB, connectionName)
 	case "tableau":
 		env.Connections.Tableau = removeConnection(env.Connections.Tableau, connectionName)
 	default:

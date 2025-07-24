@@ -516,4 +516,4 @@ Notice how:
 | **Configuration** | Only requires primary_key columns | Requires both primary_key columns and incremental_key |
 
 > [!WARNING]
-> SCD2 materializations are currently only supported for bigquery.
+> SCD2 materializations are currently only supported for BigQuery, Snowflake, Postgres, Amazon Redshift and DuckDB.

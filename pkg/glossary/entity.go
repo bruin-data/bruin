@@ -20,6 +20,7 @@ type Attribute struct {
 type Entity struct {
 	Name        string                `json:"name" yaml:"name"`
 	Description string                `json:"description" yaml:"description"`
+	Domains     []string              `json:"domains" yaml:"domains"`
 	Attributes  map[string]*Attribute `json:"attributes" yaml:"attributes"`
 }
 

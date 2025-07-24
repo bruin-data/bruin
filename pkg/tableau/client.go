@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/executor"
 	"github.com/pkg/errors"
 )
 
@@ -51,6 +54,35 @@ type TSSiteResponse struct {
 type TSUser struct {
 	ID string `json:"id"`
 }
+
+type DataSourceInfo struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type listDatasourcesResponse struct {
+	Datasources struct {
+		Datasource []DataSourceInfo `json:"datasource"`
+	} `json:"datasources"`
+}
+
+type WorkbookInfo struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type listWorkbooksResponse struct {
+	Workbooks struct {
+		Workbook []WorkbookInfo `json:"workbook"`
+	} `json:"workbooks"`
+}
+
+type TableauResourceType string
+
+const (
+	ResourceDatasources TableauResourceType = "datasources"
+	ResourceWorkbooks   TableauResourceType = "workbooks"
+)
 
 func NewClient(c Config) (*Client, error) {
 	if c.Host == "" {
@@ -159,6 +191,69 @@ func (c *Client) RefreshWorksheet(ctx context.Context, workbookID string) error 
 	return c.refreshResource(ctx, "workbooks", workbookID, "workbook")
 }
 
+func (c *Client) pollJobStatus(ctx context.Context, jobID string) error {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
+	statusURL := fmt.Sprintf("https://%s/api/%s/sites/%s/jobs/%s", c.config.Host, c.config.APIVersion, c.siteID, jobID)
+	var writer io.Writer = os.Stdout
+	if w := ctx.Value(executor.KeyPrinter); w != nil {
+		if wr, ok := w.(io.Writer); ok {
+			writer = wr
+		}
+	}
+	if _, err := writer.Write([]byte(fmt.Sprintf("Refresh started asynchronously, waiting for job to complete, job ID: %s\n", jobID))); err != nil {
+		return errors.Wrap(err, "failed to write log output")
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return errors.New("timed out waiting for Tableau job to complete")
+		default:
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, statusURL, nil)
+			if err != nil {
+				return errors.Wrap(err, "failed to create job status request")
+			}
+			req.Header.Set("X-Tableau-Auth", c.authToken)
+			req.Header.Set("Accept", "application/json")
+
+			resp, err := c.httpClient.Do(req)
+			if err != nil {
+				return errors.Wrap(err, "failed to perform job status request")
+			}
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+
+			var jobResp struct {
+				Job struct {
+					ID                string `json:"id"`
+					Type              string `json:"type"`
+					CreatedAt         string `json:"createdAt"`
+					StartedAt         string `json:"startedAt"`
+					CompletedAt       string `json:"completedAt"`
+					FinishCode        string `json:"finishCode"`
+					ExtractRefreshJob struct {
+						Notes string `json:"notes"`
+					} `json:"extractRefreshJob"`
+				} `json:"job"`
+			}
+			if err := json.Unmarshal(body, &jobResp); err != nil {
+				return errors.Wrap(err, "failed to decode job status response")
+			}
+
+			if jobResp.Job.CompletedAt != "" {
+				if jobResp.Job.FinishCode == "0" {
+					return nil
+				} else {
+					errNotes := jobResp.Job.ExtractRefreshJob.Notes
+					return errors.Errorf("Tableau job failed: finishCode=%s, notes=%s", jobResp.Job.FinishCode, errNotes)
+				}
+			}
+
+			time.Sleep(5 * time.Second)
+		}
+	}
+}
+
 func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, payloadKey string) error {
 	if err := c.authenticate(ctx); err != nil {
 		return errors.Wrap(err, "failed to authenticate with Tableau")
@@ -193,11 +288,26 @@ func (c *Client) refreshResource(ctx context.Context, resourceType, resourceID, 
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusAccepted { // 202
+		// Parse job ID from response
+		var jobResp struct {
+			Job struct {
+				ID string `json:"id"`
+			} `json:"job"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&jobResp); err != nil {
+			return errors.Wrap(err, "failed to decode Tableau job response")
+		}
+		if jobResp.Job.ID == "" {
+			return errors.New("missing job ID in Tableau response")
+		}
+		return c.pollJobStatus(ctx, jobResp.Job.ID)
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return errors.Errorf("refresh failed with status %d: %s", resp.StatusCode, string(body))
 	}
-
 	return nil
 }
 
@@ -228,4 +338,92 @@ func (c *Client) Ping(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (c *Client) getTableauResource(ctx context.Context, resource TableauResourceType, out interface{}) error {
+	if err := c.authenticate(ctx); err != nil {
+		return errors.Wrapf(err, "failed to authenticate during list %s", resource)
+	}
+
+	url := fmt.Sprintf("https://%s/api/%s/sites/%s/%s", c.config.Host, c.config.APIVersion, c.siteID, resource)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create list %s request", resource)
+	}
+
+	req.Header.Set("X-Tableau-Auth", c.authToken)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return errors.Wrapf(err, "failed to perform list %s request", resource)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return errors.Errorf("list %s failed with status %d: %s", resource, resp.StatusCode, string(body))
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+		return errors.Wrapf(err, "failed to decode list %s response", resource)
+	}
+	return nil
+}
+
+func (c *Client) ListDatasources(ctx context.Context) ([]DataSourceInfo, error) {
+	var dsResp listDatasourcesResponse
+	if err := c.getTableauResource(ctx, ResourceDatasources, &dsResp); err != nil {
+		return nil, err
+	}
+	return dsResp.Datasources.Datasource, nil
+}
+
+func (c *Client) GetDatasource(ctx context.Context) ([]DataSourceInfo, error) {
+	datasources, err := c.ListDatasources(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return datasources, nil
+}
+
+func FindDatasourceIDByName(ctx context.Context, name string, datasources []DataSourceInfo) (string, error) {
+	if datasources == nil {
+		return "", errors.New("no datasources provided")
+	}
+
+	for _, ds := range datasources {
+		if strings.EqualFold(ds.Name, name) {
+			return ds.ID, nil
+		}
+	}
+	return "", nil
+}
+
+func (c *Client) ListWorkbooks(ctx context.Context) ([]WorkbookInfo, error) {
+	var wbResp listWorkbooksResponse
+	if err := c.getTableauResource(ctx, ResourceWorkbooks, &wbResp); err != nil {
+		return nil, err
+	}
+	return wbResp.Workbooks.Workbook, nil
+}
+
+func (c *Client) GetWorkbooks(ctx context.Context) ([]WorkbookInfo, error) {
+	workbooks, err := c.ListWorkbooks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return workbooks, nil
+}
+
+func FindWorkbookIDByName(ctx context.Context, name string, workbooks []WorkbookInfo) (string, error) {
+	if workbooks == nil {
+		return "", errors.New("no workbooks provided")
+	}
+	for _, wb := range workbooks {
+		if strings.EqualFold(strings.TrimSpace(wb.Name), strings.TrimSpace(name)) {
+			return wb.ID, nil
+		}
+	}
+	return "", nil
 }

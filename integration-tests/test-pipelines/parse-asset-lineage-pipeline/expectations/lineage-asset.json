@@ -7,6 +7,8 @@
     "description": "",
     "connection": "",
     "tags": [],
+    "domains": [],
+    "meta": {},
     "materialization": {
       "type": "table",
       "strategy": "",
@@ -77,8 +79,13 @@
         "name": "country",
         "type": "varchar",
         "description": "Just a country",
+        "tags": [],
         "primary_key": false,
         "update_on_merge": false,
+        "nullable": null,
+        "owner": "",
+        "domains": [],
+        "meta": {},
         "checks": [],
         "upstreams": [
           {
@@ -92,8 +99,13 @@
         "name": "last_name",
         "type": "varchar",
         "description": "Just a last name",
+        "tags": [],
         "primary_key": false,
         "update_on_merge": false,
+        "nullable": null,
+        "owner": "",
+        "domains": [],
+        "meta": {},
         "checks": [],
         "upstreams": [
           {
@@ -107,8 +119,13 @@
         "name": "name",
         "type": "varchar",
         "description": "Just a name",
+        "tags": [],
         "primary_key": false,
         "update_on_merge": false,
+        "nullable": null,
+        "owner": "",
+        "domains": [],
+        "meta": {},
         "checks": [],
         "upstreams": [
           {
@@ -122,8 +139,13 @@
         "name": "updated_at",
         "type": "timestamp",
         "description": "Just a timestamp",
+        "tags": [],
         "primary_key": false,
         "update_on_merge": false,
+        "nullable": null,
+        "owner": "",
+        "domains": [],
+        "meta": {},
         "checks": [],
         "upstreams": [
           {

@@ -48,10 +48,10 @@ type LocalOperator struct {
 	module       modulePathFinder
 	runner       localRunner
 	envVariables map[string]string
-	config       config.ConnectionGetter
+	config       config.ConnectionDetailsGetter
 }
 
-func NewLocalOperator(config config.ConnectionGetter, envVariables map[string]string) *LocalOperator {
+func NewLocalOperator(config config.ConnectionAndDetailsGetter, envVariables map[string]string) *LocalOperator {
 	cmdRunner := &CommandRunner{}
 	fs := afero.NewOsFs()
 
@@ -78,7 +78,7 @@ func NewLocalOperator(config config.ConnectionGetter, envVariables map[string]st
 	}
 }
 
-func NewLocalOperatorWithUv(config config.ConnectionGetter, conn config.ConnectionGetter, envVariables map[string]string) *LocalOperator {
+func NewLocalOperatorWithUv(config config.ConnectionAndDetailsGetter, envVariables map[string]string) *LocalOperator {
 	cmdRunner := &CommandRunner{}
 
 	return &LocalOperator{
@@ -89,7 +89,7 @@ func NewLocalOperatorWithUv(config config.ConnectionGetter, conn config.Connecti
 			UvInstaller: &UvChecker{
 				cmd: CommandRunner{},
 			},
-			conn: conn,
+			conn: config,
 		},
 		envVariables: envVariables,
 		config:       config,
@@ -142,7 +142,14 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 		}
 	}
 
-	perAssetEnvVariables, err := env.SetupVariables(ctx, p, t, o.envVariables)
+	// Create a copy of environment variables to avoid race conditions when multiple goroutines
+	// are running concurrently and modifying the same map
+	envCopy := make(map[string]string, len(o.envVariables))
+	for k, v := range o.envVariables {
+		envCopy[k] = v
+	}
+
+	perAssetEnvVariables, err := env.SetupVariables(ctx, p, t, envCopy)
 	if err != nil {
 		return errors.Wrap(err, "failed to setup environment variables")
 	}
@@ -155,7 +162,7 @@ func (o *LocalOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pi
 	envVariables["BRUIN_THIS"] = t.Name
 
 	for _, mapping := range t.Secrets {
-		conn := o.config.GetConnection(mapping.SecretKey)
+		conn := o.config.GetConnectionDetails(mapping.SecretKey)
 		if conn == nil {
 			return errors.New(fmt.Sprintf("there's no secret with the name '%s'.", mapping.SecretKey))
 		}

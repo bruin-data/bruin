@@ -62,11 +62,12 @@ type kvV2Reader interface {
 }
 
 type Client struct {
-	client    kvV2Reader
-	mountPath string
-	path      string
-	logger    logger.Logger
-	cache     map[string]any
+	client                  kvV2Reader
+	mountPath               string
+	path                    string
+	logger                  logger.Logger
+	cacheConnections        map[string]any
+	cacheConnectionsDetails map[string]any
 }
 
 func newVaultClientWithToken(host, token, mountPath string, logger logger.Logger, path string) (*Client, error) {
@@ -83,11 +84,12 @@ func newVaultClientWithToken(host, token, mountPath string, logger logger.Logger
 	}
 
 	return &Client{
-		client:    &client.Secrets,
-		mountPath: mountPath,
-		path:      path,
-		logger:    logger,
-		cache:     make(map[string]any),
+		client:                  &client.Secrets,
+		mountPath:               mountPath,
+		path:                    path,
+		logger:                  logger,
+		cacheConnections:        make(map[string]any),
+		cacheConnectionsDetails: make(map[string]any),
 	}, nil
 }
 
@@ -116,19 +118,48 @@ func newVaultClientWithKubernetesAuth(host, role, mountPath string, logger logge
 	}
 
 	return &Client{
-		client:    &client.Secrets,
-		mountPath: mountPath,
-		path:      path,
-		logger:    logger,
-		cache:     make(map[string]any),
+		client:                  &client.Secrets,
+		mountPath:               mountPath,
+		path:                    path,
+		logger:                  logger,
+		cacheConnections:        make(map[string]any),
+		cacheConnectionsDetails: make(map[string]any),
 	}, nil
 }
 
 func (c *Client) GetConnection(name string) any {
-	if conn, ok := c.cache[name]; ok {
+	if conn, ok := c.cacheConnections[name]; ok {
 		return conn
 	}
 
+	manager, err := c.getVaultManager(name)
+	if err != nil {
+		return nil
+	}
+
+	conn := manager.GetConnection(name)
+	c.cacheConnections[name] = conn
+
+	return conn
+}
+
+func (c *Client) GetConnectionDetails(name string) any {
+	if deets, ok := c.cacheConnectionsDetails[name]; ok {
+		return deets
+	}
+
+	manager, err := c.getVaultManager(name)
+	if err != nil {
+		return nil
+	}
+
+	deets := manager.GetConnectionDetails(name)
+	c.cacheConnectionsDetails[name] = deets
+
+	return deets
+}
+
+func (c *Client) getVaultManager(name string) (config.ConnectionAndDetailsGetter, error) {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelFunc()
 
@@ -136,20 +167,20 @@ func (c *Client) GetConnection(name string) any {
 	res, err := c.client.KvV2Read(ctx, secretPath, vault.WithMountPath(c.mountPath))
 	if err != nil {
 		c.logger.Error("failed to read secret from Vault", "error", err)
-		return nil
+		return nil, err
 	}
 
 	detailsRaw, okDetails := res.Data.Data["details"]
 	secretType, okType := res.Data.Data["type"].(string)
 	if !okDetails && !okType {
 		c.logger.Error("failed to read secret from Vault", "error", "no details or type found")
-		return nil
+		return nil, errors.New("no details or type found")
 	}
 
 	details, ok := detailsRaw.(map[string]any)
 	if !ok {
 		c.logger.Error("failed to read secret from Vault", "error", "details is not a map", "details:", detailsRaw)
-		return nil
+		return nil, errors.New("details is not a map")
 	}
 
 	details["name"] = name
@@ -165,18 +196,14 @@ func (c *Client) GetConnection(name string) any {
 	serialized, err := json.Marshal(connectionsMap)
 	if err != nil {
 		c.logger.Error("failed to marshal connections map", "error", err)
-		return nil
+		return nil, err
 	}
 
 	var connections config.Connections
 
 	if err := json.Unmarshal(serialized, &connections); err != nil {
 		c.logger.Error("failed to unmarshal connections map", "error", err)
-		return nil
-	}
-
-	if secretType == "generic" {
-		return connections.Generic[0]
+		return nil, err
 	}
 
 	environment := config.Environment{
@@ -195,15 +222,8 @@ func (c *Client) GetConnection(name string) any {
 	manager, errs := connection.NewManagerFromConfig(&config)
 	if len(errs) > 0 {
 		c.logger.Error("failed to create manager from config", "error", errs)
-		return nil
+		return nil, errors.Wrap(errs[0], "failed to create manager from config")
 	}
 
-	conn := manager.GetConnection(name)
-	if conn == nil {
-		return nil
-	}
-
-	c.cache[name] = conn
-
-	return conn
+	return manager, nil
 }
