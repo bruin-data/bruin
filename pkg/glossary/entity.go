@@ -19,9 +19,9 @@ type Contact struct {
 type Domain struct {
 	Name        string     `json:"name" yaml:"name"`
 	Description string     `json:"description" yaml:"description"`
-	Owners      []string   `json:"owners" yaml:"owners"`
-	Tags        []string   `json:"tags" yaml:"tags"`
-	Contact     []*Contact `json:"contact" yaml:"contact"`
+	Owners      []string   `json:"owners,omitempty" yaml:"owners,omitempty"`
+	Tags        []string   `json:"tags,omitempty" yaml:"tags,omitempty"`
+	Contact     []*Contact `json:"contact,omitempty" yaml:"contact,omitempty"`
 }
 
 type Attribute struct {
@@ -33,7 +33,7 @@ type Attribute struct {
 type Entity struct {
 	Name        string                `json:"name" yaml:"name"`
 	Description string                `json:"description" yaml:"description"`
-	Domains     []string              `json:"domains" yaml:"domains"`
+	Domains     []string              `json:"domains,omitempty" yaml:"domains,omitempty"`
 	Attributes  map[string]*Attribute `json:"attributes" yaml:"attributes"`
 }
 
