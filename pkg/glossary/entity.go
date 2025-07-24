@@ -11,6 +11,19 @@ import (
 	"github.com/spf13/afero"
 )
 
+type Contact struct {
+	Type    string `json:"type" yaml:"type"`
+	Address string `json:"address" yaml:"address"`
+}
+
+type Domain struct {
+	Name        string     `json:"name" yaml:"name"`
+	Description string     `json:"description" yaml:"description"`
+	Owners      []string   `json:"owners" yaml:"owners"`
+	Tags        []string   `json:"tags" yaml:"tags"`
+	Contact     []*Contact `json:"contact" yaml:"contact"`
+}
+
 type Attribute struct {
 	Name        string `json:"name" yaml:"name"`
 	Description string `json:"description" yaml:"description"`
@@ -41,7 +54,8 @@ type GlossaryReader struct {
 }
 
 type Glossary struct {
-	Entities []*Entity `yaml:"entities" json:"entities"`
+	Entities []*Entity           `yaml:"entities" json:"entities"`
+	Domains  map[string]*Domain   `yaml:"domains" json:"domains"`
 }
 
 func (g *Glossary) GetEntity(name string) *Entity {
@@ -56,6 +70,7 @@ func (g *Glossary) GetEntity(name string) *Entity {
 
 type glossaryYaml struct {
 	Entities map[string]*Entity `yaml:"entities"`
+	Domains  map[string]*Domain `yaml:"domains"`
 }
 
 func (g *Glossary) Merge(anotherGlossary *Glossary) {
@@ -131,7 +146,16 @@ func LoadGlossaryFromFile(path string) (*Glossary, error) {
 		idx++
 	}
 
+	domains := make(map[string]*Domain)
+	for name, domain := range glossary.Domains {
+		if domain.Name == "" {
+			domain.Name = name
+		}
+		domains[name] = domain
+	}
+
 	return &Glossary{
 		Entities: result,
+		Domains:  domains,
 	}, nil
 }
