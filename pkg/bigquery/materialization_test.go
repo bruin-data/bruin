@@ -37,6 +37,17 @@ func TestMaterializer_Render(t *testing.T) {
 			want:  "CREATE OR REPLACE VIEW my.asset AS\nSELECT 1",
 		},
 		{
+			name: "materialize to a view with a comment",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type: pipeline.MaterializationTypeView,
+				},
+			},
+			query: "SELECT 1 -- This is a comment",
+			want:  "CREATE OR REPLACE VIEW my.asset AS\nSELECT 1 -- This is a comment",
+		},
+		{
 			name: "materialize to a table, no partition or cluster, default to create+replace",
 			task: &pipeline.Asset{
 				Name: "my.asset",
@@ -155,6 +166,24 @@ func TestMaterializer_Render(t *testing.T) {
 				"COMMIT TRANSACTION;$",
 		},
 		{
+			name: "delete+insert builds a proper transaction with trailing comment",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey: "dt",
+				},
+			},
+			query: "SELECT 1 -- This is a comment",
+			want: "^BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1 -- This is a comment\n" +
+				";\n" +
+				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
+				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
+				"COMMIT TRANSACTION;$",
+		},
+		{
 			name: "delete+insert with empty column type",
 			task: &pipeline.Asset{
 				Name: "my.asset",
@@ -217,6 +246,28 @@ func TestMaterializer_Render(t *testing.T) {
 				"COMMIT TRANSACTION;$",
 		},
 		{
+			name: "delete+insert builds a proper transaction where columns are defined with a comment",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategyDeleteInsert,
+					IncrementalKey: "somekey",
+				},
+				Columns: []pipeline.Column{
+					{Name: "somekey", Type: "date"},
+				},
+			},
+			query: "SELECT 1 -- This is a comment",
+			want: "^DECLARE distinct_keys.+ array<date>;\n" +
+				"BEGIN TRANSACTION;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1 -- This is a comment\n;\n" +
+				"SET distinct_keys_.+ = \\(SELECT array_agg\\(distinct somekey\\) FROM __bruin_tmp_.+\\);\n" +
+				"DELETE FROM my\\.asset WHERE somekey in unnest\\(distinct_keys.+\\);\n" +
+				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+\n" +
+				"COMMIT TRANSACTION;$",
+		},
+		{
 			name: "delete+insert comment out",
 			task: &pipeline.Asset{
 				Name: "my.asset",
@@ -226,9 +277,9 @@ func TestMaterializer_Render(t *testing.T) {
 					IncrementalKey: "dt",
 				},
 			},
-			query: "SELECT 1\n -- This is a comment",
+			query: "SELECT 1 -- This is a comment",
 			want: "^BEGIN TRANSACTION;\n" +
-				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1\n -- This is a comment\n;\n" +
+				"CREATE TEMP TABLE __bruin_tmp_.+ AS SELECT 1 -- This is a comment\n;\n" +
 				"DELETE FROM my\\.asset WHERE dt in \\(SELECT DISTINCT dt FROM __bruin_tmp_.+\\);\n" +
 				"INSERT INTO my\\.asset SELECT \\* FROM __bruin_tmp.+;\n" +
 				"COMMIT TRANSACTION;$",
@@ -281,7 +332,7 @@ func TestMaterializer_Render(t *testing.T) {
 			},
 			query: "SELECT 1",
 			want: "MERGE my\\.asset target\n" +
-				"USING \\(SELECT 1\\) source ON target\\.dt = source.dt AND target\\.event_type = source\\.event_type\n" +
+				"USING \\(SELECT 1\n\\) source ON target\\.dt = source.dt AND target\\.event_type = source\\.event_type\n" +
 				"\n" +
 				"WHEN NOT MATCHED THEN INSERT\\(dt, event_type, value, value2\\) VALUES\\(dt, event_type, value, value2\\);",
 		},
@@ -307,6 +358,27 @@ func TestMaterializer_Render(t *testing.T) {
 				"WHEN NOT MATCHED THEN INSERT\\(dt, event_type, value, value2\\) VALUES\\(dt, event_type, value, value2\\);",
 		},
 		{
+			name: "merge with some columns to update with a comment",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Columns: []pipeline.Column{
+					{Name: "dt", PrimaryKey: true},
+					{Name: "event_type", PrimaryKey: true},
+					{Name: "value", UpdateOnMerge: true},
+					{Name: "value2"},
+				},
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategyMerge,
+				},
+			},
+			query: "SELECT 1 -- This is a comment",
+			want: "MERGE my\\.asset target\n" +
+				"USING \\(SELECT 1 -- This is a comment\n\\) source ON target\\.dt = source.dt AND target\\.event_type = source\\.event_type\n" +
+				"WHEN MATCHED THEN UPDATE SET target\\.value = source\\.value\n" +
+				"WHEN NOT MATCHED THEN INSERT\\(dt, event_type, value, value2\\) VALUES\\(dt, event_type, value, value2\\);",
+		},
+		{
 			name: "time_interval_no_incremental_key",
 			task: &pipeline.Asset{
 				Name: "my.asset",
@@ -319,7 +391,6 @@ func TestMaterializer_Render(t *testing.T) {
 			query:   "SELECT 1",
 			wantErr: true,
 		},
-
 		{
 			name: "time_interval_timestampgranularity",
 			task: &pipeline.Asset{
@@ -334,7 +405,26 @@ func TestMaterializer_Render(t *testing.T) {
 			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'",
 			want: "^BEGIN TRANSACTION;\n" +
 				"DELETE FROM my\\.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
-				"INSERT INTO my\\.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
+				"INSERT INTO my\\.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}'\n" +
+				";\n" +
+				"COMMIT TRANSACTION;$",
+		},
+		{
+			name: "time_interval_timestampgranularity with a comment",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:            pipeline.MaterializationTypeTable,
+					Strategy:        pipeline.MaterializationStrategyTimeInterval,
+					TimeGranularity: pipeline.MaterializationTimeGranularityTimestamp,
+					IncrementalKey:  "ts",
+				},
+			},
+			query: "SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}' -- This is a comment",
+			want: "^BEGIN TRANSACTION;\n" +
+				"DELETE FROM my\\.asset WHERE ts BETWEEN '{{start_timestamp}}' AND '{{end_timestamp}}';\n" +
+				"INSERT INTO my\\.asset SELECT ts, event_name from source_table where ts between '{{start_timestamp}}' AND '{{end_timestamp}}' -- This is a comment\n" +
+				";\n" +
 				"COMMIT TRANSACTION;$",
 		},
 		{
@@ -351,7 +441,26 @@ func TestMaterializer_Render(t *testing.T) {
 			query: "SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'",
 			want: "^BEGIN TRANSACTION;\n" +
 				"DELETE FROM my\\.asset WHERE dt BETWEEN '{{start_date}}' AND '{{end_date}}';\n" +
-				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}';\n" +
+				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}'\n" +
+				";\n" +
+				"COMMIT TRANSACTION;$",
+		},
+		{
+			name: "time_interval_date with a comment",
+			task: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:            pipeline.MaterializationTypeTable,
+					Strategy:        pipeline.MaterializationStrategyTimeInterval,
+					TimeGranularity: pipeline.MaterializationTimeGranularityDate,
+					IncrementalKey:  "dt",
+				},
+			},
+			query: "SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}' -- This is a comment",
+			want: "^BEGIN TRANSACTION;\n" +
+				"DELETE FROM my\\.asset WHERE dt BETWEEN '{{start_date}}' AND '{{end_date}}';\n" +
+				"INSERT INTO my\\.asset SELECT dt, event_name from source_table where dt between '{{start_date}}' and '{{end_date}}' -- This is a comment\n" +
+				";\n" +
 				"COMMIT TRANSACTION;$",
 		},
 	}

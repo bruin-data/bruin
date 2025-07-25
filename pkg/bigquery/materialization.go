@@ -36,11 +36,16 @@ func NewMaterializer(fullRefresh bool) *pipeline.Materializer {
 	}
 }
 
+func sanitizeQueryForEmbedding(query string) string {
+	return strings.TrimRight(query, " \t\r\n") + "\n"
+}
+
 func errorMaterializer(asset *pipeline.Asset, query string) (string, error) {
 	return "", fmt.Errorf("materialization strategy %s is not supported for materialization type %s and asset type %s", asset.Materialization.Strategy, asset.Materialization.Type, asset.Type)
 }
 
 func viewMaterializer(asset *pipeline.Asset, query string) (string, error) {
+	query = sanitizeQueryForEmbedding(query)
 	return fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", asset.Name, query), nil
 }
 
@@ -77,9 +82,11 @@ func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
 		whenMatchedThenQuery = "WHEN MATCHED THEN UPDATE SET " + matchedUpdateQuery
 	}
 
+	query = sanitizeQueryForEmbedding(query)
+
 	mergeLines := []string{
 		fmt.Sprintf("MERGE %s target", asset.Name),
-		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";"), onQuery),
+		fmt.Sprintf("USING (%s) source ON %s", strings.TrimSuffix(query, ";\n"), onQuery),
 		whenMatchedThenQuery,
 		fmt.Sprintf("WHEN NOT MATCHED THEN INSERT(%s) VALUES(%s)", allColumnValues, allColumnValues),
 	}
@@ -106,10 +113,11 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 	tempTableName := "__bruin_tmp_" + randPrefix
 
 	declaredVarName := "distinct_keys_" + randPrefix
+	query = sanitizeQueryForEmbedding(query)
 	queries := []string{
 		fmt.Sprintf("DECLARE %s array<%s>", declaredVarName, foundCol.Type),
 		"BEGIN TRANSACTION",
-		fmt.Sprintf("CREATE TEMP TABLE %s AS %s\n", tempTableName, query),
+		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, query),
 		fmt.Sprintf("SET %s = (SELECT array_agg(distinct %s) FROM %s)", declaredVarName, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in unnest(%s)", asset.Name, mat.IncrementalKey, declaredVarName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", asset.Name, tempTableName),
@@ -123,9 +131,11 @@ func buildIncrementalQueryWithoutTempVariable(asset *pipeline.Asset, query strin
 	mat := asset.Materialization
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
+	query = sanitizeQueryForEmbedding(query)
+
 	queries := []string{
 		"BEGIN TRANSACTION",
-		fmt.Sprintf("CREATE TEMP TABLE %s AS %s\n", tempTableName, query),
+		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, query),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in (SELECT DISTINCT %s FROM %s)", asset.Name, mat.IncrementalKey, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", asset.Name, tempTableName),
 		"COMMIT TRANSACTION",
@@ -152,6 +162,7 @@ func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error
 		if len(mat.ClusterBy) > 0 {
 			clusterByClause = "CLUSTER BY " + strings.Join(mat.ClusterBy, ", ")
 		}
+		query = sanitizeQueryForEmbedding(query)
 		return fmt.Sprintf("CREATE OR REPLACE TABLE %s %s %s AS\n%s", asset.Name, partitionClause, clusterByClause, query), nil
 	}
 }
@@ -175,6 +186,8 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 		endVar = "{{end_date}}"
 	}
 
+	query = sanitizeQueryForEmbedding(query)
+
 	queries := []string{
 		"BEGIN TRANSACTION",
 		fmt.Sprintf(`DELETE FROM %s WHERE %s BETWEEN '%s' AND '%s'`,
@@ -184,7 +197,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 			endVar),
 		fmt.Sprintf(`INSERT INTO %s %s`,
 			asset.Name,
-			strings.TrimSuffix(query, ";")),
+			strings.TrimSuffix(query, ";\n")),
 		"COMMIT TRANSACTION",
 	}
 
@@ -229,6 +242,7 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 
 func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
 	query = strings.TrimRight(query, ";")
+	query = sanitizeQueryForEmbedding(query)
 
 	if asset.Materialization.IncrementalKey == "" {
 		return "", errors.New("incremental_key is required for SCD2_by_time strategy")
@@ -328,6 +342,7 @@ WHEN NOT MATCHED BY TARGET THEN
 
 func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error) {
 	query = strings.TrimRight(query, ";")
+	query = sanitizeQueryForEmbedding(query)
 	var (
 		primaryKeys      = make([]string, 0, 4)
 		compareConds     = make([]string, 0, 12)
@@ -427,6 +442,7 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 	}
 	tbl := fmt.Sprintf("`%s`", asset.Name)
 	cluster := strings.Join(primaryKeys, ", ")
+	query = sanitizeQueryForEmbedding(query)
 	stmt := fmt.Sprintf(
 		`CREATE OR REPLACE TABLE %s
 PARTITION BY DATE(_valid_from)
@@ -455,6 +471,7 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 	}
 	tbl := fmt.Sprintf("`%s`", asset.Name)
 	cluster := strings.Join(primaryKeys, ", ")
+	query = sanitizeQueryForEmbedding(query)
 	stmt := fmt.Sprintf(
 		`
 CREATE OR REPLACE TABLE %s
@@ -475,3 +492,5 @@ FROM (
 
 	return strings.TrimSpace(stmt), nil
 }
+
+
