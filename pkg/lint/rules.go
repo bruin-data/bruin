@@ -50,6 +50,7 @@ const (
 
 	pipelineConcurrencyMustBePositive = "Pipeline concurrency must be 1 or greater"
 	assetTierMustBeBetweenOneAndFive  = "Asset tier must be between 1 and 5"
+	secretMappingKeyMustExist         = "Secrets must have a `key` attribute"
 
 	materializationStrategyIsNotSupportedForViews     = "Materialization strategy is not supported for views"
 	materializationPartitionByNotSupportedForViews    = "Materialization partition by is not supported for views because views cannot be partitioned"
@@ -1292,6 +1293,21 @@ func EnsureAssetTierIsValidForASingleAsset(ctx context.Context, p *pipeline.Pipe
 			Task:        asset,
 			Description: assetTierMustBeBetweenOneAndFive,
 		})
+	}
+
+	return issues, nil
+}
+
+func EnsureSecretMappingsHaveKeyForASingleAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
+	issues := make([]*Issue, 0)
+
+	for _, m := range asset.Secrets {
+		if strings.TrimSpace(m.SecretKey) == "" {
+			issues = append(issues, &Issue{
+				Task:        asset,
+				Description: secretMappingKeyMustExist,
+			})
+		}
 	}
 
 	return issues, nil

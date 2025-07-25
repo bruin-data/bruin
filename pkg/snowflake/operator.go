@@ -29,6 +29,7 @@ type SfClient interface {
 	CreateSchemaIfNotExist(ctx context.Context, asset *pipeline.Asset) error
 	PushColumnDescriptions(ctx context.Context, asset *pipeline.Asset) error
 	RecreateTableOnMaterializationTypeMismatch(ctx context.Context, asset *pipeline.Asset) error
+	SelectOnlyLastResult(ctx context.Context, query *query.Query) ([][]interface{}, error)
 }
 
 type BasicOperator struct {
@@ -167,7 +168,7 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	}
 
 	for {
-		res, err := conn.Select(ctx, qry[0])
+		res, err := conn.SelectOnlyLastResult(ctx, qry[0])
 		if err != nil {
 			return err
 		}

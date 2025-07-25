@@ -11,6 +11,19 @@ import (
 	"github.com/spf13/afero"
 )
 
+type Contact struct {
+	Type    string `json:"type" yaml:"type,omitempty"`
+	Address string `json:"address" yaml:"address,omitempty"`
+}
+
+type Domain struct {
+	Name        string     `json:"name" yaml:"name,omitempty"`
+	Description string     `json:"description" yaml:"description,omitempty"`
+	Owners      []string   `json:"owners" yaml:"owners,omitempty"`
+	Tags        []string   `json:"tags" yaml:"tags,omitempty"`
+	Contact     []*Contact `json:"contact" yaml:"contact,omitempty"`
+}
+
 type Attribute struct {
 	Name        string `json:"name" yaml:"name"`
 	Description string `json:"description" yaml:"description"`
@@ -20,7 +33,7 @@ type Attribute struct {
 type Entity struct {
 	Name        string                `json:"name" yaml:"name"`
 	Description string                `json:"description" yaml:"description"`
-	Domains     []string              `json:"domains" yaml:"domains"`
+	Domains     []string              `json:"domains" yaml:"domains,omitempty"`
 	Attributes  map[string]*Attribute `json:"attributes" yaml:"attributes"`
 }
 
@@ -41,7 +54,8 @@ type GlossaryReader struct {
 }
 
 type Glossary struct {
-	Entities []*Entity `yaml:"entities" json:"entities"`
+	Entities []*Entity          `yaml:"entities" json:"entities"`
+	Domains  map[string]*Domain `yaml:"domains,omitempty" json:"domains"`
 }
 
 func (g *Glossary) GetEntity(name string) *Entity {
@@ -56,6 +70,7 @@ func (g *Glossary) GetEntity(name string) *Entity {
 
 type glossaryYaml struct {
 	Entities map[string]*Entity `yaml:"entities"`
+	Domains  map[string]*Domain `yaml:"domains"`
 }
 
 func (g *Glossary) Merge(anotherGlossary *Glossary) {
@@ -133,5 +148,6 @@ func LoadGlossaryFromFile(path string) (*Glossary, error) {
 
 	return &Glossary{
 		Entities: result,
+		Domains:  glossary.Domains,
 	}, nil
 }

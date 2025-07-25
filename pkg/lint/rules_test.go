@@ -2665,3 +2665,51 @@ func TestEnsureAssetTierIsValidForASingleAsset(t *testing.T) {
 		})
 	}
 }
+
+func TestEnsureSecretMappingsHaveKeyForASingleAsset(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		asset   *pipeline.Asset
+		want    []*Issue
+		wantErr bool
+	}{
+		{
+			name: "secret without key returns issue",
+			asset: &pipeline.Asset{
+				Secrets: []pipeline.SecretMapping{{SecretKey: "", InjectedKey: "SENTRY_DSN"}},
+			},
+			want: []*Issue{
+				{
+					Task:        &pipeline.Asset{Secrets: []pipeline.SecretMapping{{SecretKey: "", InjectedKey: "SENTRY_DSN"}}},
+					Description: secretMappingKeyMustExist,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "all secrets have keys",
+			asset: &pipeline.Asset{
+				Secrets: []pipeline.SecretMapping{
+					{SecretKey: "GCP", InjectedKey: "GCP"},
+					{SecretKey: "SENTRY_DSN", InjectedKey: ""},
+				},
+			},
+			want:    []*Issue{},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := EnsureSecretMappingsHaveKeyForASingleAsset(context.Background(), &pipeline.Pipeline{}, tt.asset)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("EnsureSecretMappingsHaveKeyForASingleAsset() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

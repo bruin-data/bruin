@@ -61,6 +61,15 @@ func (m *mockQuerierWithResult) RecreateTableOnMaterializationTypeMismatch(ctx c
 	return args.Error(0)
 }
 
+func (m *mockQuerierWithResult) SelectOnlyLastResult(ctx context.Context, q *query.Query) ([][]interface{}, error) {
+	args := m.Called(ctx, q)
+	get := args.Get(0)
+	if get == nil {
+		return nil, args.Error(1)
+	}
+	return get.([][]interface{}), args.Error(1)
+}
+
 type mockConnectionFetcher struct {
 	mock.Mock
 }
