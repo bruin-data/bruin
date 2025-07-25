@@ -53,7 +53,7 @@ func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
 	if len(primaryKeys) == 0 {
 		return "", fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column", asset.Materialization.Strategy)
 	}
-
+	query = convertLastInlineCommentToBlock(query)
 	nonPrimaryKeys := asset.ColumnNamesWithUpdateOnMerge()
 	columnNames := asset.ColumnNames()
 
@@ -87,6 +87,43 @@ func mergeMaterializer(asset *pipeline.Asset, query string) (string, error) {
 	return strings.Join(mergeLines, "\n") + ";", nil
 }
 
+func convertLastInlineCommentToBlock(query string) string {
+	lines := strings.Split(query, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := lines[i]
+		trimmed := strings.TrimRight(line, " \t\r")
+		if trimmed == "" {
+			continue
+		}
+		stmt := trimmed
+		inSingleQuote := false
+		inDoubleQuote := false
+		for j := range stmt {
+			if !inDoubleQuote && stmt[j] == '\'' {
+				inSingleQuote = !inSingleQuote
+			} else if !inSingleQuote && stmt[j] == '"' {
+				inDoubleQuote = !inDoubleQuote
+			}
+			if !inSingleQuote && !inDoubleQuote {
+				if j+1 < len(stmt) && stmt[j] == '-' && stmt[j+1] == '-' {
+					commentText := stmt[j+2:]
+					blockComment := " /*" + commentText + " */"
+					lines[i] = strings.TrimRight(stmt[:j], " \t") + blockComment
+					return strings.Join(lines, "\n")
+				}
+				if stmt[j] == '#' {
+					commentText := stmt[j+1:]
+					blockComment := " /*" + commentText + " */"
+					lines[i] = strings.TrimRight(stmt[:j], " \t") + blockComment
+					return strings.Join(lines, "\n")
+				}
+			}
+		}
+		break
+	}
+	return strings.Join(lines, "\n")
+}
+
 func buildAppendQuery(asset *pipeline.Asset, query string) (string, error) {
 	return fmt.Sprintf("INSERT INTO %s %s", asset.Name, query), nil
 }
@@ -96,6 +133,7 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 	if mat.IncrementalKey == "" {
 		return "", fmt.Errorf("materialization strategy %s requires the `incremental_key` field to be set", mat.Strategy)
 	}
+	query = convertLastInlineCommentToBlock(query)
 
 	foundCol := asset.GetColumnWithName(mat.IncrementalKey)
 	if foundCol == nil || foundCol.Type == "" || foundCol.Type == "UNKNOWN" {
@@ -109,7 +147,7 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 	queries := []string{
 		fmt.Sprintf("DECLARE %s array<%s>", declaredVarName, foundCol.Type),
 		"BEGIN TRANSACTION",
-		fmt.Sprintf("CREATE TEMP TABLE %s AS %s\n", tempTableName, query),
+		fmt.Sprintf("CREATE TEMP TABLE %s AS %s", tempTableName, query),
 		fmt.Sprintf("SET %s = (SELECT array_agg(distinct %s) FROM %s)", declaredVarName, mat.IncrementalKey, tempTableName),
 		fmt.Sprintf("DELETE FROM %s WHERE %s in unnest(%s)", asset.Name, mat.IncrementalKey, declaredVarName),
 		fmt.Sprintf("INSERT INTO %s SELECT * FROM %s", asset.Name, tempTableName),
@@ -122,6 +160,7 @@ func buildIncrementalQuery(asset *pipeline.Asset, query string) (string, error) 
 func buildIncrementalQueryWithoutTempVariable(asset *pipeline.Asset, query string) (string, error) {
 	mat := asset.Materialization
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
+	query = convertLastInlineCommentToBlock(query)
 
 	queries := []string{
 		"BEGIN TRANSACTION",
@@ -136,6 +175,7 @@ func buildIncrementalQueryWithoutTempVariable(asset *pipeline.Asset, query strin
 
 func buildCreateReplaceQuery(asset *pipeline.Asset, query string) (string, error) {
 	mat := asset.Materialization
+	query = convertLastInlineCommentToBlock(query)
 	switch {
 	case asset.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByTime:
 		return buildSCD2ByTimefullRefresh(asset, query)
@@ -168,6 +208,7 @@ func buildTimeIntervalQuery(asset *pipeline.Asset, query string) (string, error)
 	if !(asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityTimestamp || asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate) {
 		return "", errors.New("time_granularity must be either 'date', or 'timestamp'")
 	}
+	query = convertLastInlineCommentToBlock(query)
 	startVar := "{{start_timestamp}}"
 	endVar := "{{end_timestamp}}"
 	if asset.Materialization.TimeGranularity == pipeline.MaterializationTimeGranularityDate {
@@ -228,6 +269,7 @@ func buildDDLQuery(asset *pipeline.Asset, query string) (string, error) {
 }
 
 func buildSCD2QueryByTime(asset *pipeline.Asset, query string) (string, error) {
+	query = convertLastInlineCommentToBlock(query)
 	query = strings.TrimRight(query, ";")
 
 	if asset.Materialization.IncrementalKey == "" {
@@ -327,6 +369,7 @@ WHEN NOT MATCHED BY TARGET THEN
 }
 
 func buildSCD2ByColumnQuery(asset *pipeline.Asset, query string) (string, error) {
+	query = convertLastInlineCommentToBlock(query)
 	query = strings.TrimRight(query, ";")
 	var (
 		primaryKeys      = make([]string, 0, 4)
@@ -421,6 +464,7 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 		return "", errors.New("incremental_key is required for SCD2 strategy")
 	}
 
+	query = convertLastInlineCommentToBlock(query)
 	primaryKeys := asset.ColumnNamesWithPrimaryKey()
 	if len(primaryKeys) == 0 {
 		return "", errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
@@ -453,6 +497,7 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, 
 	if len(primaryKeys) == 0 {
 		return "", errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
 	}
+	query = convertLastInlineCommentToBlock(query)
 	tbl := fmt.Sprintf("`%s`", asset.Name)
 	cluster := strings.Join(primaryKeys, ", ")
 	stmt := fmt.Sprintf(
