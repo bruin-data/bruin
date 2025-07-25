@@ -407,6 +407,16 @@ func (d DuckDBConnection) GetName() string {
 	return d.Name
 }
 
+type MotherduckConnection struct {
+	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Token    string `yaml:"token,omitempty" json:"token" mapstructure:"token"`
+	Database string `yaml:"database,omitempty" json:"database,omitempty" mapstructure:"database"`
+}
+
+func (m MotherduckConnection) GetName() string {
+	return m.Name
+}
+
 type ClickHouseConnection struct {
 	Name     string `yaml:"name" json:"name" mapstructure:"name"`
 	Username string `yaml:"username" json:"username" mapstructure:"username"`

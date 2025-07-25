@@ -351,6 +351,12 @@
           },
           "type": "array"
         },
+        "motherduck": {
+          "items": {
+            "$ref": "#/$defs/MotherduckConnection"
+          },
+          "type": "array"
+        },
         "mysql": {
           "items": {
             "$ref": "#/$defs/MySQLConnection"
@@ -1344,6 +1350,25 @@
         "host",
         "port",
         "database"
+      ]
+    },
+    "MotherduckConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "token"
       ]
     },
     "MsSQLConnection": {
