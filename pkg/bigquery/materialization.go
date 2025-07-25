@@ -492,5 +492,3 @@ FROM (
 
 	return strings.TrimSpace(stmt), nil
 }
-
-
