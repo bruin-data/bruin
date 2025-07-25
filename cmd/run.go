@@ -592,6 +592,11 @@ func Run(isDebug *bool) *cli.Command {
 				Usage:   "override pipeline variables with custom values",
 				EnvVars: []string{"BRUIN_VARS"},
 			},
+			&cli.IntFlag{
+				Name:  "timeout",
+				Usage: "timeout for the entire pipeline run in seconds",
+				Value: 604800, // 7 days default
+			},
 		},
 		Action: func(c *cli.Context) error {
 			defer RecoverFromPanic()
@@ -878,7 +883,13 @@ func Run(isDebug *bool) *cli.Command {
 				return cli.Exit("", 1)
 			}
 
-			exeCtx, cancel := signal.NotifyContext(runCtx, syscall.SIGINT, syscall.SIGTERM)
+			// Create a context with timeout
+			timeoutDuration := time.Duration(c.Int("timeout")) * time.Second
+			timeoutCtx, timeoutCancel := context.WithTimeout(runCtx, timeoutDuration)
+			defer timeoutCancel()
+
+			// Combine timeout context with signal handling
+			exeCtx, cancel := signal.NotifyContext(timeoutCtx, syscall.SIGINT, syscall.SIGTERM)
 			defer cancel()
 
 			ex.Start(exeCtx, s.WorkQueue, s.Results)
