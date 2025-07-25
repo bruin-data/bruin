@@ -53,6 +53,38 @@ environments:
     schema_prefix: "dev_"
 `
 
+// Add a new config for testing mixed environments (some with connections, some empty)
+const mixedEnvironmentsConfig = `
+default_environment: dev
+environments:
+  dev:
+    connections:
+      postgres:
+        - name: "pg_conn"
+          host: "localhost"
+          username: "user"
+          password: "pass"
+          database: "db"
+          port: 5432
+    schema_prefix: "dev_"
+  staging:
+    connections: {}
+    schema_prefix: "staging_"
+  prod:
+    connections:
+      mysql:
+        - name: "mysql_conn"
+          host: "prod.localhost"
+          username: "prod_user"
+          password: "prod_pass"
+          database: "prod_db"
+          port: 3306
+    schema_prefix: "prod_"
+  empty_env:
+    connections: {}
+    schema_prefix: "empty_"
+`
+
 // Helper function to setup test config.
 func setupTestConfig(t *testing.T, configContent string) (afero.Fs, string) { //nolint:ireturn // Test helper needs to return interface for filesystem abstraction
 	fs := afero.NewMemMapFs()
@@ -375,6 +407,122 @@ func TestListConnectionsCommand_Run(t *testing.T) {
 					// All environments should be accessible
 					assert.NotEmpty(t, cm.Environments)
 				}
+			}
+		})
+	}
+}
+
+func TestListConnectionsCommand_ReturnsEmptyEnvironments(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		configContent  string
+		environment    string
+		expectedEnvs   []string
+		shouldHaveConn map[string]bool // environment name -> has connections
+	}{
+		{
+			name:          "all environments empty",
+			configContent: emptyConfig,
+			environment:   "", // list all environments
+			expectedEnvs:  []string{"dev"},
+			shouldHaveConn: map[string]bool{
+				"dev": false,
+			},
+		},
+		{
+			name:          "mixed environments - some empty, some with connections",
+			configContent: mixedEnvironmentsConfig,
+			environment:   "", // list all environments
+			expectedEnvs:  []string{"dev", "staging", "prod", "empty_env"},
+			shouldHaveConn: map[string]bool{
+				"dev":       true,
+				"staging":   false,
+				"prod":      true,
+				"empty_env": false,
+			},
+		},
+		{
+			name:          "specific empty environment",
+			configContent: mixedEnvironmentsConfig,
+			environment:   "staging",
+			expectedEnvs:  []string{"staging"},
+			shouldHaveConn: map[string]bool{
+				"staging": false,
+			},
+		},
+		{
+			name:          "specific empty environment 2",
+			configContent: mixedEnvironmentsConfig,
+			environment:   "empty_env",
+			expectedEnvs:  []string{"empty_env"},
+			shouldHaveConn: map[string]bool{
+				"empty_env": false,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			fs, configFile := setupTestConfig(t, tt.configContent)
+
+			// Load the config
+			cm, err := config.LoadOrCreate(fs, configFile)
+			require.NoError(t, err)
+
+			// Verify all expected environments exist in the config
+			for _, envName := range tt.expectedEnvs {
+				env, exists := cm.Environments[envName]
+				assert.True(t, exists, "Environment '%s' should exist", envName)
+				assert.NotNil(t, env, "Environment '%s' should not be nil", envName)
+				assert.NotNil(t, env.Connections, "Environment '%s' connections should not be nil", envName)
+
+				// Check if environment has connections as expected
+				connectionsList := env.Connections.ConnectionsSummaryList()
+				hasConnections := len(connectionsList) > 0
+				expectedHasConnections := tt.shouldHaveConn[envName]
+				
+				assert.Equal(t, expectedHasConnections, hasConnections, 
+					"Environment '%s' should have connections: %v, but has: %v", 
+					envName, expectedHasConnections, hasConnections)
+			}
+
+			// If testing specific environment, verify it exists and is accessible
+			if tt.environment != "" {
+				env, exists := cm.Environments[tt.environment]
+				assert.True(t, exists, "Specific environment '%s' should exist", tt.environment)
+				assert.NotNil(t, env, "Specific environment '%s' should not be nil", tt.environment)
+			}
+
+			// Verify that when listing all environments, empty environments are included
+			if tt.environment == "" {
+				assert.Equal(t, len(tt.expectedEnvs), len(cm.Environments), 
+					"Should have all expected environments including empty ones")
+				
+				// Count empty environments
+				emptyEnvCount := 0
+				for envName, env := range cm.Environments {
+					connectionsList := env.Connections.ConnectionsSummaryList()
+					if len(connectionsList) == 0 {
+						emptyEnvCount++
+						assert.Contains(t, tt.expectedEnvs, envName, 
+							"Empty environment '%s' should be in expected list", envName)
+					}
+				}
+				
+				// Count expected empty environments
+				expectedEmptyCount := 0
+				for _, hasConn := range tt.shouldHaveConn {
+					if !hasConn {
+						expectedEmptyCount++
+					}
+				}
+				
+				assert.Equal(t, expectedEmptyCount, emptyEnvCount, 
+					"Should have correct number of empty environments")
 			}
 		})
 	}
