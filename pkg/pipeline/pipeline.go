@@ -1060,7 +1060,15 @@ func (a *Asset) GetNameIfItWasSetFromItsPath(foundPipeline *Pipeline) (string, e
 		}
 	}
 
-	name := strings.ReplaceAll(relativePath, string(filepath.Separator), ".")
+	parts := strings.Split(relativePath, string(filepath.Separator))
+	for i, part := range parts {
+		if part == "assets" {
+			parts = parts[i+1:]
+			break
+		}
+	}
+
+	name := strings.Join(parts, ".")
 
 	switch {
 	case strings.HasSuffix(name, ".asset.yml"):
