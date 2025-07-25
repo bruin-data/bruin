@@ -135,6 +135,7 @@ export default withMermaid({
                     {text: "Clickhouse", link: "/platforms/clickhouse"},
                     {text: "Databricks", link: "/platforms/databricks"},
                     {text: "DuckDB", link: "/platforms/duckdb"},
+                    {text: "MotherDuck", link: "/platforms/motherduck"},
                     {text: "Google BigQuery", link: "/platforms/bigquery"},
                     {text: "Microsoft SQL Server", link: "/platforms/mssql"},
                     {text: "Postgres", link: "/platforms/postgres"},
