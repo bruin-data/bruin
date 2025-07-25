@@ -1531,14 +1531,14 @@ func TestBuildTableExistsQuery(t *testing.T) {
 			name:      "valid dataset.table format",
 			client:    &Client{config: &Config{ProjectID: "test-project"}},
 			tableName: "dataset.table",
-			wantQuery: "SELECT EXISTS (SELECT 1 FROM test-project.dataset.INFORMATION_SCHEMA.TABLES WHERE table_name = 'table')",
+			wantQuery: "SELECT COUNT(*) FROM `test-project.dataset.INFORMATION_SCHEMA.TABLES` WHERE table_name = 'table'",
 			wantErr:   false,
 		},
 		{
 			name:      "valid project.dataset.table format",
 			client:    &Client{config: &Config{ProjectID: "test-project"}},
 			tableName: "other-project.dataset.table",
-			wantQuery: "SELECT EXISTS (SELECT 1 FROM other-project.dataset.INFORMATION_SCHEMA.TABLES WHERE table_name = 'table')",
+			wantQuery: "SELECT COUNT(*) FROM `other-project.dataset.INFORMATION_SCHEMA.TABLES` WHERE table_name = 'table'",
 			wantErr:   false,
 		},
 		{
