@@ -486,8 +486,7 @@ func (d *Client) BuildTableExistsQuery(tableName string) (string, error) {
 	}
 
 	// Use EXISTS to return true or false
-	query := fmt.Sprintf(`
-		SELECT EXISTS (SELECT 1 FROM %s WHERE table_name = '%s')`, datasetRef, targetTable)
+	query := fmt.Sprintf("SELECT 1 FROM `%s` WHERE table_name = '%s'", datasetRef, targetTable)
 
 	return strings.TrimSpace(query), nil
 }
