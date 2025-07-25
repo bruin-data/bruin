@@ -53,7 +53,7 @@ environments:
     schema_prefix: "dev_"
 `
 
-// Add a new config for testing mixed environments (some with connections, some empty)
+// Add a new config for testing mixed environments (some with connections, some empty).
 const mixedEnvironmentsConfig = `
 default_environment: dev
 environments:
@@ -484,9 +484,9 @@ func TestListConnectionsCommand_ReturnsEmptyEnvironments(t *testing.T) {
 				connectionsList := env.Connections.ConnectionsSummaryList()
 				hasConnections := len(connectionsList) > 0
 				expectedHasConnections := tt.shouldHaveConn[envName]
-				
-				assert.Equal(t, expectedHasConnections, hasConnections, 
-					"Environment '%s' should have connections: %v, but has: %v", 
+
+				assert.Equal(t, expectedHasConnections, hasConnections,
+					"Environment '%s' should have connections: %v, but has: %v",
 					envName, expectedHasConnections, hasConnections)
 			}
 
@@ -499,20 +499,20 @@ func TestListConnectionsCommand_ReturnsEmptyEnvironments(t *testing.T) {
 
 			// Verify that when listing all environments, empty environments are included
 			if tt.environment == "" {
-				assert.Equal(t, len(tt.expectedEnvs), len(cm.Environments), 
+				assert.Equal(t, len(tt.expectedEnvs), len(cm.Environments),
 					"Should have all expected environments including empty ones")
-				
+
 				// Count empty environments
 				emptyEnvCount := 0
 				for envName, env := range cm.Environments {
 					connectionsList := env.Connections.ConnectionsSummaryList()
 					if len(connectionsList) == 0 {
 						emptyEnvCount++
-						assert.Contains(t, tt.expectedEnvs, envName, 
+						assert.Contains(t, tt.expectedEnvs, envName,
 							"Empty environment '%s' should be in expected list", envName)
 					}
 				}
-				
+
 				// Count expected empty environments
 				expectedEmptyCount := 0
 				for _, hasConn := range tt.shouldHaveConn {
@@ -520,8 +520,8 @@ func TestListConnectionsCommand_ReturnsEmptyEnvironments(t *testing.T) {
 						expectedEmptyCount++
 					}
 				}
-				
-				assert.Equal(t, expectedEmptyCount, emptyEnvCount, 
+
+				assert.Equal(t, expectedEmptyCount, emptyEnvCount,
 					"Should have correct number of empty environments")
 			}
 		})
