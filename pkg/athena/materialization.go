@@ -29,7 +29,7 @@ var matMap = AssetMaterializationMap{
 		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
-		pipeline.MaterializationStrategySCD2ByColumn:  buildSCD2ByColumnQuery,
+		pipeline.MaterializationStrategySCD2ByColumn:  buildSCD2ByColumn2,
 		pipeline.MaterializationStrategySCD2ByTime:    buildSCD2ByTimeQuery,
 	},
 }
@@ -416,7 +416,6 @@ SELECT %s FROM historical`,
 		// Historical data
 		strings.Join(allCols, ", "),
 		asset.Name,
-		// Unions
 		strings.Join(allCols, ", "),
 		strings.Join(allCols, ", "),
 		strings.Join(allCols, ", "),
@@ -670,6 +669,157 @@ FROM (
 		partitionBy,
 		strings.Join(srcCols, ", "),
 		strings.TrimSpace(query),
+	)
+
+	return []string{
+		strings.TrimSpace(createQuery),
+		"\nDROP TABLE IF EXISTS " + asset.Name,
+		fmt.Sprintf("\nALTER TABLE %s RENAME TO %s;", tempTableName, asset.Name),
+	}, nil
+}
+
+// buildSCD2ByColumn2 generates an SCD2 by column query matching the provided SQL structure.
+func buildSCD2ByColumn2(asset *pipeline.Asset, query, location string) ([]string, error) {
+	query = strings.TrimSuffix(query, ";")
+
+	var (
+		primaryKeys = make([]string, 0, 4)
+		userCols    = make([]string, 0, 12)
+		nonPKCols   = make([]string, 0, 12)
+	)
+
+	for _, col := range asset.Columns {
+		switch col.Name {
+		case "_is_current", "_valid_from", "_valid_until":
+			return nil, fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
+		}
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, col.Name)
+		} else {
+			nonPKCols = append(nonPKCols, col.Name)
+		}
+		userCols = append(userCols, col.Name)
+	}
+
+	if len(primaryKeys) == 0 {
+		return nil, fmt.Errorf("materialization strategy %s requires the primary_key field to be set on at least one column", asset.Materialization.Strategy)
+	}
+
+	var partitionBy string
+	if asset.Materialization.PartitionBy != "" {
+		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", asset.Materialization.PartitionBy)
+	}
+
+	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
+
+	// Build join conditions for primary keys
+	onConds := make([]string, len(primaryKeys))
+	for i, pk := range primaryKeys {
+		onConds[i] = fmt.Sprintf("t.%s = s.%s", pk, pk)
+	}
+	joinCondition := strings.Join(onConds, " AND ")
+
+	sourcePKCols := make([]string, len(primaryKeys))
+	targetPKCols := make([]string, len(primaryKeys))
+	for i, pk := range primaryKeys {
+		sourcePKCols[i] = fmt.Sprintf("s.%s", pk)
+		targetPKCols[i] = fmt.Sprintf("t.%s", pk)
+	}
+	//sourcePKNotNullColsList := strings.Join(sourcePKCols, " IS NOT NULL AND	")
+	//targetPKIsNullColsList := strings.Join(targetPKCols, " IS NULL AND ")
+
+	changeCondition := ""
+	for _, col := range nonPKCols {
+		changeCondition += fmt.Sprintf("t.%s != s.%s", col, col)
+	}
+	changeCondition = strings.TrimSuffix(changeCondition, " OR ")
+
+	// Build user column list for SELECTs
+	userColList := strings.Join(userCols, ", ")
+	allCols := append([]string{}, userCols...)
+	allCols = append(allCols, "_valid_from", "_valid_until", "_is_current")
+	allColList := strings.Join(allCols, ", ")
+
+	// to_keep SELECT
+	toKeepSelectCols := make([]string, 0, len(userCols)+3)
+	for _, col := range userCols {
+		toKeepSelectCols = append(toKeepSelectCols, fmt.Sprintf("t.%s", col))
+	}
+
+	// to_insert SELECT
+	toInsertSelectCols := make([]string, 0, len(userCols)+3)
+	for _, col := range userCols {
+		toInsertSelectCols = append(toInsertSelectCols, fmt.Sprintf("s.%s AS %s", col, col))
+	}
+
+	createQuery := fmt.Sprintf(`
+CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
+WITH
+  time_now AS (
+    SELECT CURRENT_TIMESTAMP AS now
+  ),
+   source AS (
+	SELECT %s,
+	TRUE as _matched_by_source from (%s)
+  ),
+  target AS (
+    SELECT %s,
+	TRUE as _matched_by_target from (%s)
+  ),
+  current_data AS (
+    SELECT %s, _valid_from, _valid_until, _is_current
+    FROM target
+    WHERE _is_current = TRUE
+  ),
+  to_keep AS (
+    SELECT %s,
+	t._valid_from,
+	CASE 
+		WHEN _matched_by_source IS NOT NULL AND (%s) THEN (SELECT now FROM time_now)
+		WHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)
+		ELSE t._valid_until
+	END AS _valid_until,
+	(_matched_by_source IS NULL AND (%s)) AS _is_current
+    FROM target t
+    LEFT JOIN source s ON (%s) AND t._is_current = TRUE
+  ),
+  -- New/changed inserts from source
+  to_insert AS (
+    SELECT %s,
+	(SELECT now FROM time_now) AS _valid_from,
+	TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
+	TRUE AS _is_current
+    FROM source s
+    LEFT JOIN current_data t ON (%s)
+    WHERE (_matched_by_target IS NOT NULL) OR (%s)
+  )
+SELECT %s FROM to_keep
+UNION ALL
+SELECT %s FROM to_insert;`,
+		tempTableName,
+		location,
+		tempTableName,
+		partitionBy,
+		// Source data
+		userColList,
+		strings.TrimSpace(query),
+		// Target data
+		userColList,
+		// current_data data
+		userColList,
+		// to_keep data
+		strings.Join(toKeepSelectCols, ", \n    "),
+		changeCondition,
+		changeCondition,
+		asset.Name,
+		joinCondition,
+		// to_insert data
+		strings.Join(toInsertSelectCols, ",\n    "),
+		joinCondition,
+		changeCondition,
+		//unions
+		allColList,
+		allColList,
 	)
 
 	return []string{
