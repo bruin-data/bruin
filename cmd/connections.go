@@ -351,6 +351,12 @@ func (r *ConnectionsCommand) ListConnections(pathToProject, output, environment,
 
 		rows := env.Connections.ConnectionsSummaryList()
 
+		if len(rows) == 0 {
+			t.Render()
+			fmt.Println()
+			continue
+		}
+
 		for row, connType := range rows {
 			t.AppendRow(table.Row{connType, row})
 		}
