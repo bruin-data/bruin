@@ -56,30 +56,31 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 func (o BasicOperator) handleDatasourceRefresh(ctx context.Context, client *Client, t *pipeline.Asset) error {
 	refreshVal, ok := t.Parameters["refresh"]
 	refresh := refreshVal == "true"
-	// if refresh is false, or if the parameter is not present, we treat 
-	if !ok || !refresh  {return nil }
+	// if refresh is false, or if the parameter is not present, we treat
+	if !ok || !refresh {
+		return nil
+	}
 
-    
 	datasourceID, ok := t.Parameters["datasource_id"]
 	if !ok || datasourceID == "" {
-			name, hasName := t.Parameters["datasource_name"]
-			if !hasName || name == "" {
-				return errors.New("tableau.datasource asset requires either 'datasource_id' or 'datasource_name' parameter when 'refresh' is true")
-			}
-			datasources, err := client.GetDatasource(ctx)
-			if err != nil {
-				return errors.Wrap(err, "failed to list datasources for name lookup")
-			}
-			id, err := FindDatasourceIDByName(ctx, name, datasources)
-			if err != nil {
-				return errors.Wrapf(err, "failed to find datasource id for name '%s'", name)
-			}
-			if id == "" {
-				return errors.Errorf("no datasource found with name '%s'", name)
-			}
-			datasourceID = id
+		name, hasName := t.Parameters["datasource_name"]
+		if !hasName || name == "" {
+			return errors.New("tableau.datasource asset requires either 'datasource_id' or 'datasource_name' parameter when 'refresh' is true")
 		}
-		if err := client.RefreshDataSource(ctx, datasourceID); err != nil {
+		datasources, err := client.GetDatasource(ctx)
+		if err != nil {
+			return errors.Wrap(err, "failed to list datasources for name lookup")
+		}
+		id, err := FindDatasourceIDByName(ctx, name, datasources)
+		if err != nil {
+			return errors.Wrapf(err, "failed to find datasource id for name '%s'", name)
+		}
+		if id == "" {
+			return errors.Errorf("no datasource found with name '%s'", name)
+		}
+		datasourceID = id
+	}
+	if err := client.RefreshDataSource(ctx, datasourceID); err != nil {
 		return errors.Wrap(err, "failed to refresh Tableau data source")
 	}
 
@@ -90,32 +91,33 @@ func (o BasicOperator) handleDatasourceRefresh(ctx context.Context, client *Clie
 func (o BasicOperator) handleWorkbookRefresh(ctx context.Context, client *Client, t *pipeline.Asset) error {
 	refreshVal, ok := t.Parameters["refresh"]
 	refresh := refreshVal == "true"
-	// if refresh is false, or if the parameter is not present, we treat 
-	if !ok || !refresh {return nil}
+	// if refresh is false, or if the parameter is not present, we treat
+	if !ok || !refresh {
+		return nil
+	}
 
 	workbookID, ok := t.Parameters["workbook_id"]
-		if !ok || workbookID == "" {
-			name, hasName := t.Parameters["workbook_name"]
-			if !hasName || name == "" {
-				return errors.New("tableau.workbook asset requires either 'workbook_id' or 'workbook_name' parameter when 'refresh' is true")
-			}
-			workbooks, err := client.GetWorkbooks(ctx)
-			if err != nil {
-				return errors.Wrap(err, "failed to list workbooks for name lookup")
-			}
-			id, err := FindWorkbookIDByName(ctx, name, workbooks)
-			if err != nil {
-				return errors.Wrapf(err, "failed to find workbook id for name '%s'", name)
-			}
-			if id == "" {
-				return errors.Errorf("no workbook found with name '%s'", name)
-			}
-			workbookID = id
+	if !ok || workbookID == "" {
+		name, hasName := t.Parameters["workbook_name"]
+		if !hasName || name == "" {
+			return errors.New("tableau.workbook asset requires either 'workbook_id' or 'workbook_name' parameter when 'refresh' is true")
 		}
-		if err := client.RefreshWorksheet(ctx, workbookID); err != nil {
-			return errors.Wrap(err, "failed to refresh Tableau workbook")
+		workbooks, err := client.GetWorkbooks(ctx)
+		if err != nil {
+			return errors.Wrap(err, "failed to list workbooks for name lookup")
 		}
-	
+		id, err := FindWorkbookIDByName(ctx, name, workbooks)
+		if err != nil {
+			return errors.Wrapf(err, "failed to find workbook id for name '%s'", name)
+		}
+		if id == "" {
+			return errors.Errorf("no workbook found with name '%s'", name)
+		}
+		workbookID = id
+	}
+	if err := client.RefreshWorksheet(ctx, workbookID); err != nil {
+		return errors.Wrap(err, "failed to refresh Tableau workbook")
+	}
 
 	return nil
 }
