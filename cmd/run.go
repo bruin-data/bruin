@@ -887,7 +887,7 @@ func Run(isDebug *bool) *cli.Command {
 			timeoutDuration := time.Duration(c.Int("timeout")) * time.Second
 			timeoutCtx, timeoutCancel := context.WithTimeout(runCtx, timeoutDuration)
 			defer timeoutCancel()
-			
+
 			// Combine timeout context with signal handling
 			exeCtx, cancel := signal.NotifyContext(timeoutCtx, syscall.SIGINT, syscall.SIGTERM)
 			defer cancel()
