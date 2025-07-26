@@ -1,6 +1,8 @@
 name: Update Ingestr Version
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '*/20 * * * *'
 
 permissions:
   contents: write
@@ -61,19 +63,8 @@ jobs:
           
           echo "Changes staged successfully"
 
-      - name: Check if branch exists
-        id: check-branch-exists
-        if: steps.check.outputs.new == 'true'
-        run: |
-            if [[ -n $(git ls-remote --heads origin update-ingestr-${{ steps.check.outputs.version }}) ]]; then
-                echo "exists=true" >> $GITHUB_OUTPUT
-            else
-                echo "exists=false" >> $GITHUB_OUTPUT          
-            fi
-        shell: bash
-
       - name: Create Pull Request
-        if: steps.check.outputs.new == 'true' && steps.check-branch-exists.outputs.exists == 'false'
+        if: steps.check.outputs.new == 'true'
         uses: peter-evans/create-pull-request@v7.0.8
         with:
           branch: update-ingestr-${{ steps.check.outputs.version }}
