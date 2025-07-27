@@ -131,6 +131,53 @@ func TestFillColumnsFromDB(t *testing.T) {
 				{Name: "name", Type: "STRING", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
 			},
 		},
+		{
+			name: "Type change for existing column",
+			existingCols: []pipeline.Column{
+				{Name: "price", Type: "DECIMAL(5,2)", Checks: []pipeline.ColumnCheck{{Name: "positive"}}, Upstreams: []*pipeline.UpstreamColumn{}},
+				{Name: "stock", Type: "INTEGER", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
+			},
+			dbColumns:      []string{"price", "stock"},
+			dbColumnTypes:  []string{"DOUBLE", "BIGINT"},
+			expectedStatus: fillStatusUpdated,
+			expectError:    false,
+			expectedCols: []pipeline.Column{
+				{Name: "price", Type: "DOUBLE", Checks: []pipeline.ColumnCheck{{Name: "positive"}}, Upstreams: []*pipeline.UpstreamColumn{}},
+				{Name: "stock", Type: "BIGINT", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
+			},
+		},
+		{
+			name: "Mixed scenario: type changes and new columns",
+			existingCols: []pipeline.Column{
+				{Name: "id", Type: "INTEGER", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
+				{Name: "price", Type: "DECIMAL(5,2)", Checks: []pipeline.ColumnCheck{{Name: "positive"}}, Upstreams: []*pipeline.UpstreamColumn{}},
+			},
+			dbColumns:      []string{"id", "price", "description", "created_at"},
+			dbColumnTypes:  []string{"INTEGER", "DOUBLE", "VARCHAR", "TIMESTAMP"},
+			expectedStatus: fillStatusUpdated,
+			expectError:    false,
+			expectedCols: []pipeline.Column{
+				{Name: "id", Type: "INTEGER", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
+				{Name: "price", Type: "DOUBLE", Checks: []pipeline.ColumnCheck{{Name: "positive"}}, Upstreams: []*pipeline.UpstreamColumn{}},
+				{Name: "description", Type: "VARCHAR", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
+				{Name: "created_at", Type: "TIMESTAMP", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
+			},
+		},
+		{
+			name: "Case insensitive type change",
+			existingCols: []pipeline.Column{
+				{Name: "ID", Type: "INT", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
+				{Name: "Name", Type: "VARCHAR(50)", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
+			},
+			dbColumns:      []string{"id", "name"},
+			dbColumnTypes:  []string{"BIGINT", "TEXT"},
+			expectedStatus: fillStatusUpdated,
+			expectError:    false,
+			expectedCols: []pipeline.Column{
+				{Name: "ID", Type: "BIGINT", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
+				{Name: "Name", Type: "TEXT", Checks: []pipeline.ColumnCheck{}, Upstreams: []*pipeline.UpstreamColumn{}},
+			},
+		},
 	}
 
 	for _, tt := range tests {

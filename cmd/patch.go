@@ -134,24 +134,35 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager inte
 		return fillStatusUpdated, nil
 	}
 
-	hasNewColumns := false
+	hasChanges := false
 	for i, colName := range result.Columns {
 		if skipColumns[colName] {
 			continue
 		}
 		lowerColName := strings.ToLower(colName)
-		if _, exists := existingColumns[lowerColName]; !exists {
+		if existingCol, exists := existingColumns[lowerColName]; exists {
+			if existingCol.Type != result.ColumnTypes[i] {
+				for j := range pp.Asset.Columns {
+					if strings.ToLower(pp.Asset.Columns[j].Name) == lowerColName {
+						pp.Asset.Columns[j].Type = result.ColumnTypes[i]
+						hasChanges = true
+						break
+					}
+				}
+			}
+		} else {
+			// Add new column
 			pp.Asset.Columns = append(pp.Asset.Columns, pipeline.Column{
 				Name:      colName,
 				Type:      result.ColumnTypes[i],
 				Checks:    []pipeline.ColumnCheck{},
 				Upstreams: []*pipeline.UpstreamColumn{},
 			})
-			hasNewColumns = true
+			hasChanges = true
 		}
 	}
 
-	if !hasNewColumns {
+	if !hasChanges {
 		return fillStatusSkipped, nil
 	}
 
