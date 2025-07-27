@@ -753,73 +753,73 @@ func buildSCD2ByColumn2(asset *pipeline.Asset, query, location string) ([]string
 	}
 
 	createQuery := fmt.Sprintf(`
-CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
+CREATE TABLE %[1]s WITH (table_type='ICEBERG', is_external=false, location='%[2]s/%[1]s') %[3]s AS
 WITH
   time_now AS (
     SELECT CURRENT_TIMESTAMP AS now
   ),
    source AS (
-	SELECT %s,
-	TRUE as _matched_by_source from (%s)
+	SELECT %[4]s,
+	TRUE as _matched_by_source from (
+	%[5]s
+	)
   ),
   target AS (
-    SELECT %s,
-	TRUE as _matched_by_target from (%s)
+    SELECT %[6]s,
+	TRUE as _matched_by_target from %[7]s
   ),
   current_data AS (
-    SELECT %s, _valid_from, _valid_until, _is_current
-    FROM target
+    SELECT *
+    FROM target as t
     WHERE _is_current = TRUE
   ),
+  --current or updated (expired) existing rows from target
   to_keep AS (
-    SELECT %s,
+    SELECT %[9]s,
 	t._valid_from,
 	CASE 
-		WHEN _matched_by_source IS NOT NULL AND (%s) THEN (SELECT now FROM time_now)
+		WHEN _matched_by_source IS NOT NULL AND (%[9]s) THEN (SELECT now FROM time_now)
 		WHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)
 		ELSE t._valid_until
 	END AS _valid_until,
-	(_matched_by_source IS NULL AND (%s)) AS _is_current
+	CASE
+		WHEN _matched_by_source IS NOT NULL AND (%[9]s) THEN FALSE
+		WHEN _matched_by_source IS NULL THEN FALSE
+		ELSE t._is_current
+	END AS _is_current
     FROM target t
-    LEFT JOIN source s ON (%s) AND t._is_current = TRUE
+    LEFT JOIN source s ON (%[10]s) AND t._is_current = TRUE
   ),
-  -- New/changed inserts from source
+  --new/updated rows from source
   to_insert AS (
-    SELECT %s,
+    SELECT %[11]s,
 	(SELECT now FROM time_now) AS _valid_from,
 	TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
 	TRUE AS _is_current
     FROM source s
-    LEFT JOIN current_data t ON (%s)
-    WHERE (_matched_by_target IS NOT NULL) OR (%s)
+    LEFT JOIN current_data t ON (%[10]s)
+    WHERE (_matched_by_target IS NULL) OR (%[9]s)
   )
-SELECT %s FROM to_keep
+SELECT %[7]s FROM to_keep
 UNION ALL
-SELECT %s FROM to_insert;`,
-		tempTableName,
-		location,
-		tempTableName,
-		partitionBy,
+SELECT %[7]s FROM to_insert;`,
+		tempTableName, //1
+		location, //2
+		partitionBy, //3
 		// Source data
-		userColList,
-		strings.TrimSpace(query),
+		userColList, //4
+		strings.TrimSpace(query), //5
 		// Target data
-		userColList,
-		// current_data data
-		userColList,
+		allColList, //6
+		asset.Name, //7
 		// to_keep data
-		strings.Join(toKeepSelectCols, ", \n    "),
-		changeCondition,
-		changeCondition,
-		asset.Name,
-		joinCondition,
+		strings.Join(toKeepSelectCols, ", \n    "), //8
+		changeCondition, //9
+		joinCondition, //10
 		// to_insert data
-		strings.Join(toInsertSelectCols, ",\n    "),
-		joinCondition,
-		changeCondition,
+		strings.Join(toInsertSelectCols, ",\n    "), //11
 		//unions
-		allColList,
-		allColList,
+		allColList, //6
 	)
 
 	return []string{
