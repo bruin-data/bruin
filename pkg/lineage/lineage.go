@@ -3,6 +3,7 @@ package lineage
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/jinja"
@@ -391,6 +392,26 @@ func updateExistingColumn(existingCol *pipeline.Column, upstreamCol *pipeline.Co
 
 	if existingCol.Tags == nil {
 		existingCol.Tags = upstreamCol.Tags
+	} else {
+		for _, tag := range upstreamCol.Tags {
+			if !slices.Contains(existingCol.Tags, tag) {
+				existingCol.Tags = append(existingCol.Tags, tag)
+			}
+		}
+	}
+
+	if existingCol.Domains == nil {
+		existingCol.Domains = upstreamCol.Domains
+	} else {
+		for _, domain := range upstreamCol.Domains {
+			if !slices.Contains(existingCol.Domains, domain) {
+				existingCol.Domains = append(existingCol.Domains, domain)
+			}
+		}
+	}
+
+	if existingCol.Owner == "" {
+		existingCol.Owner = upstreamCol.Owner
 	}
 
 	existingCol.UpdateOnMerge = upstreamCol.UpdateOnMerge
