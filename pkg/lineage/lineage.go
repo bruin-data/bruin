@@ -389,6 +389,10 @@ func updateExistingColumn(existingCol *pipeline.Column, upstreamCol *pipeline.Co
 		existingCol.PrimaryKey = upstreamCol.PrimaryKey
 	}
 
+	if existingCol.Tags == nil {
+		existingCol.Tags = upstreamCol.Tags
+	}
+
 	existingCol.UpdateOnMerge = upstreamCol.UpdateOnMerge
 }
 
