@@ -1,4 +1,4 @@
-# Interval Modifiers: Adjusting Your Processing Window
+# Interval Modifiers
 
 Bruin supports adjusting the start and end of your data processing window using `interval_modifiers`. This is useful in situations where events might arrive late (e.g. offline mobile game events) or slightly ahead of schedule.
 
