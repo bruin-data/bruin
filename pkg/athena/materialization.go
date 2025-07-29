@@ -29,7 +29,7 @@ var matMap = AssetMaterializationMap{
 		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
-		pipeline.MaterializationStrategySCD2ByColumn:  buildSCD2ByColumn2,
+		pipeline.MaterializationStrategySCD2ByColumn:  buildSCD2ByColumnQuery,
 		pipeline.MaterializationStrategySCD2ByTime:    buildSCD2ByTimeQuery,
 	},
 }
@@ -217,9 +217,9 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 	query = strings.TrimSuffix(query, ";")
 
 	var (
-		primaryKeys       = make([]string, 0, 4)
-		compareConditions = make([]string, 0, 4)
-		userCols          = make([]string, 0, 12)
+		primaryKeys = make([]string, 0, 4)
+		userCols    = make([]string, 0, 12)
+		nonPKCols   = make([]string, 0, 12)
 	)
 
 	for _, col := range asset.Columns {
@@ -230,14 +230,13 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 		if col.PrimaryKey {
 			primaryKeys = append(primaryKeys, col.Name)
 		} else {
-			compareConditions = append(compareConditions, fmt.Sprintf("t.%s != s.%s", col.Name, col.Name))
+			nonPKCols = append(nonPKCols, col.Name)
 		}
 		userCols = append(userCols, col.Name)
 	}
 
 	if len(primaryKeys) == 0 {
-		return nil, fmt.Errorf("materialization strategy %s requires the `primary_key` field to be set on at least one column",
-			asset.Materialization.Strategy)
+		return nil, fmt.Errorf("materialization strategy %s requires the primary_key field to be set on at least one column", asset.Materialization.Strategy)
 	}
 
 	var partitionBy string
@@ -247,179 +246,115 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 
 	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
-	// Build join conditions
+	// Build join conditions for primary keys
 	onConds := make([]string, len(primaryKeys))
 	for i, pk := range primaryKeys {
 		onConds[i] = fmt.Sprintf("t.%s = s.%s", pk, pk)
 	}
 	joinCondition := strings.Join(onConds, " AND ")
 
-	// Build primary key checks
-	targetPrimaryKeys := make([]string, len(primaryKeys))
+	sourcePKCols := make([]string, len(primaryKeys))
+	targetPKCols := make([]string, len(primaryKeys))
 	for i, pk := range primaryKeys {
-		targetPrimaryKeys[i] = "t." + pk
+		sourcePKCols[i] = fmt.Sprintf("s.%s", pk)
+		targetPKCols[i] = fmt.Sprintf("t.%s", pk)
 	}
-	targetPKIsNullCheck := strings.Join(targetPrimaryKeys, " IS NULL AND ")
 
-	sourcePrimaryKeys := make([]string, len(primaryKeys))
-	for i, pk := range primaryKeys {
-		sourcePrimaryKeys[i] = "s_" + pk
+	changeConditions := make([]string, 0, len(nonPKCols))
+	for _, col := range nonPKCols {
+		changeConditions = append(changeConditions, fmt.Sprintf("t.%s != s.%s", col, col))
 	}
-	sourcePKIsNullCheck := strings.Join(sourcePrimaryKeys, " IS NULL AND ")
-	sourcePKNotNullCheck := strings.Join(sourcePrimaryKeys, " IS NOT NULL AND ")
+	changeCondition := ""
+	if len(changeConditions) > 0 {
+		changeCondition = strings.Join(changeConditions, " OR ")
+	}
 
-	// Build CASE condition for change detection
-	changeCondition := strings.Join(compareConditions, " OR ")
-
-	// Build column lists
+	// Build user column list for SELECTs
+	userColList := strings.Join(userCols, ", ")
 	allCols := append([]string{}, userCols...)
 	allCols = append(allCols, "_valid_from", "_valid_until", "_is_current")
+	allColList := strings.Join(allCols, ", ")
 
-	// Build joined CTE SELECT with explicit aliases
-	joinedSelectCols := make([]string, 0, len(userCols)*2+3)
+	// to_keep SELECT
+	toKeepSelectCols := make([]string, 0, len(userCols)+3)
 	for _, col := range userCols {
-		joinedSelectCols = append(joinedSelectCols, fmt.Sprintf("t.%s AS t_%s", col, col))
+		toKeepSelectCols = append(toKeepSelectCols, fmt.Sprintf("t.%s", col))
 	}
-	joinedSelectCols = append(joinedSelectCols, "t._valid_from")
-	joinedSelectCols = append(joinedSelectCols, "t._valid_until")
-	joinedSelectCols = append(joinedSelectCols, "t._is_current")
+
+	// to_insert SELECT
+	toInsertSelectCols := make([]string, 0, len(userCols)+3)
 	for _, col := range userCols {
-		joinedSelectCols = append(joinedSelectCols, fmt.Sprintf("s.%s AS s_%s", col, col))
+		toInsertSelectCols = append(toInsertSelectCols, fmt.Sprintf("s.%s AS %s", col, col))
 	}
 
-	// Build unchanged CTE SELECT
-	unchangedSelectCols := make([]string, 0, len(allCols))
-	for _, col := range userCols {
-		unchangedSelectCols = append(unchangedSelectCols, fmt.Sprintf("t_%s AS %s", col, col))
-	}
-
-	// Build to_expire CTE SELECT
-	expireSelectCols := make([]string, 0, len(userCols)+3)
-	for _, col := range userCols {
-		expireSelectCols = append(expireSelectCols, fmt.Sprintf("t_%s AS %s", col, col))
-	}
-
-	// Build to_insert CTE SELECT
-	insertSelectCols := make([]string, 0, len(userCols)+3)
-	for _, col := range userCols {
-		insertSelectCols = append(insertSelectCols, fmt.Sprintf("s.%s AS %s", col, col))
-	}
-
-	// Build change condition for joined CTE (using aliased column names)
-	joinedChangeConds := make([]string, len(compareConditions))
-	for i, cond := range compareConditions {
-		// Replace t.col and s.col with t_col and s_col
-		cond = strings.ReplaceAll(cond, "t.", "t_")
-		cond = strings.ReplaceAll(cond, "s.", "s_")
-		joinedChangeConds[i] = cond
-	}
-	joinedChangeCondition := strings.Join(joinedChangeConds, " OR ")
-
-	// Build unchanged condition (equality check)
-	unchangedConds := make([]string, len(compareConditions))
-	for i, cond := range compareConditions {
-		// Replace t.col != s.col with t_col = s_col for unchanged check
-		cond = strings.ReplaceAll(cond, "t.", "t_")
-		cond = strings.ReplaceAll(cond, "s.", "s_")
-		cond = strings.ReplaceAll(cond, "!=", "=")
-		unchangedConds[i] = cond
-	}
-	unchangedCondition := strings.Join(unchangedConds, " AND ")
-
-	//nolint:dupword
 	createQuery := fmt.Sprintf(`
-CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
+CREATE TABLE %[1]s WITH (table_type='ICEBERG', is_external=false, location='%[2]s/%[1]s'%[3]s) AS
 WITH
-time_now AS (
-  SELECT CURRENT_TIMESTAMP AS now
-),
-source AS (
-  %s
-),
-target AS (
-  SELECT %s 	
-  FROM %s 
-  WHERE _is_current = TRUE
-),
-joined AS (
-  SELECT %s
-  FROM target t
-  LEFT JOIN source s ON %s
-),
--- Rows that are unchanged
-unchanged AS (
-  SELECT %s,
-  _valid_from,
-  _valid_until,
-  _is_current
-  FROM joined
-  WHERE %s IS NOT NULL AND %s
-),
--- Rows that need to be expired (changed or missing in source)
-to_expire AS (
-  SELECT %s,
-  _valid_from,
-  (SELECT now FROM time_now) AS _valid_until,
-  FALSE AS _is_current
-  FROM joined
-  WHERE %s IS NULL OR %s
-),
--- New/changed inserts from source
-to_insert AS (
-  SELECT %s,
-  (SELECT now FROM time_now) AS _valid_from,
-  TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
-  TRUE AS _is_current
-  FROM source s
-  LEFT JOIN target t ON %s
-  WHERE %s IS NULL OR %s
-),
--- Already expired historical rows (untouched)
-historical AS (
-  SELECT %s
-  FROM %s
-  WHERE _is_current = FALSE
-)
-SELECT %s FROM unchanged
+	time_now AS (
+    	SELECT CURRENT_TIMESTAMP AS now
+	),
+	source AS (
+		SELECT %[4]s,
+		TRUE as _matched_by_source 
+		FROM (%[5]s
+		)
+	),
+	target AS (
+    	SELECT %[6]s,
+		TRUE as _matched_by_target FROM %[7]s
+	),
+	current_data AS (
+    	SELECT %[6]s
+    	FROM target as t
+    	WHERE _is_current = TRUE
+	),
+	--current or updated (expired) existing rows from target
+	to_keep AS (
+    	SELECT %[4]s,
+			t._valid_from,
+			CASE 
+				WHEN _matched_by_source IS NOT NULL AND (%[9]s) THEN (SELECT now FROM time_now)
+				WHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)
+				ELSE t._valid_until
+			END AS _valid_until,
+			CASE
+				WHEN _matched_by_source IS NOT NULL AND (%[9]s) THEN FALSE
+				WHEN _matched_by_source IS NULL THEN FALSE
+				ELSE t._is_current
+			END AS _is_current
+    	FROM target t
+    	LEFT JOIN source s ON (%[10]s) AND t._is_current = TRUE
+	),
+	--new/updated rows from source
+	to_insert AS (
+    	SELECT %[11]s,
+			(SELECT now FROM time_now) AS _valid_from,
+			TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
+			TRUE AS _is_current
+    	FROM source s
+    	LEFT JOIN current_data t ON (%[10]s)
+    	WHERE (_matched_by_target IS NULL) OR (%[9]s)
+	)
+SELECT %[6]s FROM to_keep
 UNION ALL
-SELECT %s FROM to_expire
-UNION ALL
-SELECT %s FROM to_insert
-UNION ALL
-SELECT %s FROM historical`,
-		// Create table
-		tempTableName,
-		location,
-		tempTableName,
-		partitionBy,
+SELECT %[6]s FROM to_insert;`,
+		tempTableName, //1
+		location, //2
+		partitionBy, //3
 		// Source data
-		strings.TrimSpace(query),
-		// Target data
-		strings.Join(allCols, ", "),
-		asset.Name,
-		// Joined data
-		strings.Join(joinedSelectCols, ",\n    "),
-		joinCondition,
-		// Unchanged data
-		strings.Join(unchangedSelectCols, ", "),
-		sourcePKNotNullCheck,
-		unchangedCondition,
-		// Expired data
-		strings.Join(expireSelectCols, ", "),
-		sourcePKIsNullCheck,
-		joinedChangeCondition,
-		// Insert data
-		strings.Join(insertSelectCols, ", "),
-		joinCondition,
-		targetPKIsNullCheck,
-		changeCondition,
-		// Historical data
-		strings.Join(allCols, ", "),
-		asset.Name,
-		strings.Join(allCols, ", "),
-		strings.Join(allCols, ", "),
-		strings.Join(allCols, ", "),
-		strings.Join(allCols, ", "),
+		userColList, //4
+		strings.TrimSpace(query), //5
+		// Target data + current_data
+		allColList, //6
+		asset.Name, //7
+		// to_keep data
+		strings.Join(toKeepSelectCols, ", \n    "), //8
+		changeCondition, //9
+		joinCondition, //10
+		// to_insert data
+		strings.Join(toInsertSelectCols, ",\n    "), //11
+		//unions
+		allColList, //6
 	)
 
 	return []string{
@@ -428,6 +363,7 @@ SELECT %s FROM historical`,
 		fmt.Sprintf("\nALTER TABLE %s RENAME TO %s;", tempTableName, asset.Name),
 	}, nil
 }
+
 
 func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]string, error) {
 	query = strings.TrimSuffix(query, ";")
@@ -678,153 +614,4 @@ FROM (
 	}, nil
 }
 
-// buildSCD2ByColumn2 generates an SCD2 by column query matching the provided SQL structure.
-func buildSCD2ByColumn2(asset *pipeline.Asset, query, location string) ([]string, error) {
-	query = strings.TrimSuffix(query, ";")
 
-	var (
-		primaryKeys = make([]string, 0, 4)
-		userCols    = make([]string, 0, 12)
-		nonPKCols   = make([]string, 0, 12)
-	)
-
-	for _, col := range asset.Columns {
-		switch col.Name {
-		case "_is_current", "_valid_from", "_valid_until":
-			return nil, fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
-		}
-		if col.PrimaryKey {
-			primaryKeys = append(primaryKeys, col.Name)
-		} else {
-			nonPKCols = append(nonPKCols, col.Name)
-		}
-		userCols = append(userCols, col.Name)
-	}
-
-	if len(primaryKeys) == 0 {
-		return nil, fmt.Errorf("materialization strategy %s requires the primary_key field to be set on at least one column", asset.Materialization.Strategy)
-	}
-
-	var partitionBy string
-	if asset.Materialization.PartitionBy != "" {
-		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", asset.Materialization.PartitionBy)
-	}
-
-	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
-
-	// Build join conditions for primary keys
-	onConds := make([]string, len(primaryKeys))
-	for i, pk := range primaryKeys {
-		onConds[i] = fmt.Sprintf("t.%s = s.%s", pk, pk)
-	}
-	joinCondition := strings.Join(onConds, " AND ")
-
-	sourcePKCols := make([]string, len(primaryKeys))
-	targetPKCols := make([]string, len(primaryKeys))
-	for i, pk := range primaryKeys {
-		sourcePKCols[i] = fmt.Sprintf("s.%s", pk)
-		targetPKCols[i] = fmt.Sprintf("t.%s", pk)
-	}
-	//sourcePKNotNullColsList := strings.Join(sourcePKCols, " IS NOT NULL AND	")
-	//targetPKIsNullColsList := strings.Join(targetPKCols, " IS NULL AND ")
-
-	changeCondition := ""
-	for _, col := range nonPKCols {
-		changeCondition += fmt.Sprintf("t.%s != s.%s", col, col)
-	}
-	changeCondition = strings.TrimSuffix(changeCondition, " OR ")
-
-	// Build user column list for SELECTs
-	userColList := strings.Join(userCols, ", ")
-	allCols := append([]string{}, userCols...)
-	allCols = append(allCols, "_valid_from", "_valid_until", "_is_current")
-	allColList := strings.Join(allCols, ", ")
-
-	// to_keep SELECT
-	toKeepSelectCols := make([]string, 0, len(userCols)+3)
-	for _, col := range userCols {
-		toKeepSelectCols = append(toKeepSelectCols, fmt.Sprintf("t.%s", col))
-	}
-
-	// to_insert SELECT
-	toInsertSelectCols := make([]string, 0, len(userCols)+3)
-	for _, col := range userCols {
-		toInsertSelectCols = append(toInsertSelectCols, fmt.Sprintf("s.%s AS %s", col, col))
-	}
-
-	createQuery := fmt.Sprintf(`
-CREATE TABLE %[1]s WITH (table_type='ICEBERG', is_external=false, location='%[2]s/%[1]s') %[3]s AS
-WITH
-  time_now AS (
-    SELECT CURRENT_TIMESTAMP AS now
-  ),
-   source AS (
-	SELECT %[4]s,
-	TRUE as _matched_by_source from (
-	%[5]s
-	)
-  ),
-  target AS (
-    SELECT %[6]s,
-	TRUE as _matched_by_target from %[7]s
-  ),
-  current_data AS (
-    SELECT *
-    FROM target as t
-    WHERE _is_current = TRUE
-  ),
-  --current or updated (expired) existing rows from target
-  to_keep AS (
-    SELECT %[9]s,
-	t._valid_from,
-	CASE 
-		WHEN _matched_by_source IS NOT NULL AND (%[9]s) THEN (SELECT now FROM time_now)
-		WHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)
-		ELSE t._valid_until
-	END AS _valid_until,
-	CASE
-		WHEN _matched_by_source IS NOT NULL AND (%[9]s) THEN FALSE
-		WHEN _matched_by_source IS NULL THEN FALSE
-		ELSE t._is_current
-	END AS _is_current
-    FROM target t
-    LEFT JOIN source s ON (%[10]s) AND t._is_current = TRUE
-  ),
-  --new/updated rows from source
-  to_insert AS (
-    SELECT %[11]s,
-	(SELECT now FROM time_now) AS _valid_from,
-	TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
-	TRUE AS _is_current
-    FROM source s
-    LEFT JOIN current_data t ON (%[10]s)
-    WHERE (_matched_by_target IS NULL) OR (%[9]s)
-  )
-SELECT %[7]s FROM to_keep
-UNION ALL
-SELECT %[7]s FROM to_insert;`,
-		tempTableName, //1
-		location, //2
-		partitionBy, //3
-		// Source data
-		userColList, //4
-		strings.TrimSpace(query), //5
-		// Target data
-		allColList, //6
-		asset.Name, //7
-		// to_keep data
-		strings.Join(toKeepSelectCols, ", \n    "), //8
-		changeCondition, //9
-		joinCondition, //10
-		// to_insert data
-		strings.Join(toInsertSelectCols, ",\n    "), //11
-		//unions
-		allColList, //6
-	)
-
-	return []string{
-		strings.TrimSpace(createQuery),
-		"\nDROP TABLE IF EXISTS " + asset.Name,
-		fmt.Sprintf("\nALTER TABLE %s RENAME TO %s;", tempTableName, asset.Name),
-	}, nil
-}
