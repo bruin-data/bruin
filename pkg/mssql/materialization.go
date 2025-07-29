@@ -47,7 +47,7 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error)
 	if len(mat.ClusterBy) > 0 {
 		return "", errors.New("MsSQL assets do not support `cluster_by`")
 	}
-
+	query = strings.TrimSuffix(query, ";")
 	queries := []string{
 		"BEGIN TRANSACTION",
 		"DROP TABLE IF EXISTS " + task.Name,
