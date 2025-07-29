@@ -1202,7 +1202,7 @@ func SetupExecutors(
 		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeColumnCheck] = trinoCheckRunner
 		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
-		trinoQuerySensor :=  ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		trinoQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
 		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeMain] = trinoQuerySensor
 		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = trinoCheckRunner
 		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
