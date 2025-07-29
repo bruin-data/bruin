@@ -93,6 +93,7 @@ type Manager struct {
 	Klaviyo              map[string]*klaviyo.Client
 	Adjust               map[string]*adjust.Client
 	Athena               map[string]*athena.DB
+	Aws                  map[string]*config.AwsConnection
 	FacebookAds          map[string]*facebookads.Client
 	Stripe               map[string]*stripe.Client
 	Appsflyer            map[string]*appsflyer.Client
@@ -283,6 +284,21 @@ func (m *Manager) AddAthenaConnectionFromConfig(connection *config.AthenaConnect
 		Database:        connection.Database,
 	})
 	m.availableConnections[connection.Name] = m.Athena[connection.Name]
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
+func (m *Manager) AddAwsConnectionFromConfig(connection *config.AwsConnection) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	if m.Aws == nil {
+		m.Aws = make(map[string]*config.AwsConnection)
+	}
+
+	m.Aws[connection.Name] = connection
+	m.availableConnections[connection.Name] = m.Aws[connection.Name]
 	m.AllConnectionDetails[connection.Name] = connection
 
 	return nil
@@ -1927,6 +1943,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	var mu sync.Mutex
 
 	processConnections(cm.SelectedEnvironment.Connections.AthenaConnection, connectionManager.AddAthenaConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.AwsConnection, connectionManager.AddAwsConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.GoogleCloudPlatform, connectionManager.AddBqConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Snowflake, connectionManager.AddSfConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Postgres, connectionManager.AddPgConnectionFromConfig, &wg, &errList, &mu)
