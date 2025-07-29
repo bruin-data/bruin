@@ -1407,6 +1407,125 @@ func TestUpdateExistingColumn(t *testing.T) {
 				UpdateOnMerge:   true,
 			},
 		},
+		{
+			name: "tags should be appended when existing tags are present",
+			existingCol: &pipeline.Column{
+				Name: "test_col",
+				Tags: []string{"existing_tag1", "existing_tag2"},
+			},
+			upstreamCol: &pipeline.Column{
+				Name: "test_col",
+				Tags: []string{"new_tag1", "existing_tag1", "new_tag2"},
+			},
+			want: &pipeline.Column{
+				Name: "test_col",
+				Tags: []string{"existing_tag1", "existing_tag2", "new_tag1", "new_tag2"},
+			},
+		},
+		{
+			name: "tags should be copied when existing tags are nil",
+			existingCol: &pipeline.Column{
+				Name: "test_col",
+				Tags: nil,
+			},
+			upstreamCol: &pipeline.Column{
+				Name: "test_col",
+				Tags: []string{"tag1", "tag2", "tag3"},
+			},
+			want: &pipeline.Column{
+				Name: "test_col",
+				Tags: []string{"tag1", "tag2", "tag3"},
+			},
+		},
+		{
+			name: "domains should be appended when existing domains are present",
+			existingCol: &pipeline.Column{
+				Name:    "test_col",
+				Domains: []string{"existing_domain1", "existing_domain2"},
+			},
+			upstreamCol: &pipeline.Column{
+				Name:    "test_col",
+				Domains: []string{"new_domain1", "existing_domain1", "new_domain2"},
+			},
+			want: &pipeline.Column{
+				Name:    "test_col",
+				Domains: []string{"existing_domain1", "existing_domain2", "new_domain1", "new_domain2"},
+			},
+		},
+		{
+			name: "domains should be copied when existing domains are nil",
+			existingCol: &pipeline.Column{
+				Name:    "test_col",
+				Domains: nil,
+			},
+			upstreamCol: &pipeline.Column{
+				Name:    "test_col",
+				Domains: []string{"domain1", "domain2", "domain3"},
+			},
+			want: &pipeline.Column{
+				Name:    "test_col",
+				Domains: []string{"domain1", "domain2", "domain3"},
+			},
+		},
+		{
+			name: "owner should be copied when existing owner is empty",
+			existingCol: &pipeline.Column{
+				Name:  "test_col",
+				Owner: "",
+			},
+			upstreamCol: &pipeline.Column{
+				Name:  "test_col",
+				Owner: "data_team",
+			},
+			want: &pipeline.Column{
+				Name:  "test_col",
+				Owner: "data_team",
+			},
+		},
+		{
+			name: "owner should not be overwritten when existing owner is present",
+			existingCol: &pipeline.Column{
+				Name:  "test_col",
+				Owner: "existing_owner",
+			},
+			upstreamCol: &pipeline.Column{
+				Name:  "test_col",
+				Owner: "new_owner",
+			},
+			want: &pipeline.Column{
+				Name:  "test_col",
+				Owner: "existing_owner",
+			},
+		},
+		{
+			name: "complex scenario with all metadata fields",
+			existingCol: &pipeline.Column{
+				Name:        "test_col",
+				Description: "Existing description",
+				Type:        "string",
+				Tags:        []string{"existing_tag"},
+				Domains:     []string{"existing_domain"},
+				Owner:       "existing_owner",
+			},
+			upstreamCol: &pipeline.Column{
+				Name:          "test_col",
+				Description:   "New description",
+				Type:          "integer",
+				Tags:          []string{"new_tag1", "existing_tag", "new_tag2"},
+				Domains:       []string{"new_domain1", "existing_domain", "new_domain2"},
+				Owner:         "new_owner",
+				UpdateOnMerge: true,
+			},
+			want: &pipeline.Column{
+				Name:          "test_col",
+				Description:   "Existing description",
+				Type:          "string",
+				Tags:          []string{"existing_tag", "new_tag1", "new_tag2"},
+				Domains:       []string{"existing_domain", "new_domain1", "new_domain2"},
+				Owner:         "existing_owner",
+				UpdateOnMerge: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1423,6 +1542,31 @@ func TestUpdateExistingColumn(t *testing.T) {
 			}
 			if tt.existingCol.UpdateOnMerge != tt.want.UpdateOnMerge {
 				t.Errorf("UpdateOnMerge = %v, want %v", tt.existingCol.UpdateOnMerge, tt.want.UpdateOnMerge)
+			}
+			if tt.existingCol.Owner != tt.want.Owner {
+				t.Errorf("Owner = %v, want %v", tt.existingCol.Owner, tt.want.Owner)
+			}
+
+			// Check tags
+			if len(tt.existingCol.Tags) != len(tt.want.Tags) {
+				t.Errorf("Tags length = %v, want %v", len(tt.existingCol.Tags), len(tt.want.Tags))
+			} else {
+				for i, tag := range tt.existingCol.Tags {
+					if tag != tt.want.Tags[i] {
+						t.Errorf("Tags[%d] = %v, want %v", i, tag, tt.want.Tags[i])
+					}
+				}
+			}
+
+			// Check domains
+			if len(tt.existingCol.Domains) != len(tt.want.Domains) {
+				t.Errorf("Domains length = %v, want %v", len(tt.existingCol.Domains), len(tt.want.Domains))
+			} else {
+				for i, domain := range tt.existingCol.Domains {
+					if domain != tt.want.Domains[i] {
+						t.Errorf("Domains[%d] = %v, want %v", i, domain, tt.want.Domains[i])
+					}
+				}
 			}
 
 			if tt.want.EntityAttribute == nil {
