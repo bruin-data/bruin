@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/ansisql"
+	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -171,6 +172,9 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 
 	// Query to get column information
 	queryStr := fmt.Sprintf("SELECT * FROM %s.%s WHERE 1=0 LIMIT 0", schemaName, tableName)
+	if _, ok := conn.(mssql.MsClient); ok {
+		queryStr = "SELECT TOP 0 * FROM " + schemaName + "." + tableName
+	}
 	q := &query.Query{Query: queryStr}
 	result, err := querier.SelectWithSchema(ctx, q)
 	if err != nil {
