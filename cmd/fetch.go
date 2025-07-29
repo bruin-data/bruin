@@ -13,13 +13,20 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bruin-data/bruin/pkg/athena"
+	"github.com/bruin-data/bruin/pkg/bigquery"
+	"github.com/bruin-data/bruin/pkg/clickhouse"
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/connection"
+	duck "github.com/bruin-data/bruin/pkg/duckdb"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
+	"github.com/bruin-data/bruin/pkg/postgres"
 	"github.com/bruin-data/bruin/pkg/query"
+	"github.com/bruin-data/bruin/pkg/snowflake"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -105,10 +112,14 @@ func Query() *cli.Command {
 			if err != nil {
 				return handleError(c.String("output"), err)
 			}
-
-			dialect, err := sqlparser.AssetTypeToDialect(assetType)
-			if err != nil {
-				dialect = ""
+			var dialect string
+			if assetType == "" {
+				dialect = detectDialectFromConnection(conn)
+			} else {
+				dialect, err = sqlparser.AssetTypeToDialect(assetType)
+				if err != nil {
+					dialect = ""
+				}
 			}
 			if c.IsSet("limit") {
 				parser, err := sqlparser.NewSQLParser(false)
@@ -594,3 +605,30 @@ func handleSuccess(output string, message string) error {
 	}
 	return nil
 }
+
+func detectDialectFromConnection(conn interface{}) string {
+	if _, ok := conn.(mssql.MsClient); ok {
+		return "tsql"
+	}
+	if _, ok := conn.(bigquery.Client); ok {
+		return "bigquery"
+	}
+	if _, ok := conn.(postgres.Client); ok {
+		return "postgres"
+	}
+
+	if _, ok := conn.(athena.Client); ok {
+		return "athena"
+	}
+	if _, ok := conn.(*snowflake.DB); ok {
+		return "snowflake"
+	}
+	if _, ok := conn.(clickhouse.Client); ok {
+		return "clickhouse"
+	}
+	if _, ok := conn.(duck.Client); ok {
+		return "duckdb"
+	}
+	return "bigquery"
+}
+
