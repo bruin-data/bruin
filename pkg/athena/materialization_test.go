@@ -448,8 +448,8 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
-					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategySCD2ByColumn,
 					PartitionBy: "id",
 				},
 				Columns: []pipeline.Column{
@@ -460,40 +460,58 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			},
 			query: "SELECT id, col1, col2 from source_table",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['id']) AS " +
-					"WITH " +
-					//time_now
-					"time_now AS ( SELECT CURRENT_TIMESTAMP AS now ), " +
-					//source
-					"source AS ( SELECT id, col1, col2, TRUE as _matched_by_source FROM (SELECT id, col1, col2 from source_table ) ), " +
-					//target
-					"target AS ( SELECT id, col1, col2, _valid_from, _valid_until, _is_current, TRUE as _matched_by_target FROM my.asset ), " +
-					//current_data
-					"current_data AS ( SELECT id, col1, col2, _valid_from, _valid_until, _is_current, _matched_by_target FROM target as t WHERE _is_current = TRUE ), " +
-					//to_keep
-					"--current or updated (expired) existing rows from target " +
-					"to_keep AS ( " +
-					"SELECT t.id, t.col1, t.col2, t._valid_from, " +
-					"CASE WHEN _matched_by_source IS NOT NULL AND (t.col1 != s.col1 OR t.col2 != s.col2) THEN (SELECT now FROM time_now) " +
-					"WHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now) " +
-					"ELSE t._valid_until END AS _valid_until, " +
-					"CASE WHEN _matched_by_source IS NOT NULL AND (t.col1 != s.col1 OR t.col2 != s.col2) THEN FALSE " +
-					"WHEN _matched_by_source IS NULL THEN FALSE " +
-					"ELSE t._is_current END AS _is_current " +
-					"FROM target t LEFT JOIN source s ON (t.id = s.id) AND t._is_current = TRUE ), " +
-					//to_insert
-					"--new/updated rows from source " +
-					"to_insert AS ( " +
-					"SELECT s.id AS id, s.col1 AS col1, s.col2 AS col2, (SELECT now FROM time_now) AS _valid_from, " +
-					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until, TRUE AS _is_current " +
-					"FROM source s LEFT JOIN current_data t ON (t.id = s.id) " +
-					"WHERE (_matched_by_target IS NULL) OR (t.col1 != s.col1 OR t.col2 != s.col2) ) " +
-					//union to_keep and to_insert
-					"SELECT id, col1, col2, _valid_from, _valid_until, _is_current FROM to_keep " +
-					"UNION ALL " +
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['id']) AS\n" +
+					"WITH\n" +
+					"time_now AS (\n" +
+					"\tSELECT CURRENT_TIMESTAMP AS now\n" +
+					"),\n" +
+					"source AS (\n" +
+					"\tSELECT id, col1, col2,\n" +
+					"\tTRUE as _matched_by_source\n" +
+					"\tFROM (SELECT id, col1, col2 from source_table\n" +
+					"\t)\n" +
+					"),\n" +
+					"target AS (\n" +
+					"\tSELECT id, col1, col2, _valid_from, _valid_until, _is_current,\n" +
+					"\tTRUE as _matched_by_target FROM my.asset\n" +
+					"),\n" +
+					"current_data AS (\n" +
+					"\tSELECT id, col1, col2, _valid_from, _valid_until, _is_current, _matched_by_target\n" +
+					"\tFROM target as t\n" +
+					"\tWHERE _is_current = TRUE\n" +
+					"),\n" +
+					"--current or updated (expired) existing rows from target\n" +
+					"to_keep AS (\n" +
+					"\tSELECT t.id, t.col1, t.col2,\n" +
+					"\tt._valid_from,\n" +
+					"\t\tCASE\n" +
+					"\t\t\tWHEN _matched_by_source IS NOT NULL AND (t.col1 != s.col1 OR t.col2 != s.col2) THEN (SELECT now FROM time_now)\n" +
+					"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)\n" +
+					"\t\t\tELSE t._valid_until\n" +
+					"\t\tEND AS _valid_until,\n" +
+					"\t\tCASE\n" +
+					"\t\t\tWHEN _matched_by_source IS NOT NULL AND (t.col1 != s.col1 OR t.col2 != s.col2) THEN FALSE\n" +
+					"\t\t\tWHEN _matched_by_source IS NULL THEN FALSE\n" +
+					"\t\t\tELSE t._is_current\n" +
+					"\t\tEND AS _is_current\n" +
+					"\tFROM target t\n" +
+					"\tLEFT JOIN source s ON (t.id = s.id) AND t._is_current = TRUE\n" +
+					"),\n" +
+					"--new/updated rows from source\n" +
+					"to_insert AS (\n" +
+					"\tSELECT s.id AS id, s.col1 AS col1, s.col2 AS col2,\n" +
+					"\t(SELECT now FROM time_now) AS _valid_from,\n" +
+					"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"\tTRUE AS _is_current\n" +
+					"\tFROM source s\n" +
+					"\tLEFT JOIN current_data t ON (t.id = s.id)\n" +
+					"\tWHERE (_matched_by_target IS NULL) OR (t.col1 != s.col1 OR t.col2 != s.col2)\n" +
+					")\n" +
+					"SELECT id, col1, col2, _valid_from, _valid_until, _is_current FROM to_keep\n" +
+					"UNION ALL\n" +
 					"SELECT id, col1, col2, _valid_from, _valid_until, _is_current FROM to_insert;",
-				"DROP TABLE IF EXISTS my.asset",
-				"ALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
+				"\nDROP TABLE IF EXISTS my.asset",
+				"\nALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
 			},
 		},
 		{
@@ -512,39 +530,58 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			},
 			query: "SELECT id, category, name from source_table",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS " +
-					"WITH " +
-					//time_now
-					"time_now AS ( SELECT CURRENT_TIMESTAMP AS now ), " +
-					//source
-					"source AS ( SELECT id, category, name, TRUE as _matched_by_source FROM (SELECT id, category, name from source_table ) ), " +
-					//target
-					"target AS ( SELECT id, category, name, _valid_from, _valid_until, _is_current, TRUE as _matched_by_target FROM my.asset ), " +
-					//current_data
-					"current_data AS ( SELECT id, category, name, _valid_from, _valid_until, _is_current, _matched_by_target FROM target as t WHERE _is_current = TRUE ), " +
-					//to_keep
-					"--current or updated (expired) existing rows from target " +
-					"to_keep AS ( " +
-					"SELECT t.id, t.category, t.name, t._valid_from, " +
-					"CASE WHEN _matched_by_source IS NOT NULL AND (t.name != s.name) THEN (SELECT now FROM time_now) " +
-					"WHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now) " +
-					"ELSE t._valid_until END AS _valid_until, " +
-					"CASE WHEN _matched_by_source IS NOT NULL AND (t.name != s.name) THEN FALSE " +
-					"WHEN _matched_by_source IS NULL THEN FALSE " +
-					"ELSE t._is_current END AS _is_current " +
-					"FROM target t LEFT JOIN source s ON (t.id = s.id AND t.category = s.category) AND t._is_current = TRUE ), " +
-					//to_insert
-					"--new/updated rows from source " +
-					"to_insert AS ( SELECT s.id AS id, s.category AS category, s.name AS name, (SELECT now FROM time_now) AS _valid_from, " +
-					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until, TRUE AS _is_current " +
-					"FROM source s LEFT JOIN current_data t ON (t.id = s.id AND t.category = s.category) " +
-					"WHERE (_matched_by_target IS NULL) OR (t.name != s.name) ) " +
-					//union to_keep and to_insert
-					"SELECT id, category, name, _valid_from, _valid_until, _is_current FROM to_keep " +
-					"UNION ALL " +
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS\n" +
+					"WITH\n" +
+					"time_now AS (\n" +
+					"\tSELECT CURRENT_TIMESTAMP AS now\n" +
+					"),\n" +
+					"source AS (\n" +
+					"\tSELECT id, category, name,\n" +
+					"\tTRUE as _matched_by_source\n" +
+					"\tFROM (SELECT id, category, name from source_table\n" +
+					"\t)\n" +
+					"),\n" +
+					"target AS (\n" +
+					"\tSELECT id, category, name, _valid_from, _valid_until, _is_current,\n" +
+					"\tTRUE as _matched_by_target FROM my.asset\n" +
+					"),\n" +
+					"current_data AS (\n" +
+					"\tSELECT id, category, name, _valid_from, _valid_until, _is_current, _matched_by_target\n" +
+					"\tFROM target as t\n" +
+					"\tWHERE _is_current = TRUE\n" +
+					"),\n" +
+					"--current or updated (expired) existing rows from target\n" +
+					"to_keep AS (\n" +
+					"\tSELECT t.id, t.category, t.name,\n" +
+					"\tt._valid_from,\n" +
+					"\t\tCASE\n" +
+					"\t\t\tWHEN _matched_by_source IS NOT NULL AND (t.name != s.name) THEN (SELECT now FROM time_now)\n" +
+					"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)\n" +
+					"\t\t\tELSE t._valid_until\n" +
+					"\t\tEND AS _valid_until,\n" +
+					"\t\tCASE\n" +
+					"\t\t\tWHEN _matched_by_source IS NOT NULL AND (t.name != s.name) THEN FALSE\n" +
+					"\t\t\tWHEN _matched_by_source IS NULL THEN FALSE\n" +
+					"\t\t\tELSE t._is_current\n" +
+					"\t\tEND AS _is_current\n" +
+					"\tFROM target t\n" +
+					"\tLEFT JOIN source s ON (t.id = s.id AND t.category = s.category) AND t._is_current = TRUE\n" +
+					"),\n" +
+					"--new/updated rows from source\n" +
+					"to_insert AS (\n" +
+					"\tSELECT s.id AS id, s.category AS category, s.name AS name,\n" +
+					"\t(SELECT now FROM time_now) AS _valid_from,\n" +
+					"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"\tTRUE AS _is_current\n" +
+					"\tFROM source s\n" +
+					"\tLEFT JOIN current_data t ON (t.id = s.id AND t.category = s.category)\n" +
+					"\tWHERE (_matched_by_target IS NULL) OR (t.name != s.name)\n" +
+					")\n" +
+					"SELECT id, category, name, _valid_from, _valid_until, _is_current FROM to_keep\n" +
+					"UNION ALL\n" +
 					"SELECT id, category, name, _valid_from, _valid_until, _is_current FROM to_insert;",
-				"DROP TABLE IF EXISTS my.asset",
-				"ALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
+				"\nDROP TABLE IF EXISTS my.asset",
+				"\nALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
 			},
 		},
 	}
@@ -558,7 +595,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.want, trimSpaces(render))
+				assert.Equal(t, tt.want, render)
 			}
 		})
 	}
