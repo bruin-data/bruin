@@ -79,6 +79,7 @@ const (
 	AssetTypeClickHouseSource       = AssetType("clickhouse.source")
 	AssetTypeEMRServerlessSpark     = AssetType("emr_serverless.spark")
 	AssetTypeEMRServerlessPyspark   = AssetType("emr_serverless.pyspark")
+	AssetTypeTrinoQuery             = AssetType("trino.sql")
 	AssetTypeLooker                 = AssetType("looker")
 	AssetTypeLookerStudio           = AssetType("looker_studio")
 	AssetTypePowerBI                = AssetType("powerbi")
@@ -1751,7 +1752,6 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 		pipeline.TasksByType[task.Type] = append(pipeline.TasksByType[task.Type], task)
 		pipeline.tasksByName[task.Name] = task
 	}
-
 	var entities []*glossary.Entity
 	if b.GlossaryReader != nil {
 		entities, err = b.GlossaryReader.GetEntities(pathToPipeline)
@@ -1972,6 +1972,7 @@ func (a *Asset) IsSQLAsset() bool {
 		AssetTypeAthenaQuery:     true,
 		AssetTypeDuckDBQuery:     true,
 		AssetTypeClickHouse:      true,
+		AssetTypeTrinoQuery:      true,
 	}
 
 	return sqlAssetTypes[a.Type]
