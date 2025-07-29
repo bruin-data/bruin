@@ -574,7 +574,7 @@ func TestManager_AddAwsConnectionFromConfig(t *testing.T) {
 	res, ok := m.GetConnection("test").(*config.AwsConnection)
 	assert.True(t, ok)
 	assert.NotNil(t, res)
-	
+
 	awsConn, ok := res.(*config.AwsConnection)
 	assert.True(t, ok)
 	assert.Equal(t, "test", awsConn.Name)
