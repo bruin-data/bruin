@@ -2,7 +2,9 @@ package trino
 
 import (
 	"fmt"
+	"net"
 	"net/url"
+	"strconv"
 )
 
 type Config struct {
@@ -14,7 +16,8 @@ type Config struct {
 }
 
 func (c Config) ToDSN() string {
-	baseURL := fmt.Sprintf("http://%s@%s:%d", c.Username, c.Host, c.Port)
+	hostPort := net.JoinHostPort(c.Host, strconv.Itoa(c.Port))
+	baseURL := fmt.Sprintf("http://%s@%s", c.Username, hostPort)
 	params := url.Values{}
 	if c.Catalog != "" {
 		params.Set("catalog", c.Catalog)

@@ -85,8 +85,7 @@ func (c *Client) Select(ctx context.Context, query *query.Query) ([][]interface{
 func (c *Client) Ping(ctx context.Context) error {
 	// Simple ping query
 	q := &query.Query{Query: "SELECT 1"}
-	_, err := c.connection.QueryContext(ctx, q.String())
-	return errors.Wrap(err, "failed to ping trino")
+	return c.RunQueryWithoutResult(ctx, q)
 }
 
 func (c *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {

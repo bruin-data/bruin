@@ -1315,7 +1315,7 @@ func EnsureSecretMappingsHaveKeyForASingleAsset(ctx context.Context, p *pipeline
 	return issues, nil
 }
 
-// TODO: Remove this once materialization is fully implemented for Trino
+// TODO: Remove this once materialization is fully implemented for Trino.
 func ValidateTrinoAssetMaterialization(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
