@@ -173,7 +173,7 @@ func fillAssetColumnsFromDB(ctx context.Context, asset *pipeline.Asset, conn int
 	// Query to get column information
 	queryStr := fmt.Sprintf("SELECT * FROM %s.%s WHERE 1=0 LIMIT 0", schemaName, tableName)
 	if _, ok := conn.(mssql.MsClient); ok {
-		queryStr = fmt.Sprintf("SELECT TOP 0 * FROM %s.%s", schemaName, tableName)
+		queryStr = "SELECT TOP 0 * FROM " + schemaName + "." + tableName
 	}
 	q := &query.Query{Query: queryStr}
 	result, err := querier.SelectWithSchema(ctx, q)
