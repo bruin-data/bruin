@@ -361,11 +361,12 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]stri
 	var (
 		primaryKeys = make([]string, 0, 4)
 		userCols    = make([]string, 0, 12)
+		nonPKCols   = make([]string, 0, 12)
 	)
 
 	for _, col := range asset.Columns {
 		switch col.Name {
-		case "_valid_from", "_valid_until", "_is_current":
+		case "_is_current", "_valid_from", "_valid_until":
 			return nil, fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
 		}
 		if col.Name == asset.Materialization.IncrementalKey {
@@ -374,132 +375,107 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]stri
 				return nil, errors.New("incremental_key must be TIMESTAMP or DATE in SCD2_by_time strategy")
 			}
 		}
-		userCols = append(userCols, col.Name)
 		if col.PrimaryKey {
 			primaryKeys = append(primaryKeys, col.Name)
+		} else {
+			nonPKCols = append(nonPKCols, col.Name)
 		}
+		userCols = append(userCols, col.Name)
 	}
 
 	if len(primaryKeys) == 0 {
-		return nil, fmt.Errorf(
-			"materialization strategy %s requires the primary_key field to be set on at least one column",
-			asset.Materialization.Strategy,
-		)
+		return nil, fmt.Errorf("materialization strategy %s requires the primary_key field to be set on at least one column", asset.Materialization.Strategy)
 	}
-
-	// Build join conditions for primary keys
-	onConds := make([]string, len(primaryKeys))
-	sourcePKs := make([]string, 0, len(primaryKeys))
-	targetPKs := make([]string, 0, len(primaryKeys))
-	for i, pk := range primaryKeys {
-		onConds[i] = fmt.Sprintf("t.%s = s.%s", pk, pk)
-		sourcePKs = append(sourcePKs, fmt.Sprintf("s.%s IS NULL", pk))
-		targetPKs = append(targetPKs, fmt.Sprintf("t.%s IS NULL", pk))
-	}
-	joinCondition := strings.Join(onConds, " AND ")
-	sourcePrimaryKeyIsNull := strings.Join(sourcePKs, " AND ")
-	targetPrimaryKeyIsNull := strings.Join(targetPKs, " AND ")
-
-	// Build column lists for different CTEs
-	tNewSelectCols := make([]string, 0, len(userCols)+3)
-	for _, col := range userCols {
-		tNewSelectCols = append(tNewSelectCols, "t."+col)
-	}
-
-	insertsSelectCols := make([]string, 0, len(userCols)+3)
-	for _, col := range userCols {
-		insertsSelectCols = append(insertsSelectCols, "s."+col)
-	}
-
-	// Historical data columns
-	allCols := append([]string{}, userCols...)
-	allCols = append(allCols, "_valid_from", "_valid_until", "_is_current")
-
-	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
 	var partitionBy string
 	if asset.Materialization.PartitionBy != "" {
 		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", asset.Materialization.PartitionBy)
 	}
 
-	createQuery := fmt.Sprintf(`
-CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
-WITH
-source AS (
-  %s
-),
-current_data AS (
-  SELECT %s FROM %s WHERE _is_current = TRUE
-),
-historical_data AS (
-  SELECT %s FROM %s WHERE _is_current = FALSE
-),
-t_new AS (
-  SELECT 
-    %s,
-    t._valid_from,
-    CASE WHEN %s OR (s.%s IS NOT NULL AND CAST(s.%s AS TIMESTAMP) > t._valid_from)
-	THEN CAST(s.%s AS TIMESTAMP) 
-	ELSE t._valid_until 
-	END AS _valid_until,
-    CASE WHEN %s OR (s.%s IS NOT NULL AND CAST(s.%s AS TIMESTAMP) > t._valid_from)
-	THEN FALSE 
-	ELSE t._is_current 
-	END AS _is_current
-  FROM current_data t
-  LEFT JOIN source s ON %s
-),
-insert_rows AS (
-  SELECT 
-    %s,
-    CAST(s.%s AS TIMESTAMP) AS _valid_from,
-    TIMESTAMP '9999-12-31' AS _valid_until,
-    TRUE AS _is_current
-  FROM source s
-  LEFT JOIN current_data t ON %s
-  WHERE %s OR (%s AND CAST(s.%s AS TIMESTAMP) > t._valid_from)
-)
-SELECT %s FROM t_new
-UNION ALL
-SELECT %s FROM insert_rows
-UNION ALL
-SELECT %s FROM historical_data`,
-		// Create table
-		tempTableName,
-		location,
-		tempTableName,
-		partitionBy,
-		// Source data
-		strings.TrimSpace(query),
-		// current data
-		strings.Join(allCols, ", "),
-		asset.Name,
-		// Historical data
-		strings.Join(allCols, ", "),
-		asset.Name,
-		// t_new data
-		strings.Join(tNewSelectCols, ",\n    "),
-		sourcePrimaryKeyIsNull,
-		incrementalKey,
-		incrementalKey,
-		incrementalKey,
-		sourcePrimaryKeyIsNull,
-		incrementalKey,
-		incrementalKey,
-		joinCondition,
-		// insert_rows data
-		strings.Join(insertsSelectCols, ",\n    "),
-		incrementalKey,
-		joinCondition,
-		targetPrimaryKeyIsNull,
-		joinCondition,
-		// historical_data data
-		asset.Materialization.IncrementalKey,
-		strings.Join(allCols, ", "),
-		strings.Join(allCols, ", "),
-		strings.Join(allCols, ", "),
-	)
+	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
+	// Build join conditions for primary keys
+	onConds := make([]string, len(primaryKeys))
+	for i, pk := range primaryKeys {
+		onConds[i] = fmt.Sprintf("t.%s = s.%s", pk, pk)
+	}
+	joinCondition := strings.Join(onConds, " AND ")
+
+	changeCondition := fmt.Sprintf("CAST(s.%s AS TIMESTAMP) > t._valid_from", incrementalKey)
+
+	// Build user column list for SELECTs
+	userColList := strings.Join(userCols, ", ")
+	allCols := append([]string{}, userCols...)
+	allCols = append(allCols, "_valid_from", "_valid_until", "_is_current")
+	allColList := strings.Join(allCols, ", ")
+
+	// to_keep SELECT
+	toKeepSelectCols := make([]string, 0, len(userCols)+3)
+	for _, col := range userCols {
+		toKeepSelectCols = append(toKeepSelectCols, fmt.Sprintf("t.%s", col))
+	}
+
+	// to_insert SELECT
+	toInsertSelectCols := make([]string, 0, len(userCols)+3)
+	for _, col := range userCols {
+		toInsertSelectCols = append(toInsertSelectCols, fmt.Sprintf("s.%s AS %s", col, col))
+	}
+
+	// Build the SQL using array formatting
+	sqlLines := []string{
+		fmt.Sprintf("CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS", tempTableName, location, tempTableName, partitionBy),
+		"WITH",
+		"time_now AS (",
+		"\tSELECT CURRENT_TIMESTAMP AS now",
+		"),",
+		"source AS (",
+		fmt.Sprintf("\tSELECT %s,", userColList),
+		"\tTRUE as _matched_by_source",
+		fmt.Sprintf("\tFROM (%s", strings.TrimSpace(query)),
+		"\t)",
+		"),",
+		"target AS (",
+		fmt.Sprintf("\tSELECT %s,", allColList),
+		fmt.Sprintf("\tTRUE as _matched_by_target FROM %s", asset.Name),
+		"),",
+		"current_data AS (",
+		fmt.Sprintf("\tSELECT %s, _matched_by_target", allColList),
+		"\tFROM target as t",
+		"\tWHERE _is_current = TRUE",
+		"),",
+		"--current or updated (expired) existing rows from target",
+		"to_keep AS (",
+		fmt.Sprintf("\tSELECT %s,", strings.Join(toKeepSelectCols, ", ")),
+		"\tt._valid_from,",
+		"\t\tCASE",
+		fmt.Sprintf("\t\t\tWHEN _matched_by_source IS NOT NULL AND (%s) THEN CAST(s.%s AS TIMESTAMP)", changeCondition, incrementalKey),
+		"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)",
+		"\t\t\tELSE t._valid_until",
+		"\t\tEND AS _valid_until,",
+		"\t\tCASE",
+		fmt.Sprintf("\t\t\tWHEN _matched_by_source IS NOT NULL AND (%s) THEN FALSE", changeCondition),
+		"\t\t\tWHEN _matched_by_source IS NULL THEN FALSE",
+		"\t\t\tELSE t._is_current",
+		"\t\tEND AS _is_current",
+		"\tFROM target t",
+		fmt.Sprintf("\tLEFT JOIN source s ON (%s) AND t._is_current = TRUE", joinCondition),
+		"),",
+		"--new/updated rows from source",
+		"to_insert AS (",
+		fmt.Sprintf("\tSELECT %s,", strings.Join(toInsertSelectCols, ", ")),
+		fmt.Sprintf("\tCAST(s.%s AS TIMESTAMP) AS _valid_from,", incrementalKey),
+		"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,",
+		"\tTRUE AS _is_current",
+		"\tFROM source s",
+		fmt.Sprintf("\tLEFT JOIN current_data t ON (%s)", joinCondition),
+		fmt.Sprintf("\tWHERE (_matched_by_target IS NULL) OR (%s)", changeCondition),
+		")",
+		fmt.Sprintf("SELECT %s FROM to_keep", allColList),
+		"UNION ALL",
+		fmt.Sprintf("SELECT %s FROM to_insert;", allColList),
+	}
+	// Join all lines into a single string
+	createQuery := strings.Join(sqlLines, "\n")
 	return []string{
 		strings.TrimSpace(createQuery),
 		"\nDROP TABLE IF EXISTS " + asset.Name,
@@ -530,11 +506,11 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query, location string) (
 	}
 
 	createQuery := fmt.Sprintf(
-		`CREATE TABLE IF NOT EXISTS %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
+		`CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
 SELECT
   %s,		
-  CAST(%s AS TIMESTAMP) AS _valid_from,
-  TIMESTAMP '9999-12-31' AS _valid_until,
+  CAST(src.%s AS TIMESTAMP) AS _valid_from,
+  TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
   TRUE AS _is_current
 FROM (
 %s
@@ -550,8 +526,8 @@ FROM (
 
 	return []string{
 		strings.TrimSpace(createQuery),
-		"DROP TABLE IF EXISTS " + asset.Name,
-		fmt.Sprintf("ALTER TABLE %s RENAME TO %s", tempTableName, asset.Name),
+		"\nDROP TABLE IF EXISTS " + asset.Name,
+		fmt.Sprintf("\nALTER TABLE %s RENAME TO %s;", tempTableName, asset.Name),
 	}, nil
 }
 
