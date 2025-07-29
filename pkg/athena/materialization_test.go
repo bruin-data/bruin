@@ -444,12 +444,13 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "scd2_basic_column_change_detection",
+			name: "scd2_basic_column_change_detection and partitioning",
 			asset: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
 					Type:     pipeline.MaterializationTypeTable,
 					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+					PartitionBy: "id",
 				},
 				Columns: []pipeline.Column{
 					{Name: "id", PrimaryKey: true},
@@ -459,7 +460,7 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 			},
 			query: "SELECT id, col1, col2 from source_table",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS " +
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['id']) AS " +
 					"WITH " +
 					//time_now
 					"time_now AS ( SELECT CURRENT_TIMESTAMP AS now ), " +
@@ -468,11 +469,11 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 					//target
 					"target AS ( SELECT id, col1, col2, _valid_from, _valid_until, _is_current, TRUE as _matched_by_target FROM my.asset ), " +
 					//current_data
-					"current_data AS ( SELECT id, col1, col2, _valid_from, _valid_until, _is_current FROM target as t WHERE _is_current = TRUE ), " +
+					"current_data AS ( SELECT id, col1, col2, _valid_from, _valid_until, _is_current, _matched_by_target FROM target as t WHERE _is_current = TRUE ), " +
 					//to_keep
 					"--current or updated (expired) existing rows from target " +
 					"to_keep AS ( " +
-					"SELECT id, col1, col2, t._valid_from, " +
+					"SELECT t.id, t.col1, t.col2, t._valid_from, " +
 					"CASE WHEN _matched_by_source IS NOT NULL AND (t.col1 != s.col1 OR t.col2 != s.col2) THEN (SELECT now FROM time_now) " +
 					"WHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now) " +
 					"ELSE t._valid_until END AS _valid_until, " +
@@ -520,11 +521,11 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 					//target
 					"target AS ( SELECT id, category, name, _valid_from, _valid_until, _is_current, TRUE as _matched_by_target FROM my.asset ), " +
 					//current_data
-					"current_data AS ( SELECT id, category, name, _valid_from, _valid_until, _is_current FROM target as t WHERE _is_current = TRUE ), " +
+					"current_data AS ( SELECT id, category, name, _valid_from, _valid_until, _is_current, _matched_by_target FROM target as t WHERE _is_current = TRUE ), " +
 					//to_keep
 					"--current or updated (expired) existing rows from target " +
 					"to_keep AS ( " +
-					"SELECT id, category, name, t._valid_from, " +
+					"SELECT t.id, t.category, t.name, t._valid_from, " +
 					"CASE WHEN _matched_by_source IS NOT NULL AND (t.name != s.name) THEN (SELECT now FROM time_now) " +
 					"WHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now) " +
 					"ELSE t._valid_until END AS _valid_until, " +
