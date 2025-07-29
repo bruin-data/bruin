@@ -10,6 +10,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/git"
 	"github.com/bruin-data/bruin/pkg/jinja"
+	"github.com/bruin-data/bruin/pkg/mssql"
 	"github.com/bruin-data/bruin/pkg/path"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -92,6 +93,9 @@ func fillColumnsFromDB(pp *ppInfo, fs afero.Fs, environment string, manager inte
 	}
 	tableName := pp.Asset.Name
 	queryStr := fmt.Sprintf("SELECT * FROM %s WHERE 1=0 LIMIT 0", tableName)
+	if _, ok := conn.(mssql.MsClient); ok {
+		queryStr = fmt.Sprintf("SELECT TOP 0 * FROM %s", tableName)
+	}
 	q := &query.Query{Query: queryStr}
 	result, err := querier.SelectWithSchema(context.Background(), q)
 	if err != nil {
