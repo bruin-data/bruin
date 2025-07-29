@@ -574,7 +574,10 @@ func TestManager_AddAwsConnectionFromConfig(t *testing.T) {
 	res, ok := m.GetConnection("test").(*config.AwsConnection)
 	assert.True(t, ok)
 	assert.NotNil(t, res)
-	assert.Equal(t, "test", res.Name)
-	assert.Equal(t, "AKIAEXAMPLE", res.AccessKey)
-	assert.Equal(t, "SECRETKEYEXAMPLE", res.SecretKey)
+	
+	awsConn, ok := res.(*config.AwsConnection)
+	assert.True(t, ok)
+	assert.Equal(t, "test", awsConn.Name)
+	assert.Equal(t, "AKIAEXAMPLE", awsConn.AccessKey)
+	assert.Equal(t, "SECRETKEYEXAMPLE", awsConn.SecretKey)
 }

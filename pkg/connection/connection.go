@@ -296,11 +296,10 @@ func (m *Manager) AddAwsConnectionFromConfig(connection *config.AwsConnection) e
 	if m.Aws == nil {
 		m.Aws = make(map[string]*config.AwsConnection)
 	}
-	
+
 	m.Aws[connection.Name] = connection
 	m.availableConnections[connection.Name] = m.Aws[connection.Name]
 	m.AllConnectionDetails[connection.Name] = connection
-
 
 	return nil
 }
