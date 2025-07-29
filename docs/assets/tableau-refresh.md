@@ -1,4 +1,4 @@
-# Tableau Asset Support in Bruin
+# Tableau Assets
 
 Bruin supports integrating Tableau assets into your data pipelines. You can represent Tableau datasources, workbooks, worksheets, and dashboards as assets, and trigger refreshes for datasources and workbooks directly from your pipeline.
 

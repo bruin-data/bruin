@@ -80,6 +80,7 @@ const (
 	AssetTypeEMRServerlessSpark     = AssetType("emr_serverless.spark")
 	AssetTypeEMRServerlessPyspark   = AssetType("emr_serverless.pyspark")
 	AssetTypeLooker                 = AssetType("looker")
+	AssetTypeLookerStudio           = AssetType("looker_studio")
 	AssetTypePowerBI                = AssetType("powerbi")
 	AssetTypeQlikSense              = AssetType("qliksense")
 	AssetTypeQlikView               = AssetType("qlikview")

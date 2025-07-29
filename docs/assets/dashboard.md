@@ -1,14 +1,24 @@
 # Dashboard Assets
 
-Dashboard assets serve as placeholders to represent where data is collected, queried, or visualized by any dashboarding tools in your pipeline.
-
-They do not perform any computation, transformation, or data movement of their own, but instead are used to preserve an accurate overview of your data pipeline’s lineage.
-
-This helps you more accurately visualize and document the tools used in your data pipeline.
+Dashboard assets represent where your reports and dashboards within your data pipelines. They are used to preserve an accurate overview of your data pipeline’s lineage.
 
 Bruin supports the following dashboard tools as assets:
 
-Amazon QuickSight, Apache Superset, Domo, Good Data, Grafana, Looker, Metabase, Mode BI, Power BI, Qlik Sense, Qlik View, Redash, Sisense, and Tableau.
+- Amazon QuickSight: `quicksight`
+- Apache Superset: `superset`
+- Domo: `domo`
+- Good Data: `gooddata`
+- Grafana: `grafana`
+- Looker: `looker`
+- Looker Studio: `looker_studio`
+- Metabase: `metabase`
+- Mode BI: `modebi`
+- Power BI: `powerbi`
+- Qlik Sense: `qliksense`
+- Qlik View: `qlikview`
+- Redash: `redash`
+- Sisense: `sisense`
+- Tableau: `tableau`
 
 ## Definition Schema
 Dashboard assets are defined using the extension `{asset_name}.asset.yml`. Here is an example of the schema:
@@ -66,6 +76,12 @@ name: myschema.asset_name
 type: looker
 ```
 
+### Looker Studio
+```yaml
+name: myschema.asset_name
+type: looker_studio
+```
+
 ### Metabase
 ```yaml
 name: myschema.asset_name
@@ -109,6 +125,8 @@ type: sisense
 ```
 
 ### Tableau
+Tableau assets allow you to both define and refresh Tableau dashboards, workbooks, and worksheets. Please see the [Tableau assets](./tableau-refresh) for more information.
+
 ```yaml
 name: myschema.asset_name
 type: tableau
