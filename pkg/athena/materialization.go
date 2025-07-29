@@ -29,7 +29,7 @@ var matMap = AssetMaterializationMap{
 		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
-		pipeline.MaterializationStrategySCD2ByColumn:  buildSCD2ByColumnQuery,
+		pipeline.MaterializationStrategySCD2ByColumn:  buildSCD2ByColumnQuery2,
 		pipeline.MaterializationStrategySCD2ByTime:    buildSCD2ByTimeQuery,
 	},
 }
@@ -364,6 +364,141 @@ SELECT %[6]s FROM to_insert;`,
 	}, nil
 }
 
+func buildSCD2ByColumnQuery2(asset *pipeline.Asset, query, location string) ([]string, error) {
+	query = strings.TrimSuffix(query, ";")
+
+	var (
+		primaryKeys = make([]string, 0, 4)
+		userCols    = make([]string, 0, 12)
+		nonPKCols   = make([]string, 0, 12)
+	)
+
+	for _, col := range asset.Columns {
+		switch col.Name {
+		case "_is_current", "_valid_from", "_valid_until":
+			return nil, fmt.Errorf("column name %s is reserved for SCD-2 and cannot be used", col.Name)
+		}
+		if col.PrimaryKey {
+			primaryKeys = append(primaryKeys, col.Name)
+		} else {
+			nonPKCols = append(nonPKCols, col.Name)
+		}
+		userCols = append(userCols, col.Name)
+	}
+
+	if len(primaryKeys) == 0 {
+		return nil, fmt.Errorf("materialization strategy %s requires the primary_key field to be set on at least one column", asset.Materialization.Strategy)
+	}
+
+	var partitionBy string
+	if asset.Materialization.PartitionBy != "" {
+		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", asset.Materialization.PartitionBy)
+	}
+
+	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
+
+	// Build join conditions for primary keys
+	onConds := make([]string, len(primaryKeys))
+	for i, pk := range primaryKeys {
+		onConds[i] = fmt.Sprintf("t.%s = s.%s", pk, pk)
+	}
+	joinCondition := strings.Join(onConds, " AND ")
+
+	sourcePKCols := make([]string, len(primaryKeys))
+	targetPKCols := make([]string, len(primaryKeys))
+	for i, pk := range primaryKeys {
+		sourcePKCols[i] = fmt.Sprintf("s.%s", pk)
+		targetPKCols[i] = fmt.Sprintf("t.%s", pk)
+	}
+
+	changeConditions := make([]string, 0, len(nonPKCols))
+	for _, col := range nonPKCols {
+		changeConditions = append(changeConditions, fmt.Sprintf("t.%s != s.%s", col, col))
+	}
+	changeCondition := ""
+	if len(changeConditions) > 0 {
+		changeCondition = strings.Join(changeConditions, " OR ")
+	}
+
+	// Build user column list for SELECTs
+	userColList := strings.Join(userCols, ", ")
+	allCols := append([]string{}, userCols...)
+	allCols = append(allCols, "_valid_from", "_valid_until", "_is_current")
+	allColList := strings.Join(allCols, ", ")
+
+	// to_keep SELECT
+	toKeepSelectCols := make([]string, 0, len(userCols)+3)
+	for _, col := range userCols {
+		toKeepSelectCols = append(toKeepSelectCols, fmt.Sprintf("t.%s", col))
+	}
+
+	// to_insert SELECT
+	toInsertSelectCols := make([]string, 0, len(userCols)+3)
+	for _, col := range userCols {
+		toInsertSelectCols = append(toInsertSelectCols, fmt.Sprintf("s.%s AS %s", col, col))
+	}
+
+	// Build the SQL using array formatting
+	sqlLines := []string{
+		fmt.Sprintf("CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS", tempTableName, location, tempTableName, partitionBy),
+		"WITH",
+		"time_now AS (",
+		"\tSELECT CURRENT_TIMESTAMP AS now",
+		"),",
+		"source AS (",
+		fmt.Sprintf("\tSELECT %s,", userColList),
+		"\tTRUE as _matched_by_source",
+		fmt.Sprintf("\tFROM (%s", strings.TrimSpace(query)),
+		"\t)",
+		"),",
+		"target AS (",
+		fmt.Sprintf("\tSELECT %s,", allColList),
+		fmt.Sprintf("\tTRUE as _matched_by_target FROM %s", asset.Name),
+		"),",
+		"current_data AS (",
+		fmt.Sprintf("\tSELECT %s, _matched_by_target", allColList),
+		"\tFROM target as t",
+		"\tWHERE _is_current = TRUE",
+		"),",
+		"--current or updated (expired) existing rows from target",
+		"to_keep AS (",
+		fmt.Sprintf("\tSELECT %s,", strings.Join(toKeepSelectCols, ", ")),
+		"\tt._valid_from,",
+		"\t\tCASE",
+		fmt.Sprintf("\t\t\tWHEN _matched_by_source IS NOT NULL AND (%s) THEN (SELECT now FROM time_now)", changeCondition),
+		"\t\t\tWHEN _matched_by_source IS NULL THEN (SELECT now FROM time_now)",
+		"\t\t\tELSE t._valid_until",
+		"\t\tEND AS _valid_until,",
+		"\t\tCASE",
+		fmt.Sprintf("\t\t\tWHEN _matched_by_source IS NOT NULL AND (%s) THEN FALSE", changeCondition),
+		"\t\t\tWHEN _matched_by_source IS NULL THEN FALSE",
+		"\t\t\tELSE t._is_current",
+		"\t\tEND AS _is_current",
+		"\tFROM target t",
+		fmt.Sprintf("\tLEFT JOIN source s ON (%s) AND t._is_current = TRUE", joinCondition),
+		"),",
+		"--new/updated rows from source",
+		"to_insert AS (",
+		fmt.Sprintf("\tSELECT %s,", strings.Join(toInsertSelectCols, ", ")),
+		"\t(SELECT now FROM time_now) AS _valid_from,",
+		"\tTIMESTAMP '9999-12-31 23:59:59' AS _valid_until,",
+		"\tTRUE AS _is_current",
+		"\tFROM source s",
+		fmt.Sprintf("\tLEFT JOIN current_data t ON (%s)", joinCondition),
+		fmt.Sprintf("\tWHERE (_matched_by_target IS NULL) OR (%s)", changeCondition),
+		")",
+		fmt.Sprintf("SELECT %s FROM to_keep", allColList),
+		"UNION ALL",
+		fmt.Sprintf("SELECT %s FROM to_insert;", allColList),
+	}
+	// Join all lines into a single string
+	createQuery := strings.Join(sqlLines, "\n")
+	return []string{
+		strings.TrimSpace(createQuery),
+		"\nDROP TABLE IF EXISTS " + asset.Name,
+		fmt.Sprintf("\nALTER TABLE %s RENAME TO %s;", tempTableName, asset.Name),
+	}, nil
+}
 
 func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]string, error) {
 	query = strings.TrimSuffix(query, ";")
@@ -613,5 +748,7 @@ FROM (
 		fmt.Sprintf("\nALTER TABLE %s RENAME TO %s;", tempTableName, asset.Name),
 	}, nil
 }
+
+
 
 
