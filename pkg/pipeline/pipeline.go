@@ -80,6 +80,7 @@ const (
 	AssetTypeEMRServerlessSpark     = AssetType("emr_serverless.spark")
 	AssetTypeEMRServerlessPyspark   = AssetType("emr_serverless.pyspark")
 	AssetTypeTrinoQuery             = AssetType("trino.sql")
+	AssetTypeTrinoQuerySensor       = AssetType("trino.sensor.query")
 	AssetTypeLooker                 = AssetType("looker")
 	AssetTypeLookerStudio           = AssetType("looker_studio")
 	AssetTypePowerBI                = AssetType("powerbi")
@@ -584,6 +585,8 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeClickHouseSource:      "clickhouse",
 	AssetTypeEMRServerlessSpark:    "emr_serverless",
 	AssetTypeEMRServerlessPyspark:  "emr_serverless",
+	AssetTypeTrinoQuery:            "trino",
+	AssetTypeTrinoQuerySensor:      "trino",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
