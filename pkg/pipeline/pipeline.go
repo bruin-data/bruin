@@ -141,6 +141,7 @@ var defaultMapping = map[string]string{
 	"appstore":              "appstore-default",
 	"gcs":                   "gcs-default",
 	"emr_serverless":        "emr_serverless-default",
+	"trino":                 "trino-default",
 	"googleanalytics":       "googleanalytics-default",
 	"applovin":              "applovin-default",
 	"salesforce":            "salesforce-default",
