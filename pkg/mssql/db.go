@@ -108,9 +108,7 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 	// Extract column names and types
 	columns := make([]string, len(cols))
 	columnTypeNames := make([]string, len(columnTypes))
-	for i, col := range cols {
-		columns[i] = col
-	}
+	copy(columns, cols)
 	for i, colType := range columnTypes {
 		columnTypeNames[i] = colType.DatabaseTypeName()
 	}
