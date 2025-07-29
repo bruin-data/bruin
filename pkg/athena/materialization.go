@@ -117,9 +117,9 @@ func buildMergeQuery(asset *pipeline.Asset, query, location string) ([]string, e
 func buildCreateReplaceQuery(task *pipeline.Asset, query, location string) ([]string, error) {
 	switch {
 	case task.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByTime:
-		return buildSCD2ByTimefullRefresh(task, query, location)
+		return buildSCD2ByTimeFullRefresh(task, query, location)
 	case task.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByColumn:
-		return buildSCD2ByColumnfullRefresh(task, query, location)
+		return buildSCD2ByColumnFullRefresh(task, query, location)
 	default:
 		query = strings.TrimSuffix(query, ";")
 
@@ -256,8 +256,8 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 	sourcePKCols := make([]string, len(primaryKeys))
 	targetPKCols := make([]string, len(primaryKeys))
 	for i, pk := range primaryKeys {
-		sourcePKCols[i] = fmt.Sprintf("s.%s", pk)
-		targetPKCols[i] = fmt.Sprintf("t.%s", pk)
+		sourcePKCols[i] = "s." + pk
+		targetPKCols[i] = "t." + pk
 	}
 
 	changeConditions := make([]string, 0, len(nonPKCols))
@@ -278,7 +278,7 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 	// to_keep SELECT
 	toKeepSelectCols := make([]string, 0, len(userCols)+3)
 	for _, col := range userCols {
-		toKeepSelectCols = append(toKeepSelectCols, fmt.Sprintf("t.%s", col))
+		toKeepSelectCols = append(toKeepSelectCols, "t."+col)
 	}
 
 	// to_insert SELECT
@@ -297,12 +297,12 @@ func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]st
 		"source AS (",
 		fmt.Sprintf("\tSELECT %s,", userColList),
 		"\tTRUE as _matched_by_source",
-		fmt.Sprintf("\tFROM (%s", strings.TrimSpace(query)),
+		"\tFROM (" + strings.TrimSpace(query),
 		"\t)",
 		"),",
 		"target AS (",
 		fmt.Sprintf("\tSELECT %s,", allColList),
-		fmt.Sprintf("\tTRUE as _matched_by_target FROM %s", asset.Name),
+		"\tTRUE as _matched_by_target FROM " + asset.Name,
 		"),",
 		"current_data AS (",
 		fmt.Sprintf("\tSELECT %s, _matched_by_target", allColList),
@@ -361,7 +361,6 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]stri
 	var (
 		primaryKeys = make([]string, 0, 4)
 		userCols    = make([]string, 0, 12)
-		nonPKCols   = make([]string, 0, 12)
 	)
 
 	for _, col := range asset.Columns {
@@ -377,8 +376,6 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]stri
 		}
 		if col.PrimaryKey {
 			primaryKeys = append(primaryKeys, col.Name)
-		} else {
-			nonPKCols = append(nonPKCols, col.Name)
 		}
 		userCols = append(userCols, col.Name)
 	}
@@ -412,7 +409,7 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]stri
 	// to_keep SELECT
 	toKeepSelectCols := make([]string, 0, len(userCols)+3)
 	for _, col := range userCols {
-		toKeepSelectCols = append(toKeepSelectCols, fmt.Sprintf("t.%s", col))
+		toKeepSelectCols = append(toKeepSelectCols, "t."+col)
 	}
 
 	// to_insert SELECT
@@ -431,12 +428,12 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]stri
 		"source AS (",
 		fmt.Sprintf("\tSELECT %s,", userColList),
 		"\tTRUE as _matched_by_source",
-		fmt.Sprintf("\tFROM (%s", strings.TrimSpace(query)),
+		"\tFROM (" + strings.TrimSpace(query),
 		"\t)",
 		"),",
 		"target AS (",
 		fmt.Sprintf("\tSELECT %s,", allColList),
-		fmt.Sprintf("\tTRUE as _matched_by_target FROM %s", asset.Name),
+		"\tTRUE as _matched_by_target FROM " + asset.Name,
 		"),",
 		"current_data AS (",
 		fmt.Sprintf("\tSELECT %s, _matched_by_target", allColList),
@@ -483,7 +480,7 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]stri
 	}, nil
 }
 
-func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query, location string) ([]string, error) {
+func buildSCD2ByTimeFullRefresh(asset *pipeline.Asset, query, location string) ([]string, error) {
 	if asset.Materialization.IncrementalKey == "" {
 		return nil, errors.New("incremental_key is required for SCD2 strategy")
 	}
@@ -506,15 +503,13 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query, location string) (
 	}
 
 	createQuery := fmt.Sprintf(
-		`CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
-SELECT
-  %s,		
-  CAST(src.%s AS TIMESTAMP) AS _valid_from,
-  TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
-  TRUE AS _is_current
-FROM (
-%s
-) AS src`,
+		"CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS\n"+
+			"SELECT %s,\n"+
+			"CAST(src.%s AS TIMESTAMP) AS _valid_from,\n"+
+			"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n"+
+			"TRUE AS _is_current\n"+
+			"FROM (%s\n"+
+			") AS src",
 		tempTableName,
 		location,
 		tempTableName,
@@ -531,7 +526,7 @@ FROM (
 	}, nil
 }
 
-func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query, location string) ([]string, error) {
+func buildSCD2ByColumnFullRefresh(asset *pipeline.Asset, query, location string) ([]string, error) {
 	primaryKeys := asset.ColumnNamesWithPrimaryKey()
 	if len(primaryKeys) == 0 {
 		return nil, errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
@@ -550,15 +545,13 @@ func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query, location string)
 	}
 
 	createQuery := fmt.Sprintf(
-		`CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS
-SELECT
-  %s,
-  CURRENT_TIMESTAMP AS _valid_from,
-  TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
-  TRUE AS _is_current
-FROM (
-%s
-) AS src`,
+		"CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS\n"+
+			"SELECT %s,\n"+
+			"CURRENT_TIMESTAMP AS _valid_from,\n"+
+			"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n"+
+			"TRUE AS _is_current\n"+
+			"FROM (%s\n"+
+			") AS src",
 		tempTableName,
 		location,
 		tempTableName,
@@ -573,7 +566,3 @@ FROM (
 		fmt.Sprintf("\nALTER TABLE %s RENAME TO %s;", tempTableName, asset.Name),
 	}, nil
 }
-
-
-
-

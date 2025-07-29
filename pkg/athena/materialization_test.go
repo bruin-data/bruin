@@ -1,7 +1,6 @@
 package athena
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -646,14 +645,15 @@ func TestBuildSCD2ByColumnFullRefreshQuery(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT id, name, price from source_table",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS " +
-					"SELECT src.id, src.name, src.price, " +
-					"CURRENT_TIMESTAMP AS _valid_from, " +
-					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until, " +
-					"TRUE AS _is_current " +
-					"FROM ( SELECT id, name, price from source_table ) AS src",
-				"DROP TABLE IF EXISTS my.asset",
-				"ALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS\n" +
+					"SELECT src.id, src.name, src.price,\n" +
+					"CURRENT_TIMESTAMP AS _valid_from,\n" +
+					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"TRUE AS _is_current\n" +
+					"FROM (SELECT id, name, price from source_table\n" +
+					") AS src",
+				"\nDROP TABLE IF EXISTS my.asset",
+				"\nALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
 			},
 		},
 		{
@@ -674,14 +674,15 @@ func TestBuildSCD2ByColumnFullRefreshQuery(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT id, category, name, price from source_table",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS " +
-					"SELECT src.id, src.category, src.name, src.price, " +
-					"CURRENT_TIMESTAMP AS _valid_from, " +
-					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until, " +
-					"TRUE AS _is_current " +
-					"FROM ( SELECT id, category, name, price from source_table ) AS src",
-				"DROP TABLE IF EXISTS my.asset",
-				"ALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS\n" +
+					"SELECT src.id, src.category, src.name, src.price,\n" +
+					"CURRENT_TIMESTAMP AS _valid_from,\n" +
+					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"TRUE AS _is_current\n" +
+					"FROM (SELECT id, category, name, price from source_table\n" +
+					") AS src",
+				"\nDROP TABLE IF EXISTS my.asset",
+				"\nALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
 			},
 		},
 		{
@@ -702,14 +703,15 @@ func TestBuildSCD2ByColumnFullRefreshQuery(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT id, name, price from source_table",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['category, id']) AS " +
-					"SELECT src.id, src.name, src.price, " +
-					"CURRENT_TIMESTAMP AS _valid_from, " +
-					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until, " +
-					"TRUE AS _is_current " +
-					"FROM ( SELECT id, name, price from source_table ) AS src",
-				"DROP TABLE IF EXISTS my.asset",
-				"ALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['category, id']) AS\n" +
+					"SELECT src.id, src.name, src.price,\n" +
+					"CURRENT_TIMESTAMP AS _valid_from,\n" +
+					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"TRUE AS _is_current\n" +
+					"FROM (SELECT id, name, price from source_table\n" +
+					") AS src",
+				"\nDROP TABLE IF EXISTS my.asset",
+				"\nALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
 			},
 		},
 	}
@@ -723,7 +725,7 @@ func TestBuildSCD2ByColumnFullRefreshQuery(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.want, trimSpaces(render))
+				assert.Equal(t, tt.want, render)
 			}
 		})
 	}
@@ -850,10 +852,10 @@ func TestBuildSCD2ByTimeQuery(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
-					Type:        pipeline.MaterializationTypeTable,
-					Strategy:    pipeline.MaterializationStrategySCD2ByTime,
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
 					IncrementalKey: "ts",
-					PartitionBy: "id",
+					PartitionBy:    "id",
 				},
 				Columns: []pipeline.Column{
 					{Name: "id", PrimaryKey: true},
@@ -922,8 +924,8 @@ func TestBuildSCD2ByTimeQuery(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
-					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategySCD2ByTime,
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
 					IncrementalKey: "ts",
 				},
 				Columns: []pipeline.Column{
@@ -1037,8 +1039,8 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
-					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategySCD2ByTime,
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
 					IncrementalKey: "ts",
 				},
 				Columns: []pipeline.Column{
@@ -1051,14 +1053,14 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 			query:       "SELECT id, event_name, ts from source_table",
 			wantErr:     true,
 		},
-	
+
 		{
 			name: "scd2_full_refresh_by_time with incremental key",
 			asset: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
-					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategySCD2ByTime,
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
 					IncrementalKey: "ts",
 				},
 				Columns: []pipeline.Column{
@@ -1070,14 +1072,15 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT id, event_name, ts from source_table",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS " +
-					"SELECT src.id, src.event_name, src.ts, " +
-					"CAST(src.ts AS TIMESTAMP) AS _valid_from, " +
-					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until, " +
-					"TRUE AS _is_current " +
-					"FROM ( SELECT id, event_name, ts from source_table ) AS src",
-				"DROP TABLE IF EXISTS my.asset",
-				"ALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS\n" +
+					"SELECT src.id, src.event_name, src.ts,\n" +
+					"CAST(src.ts AS TIMESTAMP) AS _valid_from,\n" +
+					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"TRUE AS _is_current\n" +
+					"FROM (SELECT id, event_name, ts from source_table\n" +
+					") AS src",
+				"\nDROP TABLE IF EXISTS my.asset",
+				"\nALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
 			},
 		},
 		{
@@ -1085,8 +1088,8 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
-					Type:     pipeline.MaterializationTypeTable,
-					Strategy: pipeline.MaterializationStrategySCD2ByTime,
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
 					IncrementalKey: "ts",
 				},
 				Columns: []pipeline.Column{
@@ -1099,14 +1102,15 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT id, category, event_name, ts from source_table",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS " +
-					"SELECT src.id, src.category, src.event_name, src.ts, " +
-					"CAST(src.ts AS TIMESTAMP) AS _valid_from, " +
-					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until, " +
-					"TRUE AS _is_current " +
-					"FROM ( SELECT id, category, event_name, ts from source_table ) AS src",
-				"DROP TABLE IF EXISTS my.asset",
-				"ALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi') AS\n" +
+					"SELECT src.id, src.category, src.event_name, src.ts,\n" +
+					"CAST(src.ts AS TIMESTAMP) AS _valid_from,\n" +
+					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"TRUE AS _is_current\n" +
+					"FROM (SELECT id, category, event_name, ts from source_table\n" +
+					") AS src",
+				"\nDROP TABLE IF EXISTS my.asset",
+				"\nALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
 			},
 		},
 		{
@@ -1114,10 +1118,10 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 			asset: &pipeline.Asset{
 				Name: "my.asset",
 				Materialization: pipeline.Materialization{
-					Type:        pipeline.MaterializationTypeTable,
-					Strategy:    pipeline.MaterializationStrategySCD2ByTime,
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
 					IncrementalKey: "ts",
-					PartitionBy: "category, id",
+					PartitionBy:    "category, id",
 				},
 				Columns: []pipeline.Column{
 					{Name: "id", Type: "INTEGER", PrimaryKey: true},
@@ -1128,14 +1132,15 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 			fullRefresh: true,
 			query:       "SELECT id, event_name, ts from source_table",
 			want: []string{
-				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['category, id']) AS " +
-					"SELECT src.id, src.event_name, src.ts, " +
-					"CAST(src.ts AS TIMESTAMP) AS _valid_from, " +
-					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until, " +
-					"TRUE AS _is_current " +
-					"FROM ( SELECT id, event_name, ts from source_table ) AS src",
-				"DROP TABLE IF EXISTS my.asset",
-				"ALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
+				"CREATE TABLE __bruin_tmp_abcefghi WITH (table_type='ICEBERG', is_external=false, location='s3://bucket/__bruin_tmp_abcefghi', partitioning = ARRAY['category, id']) AS\n" +
+					"SELECT src.id, src.event_name, src.ts,\n" +
+					"CAST(src.ts AS TIMESTAMP) AS _valid_from,\n" +
+					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"TRUE AS _is_current\n" +
+					"FROM (SELECT id, event_name, ts from source_table\n" +
+					") AS src",
+				"\nDROP TABLE IF EXISTS my.asset",
+				"\nALTER TABLE __bruin_tmp_abcefghi RENAME TO my.asset;",
 			},
 		},
 	}
@@ -1149,16 +1154,8 @@ func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.want, trimSpaces(render))
+				assert.Equal(t, tt.want, render)
 			}
 		})
 	}
-}
-
-func trimSpaces(arr []string) []string {
-	result := make([]string, len(arr))
-	for i, s := range arr {
-		result[i] = strings.Join(strings.Fields(s), " ")
-	}
-	return result
 }
