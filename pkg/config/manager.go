@@ -92,6 +92,7 @@ type Connections struct {
 	ISOCPulse           []ISOCPulseConnection           `yaml:"isoc_pulse,omitempty" json:"isoc_pulse,omitempty" mapstructure:"isoc_pulse"`
 	InfluxDB            []InfluxDBConnection            `yaml:"influxdb,omitempty" json:"influxdb,omitempty" mapstructure:"influxdb"`
 	Tableau             []TableauConnection             `yaml:"tableau,omitempty" json:"tableau,omitempty" mapstructure:"tableau"`
+	Trino               []TrinoConnection               `yaml:"trino,omitempty" json:"trino,omitempty" mapstructure:"trino"`
 	byKey               map[string]any
 	typeNameMap         map[string]string
 }

@@ -921,6 +921,19 @@ type TableauConnection struct {
 	APIVersion                string `yaml:"api_version,omitempty" json:"api_version" mapstructure:"api_version"`
 }
 
+type TrinoConnection struct {
+	Name     string `yaml:"name" json:"name" mapstructure:"name"`
+	Host     string `yaml:"host" json:"host" mapstructure:"host"`
+	Port     int    `yaml:"port" json:"port" mapstructure:"port"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Catalog  string `yaml:"catalog" json:"catalog" mapstructure:"catalog"`
+	Schema   string `yaml:"schema" json:"schema" mapstructure:"schema"`
+}
+
+func (c TrinoConnection) GetName() string {
+	return c.Name
+}
+
 func (c TableauConnection) GetName() string {
 	return c.Name
 }

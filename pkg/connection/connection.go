@@ -70,6 +70,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/stripe"
 	"github.com/bruin-data/bruin/pkg/tableau"
 	"github.com/bruin-data/bruin/pkg/tiktokads"
+	"github.com/bruin-data/bruin/pkg/trino"
 	"github.com/bruin-data/bruin/pkg/trustpilot"
 	"github.com/bruin-data/bruin/pkg/zendesk"
 	"github.com/bruin-data/bruin/pkg/zoom"
@@ -144,6 +145,7 @@ type Manager struct {
 	ISOCPulse            map[string]*isocpulse.Client
 	InfluxDB             map[string]*influxdb.Client
 	Tableau              map[string]*tableau.Client
+	Trino                map[string]*trino.Client
 	Generic              map[string]*config.GenericConnection
 	mutex                sync.Mutex
 	availableConnections map[string]any
@@ -1890,6 +1892,35 @@ func (m *Manager) AddTableauConnectionFromConfig(connection *config.TableauConne
 	return nil
 }
 
+func (m *Manager) AddTrinoConnectionFromConfig(connection *config.TrinoConnection) error {
+	m.mutex.Lock()
+	if m.Trino == nil {
+		m.Trino = make(map[string]*trino.Client)
+	}
+	m.mutex.Unlock()
+
+	config := trino.Config{
+		Username: connection.Username,
+		Host:     connection.Host,
+		Port:     connection.Port,
+		Catalog:  connection.Catalog,
+		Schema:   connection.Schema,
+	}
+
+	client, err := trino.NewClient(config)
+	if err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.Trino[connection.Name] = client
+	m.availableConnections[connection.Name] = client
+	m.AllConnectionDetails[connection.Name] = connection
+
+	return nil
+}
+
 var envVarRegex = regexp.MustCompile(`\${([^}]+)}`)
 
 func processConnections[T config.Named](connections []T, adder func(*T) error, wg *conc.WaitGroup, errList *[]error, mu *sync.Mutex) {
@@ -2010,6 +2041,7 @@ func NewManagerFromConfig(cm *config.Config) (config.ConnectionAndDetailsGetter,
 	processConnections(cm.SelectedEnvironment.Connections.InfluxDB, connectionManager.AddInfluxDBConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Tableau, connectionManager.AddTableauConnectionFromConfig, &wg, &errList, &mu)
 	processConnections(cm.SelectedEnvironment.Connections.Generic, connectionManager.AddGenericConnectionFromConfig, &wg, &errList, &mu)
+	processConnections(cm.SelectedEnvironment.Connections.Trino, connectionManager.AddTrinoConnectionFromConfig, &wg, &errList, &mu)
 	wg.Wait()
 	return connectionManager, errList
 }
