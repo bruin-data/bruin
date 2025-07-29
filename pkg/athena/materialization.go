@@ -29,6 +29,8 @@ var matMap = AssetMaterializationMap{
 		pipeline.MaterializationStrategyMerge:         buildMergeQuery,
 		pipeline.MaterializationStrategyTimeInterval:  buildTimeIntervalQuery,
 		pipeline.MaterializationStrategyDDL:           buildDDLQuery,
+		pipeline.MaterializationStrategySCD2ByColumn:  buildSCD2ByColumnQuery,
+		pipeline.MaterializationStrategySCD2ByTime:    buildSCD2ByTimeQuery,
 	},
 }
 
@@ -113,27 +115,34 @@ func buildMergeQuery(asset *pipeline.Asset, query, location string) ([]string, e
 }
 
 func buildCreateReplaceQuery(task *pipeline.Asset, query, location string) ([]string, error) {
-	query = strings.TrimSuffix(query, ";")
+	switch {
+	case task.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByTime:
+		return buildSCD2ByTimeFullRefresh(task, query, location)
+	case task.Materialization.Strategy == pipeline.MaterializationStrategySCD2ByColumn:
+		return buildSCD2ByColumnFullRefresh(task, query, location)
+	default:
+		query = strings.TrimSuffix(query, ";")
 
-	tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
+		tempTableName := "__bruin_tmp_" + helpers.PrefixGenerator()
 
-	var partitionBy string
-	if task.Materialization.PartitionBy != "" {
-		partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", task.Materialization.PartitionBy)
+		var partitionBy string
+		if task.Materialization.PartitionBy != "" {
+			partitionBy = fmt.Sprintf(", partitioning = ARRAY['%s']", task.Materialization.PartitionBy)
+		}
+
+		return []string{
+			fmt.Sprintf(
+				"CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS %s",
+				tempTableName,
+				location,
+				tempTableName,
+				partitionBy,
+				query,
+			),
+			"DROP TABLE IF EXISTS " + task.Name,
+			fmt.Sprintf("ALTER TABLE %s RENAME TO %s", tempTableName, task.Name),
+		}, nil
 	}
-
-	return []string{
-		fmt.Sprintf(
-			"CREATE TABLE %s WITH (table_type='ICEBERG', is_external=false, location='%s/%s'%s) AS %s",
-			tempTableName,
-			location,
-			tempTableName,
-			partitionBy,
-			query,
-		),
-		"DROP TABLE IF EXISTS " + task.Name,
-		fmt.Sprintf("ALTER TABLE %s RENAME TO %s", tempTableName, task.Name),
-	}, nil
 }
 
 func buildTimeIntervalQuery(asset *pipeline.Asset, query string, location string) ([]string, error) {
@@ -202,4 +211,20 @@ func buildDDLQuery(asset *pipeline.Asset, query string, location string) ([]stri
 	)
 
 	return []string{ddlQuery}, nil
+}
+
+func buildSCD2ByColumnQuery(asset *pipeline.Asset, query, location string) ([]string, error) {
+	return []string{}, nil
+}
+
+func buildSCD2ByColumnFullRefresh(asset *pipeline.Asset, query, location string) ([]string, error) {
+	return []string{}, nil
+}
+
+func buildSCD2ByTimeQuery(asset *pipeline.Asset, query, location string) ([]string, error) {
+	return []string{}, nil
+}
+
+func buildSCD2ByTimeFullRefresh(asset *pipeline.Asset, query, location string) ([]string, error) {
+	return []string{}, nil
 }
