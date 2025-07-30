@@ -53,7 +53,11 @@ var (
 
 func renderAssetParamsMutator(renderer jinja.RendererInterface) pipeline.AssetMutator {
 	return func(ctx context.Context, a *pipeline.Asset, p *pipeline.Pipeline) (*pipeline.Asset, error) {
-		renderer = renderer.CloneForAsset(ctx, p, a)
+		var err error
+		renderer, err = renderer.CloneForAsset(ctx, p, a)
+		if err != nil {
+			return nil, fmt.Errorf("error creating renderer for asset %s: %w", a.Name, err)
+		}
 		for key, value := range a.Parameters {
 			renderedValue, err := renderer.Render(value)
 			if err != nil {
