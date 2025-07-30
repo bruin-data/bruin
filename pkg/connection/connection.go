@@ -1901,6 +1901,7 @@ func (m *Manager) AddTrinoConnectionFromConfig(connection *config.TrinoConnectio
 
 	config := trino.Config{
 		Username: connection.Username,
+		Password: connection.Password,
 		Host:     connection.Host,
 		Port:     connection.Port,
 		Catalog:  connection.Catalog,

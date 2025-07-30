@@ -926,6 +926,7 @@ type TrinoConnection struct {
 	Host     string `yaml:"host" json:"host" mapstructure:"host"`
 	Port     int    `yaml:"port" json:"port" mapstructure:"port"`
 	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password,omitempty" json:"password,omitempty" mapstructure:"password"`
 	Catalog  string `yaml:"catalog" json:"catalog" mapstructure:"catalog"`
 	Schema   string `yaml:"schema" json:"schema" mapstructure:"schema"`
 }

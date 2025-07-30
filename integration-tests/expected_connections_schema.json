@@ -2094,6 +2094,9 @@
         "username": {
           "type": "string"
         },
+        "password": {
+          "type": "string"
+        },
         "catalog": {
           "type": "string"
         },

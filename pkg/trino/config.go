@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	Username string // Required
+	Password string // Optional 
 	Host     string // Required
 	Port     int    // Required
 	Catalog  string // Optional - can be empty to use default catalog
@@ -17,7 +18,13 @@ type Config struct {
 
 func (c Config) ToDSN() string {
 	hostPort := net.JoinHostPort(c.Host, strconv.Itoa(c.Port))
-	baseURL := fmt.Sprintf("http://%s@%s", c.Username, hostPort)
+
+	userPart := c.Username
+	if c.Password != "" {
+		userPart = fmt.Sprintf("%s:%s", c.Username, c.Password)
+	}
+
+	baseURL := fmt.Sprintf("http://%s@%s", userPart, hostPort)
 	params := url.Values{}
 	if c.Catalog != "" {
 		params.Set("catalog", c.Catalog)
