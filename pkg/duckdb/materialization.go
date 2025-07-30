@@ -426,7 +426,7 @@ func buildSCD2ByTimeQuery(asset *pipeline.Asset, query string) (string, error) {
 		"UNION ALL",
 		fmt.Sprintf("SELECT %s FROM to_insert;", allColList),
 	}
-	
+
 	return strings.Join(sqlLines, "\n"), nil
 }
 

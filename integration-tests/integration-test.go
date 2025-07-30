@@ -575,6 +575,7 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 				},
 			},
 		},
+		//nolint:dupl
 		{
 			Name: "run pipeline with scd2 by column",
 			Steps: []e2e.Task{
@@ -730,6 +731,7 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 				},
 			},
 		},
+		//nolint:dupl
 		{
 			Name: "run pipeline with scd2 by time",
 			Steps: []e2e.Task{
