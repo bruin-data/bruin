@@ -4,5 +4,3 @@ ID,Name,Price,_is_current
 2,Tea,{3 2 499},true
 3,Coffee,{3 2 599},false
 4,Fanta,{3 2 199},true
-
-

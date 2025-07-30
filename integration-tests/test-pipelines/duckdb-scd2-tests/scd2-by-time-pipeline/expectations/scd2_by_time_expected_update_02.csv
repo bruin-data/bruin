@@ -6,3 +6,4 @@ product_id,product_name,stock,_is_current,_valid_from
 3,Headphones,1200,true,2025-06-10 00:00:00 +0000 UTC
 4,Monitor,25,false,2025-04-02 00:00:00 +0000 UTC
 5,ps5,25,false,2025-06-02 00:00:00 +0000 UTC
+

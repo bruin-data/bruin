@@ -31,4 +31,3 @@ SELECT
     DATE '2025-06-10' AS dt
 
 
-
