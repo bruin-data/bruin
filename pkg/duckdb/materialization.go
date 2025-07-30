@@ -437,25 +437,29 @@ func buildSCD2ByTimefullRefresh(asset *pipeline.Asset, query string) (string, er
 
 	primaryKeys := asset.ColumnNamesWithPrimaryKey()
 	if len(primaryKeys) == 0 {
-		return "", errors.New("materialization strategy 'SCD2_by_column' requires the `primary_key` field to be set on at least one column")
+		return "", errors.New("materialization strategy 'SCD2_by_time' requires the `primary_key` field to be set on at least one column")
 	}
-	tbl := asset.Name
-	stmt := fmt.Sprintf(
-		`CREATE OR REPLACE TABLE %s AS
-SELECT
-  CAST (%s AS TIMESTAMP) AS _valid_from,
-  src.*,
-  TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,
-  TRUE AS _is_current
-FROM (
-%s
-) AS src;`,
-		tbl,
+
+	srcCols := make([]string, len(asset.Columns))
+	for i, col := range asset.Columns {
+		srcCols[i] = "src." + col.Name
+	}
+
+	createQuery := fmt.Sprintf(
+		"CREATE OR REPLACE TABLE %s AS\n"+
+			"SELECT %s,\n"+
+			"CAST(src.%s AS TIMESTAMP) AS _valid_from,\n"+
+			"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n"+
+			"TRUE AS _is_current\n"+
+			"FROM (%s\n"+
+			") AS src;",
+		asset.Name,
+		strings.Join(srcCols, ", "),
 		asset.Materialization.IncrementalKey,
 		strings.TrimSpace(query),
 	)
 
-	return strings.TrimSpace(stmt), nil
+	return strings.TrimSpace(createQuery), nil
 }
 
 func buildSCD2ByColumnfullRefresh(asset *pipeline.Asset, query string) (string, error) {

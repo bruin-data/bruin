@@ -963,3 +963,150 @@ func TestBuildSCD2ByTimeQuery(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildSCD2ByTimeFullRefreshQuery(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		asset       *pipeline.Asset
+		query       string
+		want        string
+		wantErr     bool
+		fullRefresh bool
+	}{
+		{
+			name: "scd2_full_refresh_by_time_with_no_incremental_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByTime,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER", PrimaryKey: true},
+					{Name: "event_name", Type: "VARCHAR"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, event_name, ts from source_table",
+			wantErr:     true,
+		},
+		{
+			name: "scd2_full_refresh_by_time_with_no_primary_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER"},
+					{Name: "event_name", Type: "VARCHAR"},
+					{Name: "ts", Type: "TIMESTAMP"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, event_name, ts from source_table",
+			wantErr:     true,
+		},
+
+		{
+			name: "scd2_full_refresh_by_time with incremental key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER", PrimaryKey: true},
+					{Name: "event_name", Type: "VARCHAR"},
+					{Name: "ts", Type: "TIMESTAMP"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, event_name, ts from source_table",
+			want: 
+				"CREATE OR REPLACE TABLE my.asset AS\n" +
+					"SELECT src.id, src.event_name, src.ts,\n" +
+					"CAST(src.ts AS TIMESTAMP) AS _valid_from,\n" +
+					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"TRUE AS _is_current\n" +
+					"FROM (SELECT id, event_name, ts from source_table\n" +
+					") AS src;",
+				
+		},
+		{
+			name: "scd2_full_refresh_by_time_with_multiple_primary_keys",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER", PrimaryKey: true},
+					{Name: "category", Type: "VARCHAR", PrimaryKey: true},
+					{Name: "event_name", Type: "VARCHAR"},
+					{Name: "ts", Type: "TIMESTAMP"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, category, event_name, ts from source_table",
+			want: 
+				"CREATE OR REPLACE TABLE my.asset AS\n" +
+					"SELECT src.id, src.category, src.event_name, src.ts,\n" +
+					"CAST(src.ts AS TIMESTAMP) AS _valid_from,\n" +
+					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"TRUE AS _is_current\n" +
+					"FROM (SELECT id, category, event_name, ts from source_table\n" +
+					") AS src;",
+				
+		},
+		{
+			name: "scd2_full_refresh_with_custom_partitioning",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:           pipeline.MaterializationTypeTable,
+					Strategy:       pipeline.MaterializationStrategySCD2ByTime,
+					IncrementalKey: "ts",
+					PartitionBy:    "category, id",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER", PrimaryKey: true},
+					{Name: "event_name", Type: "VARCHAR"},
+					{Name: "ts", Type: "TIMESTAMP"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, event_name, ts from source_table",
+			want: 
+				"CREATE OR REPLACE TABLE my.asset AS\n" +
+					"SELECT src.id, src.event_name, src.ts,\n" +
+					"CAST(src.ts AS TIMESTAMP) AS _valid_from,\n" +
+					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"TRUE AS _is_current\n" +
+					"FROM (SELECT id, event_name, ts from source_table\n" +
+					") AS src;",
+
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			m := NewMaterializer(tt.fullRefresh)
+			render, err := m.Render(tt.asset, tt.query)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, render)
+			}
+		})
+	}
+}
