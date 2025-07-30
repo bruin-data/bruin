@@ -145,7 +145,7 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 			return nil, errors.Wrapf(err, "failed to resolve start interval modifier template for asset %s", asset.Name)
 		}
 		startDate = pipeline.ModifyDate(startDate, resolvedStartModifier)
-		
+
 		resolvedEndModifier, err := asset.IntervalModifiers.End.ResolveTemplateToNew(tempRenderer)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to resolve end interval modifier template for asset %s", asset.Name)

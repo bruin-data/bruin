@@ -720,6 +720,7 @@ type Asset struct { //nolint:recvcheck
 	downstream []*Asset
 }
 
+//nolint:recvcheck
 type TimeModifier struct {
 	Months      int    `json:"months" yaml:"months,omitempty" mapstructure:"months"`
 	Days        int    `json:"days" yaml:"days,omitempty" mapstructure:"days"`
@@ -776,7 +777,7 @@ func (t *TimeModifier) parseTimeModifier(modifier string) error {
 	return nil
 }
 
-// RendererInterface is used to avoid circular dependencies
+// RendererInterface is used to avoid circular dependencies.
 type RendererInterface interface {
 	Render(template string) (string, error)
 }

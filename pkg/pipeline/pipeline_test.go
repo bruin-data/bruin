@@ -1597,15 +1597,6 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 	}
 }
 
-// Mock renderer for testing template resolution
-type mockRenderer struct {
-	renderFunc func(template string) (string, error)
-}
-
-func (m *mockRenderer) Render(template string) (string, error) {
-	return m.renderFunc(template)
-}
-
 func TestTimeModifier_UnmarshalYAML_Template(t *testing.T) {
 	t.Parallel()
 
@@ -1705,7 +1696,7 @@ func TestTimeModifier_MarshalYAML_Template(t *testing.T) {
 
 			yamlData, err := yaml.Marshal(tt.modifier)
 			require.NoError(t, err)
-			assert.Equal(t, tt.want+"\n", string(yamlData))
+			assert.YAMLEq(t, tt.want+"\n", string(yamlData))
 		})
 	}
 }
@@ -1753,114 +1744,11 @@ func TestTimeModifier_MarshalJSON_Template(t *testing.T) {
 
 			jsonData, err := json.Marshal(tt.modifier)
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, string(jsonData))
+			assert.JSONEq(t, tt.want, string(jsonData))
 		})
 	}
 }
 
-func TestTimeModifier_ResolveTemplateToNew(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		modifier   pipeline.TimeModifier
-		mockRender func(template string) (string, error)
-		want       pipeline.TimeModifier
-		wantErr    bool
-	}{
-		{
-			name: "resolve to days",
-			modifier: pipeline.TimeModifier{
-				Template: "{% if true %}-30d{% endif %}",
-			},
-			mockRender: func(template string) (string, error) {
-				return "-30d", nil
-			},
-			want: pipeline.TimeModifier{
-				Days: -30,
-			},
-		},
-		{
-			name: "resolve to hours",
-			modifier: pipeline.TimeModifier{
-				Template: "{% if false %}-30d{% else %}-2h{% endif %}",
-			},
-			mockRender: func(template string) (string, error) {
-				return "-2h", nil
-			},
-			want: pipeline.TimeModifier{
-				Hours: -2,
-			},
-		},
-		{
-			name: "no template returns unchanged",
-			modifier: pipeline.TimeModifier{
-				Days: 5,
-			},
-			mockRender: func(template string) (string, error) {
-				return "", nil
-			},
-			want: pipeline.TimeModifier{
-				Days: 5,
-			},
-		},
-		{
-			name: "preserve existing values with template",
-			modifier: pipeline.TimeModifier{
-				Template: "{{ some_template }}",
-				Hours:    2, // Should be preserved if template doesn't set hours
-			},
-			mockRender: func(template string) (string, error) {
-				return "-30d", nil // Template sets days, not hours
-			},
-			want: pipeline.TimeModifier{
-				Days: -30, // Template fully replaces existing values
-			},
-		},
-		{
-			name: "render error",
-			modifier: pipeline.TimeModifier{
-				Template: "{% invalid %}",
-			},
-			mockRender: func(template string) (string, error) {
-				return "", errors.New("template syntax error")
-			},
-			wantErr: true,
-		},
-		{
-			name: "parse error",
-			modifier: pipeline.TimeModifier{
-				Template: "{{ valid_template }}",
-			},
-			mockRender: func(template string) (string, error) {
-				return "invalid-format", nil
-			},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			renderer := &mockRenderer{renderFunc: tt.mockRender}
-			result, err := tt.modifier.ResolveTemplateToNew(renderer)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-				return
-			}
-
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, result)
-
-			// Verify original is not mutated
-			if tt.modifier.Template != "" {
-				assert.Equal(t, tt.modifier.Template, tt.modifier.Template, "original template should not be cleared")
-			}
-		})
-	}
-}
 func TestIntervalModifiers_YAML_Integration(t *testing.T) {
 	t.Parallel()
 

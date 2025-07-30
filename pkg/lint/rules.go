@@ -1241,7 +1241,7 @@ func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.P
 	if err != nil {
 		return nil, err
 	}
-	
+
 	missingDeps, err := u.parser.GetMissingDependenciesForAsset(asset, p, assetRenderer)
 	if err != nil {
 		issues = append(issues, &Issue{
