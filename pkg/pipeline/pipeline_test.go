@@ -1596,3 +1596,305 @@ func TestBuilder_SetupDefaultsFromPipeline(t *testing.T) {
 		})
 	}
 }
+
+// Mock renderer for testing template resolution
+type mockRenderer struct {
+	renderFunc func(template string) (string, error)
+}
+
+func (m *mockRenderer) Render(template string) (string, error) {
+	return m.renderFunc(template)
+}
+
+func TestTimeModifier_UnmarshalYAML_Template(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		yamlData string
+		want     pipeline.TimeModifier
+		wantErr  bool
+	}{
+		{
+			name:     "simple template",
+			yamlData: "'{% if true %}-30d{% else %}-2h{% endif %}'",
+			want: pipeline.TimeModifier{
+				Template: "{% if true %}-30d{% else %}-2h{% endif %}",
+			},
+		},
+		{
+			name:     "template with variable",
+			yamlData: "'{{ end_date | truncate_day }}'",
+			want: pipeline.TimeModifier{
+				Template: "{{ end_date | truncate_day }}",
+			},
+		},
+		{
+			name:     "regular time modifier",
+			yamlData: "-30d",
+			want: pipeline.TimeModifier{
+				Days: -30,
+			},
+		},
+		{
+			name:     "hours modifier",
+			yamlData: "2h",
+			want: pipeline.TimeModifier{
+				Hours: 2,
+			},
+		},
+		{
+			name:     "invalid format",
+			yamlData: "x",
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var modifier pipeline.TimeModifier
+			err := yaml.Unmarshal([]byte(tt.yamlData), &modifier)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, modifier)
+		})
+	}
+}
+
+func TestTimeModifier_MarshalYAML_Template(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		modifier pipeline.TimeModifier
+		want     string
+	}{
+		{
+			name: "template",
+			modifier: pipeline.TimeModifier{
+				Template: "{% if end_date == (end_date | truncate_day) %}-30d{% else %}-2h{% endif %}",
+			},
+			want: "'{% if end_date == (end_date | truncate_day) %}-30d{% else %}-2h{% endif %}'",
+		},
+		{
+			name: "days modifier",
+			modifier: pipeline.TimeModifier{
+				Days: -30,
+			},
+			want: "-30d",
+		},
+		{
+			name: "hours modifier",
+			modifier: pipeline.TimeModifier{
+				Hours: 2,
+			},
+			want: "2h",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			yamlData, err := yaml.Marshal(tt.modifier)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want+"\n", string(yamlData))
+		})
+	}
+}
+
+func TestTimeModifier_MarshalJSON_Template(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		modifier pipeline.TimeModifier
+		want     string
+	}{
+		{
+			name: "template with all fields",
+			modifier: pipeline.TimeModifier{
+				Template: "{% if true %}-30d{% endif %}",
+				Days:     5, // Should be included in JSON even with template
+			},
+			want: `{"months":0,"days":5,"hours":0,"minutes":0,"seconds":0,"cron_periods":0,"template":"{% if true %}-30d{% endif %}"}`,
+		},
+		{
+			name: "only template",
+			modifier: pipeline.TimeModifier{
+				Template: "-2h",
+			},
+			want: `{"months":0,"days":0,"hours":0,"minutes":0,"seconds":0,"cron_periods":0,"template":"-2h"}`,
+		},
+		{
+			name: "only numeric values",
+			modifier: pipeline.TimeModifier{
+				Days: -30,
+			},
+			want: `{"months":0,"days":-30,"hours":0,"minutes":0,"seconds":0,"cron_periods":0,"template":""}`,
+		},
+		{
+			name:     "empty modifier",
+			modifier: pipeline.TimeModifier{},
+			want:     "null",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			jsonData, err := json.Marshal(tt.modifier)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, string(jsonData))
+		})
+	}
+}
+
+func TestTimeModifier_ResolveTemplateToNew(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		modifier   pipeline.TimeModifier
+		mockRender func(template string) (string, error)
+		want       pipeline.TimeModifier
+		wantErr    bool
+	}{
+		{
+			name: "resolve to days",
+			modifier: pipeline.TimeModifier{
+				Template: "{% if true %}-30d{% endif %}",
+			},
+			mockRender: func(template string) (string, error) {
+				return "-30d", nil
+			},
+			want: pipeline.TimeModifier{
+				Days: -30,
+			},
+		},
+		{
+			name: "resolve to hours",
+			modifier: pipeline.TimeModifier{
+				Template: "{% if false %}-30d{% else %}-2h{% endif %}",
+			},
+			mockRender: func(template string) (string, error) {
+				return "-2h", nil
+			},
+			want: pipeline.TimeModifier{
+				Hours: -2,
+			},
+		},
+		{
+			name: "no template returns unchanged",
+			modifier: pipeline.TimeModifier{
+				Days: 5,
+			},
+			mockRender: func(template string) (string, error) {
+				return "", nil
+			},
+			want: pipeline.TimeModifier{
+				Days: 5,
+			},
+		},
+		{
+			name: "preserve existing values with template",
+			modifier: pipeline.TimeModifier{
+				Template: "{{ some_template }}",
+				Hours:    2, // Should be preserved if template doesn't set hours
+			},
+			mockRender: func(template string) (string, error) {
+				return "-30d", nil // Template sets days, not hours
+			},
+			want: pipeline.TimeModifier{
+				Days: -30, // Template fully replaces existing values
+			},
+		},
+		{
+			name: "render error",
+			modifier: pipeline.TimeModifier{
+				Template: "{% invalid %}",
+			},
+			mockRender: func(template string) (string, error) {
+				return "", errors.New("template syntax error")
+			},
+			wantErr: true,
+		},
+		{
+			name: "parse error",
+			modifier: pipeline.TimeModifier{
+				Template: "{{ valid_template }}",
+			},
+			mockRender: func(template string) (string, error) {
+				return "invalid-format", nil
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			renderer := &mockRenderer{renderFunc: tt.mockRender}
+			result, err := tt.modifier.ResolveTemplateToNew(renderer)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, result)
+
+			// Verify original is not mutated
+			if tt.modifier.Template != "" {
+				assert.Equal(t, tt.modifier.Template, tt.modifier.Template, "original template should not be cleared")
+			}
+		})
+	}
+}
+func TestIntervalModifiers_YAML_Integration(t *testing.T) {
+	t.Parallel()
+
+	yamlContent := `
+start: '{% if end_date == (end_date | truncate_day) %}-30d{% else %}-2h{% endif %}'
+end: 5h
+`
+
+	var modifiers pipeline.IntervalModifiers
+	err := yaml.Unmarshal([]byte(yamlContent), &modifiers)
+	require.NoError(t, err)
+
+	assert.Equal(t, "{% if end_date == (end_date | truncate_day) %}-30d{% else %}-2h{% endif %}", modifiers.Start.Template)
+	assert.Equal(t, 5, modifiers.End.Hours)
+}
+
+func TestIntervalModifiers_JSON_Integration(t *testing.T) {
+	t.Parallel()
+
+	modifiers := pipeline.IntervalModifiers{
+		Start: pipeline.TimeModifier{
+			Template: "{% if condition %}-30d{% endif %}",
+		},
+		End: pipeline.TimeModifier{
+			Hours: -2,
+		},
+	}
+
+	jsonData, err := json.Marshal(modifiers)
+	require.NoError(t, err)
+
+	var result pipeline.IntervalModifiers
+	err = json.Unmarshal(jsonData, &result)
+	require.NoError(t, err)
+
+	assert.Equal(t, modifiers, result)
+}
