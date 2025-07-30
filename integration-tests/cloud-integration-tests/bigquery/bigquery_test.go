@@ -27,7 +27,7 @@ func TestBigQueryIndividualTasks(t *testing.T) {
 		{
 			Name:    "bigquery-run-pipeline",
 			Command: binary,
-			Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--full-refresh", filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline")),
+			Args:    append(append([]string{"run"}, configFlags...), "--env", "default", "--full-refresh", filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products.sql")),
 			Env:     []string{},
 			Expected: e2e.Output{
 				ExitCode: 0,
@@ -273,11 +273,23 @@ func TestBigQueryWorkflows(t *testing.T) {
 			},
 		},
 		{
-			name: "[bigquery] SCD2 by time workflow",
+			name: "bigquery-scd2-by-time",
 			workflow: func(tempDir string, configFlags []string, binary string) e2e.Workflow {
 				return e2e.Workflow{
-					Name: "[bigquery] SCD2 by time workflow",
+					Name: "bigquery-scd2-by-time",
 					Steps: []e2e.Task{
+						{
+							Name:    "scd2-by-time: drop table if exists",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "DROP TABLE IF EXISTS test.products;"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 1,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode, // Should fail because table doesn't exist
+							},
+						},
 						{
 							Name:    "scd2-by-time: restore products asset to initial state",
 							Command: "cp",
@@ -303,9 +315,23 @@ func TestBigQueryWorkflows(t *testing.T) {
 							},
 						},
 						{
-							Name:    "scd2-by-time: update products with new data",
+							Name:    "scd2-by-time: query the initial table",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+								CSVFile:  filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/expectations/scd2_by_time_expected_initial.csv"),
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+								e2e.AssertByCSV,
+							},
+						},
+						{
+							Name:    "scd2-by-time: copy products_updated_01.sql to products.sql",
 							Command: "cp",
-							Args:    []string{filepath.Join(tempDir, "test-pipelines/scd2-pipelines/resources/products_updated.sql"), filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")},
+							Args:    []string{filepath.Join(tempDir, "test-pipelines/scd2-pipelines/resources/products_updated_01.sql"), filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")},
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -315,12 +341,88 @@ func TestBigQueryWorkflows(t *testing.T) {
 							},
 						},
 						{
-							Name:    "scd2-by-time: run SCD2 by time materialization",
+							Name:    "scd2-by-time: run products_updated_01.sql with SCD2 materialization",
 							Command: binary,
 							Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "scd2-by-time: query the updated table 01",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+								CSVFile:  filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/expectations/scd2_by_time_expected_update_01.csv"),
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+								e2e.AssertByCSV,
+							},
+						},
+						{
+							Name:    "scd2-by-time: copy products_updated_02.sql to products.sql",
+							Command: "cp",
+							Args:    []string{filepath.Join(tempDir, "test-pipelines/scd2-pipelines/resources/products_updated_02.sql"), filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")},
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "scd2-by-time: run products_updated_02.sql with SCD2 materialization",
+							Command: binary,
+							Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "scd2-by-time: query the updated table 02",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+								CSVFile:  filepath.Join(tempDir, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/expectations/scd2_by_time_expected_update_02.csv"),
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+								e2e.AssertByCSV,
+							},
+						},
+						{
+							Name:    "scd2-by-time: drop the table (expect error but table will be dropped)",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "athena-default", "--query", "DROP TABLE IF EXISTS test.products;"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "scd2-by-time: confirm the table is dropped",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "athena-default", "--query", "SELECT * FROM test.products;"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 1, // Should fail because table doesn't exist
 							},
 							Asserts: []func(*e2e.Task) error{
 								e2e.AssertByExitCode,

@@ -15,6 +15,7 @@ columns:
   - name: product_name
     type: VARCHAR
     description: "Name of the product"
+    primary_key: true
   - name: dt
     type: DATE
     description: "incremental key"
@@ -28,6 +29,5 @@ SELECT
     'Headphones' AS product_name,
     1200 AS stock,
     DATE '2025-06-10' AS dt
-
 
 
