@@ -1196,7 +1196,11 @@ func SetupExecutors(
 		}
 	}
 	if s.WillRunTaskOfType(pipeline.AssetTypeTrinoQuery) || estimateCustomCheckType == pipeline.AssetTypeTrinoQuery || s.WillRunTaskOfType(pipeline.AssetTypeTrinoQuerySensor) {
-		trinoOperator := trino.NewBasicOperator(conn, wholeFileExtractor)
+		trinoFileExtractor := &query.FileQuerySplitterExtractor{
+			Fs:       fs,
+			Renderer: renderer,
+		}
+		trinoOperator := trino.NewBasicOperator(conn, trinoFileExtractor)
 		trinoCheckRunner := athena.NewColumnCheckOperator(conn)
 		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeMain] = trinoOperator
 		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeColumnCheck] = trinoCheckRunner

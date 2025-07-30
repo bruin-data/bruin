@@ -2,7 +2,6 @@ package trino
 
 import (
 	"context"
-	"strings"
 
 	"github.com/bruin-data/bruin/pkg/config"
 	"github.com/bruin-data/bruin/pkg/pipeline"
@@ -47,13 +46,10 @@ func (o BasicOperator) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pip
 	if !ok {
 		return errors.Errorf("'%s' either does not exist or is not a trino connection", connName)
 	}
-	splitQueries := strings.Split(strings.TrimSpace(queries[0].Query), ";")
-	for _, q := range splitQueries {
-		if strings.TrimSpace(q) == "" {
-			continue
-		}
-		query := &query.Query{Query: q}
-		err = conn.RunQueryWithoutResult(ctx, query)
+
+	// Execute each query separately
+	for _, q := range queries {
+		err = conn.RunQueryWithoutResult(ctx, q)
 		if err != nil {
 			return err
 		}
