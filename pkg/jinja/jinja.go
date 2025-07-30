@@ -119,15 +119,15 @@ func (r *Renderer) Render(query string) (string, error) {
 }
 
 //nolint:ireturn
-func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, asset *pipeline.Asset) RendererInterface {
+func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, asset *pipeline.Asset) (RendererInterface, error) {
 	startDate, ok := ctx.Value(pipeline.RunConfigStartDate).(time.Time)
 	if !ok {
-		return r
+		return r, nil
 	}
 
 	endDate, ok := ctx.Value(pipeline.RunConfigEndDate).(time.Time)
 	if !ok {
-		return r
+		return r, nil
 	}
 
 	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
@@ -139,21 +139,18 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 			context:         exec.NewContext(tempContext),
 			queryRenderLock: &sync.Mutex{},
 		}
-		startModifier := asset.IntervalModifiers.Start
-		endModifier := asset.IntervalModifiers.End
-		
-		if err := startModifier.ResolveTemplate(tempRenderer); err != nil {
-			// FAILLERSE NAPAK
-			
-		} else {
-			startDate = pipeline.ModifyDate(startDate, startModifier)
+		// Use non-mutating template resolution to avoid modifying the original asset
+		resolvedStartModifier, err := asset.IntervalModifiers.Start.ResolveTemplateToNew(tempRenderer)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to resolve start interval modifier template for asset %s", asset.Name)
 		}
+		startDate = pipeline.ModifyDate(startDate, resolvedStartModifier)
 		
-		if err := endModifier.ResolveTemplate(tempRenderer); err != nil {
-	
-		} else {
-			endDate = pipeline.ModifyDate(endDate, endModifier)
+		resolvedEndModifier, err := asset.IntervalModifiers.End.ResolveTemplateToNew(tempRenderer)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to resolve end interval modifier template for asset %s", asset.Name)
 		}
+		endDate = pipeline.ModifyDate(endDate, resolvedEndModifier)
 	}
 
 	jinjaContext := defaultContext(&startDate, &endDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string))
@@ -163,7 +160,7 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 	return &Renderer{
 		context:         exec.NewContext(jinjaContext),
 		queryRenderLock: &sync.Mutex{},
-	}
+	}, nil
 }
 
 func findRenderErrorType(err error) string {
@@ -202,5 +199,5 @@ func findParserErrorType(err error) string {
 // this ugly interface is needed to avoid circular dependencies and the ability to create different renderer instances per asset.
 type RendererInterface interface {
 	Render(query string) (string, error)
-	CloneForAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) RendererInterface
+	CloneForAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) (RendererInterface, error)
 }
