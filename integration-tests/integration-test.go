@@ -734,11 +734,22 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 			Name: "run pipeline with scd2 by time",
 			Steps: []e2e.Task{
 				{
-					Name:    "scd2_by_time: restore asset to initial state",
+					Name:    "scd2-by-time: drop table if exists",
+					Command: binary,
+					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql"), "--query", "DROP TABLE IF EXISTS test.products;"},
+					Env:     []string{},
+					Expected: e2e.Output{
+						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "scd2-by-time: restore products asset to initial state",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/products_original.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/duck-test-pipes/scd2-by-time-pipeline/assets/products.sql")},
+					Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/products_original.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql")},
 					Env:     []string{},
-
 					Expected: e2e.Output{
 						ExitCode: 0,
 					},
@@ -747,11 +758,10 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 					},
 				},
 				{
-					Name:    "scd2_by_time: create the table",
+					Name:    "scd2-by-time: create the initial products table",
 					Command: binary,
-					Args:    []string{"run", "--full-refresh", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/duck-test-pipes/scd2-by-time-pipeline")},
+					Args:    []string{"run", "--full-refresh", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline")},
 					Env:     []string{},
-
 					Expected: e2e.Output{
 						ExitCode: 0,
 					},
@@ -760,14 +770,13 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 					},
 				},
 				{
-					Name:    "scd2_by_time: query the initial table",
+					Name:    "scd2-by-time: query the initial table",
 					Command: binary,
-					Args:    []string{"query", "--asset", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/duck-test-pipes/scd2-by-time-pipeline/assets/products.sql"), "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--query", "SELECT  product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+					Args:    []string{"query", "--asset", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql"), "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 					Env:     []string{},
-
 					Expected: e2e.Output{
 						ExitCode: 0,
-						CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/duck-test-pipes/scd2-by-time-pipeline/expectations/scd2_time_initial_expected.csv"),
+						CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/expectations/scd2_by_time_expected_initial.csv"),
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
@@ -775,11 +784,10 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 					},
 				},
 				{
-					Name:    "scd2_by_time: copy products_updated.sql to products.sql",
+					Name:    "scd2-by-time: copy products_updated_01.sql to products.sql",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/products_updated.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/duck-test-pipes/scd2-by-time-pipeline/assets/products.sql")},
+					Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/products_updated_01.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql")},
 					Env:     []string{},
-
 					Expected: e2e.Output{
 						ExitCode: 0,
 					},
@@ -788,11 +796,10 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 					},
 				},
 				{
-					Name:    "scd2_by_time: update table with scd2_by_time materialization",
+					Name:    "scd2-by-time: run products_updated_01.sql with SCD2 materialization",
 					Command: binary,
-					Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/duck-test-pipes/scd2-by-time-pipeline/assets/products.sql")},
+					Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql")},
 					Env:     []string{},
-
 					Expected: e2e.Output{
 						ExitCode: 0,
 					},
@@ -801,14 +808,13 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 					},
 				},
 				{
-					Name:    "scd2_by_time: query the scd2_by_time materialized table",
+					Name:    "scd2-by-time: query the updated table 01",
 					Command: binary,
-					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/duck-test-pipes/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 					Env:     []string{},
-
 					Expected: e2e.Output{
 						ExitCode: 0,
-						CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/duck-test-pipes/scd2-by-time-pipeline/expectations/scd2_time_final_expected.csv"),
+						CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/expectations/scd2_by_time_expected_update_01.csv"),
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
@@ -816,11 +822,10 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 					},
 				},
 				{
-					Name:    "scd2_by_time: copy products_latest.sql to products.sql",
+					Name:    "scd2-by-time: copy products_updated_02.sql to products.sql",
 					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/products_latest.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/duck-test-pipes/scd2-by-time-pipeline/assets/products.sql")},
+					Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/products_updated_02.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql")},
 					Env:     []string{},
-
 					Expected: e2e.Output{
 						ExitCode: 0,
 					},
@@ -829,11 +834,10 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 					},
 				},
 				{
-					Name:    "scd2_by_time: update table again with scd2_by_time materialization",
+					Name:    "scd2-by-time: run products_updated_02.sql with SCD2 materialization",
 					Command: binary,
-					Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/duck-test-pipes/scd2-by-time-pipeline/assets/products.sql")},
+					Args:    []string{"run", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql")},
 					Env:     []string{},
-
 					Expected: e2e.Output{
 						ExitCode: 0,
 					},
@@ -842,14 +846,13 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 					},
 				},
 				{
-					Name:    "scd2_by_time: query the scd2_by_time materialized table",
+					Name:    "scd2-by-time: query the updated table 02",
 					Command: binary,
-					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/duck-test-pipes/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
+					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"},
 					Env:     []string{},
-
 					Expected: e2e.Output{
 						ExitCode: 0,
-						CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/duck-test-pipes/scd2-by-time-pipeline/expectations/scd2_time_latest_expected.csv"),
+						CSVFile:  filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/scd2-by-time-pipeline/expectations/scd2_by_time_expected_update_02.csv"),
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,
@@ -857,13 +860,24 @@ func getWorkflow(binary string, currentFolder string, tempdir string) []e2e.Work
 					},
 				},
 				{
-					Name:    "scd2_by_time: restore asset to initial state",
-					Command: "cp",
-					Args:    []string{filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/resources/products_original.sql"), filepath.Join(currentFolder, "test-pipelines/duckdb-scd2-tests/duck-test-pipes/scd2-by-time-pipeline/assets/products.sql")},
+					Name:    "scd2-by-time: drop the table (expect error but table will be dropped)",
+					Command: binary,
+					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--connection", "duckdb-default", "--query", "DROP TABLE IF EXISTS test.products;"},
 					Env:     []string{},
-
 					Expected: e2e.Output{
 						ExitCode: 0,
+					},
+					Asserts: []func(*e2e.Task) error{
+						e2e.AssertByExitCode,
+					},
+				},
+				{
+					Name:    "scd2-by-time: confirm the table is dropped",
+					Command: binary,
+					Args:    []string{"query", "--config-file", filepath.Join(currentFolder, ".bruin.yml"), "--connection", "duckdb-default", "--query", "SELECT * FROM test.products;"},
+					Env:     []string{},
+					Expected: e2e.Output{
+						ExitCode: 1, // Should fail because table doesn't exist
 					},
 					Asserts: []func(*e2e.Task) error{
 						e2e.AssertByExitCode,

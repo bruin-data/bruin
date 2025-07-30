@@ -1,6 +1,6 @@
 /* @bruin
 name: test.products
-type: du ckdb.sql
+type: duckdb.sql
 
 materialization:
   type: table
