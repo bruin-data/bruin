@@ -20,8 +20,8 @@ func (m *mockExtractor) ExtractQueriesFromString(content string) ([]*query.Query
 	return res.Get(0).([]*query.Query), res.Error(1)
 }
 
-func (m *mockExtractor) CloneForAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) query.QueryExtractor {
-	return m
+func (m *mockExtractor) CloneForAsset(ctx context.Context, pipeline *pipeline.Pipeline, asset *pipeline.Asset) (query.QueryExtractor, error) {
+	return m, nil
 }
 
 func (m *mockExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {

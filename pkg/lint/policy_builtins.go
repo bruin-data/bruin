@@ -9,6 +9,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/lineage"
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/sqlparser"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -473,7 +474,7 @@ func QueryColumnsMatchColumnsPolicy(parser *sqlparser.SQLParser) func(ctx contex
 		renderer = jinja.NewRendererWithYesterday("your-pipeline-name", "your-run-id")
 		renderer, err = renderer.CloneForAsset(ctx, p, asset)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "failed to create renderer for asset %s", asset.Name)
 		}
 		renderedQuery, err := renderer.Render(asset.ExecutableFile.Content)
 		if err != nil { //nolint:nilerr

@@ -40,8 +40,8 @@ func (m *mockExtractor) ExtractQueriesFromString(content string) ([]*query.Query
 	return res.Get(0).([]*query.Query), res.Error(1)
 }
 
-func (m *mockExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) query.QueryExtractor {
-	return m.Called(ctx, p, t).Get(0).(query.QueryExtractor)
+func (m *mockExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) (query.QueryExtractor, error) {
+	return m, nil
 }
 
 func (m *mockExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
@@ -119,7 +119,7 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 			},
 			setup: func(f *fields) {
 				// Mock CloneForAsset to return the extractor itself
-				f.extractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).Return(f.extractor)
+				f.extractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).Return(f.extractor, nil)
 				f.extractor.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{}, errors.New("something failed"))
 			},
@@ -154,7 +154,7 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 				},
 			},
 			setup: func(f *fields) {
-				f.extractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).Return(f.extractor)
+				f.extractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).Return(f.extractor, nil)
 				f.extractor.On("ExtractQueriesFromString", "some content").
 					Return([]*query.Query{}, nil)
 			},
@@ -199,7 +199,7 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 			},
 			setup: func(f *fields) {
 				// Mock CloneForAsset for both assets
-				f.extractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).Return(f.extractor)
+				f.extractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).Return(f.extractor, nil)
 
 				f.extractor.On("ExtractQueriesFromString", "content1").
 					Return(
@@ -253,7 +253,7 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 			},
 			setup: func(f *fields) {
 				// Mock CloneForAsset for both assets
-				f.extractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).Return(f.extractor)
+				f.extractor.On("CloneForAsset", mock.Anything, mock.Anything, mock.Anything).Return(f.extractor, nil)
 
 				f.extractor.On("ExtractQueriesFromString", "content1").
 					Return(

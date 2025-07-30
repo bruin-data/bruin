@@ -41,7 +41,10 @@ func (o *QuerySensor) RunTask(ctx context.Context, p *pipeline.Pipeline, t *pipe
 	if !ok {
 		return errors.New("query sensor requires a parameter named 'query'")
 	}
-	extractor := o.extractor.CloneForAsset(ctx, p, t)
+	extractor, err := o.extractor.CloneForAsset(ctx, p, t)
+	if err != nil {
+		return errors.Wrapf(err, "failed to clone extractor for asset %s", t.Name)
+	}
 
 	qry, err := extractor.ExtractQueriesFromString(qq)
 	if err != nil {

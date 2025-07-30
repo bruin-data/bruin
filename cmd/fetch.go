@@ -286,7 +286,10 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 			Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineInfo.Pipeline.Name, "your-run-id", nil),
 		}
 
-		newExtractor := extractor.CloneForAsset(fetchCtx, pipelineInfo.Pipeline, pipelineInfo.Asset)
+		newExtractor, err := extractor.CloneForAsset(fetchCtx, pipelineInfo.Pipeline, pipelineInfo.Asset)
+		if err != nil {
+			return "", nil, "", "", errors.Wrapf(err, "failed to clone extractor for asset %s", pipelineInfo.Asset.Name)
+		}
 
 		connName, conn, err := getConnectionFromPipelineInfo(pipelineInfo, env)
 		if err != nil {
@@ -315,7 +318,10 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 		// note: we don't support variables for now
 		Renderer: jinja.NewRendererWithStartEndDates(&startDate, &endDate, pipelineInfo.Pipeline.Name, "your-run-id", nil),
 	}
-	newExtractor := extractor.CloneForAsset(fetchCtx, pipelineInfo.Pipeline, pipelineInfo.Asset)
+	newExtractor, err := extractor.CloneForAsset(fetchCtx, pipelineInfo.Pipeline, pipelineInfo.Asset)
+	if err != nil {
+		return "", nil, "", "", errors.Wrapf(err, "failed to clone extractor for asset %s", pipelineInfo.Asset.Name)
+	}
 	// Verify that the asset is a SQL asset
 	if !pipelineInfo.Asset.IsSQLAsset() {
 		return "", nil, "", "", errors.Errorf("asset '%s' is not a SQL asset (type: %s). Only SQL assets can be queried",
