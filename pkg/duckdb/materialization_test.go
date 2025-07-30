@@ -571,3 +571,125 @@ func TestBuildSCD2ByColumnQuery(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildSCD2ByColumnFullRefreshQuery(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		asset       *pipeline.Asset
+		query       string
+		want        string
+		wantErr     bool
+		fullRefresh bool
+	}{
+		{
+			name: "scd2_full_refresh_by_column_with_no_primary_key",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER"},
+					{Name: "name", Type: "VARCHAR"},
+					{Name: "price", Type: "FLOAT"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, name, price from source_table",
+			wantErr:     true,
+		},
+		{
+			name: "scd2_full_refresh_by_column",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER", PrimaryKey: true},
+					{Name: "name", Type: "VARCHAR"},
+					{Name: "price", Type: "FLOAT"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, name, price from source_table",
+			want: 
+				"CREATE OR REPLACE TABLE my.asset AS\n" +
+					"SELECT src.id, src.name, src.price,\n" +
+					"CURRENT_TIMESTAMP AS _valid_from,\n" +
+					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"TRUE AS _is_current\n" +
+					"FROM (SELECT id, name, price from source_table\n" +
+					") AS src;",				
+		},
+		{
+			name: "scd2_full_refresh_by_column_with_multiple_primary_keys",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:     pipeline.MaterializationTypeTable,
+					Strategy: pipeline.MaterializationStrategySCD2ByColumn,
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER", PrimaryKey: true},
+					{Name: "category", Type: "VARCHAR", PrimaryKey: true},
+					{Name: "name", Type: "VARCHAR"},
+					{Name: "price", Type: "FLOAT"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, category, name, price from source_table",
+			want: 
+				"CREATE OR REPLACE TABLE my.asset AS\n" +
+					"SELECT src.id, src.category, src.name, src.price,\n" +
+					"CURRENT_TIMESTAMP AS _valid_from,\n" +
+					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"TRUE AS _is_current\n" +
+					"FROM (SELECT id, category, name, price from source_table\n" +
+					") AS src;",
+		},
+		{
+			name: "scd2_full_refresh_with_custom_partitioning",
+			asset: &pipeline.Asset{
+				Name: "my.asset",
+				Materialization: pipeline.Materialization{
+					Type:        pipeline.MaterializationTypeTable,
+					Strategy:    pipeline.MaterializationStrategySCD2ByColumn,
+					PartitionBy: "category, id",
+				},
+				Columns: []pipeline.Column{
+					{Name: "id", Type: "INTEGER", PrimaryKey: true},
+					{Name: "name", Type: "VARCHAR"},
+					{Name: "price", Type: "FLOAT"},
+				},
+			},
+			fullRefresh: true,
+			query:       "SELECT id, name, price from source_table",
+			want: 
+				"CREATE OR REPLACE TABLE my.asset AS\n" +
+					"SELECT src.id, src.name, src.price,\n" +
+					"CURRENT_TIMESTAMP AS _valid_from,\n" +
+					"TIMESTAMP '9999-12-31 23:59:59' AS _valid_until,\n" +
+					"TRUE AS _is_current\n" +
+					"FROM (SELECT id, name, price from source_table\n" +
+					") AS src;",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			m := NewMaterializer(tt.fullRefresh)
+			render, err := m.Render(tt.asset, tt.query)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, render)
+			}
+		})
+	}
+}
