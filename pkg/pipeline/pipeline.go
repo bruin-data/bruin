@@ -740,7 +740,7 @@ func (t *TimeModifier) UnmarshalYAML(value *yaml.Node) error {
 		return fmt.Errorf("invalid time modifier format: %s", modifier)
 	}
 
-	// Check if it's a Jinja template 
+	// Check if it's a Jinja template
 	if strings.Contains(modifier, "{{") || strings.Contains(modifier, "{%") {
 		t.Template = modifier
 		return nil
@@ -781,21 +781,23 @@ type RendererInterface interface {
 	Render(template string) (string, error)
 }
 
-func (t *TimeModifier) ResolveTemplate(renderer RendererInterface) error {
+func (t TimeModifier) ResolveTemplateToNew(renderer RendererInterface) (TimeModifier, error) {
 	if t.Template == "" {
-		return nil
+		return t, nil
 	}
+
 	rendered, err := renderer.Render(t.Template)
 	if err != nil {
-		return fmt.Errorf("failed to render interval modifier template: %w", err)
+		return t, fmt.Errorf("failed to render interval modifier template: %w", err)
 	}
-	
+
+	newModifier := TimeModifier{}
 	rendered = strings.TrimSpace(rendered)
-	if err := t.parseTimeModifier(rendered); err != nil {
-		return fmt.Errorf("failed to parse rendered template result '%s': %w", rendered, err)
+	if err := newModifier.parseTimeModifier(rendered); err != nil {
+		return t, fmt.Errorf("failed to parse rendered template result '%s': %w", rendered, err)
 	}
-	t.Template = ""
-	return nil
+
+	return newModifier, nil
 }
 
 func (t TimeModifier) MarshalJSON() ([]byte, error) {
@@ -2063,7 +2065,7 @@ func (t TimeModifier) MarshalYAML() (interface{}, error) {
 	if t.Template != "" {
 		return t.Template, nil
 	}
-	
+
 	switch {
 	case t.Days != 0 && t.Months == 0 && t.Hours == 0 && t.Minutes == 0 && t.Seconds == 0 && t.CronPeriods == 0:
 		return fmt.Sprintf("%dd", t.Days), nil
