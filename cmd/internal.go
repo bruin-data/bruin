@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -37,6 +38,7 @@ func Internal() *cli.Command {
 			FetchDatabases(),
 			FetchTables(),
 			FetchColumns(),
+			DryRunAsset(),
 		},
 	}
 }
@@ -1009,4 +1011,104 @@ func printColumns(databaseName, tableName string, columns []*ansisql.DBColumn) {
 
 	t.SetStyle(table.StyleLight)
 	t.Render()
+}
+
+type DryRunCommand struct {
+	builder      taskCreator
+	errorPrinter *color2.Color
+}
+
+func (r *DryRunCommand) Run(ctx context.Context, assetPath string, connectionName string, environment string, configFile string) error {
+	defer RecoverFromPanic()
+
+	if assetPath == "" {
+		errorPrinter.Printf("Please give an asset path to parse: bruin internal dry-run-asset <path to the asset file>)\n")
+		return cli.Exit("", 1)
+	}
+
+	absoluteAssetPath, err := filepath.Abs(assetPath)
+	if err != nil {
+		printErrorJSON(err)
+		return cli.Exit("", 1)
+	}
+
+	asset, err := r.builder.CreateAssetFromFile(absoluteAssetPath, nil)
+	if err != nil {
+		printErrorJSON(err)
+		return cli.Exit("", 1)
+	}
+
+	if !asset.IsSQLAsset() {
+		printErrorJSON(errors2.New("dry run is only supported for SQL assets"))
+		return cli.Exit("", 1)
+	}
+
+	query := asset.ExecutableFile.Content
+	if query == "" {
+		printErrorJSON(errors2.New("no SQL query found in asset"))
+		return cli.Exit("", 1)
+	}
+
+	fmt.Printf("Extracted query from asset:\n%s\n", query)
+
+	// Execute bruin query command with dry-run
+	bruinPath, _ := filepath.Abs(os.Args[0])
+	cmd := exec.Command(bruinPath, "query", "--connection", connectionName, "--dry-run", "--query", query)
+
+	// Add environment flag if provided
+	if environment != "" {
+		cmd.Args = append(cmd.Args, "--environment", environment)
+	}
+
+	// Add config-file flag if provided
+	if configFile != "" {
+		cmd.Args = append(cmd.Args, "--config-file", configFile)
+	}
+
+	// Capture output
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("Error executing dry-run: %v\n", err)
+		fmt.Printf("Command output: %s\n", string(output))
+		return cli.Exit("", 1)
+	}
+
+	fmt.Printf("Dry-run result:\n%s\n", string(output))
+	return nil
+}
+
+func DryRunAsset() *cli.Command {
+	return &cli.Command{
+		Name:      "dry-run-asset",
+		Usage:     "validate a Bruin asset query without executing it",
+		ArgsUsage: "[path to the asset definition]",
+		Before:    telemetry.BeforeCommand,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "connection",
+				Aliases:  []string{"c"},
+				Usage:    "the name of the connection to use for dry-run",
+				Value:    "gcp-default",
+				Required: false,
+			},
+			&cli.StringFlag{
+				Name:    "environment",
+				Aliases: []string{"env"},
+				Usage:   "Target environment name as defined in .bruin.yml. Specifies the configuration environment for the dry-run.",
+			},
+			&cli.StringFlag{
+				Name:    "config-file",
+				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Usage:   "the path to the .bruin.yml file",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			r := DryRunCommand{
+				builder:      DefaultPipelineBuilder,
+				errorPrinter: errorPrinter,
+			}
+
+			return r.Run(c.Context, c.Args().Get(0), c.String("connection"), c.String("environment"), c.String("config-file"))
+		},
+	}
 }
