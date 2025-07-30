@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/bruin-data/bruin/pkg/pipeline"
 	"github.com/bruin-data/bruin/pkg/query"
@@ -41,7 +42,8 @@ func (m *mockExtractor) ExtractQueriesFromString(content string) ([]*query.Query
 }
 
 func (m *mockExtractor) CloneForAsset(ctx context.Context, p *pipeline.Pipeline, t *pipeline.Asset) (query.QueryExtractor, error) {
-	return m, nil
+	res := m.Called(ctx, p, t)
+	return res.Get(0).(query.QueryExtractor), res.Error(1)
 }
 
 func (m *mockExtractor) ReextractQueriesFromSlice(content []string) ([]string, error) {
@@ -302,6 +304,11 @@ func TestQueryValidatorRule_Validate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		ctx := context.Background()
+		// Add required context values for CloneForAsset to work with interval modifiers
+		ctx = context.WithValue(ctx, pipeline.RunConfigStartDate, time.Now().AddDate(0, 0, -1))
+		ctx = context.WithValue(ctx, pipeline.RunConfigEndDate, time.Now())
+		ctx = context.WithValue(ctx, pipeline.RunConfigRunID, "test-run-id")
+
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
