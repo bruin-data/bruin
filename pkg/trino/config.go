@@ -9,7 +9,7 @@ import (
 
 type Config struct {
 	Username string // Required
-	Password string // Optional 
+	Password string // Optional
 	Host     string // Required
 	Port     int    // Required
 	Catalog  string // Optional - can be empty to use default catalog
