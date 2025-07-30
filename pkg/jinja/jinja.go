@@ -132,8 +132,28 @@ func (r *Renderer) CloneForAsset(ctx context.Context, pipe *pipeline.Pipeline, a
 
 	applyModifiers, ok := ctx.Value(pipeline.RunConfigApplyIntervalModifiers).(bool)
 	if ok && applyModifiers {
-		startDate = pipeline.ModifyDate(startDate, asset.IntervalModifiers.Start)
-		endDate = pipeline.ModifyDate(endDate, asset.IntervalModifiers.End)
+		tempContext := defaultContext(&startDate, &endDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string))
+		tempContext["this"] = asset.Name
+		tempContext["var"] = pipe.Variables.Value()
+		tempRenderer := &Renderer{
+			context:         exec.NewContext(tempContext),
+			queryRenderLock: &sync.Mutex{},
+		}
+		startModifier := asset.IntervalModifiers.Start
+		endModifier := asset.IntervalModifiers.End
+		
+		if err := startModifier.ResolveTemplate(tempRenderer); err != nil {
+			// FAILLERSE NAPAK
+			
+		} else {
+			startDate = pipeline.ModifyDate(startDate, startModifier)
+		}
+		
+		if err := endModifier.ResolveTemplate(tempRenderer); err != nil {
+	
+		} else {
+			endDate = pipeline.ModifyDate(endDate, endModifier)
+		}
 	}
 
 	jinjaContext := defaultContext(&startDate, &endDate, pipe.Name, ctx.Value(pipeline.RunConfigRunID).(string))
