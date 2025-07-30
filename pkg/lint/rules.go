@@ -1095,7 +1095,10 @@ func ValidateCustomCheckQueryDryRun(connections connectionManager, renderer jinj
 			return issues, nil
 		}
 
-		assetRenderer := renderer.CloneForAsset(ctx, p, asset)
+		assetRenderer, err := renderer.CloneForAsset(ctx, p, asset)
+		if err != nil {
+			return nil, err
+		}
 
 		for _, check := range asset.CustomChecks {
 			if strings.TrimSpace(check.Query) == "" {
@@ -1234,7 +1237,12 @@ func (u UsedTableValidatorRule) Validate(ctx context.Context, p *pipeline.Pipeli
 func (u UsedTableValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) ([]*Issue, error) {
 	issues := make([]*Issue, 0)
 
-	missingDeps, err := u.parser.GetMissingDependenciesForAsset(asset, p, u.renderer.CloneForAsset(ctx, p, asset))
+	assetRenderer, err := u.renderer.CloneForAsset(ctx, p, asset)
+	if err != nil {
+		return nil, err
+	}
+
+	missingDeps, err := u.parser.GetMissingDependenciesForAsset(asset, p, assetRenderer)
 	if err != nil {
 		issues = append(issues, &Issue{
 			Task:        asset,

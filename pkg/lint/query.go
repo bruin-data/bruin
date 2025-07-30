@@ -21,7 +21,7 @@ type connectionManager interface {
 
 type queryExtractor interface {
 	ExtractQueriesFromString(content string) ([]*query.Query, error)
-	CloneForAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) query.QueryExtractor
+	CloneForAsset(ctx context.Context, p *pipeline.Pipeline, asset *pipeline.Asset) (query.QueryExtractor, error)
 }
 
 type materializer interface {
@@ -63,7 +63,17 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 		return issues, nil
 	}
 
-	extractor := q.Extractor.CloneForAsset(ctx, p, asset)
+	extractor, err := q.Extractor.CloneForAsset(ctx, p, asset)
+	if err != nil {
+		issues = append(issues, &Issue{
+			Task:        asset,
+			Description: fmt.Sprintf("failed to extract queries from asset '%s': %s", asset.Name, err),
+			Context: []string{
+				err.Error(),
+			},
+		})
+		return issues, nil
+	}
 
 	queries, err := extractor.ExtractQueriesFromString(asset.ExecutableFile.Content)
 	if err != nil {
@@ -160,7 +170,18 @@ func (q *QueryValidatorRule) ValidateAsset(ctx context.Context, p *pipeline.Pipe
 func (q *QueryValidatorRule) validateTask(ctx context.Context, p *pipeline.Pipeline, task *pipeline.Asset, done chan<- []*Issue) {
 	issues := make([]*Issue, 0)
 
-	extractor := q.Extractor.CloneForAsset(ctx, p, task)
+	extractor, err := q.Extractor.CloneForAsset(ctx, p, task)
+	if err != nil {
+		issues = append(issues, &Issue{
+			Task:        task,
+			Description: fmt.Sprintf("failed to extract queries from asset '%s': %s", task.Name, err),
+			Context: []string{
+				err.Error(),
+			},
+		})
+		done <- issues
+		return
+	}
 	q.Logger.Debugf("validating pipeline '%s' task '%s'", p.Name, task.Name)
 	queries, err := extractor.ExtractQueriesFromString(task.ExecutableFile.Content)
 	q.Logger.Debugf("got the query extract results from file for pipeline '%s' task '%s'", p.Name, task.Name)

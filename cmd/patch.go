@@ -27,7 +27,12 @@ const (
 )
 
 func updateAssetDependencies(ctx context.Context, asset *pipeline.Asset, p *pipeline.Pipeline, sp *sqlparser.SQLParser, renderer *jinja.Renderer) error {
-	missingDeps, err := sp.GetMissingDependenciesForAsset(asset, p, renderer.CloneForAsset(ctx, p, asset))
+	assetRenderer, err := renderer.CloneForAsset(ctx, p, asset)
+	if err != nil {
+		return fmt.Errorf("failed to create renderer for asset '%s': %w", asset.Name, err)
+	}
+
+	missingDeps, err := sp.GetMissingDependenciesForAsset(asset, p, assetRenderer)
 	if err != nil {
 		return fmt.Errorf("failed to get missing dependencies for asset '%s': %w", asset.Name, err)
 	}

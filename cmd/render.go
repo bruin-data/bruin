@@ -202,7 +202,10 @@ func Render() *cli.Command {
 			runCtx = context.WithValue(runCtx, pipeline.RunConfigApplyIntervalModifiers, c.Bool("apply-interval-modifiers"))
 
 			renderer := jinja.NewRendererWithStartEndDates(&startDate, &endDate, pl.Name, "your-run-id", pl.Variables.Value())
-			forAsset := renderer.CloneForAsset(runCtx, pl, asset)
+			forAsset, err := renderer.CloneForAsset(runCtx, pl, asset)
+			if err != nil {
+				return err
+			}
 
 			r := RenderCommand{
 				extractor: &query.WholeFileExtractor{
@@ -368,13 +371,18 @@ func getPipelineDefinitionFullPath(pipelinePath string) (string, error) {
 	return "", errors.Errorf("no pipeline definition file found in '%s'. Supported files: %v", pipelinePath, PipelineDefinitionFiles)
 }
 
-func modifyExtractor(ctx ModifierInfo, p *pipeline.Pipeline, t *pipeline.Asset) queryExtractor {
+func modifyExtractor(ctx ModifierInfo, p *pipeline.Pipeline, t *pipeline.Asset) (queryExtractor, error) {
 	newStartDate := pipeline.ModifyDate(ctx.StartDate, t.IntervalModifiers.Start)
 	newEnddate := pipeline.ModifyDate(ctx.EndDate, t.IntervalModifiers.End)
 	newRenderer := jinja.NewRendererWithStartEndDates(&newStartDate, &newEnddate, p.Name, "your-run-id", p.Variables.Value())
 
-	return &query.WholeFileExtractor{
-		Renderer: newRenderer.CloneForAsset(context.Background(), p, t),
-		Fs:       fs,
+	renderer, err := newRenderer.CloneForAsset(context.Background(), p, t)
+	if err != nil {
+		return nil, err
 	}
+
+	return &query.WholeFileExtractor{
+		Renderer: renderer,
+		Fs:       fs,
+	}, nil
 }

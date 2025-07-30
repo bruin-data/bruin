@@ -720,13 +720,15 @@ type Asset struct { //nolint:recvcheck
 	downstream []*Asset
 }
 
+//nolint:recvcheck
 type TimeModifier struct {
-	Months      int `json:"months" yaml:"months,omitempty" mapstructure:"months"`
-	Days        int `json:"days" yaml:"days,omitempty" mapstructure:"days"`
-	Hours       int `json:"hours" yaml:"hours,omitempty" mapstructure:"hours"`
-	Minutes     int `json:"minutes" yaml:"minutes,omitempty" mapstructure:"minutes"`
-	Seconds     int `json:"seconds" yaml:"seconds,omitempty" mapstructure:"seconds"`
-	CronPeriods int `json:"cron_periods" yaml:"cron_periods,omitempty" mapstructure:"cron_periods"`
+	Months      int    `json:"months" yaml:"months,omitempty" mapstructure:"months"`
+	Days        int    `json:"days" yaml:"days,omitempty" mapstructure:"days"`
+	Hours       int    `json:"hours" yaml:"hours,omitempty" mapstructure:"hours"`
+	Minutes     int    `json:"minutes" yaml:"minutes,omitempty" mapstructure:"minutes"`
+	Seconds     int    `json:"seconds" yaml:"seconds,omitempty" mapstructure:"seconds"`
+	CronPeriods int    `json:"cron_periods" yaml:"cron_periods,omitempty" mapstructure:"cron_periods"`
+	Template    string `json:"template" yaml:"template,omitempty" mapstructure:"template"`
 }
 
 func (t *TimeModifier) UnmarshalYAML(value *yaml.Node) error {
@@ -739,6 +741,16 @@ func (t *TimeModifier) UnmarshalYAML(value *yaml.Node) error {
 		return fmt.Errorf("invalid time modifier format: %s", modifier)
 	}
 
+	// Check if it's a Jinja template
+	if strings.Contains(modifier, "{{") || strings.Contains(modifier, "{%") {
+		t.Template = modifier
+		return nil
+	}
+
+	return t.parseTimeModifier(modifier)
+}
+
+func (t *TimeModifier) parseTimeModifier(modifier string) error {
 	suffix := modifier[len(modifier)-1]
 	numeric := modifier[:len(modifier)-1]
 
@@ -765,10 +777,33 @@ func (t *TimeModifier) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+// RendererInterface is used to avoid circular dependencies.
+type RendererInterface interface {
+	Render(template string) (string, error)
+}
+
+func (t TimeModifier) ResolveTemplateToNew(renderer RendererInterface) (TimeModifier, error) {
+	if t.Template == "" {
+		return t, nil
+	}
+
+	rendered, err := renderer.Render(t.Template)
+	if err != nil {
+		return t, fmt.Errorf("failed to render interval modifier template: %w", err)
+	}
+
+	newModifier := TimeModifier{}
+	rendered = strings.TrimSpace(rendered)
+	if err := newModifier.parseTimeModifier(rendered); err != nil {
+		return t, fmt.Errorf("failed to parse rendered template result '%s': %w", rendered, err)
+	}
+
+	return newModifier, nil
+}
+
 func (t TimeModifier) MarshalJSON() ([]byte, error) {
-	if t.Months == 0 && t.Days == 0 && t.Hours == 0 && t.Minutes == 0 && t.Seconds == 0 && t.CronPeriods == 0 {
-		return []byte("null" +
-			""), nil
+	if t.Months == 0 && t.Days == 0 && t.Hours == 0 && t.Minutes == 0 && t.Seconds == 0 && t.CronPeriods == 0 && t.Template == "" {
+		return []byte("null"), nil
 	}
 
 	type Alias TimeModifier
@@ -2028,6 +2063,10 @@ func (b *Builder) SetNameFromPath(ctx context.Context, asset *Asset, foundPipeli
 }
 
 func (t TimeModifier) MarshalYAML() (interface{}, error) {
+	if t.Template != "" {
+		return t.Template, nil
+	}
+
 	switch {
 	case t.Days != 0 && t.Months == 0 && t.Hours == 0 && t.Minutes == 0 && t.Seconds == 0 && t.CronPeriods == 0:
 		return fmt.Sprintf("%dd", t.Days), nil
