@@ -426,28 +426,6 @@
       },
       "schema_prefix": ""
     },
-    "env-scd2-col-duckdb": {
-      "connections": {
-        "duckdb": [
-          {
-            "name": "scd2-by-col-duckdb",
-            "path": "duckdb-files/scd2-by-col-duckdb.db"
-          }
-        ]
-      },
-      "schema_prefix": ""
-    },
-    "env-scd2-time-duckdb": {
-      "connections": {
-        "duckdb": [
-          {
-            "name": "scd2-by-time-duckdb",
-            "path": "duckdb-files/scd2-by-time-duckdb.db"
-          }
-        ]
-      },
-      "schema_prefix": ""
-    },
     "env-time-materialization": {
       "connections": {
         "duckdb": [

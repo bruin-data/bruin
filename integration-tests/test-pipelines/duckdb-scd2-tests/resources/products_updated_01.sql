@@ -14,8 +14,8 @@ columns:
     primary_key: true
   - name: product_name
     type: VARCHAR
-    description: "Name of the product"
     primary_key: true
+    description: "Name of the product"
   - name: dt
     type: DATE
     description: "incremental key"
@@ -46,4 +46,3 @@ SELECT
     'ps5' AS product_name,
     25 AS stock,
     DATE '2025-06-02' AS dt
-

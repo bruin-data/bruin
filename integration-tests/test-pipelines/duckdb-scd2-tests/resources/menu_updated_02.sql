@@ -25,9 +25,5 @@ columns:
 @bruin */
 
 
-SELECT 1 AS ID, 'Cola' AS Name, 7.99 AS Price
-UNION ALL
-SELECT 2 AS ID, 'Tea' AS Name, 4.99 AS Price
-UNION ALL
-SELECT 4 AS ID, 'Fanta' AS Name, 1.99 AS Price
+SELECT 1 AS ID, 'Cola' AS Name, 0.99 AS Price
 
