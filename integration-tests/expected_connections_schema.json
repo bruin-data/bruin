@@ -704,6 +704,12 @@
             "$ref": "#/$defs/TableauConnection"
           },
           "type": "array"
+        },
+        "trino": {
+          "items": {
+            "$ref": "#/$defs/TrinoConnection"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -2072,6 +2078,41 @@
         "personal_access_token_secret",
         "site_id",
         "api_version"
+      ]
+    },
+    "TrinoConnection": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "catalog": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "host",
+        "port",
+        "username",
+        "catalog",
+        "schema"
       ]
     },
     "TikTokAdsConnection": {

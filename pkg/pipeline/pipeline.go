@@ -79,6 +79,8 @@ const (
 	AssetTypeClickHouseSource       = AssetType("clickhouse.source")
 	AssetTypeEMRServerlessSpark     = AssetType("emr_serverless.spark")
 	AssetTypeEMRServerlessPyspark   = AssetType("emr_serverless.pyspark")
+	AssetTypeTrinoQuery             = AssetType("trino.sql")
+	AssetTypeTrinoQuerySensor       = AssetType("trino.sensor.query")
 	AssetTypeLooker                 = AssetType("looker")
 	AssetTypeLookerStudio           = AssetType("looker_studio")
 	AssetTypePowerBI                = AssetType("powerbi")
@@ -139,6 +141,7 @@ var defaultMapping = map[string]string{
 	"appstore":              "appstore-default",
 	"gcs":                   "gcs-default",
 	"emr_serverless":        "emr_serverless-default",
+	"trino":                 "trino-default",
 	"googleanalytics":       "googleanalytics-default",
 	"applovin":              "applovin-default",
 	"salesforce":            "salesforce-default",
@@ -583,6 +586,8 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeClickHouseSource:      "clickhouse",
 	AssetTypeEMRServerlessSpark:    "emr_serverless",
 	AssetTypeEMRServerlessPyspark:  "emr_serverless",
+	AssetTypeTrinoQuery:            "trino",
+	AssetTypeTrinoQuerySensor:      "trino",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -1786,7 +1791,6 @@ func (b *Builder) CreatePipelineFromPath(ctx context.Context, pathToPipeline str
 		pipeline.TasksByType[task.Type] = append(pipeline.TasksByType[task.Type], task)
 		pipeline.tasksByName[task.Name] = task
 	}
-
 	var entities []*glossary.Entity
 	if b.GlossaryReader != nil {
 		entities, err = b.GlossaryReader.GetEntities(pathToPipeline)
@@ -2007,6 +2011,7 @@ func (a *Asset) IsSQLAsset() bool {
 		AssetTypeAthenaQuery:     true,
 		AssetTypeDuckDBQuery:     true,
 		AssetTypeClickHouse:      true,
+		AssetTypeTrinoQuery:      true,
 	}
 
 	return sqlAssetTypes[a.Type]

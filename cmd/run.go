@@ -46,6 +46,7 @@ import (
 	"github.com/bruin-data/bruin/pkg/synapse"
 	"github.com/bruin-data/bruin/pkg/tableau"
 	"github.com/bruin-data/bruin/pkg/telemetry"
+	"github.com/bruin-data/bruin/pkg/trino"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -1194,7 +1195,22 @@ func SetupExecutors(
 			mainExecutors[pipeline.AssetTypePython][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 		}
 	}
+	if s.WillRunTaskOfType(pipeline.AssetTypeTrinoQuery) || estimateCustomCheckType == pipeline.AssetTypeTrinoQuery || s.WillRunTaskOfType(pipeline.AssetTypeTrinoQuerySensor) {
+		trinoFileExtractor := &query.FileQuerySplitterExtractor{
+			Fs:       fs,
+			Renderer: renderer,
+		}
+		trinoOperator := trino.NewBasicOperator(conn, trinoFileExtractor)
+		trinoCheckRunner := athena.NewColumnCheckOperator(conn)
+		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeMain] = trinoOperator
+		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeColumnCheck] = trinoCheckRunner
+		mainExecutors[pipeline.AssetTypeTrinoQuery][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
 
+		trinoQuerySensor := ansisql.NewQuerySensor(conn, wholeFileExtractor, sensorMode)
+		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeMain] = trinoQuerySensor
+		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeColumnCheck] = trinoCheckRunner
+		mainExecutors[pipeline.AssetTypeTrinoQuerySensor][scheduler.TaskInstanceTypeCustomCheck] = customCheckRunner
+	}
 	shouldInitiateSnowflake := s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuery) || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeQuerySensor) || estimateCustomCheckType == pipeline.AssetTypeSnowflakeQuery || s.WillRunTaskOfType(pipeline.AssetTypeSnowflakeSeed)
 	if shouldInitiateSnowflake {
 		sfOperator := snowflake.NewBasicOperator(conn, wholeFileExtractor, snowflake.NewMaterializer(fullRefresh))

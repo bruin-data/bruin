@@ -211,6 +211,13 @@ func GetRules(fs afero.Fs, finder repoFinder, excludeWarnings bool, parser *sqlp
 			Validator:        EnsurePipelineConcurrencyIsValid,
 			ApplicableLevels: []Level{LevelPipeline},
 		},
+		&SimpleRule{
+			Identifier:       "trino-materialization-not-supported",
+			Fast:             true,
+			Severity:         ValidatorSeverityCritical,
+			AssetValidator:   ValidateTrinoAssetMaterialization,
+			ApplicableLevels: []Level{LevelAsset},
+		},
 	}
 
 	if parser != nil {
