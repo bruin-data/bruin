@@ -173,3 +173,153 @@ func TestGetAllFilesRecursive(t *testing.T) {
 		})
 	}
 }
+
+func TestGetPipelinePathsWithExclusions(t *testing.T) {
+	t.Parallel()
+
+	firstPipelineAbsolute, err := filepath.Abs("testdata/walk/pipelines/first-pipeline")
+	require.NoError(t, err)
+
+	secondPipelineAbsolute, err := filepath.Abs("testdata/walk/pipelines/second-pipeline")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name                   string
+		root                   string
+		pipelineDefinitionFile []string
+		excludePaths           []string
+		want                   []string
+		wantErr                bool
+	}{
+		{
+			name:                   "no exclusions - all pipelines found",
+			root:                   testPipelinePath,
+			pipelineDefinitionFile: []string{"pipeline.yml"},
+			excludePaths:           []string{},
+			want:                   []string{firstPipelineAbsolute, secondPipelineAbsolute},
+		},
+		{
+			name:                   "exclude first pipeline by absolute path",
+			root:                   testPipelinePath,
+			pipelineDefinitionFile: []string{"pipeline.yml"},
+			excludePaths:           []string{firstPipelineAbsolute},
+			want:                   []string{secondPipelineAbsolute},
+		},
+		{
+			name:                   "exclude first pipeline by relative path",
+			root:                   testPipelinePath,
+			pipelineDefinitionFile: []string{"pipeline.yml"},
+			excludePaths:           []string{"testdata/walk/pipelines/first-pipeline"},
+			want:                   []string{secondPipelineAbsolute},
+		},
+		{
+			name:                   "exclude both pipelines",
+			root:                   testPipelinePath,
+			pipelineDefinitionFile: []string{"pipeline.yml"},
+			excludePaths:           []string{firstPipelineAbsolute, secondPipelineAbsolute},
+			want:                   []string{},
+		},
+		{
+			name:                   "exclude parent directory excludes all pipelines",
+			root:                   testPipelinePath,
+			pipelineDefinitionFile: []string{"pipeline.yml"},
+			excludePaths:           []string{testPipelinePath},
+			want:                   []string{},
+		},
+		{
+			name:                   "exclude non-existent path doesn't affect results",
+			root:                   testPipelinePath,
+			pipelineDefinitionFile: []string{"pipeline.yml"},
+			excludePaths:           []string{"non-existent-path"},
+			want:                   []string{firstPipelineAbsolute, secondPipelineAbsolute},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := GetPipelinePathsWithExclusions(tt.root, tt.pipelineDefinitionFile, tt.excludePaths)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetPipelinePathsWithExclusions() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestShouldExcludePath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		path         string
+		excludePaths []string
+		want         bool
+	}{
+		{
+			name:         "empty exclude paths returns false",
+			path:         "/some/path",
+			excludePaths: []string{},
+			want:         false,
+		},
+		{
+			name:         "exact match returns true",
+			path:         "/some/path",
+			excludePaths: []string{"/some/path"},
+			want:         true,
+		},
+		{
+			name:         "prefix match with separator returns true",
+			path:         "/some/path/subdir",
+			excludePaths: []string{"/some/path"},
+			want:         true,
+		},
+		{
+			name:         "partial prefix without separator returns false",
+			path:         "/some/pathological",
+			excludePaths: []string{"/some/path"},
+			want:         false,
+		},
+		{
+			name:         "relative path exact match returns true",
+			path:         "some/path",
+			excludePaths: []string{"some/path"},
+			want:         true,
+		},
+		{
+			name:         "relative path prefix match returns true",
+			path:         "some/path/subdir",
+			excludePaths: []string{"some/path"},
+			want:         true,
+		},
+		{
+			name:         "multiple exclude paths - first matches",
+			path:         "/some/path",
+			excludePaths: []string{"/some/path", "/other/path"},
+			want:         true,
+		},
+		{
+			name:         "multiple exclude paths - second matches",
+			path:         "/other/path",
+			excludePaths: []string{"/some/path", "/other/path"},
+			want:         true,
+		},
+		{
+			name:         "multiple exclude paths - none match",
+			path:         "/different/path",
+			excludePaths: []string{"/some/path", "/other/path"},
+			want:         false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := shouldExcludePath(tt.path, tt.excludePaths)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
