@@ -164,7 +164,7 @@ func Query() *cli.Command {
 					}
 					return nil
 				} else {
-					return handleError(c.String("output"), errors.New("dry-run is only supported for BigQuery connections"))
+					return handleError(c.String("output"), errors.New("dry-run is not supported for this connection"))
 				}
 			}
 

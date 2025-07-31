@@ -1088,7 +1088,7 @@ func DryRunAsset() *cli.Command {
 				Name:     "connection",
 				Aliases:  []string{"c"},
 				Usage:    "the name of the connection to use for dry-run",
-				Value:    "gcp-default",
+				DefaultText:	"gcp-default",
 				Required: false,
 			},
 			&cli.StringFlag{
