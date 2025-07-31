@@ -113,11 +113,11 @@ func TestBigQueryWorkflows(t *testing.T) {
 			},
 		},
 		{
-			name: "bigquery-scd2_by_column",
+			name: "bigquery-scd2-by-column",
 			workflow: func(tempDir string, configFlags []string, binary string) e2e.Workflow {
 				return e2e.Workflow{
-				Name: "athena-scd2_by_column",
-				Steps: []e2e.Task{
+					Name: "bigquery-scd2-by-column",
+					Steps: []e2e.Task{
 						{
 							Name:    "scd2-by-column: drop table if exists",
 							Command: binary,
@@ -247,10 +247,10 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "scd2-by-column: drop the table (expect error but table will be dropped)",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "athena-default", "--query", "DROP TABLE IF EXISTS test.menu;"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS test.menu;"),
 							Env:     []string{},
 							Expected: e2e.Output{
-								ExitCode: 0,
+								ExitCode: 1,
 							},
 							Asserts: []func(*e2e.Task) error{
 								e2e.AssertByExitCode,
@@ -259,7 +259,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "scd2-by-column: confirm the table is dropped",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "athena-default", "--query", "SELECT * FROM test.menu;"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM test.menu;"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 1, // Should fail because table doesn't exist
@@ -407,10 +407,10 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "scd2-by-time: drop the table (expect error but table will be dropped)",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "athena-default", "--query", "DROP TABLE IF EXISTS test.products;"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS test.products;"),
 							Env:     []string{},
 							Expected: e2e.Output{
-								ExitCode: 0,
+								ExitCode: 1,
 							},
 							Asserts: []func(*e2e.Task) error{
 								e2e.AssertByExitCode,
@@ -419,7 +419,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 						{
 							Name:    "scd2-by-time: confirm the table is dropped",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "athena-default", "--query", "SELECT * FROM test.products;"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM test.products;"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 1, // Should fail because table doesn't exist
@@ -438,19 +438,17 @@ func TestBigQueryWorkflows(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tempDir, tempErr := os.MkdirTemp("", "bigquery-test-*")
-			require.NoError(t, tempErr, "Failed to create temporary directory")
-			defer os.RemoveAll(tempDir)
+			tempDir := t.TempDir()
 
 			srcPipelines := filepath.Join(currentFolder, "test-pipelines")
 			destPipelines := filepath.Join(tempDir, "test-pipelines")
-			copyErr := copyDir(srcPipelines, destPipelines)
-			require.NoError(t, copyErr, "Failed to copy test-pipelines to tempDir")
+			err := copyDir(srcPipelines, destPipelines)
+			require.NoError(t, err, "Failed to copy test-pipelines to tempDir")
 			runGitInitInTempPipelines(t, tempDir)
 
 			configFlags := []string{"--config-file", filepath.Join(projectRoot, "integration-tests/cloud-integration-tests/.bruin.cloud.yml")}
 			workflow := tt.workflow(tempDir, configFlags, binary)
-			err := workflow.Run()
+			err = workflow.Run()
 			require.NoError(t, err, "Workflow %s failed: %v", workflow.Name, err)
 			t.Logf("Workflow '%s' completed successfully", workflow.Name)
 		})
