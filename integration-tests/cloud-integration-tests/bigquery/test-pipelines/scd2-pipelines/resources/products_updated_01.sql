@@ -14,6 +14,7 @@ columns:
     primary_key: true
   - name: product_name
     type: VARCHAR
+    primary_key: true
     description: "Name of the product"
   - name: dt
     type: DATE
@@ -45,4 +46,3 @@ SELECT
     'ps5' AS product_name,
     25 AS stock,
     DATE '2025-06-02' AS dt
-

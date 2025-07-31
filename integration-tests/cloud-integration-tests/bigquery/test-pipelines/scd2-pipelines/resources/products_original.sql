@@ -14,6 +14,7 @@ columns:
     primary_key: true
   - name: product_name
     type: VARCHAR
+    primary_key: true
   - name: dt
     type: DATE
     description: "incremental key"
@@ -45,4 +46,3 @@ SELECT
     'Monitor' AS product_name,
     25 AS stock,
     DATE '2025-04-02' AS dt
-
