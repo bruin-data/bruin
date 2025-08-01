@@ -12,7 +12,7 @@ import (
 
 var SkipDirs = []string{".git", ".github", ".vscode", "node_modules", "dist", "build", "target", "vendor", ".venv", ".env", "env", "venv", "dbt_packages"}
 
-// shouldExcludePath checks if a given path should be excluded based on the exclude patterns
+// shouldExcludePath checks if a given path should be excluded based on the exclude patterns.
 func shouldExcludePath(path string, excludePaths []string) bool {
 	if len(excludePaths) == 0 {
 		return false

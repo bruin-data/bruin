@@ -28,7 +28,7 @@ import (
 
 var ErrExcludeTagNotSupported = errors.New("exclude-tag flag is not supported for asset-only validation")
 
-// createPipelineFinderWithExclusions creates a pipeline finder function that excludes specified paths
+// createPipelineFinderWithExclusions creates a pipeline finder function that excludes specified paths.
 func createPipelineFinderWithExclusions(excludePaths []string) func(string, []string) ([]string, error) {
 	return func(root string, pipelineDefinitionFile []string) ([]string, error) {
 		return path.GetPipelinePathsWithExclusions(root, pipelineDefinitionFile, excludePaths)
