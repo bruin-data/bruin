@@ -486,15 +486,15 @@ func TestBigQueryWorkflows(t *testing.T) {
 			},
 		},
 		{
-			name: "dry run asset bytes scanned estimation workflow",
+			name: "dry-run-query",
 			workflow: func(tempDir string, configFlags []string, binary string) e2e.Workflow {
 				return e2e.Workflow{
-					Name: "dry run asset bytes scanned estimation workflow",
+					Name: "dry-run-query",
 					Steps: []e2e.Task{
 						{
-							Name:    "dry-run-pipeline: create sample data table",
+							Name:    "dry-run-query: create sample data table",
 							Command: binary,
-							Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/dry-run-pipeline")),
+							Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/dry-run-query-pipeline")),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -504,9 +504,9 @@ func TestBigQueryWorkflows(t *testing.T) {
 							},
 						},
 						{
-							Name:    "dry-run: test cost estimation with custom query on asset",
+							Name:    "dry-run-query: test cost estimation with custom query on asset",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/dry-run-pipeline/assets/sample_data.sql"), "--query", "SELECT id, name FROM dataset.sample_data WHERE value > 200", "--dry-run", "--output", "json"),
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/dry-run-query-pipeline/assets/sample_data.sql"), "--query", "SELECT id, name FROM dataset.sample_data WHERE value > 200", "--dry-run", "--output", "json"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -521,7 +521,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 							},
 						},
 						{
-							Name: "dry-run: drop the created table",
+							Name: "dry-run-query: drop the created table",
 							Command: binary,
 							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS dataset.sample_data;"),
 							Env:     []string{},
@@ -533,7 +533,7 @@ func TestBigQueryWorkflows(t *testing.T) {
 							},
 						},
 						{
-							Name:    "dry-run: confirm the table is dropped",
+							Name:    "dry-run-query: confirm the table is dropped",
 							Command: binary,
 							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM dataset.sample_data;"),
 							Env:     []string{},
@@ -549,27 +549,65 @@ func TestBigQueryWorkflows(t *testing.T) {
 			},
 		},
 		{
-			name: "[bigquery] dry run metadata workflow",
+			name: "dry-run-asset",
 			workflow: func(tempDir string, configFlags []string, binary string) e2e.Workflow {
 				return e2e.Workflow{
-						Name: "[bigquery] dry run metadata workflow",
-						Steps: []e2e.Task{
+					Name: "dry-run-asset",
+					Steps: []e2e.Task{
 						{
-							Name:    "dry-run: validate JSON structure for non-existent table",
+							Name:    "dry-run-asset: create sample data table",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--dry-run", "--query", "SELECT * FROM non_existent_table;", "--output", "json"),
+							Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/dry-run-asset-internal-pipeline/assets/sample_data.sql")),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "dry-run-asset: run internal dry-run-asset",
+							Command: binary,
+							Args:    append(append([]string{"internal", "dry-run-asset"}, configFlags...), "--connection", "gcp-default", filepath.Join(currentFolder, "test-pipelines/dry-run-asset-internal-pipeline/assets/dry-run-query.sql")),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
 								Contains: []string{
-									"\"is_valid\":false",
-									"\"total_bytes_processed\":0",
-									"\"validation_error\":",
+									"Extracted query from asset:",
+									"SELECT id, name FROM dataset.sample_data WHERE value > 200",
+									"Dry-run result:",
+									"Query Validation: true",
+									"Total Bytes Processed: 225",
 								},
 							},
 							Asserts: []func(*e2e.Task) error{
 								e2e.AssertByExitCode,
 								e2e.AssertByContains,
+							},
+						},
+						{
+							Name: "dry-run-asset: drop the created table",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "DROP TABLE IF EXISTS dataset.sample_data;"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 1,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "dry-run-asset: confirm the table is dropped",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "gcp-default", "--query", "SELECT * FROM dataset.sample_data;"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 1,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
 							},
 						},
 					},
