@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/git"
+	"github.com/bruin-data/bruin/pkg/python"
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	"github.com/bruin-data/bruin/pkg/user"
 	"github.com/pkg/errors"
@@ -53,17 +55,20 @@ type CleanCommand struct {
 }
 
 func (r *CleanCommand) Run(inputPath string, cleanUvCache bool) error {
-	cm := user.NewConfigManager(afero.NewOsFs())
-	err := cm.RecreateHomeDir()
-	if err != nil {
-		return errors.Wrap(err, "failed to recreate the home directory")
-	}
-
 	// Clean uv caches if requested
 	if cleanUvCache {
 		if err := r.cleanUvCache(); err != nil {
 			return err
 		}
+		// Return early after uv cache cleaning, skip log cleanup
+		return nil
+	}
+
+	// Only perform log cleanup if --uv-cache flag is not provided
+	cm := user.NewConfigManager(afero.NewOsFs())
+	err := cm.RecreateHomeDir()
+	if err != nil {
+		return errors.Wrap(err, "failed to recreate the home directory")
 	}
 
 	repoRoot, err := git.FindRepoFromPath(inputPath)
@@ -99,13 +104,23 @@ func (r *CleanCommand) Run(inputPath string, cleanUvCache bool) error {
 }
 
 func (r *CleanCommand) cleanUvCache() error {
-	// Check if uv is available
-	cmd := exec.Command("uv", "version")
-	if err := cmd.Run(); err != nil {
-		return errors.Wrap(err, "uv is not installed or not available in PATH")
+	uvChecker := &python.UvChecker{}
+	ctx := context.Background()
+	uvBinaryPath, err := uvChecker.CheckUvInstalled(ctx)
+
+	if err != nil {
+		// Prompt user to install uv if not found
+		if r.confirmUvInstall() {
+			// Use EnsureUvInstalled which will handle the installation
+			uvBinaryPath, err = uvChecker.EnsureUvInstalled(ctx)
+			if err != nil {
+				return errors.Wrap(err, "failed to install uv")
+			}
+		} else {
+			return errors.New("uv is not installed. Please install uv first using the bruin installation process")
+		}
 	}
 
-	// Prompt user for confirmation
 	if !r.confirmUvCacheClean() {
 		infoPrinter.Println("UV cache cleaning cancelled by user.")
 		return nil
@@ -113,8 +128,7 @@ func (r *CleanCommand) cleanUvCache() error {
 
 	infoPrinter.Println("Cleaning uv caches...")
 
-	// Run uv cache clean
-	cleanCmd := exec.Command("uv", "cache", "clean")
+	cleanCmd := exec.Command(uvBinaryPath, "cache", "clean")
 	output, err := cleanCmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "failed to clean uv cache: %s", string(output))
@@ -122,6 +136,20 @@ func (r *CleanCommand) cleanUvCache() error {
 
 	infoPrinter.Println("Successfully cleaned uv caches.")
 	return nil
+}
+
+func (r *CleanCommand) confirmUvInstall() bool {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("uv is not installed. Would you like to install it now? (y/N): ")
+
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		errorPrinter.Printf("Error reading input: %v\n", err)
+		return false
+	}
+
+	response = strings.TrimSpace(strings.ToLower(response))
+	return response == "y" || response == "yes"
 }
 
 func (r *CleanCommand) confirmUvCacheClean() bool {
