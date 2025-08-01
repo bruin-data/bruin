@@ -12,8 +12,54 @@ import (
 
 var SkipDirs = []string{".git", ".github", ".vscode", "node_modules", "dist", "build", "target", "vendor", ".venv", ".env", "env", "venv", "dbt_packages"}
 
+// shouldExcludePath checks if a given path should be excluded based on the exclude patterns.
+func shouldExcludePath(path string, excludePaths []string) bool {
+	if len(excludePaths) == 0 {
+		return false
+	}
+
+	// Convert path to absolute path for consistent comparison
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		// If we can't get absolute path, fall back to original path
+		absPath = path
+	}
+
+	for _, excludePattern := range excludePaths {
+		// Convert exclude pattern to absolute path
+		absExcludePattern, err := filepath.Abs(excludePattern)
+		if err != nil {
+			// If we can't get absolute path, use original pattern
+			absExcludePattern = excludePattern
+		}
+
+		// Check if the path starts with the exclude pattern (prefix match)
+		// This allows excluding entire directory trees
+		if strings.HasPrefix(absPath, absExcludePattern) {
+			// Ensure we're matching complete path components to avoid false positives
+			// e.g., "/foo/bar" should not match "/foo/barbaz"
+			if absPath == absExcludePattern || strings.HasPrefix(absPath, absExcludePattern+string(filepath.Separator)) {
+				return true
+			}
+		}
+
+		// Also check relative path matching for convenience
+		if strings.HasPrefix(path, excludePattern) {
+			if path == excludePattern || strings.HasPrefix(path, excludePattern+string(filepath.Separator)) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 func GetPipelinePaths(root string, pipelineDefinitionFile []string) ([]string, error) {
-	var pipelinePaths []string
+	return GetPipelinePathsWithExclusions(root, pipelineDefinitionFile, nil)
+}
+
+func GetPipelinePathsWithExclusions(root string, pipelineDefinitionFile []string, excludePaths []string) ([]string, error) {
+	pipelinePaths := make([]string, 0)
 
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -25,6 +71,16 @@ func GetPipelinePaths(root string, pipelineDefinitionFile []string) ([]string, e
 				return filepath.SkipDir
 			}
 
+			// Check if this directory path should be excluded
+			if shouldExcludePath(path, excludePaths) {
+				return filepath.SkipDir
+			}
+
+			return nil
+		}
+
+		// Check if the parent directory should be excluded before processing files
+		if shouldExcludePath(filepath.Dir(path), excludePaths) {
 			return nil
 		}
 
@@ -36,7 +92,11 @@ func GetPipelinePaths(root string, pipelineDefinitionFile []string) ([]string, e
 					return errors.Wrapf(err, "failed to get absolute path for %s", path)
 				}
 
-				pipelinePaths = append(pipelinePaths, filepath.Dir(abs))
+				pipelineDir := filepath.Dir(abs)
+				// Double-check that the pipeline directory itself isn't excluded
+				if !shouldExcludePath(pipelineDir, excludePaths) {
+					pipelinePaths = append(pipelinePaths, pipelineDir)
+				}
 				break // Stop checking other file names if one matches
 			}
 		}
