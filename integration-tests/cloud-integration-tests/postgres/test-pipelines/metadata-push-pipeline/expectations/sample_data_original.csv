@@ -1,1 +1,8 @@
-1
+┌───────────────┬─────────────┬─────────────┬────────────────────┐
+│ TABLE_SCHEMA  │ TABLE_NAME  │ COLUMN_NAME │ COLUMN_DESCRIPTION │
+├───────────────┼─────────────┼─────────────┼────────────────────┤
+│ test_metadata │ sample_data │ id          │ empty description  │
+│ test_metadata │ sample_data │ name        │ empty description  │
+│ test_metadata │ sample_data │ value       │ empty description  │
+│ test_metadata │ sample_data │ category    │ empty description  │
+└───────────────┴─────────────┴─────────────┴────────────────────┘

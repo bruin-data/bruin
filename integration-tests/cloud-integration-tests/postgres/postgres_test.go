@@ -371,7 +371,7 @@ func TestPostgresWorkflows(t *testing.T) {
 						{
 							Name:    "metadata-push: create the initial table",
 							Command: binary,
-							Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/metadata-push-pipeline/assets/sample_data_original.sql")),
+							Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/metadata-push-pipeline/assets/sample_data_original.sql")),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -383,24 +383,27 @@ func TestPostgresWorkflows(t *testing.T) {
 						{
 							Name:    "metadata-push: query the initial table",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/metadata-push-pipeline/assets/sample_data_original.sql"), "--query", "SELECT 1"), //"SELECT table_schema, table_name, column_name, col_description(c.oid, cols.ordinal_position) AS column_description FROM information_schema.columns AS cols JOIN pg_class AS c ON c.relname = cols.table_name WHERE cols.table_schema = 'test_metadata' AND cols.table_name = 'sample_data';"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query","SELECT table_schema, table_name, column_name, col_description(c.oid, cols.ordinal_position) AS column_description FROM information_schema.columns AS cols JOIN pg_class AS c ON c.relname = cols.table_name WHERE cols.table_schema = 'test_metadata' AND cols.table_name = 'sample_data';"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
-								CSVFile:  filepath.Join(currentFolder, "test-pipelines/metadata-push-pipeline/expectations/sample_data_expected_original.csv"),
+								CSVFile:  filepath.Join(currentFolder, "test-pipelines/metadata-push-pipeline/expectations/sample_data_original.csv"),
 							},
 							Asserts: []func(*e2e.Task) error{
 								e2e.AssertByExitCode,
-								//e2e.AssertByCSV,
+								e2e.AssertByCSV,
 							},
 						},
 						{
 							Name:    "metadata-push: update the table",
 							Command: binary,
-							Args:    append(append([]string{"run"}, configFlags...), "push-metadata", "--env", "default", filepath.Join(currentFolder, "test-pipelines/metadata-push-pipeline/assets/sample_data_updated.sql")),
+							Args:    append(append([]string{"run"}, configFlags...), "--push-metadata", "--env", "default", filepath.Join(currentFolder, "test-pipelines/metadata-push-pipeline/assets/sample_data_updated.sql")),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
 							},
 						},
 						{
@@ -410,11 +413,35 @@ func TestPostgresWorkflows(t *testing.T) {
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
-								CSVFile:  filepath.Join(currentFolder, "test-pipelines/metadata-push-pipeline/expectations/sample_data_expected_updated.csv"),
+								CSVFile:  filepath.Join(currentFolder, "test-pipelines/metadata-push-pipeline/expectations/sample_data_updated.csv"),
 							},
 							Asserts: []func(*e2e.Task) error{
 								e2e.AssertByExitCode,
 								e2e.AssertByCSV,
+							},
+						},
+						{
+							Name:    "metadata-push: drop table if exists",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--query", "DROP TABLE IF EXISTS test_metadata.sample_data;"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 1,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "metadata-push: confirm the table is dropped",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "SELECT * FROM test_metadata.sample_data;"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 1,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
 							},
 						},
 					},
