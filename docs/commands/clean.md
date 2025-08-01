@@ -24,3 +24,15 @@ bruin clean
 
 
 <img alt="Bruin - clean" src="/clean.gif" style="margin: 10px;" />
+
+### Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--uv-cache` | str | - | clean uv caches |
+
+Adding the flag `uv-cache` will remove all cached uv packages and metadata that were stored during previous installs or dependency resolutions. You will be prompted to confirm whether you want to proceed:
+
+```bash
+"Are you sure you want to clean uv cache? (y/N): "
+```
