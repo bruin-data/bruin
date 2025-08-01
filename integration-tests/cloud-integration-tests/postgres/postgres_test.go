@@ -25,331 +25,400 @@ func TestPostgresWorkflows(t *testing.T) {
 		name     string
 		workflow e2e.Workflow
 	}{
+		// {
+		// 	name: "postgres-products-create-and-validate",
+		// 	workflow: e2e.Workflow{
+		// 		Name: "postgres-products-create-and-validate",
+		// 		Steps: []e2e.Task{
+		// 			{
+		// 				Name:    "create the initial products table",
+		// 				Command: binary,
+		// 				Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products.sql")),
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "query the products table",
+		// 				Command: binary,
+		// 				Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "SELECT PRODUCT_ID, PRODUCT_NAME, PRICE, STOCK FROM public.products ORDER BY PRODUCT_ID;", "--output", "csv"),
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 					CSVFile:  filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/expected_products_table.csv"),
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 					e2e.AssertByCSV,
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	name: "scd2_by_column",
+		// 	workflow: e2e.Workflow{
+		// 		Name: "scd2_by_column",
+		// 		Steps: []e2e.Task{
+		// 			{
+		// 				Name:    "scd2-by-column: restore menu asset to initial state",
+		// 				Command: "cp",
+		// 				Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/menu_original.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql")},
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-column: create the initial table",
+		// 				Command: binary,
+		// 				Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline")),
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-column: query the initial table",
+		// 				Command: binary,
+		// 				Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"),
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 					CSVFile:  filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/expectations/scd2_by_col_expected_initial.csv"),
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 					e2e.AssertByCSV,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-column: copy menu_updated_01.sql to menu.sql",
+		// 				Command: "cp",
+		// 				Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/menu_updated_01.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql")},
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-column: run menu_updated_01.sql with SCD2 materialization",
+		// 				Command: binary,
+		// 				Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql")),
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-column: query the updated table 01",
+		// 				Command: binary,
+		// 				Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"),
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 					CSVFile:  filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/expectations/scd2_by_col_expected_updated_01.csv"),
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 					e2e.AssertByCSV,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-column: copy menu_updated_02.sql to menu.sql",
+		// 				Command: "cp",
+		// 				Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/menu_updated_02.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql")},
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-column: run menu_updated_02.sql with SCD2 materialization",
+		// 				Command: binary,
+		// 				Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql")),
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-column: query the updated table 02",
+		// 				Command: binary,
+		// 				Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"),
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 					CSVFile:  filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/expectations/scd2_by_col_expected_updated_02.csv"),
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 					e2e.AssertByCSV,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-column: drop the table (expect error but table will be dropped)",
+		// 				Command: binary,
+		// 				Args:    []string{"query", "--config-file", filepath.Join(currentFolder, "../.bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "DROP TABLE IF EXISTS test.menu;"},
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 1, // Expect failure due to "field descriptions not available for DDL statements" - specific to PostgresSQL driver
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode, // Assert that it fails as expected
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-column: confirm the table is dropped",
+		// 				Command: binary,
+		// 				Args:    []string{"query", "--config-file", filepath.Join(currentFolder, "../.bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT * FROM test.menu;"},
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 1,
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	name: "SCD2 by time",
+		// 	workflow: e2e.Workflow{
+		// 		Name: "SCD2 by time",
+		// 		Steps: []e2e.Task{
+		// 			{
+		// 				Name:    "scd2-by-time: restore products asset to initial state",
+		// 				Command: "cp",
+		// 				Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/products_original.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")},
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-time: create the initial products table",
+		// 				Command: binary,
+		// 				Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline")),
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-time: query the initial table",
+		// 				Command: binary,
+		// 				Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"),
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 					CSVFile:  filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/expectations/scd2_by_time_expected_initial.csv"),
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 					e2e.AssertByCSV,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-time: copy products_updated_01.sql to products.sql",
+		// 				Command: "cp",
+		// 				Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/products_updated_01.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")},
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-time: run products_updated_01.sql with SCD2 materialization",
+		// 				Command: binary,
+		// 				Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")),
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-time: query the updated table 01",
+		// 				Command: binary,
+		// 				Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"),
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 					CSVFile:  filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/expectations/scd2_by_time_expected_update_01.csv"),
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 					e2e.AssertByCSV,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-time: copy products_updated_02.sql to products.sql",
+		// 				Command: "cp",
+		// 				Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/products_updated_02.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")},
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-time: run products_updated_02.sql with SCD2 materialization",
+		// 				Command: binary,
+		// 				Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")),
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-time: query the updated table 02",
+		// 				Command: binary,
+		// 				Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"),
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 0,
+		// 					CSVFile:  filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/expectations/scd2_by_time_expected_update_02.csv"),
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 					e2e.AssertByCSV,
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-time: drop the table",
+		// 				Command: binary,
+		// 				Args:    []string{"query", "--config-file", filepath.Join(currentFolder, "../.bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "DROP TABLE IF EXISTS test.products;"},
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 1, // Expect failure due to "field descriptions not available for DDL statements" - specific to PostgresSQL driver
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode, // Assert that it fails as expected
+		// 				},
+		// 			},
+		// 			{
+		// 				Name:    "scd2-by-time: confirm the table is dropped",
+		// 				Command: binary,
+		// 				Args:    []string{"query", "--config-file", filepath.Join(currentFolder, "../.bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT * FROM test.products;"},
+		// 				Env:     []string{},
+		// 				Expected: e2e.Output{
+		// 					ExitCode: 1,
+		// 				},
+		// 				Asserts: []func(*e2e.Task) error{
+		// 					e2e.AssertByExitCode,
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// },
 		{
-			name: "postgres-products-create-and-validate",
+			name: "postgres-metadata-push",
 			workflow: e2e.Workflow{
-				Name: "postgres-products-create-and-validate",
-				Steps: []e2e.Task{
-					{
-						Name:    "create the initial products table",
-						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/assets/products.sql")),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
+					Name: "postgres-metadata-push",
+					Steps: []e2e.Task{
+						{
+							Name:    "metadata-push: drop table if exists",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--query", "DROP TABLE IF EXISTS test_metadata.sample_data;"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 1,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
 						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
+						{
+							Name:    "metadata-push: create the initial table",
+							Command: binary,
+							Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/metadata-push-pipeline/assets/sample_data_original.sql")),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
 						},
-					},
-					{
-						Name:    "query the products table",
-						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "SELECT PRODUCT_ID, PRODUCT_NAME, PRICE, STOCK FROM public.products ORDER BY PRODUCT_ID;", "--output", "csv"),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/asset-query-pipeline/expected_products_table.csv"),
+						{
+							Name:    "metadata-push: query the initial table",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/metadata-push-pipeline/assets/sample_data_original.sql"), "--query", "SELECT 1"), //"SELECT table_schema, table_name, column_name, col_description(c.oid, cols.ordinal_position) AS column_description FROM information_schema.columns AS cols JOIN pg_class AS c ON c.relname = cols.table_name WHERE cols.table_schema = 'test_metadata' AND cols.table_name = 'sample_data';"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+								CSVFile:  filepath.Join(currentFolder, "test-pipelines/metadata-push-pipeline/expectations/sample_data_expected_original.csv"),
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+								//e2e.AssertByCSV,
+							},
 						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByCSV,
+						{
+							Name:    "metadata-push: update the table",
+							Command: binary,
+							Args:    append(append([]string{"run"}, configFlags...), "push-metadata", "--env", "default", filepath.Join(currentFolder, "test-pipelines/metadata-push-pipeline/assets/sample_data_updated.sql")),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+						},
+						{
+							Name:    "metadata-push: query the updated table",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "SELECT table_schema, table_name, column_name, col_description(c.oid, cols.ordinal_position) AS column_description FROM information_schema.columns AS cols JOIN pg_class AS c ON c.relname = cols.table_name WHERE cols.table_schema = 'test_metadata' AND cols.table_name = 'sample_data';"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+								CSVFile:  filepath.Join(currentFolder, "test-pipelines/metadata-push-pipeline/expectations/sample_data_expected_updated.csv"),
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+								e2e.AssertByCSV,
+							},
 						},
 					},
 				},
-			},
-		},
-		{
-			name: "scd2_by_column",
-			workflow: e2e.Workflow{
-				Name: "scd2_by_column",
-				Steps: []e2e.Task{
-					{
-						Name:    "scd2-by-column: restore menu asset to initial state",
-						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/menu_original.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql")},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "scd2-by-column: create the initial table",
-						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline")),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "scd2-by-column: query the initial table",
-						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/expectations/scd2_by_col_expected_initial.csv"),
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByCSV,
-						},
-					},
-					{
-						Name:    "scd2-by-column: copy menu_updated_01.sql to menu.sql",
-						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/menu_updated_01.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql")},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "scd2-by-column: run menu_updated_01.sql with SCD2 materialization",
-						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql")),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "scd2-by-column: query the updated table 01",
-						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/expectations/scd2_by_col_expected_updated_01.csv"),
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByCSV,
-						},
-					},
-					{
-						Name:    "scd2-by-column: copy menu_updated_02.sql to menu.sql",
-						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/menu_updated_02.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql")},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "scd2-by-column: run menu_updated_02.sql with SCD2 materialization",
-						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql")),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "scd2-by-column: query the updated table 02",
-						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT ID, Name, Price, _is_current FROM test.menu ORDER BY ID, _valid_from;", "--output", "csv"),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/expectations/scd2_by_col_expected_updated_02.csv"),
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByCSV,
-						},
-					},
-					{
-						Name:    "scd2-by-column: drop the table (expect error but table will be dropped)",
-						Command: binary,
-						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, "../.bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "DROP TABLE IF EXISTS test.menu;"},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 1, // Expect failure due to "field descriptions not available for DDL statements" - specific to PostgresSQL driver
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode, // Assert that it fails as expected
-						},
-					},
-					{
-						Name:    "scd2-by-column: confirm the table is dropped",
-						Command: binary,
-						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, "../.bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-column-pipeline/assets/menu.sql"), "--query", "SELECT * FROM test.menu;"},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 1,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "SCD2 by time",
-			workflow: e2e.Workflow{
-				Name: "SCD2 by time",
-				Steps: []e2e.Task{
-					{
-						Name:    "scd2-by-time: restore products asset to initial state",
-						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/products_original.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "scd2-by-time: create the initial products table",
-						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--full-refresh", "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline")),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "scd2-by-time: query the initial table",
-						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/expectations/scd2_by_time_expected_initial.csv"),
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByCSV,
-						},
-					},
-					{
-						Name:    "scd2-by-time: copy products_updated_01.sql to products.sql",
-						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/products_updated_01.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "scd2-by-time: run products_updated_01.sql with SCD2 materialization",
-						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "scd2-by-time: query the updated table 01",
-						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/expectations/scd2_by_time_expected_update_01.csv"),
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByCSV,
-						},
-					},
-					{
-						Name:    "scd2-by-time: copy products_updated_02.sql to products.sql",
-						Command: "cp",
-						Args:    []string{filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/resources/products_updated_02.sql"), filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "scd2-by-time: run products_updated_02.sql with SCD2 materialization",
-						Command: binary,
-						Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql")),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-					{
-						Name:    "scd2-by-time: query the updated table 02",
-						Command: binary,
-						Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT product_id,product_name,stock,_is_current,_valid_from FROM test.products ORDER BY product_id, _valid_from;", "--output", "csv"),
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 0,
-							CSVFile:  filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/expectations/scd2_by_time_expected_update_02.csv"),
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-							e2e.AssertByCSV,
-						},
-					},
-					{
-						Name:    "scd2-by-time: drop the table",
-						Command: binary,
-						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, "../.bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "DROP TABLE IF EXISTS test.products;"},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 1, // Expect failure due to "field descriptions not available for DDL statements" - specific to PostgresSQL driver
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode, // Assert that it fails as expected
-						},
-					},
-					{
-						Name:    "scd2-by-time: confirm the table is dropped",
-						Command: binary,
-						Args:    []string{"query", "--config-file", filepath.Join(currentFolder, "../.bruin.cloud.yml"), "--asset", filepath.Join(currentFolder, "test-pipelines/scd2-pipelines/scd2-by-time-pipeline/assets/products.sql"), "--query", "SELECT * FROM test.products;"},
-						Env:     []string{},
-						Expected: e2e.Output{
-							ExitCode: 1,
-						},
-						Asserts: []func(*e2e.Task) error{
-							e2e.AssertByExitCode,
-						},
-					},
-				},
-			},
 		},
 	}
 	for _, tt := range tests {

@@ -432,6 +432,77 @@ func TestBigQueryWorkflows(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "bigquery-metadata-push",
+			workflow: func(tempDir string, configFlags []string, binary string) e2e.Workflow {
+				return e2e.Workflow{
+					Name: "bigquery-metadata-push",
+					Steps: []e2e.Task{
+						{
+							Name:    "metadata-push: drop table if exists",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--query", "DROP TABLE IF EXISTS test_metadata.sample_data;"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 1,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "metadata-push: create the initial table",
+							Command: binary,
+							Args:    append(append([]string{"run"}, configFlags...), "--env", "default", filepath.Join(tempDir, "test-pipelines/metadata-push-pipeline/assets/sample_data_original.sql")),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+							},
+						},
+						{
+							Name:    "metadata-push: query the initial table",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/metadata-push-pipeline/assets/sample_data_original.sql"), "--query", "SELECT * FROM test_metadata.sample_data;"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+								CSVFile:  filepath.Join(tempDir, "test-pipelines/metadata-push-pipeline/expectations/sample_data_expected_original.csv"),
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+								e2e.AssertByCSV,
+							},
+						},
+						{
+							Name:    "metadata-push: update the table",
+							Command: binary,
+							Args:    append(append([]string{"run"}, configFlags...), "push-metadata", "--env", "default", filepath.Join(tempDir, "test-pipelines/metadata-push-pipeline/assets/sample_data_updated.sql")),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+							},
+						},
+						{
+							Name:    "metadata-push: query the updated table",
+							Command: binary,
+							Args:    append(append([]string{"query"}, configFlags...), "--env", "default", "--asset", filepath.Join(tempDir, "test-pipelines/metadata-push-pipeline/assets/sample_data.sql"), "--query", "SELECT * FROM test.sample_data;"),
+							Env:     []string{},
+							Expected: e2e.Output{
+								ExitCode: 0,
+								CSVFile:  filepath.Join(tempDir, "test-pipelines/metadata-push-pipeline/expectations/sample_data_expected_updated.csv"),
+							},
+							Asserts: []func(*e2e.Task) error{
+								e2e.AssertByExitCode,
+								e2e.AssertByCSV,
+							},
+						},
+					},
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
