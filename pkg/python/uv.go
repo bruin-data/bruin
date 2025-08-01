@@ -112,6 +112,49 @@ func (u *UvChecker) EnsureUvInstalled(ctx context.Context) (string, error) {
 	return uvBinaryPath, nil
 }
 
+// CheckUvInstalled checks if uv is installed in the bruin home directory and returns its path if present.
+// It does NOT attempt to install uv if it is missing or the version is incorrect.
+func (u *UvChecker) CheckUvInstalled(ctx context.Context) (string, error) {
+	u.mut.Lock()
+	defer u.mut.Unlock()
+
+	m := user.NewConfigManager(afero.NewOsFs())
+	bruinHomeDirAbsPath, err := m.EnsureAndGetBruinHomeDir()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get bruin home directory")
+	}
+	var binaryName string
+	if runtime.GOOS == "windows" {
+		binaryName = "uv.exe"
+	} else {
+		binaryName = "uv"
+	}
+	uvBinaryPath := filepath.Join(bruinHomeDirAbsPath, binaryName)
+	if _, err := os.Stat(uvBinaryPath); errors.Is(err, os.ErrNotExist) {
+		// If not found in bruin home directory, try system PATH
+		return "", fmt.Errorf("uv binary not found at %s", uvBinaryPath)
+	}
+
+	cmd := exec.Command(uvBinaryPath, "version", "--no-config", "--output-format", "json")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to check uv version: %w -- Output: %s", err, output)
+	}
+
+	var uvVersion struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(output, &uvVersion); err != nil {
+		return "", fmt.Errorf("failed to parse uv version: %w", err)
+	}
+
+	if uvVersion.Version != UvVersion {
+		return "", fmt.Errorf("uv version mismatch: found %s, expected %s", uvVersion.Version, UvVersion)
+	}
+
+	return uvBinaryPath, nil
+}
+
 const CtxUseWingetForUv = "use_winget_for_uv"
 
 func (u *UvChecker) installUvCommand(ctx context.Context, dest string) error {
