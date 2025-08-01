@@ -27,6 +27,40 @@ import (
 
 const testProjectID = "test-project"
 
+// Place these at the package level, before any test functions
+
+type mockStatistics struct {
+	TotalBytesProcessed int64
+}
+
+type mockStatus struct {
+	state bigquery.State
+	stats *mockStatistics
+	err   error
+}
+
+func (s *mockStatus) State() bigquery.State       { return s.state }
+func (s *mockStatus) Statistics() *mockStatistics { return s.stats }
+func (s *mockStatus) Err() error                  { return s.err }
+
+type mockJob struct {
+	status *mockStatus
+}
+
+func (m *mockJob) LastStatus() *mockStatus { return m.status }
+
+type mockBqQuery struct {
+	runErr error
+	status *mockStatus
+}
+
+func (q *mockBqQuery) Run(ctx context.Context) (*mockJob, error) {
+	if q.runErr != nil {
+		return nil, q.runErr
+	}
+	return &mockJob{status: q.status}, nil
+}
+
 func TestDB_IsValid(t *testing.T) {
 	t.Parallel()
 
@@ -1905,6 +1939,119 @@ func TestClient_GetTables(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestClient_GetDryRunMetadata(t *testing.T) {
+	t.Parallel()
+
+	type dryRunJobStatus struct {
+		state bigquery.State
+		stats *mockStatistics
+		err   error
+	}
+
+	tests := []struct {
+		name         string
+		jobStatus    dryRunJobStatus
+		runErr       error
+		wantMetadata *DryRunMetadata
+	}{
+		{
+			name: "valid dry run with stats",
+			jobStatus: dryRunJobStatus{
+				state: bigquery.Done,
+				stats: &mockStatistics{TotalBytesProcessed: 12345},
+				err:   nil,
+			},
+			wantMetadata: &DryRunMetadata{
+				IsValid:             true,
+				TotalBytesProcessed: 12345,
+			},
+		},
+		{
+			name: "valid dry run with no stats",
+			jobStatus: dryRunJobStatus{
+				state: bigquery.Done,
+				stats: nil,
+				err:   nil,
+			},
+			wantMetadata: &DryRunMetadata{
+				IsValid: true,
+			},
+		},
+		{
+			name: "invalid dry run with error in status",
+			jobStatus: dryRunJobStatus{
+				state: bigquery.Done,
+				stats: nil,
+				err:   fmt.Errorf("validation error"),
+			},
+			wantMetadata: &DryRunMetadata{
+				IsValid:         false,
+				ValidationError: "validation error",
+			},
+		},
+		{
+			name:   "run error",
+			runErr: fmt.Errorf("run error"),
+			wantMetadata: &DryRunMetadata{
+				IsValid:         false,
+				ValidationError: "run error",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var (
+				q = &mockBqQuery{
+					runErr: tt.runErr,
+					status: &mockStatus{
+						state: tt.jobStatus.state,
+						stats: tt.jobStatus.stats,
+						err:   tt.jobStatus.err,
+					},
+				}
+			)
+
+			var metadata *DryRunMetadata
+			if tt.runErr != nil {
+				metadata = &DryRunMetadata{
+					IsValid:         false,
+					ValidationError: tt.runErr.Error(),
+				}
+			} else {
+				job, err := q.Run(context.Background())
+				if err != nil {
+					metadata = &DryRunMetadata{
+						IsValid:         false,
+						ValidationError: err.Error(),
+					}
+				} else {
+					status := job.LastStatus()
+					if status.Err() != nil {
+						metadata = &DryRunMetadata{
+							IsValid:         false,
+							ValidationError: status.Err().Error(),
+						}
+					} else {
+						metadata = &DryRunMetadata{
+							IsValid: status.state == bigquery.Done,
+						}
+						if metadata.IsValid && status.stats != nil {
+							metadata.TotalBytesProcessed = status.stats.TotalBytesProcessed
+						}
+					}
+				}
+			}
+
+			assert.Equal(t, tt.wantMetadata.IsValid, metadata.IsValid)
+			assert.Equal(t, tt.wantMetadata.TotalBytesProcessed, metadata.TotalBytesProcessed)
+			assert.Equal(t, tt.wantMetadata.ValidationError, metadata.ValidationError)
 		})
 	}
 }
