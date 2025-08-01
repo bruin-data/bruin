@@ -1043,6 +1043,11 @@ func (r *DryRunCommand) Run(ctx context.Context, assetPath string, connectionNam
 		return cli.Exit("", 1)
 	}
 
+	if asset.Type != pipeline.AssetTypeBigqueryQuery {
+		printErrorJSON(errors2.New("dry run is only supported for BigQuery assets"))
+		return cli.Exit("", 1)
+	}
+
 	query := asset.ExecutableFile.Content
 	if query == "" {
 		printErrorJSON(errors2.New("no SQL query found in asset"))

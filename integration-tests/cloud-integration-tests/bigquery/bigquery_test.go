@@ -48,8 +48,61 @@ func TestBigQueryIndividualTasks(t *testing.T) {
 				e2e.AssertByExitCode,
 			},
 		},
+		{
+			Name:    "bigquery-dry-run-empty-asset-path",
+			Command: binary,
+			Args:    append(append([]string{"internal", "dry-run-asset"}, configFlags...), ""),
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 1,
+				Contains: []string{"Please give an asset path to parse"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "bigquery-dry-run-non-existent-file",
+			Command: binary,
+			Args:    append(append([]string{"internal", "dry-run-asset"}, configFlags...), "/non/existent/file.sql"),
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 1,
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+			},
+		},
+		{
+			Name:    "bigquery-dry-run-non-sql-asset",
+			Command: binary,
+			Args:    append(append([]string{"internal", "dry-run-asset"}, configFlags...), "--connection", "gcp-default", filepath.Join(currentFolder, "test-pipelines/faulty-dry-run-pipeline/assets/sample_data.py")),
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 1,
+				Contains: []string{"dry run is only supported for SQL assets"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
+		{
+			Name:    "bigquery-dry-run-sql-asset-with-non-bigquery-asset",
+			Command: binary,
+			Args:    append(append([]string{"internal", "dry-run-asset"}, configFlags...), filepath.Join(currentFolder, "test-pipelines/faulty-dry-run-pipeline/assets/non_bq_asset.sql")),
+			Env:     []string{},
+			Expected: e2e.Output{
+				ExitCode: 1,
+				Contains: []string{"dry run is only supported for BigQuery assets"},
+			},
+			Asserts: []func(*e2e.Task) error{
+				e2e.AssertByExitCode,
+				e2e.AssertByContains,
+			},
+		},
 	}
-
 	for _, task := range tasks {
 		t.Run(task.Name, func(t *testing.T) {
 			t.Parallel()
