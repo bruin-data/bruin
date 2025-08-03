@@ -799,12 +799,19 @@ func (c DB2Connection) GetName() string {
 }
 
 type OracleConnection struct {
-	Name     string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
-	Username string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
-	Password string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
-	Host     string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
-	Port     string `yaml:"port,omitempty" json:"port" mapstructure:"port"`
-	DBName   string `yaml:"dbname,omitempty" json:"dbname" mapstructure:"dbname"`
+	Name         string `yaml:"name,omitempty" json:"name" mapstructure:"name"`
+	Username     string `yaml:"username,omitempty" json:"username" mapstructure:"username"`
+	Password     string `yaml:"password,omitempty" json:"password" mapstructure:"password"`
+	Host         string `yaml:"host,omitempty" json:"host" mapstructure:"host"`
+	Port         string `yaml:"port,omitempty" json:"port" mapstructure:"port"`
+	ServiceName  string `yaml:"service_name,omitempty" json:"service_name" mapstructure:"service_name"`
+	SID          string `yaml:"sid,omitempty" json:"sid" mapstructure:"sid"`
+	Role         string `yaml:"role,omitempty" json:"role" mapstructure:"role"`
+	SSL          bool   `yaml:"ssl,omitempty" json:"ssl" mapstructure:"ssl"`
+	SSLVerify    bool   `yaml:"ssl_verify,omitempty" json:"ssl_verify" mapstructure:"ssl_verify"`
+	PrefetchRows int    `yaml:"prefetch_rows,omitempty" json:"prefetch_rows" mapstructure:"prefetch_rows"`
+	TraceFile    string `yaml:"trace_file,omitempty" json:"trace_file" mapstructure:"trace_file"`
+	Wallet       string `yaml:"wallet,omitempty" json:"wallet" mapstructure:"wallet"`
 }
 
 func (c OracleConnection) GetName() string {
