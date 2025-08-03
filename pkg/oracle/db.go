@@ -12,12 +12,12 @@ import (
 	_ "github.com/sijms/go-ora/v2"
 )
 
-type DB struct {
+type Client struct {
 	conn   *sql.DB
 	config *Config
 }
 
-func NewDB(c *Config) (*DB, error) {
+func NewClient(c Config) (*Client, error) {
 	dsn, err := c.DSN()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create DSN")
@@ -28,20 +28,20 @@ func NewDB(c *Config) (*DB, error) {
 		return nil, errors.Wrap(err, "failed to open oracle connection")
 	}
 
-	return &DB{
+	return &Client{
 		conn:   conn,
-		config: c,
+		config: &c,
 	}, nil
 }
 
-func (db *DB) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
+func (db *Client) RunQueryWithoutResult(ctx context.Context, query *query.Query) error {
 	queryStr := strings.TrimSpace(query.String())
 	queryStr = strings.TrimSuffix(queryStr, ";")
 	_, err := db.conn.ExecContext(ctx, queryStr)
 	return errors.Wrap(err, "failed to execute query")
 }
 
-func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
+func (db *Client) Select(ctx context.Context, query *query.Query) ([][]interface{}, error) {
 	queryStr := strings.TrimSpace(query.String())
 	queryStr = strings.TrimSuffix(queryStr, ";")
 	rows, err := db.conn.QueryContext(ctx, queryStr)
@@ -79,13 +79,13 @@ func (db *DB) Select(ctx context.Context, query *query.Query) ([][]interface{}, 
 	return result, nil
 }
 
-func (db *DB) Ping(ctx context.Context) error {
+func (db *Client) Ping(ctx context.Context) error {
 	// Simple ping query
 	q := &query.Query{Query: "SELECT 1 FROM DUAL"}
 	return db.RunQueryWithoutResult(ctx, q)
 }
 
-func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
+func (db *Client) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*query.QueryResult, error) {
 	queryStr := strings.TrimSpace(queryObj.String())
 	queryStr = strings.TrimSuffix(queryStr, ";")
 	rows, err := db.conn.QueryContext(ctx, queryStr)
@@ -140,7 +140,7 @@ func (db *DB) SelectWithSchema(ctx context.Context, queryObj *query.Query) (*que
 	return result, nil
 }
 
-func (db *DB) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
+func (db *Client) GetDatabaseSummary(ctx context.Context) (*ansisql.DBDatabase, error) {
 	// Query to get all schemas and tables in the database
 	q := `
 SELECT
