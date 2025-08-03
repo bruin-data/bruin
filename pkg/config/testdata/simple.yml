@@ -307,7 +307,7 @@ environments:
           password: "password-123"
           host: "host-123"
           port: "1234"
-          dbname: "dbname-123"
+          service_name: "service-123"
       db2:
         - name: "db2-default"
           username: "username-123"
