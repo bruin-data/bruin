@@ -10,24 +10,24 @@ import (
 )
 
 type Config struct {
-	Username    string
-	Password    string
-	Host        string
-	Port        string
-	ServiceName string 
-	SID         string 
-	Role        string 
+	Username     string
+	Password     string
+	Host         string
+	Port         string
+	ServiceName  string
+	SID          string
+	Role         string
 	SSL          bool
 	SSLVerify    bool
 	PrefetchRows int
 	TraceFile    string
-	Wallet       string 
+	Wallet       string
 }
 
 func (c *Config) DSN() (string, error) {
 	port := c.Port
 	if port == "" {
-		port = "1521" 
+		port = "1521"
 	}
 
 	portInt := 1521
@@ -58,21 +58,18 @@ func (c *Config) DSN() (string, error) {
 	if c.TraceFile != "" {
 		options["TRACE FILE"] = c.TraceFile
 	}
-
-	// Build DSN based on whether we're using Service Name or SID
 	var dsn string
-	if c.ServiceName != "" {
-		// Use service name connection
+	switch {
+	case c.ServiceName != "":
 		dsn = go_ora.BuildUrl(c.Host, portInt, c.ServiceName, c.Username, c.Password, options)
-	} else if c.SID != "" {
-		// Use SID-based connection - pass SID in options with empty service name
+	case c.SID != "":
 		sidOptions := make(map[string]string)
 		for k, v := range options {
 			sidOptions[k] = v
 		}
 		sidOptions["SID"] = c.SID
 		dsn = go_ora.BuildUrl(c.Host, portInt, "", c.Username, c.Password, sidOptions)
-	} else {
+	default:
 		return "", errors.New("either ServiceName or SID must be specified")
 	}
 
