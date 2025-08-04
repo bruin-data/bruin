@@ -138,10 +138,10 @@ CREATE TABLE %s AS %s;`, task.Name, task.Name, query)
 
 		// Add column comments after table creation
 		if len(columnComments) > 0 {
-			createTableStmt += "\n" + strings.Join(columnComments, ";\n")
+			createTableStmt += "\n" + strings.Join(columnComments, "\n")
 		}
 
-		createTableStmt += ";\nCOMMIT;"
+		createTableStmt += "\nCOMMIT;"
 
 		return createTableStmt, nil
 	}

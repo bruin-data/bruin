@@ -14,7 +14,7 @@ columns:
     type: VARCHAR
     description: "empty description"
   - name: value
-    type: FLOAT
+    type: NUMERIC
     description: "empty description"
   - name: category
     type: VARCHAR
@@ -22,7 +22,7 @@ columns:
 @bruin */
 
 SELECT
-    1 AS id, 'Alice' AS name, 100.50 AS value, 'A' AS category
+    1 AS id, 'Alice' AS name, 100 AS value, 'A' AS category
 UNION ALL
 SELECT
-    2 AS id, 'Bob' AS name, 200.75 AS value, 'B' AS category
+    2 AS id, 'Bob' AS name, 200 AS value, 'B' AS category

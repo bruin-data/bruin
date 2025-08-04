@@ -14,15 +14,14 @@ columns:
     type: VARCHAR
     description: "Sample name field"
   - name: value
-    type: FLOAT
+    type: NUMERIC
     description: "Sample numeric value"
   - name: category
     type: VARCHAR
     description: "Sample category field"
 @bruin */
 
+
+-- If metadata is pushed correctly, this SELECT statement will not be included in the output.
 SELECT
-    3 AS id, 'Charlie' AS name, 150.25 AS value, 'A' AS category
-UNION ALL
-SELECT
-    4 AS id, 'Diana' AS name, 300.00 AS value, 'C' AS category
+    3 AS id, 'Charlie' AS name, 150 AS value, 'A' AS category
