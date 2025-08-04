@@ -51,6 +51,9 @@ func main() {
 		Usage:          "The CLI used for managing Bruin-powered data pipelines",
 		Compiled:       time.Now(),
 		ExitErrHandler: telemetry.ErrorCommand,
+		CommandNotFound: func(c *cli.Context, command string) {
+			cmd.HandleInvalidCommand(command)
+		},
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:        "debug",
