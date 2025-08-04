@@ -1,6 +1,7 @@
 /* @bruin
 name: test_metadata.sample_data
 type: pg.sql
+description: "A sample table"
 
 materialization:
   type: table
@@ -8,17 +9,17 @@ materialization:
 columns:
   - name: id
     type: INTEGER
-    description: "empty description"
+    description: "Unique identifier"
     primary_key: true
   - name: name
     type: VARCHAR
-    description: "empty description"
+    description: "Sample name field"
   - name: value
     type: NUMERIC
-    description: "empty description"
+    description: "Sample numeric value"
   - name: category
     type: VARCHAR
-    description: "empty description"
+    description: "Sample category field"
 @bruin */
 
 SELECT

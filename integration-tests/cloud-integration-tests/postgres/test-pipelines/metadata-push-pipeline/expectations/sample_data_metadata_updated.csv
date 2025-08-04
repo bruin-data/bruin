@@ -1,5 +1,0 @@
-table_schema,table_name,column_name,column_description
-test_metadata,sample_data,id,Unique identifier
-test_metadata,sample_data,name,Sample name field
-test_metadata,sample_data,value,Sample numeric value
-test_metadata,sample_data,category,Sample category field
