@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGlossary_Merge(t *testing.T) {
@@ -77,11 +78,11 @@ func TestLoadGlossaryFromFile_WithDomains(t *testing.T) {
 
 	// Test loading the test glossary file to ensure domains are properly converted from map to array
 	glossary, err := LoadGlossaryFromFile("../../test-glossary.yml")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, glossary)
 
 	// Verify domains were loaded and converted to array
-	assert.Greater(t, len(glossary.Domains), 0)
+	assert.NotEmpty(t, glossary.Domains)
 
 	// Test that we can find a domain by name
 	analyticsDomain := glossary.GetDomain("analytics")

@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -121,7 +122,7 @@ func LoadGlossary() *cli.Command {
 		Action: func(c *cli.Context) error {
 			glossaryPath := c.Args().Get(0)
 			if glossaryPath == "" {
-				return fmt.Errorf("glossary file path is required")
+				return errors.New("glossary file path is required")
 			}
 
 			// Load the glossary file
@@ -132,11 +133,12 @@ func LoadGlossary() *cli.Command {
 
 			// Prepare output based on flags
 			var output interface{}
-			if c.Bool("entities-only") {
+			switch {
+			case c.Bool("entities-only"):
 				output = loadedGlossary.Entities
-			} else if c.Bool("domains-only") {
+			case c.Bool("domains-only"):
 				output = loadedGlossary.Domains
-			} else {
+			default:
 				output = loadedGlossary
 			}
 
