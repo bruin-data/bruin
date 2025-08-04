@@ -121,29 +121,11 @@ func buildCreateReplaceQuery(task *pipeline.Asset, query string) (string, error)
 		return buildSCD2ByColumnfullRefresh(task, query)
 	default:
 		query = strings.TrimSuffix(query, ";")
-
-		// Add column comments if descriptions are provided
-		columnComments := []string{}
-		for _, col := range task.Columns {
-			if col.Description != "" {
-				comment := fmt.Sprintf("COMMENT ON COLUMN %s.%s IS '%s';", task.Name, col.Name, strings.ReplaceAll(col.Description, "'", "''"))
-				columnComments = append(columnComments, comment)
-			}
-		}
-
-		createTableStmt := fmt.Sprintf(
+		return fmt.Sprintf(
 			`BEGIN TRANSACTION;
 DROP TABLE IF EXISTS %s; 
-CREATE TABLE %s AS %s;`, task.Name, task.Name, query)
-
-		// Add column comments after table creation
-		if len(columnComments) > 0 {
-			createTableStmt += "\n" + strings.Join(columnComments, "\n")
-		}
-
-		createTableStmt += "\nCOMMIT;"
-
-		return createTableStmt, nil
+CREATE TABLE %s AS %s;
+COMMIT;`, task.Name, task.Name, query), nil
 	}
 }
 
