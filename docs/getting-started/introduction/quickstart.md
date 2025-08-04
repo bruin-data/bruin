@@ -142,7 +142,7 @@ print('hello world')
 
 You can run this asset either via the Bruin VS Code extension, or in the terminal:
 ```bash
-bruin run assets/my_python_asset.sql
+bruin run assets/my_python_asset.py
 ```
 
 At this point, you can also run the whole pipeline:
