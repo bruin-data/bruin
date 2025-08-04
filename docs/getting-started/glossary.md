@@ -25,10 +25,22 @@ Glossaries in Bruin support three primary concepts at the time of writing:
 
 An entity can have zero or more attributes, while an attribute must always be within an entity.
 
-Both entities and attributes can have additional metadata including:
-- **Domains**: Business domains that the entity or attribute belongs to, used for organizing and categorizing by business function
+Entities can have additional metadata including:
+- **Domains**: Business domains that the entity belongs to, used for organizing and categorizing by business function
+- **Tags**: Labels for categorization and filtering  
+- **Owners**: Responsible parties for governance and lineage tracking
+
+Attributes have the following metadata:
+- **Name**: The name of the attribute
+- **Type**: The data type of the attribute
+- **Description**: The human-readable description of the attribute
+
+Domains can have the following metadata:
+- **Name**: The name of the domain
+- **Description**: A description of the business domain and its purpose
+- **Owners**: Responsible parties for the domain
 - **Tags**: Labels for categorization and filtering
-- **Owners**: Responsible parties for governance and lineage tracking 
+- **Contact**: Contact information for the domain (email, slack, etc.) 
 
 > [!INFO]
 > Glossaries are primarily utilized for entities in its first version. In the future they will be used to incorporate further business concepts.
@@ -74,25 +86,16 @@ entities:
     description: Customer is an individual/business that has registered on our platform.
     domains:
       - customer-management
-      - user-accounts
     attributes:
       ID:
         type: integer
         description: The unique identifier of the customer in our systems.
-        domains:
-          - customer-management
       Email:
         type: string
         description: the e-mail address the customer used while registering on our website.
-        domains:
-          - customer-management
-          - communication
       Language:
         type: string
         description: the language the customer picked during registration.
-        domains:
-          - customer-management
-          - internationalization
   
   # You can define multi-line descriptions, and give further details or references for others. 
   Address:
@@ -103,44 +106,38 @@ entities:
       The addresses are not validated beforehand, therefore the addresses are not guaranteed to be real.
     domains:
       - location-management
-      - shipping
     attributes:
       ID:
         type: integer
         description: The unique identifier of the address in our systems.
-        domains:
-          - location-management
       Street:
         type: string
         description: The given street name for the address, depending on the country it may have a different structure.
-        domains:
-          - location-management
       Country:
         type: string
         description: The country of the address, represents a real country.
-        domains:
-          - location-management
-          - internationalization
       CountryCode:
         type: string
         description: The ISO country code for the given country.
-        domains:
-          - location-management
-          - internationalization
 ```
 
 The file structure is flexible enough to allow conceptual attributes to be defined here. You can define unlimited number of entities and attributes.
 
 ### Schema
 The `glossary.yml` file has a rather simple schema:
-- `entities`: must be key-value pairs of string - an Entity object
+- `domains` (optional): key-value pairs of string - Domain objects
+- `Domain` object:
+  - `description`: string, description of the business domain
+  - `owners`: array of strings, responsible parties for the domain
+  - `tags`: array of strings, labels for categorization and filtering
+  - `contact`: array of Contact objects with `type` and `address` fields
+- `entities`: must be key-value pairs of string - Entity objects
 - `Entity` object:
   - `description`: string, supports markdown descriptions
   - `domains`: array of strings, business domains the entity belongs to
   - `attributes`: a key-value map, where the key is the name of the attribute, the value is an object.
     - `type`: the data type of the attribute
     - `description`: the markdown description of the given column
-    - `domains`: array of strings, business domains the attribute belongs to
 
 Take a look at the example above and modify it as per your needs.
 
@@ -180,7 +177,6 @@ Entities are used as defaults when there are no explicit definitions on an asset
 - `name`: the name of the attribute
 - `type`: the type of the attribute
 - `description`: the human-readable description of the attribute, ideally in relation to the business
-- `domains`: business domains the attribute belongs to
 
 Bruin will take all of the fields from the attribute, and combine them with the asset column:
 - if the column definition already has a value for a field, use that.
