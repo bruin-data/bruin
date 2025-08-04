@@ -54,14 +54,24 @@ type GlossaryReader struct {
 }
 
 type Glossary struct {
-	Entities []*Entity          `yaml:"entities" json:"entities"`
-	Domains  map[string]*Domain `yaml:"domains,omitempty" json:"domains"`
+	Entities []*Entity `yaml:"entities" json:"entities"`
+	Domains  []*Domain `yaml:"domains,omitempty" json:"domains"`
 }
 
 func (g *Glossary) GetEntity(name string) *Entity {
 	for _, entity := range g.Entities {
 		if entity.Name == name {
 			return entity
+		}
+	}
+
+	return nil
+}
+
+func (g *Glossary) GetDomain(name string) *Domain {
+	for _, domain := range g.Domains {
+		if domain.Name == name {
+			return domain
 		}
 	}
 
@@ -78,7 +88,12 @@ func (g *Glossary) Merge(anotherGlossary *Glossary) {
 		g.Entities = make([]*Entity, 0)
 	}
 
+	if g.Domains == nil {
+		g.Domains = make([]*Domain, 0)
+	}
+
 	g.Entities = append(g.Entities, anotherGlossary.Entities...)
+	g.Domains = append(g.Domains, anotherGlossary.Domains...)
 }
 
 func (r *GlossaryReader) GetGlossary(pipelinePath string) (*Glossary, error) {
@@ -146,8 +161,19 @@ func LoadGlossaryFromFile(path string) (*Glossary, error) {
 		idx++
 	}
 
+	domains := make([]*Domain, len(glossary.Domains))
+	idx = 0
+	for name, domain := range glossary.Domains {
+		if domain.Name == "" {
+			domain.Name = name
+		}
+
+		domains[idx] = domain
+		idx++
+	}
+
 	return &Glossary{
 		Entities: result,
-		Domains:  glossary.Domains,
+		Domains:  domains,
 	}, nil
 }
