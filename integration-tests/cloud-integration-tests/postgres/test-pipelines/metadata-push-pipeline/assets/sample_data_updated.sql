@@ -22,12 +22,6 @@ columns:
 @bruin */
 
 SELECT
-    1 AS id, 'Alice' AS name, 100.50 AS value, 'A' AS category
-UNION ALL
-SELECT
-    2 AS id, 'Bob' AS name, 200.75 AS value, 'B' AS category
-UNION ALL
-SELECT
     3 AS id, 'Charlie' AS name, 150.25 AS value, 'A' AS category
 UNION ALL
 SELECT
