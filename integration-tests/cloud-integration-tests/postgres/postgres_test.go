@@ -395,7 +395,7 @@ func TestPostgresWorkflows(t *testing.T) {
 						{
 							Name:    "metadata-push: query the initial table",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query","SELECT table_schema, table_name, column_name, col_description(c.oid, cols.ordinal_position) AS column_description FROM information_schema.columns AS cols JOIN pg_class AS c ON c.relname = cols.table_name WHERE cols.table_schema = 'test_metadata' AND cols.table_name = 'sample_data';"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query","SELECT table_schema, table_name, column_name, col_description(c.oid, cols.ordinal_position) AS column_description FROM information_schema.columns AS cols JOIN pg_class AS c ON c.relname = cols.table_name WHERE cols.table_schema = 'test_metadata' AND cols.table_name = 'sample_data';", "--output", "csv"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -433,7 +433,7 @@ func TestPostgresWorkflows(t *testing.T) {
 						{
 							Name:    "metadata-push: query the updated metadata",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "SELECT table_schema, table_name, column_name, col_description(c.oid, cols.ordinal_position) AS column_description FROM information_schema.columns AS cols JOIN pg_class AS c ON c.relname = cols.table_name WHERE cols.table_schema = 'test_metadata' AND cols.table_name = 'sample_data';"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "SELECT table_schema, table_name, column_name, col_description(c.oid, cols.ordinal_position) AS column_description FROM information_schema.columns AS cols JOIN pg_class AS c ON c.relname = cols.table_name WHERE cols.table_schema = 'test_metadata' AND cols.table_name = 'sample_data';", "--output", "csv"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,
@@ -447,7 +447,7 @@ func TestPostgresWorkflows(t *testing.T) {
 						{
 							Name:    "metadata-push: check only metadata was pushed",
 							Command: binary,
-							Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "SELECT * FROM test_metadata.sample_data;"),
+							Args:    append(append([]string{"query"}, configFlags...), "--connection", "postgres-default", "--query", "SELECT * FROM test_metadata.sample_data;", "--output", "csv"),
 							Env:     []string{},
 							Expected: e2e.Output{
 								ExitCode: 0,

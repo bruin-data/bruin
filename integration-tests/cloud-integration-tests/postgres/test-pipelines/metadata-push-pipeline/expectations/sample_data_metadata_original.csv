@@ -1,8 +1,5 @@
-┌───────────────┬─────────────┬─────────────┬────────────────────┐
-│ TABLE_SCHEMA  │ TABLE_NAME  │ COLUMN_NAME │ COLUMN_DESCRIPTION │
-├───────────────┼─────────────┼─────────────┼────────────────────┤
-│ test_metadata │ sample_data │ id          │ empty description  │
-│ test_metadata │ sample_data │ name        │ empty description  │
-│ test_metadata │ sample_data │ value       │ empty description  │
-│ test_metadata │ sample_data │ category    │ empty description  │
-└───────────────┴─────────────┴─────────────┴────────────────────┘
+table_schema,table_name,column_name,column_description
+test_metadata,sample_data,id,<nil>
+test_metadata,sample_data,name,<nil>
+test_metadata,sample_data,value,<nil>
+test_metadata,sample_data,category,<nil>
