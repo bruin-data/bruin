@@ -79,7 +79,7 @@ func HandleInvalidCommand(invalidCmd string) {
 	validCommands := []string{
 		"validate", "run", "render", "lineage", "clean", "format",
 		"docs", "init", "environments", "query", "patch", "data-diff",
-		"diff", "import", "version", "help", "h",
+		"diff", "import", "version", "help", "h", "connections",
 	}
 
 	suggestion := suggestCommand(invalidCmd, validCommands, 2)

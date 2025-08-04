@@ -18,8 +18,9 @@ import (
 
 func Connections() *cli.Command {
 	return &cli.Command{
-		Name:   "connections",
-		Hidden: true,
+		Name:  "connections",
+		Usage: "manage connections defined in a Bruin project",
+		Hidden: false,
 		Subcommands: []*cli.Command{
 			ListConnections(),
 			AddConnection(),
