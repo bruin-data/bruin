@@ -136,6 +136,7 @@ export default withMermaid({
                     {text: "Databricks", link: "/platforms/databricks"},
                     {text: "DuckDB", link: "/platforms/duckdb"},
                     {text: "MotherDuck", link: "/platforms/motherduck"},
+                    {text: "Oracle", link: "/platforms/oracle"},
                     {text: "Google BigQuery", link: "/platforms/bigquery"},
                     {text: "Microsoft SQL Server", link: "/platforms/mssql"},
                     {text: "Postgres", link: "/platforms/postgres"},

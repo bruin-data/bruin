@@ -17,12 +17,30 @@ In order to align on different teams on building on a shared language, Bruin has
 
 ## Entities & Attributes
 
-Glossaries in Bruin support two primary concepts at the time of writing:
+Glossaries in Bruin support three primary concepts at the time of writing:
 - Entity: a high-level business entity that is not necessarily tied to a data asset, e.g. `Customer` or `Order`
 - Attribute: the logical attributes of an entity, e.g. `ID` for a `Customer`, or `Address` for an `Order`.
   - Attributes have names, types and descriptions.
+- Domain: a business area or function that groups related entities and attributes, e.g. `customer-management` or `location-management`
 
-An entity can have zero or more attributes, while an attribute must always be within an entity. 
+An entity can have zero or more attributes, while an attribute must always be within an entity.
+
+Entities can have additional metadata including:
+- **Domains**: Business domains that the entity belongs to, used for organizing and categorizing by business function
+- **Tags**: Labels for categorization and filtering  
+- **Owners**: Responsible parties for governance and lineage tracking
+
+Attributes have the following metadata:
+- **Name**: The name of the attribute
+- **Type**: The data type of the attribute
+- **Description**: The human-readable description of the attribute
+
+Domains can have the following metadata:
+- **Name**: The name of the domain
+- **Description**: A description of the business domain and its purpose
+- **Owners**: Responsible parties for the domain
+- **Tags**: Labels for categorization and filtering
+- **Contact**: Contact information for the domain (email, slack, etc.) 
 
 > [!INFO]
 > Glossaries are primarily utilized for entities in its first version. In the future they will be used to incorporate further business concepts.
@@ -34,12 +52,40 @@ In order to define your glossary, you need to put a file called `glossary.yml` a
 - The file `glossary.yml` must be at the root of the repo.
 - The file must be named `glossary.yml` or `glossary.yaml`, nothing else.
 
-Below is an example `glossary.yml` file that defines 2 entities, a `Customer` entity and an `Address` entity:
+Below is an example `glossary.yml` file that defines 2 entities, a `Customer` entity and an `Address` entity, along with domain definitions:
 ```yaml
+domains:
+  customer-management:
+    description: All aspects related to customer data, registration, and account management
+    owners:
+      - "Customer Success Team"
+      - "Product Team"
+    tags:
+      - customer
+      - user-management
+    contact:
+      - type: "email"
+        address: "customer-team@company.com"
+      - type: "slack"
+        address: "#customer-success"
+  
+  location-management:
+    description: Physical location data including addresses, coordinates, and geographic information
+    owners:
+      - "Data Engineering Team"
+    tags:
+      - location
+      - geography
+    contact:
+      - type: "email"
+        address: "data-eng@company.com"
+
 # The `entities` key is used to define entities within the glossary, which can then be referred by different assets.
 entities:  
   Customer:
     description: Customer is an individual/business that has registered on our platform.
+    domains:
+      - customer-management
     attributes:
       ID:
         type: integer
@@ -58,6 +104,8 @@ entities:
       
       These addresses can be anywhere in the world, there is no country/geography limitation. 
       The addresses are not validated beforehand, therefore the addresses are not guaranteed to be real.
+    domains:
+      - location-management
     attributes:
       ID:
         type: integer
@@ -77,9 +125,16 @@ The file structure is flexible enough to allow conceptual attributes to be defin
 
 ### Schema
 The `glossary.yml` file has a rather simple schema:
-- `entities`: must be key-value pairs of string - an Entity object
+- `domains` (optional): key-value pairs of string - Domain objects
+- `Domain` object:
+  - `description`: string, description of the business domain
+  - `owners`: array of strings, responsible parties for the domain
+  - `tags`: array of strings, labels for categorization and filtering
+  - `contact`: array of Contact objects with `type` and `address` fields
+- `entities`: must be key-value pairs of string - Entity objects
 - `Entity` object:
   - `description`: string, supports markdown descriptions
+  - `domains`: array of strings, business domains the entity belongs to
   - `attributes`: a key-value map, where the key is the name of the attribute, the value is an object.
     - `type`: the data type of the attribute
     - `description`: the markdown description of the given column

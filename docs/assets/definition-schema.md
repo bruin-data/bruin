@@ -72,6 +72,14 @@ bruin run --tags client1
 ```
 - **Type:** `String[]` 
 
+## `domains`
+Business domains that the asset belongs to. This is used for organizing and categorizing assets by business function or domain.
+- **Type:** `String[]` 
+
+## `meta`
+Additional metadata for the asset stored as key-value pairs. This can be used to store custom information about the asset that doesn't fit into other predefined fields.
+- **Type:** `Object`
+
 ## `depends`
 The list of assets this asset depends on. This list determines the execution order.
 In other words, the asset will be executed only when all of the assets in the `depends` list have succeeded.
@@ -94,6 +102,13 @@ Controls how the processing window is adjusted by shifting the start and end tim
 interval_modifiers:
   start: -2h    # Shift start time back 2 hours
   end: 1h       # Shift end time forward 1 hour
+```
+
+You can also use [Jinja templating](./templating/templating.md) within the interval modifier values for conditional logic:
+
+```yaml
+interval_modifiers:
+  start: '{% if start_timestamp|date_format("%H") == "00" %}-20d{% else %}0{% endif %}'
 ```
 
 Supported time units: `s` (seconds), `m` (minutes), `h` (hours), `d` (days), `M` (months).
