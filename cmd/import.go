@@ -263,6 +263,9 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 		if strings.Contains(connType, "clickhouse") {
 			return pipeline.AssetTypeClickHouseSource
 		}
+		if strings.Contains(connType, "oracle") {
+			return pipeline.AssetTypeOracleSource
+		}
 	}
 
 	// Fallback: try to detect the connection type from the connection name
@@ -297,6 +300,9 @@ func determineAssetTypeFromConnection(connectionName string, conn interface{}) p
 	}
 	if strings.Contains(connectionLower, "mssql") || strings.Contains(connectionLower, "sqlserver") {
 		return pipeline.AssetTypeMsSQLSource
+	}
+	if strings.Contains(connectionLower, "oracle") {
+		return pipeline.AssetTypeOracleSource
 	}
 
 	// Default to Snowflake if we can't determine the type

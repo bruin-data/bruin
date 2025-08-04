@@ -81,6 +81,8 @@ const (
 	AssetTypeEMRServerlessPyspark   = AssetType("emr_serverless.pyspark")
 	AssetTypeTrinoQuery             = AssetType("trino.sql")
 	AssetTypeTrinoQuerySensor       = AssetType("trino.sensor.query")
+	AssetTypeOracleQuery            = AssetType("oracle.sql")
+	AssetTypeOracleSource           = AssetType("oracle.source")
 	AssetTypeLooker                 = AssetType("looker")
 	AssetTypeLookerStudio           = AssetType("looker_studio")
 	AssetTypePowerBI                = AssetType("powerbi")
@@ -142,10 +144,10 @@ var defaultMapping = map[string]string{
 	"gcs":                   "gcs-default",
 	"emr_serverless":        "emr_serverless-default",
 	"trino":                 "trino-default",
+	"oracle":                "oracle-default",
 	"googleanalytics":       "googleanalytics-default",
 	"applovin":              "applovin-default",
 	"salesforce":            "salesforce-default",
-	"oracle":                "oracle-default",
 	"solidgate":             "solidgate-default",
 	"smartsheet":            "smartsheet-default",
 	"sftp":                  "sftp-default",
@@ -588,6 +590,8 @@ var AssetTypeConnectionMapping = map[AssetType]string{
 	AssetTypeEMRServerlessPyspark:  "emr_serverless",
 	AssetTypeTrinoQuery:            "trino",
 	AssetTypeTrinoQuerySensor:      "trino",
+	AssetTypeOracleQuery:           "oracle",
+	AssetTypeOracleSource:          "oracle",
 }
 
 var IngestrTypeConnectionMapping = map[string]AssetType{
@@ -601,6 +605,7 @@ var IngestrTypeConnectionMapping = map[string]AssetType{
 	"synapse":    AssetTypeSynapseQuery,
 	"duckdb":     AssetTypeDuckDBQuery,
 	"clickhouse": AssetTypeClickHouse,
+	"oracle":     AssetTypeOracleQuery,
 }
 
 type SecretMapping struct {
@@ -2012,6 +2017,7 @@ func (a *Asset) IsSQLAsset() bool {
 		AssetTypeDuckDBQuery:     true,
 		AssetTypeClickHouse:      true,
 		AssetTypeTrinoQuery:      true,
+		AssetTypeOracleQuery:     true,
 	}
 
 	return sqlAssetTypes[a.Type]

@@ -1488,7 +1488,28 @@
         "port": {
           "type": "string"
         },
-        "dbname": {
+        "service_name": {
+          "type": "string"
+        },
+        "sid": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "ssl": {
+          "type": "boolean"
+        },
+        "ssl_verify": {
+          "type": "boolean"
+        },
+        "prefetch_rows": {
+          "type": "integer"
+        },
+        "trace_file": {
+          "type": "string"
+        },
+        "wallet": {
           "type": "string"
         }
       },
@@ -1500,7 +1521,14 @@
         "password",
         "host",
         "port",
-        "dbname"
+        "service_name",
+        "sid",
+        "role",
+        "ssl",
+        "ssl_verify",
+        "prefetch_rows",
+        "trace_file",
+        "wallet"
       ]
     },
     "PersonioConnection": {

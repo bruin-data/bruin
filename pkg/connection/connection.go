@@ -1673,11 +1673,18 @@ func (m *Manager) AddOracleConnectionFromConfig(connection *config.OracleConnect
 	m.mutex.Unlock()
 
 	client, err := oracle.NewClient(oracle.Config{
-		Username: connection.Username,
-		Password: connection.Password,
-		Host:     connection.Host,
-		Port:     connection.Port,
-		DBName:   connection.DBName,
+		Username:     connection.Username,
+		Password:     connection.Password,
+		Host:         connection.Host,
+		Port:         connection.Port,
+		ServiceName:  connection.ServiceName,
+		SID:          connection.SID,
+		Role:         connection.Role,
+		SSL:          connection.SSL,
+		SSLVerify:    connection.SSLVerify,
+		PrefetchRows: connection.PrefetchRows,
+		TraceFile:    connection.TraceFile,
+		Wallet:       connection.Wallet,
 	})
 	if err != nil {
 		return err
