@@ -17,12 +17,18 @@ In order to align on different teams on building on a shared language, Bruin has
 
 ## Entities & Attributes
 
-Glossaries in Bruin support two primary concepts at the time of writing:
+Glossaries in Bruin support three primary concepts at the time of writing:
 - Entity: a high-level business entity that is not necessarily tied to a data asset, e.g. `Customer` or `Order`
 - Attribute: the logical attributes of an entity, e.g. `ID` for a `Customer`, or `Address` for an `Order`.
   - Attributes have names, types and descriptions.
+- Domain: a business area or function that groups related entities and attributes, e.g. `customer-management` or `location-management`
 
-An entity can have zero or more attributes, while an attribute must always be within an entity. 
+An entity can have zero or more attributes, while an attribute must always be within an entity.
+
+Both entities and attributes can have additional metadata including:
+- **Domains**: Business domains that the entity or attribute belongs to, used for organizing and categorizing by business function
+- **Tags**: Labels for categorization and filtering
+- **Owners**: Responsible parties for governance and lineage tracking 
 
 > [!INFO]
 > Glossaries are primarily utilized for entities in its first version. In the future they will be used to incorporate further business concepts.
@@ -34,22 +40,59 @@ In order to define your glossary, you need to put a file called `glossary.yml` a
 - The file `glossary.yml` must be at the root of the repo.
 - The file must be named `glossary.yml` or `glossary.yaml`, nothing else.
 
-Below is an example `glossary.yml` file that defines 2 entities, a `Customer` entity and an `Address` entity:
+Below is an example `glossary.yml` file that defines 2 entities, a `Customer` entity and an `Address` entity, along with domain definitions:
 ```yaml
+domains:
+  customer-management:
+    description: All aspects related to customer data, registration, and account management
+    owners:
+      - "Customer Success Team"
+      - "Product Team"
+    tags:
+      - customer
+      - user-management
+    contact:
+      - type: "email"
+        address: "customer-team@company.com"
+      - type: "slack"
+        address: "#customer-success"
+  
+  location-management:
+    description: Physical location data including addresses, coordinates, and geographic information
+    owners:
+      - "Data Engineering Team"
+    tags:
+      - location
+      - geography
+    contact:
+      - type: "email"
+        address: "data-eng@company.com"
+
 # The `entities` key is used to define entities within the glossary, which can then be referred by different assets.
 entities:  
   Customer:
     description: Customer is an individual/business that has registered on our platform.
+    domains:
+      - customer-management
+      - user-accounts
     attributes:
       ID:
         type: integer
         description: The unique identifier of the customer in our systems.
+        domains:
+          - customer-management
       Email:
         type: string
         description: the e-mail address the customer used while registering on our website.
+        domains:
+          - customer-management
+          - communication
       Language:
         type: string
         description: the language the customer picked during registration.
+        domains:
+          - customer-management
+          - internationalization
   
   # You can define multi-line descriptions, and give further details or references for others. 
   Address:
@@ -58,19 +101,32 @@ entities:
       
       These addresses can be anywhere in the world, there is no country/geography limitation. 
       The addresses are not validated beforehand, therefore the addresses are not guaranteed to be real.
+    domains:
+      - location-management
+      - shipping
     attributes:
       ID:
         type: integer
         description: The unique identifier of the address in our systems.
+        domains:
+          - location-management
       Street:
         type: string
         description: The given street name for the address, depending on the country it may have a different structure.
+        domains:
+          - location-management
       Country:
         type: string
         description: The country of the address, represents a real country.
+        domains:
+          - location-management
+          - internationalization
       CountryCode:
         type: string
         description: The ISO country code for the given country.
+        domains:
+          - location-management
+          - internationalization
 ```
 
 The file structure is flexible enough to allow conceptual attributes to be defined here. You can define unlimited number of entities and attributes.
@@ -80,9 +136,11 @@ The `glossary.yml` file has a rather simple schema:
 - `entities`: must be key-value pairs of string - an Entity object
 - `Entity` object:
   - `description`: string, supports markdown descriptions
+  - `domains`: array of strings, business domains the entity belongs to
   - `attributes`: a key-value map, where the key is the name of the attribute, the value is an object.
     - `type`: the data type of the attribute
     - `description`: the markdown description of the given column
+    - `domains`: array of strings, business domains the attribute belongs to
 
 Take a look at the example above and modify it as per your needs.
 
@@ -122,6 +180,7 @@ Entities are used as defaults when there are no explicit definitions on an asset
 - `name`: the name of the attribute
 - `type`: the type of the attribute
 - `description`: the human-readable description of the attribute, ideally in relation to the business
+- `domains`: business domains the attribute belongs to
 
 Bruin will take all of the fields from the attribute, and combine them with the asset column:
 - if the column definition already has a value for a field, use that.
