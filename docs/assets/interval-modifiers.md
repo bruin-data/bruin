@@ -18,7 +18,7 @@ interval_modifiers:
 
 ## Conditional Interval Modifiers with Jinja
 
-You can use [Jinja templating](../templating/templating.md) within the `interval_modifiers` values themselves to conditionally modify intervals based on dynamic conditions:
+You can use [Jinja templating](./templating/templating.md) within the `interval_modifiers` values themselves to conditionally modify intervals based on dynamic conditions:
 
 ```yaml
 interval_modifiers:
@@ -29,7 +29,7 @@ This example:
 - Shifts the start time back by 20 days if the start timestamp is at midnight (hour = 00)
 - Otherwise, applies no shift (0)
 
-You can use any Jinja expressions, filters, and conditional logic to determine your interval modifiers dynamically. For more information about Jinja syntax and features, see the [Jinja templating documentation](../templating/templating.md).
+You can use any Jinja expressions, filters, and conditional logic to determine your interval modifiers dynamically. For more information about Jinja syntax and features, see the [Jinja templating documentation](./templating/templating.md).
 
 ## Pipeline-Level Defaults
 
