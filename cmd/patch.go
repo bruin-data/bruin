@@ -367,15 +367,25 @@ func Patch() *cli.Command {
 							return cli.Exit("", 1)
 						}
 						
+						var message string
+						switch status {
+						case fillStatusUpdated:
+							message = fmt.Sprintf("Columns filled from DB for asset '%s'", pp.Asset.Name)
+						case fillStatusSkipped:
+							message = fmt.Sprintf("No changes needed for asset '%s'", pp.Asset.Name)
+						case fillStatusFailed:
+							message = fmt.Sprintf("Failed to fill columns from DB for asset '%s'", pp.Asset.Name)
+						}
+						
 						switch output {
 						case "plain":
 							switch status {
 							case fillStatusUpdated:
-								printSuccessForOutput(output, fmt.Sprintf("Columns filled from DB for asset '%s'", pp.Asset.Name))
+								printSuccessForOutput(output, message)
 							case fillStatusSkipped:
-								printWarningForOutput(output, fmt.Sprintf("No changes needed for asset '%s'", pp.Asset.Name))
+								printWarningForOutput(output, message)
 							case fillStatusFailed:
-								printErrorForOutput(output, fmt.Errorf("Failed to fill columns from DB for asset '%s'", pp.Asset.Name))
+								printErrorForOutput(output, fmt.Errorf("%s", message))
 							}
 						case "json":
 							type jsonResponse struct {
@@ -383,16 +393,6 @@ func Patch() *cli.Command {
 								AssetName string             `json:"asset_name"`
 								Columns   []pipeline.Column  `json:"columns"`
 								Message   string             `json:"message"`
-							}
-							
-							var message string
-							switch status {
-							case fillStatusUpdated:
-								message = fmt.Sprintf("Columns filled from DB for asset '%s'", pp.Asset.Name)
-							case fillStatusSkipped:
-								message = fmt.Sprintf("No changes needed for asset '%s'", pp.Asset.Name)
-							case fillStatusFailed:
-								message = fmt.Sprintf("Failed to fill columns from DB for asset '%s'", pp.Asset.Name)
 							}
 							
 							response := jsonResponse{
