@@ -30,11 +30,7 @@ func TestLevenshteinDistance(t *testing.T) {
 }
 
 func TestSuggestCommand(t *testing.T) {
-	validCommands := []string{
-		"validate", "run", "render", "lineage", "clean", "format",
-		"docs", "init", "environments", "query", "patch", "data-diff",
-		"diff", "import", "version", "help", "h",
-	}
+	validCommands := GetValidCommands()
 
 	tests := []struct {
 		input     string

@@ -3,6 +3,8 @@ package cmd
 import (
 	"fmt"
 	"os"
+
+	"github.com/urfave/cli/v2"
 )
 
 // levenshteinDistance calculates the Levenshtein distance between two strings
@@ -74,13 +76,48 @@ func suggestCommand(input string, validCommands []string, threshold int) string 
 	return bestMatch
 }
 
+// GetValidCommands returns a list of all valid command names
+func GetValidCommands() []string {
+	// Create a temporary app to extract command names
+	app := &cli.App{
+		Commands: []*cli.Command{
+			Lint(nil),
+			Run(nil),
+			Render(),
+			Lineage(),
+			CleanCmd(),
+			Format(nil),
+			Docs(),
+			Init(),
+			Internal(),
+			Environments(nil),
+			Connections(),
+			Query(),
+			Patch(),
+			DataDiffCmd(),
+			Import(),
+			VersionCmd(""),
+		},
+	}
+
+	var commands []string
+	for _, cmd := range app.Commands {
+		commands = append(commands, cmd.Name)
+		// Also add aliases
+		for _, alias := range cmd.Aliases {
+			commands = append(commands, alias)
+		}
+	}
+
+	// Add built-in commands
+	commands = append(commands, "help", "h", "version")
+
+	return commands
+}
+
 // HandleInvalidCommand prints a suggestion or generic error message
 func HandleInvalidCommand(invalidCmd string) {
-	validCommands := []string{
-		"validate", "run", "render", "lineage", "clean", "format",
-		"docs", "init", "environments", "query", "patch", "data-diff",
-		"diff", "import", "version", "help", "h", "connections",
-	}
+	validCommands := GetValidCommands()
 
 	suggestion := suggestCommand(invalidCmd, validCommands, 2)
 	
