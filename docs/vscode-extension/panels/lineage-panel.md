@@ -29,5 +29,30 @@ The Lineage Panel is located at the bottom of the VS Code interface, near the te
 
 ![Bruin Lineage Panel](../../public/vscode-extension/panels/lineage-panel/pipeline-lineage-view.gif)
 
+## Column Level Lineage
+
+The lineage panel now supports column-level lineage visualization, providing detailed insights into how individual columns flow through your data pipeline.
+
+### Features
+- **Column Level View**: Switch to column-level lineage to see how specific columns are transformed and used across assets
+- **Highlighting Support**: Added highlighting functionality to make it easier to trace column relationships and dependencies
+- **Interactive Navigation**: Click on columns to see their upstream and downstream relationships
+- **Visual Clarity**: Enhanced visual representation makes it easier to understand complex column transformations
+
+### How to Use Column Level Lineage
+
+1. **Access Column View**: In the lineage panel options, select the column-level view mode
+2. **Select Columns**: Click on specific columns to highlight their lineage paths
+3. **Trace Dependencies**: Follow the highlighted paths to understand column transformations
+4. **Navigate Relationships**: Use the interactive features to explore how columns relate across different assets
+
+This feature is particularly useful for:
+- **Data Governance**: Understanding data flow for compliance and auditing
+- **Impact Analysis**: Assessing how changes to one column affect downstream processes  
+- **Debugging**: Identifying where data transformations might be causing issues
+- **Documentation**: Visualizing complex data relationships for team understanding
+
+![Column Level Lineage](../../public/vscode-extension/panels/lineage-panel/column-level-lineage.gif)
+
 
  

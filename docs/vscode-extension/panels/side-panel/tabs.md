@@ -33,6 +33,14 @@ This tab provides a comprehensive view of your asset, allowing you to manage key
   - **Add or Remove Columns**: Easily insert new columns or delete existing ones.
   - **Manage Quality Checks**: Add or remove quality checks.
 
+### Fill from DB
+The Columns tab includes a "Fill from DB" feature that allows you to automatically populate column information from your database:
+
+- **Auto-populate Columns**: Retrieve column definitions directly from the connected database
+- **Background Processing**: The fill operation runs in the background rather than in the terminal for a smoother experience
+- **Column Sync**: Automatically sync column names, types, and constraints from your database schema
+- **Conditional Availability**: The "Fill from DB" button appears based on connection availability and asset type
+
 ![Bruin Columns Tab](../../../public/vscode-extension/panels/side-panel/manage-columns.gif)
 
 ## 3. Details
@@ -91,6 +99,14 @@ The Details tab is your central hub for configuring crucial metadata and operati
 
 7. **Save Changes**:
    - Click the "Save Changes" button to apply your materialization settings for partitioning, clustering, and strategy.
+
+### Fill Asset Dependencies and Columns from DB
+The Details tab also provides functionality to automatically populate asset dependencies and columns from your database:
+
+- **Fill Dependencies**: Automatically detect and fill asset dependencies based on database relationships
+- **Database Integration**: Pull dependency information directly from your connected database systems
+- **Smart Detection**: Intelligent detection of upstream and downstream dependencies
+- **Bulk Operations**: Fill multiple dependencies at once for complex asset relationships
 
 ![Details Tab](../../../public/vscode-extension/panels/side-panel/details-tab.gif)
 
