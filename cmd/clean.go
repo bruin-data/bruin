@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/bruin-data/bruin/pkg/git"
@@ -55,16 +56,21 @@ type CleanCommand struct {
 
 func (r *CleanCommand) Run(inputPath string, cleanUvCache bool) error {
 	cm := user.NewConfigManager(afero.NewOsFs())
-	err := cm.RecreateHomeDir()
+	bruinHomeDirAbsPath, err := cm.EnsureAndGetBruinHomeDir()
 	if err != nil {
-		return errors.Wrap(err, "failed to recreate the home directory")
+		return errors.Wrap(err, "failed to get bruin home directory")
 	}
 
 	// Clean uv caches if requested
 	if cleanUvCache {
-		if err := r.cleanUvCache(); err != nil {
+		if err := r.cleanUvCache(bruinHomeDirAbsPath); err != nil {
 			return err
 		}
+	}
+
+	err = cm.RecreateHomeDir()
+	if err != nil {
+		return errors.Wrap(err, "failed to recreate the home directory")
 	}
 
 	repoRoot, err := git.FindRepoFromPath(inputPath)
@@ -99,11 +105,25 @@ func (r *CleanCommand) Run(inputPath string, cleanUvCache bool) error {
 	return nil
 }
 
-func (r *CleanCommand) cleanUvCache() error {
-	// Check if uv is available
-	cmd := exec.Command("uv", "version")
+func (r *CleanCommand) cleanUvCache(bruinHomeDirAbsPath string) error {
+	var binaryName string
+	if runtime.GOOS == "windows" {
+		binaryName = "uv.exe"
+	} else {
+		binaryName = "uv"
+	}
+	uvBinaryPath := filepath.Join(bruinHomeDirAbsPath, binaryName)
+
+	// Check if uv binary exists
+	if _, err := os.Stat(uvBinaryPath); os.IsNotExist(err) {
+		infoPrinter.Println("UV is not installed yet. Nothing to clean.")
+		return nil
+	}
+
+	// Check if uv is available and working
+	cmd := exec.Command(uvBinaryPath, "version")
 	if err := cmd.Run(); err != nil {
-		return errors.Wrap(err, "uv is not installed or not available in PATH")
+		return errors.Wrap(err, "uv binary exists but is not working properly")
 	}
 
 	// Prompt user for confirmation
@@ -114,8 +134,7 @@ func (r *CleanCommand) cleanUvCache() error {
 
 	infoPrinter.Println("Cleaning uv caches...")
 
-	// Run uv cache clean
-	cleanCmd := exec.Command("uv", "cache", "clean")
+	cleanCmd := exec.Command(uvBinaryPath, "cache", "clean")
 	output, err := cleanCmd.CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "failed to clean uv cache: %s", string(output))
