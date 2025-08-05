@@ -11,7 +11,7 @@ import (
 	"github.com/denisbrodbeck/machineid"
 	"github.com/google/uuid"
 	"github.com/rudderlabs/analytics-go/v4"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 const (
@@ -70,54 +70,55 @@ func SendEvent(event string, properties analytics.Properties) {
 	})
 }
 
-func SendEventWithAssetStats(event string, stats map[string]int, context *cli.Context) {
+func SendEventWithAssetStats(event string, stats map[string]int, c *cli.Command) {
 	properties := analytics.Properties{
 		"assets":        stats,
-		"downstream":    context.Bool("downstream"),
-		"push_metadata": context.Bool("push-metadata"),
-		"full_refresh":  context.Bool("full-refresh"),
-		"use_pip":       context.Bool("use-pip"),
-		"force":         context.Bool("force"),
+		"downstream":    c.Bool("downstream"),
+		"push_metadata": c.Bool("push-metadata"),
+		"full_refresh":  c.Bool("full-refresh"),
+		"use_pip":       c.Bool("use-pip"),
+		"force":         c.Bool("force"),
 	}
 
 	SendEvent(event, properties)
 }
 
-func BeforeCommand(c *cli.Context) error {
+func BeforeCommand(ctx context.Context, c *cli.Command) (context.Context, error) {
 	start := time.Now()
-	c.Context = context.WithValue(c.Context, contextKey(startTimeKey), start)
+	ctx = context.WithValue(ctx, contextKey(startTimeKey), start)
 	SendEvent("command_start", analytics.Properties{
-		"command": c.Command.Name,
+		"command": c.Name,
 	})
-	return nil
+	return ctx, nil
 }
 
-func AfterCommand(context *cli.Context) error {
-	start := context.Context.Value(contextKey(startTimeKey))
+func AfterCommand(ctx context.Context, c *cli.Command) error {
+	start := ctx.Value(contextKey(startTimeKey))
 	durationMs := int64(-1)
 	if start != nil {
 		durationMs = time.Since(start.(time.Time)).Milliseconds()
 	}
 	SendEvent("command_end", analytics.Properties{
-		"command":     context.Command.Name,
+		"command":     c.Name,
 		"duration_ms": durationMs,
 	})
 	return nil
 }
 
-func ErrorCommand(context *cli.Context, err error) {
+func ErrorCommand(ctx context.Context, c *cli.Command, err error) error {
 	if err == nil {
-		return
+		return err
 	}
 	fmt.Println(err)
-	start := context.Context.Value(contextKey(startTimeKey))
-	startTime, err2 := start.(time.Time)
-	if !err2 {
-		return
+	start := ctx.Value(contextKey(startTimeKey))
+	startTime, ok := start.(time.Time)
+	if !ok {
+		return err
 	}
 
 	SendEvent("command_error", analytics.Properties{
-		"command":     context.Command.Name,
+		"command":     c.Name,
 		"duration_ms": time.Since(startTime).Milliseconds(),
 	})
+	return err
 }

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,7 +10,7 @@ import (
 
 	"github.com/bruin-data/bruin/pkg/logger"
 	"github.com/pkg/errors"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 type VersionInfo struct {
@@ -33,11 +34,11 @@ func VersionCmd(commit string) *cli.Command {
 				Value: 5 * time.Second,
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			timeout := c.Duration("timeout")
 			debug := c.Bool("debug")
 			latest := fetchLatestVersion(timeout, makeLogger(debug))
-			version := c.App.Version
+			version := c.Version
 			outputFormat := c.String("output")
 
 			if outputFormat == "json" {
@@ -52,7 +53,7 @@ func VersionCmd(commit string) *cli.Command {
 				return nil
 			}
 
-			fmt.Printf("Current: %s (%s)\n", c.App.Version, commit)
+			fmt.Printf("Current: %s (%s)\n", c.Version, commit)
 			fmt.Println("Latest: " + latest)
 			return nil
 		},

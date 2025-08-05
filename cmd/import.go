@@ -15,13 +15,13 @@ import (
 	"github.com/bruin-data/bruin/pkg/telemetry"
 	errors2 "github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func Import() *cli.Command {
 	return &cli.Command{
 		Name: "import",
-		Subcommands: []*cli.Command{
+		Commands: []*cli.Command{
 			ImportDatabase(),
 		},
 	}
@@ -57,11 +57,11 @@ func ImportDatabase() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			pipelinePath := c.Args().Get(0)
 			if pipelinePath == "" {
 				return cli.Exit("pipeline path is required", 1)
@@ -73,7 +73,7 @@ func ImportDatabase() *cli.Command {
 			environment := c.String("environment")
 			configFile := c.String("config-file")
 
-			return runImport(c.Context, pipelinePath, connectionName, schema, !noColumns, environment, configFile)
+			return runImport(ctx, pipelinePath, connectionName, schema, !noColumns, environment, configFile)
 		},
 	}
 }

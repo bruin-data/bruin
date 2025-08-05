@@ -23,7 +23,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var ErrExcludeTagNotSupported = errors.New("exclude-tag flag is not supported for asset-only validation")
@@ -76,7 +76,7 @@ func Lint(isDebug *bool) *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 			&cli.StringFlag{
@@ -96,7 +96,7 @@ func Lint(isDebug *bool) *cli.Command {
 				Usage: "exclude the given list of paths from the folders that are searched during validation",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			// if the output is JSON then we intend to discard all the nicer pretty-print statements
 			// and only print the JSON output directly to the stdout
 			if c.String("output") == "json" {

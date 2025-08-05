@@ -25,7 +25,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 const (
@@ -91,17 +91,17 @@ func Query() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "config-file",
-				EnvVars: []string{"BRUIN_CONFIG_FILE"},
+				Sources: cli.EnvVars("BRUIN_CONFIG_FILE"),
 				Usage:   "the path to the .bruin.yml file",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			fs := afero.NewOsFs()
 			if err := validateFlags(c.String("connection"), c.String("query"), c.String("asset")); err != nil {
 				return handleError(c.String("output"), err)
 			}
 
-			connName, conn, queryStr, assetType, err := prepareQueryExecution(c, fs)
+			connName, conn, queryStr, assetType, err := prepareQueryExecution(ctx, c, fs)
 			if err != nil {
 				return handleError(c.String("output"), err)
 			}
@@ -238,7 +238,7 @@ func validateFlags(connection, query, asset string) error {
 	}
 }
 
-func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, string, pipeline.AssetType, error) {
+func prepareQueryExecution(ctx context.Context, c *cli.Command, fs afero.Fs) (string, interface{}, string, pipeline.AssetType, error) {
 	assetPath := c.String("asset")
 	queryStr := c.String("query")
 	env := c.String("environment")
@@ -271,7 +271,7 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 	}
 
 	if queryStr != "" {
-		pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs, c.String("config-file"))
+		pipelineInfo, err := GetPipelineAndAsset(ctx, assetPath, fs, c.String("config-file"))
 		if err != nil {
 			return "", nil, "", "", errors.Wrap(err, "failed to get pipeline info")
 		}
@@ -304,7 +304,7 @@ func prepareQueryExecution(c *cli.Context, fs afero.Fs) (string, interface{}, st
 		return connName, conn, queryStr, pipelineInfo.Asset.Type, nil
 	}
 	// Asset query mode (only asset path)
-	pipelineInfo, err := GetPipelineAndAsset(c.Context, assetPath, fs, c.String("config-file"))
+	pipelineInfo, err := GetPipelineAndAsset(ctx, assetPath, fs, c.String("config-file"))
 	if err != nil {
 		return "", nil, "", "", errors.Wrap(err, "failed to get pipeline info")
 	}
